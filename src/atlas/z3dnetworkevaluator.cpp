@@ -197,7 +197,7 @@ void Z3DNetworkEvaluator::updateNetwork()
   // sort to get rendering order
   std::vector<Vertex> sorted;
   boost::topological_sort(m_filterGraph, std::back_inserter(sorted));
-  for (auto rv : make_reverse(sorted)) {
+  for (auto rv : makeReverse(sorted)) {
     m_renderingOrder.push_back(m_filterGraph[rv].filter);
   }
 

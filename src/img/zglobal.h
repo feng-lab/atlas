@@ -54,13 +54,13 @@ inline constexpr bool is_scoped_enum_v = is_scoped_enum<T>::value;
 namespace nim {
 
 template<typename Type>
-__forceinline bool is_aligned(Type* ptr)
+__forceinline bool isAligned(Type* ptr)
 {
   return (reinterpret_cast<uintptr_t>(ptr) & (alignof(Type) - 1)) == 0;
 }
 
 template<typename Type>
-__forceinline bool is_aligned(Type* ptr, size_t a)
+__forceinline bool isAligned(Type* ptr, size_t a)
 {
   return (reinterpret_cast<uintptr_t>(ptr) & (a - 1)) == 0;
 }
@@ -158,7 +158,7 @@ __forceinline auto end(reversion_wrapper<T> w)
 }
 
 template<typename T>
-__forceinline reversion_wrapper<T> make_reverse(T&& iterable)
+__forceinline reversion_wrapper<T> makeReverse(T&& iterable)
 {
   return {iterable};
 }
@@ -222,7 +222,7 @@ __forceinline Container& unique(Container& on)
 }
 
 template<class Container, class Pred>
-__forceinline Container& unique_if(Container& on, Pred pred)
+__forceinline Container& uniqueIf(Container& on, Pred pred)
 {
   on.erase(std::unique(std::begin(on), std::end(on), pred), std::end(on));
   return on;
@@ -230,7 +230,7 @@ __forceinline Container& unique_if(Container& on, Pred pred)
 
 // to support std::get for local type
 template<std::size_t Index, std::size_t N, typename T>
-constexpr auto&& tuple_like_get_helper(T&& t) noexcept
+constexpr auto&& tupleLikeGetHelper(T&& t) noexcept
 {
   static_assert(Index < N, "Index out of bounds for tuple_like");
   return std::forward<T>(t)[Index];

@@ -154,42 +154,55 @@ auto format_as(TEnum f)
   return enumToString(f);
 }
 
-inline std::ostream& operator<<(std::ostream& s, const QByteArray& q)
+// stream support for qt types
+template<typename T>
+QString qtTypeToQString(const T& v)
 {
-  return (s << q.constData());
+  QString buffer;
+  QDebug out(&buffer);
+  out << v;
+  return buffer;
 }
 
-inline std::ostream& operator<<(std::ostream& s, const QString& q)
+#define OUTPUT_QT_TYPE_VALUE(v)          \
+  auto u8 = qtTypeToQString(v).toUtf8(); \
+  return (s << std::string_view(u8.data(), u8.size()));
+
+#define OUTPUT_QSTRING(v) \
+  auto u8 = v.toUtf8();   \
+  return (s << std::string_view(u8.data(), u8.size()));
+
+#define OUTPUT_QBYTEARRAY(v) return (s << std::string_view(v.data(), v.size()));
+
+inline std::ostream& operator<<(std::ostream& s, const QByteArray& v)
 {
-  return (s << q.toUtf8().constData());
+  OUTPUT_QBYTEARRAY(v)
+}
+
+inline std::ostream& operator<<(std::ostream& s, const QString& v)
+{
+  OUTPUT_QSTRING(v)
 }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-inline std::ostream& operator<<(std::ostream& s, QStringView q)
+inline std::ostream& operator<<(std::ostream& s, QStringView v)
 {
-  return (s << q.toUtf8().constData());
+  OUTPUT_QSTRING(v)
 }
-inline std::ostream& operator<<(std::ostream& s, QUtf8StringView q)
+inline std::ostream& operator<<(std::ostream& s, QUtf8StringView v)
 {
-  return (s << q.data());
+  OUTPUT_QBYTEARRAY(v)
 }
-inline std::ostream& operator<<(std::ostream& s, QByteArrayView q)
+inline std::ostream& operator<<(std::ostream& s, QByteArrayView v)
 {
-  return (s << q.constData());
+  OUTPUT_QBYTEARRAY(v)
 }
 #else
-inline std::ostream& operator<<(std::ostream& s, QStringRef q)
+inline std::ostream& operator<<(std::ostream& s, QStringRef v)
 {
-  return (s << q.toUtf8().constData());
+  OUTPUT_QSTRING(v)
 }
 #endif
-
-// template<class T, std::size_t N>
-// inline std::ostream& operator<<(std::ostream& s, const std::array<T, N>& arr)
-//{
-//   std::copy(arr.cbegin(), arr.cend(), std::ostream_iterator<T>(s, " "));
-//   return s;
-// }
 
 inline void logLongString(const QString& q)
 {
@@ -208,141 +221,86 @@ inline void logLongString(const QString& q)
 #endif
 }
 
-template<typename T>
-QString qtTypeToQString(const T& v)
-{
-  QString buffer;
-  QDebug out(&buffer);
-  out << v;
-  return buffer;
-}
-
 inline std::ostream& operator<<(std::ostream& s, const QPoint& v)
 {
-  return (s << qtTypeToQString(v).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 inline std::ostream& operator<<(std::ostream& s, const QPointF& v)
 {
-  return (s << qtTypeToQString(v).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 inline std::ostream& operator<<(std::ostream& s, const QRect& v)
 {
-  return (s << qtTypeToQString(v).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 inline std::ostream& operator<<(std::ostream& s, const QRectF& v)
 {
-  return (s << qtTypeToQString(v).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 template<class T>
-std::ostream& operator<<(std::ostream& s, const QList<T>& list)
+std::ostream& operator<<(std::ostream& s, const QList<T>& v)
 {
-  return (s << qtTypeToQString(list).toUtf8().constData());
-}
-
-#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-template<typename T>
-inline std::ostream& operator<<(std::ostream& s, const QVector<T>& vec)
-{
-  return (s << qtTypeToQString(vec).toUtf8().constData());
-}
-#endif
-
-// template<typename T, typename Alloc>
-// std::ostream& operator<<(std::ostream& s, const std::vector<T, Alloc>& vec)
-//{
-//   return (s << qtTypeToQString(vec).toUtf8().constData());
-// }
-//
-// template<typename T, typename Alloc>
-// std::ostream& operator<<(std::ostream& s, const std::list<T, Alloc>& vec)
-//{
-//   return (s << qtTypeToQString(vec).toUtf8().constData());
-// }
-//
-// template<typename Key, typename T, typename Compare, typename Alloc>
-// std::ostream& operator<<(std::ostream& s, const std::map<Key, T, Compare, Alloc>& map)
-//{
-//   return (s << qtTypeToQString(map).toUtf8().constData());
-// }
-//
-// template<typename Key, typename T, typename Compare, typename Alloc>
-// std::ostream& operator<<(std::ostream& s, const std::multimap<Key, T, Compare, Alloc>& map)
-//{
-//   return (s << qtTypeToQString(map).toUtf8().constData());
-// }
-
-template<class Key, class T>
-std::ostream& operator<<(std::ostream& s, const QMap<Key, T>& map)
-{
-  return (s << qtTypeToQString(map).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 template<class Key, class T>
-std::ostream& operator<<(std::ostream& s, const QMultiMap<Key, T>& map)
+std::ostream& operator<<(std::ostream& s, const QMap<Key, T>& v)
 {
-  return (s << qtTypeToQString(map).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 template<class Key, class T>
-std::ostream& operator<<(std::ostream& s, const QHash<Key, T>& hash)
+std::ostream& operator<<(std::ostream& s, const QMultiMap<Key, T>& v)
 {
-  return (s << qtTypeToQString(hash).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 template<class Key, class T>
-std::ostream& operator<<(std::ostream& s, const QMultiHash<Key, T>& hash)
+std::ostream& operator<<(std::ostream& s, const QHash<Key, T>& v)
 {
-  return (s << qtTypeToQString(hash).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
-#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-template<class T1, class T2>
-inline std::ostream& operator<<(std::ostream& s, const QPair<T1, T2>& pair)
+template<class Key, class T>
+std::ostream& operator<<(std::ostream& s, const QMultiHash<Key, T>& v)
 {
-  return (s << qtTypeToQString(pair).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
-#endif
-
-// template<class T1, class T2>
-// inline std::ostream& operator<<(std::ostream& s, const std::pair<T1, T2>& pair)
-//{
-//   return (s << qtTypeToQString(pair).toUtf8().constData());
-// }
 
 template<typename T>
-std::ostream& operator<<(std::ostream& s, const QSet<T>& set)
+std::ostream& operator<<(std::ostream& s, const QSet<T>& v)
 {
-  return (s << qtTypeToQString(set).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 template<class T>
-std::ostream& operator<<(std::ostream& s, const QContiguousCache<T>& cache)
+std::ostream& operator<<(std::ostream& s, const QContiguousCache<T>& v)
 {
-  return (s << qtTypeToQString(cache).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 template<class T>
-std::ostream& operator<<(std::ostream& s, const QSharedPointer<T>& ptr)
+std::ostream& operator<<(std::ostream& s, const QSharedPointer<T>& v)
 {
-  return (s << qtTypeToQString(ptr).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 template<typename T, typename Tag>
-std::ostream& operator<<(std::ostream& s, const QTaggedPointer<T, Tag>& ptr)
+std::ostream& operator<<(std::ostream& s, const QTaggedPointer<T, Tag>& v)
 {
-  return (s << qtTypeToQString(ptr).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 #endif
 
 template<typename T>
-typename std::enable_if<QtPrivate::IsQEnumHelper<T>::Value, std::ostream&>::Type operator<<(std::ostream& s, T value)
+typename std::enable_if<QtPrivate::IsQEnumHelper<T>::Value, std::ostream&>::Type operator<<(std::ostream& s, T v)
 {
-  return (s << qtTypeToQString(value).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 template<typename T,
@@ -350,21 +308,21 @@ template<typename T,
          typename B = std::enable_if_t<sizeof(T) <= sizeof(int), void>,
          typename C = std::enable_if_t<!QtPrivate::IsQEnumHelper<T>::Value, void>,
          typename D = std::enable_if_t<QtPrivate::IsQEnumHelper<QFlags<T>>::Value, void>>
-std::ostream& operator<<(std::ostream& s, T value)
+std::ostream& operator<<(std::ostream& s, T v)
 {
-  return (s << qtTypeToQString(value).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 template<typename T>
-std::ostream& operator<<(std::ostream& s, const QFlags<T>& flags)
+std::ostream& operator<<(std::ostream& s, const QFlags<T>& v)
 {
-  return (s << qtTypeToQString(flags).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-inline std::ostream& operator<<(std::ostream& s, QKeyCombination combination)
+inline std::ostream& operator<<(std::ostream& s, QKeyCombination v)
 {
-  return (s << qtTypeToQString(combination).toUtf8().constData());
+  OUTPUT_QT_TYPE_VALUE(v)
 }
 #endif
 

@@ -73,78 +73,76 @@ inline quat mix(const quat& q1, const quat& q2, double p)
   return mix(q1, q2, float(p));
 }
 
-using nim::tuple_like_get_helper;
-
 template<std::size_t Index, auto N, typename T, auto Q>
 constexpr auto&& get(glm::vec<N, T, Q>& v) noexcept
 {
-  return tuple_like_get_helper<Index, N>(v);
+  return nim::tupleLikeGetHelper<Index, N>(v);
 }
 
 template<std::size_t Index, auto N, typename T, auto Q>
 constexpr auto&& get(const glm::vec<N, T, Q>& v) noexcept
 {
-  return tuple_like_get_helper<Index, N>(v);
+  return nim::tupleLikeGetHelper<Index, N>(v);
 }
 
 template<std::size_t Index, auto N, typename T, auto Q>
 constexpr auto&& get(glm::vec<N, T, Q>&& v) noexcept
 {
-  return tuple_like_get_helper<Index, N>(std::move(v));
+  return nim::tupleLikeGetHelper<Index, N>(std::move(v));
 }
 
 template<std::size_t Index, auto N, typename T, auto Q>
 constexpr auto&& get(const glm::vec<N, T, Q>&& v) noexcept
 {
-  return tuple_like_get_helper<Index, N>(std::move(v));
+  return nim::tupleLikeGetHelper<Index, N>(std::move(v));
 }
 
 template<std::size_t Index, typename T, auto Q>
 constexpr auto&& get(glm::tquat<T, Q>& v) noexcept
 {
-  return tuple_like_get_helper<Index, 4>(v);
+  return nim::tupleLikeGetHelper<Index, 4>(v);
 }
 
 template<std::size_t Index, typename T, auto Q>
 constexpr auto&& get(const glm::tquat<T, Q>& v) noexcept
 {
-  return tuple_like_get_helper<Index, 4>(v);
+  return nim::tupleLikeGetHelper<Index, 4>(v);
 }
 
 template<std::size_t Index, typename T, auto Q>
 constexpr auto&& get(glm::tquat<T, Q>&& v) noexcept
 {
-  return tuple_like_get_helper<Index, 4>(std::move(v));
+  return nim::tupleLikeGetHelper<Index, 4>(std::move(v));
 }
 
 template<std::size_t Index, typename T, auto Q>
 constexpr auto&& get(const glm::tquat<T, Q>&& v) noexcept
 {
-  return tuple_like_get_helper<Index, 4>(std::move(v));
+  return nim::tupleLikeGetHelper<Index, 4>(std::move(v));
 }
 
 template<std::size_t Index, auto C, auto R, typename T, auto Q>
 constexpr auto&& get(glm::mat<C, R, T, Q>& m) noexcept
 {
-  return tuple_like_get_helper<Index, C>(m);
+  return nim::tupleLikeGetHelper<Index, C>(m);
 }
 
 template<std::size_t Index, auto C, auto R, typename T, auto Q>
 constexpr auto&& get(const glm::mat<C, R, T, Q>& m) noexcept
 {
-  return tuple_like_get_helper<Index, C>(m);
+  return nim::tupleLikeGetHelper<Index, C>(m);
 }
 
 template<std::size_t Index, auto C, auto R, typename T, auto Q>
 constexpr auto&& get(glm::mat<C, R, T, Q>&& m) noexcept
 {
-  return tuple_like_get_helper<Index, C>(std::move(m));
+  return nim::tupleLikeGetHelper<Index, C>(std::move(m));
 }
 
 template<std::size_t Index, auto C, auto R, typename T, auto Q>
 constexpr auto&& get(const glm::mat<C, R, T, Q>&& m) noexcept
 {
-  return tuple_like_get_helper<Index, C>(std::move(m));
+  return nim::tupleLikeGetHelper<Index, C>(std::move(m));
 }
 
 } // namespace glm

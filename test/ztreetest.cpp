@@ -643,17 +643,17 @@ TEST(SWC, DepthFirstIterator)
     }
     ASSERT_EQ(sidx, 0_uz);
     sidx = std::extent<decltype(smallSwcRes)>::value;
-    for (auto node : make_reverse(smallSwc)) {
+    for (auto node : makeReverse(smallSwc)) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
     sidx = std::extent<decltype(smallSwcRes)>::value;
-    for (auto& node : make_reverse(smallSwc)) {
+    for (auto& node : makeReverse(smallSwc)) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
     sidx = std::extent<decltype(smallSwcRes)>::value;
-    for (const auto& node : make_reverse(smallSwc)) {
+    for (const auto& node : makeReverse(smallSwc)) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
@@ -777,17 +777,17 @@ TEST(SWC, DepthFirstIterator)
     }
     ASSERT_EQ(idx, 0_uz);
     idx = std::extent<decltype(dfres)>::value;
-    for (auto node : make_reverse(swc)) {
+    for (auto node : makeReverse(swc)) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);
     idx = std::extent<decltype(dfres)>::value;
-    for (auto& node : make_reverse(swc)) {
+    for (auto& node : makeReverse(swc)) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);
     idx = std::extent<decltype(dfres)>::value;
-    for (const auto& node : make_reverse(swc)) {
+    for (const auto& node : makeReverse(swc)) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);

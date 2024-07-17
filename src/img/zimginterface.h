@@ -160,7 +160,7 @@ struct col4
       case 3:
         return a;
       default:
-        CHECK(false);
+        throw ZException(fmt::format("invalid index {}", i));
     }
   }
 
@@ -176,7 +176,7 @@ struct col4
       case 3:
         return a;
       default:
-        CHECK(false);
+        throw ZException(fmt::format("invalid index {}", i));
     }
   }
 
@@ -289,25 +289,25 @@ enum class ImgMergeMode
 template<std::size_t Index>
 constexpr auto&& get(col4& v) noexcept
 {
-  return tuple_like_get_helper<Index, 4>(v);
+  return tupleLikeGetHelper<Index, 4>(v);
 }
 
 template<std::size_t Index>
 constexpr auto&& get(const col4& v) noexcept
 {
-  return tuple_like_get_helper<Index, 4>(v);
+  return tupleLikeGetHelper<Index, 4>(v);
 }
 
 template<std::size_t Index>
 constexpr auto&& get(col4&& v) noexcept
 {
-  return tuple_like_get_helper<Index, 4>(v);
+  return tupleLikeGetHelper<Index, 4>(v);
 }
 
 template<std::size_t Index>
 constexpr auto&& get(const col4&& v) noexcept
 {
-  return tuple_like_get_helper<Index, 4>(v);
+  return tupleLikeGetHelper<Index, 4>(v);
 }
 
 template<class T>

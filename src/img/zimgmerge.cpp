@@ -248,7 +248,7 @@ QStringList ZImgMerge::resolveLocations()
   // only do it when every image name is unique
   if (orderedTiles.size() == m_imgFinalCoords.size()) {
     // should be in reverse order as we write tiles from begin to end and we want lower image overwrites higher image
-    for (const auto& nameBlock : make_reverse(orderedTiles)) {
+    for (const auto& nameBlock : makeReverse(orderedTiles)) {
       // LOG(INFO) << nameBlock.first;
       m_tiles.emplace_back(*nameBlock.second, m_imgFinalCoords[nameBlock.second]);
     }

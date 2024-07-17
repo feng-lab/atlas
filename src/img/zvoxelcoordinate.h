@@ -452,25 +452,25 @@ inline ZVoxelCoordinate min(ZVoxelCoordinate::value_type b, const ZVoxelCoordina
 template<std::size_t Index>
 constexpr auto&& get(ZVoxelCoordinate& v) noexcept
 {
-  return tuple_like_get_helper<Index, 5>(v);
+  return tupleLikeGetHelper<Index, 5>(v);
 }
 
 template<std::size_t Index>
 constexpr auto&& get(const ZVoxelCoordinate& v) noexcept
 {
-  return tuple_like_get_helper<Index, 5>(v);
+  return tupleLikeGetHelper<Index, 5>(v);
 }
 
 template<std::size_t Index>
 constexpr auto&& get(ZVoxelCoordinate&& v) noexcept
 {
-  return tuple_like_get_helper<Index, 5>(v);
+  return tupleLikeGetHelper<Index, 5>(v);
 }
 
 template<std::size_t Index>
 constexpr auto&& get(const ZVoxelCoordinate&& v) noexcept
 {
-  return tuple_like_get_helper<Index, 5>(v);
+  return tupleLikeGetHelper<Index, 5>(v);
 }
 
 } // namespace nim

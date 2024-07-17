@@ -15,7 +15,7 @@ FOLLY_CLANG_DISABLE_WARNING("-Wunused-parameter")
 void saturate_add_avx512(const uint8_t* x, const uint8_t* y, size_t count, uint8_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(y, 64) && isAligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 64) {
     for (; i < count - 63; i += 64) {
@@ -49,7 +49,7 @@ void saturate_add_avx512(const uint8_t* x, const uint8_t* y, size_t count, uint8
 void saturate_add_avx512(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 64) {
     auto r = _mm512_set1_epi8(y);
@@ -83,7 +83,7 @@ void saturate_add_avx512(const uint8_t* x, uint8_t y, size_t count, uint8_t* res
 void saturate_add_avx512(const int8_t* x, const int8_t* y, size_t count, int8_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(y, 64) && isAligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 64) {
     for (; i < count - 63; i += 64) {
@@ -117,7 +117,7 @@ void saturate_add_avx512(const int8_t* x, const int8_t* y, size_t count, int8_t*
 void saturate_add_avx512(const int8_t* x, int8_t y, size_t count, int8_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 64) {
     auto r = _mm512_set1_epi8(y);
@@ -151,7 +151,7 @@ void saturate_add_avx512(const int8_t* x, int8_t y, size_t count, int8_t* res)
 void saturate_add_avx512(const uint16_t* x, const uint16_t* y, size_t count, uint16_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(y, 64) && isAligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
@@ -185,7 +185,7 @@ void saturate_add_avx512(const uint16_t* x, const uint16_t* y, size_t count, uin
 void saturate_add_avx512(const uint16_t* x, uint16_t y, size_t count, uint16_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
     auto r = _mm512_set1_epi16(y);
@@ -219,7 +219,7 @@ void saturate_add_avx512(const uint16_t* x, uint16_t y, size_t count, uint16_t* 
 void saturate_add_avx512(const int16_t* x, const int16_t* y, size_t count, int16_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(y, 64) && isAligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
@@ -253,7 +253,7 @@ void saturate_add_avx512(const int16_t* x, const int16_t* y, size_t count, int16
 void saturate_add_avx512(const int16_t* x, int16_t y, size_t count, int16_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
     auto r = _mm512_set1_epi16(y);
@@ -287,7 +287,7 @@ void saturate_add_avx512(const int16_t* x, int16_t y, size_t count, int16_t* res
 void saturate_sub_avx512(const uint8_t* x, const uint8_t* y, size_t count, uint8_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(y, 64) && isAligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 64) {
     for (; i < count - 63; i += 64) {
@@ -321,7 +321,7 @@ void saturate_sub_avx512(const uint8_t* x, const uint8_t* y, size_t count, uint8
 void saturate_sub_avx512(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 64) {
     auto r = _mm512_set1_epi8(y);
@@ -355,7 +355,7 @@ void saturate_sub_avx512(const uint8_t* x, uint8_t y, size_t count, uint8_t* res
 void saturate_sub_avx512(const int8_t* x, const int8_t* y, size_t count, int8_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(y, 64) && isAligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 64) {
     for (; i < count - 63; i += 64) {
@@ -389,7 +389,7 @@ void saturate_sub_avx512(const int8_t* x, const int8_t* y, size_t count, int8_t*
 void saturate_sub_avx512(const int8_t* x, int8_t y, size_t count, int8_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 64) {
     auto r = _mm512_set1_epi8(y);
@@ -423,7 +423,7 @@ void saturate_sub_avx512(const int8_t* x, int8_t y, size_t count, int8_t* res)
 void saturate_sub_avx512(const uint16_t* x, const uint16_t* y, size_t count, uint16_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(y, 64) && isAligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
@@ -457,7 +457,7 @@ void saturate_sub_avx512(const uint16_t* x, const uint16_t* y, size_t count, uin
 void saturate_sub_avx512(const uint16_t* x, uint16_t y, size_t count, uint16_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
     auto r = _mm512_set1_epi16(y);
@@ -491,7 +491,7 @@ void saturate_sub_avx512(const uint16_t* x, uint16_t y, size_t count, uint16_t* 
 void saturate_sub_avx512(const int16_t* x, const int16_t* y, size_t count, int16_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(y, 64) && isAligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
@@ -525,7 +525,7 @@ void saturate_sub_avx512(const int16_t* x, const int16_t* y, size_t count, int16
 void saturate_sub_avx512(const int16_t* x, int16_t y, size_t count, int16_t* res)
 {
 #if CPUINFO_ARCH_X86_64
-  CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
+  CHECK(isAligned(x, 64) && isAligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
     auto r = _mm512_set1_epi16(y);

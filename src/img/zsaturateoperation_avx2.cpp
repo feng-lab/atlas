@@ -9,7 +9,7 @@ namespace nim {
 
 void saturate_add_avx2(const uint8_t* x, const uint8_t* y, size_t count, uint8_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(y, 32) && is_aligned(res, 32)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(y, 32) && isAligned(res, 32)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
@@ -33,7 +33,7 @@ void saturate_add_avx2(const uint8_t* x, const uint8_t* y, size_t count, uint8_t
 
 void saturate_add_avx2(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
     auto r = simde_mm256_set1_epi8(y);
@@ -57,7 +57,7 @@ void saturate_add_avx2(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 
 void saturate_add_avx2(const int8_t* x, const int8_t* y, size_t count, int8_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(y, 32) && is_aligned(res, 32)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(y, 32) && isAligned(res, 32)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
@@ -81,7 +81,7 @@ void saturate_add_avx2(const int8_t* x, const int8_t* y, size_t count, int8_t* r
 
 void saturate_add_avx2(const int8_t* x, int8_t y, size_t count, int8_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
     auto r = simde_mm256_set1_epi8(y);
@@ -105,7 +105,7 @@ void saturate_add_avx2(const int8_t* x, int8_t y, size_t count, int8_t* res)
 
 void saturate_add_avx2(const uint16_t* x, const uint16_t* y, size_t count, uint16_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(y, 32) && is_aligned(res, 32)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(y, 32) && isAligned(res, 32)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
@@ -129,7 +129,7 @@ void saturate_add_avx2(const uint16_t* x, const uint16_t* y, size_t count, uint1
 
 void saturate_add_avx2(const uint16_t* x, uint16_t y, size_t count, uint16_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 16) {
     auto r = simde_mm256_set1_epi16(y);
@@ -153,7 +153,7 @@ void saturate_add_avx2(const uint16_t* x, uint16_t y, size_t count, uint16_t* re
 
 void saturate_add_avx2(const int16_t* x, const int16_t* y, size_t count, int16_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(y, 32) && is_aligned(res, 32)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(y, 32) && isAligned(res, 32)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
@@ -177,7 +177,7 @@ void saturate_add_avx2(const int16_t* x, const int16_t* y, size_t count, int16_t
 
 void saturate_add_avx2(const int16_t* x, int16_t y, size_t count, int16_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 16) {
     auto r = simde_mm256_set1_epi16(y);
@@ -201,7 +201,7 @@ void saturate_add_avx2(const int16_t* x, int16_t y, size_t count, int16_t* res)
 
 void saturate_sub_avx2(const uint8_t* x, const uint8_t* y, size_t count, uint8_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(y, 32) && is_aligned(res, 32)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(y, 32) && isAligned(res, 32)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
@@ -225,7 +225,7 @@ void saturate_sub_avx2(const uint8_t* x, const uint8_t* y, size_t count, uint8_t
 
 void saturate_sub_avx2(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
     auto r = simde_mm256_set1_epi8(y);
@@ -249,7 +249,7 @@ void saturate_sub_avx2(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 
 void saturate_sub_avx2(const int8_t* x, const int8_t* y, size_t count, int8_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(y, 32) && is_aligned(res, 32)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(y, 32) && isAligned(res, 32)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
@@ -273,7 +273,7 @@ void saturate_sub_avx2(const int8_t* x, const int8_t* y, size_t count, int8_t* r
 
 void saturate_sub_avx2(const int8_t* x, int8_t y, size_t count, int8_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
     auto r = simde_mm256_set1_epi8(y);
@@ -297,7 +297,7 @@ void saturate_sub_avx2(const int8_t* x, int8_t y, size_t count, int8_t* res)
 
 void saturate_sub_avx2(const uint16_t* x, const uint16_t* y, size_t count, uint16_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(y, 32) && is_aligned(res, 32)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(y, 32) && isAligned(res, 32)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
@@ -321,7 +321,7 @@ void saturate_sub_avx2(const uint16_t* x, const uint16_t* y, size_t count, uint1
 
 void saturate_sub_avx2(const uint16_t* x, uint16_t y, size_t count, uint16_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 16) {
     auto r = simde_mm256_set1_epi16(y);
@@ -345,7 +345,7 @@ void saturate_sub_avx2(const uint16_t* x, uint16_t y, size_t count, uint16_t* re
 
 void saturate_sub_avx2(const int16_t* x, const int16_t* y, size_t count, int16_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(y, 32) && is_aligned(res, 32)) << x << " " << y << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(y, 32) && isAligned(res, 32)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
@@ -369,7 +369,7 @@ void saturate_sub_avx2(const int16_t* x, const int16_t* y, size_t count, int16_t
 
 void saturate_sub_avx2(const int16_t* x, int16_t y, size_t count, int16_t* res)
 {
-  CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
+  CHECK(isAligned(x, 32) && isAligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 16) {
     auto r = simde_mm256_set1_epi16(y);
