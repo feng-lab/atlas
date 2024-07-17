@@ -110,11 +110,11 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
   try {
     std::vector<ZImgInfo> info = ZImg::readImgInfos(fn);
     if (info.size() != 1 || info[0].isEmpty()) {
-      throw ZIOException("Not supported image dimensions");
+      throw ZException("Not supported image dimensions");
     }
     channelNumber = info[0].numChannels;
   }
-  catch (const ZIOException& e) {
+  catch (const ZException& e) {
     QMessageBox::critical(this,
                           QApplication::applicationName(),
                           QString("Can not parse input image:\n%1").arg(e.what()));

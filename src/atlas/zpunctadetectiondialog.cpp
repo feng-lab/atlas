@@ -112,7 +112,7 @@ void ZPunctaDetectionDialog::inputImageChanged()
         updateInterface(fn, info.numChannels, 0, 0, 0);
       }
     }
-    catch (const ZIOException& e) {
+    catch (const ZException& e) {
       updateInterface(fn, 0, 0, 0, 0);
       QMessageBox::critical(this,
                             QApplication::applicationName(),

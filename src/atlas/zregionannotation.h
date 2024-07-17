@@ -13,7 +13,7 @@ class ZRegionAnnotation : public QObject
   Q_OBJECT
 
 public:
-  // might throw ZIOException
+  // might throw ZException
   explicit ZRegionAnnotation(QObject* parent = nullptr);
 
   explicit ZRegionAnnotation(const QString& filename, QObject* parent = nullptr);
@@ -122,7 +122,7 @@ public:
     return QString("Region Annotation files (*.reganno)");
   }
 
-  // might throw ZIOException
+  // might throw ZException
   void load(const QString& filename);
 
   void save(const QString& filename) const;

@@ -163,7 +163,7 @@ uint16_t getOrientation(jpeg_decompress_struct& cinfo)
           orientation = exif.ifds()[0].orientation();
         }
       }
-      catch (const ZIOException& e) {
+      catch (const ZException& e) {
         LOG(WARNING) << "failed to read Orientation from Exif: " << e.what();
       }
       break;
@@ -405,7 +405,7 @@ void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t 
           meta.attachToTopLevel(exif.ifds()[0].extractMetadata());
         }
       }
-      catch (const ZIOException& e) {
+      catch (const ZException& e) {
         LOG(WARNING) << "failed to read metadata from jpeg: " << e.what();
       }
       break;
@@ -486,7 +486,7 @@ void ZImgJpeg::readThumbnail(const QString& filename,
           }
         }
       }
-      catch (const ZIOException& e) {
+      catch (const ZException& e) {
         LOG(WARNING) << "failed to read thumbnail from jpeg: " << e.what();
       }
       break;

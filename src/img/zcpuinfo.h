@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zglobal.h"
+#include <QString>
 #include <cstdint>
 
 namespace nim {

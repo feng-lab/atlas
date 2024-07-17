@@ -61,7 +61,7 @@ void ZTheme::loadTheme(const QString& fn)
 {
   const auto& loadObj = loadJsonObject(fn);
   if (!loadObj.contains("AtlasTheme") || !loadObj.at("AtlasTheme").is_object()) {
-    throw ZIOException(tr("File is not AtlasTheme format"));
+    throw ZException("File is not AtlasTheme format");
   }
 
   const auto& themeObj = loadObj.at("AtlasTheme").as_object();
@@ -111,7 +111,7 @@ std::pair<QColor, QString> ZTheme::readNamedColor(const QString& color) const
 
   const QColor col('#' + color);
   if (!col.isValid()) {
-    throw ZIOException(QString("theme color %1 invalid").arg(color));
+    throw ZException(QString("theme color %1 invalid").arg(color));
   }
   return std::make_pair(col, QString());
 }

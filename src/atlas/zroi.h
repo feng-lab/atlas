@@ -530,7 +530,7 @@ public:
     return QString("ROI files (*.nimroi)");
   }
 
-  // might throw ZIOException
+  // might throw ZException
   void load(const QString& filename);
 
   void save(const QString& filename) const;

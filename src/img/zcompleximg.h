@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zglobal.h"
+#include <QString>
 #include <boost/align/aligned_allocator.hpp>
 #include <complex>
 #include <vector>

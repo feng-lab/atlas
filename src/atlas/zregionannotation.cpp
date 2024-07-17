@@ -126,20 +126,20 @@ void ZRegionAnnotation::importLabelImage(const QString& fn,
 
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(fn, nullptr, format);
   if (infos.size() > 1) {
-    throw ZIOException("label image with more than one scene is not supported");
+    throw ZException("label image with more than one scene is not supported");
   }
   ZImgInfo info = infos[0];
   if (info.isEmpty()) {
-    throw ZIOException("label image is empty");
+    throw ZException("label image is empty");
   }
   if (info.voxelFormat == VoxelFormat::Float) {
-    throw ZIOException("label image can not be a floating point image");
+    throw ZException("label image can not be a floating point image");
   }
   if (info.voxelFormat == VoxelFormat::Unsigned && info.bytesPerVoxel == 8) {
-    throw ZIOException("uint64 label image is not supported");
+    throw ZException("uint64 label image is not supported");
   }
   if (info.numChannels > 1 || info.numTimes > 1) {
-    throw ZIOException("label image can not be time sequence or color image");
+    throw ZException("label image can not be time sequence or color image");
   }
 
   ZImg origLabelImg(fn, ZImgRegion(), 0, 1, 1, 1, format);
@@ -449,20 +449,20 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
 
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(fn, nullptr, format);
   if (infos.size() > 1) {
-    throw ZIOException("label image with more than one scene is not supported");
+    throw ZException("label image with more than one scene is not supported");
   }
   ZImgInfo info = infos[0];
   if (info.isEmpty()) {
-    throw ZIOException("label image is empty");
+    throw ZException("label image is empty");
   }
   if (info.voxelFormat == VoxelFormat::Float) {
-    throw ZIOException("label image can not be a floating point image");
+    throw ZException("label image can not be a floating point image");
   }
   if (info.voxelFormat == VoxelFormat::Unsigned && info.bytesPerVoxel == 8) {
-    throw ZIOException("uint64 label image is not supported");
+    throw ZException("uint64 label image is not supported");
   }
   if (info.numChannels > 1 || info.numTimes > 1) {
-    throw ZIOException("label image can not be time sequence or color image");
+    throw ZException("label image can not be time sequence or color image");
   }
 
   ZImg origLabelImg(fn, ZImgRegion(), 0, 1, 1, 1, format);

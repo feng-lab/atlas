@@ -44,7 +44,7 @@ void readOntology(const json::object& obj,
       node.id = json::value_to<int64_t>(value);
       for (const auto& nd : ontology) {
         if (nd.id == node.id) {
-          throw ZIOException(QString("id %1 used more than once").arg(nd.id));
+          throw ZException(fmt::format("id {} used more than once", nd.id));
         }
       }
     } else if (key == "parent_structure_id") {
@@ -56,42 +56,42 @@ void readOntology(const json::object& obj,
     } else if (key == "acronym") {
       node.abbreviation = asQString(value);
       if (node.abbreviation.isEmpty()) {
-        throw ZIOException(QString("node acronym can not be empty"));
+        throw ZException("node acronym can not be empty");
       }
     } else if (key == "name") {
       node.name = asQString(value);
       if (node.name.isEmpty()) {
-        throw ZIOException(QString("node name can not be empty"));
+        throw ZException("node name can not be empty");
       }
     } else if (key == "color_hex_triplet") {
       QString colorStr = asQString(value);
       if (colorStr.size() != 6) {
-        throw ZIOException(QString("wrong color string: %1").arg(colorStr));
+        throw ZException(QString("wrong color string: %1").arg(colorStr));
       }
       bool ok;
       node.red = colorStr.mid(0, 2).toInt(&ok, 16);
       if (!ok) {
-        throw ZIOException(QString("wrong color string: %1").arg(colorStr));
+        throw ZException(QString("wrong color string: %1").arg(colorStr));
       }
       node.green = colorStr.mid(2, 2).toInt(&ok, 16);
       if (!ok) {
-        throw ZIOException(QString("wrong color string: %1").arg(colorStr));
+        throw ZException(QString("wrong color string: %1").arg(colorStr));
       }
       node.blue = colorStr.mid(4, 2).toInt(&ok, 16);
       if (!ok) {
-        throw ZIOException(QString("wrong color string: %1").arg(colorStr));
+        throw ZException(QString("wrong color string: %1").arg(colorStr));
       }
     } else if (key == "children") {
       if (!value.is_array()) {
-        throw ZIOException(QString("children is not array"));
+        throw ZException("children is not array");
       }
       children = &value.as_array();
     }
   }
   if (!ZTree<RegionNode>::isNull(parentIt)) {
     if (node.parentID != parentIt->id) {
-      throw ZIOException(
-        QString("node %1 has wrong parent id %2 (should be %3)").arg(node.id).arg(node.parentID).arg(parentIt->id));
+      throw ZException(
+        fmt::format("node {} has wrong parent id {} (should be {})", node.id, node.parentID, parentIt->id));
     }
     ZTree<RegionNode>::Iterator currIt = ontology.appendChild(parentIt, node);
     if (!children) {
@@ -99,7 +99,7 @@ void readOntology(const json::object& obj,
     }
     for (const auto& child : *children) {
       if (!child.is_object()) {
-        throw ZIOException(QString("child is not object"));
+        throw ZException("child is not object");
       }
       readOntology(child.as_object(), currIt, regionAbbrevs, ontology);
     }
@@ -113,7 +113,7 @@ void readOntology(const json::object& obj,
     }
     for (const auto& child : *children) {
       if (!child.is_object()) {
-        throw ZIOException(QString("child is not object"));
+        throw ZException("child is not object");
       }
       readOntology(child.as_object(), currIt, regionAbbrevs, ontology);
     }
@@ -127,7 +127,7 @@ void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology)
   auto loadObj = loadJsonObject(ontologyFilename);
   if (!loadObj.contains("msg") || !loadObj.at("msg").is_array() || loadObj.at("msg").as_array().empty() ||
       !loadObj.at("msg").as_array()[0].is_object()) {
-    throw ZIOException(QObject::tr("File is not %1 format").arg("ontology"));
+    throw ZException("File is not ontology format");
   }
   auto& rootObj = loadObj.at("msg").as_array()[0].as_object();
   ZTree<RegionNode>::Iterator nullIt;
@@ -142,7 +142,7 @@ void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionN
   auto loadObj = loadJsonObject(ontologyFilename);
   if (!loadObj.contains("msg") || !loadObj.at("msg").is_array() || loadObj.at("msg").as_array().empty() ||
       !loadObj.at("msg").as_array()[0].is_object()) {
-    throw ZIOException(QObject::tr("File is not %1 format").arg("ontology"));
+    throw ZException("File is not ontology format");
   }
   auto& rootObj = loadObj.at("msg").as_array()[0].as_object();
   ZTree<RegionNode>::Iterator nullIt;

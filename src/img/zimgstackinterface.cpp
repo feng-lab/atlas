@@ -107,7 +107,7 @@ ZStack* readZStack(const std::string& filename, ZStack* data, QString* error)
 
     return imgToZStack(img, data);
   }
-  catch (const ZIOException& e) {
+  catch (const ZException& e) {
     LOG(ERROR) << e.what();
     if (error) {
       *error = e.what();
@@ -125,7 +125,7 @@ bool writeZStack(const std::string& filename, const ZStack& stack, QString* erro
     LOG(INFO) << "Wrote image: " << filename;
     return true;
   }
-  catch (const ZIOException& e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Failed to write image " << filename << ". error: " << e.what();
     if (error) {
       *error = e.what();
@@ -153,7 +153,7 @@ ZStack* readZStack(const QStringList& fileList, Dimension catDim, QString* error
 
     return imgToZStack(img);
   }
-  catch (const ZIOException& e) {
+  catch (const ZException& e) {
     LOG(ERROR) << e.what();
     if (error) {
       *error = e.what();

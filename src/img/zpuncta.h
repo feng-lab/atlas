@@ -12,7 +12,7 @@ public:
 
   ZPuncta() = default;
 
-  // might throw ZIOException
+  // might throw ZException
   explicit ZPuncta(const QString& filename);
 
   explicit ZPuncta(const std::list<ZPunctum>& p)
@@ -52,7 +52,7 @@ public:
 
   static void getQtWriteNameFilter(QStringList& filters, QStringList& formats);
 
-  // might throw ZIOException
+  // might throw ZException
   void load(const QString& filename);
 
   void save(const QString& filename, const QString& format = "") const;

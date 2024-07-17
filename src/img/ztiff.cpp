@@ -802,7 +802,7 @@ void ZTiff::load(const QString& filename, bool tagOnly)
       m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "r"));
 #endif
     }
-    catch (const ZIOException& e) {
+    catch (const ZException& e) {
       const QString& err(e.what());
       if (err.contains("Colormap", Qt::CaseInsensitive)) {
         m_tif.reset();
@@ -848,7 +848,7 @@ void ZTiff::load(std::istream& fs, bool tagOnly)
     try {
       m_tif.reset(TIFFStreamOpen("MemTiff", &fs));
     }
-    catch (const ZIOException& e) {
+    catch (const ZException& e) {
       const QString& err(e.what());
       if (err.contains("Colormap", Qt::CaseInsensitive)) {
         m_tif.reset();
@@ -968,7 +968,7 @@ ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD& ifd)
       res = ZImg(info);
       readImgFromIFD(ifd, res);
     }
-    catch (const ZIOException& e) {
+    catch (const ZException& e) {
       LOG(WARNING) << "read thumbnail from tif ifd failed: " << e.what();
       res.clear();
     }

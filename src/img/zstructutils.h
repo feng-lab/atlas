@@ -133,7 +133,7 @@ bool readStructFromFileStreamNoThrow(T& t, std::istream& fs)
     readStructFromFileStream(t, fs);
     return true;
   }
-  catch (const ZIOException& e) {
+  catch (const ZException& e) {
     LOG(WARNING) << e.what();
   }
   return false;

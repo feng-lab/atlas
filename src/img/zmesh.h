@@ -54,7 +54,7 @@ public:
 
   explicit ZMesh(Type type = Type::TRIANGLES);
 
-  // might throw ZIOException
+  // might throw ZException
   explicit ZMesh(const QString& filename);
 
   ZMesh(ZMesh&&) = default;
@@ -76,7 +76,7 @@ public:
 
   static void getQtWriteNameFilter(QStringList& filters, std::vector<std::string>& formats);
 
-  // might throw ZIOException
+  // might throw ZException
   void load(const QString& filename);
 
   void save(const QString& filename, const std::string& format = "") const;

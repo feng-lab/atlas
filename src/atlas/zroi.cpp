@@ -446,7 +446,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
         } else if (strBuf == "Line") {
           type = ROIType::Line;
         } else {
-          throw ZIOException(fmt::format("invalid shape type {}", strBuf));
+          throw ZException(fmt::format("invalid shape type {}", strBuf));
         }
 
         H5::Attribute isAddAttr = shapeGrp.openAttribute("IsAdd");
@@ -457,7 +457,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
         H5::DataSpace pointsDataspace = points.getSpace();
 
         if (pointsDataspace.getSimpleExtentNdims() != 2) {
-          throw ZIOException("Wrong ROI file contents");
+          throw ZException("Wrong ROI file contents");
         }
 
         hsize_t pointListDim[2];
@@ -465,7 +465,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
         pointsDataspace.getSimpleExtentDims(pointListDim, nullptr);
 
         if (pointListDim[1] != 2 || pointListDim[0] < 2) {
-          throw ZIOException("Wrong ROI file contents");
+          throw ZException("Wrong ROI file contents");
         }
 
         QPolygonF poly(pointListDim[0]);
@@ -541,7 +541,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
           } else if (strBuf == "Line") {
             type = ROIType::Line;
           } else {
-            throw ZIOException(fmt::format("invalid shape type {}", strBuf));
+            throw ZException(fmt::format("invalid shape type {}", strBuf));
           }
 
           H5::Attribute isAddAttr = shapeGrp.openAttribute("IsAdd");
@@ -552,7 +552,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
           H5::DataSpace pointsDataspace = points.getSpace();
 
           if (pointsDataspace.getSimpleExtentNdims() != 2) {
-            throw ZIOException("Wrong ROI file contents");
+            throw ZException("Wrong ROI file contents");
           }
 
           hsize_t pointListDim[2];
@@ -560,7 +560,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
           pointsDataspace.getSimpleExtentDims(pointListDim, nullptr);
 
           if (pointListDim[1] != 2 || pointListDim[0] < 2) {
-            throw ZIOException("Wrong ROI file contents2");
+            throw ZException("Wrong ROI file contents2");
           }
 
           QPolygonF poly(pointListDim[0]);
@@ -625,7 +625,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
     }
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 
   return id;
@@ -695,7 +695,7 @@ void ZSliceROI::save(H5::Group& sliceGrp) const
     }
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -729,14 +729,14 @@ void ZROI::importMaskImage(const QString& fn, FileFormat format)
 
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(fn, nullptr, format);
   if (infos.size() > 1) {
-    throw ZIOException("mask image with more than one scene is not supported");
+    throw ZException("mask image with more than one scene is not supported");
   }
   ZImgInfo info = infos[0];
   if (info.isEmpty()) {
-    throw ZIOException("mask image is empty");
+    throw ZException("mask image is empty");
   }
   if (info.numChannels > 1 || info.numTimes > 1) {
-    throw ZIOException("mask image can not be time sequence or color image");
+    throw ZException("mask image can not be time sequence or color image");
   }
 
   if (info.isType<uint8_t>()) {
@@ -1531,7 +1531,7 @@ void ZROI::load(H5::Group& allGrp)
     }
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -1567,7 +1567,7 @@ void ZROI::save(H5::Group& allGrp) const
     numSliceAttr.write(intType, &idx);
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 

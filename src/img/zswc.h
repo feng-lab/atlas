@@ -67,7 +67,7 @@ public:
 
   ZSwc() = default;
 
-  // might throw ZIOException
+  // might throw ZException
   explicit ZSwc(const QString& filename)
   {
     load(filename);
@@ -143,7 +143,7 @@ public:
     return {"SWC files (*.swc)"};
   }
 
-  // might throw ZIOException
+  // might throw ZException
   void load(const QString& filename);
 
   void save(const QString& filename) const;

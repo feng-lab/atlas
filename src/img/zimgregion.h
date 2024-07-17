@@ -216,7 +216,7 @@ inline ZImgRegion tag_invoke(const json::value_to_tag<ZImgRegion>&, const json::
   res.start = json::value_to<ZVoxelCoordinate>(jv.at("start"));
   res.end = json::value_to<ZVoxelCoordinate>(jv.at("end"));
   if (res.isEmpty()) {
-    throw ZIOException(QString("Invalid json creates empty ZImgRegion"));
+    throw ZException(QString("Invalid json creates empty ZImgRegion"));
   }
   return res;
 }

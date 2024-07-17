@@ -387,8 +387,8 @@ std::shared_ptr<ZImg> ZImgCZISubBlock::read() const
     }
     return res;
   }
-  catch (const ZIOException& e) {
-    throw ZIOException(QString("read %1 error: %2").arg(m_filename, e.what()));
+  catch (const ZException& e) {
+    throw ZException(QString("read %1 error: %2").arg(m_filename, e.what()));
   }
 }
 
@@ -413,8 +413,8 @@ ZImgInfo ZImgCZISubBlock::readInfo() const
     }
     return res;
   }
-  catch (const ZIOException& e) {
-    throw ZIOException(QString("read %1 error: %2").arg(m_filename, e.what()));
+  catch (const ZException& e) {
+    throw ZException(QString("read %1 error: %2").arg(m_filename, e.what()));
   }
 }
 

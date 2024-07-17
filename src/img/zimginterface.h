@@ -317,7 +317,7 @@ T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
   constexpr std::size_t n = std::tuple_size_v<json::detail::remove_cvref<T>>;
   const auto& ja = jv.as_array();
   if (ja.size() < n) {
-    throw ZIOException("json array too short");
+    throw ZException("json array too short");
   }
   T res;
   for (size_t i = 0; i < n; ++i) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zglobal.h"
+#include "zexception.h"
 
 #ifdef _WIN32
 #undef ERROR
@@ -112,7 +113,7 @@ std::string_view enumToString(TEnum e)
 {
   auto res = reflect::enum_name(e);
   if (res.empty()) {
-    throw ZIOException(fmt::format("invalid enum value: {}", std::to_underlying(e)));
+    throw ZException(fmt::format("invalid enum value: {}", std::to_underlying(e)));
   }
   return res;
 }
@@ -128,7 +129,7 @@ TEnum stringToEnum(std::string_view s)
       return static_cast<TEnum>(enumerators[i].first);
     }
   }
-  throw ZIOException(fmt::format("invalid enum string: {}", s));
+  throw ZException(fmt::format("invalid enum string: {}", s));
 }
 
 template<typename TEnum>

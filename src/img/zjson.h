@@ -97,7 +97,7 @@ inline QString asQString(const json::value& jv)
 //   constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
 //   const auto& ja = jv.as_array();
 //   if (ja.size() < n) {
-//     throw ZIOException("json array too short");
+//     throw ZException("json array too short");
 //   }
 //   T res;
 //   for (size_t i = 0; i < n; ++i) {

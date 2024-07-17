@@ -23,8 +23,7 @@ public:
   // if FileFormat is FileFormat::Unknown, use extension of filename to match correct reader or writer
   // otherwise file extension is ignored, which means you can write a tif file with '.raw' as extension...
 
-  // note: will throw ZIOException or ZException if read error or an empty region is passed or image is empty or out
-  // of memory
+  // note: will throw ZException if read error or an empty region is passed or image is empty or out of memory
 
   // only info
   void readInfos(const QString& filename,

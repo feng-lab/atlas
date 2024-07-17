@@ -765,7 +765,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
   try {
     auto loadObj = loadJsonObject(fn);
     if (!loadObj.contains(jsonKey.toStdString()) || !loadObj.at(jsonKey.toStdString()).is_object()) {
-      throw ZIOException(tr("File is not %1 format").arg(jsonKey));
+      throw ZException(tr("File is not %1 format").arg(jsonKey));
     }
 
     QDir::setCurrent(QFileInfo(fn).absolutePath());
@@ -866,7 +866,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     // read files
     std::map<size_t, size_t> idmap = m_doc.read(docObj, err);
     if (idmap.empty()) {
-      err += QString("%1 %2 contains zero valid objects.\n").arg(jsonKey).arg(fn);
+      err += QString("%1 %2 contains zero valid objects.\n").arg(jsonKey, fn);
     } else {
       for (auto& i : m_objList) {
         if (idmap.contains(i->uniqueId)) {
@@ -885,7 +885,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     updateObjAnimation();
   }
   catch (const ZException& e) {
-    throw ZIOException(QString("Can not load animation %1: %2").arg(fn, e.what()));
+    throw ZException(QString("Can not load animation %1: %2").arg(fn, e.what()));
   }
 }
 
@@ -960,7 +960,7 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
     }
   }
   catch (const ZException& e) {
-    throw ZIOException(QString("Can not save animation %1: %2").arg(fn, e.what()));
+    throw ZException(QString("Can not save animation %1: %2").arg(fn, e.what()));
   }
 }
 

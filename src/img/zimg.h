@@ -376,7 +376,7 @@ QString ZImgMetadataBase<ZImg>::toQString() const;
 using ZImgMetadata = ZImgMetadataBase<ZImgMetatag>;
 using ZImgThumbernail = ZImgMetadataBase<ZImg>;
 
-// throw ZIOException if file does not exist
+// throw ZException if file does not exist
 struct ZImgSource
 {
   ZImgSource() = default;
@@ -533,7 +533,7 @@ public:
 
   ZImg(ZImg&& other) noexcept = default;
 
-  // read image from file, throw ZIOException if read failed, might throw ZException if can't allocate memory
+  // read image from file, throw ZException if read failed, might throw ZException if can't allocate memory
   explicit ZImg(const QString& filename,
                 ZImgRegion region = ZImgRegion(),
                 size_t scene = 0,
@@ -580,7 +580,7 @@ public:
 
   static bool fileExtensionWriteSupported(const QString& filename);
 
-  // throw ZIOException if io error or empty image, might throw ZException if can't allocate memory
+  // throw ZException if io error or empty image, might throw ZException if can't allocate memory
   void load(const QString& filename,
             size_t scene = 0,
             size_t xRatio = 1,
@@ -598,7 +598,7 @@ public:
 
   // load a sequence of imgs, cat these imgs along dimension "catDim"
   // imgs should have same size in other dimensions and have same type
-  // throw ZIOException if io error, might throw ZException if can't allocate memory or can't cat imgs
+  // throw ZException if io error, might throw ZException if can't allocate memory or can't cat imgs
   // expandXY can not be true if catDim is Dimension::X or Dimension::Y
   void load(const QStringList& fileList,
             Dimension catDim,
@@ -639,13 +639,13 @@ public:
                        FileFormat format = FileFormat::Unknown,
                        const ZImgWriteParameters& paras = ZImgWriteParameters());
 
-  // convenient function to get img information from file, throw ZIOException if read error or empty image
+  // convenient function to get img information from file, throw ZException if read error or empty image
   static std::vector<ZImgInfo>
   readImgInfos(const QString& filename,
                std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
                FileFormat format = FileFormat::Unknown);
 
-  // throw ZIOException if sequence is not valid or empty image
+  // throw ZException if sequence is not valid or empty image
   static std::vector<ZImgInfo>
   readImgInfos(const QStringList& fileList,
                Dimension catDim,

@@ -36,7 +36,7 @@ public:
 
   [[nodiscard]] virtual FileFormat format() const = 0;
 
-  // following io functions will throw ZIOException if read or write fails
+  // following io functions will throw ZException if read or write fails
 
   // only info, input can be changed even if read failed
   virtual void readInfo(const QString& filename,
