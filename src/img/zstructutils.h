@@ -3,7 +3,10 @@
 #include "zglobal.h"
 #include "zioutils.h"
 #include "zlog.h"
+
+#ifndef Q_MOC_RUN
 #include <reflect>
+#endif
 
 namespace nim {
 

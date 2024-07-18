@@ -17,7 +17,11 @@
 #include <QDebug>
 #include <QPoint>
 #include <QRect>
+
+#ifndef Q_MOC_RUN
 #include <reflect>
+#endif
+
 #include <functional>
 #include <iosfwd>
 #include <type_traits>
