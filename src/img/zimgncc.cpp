@@ -127,8 +127,10 @@ void checkInputImgs(const ZImg& fixedImg, const ZImg& movingImg, const QString& 
 {
   if (fixedImg.isEmpty() || movingImg.isEmpty() || fixedImg.numChannels() != 1 || fixedImg.numTimes() != 1 ||
       movingImg.numChannels() != 1 || movingImg.numTimes() != 1) {
-    throw ZException(QString("%1 input img dimension is not supported: fixed img <%1>, moving img <%2>")
-                       .arg(name, fixedImg.info().toQString(), movingImg.info().toQString()));
+    throw ZException(fmt::format("{} input img dimension is not supported: fixed img <{}>, moving img <{}>",
+                                 name,
+                                 fixedImg.info().toString(),
+                                 movingImg.info().toString()));
   }
 }
 
@@ -551,8 +553,10 @@ void cropOverlapSubImg(const ZImg& fixedImgIn,
   ZVoxelCoordinate fixedStart = max(offset, 0); // max of zero and offset
   ZVoxelCoordinate fixedEnd = min(offset + movingImgIn.endCoord(), fixedImgIn.endCoord());
   if (fixedEnd.anyLessEqual(fixedStart)) {
-    throw ZException(QString("Trying to crop overlap region of non-overlap img1 <%1> and img2 <%2> with offset: %3")
-                       .arg(fixedImgIn.info().toQString(), movingImgIn.info().toQString(), offset.toQString()));
+    throw ZException(fmt::format("Trying to crop overlap region of non-overlap img1 <{}> and img2 <{}> with offset: {}",
+                                 fixedImgIn.info().toString(),
+                                 movingImgIn.info().toString(),
+                                 offset.toString()));
   }
   ZImgRegion fixedRegion(fixedStart, fixedEnd);
   subFixedImg = fixedImgIn.crop(fixedRegion);

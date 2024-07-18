@@ -14,13 +14,11 @@ typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img,
 {
   if (!img.isType<TVoxel>()) {
     throw ZException(
-      QString("wrapZImgChannelAsITKImg wrap img <%1> to wrong type of itk img").arg(img.info().toQString()));
+      fmt::format("wrapZImgChannelAsITKImg wrap img <{}> to wrong type of itk img", img.info().toString()));
   }
   if (c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
-    throw ZException(QString("wrapZImgChannelAsITKImg invalid pos of img, c:%1, t:%2, img:<%3>")
-                       .arg(c)
-                       .arg(t)
-                       .arg(img.info().toQString()));
+    throw ZException(
+      fmt::format("wrapZImgChannelAsITKImg invalid pos of img, c:{}, t:{}, img:<{}>", c, t, img.info().toString()));
   }
   using ImportFilterType = itk::ImportImageFilter<TVoxel, 3>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
@@ -66,14 +64,14 @@ typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, s
 {
   if (!img.isType<TVoxel>()) {
     throw ZException(
-      QString("wrapZImgPlaneAsITKImg wrap img <%1> to wrong type of itk img").arg(img.info().toQString()));
+      fmt::format("wrapZImgPlaneAsITKImg wrap img <{}> to wrong type of itk img", img.info().toString()));
   }
   if (z >= img.depth() || c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
-    throw ZException(QString("wrapZImgPlaneAsITKImg invalid pos of img, z:%1 c:%2, t:%3, img:<%4>")
-                       .arg(z)
-                       .arg(c)
-                       .arg(t)
-                       .arg(img.info().toQString()));
+    throw ZException(fmt::format("wrapZImgPlaneAsITKImg invalid pos of img, z:{} c:{}, t:{}, img:<{}>",
+                                 z,
+                                 c,
+                                 t,
+                                 img.info().toString()));
   }
   using ImportFilterType = itk::ImportImageFilter<TVoxel, 2>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();

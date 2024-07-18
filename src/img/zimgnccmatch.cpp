@@ -631,14 +631,14 @@ void ZImgNCCMatch::init()
 void ZImgNCCMatch::checkFixedImgChannel(size_t ch)
 {
   if (ch >= m_fixedImg.numChannels()) {
-    throw ZException(QString("Wrong channel %1 for fixed img <%2>").arg(ch).arg(m_fixedImg.info().toQString()));
+    throw ZException(fmt::format("Wrong channel {} for fixed img <{}>", ch, m_fixedImg.info().toString()));
   }
 }
 
 void ZImgNCCMatch::checkMovingImgChannel(size_t ch)
 {
   if (ch >= m_movingImg.numChannels()) {
-    throw ZException(QString("Wrong channel %1 for moving img <%2>").arg(ch).arg(m_movingImg.info().toQString()));
+    throw ZException(fmt::format("Wrong channel {} for moving img <{}>", ch, m_movingImg.info().toString()));
   }
 }
 
@@ -879,9 +879,8 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLocPart(ZImg& fixedImg,
   ZVoxelCoordinate offset =
     maxNCCCoord + ZVoxelCoordinate(xStart, yStart, zStart) -
     ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1, movingImgInfo.depth - 1);
-  LOG(INFO)
-    << "max NCC coord: " << json::value_from(maxNCCCoord)
-    << QString(" region (x:%1-%2, y:%3-%4, z:%5-%6)").arg(xStart).arg(xEnd).arg(yStart).arg(yEnd).arg(zStart).arg(zEnd);
+  LOG(INFO) << "max NCC coord: " << json::value_from(maxNCCCoord)
+            << fmt::format(" region (x:{}-{}, y:{}-{}, z:{}-{})", xStart, xEnd, yStart, yEnd, zStart, zEnd);
   LOG(INFO) << "moving image offset: " << json::value_from(offset);
 
   return offset;

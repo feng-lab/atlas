@@ -212,7 +212,7 @@ void ZPunctaDetection::doWork()
   if (m_punctaChannel < m_imgInfo.numChannels) {
     LOG(INFO) << "Puncta Channel: " << m_punctaChannel + 1 << " (start from 1)";
   } else {
-    throw ZException(QString("Wrong puncta channel: %1. Abort.").arg(m_punctaChannel));
+    throw ZException(fmt::format("Wrong puncta channel: {}. Abort.", m_punctaChannel));
   }
 
   if (m_dendriteChannel != -1) {
@@ -221,7 +221,7 @@ void ZPunctaDetection::doWork()
       LOG(INFO) << "Dendrite Threshold: " << m_dendriteThreshold;
       LOG(INFO) << "Max Dendrite Tube Radius: " << m_maxDendriteTubeRadius << "um";
     } else {
-      throw ZException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
+      throw ZException(fmt::format("Wrong dendrite channel: {}. Abort.", m_dendriteChannel));
     }
     if (m_imgInfo.voxelSizeUnit == VoxelSizeUnit::none) {
       throw ZException("Voxel Size not set (need by soma detection and puncta-tree matching), Abort Puncta Detection.");

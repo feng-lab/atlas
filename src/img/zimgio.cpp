@@ -318,7 +318,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
         readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
         if (tmpInfo.empty()) {
-          throw ZException(QString("Read sequence failed: img %1 is empty").arg(i));
+          throw ZException(fmt::format("Read sequence failed: img {} is empty", i));
         }
         res.insert(res.end(), tmpInfo.begin(), tmpInfo.end());
         if (subBlocks) {
@@ -391,7 +391,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
         readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
         if (tmpInfo.empty()) {
-          throw ZException(QString("Read sequence failed: img %1 is empty").arg(i));
+          throw ZException(fmt::format("Read sequence failed: img {} is empty", i));
         }
         // check whether number of scenes match
         if (tmpInfo.size() != res.size()) {

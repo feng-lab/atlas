@@ -93,7 +93,7 @@ ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene_, 
     filenames << fi.canonicalFilePath();
     totalFileSize += fi.size();
   } else {
-    throw ZException(QString("file %1 does not exist").arg(fn));
+    throw ZException(fmt::format("file {} does not exist", fn));
   }
 }
 
@@ -119,7 +119,7 @@ ZImgSource::ZImgSource(const QStringList& fns,
       filenames << fi.canonicalFilePath();
       totalFileSize += fi.size();
     } else {
-      throw ZException(QString("file %1 does not exist").arg(fn));
+      throw ZException(fmt::format("file {} does not exist", fn));
     }
   }
 }
@@ -2650,7 +2650,7 @@ template<typename TVoxel>
 void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const
 {
   if (maxData <= minData) {
-    throw ZException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
+    throw ZException(fmt::format("Invalid histogram range {}:{}", minData, maxData));
   }
 
   if constexpr (std::is_floating_point_v<std::remove_reference_t<TVoxel>>) {
@@ -2717,7 +2717,7 @@ template<typename TVoxel, typename TMaskVoxel>
 void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const
 {
   if (maxData < minData) {
-    throw ZException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
+    throw ZException(fmt::format("Invalid histogram range {}:{}", minData, maxData));
   }
 
   if constexpr (std::is_floating_point_v<std::remove_reference_t<TVoxel>>) {

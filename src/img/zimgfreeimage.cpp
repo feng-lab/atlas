@@ -15,12 +15,11 @@ FreeImage error handler
 */
 void FreeImageErrorHandler(FREE_IMAGE_FORMAT fif, const char* message)
 {
-  QString msg;
   if (fif != FIF_UNKNOWN) {
-    msg = QString("FreeImage %1 Format: %2").arg(FreeImage_GetFormatFromFIF(fif), message);
+    LOG(WARNING) << fmt::format("FreeImage {} Format: {}", FreeImage_GetFormatFromFIF(fif), message);
+  } else {
+    LOG(WARNING) << fmt::format("FreeImage: {}", message);;
   }
-  msg = QString("FreeImage: %1").arg(message);
-  LOG(WARNING) << msg;
 }
 
 ZImgInfo readInfoFromFIPImage(fipImage& fipImg)

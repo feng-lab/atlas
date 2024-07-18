@@ -706,7 +706,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
     }
   }
   catch (const std::exception& e) {
-    throw ZIOException(QString("read %1 folly:%2").arg(m_filename, e.what()));
+    throw ZIOException(fmt::format("read {} folly:{}", m_filename, e.what()));
   }
 
   LOG(WARNING) << "fall back to single thread hdf5 image reading!";
@@ -737,7 +737,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
     return res;
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(QString("read %1 hdf5:%2").arg(m_filename, QString::fromStdString(e.getDetailMsg())));
+    throw ZIOException(fmt::format("read {} hdf5:{}", m_filename, e.getDetailMsg()));
   }
 }
 
@@ -837,7 +837,7 @@ void ZImgHDF5::readInfo(const QString& filename,
       //          hsize_t chunk_dims[2];
       //          auto rank_chunk = pList.getChunk(2, chunk_dims);
       //          if (rank_chunk != 2) {
-      //            throw ZException(QString("invalid rank of chunk dim %1").arg(rank_chunk));
+      //            throw ZException(fmt::format("invalid rank of chunk dim {}", rank_chunk));
       //          }
       //          chunkHeight = chunk_dims[0];
       //          chunkWidth = chunk_dims[1];

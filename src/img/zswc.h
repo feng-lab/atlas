@@ -87,18 +87,18 @@ public:
   }
 
   template<typename Iter>
-  static QString toQString(const Iter& pos)
+  static std::string toString(const Iter& pos)
   {
-    return isNull(pos) ? QString("(Empty Node)")
-                       : QString("id:%1, type:%2, x:%3, y:%4, z:%5, radius:%6, parentID:%7, label:%8")
-                           .arg(pos->id)
-                           .arg(pos->type)
-                           .arg(pos->x)
-                           .arg(pos->y)
-                           .arg(pos->z)
-                           .arg(pos->radius)
-                           .arg(parentID(pos))
-                           .arg(pos->label);
+    return isNull(pos) ? std::string("(Empty Node)")
+                       : fmt::format("id:{}, type:{}, xyz:({}, {}, {}), radius:{}, parentID:{}, label:{}",
+                                     pos->id,
+                                     pos->type,
+                                     pos->x,
+                                     pos->y,
+                                     pos->z,
+                                     pos->radius,
+                                     parentID(pos),
+                                     pos->label);
   }
 
   // pos must not be null

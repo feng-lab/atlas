@@ -98,7 +98,7 @@ void ZAssignPuncta::doWork()
     LOG(INFO) << "Number of Soma Puncta: " << m_somaPuncta.data.size();
     LOG(INFO) << "Number of Swc Trees: " << m_swcTreeToPuncta.size();
   } else {
-    throw ZException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
+    throw ZException(fmt::format("Wrong dendrite channel: {}. Abort.", m_dendriteChannel));
   }
   for (auto& treePuncta : m_swcTreeToPuncta) {
     treePuncta.second.clear();

@@ -168,7 +168,7 @@ ConnComp ZImgConnectedComponents<ReportProgress>::createRes(const ZImg& img, siz
   if (conn == 0) {
     conn = img.is2DImg() ? 8 : 26;
   } else if (conn != 4 && conn != 8 && conn != 6 && conn != 18 && conn != 26) {
-    throw ZException(QString("invalid conn input: %1").arg(conn));
+    throw ZException(fmt::format("invalid conn input: {}", conn));
   }
   if (img.is2DImg() && conn != 4 && conn != 8) {
     if (conn == 6) {

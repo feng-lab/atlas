@@ -41,7 +41,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
   size_t nStacks = 0;
 
   if (!QFile::exists(filename)) {
-    throw ZException(QString("file %1 doesn't exist").arg(filename));
+    throw ZException(fmt::format("file {} doesn't exist", filename));
   }
 
   QStringList header;
@@ -61,18 +61,17 @@ size_t buildConnectionFromTextFile(const QString& filename,
         continue;
       }
       if (list.size() < header.size()) {
-        throw ZException(QString("Wrong number of items in line (%1), expected format: <%2>")
-                           .arg(list.join(','))
-                           .arg(header.join(',')));
+        throw ZException(
+          fmt::format("Wrong number of items in line ({}), expected format: <{}>", list.join(','), header.join(',')));
       }
       bool ok = false;
       auto idx1 = list[0].toInt(&ok);
       if (!ok || idx1 <= 0) {
-        throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+        throw ZException(fmt::format("Can not parse line ({}) with format <{}>", list.join(','), header.join(',')));
       }
       auto idx2 = list[1].toInt(&ok);
       if (!ok || idx2 <= 0) {
-        throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+        throw ZException(fmt::format("Can not parse line ({}) with format <{}>", list.join(','), header.join(',')));
       }
       auto stackPair = std::make_pair<size_t, size_t>(idx1 - 1, idx2 - 1);
       nStacks = std::max<size_t>(nStacks, idx1);
@@ -87,8 +86,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
         } else if (pos.compare("Back", Qt::CaseInsensitive) == 0) {
           conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Back;
         } else {
-          throw ZException(
-            QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+          throw ZException(fmt::format("Can not parse line ({}) with format <{}>", list.join(','), header.join(',')));
         }
       }
     }
@@ -441,11 +439,11 @@ void ZStitchImage::doWork()
       auto info = ZImg::readImgInfo(inputStackSources[0]);
       auto tmpInfo = ZImg::readImgInfo(input2ndStackSources[0]);
       if (!tmpInfo.isSameType(info)) {
-        throw ZException(QString("Image type of %1 <%2> and %3 <%4> don't match")
-                           .arg(inputStackSources[0].toQString())
-                           .arg(info.toQString())
-                           .arg(input2ndStackSources[0].toQString())
-                           .arg(tmpInfo.toQString()));
+        throw ZException(fmt::format("Image type of {} <{}> and {} <{}> don't match",
+                                     inputStackSources[0].toString(),
+                                     info.toString(),
+                                     input2ndStackSources[0].toString(),
+                                     tmpInfo.toString()));
       }
     } else {
       if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
@@ -458,7 +456,7 @@ void ZStitchImage::doWork()
 
         img.save(m_resFileName);
 
-        LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
+        LOG(INFO) << fmt::format("{} saved.", m_resFileName);
         return;
       }
       throw ZException("Need at least two images to do stitching.");
@@ -473,11 +471,11 @@ void ZStitchImage::doWork()
       for (size_t i = 1; i < inputStackSources.size(); ++i) {
         auto tmpInfo = ZImg::readImgInfo(inputStackSources[i]);
         if (!tmpInfo.isSameType(info)) {
-          throw ZException(QString("Image type of %1 <%2> and %3 <%4> don't match")
-                             .arg(inputStackSources[0].toQString())
-                             .arg(info.toQString())
-                             .arg(inputStackSources[i].toQString())
-                             .arg(tmpInfo.toQString()));
+          throw ZException(fmt::format("Image type of {} <{}> and {} <{}> don't match",
+                                       inputStackSources[0].toString(),
+                                       info.toString(),
+                                       inputStackSources[i].toString(),
+                                       tmpInfo.toString()));
         }
       }
       if (hasStack2) {
@@ -487,11 +485,11 @@ void ZStitchImage::doWork()
         for (auto& input2ndStackSource : input2ndStackSources) {
           auto tmpInfo = ZImg::readImgInfo(input2ndStackSource);
           if (!tmpInfo.isSameType(info)) {
-            throw ZException(QString("Image type of %1 <%2> and %3 <%4> don't match")
-                               .arg(inputStackSources[0].toQString())
-                               .arg(info.toQString())
-                               .arg(input2ndStackSource.toQString())
-                               .arg(tmpInfo.toQString()));
+            throw ZException(fmt::format("Image type of {} <{}> and {} <{}> don't match",
+                                         inputStackSources[0].toString(),
+                                         info.toString(),
+                                         input2ndStackSource.toString(),
+                                         tmpInfo.toString()));
           }
         }
       }
@@ -545,15 +543,15 @@ void ZStitchImage::doWork()
           }
         }
       } else {
-        throw ZException(QString("do not know how to split the input image to %1 parts.").arg(nStacks));
+        throw ZException(fmt::format("do not know how to split the input image to {} parts.", nStacks));
       }
     } else {
-      throw ZException(QString("number of inputs %1 does not match number of stacks %2 to stitch.")
-                         .arg(m_inputFilenames.size())
-                         .arg(nStacks));
+      throw ZException(fmt::format("number of inputs {} does not match number of stacks {} to stitch.",
+                                   m_inputFilenames.size(),
+                                   nStacks));
     }
 
-    LOG(INFO) << QString("Stitching %1 images ...").arg(nStacks);
+    LOG(INFO) << fmt::format("Stitching {} images ...", nStacks);
     for (const auto& ss : inputStackSources) {
       LOG(INFO) << ss.toQString();
     }
@@ -634,12 +632,12 @@ void ZStitchImage::doWork()
                                                                                   &maxNCC);
           offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
 
-          QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-                           .arg(f + 1)
-                           .arg(m + 1)
-                           .arg(imgNCCMatch.positionHintToQString())
-                           .arg(movingImgOffset.toQString())
-                           .arg(maxNCC);
+          auto info = fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
+                                  f + 1,
+                                  m + 1,
+                                  imgNCCMatch.positionHintToQString(),
+                                  movingImgOffset.toString(),
+                                  maxNCC);
 
           LOG(INFO) << info;
         } else {
@@ -660,12 +658,12 @@ void ZStitchImage::doWork()
           movingImgOffset.c = oneImgInfo.numChannels;
           offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
 
-          QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-                           .arg(f + 1)
-                           .arg(m + 1)
-                           .arg(imgNCCMatch.positionHintToQString())
-                           .arg(movingImgOffset.toQString())
-                           .arg(maxNCC);
+          auto info = fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
+                                  f + 1,
+                                  m + 1,
+                                  imgNCCMatch.positionHintToQString(),
+                                  movingImgOffset.toString(),
+                                  maxNCC);
 
           LOG(INFO) << info;
         }
@@ -744,7 +742,7 @@ void ZStitchImage::doWork()
     }
   }
 
-  LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
+  LOG(INFO) << fmt::format("{} saved.", m_resFileName);
   Q_EMIT resultReady(m_resFileName);
 }
 
@@ -1007,7 +1005,7 @@ void ZStitchImage::doRestitch()
       size_t radiusX = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.width(), movingImg.width()));
       size_t radiusY = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.height(), movingImg.height()));
       size_t radiusZ = std::ceil(m_maxOverlapRate / 5.0 * std::max(fixedImg.depth(), movingImg.depth()));
-      LOG(INFO) << QString("radius: %1, %2, %3").arg(radiusX).arg(radiusY).arg(radiusZ);
+      LOG(INFO) << fmt::format("radius: {}, {}, {}", radiusX, radiusY, radiusZ);
 
       double maxNCC;
       ZVoxelCoordinate movingImgOffset = imgNCCMatch.refineMovingImgOffsetMR(initOffset,
@@ -1020,14 +1018,15 @@ void ZStitchImage::doRestitch()
                                                                              &maxNCC);
       offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
 
-      QString info = QString("tile %1 (%2) -- tile %3 (%4), tile %3 initial offset: %5, final offset: %6, NCC: %7")
-                       .arg(f + 1)
-                       .arg(rgns[f].start.toQString())
-                       .arg(m + 1)
-                       .arg(rgns[m].start.toQString())
-                       .arg(initOffset.toQString())
-                       .arg(movingImgOffset.toQString())
-                       .arg(maxNCC);
+      auto info =
+        fmt::format("tile {0} ({1}) -- tile {2} ({3}), tile {2} initial offset: {4}, final offset: {5}, NCC: {6}",
+                    f + 1,
+                    rgns[f].start.toString(),
+                    m + 1,
+                    rgns[m].start.toString(),
+                    initOffset.toString(),
+                    movingImgOffset.toString(),
+                    maxNCC);
 
       LOG(INFO) << info;
     };
@@ -1104,7 +1103,7 @@ void ZStitchImage::doRestitch()
     }
   }
 
-  LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
+  LOG(INFO) << fmt::format("{} saved.", m_resFileName);
   Q_EMIT resultReady(m_resFileName);
 }
 

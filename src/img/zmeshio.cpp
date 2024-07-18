@@ -260,7 +260,7 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh)
     }
   }
   catch (const ZException& e) {
-    throw ZException(QString("Can not load mesh %1: %2").arg(filename).arg(e.what()));
+    throw ZException(fmt::format("Can not load mesh {}: {}", filename, e.what()));
   }
 }
 
@@ -323,7 +323,7 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
     }
   }
   catch (const ZException& e) {
-    throw ZException(QString("Can not save mesh %1: %2").arg(filename).arg(e.what()));
+    throw ZException(fmt::format("Can not save mesh {}: {}", filename, e.what()));
   }
 }
 

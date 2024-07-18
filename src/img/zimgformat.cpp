@@ -36,7 +36,7 @@ void ZImgFormat::checkImgBeforeWriting(const QString& filename,
                                        const ZImgWriteParameters& /*paras*/)
 {
   if (!canWrite(filename)) {
-    throw ZException(QString("filename %1 is not supported for writing").arg(filename));
+    throw ZException(fmt::format("filename {} is not supported for writing", filename));
   }
 }
 
@@ -67,10 +67,10 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
 {
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString(), region.toQString()));
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo.toString(), region.toString()));
   }
   if (dimensionOrderIn != "XYZCT" && dimensionOrderIn != "XYCZT" && dimensionOrderIn != "CXYZT") {
-    throw ZException(QString("Not supported dimension order: %1").arg(dimensionOrderIn));
+    throw ZException(fmt::format("Not supported dimension order: {}", dimensionOrderIn));
   }
   auto dimensionOrder = dimensionOrderIn;
   if (dimensionOrder == "CXYZT" && imgInfo.numChannels == 1) {

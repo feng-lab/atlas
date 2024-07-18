@@ -29,16 +29,16 @@ void ZSectionsRegistration::doWork()
   LOG(INFO) << "Image Info: " << imgSource.toString();
   ZCachedImg srcImg(imgSource);
   if (srcImg.depth() <= 1) {
-    throw ZException(QString("Only one slice. Do not need alignment."));
+    throw ZException("Only one slice. Do not need alignment.");
   }
   if (srcImg.numTimes() > 1) {
-    throw ZException(QString("Can not align time sequence image: %1").arg(srcImg.info().toQString()));
+    throw ZException(fmt::format("Can not align time sequence image: {}", srcImg.info().toString()));
   }
 
   if (m_fixedSliceIndex >= 0 && static_cast<size_t>(m_fixedSliceIndex) < srcImg.depth()) {
     LOG(INFO) << "Fixed Image Index: " << m_fixedSliceIndex + 1 << " (start from 1)";
   } else {
-    throw ZException(QString("Wrong fixed image index: %1. Abort.").arg(m_fixedSliceIndex));
+    throw ZException(fmt::format("Wrong fixed image index: {}. Abort", m_fixedSliceIndex));
   }
 
   if (m_referenceChannel == -1) {
@@ -52,7 +52,7 @@ void ZSectionsRegistration::doWork()
   if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < srcImg.numChannels()) {
     LOG(INFO) << "Reference Channel: " << m_referenceChannel + 1 << " (start from 1)";
   } else {
-    throw ZException(QString("Wrong reference channel: %1. Abort").arg(m_referenceChannel));
+    throw ZException(fmt::format("Wrong reference channel: {}. Abort", m_referenceChannel));
   }
 
   LOG(INFO) << "Remove Background: " << m_removeBackground;

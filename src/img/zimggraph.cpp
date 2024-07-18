@@ -179,7 +179,7 @@ std::vector<double> ZImgGraph::shortestPaths(size_t startIdx, std::vector<size_t
   }
   if (startIdx >= boost::num_vertices(m_graph)) {
     throw ZException(
-      QString("Invalid start idx %1 for shortest path in img region <%2>").arg(startIdx).arg(m_region.toQString()));
+      fmt::format("Invalid start idx {} for shortest path in img region <{}>", startIdx, m_region.toString()));
   }
 
   std::vector<double> distance(boost::num_vertices(m_graph));
@@ -273,7 +273,7 @@ ZImgGraph::shortestPath(size_t startIdx, const std::vector<size_t>& targetIdxs, 
     return std::make_tuple(distance[fg.v], fg.v);
   }
 
-  throw ZException(QString("Didn't find a path from %1 to target points").arg(startIdx));
+  throw ZException(fmt::format("Didn't find a path from {} to target points", startIdx));
 }
 
 void ZImgGraph::updateNeighborDistances()

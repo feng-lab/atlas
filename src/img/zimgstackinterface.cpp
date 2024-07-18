@@ -100,9 +100,7 @@ ZStack* readZStack(const std::string& filename, ZStack* data, QString* error)
       size_t newHeight = static_cast<size_t>(std::floor(img.height() * scale));
       ZImgInfo oldInfo = img.info();
       img.resize(newWidth, newHeight, img.depth(), Interpolant::Cubic);
-      LOG(WARNING) << QString("Image <%1> is too big for Qt to display, resize to <%2>")
-                        .arg(oldInfo.toQString())
-                        .arg(img.info().toQString());
+      LOG(WARNING) << fmt::format("Image <{}> is too big for Qt to display, resize to <{}>", oldInfo.toString(), img.info().toString());
     }
 
     return imgToZStack(img, data);
@@ -146,9 +144,7 @@ ZStack* readZStack(const QStringList& fileList, Dimension catDim, QString* error
       size_t newHeight = static_cast<size_t>(std::floor(img.height() * scale));
       ZImgInfo oldInfo = img.info();
       img.resize(newWidth, newHeight, img.depth(), Interpolant::Cubic);
-      LOG(WARNING) << QString("Image <%1> is too big for Qt to display, resize to <%2>")
-                        .arg(oldInfo.toQString())
-                        .arg(img.info().toQString());
+      LOG(WARNING) << fmt::format("Image <{}> is too big for Qt to display, resize to <{}>", oldInfo.toString(), img.info().toString());
     }
 
     return imgToZStack(img);

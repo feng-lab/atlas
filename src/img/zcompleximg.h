@@ -1,8 +1,8 @@
 #pragma once
 
-#include <QString>
 #include <boost/align/aligned_allocator.hpp>
 #include <complex>
+#include <string>
 #include <vector>
 
 namespace nim {
@@ -68,10 +68,7 @@ public:
     return voxelByteNumber() * m_width * m_height;
   }
 
-  [[nodiscard]] QString toQString() const
-  {
-    return QString("width:%1, height:%2, depth:%3").arg(m_width).arg(m_height).arg(m_depth);
-  }
+  [[nodiscard]] std::string toString() const;
 
   ZComplexImg& conj();
 

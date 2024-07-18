@@ -246,7 +246,7 @@ void ZImgInfo::setVoxelFormat(const QString& dt, size_t validBitCountIn)
   } else if (dt.startsWith("float")) {
     voxelFormat = VoxelFormat::Float;
   } else {
-    throw ZException(QString("invalid data type string %1").arg(dt));
+    throw ZException(fmt::format("invalid data type string {}", dt));
   }
   if (dt.endsWith("8")) {
     bytesPerVoxel = 1;
@@ -257,7 +257,7 @@ void ZImgInfo::setVoxelFormat(const QString& dt, size_t validBitCountIn)
   } else if (dt.endsWith("64")) {
     bytesPerVoxel = 8;
   } else {
-    throw ZException(QString("invalid data type string %1").arg(dt));
+    throw ZException(fmt::format("invalid data type string {}", dt));
   }
   validBitCount = validBitCountIn;
 }

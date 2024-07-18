@@ -124,35 +124,35 @@ void ZSwc::load(const QString& filename)
         bool ok;
         node.id = fieldList[0].toInt(&ok);
         if (!ok || node.id < 0) {
-          throw ZException(QString("Wrong SWC format: %1.").arg(line));
+          throw ZException(fmt::format("Wrong SWC format: {}.", line));
         }
         node.type = fieldList[1].toInt(&ok);
         if (!ok) {
-          throw ZException(QString("Wrong SWC format: %1.").arg(line));
+          throw ZException(fmt::format("Wrong SWC format: {}.", line));
         }
         node.x = fieldList[2].toDouble(&ok);
         if (!ok) {
-          throw ZException(QString("Wrong SWC format: %1.").arg(line));
+          throw ZException(fmt::format("Wrong SWC format: {}.", line));
         }
         node.y = fieldList[3].toDouble(&ok);
         if (!ok) {
-          throw ZException(QString("Wrong SWC format: %1.").arg(line));
+          throw ZException(fmt::format("Wrong SWC format: {}.", line));
         }
         node.z = fieldList[4].toDouble(&ok);
         if (!ok) {
-          throw ZException(QString("Wrong SWC format: %1.").arg(line));
+          throw ZException(fmt::format("Wrong SWC format: {}.", line));
         }
         node.radius = fieldList[5].toDouble(&ok);
         if (!ok) {
-          throw ZException(QString("Wrong SWC format: %1.").arg(line));
+          throw ZException(fmt::format("Wrong SWC format: {}.", line));
         }
         node.parentID = fieldList[6].toInt(&ok);
         if (!ok) {
-          throw ZException(QString("Wrong SWC format: %1.").arg(line));
+          throw ZException(fmt::format("Wrong SWC format: {}.", line));
         }
         nodeMap[node.id] = node;
       } else if (!line.isEmpty()) {
-        throw ZException(QString("Wrong SWC format: %1.").arg(line));
+        throw ZException(fmt::format("Wrong SWC format: {}.", line));
       }
     }
 
@@ -174,7 +174,7 @@ void ZSwc::load(const QString& filename)
     }
   }
   catch (const ZException& e) {
-    throw ZException(QString("Can not load swc %1: %2").arg(filename, e.what()));
+    throw ZException(fmt::format("Can not load swc {}: {}", filename, e.what()));
   }
 }
 
@@ -209,7 +209,7 @@ void ZSwc::save(const QString& filename) const
     }
   }
   catch (const ZException& e) {
-    throw ZException(QString("Can not save swc %1: %2").arg(filename, e.what()));
+    throw ZException(fmt::format("Can not save swc {}: {}", filename, e.what()));
   }
 }
 

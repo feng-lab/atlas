@@ -388,7 +388,7 @@ std::shared_ptr<ZImg> ZImgCZISubBlock::read() const
     return res;
   }
   catch (const ZException& e) {
-    throw ZException(QString("read %1 error: %2").arg(m_filename, e.what()));
+    throw ZException(fmt::format("read {} error: {}", m_filename, e.what()));
   }
 }
 
@@ -414,7 +414,7 @@ ZImgInfo ZImgCZISubBlock::readInfo() const
     return res;
   }
   catch (const ZException& e) {
-    throw ZException(QString("read %1 error: %2").arg(m_filename, e.what()));
+    throw ZException(fmt::format("read {} error: {}", m_filename, e.what()));
   }
 }
 
@@ -1045,7 +1045,7 @@ void ZImgZeissCZI::readCZIInfo(const QString& xmlString)
   }
   // Error handling.
   if (xml.hasError()) {
-    throw ZException(QString("error parsing czi metadata xml: %1").arg(xml.errorString()));
+    throw ZException(fmt::format("error parsing czi metadata xml: {}", xml.errorString()));
   }
   xml.clear();
 }
@@ -1247,7 +1247,7 @@ void ZImgZeissCZI::parseChannel(QXmlStreamReader& xml)
       } else if (pixelTypeStr.compare("Gray64", Qt::CaseInsensitive) == 0) {
         pixelType = 13;
       } else {
-        throw ZException(QString("Not supported czi pixel type: %1").arg(pixelTypeStr));
+        throw ZException(fmt::format("Not supported czi pixel type: {}", pixelTypeStr));
       }
       hasPixelType = true;
     } else if (xml.name() == QString("ComponentBitCount")) {
