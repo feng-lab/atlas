@@ -77,7 +77,7 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo& PI, Z
   info.numChannels = PI.cChannel;
   if (PI.cfColorFormat != Y_ONLY && PI.cfColorFormat != NCOMPONENT && PI.cfColorFormat != CF_RGB &&
       PI.cfColorFormat != CF_RGBE) {
-    throw ZIOException("Not supported color type");
+    throw ZException("Not supported color type");
   }
   if (PI.grBit & PK_pixfmtHasAlpha) {
     info.lastChannelIsAlphaChannel = true;
@@ -96,14 +96,14 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo& PI, Z
       info.bytesPerVoxel = 4;
       break;
     default:
-      throw ZIOException("Not supported bit format");
+      throw ZException("Not supported bit format");
   }
 
   if (PI.cbitUnit != info.bytesPerVoxel * info.numChannels * 8) {
     // might be caused by empty channel, try increase channel number
     info.numChannels += 1;
     if (PI.cbitUnit != info.bytesPerVoxel * info.numChannels * 8) {
-      throw ZIOException("Not supported bit unit");
+      throw ZException("Not supported bit unit");
     }
   }
 
@@ -240,7 +240,7 @@ void ZImgJpegXR::readInfo(const QString& filename,
 void ZImgJpegXR::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
 }
 
@@ -250,14 +250,14 @@ void ZImgJpegXR::readThumbnail(const QString& /*filename*/,
                                size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
 }
 
 void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
 
   PKCodecFactory* pCodecFactory = nullptr;
@@ -287,8 +287,8 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   readInfoFromDecoder(pDecoder, PI, info);
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), region.toQString()));
+    throw ZException(
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
   }
 
   if (PI.grBit & PK_pixfmtHasAlpha) {
@@ -412,7 +412,7 @@ void ZImgJpegXR::readMemImg(void* mem, size_t size, void* des, size_t desSize)
   // LOG(INFO) << info.toQString();
 
   if (desSize < info.byteNumber()) {
-    throw ZIOException("buffer space is not enough");
+    throw ZException("buffer space is not enough");
   }
 
   if (PI.grBit & PK_pixfmtHasAlpha) {
@@ -577,7 +577,7 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
 {
   checkBeforeWriting(img.info(), paras);
   if (size < img.byteNumber()) {
-    throw ZIOException("target buffer space is not enough");
+    throw ZException("target buffer space is not enough");
   }
   size_t byteWritten = 0;
 
@@ -709,18 +709,18 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
 void ZImgJpegXR::checkBeforeWriting(const ZImgInfo& info, const ZImgWriteParameters& paras)
 {
   if (paras.compression != Compression::AUTO) {
-    throw ZIOException(fmt::format("compression {} is not supported", paras.compression));
+    throw ZException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1 || info.depth != 1) {
-    throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
+    throw ZException(fmt::format("only 2d image is supported: {}", info.toString()));
   }
   if (!(info.numChannels == 1 || (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
       info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel > 2) {
-    throw ZIOException(QString("image type currently not supported: %1").arg(info.toQString()));
+    throw ZException(fmt::format("image type currently not supported: {}", info.toString()));
   }
   if (paras.jpegXRQuality < 0.01 || paras.jpegXRQuality > 1.) {
-    throw ZIOException(QString("invalid jpeg xr quality: %1").arg(paras.jpegXRQuality));
+    throw ZException(fmt::format("invalid jpeg xr quality: {}", paras.jpegXRQuality));
   }
 }
 

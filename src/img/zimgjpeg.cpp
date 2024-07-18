@@ -69,7 +69,7 @@ void my_error_exit(j_common_ptr cinfo)
 
   /* Create the message */
   (cinfo->err->format_message)(cinfo, errbuffer);
-  throw ZIOException(QString("Libjpeg-turbo error: %1").arg(errbuffer));
+  throw ZIOException(fmt::format("Libjpeg-turbo error: {}", errbuffer));
 }
 
 void createcinfo(jpeg_decompress_struct& cinfo, my_error_mgr& jerr)
@@ -88,7 +88,7 @@ void createcinfo(jpeg_decompress_struct& cinfo, my_error_mgr& jerr)
   //       * We need to clean up the JPEG object, close the input file, and return.
   //       */
   //    jpeg_destroy_decompress(&cinfo);
-  //    throw ZIOException(QString("Libjpeg-turbo error:") + QString(errbuffer));
+  //    throw ZIOException(fmt::format("Libjpeg-turbo error: {}", errbuffer));
   //  }
   /* Now we can initialize the JPEG decompression object. */
   jpeg_create_decompress(&cinfo);
@@ -210,8 +210,8 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
   imgInfo.createDefaultDescriptions();
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString(), region.toQString()));
+    throw ZException(
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo.toString(), region.toString()));
   }
 
   ZImgInfo partialImgInfo = region.clip(imgInfo);
@@ -376,7 +376,7 @@ void ZImgJpeg::readInfo(const QString& filename,
 void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   auto infile = openFile(filename, "rb");
 
@@ -421,7 +421,7 @@ void ZImgJpeg::readThumbnail(const QString& filename,
                              size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   auto infile = openFile(filename, "rb");
 
@@ -499,7 +499,7 @@ void ZImgJpeg::readThumbnail(const QString& filename,
 void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   auto infile = openFile(filename, "rb");
 
@@ -525,22 +525,22 @@ void ZImgJpeg::checkImgBeforeWriting(const QString& filename, const ZImgInfo& in
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (paras.compression != Compression::AUTO) {
-    throw ZIOException(fmt::format("compression {} is not supported", paras.compression));
+    throw ZException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1 || info.depth != 1) {
-    throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
+    throw ZException(fmt::format("only 2d image is supported: {}", info.toString()));
   }
   if (!(info.numChannels == 1 || (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
       info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel > 1) {
-    throw ZIOException(QString("image can not be represented as jpeg: %1").arg(info.toQString()));
+    throw ZException(fmt::format("image can not be represented as jpeg: {}", info.toString()));
   }
   if (paras.jpegChrominanceSubsampling != 444 && paras.jpegChrominanceSubsampling != 422 &&
       paras.jpegChrominanceSubsampling != 420) {
-    throw ZIOException(QString("unsupported chrominance subsampling: %1").arg(paras.jpegChrominanceSubsampling));
+    throw ZException(fmt::format("unsupported chrominance subsampling: {}", paras.jpegChrominanceSubsampling));
   }
   if (paras.jpegQuality < 1 || paras.jpegQuality > 100) {
-    throw ZIOException(fmt::format("invalid jpeg quality: {}", paras.jpegQuality));
+    throw ZException(fmt::format("invalid jpeg quality: {}", paras.jpegQuality));
   }
 }
 
@@ -577,7 +577,7 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
 
   tjhandle tjInstance = nullptr;
   if ((tjInstance = tjInitCompress()) == nullptr) {
-    throw ZIOException(QString("libjpeg-turbo: initializing compressor: %1").arg(tjGetErrorStr2(tjInstance)));
+    throw ZIOException(fmt::format("libjpeg-turbo: initializing compressor: {}", tjGetErrorStr2(tjInstance)));
   }
   auto guard1 = folly::makeGuard([&tjInstance]() {
     if (tjInstance) {
@@ -606,7 +606,7 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
                   chrominanceSubsampling,
                   paras.jpegQuality,
                   flags) < 0) {
-    throw ZIOException(QString("libjpeg-turbo: compressing image: %1").arg(tjGetErrorStr2(tjInstance)));
+    throw ZIOException(fmt::format("libjpeg-turbo: compressing image: {}", tjGetErrorStr2(tjInstance)));
   }
 
   auto outfile = openFile(filename, "wb");

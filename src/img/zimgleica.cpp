@@ -150,13 +150,13 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
   detectInfos(infos, leicaImageInfos);
 
   if (scene >= infos.size()) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   ZImgInfo& info = infos[scene];
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), region.toQString()));
+    throw ZException(
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
   }
 
   ZImgRegion rgn = region;
@@ -216,7 +216,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
           dimensionStrides[4] = dd.bytesInc;
           break;
         default:
-          throw ZIOException(QString("impossible dimension %1").arg(dd.dimID));
+          throw ZException(fmt::format("impossible dimension {}", dd.dimID));
       }
     }
     if (dimensionStrides[0] == 0) {
@@ -304,7 +304,7 @@ int ZImgLeica::parseLIFVersion(const QString& xmlString)
       if (attributes.hasAttribute("Version")) {
         res = attributes.value("Version").toInt(&ok);
         if (!ok) {
-          throw ZIOException("Can not parse Leica file version");
+          throw ZException("Can not parse Leica file version");
         }
       }
       return res;
@@ -410,7 +410,7 @@ void ZImgLeica::readXml(const QString& filename,
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else {
-          throw ZIOException(QString("not supported leica lif version: %1").arg(majorVersion));
+          throw ZIOException(fmt::format("not supported leica lif version: {}", majorVersion));
         }
       } while (true);
     }
@@ -444,7 +444,7 @@ void ZImgLeica::readLeicaInfo(const QString& xmlString, const QDir& xmlDir, std:
   }
   // Error handling.
   if (xml.hasError()) {
-    throw ZIOException(QString("error parsing leica metadata xml: %1").arg(xml.errorString()));
+    throw ZException(fmt::format("error parsing leica metadata xml: {}", xml.errorString()));
   }
   xml.clear();
 }
@@ -476,14 +476,14 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
   if (attributes.hasAttribute("Visibility")) {
     int v = attributes.value("Visibility").toInt(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse leica element Visibility");
+      throw ZException("Can not parse leica element Visibility");
     }
     visibilityInvalid = v != 1;
   }
   if (attributes.hasAttribute("CopyOption")) {
     int v = attributes.value("CopyOption").toInt(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse leica element CopyOption");
+      throw ZException("Can not parse leica element CopyOption");
     }
     copyOptionInvalid = v != 1;
   }
@@ -510,38 +510,38 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                       attributes = xml.attributes();
                       cd.dataType = attributes.value("DataType").toInt(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica ChannelDescription DataType");
+                        throw ZException("Can not parse leica ChannelDescription DataType");
                       }
                       cd.channelTag = attributes.value("ChannelTag").toInt(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica ChannelDescription ChannelTag");
+                        throw ZException("Can not parse leica ChannelDescription ChannelTag");
                       }
                       cd.resolution = attributes.value("Resolution").toUInt(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica ChannelDescription Resolution");
+                        throw ZException("Can not parse leica ChannelDescription Resolution");
                       }
                       cd.nameOfMeasuredQuantity = attributes.value("NameOfMeasuredQuantity").toString();
                       cd.min = attributes.value("Min").toDouble(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica ChannelDescription Min");
+                        throw ZException("Can not parse leica ChannelDescription Min");
                       }
                       cd.max = attributes.value("Max").toDouble(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica ChannelDescription Max");
+                        throw ZException("Can not parse leica ChannelDescription Max");
                       }
                       cd.unit = attributes.value("Unit").toString();
                       cd.LUTName = attributes.value("LUTName").toString();
                       cd.isLUTInverted = attributes.value("IsLUTInverted").toInt(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica ChannelDescription isLUTInverted");
+                        throw ZException("Can not parse leica ChannelDescription isLUTInverted");
                       }
                       cd.bytesInc = attributes.value("BytesInc").toULongLong(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica ChannelDescription BytesInc");
+                        throw ZException("Can not parse leica ChannelDescription BytesInc");
                       }
                       cd.bitInc = attributes.value("BitInc").toUInt(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica ChannelDescription BitInc");
+                        throw ZException("Can not parse leica ChannelDescription BitInc");
                       }
                       imageInfo.channels.push_back(cd);
                     }
@@ -554,28 +554,28 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                       attributes = xml.attributes();
                       dd.dimID = attributes.value("DimID").toInt(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica DimensionDescription DimID");
+                        throw ZException("Can not parse leica DimensionDescription DimID");
                       }
                       dd.numberOfElements = attributes.value("NumberOfElements").toUInt(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica DimensionDescription NumberOfElements");
+                        throw ZException("Can not parse leica DimensionDescription NumberOfElements");
                       }
                       dd.origin = attributes.value("Origin").toDouble(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica DimensionDescription Origin");
+                        throw ZException("Can not parse leica DimensionDescription Origin");
                       }
                       dd.length = attributes.value("Length").toDouble(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica DimensionDescription Length");
+                        throw ZException("Can not parse leica DimensionDescription Length");
                       }
                       dd.unit = attributes.value("Unit").toString();
                       dd.bytesInc = attributes.value("BytesInc").toULongLong(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica DimensionDescription BytesInc");
+                        throw ZException("Can not parse leica DimensionDescription BytesInc");
                       }
                       dd.bitInc = attributes.value("BitInc").toUInt(&ok);
                       if (!ok) {
-                        throw ZIOException("Can not parse leica DimensionDescription BitInc");
+                        throw ZException("Can not parse leica DimensionDescription BitInc");
                       }
                       imageInfo.dimensions.push_back(dd);
                     }
@@ -591,17 +591,17 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
               if (attributes.hasAttribute("NumberOfTimeStamps")) {
                 uint64_t nts = attributes.value("NumberOfTimeStamps").toULongLong(&ok);
                 if (!ok) {
-                  throw ZIOException("Can not parse leica TimeStampList NumberOfTimeStamps");
+                  throw ZException("Can not parse leica TimeStampList NumberOfTimeStamps");
                 }
                 QString tsText = xml.readElementText();
                 QStringList nums = tsText.split(" ", Qt::SkipEmptyParts);
                 if (uint64_t(nums.size()) != nts) {
-                  throw ZIOException("TimeStampList NumberOfTimeStamps does not match actual number");
+                  throw ZException("TimeStampList NumberOfTimeStamps does not match actual number");
                 }
                 for (const auto& num : nums) {
                   values.push_back(num.toULongLong(&ok, 16));
                   if (!ok) {
-                    throw ZIOException(QString("Can not parse leica TimeStamp string: %1").arg(num));
+                    throw ZException(fmt::format("Can not parse leica TimeStamp string: {}", num));
                   }
                 }
               } else {
@@ -610,15 +610,15 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                     attributes = xml.attributes();
                     uint64_t highInteger = attributes.value("HighInteger").toULongLong(&ok);
                     if (!ok) {
-                      throw ZIOException("Can not parse leica TimeStamp HighInteger");
+                      throw ZException("Can not parse leica TimeStamp HighInteger");
                     }
                     uint64_t lowInteger = attributes.value("LowInteger").toULongLong(&ok);
                     if (!ok) {
-                      throw ZIOException("Can not parse leica TimeStamp LowInteger");
+                      throw ZException("Can not parse leica TimeStamp LowInteger");
                     }
                     values.push_back((highInteger << 32) + lowInteger);
                   } else {
-                    throw ZIOException(QString("invalid child of leica TimeStampList: %1").arg(xml.name().toString()));
+                    throw ZException(fmt::format("invalid child of leica TimeStampList: {}", xml.name()));
                   }
                   xml.skipCurrentElement();
                 }
@@ -645,7 +645,7 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
       attributes = xml.attributes();
       imageInfo.imageMemory.size = attributes.value("Size").toULongLong(&ok);
       if (!ok) {
-        throw ZIOException("Can not parse leica Memory Size");
+        throw ZException("Can not parse leica Memory Size");
       }
       imageInfo.imageMemory.memoryBlockID = attributes.value("MemoryBlockID").toString();
       while (xml.readNextStartElement()) {
@@ -656,11 +656,11 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
           fp = xmlDir.filePath(fp);
           uint64_t foffset = attributes.value("Offset").toULongLong(&ok);
           if (!ok) {
-            throw ZIOException("Can not parse leica Memory Block/Frame Offset");
+            throw ZException("Can not parse leica Memory Block/Frame Offset");
           }
           uint64_t fsize = attributes.value("Size").toULongLong(&ok);
           if (!ok) {
-            throw ZIOException("Can not parse leica Memory Block/Frame Size");
+            throw ZException("Can not parse leica Memory Block/Frame Size");
           }
           imageInfo.imageMemory.fileNames.push_back(fp);
           imageInfo.imageMemory.fileOffsets.push_back(foffset);
@@ -799,8 +799,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
           di.name = "Loop";
           break;
         default:
-          throw ZIOException("impossible dimension");
-          break;
+          throw ZException("impossible dimension");
       }
       dims.push_back(di);
     }
@@ -961,12 +960,11 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
           info.numTimes = dd.numberOfElements;
           lastTime = dd.length;
           if (dd.unit.compare("s", Qt::CaseInsensitive) != 0) {
-            throw ZIOException(
-              QString("unhandled time unit %1, please send this message to flq@live.com").arg(dd.unit));
+            throw ZException(fmt::format("unhandled time unit {}, please send this message to flq@live.com", dd.unit));
           }
           break;
         default:
-          throw ZIOException(QString("impossible dimension %1").arg(dd.dimID));
+          throw ZException(fmt::format("impossible dimension {}", dd.dimID));
       }
       if (dd.dimID == 1 || dd.dimID == 2 || dd.dimID == 3) {
         //"none", "inch", "cm", "mm", "um", "nm", "m", "hm", "km"
@@ -1012,7 +1010,7 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
       channelOffsets.push_back(cd.bytesInc);
     }
     if (dataTypes.size() != 1) {
-      throw ZIOException("inconsistent channel data types");
+      throw ZException("inconsistent channel data types");
     } else {
       switch (*dataTypes.begin()) {
         case 0:
@@ -1022,11 +1020,11 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
           info.voxelFormat = VoxelFormat::Float;
           break;
         default:
-          throw ZIOException("invalid channel data type");
+          throw ZException("invalid channel data type");
       }
     }
     if (resolutions.size() != 1) {
-      throw ZIOException("inconsistent channel resolutions");
+      throw ZException("inconsistent channel resolutions");
     } else {
       uint32_t resl = *resolutions.begin();
       info.validBitCount = resl;
@@ -1037,11 +1035,11 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
     if (channelOffsets.size() > 1) {
       uint64_t channelStride = channelOffsets[1] - channelOffsets[0];
       if (channelStride == 0) {
-        throw ZIOException("invalid channel stride");
+        throw ZException("invalid channel stride");
       }
       for (size_t i = 2; i < channelOffsets.size(); ++i) {
         if (channelOffsets[i] - channelOffsets[i - 1] != channelStride) {
-          throw ZIOException("inconsistent channel strides not supported");
+          throw ZException("inconsistent channel strides not supported");
         }
       }
     }
@@ -1072,11 +1070,10 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
         } else if (cd.LUTName.compare("yellow", Qt::CaseInsensitive) == 0) {
           info.channelColors[i] = col4{255, 255, 0};
         } else if (!cd.LUTName.isEmpty()) {
-          throw ZIOException(
-            QString("unhandled LUT name: %1, please send this message to flq@live.com").arg(cd.LUTName));
+          throw ZException(fmt::format("unhandled LUT name: {}, please send this message to flq@live.com", cd.LUTName));
         }
       } else {
-        throw ZIOException("invalid channel tag");
+        throw ZException("invalid channel tag");
       }
     }
 

@@ -91,30 +91,30 @@ void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgIn
       info.numChannels = 2;
       info.lastChannelIsAlphaChannel = true;
       if (bitDepth < 8) {
-        throw ZIOException("invalid bit depth for gray alpha png");
+        throw ZException("invalid bit depth for gray alpha png");
       }
       break;
     case PNG_COLOR_TYPE_RGB:
       info.numChannels = 3;
       if (bitDepth < 8) {
-        throw ZIOException("invalid bit depth for rgb png");
+        throw ZException("invalid bit depth for rgb png");
       }
       break;
     case PNG_COLOR_TYPE_RGB_ALPHA:
       info.numChannels = 4;
       info.lastChannelIsAlphaChannel = true;
       if (bitDepth < 8) {
-        throw ZIOException("invalid bit depth for rgba png");
+        throw ZException("invalid bit depth for rgba png");
       }
       break;
     case PNG_COLOR_TYPE_PALETTE:
       info.numChannels = 3;
       if (bitDepth > 8) {
-        throw ZIOException("invalid bit depth for palette png");
+        throw ZException("invalid bit depth for palette png");
       }
       break;
     default:
-      throw ZIOException("not supported png colortype");
+      throw ZException("not supported png colortype");
   }
   if (png_get_valid(pngPtr, infoPtr, PNG_INFO_tRNS) && colorType != PNG_COLOR_TYPE_GRAY_ALPHA &&
       colorType != PNG_COLOR_TYPE_RGB_ALPHA) {
@@ -167,7 +167,7 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
           break;
         }
         default:
-          throw ZIOException(QString("Not support png with voxelByteNumber %1").arg(img.voxelByteNumber()));
+          throw ZException(fmt::format("Not support png with voxelByteNumber {}", img.voxelByteNumber()));
       }
     }
   } else {
@@ -195,7 +195,7 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
         }
       }
     } else {
-      throw ZIOException(QString("Not support png with voxelByteNumber %1").arg(img.voxelByteNumber()));
+      throw ZException(fmt::format("Not support png with voxelByteNumber {}", img.voxelByteNumber()));
     }
   }
 }
@@ -271,7 +271,7 @@ void ZImgPng::readInfo(const QString& filename,
 void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
 
   auto infile = openFile(filename, "rb");
@@ -318,7 +318,7 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
   // ZBenchTimer bt("b");
   // bt.start();
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
 
   auto infile = openFile(filename, "rb");
@@ -347,8 +347,8 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
   readInfoFromBuf(png.pngPtr, png.infoPtr, info);
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), region.toQString()));
+    throw ZException(
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
   }
 
   png_byte colorType = png_get_color_type(png.pngPtr, png.infoPtr);
@@ -400,16 +400,16 @@ void ZImgPng::checkImgBeforeWriting(const QString& filename, const ZImgInfo& inf
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (paras.compression != Compression::AUTO && paras.compression != Compression::DEFLATE) {
-    throw ZIOException(fmt::format("compression {} is not supported", paras.compression));
+    throw ZException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1 || info.depth != 1) {
-    throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
+    throw ZException(fmt::format("only 2d image is supported: {}", info.toString()));
   }
   if (!(info.numChannels == 1 || (info.numChannels == 2 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
       info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel > 2) {
-    throw ZIOException(QString("image can not be represented as png: %1").arg(info.toQString()));
+    throw ZException(fmt::format("image can not be represented as png: {}", info.toString()));
   }
 }
 

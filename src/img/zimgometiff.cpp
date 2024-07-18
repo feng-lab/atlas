@@ -14,7 +14,7 @@ void ZImgOmeTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff
       m_imageDescription.contains("<Pixels")) {
     readOmeInfo(tiff);
   } else {
-    throw ZIOException("Not OME Tiff file");
+    throw ZException("Not OME Tiff file");
   }
 }
 
@@ -32,8 +32,9 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
   if (m_imgInfo[0].width != m_omeImgInfo.width || m_imgInfo[0].height != m_omeImgInfo.height ||
       m_imgInfo[0].numChannels != 1 || m_imgInfo[0].bytesPerVoxel != m_omeImgInfo.bytesPerVoxel ||
       m_imgInfo[0].voxelFormat != m_omeImgInfo.voxelFormat) {
-    throw ZIOException(QString("ome meta info <%1> doesn't match image data <%2>")
-                         .arg(m_omeImgInfo.toQString(), m_imgInfo[0].toQString()));
+    throw ZException(fmt::format("ome meta info <{}> doesn't match image data <{}>",
+                                 m_omeImgInfo.toString(),
+                                 m_imgInfo[0].toString()));
   }
 
   m_imgInfo[0].numChannels = m_omeImgInfo.numChannels;
@@ -178,7 +179,7 @@ void ZImgOmeTiff::readOmeInfo(ZTiff& tiff)
   }
   // Error handling.
   if (xml.hasError()) {
-    throw ZIOException(QString("error parsing ome xml: %1").arg(xml.errorString()));
+    throw ZException(fmt::format("error parsing ome xml: {}", xml.errorString()));
   }
   xml.clear();
 }
@@ -228,7 +229,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     double ps = attributes.value("PhysicalSizeX").toString().toDouble(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome PhysicalSizeX");
+      throw ZException("Can not parse ome PhysicalSizeX");
     }
     m_omeImgInfo.voxelSizeX = ps;
   }
@@ -236,7 +237,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     double ps = attributes.value("PhysicalSizeY").toString().toDouble(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome PhysicalSizeY");
+      throw ZException("Can not parse ome PhysicalSizeY");
     }
     m_omeImgInfo.voxelSizeY = ps;
   }
@@ -244,7 +245,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     double ps = attributes.value("PhysicalSizeZ").toString().toDouble(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome PhysicalSizeZ");
+      throw ZException("Can not parse ome PhysicalSizeZ");
     }
     m_omeImgInfo.voxelSizeZ = ps;
   }
@@ -257,7 +258,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     auto sz = attributes.value("SizeX").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome SizeX");
+      throw ZException("Can not parse ome SizeX");
     }
     m_omeImgInfo.width = sz;
   }
@@ -265,7 +266,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     auto sz = attributes.value("SizeY").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome SizeY");
+      throw ZException("Can not parse ome SizeY");
     }
     m_omeImgInfo.height = sz;
   }
@@ -273,7 +274,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     auto sz = attributes.value("SizeZ").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome SizeZ");
+      throw ZException("Can not parse ome SizeZ");
     }
     m_omeImgInfo.depth = sz;
   }
@@ -281,7 +282,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     auto sz = attributes.value("SizeC").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome SizeC");
+      throw ZException("Can not parse ome SizeC");
     }
     m_omeImgInfo.numChannels = sz;
   }
@@ -289,7 +290,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     auto sz = attributes.value("SizeT").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome SizeT");
+      throw ZException("Can not parse ome SizeT");
     }
     m_omeImgInfo.numTimes = sz;
   }
@@ -297,7 +298,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     double ti = attributes.value("TimeIncrement").toString().toDouble(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome TimeIncrement");
+      throw ZException("Can not parse ome TimeIncrement");
     }
     m_omeImgInfo.timeStamps.resize(m_omeImgInfo.numTimes);
     m_omeImgInfo.timeStamps[0] = 0;
@@ -313,7 +314,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     type = attributes.value("PixelType").toString();
   }
   if (type.isEmpty()) {
-    throw ZIOException("Can not find ome PixelType or Type attribute");
+    throw ZException("Can not find ome PixelType or Type attribute");
   } else if (type.compare("int8", Qt::CaseInsensitive) == 0) {
     m_omeImgInfo.bytesPerVoxel = 1;
     m_omeImgInfo.voxelFormat = VoxelFormat::Signed;
@@ -336,7 +337,7 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
     m_omeImgInfo.bytesPerVoxel = 8;
     m_omeImgInfo.voxelFormat = VoxelFormat::Float;
   } else {
-    throw ZIOException(QString("Not supported ome type: %1").arg(type));
+    throw ZException(fmt::format("Not supported ome type: {}", type));
   }
 
   while (xml.readNextStartElement()) {
@@ -361,7 +362,7 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     ifd = attributes.value("IFD").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome TiffData IFD");
+      throw ZException("Can not parse ome TiffData IFD");
     }
     planeCount = 1;
   }
@@ -369,7 +370,7 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     planeCount = attributes.value("PlaneCount").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome TiffData IFD");
+      throw ZException("Can not parse ome TiffData IFD");
     }
   }
   size_t firstZ = 0;
@@ -379,21 +380,21 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
     bool ok;
     firstZ = attributes.value("FirstZ").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome TiffData FirstZ");
+      throw ZException("Can not parse ome TiffData FirstZ");
     }
   }
   if (attributes.hasAttribute("FirstT")) {
     bool ok;
     firstT = attributes.value("FirstT").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome TiffData FirstT");
+      throw ZException("Can not parse ome TiffData FirstT");
     }
   }
   if (attributes.hasAttribute("FirstC")) {
     bool ok;
     firstC = attributes.value("FirstC").toString().toULongLong(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome TiffData FirstC");
+      throw ZException("Can not parse ome TiffData FirstC");
     }
   }
 
@@ -424,7 +425,7 @@ void ZImgOmeTiff::parseChannel(QXmlStreamReader& xml)
     bool ok;
     int32_t color = attributes.value("Color").toString().toInt(&ok);
     if (!ok) {
-      throw ZIOException("Can not parse ome channel Color");
+      throw ZException("Can not parse ome channel Color");
     }
     col4 col;
     std::memcpy(static_cast<void*>(&col), &color, 3);
@@ -469,7 +470,7 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimension
     } else if (info.bytesPerVoxel == 8) {
       xml.writeAttribute("Type", "double");
     } else {
-      throw ZIOException(QString("%1 bytes float pixel?").arg(info.bytesPerVoxel));
+      throw ZException(fmt::format("{} bytes float pixel?", info.bytesPerVoxel));
     }
   } else if (info.voxelFormat == VoxelFormat::Signed) {
     xml.writeAttribute("Type", QString("int%1").arg(info.bytesPerVoxel * 8));

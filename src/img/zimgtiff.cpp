@@ -50,7 +50,7 @@ void ZImgTiff::readMetadata(const QString& filename, ZImgMetadata& meta, size_t 
   readIntoInternalStructure(filename, tiff);
   detectImgInfo(tiff);
   if (scene >= m_imgInfo.size()) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   readMetadataInternal(meta, scene, tiff);
 }
@@ -65,7 +65,7 @@ void ZImgTiff::readThumbnail(const QString& filename,
   readIntoInternalStructure(filename, tiff);
   detectImgInfo(tiff);
   if (scene >= m_imgInfo.size()) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   readThumbnailInternal(thumbnail, region, scene, tiff);
 }
@@ -77,14 +77,14 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   readIntoInternalStructure(filename, tiff);
   detectImgInfo(tiff);
   if (scene >= m_imgInfo.size()) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   const std::vector<ZTiffIFD>& ifds = tiff.ifds();
 
   if (m_isImageJTiff && m_onlyOneIFDInImageJTiff) {
     if (!ifds[0].isNormalImage() || ifds[0].compression() != getTiffCompressionTag(Compression::NONE) ||
         ifds[0].isTiledImage() || ifds[0].stripsPerImage() != 1) {
-      throw ZIOException("Wrong ImageJ Tiff file");
+      throw ZException("Wrong ImageJ Tiff file");
     }
     auto dimensionOrder = m_dimensionOrder;
     dimensionOrder.remove('L');
@@ -101,9 +101,9 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   }
 
   if (region.isEmpty() || !region.isValid(m_imgInfo[scene])) {
-    throw ZIOException(fmt::format("Invalid image region. Image info: '{}', region: '{}'",
-                                   m_imgInfo[scene].toString(),
-                                   region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'",
+                                 m_imgInfo[scene].toString(),
+                                 region.toString()));
   }
 
   ZImgInfo imgInfo2D(m_imgInfo[scene]);
@@ -269,7 +269,7 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
       }
 
       if (images != channels * slices * frames) {
-        throw ZIOException(QString("Not supported ImageJ tiff: %1").arg(m_imageDescription));
+        throw ZException(fmt::format("Not supported ImageJ tiff: {}", m_imageDescription));
       }
 
       if (images > 1 && ifds.size() == 1) {
@@ -334,9 +334,9 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
   const std::vector<ZTiffIFD>& ifds = tiff.ifds();
 
   if (region.isEmpty() || !region.isValid(m_imgInfo[scene])) {
-    throw ZIOException(fmt::format("Invalid image region. Image info: '{}', region: '{}'",
-                                   m_imgInfo[scene].toString(),
-                                   region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'",
+                                 m_imgInfo[scene].toString(),
+                                 region.toString()));
   }
 
   // thumbnail follows image or in subifd
@@ -379,7 +379,7 @@ void ZImgTiff::setDimensionOrder(const QString& order)
   if (isDimensionOrderValid(order)) {
     m_dimensionOrder = order;
   } else {
-    throw ZIOException(QString("Wrong dimension order: %1").arg(order));
+    throw ZException(fmt::format("Wrong dimension order: {}", order));
   }
 }
 

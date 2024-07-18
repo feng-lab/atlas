@@ -54,7 +54,7 @@ void ZImgMetaImage::readThumbnail(const QString& /*filename*/,
 void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   MetaImage metaImage;
   if (!metaImage.Read(QFile::encodeName(filename).constData(), false, nullptr)) {
@@ -64,12 +64,12 @@ void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   ZImgInfo imgInfo;
   parseInfo(metaImage, imgInfo);
   if (imgInfo.isEmpty()) {
-    throw ZIOException("Empty Image");
+    throw ZException("Empty Image");
   }
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString(), region.toQString()));
+    throw ZException(
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo.toString(), region.toString()));
   }
 
   if (region.containsWholeImg(imgInfo)) {
@@ -129,10 +129,10 @@ void ZImgMetaImage::checkImgBeforeWriting(const QString& filename,
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (!(paras.compression == Compression::AUTO || paras.compression == Compression::NONE ||
         paras.compression == Compression::DEFLATE)) {
-    throw ZIOException(fmt::format("compression {} is not supported", paras.compression));
+    throw ZException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1) {
-    throw ZIOException("time sequence image is not supported");
+    throw ZException("time sequence image is not supported");
   }
 }
 
@@ -263,7 +263,7 @@ void ZImgMetaImage::parseInfo(const MetaImage& metaImage, ZImgInfo& info)
     info.height = metaImage.DimSize(1);
     info.depth = metaImage.DimSize(2);
   } else {
-    throw ZIOException(QString("NDims not supported: %1.").arg(ndims));
+    throw ZException(fmt::format("NDims not supported: {}", ndims));
   }
   info.numChannels = metaImage.ElementNumberOfChannels();
   info.numTimes = 1;
@@ -323,7 +323,7 @@ void ZImgMetaImage::parseInfo(const MetaImage& metaImage, ZImgInfo& info)
       info.voxelFormat = VoxelFormat::Float;
       break;
     default:
-      throw ZIOException("Not supported ElementType");
+      throw ZException("Not supported ElementType");
       break;
   }
 

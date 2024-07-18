@@ -14,8 +14,7 @@ TEST(ZImgAutoThreshold, img0515)
     ASSERT_EQ(32, thre);
     STOP_AND_LOG(bt)
   }
-  catch (const ZIOException & e) {
+  catch (const ZException& e) {
     LOG(WARNING) << e.what();
   }
 }
-

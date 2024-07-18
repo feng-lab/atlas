@@ -509,7 +509,7 @@ private:
 };
 
 // Dimension order of ZImg is XYZCT
-// this class might throw ZException or ZIOException if error
+// this class might throw ZException if error
 
 class ZImg
 {

@@ -303,58 +303,58 @@ inline std::ostream& operator<<(std::ostream& s, QKeyCombination v)
 } // namespace nim
 
 template<>
-struct fmt::formatter<QString> : formatter<string_view>
+struct fmt::formatter<QString> : fmt::formatter<fmt::string_view>
 {
   auto format(const QString& s, format_context& ctx)
   {
     auto u8 = s.toUtf8();
-    return formatter<string_view>::format(string_view(u8.data(), u8.size()), ctx);
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
   }
 };
 
 template<>
-struct fmt::formatter<QByteArray> : formatter<string_view>
+struct fmt::formatter<QByteArray> : fmt::formatter<fmt::string_view>
 {
   auto format(const QByteArray& s, format_context& ctx)
   {
-    return formatter<string_view>::format(string_view(s.data(), s.size()), ctx);
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
   }
 };
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 template<>
-struct fmt::formatter<QStringView> : formatter<string_view>
+struct fmt::formatter<QStringView> : fmt::formatter<fmt::string_view>
 {
   auto format(QStringView s, format_context& ctx)
   {
     auto u8 = s.toUtf8();
-    return formatter<string_view>::format(string_view(u8.data(), u8.size()), ctx);
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
   }
 };
 template<>
-struct fmt::formatter<QUtf8StringView> : formatter<string_view>
+struct fmt::formatter<QUtf8StringView> : fmt::formatter<fmt::string_view>
 {
   auto format(QUtf8StringView s, format_context& ctx)
   {
-    return formatter<string_view>::format(string_view(s.data(), s.size()), ctx);
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
   }
 };
 template<>
-struct fmt::formatter<QByteArrayView> : formatter<string_view>
+struct fmt::formatter<QByteArrayView> : fmt::formatter<fmt::string_view>
 {
   auto format(QByteArrayView s, format_context& ctx)
   {
-    return formatter<string_view>::format(string_view(s.data(), s.size()), ctx);
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
   }
 };
 #else
 template<>
-struct fmt::formatter<QStringRef> : formatter<string_view>
+struct fmt::formatter<QStringRef> : fmt::formatter<fmt::string_view>
 {
   auto format(QStringRef s, format_context& ctx)
   {
     auto u8 = s.toUtf8();
-    return formatter<string_view>::format(string_view(u8.data(), u8.size()), ctx);
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
   }
 };
 #endif

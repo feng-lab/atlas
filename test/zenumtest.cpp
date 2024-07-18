@@ -17,12 +17,12 @@ using namespace nim;
   TEST(EnumConversionTests, EnumType##InvalidEnum)                             \
   {                                                                            \
     using TEnum = EnumType;                                                    \
-    EXPECT_THROW(enumToString(static_cast<TEnum>(999)), nim::ZIOException);    \
+    EXPECT_THROW(enumToString(static_cast<TEnum>(999)), nim::ZException);      \
   }                                                                            \
   TEST(EnumConversionTests, EnumType##InvalidString)                           \
   {                                                                            \
     using TEnum = EnumType;                                                    \
-    EXPECT_THROW(stringToEnum<TEnum>("InvalidString"), nim::ZIOException);     \
+    EXPECT_THROW(stringToEnum<TEnum>("InvalidString"), nim::ZException);       \
   }
 
 // Define test cases for each enum type

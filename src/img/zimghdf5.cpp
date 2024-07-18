@@ -54,7 +54,7 @@ void readH5DataToImg(nim::ZImg& img, const H5::DataSet& data, size_t x_, size_t 
   H5::DataSpace filespace = data.getSpace();
 
   if (filespace.getSimpleExtentNdims() != 2) {
-    throw nim::ZIOException("wrong slice data dimension number");
+    throw nim::ZException("wrong slice data dimension number");
   }
 
   hsize_t dims[2];
@@ -62,7 +62,7 @@ void readH5DataToImg(nim::ZImg& img, const H5::DataSet& data, size_t x_, size_t 
   // LOG(INFO) << dims[0] << " " << dims[1] << img.info().toQString() << x_ <<" "<< y_;
 
   if (dims[1] < img.width() + x_ || dims[0] < img.height() + y_) {
-    throw nim::ZIOException("wrong slice data dimension");
+    throw nim::ZException("wrong slice data dimension");
   }
 
   hsize_t offset[2] = {y_, x_};
@@ -147,7 +147,7 @@ void writeFixedValueImgSliceToH5Grp(H5::Group& zGrp,
   pList.setChunk(2, chunkDim);
   if (paras.compression == nim::Compression::JPEGXR) {
     if (img.voxelFormat() != nim::VoxelFormat::Unsigned || img.bytesPerVoxel() > 2) {
-      throw nim::ZIOException("image can not be compressed with jpegxr");
+      throw nim::ZException("image can not be compressed with jpegxr");
     }
     size_t nelements = 4;
     unsigned int values[] = {std::bit_cast<unsigned int>(float(paras.jpegXRQuality)),
@@ -242,7 +242,7 @@ void writeImgSliceToH5Grp(H5::Group& zGrp,
   pList.setChunk(2, chunkDim);
   if (paras.compression == nim::Compression::JPEGXR) {
     if (img.voxelFormat() != nim::VoxelFormat::Unsigned || img.bytesPerVoxel() > 2) {
-      throw nim::ZIOException("image can not be compressed with jpegxr");
+      throw nim::ZException("image can not be compressed with jpegxr");
     }
     size_t nelements = 4;
     unsigned int values[] = {std::bit_cast<unsigned int>(float(paras.jpegXRQuality)),
@@ -347,7 +347,7 @@ void mergeImgToH5DataSetMax(H5::DataSet& imgData,
   H5::DataSpace filespace = imgData.getSpace();
 
   if (filespace.getSimpleExtentNdims() != 2) {
-    throw nim::ZIOException("wrong slice data dimension number");
+    throw nim::ZException("wrong slice data dimension number");
   }
 
   hsize_t dims[2];
@@ -355,7 +355,7 @@ void mergeImgToH5DataSetMax(H5::DataSet& imgData,
   // LOG(INFO) << dims[0] << " " << dims[1] << img.info().toQString() << x_ <<" "<< y_;
 
   if (dims[1] < img.width() + imgCoord.x || dims[0] < img.height() + imgCoord.y) {
-    throw nim::ZIOException("wrong slice data dimension");
+    throw nim::ZException("wrong slice data dimension");
   }
 
   hsize_t offset[2] = {hsize_t(imgCoord.y), hsize_t(imgCoord.x)};
@@ -426,7 +426,7 @@ std::set<size_t> loadRatiosFromH5Grp(const H5::Group& grp)
   {
     H5::Attribute attr = grp.openAttribute("DownsamplingFactors");
     if (attr.getSpace().getSimpleExtentNdims() != 1) {
-      throw nim::ZIOException("wrong levels dimension number");
+      throw nim::ZException("wrong levels dimension number");
     }
     hsize_t dims[1];
     attr.getSpace().getSimpleExtentDims(dims);
@@ -437,7 +437,7 @@ std::set<size_t> loadRatiosFromH5Grp(const H5::Group& grp)
   }
 
   if (numLevels != levels.size() || levels.empty() || levels[0] != 1) {
-    throw nim::ZIOException("invalid levels");
+    throw nim::ZException("invalid levels");
   }
 
   std::set<size_t> res;
@@ -837,7 +837,7 @@ void ZImgHDF5::readInfo(const QString& filename,
       //          hsize_t chunk_dims[2];
       //          auto rank_chunk = pList.getChunk(2, chunk_dims);
       //          if (rank_chunk != 2) {
-      //            throw ZIOException(QString("invalid rank of chunk dim %1").arg(rank_chunk));
+      //            throw ZException(QString("invalid rank of chunk dim %1").arg(rank_chunk));
       //          }
       //          chunkHeight = chunk_dims[0];
       //          chunkWidth = chunk_dims[1];
@@ -957,7 +957,7 @@ void ZImgHDF5::readImg(const QString& filename,
     ZImgInfo info = ZImgInfoIO::load(allGrp);
 
     if (region.isEmpty() || !region.isValid(info)) {
-      throw ZIOException(
+      throw ZException(
         fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
     }
 

@@ -64,8 +64,7 @@ TEST(ZImgConnectedComponents, text)
     ASSERT_EQ(size_t(61095), CC.voxelIdxList[85][7]);
     ASSERT_EQ(size_t(61096), CC.voxelIdxList[85][8]);
   }
-  catch (const ZIOException & e) {
+  catch (const ZException& e) {
     LOG(WARNING) << e.what();
   }
 }
-

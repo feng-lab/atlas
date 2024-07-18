@@ -170,8 +170,8 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   ZImgInfo info = infoFromHead(colorSpec, geometry);
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
+    throw ZException(
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
   }
 
   Image imagePn;
@@ -274,7 +274,7 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
 void ZImgJpeg2000::writeImg(const QString& filename, const ZImg& img, Compression)
 {
   if (!img.is2DImg() || (img.numChannels() != 1 && img.numChannels() != 3) || img.bytesPerVoxel() > 2) {
-    throw ZIOException("only support 8 and 16 bit grayscale or RGB 2d image");
+    throw ZException("only support 8 and 16 bit grayscale or RGB 2d image");
   }
   CStdFileOutput out;
   if (!BaseStream::IsOk(out.Open(qPrintable(filename)))) {

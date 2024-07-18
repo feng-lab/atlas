@@ -148,7 +148,7 @@ void ZImgITKImage::readThumbnail(const QString& /*filename*/,
 void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
 
   try {
@@ -171,9 +171,8 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     parseInfo(imageIO.GetPointer(), imgInfo, isNd2);
 
     if (region.isEmpty() || !region.isValid(imgInfo)) {
-      throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'")
-                           .arg(imgInfo.toQString())
-                           .arg(region.toQString()));
+      throw ZException(
+        fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo.toString(), region.toString()));
     }
 
     if (isNd2) {
@@ -316,14 +315,14 @@ void ZImgITKImage::checkImgBeforeWriting(const QString& filename,
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (!filename.endsWith(".nrrd", Qt::CaseInsensitive)) {
-    throw ZIOException("only support nrrd format for now");
+    throw ZException("only support nrrd format for now");
   }
   if (!(paras.compression == Compression::AUTO || paras.compression == Compression::NONE ||
         paras.compression == Compression::DEFLATE)) {
-    throw ZIOException(fmt::format("compression {} is not supported", paras.compression));
+    throw ZException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1) {
-    throw ZIOException("time sequence image is not supported");
+    throw ZException("time sequence image is not supported");
   }
 }
 
@@ -380,7 +379,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
     info.numTimes = imageIO->GetDimensions(3);
     info.numChannels = imageIO->GetDimensions(4);
   } else {
-    throw ZIOException(QString("NDims not supported: %1.").arg(ndims));
+    throw ZException(fmt::format("NDims not supported: {}", ndims));
   }
   if (!isNd2) {
     info.numChannels = imageIO->GetNumberOfComponents();
@@ -427,7 +426,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
       info.voxelFormat = VoxelFormat::Float;
       break;
     default:
-      throw ZIOException("Not supported ElementType");
+      throw ZException("Not supported ElementType");
   }
 
   info.voxelSizeUnit = VoxelSizeUnit::mm;
@@ -449,7 +448,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
   }
 
   if (info.isEmpty()) {
-    throw ZIOException("Empty Image");
+    throw ZException("Empty Image");
   }
 
   if (isNd2) {
@@ -495,7 +494,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
           bool ok;
           int32_t color = tagvalue.toInt(&ok);
           if (!ok) {
-            throw ZIOException("Can not parse nd2 channel Color");
+            throw ZException("Can not parse nd2 channel Color");
           }
           col4 col;
           std::memcpy(&col, &color, 3);

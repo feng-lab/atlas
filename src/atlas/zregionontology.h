@@ -50,7 +50,7 @@ struct RegionNode
   //  }
 };
 
-// ZIOException
+// ZException
 void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology);
 
 void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionNode>& ontology);
