@@ -821,96 +821,10 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
 
 def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     print(nasm_dir)
-    # ssl_src_dir = os.path.join(src_dir, 'third_party', 'boringssl-with-bazel')
-    # ssl_install_dir = ext_build_dir()
-    # ssl_build_dir = create_build_dir(src_dir)
-    # try:
-    #     cmakecmd = get_cmake_cmd_common_part(ssl_install_dir)
-    #     if is_windows():
-    #         cmakecmd.extend(['-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '\\nasm.exe',
-    #                          ssl_src_dir])
-    #     else:
-    #         cmakecmd.extend([ssl_src_dir])
-    #     build_cmakecmd(cmakecmd, ssl_build_dir)
-    #     distutils.dir_util.copy_tree(os.path.join(ssl_src_dir, 'src', 'include'),
-    #                                  os.path.join(ssl_install_dir, 'include'))
-    #     if is_windows():
-    #         glob_copy(os.path.join(ssl_build_dir, '*.lib'), os.path.join(ssl_install_dir, 'lib'))
-    #         glob_copy(os.path.join(ssl_build_dir, 'decrepit', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
-    #         glob_copy(os.path.join(ssl_build_dir, 'crypto', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
-    #         glob_copy(os.path.join(ssl_build_dir, 'ssl', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
-    #     else:
-    #         glob_copy(os.path.join(ssl_build_dir, 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-    #         glob_copy(os.path.join(ssl_build_dir, 'decrepit', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-    #         glob_copy(os.path.join(ssl_build_dir, 'crypto', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-    #         glob_copy(os.path.join(ssl_build_dir, 'ssl', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-    # finally:
-    #     shutil.rmtree(ssl_build_dir, ignore_errors=False)
-
-    # sub_src_dir = os.path.join(src_dir, 'third_party', 'cares', 'cares')
-    # sub_install_dir = ext_build_dir()
-    # sub_build_dir = create_build_dir(src_dir)
-    # try:
-    #     cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
-    #     cmakecmd.extend(['-DCARES_SHARED:BOOL=OFF',
-    #                      '-DCARES_STATIC:BOOL=ON',
-    #                      '-DCARES_STATIC_PIC:BOOL=ON',
-    #                      sub_src_dir])
-    #     build_and_install_cmakecmd(cmakecmd, sub_build_dir)
-    # finally:
-    #     shutil.rmtree(sub_build_dir, ignore_errors=False)
-
-    sub_src_dir = os.path.join(src_dir, 'third_party', 'abseil-cpp')
-    sub_install_dir = ext_build_dir()
-    sub_build_dir = create_build_dir(src_dir)
-    try:
-        cmakecmd = get_cmake_cmd_common_part(sub_install_dir, universal=True)
-        cmakecmd.extend(['-DABSL_USE_EXTERNAL_GOOGLETEST:BOOL=ON',
-                         '-DABSL_PROPAGATE_CXX_STD:BOOL=OFF',
-                         '-DABSL_BUILD_TESTING:BOOL=OFF',
-                         '-DBUILD_TESTING:BOOL=OFF',
-                         '-DCMAKE_POSITION_INDEPENDENT_CODE=TRUE',
-                         ])
-
-        cmakecmd.extend([sub_src_dir])
-        build_and_install_cmakecmd(cmakecmd, sub_build_dir)
-    finally:
-        shutil.rmtree(sub_build_dir, ignore_errors=False)
-
-    sub_src_dir = os.path.join(src_dir, 'third_party', 'protobuf')
-    sub_install_dir = ext_build_dir()
-    sub_build_dir = create_build_dir(src_dir)
-    try:
-        cmakecmd = get_cmake_cmd_common_part(sub_install_dir, universal=True)
-        cmakecmd.extend(['-Dprotobuf_BUILD_TESTS:BOOL=OFF',
-                         '-Dprotobuf_WITH_ZLIB:BOOL=ON',
-                         '-Dprotobuf_MSVC_STATIC_RUNTIME:BOOL=OFF',
-                         '-Dprotobuf_BUILD_SHARED_LIBS:BOOL=OFF',
-                         '-Dprotobuf_ABSL_PROVIDER=package'])
-
-        cmakecmd.extend([sub_src_dir])
-        build_and_install_cmakecmd(cmakecmd, sub_build_dir)
-
-        # orig_file_2 = os.path.join(sub_install_dir, 'lib', 'cmake', 'protobuf', 'protobuf-config.cmake')
-        # if is_windows():
-        #     orig_file_2 = os.path.join(sub_install_dir, 'cmake', 'protobuf-config.cmake')
-        # patch_file(orig_file_2,
-        #            from_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_rel_dir}/${_basename}${_ext}'],
-        #            to_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_basename}${_ext}'])
-    finally:
-        shutil.rmtree(sub_build_dir, ignore_errors=False)
 
     build_dir = create_build_dir(src_dir)
     orig_file = bak_file = None
-    orig_file1 = bak_file1 = None
     try:
-        # if is_linux() and not use_clang_in_linux():
-        #     orig_file = os.path.join(src_dir, 'src', 'core', 'ext', 'gcp', 'metadata_query.cc')
-        #     bak_file = patch_file(orig_file,
-        #                           from_texts=[r'constexpr const char MetadataQuery',
-        #                                       ],
-        #                           to_texts=[r'const char MetadataQuery',
-        #                                     ])
         if is_mac():
             orig_file = os.path.join(src_dir, 'cmake', 'gRPCConfig.cmake.in')
             bak_file = patch_file(orig_file,
@@ -918,30 +832,18 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                                               ],
                                   to_texts=[r'if(1)',
                                             ])
-        orig_file1 = os.path.join(src_dir, 'src', 'core', 'lib', 'promise', 'detail', 'promise_like.h')
-        bak_file1 = patch_file(orig_file1,
-                               from_texts=[r'typename std::result_of<F()>::type>::value>> {',
-                                           ],
-                               to_texts=[r"""#if (defined(__cpp_lib_is_invocable) && __cpp_lib_is_invocable >= 201703L) || \
-    (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
-                         std::invoke_result_t<F>
-#else
-                         typename std::result_of<F()>::type
-#endif
-                         >::value>> {""",
-                                         ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
                          '-DgRPC_BUILD_TESTS:BOOL=OFF',
                          '-DgRPC_MSVC_STATIC_RUNTIME:BOOL=OFF' if is_windows() else '',
                          '-DgRPC_ZLIB_PROVIDER:STRING=package',
-                         '-DgRPC_PROTOBUF_PROVIDER=package',
+                         '-DgRPC_PROTOBUF_PROVIDER=module',
                          '-DgRPC_CARES_PROVIDER=module',
                          '-DgRPC_SSL_PROVIDER=package',
                          f'-DOPENSSL_ROOT_DIR:PATH={install_dir}',
                          '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
-                         '-DgRPC_ABSL_PROVIDER:STRING=package',
+                         '-DgRPC_ABSL_PROVIDER:STRING=module',
                          '-DgRPC_RE2_PROVIDER:STRING=module',
                          ])
 
@@ -949,11 +851,8 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        # if is_linux() and not use_clang_in_linux():
-        #     os.replace(bak_file, orig_file)
         if is_mac():
             os.replace(bak_file, orig_file)
-        os.replace(bak_file1, orig_file1)
 
 
 def build_bzip2(src_dir: str, install_dir: str):

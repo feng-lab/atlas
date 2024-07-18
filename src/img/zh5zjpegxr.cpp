@@ -24,7 +24,7 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       ZImgInfo info;
       ZImgJpegXR::readMemInfo(*buf, *buf_size, info);
       if (nullptr == (outBuf = H5allocate_memory(info.byteNumber(), false))) {
-        throw ZIOException("error calling H5allocate_memory");
+        throw ZException("error calling H5allocate_memory");
       }
       ZImgJpegXR::readMemImg(*buf, nbytes, outBuf, info.byteNumber());
 
@@ -37,12 +37,12 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       // write data, e.g., compress data
       ZImgWriteParameters paras;
       if (cd_nelmts < 4) {
-        throw ZIOException("not enough parameters");
+        throw ZException("not enough parameters");
       }
       paras.jpegXRQuality = std::bit_cast<float>(cd_values[0]);
       ZImgInfo info(cd_values[3], cd_values[2], 1, 1, 1, cd_values[1]);
       if (nbytes < info.byteNumber()) {
-        throw ZIOException("not enough data to compress");
+        throw ZException("not enough data to compress");
       }
       ZImg img;
       img.wrapData(*buf, info);
@@ -57,7 +57,7 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       auto byteWritten = ZImgJpegXR::writeImgToMem(img, paras, memBuf.get(), info.byteNumber());
       // LOG(INFO) << byteWritten;
       if (byteWritten > info.byteNumber()) {
-        throw ZIOException("compression overflow");
+        throw ZException("compression overflow");
       }
       memcpy(*buf, memBuf.get(), byteWritten);
       retValue = byteWritten;

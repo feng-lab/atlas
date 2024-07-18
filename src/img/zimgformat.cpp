@@ -36,7 +36,7 @@ void ZImgFormat::checkImgBeforeWriting(const QString& filename,
                                        const ZImgWriteParameters& /*paras*/)
 {
   if (!canWrite(filename)) {
-    throw ZIOException(QString("filename %1 is not supported for writing").arg(filename));
+    throw ZException(QString("filename %1 is not supported for writing").arg(filename));
   }
 }
 
@@ -66,11 +66,11 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
                             size_t timeStride)
 {
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZIOException(
+    throw ZException(
       QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString(), region.toQString()));
   }
   if (dimensionOrderIn != "XYZCT" && dimensionOrderIn != "XYCZT" && dimensionOrderIn != "CXYZT") {
-    throw ZIOException(QString("Not supported dimension order: %1").arg(dimensionOrderIn));
+    throw ZException(QString("Not supported dimension order: %1").arg(dimensionOrderIn));
   }
   auto dimensionOrder = dimensionOrderIn;
   if (dimensionOrder == "CXYZT" && imgInfo.numChannels == 1) {
@@ -192,8 +192,8 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
   ZImg res;
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString(), region.toQString()));
+    throw ZException(
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo.toString(), region.toQString()));
   }
 
   CHECK(dimensionStrides.size() == 5);
@@ -207,8 +207,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
     auto idx = sortedIndexes[i];
     packedStrides[idx] = packedPrev;
     if (dimensionStrides[idx] < prev) {
-      throw ZIOException(QString("invalid dimensionStrides %1 for image %2")
-                           .arg(qtTypeToQString(dimensionStrides), imgInfo.toQString()));
+      throw ZException(fmt::format("invalid dimensionStrides {} for image {}", dimensionStrides, imgInfo.toString()));
     }
     packedPrev = packedStrides[idx] * imgInfo.size(idx);
     prev = dimensionStrides[idx] * imgInfo.size(idx);

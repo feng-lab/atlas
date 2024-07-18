@@ -93,7 +93,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
       } else if (strBuf == "hm") {
         info.voxelSizeUnit = VoxelSizeUnit::hm;
       } else {
-        throw ZIOException(fmt::format("invalid voxel size unit {}", strBuf));
+        throw ZException(fmt::format("invalid voxel size unit {}", strBuf));
       }
     }
 
@@ -115,7 +115,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
     {
       H5::Attribute attr = grp.openAttribute("TimeStamps");
       if (attr.getSpace().getSimpleExtentNdims() != 1) {
-        throw ZIOException("wrong TimeStamps dimension number");
+        throw ZException("wrong TimeStamps dimension number");
       }
       hsize_t dims[1];
       attr.getSpace().getSimpleExtentDims(dims);
@@ -131,7 +131,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
     {
       H5::Attribute attr = grp.openAttribute("ChannelNames");
       if (attr.getSpace().getSimpleExtentNdims() != 1) {
-        throw ZIOException("wrong ChannelNames dimension number");
+        throw ZException("wrong ChannelNames dimension number");
       }
       hsize_t dims[1];
       attr.getSpace().getSimpleExtentDims(dims);
@@ -152,12 +152,12 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
     {
       H5::Attribute attr = grp.openAttribute("ChannelColors");
       if (attr.getSpace().getSimpleExtentNdims() != 2) {
-        throw ZIOException("wrong ChannelColors dimension number");
+        throw ZException("wrong ChannelColors dimension number");
       }
       hsize_t dims[2];
       attr.getSpace().getSimpleExtentDims(dims);
       if (dims[1] != 4) {
-        throw ZIOException("wrong ChannelColors dimension");
+        throw ZException("wrong ChannelColors dimension");
       }
       if (dims[0] != info.numChannels) {
         LOG(WARNING) << "ChannelColors dimension does not match image dimension";
@@ -171,7 +171,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
     {
       H5::Attribute attr = grp.openAttribute("Position");
       if (attr.getSpace().getSimpleExtentNdims() != 1) {
-        throw ZIOException("wrong Position dimension number");
+        throw ZException("wrong Position dimension number");
       }
       hsize_t dims[1];
       attr.getSpace().getSimpleExtentDims(dims);
@@ -193,7 +193,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
     return info;
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -306,7 +306,7 @@ void ZImgInfoIO::save(H5::Group& grp, const ZImgInfo& info)
     lciacAttr.write(int32Type, &lastChannelIsAlphaChannel);
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 

@@ -53,8 +53,7 @@ ZImgInfo readInfoFromFIPImage(fipImage& fipImg)
           }
           break;
         default:
-          throw ZIOException(QString("Not supported bitsPerPixel %1").arg(fipImg.getBitsPerPixel()));
-          break;
+          throw ZException(fmt::format("Not supported bitsPerPixel {}", fipImg.getBitsPerPixel()));
       }
       break;
     case FIT_UINT16:
@@ -88,7 +87,7 @@ ZImgInfo readInfoFromFIPImage(fipImage& fipImg)
       info.voxelFormat = VoxelFormat::Float;
       break;
     case FIT_COMPLEX:
-      throw ZIOException("Complex format image is not supported.");
+      throw ZException("Complex format image is not supported.");
       break;
     case FIT_RGB16:
       info.bytesPerVoxel = 2;
@@ -113,8 +112,7 @@ ZImgInfo readInfoFromFIPImage(fipImage& fipImg)
       info.voxelFormat = VoxelFormat::Float;
       break;
     default:
-      throw ZIOException("Not supported format");
-      break;
+      throw ZException("Not supported format");
   }
 
   info.width = fipImg.getWidth();
@@ -302,13 +300,13 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   std::vector<ZImgInfo> infos;
   readInfo(filename, infos, nullptr);
   if (scene >= infos.size()) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   ZImgInfo& info = infos[0];
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), region.toQString()));
+    throw ZException(
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
   }
 
   img = ZImg(info);
@@ -429,7 +427,7 @@ void ZImgFreeImage::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
   fipImage fipImg;
   fipMemoryIO memIO(mem, size);
   if (!fipImg.loadFromMemory(memIO, FIF_LOAD_NOPIXELS)) {
-    throw ZIOException("Can not load from memory");
+    throw ZException("Can not load from memory");
   }
   info = readInfoFromFIPImage(fipImg);
 }
@@ -439,34 +437,34 @@ void ZImgFreeImage::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t d
   fipImage fipImg;
   fipMemoryIO memIO(mem, size);
   if (!fipImg.loadFromMemory(memIO)) {
-    throw ZIOException("Can not load from memory");
+    throw ZException("Can not load from memory");
   }
   ZImgInfo info = readInfoFromFIPImage(fipImg);
 
   if (desSize < info.byteNumber()) {
-    throw ZIOException("buffer space is not enough");
+    throw ZException("buffer space is not enough");
   }
 
   switch (fipImg.getColorType()) {
     case FIC_CMYK:
       LOG(INFO) << "cmyk";
       if (!fipImg.convertTo24Bits()) {
-        throw ZIOException("convert CMYK to 24bit error");
+        throw ZException("convert CMYK to 24bit error");
       }
       break;
     case FIC_PALETTE:
       if (!fipImg.convertTo24Bits()) {
-        throw ZIOException("convert PALETTE image to 24bit error");
+        throw ZException("convert PALETTE image to 24bit error");
       }
       break;
     case FIC_MINISBLACK:
       if (!fipImg.convertToGrayscale()) {
-        throw ZIOException("convert MINISBLACK image to Grayscale error");
+        throw ZException("convert MINISBLACK image to Grayscale error");
       }
       break;
     case FIC_MINISWHITE:
       if (!fipImg.convertToGrayscale()) {
-        throw ZIOException("convert MINISWHITE image to Grayscale error");
+        throw ZException("convert MINISWHITE image to Grayscale error");
       }
       break;
     default:

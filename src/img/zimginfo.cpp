@@ -172,7 +172,7 @@ void ZImgInfo::createDefaultDescriptions()
 double ZImgInfo::voxelSizeXInUnit(VoxelSizeUnit unit) const
 {
   if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none) {
-    throw ZIOException("no resolution info");
+    throw ZException("no resolution info");
   }
   if (voxelSizeUnit == unit) {
     return voxelSizeX;
@@ -183,7 +183,7 @@ double ZImgInfo::voxelSizeXInUnit(VoxelSizeUnit unit) const
 double ZImgInfo::voxelSizeYInUnit(VoxelSizeUnit unit) const
 {
   if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none) {
-    throw ZIOException("no resolution info");
+    throw ZException("no resolution info");
   }
   if (voxelSizeUnit == unit) {
     return voxelSizeY;
@@ -194,7 +194,7 @@ double ZImgInfo::voxelSizeYInUnit(VoxelSizeUnit unit) const
 double ZImgInfo::voxelSizeZInUnit(VoxelSizeUnit unit) const
 {
   if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none) {
-    throw ZIOException("no resolution info");
+    throw ZException("no resolution info");
   }
   if (voxelSizeUnit == unit) {
     return voxelSizeZ;
@@ -246,7 +246,7 @@ void ZImgInfo::setVoxelFormat(const QString& dt, size_t validBitCountIn)
   } else if (dt.startsWith("float")) {
     voxelFormat = VoxelFormat::Float;
   } else {
-    throw ZIOException(QString("invalid data type string %1").arg(dt));
+    throw ZException(QString("invalid data type string %1").arg(dt));
   }
   if (dt.endsWith("8")) {
     bytesPerVoxel = 1;
@@ -257,7 +257,7 @@ void ZImgInfo::setVoxelFormat(const QString& dt, size_t validBitCountIn)
   } else if (dt.endsWith("64")) {
     bytesPerVoxel = 8;
   } else {
-    throw ZIOException(QString("invalid data type string %1").arg(dt));
+    throw ZException(QString("invalid data type string %1").arg(dt));
   }
   validBitCount = validBitCountIn;
 }

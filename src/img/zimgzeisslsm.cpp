@@ -42,7 +42,7 @@ void ZImgZeissLsm::readIntoInternalStructure(const QString& filename, ZTiff& tif
     readLsmInfo(filename, tiff);
     // logLsmInfo(filename);
   } else {
-    throw ZIOException("Not lsm file");
+    throw ZException("Not lsm file");
   }
 }
 
@@ -66,8 +66,9 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
        m_imgInfo[0].depth % (m_lsmImgInfo.depth * m_lsmImgInfo.numTimes) != 0) ||
       m_imgInfo[0].bytesPerVoxel != m_lsmImgInfo.bytesPerVoxel ||
       m_imgInfo[0].voxelFormat != m_lsmImgInfo.voxelFormat) {
-    throw ZIOException(QString("lsm meta info <%1> doesn't match image data <%2>")
-                         .arg(m_lsmImgInfo.toQString(), m_imgInfo[0].toQString()));
+    throw ZException(fmt::format("lsm meta info <{}> doesn't match image data <{}>",
+                                   m_lsmImgInfo.toString(),
+                                   m_imgInfo[0].toString()));
   }
 
   size_t numLocations;
@@ -77,7 +78,7 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
     numLocations = m_imgInfo[0].depth / (m_lsmImgInfo.depth * m_lsmImgInfo.numTimes);
   }
   if (numLocations == 0) {
-    throw ZIOException("invalid number of scenes in lsm file");
+    throw ZException("invalid number of scenes in lsm file");
   }
   m_imgInfo[0].depth = m_lsmImgInfo.depth;
   m_imgInfo[0].numTimes = m_lsmImgInfo.numTimes;
@@ -182,11 +183,11 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
 
   if (m_lsmInfo.s32DataType == 0) {
     if (m_channelDataTypes.size() < m_lsmImgInfo.numChannels) {
-      throw ZIOException("lsm channel data type is not complete");
+      throw ZException("lsm channel data type is not complete");
     }
     for (size_t i = 1; i < m_lsmImgInfo.numChannels; ++i) {
       if (m_channelDataTypes[i] != m_channelDataTypes[0]) {
-        throw ZIOException("lsm different channel data type is not supported");
+        throw ZException("lsm different channel data type is not supported");
       }
     }
     switch (m_channelDataTypes[0]) {
@@ -208,7 +209,7 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
         m_lsmImgInfo.bytesPerVoxel = 4;
         break;
       default:
-        throw ZIOException(fmt::format("lsm data type {} is not recognized", m_channelDataTypes[0]));
+        throw ZException(fmt::format("lsm data type {} is not recognized", m_channelDataTypes[0]));
     }
   } else {
     switch (m_lsmInfo.s32DataType) {
@@ -226,7 +227,7 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
         m_lsmImgInfo.bytesPerVoxel = 4;
         break;
       default:
-        throw ZIOException("lsm data type is not recognized");
+        throw ZException("lsm data type is not recognized");
     }
   }
 }

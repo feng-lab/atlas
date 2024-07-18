@@ -71,11 +71,11 @@ void ZPunctaIO::load(const QString& filename, ZPuncta& puncta) const
     } else if (filename.endsWith(".txt", Qt::CaseInsensitive) || filename.endsWith(".xyz", Qt::CaseInsensitive)) {
       readMatFile(filename, puncta);
     } else {
-      throw ZIOException("Not supported puncta format");
+      throw ZException("Not supported puncta format");
     }
   }
   catch (const ZException& e) {
-    throw ZIOException(QString("Can not load puncta %1: %2").arg(filename).arg(e.what()));
+    throw ZException(QString("Can not load puncta %1: %2").arg(filename).arg(e.what()));
   }
 }
 
@@ -100,7 +100,7 @@ void ZPunctaIO::save(const ZPuncta& puncta, const QString& filename, QString for
     }
   }
   catch (const ZException& e) {
-    throw ZIOException(QString("Can not save puncta %1: %2").arg(filename).arg(e.what()));
+    throw ZException(QString("Can not save puncta %1: %2").arg(filename).arg(e.what()));
   }
 }
 
@@ -183,7 +183,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
         H5::DataSpace voxelIntenDataspace = voxelInten.getSpace();
 
         if (voxelListDataspace.getSimpleExtentNdims() != 2 || voxelIntenDataspace.getSimpleExtentNdims() != 1) {
-          throw ZIOException("Wrong puncta file contents");
+          throw ZException("Wrong puncta file contents");
         }
 
         hsize_t voxelListDim[2];
@@ -193,7 +193,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
         voxelIntenDataspace.getSimpleExtentDims(&voxelIntenDim, nullptr);
 
         if (voxelListDim[1] != 3 || voxelListDim[0] != voxelIntenDim) {
-          throw ZIOException("Wrong puncta file contents");
+          throw ZException("Wrong puncta file contents");
         }
 
         Eigen::MatrixXi voxelLocations(voxelIntenDim, 3);
@@ -330,41 +330,41 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
       bool ok;
       fieldList[0].toInt(&ok);
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
       }
       punctum.setName(fieldList[2]);
       punctum.setComment(fieldList[3]);
       punctum.setZ(fieldList[4].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
       }
       punctum.setX(fieldList[5].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
       }
       punctum.setY(fieldList[6].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
       }
       punctum.setMaxIntensity(fieldList[7].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
       }
       punctum.setMeanIntensity(fieldList[8].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
       }
       punctum.setSDevOfIntensity(fieldList[9].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
       }
       punctum.setVolSize(fieldList[10].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
       }
       punctum.setMass(fieldList[11].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
       }
       if (fieldList.size() > 12) {
         punctum.setProperty1(fieldList[12]);
@@ -385,7 +385,7 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
           if (fieldList[15].isEmpty() && fieldList[16].isEmpty() && fieldList[17].isEmpty()) {
             punctum.setColor(col4{0, 0, 0});
           } else {
-            throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+            throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
           }
         }
       }
@@ -393,7 +393,7 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
       punctum.setRadius(std::pow(three_quarters_pi * punctum.volSize(), 1.0 / 3));
       puncta.data.push_back(std::move(punctum));
     } else if (!line.isEmpty()) {
-      throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
+      throw ZException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
     }
   }
 }
@@ -464,19 +464,19 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
       bool ok;
       punctum.setX(fieldList[0].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
       }
       punctum.setY(fieldList[1].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
       }
       punctum.setZ(fieldList[2].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
       }
       punctum.setRadius(fieldList[3].toDouble(&ok));
       if (!ok) {
-        throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
+        throw ZException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
       }
       if (punctum.radius() <= 0) {
         punctum.setRadius(2.0);
@@ -498,12 +498,12 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
         if (fieldList[7].isEmpty() && fieldList[8].isEmpty() && fieldList[9].isEmpty()) {
           punctum.setColor(col4{0, 0, 0});
         } else {
-          throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
+          throw ZException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
         }
       }
       puncta.data.push_back(std::move(punctum));
     } else if (!line.isEmpty()) {
-      throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
+      throw ZException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
     }
   }
 }
@@ -525,7 +525,7 @@ void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta)
       puncta.data.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), mat(i, 3));
     }
   } else {
-    throw ZIOException("file is not nx2 or nx3 or nx4 matrix");
+    throw ZException("file is not nx2 or nx3 or nx4 matrix");
   }
 }
 

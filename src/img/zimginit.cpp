@@ -73,7 +73,7 @@ void initImgLib(const char* argv0,
   } else {
     QDir jarsD(jarsDIR);
     if (!jarsD.exists() || !jarsD.exists("bioformats_package.jar") || !jarsD.exists("scifio-itk-bridge.jar")) {
-      throw ZIOException(QString("invalid jarsDIR: %1").arg(jarsDIR));
+      throw ZException(QString("invalid jarsDIR: %1").arg(jarsDIR));
     }
     QDir jreD;
     QString javahome = jreDIR;
@@ -94,7 +94,7 @@ void initImgLib(const char* argv0,
 
     if (!javahome.isEmpty()) {
       if (!jreD.exists() || !jreD.exists("release") || !jreD.exists("bin")) {
-        throw ZIOException(QString("invalid jreDIR: %1").arg(jreD.absolutePath()));
+        throw ZException(QString("invalid jreDIR: %1").arg(jreD.absolutePath()));
       }
 #ifdef _WIN32
       if (!jreD.exists("bin/javaw.exe"))
@@ -102,7 +102,7 @@ void initImgLib(const char* argv0,
       if (!jreD.exists("bin/java"))
 #endif
       {
-        throw ZIOException(QString("no java in jreDIR: %1").arg(jreD.absolutePath()));
+        throw ZException(QString("no java in jreDIR: %1").arg(jreD.absolutePath()));
       }
 
       ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();

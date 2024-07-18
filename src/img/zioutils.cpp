@@ -55,7 +55,7 @@ void readStream_impl(std::istream& fs, char* buf, size_t count)
   }
 #else
   if (!fs.read(buf, count)) {
-    throw ZIOException(QString("Expect %1 bytes, only read %2 bytes.").arg(count).arg(fs.gcount()));
+    throw ZIOException(fmt::format("Expect {} bytes, only read {} bytes.", count, fs.gcount()));
   }
 #endif
 }

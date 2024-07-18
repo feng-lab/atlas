@@ -93,7 +93,7 @@ ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene_, 
     filenames << fi.canonicalFilePath();
     totalFileSize += fi.size();
   } else {
-    throw ZIOException(QString("file %1 does not exist").arg(fn));
+    throw ZException(QString("file %1 does not exist").arg(fn));
   }
 }
 
@@ -119,7 +119,7 @@ ZImgSource::ZImgSource(const QStringList& fns,
       filenames << fi.canonicalFilePath();
       totalFileSize += fi.size();
     } else {
-      throw ZIOException(QString("file %1 does not exist").arg(fn));
+      throw ZException(QString("file %1 does not exist").arg(fn));
     }
   }
 }
@@ -469,10 +469,10 @@ ZImg ZImg::readSubBlock(const QString& filename, size_t scene, size_t blockIndex
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
   ZImgIO::instance().readInfos(filename, infos, &subBlocks, format);
   if (scene >= subBlocks.size()) {
-    throw ZIOException(fmt::format("scene {} overflow, max {}", scene, subBlocks.size()));
+    throw ZException(fmt::format("scene {} overflow, max {}", scene, subBlocks.size()));
   }
   if (blockIndex >= subBlocks[scene].size()) {
-    throw ZIOException(fmt::format("blockIndex {} overflow, max {}", blockIndex, subBlocks[scene].size()));
+    throw ZException(fmt::format("blockIndex {} overflow, max {}", blockIndex, subBlocks[scene].size()));
   }
   auto img = subBlocks[scene][blockIndex]->read();
   ZImg res;
@@ -492,10 +492,10 @@ ZImg ZImg::readSubBlock(const QStringList& fileList,
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
   ZImgIO::instance().readInfos(fileList, catDim, catScenes, infos, &subBlocks, format, expandXY);
   if (scene >= subBlocks.size()) {
-    throw ZIOException(fmt::format("scene {} overflow, max {}", scene, subBlocks.size()));
+    throw ZException(fmt::format("scene {} overflow, max {}", scene, subBlocks.size()));
   }
   if (blockIndex >= subBlocks[scene].size()) {
-    throw ZIOException(fmt::format("blockIndex {} overflow, max {}", blockIndex, subBlocks[scene].size()));
+    throw ZException(fmt::format("blockIndex {} overflow, max {}", blockIndex, subBlocks[scene].size()));
   }
   auto img = subBlocks[scene][blockIndex]->read();
   ZImg res;

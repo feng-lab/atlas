@@ -239,18 +239,18 @@ void ZMesh::load(H5::Group& allGrp)
     } else if (strBuf == "TRIANGLE_FAN") {
       m_type = Type::TRIANGLE_FAN;
     } else {
-      throw ZIOException(QString("invalid mesh type %1").arg(QString::fromStdString(strBuf)));
+      throw ZException(fmt::format("invalid mesh type {}", strBuf));
     }
 
     H5::DataSet vertices = allGrp.openDataSet("Vertices");
     H5::DataSpace verticesDataspace = vertices.getSpace();
     if (verticesDataspace.getSimpleExtentNdims() != 2) {
-      throw ZIOException("Wrong mesh file contents");
+      throw ZException("Wrong mesh file contents");
     }
     hsize_t verticesDim[2];
     verticesDataspace.getSimpleExtentDims(verticesDim, nullptr);
     if (verticesDim[1] != 3 || verticesDim[0] < 3) {
-      throw ZIOException("Wrong ROI file contents");
+      throw ZException("Wrong ROI file contents");
     }
     m_vertices.resize(verticesDim[0]);
     vertices.read(m_vertices.data(), floatType);
@@ -258,12 +258,12 @@ void ZMesh::load(H5::Group& allGrp)
     H5::DataSet normals = allGrp.openDataSet("Normals");
     H5::DataSpace normalsDataspace = normals.getSpace();
     if (normalsDataspace.getSimpleExtentNdims() != 2) {
-      throw ZIOException("Wrong mesh file contents");
+      throw ZException("Wrong mesh file contents");
     }
     hsize_t normalsDim[2];
     normalsDataspace.getSimpleExtentDims(normalsDim, nullptr);
     if (normalsDim[1] != 3 || normalsDim[0] < 3) {
-      throw ZIOException("Wrong ROI file contents");
+      throw ZException("Wrong ROI file contents");
     }
     m_normals.resize(normalsDim[0]);
     normals.read(m_normals.data(), floatType);
@@ -271,7 +271,7 @@ void ZMesh::load(H5::Group& allGrp)
     H5::DataSet indices = allGrp.openDataSet("Indices");
     H5::DataSpace indicesDataspace = indices.getSpace();
     if (indicesDataspace.getSimpleExtentNdims() != 1) {
-      throw ZIOException("Wrong mesh file contents");
+      throw ZException("Wrong mesh file contents");
     }
     hsize_t indicesDim;
     indicesDataspace.getSimpleExtentDims(&indicesDim, nullptr);
@@ -279,7 +279,7 @@ void ZMesh::load(H5::Group& allGrp)
     indices.read(m_indices.data(), uintType);
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -337,7 +337,7 @@ void ZMesh::save(H5::Group& allGrp) const
     indices.write(m_indices.data(), uintType);
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 

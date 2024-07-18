@@ -901,7 +901,7 @@ void ZStitchImage::getTileMatrixFromConnImage(ZImg& img)
   }
   if (numCols == 0 || numRows == 0) {
     m_tileGrid.clear();
-    throw ZIOException("can not find any block in conn image");
+    throw ZException("can not find any block in conn image");
   }
 
   m_tileGrid = ZImg(ZImgInfo(numCols, numRows, 1, 1, 1, 4, VoxelFormat::Signed));
@@ -918,7 +918,7 @@ void ZStitchImage::getTileMatrixFromConnImage(ZImg& img)
         if (value > thre2) {
           if (currentrow >= numRows || currentcol >= numCols) {
             m_tileGrid.clear();
-            throw ZIOException("can not parse tile conn image");
+            throw ZException("can not parse tile conn image");
           }
           m_tileGrid.setValue(tileindex++, ZVoxelCoordinate(currentcol, currentrow));
         }

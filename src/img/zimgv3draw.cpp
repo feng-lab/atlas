@@ -36,7 +36,7 @@ void ZImgV3DRaw::readInfo(const QString& filename,
   auto realKey = formatKey;
   readStream(inputFileStream, realKey.data(), realKey.size() - 1);
   if (formatKey != realKey) {
-    throw ZIOException("File is not Vaa3D raw format.");
+    throw ZException("File is not Vaa3D raw format.");
   }
 
   char endian;
@@ -93,7 +93,7 @@ void ZImgV3DRaw::readInfo(const QString& filename,
 void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata& /*meta*/, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
@@ -102,7 +102,7 @@ void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata& /*meta*/, s
   auto realKey = formatKey;
   readStream(inputFileStream, realKey.data(), realKey.size() - 1);
   if (formatKey != realKey) {
-    throw ZIOException("File is not Vaa3D raw format.");
+    throw ZException("File is not Vaa3D raw format.");
   }
 }
 
@@ -112,7 +112,7 @@ void ZImgV3DRaw::readThumbnail(const QString& filename,
                                size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
@@ -121,14 +121,14 @@ void ZImgV3DRaw::readThumbnail(const QString& filename,
   auto realKey = formatKey;
   readStream(inputFileStream, realKey.data(), realKey.size() - 1);
   if (formatKey != realKey) {
-    throw ZIOException("File is not Vaa3D raw format.");
+    throw ZException("File is not Vaa3D raw format.");
   }
 }
 
 void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
@@ -137,7 +137,7 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   auto realKey = formatKey;
   readStream(inputFileStream, realKey.data(), realKey.size() - 1);
   if (formatKey != realKey) {
-    throw ZIOException("File is not Vaa3D raw format.");
+    throw ZException("File is not Vaa3D raw format.");
   }
 
   char endian;
@@ -200,10 +200,10 @@ void ZImgV3DRaw::checkImgBeforeWriting(const QString& filename, const ZImgInfo& 
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (paras.compression != Compression::AUTO && paras.compression != Compression::NONE) {
-    throw ZIOException(fmt::format("compression {} is not supported", paras.compression));
+    throw ZException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1) {
-    throw ZIOException("time sequence is not supported");
+    throw ZException("time sequence is not supported");
   }
 }
 

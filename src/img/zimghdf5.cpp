@@ -613,7 +613,7 @@ ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName,
 std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
 {
   if (m_tiles.empty() || m_info.isEmpty()) {
-    throw ZIOException("empty hdf5 sub block");
+    throw ZException("empty hdf5 sub block");
   }
   std::shared_ptr<ZImg> res;
   try {
@@ -912,7 +912,7 @@ void ZImgHDF5::readInfo(const QString& filename,
 void ZImgHDF5::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
 }
 
@@ -922,7 +922,7 @@ void ZImgHDF5::readThumbnail(const QString& /*filename*/,
                              size_t scene)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
 }
 
@@ -935,7 +935,7 @@ void ZImgHDF5::readImg(const QString& filename,
                        size_t zRatio)
 {
   if (scene != 0) {
-    throw ZIOException("invalid scene");
+    throw ZException("invalid scene");
   }
   static std::mutex mutex;
   std::lock_guard<std::mutex> lock(mutex);
@@ -958,7 +958,7 @@ void ZImgHDF5::readImg(const QString& filename,
 
     if (region.isEmpty() || !region.isValid(info)) {
       throw ZIOException(
-        QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), region.toQString()));
+        fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
     }
 
     ZImgRegion rgn = region;

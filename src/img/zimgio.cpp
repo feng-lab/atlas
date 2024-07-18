@@ -73,7 +73,7 @@ void ZImgIO::readInfos(const QString& filename,
             tmpInfo.swap(res);
             return;
           } else {
-            throw ZIOException("empty image");
+            throw ZException("empty image");
           }
         }
         catch (const ZException& e) {
@@ -95,7 +95,7 @@ void ZImgIO::readInfos(const QString& filename,
         tmpInfo.swap(res);
         return;
       }
-      throw ZIOException("empty image");
+      throw ZException("empty image");
     }
     catch (const ZException& e) {
       error =
@@ -103,7 +103,7 @@ void ZImgIO::readInfos(const QString& filename,
     }
   }
 
-  throw ZIOException(error);
+  throw ZException(error);
 }
 
 void ZImgIO::readInfos(const QStringList& fileList,
@@ -119,12 +119,12 @@ void ZImgIO::readInfos(const QStringList& fileList,
     return;
   }
   if (fileList.empty()) {
-    throw ZIOException("Read sequence failed: empty file list");
+    throw ZException("Read sequence failed: empty file list");
   }
 
   readInfos(fileList[0], res, subBlocks, format);
   if (res.empty()) {
-    throw ZIOException("Read sequence failed: img 0 is empty");
+    throw ZException("Read sequence failed: img 0 is empty");
   }
   if (expandXY) {
     CHECK(catDim != Dimension::X && catDim != Dimension::Y);
@@ -144,7 +144,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
         ZImgIO::instance().readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
         if (tmpInfo.empty()) {
-          throw ZIOException(fmt::format("Read sequence failed: img {} is empty", i));
+          throw ZException(fmt::format("Read sequence failed: img {} is empty", i));
         }
         return std::make_tuple(std::move(tmpInfo), std::move(tmpSubBlocks));
       }));
@@ -164,7 +164,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
             for (size_t s = 1; s < res.size(); ++s) {
               // check whether type match
               if (!res[s].isSameType(res[0])) {
-                throw ZIOException(
+                throw ZException(
                   fmt::format("Read sequence failed: image type don't match, can not cat Img <{}> to Img 0 <{}>",
                               res[s].toString(),
                               res[0].toString()));
@@ -174,14 +174,14 @@ void ZImgIO::readInfos(const QStringList& fileList,
                 if (expandXY) {
                   if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
                       res[s].size(dim) != res[0].size(dim)) {
-                    throw ZIOException(fmt::format(
+                    throw ZException(fmt::format(
                       "Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
                       res[s].toString(),
                       res[0].toString()));
                   }
                 } else {
                   if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
-                    throw ZIOException(fmt::format(
+                    throw ZException(fmt::format(
                       "Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
                       res[s].toString(),
                       res[0].toString()));
@@ -228,12 +228,12 @@ void ZImgIO::readInfos(const QStringList& fileList,
               ++i;
               // check whether number of scenes match
               if (tmpInfo.size() != res.size()) {
-                throw ZIOException("Read sequence failed: images have different number of scenes");
+                throw ZException("Read sequence failed: images have different number of scenes");
               }
               for (size_t s = 0; s < res.size(); ++s) {
                 // check whether type match
                 if (!tmpInfo[s].isSameType(res[s])) {
-                  throw ZIOException(
+                  throw ZException(
                     fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
                                 i,
                                 tmpInfo[s].toString(),
@@ -244,7 +244,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
                   if (expandXY) {
                     if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
                         res[s].size(dim) != tmpInfo[s].size(dim)) {
-                      throw ZIOException(fmt::format(
+                      throw ZException(fmt::format(
                         "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                         i,
                         tmpInfo[s].toQString(),
@@ -252,7 +252,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
                     }
                   } else {
                     if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
-                      throw ZIOException(fmt::format(
+                      throw ZException(fmt::format(
                         "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                         i,
                         tmpInfo[s].toQString(),
@@ -318,7 +318,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
         readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
         if (tmpInfo.empty()) {
-          throw ZIOException(QString("Read sequence failed: img %1 is empty").arg(i));
+          throw ZException(QString("Read sequence failed: img %1 is empty").arg(i));
         }
         res.insert(res.end(), tmpInfo.begin(), tmpInfo.end());
         if (subBlocks) {
@@ -328,7 +328,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
       for (size_t s = 1; s < res.size(); ++s) {
         // check whether type match
         if (!res[s].isSameType(res[0])) {
-          throw ZIOException(
+          throw ZException(
             fmt::format("Read sequence failed: image type don't match, can not cat Img <{}> to Img 0 <{}>",
                         res[s].toString(),
                         res[0].toString()));
@@ -337,14 +337,14 @@ void ZImgIO::readInfos(const QStringList& fileList,
         for (auto dim : ZImgInfo::dimensions()) {
           if (expandXY) {
             if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && res[s].size(dim) != res[0].size(dim)) {
-              throw ZIOException(
+              throw ZException(
                 fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
                             res[s].toString(),
                             res[0].toString()));
             }
           } else {
             if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
-              throw ZIOException(
+              throw ZException(
                 fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
                             res[s].toString(),
                             res[0].toString()));
@@ -391,16 +391,16 @@ void ZImgIO::readInfos(const QStringList& fileList,
         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
         readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
         if (tmpInfo.empty()) {
-          throw ZIOException(QString("Read sequence failed: img %1 is empty").arg(i));
+          throw ZException(QString("Read sequence failed: img %1 is empty").arg(i));
         }
         // check whether number of scenes match
         if (tmpInfo.size() != res.size()) {
-          throw ZIOException("Read sequence failed: images have different number of scenes");
+          throw ZException("Read sequence failed: images have different number of scenes");
         }
         for (size_t s = 0; s < res.size(); ++s) {
           // check whether type match
           if (!tmpInfo[s].isSameType(res[s])) {
-            throw ZIOException(
+            throw ZException(
               fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
                           i,
                           tmpInfo[s].toString(),
@@ -411,7 +411,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
             if (expandXY) {
               if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
                   res[s].size(dim) != tmpInfo[s].size(dim)) {
-                throw ZIOException(fmt::format(
+                throw ZException(fmt::format(
                   "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                   i,
                   tmpInfo[s].toString(),
@@ -419,7 +419,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
               }
             } else {
               if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
-                throw ZIOException(fmt::format(
+                throw ZException(fmt::format(
                   "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                   i,
                   tmpInfo[s].toString(),
@@ -490,7 +490,7 @@ void ZImgIO::readInfo(const ZImgSource& imgSource,
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
     readInfos(imgSource.filenames[0], res, subBlocks ? &tmpSubBlocks : nullptr, imgSource.format);
     if (imgSource.scene >= res.size()) {
-      throw ZIOException("invalid scene");
+      throw ZException("invalid scene");
     }
     info = res[imgSource.scene];
     info = imgSource.region.clip(info);
@@ -508,7 +508,7 @@ void ZImgIO::readInfo(const ZImgSource& imgSource,
               imgSource.format,
               imgSource.expandXY);
     if (imgSource.scene >= res.size()) {
-      throw ZIOException("invalid scene");
+      throw ZException("invalid scene");
     }
     info = res[imgSource.scene];
     info = imgSource.region.clip(info);
@@ -516,7 +516,7 @@ void ZImgIO::readInfo(const ZImgSource& imgSource,
       *subBlocks = tmpSubBlocks[imgSource.scene];
     }
   } else {
-    throw ZIOException("invalid image source");
+    throw ZException("invalid image source");
   }
 }
 
@@ -556,7 +556,7 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
       if (lt == t && lx == x && ly == y && lwidth == width && lheight == height) {
         auto& rgn = res[i].back();
         if (z != size_t(rgn.end.z)) {
-          throw ZIOException("z jumping");
+          throw ZException("z jumping");
         } else {
           rgn.end.z += depth;
         }
@@ -613,7 +613,7 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
     }
   }
 
-  throw ZIOException(error);
+  throw ZException(error);
 }
 
 void ZImgIO::readThumbnail(const QString& filename,
@@ -658,7 +658,7 @@ void ZImgIO::readThumbnail(const QString& filename,
     }
   }
 
-  throw ZIOException(error);
+  throw ZException(error);
 }
 
 void ZImgIO::readImg(const QString& filename,
@@ -706,7 +706,7 @@ void ZImgIO::readImg(const QString& filename,
     }
   }
 
-  throw ZIOException(error);
+  throw ZException(error);
 }
 
 void ZImgIO::readImg(const QStringList& fileList,
@@ -729,7 +729,7 @@ void ZImgIO::readImg(const QStringList& fileList,
   std::vector<ZImgInfo> infos;
   readInfos(fileList, catDim, catScenes, infos, nullptr, format, expandXY);
   if (scene >= infos.size()) {
-    throw ZIOException("invalid scene for image sequence");
+    throw ZException("invalid scene for image sequence");
   }
   ZImgInfo& info = infos[scene];
 
@@ -824,11 +824,11 @@ void ZImgIO::readImg(const QStringList& fileList,
   std::vector<ZImgInfo> infos;
   readInfos(fileList, catDim, catScenes, infos, nullptr, format, expandXY);
   if (infos.size() <= scene) {
-    throw ZIOException("invalid scene for image sequence");
+    throw ZException("invalid scene for image sequence");
   }
   ZImgInfo& info = infos[scene];
   if (regionIn.isEmpty() || !regionIn.isValid(info)) {
-    throw ZIOException(
+    throw ZException(
       QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), regionIn.toQString()));
   }
   ZImgRegion region = regionIn;
@@ -958,14 +958,14 @@ void ZImgIO::readImg(const ZImgSource& imgSource, ZImg& img, size_t xRatio, size
             imgSource.expandXY,
             imgSource.expandWithMaxValue);
   } else {
-    throw ZIOException("invalid image source");
+    throw ZException("invalid image source");
   }
 }
 
 void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat format, const ZImgWriteParameters& paras)
 {
   if (img.isEmpty()) {
-    throw ZIOException("Can not write empty image.");
+    throw ZException("Can not write empty image.");
   }
 
   QString error;
@@ -1009,7 +1009,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     }
   }
 
-  throw ZIOException(error);
+  throw ZException(error);
 }
 
 void ZImgIO::writeImg(const QString& filename,
@@ -1018,7 +1018,7 @@ void ZImgIO::writeImg(const QString& filename,
                       const ZImgWriteParameters& paras)
 {
   if (img.imgInfo().isEmpty()) {
-    throw ZIOException("Can not write empty image.");
+    throw ZException("Can not write empty image.");
   }
 
   QString error;
@@ -1062,7 +1062,7 @@ void ZImgIO::writeImg(const QString& filename,
     }
   }
 
-  throw ZIOException(error);
+  throw ZException(error);
 }
 
 void ZImgIO::writeImg(const QString& filename,
@@ -1071,7 +1071,7 @@ void ZImgIO::writeImg(const QString& filename,
                       const ZImgWriteParameters& paras)
 {
   if (img.imgInfo().isEmpty()) {
-    throw ZIOException("Can not write empty image.");
+    throw ZException("Can not write empty image.");
   }
 
   QString error;
@@ -1115,7 +1115,7 @@ void ZImgIO::writeImg(const QString& filename,
     }
   }
 
-  throw ZIOException(error);
+  throw ZException(error);
 }
 
 void ZImgIO::getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& formats) const
