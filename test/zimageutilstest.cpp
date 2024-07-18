@@ -143,7 +143,8 @@ TEST(ZImageUtils, GaussianFilter3D)
     LOG(WARNING) << e.what();
   }
 }
-¬ TEST(ZImageUtils, ImageFlip)
+
+TEST(ZImageUtils, ImageFlip)
 {
   using namespace nim;
 
