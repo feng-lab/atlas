@@ -24,7 +24,6 @@
 
 #include <functional>
 #include <iosfwd>
-#include <type_traits>
 
 namespace nim {
 
@@ -248,36 +247,6 @@ inline std::ostream& operator<<(std::ostream& s, const QRectF& v)
 
 template<class T>
 std::ostream& operator<<(std::ostream& s, const QList<T>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<class Key, class T>
-std::ostream& operator<<(std::ostream& s, const QMap<Key, T>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<class Key, class T>
-std::ostream& operator<<(std::ostream& s, const QMultiMap<Key, T>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<class Key, class T>
-std::ostream& operator<<(std::ostream& s, const QHash<Key, T>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<class Key, class T>
-std::ostream& operator<<(std::ostream& s, const QMultiHash<Key, T>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<typename T>
-std::ostream& operator<<(std::ostream& s, const QSet<T>& v)
 {
   OUTPUT_QT_TYPE_VALUE(v)
 }
