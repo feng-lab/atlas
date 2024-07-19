@@ -28,15 +28,15 @@ bool IsJP2(BaseStreamInput& in)
   UIC::BaseStream::TSize cnt;
 
   if (UIC::BaseStream::StatusOk != in.Seek(4, UIC::BaseStreamInput::Beginning)) {
-    throw ZIOException("unsupported Image format");
+    throw ZException("unsupported Image format", ZException::Option::CheckErrno);
   }
 
   if (UIC::BaseStream::StatusOk != in.Read(buf, 4 * sizeof(char), cnt)) {
-    throw ZIOException("unsupported Image format");
+    throw ZException("unsupported Image format", ZException::Option::CheckErrno);
   }
 
   if (UIC::BaseStream::StatusOk != in.Seek(0, UIC::BaseStreamInput::Beginning)) {
-    throw ZIOException("unsupported Image format");
+    throw ZException("unsupported Image format", ZException::Option::CheckErrno);
   }
 
   if (buf[0] == 0x6a && buf[1] == 0x50 && buf[2] == 0x20 && buf[3] == 0x20) {
@@ -49,7 +49,7 @@ bool IsJP2(BaseStreamInput& in)
 inline void checkIPPError(IppStatus status)
 {
   if (status != ippStsNoErr) {
-    throw ZIOException(ippGetStatusString(status));
+    throw ZException(ippGetStatusString(status), ZException::Option::CheckErrno);
   }
 }
 
@@ -73,13 +73,13 @@ initDecoder(CStdFileInput& in, JP2Decoder& JP2decoder, JPEG2000Decoder& JP2Kdeco
   }
 
   if (ExcStatusOk != decoder->Init()) {
-    throw ZIOException("can not initialize codec");
+    throw ZException("can not initialize codec", ZException::Option::CheckErrno);
   }
 
   decoder->SetNOfThreads(ZCpuInfoInstance.nPhysicalCores);
 
   if (ExcStatusOk != decoder->AttachStream(in)) {
-    throw ZIOException("can not attach stream");
+    throw ZException("can not attach stream", ZException::Option::CheckErrno);
   }
 
   decoder->AttachDiagnOut(diagnOutput);
@@ -132,7 +132,7 @@ void ZImgJpeg2000::readInfo(const QString& filename, ZImgInfo& info)
 {
   CStdFileInput in;
   if (!BaseStream::IsOk(in.Open(qPrintable(filename)))) {
-    throw ZIOException("can not open file");
+    throw ZException("can not open file", ZException::Option::CheckErrno);
   }
   JP2Decoder JP2decoder;
   JPEG2000Decoder JP2Kdecoder;
@@ -141,7 +141,7 @@ void ZImgJpeg2000::readInfo(const QString& filename, ZImgInfo& info)
   ImageColorSpec colorSpec;
   ImageSamplingGeometry geometry;
   if (ExcStatusOk != decoder->ReadHeader(colorSpec, geometry)) {
-    throw ZIOException("can not read head");
+    throw ZException("can not read head", ZException::Option::CheckErrno);
   }
   geometry.ReduceByGCD();
   info = infoFromHead(colorSpec, geometry);
@@ -155,7 +155,7 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
 {
   CStdFileInput in;
   if (!BaseStream::IsOk(in.Open(qPrintable(filename)))) {
-    throw ZIOException("can not open file");
+    throw ZException("can not open file", ZException::Option::CheckErrno);
   }
   JP2Decoder JP2decoder;
   JPEG2000Decoder JP2Kdecoder;
@@ -164,7 +164,7 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   ImageColorSpec colorSpec;
   ImageSamplingGeometry geometry;
   if (ExcStatusOk != decoder->ReadHeader(colorSpec, geometry)) {
-    throw ZIOException("can not read head");
+    throw ZException("can not read head", ZException::Option::CheckErrno);
   }
   geometry.ReduceByGCD();
   ZImgInfo info = infoFromHead(colorSpec, geometry);
@@ -200,7 +200,7 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   imagePn.ColorSpec().SetEnumColorSpace(colorSpec.EnumColorSpace());
 
   if (ExcStatusOk != decoder->ReadData(imagePn.Buffer().DataPtr(), dataOrderPn)) {
-    throw ZIOException("can not read data");
+    throw ZException("can not read data", ZException::Option::CheckErrno);
   }
 
   ZImg res(info);
@@ -278,7 +278,7 @@ void ZImgJpeg2000::writeImg(const QString& filename, const ZImg& img, Compressio
   }
   CStdFileOutput out;
   if (!BaseStream::IsOk(out.Open(qPrintable(filename)))) {
-    throw ZIOException("can not open output file");
+    throw ZException("can not open output file", ZException::Option::CheckErrno);
   }
 
   IppiSize roi;
@@ -287,13 +287,13 @@ void ZImgJpeg2000::writeImg(const QString& filename, const ZImg& img, Compressio
 
   JP2Encoder jp2enc;
   if (ExcStatusOk != jp2enc.Init()) {
-    throw ZIOException("can not init codec");
+    throw ZException("can not init codec", ZException::Option::CheckErrno);
   }
 
   jp2enc.SetNOfThreads(ZCpuInfoInstance.nPhysicalCores);
 
   if (ExcStatusOk != jp2enc.AttachStream(out)) {
-    throw ZIOException("can not attach stream");
+    throw ZException("can not attach stream", ZException::Option::CheckErrno);
   }
 
   RectSize size;
@@ -363,19 +363,19 @@ void ZImgJpeg2000::writeImg(const QString& filename, const ZImg& img, Compressio
   }
 
   if (ExcStatusOk != jp2enc.AttachImage(imagePn)) {
-    throw ZIOException("can not attach image");
+    throw ZException("can not attach image", ZException::Option::CheckErrno);
   }
 
   if (ExcStatusOk != jp2enc.SetParams(5, false, true, false, 0, 0, img.byteNumber())) {
-    throw ZIOException("can not set parameters");
+    throw ZException("can not set parameters", ZException::Option::CheckErrno);
   }
 
   if (ExcStatusOk != jp2enc.WriteHeader()) {
-    throw ZIOException("can not write header");
+    throw ZException("can not write header", ZException::Option::CheckErrno);
   }
 
   if (ExcStatusOk != jp2enc.WriteData()) {
-    throw ZIOException("can not write data");
+    throw ZException("can not write data", ZException::Option::CheckErrno);
   }
 }
 

@@ -1012,11 +1012,11 @@ int64_t ZImgZeissCZI::checkFilename(const QString& filename)
 {
   QFileInfo fi(filename);
   if (!fi.exists() || !fi.isFile()) {
-    throw ZIOException(QString("File does not exist"));
+    throw ZException("File does not exist");
   }
   int64_t filesize = fi.size();
   if (filesize < 16 + 8 + 8 + 512) {
-    throw ZIOException(QString("Invalid CZI file"));
+    throw ZException("Invalid CZI file", ZException::Option::CheckErrno);
   }
   return filesize;
 }

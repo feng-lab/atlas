@@ -7,24 +7,44 @@
 #include <string>
 
 // all exceptions are defined here
-// always catch ZException unless you can make sure of the possible exception type
 
 namespace nim {
 
 class ZException : public std::exception
 {
 public:
-  explicit ZException(const char* what)
-    : m_what(what)
-  {}
+  enum class Option
+  {
+    Default = 0,
+    CheckErrno,
+  };
 
-  explicit ZException(std::string_view what)
+  explicit ZException(const char* what = "", Option option = Option::Default)
     : m_what(what)
-  {}
+  {
+    if (option == Option::CheckErrno && errno != 0) {
+      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
+      errno = 0;
+    }
+  }
 
-  explicit ZException(const QString& what)
+  explicit ZException(std::string_view what, Option option = Option::Default)
+    : m_what(what)
+  {
+    if (option == Option::CheckErrno && errno != 0) {
+      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
+      errno = 0;
+    }
+  }
+
+  explicit ZException(const QString& what, Option option = Option::Default)
     : m_what(what.toStdString())
-  {}
+  {
+    if (option == Option::CheckErrno && errno != 0) {
+      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
+      errno = 0;
+    }
+  }
 
   ZException(ZException&&) = default;
 
@@ -34,7 +54,7 @@ public:
 
   ZException& operator=(const ZException&) = default;
 
-  ~ZException() noexcept override;
+  ~ZException() noexcept override = default;
 
   [[nodiscard]] const char* what() const noexcept override
   {
@@ -43,38 +63,6 @@ public:
 
 protected:
   std::string m_what;
-};
-
-// io exception, generated while reading or writing
-class ZIOException : public ZException
-{
-public:
-  explicit ZIOException(const char* what)
-    : ZException(what)
-  {
-    if (errno != 0) {
-      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
-      errno = 0;
-    }
-  }
-
-  explicit ZIOException(std::string_view what)
-    : ZException(what)
-  {
-    if (errno != 0) {
-      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
-      errno = 0;
-    }
-  }
-
-  explicit ZIOException(const QString& what)
-    : ZException(what)
-  {
-    if (errno != 0) {
-      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
-      errno = 0;
-    }
-  }
 };
 
 class ZCancellationException : public ZException

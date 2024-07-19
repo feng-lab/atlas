@@ -956,7 +956,8 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
     saveJsonObject(saveObj, nName);
 
     if ((QFile::exists(fn) && !QFile::remove(fn)) || !QFile::rename(nName, fn)) {
-      throw ZIOException(QString("Can not replace old file with new file %2").arg(nName));
+      throw ZException(fmt::format("Can not replace old file {} with new file {}", nName, fn),
+                       ZException::Option::CheckErrno);
     }
   }
   catch (const ZException& e) {

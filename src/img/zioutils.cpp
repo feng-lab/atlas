@@ -18,7 +18,7 @@ void openFileStream(std::ifstream& fs, const QString& filename, std::ios_base::o
   fs.open(QFile::encodeName(filename).constData(), mode);
 #endif
   if (!fs.is_open()) {
-    throw ZIOException("Can not open file for reading.");
+    throw ZException("Can not open file for reading.", ZException::Option::CheckErrno);
   }
 }
 
@@ -30,7 +30,7 @@ void openFileStream(std::ofstream& fs, const QString& filename, std::ios_base::o
   fs.open(QFile::encodeName(filename).constData(), mode);
 #endif
   if (!fs.is_open()) {
-    throw ZIOException("Can not open file for writing.");
+    throw ZException("Can not open file for writing.", ZException::Option::CheckErrno);
   }
 }
 
@@ -39,7 +39,8 @@ void readStream_impl(std::istream& fs, char* buf, size_t count)
 #if defined(__APPLE__)
   if (count < 1024_uz * 1024 * 1024 * 2) {
     if (!fs.read(buf, count)) {
-      throw ZIOException(fmt::format("Expect {} bytes, only read {} bytes.", count, fs.gcount()));
+      throw ZException(fmt::format("Expect {} bytes, only read {} bytes.", count, fs.gcount()),
+                       ZException::Option::CheckErrno);
     }
     return;
   }
@@ -48,14 +49,16 @@ void readStream_impl(std::istream& fs, char* buf, size_t count)
   while (bytesRemaining > 0) {
     size_t bytesToRead = std::min(bytesRemaining, chunkSize);
     if (!fs.read(buf, bytesToRead)) {
-      throw ZIOException(fmt::format("Expect {} bytes, only read {} bytes.", bytesToRead, fs.gcount()));
+      throw ZException(fmt::format("Expect {} bytes, only read {} bytes.", bytesToRead, fs.gcount()),
+                       ZException::Option::CheckErrno);
     }
     bytesRemaining -= bytesToRead;
     buf += bytesToRead;
   }
 #else
   if (!fs.read(buf, count)) {
-    throw ZIOException(fmt::format("Expect {} bytes, only read {} bytes.", count, fs.gcount()));
+    throw ZException(fmt::format("Expect {} bytes, only read {} bytes.", count, fs.gcount()),
+                     ZException::Option::CheckErrno);
   }
 #endif
 }
@@ -63,7 +66,7 @@ void readStream_impl(std::istream& fs, char* buf, size_t count)
 void writeStream_impl(std::ostream& fs, const char* buf, size_t count)
 {
   if (!fs.write(buf, count)) {
-    throw ZIOException("File write failed.");
+    throw ZException("File write failed.", ZException::Option::CheckErrno);
   }
 }
 
@@ -74,7 +77,7 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
   errno = 0;
   std::FILE* tmpf = nullptr;
   if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), mode.toStdWString().c_str()) != 0) {
-    throw ZIOException("Can not open file");
+    throw ZException("Can not open file", ZException::Option::CheckErrno);
   }
   return std::unique_ptr<std::FILE, decltype(&std::fclose)>(tmpf, std::fclose);
 }
@@ -86,7 +89,7 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
   errno = 0;
   std::FILE* tmpf = std::fopen(QFile::encodeName(filename).constData(), mode);
   if (!tmpf) {
-    throw ZIOException("Can not open file");
+    throw ZException("Can not open file", ZException::Option::CheckErrno);
   }
   return std::unique_ptr<std::FILE, decltype(&std::fclose)>(tmpf, std::fclose);
 }
@@ -102,15 +105,15 @@ QString getTemporaryFilename(const QString& filename)
 void renameFile(const QString& oldName, const QString& newName)
 {
   if (!QFile::exists(oldName)) {
-    throw ZIOException(fmt::format("File {} does not exist", oldName));
+    throw ZException(fmt::format("File {} does not exist", oldName), ZException::Option::CheckErrno);
   }
   if (QFile::exists(newName)) {
     if (!QFile::remove(newName)) {
-      throw ZIOException(fmt::format("Can not remove existing file {}", newName));
+      throw ZException(fmt::format("Can not remove existing file {}", newName), ZException::Option::CheckErrno);
     }
   }
   if (!QFile::rename(oldName, newName)) {
-    throw ZIOException(fmt::format("Can not rename file {}", oldName));
+    throw ZException(fmt::format("Can not rename file {}", oldName), ZException::Option::CheckErrno);
   }
 }
 
@@ -129,7 +132,7 @@ std::string readFileIntoString(const QString& filename, std::ios_base::openmode 
   fs.open(QFile::encodeName(filename).constData(), mode);
 #endif
   if (!fs.is_open()) {
-    throw ZIOException("Can not open file for reading.");
+    throw ZException("Can not open file for reading.", ZException::Option::CheckErrno);
   }
   res.resize(fileSize);
   fs.read(&res[0], res.size());
@@ -141,7 +144,7 @@ QByteArray readFileIntoByteArray(const QString& filename, QIODevice::OpenMode op
   QFile loadFile(filename);
 
   if (!loadFile.open(openMode)) {
-    throw ZIOException("could not open: " + filename);
+    throw ZException(fmt::format("could not open: {}", filename), ZException::Option::CheckErrno);
   }
 
   return loadFile.readAll();

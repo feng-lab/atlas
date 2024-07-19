@@ -41,8 +41,17 @@ void ZImgProcess::run()
       throw; // notify parent
     }
   }
+  catch (const ZCancellationException&) {
+    QString errMsg = "Cancelled by user";
+    LOG(ERROR) << errMsg;
+    Q_EMIT processError(errMsg);
+    if (hasParent()) {
+      LOG(ERROR) << "notifying parent operation..";
+      throw; // notify parent
+    }
+  }
   catch (const ZException& e) {
-    QString errMsg = QString("Caught exception: %1").arg(e.what());
+    QString errMsg = QString("Caught ZException: %1").arg(e.what());
     LOG(ERROR) << errMsg;
     Q_EMIT processError(errMsg);
     if (hasParent()) {

@@ -186,11 +186,11 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
         }
       }
       if (!found) {
-        throw ZIOException("can not find valid memory, please send this file to flq@live.com");
+        throw ZException("can not find valid memory, please send this file to flq@live.com");
       }
     }
     if (std::get<2>(monl) == 0) {
-      throw ZIOException("find invalid memory, please send this file to flq@live.com");
+      throw ZException("find invalid memory, please send this file to flq@live.com");
     }
     std::vector<size_t> dimensionStrides(5, 0); // XYZCT
     std::vector<uint64_t> channelOffsets;
@@ -250,7 +250,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
         imgIO.readImg(ii.imageMemory.fileNames[0], img, rgn);
         img.infoRef() = resInfo;
       } else {
-        throw ZIOException("image and metadata do not match, please send this file to flq@live.com");
+        throw ZException("image and metadata do not match, please send this file to flq@live.com");
       }
     } else if (size_t(ii.imageMemory.fileNames.size()) == info.numTimes) {
       std::vector<ZImgInfo> fileInfos;
@@ -259,7 +259,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
         imgIO.readImg(ii.imageMemory.fileNames, Dimension::T, false, rgn, img);
         img.infoRef() = resInfo;
       } else {
-        throw ZIOException("image and metadata do not match, please send this file to flq@live.com");
+        throw ZException("image and metadata do not match, please send this file to flq@live.com");
       }
     } else if (size_t(ii.imageMemory.fileNames.size()) == info.depth) {
       std::vector<ZImgInfo> fileInfos;
@@ -268,10 +268,10 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
         imgIO.readImg(ii.imageMemory.fileNames, Dimension::Z, false, rgn, img);
         img.infoRef() = resInfo;
       } else {
-        throw ZIOException("image and metadata do not match, please send this file to flq@live.com");
+        throw ZException("image and metadata do not match, please send this file to flq@live.com");
       }
     } else {
-      throw ZIOException("Unhandled leica image sequence, please send this file to flq@live.com");
+      throw ZException("Unhandled leica image sequence, please send this file to flq@live.com");
     }
   }
 
@@ -320,7 +320,7 @@ void ZImgLeica::readXml(const QString& filename,
   if (filename.endsWith(".xlef", Qt::CaseInsensitive) || filename.endsWith(".xllf", Qt::CaseInsensitive)) {
     QFile f(filename);
     if (!f.open(QFile::ReadOnly | QFile::Text)) {
-      throw ZIOException("can not open file");
+      throw ZException("can not open file", ZException::Option::CheckErrno);
     }
     QTextStream in(&f);
     xml = in.readAll();
@@ -331,13 +331,13 @@ void ZImgLeica::readXml(const QString& filename,
     NextBlock nb;
     readStructFromFileStream(nb, inputFileStream);
     if (nb.test != 0x70) {
-      throw ZIOException("incorrect leica file header");
+      throw ZException("incorrect leica file header", ZException::Option::CheckErrno);
     }
 
     XMLOrTypeContent xtc;
     readStructFromFileStream(xtc, inputFileStream);
     if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
-      throw ZIOException("incorrect lecia xml or type content");
+      throw ZException("incorrect lecia xml or type content", ZException::Option::CheckErrno);
     }
     std::vector<QChar> charBuf(xtc.textLength);
     readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
@@ -351,29 +351,29 @@ void ZImgLeica::readXml(const QString& filename,
       if (majorVersionBlock.test == 0x2A) {
         majorVersion = majorVersionBlock.number;
       } else {
-        throw ZIOException("incorrect lecia LOF major version");
+        throw ZException("incorrect lecia LOF major version", ZException::Option::CheckErrno);
       }
       Int32Block minorVersionBlock;
       readStructFromFileStream(minorVersionBlock, inputFileStream);
       if (minorVersionBlock.test != 0x2A) {
-        throw ZIOException("incorrect lecia LOF minor version");
+        throw ZException("incorrect lecia LOF minor version", ZException::Option::CheckErrno);
       }
       UInt64Block memorySizeBlock;
       readStructFromFileStream(memorySizeBlock, inputFileStream);
       if (memorySizeBlock.test != 0x2A) {
-        throw ZIOException("incorrect lecia LOF memory size");
+        throw ZException("incorrect lecia LOF memory size", ZException::Option::CheckErrno);
       }
       memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()), QString(""), size_t(memorySizeBlock.Number));
       inputFileStream.seekg(memorySizeBlock.Number, std::ios_base::cur);
 
       readStructFromFileStream(nb, inputFileStream);
       if (nb.test != 0x70) {
-        throw ZIOException("incorrect leica LOF xml header");
+        throw ZException("incorrect leica LOF xml header", ZException::Option::CheckErrno);
       }
 
       readStructFromFileStream(xtc, inputFileStream);
       if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
-        throw ZIOException("incorrect lecia LOF xml content");
+        throw ZException("incorrect lecia LOF xml content", ZException::Option::CheckErrno);
       }
       charBuf.resize(xtc.textLength);
       readStream(inputFileStream, charBuf.data(), xtc.textLength * 2);
@@ -389,7 +389,7 @@ void ZImgLeica::readXml(const QString& filename,
           MemoryBlock32 md;
           readStructFromFileStream(md, inputFileStream);
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 10 + md.textLength * 2) {
-            throw ZIOException("incorrect lecia LOF xml content");
+            throw ZException("incorrect lecia LOF xml content", ZException::Option::CheckErrno);
           }
           charBuf.resize(md.textLength);
           readStream(inputFileStream, charBuf.data(), md.textLength * 2);
@@ -401,7 +401,7 @@ void ZImgLeica::readXml(const QString& filename,
           MemoryBlock64 md;
           readStructFromFileStream(md, inputFileStream);
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 14 + md.textLength * 2) {
-            throw ZIOException("incorrect lecia LOF xml content");
+            throw ZException("incorrect lecia LOF xml content", ZException::Option::CheckErrno);
           }
           charBuf.resize(md.textLength);
           readStream(inputFileStream, charBuf.data(), md.textLength * 2);
@@ -410,7 +410,8 @@ void ZImgLeica::readXml(const QString& filename,
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else {
-          throw ZIOException(fmt::format("not supported leica lif version: {}", majorVersion));
+          throw ZException(fmt::format("not supported leica lif version: {}", majorVersion),
+                           ZException::Option::CheckErrno);
         }
       } while (true);
     }
@@ -725,7 +726,7 @@ void ZImgLeica::parseXLIF(const QString& filename, std::vector<ImageInfo>& image
 {
   QFile f(filename);
   if (!f.open(QFile::ReadOnly | QFile::Text)) {
-    throw ZIOException("can not open file");
+    throw ZException("can not open file", ZException::Option::CheckErrno);
   }
   QTextStream in(&f);
   QString xml = in.readAll();
@@ -737,7 +738,7 @@ void ZImgLeica::parseXLCF(const QString& filename, std::vector<ImageInfo>& image
 {
   QFile f(filename);
   if (!f.open(QFile::ReadOnly | QFile::Text)) {
-    throw ZIOException("can not open file");
+    throw ZException("can not open file", ZException::Option::CheckErrno);
   }
   QTextStream in(&f);
   QString xml = in.readAll();

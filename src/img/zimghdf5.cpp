@@ -706,7 +706,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
     }
   }
   catch (const std::exception& e) {
-    throw ZIOException(fmt::format("read {} folly:{}", m_filename, e.what()));
+    throw ZException(fmt::format("read {} folly:{}", m_filename, e.what()), ZException::Option::CheckErrno);
   }
 
   LOG(WARNING) << "fall back to single thread hdf5 image reading!";
@@ -737,7 +737,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
     return res;
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("read {} hdf5:{}", m_filename, e.getDetailMsg()));
+    throw ZException(fmt::format("read {} hdf5:{}", m_filename, e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 
@@ -902,10 +902,10 @@ void ZImgHDF5::readInfo(const QString& filename,
     }
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
   catch (const std::exception& e) {
-    throw ZIOException(fmt::format("std:{}", e.what()));
+    throw ZException(fmt::format("std:{}", e.what()), ZException::Option::CheckErrno);
   }
 }
 
@@ -1017,7 +1017,7 @@ void ZImgHDF5::readImg(const QString& filename,
     }
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 
@@ -1081,7 +1081,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
   }
   catch (const H5::Exception& e) {
     QFile::remove(filename);
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 
@@ -1153,7 +1153,7 @@ void ZImgHDF5::writeImg(const QString& filename,
   }
   catch (const H5::Exception& e) {
     QFile::remove(filename);
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 
@@ -1257,7 +1257,7 @@ void ZImgHDF5::writeImg(const QString& filename,
   }
   catch (const H5::Exception& e) {
     QFile::remove(filename);
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 

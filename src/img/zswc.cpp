@@ -102,7 +102,7 @@ void ZSwc::load(const QString& filename)
 
     QFile qFile(filename);
     if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-      throw ZIOException("Can not read file.");
+      throw ZException("Can not read file.", ZException::Option::CheckErrno);
     }
 
     std::map<int64_t, SwcNode> nodeMap;
@@ -114,7 +114,7 @@ void ZSwc::load(const QString& filename)
     while (!stream.atEnd()) {
       QString line = stream.readLine().trimmed();
       if (stream.status() != QTextStream::Ok) {
-        throw ZIOException("Error while reading file.");
+        throw ZException("Error while reading file.", ZException::Option::CheckErrno);
       }
       removeComment(line, QString("#"), true);
       static QRegularExpression rx("\\s+");
@@ -183,7 +183,7 @@ void ZSwc::save(const QString& filename) const
   try {
     QFile qFile(filename);
     if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-      throw ZIOException("Can not open file.");
+      throw ZException("Can not open file.", ZException::Option::CheckErrno);
     }
 
     QTextStream out(&qFile);
@@ -192,7 +192,7 @@ void ZSwc::save(const QString& filename) const
 #endif
     out << "#id type x y z radius parentID\n";
     if (out.status() != QTextStream::Ok) {
-      throw ZIOException("Error while writing file.");
+      throw ZException("Error while writing file.", ZException::Option::CheckErrno);
     }
     for (ConstBreadthFirstIterator it = beginBreadthFirst(); it != endBreadthFirst(); ++it) {
       out << QString("%1 %2 %3 %4 %5 %6 %7\n")
@@ -204,7 +204,7 @@ void ZSwc::save(const QString& filename) const
                .arg(it->radius)
                .arg(parentID(it));
       if (out.status() != QTextStream::Ok) {
-        throw ZIOException("Error while writing file.");
+        throw ZException("Error while writing file.", ZException::Option::CheckErrno);
       }
     }
   }

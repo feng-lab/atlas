@@ -417,7 +417,7 @@ void Z3DTexture::saveAsColorImage(const QString& filename) const
     tmpImg.infoRef().lastChannelIsAlphaChannel = true;
     tmpImg.save(filename);
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Exception: " << e.what();
   }
 }
@@ -434,7 +434,7 @@ void Z3DTexture::saveAsDepthImage(const QString& filename) const
     img.flip(Dimension::Y);
     img.save(filename);
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Exception: " << e.what();
   }
 }
@@ -453,7 +453,7 @@ void Z3DTexture::saveAsRGBFloatImage(const QString& filename) const
     tmpImg.flip(Dimension::Y);
     tmpImg.save(filename);
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Exception: " << e.what();
   }
 }
@@ -472,7 +472,7 @@ void Z3DTexture::saveAsRGBAFloatImage(const QString& filename) const
     tmpImg.flip(Dimension::Y);
     tmpImg.save(filename);
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Exception: " << e.what();
   }
 }

@@ -256,7 +256,7 @@ void ZImgFreeImage::readInfo(const QString& filename,
   FREE_IMAGE_FORMAT fmt = fipImage::identifyFIF(QFile::encodeName(filename).constData());
 #endif
   if (fmt == FIF_UNKNOWN) {
-    throw ZIOException("Can not identify image format");
+    throw ZException("Can not identify image format", ZException::Option::CheckErrno);
   } /*else {
     LOG(INFO) << FreeImage_GetFIFDescription(fmt);
   }*/
@@ -278,7 +278,7 @@ void ZImgFreeImage::readInfo(const QString& filename,
 #else
     if (!fipImg.load(fmt, QFile::encodeName(filename).constData(), FIF_LOAD_NOPIXELS)) {
 #endif
-      throw ZIOException("Can not load header");
+      throw ZException("Can not load header", ZException::Option::CheckErrno);
     }
     infos.push_back(readInfoFromFIPImage(fipImg));
   }
@@ -318,7 +318,7 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
 #else
     if (!fipImg.load(QFile::encodeName(filename).constData())) {
 #endif
-      throw ZIOException("Can not load");
+      throw ZException("Can not load", ZException::Option::CheckErrno);
     }
 
     isBGA = fipImg.getImageType() == FIT_BITMAP;
@@ -327,22 +327,22 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
       case FIC_CMYK:
         LOG(INFO) << "cmyk";
         if (!fipImg.convertTo24Bits()) {
-          throw ZIOException("convert CMYK to 24bit error");
+          throw ZException("convert CMYK to 24bit error", ZException::Option::CheckErrno);
         }
         break;
       case FIC_PALETTE:
         if (!fipImg.convertTo24Bits()) {
-          throw ZIOException("convert PALETTE image to 24bit error");
+          throw ZException("convert PALETTE image to 24bit error", ZException::Option::CheckErrno);
         }
         break;
       case FIC_MINISBLACK:
         if (!fipImg.convertToGrayscale()) {
-          throw ZIOException("convert MINISBLACK image to Grayscale error");
+          throw ZException("convert MINISBLACK image to Grayscale error", ZException::Option::CheckErrno);
         }
         break;
       case FIC_MINISWHITE:
         if (!fipImg.convertToGrayscale()) {
-          throw ZIOException("convert MINISWHITE image to Grayscale error");
+          throw ZException("convert MINISWHITE image to Grayscale error", ZException::Option::CheckErrno);
         }
         break;
       default:
@@ -358,7 +358,7 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   } else {
     fipMultiPage fipMp(true);
     if (!fipMp.open(QFile::encodeName(filename).constData(), false, true, GIF_PLAYBACK)) {
-      throw ZIOException("Can not open gif");
+      throw ZException("Can not open gif", ZException::Option::CheckErrno);
     }
 
     for (size_t t = 0; t < info.numTimes; ++t) {
@@ -373,22 +373,22 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
         case FIC_CMYK:
           LOG(INFO) << "cmyk";
           if (!fipImg.convertTo24Bits()) {
-            throw ZIOException("convert CMYK to 24bit error");
+            throw ZException("convert CMYK to 24bit error", ZException::Option::CheckErrno);
           }
           break;
         case FIC_PALETTE:
           if (!fipImg.convertTo24Bits()) {
-            throw ZIOException("convert PALETTE image to 24bit error");
+            throw ZException("convert PALETTE image to 24bit error", ZException::Option::CheckErrno);
           }
           break;
         case FIC_MINISBLACK:
           if (!fipImg.convertToGrayscale()) {
-            throw ZIOException("convert MINISBLACK image to Grayscale error");
+            throw ZException("convert MINISBLACK image to Grayscale error", ZException::Option::CheckErrno);
           }
           break;
         case FIC_MINISWHITE:
           if (!fipImg.convertToGrayscale()) {
-            throw ZIOException("convert MINISWHITE image to Grayscale error");
+            throw ZException("convert MINISWHITE image to Grayscale error", ZException::Option::CheckErrno);
           }
           break;
         default:

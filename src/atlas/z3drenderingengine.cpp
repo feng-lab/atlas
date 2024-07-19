@@ -365,7 +365,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int wi
     takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename, width, height, sst);
     resetOutputSizeToMatchCanvasSize();
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     auto errorMsg = fmt::format("takeFixedSizeScreenShot error: {}", e.what());
     LOG(ERROR) << errorMsg;
     reportRenderingError(errorMsg);
@@ -377,7 +377,7 @@ void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotTy
   try {
     takeScreenShotPrivate(filename, sst);
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     auto errorMsg = fmt::format("takeScreenShot error: {}", e.what());
     LOG(ERROR) << errorMsg;
     reportRenderingError(errorMsg);
@@ -676,7 +676,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
       LOG(INFO) << dir.filePath(fn) << " saved";
     }
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     LOG(ERROR) << e.what();
     reportRenderingError(e.what());
   }
@@ -1061,12 +1061,11 @@ void Z3DRenderingEngine::render(bool stereo)
       Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
     }
   }
-  catch (ZCancellationException& e) {
-    LOG(INFO) << e.what();
-    LOG(INFO) << "schedule a update later";
+  catch (const ZCancellationException&) {
+    LOG(INFO) << "cancelled, schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   }
-  catch (ZException& e) {
+  catch (const ZException& e) {
     LOG(INFO) << e.what();
   }
   Q_EMIT progressChanged(100);

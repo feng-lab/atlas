@@ -210,7 +210,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
     }
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 
@@ -303,7 +303,7 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename)
   }
   catch (const H5::Exception& e) {
     QFile::remove(filename);
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 
@@ -311,7 +311,7 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    throw ZIOException("Can not read file.");
+    throw ZException("Can not read file.", ZException::Option::CheckErrno);
   }
 
   QTextStream stream(&qFile);
@@ -321,7 +321,7 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
   while (!stream.atEnd()) {
     QString line = stream.readLine().trimmed();
     if (stream.status() != QTextStream::Ok) {
-      throw ZIOException("Error while reading file.");
+      throw ZException("Error while reading file.", ZException::Option::CheckErrno);
     }
     removeComment(line, QString("#"), true);
     QStringList fieldList = line.split(",", Qt::KeepEmptyParts);
@@ -402,7 +402,7 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file)
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-    throw ZIOException("Can not open file.");
+    throw ZException("Can not open file.", ZException::Option::CheckErrno);
   }
 
   QTextStream out(&qFile);
@@ -413,7 +413,7 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file)
   out
     << "#id, , name, comment, z, x, y, maxIntensity, meanIntensity, sDevOfIntensity, volSize, mass, property1, property2, property3, red, green, blue\n";
   if (out.status() != QTextStream::Ok) {
-    throw ZIOException("Error while writing file.");
+    throw ZException("Error while writing file.", ZException::Option::CheckErrno);
   }
   for (const auto& pun : puncta.data) {
     out << QString("%1,,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15,%16,%17\n")
@@ -436,7 +436,7 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file)
              .arg(pun.color().b);
     ++idx;
     if (out.status() != QTextStream::Ok) {
-      throw ZIOException("Error while writing file.");
+      throw ZException("Error while writing file.", ZException::Option::CheckErrno);
     }
   }
 }
@@ -445,7 +445,7 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    throw ZIOException("Can not read file.");
+    throw ZException("Can not read file.", ZException::Option::CheckErrno);
   }
 
   QTextStream stream(&qFile);
@@ -455,7 +455,7 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
   while (!stream.atEnd()) {
     QString line = stream.readLine().trimmed();
     if (stream.status() != QTextStream::Ok) {
-      throw ZIOException("Error while reading file.");
+      throw ZException("Error while reading file.", ZException::Option::CheckErrno);
     }
     removeComment(line, QString("#"), true);
     QStringList fieldList = line.split(",", Qt::KeepEmptyParts);
@@ -533,7 +533,7 @@ void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file)
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-    throw ZIOException("Can not open file.");
+    throw ZException("Can not open file.", ZException::Option::CheckErrno);
   }
 
   QTextStream out(&qFile);
@@ -542,12 +542,12 @@ void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file)
 #endif
   out << "# x y z radius\n";
   if (out.status() != QTextStream::Ok) {
-    throw ZIOException("Error while writing file.");
+    throw ZException("Error while writing file.", ZException::Option::CheckErrno);
   }
   for (const auto& pun : puncta.data) {
     out << QString("%1 %2 %3 %4\n").arg(pun.x()).arg(pun.y()).arg(pun.z()).arg(pun.radius());
     if (out.status() != QTextStream::Ok) {
-      throw ZIOException("Error while writing file.");
+      throw ZException("Error while writing file.", ZException::Option::CheckErrno);
     }
   }
 }

@@ -40,7 +40,7 @@ public:
     m_weight = 1 - w;
   }
 
-  // if cancelled, current algorithm will abort and throw a ZException or itk::ProcessAborted
+  // if cancelled, current algorithm will abort and throw a ZCancellationException or itk::ProcessAborted
   void setCancellationToken(const folly::CancellationToken& token)
   {
     m_cancellationToken = token;

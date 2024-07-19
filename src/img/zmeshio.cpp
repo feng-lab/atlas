@@ -213,7 +213,7 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh)
           aiProcess_FindInvalidData | aiProcess_RemoveComponent | 0);
 
       if (!scene) {
-        throw ZIOException(importer.GetErrorString());
+        throw ZException(importer.GetErrorString(), ZException::Option::CheckErrno);
       }
 
       if (scene->mNumMeshes == 0) {
@@ -319,7 +319,7 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
     Assimp::Exporter exporter;
     aiReturn res = exporter.Export(sc.get(), format, QFile::encodeName(filename).constData());
     if (res != aiReturn_SUCCESS) {
-      throw ZIOException(exporter.GetErrorString());
+      throw ZException(exporter.GetErrorString(), ZException::Option::CheckErrno);
     }
   }
   catch (const ZException& e) {

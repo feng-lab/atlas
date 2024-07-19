@@ -820,7 +820,7 @@ void ZTiff::load(const QString& filename, bool tagOnly)
       }
     }
     if (!m_tif) {
-      throw ZIOException("Libtiff can not open Tiff file");
+      throw ZException("Libtiff can not open Tiff file", ZException::Option::CheckErrno);
     }
   }
 }
@@ -833,7 +833,7 @@ void ZTiff::load(std::istream& fs, bool tagOnly)
 
   if (!tagOnly) {
     if (fs.fail()) {
-      throw ZIOException("Read tiff tags failed");
+      throw ZException("Read tiff tags failed", ZException::Option::CheckErrno);
     }
     fs.clear();
     fs.seekg(0);
@@ -862,7 +862,7 @@ void ZTiff::load(std::istream& fs, bool tagOnly)
       }
     }
     if (!m_tif) {
-      throw ZIOException("Libtiff can not open Tiff file");
+      throw ZException("Libtiff can not open Tiff file", ZException::Option::CheckErrno);
     }
   }
 }
@@ -941,7 +941,7 @@ void ZTiff::readInfoFromIFD(const ZTiffIFD& ifd, ZImgInfo& info) const
 void ZTiff::readImgFromIFD(size_t ifdIdx, ZImg& img)
 {
   if (TIFFSetDirectory(m_tif.get(), ifdIdx) != 1) {
-    throw ZIOException(fmt::format("Can not read ifd of index {}", ifdIdx));
+    throw ZException(fmt::format("Can not read ifd of index {}", ifdIdx), ZException::Option::CheckErrno);
   }
   readImg(img,
           m_ifds[ifdIdx].extraSample() == EXTRASAMPLE_ASSOCALPHA ||
@@ -951,7 +951,7 @@ void ZTiff::readImgFromIFD(size_t ifdIdx, ZImg& img)
 void ZTiff::readImgFromIFD(const ZTiffIFD& ifd, ZImg& img)
 {
   if (TIFFSetSubDirectory(m_tif.get(), ifd.offset()) != 1) {
-    throw ZIOException(fmt::format("Can not read ifd at offset {}", ifd.offset()));
+    throw ZException(fmt::format("Can not read ifd at offset {}", ifd.offset()), ZException::Option::CheckErrno);
   }
   readImg(img, ifd.extraSample() == EXTRASAMPLE_ASSOCALPHA || ifd.extraSample() == EXTRASAMPLE_UNSPECIFIED);
 }
@@ -1433,7 +1433,7 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
 
     auto ret = TIFFReadRGBAImageOriented(m_tif.get(), img.width(), img.height(), raster, orientation, 0);
     if (ret == 0) {
-      throw ZIOException("Read tiff as rgba failed");
+      throw ZException("Read tiff as rgba failed", ZException::Option::CheckErrno);
     }
     separateChannel(bufImg, img);
 
@@ -1502,7 +1502,8 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
             }
           }
           if (off != img.channelByteNumber()) {
-            throw ZIOException(fmt::format("read({}):expected({})", off, img.channelByteNumber()));
+            throw ZException(fmt::format("read({}):expected({})", off, img.channelByteNumber()),
+                             ZException::Option::CheckErrno);
           }
         }
       } else {
@@ -1526,7 +1527,8 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
           }
         }
         if (off != img.timeByteNumber()) {
-          throw ZIOException(fmt::format("read({}):expected({})", off, img.timeByteNumber()));
+          throw ZException(fmt::format("read({}):expected({})", off, img.timeByteNumber()),
+                           ZException::Option::CheckErrno);
         }
 
         separateChannel(bufImg, img);
@@ -1634,11 +1636,12 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
     uint8_t* buf8 = buf;
     size_t bytesPerRow = (width * nChannel + 7) / 8;
     if (packedBuf.size() < bytesPerRow * height) {
-      throw ZIOException(fmt::format("Not enought strip data, nRows:{}, nChannel:{}, bitsPerSample:{}, strip data:{}",
-                                     height,
-                                     nChannel,
-                                     bitspersample,
-                                     packedBuf.size()));
+      throw ZException(fmt::format("Not enought strip data, nRows:{}, nChannel:{}, bitsPerSample:{}, strip data:{}",
+                                   height,
+                                   nChannel,
+                                   bitspersample,
+                                   packedBuf.size()),
+                       ZException::Option::CheckErrno);
     }
     for (size_t r = 0; r < height; ++r) {
       for (size_t i = 0; i < width * nChannel; ++i) {
@@ -1655,11 +1658,12 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
     uint8_t* buf8 = buf;
     size_t bytesPerRow = (width * nChannel + 3) / 4;
     if (packedBuf.size() < bytesPerRow * height) {
-      throw ZIOException(fmt::format("Not enought strip data, nRows:{}, nChannel:{}, bitsPerSample:{}, strip data:{}",
-                                     height,
-                                     nChannel,
-                                     bitspersample,
-                                     packedBuf.size()));
+      throw ZException(fmt::format("Not enought strip data, nRows:{}, nChannel:{}, bitsPerSample:{}, strip data:{}",
+                                   height,
+                                   nChannel,
+                                   bitspersample,
+                                   packedBuf.size()),
+                       ZException::Option::CheckErrno);
     }
     for (size_t r = 0; r < height; ++r) {
       for (size_t i = 0; i < width * nChannel; ++i) {
@@ -1676,11 +1680,12 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
     uint8_t* buf8 = buf;
     size_t bytesPerRow = (width * nChannel + 1) / 2;
     if (packedBuf.size() < bytesPerRow * height) {
-      throw ZIOException(fmt::format("Not enought strip data, nRows:{}, nChannel:{}, bitsPerSample:{}, strip data:{}",
-                                     height,
-                                     nChannel,
-                                     bitspersample,
-                                     packedBuf.size()));
+      throw ZException(fmt::format("Not enought strip data, nRows:{}, nChannel:{}, bitsPerSample:{}, strip data:{}",
+                                   height,
+                                   nChannel,
+                                   bitspersample,
+                                   packedBuf.size()),
+                       ZException::Option::CheckErrno);
     }
     for (size_t r = 0; r < height; ++r) {
       for (size_t i = 0; i < width * nChannel; ++i) {
@@ -1691,7 +1696,7 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
     }
     return height * width * nChannel;
   }
-  throw ZIOException("should not happen");
+  throw ZException("should not happen", ZException::Option::CheckErrno);
 }
 
 void ZTiff::readTile(uint32_t tile, uint8_t* buf, size_t tileWidth, size_t tileHeight, size_t tileChannel, bool invert)
@@ -1879,7 +1884,7 @@ void ZTiffWriter::startWriting(const QString& filename, Compression comp, int32_
   m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), bigTiff ? "w8" : "w"));
 #endif
   if (!m_tif) {
-    throw ZIOException(fmt::format("Can't open {} for writing", filename));
+    throw ZException(fmt::format("Can't open {} for writing", filename), ZException::Option::CheckErrno);
   }
 }
 

@@ -396,7 +396,7 @@ void Z3DRenderTarget::saveAsColorImage(const QString& filename)
     tmpImg.infoRef().lastChannelIsAlphaChannel = true;
     tmpImg.save(filename);
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     release();
     LOG(ERROR) << "Exception: " << e.what();
   }
@@ -419,7 +419,7 @@ void Z3DRenderTarget::saveAsDepthImage(const QString& filename)
     img.flip(Dimension::Y);
     img.save(filename);
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     release();
     LOG(ERROR) << "Exception: " << e.what();
   }

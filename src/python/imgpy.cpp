@@ -404,7 +404,6 @@ PYBIND11_MODULE(_imgpy, m)
   py::implicitly_convertible<py::tuple, col4>();
 
   py::register_exception<ZCancellationException>(m, "ZCancellationException");
-  py::register_exception<ZIOException>(m, "ZIOException");
   py::register_exception<ZException>(m, "ZException");
 
   py::class_<ZImgWriteParameters>(m,

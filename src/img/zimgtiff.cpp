@@ -196,7 +196,7 @@ void ZImgTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff)
 {
   tiff.load(filename);
   if (!tiff.isValid()) {
-    throw ZIOException("No Image in Tiff");
+    throw ZException("No Image in Tiff", ZException::Option::CheckErrno);
   }
   m_imageDescription = tiff.ifds()[0].imageDescriptionAsQString();
 }
@@ -292,7 +292,7 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
 
     m_imgInfo[0].createDefaultDescriptions();
   } else {
-    throw ZIOException("No Image in Tiff");
+    throw ZException("No Image in Tiff", ZException::Option::CheckErrno);
   }
 }
 

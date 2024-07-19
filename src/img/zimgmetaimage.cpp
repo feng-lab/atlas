@@ -34,7 +34,7 @@ void ZImgMetaImage::readInfo(const QString& filename,
 {
   MetaImage metaImage;
   if (!metaImage.Read(QFile::encodeName(filename).constData(), false, nullptr)) {
-    throw ZIOException("Can not read file");
+    throw ZException("Can not read file", ZException::Option::CheckErrno);
   }
   infos.resize(1);
   parseInfo(metaImage, infos[0]);
@@ -58,7 +58,7 @@ void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   }
   MetaImage metaImage;
   if (!metaImage.Read(QFile::encodeName(filename).constData(), false, nullptr)) {
-    throw ZIOException("Can not read metaImage");
+    throw ZException("Can not read metaImage", ZException::Option::CheckErrno);
   }
   // metaImage.PrintInfo();
   ZImgInfo imgInfo;
@@ -233,7 +233,7 @@ void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, const ZIm
   metaImage.CompressedData(paras.compression != Compression::NONE);
 
   if (!metaImage.Write(QFile::encodeName(filename).constData())) {
-    throw ZIOException("Can not write metaimage");
+    throw ZException("Can not write metaimage", ZException::Option::CheckErrno);
   }
 }
 

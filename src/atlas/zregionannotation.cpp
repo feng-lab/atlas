@@ -723,7 +723,7 @@ void ZRegionAnnotation::load(const QString& filename)
     }
   }
   catch (const H5::Exception& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 
   updateBoundBox();
@@ -805,7 +805,7 @@ void ZRegionAnnotation::save(const QString& filename) const
   }
   catch (const H5::Exception& e) {
     QFile::remove(tfn);
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 

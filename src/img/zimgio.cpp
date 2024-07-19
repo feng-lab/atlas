@@ -247,16 +247,16 @@ void ZImgIO::readInfos(const QStringList& fileList,
                       throw ZException(fmt::format(
                         "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                         i,
-                        tmpInfo[s].toQString(),
-                        res[s].toQString()));
+                        tmpInfo[s].toString(),
+                        res[s].toString()));
                     }
                   } else {
                     if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
                       throw ZException(fmt::format(
                         "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                         i,
-                        tmpInfo[s].toQString(),
-                        res[s].toQString()));
+                        tmpInfo[s].toString(),
+                        res[s].toString()));
                     }
                   }
                   if (dim == catDim) {

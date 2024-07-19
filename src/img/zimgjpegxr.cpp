@@ -31,41 +31,41 @@ void reportError(ERR err)
     case WMP_errSuccess:
       return;
     case WMP_errFail:
-      throw ZIOException("JXR Fail");
+      throw ZException("JXR Fail", ZException::Option::CheckErrno);
     case WMP_errNotYetImplemented:
-      throw ZIOException("Not yet implemented");
+      throw ZException("Not yet implemented");
     case WMP_errAbstractMethod:
-      throw ZIOException("Abstract method");
+      throw ZException("Abstract method");
     case WMP_errOutOfMemory:
-      throw ZIOException("Out of memory");
+      throw ZException("Out of memory");
     case WMP_errFileIO:
-      throw ZIOException("File I/O error");
+      throw ZException("File I/O error", ZException::Option::CheckErrno);
     case WMP_errBufferOverflow:
-      throw ZIOException("Buffer overflow");
+      throw ZException("Buffer overflow");
     case WMP_errInvalidParameter:
-      throw ZIOException("Invalid parameter");
+      throw ZException("Invalid parameter");
     case WMP_errInvalidArgument:
-      throw ZIOException("Invalid argument");
+      throw ZException("Invalid argument");
     case WMP_errUnsupportedFormat:
-      throw ZIOException("Unsupported format");
+      throw ZException("Unsupported format");
     case WMP_errIncorrectCodecVersion:
-      throw ZIOException("Incorrect codec version");
+      throw ZException("Incorrect codec version");
     case WMP_errIndexNotFound:
-      throw ZIOException("Index not found");
+      throw ZException("Index not found");
     case WMP_errOutOfSequence:
-      throw ZIOException("Out of sequence");
+      throw ZException("Out of sequence");
     case WMP_errNotInitialized:
-      throw ZIOException("Not Initialized");
+      throw ZException("Not Initialized");
     case WMP_errMustBeMultipleOf16LinesUntilLastCall:
-      throw ZIOException("Must be multiple of 16 lines until last call");
+      throw ZException("Must be multiple of 16 lines until last call");
     case WMP_errPlanarAlphaBandedEncRequiresTempFile:
-      throw ZIOException("Planar alpha banded encoder requires temp files");
+      throw ZException("Planar alpha banded encoder requires temp files", ZException::Option::CheckErrno);
     case WMP_errAlphaModeCannotBeTranscoded:
-      throw ZIOException("Alpha mode cannot be transcoded");
+      throw ZException("Alpha mode cannot be transcoded");
     case WMP_errIncorrectCodecSubVersion:
-      throw ZIOException("Incorrect codec subversion");
+      throw ZException("Incorrect codec subversion");
     default:
-      throw ZIOException("Unknown JXR error");
+      throw ZException("Unknown JXR error", ZException::Option::CheckErrno);
   }
 }
 

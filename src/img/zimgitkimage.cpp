@@ -36,7 +36,7 @@ ZImgITKImage::ZImgITKImage()
     }
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.what());
+    throw ZException(err.what(), ZException::Option::CheckErrno);
   }
 }
 
@@ -72,7 +72,7 @@ QStringList ZImgITKImage::extensions() const
 #endif
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.what());
+    throw ZException(err.what(), ZException::Option::CheckErrno);
   }
 
   return res;
@@ -88,7 +88,7 @@ void ZImgITKImage::readInfo(const QString& filename,
                                          itk::ImageIOFactory::IOFileModeEnum::ReadMode);
 
     if (imageIO.IsNull()) {
-      throw ZIOException("can not create reader");
+      throw ZException("can not create reader", ZException::Option::CheckErrno);
     }
 
     imageIO->SetFileName(QFile::encodeName(filename).constData());
@@ -108,7 +108,7 @@ void ZImgITKImage::readInfo(const QString& filename,
     }
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.what());
+    throw ZException(err.what(), ZException::Option::CheckErrno);
   }
 }
 
@@ -120,7 +120,7 @@ void ZImgITKImage::readMetadata(const QString& filename, ZImgMetadata& meta, siz
                                          itk::ImageIOFactory::IOFileModeEnum::ReadMode);
 
     if (imageIO.IsNull()) {
-      throw ZIOException("can not create reader");
+      throw ZException("can not create reader", ZException::Option::CheckErrno);
     }
 
     imageIO->SetFileName(QFile::encodeName(filename).constData());
@@ -129,7 +129,7 @@ void ZImgITKImage::readMetadata(const QString& filename, ZImgMetadata& meta, siz
     parseMetadata(imageIO.GetPointer(), meta);
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.what());
+    throw ZException(err.what(), ZException::Option::CheckErrno);
   }
 }
 
@@ -141,7 +141,7 @@ void ZImgITKImage::readThumbnail(const QString& /*filename*/,
   try {
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.what());
+    throw ZException(err.what(), ZException::Option::CheckErrno);
   }
 }
 
@@ -157,7 +157,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
                                          itk::ImageIOFactory::IOFileModeEnum::ReadMode);
 
     if (imageIO.IsNull()) {
-      throw ZIOException("can not create reader");
+      throw ZException("can not create reader", ZException::Option::CheckErrno);
     }
 
     imageIO->SetFileName(QFile::encodeName(filename).constData());
@@ -305,7 +305,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     parseMetadata(imageIO.GetPointer(), img.metadataRef());
   }
   catch (itk::ExceptionObject& err) {
-    throw ZIOException(err.what());
+    throw ZException(err.what(), ZException::Option::CheckErrno);
   }
 }
 

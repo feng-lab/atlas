@@ -24,7 +24,7 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename,
   inputFileStream.seekg(0, std::ios::beg);
 
   if (inputFileStream.bad()) {
-    throw ZIOException(fmt::format("Error while reading file {}", filename));
+    throw ZException(fmt::format("Error while reading file {}", filename), ZException::Option::CheckErrno);
   }
 
   Eigen::Index nCol = 0;
@@ -49,7 +49,7 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename,
   }
 
   if (inputFileStream.bad()) {
-    throw ZIOException(fmt::format("Error while reading file {}", filename));
+    throw ZException(fmt::format("Error while reading file {}", filename), ZException::Option::CheckErrno);
   }
 
   inputFileStream.close();

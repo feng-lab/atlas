@@ -1475,7 +1475,7 @@ void ZROI::load(const QString& filename)
     load(allGrp);
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 
@@ -1497,7 +1497,7 @@ void ZROI::save(const QString& filename) const
   }
   catch (const H5::Exception& e) {
     QFile::remove(tfn);
-    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+    throw ZException(fmt::format("hdf5:{}", e.getDetailMsg()), ZException::Option::CheckErrno);
   }
 }
 

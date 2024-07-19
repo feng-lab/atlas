@@ -69,7 +69,7 @@ void my_error_exit(j_common_ptr cinfo)
 
   /* Create the message */
   (cinfo->err->format_message)(cinfo, errbuffer);
-  throw ZIOException(fmt::format("Libjpeg-turbo error: {}", errbuffer));
+  throw ZException(fmt::format("Libjpeg-turbo error: {}", errbuffer), ZException::Option::CheckErrno);
 }
 
 void createcinfo(jpeg_decompress_struct& cinfo, my_error_mgr& jerr)
@@ -88,7 +88,7 @@ void createcinfo(jpeg_decompress_struct& cinfo, my_error_mgr& jerr)
   //       * We need to clean up the JPEG object, close the input file, and return.
   //       */
   //    jpeg_destroy_decompress(&cinfo);
-  //    throw ZIOException(fmt::format("Libjpeg-turbo error: {}", errbuffer));
+  //    throw ZException(fmt::format("Libjpeg-turbo error: {}", errbuffer), ZException::Option::CheckErrno);
   //  }
   /* Now we can initialize the JPEG decompression object. */
   jpeg_create_decompress(&cinfo);
@@ -577,7 +577,8 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
 
   tjhandle tjInstance = nullptr;
   if ((tjInstance = tjInitCompress()) == nullptr) {
-    throw ZIOException(fmt::format("libjpeg-turbo: initializing compressor: {}", tjGetErrorStr2(tjInstance)));
+    throw ZException(fmt::format("libjpeg-turbo: initializing compressor: {}", tjGetErrorStr2(tjInstance)),
+                     ZException::Option::CheckErrno);
   }
   auto guard1 = folly::makeGuard([&tjInstance]() {
     if (tjInstance) {
@@ -606,12 +607,13 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
                   chrominanceSubsampling,
                   paras.jpegQuality,
                   flags) < 0) {
-    throw ZIOException(fmt::format("libjpeg-turbo: compressing image: {}", tjGetErrorStr2(tjInstance)));
+    throw ZException(fmt::format("libjpeg-turbo: compressing image: {}", tjGetErrorStr2(tjInstance)),
+                     ZException::Option::CheckErrno);
   }
 
   auto outfile = openFile(filename, "wb");
   if (fwrite(jpegBuf, jpegSize, 1, outfile.get()) < 1) {
-    throw ZIOException("error writing output jpeg file");
+    throw ZException("error writing output jpeg file", ZException::Option::CheckErrno);
   }
 }
 
@@ -660,7 +662,7 @@ void ZImgJpeg::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSiz
   readImgFromJpeg(cinfo, img, ZImgRegion(), getOrientation(cinfo));
 
   if (desSize < img.byteNumber()) {
-    throw ZIOException("buffer space is not enough");
+    throw ZException("buffer space is not enough");
   }
 
   std::memcpy(des, img.channelData<uint8_t>(0), img.byteNumber());

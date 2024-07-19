@@ -35,7 +35,7 @@ void ZImgAlgorithmBaseWithProgressReporter::subOperationProgressChanged(double p
 void ZImgAlgorithmBaseWithProgressReporter::reportProgress(double progress)
 {
   if (m_cancellationToken.isCancellationRequested()) {
-    throw ZException("cancelled by user");
+    throw ZCancellationException();
   }
   if ((progress - m_progress) * m_weight >= m_reportInterval || progress == 1.0) {
     m_progress = progress;

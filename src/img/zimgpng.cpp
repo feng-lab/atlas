@@ -19,7 +19,7 @@ struct PngPack
 
 void pngReadErrorFunction(png_structp, const char* message)
 {
-  throw ZIOException(fmt::format("Libpng error: {}", message));
+  throw ZException(fmt::format("Libpng error: {}", message), ZException::Option::CheckErrno);
 }
 
 void pngReadWarningFunction(png_structp, const char* message)
@@ -80,7 +80,7 @@ void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgIn
   info.depth = 1;
   auto bitDepth = png_get_bit_depth(pngPtr, infoPtr);
   if (bitDepth != 16 && bitDepth != 8 && bitDepth != 4 && bitDepth != 2 && bitDepth != 1) {
-    throw ZIOException(fmt::format("invalid bit depth {}", bitDepth));
+    throw ZException(fmt::format("invalid bit depth {}", bitDepth), ZException::Option::CheckErrno);
   }
   png_byte colorType = png_get_color_type(pngPtr, infoPtr);
   switch (colorType) {
@@ -237,7 +237,7 @@ void ZImgPng::readInfo(const QString& filename,
   }
   if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
-    throw ZIOException("Libpng read error");
+    throw ZException("Libpng read error", ZException::Option::CheckErrno);
   }
 
   auto guard1 = folly::makeGuard([&png]() {
@@ -284,7 +284,7 @@ void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t s
   }
   if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
-    throw ZIOException("Libpng read error");
+    throw ZException("Libpng read error", ZException::Option::CheckErrno);
   }
 
   auto guard1 = folly::makeGuard([&png]() {
@@ -331,7 +331,7 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
   }
   if (!png.pngPtr || !png.infoPtr || !png.endPtr) {
     png_destroy_read_struct(&png.pngPtr, &png.infoPtr, &png.endPtr);
-    throw ZIOException("Libpng read error");
+    throw ZException("Libpng read error", ZException::Option::CheckErrno);
   }
 
   auto guard1 = folly::makeGuard([&png]() {
@@ -372,7 +372,7 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
 
   size_t rowBytes = png_get_rowbytes(png.pngPtr, png.infoPtr);
   if (rowBytes * info.height != info.byteNumber()) {
-    throw ZIOException("fatal png read error");
+    throw ZException("fatal png read error", ZException::Option::CheckErrno);
   }
   std::vector<png_byte, boost::alignment::aligned_allocator<png_byte, 64>> outRaw(info.byteNumber());
   std::vector<png_bytep> rowPointers(info.height);
@@ -426,7 +426,7 @@ void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWrite
   }
   if (!png.pngPtr || !png.infoPtr) {
     png_destroy_write_struct(&png.pngPtr, &png.infoPtr);
-    throw ZIOException("can not create Libpng write struct");
+    throw ZException("can not create Libpng write struct", ZException::Option::CheckErrno);
   }
 
   auto guard1 = folly::makeGuard([&png]() {
