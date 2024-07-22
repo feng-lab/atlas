@@ -1,4 +1,5 @@
 import os
+import sys
 import hashlib
 import requests
 import urllib.request
@@ -92,9 +93,28 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
     for current_url in urls:
         try:
             print(f"Downloading from {current_url}")
-            # Set the range header to resume download
-            headers = {'Range': f'bytes={current_size}-'}
+
+            # Set up headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+                'Accept': '*/*',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive'
+            }
+
+            # Try to use range if file exists
+            if current_size > 0:
+                headers['Range'] = f'bytes={current_size}-'
+
             response = requests.get(current_url, stream=True, proxies=proxies, headers=headers)
+
+            # If we get a 406 or 416 error, try again without range header
+            if response.status_code in [406, 416]:
+                print(f"Range request not supported or invalid. Downloading entire file.")
+                headers.pop('Range', None)
+                response = requests.get(current_url, stream=True, proxies=proxies, headers=headers)
+                current_size = 0  # Reset current_size as we're downloading from the beginning
+
             response.raise_for_status()
 
             # Append to file if resuming, otherwise write new file
@@ -153,7 +173,8 @@ def sync_files(files_to_download, target_directory, check_os: bool = True):
         )
 
         if not success:
-            print(f"Failed to download {file_info['filename']}")
+            sys.stderr.write(f"Failed to download {file_info['filename']}")
+            sys.exit(1)
 
         print()
 
