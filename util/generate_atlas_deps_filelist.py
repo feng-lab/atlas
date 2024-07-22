@@ -57,10 +57,8 @@ def sync_via_ftp(local_folder, hostname, username, password, remote_folder):
     ftp.quit()
 
 
-def process_files(folder_path, ftp_info, base_url, backup_base_url):
+def process_files(folder_path, base_url, backup_base_url):
     files_info = []
-
-    # sync_via_ftp(folder_path, **ftp_info)
 
     for root, dirs, files in os.walk(folder_path):
         for filename in files:
@@ -88,43 +86,33 @@ def process_files(folder_path, ftp_info, base_url, backup_base_url):
     return files_info
 
 
-def generate_download_script(files_info, output_file):
+def generate_atlas_deps_filelist(files_info, output_file):
     with open(output_file, 'w') as f:
         f.write("import os\n")
-        f.write("import common_dirs\n")
-        f.write("from download_utils import is_correct_platform\n")
-        f.write("from download_utils import download_file_with_resume\n\n")
+        f.write("import common_dirs\n\n\n")
         f.write("files_to_download = [\n")
         for file_info in files_info:
             f.write(f"    {{\n")
             f.write(f"        'url': '{file_info['url']}',\n")
             f.write(f"        'backup_url': '{file_info['backup_url']}',\n")
-            f.write(
-                f"        'target_path': os.path.join(common_dirs.atlas_repository_dir(), 'atlas_deps', '{file_info['filename']}'),\n")
             f.write(f"        'expected_size': {file_info['size']},\n")
             f.write(f"        'expected_sha256': '{file_info['checksum']}',\n")
             f.write(f"        'filename': '{file_info['filename']}',\n")
             f.write(f"    }},\n")
         f.write("]\n\n")
-        f.write("for file_info in files_to_download:\n")
-        f.write("    if is_correct_platform(file_info['filename']):\n")
-        f.write("        os.makedirs(os.path.dirname(file_info['target_path']), exist_ok=True)\n")
-        f.write("        success = download_file_with_resume(**file_info)\n")
-        f.write("        print(f\"Download of {file_info['url']} {'succeeded' if success else 'failed'}\\n\")\n")
 
 
 if __name__ == "__main__":
-    # Example usage
-    folder_path = common_dirs.dropbox_src_package_dir()
-
     ftp_info = {
         'hostname': os.getenv('FTP_HOSTNAME'),
         'username': os.getenv('FTP_USERNAME'),
         'password': os.getenv('FTP_PASSWORD'),
         'remote_folder': "/public_html/static/atlas_deps",
     }
+
     base_url = "https://neutracing.com/static/atlas_deps"
     backup_base_url = "https://fenglab.xyz/static/atlas_deps"
+    folder_path = common_dirs.dropbox_src_package_dir()
 
-    files_info = process_files(folder_path, ftp_info, base_url, backup_base_url)
-    generate_download_script(files_info, os.path.join(common_dirs.atlas_util_dir(), 'download_atlas_deps.py'))
+    files_info = process_files(folder_path, base_url, backup_base_url)
+    generate_atlas_deps_filelist(files_info, os.path.join(common_dirs.atlas_util_dir(), 'atlas_deps_filelist.py'))

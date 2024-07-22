@@ -97,6 +97,11 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     # in atlas repo
     python3 util/download_atlas_deps.py
     ```
+* (optional, not required for building) download `atlas_test_data` folder to the repo directory.
+    ```bash
+    # in atlas repo
+    python3 util/download_atlas_test_data.py
+    ```
 * get submodules
     ```bash
     # in atlas repo

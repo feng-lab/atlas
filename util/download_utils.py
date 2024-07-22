@@ -67,11 +67,7 @@ def is_correct_platform(filename):
 
 
 @retry_with_backoff()
-def download_file_with_resume(url, backup_url, target_path, expected_size, expected_sha256, filename):
-    if not is_correct_platform(filename):
-        print(f"Skipping download of {filename} as it is not for the current platform.")
-        return
-
+def download_file_with_resume(url, backup_url, target_path, expected_size, expected_sha256):
     http_proxy, https_proxy = get_system_proxy()
     proxies = {
         'http': http_proxy,
@@ -123,3 +119,57 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
 
     print(f"Failed to download file from all URLs.")
     return False
+
+
+def sync_files(files_to_download, target_directory, check_os: bool = True):
+    """
+    Synchronize files in the target directory with the provided list of files to download.
+
+    :param files_to_download: List of dictionaries containing file information
+    :param target_directory: Directory to synchronize files to
+    """
+    # Create target directory if it doesn't exist
+    os.makedirs(target_directory, exist_ok=True)
+
+    # Keep track of files that should be in the directory
+    expected_files = set()
+
+    # Download or update files
+    for file_info in files_to_download:
+        if check_os and not is_correct_platform(file_info['filename']):
+            continue
+        target_path = os.path.join(target_directory, file_info['filename'])
+        expected_files.add(file_info['filename'])
+
+        # Create subdirectories if necessary
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+        success = download_file_with_resume(
+            file_info['url'],
+            file_info['backup_url'],
+            target_path,
+            file_info['expected_size'],
+            file_info['expected_sha256']
+        )
+
+        if not success:
+            print(f"Failed to download {file_info['filename']}")
+
+        print()
+
+    # Remove files that are not in the download list
+    for root, dirs, files in os.walk(target_directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            relative_path = os.path.relpath(file_path, target_directory)
+            if relative_path not in expected_files:
+                print(f"Removing file not in download list: {relative_path}")
+                os.remove(file_path)
+
+    # Remove empty directories
+    for root, dirs, files in os.walk(target_directory, topdown=False):
+        for dir in dirs:
+            dir_path = os.path.join(root, dir)
+            if not os.listdir(dir_path):
+                os.rmdir(dir_path)
+                print(f"Removed empty directory: {dir_path}")
