@@ -104,8 +104,14 @@ def dropbox_dir() -> str:
     return res
 
 
+def dropbox_src_package_dir() -> str:
+    res = os.path.join(dropbox_dir(), 'code', 'my', 'proxy', 'static', 'atlas_deps')
+    assert os.path.exists(res)
+    return res
+
+
 def src_package_dir() -> str:
-    res = os.path.join(src_package_dir(), 'atlas_deps')
+    res = os.path.join(atlas_repository_dir(), 'atlas_deps')
     if not os.path.exists(res):
         res = os.path.join(dropbox_dir(), 'code', 'my', 'proxy', 'static', 'atlas_deps')
     assert os.path.exists(res)
@@ -113,7 +119,7 @@ def src_package_dir() -> str:
 
 
 def atlas_test_data_dir() -> str:
-    res = os.path.join(src_package_dir(), 'atlas_test_data')
+    res = os.path.join(atlas_repository_dir(), 'atlas_test_data')
     if not os.path.exists(res):
         res = os.path.join(dropbox_dir(), 'code', 'my', 'proxy', 'static', 'atlas_test_data')
     assert os.path.exists(res)

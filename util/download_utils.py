@@ -5,6 +5,7 @@ import urllib.request
 import random
 import time
 from functools import wraps
+import common_dirs
 
 
 def retry_with_backoff(retries=5, backoff_in_seconds=1):
@@ -53,8 +54,24 @@ def validate_checksum(file_path, expected_sha256):
         return False
 
 
+def is_correct_platform(filename):
+    if common_dirs.is_linux():
+        return not ('win' in filename.lower() or '.exe' in filename.lower() or '.msi' in filename.lower()
+                    or 'mac' in filename.lower())
+    elif common_dirs.is_windows():
+        return not ('linux' in filename.lower() or 'mac' in filename.lower())
+    elif common_dirs.is_mac():
+        return not ('linux' in filename.lower() or 'win' in filename.lower() or '.exe' in filename.lower()
+                    or '.msi' in filename.lower())
+    return True
+
+
 @retry_with_backoff()
-def download_file_with_resume(url, backup_url, target_path, expected_size, expected_sha256):
+def download_file_with_resume(url, backup_url, target_path, expected_size, expected_sha256, filename):
+    if not is_correct_platform(filename):
+        print(f"Skipping download of {filename} as it is not for the current platform.")
+        return
+
     http_proxy, https_proxy = get_system_proxy()
     proxies = {
         'http': http_proxy,
@@ -78,6 +95,7 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
     urls = [url, backup_url]
     for current_url in urls:
         try:
+            print(f"Downloading from {current_url}")
             # Set the range header to resume download
             headers = {'Range': f'bytes={current_size}-'}
             response = requests.get(current_url, stream=True, proxies=proxies, headers=headers)

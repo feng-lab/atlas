@@ -92,10 +92,11 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
 
 ### All:
 * clone atlas repo
-* `atlas_deps` folder should be in home directory. 
-  * `atlas_deps` folder can be downloaded from https://www.dropbox.com/scl/fo/uw1tj7n1tl6gswb2nb8ma/h?rlkey=dbe2tj3a4frld6ifsv1cmqobr&dl=0
-* (not required for building): `atlas_test_data` folder should be in home directory.
-  * `atlas_test_data` folder can be downloaded from https://www.dropbox.com/scl/fo/n816eimuynywew9pyfec3/h?rlkey=of5b1hmany7yopder5hj41y8x&dl=0
+* download `atlas_deps` folder to the repo directory.
+    ```bash
+    # in atlas repo
+    python3 util/download_atlas_deps.py
+    ```
 * get submodules
     ```bash
     # in atlas repo
