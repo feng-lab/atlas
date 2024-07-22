@@ -214,3 +214,5 @@ src/neurolabi/python/CMakeParser.pyc
 src/neurolabi/python/QMakeParser.pyc
 
 /.vscode
+/atlas_deps/
+/atlas_test_data/

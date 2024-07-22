@@ -98,21 +98,6 @@ def resource_dir() -> str:
     return res
 
 
-def google_drive_dir() -> str:
-    res = os.path.join(os.path.expanduser('~'), 'Google Drive', 'My Drive')
-    if not os.path.exists(res):
-        if is_mac():
-            res = os.path.join(os.path.expanduser('~'), 'Google Drive')
-        elif is_windows():
-            res = os.path.join('Z:', os.sep, 'Google Drive', 'My Drive')
-            if not os.path.exists(res):
-                res = os.path.join(os.path.expanduser('~'), 'GoogleDrive')
-            if not os.path.exists(res):
-                res = os.path.join(os.path.expanduser('~'), 'Google Drive')
-    assert os.path.exists(res)
-    return res
-
-
 def dropbox_dir() -> str:
     res = os.path.join(os.path.expanduser('~'), 'Dropbox')
     assert os.path.exists(res)
@@ -120,19 +105,17 @@ def dropbox_dir() -> str:
 
 
 def src_package_dir() -> str:
-    res = os.path.join(os.path.expanduser('~'), 'atlas_deps')
+    res = os.path.join(src_package_dir(), 'atlas_deps')
     if not os.path.exists(res):
-        res = os.path.join(dropbox_dir(), 'code', 'my', 'atlas_deps')
+        res = os.path.join(dropbox_dir(), 'code', 'my', 'proxy', 'static', 'atlas_deps')
     assert os.path.exists(res)
     return res
 
 
 def atlas_test_data_dir() -> str:
-    res = os.path.join(os.path.expanduser('~'), 'atlas_test_data')
+    res = os.path.join(src_package_dir(), 'atlas_test_data')
     if not os.path.exists(res):
-        res = os.path.join(dropbox_dir(), 'code', 'my', 'atlas_test_data')
-    if not os.path.exists(res):
-        res = os.path.normpath(os.path.join(src_package_dir(), '..', 'atlas_test_data'))
+        res = os.path.join(dropbox_dir(), 'code', 'my', 'proxy', 'static', 'atlas_test_data')
     assert os.path.exists(res)
     return res
 
