@@ -117,14 +117,26 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
 
             response.raise_for_status()
 
+            start_time = time.time()
             # Append to file if resuming, otherwise write new file
             mode = 'ab' if current_size > 0 else 'wb'
             with open(target_path, mode) as file:
+                downloaded_size = current_size
                 for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:  # filter out keep-alive new chunks
+                    if chunk:
                         file.write(chunk)
-                        current_size += len(chunk)
-                        # You can add progress reporting here if desired
+                        downloaded_size += len(chunk)
+                        elapsed_time = time.time() - start_time
+                        speed = downloaded_size / (1024 * 1024 * elapsed_time)  # MB/s
+                        progress = (downloaded_size / expected_size) * 100
+
+                        # Clear the current line
+                        sys.stdout.write('\033[K')
+                        # Print progress and speed
+                        sys.stdout.write(f"\rProgress: {progress:.2f}% | Speed: {speed:.2f} MB/s")
+                        sys.stdout.flush()
+
+            print()  # New line after download completes
 
             if os.path.getsize(target_path) != expected_size:
                 print(f"Downloaded file size does not match expected size. Trying next URL.")
