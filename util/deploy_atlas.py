@@ -291,7 +291,8 @@ def deploy_atlas(is_debug_version: bool = False):
     build_atlas_package(is_debug_version=is_debug_version)
     if not is_debug_version:
         pack_atlas_package()
-        build_atlas_installer()
+        if common_dirs.is_my_computer():
+            build_atlas_installer()
 
 
 if __name__ == "__main__":

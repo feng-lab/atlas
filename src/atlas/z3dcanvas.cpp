@@ -282,6 +282,7 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
 
 #ifdef ATLAS_USE_OPENGLWINDOW
   connect(m_glWindow, &ZOpenGLWindow::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
+  connect(m_glWindow, &ZOpenGLWindow::openGLContextInitialized, m_3dScene.get(), &Z3DScene::initPainter);
 #else
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, m_3dScene.get(), &Z3DScene::initPainter);

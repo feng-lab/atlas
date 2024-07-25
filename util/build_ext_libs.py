@@ -3312,10 +3312,15 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 build_skia(src_dir, ext_build_dir())
 
         if lib_name == 'neuTube':
-            for suffix in ('macOS', 'Linux', 'Windows'):
-                shutil.copytree(os.path.join(src_package_dir(), 'packages-' + suffix),
-                                os.path.join(ext_build_dir(), 'packages-' + suffix),
-                                dirs_exist_ok=True)
+            if is_windows():
+                suffix = 'Windows'
+            elif is_mac():
+                suffix = 'macOS'
+            else:
+                suffix = 'Linux'
+            shutil.copytree(os.path.join(src_package_dir(), 'packages-' + suffix),
+                            os.path.join(ext_build_dir(), 'packages-' + suffix),
+                            dirs_exist_ok=True)
 
         if lib_name == 'rocksdb':
             src_dir = os.path.join(ext_dir(), 'rocksdb')
