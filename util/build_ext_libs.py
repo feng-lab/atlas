@@ -7,6 +7,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 from common_dirs import *
+from download_atlas_deps import *
 
 
 def macos_min_version():
@@ -2868,7 +2869,7 @@ def build_proxygen(src_dir: str, install_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         if is_windows():
-            cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={atlas_util_dir()};{os.path.dirname(sys.executable)}',
+            cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={get_gperf_dir()};{os.path.dirname(sys.executable)}',
                              f'-DBUILD_SAMPLES:BOOL=OFF',
                              ])
         else:
@@ -2903,6 +2904,8 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
     print('HOME:', os.environ['HOME'])
 
+    download_atlas_deps()
+
     for lib_name, build_lib in libs.items():
         if not build_lib:
             continue
@@ -2917,14 +2920,9 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             if is_windows():
                 unpack_tool_to_target_dir(src_package_dir(), 'curl*win*')
 
-        if lib_name == 'make-cmake-pathlist':
-            with open(os.path.join(ext_build_dir(), 'PathList.cmake'), mode='w', encoding='utf-8') as file:
-                file.write('# Set PATH for CMake\n')
-                file.write(f'set(QT_VERSION {qt_ver()})\n')
-                if is_windows():
-                    file.write('set(QT_HOST_PATH "{0}")\n'.format(qt_base_dir().replace("\\", "/")))
-                else:
-                    file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
+        if lib_name == 'gperf':
+            if is_windows():
+                install_gperf()
 
         if lib_name == 'qt':
             print(f'Qt {qt_ver()} in {qt_base_dir()}')
@@ -2970,9 +2968,18 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                         mm.flush()
                         print("{0} successfully patched at {1} places.".format(file, len(all_indexes)))
 
+        if lib_name == 'make-cmake-pathlist':
+            with open(os.path.join(ext_build_dir(), 'PathList.cmake'), mode='w', encoding='utf-8') as file:
+                file.write('# Set PATH for CMake\n')
+                file.write(f'set(QT_VERSION {qt_ver()})\n')
+                if is_windows():
+                    file.write('set(QT_HOST_PATH "{0}")\n'.format(qt_base_dir().replace("\\", "/")))
+                else:
+                    file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
+
         if lib_name == 'zlib':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'zlib*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -2986,7 +2993,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'boost':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'boost*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'boost*'))
                 clean_boost(ext_build_dir())
@@ -3038,7 +3045,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'openssl':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'openssl*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'openssl*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3092,7 +3099,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'libsodium':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libsodium*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'libsodium*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3131,7 +3138,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             else:
                 nasm_dir = ''
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libjpeg*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'libjpeg*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3140,7 +3147,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'libpng':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libpng*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'libpng*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3149,7 +3156,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'openjpeg':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'openjpeg*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'openjpeg*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3158,7 +3165,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'libwebp':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libwebp*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'libwebp*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3178,7 +3185,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'hdf5':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'hdf5*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'hdf5*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3187,7 +3194,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'freeimage':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'freeimage-svn*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'freeimage-svn*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3230,7 +3237,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'ospray':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ospray*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'ospray*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3248,7 +3255,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*linux*'))
             else:
                 package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*windows*'))
-            jre_dir = get_package_top_level_folder(package_name, ext_build_dir())
+            jre_dir = os.path.join(ext_build_dir(), get_package_top_level_folder(package_name))
             print(jre_dir)
             if not os.path.exists(jre_dir):
                 if os.path.exists(os.path.join(ext_build_dir(), 'jre')):
@@ -3268,7 +3275,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_aarch64*mac*'))
                 if not os.path.lexists(os.path.join(ext_build_dir(), 'jrearm')):
                     os.mkdir(os.path.join(ext_build_dir(), 'jrearm'))
-                jre_dir = get_package_top_level_folder(package_name, os.path.join(ext_build_dir(), 'jrearm'))
+                jre_dir = os.path.join(ext_build_dir(), 'jrearm', get_package_top_level_folder(package_name))
                 print(jre_dir)
                 if not os.path.exists(jre_dir):
                     if os.path.exists(os.path.join(ext_build_dir(), 'jre-arm')):
@@ -3324,7 +3331,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'jansson':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'jansson*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
             if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'jansson*'))
                 unpack_file_to_folder(package_name, ext_dir())
@@ -3334,7 +3341,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
         if lib_name == 'pcre':
             if is_windows():
                 package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'pcre2*'))
-                src_dir = get_package_top_level_folder(package_name, ext_dir())
+                src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
                 if not os.path.exists(src_dir):
                     remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'pcre2*'))
                     unpack_file_to_folder(package_name, ext_dir())
@@ -3359,7 +3366,8 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
 
 def parse_inputs(argv: list):
-    lib_list = ['cmake', 'ninja', 'curl', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'tbb', 'eigen',
+    lib_list = ['cmake', 'ninja', 'curl', 'gperf', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'tbb',
+                'eigen',
                 'pybind11', 'glm', 'magic_enum', 'pocketfft', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
                 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'snappy', 'bzip2',
                 'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
@@ -3401,6 +3409,7 @@ def parse_inputs(argv: list):
                             'qt': ['make-cmake-pathlist'],
                             'wangle': ['proxygen'],
                             'mvfst': ['proxygen'],
+                            'gperf': ['proxygen'],
                             'fizz': ['mvfst'],
                             }
 

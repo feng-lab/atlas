@@ -1,7 +1,3 @@
-import os
-import common_dirs
-
-
 files_to_download = [
     {
         'url': 'https://neutracing.com/static/atlas_deps/ffmpeg-n7.0-latest-linux64-gpl-7.0.tar.xz',
@@ -23,13 +19,6 @@ files_to_download = [
         'expected_size': 2215544,
         'expected_sha256': '7fad7bc85961b642458f80056b79ed45628e4cc4196dfc0b266100aaaf712728',
         'filename': 'openjpeg-2.5.2.zip',
-    },
-    {
-        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-linux-x86_64-1.3.283.0.tar.xz',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-linux-x86_64-1.3.283.0.tar.xz',
-        'expected_size': 239217328,
-        'expected_sha256': '8005e2cf3e89c80cbe1c0d0a259c88248de3257b4fc6fdefb47409edb3e43ecb',
-        'filename': 'vulkansdk-linux-x86_64-1.3.283.0.tar.xz',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/libjpeg-turbo-3.0.3.tar.gz',
@@ -67,6 +56,13 @@ files_to_download = [
         'filename': 'qwt-code-r3377-trunk.zip',
     },
     {
+        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-macos-1.3.290.0.dmg',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-macos-1.3.290.0.dmg',
+        'expected_size': 266727967,
+        'expected_sha256': 'a14f3026290c2ef0a9fc96af3f6b75135018d145748543a644107a36f1d65a71',
+        'filename': 'vulkansdk-macos-1.3.290.0.dmg',
+    },
+    {
         'url': 'https://neutracing.com/static/atlas_deps/zlib131.zip',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/zlib131.zip',
         'expected_size': 1655249,
@@ -102,6 +98,13 @@ files_to_download = [
         'filename': 'OpenJDK21U-jre_x64_linux_hotspot_21.0.4_7.tar.gz',
     },
     {
+        'url': 'https://neutracing.com/static/atlas_deps/VulkanSDK-1.3.290.0-Installer.exe',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/VulkanSDK-1.3.290.0-Installer.exe',
+        'expected_size': 169787816,
+        'expected_sha256': '0ba0392a78157b82354157c5c988d74ddc6bc15573cc9c8653aa60245355fe8a',
+        'filename': 'VulkanSDK-1.3.290.0-Installer.exe',
+    },
+    {
         'url': 'https://neutracing.com/static/atlas_deps/ninja-win.zip',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/ninja-win.zip',
         'expected_size': 275425,
@@ -114,6 +117,13 @@ files_to_download = [
         'expected_size': 8314627,
         'expected_sha256': 'dd9256cc7ad3a140b1fa9035c56102455441c26d924d7d8443fe06ba54261607',
         'filename': 'freeimage-svn-r1911-FreeImage-trunk.zip',
+    },
+    {
+        'url': 'https://neutracing.com/static/atlas_deps/gawk-3.1.6-1-bin.zip',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/gawk-3.1.6-1-bin.zip',
+        'expected_size': 1448542,
+        'expected_sha256': 'f05128cc735e8a4a0dff027a2c54a8ce69c30b4c0774bfb2994638317927c224',
+        'filename': 'gawk-3.1.6-1-bin.zip',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/ffmpeg7intel.zip',
@@ -135,13 +145,6 @@ files_to_download = [
         'expected_size': 48772289,
         'expected_sha256': 'f79eaa741cb9ec4d20c7fd57a0fc52c715da183bc68eb19f4778b816b89ef003',
         'filename': 'OpenJDK21U-jre_x64_windows_hotspot_21.0.3_9.zip',
-    },
-    {
-        'url': 'https://neutracing.com/static/atlas_deps/VulkanSDK-1.3.283.0-Installer.exe',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/VulkanSDK-1.3.283.0-Installer.exe',
-        'expected_size': 166138880,
-        'expected_sha256': '811fcb9b43d09248520b2f38ae9a3763fc81df950fdab874f23bd762b07a9b12',
-        'filename': 'VulkanSDK-1.3.283.0-Installer.exe',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/trust_stores_as_pem.tar.gz',
@@ -249,6 +252,13 @@ files_to_download = [
         'filename': 'strawberry-perl-5.32.1.1-64bit.msi',
     },
     {
+        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-linux-x86_64-1.3.290.0.tar.xz',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-linux-x86_64-1.3.290.0.tar.xz',
+        'expected_size': 253487532,
+        'expected_sha256': '440906a95e7d42da0eaf5c3ae41471baf4aa7086df9d9b93795b0f908239a76a',
+        'filename': 'vulkansdk-linux-x86_64-1.3.290.0.tar.xz',
+    },
+    {
         'url': 'https://neutracing.com/static/atlas_deps/cmake-3.29.6-linux-x86_64.tar.gz',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/cmake-3.29.6-linux-x86_64.tar.gz',
         'expected_size': 53250177,
@@ -277,11 +287,11 @@ files_to_download = [
         'filename': 'pcre2-10.42.zip',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-macos-1.3.283.0.dmg',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-macos-1.3.283.0.dmg',
-        'expected_size': 268015514,
-        'expected_sha256': '60ca47ad5a84a890087e7b372b5b2352bbced07966767dd30159efd49d0f7118',
-        'filename': 'vulkansdk-macos-1.3.283.0.dmg',
+        'url': 'https://neutracing.com/static/atlas_deps/gperf-3.0.1-bin.zip',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/gperf-3.0.1-bin.zip',
+        'expected_size': 105431,
+        'expected_sha256': '413d9f5562c39c2fcac1e48b3e2155838680a0aec1ddcb95b23cb2f092962dcc',
+        'filename': 'gperf-3.0.1-bin.zip',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/jars/bioformats_package.jar',
@@ -382,4 +392,3 @@ files_to_download = [
         'filename': 'packages-macOS/fenglab.neutube/data/neuTube.7z',
     },
 ]
-

@@ -121,9 +121,10 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
             mode = 'ab' if current_size > 0 else 'wb'
             with open(target_path, mode) as file:
                 for chunk in response.iter_content(chunk_size=8192):
-                    file.write(chunk)
-                    current_size += len(chunk)
-                    # You can add progress reporting here if desired
+                    if chunk:  # filter out keep-alive new chunks
+                        file.write(chunk)
+                        current_size += len(chunk)
+                        # You can add progress reporting here if desired
 
             if os.path.getsize(target_path) != expected_size:
                 print(f"Downloaded file size does not match expected size. Trying next URL.")

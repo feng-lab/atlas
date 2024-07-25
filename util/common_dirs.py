@@ -1,6 +1,5 @@
 import os
 import sys
-from pkg_resources import parse_version
 import shutil
 import glob
 import tarfile
@@ -8,6 +7,7 @@ import zipfile
 import stat
 import subprocess
 import errno
+from packaging import version
 
 
 def is_windows() -> bool:
@@ -98,37 +98,43 @@ def resource_dir() -> str:
     return res
 
 
-def dropbox_dir() -> str:
-    res = os.path.join(os.path.expanduser('~'), 'Dropbox')
-    assert os.path.exists(res)
-    return res
+def static_deploy_folder() -> str:
+    return os.path.join(os.path.expanduser('~'), 'Dropbox', 'code', 'my', 'proxy', 'static')
 
 
-def dropbox_src_package_dir() -> str:
-    res = os.path.join(dropbox_dir(), 'code', 'my', 'proxy', 'static', 'atlas_deps')
+def is_my_computer() -> bool:
+    return os.path.exists(static_deploy_folder())
+
+
+def static_src_package_dir() -> str:
+    assert is_my_computer()
+    res = os.path.join(static_deploy_folder(), 'atlas_deps')
     assert os.path.exists(res)
     return res
 
 
 def src_package_dir() -> str:
-    res = os.path.join(atlas_repository_dir(), 'atlas_deps')
-    if not os.path.exists(res):
-        res = dropbox_src_package_dir()
-    assert os.path.exists(res)
+    if is_my_computer():
+        res = static_src_package_dir()
+    else:
+        res = os.path.join(atlas_repository_dir(), 'atlas_deps')
+        assert os.path.exists(res)
     return res
 
 
-def dropbox_atlas_test_data_dir() -> str:
-    res = os.path.join(dropbox_dir(), 'code', 'my', 'proxy', 'static', 'atlas_test_data')
+def static_atlas_test_data_dir() -> str:
+    assert is_my_computer()
+    res = os.path.join(static_deploy_folder(), 'atlas_test_data')
     assert os.path.exists(res)
     return res
 
 
 def atlas_test_data_dir() -> str:
-    res = os.path.join(atlas_repository_dir(), 'atlas_test_data')
-    if not os.path.exists(res):
-        res = dropbox_atlas_test_data_dir()
-    assert os.path.exists(res)
+    if is_my_computer():
+        res = static_atlas_test_data_dir()
+    else:
+        res = os.path.join(atlas_repository_dir(), 'atlas_test_data')
+        assert os.path.exists(res)
     return res
 
 
@@ -200,8 +206,8 @@ def qmake_bin_name() -> str:
 def qt_ver() -> str:
     vers = [fd for fd in os.listdir(qt_install_dir()) if
             os.path.exists(os.path.join(qt_install_dir(), fd, qt_compiler_name(), 'bin', qmake_bin_name()))]
-    assert vers
-    vers = sorted(vers, key=parse_version)
+    assert vers, "No valid QT versions found."
+    vers = sorted(vers, key=version.parse)
     ver = vers[-1]
     return ver
 
@@ -223,7 +229,7 @@ def qt_installer_framework_ver() -> str:
     vers = [fd for fd in os.listdir(folder) if
             os.path.exists(os.path.join(folder, fd, 'bin'))]
     assert vers
-    vers = sorted(vers, key=parse_version)
+    vers = sorted(vers, key=version.parse)
     ver = vers[-1]
     return ver
 
@@ -350,18 +356,18 @@ def get_7za_binary() -> str:
         return '7za'
 
 
-def get_package_top_level_folder(file: str, folder: str):
+def get_package_top_level_folder(file: str):
     res = ''
     if file.lower().endswith('.zip'):
         with zipfile.ZipFile(file, mode='r') as zf:
-            # print(zf.namelist())
-            res = os.path.join(folder, os.path.commonpath(
-                [nm for nm in zf.namelist() if not nm.endswith('/') and not nm.startswith('__MACOSX')]))
+            print(zf.namelist())
+            res = os.path.commonpath(
+                [nm for nm in zf.namelist() if not nm.endswith('/') and not nm.startswith('__MACOSX')])
     elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
             or file.lower().endswith('.tgz'):
         with tarfile.open(file, mode='r|*') as tf:
             names = [nm for nm in tf.getnames() if not nm == '.']
-            res = os.path.join(folder, os.path.commonpath(names))
+            res = os.path.commonpath(names)
     elif file.lower().endswith('.7z'):
         cp = subprocess.run([get_7za_binary(), 'l', '-slt', '-sccUTF-8', file],
                             stdout=subprocess.PIPE, encoding='utf-8')
@@ -374,7 +380,7 @@ def get_package_top_level_folder(file: str, folder: str):
             else:
                 if line.startswith('-------'):
                     started = True
-        res = os.path.join(folder, os.path.commonpath(filenames))
+        res = os.path.commonpath(filenames)
 
     if res.endswith('/') or res.endswith('\\'):
         res = res[:-1]
@@ -399,11 +405,15 @@ def unpack_tool_to_target_dir(tool_package_folder: str, tool_package_glob_name: 
     if tool_folder_glob_name is None:
         tool_folder_glob_name = tool_package_glob_name
     package_name = find_src_package_with_glob(os.path.join(tool_package_folder, tool_package_glob_name))
-    package_unpack_folder = get_package_top_level_folder(package_name, target_dir)
+    package_folder = get_package_top_level_folder(package_name)
+    if not package_folder:
+        package_unpack_folder = os.path.join(target_dir, os.path.splitext(os.path.basename(package_name))[0])
+    else:
+        package_unpack_folder = os.path.join(target_dir, package_folder)
     print(package_unpack_folder)
     if not os.path.exists(package_unpack_folder):
         remove_old_src_folder_with_glob(os.path.join(target_dir, tool_folder_glob_name))
-        unpack_file_to_folder(package_name, target_dir)
+        unpack_file_to_folder(package_name, target_dir if package_folder else package_unpack_folder)
         assert os.path.exists(package_unpack_folder)
     return package_unpack_folder
 
@@ -456,7 +466,7 @@ def install_ffmpeg():
                        shell=False,
                        check=True)
         os.chmod(os.path.join(ext_build_dir(), 'ffmpeg'), stat.S_IRWXU or stat.S_IXGRP or stat.S_IRGRP or stat.S_IROTH)
-        if 'feng' in os.path.expanduser("~"):
+        if is_my_computer():
             # from https://evermeet.cx/ffmpeg/
             if os.path.lexists('/usr/local/bin/ffmpeg'):
                 os.unlink('/usr/local/bin/ffmpeg')
@@ -506,6 +516,21 @@ def get_ffmpeg_binary() -> str:
         return folder
 
 
+def install_gperf():
+    if is_windows():
+        unpack_tool_to_target_dir(src_package_dir(), 'gperf*-bin*')
+    else:
+        assert False
+
+
+def get_gperf_dir() -> str:
+    if is_windows():
+        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'gperf*-bin*'))
+        return os.path.join(folder, 'bin')
+    else:
+        assert False
+
+
 def handleRemoveReadonly(func, path, exc):
     excvalue = exc[1]
     if func in (os.rmdir, os.unlink, os.remove) and excvalue.errno == errno.EACCES:
@@ -516,4 +541,4 @@ def handleRemoveReadonly(func, path, exc):
 
 
 if __name__ == "__main__":
-    print('nothing')
+    print('done')

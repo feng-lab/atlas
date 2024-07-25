@@ -258,9 +258,9 @@ def build_atlas_installer():
         subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', installer_zip_name, installer_app_name],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
-    if 'feng' in os.path.expanduser("~"):
+    if common_dirs.is_my_computer():
         if common_dirs.is_mac():
-            out_folder = os.path.join(common_dirs.dropbox_dir(), "code", 'my', 'proxy', 'static')
+            out_folder = common_dirs.static_deploy_folder()
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
                          os.path.join(out_folder, 'installers', installer_zip_name))
             target_folder = os.path.join(out_folder, 'packages')
@@ -277,7 +277,7 @@ def build_atlas_installer():
         #                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         #     shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
         else:
-            out_folder = os.path.join(common_dirs.dropbox_dir(), "code", 'my', 'proxy', 'static')
+            out_folder = common_dirs.static_deploy_folder()
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
                          os.path.join(out_folder, 'installers', installer_zip_name))
             target_folder = os.path.join(out_folder, 'packages')

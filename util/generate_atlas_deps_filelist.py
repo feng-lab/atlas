@@ -88,8 +88,6 @@ def process_files(folder_path, base_url, backup_base_url):
 
 def generate_atlas_deps_filelist(files_info, output_file):
     with open(output_file, 'w') as f:
-        f.write("import os\n")
-        f.write("import common_dirs\n\n\n")
         f.write("files_to_download = [\n")
         for file_info in files_info:
             f.write(f"    {{\n")
@@ -99,7 +97,7 @@ def generate_atlas_deps_filelist(files_info, output_file):
             f.write(f"        'expected_sha256': '{file_info['checksum']}',\n")
             f.write(f"        'filename': '{file_info['filename']}',\n")
             f.write(f"    }},\n")
-        f.write("]\n\n")
+        f.write("]\n")
 
 
 if __name__ == "__main__":
@@ -112,7 +110,7 @@ if __name__ == "__main__":
 
     base_url = "https://neutracing.com/static/atlas_deps"
     backup_base_url = "https://fenglab.xyz/static/atlas_deps"
-    folder_path = common_dirs.dropbox_src_package_dir()
+    folder_path = common_dirs.static_src_package_dir()
 
     files_info = process_files(folder_path, base_url, backup_base_url)
     generate_atlas_deps_filelist(files_info, os.path.join(common_dirs.atlas_util_dir(), 'atlas_deps_filelist.py'))

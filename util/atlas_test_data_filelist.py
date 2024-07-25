@@ -1,7 +1,3 @@
-import os
-import common_dirs
-
-
 files_to_download = [
     {
         'url': 'https://neutracing.com/static/atlas_test_data/uint8_add_test.dat',
@@ -417,4 +413,3 @@ files_to_download = [
         'filename': 'img/im2d1maxres.tif',
     },
 ]
-
