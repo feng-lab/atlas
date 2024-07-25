@@ -74,6 +74,13 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
         'http': http_proxy,
         'https': https_proxy
     }
+    # Print proxy information
+    if http_proxy or https_proxy:
+        print("Using proxy:")
+        if http_proxy:
+            print(f"  HTTP Proxy: {http_proxy}")
+        if https_proxy:
+            print(f"  HTTPS Proxy: {https_proxy}")
 
     # Check if file exists and has correct size
     if os.path.exists(target_path):
