@@ -5,9 +5,9 @@ from atlas_test_data_filelist import files_to_download
 
 
 def download_atlas_test_data():
-    if not common_dirs.is_my_computer():
-        sync_files(files_to_download, os.path.join(common_dirs.atlas_repository_dir(), 'atlas_test_data'),
-                   check_os=False)
+    if common_dirs.is_my_computer():
+        print('skip downloading atlas test data')
+    sync_files(files_to_download, os.path.join(common_dirs.atlas_repository_dir(), 'atlas_test_data'), check_os=False)
 
 
 if __name__ == "__main__":

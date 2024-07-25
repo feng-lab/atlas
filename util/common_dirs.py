@@ -103,11 +103,12 @@ def static_deploy_folder() -> str:
 
 
 def is_my_computer() -> bool:
-    return os.path.exists(static_deploy_folder())
+    return (os.path.exists(static_deploy_folder()) and
+            os.path.exists(os.path.join(static_deploy_folder(), 'atlas_deps')) and
+            os.path.exists(os.path.join(static_deploy_folder(), 'atlas_test_data')))
 
 
 def static_src_package_dir() -> str:
-    assert is_my_computer()
     res = os.path.join(static_deploy_folder(), 'atlas_deps')
     assert os.path.exists(res)
     return res
@@ -123,7 +124,6 @@ def src_package_dir() -> str:
 
 
 def static_atlas_test_data_dir() -> str:
-    assert is_my_computer()
     res = os.path.join(static_deploy_folder(), 'atlas_test_data')
     assert os.path.exists(res)
     return res

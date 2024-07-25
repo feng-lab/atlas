@@ -267,16 +267,7 @@ def build_atlas_installer():
             if os.path.exists(os.path.join(target_folder, suffix)):
                 shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
             shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
-        elif common_dirs.is_linux():
-            print()
-        #     subprocess.run(['scp', installer_zip_name,
-        #                     'feng@labmacpro:"/Users/feng/Google Drive/My Drive/code/my/proxy/static/installers/"'],
-        #                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-        #     subprocess.run(['rsync', '-av', '--delete', suffix,
-        #                     'feng@labmacpro:"/Users/feng/Google Drive/My Drive/code/my/proxy/static/packages/"'],
-        #                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-        #     shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
-        else:
+        elif common_dirs.is_windows():
             out_folder = common_dirs.static_deploy_folder()
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
                          os.path.join(out_folder, 'installers', installer_zip_name))
@@ -291,8 +282,7 @@ def deploy_atlas(is_debug_version: bool = False):
     build_atlas_package(is_debug_version=is_debug_version)
     if not is_debug_version:
         pack_atlas_package()
-        if common_dirs.is_my_computer():
-            build_atlas_installer()
+        build_atlas_installer()
 
 
 if __name__ == "__main__":
