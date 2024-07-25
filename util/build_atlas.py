@@ -2,6 +2,7 @@ import argparse
 
 from common_dirs import *
 import build_ext_libs
+from download_atlas_test_data import *
 
 
 def get_cmake_cmd_common_part(arm64: bool = False):
@@ -81,6 +82,7 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
                            cwd=atlas_build_dir(arm64=arm64), shell=True, check=True, env=env)
 
         if not skip_test:
+            download_atlas_test_data()
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
             subprocess.run([get_ctest_binary(), '--extra-verbose'],
                            cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
@@ -98,6 +100,7 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
                            cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
 
         if not skip_test:
+            download_atlas_test_data()
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
             subprocess.run([get_ctest_binary(), '--extra-verbose'],
                            cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)

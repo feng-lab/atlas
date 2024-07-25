@@ -69,19 +69,6 @@ def is_correct_platform(filename):
 
 @retry_with_backoff()
 def download_file_with_resume(url, backup_url, target_path, expected_size, expected_sha256):
-    http_proxy, https_proxy = get_system_proxy()
-    proxies = {
-        'http': http_proxy,
-        'https': https_proxy
-    }
-    # Print proxy information
-    if http_proxy or https_proxy:
-        print("Using proxy:")
-        if http_proxy:
-            print(f"  HTTP Proxy: {http_proxy}")
-        if https_proxy:
-            print(f"  HTTPS Proxy: {https_proxy}")
-
     # Check if file exists and has correct size
     if os.path.exists(target_path):
         current_size = os.path.getsize(target_path)
@@ -95,6 +82,19 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
             print(f"Resuming download for {target_path}")
     else:
         current_size = 0
+
+    http_proxy, https_proxy = get_system_proxy()
+    proxies = {
+        'http': http_proxy,
+        'https': https_proxy
+    }
+    # Print proxy information
+    if http_proxy or https_proxy:
+        print("Using proxy:")
+        if http_proxy:
+            print(f"  HTTP Proxy: {http_proxy}")
+        if https_proxy:
+            print(f"  HTTPS Proxy: {https_proxy}")
 
     urls = [url, backup_url]
     for current_url in urls:
