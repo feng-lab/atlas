@@ -2,8 +2,6 @@
 
 #include "zlog.h"
 
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-
 namespace nim {
 
 std::string uuidToString(const uint8_t uuid[VK_UUID_SIZE])
@@ -36,49 +34,28 @@ std::string versionToString(uint32_t version)
 void test()
 {
   try {
-    // initialize minimal set of function pointers
-    VULKAN_HPP_DEFAULT_DISPATCHER.init();
+    // instantiate a vk::raii::Context
+    vk::raii::Context context;
 
-    // Log all available instance extensions
-    std::vector<vk::ExtensionProperties> extensionProperties = vk::enumerateInstanceExtensionProperties();
+    // Determine what API version is available
+    uint32_t apiVersion = context.enumerateInstanceVersion();
 
-    // LOG(INFO) << "Available Vulkan instance extensions:";
-    // for (const auto& ext : extensionProperties) {
-    //   LOG(INFO) << "  " << std::string_view(ext.extensionName.data(), std::strlen(ext.extensionName)) << " (version "
-    //             << ext.specVersion << ")";
-    // }
-    // LOG(INFO) << "Total number of extensions: " << extensionProperties.size();
+    LOG(INFO) << fmt::format("Loader/Runtime support detected for Vulkan {}.{}.{}",
+                             VK_VERSION_MAJOR(apiVersion),
+                             VK_VERSION_MINOR(apiVersion),
+                             VK_VERSION_PATCH(apiVersion));
 
-    // std::vector<const char*> enabledExtensions;
-    // std::vector<const char*> enabledLayers;
-    //
-    // // Try to enable some extensions if they're available
-    // auto addExtensionIfAvailable = [&](const char* extName) {
-    //   if (std::any_of(extensionProperties.begin(),
-    //                   extensionProperties.end(),
-    //                   [extName](const vk::ExtensionProperties& prop) {
-    //                     return strcmp(extName, prop.extensionName) == 0;
-    //                   })) {
-    //     enabledExtensions.push_back(extName);
-    //     LOG(INFO) << "Enabling extension: " << extName;
-    //   } else {
-    //     LOG(WARNING) << "Extension not available: " << extName;
-    //   }
-    // };
-
-    // addExtensionIfAvailable(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-
-    // if (std::find(enabledExtensions.begin(), enabledExtensions.end(), VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)
-    // !=
-    //     enabledExtensions.end()) {
-    //   createInfo.setFlags(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR);
-    // }
+    // Set the desired version we want
+    constexpr uint16_t desiredMajorVersion = 1;
+    constexpr uint16_t desiredMinorVersion = 2;
+    constexpr uint32_t desiredVersion = VK_MAKE_VERSION(desiredMajorVersion, desiredMinorVersion, 0);
+    std::string desiredVersionString = fmt::format("{}.{}.{}", desiredMajorVersion, desiredMinorVersion, 0);
 
     constexpr auto appInfo = vk::ApplicationInfo{.pApplicationName = "Vulkan Device Enumerator",
                                                  .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
                                                  .pEngineName = "No Engine",
                                                  .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-                                                 .apiVersion = VK_API_VERSION_1_2};
+                                                 .apiVersion = desiredVersion};
 
     constexpr std::array enabledExtensions = {
       VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
@@ -90,20 +67,21 @@ void test()
                              .enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size()),
                              .ppEnabledExtensionNames = enabledExtensions.data()};
 
-    vk::UniqueInstance instance = vk::createInstanceUnique(createInfo);
+    vk::raii::Instance instance(context, createInfo);
 
-    // initialize function pointers for instance
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance.get());
+    // enumerate the physicalDevices
+    vk::raii::PhysicalDevices physicalDevices(instance);
 
-    std::vector<vk::PhysicalDevice> devices = instance->enumeratePhysicalDevices();
-
-    if (devices.empty()) {
+    if (physicalDevices.empty()) {
       LOG(WARNING) << "No Vulkan-compatible devices found";
     }
 
-    for (const auto& device : devices) {
-      vk::PhysicalDeviceProperties deviceProperties = device.getProperties();
-      vk::PhysicalDeviceMemoryProperties memProperties = device.getMemoryProperties();
+    // Go through the list of physical devices and select only those that are capable of running the API version we
+    // want.
+    std::vector<vk::raii::PhysicalDevice> desiredPhysicalDevices;
+    for (const auto& physicalDevice : physicalDevices) {
+      vk::PhysicalDeviceProperties deviceProperties = physicalDevice.getProperties();
+      vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
 
       // Calculate dedicated GPU memory
       vk::DeviceSize dedicatedMemory = 0;
@@ -126,6 +104,15 @@ void test()
       LOG(INFO) << fmt::format("Pipeline Cache UUID:  {}", uuidToString(deviceProperties.pipelineCacheUUID));
       LOG(INFO) << fmt::format("Dedicated GPU Memory: {} MB", dedicatedMemory / (1024 * 1024));
       LOG(INFO) << "-------------------------";
+
+      if (desiredVersion <= physicalDevice.getProperties().apiVersion) {
+        desiredPhysicalDevices.push_back(physicalDevice);
+      }
+    }
+
+    // If we have something in the desired version physical device list, we're good
+    if (desiredPhysicalDevices.empty()) {
+      LOG(ERROR) << "Current system can not use the desired Vulkan API version " << desiredVersionString;
     }
   }
   catch (const vk::SystemError& e) {
