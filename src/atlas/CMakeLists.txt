@@ -550,13 +550,25 @@ else (WIN32)
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json)
-    add_custom_command(TARGET ${APP_NAME}
-                       POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Resources/vulkan
+    add_custom_command(TARGET ${APP_NAME} POST_BUILD
+                       # Copy Vulkan resources
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory
+                       ${CMAKE_CURRENT_SOURCE_DIR}/Resources/vulkan
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/vulkan
-                       COMMAND ${CMAKE_COMMAND} -E copy $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib
+
+                       # Copy libvulkan.1.dylib if it exists
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libvulkan.1.dylib
-                       COMMAND ${CMAKE_COMMAND} -E copy $ENV{VULKAN_SDK}/lib/libMoltenVK.dylib
+
+                       # Create symlink for libvulkan.dylib if libvulkan.1.dylib exists
+                       COMMAND ${CMAKE_COMMAND} -E create_symlink
+                       libvulkan.1.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libvulkan.dylib
+
+                       # Copy libMoltenVK.dylib if it exists
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libMoltenVK.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libMoltenVK.dylib
     )
     add_custom_command(TARGET ${APP_NAME}
