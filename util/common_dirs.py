@@ -175,11 +175,11 @@ def deploy_target_dir() -> str:
 
 
 def qt_install_dir() -> str:
-    if sys.platform.startswith('win32'):
+    if is_windows():
         res = os.path.join('C:', os.sep, 'Qt')
         if not os.path.exists(res):
             res = os.path.join(os.path.expanduser('~'), 'Qt')
-    elif sys.platform.startswith('darwin'):
+    elif is_mac():
         res = os.path.join(os.path.expanduser('~'), 'Qt')
     else:
         res = os.path.join(os.path.expanduser('~'), 'Qt')
@@ -188,9 +188,9 @@ def qt_install_dir() -> str:
 
 
 def qt_compiler_name() -> str:
-    if sys.platform.startswith('win32'):
+    if is_windows():
         return 'msvc2019_64'
-    elif sys.platform.startswith('darwin'):
+    elif is_mac():
         return 'macos'
     else:
         return 'gcc_64'
@@ -237,6 +237,58 @@ def qt_installer_framework_ver() -> str:
 def qt_installer_framework_bin_dir() -> str:
     folder = os.path.join(qt_install_dir(), 'Tools', 'QtInstallerFramework')
     return os.path.join(folder, qt_installer_framework_ver(), 'bin')
+
+
+def vulkan_SDK_dir() -> str:
+    if is_windows():
+        res = os.path.join('C:', os.sep, 'VulkanSDK')
+        if not os.path.exists(res):
+            res = os.path.join(os.path.expanduser('~'), 'VulkanSDK')
+    elif is_mac():
+        res = os.path.join(os.path.expanduser('~'), 'VulkanSDK')
+    else:
+        res = os.path.join(os.path.expanduser('~'), 'VulkanSDK')
+    assert os.path.exists(res)
+    return res
+
+
+def _vulkan_SDK_bin_folder_name() -> str:
+    if is_windows():
+        return 'Bin'
+    elif is_mac():
+        return 'macOS/bin'
+    else:
+        return 'x86_64/bin'
+
+
+def vulkan_SDK_ver() -> str:
+    vers = [fd for fd in os.listdir(vulkan_SDK_dir()) if
+            os.path.exists(os.path.join(vulkan_SDK_dir(), fd, _vulkan_SDK_bin_folder_name()))]
+    assert vers, "No valid vulkan SDK versions found."
+    vers = sorted(vers, key=version.parse)
+    ver = vers[-1]
+    return ver
+
+
+def _vulkan_SDK_env_folder_name() -> str:
+    if is_windows():
+        return ''
+    elif is_mac():
+        return 'macOS'
+    else:
+        return 'x86_64'
+
+
+def vulkan_SDK_env_dir() -> str:
+    res = os.path.join(vulkan_SDK_dir(), vulkan_SDK_ver(), _vulkan_SDK_env_folder_name())
+    assert os.path.exists(res)
+    return res
+
+
+def vulkan_SDK_bin_dir() -> str:
+    res = os.path.join(vulkan_SDK_dir(), vulkan_SDK_ver(), _vulkan_SDK_bin_folder_name())
+    assert os.path.exists(res)
+    return res
 
 
 def vs_install_dir() -> str:
@@ -541,4 +593,5 @@ def handleRemoveReadonly(func, path, exc):
 
 
 if __name__ == "__main__":
+    print(vulkan_SDK_ver())
     print('done')

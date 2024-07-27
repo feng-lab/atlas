@@ -1,0 +1,30 @@
+#pragma once
+
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#define VULKAN_HPP_NO_CONSTRUCTORS
+
+#ifdef __APPLE__
+
+#include <Availability.h>
+
+#define VK_USE_PLATFORM_METAL_EXT 1
+
+#define VK_ENABLE_BETA_EXTENSIONS 1 // VK_KHR_portability_subset
+
+#ifdef __IPHONE_OS_VERSION_MAX_ALLOWED
+#define VK_USE_PLATFORM_IOS_MVK 1
+#endif
+
+#ifdef __MAC_OS_X_VERSION_MAX_ALLOWED
+#define VK_USE_PLATFORM_MACOS_MVK 1
+#endif
+
+#endif
+
+#include <vulkan/vulkan.hpp>
+
+namespace nim {
+
+void test();
+
+} // namespace nim

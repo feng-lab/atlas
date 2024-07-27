@@ -108,6 +108,15 @@ if (UNIX AND NOT APPLE)
   print_target_properties(OpenGL::EGL)
 endif ()
 
+message(STATUS $ENV{VULKAN_SDK})
+if (APPLE)
+  find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator MoltenVK)
+  print_target_properties(Vulkan::MoltenVK)
+else ()
+  find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator)
+endif ()
+print_target_properties(Vulkan::Headers)
+
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
 #   message(STATUS "${_variableName}=${${_variableName}}")
@@ -416,6 +425,8 @@ set(SOURCES
     zcancellation.h
     zrunneutucommand.cpp zrunneutucommand.h
     zprocess.cpp zprocess.h
+    zvulkan.cpp
+    zvulkan.h
 )
 
 # our target
@@ -433,8 +444,6 @@ target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
 target_include_directories(${APP_NAME} PRIVATE ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE)
 if (WIN32)
-  #set_source_files_properties(${SYS_SOURCES} PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
-  #set_source_files_properties(z3dnetworkevaluator.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
   set_source_files_properties(${LIBQXTDIR}/core/qxtcsvmodel.cpp PROPERTIES COMPILE_FLAGS /wd4458) # declaration of 'd_ptr' hides class member
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
   set_source_files_properties(${PROTO_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
@@ -444,7 +453,10 @@ if (WIN32)
     target_link_options(${APP_NAME} PUBLIC /LTCG:STATUS /DEBUG:NONE /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
   endif ()
 
-  # for some files
+  # add manifest
+  target_sources(${APP_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Resources/app.manifest")
+
+  # post process
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>/Resources")
@@ -540,6 +552,15 @@ else (WIN32)
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Resources/vulkan
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/vulkan
+                       COMMAND ${CMAKE_COMMAND} -E copy $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libvulkan.1.dylib
+                       COMMAND ${CMAKE_COMMAND} -E copy $ENV{VULKAN_SDK}/lib/libMoltenVK.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libMoltenVK.dylib
+    )
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
                        COMMAND codesign --force --deep --sign - $<TARGET_BUNDLE_DIR:${APP_NAME}>)
   else ()
     add_custom_command(TARGET ${APP_NAME}
@@ -586,7 +607,7 @@ target_link_libraries(${APP_NAME} PUBLIC img neutu
                       Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
                       Qt6::OpenGLWidgets Qt6::CorePrivate Qt6::Test
                       benchmark::benchmark
-                      gRPC::grpc++ protobuf::libprotobuf
+                      gRPC::grpc++ protobuf::libprotobuf Vulkan::Headers
                       # RocksDB::rocksdb
 )
 

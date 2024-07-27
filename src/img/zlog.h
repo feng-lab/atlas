@@ -26,7 +26,6 @@
 #include <iosfwd>
 
 namespace nim {
-
 void initLogging(const char* argv0, const QString& filename = "");
 
 void shutdownLogging();
@@ -156,6 +155,21 @@ template<typename TEnum>
 auto format_as(TEnum f)
 {
   return enumToString(f);
+}
+
+inline QByteArray toUtf8QByteArray(const std::wstring& s)
+{
+  return QString::fromStdWString(s).toUtf8();
+}
+
+inline QByteArray toUtf8QByteArray(const std::wstring_view& s)
+{
+  return QString::fromStdWString(std::wstring(s)).toUtf8();
+}
+
+inline QByteArray toUtf8QByteArray(const wchar_t* s)
+{
+  return QString::fromStdWString(std::wstring(s)).toUtf8();
 }
 
 // stream support for qt types

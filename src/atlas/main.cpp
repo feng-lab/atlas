@@ -13,6 +13,7 @@
 #include "zrunexport3danimation.h"
 #include "zrunneutucommand.h"
 #include "zwindowsheader.h"
+#include "zvulkan.h"
 
 #include <QSurfaceFormat>
 #include <QDir>
@@ -150,7 +151,13 @@ int main(int argc, char* argv[])
 
     ZSystemInfo::instance().logOSInfo();
 
+#ifdef _WIN32
+    logActiveCodePage();
+#endif
+
     LOG(INFO) << "ASAN_OPTIONS: " << __asan_default_options();
+
+    test();
 
     // ZServiceManager sm;
 

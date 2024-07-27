@@ -135,15 +135,15 @@ QString levelToString(LogSeverity theLevel)
 {
   switch (theLevel) {
     case google::GLOG_INFO:
-      return QObject::tr("Info");
+      return "Info";
     case google::GLOG_WARNING:
-      return QObject::tr("Warning");
+      return "Warning";
     case google::GLOG_ERROR:
-      return QObject::tr("Error");
+      return "Error";
     case google::GLOG_FATAL:
-      return QObject::tr("Fatal");
+      return "Fatal";
     default:
-      return {"Unknown"};
+      return "Unknown";
   }
 }
 
