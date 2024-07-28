@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
   QCoreApplication::setOrganizationName("fenglab");
   // On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
   //  is preferred over the name. On other platforms, the name is preferred over the domain.
-#ifndef __APPLE__
+#ifndef v
   QCoreApplication::setOrganizationDomain("fenglab.xyz");
 #endif
   QCoreApplication::setApplicationName("Atlas");
@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
 
     LOG(INFO) << "ASAN_OPTIONS: " << __asan_default_options();
 
-    test();
+    initVulkan();
 
     // ZServiceManager sm;
 

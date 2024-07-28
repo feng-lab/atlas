@@ -570,6 +570,30 @@ else (WIN32)
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libMoltenVK.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libMoltenVK.dylib
+
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libVkLayer_api_dump.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_api_dump.dylib
+
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_profiles.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_khronos_profiles.dylib
+
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_shader_object.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_khronos_shader_object.dylib
+
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_synchronization2.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_khronos_synchronization2.dylib
+
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_khronos_validation.dylib
+
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libVkLayer_screenshot.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_screenshot.dylib
     )
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <fmt/core.h>
+
 #define VULKAN_HPP_NO_CONSTRUCTORS
 
 #ifdef __APPLE__
@@ -24,6 +26,17 @@
 
 namespace nim {
 
-void test();
+void initVulkan();
 
 } // namespace nim
+
+namespace vk {
+
+template<size_t N>
+auto format_as(const ArrayWrapper1D<char, N>& s)
+{
+  return std::string_view(s);
+}
+
+} // namespace vk
+
