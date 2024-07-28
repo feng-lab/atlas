@@ -2,8 +2,6 @@
 
 #include <fmt/core.h>
 
-#define VULKAN_HPP_NO_CONSTRUCTORS
-
 #ifdef __APPLE__
 
 #include <Availability.h>
@@ -22,6 +20,7 @@
 
 #endif
 
+#define VULKAN_HPP_NO_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
 
 namespace nim {

@@ -58,10 +58,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(VkDebugUtilsMessageSe
                                                            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
                                                            void* /*pUserData*/)
 {
+  // Determine the appropriate log level based on message severity
+  if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+    // For verbose messages, use VLOG(1)
+    VLOG(1) << pCallbackData->pMessage;
+    return VK_FALSE; // Return early since we already logged the verbose message
+  }
   auto logLevel = google::GLOG_INFO;
-  if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+  if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
     logLevel = google::GLOG_WARNING;
-  } else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+  } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
     logLevel = google::GLOG_ERROR;
   }
 
@@ -96,6 +102,7 @@ vk::raii::Instance createVulkanInstance(vk::raii::Context& context, uint32_t des
                               .apiVersion = desiredVersion};
 
   std::vector<const char*> layers;
+  // layers.push_back("VK_LAYER_NONEXISTENT_FOR_TESTING");
   std::vector<const char*> extensions;
   vk::InstanceCreateFlags instanceFlags;
 
@@ -162,14 +169,32 @@ vk::raii::Instance createVulkanInstance(vk::raii::Context& context, uint32_t des
 #endif
 
   // Create the Vulkan instance
-  vk::InstanceCreateInfo createInfo{.flags = instanceFlags,
-                                    .pApplicationInfo = &appInfo,
-                                    .enabledLayerCount = static_cast<uint32_t>(layers.size()),
-                                    .ppEnabledLayerNames = layers.data(),
-                                    .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
-                                    .ppEnabledExtensionNames = extensions.data()};
+#ifdef ATLAS_USE_VULKAN_DEBUG
+  vk::StructureChain<vk::InstanceCreateInfo, vk::DebugUtilsMessengerCreateInfoEXT> instanceCreateInfo(
+    vk::InstanceCreateInfo{.flags = instanceFlags,
+                           .pApplicationInfo = &appInfo,
+                           .enabledLayerCount = static_cast<uint32_t>(layers.size()),
+                           .ppEnabledLayerNames = layers.data(),
+                           .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
+                           .ppEnabledExtensionNames = extensions.data()},
+    vk::DebugUtilsMessengerCreateInfoEXT{.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
+                                                            vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+                                                            vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose,
+                                         .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+                                                        vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+                                                        vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+                                         .pfnUserCallback = debugUtilsMessengerCallback});
+#else
+  vk::StructureChain<vk::InstanceCreateInfo> instanceCreateInfo(
+    vk::InstanceCreateInfo{.flags = instanceFlags,
+                           .pApplicationInfo = &appInfo,
+                           .enabledLayerCount = static_cast<uint32_t>(layers.size()),
+                           .ppEnabledLayerNames = layers.data(),
+                           .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
+                           .ppEnabledExtensionNames = extensions.data()});
+#endif
 
-  vk::raii::Instance instance(context, createInfo);
+  vk::raii::Instance instance(context, instanceCreateInfo.get<vk::InstanceCreateInfo>());
   LOG(INFO) << "Vulkan instance created successfully";
 
   // Log enabled layers and extensions
@@ -210,9 +235,9 @@ void initVulkan()
 #ifdef ATLAS_USE_VULKAN_DEBUG
     // Set up debug messenger
     vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo{
-      .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+      .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
                          vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-                         vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+                         vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose,
       .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
                      vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
                      vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
@@ -260,7 +285,7 @@ void initVulkan()
                                versionToString(deviceProperties.driverVersion),
                                deviceProperties.driverVersion);
       VLOG(1) << fmt::format("Vendor ID:            0x{:04x}", deviceProperties.vendorID);
-      VLOG(1) << fmt::format("Device ID:            0x{:04x}", deviceProperties.deviceID);
+      LOG(INFO) << fmt::format("Device ID:            0x{:04x}", deviceProperties.deviceID);
       LOG(INFO) << fmt::format("Device Type:          {}", vk::to_string(deviceProperties.deviceType));
       VLOG(1) << fmt::format("Pipeline Cache UUID:  {}", uuidToString(deviceProperties.pipelineCacheUUID));
       LOG(INFO) << fmt::format("Dedicated GPU Memory: {} MB", dedicatedMemory / (1024 * 1024));
