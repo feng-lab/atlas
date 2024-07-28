@@ -517,8 +517,8 @@ else (WIN32)
 
     set(copyright_line "Copyright 2011-2019 Linqing Feng")
     set_target_properties(${APP_NAME} PROPERTIES
-                          BUILD_RPATH "@executable_path/../Frameworks"
-                          INSTALL_RPATH "@executable_path/../Frameworks"
+                          BUILD_RPATH "@executable_path/../Frameworks;@executable_path/../lib"
+                          INSTALL_RPATH "@executable_path/../Frameworks;@executable_path/../lib"
                           OUTPUT_NAME "${APP_NAME}"
                           MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Resources/Info.plist.in"
                           MACOSX_BUNDLE_INFO_STRING "${APP_NAME}"
@@ -553,47 +553,47 @@ else (WIN32)
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
                        # Copy Vulkan resources
                        COMMAND ${CMAKE_COMMAND} -E copy_directory
-                       ${CMAKE_CURRENT_SOURCE_DIR}/Resources/vulkan
+                       $ENV{VULKAN_SDK}/share/vulkan
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/vulkan
 
                        # Copy libvulkan.1.dylib if it exists
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libvulkan.1.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libvulkan.1.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libvulkan.1.dylib
 
                        # Create symlink for libvulkan.dylib if libvulkan.1.dylib exists
                        COMMAND ${CMAKE_COMMAND} -E create_symlink
                        libvulkan.1.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libvulkan.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libvulkan.dylib
 
                        # Copy libMoltenVK.dylib if it exists
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libMoltenVK.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libMoltenVK.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libMoltenVK.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libVkLayer_api_dump.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_api_dump.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_api_dump.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_profiles.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_khronos_profiles.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_profiles.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_shader_object.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_khronos_shader_object.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_shader_object.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_synchronization2.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_khronos_synchronization2.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_synchronization2.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_khronos_validation.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_validation.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libVkLayer_screenshot.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Frameworks/libVkLayer_screenshot.dylib
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_screenshot.dylib
     )
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
