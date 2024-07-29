@@ -51,6 +51,39 @@ const char* __asan_default_options()
 }
 #endif
 
+#if defined(Q_OS_MAC)
+#include <mach-o/dyld.h>
+#elif defined(Q_OS_LINUX)
+#include <unistd.h>
+#include <limits.h>
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+QString getExecutablePath()
+{
+#ifdef Q_OS_WIN
+  wchar_t path[MAX_PATH] = {0};
+  GetModuleFileNameW(NULL, path, MAX_PATH);
+  return QString::fromWCharArray(path);
+#elif defined(Q_OS_MAC)
+  char path[1024];
+  uint32_t size = sizeof(path);
+  if (_NSGetExecutablePath(path, &size) == 0) {
+    return QString::fromUtf8(path);
+  }
+  return {};
+#elif defined(Q_OS_LINUX)
+  char result[PATH_MAX];
+  ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+  return QString::fromUtf8(result, (count > 0) ? count : 0);
+#else
+  return {};
+#endif
+}
+
 int main(int argc, char* argv[])
 {
 #ifdef _WIN32
@@ -60,10 +93,19 @@ int main(int argc, char* argv[])
   }
 #endif
 
+#ifndef __APPLE__
+  // Construct the Vulkan layers path
+  // LOG(INFO) << getExecutablePath();
+  QString vulkanPath = QDir(QFileInfo(getExecutablePath()).absolutePath()).filePath("Resource/vulkan/explicit_layer.d");
+  // Set the environment variable
+  // qputenv("VK_ADD_LAYER_PATH", vulkanPath.toUtf8());  // should be
+  qputenv("VK_LAYER_PATH", vulkanPath.toUtf8());
+#endif
+
   QCoreApplication::setOrganizationName("fenglab");
   // On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
   //  is preferred over the name. On other platforms, the name is preferred over the domain.
-#ifndef v
+#ifndef __APPLE__
   QCoreApplication::setOrganizationDomain("fenglab.xyz");
 #endif
   QCoreApplication::setApplicationName("Atlas");
