@@ -108,14 +108,8 @@ if (UNIX AND NOT APPLE)
   print_target_properties(OpenGL::EGL)
 endif ()
 
-message(STATUS $ENV{VULKAN_SDK})
-if (APPLE)
-  find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator MoltenVK)
-  print_target_properties(Vulkan::MoltenVK)
-else ()
-  find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator)
-endif ()
-print_target_properties(Vulkan::Headers)
+message(STATUS "ENV{VULKAN_SDK}: $ENV{VULKAN_SDK}")
+find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -442,6 +436,11 @@ target_include_directories(${APP_NAME} SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR
 target_include_directories(${APP_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
 target_include_directories(${APP_NAME} PRIVATE ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
+if (WIN32)
+  target_include_directories(${APP_NAME} PRIVATE $ENV{VULKAN_SDK}/Include)
+else ()
+  target_include_directories(${APP_NAME} PRIVATE $ENV{VULKAN_SDK}/include) # do not use Vulkan::Headers, which might point to /usr/include
+endif ()
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE)
 if (WIN32)
   set_source_files_properties(${LIBQXTDIR}/core/qxtcsvmodel.cpp PROPERTIES COMPILE_FLAGS /wd4458) # declaration of 'd_ptr' hides class member
@@ -572,28 +571,12 @@ else (WIN32)
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libMoltenVK.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libVkLayer_api_dump.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_api_dump.dylib
-
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_profiles.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_profiles.dylib
 
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_shader_object.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_shader_object.dylib
-
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_synchronization2.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_synchronization2.dylib
-
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_validation.dylib
-
-                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                       $ENV{VULKAN_SDK}/lib/libVkLayer_screenshot.dylib
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_screenshot.dylib
     )
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
@@ -634,6 +617,20 @@ else (WIN32)
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json)
+    add_custom_command(TARGET ${APP_NAME} POST_BUILD
+                       # Copy Vulkan resources
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory
+                       $ENV{VULKAN_SDK}/share/vulkan
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/vulkan
+
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_profiles.so
+                       $<TARGET_FILE_DIR:${APP_NAME}>/lib/libVkLayer_khronos_profiles.so
+
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                       $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.so
+                       $<TARGET_FILE_DIR:${APP_NAME}>/lib/libVkLayer_khronos_validation.so
+    )
   endif ()
 endif (WIN32)
 
@@ -643,7 +640,7 @@ target_link_libraries(${APP_NAME} PUBLIC img neutu
                       Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
                       Qt6::OpenGLWidgets Qt6::CorePrivate Qt6::Test
                       benchmark::benchmark
-                      gRPC::grpc++ protobuf::libprotobuf Vulkan::Headers
+                      gRPC::grpc++ protobuf::libprotobuf
                       # RocksDB::rocksdb
 )
 

@@ -216,6 +216,8 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
 
+    shutil.copytree(os.path.join(os.path.dirname(executable), 'lib'), os.path.join(dest_dir, 'lib'))
+
     appdir_libs = 'lib'
     appdir_qml = 'qml'
     appdir_plugins = 'plugins'
