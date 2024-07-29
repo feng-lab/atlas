@@ -303,9 +303,12 @@ void initVulkan()
                                                   .pQueuePriorities = &queuePriority};
 
         std::vector<const char*> deviceExtensions;
+
+#ifdef __APPLE__
         if (isExtensionAvailable(deviceExtensionProperties, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
           deviceExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
         }
+#endif
 
         vk::DeviceCreateInfo deviceCreateInfo{.queueCreateInfoCount = 1,
                                               .pQueueCreateInfos = &queueCreateInfo,
