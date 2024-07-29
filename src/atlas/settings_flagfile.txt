@@ -34,8 +34,8 @@
 # Whether to create mmap file for nim format, default is false
 --zimg_use_mmap_file_for_hdf5=false
 
-# Whether to check openGL error after all gl calls, default is true, can set to false for better performance
---atlas_check_opengl_error_for_all_gl_calls=true
+# Whether to check openGL error after all gl calls, default is false, can set to true for debugging
+--atlas_check_opengl_error_for_all_gl_calls=false
 
 # Whether to clear image cache after rendering, for test, default is false
 --atlas_clear_image_cache_after_rendering=false
@@ -51,3 +51,9 @@
 
 # define the width, height, and depth of image blocks in the 3D image cache system, can be 64 (default), 128, 256 or 512
 --atlas_image_block_size=64
+
+# Whether to enable debugging features of vulkan, default is false, can set to true for debugging
+--atlas_debug_vulkan=false
+
+# set to 1 or higher for verbose logging
+--v=0

@@ -2,7 +2,9 @@
 
 #include "zlog.h"
 
-#define ATLAS_USE_VULKAN_DEBUG
+DEFINE_bool(atlas_debug_vulkan,
+            false,
+            "Whether to enable debugging features of vulkan, default is false, can set to true for debugging");
 
 namespace nim {
 
@@ -141,22 +143,22 @@ vk::raii::Instance createVulkanInstance(vk::raii::Context& context, uint32_t des
   //   }
   // }
 
-#ifdef ATLAS_USE_VULKAN_DEBUG
-  // Enable validation layers in debug mode
-  const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
-  if (isLayerAvailable(availableLayers, validationLayerName)) {
-    layers.push_back(validationLayerName);
-  } else {
-    LOG(WARNING) << "Validation layer not available, continuing without it";
-  }
+  if (FLAGS_atlas_debug_vulkan) {
+    // Enable validation layers in debug mode
+    const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
+    if (isLayerAvailable(availableLayers, validationLayerName)) {
+      layers.push_back(validationLayerName);
+    } else {
+      LOG(WARNING) << "Validation layer not available, continuing without it";
+    }
 
-  // Enable debug utils extension
-  if (isExtensionAvailable(availableExtensions, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
-    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-  } else {
-    LOG(WARNING) << "Debug extension " << VK_EXT_DEBUG_UTILS_EXTENSION_NAME << " not available";
+    // Enable debug utils extension
+    if (isExtensionAvailable(availableExtensions, VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
+      extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    } else {
+      LOG(WARNING) << "Debug extension " << VK_EXT_DEBUG_UTILS_EXTENSION_NAME << " not available";
+    }
   }
-#endif
 
 #ifdef __APPLE__
   // Enable portability enumeration on macOS
@@ -169,32 +171,25 @@ vk::raii::Instance createVulkanInstance(vk::raii::Context& context, uint32_t des
 #endif
 
   // Create the Vulkan instance
-#ifdef ATLAS_USE_VULKAN_DEBUG
-  vk::StructureChain<vk::InstanceCreateInfo, vk::DebugUtilsMessengerCreateInfoEXT> instanceCreateInfo(
-    vk::InstanceCreateInfo{.flags = instanceFlags,
-                           .pApplicationInfo = &appInfo,
-                           .enabledLayerCount = static_cast<uint32_t>(layers.size()),
-                           .ppEnabledLayerNames = layers.data(),
-                           .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
-                           .ppEnabledExtensionNames = extensions.data()},
-    vk::DebugUtilsMessengerCreateInfoEXT{.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
-                                                            vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-                                                            vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose,
-                                         .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                                                        vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-                                                        vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-                                         .pfnUserCallback = debugUtilsMessengerCallback});
-#else
-  vk::StructureChain<vk::InstanceCreateInfo> instanceCreateInfo(
-    vk::InstanceCreateInfo{.flags = instanceFlags,
-                           .pApplicationInfo = &appInfo,
-                           .enabledLayerCount = static_cast<uint32_t>(layers.size()),
-                           .ppEnabledLayerNames = layers.data(),
-                           .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
-                           .ppEnabledExtensionNames = extensions.data()});
-#endif
+  vk::InstanceCreateInfo instanceCreateInfo{.flags = instanceFlags,
+                                            .pApplicationInfo = &appInfo,
+                                            .enabledLayerCount = static_cast<uint32_t>(layers.size()),
+                                            .ppEnabledLayerNames = layers.data(),
+                                            .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
+                                            .ppEnabledExtensionNames = extensions.data()};
 
-  vk::raii::Instance instance(context, instanceCreateInfo.get<vk::InstanceCreateInfo>());
+  vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfo{
+    .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
+                       vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+                       vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose,
+    .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+                   vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+    .pfnUserCallback = debugUtilsMessengerCallback};
+  if (FLAGS_atlas_debug_vulkan) {
+    instanceCreateInfo.setPNext(&debugUtilsMessengerCreateInfo);
+  }
+
+  vk::raii::Instance instance(context, instanceCreateInfo);
   LOG(INFO) << "Vulkan instance created successfully";
 
   // Log enabled layers and extensions
@@ -232,27 +227,27 @@ void initVulkan()
 
     auto instance = createVulkanInstance(context, desiredVersion);
 
-#ifdef ATLAS_USE_VULKAN_DEBUG
-    // Set up debug messenger
-    vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo{
-      .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
-                         vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-                         vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose,
-      .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                     vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-                     vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-      .pfnUserCallback = debugUtilsMessengerCallback};
-
     vk::raii::DebugUtilsMessengerEXT debugUtilsMessenger(nullptr);
-    try {
-      debugUtilsMessenger = vk::raii::DebugUtilsMessengerEXT(instance, debugCreateInfo);
-      LOG(INFO) << "Debug messenger created successfully";
+    if (FLAGS_atlas_debug_vulkan) {
+      // Set up debug messenger
+      vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo{
+        .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
+                           vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+                           vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose,
+        .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+                       vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+                       vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+        .pfnUserCallback = debugUtilsMessengerCallback};
+
+      try {
+        debugUtilsMessenger = vk::raii::DebugUtilsMessengerEXT(instance, debugCreateInfo);
+        LOG(INFO) << "Debug messenger created successfully";
+      }
+      catch (const vk::SystemError& e) {
+        LOG(ERROR) << fmt::format("Failed to create debug messenger: {}", e.what());
+        // Continue without debug messenger
+      }
     }
-    catch (const vk::SystemError& e) {
-      LOG(ERROR) << fmt::format("Failed to create debug messenger: {}", e.what());
-      // Continue without debug messenger
-    }
-#endif
 
     // enumerate the physicalDevices
     vk::raii::PhysicalDevices physicalDevices(instance);
@@ -265,9 +260,9 @@ void initVulkan()
     // want.
     std::vector<vk::raii::PhysicalDevice> desiredPhysicalDevices;
     for (const auto& physicalDevice : physicalDevices) {
-      vk::PhysicalDeviceProperties deviceProperties = physicalDevice.getProperties();
-      vk::PhysicalDeviceMemoryProperties memProperties = physicalDevice.getMemoryProperties();
-      auto extensionProperties = physicalDevice.enumerateDeviceExtensionProperties();
+      auto deviceProperties = physicalDevice.getProperties();
+      auto memProperties = physicalDevice.getMemoryProperties();
+      auto deviceExtensionProperties = physicalDevice.enumerateDeviceExtensionProperties();
 
       // Calculate dedicated GPU memory
       vk::DeviceSize dedicatedMemory = 0;
@@ -289,8 +284,8 @@ void initVulkan()
       LOG(INFO) << fmt::format("Device Type:          {}", vk::to_string(deviceProperties.deviceType));
       VLOG(1) << fmt::format("Pipeline Cache UUID:  {}", uuidToString(deviceProperties.pipelineCacheUUID));
       LOG(INFO) << fmt::format("Dedicated GPU Memory: {} MB", dedicatedMemory / (1024 * 1024));
-      VLOG(1) << "Supported Extensions: ";
-      for (const auto& ext : extensionProperties) {
+      VLOG(1) << "Supported Device Extensions: ";
+      for (const auto& ext : deviceExtensionProperties) {
         VLOG(1) << fmt::format("  - {} (version {})", ext.extensionName, ext.specVersion);
       }
       LOG(INFO) << "-------------------------";
@@ -308,9 +303,9 @@ void initVulkan()
                                                   .pQueuePriorities = &queuePriority};
 
         std::vector<const char*> deviceExtensions;
-        // if (isExtensionAvailable(extensionProperties, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
-        //   deviceExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-        // }
+        if (isExtensionAvailable(deviceExtensionProperties, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
+          deviceExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+        }
 
         vk::DeviceCreateInfo deviceCreateInfo{.queueCreateInfoCount = 1,
                                               .pQueueCreateInfos = &queueCreateInfo,

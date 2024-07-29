@@ -96,10 +96,15 @@ int main(int argc, char* argv[])
 #ifndef __APPLE__
   // Construct the Vulkan layers path
   // LOG(INFO) << getExecutablePath();
-  QString vulkanPath = QDir(QFileInfo(getExecutablePath()).absolutePath()).filePath("Resource/vulkan/explicit_layer.d");
+#ifdef Q_OS_WIN
+  QString vulkanLayerPath = QDir(QFileInfo(getExecutablePath()).absolutePath()).filePath("vulkan");
+#elif defined(Q_OS_LINUX)
+  QString vulkanLayerPath =
+    QDir(QFileInfo(getExecutablePath()).absolutePath()).filePath("Resources/vulkan/explicit_layer.d");
+#endif
   // Set the environment variable
-  // qputenv("VK_ADD_LAYER_PATH", vulkanPath.toUtf8());  // should be
-  qputenv("VK_LAYER_PATH", vulkanPath.toUtf8());
+  // qputenv("VK_ADD_LAYER_PATH", vulkanLayerPath.toUtf8());  // should be
+  qputenv("VK_LAYER_PATH", vulkanLayerPath.toUtf8());
 #endif
 
   QCoreApplication::setOrganizationName("fenglab");

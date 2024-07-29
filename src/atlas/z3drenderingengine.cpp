@@ -27,8 +27,8 @@
 
 DEFINE_bool(
   atlas_check_opengl_error_for_all_gl_calls,
-  true,
-  "Whether to check openGL error after all gl calls, default is true, can set to false for better performance");
+  false,
+  "Whether to check openGL error after all gl calls, default is false, can set to true for debugging");
 
 DEFINE_bool(atlas_log_glbinding_context_switch, false, "Whether to log openGL context switch event, default is false");
 

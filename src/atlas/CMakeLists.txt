@@ -487,6 +487,24 @@ if (WIN32)
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
                      $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json)
+  add_custom_command(TARGET ${APP_NAME} POST_BUILD
+                     # Copy Vulkan resources
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_profiles.dll
+                     $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_profiles.dll
+
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_profiles.json
+                     $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_profiles.json
+
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_validation.dll
+                     $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_validation.dll
+
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_validation.json
+                     $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_validation.json
+  )
 else (WIN32)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
