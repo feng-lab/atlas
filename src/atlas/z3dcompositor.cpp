@@ -724,27 +724,45 @@ double Z3DCompositor::process(Z3DEye eye)
 
   {
     const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
-    if (!m_monoReadyTarget) {
-      m_monoReadyTarget = &m_outRenderTarget2 != m_monoCurrentTarget ? &m_outRenderTarget2 : &m_outRenderTarget1;
-      m_leftReadyTarget =
-        &m_leftEyeOutRenderTarget2 != m_leftCurrentTarget ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
-      m_rightReadyTarget =
-        &m_rightEyeOutRenderTarget2 != m_rightCurrentTarget ? &m_rightEyeOutRenderTarget2 : &m_rightEyeOutRenderTarget1;
-    }
-    std::swap(m_monoReadyTarget, m_monoCurrentTarget);
-    std::swap(m_leftReadyTarget, m_leftCurrentTarget);
-    std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+    if (eye == MonoEye) {
+      if (!m_monoReadyTarget) {
+        m_monoReadyTarget = &m_outRenderTarget2 != m_monoCurrentTarget ? &m_outRenderTarget2 : &m_outRenderTarget1;
+      }
+      std::swap(m_monoReadyTarget, m_monoCurrentTarget);
 
-    if (m_monoCurrentTarget->size() != m_monoReadyTarget->size()) {
-      m_monoCurrentTarget->resize(m_monoReadyTarget->size());
-      m_leftCurrentTarget->resize(m_leftReadyTarget->size());
-      m_rightCurrentTarget->resize(m_rightReadyTarget->size());
-    }
+      if (m_monoCurrentTarget->size() != m_monoReadyTarget->size()) {
+        m_monoCurrentTarget->resize(m_monoReadyTarget->size());
+      }
 
-    m_rendererBase.globalParas().hasNewRendering = true;
+      m_rendererBase.globalParas().hasNewRendering = true;
+    } else if (eye == LeftEye) {
+      if (!m_leftReadyTarget) {
+        m_leftReadyTarget =
+          &m_leftEyeOutRenderTarget2 != m_leftCurrentTarget ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
+      }
+      std::swap(m_leftReadyTarget, m_leftCurrentTarget);
+
+      if (m_leftCurrentTarget->size() != m_leftReadyTarget->size()) {
+        m_leftCurrentTarget->resize(m_leftReadyTarget->size());
+      }
+    } else {
+      if (!m_rightReadyTarget) {
+        m_rightReadyTarget = &m_rightEyeOutRenderTarget2 != m_rightCurrentTarget ? &m_rightEyeOutRenderTarget2
+                                                                                 : &m_rightEyeOutRenderTarget1;
+      }
+      std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+
+      if (m_rightCurrentTarget->size() != m_rightReadyTarget->size()) {
+        m_rightCurrentTarget->resize(m_rightReadyTarget->size());
+      }
+
+      m_rendererBase.globalParas().hasNewRendering = true;
+    }
   }
-  VLOG(1) << fmt::format("{} finished", m_progressiveRendering ? "progressive rendering" : "rendering");
-  Q_EMIT renderingFinished();
+  if (eye != LeftEye) {
+    VLOG(1) << fmt::format("{} finished", m_progressiveRendering ? "progressive rendering" : "rendering");
+    Q_EMIT renderingFinished();
+  }
 
   return 1.0;
 }

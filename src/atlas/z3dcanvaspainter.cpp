@@ -15,9 +15,16 @@ Z3DCanvasPainter::Z3DCanvasPainter(Z3DCanvas& canvas)
 
 void Z3DCanvasPainter::paint(bool stereo)
 {
-  if (!m_engine || !m_engine->monoReadyTarget()) {
+  if (!m_engine) {
     return;
   }
+  if (!stereo && !m_engine->monoReadyTarget()) {
+    return;
+  }
+  if (stereo && (!m_engine->leftReadyTarget() || !m_engine->rightReadyTarget())) {
+    return;
+  }
+
   const std::lock_guard<std::mutex> lock(m_engine->targetSwitchMutex());
   // render to screen
   glViewport(0, 0, m_canvas.physicalSize().x, m_canvas.physicalSize().y);

@@ -1,10 +1,13 @@
 #pragma once
 
-// #define ATLAS_USE_OPENGLWINDOW
 // #define ATLAS_USE_OPENGLWIDGET
+
+#define ATLAS_USE_OFFLINE_RENDERING
 
 #include "zglmutils.h"
 #include <QGraphicsView>
+#include <QGraphicsScene>
+#include <QGraphicsPixmapItem>
 #include <QSurfaceFormat>
 #include <QInputEvent>
 #include <QShortcut>
@@ -16,13 +19,17 @@
 
 namespace nim {
 
-class Z3DScene;
-
 class Z3DRenderingEngine;
+
+#ifndef ATLAS_USE_OFFLINE_RENDERING
+
+class Z3DScene;
 
 class ZOpenGLWidget;
 
 class ZOpenGLWindow;
+
+#endif
 
 #ifdef ATLAS_USE_OPENGLWIDGET
 
@@ -63,11 +70,6 @@ public:
   {
     auto pe = std::make_unique<QPaintEvent>(rect());
     paintEvent(pe.get());
-  }
-
-  void updateAll()
-  {
-    update();
   }
 
   // for high dpi support like retina
@@ -169,8 +171,6 @@ public:
 
   ~Z3DCanvas() override;
 
-  [[nodiscard]] QSurfaceFormat format() const;
-
   QOpenGLContext* context() const;
 
   void setRenderingEngine(Z3DRenderingEngine* engine);
@@ -183,10 +183,6 @@ public:
   void sceneParaUpdated();
 
   void renderingFinished();
-
-  void updateAll();
-
-  void repaintAll();
 
   // for high dpi support like retina
   glm::uvec2 physicalSize()
@@ -257,9 +253,14 @@ private:
 private:
   bool m_fullscreen = false;
 
+#ifdef ATLAS_USE_OFFLINE_RENDERING
+  std::unique_ptr<QGraphicsScene> m_scene;
+  QGraphicsPixmapItem* m_pixmapItem = nullptr;
+#else
   ZOpenGLWidget* m_glWidget = nullptr;
   ZOpenGLWindow* m_glWindow = nullptr;
   std::unique_ptr<Z3DScene> m_3dScene;
+#endif
 
   QShortcut* m_rotateXShortCut = nullptr;
   QShortcut* m_rotateYShortCut = nullptr;

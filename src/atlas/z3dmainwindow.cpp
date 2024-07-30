@@ -45,6 +45,10 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
   connect(this, &Z3DMainWindow::canvasReady, m_engine, &Z3DRenderingEngine::initAndAttachToCanvas);
   connect(m_engine, &Z3DRenderingEngine::initialized, this, &Z3DMainWindow::renderingEngineInitialized);
 
+#ifdef ATLAS_USE_OFFLINE_RENDERING
+  onCanvasReady();
+#endif
+
   setCentralWidget(m_canvas);
   init();
   setCurrentFile("");

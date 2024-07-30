@@ -1,11 +1,15 @@
 #include "z3dcanvas.h"
 
 #include "z3drenderingengine.h"
+#ifndef ATLAS_USE_OFFLINE_RENDERING
 #include "z3dscene.h"
-#include "zlog.h"
 #include "z3dopenglwidget.h"
+#endif
+#include "zlog.h"
 #include <QCoreApplication>
 #include <algorithm>
+
+// #define ATLAS_USE_OPENGLWINDOW
 
 namespace nim {
 
@@ -242,19 +246,29 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   setAlignment(Qt::AlignLeft | Qt::AlignTop);
   resize(width, height);
 
+#ifdef ATLAS_USE_OFFLINE_RENDERING
+  Q_UNUSED(f)
+  m_scene = std::make_unique<QGraphicsScene>(0, 0, width, height);
+  m_pixmapItem = new QGraphicsPixmapItem();
+  // m_pixmapItem->setTransformationMode(Qt::SmoothTransformation);
+  m_pixmapItem->setScale(1.0 / devicePixelRatio());
+  m_scene->addItem(m_pixmapItem);
+  setScene(m_scene.get());
+#else
 #ifdef ATLAS_USE_OPENGLWINDOW
   m_glWindow = new ZOpenGLWindow();
   m_glWindow->setFlags(Qt::WindowDoesNotAcceptFocus);
-  m_3dScene = new Z3DScene(width, height, m_glWindow->format().stereo(), this);
-  setViewport(QWidget::createWindowContainer(m_glWindow, nullptr, f));
+  m_3dScene = std::make_unique<Z3DScene>(width, height, m_glWindow->format().stereo(), *this);
+  setViewport(QWidget::createWindowContainer(m_glWindow, this, f));
 #else
   m_glWidget = new ZOpenGLWidget(this, f);
   m_3dScene = std::make_unique<Z3DScene>(width, height, m_glWidget->format().stereo(), *this);
   setViewport(m_glWidget);
 #endif
+  setScene(m_3dScene.get());
+#endif
 
   setViewportUpdateMode(FullViewportUpdate);
-  setScene(m_3dScene.get());
 
   setWindowTitle(title);
   setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
@@ -280,12 +294,14 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   m_rotateZMShortCut = new QShortcut(QKeySequence(QKeyCombination(Qt::ALT | Qt::SHIFT, Qt::Key_Z)), this);
   connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
 
+#ifndef ATLAS_USE_OFFLINE_RENDERING
 #ifdef ATLAS_USE_OPENGLWINDOW
   connect(m_glWindow, &ZOpenGLWindow::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
   connect(m_glWindow, &ZOpenGLWindow::openGLContextInitialized, m_3dScene.get(), &Z3DScene::initPainter);
 #else
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, m_3dScene.get(), &Z3DScene::initPainter);
+#endif
 #endif
 }
 
@@ -295,24 +311,25 @@ Z3DCanvas::~Z3DCanvas()
   getGLFocus();
 }
 
-QSurfaceFormat Z3DCanvas::format() const
-{
-#ifdef ATLAS_USE_OPENGLWINDOW
-  return m_glWindow->format();
-#else
-  return m_glWidget->format();
-#endif
-}
-
 QOpenGLContext* Z3DCanvas::context() const
 {
+#ifdef ATLAS_USE_OFFLINE_RENDERING
+  return nullptr;
+#else
+#ifdef ATLAS_USE_OPENGLWINDOW
+  return m_glWindow->context();
+#else
   return m_glWidget->context();
+#endif
+#endif
 }
 
 void Z3DCanvas::setRenderingEngine(Z3DRenderingEngine* engine)
 {
   m_engine = engine;
+#ifndef ATLAS_USE_OFFLINE_RENDERING
   m_3dScene->setRenderingEngine(engine);
+#endif
   sceneParaUpdated();
 }
 
@@ -338,27 +355,28 @@ void Z3DCanvas::sceneParaUpdated()
 void Z3DCanvas::renderingFinished()
 {
   if (m_engine->hasNewRenderingFlag()) {
-    updateAll();
+    VLOG(1) << "update";
+#ifdef ATLAS_USE_OFFLINE_RENDERING
+
+    const std::lock_guard<std::mutex> lock(m_engine->targetSwitchMutex());
+    if (m_engine->monoReadyTarget()) {
+      auto startTarget = m_engine->monoReadyTarget();
+      // VLOG(1) << m_engine->monoReadyPixmap().width() << " " << m_engine->monoReadyPixmap().height();
+      m_pixmapItem->setPixmap(m_engine->monoReadyPixmap());
+      auto endTarget = m_engine->monoReadyTarget();
+
+      m_engine->clearNewRenderingFlag();
+      VLOG(1) << startTarget << " " << endTarget << " " << physicalSize();
+    }
+
+#else
+#ifdef ATLAS_USE_OPENGLWINDOW
+    m_glWindow->update();
+#else
+    m_glWidget->update();
+#endif
+#endif
   }
-}
-
-void Z3DCanvas::updateAll()
-{
-  VLOG(1) << "update";
-#ifdef ATLAS_USE_OPENGLWINDOW
-  m_glWindow->update();
-#else
-  m_glWidget->update();
-#endif
-}
-
-void Z3DCanvas::repaintAll()
-{
-#ifdef ATLAS_USE_OPENGLWINDOW
-  m_glWindow->repaint();
-#else
-  m_glWidget->repaint();
-#endif
 }
 
 void Z3DCanvas::contextMenuEvent(QContextMenuEvent* e)
@@ -439,16 +457,21 @@ void Z3DCanvas::keyReleaseEvent(QKeyEvent* e)
 void Z3DCanvas::resizeEvent(QResizeEvent* event)
 {
   QGraphicsView::resizeEvent(event);
+#ifdef ATLAS_USE_OFFLINE_RENDERING
+  CHECK(m_scene);
+  m_scene->setSceneRect(QRect(QPoint(0, 0), event->size()));
+#else
   if (m_3dScene) {
     m_3dScene->setSceneRect(QRect(QPoint(0, 0), event->size()));
   }
+#endif
 
   Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatio(), event->size().height() * devicePixelRatio());
 }
 
 void Z3DCanvas::paintEvent(QPaintEvent* e)
 {
-  // LOG(INFO) << "paintevent";
+  VLOG(1) << "paintevent";
   QGraphicsView::paintEvent(e);
 }
 
@@ -472,10 +495,12 @@ void Z3DCanvas::timerEvent(QTimerEvent* e)
 
 void Z3DCanvas::getGLFocus()
 {
+#ifndef ATLAS_USE_OFFLINE_RENDERING
 #ifdef ATLAS_USE_OPENGLWINDOW
   m_glWindow->makeCurrent();
 #else
   m_glWidget->makeCurrent();
+#endif
 #endif
 }
 

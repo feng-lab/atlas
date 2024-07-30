@@ -185,6 +185,11 @@ public:
 
   Z3DRenderTarget* monoReadyTarget() const;
 
+  QPixmap monoReadyPixmap() const
+  {
+    return m_pixmap;
+  }
+
   Z3DRenderTarget* leftReadyTarget() const;
 
   Z3DRenderTarget* rightReadyTarget() const;
@@ -277,6 +282,8 @@ private:
 
   void onCanvasResized(size_t w, size_t h);
 
+  void onRenderingFinished();
+
   void initGL();
 
   void rotateX();
@@ -336,6 +343,9 @@ private:
   QMutex m_mutex;
 
   double m_progress = 0;
+
+  std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> m_pixmapColorBuffer;
+  QPixmap m_pixmap;
 };
 
 } // namespace nim
