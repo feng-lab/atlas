@@ -5,7 +5,7 @@
 #include <glbinding/Version.h>
 #include <glbinding-aux/Meta.h>
 
-DECLARE_bool(atlas_check_opengl_error_for_all_gl_calls);
+DECLARE_bool(atlas_debug_opengl);
 
 namespace nim {
 
@@ -20,7 +20,7 @@ bool GLVersionGE(int majorVersion, int minorVersion)
 
 void CheckGLError_Impl(const char* file, int line)
 {
-  if (FLAGS_atlas_check_opengl_error_for_all_gl_calls) {
+  if (FLAGS_atlas_debug_opengl) {
     return;
   }
 

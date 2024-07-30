@@ -26,9 +26,9 @@
 #include <memory>
 
 DEFINE_bool(
-  atlas_check_opengl_error_for_all_gl_calls,
+  atlas_debug_opengl,
   false,
-  "Whether to check openGL error after all gl calls, default is false, can set to true for debugging");
+  "Whether to check openGL error aggressively, default is false, can set to true for debugging");
 
 DEFINE_bool(atlas_log_glbinding_context_switch, false, "Whether to log openGL context switch event, default is false");
 
@@ -892,7 +892,7 @@ void Z3DRenderingEngine::initGL()
   });
   glbinding::useContext(0);
   Z3DGpuInfo::instance().logGpuInfo();
-  if (FLAGS_atlas_check_opengl_error_for_all_gl_calls) {
+  if (FLAGS_atlas_debug_opengl) {
     glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
                                        glbinding::CallbackMask::ParametersAndReturnValue |
                                        glbinding::CallbackMask::Unresolved,
