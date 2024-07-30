@@ -469,12 +469,6 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
   Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatio(), event->size().height() * devicePixelRatio());
 }
 
-void Z3DCanvas::paintEvent(QPaintEvent* e)
-{
-  VLOG(1) << "paintevent";
-  QGraphicsView::paintEvent(e);
-}
-
 void Z3DCanvas::dragEnterEvent(QDragEnterEvent* event)
 {
   event->ignore();
