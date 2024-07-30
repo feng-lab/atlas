@@ -138,4 +138,4 @@
 	url = https://github.com/ned14/llfio.git
 [submodule "src/3rdparty/reflect"]
 	path = src/3rdparty/reflect
-	url = https://github.com/boost-ext/reflect.git
+	url = https://github.com/qlibs/reflect.git

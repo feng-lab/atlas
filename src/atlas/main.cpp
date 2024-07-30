@@ -103,8 +103,8 @@ int main(int argc, char* argv[])
     QDir(QFileInfo(getExecutablePath()).absolutePath()).filePath("Resources/vulkan/explicit_layer.d");
 #endif
   // Set the environment variable
-  // qputenv("VK_ADD_LAYER_PATH", vulkanLayerPath.toUtf8());  // should be
-  qputenv("VK_LAYER_PATH", vulkanLayerPath.toUtf8());
+  qputenv("VK_ADD_LAYER_PATH", vulkanLayerPath.toUtf8());
+  qputenv("VK_LAYER_PATH", vulkanLayerPath.toUtf8());  // should remove in later version
 #endif
 
   QCoreApplication::setOrganizationName("fenglab");
