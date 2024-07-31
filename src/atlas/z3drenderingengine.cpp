@@ -738,7 +738,7 @@ void Z3DRenderingEngine::init()
   m_compositor = std::make_unique<Z3DCompositor>(*m_globalParas);
   addEventListenerToBack(*m_compositor);
   connect(m_compositor.get(), &Z3DCompositor::sceneParaUpdated, this, &Z3DRenderingEngine::sceneParaUpdated);
-  connect(m_compositor.get(), &Z3DCompositor::renderingFinished, this, &Z3DRenderingEngine::onRenderingFinished);
+  connect(m_compositor.get(), &Z3DCompositor::renderingFinished, this, &Z3DRenderingEngine::renderingFinished);
 
   // build network and connect to canvas
   m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_compositor);
@@ -860,34 +860,6 @@ ZImg Z3DRenderingEngine::textureToRGBAImg(const Z3DTexture& tex)
 void Z3DRenderingEngine::onCanvasResized(size_t w, size_t h)
 {
   setOutputSize(glm::uvec2(w, h));
-}
-
-void Z3DRenderingEngine::onRenderingFinished()
-{
-  {
-    const std::lock_guard<std::mutex> lock(targetSwitchMutex());
-    // Set up format and type
-    GLenum dataFormat = GL_BGRA;
-    GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-    auto tex = m_compositor->monoReadyTarget()->colorTexture();
-
-    // Allocate buffer for texture data
-    auto desiredSize = Z3DTexture::bypePerPixel(dataFormat, dataType) * tex->numPixels();
-    if (m_pixmapColorBuffer.size() < desiredSize) {
-      m_pixmapColorBuffer.resize(desiredSize);
-    }
-
-    // Download texture data to buffer
-    tex->downloadTextureToBuffer(dataFormat, dataType, m_pixmapColorBuffer.data());
-
-    // Create QImage from buffer
-    QImage image(m_pixmapColorBuffer.data(), tex->width(), tex->height(), QImage::Format_ARGB32_Premultiplied);
-
-    // Create QPixmap from QImage
-    m_pixmap = QPixmap::fromImage(image.mirrored());
-  }
-
-  Q_EMIT renderingFinished();
 }
 
 void Z3DRenderingEngine::initGL()
@@ -1112,6 +1084,21 @@ Z3DRenderTarget* Z3DRenderingEngine::leftReadyTarget() const
 Z3DRenderTarget* Z3DRenderingEngine::rightReadyTarget() const
 {
   return m_compositor->rightReadyTarget();
+}
+
+Z3DLocalColorBuffer* Z3DRenderingEngine::monoReadyLocalBuffer() const
+{
+  return m_compositor->monoReadyLocalBuffer();
+}
+
+Z3DLocalColorBuffer* Z3DRenderingEngine::leftReadyLocalBuffer() const
+{
+  return m_compositor->leftReadyLocalBuffer();
+}
+
+Z3DLocalColorBuffer* Z3DRenderingEngine::rightReadyLocalBuffer() const
+{
+  return m_compositor->rightReadyLocalBuffer();
 }
 
 void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,

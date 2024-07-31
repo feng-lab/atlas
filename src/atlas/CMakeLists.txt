@@ -81,7 +81,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Svg SvgWidgets Concurrent OpenGLWidgets Test
+find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Svg SvgWidgets Concurrent Test
              PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
 print_target_properties(Qt6::Core)
 print_target_properties(Qt6::Widgets)
@@ -89,8 +89,13 @@ print_target_properties(Qt6::Network)
 print_target_properties(Qt6::Svg)
 print_target_properties(Qt6::SvgWidgets)
 print_target_properties(Qt6::Concurrent)
-print_target_properties(Qt6::OpenGLWidgets)
 print_target_properties(Qt6::Test)
+
+if (ATLAS_USE_OPENGLWIDGET)
+  find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS OpenGLWidgets
+               PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
+  print_target_properties(Qt6::OpenGLWidgets)
+endif ()
 
 #find_package(RocksDB REQUIRED
 #             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
@@ -656,7 +661,7 @@ target_link_libraries(${APP_NAME} PUBLIC img neutu
                       glbinding::glbinding-aux glbinding::glbinding
                       ${OpenCV_LIBS}
                       Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
-                      Qt6::OpenGLWidgets Qt6::CorePrivate Qt6::Test
+                      Qt6::CorePrivate Qt6::Test
                       benchmark::benchmark
                       gRPC::grpc++ protobuf::libprotobuf
                       # RocksDB::rocksdb
@@ -664,4 +669,8 @@ target_link_libraries(${APP_NAME} PUBLIC img neutu
 
 if (UNIX AND NOT APPLE)
   target_link_libraries(${APP_NAME} PRIVATE OpenGL::OpenGL OpenGL::EGL)
+endif ()
+
+if (ATLAS_USE_OPENGLWIDGET)
+  target_link_libraries(${APP_NAME} PRIVATE Qt6::OpenGLWidgets)
 endif ()

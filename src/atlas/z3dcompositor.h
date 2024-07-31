@@ -52,6 +52,21 @@ public:
     return m_rightReadyTarget;
   }
 
+  Z3DLocalColorBuffer* monoReadyLocalBuffer() const
+  {
+    return m_monoReadyLocalBuffer;
+  }
+
+  Z3DLocalColorBuffer* leftReadyLocalBuffer() const
+  {
+    return m_leftReadyLocalBuffer;
+  }
+
+  Z3DLocalColorBuffer* rightReadyLocalBuffer() const
+  {
+    return m_rightReadyLocalBuffer;
+  }
+
   void invalidate(State inv) override;
 
   void setProgressiveRenderingMode(bool v) override;
@@ -138,6 +153,8 @@ private:
 
   void setClipPlanes() override {}
 
+  static void downloadTextureToLocalColorBuffer(const Z3DTexture& tex, Z3DLocalColorBuffer& localColorBuffer);
+
 private:
   Z3DTextureBlendRenderer m_alphaBlendRenderer;
   Z3DTextureBlendRenderer m_firstOnTopBlendRenderer;
@@ -156,11 +173,9 @@ private:
 
   Z3DRenderTarget m_outRenderTarget1;
   Z3DRenderTarget m_leftEyeOutRenderTarget1;
-  Z3DRenderTarget m_rightEyeOutRenderTarget1;
 
   Z3DRenderTarget m_outRenderTarget2;
   Z3DRenderTarget m_leftEyeOutRenderTarget2;
-  Z3DRenderTarget m_rightEyeOutRenderTarget2;
 
   Z3DRenderTarget* m_monoReadyTarget = nullptr;
   Z3DRenderTarget* m_leftReadyTarget = nullptr;
@@ -220,6 +235,19 @@ private:
   glm::vec4 m_region;
 
   bool m_progressiveRendering = false;
+
+  Z3DLocalColorBuffer m_localColorBuffer1 = {};
+  Z3DLocalColorBuffer m_leftLocalColorBuffer1 = {};
+
+  Z3DLocalColorBuffer m_localColorBuffer2 = {};
+  Z3DLocalColorBuffer m_leftLocalColorBuffer2 = {};
+
+  Z3DLocalColorBuffer* m_monoReadyLocalBuffer = nullptr;
+  Z3DLocalColorBuffer* m_leftReadyLocalBuffer = nullptr;
+  Z3DLocalColorBuffer* m_rightReadyLocalBuffer = nullptr;
+  Z3DLocalColorBuffer* m_monoCurrentLocalBuffer = nullptr;
+  Z3DLocalColorBuffer* m_leftCurrentLocalBuffer = nullptr;
+  Z3DLocalColorBuffer* m_rightCurrentLocalBuffer = nullptr;
 };
 
 } // namespace nim

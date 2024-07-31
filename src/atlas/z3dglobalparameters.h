@@ -17,6 +17,13 @@ class ZWidgetsGroup;
 
 class Z3DRenderingEngine;
 
+struct Z3DLocalColorBuffer
+{
+  std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> data;
+  size_t width;
+  size_t height;
+};
+
 class Z3DGlobalParameters : public QObject
 {
   Q_OBJECT

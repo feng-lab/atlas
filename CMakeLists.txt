@@ -82,6 +82,12 @@ if (ATLAS_DEBUG_VERSION)
 endif ()
 message(STATUS "ATLAS_DEBUG_VERSION: ${ATLAS_DEBUG_VERSION}")
 
+option(ATLAS_USE_OPENGLWIDGET "Build Atlas with OPENGLWIDGET, might be slower." OFF)
+if (ATLAS_USE_OPENGLWIDGET)
+  add_compile_definitions(ATLAS_USE_OPENGLWIDGET)
+endif ()
+message(STATUS "ATLAS_USE_OPENGLWIDGET: ${ATLAS_USE_OPENGLWIDGET}")
+
 include(PrintCMakeTargetInfo)
 
 

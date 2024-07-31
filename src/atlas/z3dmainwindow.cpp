@@ -41,11 +41,14 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
   m_renderingThread.start();
 
   m_canvas = new Z3DCanvas("", 512, 512, this);
+
+#if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
   connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DMainWindow::onCanvasReady);
+#endif
   connect(this, &Z3DMainWindow::canvasReady, m_engine, &Z3DRenderingEngine::initAndAttachToCanvas);
   connect(m_engine, &Z3DRenderingEngine::initialized, this, &Z3DMainWindow::renderingEngineInitialized);
 
-#ifdef ATLAS_USE_OFFLINE_RENDERING
+#if !defined(ATLAS_USE_OPENGLWIDGET) && !defined(ATLAS_USE_OPENGLWINDOW)
   onCanvasReady();
 #endif
 

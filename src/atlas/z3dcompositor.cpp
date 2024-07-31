@@ -44,7 +44,11 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
 {
   m_monoCurrentTarget = &m_outRenderTarget1;
   m_leftCurrentTarget = &m_leftEyeOutRenderTarget1;
-  m_rightCurrentTarget = &m_rightEyeOutRenderTarget1;
+  m_rightCurrentTarget = &m_outRenderTarget1;
+
+  m_monoCurrentLocalBuffer = &m_localColorBuffer1;
+  m_leftCurrentLocalBuffer = &m_leftLocalColorBuffer1;
+  m_rightCurrentLocalBuffer = &m_localColorBuffer1;
 
   addParameter(m_showBackground);
 
@@ -720,48 +724,72 @@ double Z3DCompositor::process(Z3DEye eye)
 
   glDisable(GL_DEPTH_TEST);
 
+#if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
   glFinish();
+#else
+  downloadTextureToLocalColorBuffer((eye == MonoEye)   ? *m_monoCurrentTarget->colorTexture()
+                                    : (eye == LeftEye) ? *m_leftCurrentTarget->colorTexture()
+                                                       : *m_rightCurrentTarget->colorTexture(),
+                                    (eye == MonoEye)   ? *m_monoCurrentLocalBuffer
+                                    : (eye == LeftEye) ? *m_leftCurrentLocalBuffer
+                                                       : *m_rightCurrentLocalBuffer);
+#endif
 
-  {
-    const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
-    if (eye == MonoEye) {
+  if (eye == MonoEye) {
+    {
+      const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
       if (!m_monoReadyTarget) {
         m_monoReadyTarget = &m_outRenderTarget2 != m_monoCurrentTarget ? &m_outRenderTarget2 : &m_outRenderTarget1;
+        m_monoReadyLocalBuffer =
+          &m_localColorBuffer2 != m_monoCurrentLocalBuffer ? &m_localColorBuffer2 : &m_localColorBuffer1;
       }
       std::swap(m_monoReadyTarget, m_monoCurrentTarget);
+      std::swap(m_monoReadyLocalBuffer, m_monoCurrentLocalBuffer);
+    }
 
-      if (m_monoCurrentTarget->size() != m_monoReadyTarget->size()) {
-        m_monoCurrentTarget->resize(m_monoReadyTarget->size());
-      }
+    m_rendererBase.globalParas().hasNewRendering = true;
+    VLOG(1) << fmt::format("{} finished", m_progressiveRendering ? "progressive rendering" : "rendering");
+    Q_EMIT renderingFinished();
 
-      m_rendererBase.globalParas().hasNewRendering = true;
-    } else if (eye == LeftEye) {
+    if (m_monoCurrentTarget->size() != m_monoReadyTarget->size()) {
+      m_monoCurrentTarget->resize(m_monoReadyTarget->size());
+    }
+
+  } else if (eye == LeftEye) {
+    {
+      const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
       if (!m_leftReadyTarget) {
         m_leftReadyTarget =
           &m_leftEyeOutRenderTarget2 != m_leftCurrentTarget ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
+        m_leftReadyLocalBuffer =
+          &m_leftLocalColorBuffer2 != m_leftCurrentLocalBuffer ? &m_leftLocalColorBuffer2 : &m_leftLocalColorBuffer1;
       }
       std::swap(m_leftReadyTarget, m_leftCurrentTarget);
+      std::swap(m_leftReadyLocalBuffer, m_leftCurrentLocalBuffer);
+    }
 
-      if (m_leftCurrentTarget->size() != m_leftReadyTarget->size()) {
-        m_leftCurrentTarget->resize(m_leftReadyTarget->size());
-      }
-    } else {
+    if (m_leftCurrentTarget->size() != m_leftReadyTarget->size()) {
+      m_leftCurrentTarget->resize(m_leftReadyTarget->size());
+    }
+  } else {
+    {
+      const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
       if (!m_rightReadyTarget) {
-        m_rightReadyTarget = &m_rightEyeOutRenderTarget2 != m_rightCurrentTarget ? &m_rightEyeOutRenderTarget2
-                                                                                 : &m_rightEyeOutRenderTarget1;
+        m_rightReadyTarget = &m_outRenderTarget2 != m_rightCurrentTarget ? &m_outRenderTarget2 : &m_outRenderTarget1;
+        m_rightReadyLocalBuffer =
+          &m_localColorBuffer2 != m_rightCurrentLocalBuffer ? &m_localColorBuffer2 : &m_localColorBuffer1;
       }
       std::swap(m_rightReadyTarget, m_rightCurrentTarget);
-
-      if (m_rightCurrentTarget->size() != m_rightReadyTarget->size()) {
-        m_rightCurrentTarget->resize(m_rightReadyTarget->size());
-      }
-
-      m_rendererBase.globalParas().hasNewRendering = true;
+      std::swap(m_rightReadyLocalBuffer, m_rightCurrentLocalBuffer);
     }
-  }
-  if (eye != LeftEye) {
+
+    m_rendererBase.globalParas().hasNewRendering = true;
     VLOG(1) << fmt::format("{} finished", m_progressiveRendering ? "progressive rendering" : "rendering");
     Q_EMIT renderingFinished();
+
+    if (m_rightCurrentTarget->size() != m_rightReadyTarget->size()) {
+      m_rightCurrentTarget->resize(m_rightReadyTarget->size());
+    }
   }
 
   return 1.0;
@@ -1635,6 +1663,24 @@ void Z3DCompositor::setupAxisCamera()
   m_arrowRenderer.setArrowData(&m_tailPosAndTailRadius, &m_headPosAndHeadRadius, .1f);
   m_arrowRenderer.setArrowColors(&m_textColors);
   m_fontRenderer.setDataColors(&m_textColors);
+}
+
+void Z3DCompositor::downloadTextureToLocalColorBuffer(const Z3DTexture& tex, Z3DLocalColorBuffer& localColorBuffer)
+{
+  // Set up format and type
+  GLenum dataFormat = GL_BGRA;
+  GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
+
+  // Allocate buffer for texture data
+  auto desiredSize = Z3DTexture::bypePerPixel(dataFormat, dataType) * tex.numPixels();
+  if (localColorBuffer.data.size() < desiredSize) {
+    localColorBuffer.data.resize(desiredSize);
+  }
+
+  // Download texture data to buffer
+  tex.downloadTextureToBuffer(dataFormat, dataType, localColorBuffer.data.data());
+  localColorBuffer.width = tex.width();
+  localColorBuffer.height = tex.height();
 }
 
 } // namespace nim
