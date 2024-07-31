@@ -844,7 +844,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                          '-DgRPC_SSL_PROVIDER=package',
                          f'-DOPENSSL_ROOT_DIR:PATH={install_dir}',
                          '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
-                         '-DgRPC_ABSL_PROVIDER:STRING=module',
+                         '-DgRPC_ABSL_PROVIDER:STRING=package',
                          '-DgRPC_RE2_PROVIDER:STRING=module',
                          ])
 
@@ -3062,14 +3062,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 nasm_dir = ''  # does not need
             build_openssl(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
-        if lib_name == 'grpc':
-            src_dir = os.path.join(ext_dir(), 'grpc')
-            if is_windows():
-                nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
-            else:
-                nasm_dir = ''  # does not need
-            build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
-
         if lib_name == 'double-conversion':
             dc_src_dir = os.path.join(ext_dir(), 'double-conversion')
             build_double_conversion(dc_src_dir, ext_build_dir())
@@ -3129,6 +3121,14 @@ def build_libs(libs: OrderedDict, use_asan: bool):
         if lib_name == 'ceres-solver':
             src_dir = os.path.join(ext_dir(), 'ceres-solver')
             build_ceres_solver(src_dir, ext_build_dir())
+
+        if lib_name == 'grpc':
+            src_dir = os.path.join(ext_dir(), 'grpc')
+            if is_windows():
+                nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
+            else:
+                nasm_dir = ''  # does not need
+            build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
         if lib_name == 'glbinding':
             src_dir = os.path.join(ext_dir(), 'glbinding')
@@ -3380,8 +3380,9 @@ def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'gperf', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'tbb',
                 'eigen',
                 'pybind11', 'glm', 'magic_enum', 'pocketfft', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
-                'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'snappy', 'bzip2',
-                'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
+                'openssl', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'snappy', 'bzip2',
+                'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'grpc', 'glbinding', 'libjpeg', 'libpng',
+                'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
                 'opencv', 'botan', 'ospray', 'java', 'ants', 'skia',
                 'neuTube', 'rocksdb', 'llfio', 'jansson', 'pcre',
@@ -3403,7 +3404,7 @@ def parse_inputs(argv: list):
                             'openssl': ['grpc', 'folly'],
                             'hdf5': ['itk', 'vtk'],
                             'suitesparse': ['ceres-solver'],
-                            'ceres-solver': ['opencv'],  # only if we need opencv sfm
+                            'ceres-solver': ['opencv', 'grpc'],  # only if we need opencv sfm
                             'boost': ['folly'],
                             'libevent': ['folly'],
                             'double-conversion': ['folly', 'itk', 'vtk'],
