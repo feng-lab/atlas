@@ -113,8 +113,8 @@ vk::raii::Instance createVulkanInstance(vk::raii::Context& context, uint32_t des
   LOG(INFO) << fmt::format("Available Instance Layers ({})", availableLayers.size());
   for (const auto& layer : availableLayers) {
     LOG(INFO) << fmt::format("  Layer Name: {} (Description: {}, Spec Version: {}.{}.{}, Implementation Version: {})",
-                             layer.layerName,
-                             layer.description,
+                             layer.layerName.data(),
+                             layer.description.data(),
                              VK_VERSION_MAJOR(layer.specVersion),
                              VK_VERSION_MINOR(layer.specVersion),
                              VK_VERSION_PATCH(layer.specVersion),
@@ -124,7 +124,9 @@ vk::raii::Instance createVulkanInstance(vk::raii::Context& context, uint32_t des
   std::vector<vk::ExtensionProperties> availableExtensions = context.enumerateInstanceExtensionProperties();
   LOG(INFO) << fmt::format("Available Instance Extensions ({})", availableExtensions.size());
   for (const auto& extension : availableExtensions) {
-    LOG(INFO) << fmt::format("  Extension Name: {} (Spec Version: {})", extension.extensionName, extension.specVersion);
+    LOG(INFO) << fmt::format("  Extension Name: {} (Spec Version: {})",
+                             extension.extensionName.data(),
+                             extension.specVersion);
   }
 
   // // enumerate extensions for each layer
@@ -272,7 +274,7 @@ void initVulkan()
         }
       }
 
-      LOG(INFO) << fmt::format("Device Name:          {}", deviceProperties.deviceName);
+      LOG(INFO) << fmt::format("Device Name:          {}", deviceProperties.deviceName.data());
       LOG(INFO) << fmt::format("API Version:          {} ({})",
                                versionToString(deviceProperties.apiVersion),
                                deviceProperties.apiVersion);
@@ -286,7 +288,7 @@ void initVulkan()
       LOG(INFO) << fmt::format("Dedicated GPU Memory: {} MB", dedicatedMemory / (1024 * 1024));
       VLOG(1) << "Supported Device Extensions: ";
       for (const auto& ext : deviceExtensionProperties) {
-        VLOG(1) << fmt::format("  - {} (version {})", ext.extensionName, ext.specVersion);
+        VLOG(1) << fmt::format("  - {} (version {})", ext.extensionName.data(), ext.specVersion);
       }
       LOG(INFO) << "-------------------------";
 

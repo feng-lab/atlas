@@ -3404,7 +3404,7 @@ def parse_inputs(argv: list):
                             'openssl': ['grpc', 'folly'],
                             'hdf5': ['itk', 'vtk'],
                             'suitesparse': ['ceres-solver'],
-                            'ceres-solver': ['opencv', 'grpc'],  # only if we need opencv sfm
+                            'ceres-solver': ['opencv', 'grpc'],  # only if we need opencv sfm, let grpc use ceres absl
                             'boost': ['folly'],
                             'libevent': ['folly'],
                             'double-conversion': ['folly', 'itk', 'vtk'],

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <fmt/core.h>
-
 #ifdef __APPLE__
 
 #include <Availability.h>
@@ -28,14 +26,3 @@ namespace nim {
 void initVulkan();
 
 } // namespace nim
-
-namespace vk {
-
-template<size_t N>
-auto format_as(const ArrayWrapper1D<char, N>& s)
-{
-  return std::string_view(s);
-}
-
-} // namespace vk
-

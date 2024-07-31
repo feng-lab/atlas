@@ -182,8 +182,67 @@ QString qtTypeToQString(const T& v)
   return buffer;
 }
 
-#define OUTPUT_QT_TYPE_VALUE(v)          \
-  auto u8 = qtTypeToQString(v).toUtf8(); \
+} // namespace nim
+
+template<>
+struct fmt::formatter<QString> : fmt::formatter<fmt::string_view>
+{
+  auto format(const QString& s, format_context& ctx) const
+  {
+    auto u8 = s.toUtf8();
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
+  }
+};
+
+template<>
+struct fmt::formatter<QByteArray> : fmt::formatter<fmt::string_view>
+{
+  auto format(const QByteArray& s, format_context& ctx) const
+  {
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
+  }
+};
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+template<>
+struct fmt::formatter<QStringView> : fmt::formatter<fmt::string_view>
+{
+  auto format(QStringView s, format_context& ctx) const
+  {
+    auto u8 = s.toUtf8();
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
+  }
+};
+template<>
+struct fmt::formatter<QUtf8StringView> : fmt::formatter<fmt::string_view>
+{
+  auto format(QUtf8StringView s, format_context& ctx) const
+  {
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
+  }
+};
+template<>
+struct fmt::formatter<QByteArrayView> : fmt::formatter<fmt::string_view>
+{
+  auto format(QByteArrayView s, format_context& ctx) const
+  {
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
+  }
+};
+#else
+template<>
+struct fmt::formatter<QStringRef> : fmt::formatter<fmt::string_view>
+{
+  auto format(QStringRef s, format_context& ctx) const
+  {
+    auto u8 = s.toUtf8();
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
+  }
+};
+#endif
+
+#define OUTPUT_QT_TYPE_VALUE(v)               \
+  auto u8 = nim::qtTypeToQString(v).toUtf8(); \
   return (s << std::string_view(u8.data(), u8.size()));
 
 #define OUTPUT_QSTRING(v) \
@@ -312,63 +371,4 @@ inline std::ostream& operator<<(std::ostream& s, QKeyCombination v)
 {
   OUTPUT_QT_TYPE_VALUE(v)
 }
-#endif
-
-} // namespace nim
-
-template<>
-struct fmt::formatter<QString> : fmt::formatter<fmt::string_view>
-{
-  auto format(const QString& s, format_context& ctx) const
-  {
-    auto u8 = s.toUtf8();
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
-  }
-};
-
-template<>
-struct fmt::formatter<QByteArray> : fmt::formatter<fmt::string_view>
-{
-  auto format(const QByteArray& s, format_context& ctx) const
-  {
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
-  }
-};
-
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-template<>
-struct fmt::formatter<QStringView> : fmt::formatter<fmt::string_view>
-{
-  auto format(QStringView s, format_context& ctx) const
-  {
-    auto u8 = s.toUtf8();
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
-  }
-};
-template<>
-struct fmt::formatter<QUtf8StringView> : fmt::formatter<fmt::string_view>
-{
-  auto format(QUtf8StringView s, format_context& ctx) const
-  {
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
-  }
-};
-template<>
-struct fmt::formatter<QByteArrayView> : fmt::formatter<fmt::string_view>
-{
-  auto format(QByteArrayView s, format_context& ctx) const
-  {
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
-  }
-};
-#else
-template<>
-struct fmt::formatter<QStringRef> : fmt::formatter<fmt::string_view>
-{
-  auto format(QStringRef s, format_context& ctx) const
-  {
-    auto u8 = s.toUtf8();
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
-  }
-};
 #endif
