@@ -1443,7 +1443,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
 
     orig_file = bak_file = None
     orig_file1 = bak_file1 = None
-    orig_file2 = bak_file2 = None
     orig_file4 = bak_file4 = None
     orig_file5 = bak_file5 = None
     try:
@@ -1477,10 +1476,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                          r'set(CMAKE_FIND_LIBRARY_SUFFIXES "_static.lib" "${CMAKE_FIND_LIBRARY_SUFFIXES}")',
                                          ]
                                )
-        orig_file2 = os.path.join(src_dir, 'cmake', 'FindGlog.cmake')
-        bak_file2 = patch_file(orig_file2,
-                               from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
-                               to_texts=[r'if (FALSE)'])
         # we build ceres as static lib, so no point to hard link lapack now as we might link to mkl later
         orig_file4 = os.path.join(src_dir, 'internal', 'ceres', 'CMakeLists.txt')
         bak_file4 = patch_file(orig_file4,
@@ -1546,7 +1541,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
         os.replace(bak_file1, orig_file1)
-        os.replace(bak_file2, orig_file2)
         os.replace(bak_file4, orig_file4)
         os.replace(bak_file5, orig_file5)
         cleanup_git_submodule(src_dir)
