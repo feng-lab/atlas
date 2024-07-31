@@ -1482,17 +1482,11 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                from_texts=[r' ${LAPACK_LIBRARIES}',
                                            r'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")',
                                            r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags)',
-                                           r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES absl::log)',
-                                           r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES absl::check)',
-                                           r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES absl::fixed_array)',
                                            ],
                                to_texts=[r' ',
                                          'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")\n'
                                          'add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")',
                                          r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags::gflags)',
-                                         r'',
-                                         r'',
-                                         r'',
                                          ])
         orig_file5 = os.path.join(src_dir, 'cmake', 'CeresConfig.cmake.in')
         bak_file5 = patch_file(orig_file5,
