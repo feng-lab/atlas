@@ -2694,7 +2694,7 @@ def build_fizz(src_dir: str, install_dir: str):
                                   'add_library(gflags::gflags ALIAS gflags)',
                               ])
 
-        orig_file2 = os.path.join(src_dir, 'fizz', 'record', 'Types.h')
+        orig_file2 = os.path.join(src_dir, 'record', 'Types.h')
         bak_file2 = patch_file(orig_file2,
                                from_texts=[
                                    r'auto format(fizz::ExtensionType t, format_context& ctx) {',
