@@ -727,7 +727,6 @@ double Z3DCompositor::process(Z3DEye eye)
 #if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
   glFinish();
 #else
-  VLOG(1) << "start downloading texture";
   downloadTextureToLocalColorBuffer((eye == MonoEye)   ? *m_monoCurrentTarget->colorTexture()
                                     : (eye == LeftEye) ? *m_leftCurrentTarget->colorTexture()
                                                        : *m_rightCurrentTarget->colorTexture(),

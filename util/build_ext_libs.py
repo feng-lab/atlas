@@ -2682,6 +2682,7 @@ def build_fizz(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     bak_file = orig_file = None
+    bak_file2 = orig_file2 = None
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -2692,6 +2693,15 @@ def build_fizz(src_dir: str, install_dir: str):
                                   'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n'
                                   'add_library(gflags::gflags ALIAS gflags)',
                               ])
+
+        orig_file2 = os.path.join(src_dir, 'fizz', 'record', 'Types.h')
+        bak_file2 = patch_file(orig_file2,
+                               from_texts=[
+                                   r'auto format(fizz::ExtensionType t, format_context& ctx) {',
+                               ],
+                               to_texts=[
+                                   r'auto format(fizz::ExtensionType t, format_context& ctx) const {',
+                               ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DFIZZ_BUILD_AEGIS:BOOL=OFF',
@@ -2704,6 +2714,7 @@ def build_fizz(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        os.replace(bak_file2, orig_file2)
         print()
 
 
@@ -2970,7 +2981,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                     file.write('set(QT_HOST_PATH "{0}")\n'.format(qt_base_dir().replace("\\", "/")))
                 else:
                     file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
-                file.write('set(ENV{VULKAN_SDK} '+ f'{vulkan_SDK_env_dir()})\n')
+                file.write('set(ENV{VULKAN_SDK} ' + f'{vulkan_SDK_env_dir()})\n')
 
         if lib_name == 'zlib':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))

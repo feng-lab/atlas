@@ -319,7 +319,7 @@ inline std::ostream& operator<<(std::ostream& s, QKeyCombination v)
 template<>
 struct fmt::formatter<QString> : fmt::formatter<fmt::string_view>
 {
-  auto format(const QString& s, format_context& ctx)
+  auto format(const QString& s, format_context& ctx) const
   {
     auto u8 = s.toUtf8();
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
@@ -329,7 +329,7 @@ struct fmt::formatter<QString> : fmt::formatter<fmt::string_view>
 template<>
 struct fmt::formatter<QByteArray> : fmt::formatter<fmt::string_view>
 {
-  auto format(const QByteArray& s, format_context& ctx)
+  auto format(const QByteArray& s, format_context& ctx) const
   {
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
   }
@@ -339,7 +339,7 @@ struct fmt::formatter<QByteArray> : fmt::formatter<fmt::string_view>
 template<>
 struct fmt::formatter<QStringView> : fmt::formatter<fmt::string_view>
 {
-  auto format(QStringView s, format_context& ctx)
+  auto format(QStringView s, format_context& ctx) const
   {
     auto u8 = s.toUtf8();
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
@@ -348,7 +348,7 @@ struct fmt::formatter<QStringView> : fmt::formatter<fmt::string_view>
 template<>
 struct fmt::formatter<QUtf8StringView> : fmt::formatter<fmt::string_view>
 {
-  auto format(QUtf8StringView s, format_context& ctx)
+  auto format(QUtf8StringView s, format_context& ctx) const
   {
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
   }
@@ -356,7 +356,7 @@ struct fmt::formatter<QUtf8StringView> : fmt::formatter<fmt::string_view>
 template<>
 struct fmt::formatter<QByteArrayView> : fmt::formatter<fmt::string_view>
 {
-  auto format(QByteArrayView s, format_context& ctx)
+  auto format(QByteArrayView s, format_context& ctx) const
   {
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
   }
@@ -365,7 +365,7 @@ struct fmt::formatter<QByteArrayView> : fmt::formatter<fmt::string_view>
 template<>
 struct fmt::formatter<QStringRef> : fmt::formatter<fmt::string_view>
 {
-  auto format(QStringRef s, format_context& ctx)
+  auto format(QStringRef s, format_context& ctx) const
   {
     auto u8 = s.toUtf8();
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
