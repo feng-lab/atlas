@@ -629,6 +629,46 @@ def build_tbb(src_dir: str, install_dir: str):
         print()
 
 
+def build_eigen(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    orig_file = bak_file = None
+    try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'add_subdirectory(blas',
+                                          r'add_subdirectory(lapack',
+                                          ],
+                              to_texts=[r'set(blas',
+                                        r'set(lapack',
+                                        ])
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+
+        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                         '-DEIGEN_BUILD_DOC:BOOL=OFF',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+
+
+def build_pocketfft(src_dir: str, install_dir: str):
+    shutil.copy2(os.path.join(src_dir, 'pocketfft_hdronly.h'), os.path.join(install_dir, 'include'))
+
+
+def build_reflect(src_dir: str, install_dir: str):
+    shutil.copy2(os.path.join(src_dir, 'reflect'), os.path.join(install_dir, 'include'))
+
+
+def build_simde(src_dir: str, install_dir: str):
+    shutil.copytree(os.path.join(src_dir, 'simde'),
+                    os.path.join(install_dir, 'include', 'simde'), dirs_exist_ok=True)
+
+
 def build_cpuinfo(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     cmake_options = ['-DBUILD_GMOCK:BOOL=OFF',
@@ -1335,33 +1375,6 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
             shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
 
-def build_eigen(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    orig_file = bak_file = None
-    try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'add_subdirectory(blas',
-                                          r'add_subdirectory(lapack',
-                                          ],
-                              to_texts=[r'set(blas',
-                                        r'set(lapack',
-                                        ])
-
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-
-        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
-                         '-DEIGEN_BUILD_DOC:BOOL=OFF',
-                         ])
-
-        cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
-
-
 def build_glm(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -1393,10 +1406,6 @@ def build_glm(src_dir: str, install_dir: str):
     #                          ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_pocketfft(src_dir: str, install_dir: str):
-    shutil.copy2(os.path.join(src_dir, 'pocketfft_hdronly.h'), os.path.join(install_dir, 'include'))
 
 
 def build_suitesparse(src_dir: str, install_dir: str):
@@ -3016,6 +3025,18 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(ext_dir(), 'eigen')
             build_eigen(src_dir, ext_build_dir())
 
+        if lib_name == 'pocketfft':
+            src_dir = os.path.join(ext_dir(), 'pocketfft')
+            build_pocketfft(src_dir, ext_build_dir())
+
+        if lib_name == 'reflect':
+            src_dir = os.path.join(ext_dir(), 'reflect')
+            build_reflect(src_dir, ext_build_dir())
+
+        if lib_name == 'simde':
+            src_dir = os.path.join(ext_dir(), 'simde')
+            build_simde(src_dir, ext_build_dir())
+
         if lib_name == 'pybind11':
             print('pybind11')
 
@@ -3025,10 +3046,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'magic_enum':
             print('magic_enum')
-
-        if lib_name == 'pocketfft':
-            src_dir = os.path.join(ext_dir(), 'pocketfft')
-            build_pocketfft(src_dir, ext_build_dir())
 
         if lib_name == 'googletest':
             print('googletest')
@@ -3378,8 +3395,8 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
 def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'gperf', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'tbb',
-                'eigen',
-                'pybind11', 'glm', 'magic_enum', 'pocketfft', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
+                'eigen', 'pocketfft', 'reflect', 'simde',
+                'pybind11', 'glm', 'magic_enum', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
                 'openssl', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'snappy', 'bzip2',
                 'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'grpc', 'glbinding', 'libjpeg', 'libpng',
                 'openjpeg',
