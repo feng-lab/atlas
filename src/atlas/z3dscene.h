@@ -1,5 +1,7 @@
 #pragma once
 
+#if defined(ATLAS_USE_OPENGLWIDGET)
+
 #include <QGraphicsScene>
 #include <memory>
 
@@ -32,3 +34,5 @@ private:
 };
 
 } // namespace nim
+
+#endif

@@ -724,7 +724,7 @@ double Z3DCompositor::process(Z3DEye eye)
 
   glDisable(GL_DEPTH_TEST);
 
-#if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
+#if defined(ATLAS_USE_OPENGLWIDGET)
   glFinish();
 #else
   // glFinish();

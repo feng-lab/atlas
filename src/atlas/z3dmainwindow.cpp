@@ -36,20 +36,17 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
 {
   m_engine = new Z3DRenderingEngine(m_doc);
   m_engine->moveToThread(&m_renderingThread);
-  // connect(&m_renderingThread, &QThread::started, m_engine, &Z3DRenderingEngine::init);
   connect(&m_renderingThread, &QThread::finished, m_engine, &QObject::deleteLater);
   m_renderingThread.start();
 
   m_canvas = new Z3DCanvas("", 512, 512, this);
 
-#if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
-  connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DMainWindow::onCanvasReady);
-#endif
-  connect(this, &Z3DMainWindow::canvasReady, m_engine, &Z3DRenderingEngine::initAndAttachToCanvas);
   connect(m_engine, &Z3DRenderingEngine::initialized, this, &Z3DMainWindow::renderingEngineInitialized);
 
-#if !defined(ATLAS_USE_OPENGLWIDGET) && !defined(ATLAS_USE_OPENGLWINDOW)
-  onCanvasReady();
+#if defined(ATLAS_USE_OPENGLWIDGET)
+  connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DMainWindow::initRenderingEngine);
+#else
+  initRenderingEngine();
 #endif
 
   setCentralWidget(m_canvas);
@@ -584,9 +581,9 @@ QWidget* Z3DMainWindow::createCaptureWidget() const
   return m_screenShotWidget;
 }
 
-void Z3DMainWindow::onCanvasReady()
+void Z3DMainWindow::initRenderingEngine()
 {
-  Q_EMIT canvasReady(m_canvas);
+  QMetaObject::invokeMethod(m_engine, &Z3DRenderingEngine::initAndAttachToCanvas, m_canvas);
 }
 
 void Z3DMainWindow::onRenderingError(const QString& error)

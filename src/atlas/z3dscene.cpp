@@ -1,5 +1,7 @@
 #include "z3dscene.h"
 
+#if defined(ATLAS_USE_OPENGLWIDGET)
+
 #include "z3dgl.h"
 #include "z3dcanvas.h"
 #include "z3dcanvaspainter.h"
@@ -69,3 +71,5 @@ void Z3DScene::setRenderingEngine(Z3DRenderingEngine* engine)
 }
 
 } // namespace nim
+
+#endif

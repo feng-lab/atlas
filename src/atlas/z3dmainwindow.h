@@ -46,8 +46,6 @@ Q_SIGNALS:
 
   void viewReady(Z3DRenderingEngine* view);
 
-  void canvasReady(Z3DCanvas* canvas);
-
   void renderingEngineInitialized();
 
 protected:
@@ -110,7 +108,7 @@ private:
 
   [[nodiscard]] QWidget* createCaptureWidget() const;
 
-  void onCanvasReady();
+  void initRenderingEngine();
 
   void onRenderingError(const QString& error);
 

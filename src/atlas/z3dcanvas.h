@@ -1,17 +1,17 @@
 #pragma once
 
-// #define ATLAS_USE_OPENGLWIDGET
-// #define ATLAS_USE_OPENGLWINDOW
-
 #include "zglmutils.h"
 #include <QGraphicsView>
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
-#include <QSurfaceFormat>
 #include <QInputEvent>
 #include <QShortcut>
 
 #include <memory>
+
+#ifdef ATLAS_USE_OPENGLWIDGET
+class QOpenGLContext;
+#endif
 
 namespace nim {
 
@@ -19,10 +19,6 @@ class Z3DRenderingEngine;
 
 #ifdef ATLAS_USE_OPENGLWIDGET
 class ZOpenGLWidget;
-class Z3DScene;
-#endif
-#ifdef ATLAS_USE_OPENGLWINDOW
-class ZOpenGLWindow;
 class Z3DScene;
 #endif
 
@@ -37,14 +33,16 @@ public:
             QWidget* parent = nullptr,
             Qt::WindowFlags f = Qt::WindowFlags());
 
+#ifdef ATLAS_USE_OPENGLWIDGET
   ~Z3DCanvas() override;
 
   QOpenGLContext* context() const;
 
-  void setRenderingEngine(Z3DRenderingEngine* engine);
-
   // Set the opengl context of this canvas as the current one.
   void getGLFocus();
+#endif
+
+  void setRenderingEngine(Z3DRenderingEngine* engine);
 
   void toggleFullScreen();
 
@@ -67,7 +65,7 @@ Q_SIGNALS:
   // w and h is physical size not logical size, opengl works in physical pixel
   void canvasSizeChanged(size_t w, size_t h);
 
-#if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
+#if defined(ATLAS_USE_OPENGLWIDGET)
   void openGLContextInitialized();
 #endif
 
@@ -123,9 +121,6 @@ private:
 
 #ifdef ATLAS_USE_OPENGLWIDGET
   ZOpenGLWidget* m_glWidget = nullptr;
-  std::unique_ptr<Z3DScene> m_3dScene;
-#elif defined(ATLAS_USE_OPENGLWINDOW)
-  ZOpenGLWindow* m_glWindow = nullptr;
   std::unique_ptr<Z3DScene> m_3dScene;
 #else
   std::unique_ptr<QGraphicsScene> m_scene;

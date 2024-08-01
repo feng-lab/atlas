@@ -1,11 +1,11 @@
 #include "z3dcanvas.h"
 
+#include "zlog.h"
 #include "z3drenderingengine.h"
-#if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
+#if defined(ATLAS_USE_OPENGLWIDGET)
 #include "z3dscene.h"
 #include "z3dopenglwidget.h"
 #endif
-#include "zlog.h"
 #include <QCoreApplication>
 #include <algorithm>
 
@@ -17,13 +17,7 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   setAlignment(Qt::AlignLeft | Qt::AlignTop);
   resize(width, height);
 
-#ifdef ATLAS_USE_OPENGLWINDOW
-  m_glWindow = new ZOpenGLWindow();
-  m_glWindow->setFlags(Qt::WindowDoesNotAcceptFocus);
-  m_3dScene = std::make_unique<Z3DScene>(width, height, m_glWindow->format().stereo(), *this);
-  setViewport(QWidget::createWindowContainer(m_glWindow, this, f));
-  setScene(m_3dScene.get());
-#elif defined(ATLAS_USE_OPENGLWIDGET)
+#if defined(ATLAS_USE_OPENGLWIDGET)
   m_glWidget = new ZOpenGLWidget(this, f);
   m_3dScene = std::make_unique<Z3DScene>(width, height, m_glWidget->format().stereo(), *this);
   setViewport(m_glWidget);
@@ -64,15 +58,13 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   m_rotateZMShortCut = new QShortcut(QKeySequence(QKeyCombination(Qt::ALT | Qt::SHIFT, Qt::Key_Z)), this);
   connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
 
-#ifdef ATLAS_USE_OPENGLWINDOW
-  connect(m_glWindow, &ZOpenGLWindow::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
-  connect(m_glWindow, &ZOpenGLWindow::openGLContextInitialized, m_3dScene.get(), &Z3DScene::initPainter);
-#elif defined(ATLAS_USE_OPENGLWIDGET)
+#if defined(ATLAS_USE_OPENGLWIDGET)
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, m_3dScene.get(), &Z3DScene::initPainter);
 #endif
 }
 
+#ifdef ATLAS_USE_OPENGLWIDGET
 Z3DCanvas::~Z3DCanvas()
 {
   VLOG(1) << "in canvas destructor";
@@ -81,19 +73,19 @@ Z3DCanvas::~Z3DCanvas()
 
 QOpenGLContext* Z3DCanvas::context() const
 {
-#ifdef ATLAS_USE_OPENGLWINDOW
-  return m_glWindow->context();
-#elif defined(ATLAS_USE_OPENGLWIDGET)
   return m_glWidget->context();
-#else
-  return nullptr;
-#endif
 }
+
+void Z3DCanvas::getGLFocus()
+{
+  m_glWidget->makeCurrent();
+}
+#endif
 
 void Z3DCanvas::setRenderingEngine(Z3DRenderingEngine* engine)
 {
   m_engine = engine;
-#if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
+#if defined(ATLAS_USE_OPENGLWIDGET)
   m_3dScene->setRenderingEngine(engine);
 #endif
   sceneParaUpdated();
@@ -123,9 +115,7 @@ void Z3DCanvas::renderingFinished()
   if (m_engine->hasNewRenderingFlag()) {
     VLOG(1) << "update";
 
-#ifdef ATLAS_USE_OPENGLWINDOW
-    m_glWindow->update();
-#elif defined(ATLAS_USE_OPENGLWIDGET)
+#if defined(ATLAS_USE_OPENGLWIDGET)
     m_glWidget->update();
 #else
     const std::lock_guard<std::mutex> lock(m_engine->targetSwitchMutex());
@@ -221,7 +211,7 @@ void Z3DCanvas::keyReleaseEvent(QKeyEvent* e)
 void Z3DCanvas::resizeEvent(QResizeEvent* event)
 {
   QGraphicsView::resizeEvent(event);
-#if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
+#if defined(ATLAS_USE_OPENGLWIDGET)
   if (m_3dScene) {
     m_3dScene->setSceneRect(QRect(QPoint(0, 0), event->size()));
   }
@@ -249,15 +239,6 @@ void Z3DCanvas::timerEvent(QTimerEvent* e)
   //    QCoreApplication::postEvent(m_engine, e->clone());
   //  }
   QGraphicsView::timerEvent(e);
-}
-
-void Z3DCanvas::getGLFocus()
-{
-#ifdef ATLAS_USE_OPENGLWINDOW
-  m_glWindow->makeCurrent();
-#elif defined(ATLAS_USE_OPENGLWIDGET)
-  m_glWidget->makeCurrent();
-#endif
 }
 
 } // namespace nim

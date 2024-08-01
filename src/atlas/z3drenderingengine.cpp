@@ -865,7 +865,11 @@ void Z3DRenderingEngine::onCanvasResized(size_t w, size_t h)
 void Z3DRenderingEngine::initGL()
 {
   if (m_canvas) {
+#if defined(ATLAS_USE_OPENGLWIDGET)
     m_context = std::make_unique<Z3DContext>(*m_offscreenSurface, m_canvas->context());
+#else
+    m_context = std::make_unique<Z3DContext>(*m_offscreenSurface);
+#endif
   } else {
 #if defined(__linux__)
     if (FLAGS___use_EGL) {

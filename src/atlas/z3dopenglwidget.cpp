@@ -1,10 +1,10 @@
 #include "z3dopenglwidget.h"
 
+#if defined(ATLAS_USE_OPENGLWIDGET)
+
 #include "zlog.h"
 
 namespace nim {
-
-#if defined(ATLAS_USE_OPENGLWIDGET)
 
 ZOpenGLWidget::~ZOpenGLWidget()
 {
@@ -21,15 +21,6 @@ void ZOpenGLWidget::paintGL()
   VLOG(1) << "paint GL";
 }
 
-#endif
-
-#if defined(ATLAS_USE_OPENGLWINDOW)
-
-void ZOpenGLWindow::initializeGL()
-{
-  Q_EMIT openGLContextInitialized();
-}
-
-#endif
-
 } // namespace nim
+
+#endif
