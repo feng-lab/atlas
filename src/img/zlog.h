@@ -18,6 +18,7 @@
 #include <QRect>
 
 #ifndef Q_MOC_RUN
+#define NTEST
 #include <reflect>
 #endif
 
@@ -25,21 +26,14 @@
 #include <iosfwd>
 
 namespace nim {
+
 void initLogging(const char* argv0, const QString& filename = "");
 
 void shutdownLogging();
 
-using LogSink = google::LogSink;
-using LogSinkPtr = std::shared_ptr<google::LogSink>;
-using LogSeverity = google::LogSeverity;
-constexpr LogSeverity InfoLevel = google::GLOG_INFO;
-constexpr LogSeverity WarningLevel = google::GLOG_WARNING;
-constexpr LogSeverity ErrorLevel = google::GLOG_ERROR;
-constexpr LogSeverity FatalLevel = google::GLOG_FATAL;
-
 struct LogData
 {
-  LogData(LogSeverity severity,
+  LogData(google::LogSeverity severity,
           const char* full_filename,
           const char* base_filename,
           int line_,
@@ -56,7 +50,7 @@ struct LogData
     , formatted(QString::fromStdString(formatted_msg))
   {}
 
-  LogSeverity level;
+  google::LogSeverity level;
   std::string fullFilename;
   std::string baseFilename;
   int line;
@@ -68,44 +62,39 @@ struct LogData
 using LogFunction = std::function<void(const LogData&)>;
 
 // might return nullptr
-LogSinkPtr createFileLogSink(const QString& filename);
+std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename);
 
-LogSinkPtr createFunctorLogSink(const LogFunction& f);
+std::shared_ptr<google::LogSink> createFunctorLogSink(const LogFunction& f);
 
-inline void addLogSink(LogSink* sink)
+inline void addLogSink(google::LogSink* sink)
 {
   if (sink) {
     google::AddLogSink(sink);
   }
 }
 
-inline void addLogSink(const LogSinkPtr& sink)
+inline void addLogSink(const std::shared_ptr<google::LogSink>& sink)
 {
   if (sink) {
     google::AddLogSink(sink.get());
   }
 }
 
-inline void removeLogSink(LogSink* sink)
+inline void removeLogSink(google::LogSink* sink)
 {
   if (sink) {
     google::RemoveLogSink(sink);
   }
 }
 
-inline void removeLogSink(const LogSinkPtr& sink)
+inline void removeLogSink(const std::shared_ptr<google::LogSink>& sink)
 {
   if (sink) {
     google::RemoveLogSink(sink.get());
   }
 }
 
-QString levelToString(LogSeverity theLevel);
-
-#define LINFOF(file, line) google::LogMessage(file, line, google::GLOG_INFO).stream()
-#define LWARNF(file, line) google::LogMessage(file, line, google::GLOG_WARNING).stream()
-#define LERRORF(file, line) google::LogMessage(file, line, google::GLOG_ERROR).stream()
-#define LFATALF(file, line) google::LogMessage(file, line, google::GLOG_FATAL).stream()
+QString levelToString(google::LogSeverity theLevel);
 
 // enum related
 template<typename TEnum>

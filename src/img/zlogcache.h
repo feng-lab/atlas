@@ -12,7 +12,7 @@ namespace nim {
 
 class ZLogCache
   : public QObject
-  , public LogSink
+  , public google::LogSink
 {
   Q_OBJECT
 
@@ -26,7 +26,7 @@ public:
   ZLogCache& operator=(ZLogCache&&) = delete; // Move assign
 
   // LogSink interface
-  void send(LogSeverity severity,
+  void send(google::LogSeverity severity,
             const char* full_filename,
             const char* base_filename,
             int line,

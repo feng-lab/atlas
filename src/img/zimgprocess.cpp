@@ -8,7 +8,7 @@ namespace nim {
 
 void ZImgProcess::run()
 {
-  LogSinkPtr fileDestination = createFileLogSink(m_logFile);
+  std::shared_ptr<google::LogSink> fileDestination = createFileLogSink(m_logFile);
   if (fileDestination) {
     addLogSink(fileDestination);
   }
@@ -63,7 +63,7 @@ void ZImgProcess::run()
 
 void ZImgProcess::runInPython()
 {
-  LogSinkPtr fileDestination = createFileLogSink(m_logFile);
+  std::shared_ptr<google::LogSink> fileDestination = createFileLogSink(m_logFile);
   if (fileDestination) {
     addLogSink(fileDestination);
   }

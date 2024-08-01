@@ -18,7 +18,7 @@ void ZLogWidget::writeLogData(const std::deque<LogData>* messages, size_t start,
 {
   if (end - start == 1) {
     const auto& logData = (*messages)[start];
-    if (logData.level <= InfoLevel) {
+    if (logData.level <= google::GLOG_INFO) {
       appendPlainText(logData.formatted);
     } else {
       setCurrentCharFormat(m_errorFormat);
@@ -27,14 +27,14 @@ void ZLogWidget::writeLogData(const std::deque<LogData>* messages, size_t start,
     }
   } else {
     const auto& logData = (*messages)[start];
-    bool firstFormat = logData.level <= InfoLevel;
+    bool firstFormat = logData.level <= google::GLOG_INFO;
     bool lastFormat = firstFormat;
     std::vector<QStringList> textList;
     textList.emplace_back();
     textList.back().push_back(logData.formatted);
     for (auto i = start + 1; i < end; ++i) {
       const auto& logD = (*messages)[i];
-      if ((logD.level <= InfoLevel) != lastFormat) {
+      if ((logD.level <= google::GLOG_INFO) != lastFormat) {
         lastFormat = !lastFormat;
         textList.emplace_back();
       }

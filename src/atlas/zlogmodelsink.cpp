@@ -90,11 +90,11 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
     const LogData& item = m_logDatas.at(index.row());
 
     switch (item.level) {
-      case WarningLevel:
+      case google::GLOG_WARNING:
         return QVariant(QColor(255, 255, 128));
-      case ErrorLevel:
+      case google::GLOG_ERROR:
         return QVariant(QColor(255, 128, 128));
-      case FatalLevel:
+      case  google::GLOG_FATAL:
         return QVariant(QColor(255, 0, 0));
       default:
         break;

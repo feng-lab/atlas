@@ -43,7 +43,7 @@ void shutdownLogging()
   google::ShutdownGoogleLogging();
 }
 
-class FileLogSink : public LogSink
+class FileLogSink : public google::LogSink
 {
   QFile m_file;
 
@@ -64,7 +64,7 @@ public:
   // LogSink interface
 
 public:
-  void send(LogSeverity severity,
+  void send(google::LogSeverity severity,
             const char*,
             const char* base_filename,
             int line,
@@ -81,7 +81,7 @@ public:
   }
 };
 
-class FunctionLogSink : public LogSink
+class FunctionLogSink : public google::LogSink
 {
   LogFunction m_logFunction;
 
@@ -98,7 +98,7 @@ public:
   // LogSink interface
 
 public:
-  void send(LogSeverity severity,
+  void send(google::LogSeverity severity,
             const char* full_filename,
             const char* base_filename,
             int line,
@@ -119,19 +119,19 @@ public:
   }
 };
 
-LogSinkPtr createFileLogSink(const QString& filename)
+std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename)
 {
   auto res = std::make_shared<FileLogSink>(filename);
-  return res->isValid() ? res : LogSinkPtr();
+  return res->isValid() ? res : std::shared_ptr<google::LogSink>();
 }
 
-LogSinkPtr createFunctorLogSink(const LogFunction& f)
+std::shared_ptr<google::LogSink> createFunctorLogSink(const LogFunction& f)
 {
   auto res = std::make_shared<FunctionLogSink>(f);
-  return res->isValid() ? res : LogSinkPtr();
+  return res->isValid() ? res : std::shared_ptr<google::LogSink>();
 }
 
-QString levelToString(LogSeverity theLevel)
+QString levelToString(google::LogSeverity theLevel)
 {
   switch (theLevel) {
     case google::GLOG_INFO:

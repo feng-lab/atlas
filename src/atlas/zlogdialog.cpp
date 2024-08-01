@@ -15,18 +15,18 @@ namespace nim {
 class ZLogFilterProxyModel : public QSortFilterProxyModel
 {
 public:
-  explicit ZLogFilterProxyModel(LogSeverity level, QObject* parent = nullptr)
+  explicit ZLogFilterProxyModel(google::LogSeverity level, QObject* parent = nullptr)
     : QSortFilterProxyModel(parent)
     , mLevel(level)
     , mLastVisibleRow(0)
   {}
 
-  [[nodiscard]] LogSeverity level() const
+  [[nodiscard]] google::LogSeverity level() const
   {
     return mLevel;
   }
 
-  void setLevel(const LogSeverity level)
+  void setLevel(const google::LogSeverity level)
   {
     mLevel = level;
     invalidateFilter();
@@ -53,11 +53,11 @@ protected:
   }
 
 private:
-  LogSeverity mLevel;
+  google::LogSeverity mLevel;
   int mLastVisibleRow;
 };
 
-ZLogDialog::ZLogDialog(const LogSinkPtr& destination, QWidget* parent)
+ZLogDialog::ZLogDialog(const std::shared_ptr<google::LogSink>& destination, QWidget* parent)
   : QDialog(parent)
   , mUi(nullptr)
   , mProxyModel(nullptr)
@@ -86,7 +86,7 @@ ZLogDialog::ZLogDialog(const LogSinkPtr& destination, QWidget* parent)
           SLOT(ModelRowsInserted(const QModelIndex&, int, int)));
 
   // Install the sort / filter model
-  mProxyModel = new ZLogFilterProxyModel(InfoLevel, this);
+  mProxyModel = new ZLogFilterProxyModel(google::GLOG_INFO, this);
   mProxyModel->setSourceModel(mModelDestination);
   mUi->tableViewMessages->setModel(mProxyModel);
 
@@ -109,11 +109,11 @@ ZLogDialog::ZLogDialog(const LogSinkPtr& destination, QWidget* parent)
 #endif
 
   // Initialize log level selection
-  mUi->comboBoxLevel->addItem("Info", InfoLevel);
-  mUi->comboBoxLevel->addItem("Warning", WarningLevel);
-  mUi->comboBoxLevel->addItem("Error", ErrorLevel);
-  mUi->comboBoxLevel->addItem("Fatal", FatalLevel);
-  mUi->comboBoxLevel->setCurrentIndex(InfoLevel);
+  mUi->comboBoxLevel->addItem("Info", google::GLOG_INFO);
+  mUi->comboBoxLevel->addItem("Warning", google::GLOG_WARNING);
+  mUi->comboBoxLevel->addItem("Error", google::GLOG_ERROR);
+  mUi->comboBoxLevel->addItem("Fatal",  google::GLOG_FATAL);
+  mUi->comboBoxLevel->setCurrentIndex(google::GLOG_INFO);
 }
 
 ZLogDialog::~ZLogDialog()
@@ -165,7 +165,7 @@ void ZLogDialog::OnCopyClicked()
 
 void ZLogDialog::OnLevelChanged(int value)
 {
-  mProxyModel->setLevel(static_cast<LogSeverity>(value));
+  mProxyModel->setLevel(static_cast<google::LogSeverity>(value));
 }
 
 void ZLogDialog::OnAutoScrollChanged(bool checked)

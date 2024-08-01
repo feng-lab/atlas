@@ -10,7 +10,7 @@ ZLogCache& ZLogCache::instance()
   return cache;
 }
 
-void ZLogCache::send(LogSeverity severity,
+void ZLogCache::send(google::LogSeverity severity,
                      const char* full_filename,
                      const char* base_filename,
                      int line,

@@ -26,19 +26,17 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
 {
   switch (type) {
     case QtDebugMsg:
-      LWARNF(context.file ? context.file : "QtFile", context.line) << msg;
-      break;
     case QtInfoMsg:
-      LINFOF(context.file ? context.file : "QtFile", context.line) << msg;
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_INFO).stream() << msg;
       break;
     case QtWarningMsg:
-      LWARNF(context.file ? context.file : "QtFile", context.line) << msg;
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_WARNING).stream() << msg;
       break;
     case QtCriticalMsg:
-      LERRORF(context.file ? context.file : "QtFile", context.line) << msg;
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_ERROR).stream() << msg;
       break;
     case QtFatalMsg:
-      LFATALF(context.file ? context.file : "QtFile", context.line) << msg;
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_FATAL).stream() << msg;
       break;
     default:
       break;

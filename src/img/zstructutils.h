@@ -5,6 +5,7 @@
 #include "zlog.h"
 
 #ifndef Q_MOC_RUN
+#define NTEST
 #include <reflect>
 #endif
 
