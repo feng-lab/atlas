@@ -59,7 +59,7 @@ void readH5DataToImg(nim::ZImg& img, const H5::DataSet& data, size_t x_, size_t 
 
   hsize_t dims[2];
   filespace.getSimpleExtentDims(dims);
-  // LOG(INFO) << dims[0] << " " << dims[1] << img.info().toQString() << x_ <<" "<< y_;
+  // VLOG(1) << dims[0] << " " << dims[1] << img.info().toQString() << x_ <<" "<< y_;
 
   if (dims[1] < img.width() + x_ || dims[0] < img.height() + y_) {
     throw nim::ZException("wrong slice data dimension");
@@ -352,7 +352,7 @@ void mergeImgToH5DataSetMax(H5::DataSet& imgData,
 
   hsize_t dims[2];
   filespace.getSimpleExtentDims(dims);
-  // LOG(INFO) << dims[0] << " " << dims[1] << img.info().toQString() << x_ <<" "<< y_;
+  // VLOG(1) << dims[0] << " " << dims[1] << img.info().toQString() << x_ <<" "<< y_;
 
   if (dims[1] < img.width() + imgCoord.x || dims[0] < img.height() + imgCoord.y) {
     throw nim::ZException("wrong slice data dimension");
@@ -647,13 +647,13 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
               std::memcpy(res->channelData(c), memBuf.get(), res->channelByteNumber());
             } else {
               auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
-              // LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
-              // LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
-              // LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
-              // LOG(INFO) << m_info.toQString();
-              // LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
+              // VLOG(1) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
+              // VLOG(1) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
+              // VLOG(1) << m_x << " " << m_y << " " << m_ratio;
+              // VLOG(1) << m_info.toQString();
+              // VLOG(1) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
               // auto decompressedBuf = codec->uncompress(ioBuf.get());
-              // LOG(INFO) << decompressedBuf->length();
+              // VLOG(1) << decompressedBuf->length();
               auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
               // STOP_AND_LOG(bt)
               std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
@@ -680,13 +680,13 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
               std::memcpy(res->channelData(c), memBuf.get(), res->channelByteNumber());
             } else {
               auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
-              // LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
-              // LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
-              // LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
-              // LOG(INFO) << m_info.toQString();
-              // LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
+              // VLOG(1) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
+              // VLOG(1) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
+              // VLOG(1) << m_x << " " << m_y << " " << m_ratio;
+              // VLOG(1) << m_info.toQString();
+              // VLOG(1) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
               // auto decompressedBuf = codec->uncompress(ioBuf.get());
-              // LOG(INFO) << decompressedBuf->length();
+              // VLOG(1) << decompressedBuf->length();
               auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
               std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
             }
@@ -723,7 +723,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
                     accPropList());
 
     if (m_tiles.size() == 1) {
-      // LOG(INFO) << m_tiles[0] << m_info.toQString();
+      // VLOG(1) << m_tiles[0] << m_info.toQString();
       H5::DataSet ds = file.openDataSet(m_tiles[0]);
       readH5DataToImg(*res, ds, m_x, m_y);
     } else {
@@ -871,7 +871,7 @@ void ZImgHDF5::readInfo(const QString& filename,
                         fmt::format("/Img/TimePoint{}/Channel{}/Z{}/DownsampledBy{}Data", t, c, z, level));
                     }
                     if (!hdf5Chunks.empty()) {
-                      // LOG(INFO) << level << " " << t << " " << c << " " << z << " " << y << " " << x;
+                      // VLOG(1) << level << " " << t << " " << c << " " << z << " " << y << " " << x;
                       auto key = std::make_tuple(level, t, c, z, y, x);
                       auto iter = hdf5Chunks.find(key);
                       if (iter != hdf5Chunks.end()) {

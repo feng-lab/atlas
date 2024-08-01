@@ -98,7 +98,7 @@ void ZSwcTreeView::keyPressEvent(QKeyEvent* e)
   if (m_swcPack.isLocked()) {
     return;
   }
-  // LOG(INFO) << QKeySequence::listToString(QKeySequence::keyBindings(QKeySequence::Delete));
+  // VLOG(1) << QKeySequence::listToString(QKeySequence::keyBindings(QKeySequence::Delete));
   switch (e->key()) {
     case Qt::Key_Delete:
     case Qt::Key_Backspace:
@@ -135,7 +135,7 @@ void ZSwcTreeView::selectionChanged(const QItemSelection& selected, const QItemS
   for (const auto& r : selectedRows) {
     selectedNodes.insert(m_swcPack.getNodeOfParentRowAndRow(r));
   }
-  // LOG(INFO) << selectedNodes.size();
+  // VLOG(1) << selectedNodes.size();
   m_ignoreSelectionChangedSignal = true;
   m_swcPack.setSelectedNodes(selectedNodes);
   m_ignoreSelectionChangedSignal = false;

@@ -370,7 +370,7 @@ bool ZDoc::saveOrDiscard(size_t id)
       return true;
     case QMessageBox::Cancel:
       // Cancel was clicked
-      LOG(INFO) << "cancel clicked";
+      VLOG(1) << "cancel clicked";
       break;
     default:
       // should never be reached
@@ -395,17 +395,17 @@ bool ZDoc::saveOrDiscard(const std::vector<size_t>& objs)
   auto ret = dlg.exec();
   switch (ret) {
     case QDialog::Accepted: {
-      // LOG(INFO) << "Save or Discard was clicked";
+      // VLOG(1) << "Save or Discard was clicked";
       bool saveSuccess = true;
       const auto& sobjs = dlg.objsToSave();
       for (auto sobj : sobjs) {
-        // LOG(INFO) << "save " << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
+        // VLOG(1) << "save " << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
         saveSuccess = saveSuccess && m_objModel->idToDoc(sobj)->save(sobj);
       }
       return saveSuccess;
     }
     case QDialog::Rejected:
-      // LOG(INFO) << "Cancel was clicked";
+      // VLOG(1) << "Cancel was clicked";
       break;
     default:
       // should never be reached
@@ -462,7 +462,7 @@ std::map<size_t, size_t> ZDoc::read(const json::object& jo, QString& err)
           docKeyValueList.emplace_back(qkey, value);
         }
       }
-      // LOG(INFO) << json::value_from(docKeyValueList);
+      // VLOG(1) << json::value_from(docKeyValueList);
       if (!docKeyValueList.empty()) {
         for (const auto& idid : docPack.doc->read(docKeyValueList, err)) {
           res[idid.first] = idid.second;

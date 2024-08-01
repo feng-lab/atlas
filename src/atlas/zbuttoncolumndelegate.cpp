@@ -42,7 +42,7 @@ void ZButtonColumnDelegate::setEditorData(QWidget* editor, const QModelIndex& in
     if (auto btn = qobject_cast<QPushButton*>(editor)) {
       btn->setProperty("user_data", index.data(Qt::UserRole));
     }
-    // LOG(INFO) << "set " << btn->property("user_data");
+    // VLOG(1) << "set " << btn->property("user_data");
   } else {
     QStyledItemDelegate::setEditorData(editor, index);
   }
@@ -54,7 +54,7 @@ void ZButtonColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* mo
     if (auto btn = qobject_cast<QPushButton*>(editor)) {
       model->setData(index, btn->property("user_data"), Qt::UserRole);
     }
-    // LOG(INFO) << btn->property("user_data");
+    // VLOG(1) << btn->property("user_data");
   } else {
     QStyledItemDelegate::setModelData(editor, model, index);
   }
@@ -63,7 +63,7 @@ void ZButtonColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* mo
 void ZButtonColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    // LOG(INFO) << "painting " << index.data().toString();
+    // VLOG(1) << "painting " << index.data().toString();
     QRect rect = option.rect;
     m_button->setGeometry(rect);
     m_button->setText(index.data().toString());
@@ -102,7 +102,7 @@ QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const 
 void ZButtonColumnDelegate::cellEntered(const QModelIndex& index)
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole) == 1) {
-    // LOG(INFO) << "in";
+    // VLOG(1) << "in";
     if (m_isOneCellInEditMode) {
       m_widget->closePersistentEditor(m_currentEditedCellIndex);
     }
@@ -111,7 +111,7 @@ void ZButtonColumnDelegate::cellEntered(const QModelIndex& index)
     m_currentEditedCellIndex = index;
   } else {
     if (m_isOneCellInEditMode) {
-      // LOG(INFO) << "out";
+      // VLOG(1) << "out";
       m_isOneCellInEditMode = false;
       m_widget->closePersistentEditor(m_currentEditedCellIndex);
     }

@@ -689,7 +689,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   //    const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
   //    glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
   //    auto imageBlockSize = m_imageBlockSize;
-  //    LOG(INFO) << m_levelScales[blockImagePos.x].x * blockImagePos.y << " "
+  //    VLOG(1) << m_levelScales[blockImagePos.x].x * blockImagePos.y << " "
   //              << m_levelScales[blockImagePos.x].x * blockImagePos.z << " "
   //              << m_levelScales[blockImagePos.x].z * blockImagePos.w << " "
   //              << m_levelScales[blockImagePos.x].x * imageBlockSize.x << " "
@@ -810,16 +810,16 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
 void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef)
 {
   // auto hasher = boost::hash<glm::uvec4>();
-  // LOG(INFO) << hasher(pageTableEntryKey);
+  // VLOG(1) << hasher(pageTableEntryKey);
 #ifdef ATLAS_CHECK_CACHE
   CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey))
     << pageTableEntryKey << " " << m_channelImageCacheManagers[c]->get(pageTableEntryKey) << " " << pageTableEntryRef;
 #endif
   glm::uvec4 erasedKey;
   glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
-  // LOG(INFO) << c << " " <<  pageTableEntryKey << " " << erasedKey << " " << imageBlockCachePos;
+  // VLOG(1) << c << " " <<  pageTableEntryKey << " " << erasedKey << " " << imageBlockCachePos;
   pageTableEntryRef = glm::uvec4(imageBlockCachePos, 1);
-  // LOG(INFO) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " <<
+  // VLOG(1) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " <<
   // level;
   if (erasedKey.x != std::numeric_limits<uint32_t>::max()) { // valid
     glm::uvec4 erasedKeyPageDirectoryEntryKey = erasedKey / glm::uvec4(m_pageTableBlockSize, 1);
@@ -879,7 +879,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   CHECK(p);
 
   //  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {
-  //    LOG(INFO) << "number of priorities: " << static_cast<int>(p->getNumPriorities());
+  //    VLOG(1) << "number of priorities: " << static_cast<int>(p->getNumPriorities());
   //  }
 
   auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;

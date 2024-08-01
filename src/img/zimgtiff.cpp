@@ -113,11 +113,11 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
     imgInfo2D.numChannels = 1;
   }
   ZImg buf2DImg(imgInfo2D);
-  // LOG(INFO) << imgInfo2D.toQString();
+  // VLOG(1) << imgInfo2D.toQString();
 
   ZImgInfo partialImgInfo = region.clip(m_imgInfo[scene]);
   ZImg imgTmp(partialImgInfo);
-  // LOG(INFO) << partialImgInfo.toQString();
+  // VLOG(1) << partialImgInfo.toQString();
 
   index_t z = 0;
   index_t c = 0;
@@ -132,7 +132,7 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
       }
       if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == size_t(l))) {
         tiff.readImgFromIFD(i, buf2DImg);
-        // LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
+        // VLOG(1) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
         cpyImg(buf2DImg, region, imgTmp, z - region.start.z, c, t - region.start.t);
       }
       ifdIdx++;
@@ -476,7 +476,7 @@ bool ZImgTiff::IFDToLoc(size_t ifdIdx,
     c = -1;
   }
 
-  //  LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l << " " << startIFDIndex << " " <<
+  //  VLOG(1) << ifdIdx << " " << z << " " << c << " " << t << " " << l << " " << startIFDIndex << " " <<
   //  dimensionOrder
   //            << " " << imgInfo.toQString() << " " << startZ << " " << startC << " " << startT << " " << startL;
   return true;

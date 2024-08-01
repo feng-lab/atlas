@@ -735,11 +735,11 @@ void ZImgZeissCZI::readInfo(const QString& filename,
             } else if (!tiles.empty()) {
               hasMixedTiles = true;
 
-              //              LOG(INFO) << "";
-              //              LOG(INFO) << "";
-              //              LOG(INFO) << "";
+              //              VLOG(1) << "";
+              //              VLOG(1) << "";
+              //              VLOG(1) << "";
               //              for (size_t tp=0; tp<tiles.size(); ++tp) {
-              //                LOG(INFO) << tiles[tp].ratio << " " << tiles[tp].start << " " << tiles[tp].size;
+              //                VLOG(1) << tiles[tp].ratio << " " << tiles[tp].start << " " << tiles[tp].size;
               //              }
 
               if (mixAllTilesIfNecessary) {
@@ -1133,7 +1133,7 @@ void ZImgZeissCZI::parseMetadata(QXmlStreamReader& xml)
     m_voxelSizeX *= 1e6;
     m_voxelSizeY *= 1e6;
     m_voxelSizeZ = m_voxelSizeZ <= 0 ? 1 : (m_voxelSizeZ * 1e6);
-    // LOG(INFO) << m_voxelSizeX << " " << m_voxelSizeY << " " << m_voxelSizeZ;
+    // VLOG(1) << m_voxelSizeX << " " << m_voxelSizeY << " " << m_voxelSizeZ;
   }
 
   if (m_channelColors.size() < m_channelNames.size()) {

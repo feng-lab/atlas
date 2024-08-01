@@ -118,7 +118,7 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(index_t star
     }
   }
 
-  // LOG(INFO) << "running " << (mstMethod == Kruskal ? "Kruskal" : "Prim") << " minimum spanning tree...";
+  // VLOG(1) << "running " << (mstMethod == Kruskal ? "Kruskal" : "Prim") << " minimum spanning tree...";
 
   typedef boost::adjacency_list<
     boost::setS,
@@ -194,7 +194,7 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(index_t star
     CHECK(false);
   }
 
-  // LOG(INFO) << "end running " << (mstMethod == Kruskal ? "Kruskal" : "Prim") << " minimum spanning tree";
+  // VLOG(1) << "end running " << (mstMethod == Kruskal ? "Kruskal" : "Prim") << " minimum spanning tree";
   return res;
 }
 

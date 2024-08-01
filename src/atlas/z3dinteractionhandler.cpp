@@ -39,25 +39,25 @@ void Z3DInteractionHandler::onEvent(QEvent* e, int w, int h)
   //  if (e->type() == QEvent::MouseButtonPress) {
   //    auto event = dynamic_cast<QMouseEvent*>(e);
   //    if (event->button() == Qt::LeftButton) {
-  //      LOG(INFO) << "mouse enter interaction";
+  //      VLOG(1) << "mouse enter interaction";
   //      Q_EMIT enterInteractionMode();
   //    }
   //  } else if (e->type() == QEvent::MouseButtonRelease) {
   //    auto event = dynamic_cast<QMouseEvent*>(e);
   //    if (event->button() == Qt::LeftButton && QApplication::keyboardModifiers() == Qt::NoModifier) {
-  //      LOG(INFO) << "mouse exit interaction";
+  //      VLOG(1) << "mouse exit interaction";
   //      Q_EMIT exitInteractionMode();
   //    }
   //  } else if (e->type() == QEvent::KeyPress) {
   //    auto event = dynamic_cast<QKeyEvent*>(e);
   //    if (event->modifiers() != Qt::NoModifier) {
-  //      LOG(INFO) << "key enter interaction";
+  //      VLOG(1) << "key enter interaction";
   //      Q_EMIT enterInteractionMode();
   //    }
   //  } else if (e->type() == QEvent::KeyRelease) {
   //    auto event = dynamic_cast<QKeyEvent*>(e);
   //    if (event->modifiers() == Qt::NoModifier && QApplication::mouseButtons() == Qt::NoButton) {
-  //      LOG(INFO) << "key exit interaction";
+  //      VLOG(1) << "key exit interaction";
   //      Q_EMIT exitInteractionMode();
   //    }
   //  }
@@ -398,7 +398,7 @@ void Z3DTrackballInteractionHandler::wheelEvent(QWheelEvent* e, int, int)
   m_delta = 0;
 #else
   if (e->angleDelta().y() == 0) {
-    // LOG(INFO) << "empty wheel";
+    // VLOG(1) << "empty wheel";
     return;
   }
   if (m_state == State::Dolly) {
@@ -474,7 +474,7 @@ void Z3DTrackballInteractionHandler::dolly(const glm::ivec2& mouseStart,
   float factor = dPos.y * deltaFactor;
 
   m_camera->dollyToCenterDistance(std::pow(1.1f, factor) * centerDistStart);
-  // LOG(INFO) << centerDistStart << std::pow(1.1f, factor) * centerDistStart << factor
+  // VLOG(1) << centerDistStart << std::pow(1.1f, factor) * centerDistStart << factor
   //  << dPos << deltaFactor << mouseStart << mouseEnd;
 }
 

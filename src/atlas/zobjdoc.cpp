@@ -80,12 +80,12 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
       LOG(WARNING) << "Invalid object key " << keyValue.first;
     }
   }
-  // LOG(INFO) << json::value_from(idToJsonValue);
+  // VLOG(1) << json::value_from(idToJsonValue);
 
   while (!idToJsonValue.empty()) {
     auto it = idToJsonValue.begin();
     json::value jv = it->second; // copy
-    // LOG(INFO) << jv;
+    // VLOG(1) << jv;
     std::set<size_t> ids; // collect all ids that are pointing to jv
     ids.insert(it->first);
     it = idToJsonValue.erase(it);
@@ -108,9 +108,9 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
 
     if (existingIds.empty()) {
       QString errMsg;
-      // LOG(INFO) << jv;
+      // VLOG(1) << jv;
       size_t id = loadFile(jv, errMsg);
-      // LOG(INFO) << jv << errMsg;
+      //VLOG(1) << jv << errMsg;
       if (id == 0) {
         err += QString("%1\n").arg(errMsg);
         continue;

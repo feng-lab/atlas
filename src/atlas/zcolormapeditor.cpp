@@ -100,7 +100,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent* e)
     // need to check from index 0 since selected key might be inserted before first key
     // during move, but it is impossible to go after last key because the clamp below
     for (size_t i = 0; i < m_colorMap->get().numKeys() - 1; ++i) {
-      // LOG(INFO) << m_colorMap->get().isKeySelected(i) << " " << m_colorMap->get().key(i).intensity() << " " <<
+      // VLOG(1) << m_colorMap->get().isKeySelected(i) << " " << m_colorMap->get().key(i).intensity() << " " <<
       // m_colorMap->get().domainMin();
       if (m_colorMap->get().isKeySelected(i)) {
         if (m_colorMap->get().key(i).intensity() == m_colorMap->get().domainMin()) {
@@ -112,7 +112,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent* e)
     }
   } else {
     for (size_t i = m_colorMap->get().numKeys() - 1; i-- > 0;) {
-      // LOG(INFO) << m_colorMap->get().isKeySelected(i) << " " << m_colorMap->get().key(i).intensity() << " " <<
+      // VLOG(1) << m_colorMap->get().isKeySelected(i) << " " << m_colorMap->get().key(i).intensity() << " " <<
       // m_colorMap->get().domainMax();
       if (m_colorMap->get().isKeySelected(i)) {
         if (m_colorMap->get().key(i).intensity() == m_colorMap->get().domainMax()) {
@@ -123,7 +123,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent* e)
       }
     }
   }
-  // LOG(INFO) << edgeKeyIndex << " " << m_colorMap->get().numKeys();
+  // VLOG(1) << edgeKeyIndex << " " << m_colorMap->get().numKeys();
   CHECK(edgeKeyIndex != m_colorMap->get().numKeys());
 
   if (change) {

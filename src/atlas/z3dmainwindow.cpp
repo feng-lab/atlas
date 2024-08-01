@@ -508,7 +508,7 @@ void Z3DMainWindow::readSettings()
   QSettings settings;
   QPoint pos = settings.value("pos3d", QPoint(200, 200)).toPoint();
   QSize size = settings.value("size3d", QSize(400, 400)).toSize();
-  // LOG(INFO) << pos << " " << size.width() << " " <<  size.height();
+  // VLOG(1) << pos << " " << size.width() << " " <<  size.height();
   move(pos);
   resize(size);
 }

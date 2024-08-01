@@ -481,7 +481,7 @@ void ZObjModel::activated(const QModelIndex& idxIn)
   if (idxIn.column() == ShowHideNameColumn || idxIn.column() == NameColumn) {
     size_t id = indexToId(idxIn);
     if (id > 0) {
-      // LOG(INFO) << id;
+      // VLOG(1) << id;
       m_doc->sendOpenEditWidgetSignal(id);
     }
   }

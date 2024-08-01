@@ -1265,7 +1265,7 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
 
     CC.removeSmallObject(m_seedSizeThreshold, true);
 
-    // LOG(INFO) << level << " " << CC.voxelIdxList.size() << " " << CC.toatalNumVoxels();
+    // VLOG(1) << level << " " << CC.voxelIdxList.size() << " " << CC.toatalNumVoxels();
 
     bool sep = false;
     if (!labelImg.isEmpty()) {
@@ -1318,7 +1318,7 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
       CC = connComp.runLabelModifyInput(bim);
       CC.removeSmallObject(m_seedSizeThreshold, true);
 
-      // LOG(INFO) << "sep " << level << " " << CC.voxelIdxList.size() << " " << CC.toatalNumVoxels();
+      // VLOG(1) << "sep " << level << " " << CC.voxelIdxList.size() << " " << CC.toatalNumVoxels();
     }
     labelImg = CC.createTypedLabelImg<uint32_t>();
   }
@@ -1523,7 +1523,7 @@ void ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs,
       for (size_t t = 0; !overlap && t < testGroup.size(); ++t) {
         auto testModel = testGroup[t];
 
-        //        LOG(INFO) << currentModel << " " << testModel << " " <<
+        //        VLOG(1) << currentModel << " " << testModel << " " <<
         //        getOverlapRateOfTwoErrorEllipse(centroids.row(currentModel), vbgmm.covar(currentModel),
         //                                                                                centroids.row(testModel),
         //                                                                                vbgmm.covar(testModel),

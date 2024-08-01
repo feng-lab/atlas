@@ -46,7 +46,7 @@ void Z3DCamera::setTileFrustum(double normalizedLeft,
   m_bottom = -halfheight + 2.f * halfheight * m_normalizedBottom;
   m_top = -halfheight + 2.f * halfheight * m_normalizedTop;
 
-  // LOG(INFO) << m_left << m_right << m_bottom << m_top << halfheight << halfwidth;
+  // VLOG(1) << m_left << m_right << m_bottom << m_top << halfheight << halfwidth;
 
   makeProjectionMatrices();
 }
@@ -345,7 +345,7 @@ void Z3DCamera::updateFrustum()
   //  m_left = -halfwidth;
   //  m_right = halfwidth;
 
-  // LOG(INFO) << halfwidth << " " << halfheight << " " << m_aspectRatio << " " << m_windowAspectRatio;
+  // VLOG(1) << halfwidth << " " << halfheight << " " << m_aspectRatio << " " << m_windowAspectRatio;
 
   m_left = -halfwidth + 2.f * halfwidth * m_normalizedLeft;
   m_right = -halfwidth + 2.f * halfwidth * m_normalizedRight;
@@ -388,7 +388,7 @@ void Z3DCamera::makeProjectionMatrices()
     m_inverseProjectionMatrices[MonoEye] = pmat;
     m_inverseProjectionMatrices[RightEye] = pmat;
   } else {
-    // LOG(INFO) << fmt::format("{}, {}, {}, {}", m_left, m_right, m_bottom, m_top);
+    // VLOG(1) << fmt::format("{}, {}, {}, {}", m_left, m_right, m_bottom, m_top);
     m_projectionMatrices[MonoEye] = glm::frustum(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
     float frustumShift = 0.5f * m_eyeSeparation * m_nearDist / m_focusDistance;
     m_projectionMatrices[LeftEye] =

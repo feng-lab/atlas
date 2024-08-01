@@ -31,7 +31,7 @@ bool ZRegistrationNumericDiffCostFunction::evaluate(const double* const paramete
   }
   // do img check in ZImgRegistration
 
-  // LOG(INFO) << "Func Eval Once";
+  // VLOG(1) << "Func Eval Once";
   // ZBenchTimer bt("Func Eval");
   // bt.start();
 

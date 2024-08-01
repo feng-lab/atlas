@@ -2606,12 +2606,12 @@ ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, const std::vector<glm::ve
 
     result.interpolate(mesh);
 
-//    LOG(INFO) << result.numTriangles();
+//    VLOG(1) << result.numTriangles();
 //    for (size_t i = 0; i < result.numVertices(); ++i) {
-//      LOG(INFO) << result.vertices()[i] << " " << result.textureCoordinates3D()[i];
+//      VLOG(1) << result.vertices()[i] << " " << result.textureCoordinates3D()[i];
 //    }
 //    for (size_t i = 0; i < result.numTriangles(); ++i) {
-//      LOG(INFO) << result.triangleIndices()[i];
+//      VLOG(1) << result.triangleIndices()[i];
 //    }
 
     return result;

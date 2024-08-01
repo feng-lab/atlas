@@ -128,7 +128,7 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
     dir.mkpath(".");
   }
   QStorageInfo volumeInfo(folder);
-  // LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
+  // VLOG(1) << folder << " " << volumeInfo.bytesAvailable();
   if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() ||
       static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes) {
     folder.clear();
@@ -141,7 +141,7 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
       dir1.mkpath(".");
     }
     volumeInfo = QStorageInfo(folder);
-    // LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
+    // VLOG(1) << folder << " " << volumeInfo.bytesAvailable();
     if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() ||
         static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes) {
       folder.clear();
@@ -152,7 +152,7 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
   if (folder.isEmpty()) {
     auto vols = QStorageInfo::mountedVolumes();
     for (auto& vol : vols) {
-      // LOG(INFO) << vols[i].bytesAvailable() << " " << vols[i].rootPath();
+      // VLOG(1) << vols[i].bytesAvailable() << " " << vols[i].rootPath();
       if (!vol.isRoot() && vol.isValid() && vol.isReady() && !vol.isReadOnly() &&
           static_cast<size_t>(vol.bytesAvailable()) >= requiredSpaceInBytes) {
         folder = vol.rootPath();

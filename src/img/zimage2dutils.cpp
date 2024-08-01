@@ -60,7 +60,7 @@ bool seperate2DKernel(const double* kernel, size_t width, size_t height, double*
     Map<const Matrix<double, Dynamic, Dynamic, RowMajor>> knl(kernel, height, width);
     JacobiSVD<Matrix<double, Dynamic, Dynamic, RowMajor>> svd(knl, ComputeThinU | ComputeThinV);
     VectorXd s = svd.singularValues();
-    // LOG(INFO) << s;
+    // VLOG(1) << s;
     double tol = std::numeric_limits<double>::epsilon() * s(0) * std::max(width, height);
     auto rank = 1;
     for (Eigen::Index i = 1; i < s.size(); ++i) {
@@ -69,9 +69,9 @@ bool seperate2DKernel(const double* kernel, size_t width, size_t height, double*
       }
     }
     if (rank == 1) {
-      // LOG(INFO) << "rank " << rank;
-      // LOG(INFO) << svd.matrixU();
-      // LOG(INFO) << svd.matrixV();
+      // VLOG(1) << "rank " << rank;
+      // VLOG(1) << svd.matrixU();
+      // VLOG(1) << svd.matrixV();
       Map<VectorXd>(colKernel, height) = svd.matrixU().col(0) * std::sqrt(s(0));
       Map<VectorXd>(rowKernel, width) = svd.matrixV().col(0) * std::sqrt(s(0));
       //      std::vector<double> show;
@@ -151,8 +151,8 @@ void _resizeContributions(size_t inLength,
     indices.col(i) = indices.col(i - 1) + 1;
   }
 
-  // LOG(INFO) << "incoord " << inCoord;
-  // LOG(INFO) << "indices " << indices;
+  // VLOG(1) << "incoord " << inCoord;
+  // VLOG(1) << "indices " << indices;
 
   ArrayXXd weights = -indices;
   weights.colwise() += inCoord;
@@ -217,8 +217,8 @@ void _resizeContributions(size_t inLength,
 
   weights.colwise() /= weights.rowwise().sum();
 
-  // LOG(INFO) << "weights " << weights;
-  // LOG(INFO) << "indices " << indices;
+  // VLOG(1) << "weights " << weights;
+  // VLOG(1) << "indices " << indices;
 
   auto validCols = (weights != 0).colwise().any();
 
@@ -241,9 +241,9 @@ void _resizeContributions(size_t inLength,
   }
   CHECK(idx == weightsOut.size());
 
-  //  LOG(INFO) << kernelWidthOut;
-  //  LOG(INFO) << qtTypeToQString(weightsOut);
-  //  LOG(INFO) << qtTypeToQString(indicesOut);
+  //  VLOG(1) << kernelWidthOut;
+  //  VLOG(1) << qtTypeToQString(weightsOut);
+  //  VLOG(1) << qtTypeToQString(indicesOut);
 }
 
 } // namespace nim

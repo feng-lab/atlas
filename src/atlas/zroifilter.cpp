@@ -159,7 +159,7 @@ QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, c
   //  }
   if (change == ItemSelectedHasChanged && scene()) {
     auto selected = value.toBool();
-    // LOG(INFO) << selected;
+    // VLOG(1) << selected;
     if (!selected) {
       Q_EMIT m_roi.deselectShape(m_slice, m_id);
     } else {
@@ -375,7 +375,7 @@ QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange cha
   //    return m_roi.setControlPointCoord(m_controlPoint, newPos) + m_offset;
   //  } else
   if (change == ItemSelectedHasChanged && scene()) {
-    // LOG(INFO) << value.toBool();
+    // VLOG(1) << value.toBool();
     updateRectSize();
     return value;
   }
@@ -1192,7 +1192,7 @@ void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
   if (!m_ROI) {
     return;
   }
-  // LOG(INFO) << slice << " " << shapeID << " " << m_engine.scene().selectedItems().size();
+  // VLOG(1) << slice << " " << shapeID << " " << m_engine.scene().selectedItems().size();
   if (!append) {
     for (auto& item : m_view.scene().selectedItems()) {
       item->setSelected(false);
@@ -1203,7 +1203,7 @@ void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
       item->setSelected(true);
     }
   }
-  // LOG(INFO) << slice << " " << shapeID << " " << m_engine.scene().selectedItems().size();
+  // VLOG(1) << slice << " " << shapeID << " " << m_engine.scene().selectedItems().size();
 }
 
 void ZROIFilter::deselectCtrlPtItems(int slice, size_t shapeID)

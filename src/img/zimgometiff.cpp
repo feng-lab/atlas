@@ -53,7 +53,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
 
   m_imgInfo[0].createDefaultDescriptions();
 
-  // LOG(INFO) << m_imgInfo.toQString() << " " << m_dimensionOrder;
+  // VLOG(1) << m_imgInfo.toQString() << " " << m_dimensionOrder;
 }
 
 bool ZImgOmeTiff::mapIFDToImgLocation(size_t ifdIdx, index_t& z, index_t& c, index_t& t, index_t& l)
@@ -66,7 +66,7 @@ bool ZImgOmeTiff::mapIFDToImgLocation(size_t ifdIdx, index_t& z, index_t& c, ind
   c = pos.c;
   t = pos.t;
   l = 0;
-  // LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
+  // VLOG(1) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
   return true;
 }
 
@@ -104,7 +104,7 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImg& img, const ZImgW
   for (size_t t = 0; t < img.numTimes(); ++t) {
     for (size_t c = 0; c < img.numChannels(); ++c) {
       for (size_t z = 0; z < img.depth(); ++z) {
-        // LOG(INFO) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
+        // VLOG(1) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
         if (t == 0 && z == 0 && c == 0) {
           tiffWriter.writeIFD(img, z, t, c, false, tags);
         } else {
@@ -134,7 +134,7 @@ void ZImgOmeTiff::writeImg(const QString& filename,
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
       ZImg img = imgSliceProvider.slice(z, t);
       for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
-        // LOG(INFO) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
+        // VLOG(1) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
         if (t == 0 && z == 0 && c == 0) {
           tiffWriter.writeIFD(img, 0, 0, c, false, tags);
         } else {
@@ -404,7 +404,7 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
     index_t l;
     index_t z;
     if (IFDToLoc(i, z, c, t, l, ifd, m_dimensionOrder, m_omeImgInfo, 1, firstZ, firstC, firstT, 0)) {
-      // LOG(INFO) << i << " " << z << " " << c << " " << t << " " << l << " " << m_dimensionOrder;
+      // VLOG(1) << i << " " << z << " " << c << " " << t << " " << l << " " << m_dimensionOrder;
       m_ifdIdxPosMap[i] = IFDPos(z, c, t);
     }
   }

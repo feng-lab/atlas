@@ -253,7 +253,7 @@ public:
       ResultDataType loglikHist;
       // m_post.display("before loop");
       while (!done) {
-        // LOG(INFO) << "-1";
+        // VLOG(1) << "-1";
         //  E step
         // m_post.display("before infer");
         mixGaussBayesInfer(m_post);
@@ -262,13 +262,13 @@ public:
         MatrixXrt xbar;
         std::vector<MatrixXrt> S;
         computeEss(Nk, xbar, S, m_post);
-        // LOG(INFO) << Nk;
+        // VLOG(1) << Nk;
         loglikHist = lowerBound(Nk, xbar, S, m_post);
-        // LOG(INFO) << "out E";
+        // VLOG(1) << "out E";
         //  M step
         Mstep(Nk, xbar, S, m_post);
         // m_post.display("after M");
-        // LOG(INFO) << "out M";
+        // VLOG(1) << "out M";
 
         bool useSlopeCovergeTest = true;
 
@@ -647,8 +647,8 @@ protected:
       }
     }
     // precompute various functions of the distribution for speed
-    // LOG(INFO) << out.alpha;
-    // LOG(INFO) << out.alpha.sum();
+    // VLOG(1) << out.alpha;
+    // VLOG(1) << out.alpha.sum();
     // out.display();
     out.logPiTilde = ZEigenUtils::matrixDigamma(out.alpha).array() - ZEigenUtils::digamma(out.alpha.sum()); // 10.66
     out.logDirConst = ZEigenUtils::gammaln(out.alpha.sum()) - ZEigenUtils::matrixGammaln(out.alpha).sum(); // B.23

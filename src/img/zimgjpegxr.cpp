@@ -409,7 +409,7 @@ void ZImgJpegXR::readMemImg(void* mem, size_t size, void* des, size_t desSize)
   // Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
 
   readInfoFromDecoder(pDecoder, PI, info);
-  // LOG(INFO) << info.toQString();
+  // VLOG(1) << info.toQString();
 
   if (desSize < info.byteNumber()) {
     throw ZException("buffer space is not enough");
@@ -566,10 +566,10 @@ void ZImgJpegXR::writeImg(const QString& filename, const ZImg& img, const ZImgWr
                                img.height(),
                                const_cast<U8*>(imgTmp.channelData(0)),
                                imgTmp.rowByteNumber() * imgTmp.numChannels()));
-    //      LOG(INFO) << pEncoder->WMP.nOffImage;
-    //      LOG(INFO) << pEncoder->WMP.nCbImage;
-    //      LOG(INFO) << pEncoder->WMP.nOffAlpha;
-    //      LOG(INFO) << pEncoder->WMP.nCbAlpha;
+    //      VLOG(1) << pEncoder->WMP.nOffImage;
+    //      VLOG(1) << pEncoder->WMP.nCbImage;
+    //      VLOG(1) << pEncoder->WMP.nOffAlpha;
+    //      VLOG(1) << pEncoder->WMP.nCbAlpha;
   }
 }
 
@@ -684,10 +684,10 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
   Call(pEncoder->SetSize(pEncoder, img.width(), img.height()));
   if (img.numChannels() == 1) {
     Call(pEncoder->WritePixels(pEncoder, img.height(), const_cast<U8*>(img.channelData(0)), img.rowByteNumber()));
-    //      LOG(INFO) << pEncoder->WMP.nOffImage;
-    //      LOG(INFO) << pEncoder->WMP.nCbImage;
-    //      LOG(INFO) << pEncoder->WMP.nOffAlpha;
-    //      LOG(INFO) << pEncoder->WMP.nCbAlpha;
+    //      VLOG(1) << pEncoder->WMP.nOffImage;
+    //      VLOG(1) << pEncoder->WMP.nCbImage;
+    //      VLOG(1) << pEncoder->WMP.nOffAlpha;
+    //      VLOG(1) << pEncoder->WMP.nCbAlpha;
   } else {
     ZImg imgTmp(img.info());
     XYZCtoCXYZ(img, imgTmp);

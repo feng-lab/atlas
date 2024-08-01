@@ -909,7 +909,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
         if (ok) {
           if (idmap.contains(objectId)) {
             size_t id = idmap.at(objectId);
-            // LOG(INFO) << id;
+            // VLOG(1) << id;
             const auto& viewObj = value.as_object();
             if (viewObj.contains("View2D")) {
               m_view->read(id, viewObj.at("View2D").as_object());

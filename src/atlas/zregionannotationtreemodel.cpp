@@ -242,7 +242,7 @@ void ZRegionAnnotationTreeModel::activated(const QModelIndex&)
 {
   //  size_t id = indexToId(idxIn);
   //  if (id > 0) {
-  //    //LOG(INFO) << id;
+  //    //VLOG(1) << id;
   //    m_regionAnnotation->sendOpenEditWidgetSignal(id);
   //  }
 }

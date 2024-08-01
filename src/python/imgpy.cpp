@@ -392,7 +392,7 @@ PYBIND11_MODULE(_imgpy, m)
         if (py::len(t) != 4) {
           throw ZException("col4 needs tuple with 4 values");
         }
-        new (&self) col4(t[0].cast<uint8_t>(), t[1].cast<uint8_t>(), t[2].cast<uint8_t>(), t[3].cast<uint8_t>());
+        new (&self) col4{t[0].cast<uint8_t>(), t[1].cast<uint8_t>(), t[2].cast<uint8_t>(), t[3].cast<uint8_t>()};
       },
       "Constructor that initializes the color with a tuple of four 8-bit unsigned integers representing RGBA color channels respectively.")
     .def(

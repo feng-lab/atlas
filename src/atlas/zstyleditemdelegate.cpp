@@ -59,7 +59,7 @@ void ZStyledItemDelegate::setEditorData(QWidget *editor, const QModelIndex &inde
   if (index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     QPushButton * btn = qobject_cast<QPushButton*>(editor);
     btn->setProperty("data_value", index.data());
-    LOG(INFO) << index.data() << " 1";
+    VLOG(1) << index.data() << " 1";
   } else {
     QStyledItemDelegate::setEditorData(editor, index);
   }
@@ -70,7 +70,7 @@ void ZStyledItemDelegate::setModelData(QWidget *editor, QAbstractItemModel *mode
   if (index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     QPushButton *btn = qobject_cast<QPushButton*>(editor);
     model->setData(index, btn->property("data_value"));
-    LOG(INFO) << index.data() << " 2";
+    VLOG(1) << index.data() << " 2";
   } else {
     QStyledItemDelegate::setModelData(editor, model, index);
   }

@@ -2063,7 +2063,7 @@ private:
       minv = src->dataRangeMin<TVoxel>();
       maxv = src->dataRangeMax<TVoxel>();
     }
-    // LOG(INFO) << minv << " " << maxv;
+    // VLOG(1) << minv << " " << maxv;
     scale_Impl<TVoxel, TDesVoxel>(minv, maxv, src, des);
   }
 

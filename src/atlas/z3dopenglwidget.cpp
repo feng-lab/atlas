@@ -8,7 +8,7 @@ namespace nim {
 
 ZOpenGLWidget::~ZOpenGLWidget()
 {
-  LOG(INFO) << "in OpenGLWidget destructor";
+  VLOG(1) << "in OpenGLWidget destructor";
 }
 
 void ZOpenGLWidget::initializeGL()
@@ -18,7 +18,7 @@ void ZOpenGLWidget::initializeGL()
 
 void ZOpenGLWidget::paintGL()
 {
-  LOG(INFO) << "paint GL";
+  VLOG(1) << "paint GL";
 }
 
 #endif

@@ -50,7 +50,7 @@ SkPath splineToPath(const std::vector<QPointF>& spline, bool showLastSeg = true)
     gte::Vector<2, double>& m1 = values1[1];
     m0 *= times[i + 1] - times[i];
     m1 *= times[i + 1] - times[i];
-    // LOG(INFO) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " <<
+    // VLOG(1) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " <<
     // cspline[i+1];
     res.cubicTo(spline[i].x() + 1. / 3. * m0[0],
                 spline[i].y() + 1. / 3. * m0[1],

@@ -766,7 +766,7 @@ void ZTiff::load(const QString& filename, bool tagOnly)
   close();
 
   readIFDs(filename, m_ifds, m_isNativeEndianness);
-  // LOG(INFO) << toQString();
+  // VLOG(1) << toQString();
 
   if (m_useColormap) {
     bool allGray = true;
@@ -1329,13 +1329,13 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
     swabflag = boost::endian::order::native == boost::endian::order::big;
   }
   isNativeEndianness = !swabflag;
-  // LOG(INFO) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN);
+  // VLOG(1) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN);
 
   if (swabflag) {
     boost::endian::endian_reverse_inplace(hdr.common.tiff_version);
   }
 
-  // LOG(INFO) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN) << " "
+  // VLOG(1) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN) << " "
   // << hdr.common.tiff_version;
 
   bool bigtiff = false;

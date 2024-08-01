@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
 
 #ifndef __APPLE__
   // Construct the Vulkan layers path
-  // LOG(INFO) << getExecutablePath();
+  // VLOG(1) << getExecutablePath();
 #ifdef Q_OS_WIN
   QString vulkanLayerPath = QDir(QFileInfo(getExecutablePath()).absolutePath()).filePath("vulkan");
 #elif defined(Q_OS_LINUX)

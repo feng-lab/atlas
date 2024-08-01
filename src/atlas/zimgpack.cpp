@@ -334,7 +334,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
         imgs.push_back(*imgPtr);
         locs.push_back(QPoint(tile.x, tile.y));
         scales.push_back(readRatio);
-        // LOG(INFO) << level << " " << (1<<level) << " " << x << " " << y << " " << width << " " << height;
+        // VLOG(1) << level << " " << (1<<level) << " " << x << " " << y << " " << width << " " << height;
       }
     }
   }
@@ -516,7 +516,7 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
 
 ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) const
 {
-  // LOG(INFO) << width << " " << height << " " << depth;
+  // VLOG(1) << width << " " << height << " " << depth;
   CHECK(width <= m_imgInfo.width && height <= m_imgInfo.height && depth <= m_imgInfo.depth && width > 0 && height > 0 &&
         depth > 0);
   ZImg res;
@@ -1047,7 +1047,7 @@ void ZImgPack::buildPyramidal()
 
 void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock>>& subBlocks)
 {
-  // LOG(INFO) << "here";
+  // VLOG(1) << "here";
   m_allTiles = subBlocks;
 
   createTileIndexStructure();
@@ -1082,7 +1082,7 @@ void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock
   m_minMaxState = ratio == std::array<size_t, 3>{1, 1, 1} ? MinMaxState::Complete : MinMaxState::Partial;
 
   // bt.stop();
-  // LOG(INFO) << bt;
+  // VLOG(1) << bt;
 #endif
 }
 
@@ -1140,7 +1140,7 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio) const
     }
   }
 
-  // LOG(INFO) << "end assemble level " << level;
+  // VLOG(1) << "end assemble level " << level;
   return res;
 }
 
@@ -1173,7 +1173,7 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
     });
   }
 
-  // LOG(INFO) << "end assemble level " << level;
+  // VLOG(1) << "end assemble level " << level;
   return res;
 }
 
@@ -1212,7 +1212,7 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
 
 void ZImgPack::updateDerivedData()
 {
-  // LOG(INFO) << m_imgInfo.toQString();
+  // VLOG(1) << m_imgInfo.toQString();
   if (!m_diskCached) {
     m_maximumProjectedAlongZImg.clear();
     if (m_imgInfo.depth == 1) {

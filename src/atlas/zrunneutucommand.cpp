@@ -67,16 +67,16 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
   }
 
   auto configJson = loadConfig(configPath);
-  // LOG(INFO) << configJson.dumpString(2);
+  // VLOG(1) << configJson.dumpString(2);
 
   ECommand command = UNKNOWN_COMMAND;
   if (!configJson.isEmpty()) {
     command = getCommand(ZJsonParser::stringValue(configJson["command"]).c_str());
     m_input.push_back(ZJsonParser::stringValue(configJson["input"]));
     m_output = ZJsonParser::stringValue(configJson["output"]);
-    // LOG(INFO) << ZJsonParser::stringValue(configJson["command"]);
-    // LOG(INFO) << ZJsonParser::stringValue(configJson["input"]);
-    // LOG(INFO) << ZJsonParser::stringValue(configJson["output"]);
+    // VLOG(1) << ZJsonParser::stringValue(configJson["command"]);
+    // VLOG(1) << ZJsonParser::stringValue(configJson["input"]);
+    // VLOG(1) << ZJsonParser::stringValue(configJson["output"]);
   }
 
   if (Is_Arg_Matched(const_cast<char*>("--scale"))) {

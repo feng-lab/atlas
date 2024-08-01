@@ -426,7 +426,7 @@ void Z3DMeshFilter::selectMesh(QMouseEvent* e, int /*w*/, int /*h*/)
 
 void Z3DMeshFilter::onApplyTransform()
 {
-  LOG(INFO) << m_rendererBase.coordTransform();
+  VLOG(1) << m_rendererBase.coordTransform();
 }
 
 void Z3DMeshFilter::updateMeshVisibleState()

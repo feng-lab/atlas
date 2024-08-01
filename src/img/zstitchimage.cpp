@@ -308,7 +308,7 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
       CHECK(overlapToCentroid.contains(p.second));
       p.second = overlapToCentroid[p.second];
     }
-    // LOG(INFO) << valC.size();
+    // VLOG(1) << valC.size();
     std::sort(valC.begin(), valC.end(), [](const std::pair<size_t, double>& a, const std::pair<size_t, double>& b) {
       return a.second > b.second;
     });
@@ -319,7 +319,7 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
         break;
       }
       idxToPrunedConn[key].insert(valC[i].first);
-      // LOG(INFO) << valC[i].second;
+      // VLOG(1) << valC[i].second;
     }
   }
 
@@ -632,14 +632,13 @@ void ZStitchImage::doWork()
                                                                                   &maxNCC);
           offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
 
-          auto info = fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
-                                  f + 1,
-                                  m + 1,
-                                  imgNCCMatch.positionHintToQString(),
-                                  movingImgOffset.toString(),
-                                  maxNCC);
-
-          LOG(INFO) << info;
+          LOG(INFO) << fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
+                                   f + 1,
+                                   m + 1,
+                                   imgNCCMatch.positionHintToQString(),
+                                   movingImgOffset.toString(),
+                                   maxNCC);
+          ;
         } else {
           // between input set
           CHECK(m == f + nStacks);
@@ -658,14 +657,12 @@ void ZStitchImage::doWork()
           movingImgOffset.c = oneImgInfo.numChannels;
           offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
 
-          auto info = fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
-                                  f + 1,
-                                  m + 1,
-                                  imgNCCMatch.positionHintToQString(),
-                                  movingImgOffset.toString(),
-                                  maxNCC);
-
-          LOG(INFO) << info;
+          LOG(INFO) << fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
+                                   f + 1,
+                                   m + 1,
+                                   imgNCCMatch.positionHintToQString(),
+                                   movingImgOffset.toString(),
+                                   maxNCC);
         }
       }
     };
@@ -1018,17 +1015,15 @@ void ZStitchImage::doRestitch()
                                                                              &maxNCC);
       offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
 
-      auto info =
-        fmt::format("tile {0} ({1}) -- tile {2} ({3}), tile {2} initial offset: {4}, final offset: {5}, NCC: {6}",
-                    f + 1,
-                    rgns[f].start.toString(),
-                    m + 1,
-                    rgns[m].start.toString(),
-                    initOffset.toString(),
-                    movingImgOffset.toString(),
-                    maxNCC);
-
-      LOG(INFO) << info;
+      LOG(INFO) << fmt::format(
+        "tile {0} ({1}) -- tile {2} ({3}), tile {2} initial offset: {4}, final offset: {5}, NCC: {6}",
+        f + 1,
+        rgns[f].start.toString(),
+        m + 1,
+        rgns[m].start.toString(),
+        initOffset.toString(),
+        movingImgOffset.toString(),
+        maxNCC);
     };
 
     if (m_useMultithreading) {

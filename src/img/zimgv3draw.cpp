@@ -86,7 +86,7 @@ void ZImgV3DRaw::readInfo(const QString& filename,
   }
   infos[0].createDefaultDescriptions();
 
-  LOG(INFO) << infos[0].toQString();
+  LOG(INFO) << infos[0].toString();
   createDefaultSubBlocks(filename, infos, subBlocks);
 }
 

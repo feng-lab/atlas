@@ -717,8 +717,8 @@ public:
   void setRangeKeepIfMinMax(typename T::value_type min, typename T::value_type max)
   {
     if (min <= max && (min != m_min || max != m_max)) {
-      // LOG(INFO) << min << " " << max;
-      // LOG(INFO) << lowerValue() << " " << upperValue() << " " << m_min << " " << m_max;
+      // VLOG(1) << min << " " << max;
+      // VLOG(1) << lowerValue() << " " << upperValue() << " " << m_min << " " << m_max;
       auto oldLowerValue = lowerValue();
       auto oldUpperValue = upperValue();
       bool keepLowerToMin = m_min == oldLowerValue;

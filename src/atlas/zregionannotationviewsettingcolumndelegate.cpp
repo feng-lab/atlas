@@ -33,7 +33,7 @@ void ZRegionAnnotationViewSettingColumnDelegate::paint(QPainter* painter,
     bool ok;
     int64_t regionID = index.data(Qt::UserRole).toLongLong(&ok);
     CHECK(ok);
-    // LOG(INFO) << "painting " << regionID;
+    // VLOG(1) << "painting " << regionID;
     QRect rect = option.rect;
     QWidget* wgt = nullptr;
     if (m_idToROIFilters) {

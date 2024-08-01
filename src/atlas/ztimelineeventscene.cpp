@@ -281,7 +281,7 @@ void ZTimelineEventScene::updateItems()
   m_currentTimeItem->setPos(m_timeline.timeToX(m_timeline.currentTime()), 0);
   addItem(m_currentTimeItem);
   // bt.stop();
-  // LOG(INFO) << bt;
+  // VLOG(1) << bt;
 }
 
 void ZTimelineEventScene::removeSelectedKeys()
@@ -409,7 +409,7 @@ void ZTimelineEventScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event
         LOG(FATAL) << "wrong selected action";
       }
       if (ok) {
-        // LOG(INFO) << time;
+        // VLOG(1) << time;
         std::set<ZParameterKey*> keys;
         std::set<ZParameterAnimation*> anis;
         for (auto itm : allSelectedItems) {

@@ -205,11 +205,11 @@ void ZSwcSkeletonGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphi
   }
 
   if (m_selected) {
-    // LOG(INFO) << "here";
+    // VLOG(1) << "here";
     QPen pen(QBrush(QColor(255, 255, 255)), 2);
     pen.setCosmetic(true);
     painter->setPen(pen);
-    // LOG(INFO) << boundingRect();
+    // VLOG(1) << boundingRect();
     painter->drawRect(boundingRect());
   }
 
@@ -543,7 +543,7 @@ void ZSwcFilter::createSwcNodeItems()
   }
   m_swcNodeItems.swap(items);
 
-  // LOG(INFO) << "here";
+  // VLOG(1) << "here";
   updateItemSelectedState();
 }
 
@@ -592,7 +592,7 @@ void ZSwcFilter::onSceneItemSelectionChanged()
       selectedNodes.insert(it->second);
     }
   }
-  // LOG(INFO) << selectedPuncta.size();
+  // VLOG(1) << selectedPuncta.size();
   m_ignoreSelectionChangedSignal = true;
   m_swcPack->setSelectedNodes(selectedNodes);
   m_ignoreSelectionChangedSignal = false;

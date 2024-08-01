@@ -375,7 +375,7 @@ int ZView::maxViewPrecedence() const
 
 void ZView::copy()
 {
-  LOG(INFO) << "copy";
+  VLOG(1) << "copy";
   for (const auto& view : m_objViews) {
     view->copyKeyPressed();
   }
@@ -383,7 +383,7 @@ void ZView::copy()
 
 void ZView::pasteHere(int slice, QPointF point, bool hFlip, bool vFlip)
 {
-  LOG(INFO) << "paste here";
+  VLOG(1) << "paste here";
   for (const auto& view : m_objViews) {
     view->pasteKeyPressed(slice, point, hFlip, vFlip);
   }
@@ -391,7 +391,7 @@ void ZView::pasteHere(int slice, QPointF point, bool hFlip, bool vFlip)
 
 void ZView::paste()
 {
-  LOG(INFO) << "paste";
+  VLOG(1) << "paste";
   for (const auto& view : m_objViews) {
     view->pasteKeyPressed(currentSlice(), m_scene->lastPressedPoint(), false, false);
   }
@@ -430,7 +430,7 @@ void ZView::estimateMontageColumns() const
       if (dist < bestDist) {
         bestNCols = nCols;
         bestDist = dist;
-        // LOG(INFO) << bestDist << " " << bestNCols;
+        // VLOG(1) << bestDist << " " << bestNCols;
       } else {
         break;
       }
@@ -857,7 +857,7 @@ void ZView::updateMontageScene()
 
 void ZView::emptyFun()
 {
-  LOG(INFO) << "here";
+  VLOG(1) << "here";
 }
 
 } // namespace nim

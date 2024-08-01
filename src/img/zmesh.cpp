@@ -39,7 +39,7 @@ nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData, int label = -1)
   vtkDataArray* pointsNormals = polyData->GetPointData()->GetNormals();
 
   std::vector<glm::dvec3> vertices(points->GetNumberOfPoints());
-  // LOG(INFO) << vertices.size();
+  // VLOG(1) << vertices.size();
   std::vector<glm::dvec3> normals;
   if (pointsNormals) {
     normals.resize(pointsNormals->GetNumberOfTuples());
@@ -742,7 +742,7 @@ void ZMesh::logProperties(const ZMeshProperties& prop, const QString& str)
   }
   LOG(INFO) << "Vertices Number: " << prop.numVertices;
   LOG(INFO) << "Triangles Number: " << prop.numTriangles;
-  // LOG(INFO) << "volume old: " << volume();
+  // VLOG(1) << "volume old: " << volume();
   LOG(INFO) << "Surface Area: " << prop.surfaceArea;
   LOG(INFO) << "Min Triangle Area: " << prop.minTriangleArea;
   LOG(INFO) << "Max Triangle Area: " << prop.maxTriangleArea;
@@ -1406,7 +1406,7 @@ void ZMesh::createSwcMesh(const ZSwc& tree,
     //    if (i < 20) {
     //      meshes[meshes.size()-1].save(QString("/Users/feng/Downloads/tubetest%1.obj").arg(i++));
     //    }
-    //    LOG(INFO) << branch[0]->type;
+    //    VLOG(1) << branch[0]->type;
   }
   if (!meshes.empty()) {
     branchMesh = merge(meshes);
@@ -1431,7 +1431,7 @@ void ZMesh::createSwcMesh(const ZSwc& tree,
   //    logProperties(prop, "Merge Result");
   //    res.save("/Users/feng/Downloads/combtest.obj");
   //  }
-  //  LOG(INFO) << sumVolume;
+  //  VLOG(1) << sumVolume;
   //  return res;
 }
 
@@ -1496,17 +1496,17 @@ ZMesh ZMesh::clipClosedSurface(const ZMesh& mesh,
     // pdres->PrintSelf(std::cout, vtkIndent());
     auto res = vtkPolyDataToMesh(clipper->GetOutput());
     res.interpolate(mesh);
-    //    LOG(INFO) << res.numTriangles();
+    //    VLOG(1) << res.numTriangles();
     //    for (size_t i = 0; i < res.numVertices(); ++i) {
-    //      LOG(INFO) << res.vertices()[i] << " " << res.textureCoordinates3D()[i];
+    //      VLOG(1) << res.vertices()[i] << " " << res.textureCoordinates3D()[i];
     //    }
     //    for (size_t i = 0; i < res.numTriangles(); ++i) {
-    //      LOG(INFO) << res.triangleIndices()[i];
+    //      VLOG(1) << res.triangleIndices()[i];
     //    }
-    //    LOG(INFO) << "original: ";
-    //    LOG(INFO) << mesh.numTriangles();
+    //    VLOG(1) << "original: ";
+    //    VLOG(1) << mesh.numTriangles();
     //    for (size_t i = 0; i < mesh.numVertices(); ++i) {
-    //      LOG(INFO) << mesh.vertices()[i] << " " << mesh.textureCoordinates3D()[i];
+    //      VLOG(1) << mesh.vertices()[i] << " " << mesh.textureCoordinates3D()[i];
     //    }
     return res;
   } else {
@@ -1547,7 +1547,7 @@ ZMesh ZMesh::planeClosedSurfaceIntersection(const ZMesh& mesh,
         auto vertex = glm::dvec3(res.triangleVertex(t, v));
         auto dist = plane->DistanceToPlane(&vertex[0]);
         if (dist > 1e-2) {
-          // LOG(INFO) << dist;
+          // VLOG(1)<< dist;
           return ZMesh();
         }
       }

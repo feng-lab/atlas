@@ -217,7 +217,7 @@ void ZSwcTreeModel::activated(const QModelIndex& /*idxIn*/)
 {
   //  size_t id = indexToId(idxIn);
   //  if (id > 0) {
-  //    //LOG(INFO) << id;
+  //    //VLOG(1) << id;
   //    m_regionAnnotation->sendOpenEditWidgetSignal(id);
   //  }
 }

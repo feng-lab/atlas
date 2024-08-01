@@ -33,7 +33,7 @@ double
 Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly::CancellationToken& cancellationToken)
 {
   //  if (m_locked) {
-  //    LOG(INFO) << "locked. Scheduling.";
+  //    VLOG(1) << "locked. Scheduling.";
   //    // m_processPending = true;
   //    return;
   //  }

@@ -143,7 +143,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn,
   }
 
   ZImg origLabelImg(fn, ZImgRegion(), 0, 1, 1, 1, format);
-  // LOG(INFO) << origLabelImg.info().toQString();
+  // VLOG(1) << origLabelImg.info().toQString();
   //  m_width = origLabelImg.width();
   //  m_height = origLabelImg.height();
   //  m_depth = origLabelImg.depth();

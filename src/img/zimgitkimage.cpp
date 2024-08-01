@@ -57,7 +57,7 @@ QStringList ZImgITKImage::extensions() const
   try {
     for (const auto& pt : itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase")) {
       if (auto io = dynamic_cast<const itk::ImageIOBase*>(pt.GetPointer())) {
-        // LOG(INFO) << "ImageIO: " << io->GetNameOfClass();
+        // VLOG(1) << "ImageIO: " << io->GetNameOfClass();
         for (const auto& ext : io->GetSupportedReadExtensions()) {
           res.push_back(QString::fromStdString(ext));
           res.last().remove(0, 1); // remove '.'

@@ -189,7 +189,7 @@ double ZImgRegistration::run()
 
     LOG(INFO) << "  "
               << "Final Parameters: " << json::value_from(m_transform->parameters());
-    LOG(INFO) << "Optimizer brief report: " << m_optimizer.briefReport();
+    LOG(INFO) << "Optimizer report: " << m_optimizer.fullReport();
   }
   return m_optimizer.finalCost();
 }

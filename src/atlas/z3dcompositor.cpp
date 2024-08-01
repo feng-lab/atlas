@@ -199,7 +199,7 @@ void Z3DCompositor::invalidate(State inv)
   if (is_flag_set(m_state, inv)) {
     return;
   }
-  // LOG(INFO) << std::to_underlying(m_state) << " " << to_underlying(inv);
+  // VLOG(1) << std::to_underlying(m_state) << " " << to_underlying(inv);
   set_flag(m_state, inv);
 
   Q_EMIT sceneParaUpdated();
@@ -214,7 +214,7 @@ double Z3DCompositor::process(Z3DEye eye)
 {
   std::vector<Z3DGeometryFilter*> filters = m_gPPort.connectedFilters();
   std::vector<Z3DImgFilter*> vFilters = m_vPPort.connectedFilters();
-  // LOG(INFO) << filters.size() << " " << vFilters.size();
+  // VLOG(1) << filters.size() << " " << vFilters.size();
   std::vector<Z3DBoundedFilter*> onTopOpaqueFilters;
   std::vector<Z3DBoundedFilter*> onTopTransparentFilters;
   std::vector<Z3DBoundedFilter*> normalOpaqueFilters;
@@ -1502,7 +1502,7 @@ void Z3DCompositor::renderImages(Z3DRenderInputPort& currentInport,
                                  const Z3DTexture*& depthTex)
 {
   size_t numImages = currentInport.numValidInputs();
-  // LOG(INFO) << numImages;
+  // VLOG(1) << numImages;
   if (numImages == 0) {
     CHECK(false);
   }

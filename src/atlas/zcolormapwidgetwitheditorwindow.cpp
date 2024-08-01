@@ -40,12 +40,12 @@ void ZColorMapWidgetWithEditorWindow::labelClicked()
 
 // void ZColorMapWidgetWithEditorWindow::aboutToBeDestroyed()
 //{
-//   LOG(INFO) << "here";
+//   VLOG(1) << "here";
 // }
 //
 // void ZColorMapWidgetWithEditorWindow::closeEvent(QCloseEvent *event)
 //{
-//   LOG(INFO) << "here";
+//   VLOG(1) << "here";
 //   if (m_editorWindow)
 //     delete m_editorWindow;
 // }

@@ -46,18 +46,18 @@ ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length,
 QVariant ZImgScaleBarGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
   if (change == ItemPositionChange && scene()) {
-    // LOG(INFO) << value.toPointF();
+    // VLOG(1) << value.toPointF();
     QPointF newPos = value.toPointF();
-    // LOG(INFO) << mapFromScene(newPos);
+    // VLOG(1) << mapFromScene(newPos);
     // auto vp = mapRectFromScene(m_viewPort);
-    // LOG(INFO) << m_viewPort.topLeft() << m_viewPort.bottomRight() << vp.topLeft() << vp.bottomRight();
+    // VLOG(1) << m_viewPort.topLeft() << m_viewPort.bottomRight() << vp.topLeft() << vp.bottomRight();
     newPos = QPointF(qMin(m_viewPort.right(), qMax(newPos.x(), m_viewPort.left())),
                      qMin(m_viewPort.bottom(), qMax(newPos.y(), m_viewPort.top())));
     //    newPos.setX(qMin(m_viewPort.right(), qMax(newPos.x(), m_viewPort.left())));
     //    newPos.setY(qMin(m_viewPort.bottom(), qMax(newPos.y(), m_viewPort.top())));
     m_viewPortPos.x = (newPos.x() - m_viewPort.left()) / m_viewPort.width();
     m_viewPortPos.y = (newPos.y() - m_viewPort.top()) / m_viewPort.height();
-    // LOG(INFO) << newPos;
+    // VLOG(1) << newPos;
     return newPos;
   }
   return QGraphicsRectItem::itemChange(change, value);
@@ -568,10 +568,10 @@ void ZImgFilter::updateImgItems()
 {
   CHECK(m_isVisible);
 
-  // LOG(INFO) << curDisplay->slice() << " " << m_lastSlice << " " << m_engine.currentSlice();
+  // VLOG(1) << curDisplay->slice() << " " << m_lastSlice << " " << m_engine.currentSlice();
   if (!m_imgItems.empty() && m_displayValid && m_lastMIP == m_view.isMaxZProjView() &&
       m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
-    // LOG(INFO) << "0";
+    // VLOG(1) << "0";
     //  pixmap is same, we only need to show it
     if (m_item && !m_item->isVisible()) {
       m_item->setVisible(true);

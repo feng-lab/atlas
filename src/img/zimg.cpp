@@ -163,7 +163,7 @@ ZImgSource tag_invoke(const json::value_to_tag<ZImgSource>&, const json::value& 
   } else {
     filenames = json::value_to<QStringList>(jo.at("filenames"));
   }
-  // LOG(INFO) << filenames;
+  // VLOG(1) << filenames;
 
   auto catDim = Dimension::Z;
   if (jo.contains("CatDimension")) { // compat to old version

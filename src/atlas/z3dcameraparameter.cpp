@@ -255,11 +255,11 @@ void Z3DCameraParameter::beforeChange(Z3DCamera& value)
 void Z3DCameraParameter::updateWidget(Z3DCamera& value)
 {
   m_eye.set(value.eye());
-  // LOG(INFO) << value.eye() << " " << m_eye.get();
+  // VLOG(1) << value.eye() << " " << m_eye.get();
   m_center.set(value.center());
-  // LOG(INFO) << value.center() << " " << m_center.get();
+  // VLOG(1) << value.center() << " " << m_center.get();
   m_upVector.set(value.upVector());
-  // LOG(INFO) << value.upVector() << " " << m_upVector.get();
+  // VLOG(1) << value.upVector() << " " << m_upVector.get();
   if (value.isPerspectiveProjection()) {
     m_projectionType.select("Perspective");
   } else {

@@ -113,7 +113,7 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(const QVariant& ud)
   int64_t action = std::abs(regionID % 10);
   regionID = regionID / 10;
   CHECK(ok);
-  // LOG(INFO) << regionID;
+  // VLOG(1) << regionID;
   if (action == 1) {
     if (!m_doc.roiDoc().hasObj()) {
       QMessageBox::critical(this, QApplication::applicationName(), tr("No ROI to merge, try creating some ROI first"));
@@ -159,7 +159,7 @@ void ZRegionAnnotationTreeView::selectionChanged(const QItemSelection& selected,
 
   for (const auto& sindex : selectedIndexes()) {
     m_regionAnnotationPack.setCurrentRegionID(m_ratModel.getRegionID(m_ratProxyModel->mapToSource(sindex)));
-    LOG(INFO) << m_regionAnnotationPack.currentRegionID();
+    VLOG(1) << m_regionAnnotationPack.currentRegionID();
   }
 }
 

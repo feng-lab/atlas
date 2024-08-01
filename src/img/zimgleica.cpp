@@ -177,8 +177,8 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
     if (allMemoryOffsetNameLength.size() > 1) {
       bool found = false;
       for (const auto& tmp : allMemoryOffsetNameLength) {
-        // LOG(INFO) << std::get<1>(tmp);
-        // LOG(INFO) << ii.imageMemory.memoryBlockID;
+        // VLOG(1) << std::get<1>(tmp);
+        // VLOG(1) << ii.imageMemory.memoryBlockID;
         if (std::get<1>(tmp) == ii.imageMemory.memoryBlockID) {
           found = true;
           monl = tmp;
@@ -669,7 +669,7 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
         }
         xml.skipCurrentElement();
       }
-      // LOG(INFO) << imageInfo.imageMemory.memoryBlockID;
+      // VLOG(1) << imageInfo.imageMemory.memoryBlockID;
     } else if (xml.name() == QString("Children")) {
       while (xml.readNextStartElement()) {
         if (xml.name() == QString("Element")) {
@@ -697,8 +697,8 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
   }
 
   bool willRead = !imageInfo.channels.empty() && !imageInfo.dimensions.empty();
-  //    LOG(INFO) << imageInfo.channels.size();
-  //    LOG(INFO) << imageInfo.dimensions.size();
+  //    VLOG(1) << imageInfo.channels.size();
+  //    VLOG(1) << imageInfo.dimensions.size();
   if (willRead) {
     for (const auto& channel : imageInfo.channels) {
       if (channel.bitInc != 0) {

@@ -50,12 +50,12 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       //      QTemporaryFile tempFile("XXXXXX.jxr");
       //      if (tempFile.open()) {
       //        ZImgJpegXR::instance().writeImg(tempFile.fileName(), img, paras);
-      //        LOG(INFO) << QFile(tempFile.fileName()).size();
+      //        VLOG(1) << QFile(tempFile.fileName()).size();
       //      }
 
       auto memBuf = std::make_unique_for_overwrite<std::byte[]>(info.byteNumber());
       auto byteWritten = ZImgJpegXR::writeImgToMem(img, paras, memBuf.get(), info.byteNumber());
-      // LOG(INFO) << byteWritten;
+      // VLOG(1) << byteWritten;
       if (byteWritten > info.byteNumber()) {
         throw ZException("compression overflow");
       }

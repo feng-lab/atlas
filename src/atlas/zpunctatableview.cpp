@@ -98,7 +98,7 @@ void ZPunctaTableView::keyPressEvent(QKeyEvent* e)
   if (m_punctaPack.isLocked()) {
     return;
   }
-  // LOG(INFO) << QKeySequence::listToString(QKeySequence::keyBindings(QKeySequence::Delete));
+  // VLOG(1) << QKeySequence::listToString(QKeySequence::keyBindings(QKeySequence::Delete));
   switch (e->key()) {
     case Qt::Key_Delete:
     case Qt::Key_Backspace:
@@ -130,7 +130,7 @@ void ZPunctaTableView::selectionChanged(const QItemSelection& selected, const QI
   for (auto r : selectedRows) {
     selectedPuncta.insert(m_punctaPack.punctaPts()[r]);
   }
-  // LOG(INFO) << selectedPuncta.size();
+  // VLOG(1) << selectedPuncta.size();
   m_ignoreSelectionChangedSignal = true;
   m_punctaPack.setSelectedPuncta(selectedPuncta);
   m_ignoreSelectionChangedSignal = false;

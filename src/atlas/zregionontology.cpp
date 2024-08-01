@@ -545,7 +545,7 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, do
 
       for (auto rit = contoursTree.cbeginRoot(); rit != contoursTree.cendRoot(); ++rit) {
         for (auto it = contoursTree.cbeginBreadthFirst(rit); it != contoursTree.cendBreadthFirst(rit); ++it) {
-          // LOG(INFO) << it->index << " " << contours[it->index].size();
+          // VLOG(1) << it->index << " " << contours[it->index].size();
           size_t c = it->index;
 
           if (contours[c].size() < 3) {

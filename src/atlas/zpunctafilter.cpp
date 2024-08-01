@@ -361,7 +361,7 @@ void ZPunctaFilter::createPunctumItems()
   }
   m_puntumItems.swap(items);
 
-  // LOG(INFO) << "here";
+  // VLOG(1) << "here";
   updateItemSelectedState();
 }
 
@@ -371,7 +371,7 @@ void ZPunctaFilter::updateItemSelectedState()
     return;
   }
   m_skipSelectionChangedProcessing = true;
-  // LOG(INFO) << m_puncta->selectedPuncta().size();
+  // VLOG(1) << m_puncta->selectedPuncta().size();
   for (auto& [p, item] : m_punctumToItem) {
     item->setSelected(m_punctaPack->selectedPuncta().contains(p));
   }
@@ -398,14 +398,14 @@ void ZPunctaFilter::onSceneItemSelectionChanged()
   if (!m_punctaPack) {
     return;
   }
-  // LOG(INFO) << "puncta";
+  // VLOG(1) << "puncta";
   std::set<const ZPunctum*> selectedPuncta;
   for (auto item : m_view.scene().selectedItems()) {
     if (auto it = m_itemToPunctum.find(item); it != m_itemToPunctum.end()) {
       selectedPuncta.insert(it->second);
     }
   }
-  // LOG(INFO) << selectedPuncta.size();
+  // VLOG(1) << selectedPuncta.size();
   m_ignoreSelectionChangedSignal = true;
   m_punctaPack->setSelectedPuncta(selectedPuncta);
   m_ignoreSelectionChangedSignal = false;

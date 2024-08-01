@@ -69,7 +69,7 @@ QString ZFileUtils::getSaveFileName(QWidget* parent,
   //  if (!filters.isEmpty()) {
   //    dialog.setNameFilter(filters.first());
   //    if (filter_regex.indexIn(filters.first()) != -1) {
-  //      //LOG(INFO) << filter_regex.cap(1);
+  //      //VLOG(1) << filter_regex.cap(1);
   //      dialog.setDefaultSuffix(filter_regex.cap(1));
   //    }
   //  }
@@ -82,12 +82,12 @@ QString ZFileUtils::getSaveFileName(QWidget* parent,
       }
       res = dialog.selectedFiles().first();
       QFileInfo info(res);
-      // LOG(INFO) << file_name << " " << dialog.selectedNameFilter();
+      // VLOG(1) << file_name << " " << dialog.selectedNameFilter();
       if (info.suffix().isEmpty() && !dialog.selectedNameFilter().isEmpty()) {
         auto match = filter_regex.match(dialog.selectedNameFilter());
         if (match.hasMatch()) {
           QString extension = match.captured(1);
-          // LOG(INFO) << extension;
+          // VLOG(1) << extension;
           res += QString(".") + extension;
 
           info.setFile(res);

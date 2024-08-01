@@ -499,7 +499,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
 
     if (m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4 != m_blockIDs.size()) {
       m_blockIDs.resize(m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4);
-      LOG(INFO) << m_blockIDs.size();
+      VLOG(1) << m_blockIDs.size();
     }
 
     std::vector<uint32_t> missingBlockIDs;
@@ -873,7 +873,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   const Z3DTexture* missingBlockIDsTexture = m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0);
   if (missingBlockIDsTexture->numPixels() * 4 != m_blockIDs.size()) {
     m_blockIDs.resize(missingBlockIDsTexture->numPixels() * 4);
-    LOG(INFO) << m_blockIDs.size();
+    VLOG(1) << m_blockIDs.size();
   }
   missingBlockIDsTexture->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
 
@@ -950,7 +950,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
         std::sort(missingBlockIDs.begin(), missingBlockIDs.end());
       }
     }
-    // LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
+    // VLOG(1) << missingBlockIDs.size() << " " << usedBlockIDs.size();
     STOP_AND_LOG(btcb)
 
     processEventsAndMaybeCancel(cancellationToken);

@@ -605,7 +605,7 @@ void Z3DImgFilter::setProgressiveRenderingMode(bool v)
 void Z3DImgFilter::enterSubregionView(float x, float y, float z)
 {
   glm::vec3 pos3D(x, y, z);
-  LOG(INFO) << "open subregion at image coord " << pos3D;
+  VLOG(1) << "open subregion at image coord " << pos3D;
   auto minCoord = pos3D - 64.f;
   auto maxCoord = pos3D + 64.f;
   m_xCut.set(glm::vec2(minCoord.x, maxCoord.x));
@@ -1040,7 +1040,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
         planeNormals.emplace_back(0., 0., -1.);
         planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().globalZCut.upperValue());
       }
-      // LOG(INFO) << planeNormals.size();
+      // VLOG(1) << planeNormals.size();
       ZMesh clipped = ZMesh::clipClosedSurface(cube, planeNormals, planeOrigins);
 #if 0
     float nearPlaneDistToOrigin =
@@ -1065,7 +1065,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
     if (m_rendererBase.globalParas().globalZCut.upperValue() != m_rendererBase.globalParas().globalZCut.maximum()) {
       planes.emplace_back(0., 0., 1., m_rendererBase.globalParas().globalZCut.upperValue());
     }
-    LOG(INFO) << planes.size();
+    VLOG(1) << planes.size();
     auto clipped = ZMeshUtils::clipClosedSurface(cube, planes);
 #endif
 

@@ -67,8 +67,8 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
       m_imgInfo[0].bytesPerVoxel != m_lsmImgInfo.bytesPerVoxel ||
       m_imgInfo[0].voxelFormat != m_lsmImgInfo.voxelFormat) {
     throw ZException(fmt::format("lsm meta info <{}> doesn't match image data <{}>",
-                                   m_lsmImgInfo.toString(),
-                                   m_imgInfo[0].toString()));
+                                 m_lsmImgInfo.toString(),
+                                 m_imgInfo[0].toString()));
   }
 
   size_t numLocations;

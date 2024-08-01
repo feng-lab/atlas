@@ -19,12 +19,12 @@ ZSelectFileWidget::ZSelectFileWidget(FileMode mode,
   , m_filter(filter)
   , m_startDirQSettingLocation(startDirQSettingLocation)
 {
-  // LOG(INFO) << alternativeDir;
+  // VLOG(1) << alternativeDir;
   m_startDir = alternativeStartDir;
   if (!m_startDirQSettingLocation.isEmpty()) {
     QSettings settings;
     QString res = settings.value(m_startDirQSettingLocation).toString();
-    // LOG(INFO) << res;
+    // VLOG(1) << res;
     if (!res.isEmpty()) {
       m_startDir = res;
     }
@@ -163,7 +163,7 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_lineEdit = new QLineEdit(this);
     m_lineEdit->setReadOnly(true);
-    // LOG(INFO) << m_startDir;
+    // VLOG(1) << m_startDir;
     if (m_fileMode != FileMode::OpenSingleFile) {
       m_lineEdit->setText(m_startDir);
     }
@@ -255,7 +255,7 @@ void ZSelectFileWidget::setStartDir(const QString& path)
   } else {
     m_startDir = QFileInfo(path).canonicalPath();
   }
-  // LOG(INFO) << path << m_startDir;
+  // VLOG(1) << path << m_startDir;
   if (!m_startDirQSettingLocation.isEmpty()) {
     QSettings settings;
     settings.setValue(m_startDirQSettingLocation, m_startDir);

@@ -127,18 +127,18 @@ QPalette ZTheme::palette() const
   QMetaEnum e = m.enumerator(m.indexOfEnumerator("ColorRole"));
   for (int i = 0, total = static_cast<int>(QPalette::NColorRoles); i < total; ++i) {
     const QString key = e.key(i);
-    LOG(INFO) << key << " Color A: "
-              << qtTypeToQString(pal.color(QPalette::Active, static_cast<QPalette::ColorRole>(e.value(i))))
-              << " Color D: "
-              << qtTypeToQString(pal.color(QPalette::Disabled, static_cast<QPalette::ColorRole>(e.value(i))))
-              << " Color I: "
-              << qtTypeToQString(pal.color(QPalette::Inactive, static_cast<QPalette::ColorRole>(e.value(i))));
-    LOG(INFO) << key << " Brush A: "
-              << qtTypeToQString(pal.brush(QPalette::Active, static_cast<QPalette::ColorRole>(e.value(i))))
-              << " Brush D: "
-              << qtTypeToQString(pal.brush(QPalette::Disabled, static_cast<QPalette::ColorRole>(e.value(i))))
-              << " Brush I: "
-              << qtTypeToQString(pal.brush(QPalette::Inactive, static_cast<QPalette::ColorRole>(e.value(i))));
+    VLOG(1) << key << " Color A: "
+            << qtTypeToQString(pal.color(QPalette::Active, static_cast<QPalette::ColorRole>(e.value(i))))
+            << " Color D: "
+            << qtTypeToQString(pal.color(QPalette::Disabled, static_cast<QPalette::ColorRole>(e.value(i))))
+            << " Color I: "
+            << qtTypeToQString(pal.color(QPalette::Inactive, static_cast<QPalette::ColorRole>(e.value(i))));
+    VLOG(1) << key << " Brush A: "
+            << qtTypeToQString(pal.brush(QPalette::Active, static_cast<QPalette::ColorRole>(e.value(i))))
+            << " Brush D: "
+            << qtTypeToQString(pal.brush(QPalette::Disabled, static_cast<QPalette::ColorRole>(e.value(i))))
+            << " Brush I: "
+            << qtTypeToQString(pal.brush(QPalette::Inactive, static_cast<QPalette::ColorRole>(e.value(i))));
   }
 #endif
 
@@ -196,14 +196,14 @@ QPalette ZTheme::palette() const
       if (entry.setColorRoleAsBrush) {
         pal.setBrush(entry.paletteColorGroup, entry.paletteColorRole, themeColor);
 #ifdef DEBUG_QPalette
-        LOG(INFO) << "set brush " << e.valueToKey(entry.paletteColorRole) << " " << entry.paletteColorGroup << " to "
-                  << qtTypeToQString(themeColor);
+        VLOG(1) << "set brush " << e.valueToKey(entry.paletteColorRole) << " " << entry.paletteColorGroup << " to "
+                << qtTypeToQString(themeColor);
 #endif
       } else {
         pal.setColor(entry.paletteColorGroup, entry.paletteColorRole, themeColor);
 #ifdef DEBUG_QPalette
-        LOG(INFO) << "set color " << e.valueToKey(entry.paletteColorRole) << " " << entry.paletteColorGroup << " to "
-                  << qtTypeToQString(themeColor);
+        VLOG(1) << "set color " << e.valueToKey(entry.paletteColorRole) << " " << entry.paletteColorGroup << " to "
+                << qtTypeToQString(themeColor);
 #endif
       }
     }

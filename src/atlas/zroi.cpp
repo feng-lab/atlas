@@ -303,7 +303,7 @@ bool ZSliceROI::addCtrlPoint(const QPointF& pt, std::set<size_t>& editedShapes)
   for (const auto& [id, shapes] : m_idToShapeOperations) {
     for (size_t i = 0; i < shapes.size(); ++i) {
       const auto& shape = shapes[i];
-      // LOG(INFO) << (shape.type == ROIType::Line);
+      // VLOG(1) << (shape.type == ROIType::Line);
       if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline || shape.type == ROIType::Line) {
         const QPolygonF& poly = shape.poly;
         for (int64_t j = 0; j < poly.size() - 1; ++j) {
@@ -785,7 +785,7 @@ ZImg ZROI::toMaskImg(int outWidth,
       if (slice < 0) {
         continue;
       }
-      // LOG(INFO) << slice;
+      // VLOG(1) << slice;
       const QPainterPath& path = slicePaintPath(slice, scaleX, scaleY);
       auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
       if (mask.isEmpty()) {
@@ -1587,7 +1587,7 @@ void ZROI::onSliceROIUpdated(int slice,
                              const std::set<size_t>& deletedShapes,
                              const std::set<size_t>& changedShapes)
 {
-  // LOG(INFO) << "..";
+  // VLOG(1) << "..";
   if (m_sliceROIs.at(slice).isEmpty()) {
     deleteSliceROI_Impl(slice);
     resetBoundBox();

@@ -29,7 +29,7 @@ void pngReadWarningFunction(png_structp, const char* message)
 
 int skipIDATChunk(png_structp, png_unknown_chunkp chunk)
 {
-  // LOG(INFO) << reinterpret_cast<const char*>(chunk->name);
+  // VLOG(1) << reinterpret_cast<const char*>(chunk->name);
   if (chunk->name[0] == 'I' && chunk->name[1] == 'D' && chunk->name[2] == 'A' && chunk->name[3] == 'T') {
     return 1;
   }

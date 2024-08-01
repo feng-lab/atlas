@@ -203,7 +203,7 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
 
 Z3DRenderingEngine::~Z3DRenderingEngine()
 {
-  LOG(INFO) << "in engine destructor";
+  VLOG(1) << "in engine destructor";
   detachCanvas();
   getGLFocus();
 }
@@ -350,7 +350,7 @@ void Z3DRenderingEngine::resetCameraCenter()
 
 void Z3DRenderingEngine::resetCameraClippingRange()
 {
-  // LOG(INFO) << "resetCameraClippingRange";
+  // VLOG(1) << "resetCameraClippingRange";
   if (!m_mutex.try_lock()) {
     return;
   }
@@ -1155,7 +1155,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
         // set camera frustum
         m_globalParas->camera.setTileFrustum(nLeft, nRight, nBottom, nTop);
         m_compositor->setRenderingRegion(nLeft, nRight, nBottom, nTop);
-        // LOG(INFO) << globalCameraPara().get().left() << globalCameraPara().get().right() <<
+        // VLOG(1) << globalCameraPara().get().left() << globalCameraPara().get().right() <<
         // globalCameraPara().get().top() << globalCameraPara().get().bottom();
 
         m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
@@ -1234,7 +1234,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
     m_globalParas->camera.setTileFrustum();
     m_compositor->setRenderingRegion();
   });
-  // LOG(INFO) << globalCameraPara().get().nLeft() << globalCameraPara().get().nRight() <<
+  // VLOG(1) << globalCameraPara().get().nLeft() << globalCameraPara().get().nRight() <<
   // globalCameraPara().get().nTop() << globalCameraPara().get().nBottom();
 
   m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);

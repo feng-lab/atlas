@@ -215,7 +215,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
   }
   packedStrides[4] = dimensionStrides[4]; // time dimenstion does not need to be packed
   bool packed = packedStrides == dimensionStrides;
-  // LOG(INFO) << dimensionStrides << " " << dimensionOrder << " Packed: " << packed << " " << imgInfo.toQString();
+  // VLOG(1) << dimensionStrides << " " << dimensionOrder << " Packed: " << packed << " " << imgInfo.toQString();
   if (packed && (dimensionOrder == "XYZCT" || dimensionOrder == "XYCZT" || dimensionOrder == "CXYZT")) {
     res = readRawImg(filename, imgInfo, dimensionOrder, dataOffset, region, dimensionStrides[4]);
   } else {

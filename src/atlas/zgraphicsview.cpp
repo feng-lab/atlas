@@ -83,7 +83,7 @@ QWidget* ZGraphicsView::createScaleWidget(QWidget* parent)
 void ZGraphicsView::fitRect(const QRectF& rect)
 {
   fitInView(rect, Qt::KeepAspectRatio);
-  // LOG(INFO) << rect << transform().m11();
+  // VLOG(1) << rect << transform().m11();
   setScale(transform().m11());
 }
 
@@ -175,7 +175,7 @@ bool ZGraphicsView::event(QEvent* event)
 
 bool ZGraphicsView::gestureEvent(QGestureEvent* event)
 {
-  LOG(INFO) << "gestureEvent():" << event;
+  VLOG(1) << "gestureEvent():" << event;
   if (QGesture* pan = event->gesture(Qt::PanGesture)) {
     panTriggered(static_cast<QPanGesture*>(pan));
   }
@@ -198,7 +198,7 @@ void ZGraphicsView::panTriggered(QPanGesture* gesture)
   }
 #endif
   QPointF delta = gesture->delta();
-  LOG(INFO) << "panTriggered():" << gesture;
+  VLOG(1) << "panTriggered():" << gesture;
   translate(delta.x(), delta.y());
 }
 
@@ -213,7 +213,7 @@ void ZGraphicsView::pinchTriggered(QPinchGesture* gesture)
   }
   if (changeFlags & QPinchGesture::ScaleFactorChanged) {
     m_currentStepScaleFactor = gesture->scaleFactor();
-    LOG(INFO) << "pinchTriggered(): zoom by " << gesture->scaleFactor() << " -> " << m_currentStepScaleFactor;
+    VLOG(1) << "pinchTriggered(): zoom by " << gesture->scaleFactor() << " -> " << m_currentStepScaleFactor;
     setScale(currentScale() * m_currentStepScaleFactor);
   }
   //  if (gesture->state() == Qt::GestureFinished) {

@@ -169,7 +169,7 @@ void normXCorr(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOver
 
   movingImg.reflect();
 
-  // LOG(INFO) << movingImg.info().toQString() << " " << fixedImg.info().toQString();
+  // VLOG(1) << movingImg.info().toQString() << " " << fixedImg.info().toQString();
 
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info); // 1
@@ -244,27 +244,27 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
   }
 
   //  ZVoxelCoordinate offset1(0,5,0);
-  //  LOG(INFO) << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
+  //  VLOG(1) << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
   //  offset1 = ZVoxelCoordinate(0, 255, 0);
-  //  LOG(INFO) << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
+  //  VLOG(1) << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
 
   movingImg.reflect();
 
-  // LOG(INFO) << movingImg.info().toQString() << " " << fixedImg.info().toQString();
+  // VLOG(1) << movingImg.info().toQString() << " " << fixedImg.info().toQString();
 
-  // LOG(WARNING) << "1";
+  // VLOG(1) << "1";
   nccImg = xCorrFFT(fixedImg, movingImg, false); // 1, I think peak is 3
   // numerator.write(QString("/Users/feng/Downloads/test_xcorr_fftxcorr%1.tif").arg(m_fixedImg.width()));
-  // LOG(WARNING) << "2";
+  // VLOG(1) << "2";
   ZImg numeratorPart = fixedImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth()); // 2
-  // LOG(WARNING) << "3";
+  // VLOG(1) << "3";
   ZImg localSumMoving = movingImg.blockSum(fixedImg.width(), fixedImg.height(), fixedImg.depth()); // 3
   numeratorPart *= localSumMoving;
-  // LOG(WARNING) << "2";
+  // VLOG(1)) << "2";
   localSumMoving.clear(); // 2
 
   ZImgInfo info = fixedImg.info();
-  // LOG(WARNING) << "3";
+  // VLOG(1) << "3";
   numberOfOverlapVoxelsImg = ZImg(info); // 3
   numberOfOverlapVoxelsImg.fill(1);
   numberOfOverlapVoxelsImg =
@@ -272,52 +272,52 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
 
   numeratorPart /= numberOfOverlapVoxelsImg;
   nccImg -= numeratorPart;
-  // LOG(WARNING) << "2";
+  // VLOG(1) << "2";
   numeratorPart.clear(); // 2
   // numerator.write(QString("/Users/feng/Downloads/test_xcorr_numerator%1.tif").arg(m_fixedImg.width()));
 
-  // LOG(WARNING) << "3";
+  // VLOG(1) << "3";
   ZImg localSumFixed = fixedImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth()); // 3
   localSumFixed *= localSumFixed;
   localSumFixed /= numberOfOverlapVoxelsImg;
-  // LOG(WARNING) << "2";
+  // VLOG(1) << "2";
   numberOfOverlapVoxelsImg.clear(); // 2
 
   fixedImg *= fixedImg;
-  // LOG(WARNING) << "3";
+  // VLOG(1) << "3";
   ZImg denomFixed = fixedImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth()); // 3
   size_t fixedImgWidth = fixedImg.width();
   size_t fixedImgHeight = fixedImg.height();
   size_t fixedImgDepth = fixedImg.depth();
   fixedImg.clear();
   denomFixed -= localSumFixed;
-  // LOG(WARNING) << "2";
+  // VLOG(1) << "2";
   localSumFixed.clear(); // 2
   denomFixed.typedUnaryOperation<double>(removeNegative);
 
   // denomFixed.write(QString("/Users/feng/Downloads/test_xcorr_df%1.tif").arg(m_fixedImg.width()));
   nccImg.typedBinaryOperation<double, double>(denomFixed, secureDivideSqrt);
-  // LOG(WARNING) << "1";
+  // VLOG(1) << "1";
   denomFixed.clear(); // 1
 
-  // LOG(WARNING) << "2";
+  // VLOG(1) << "2";
   numberOfOverlapVoxelsImg = ZImg(info); // 2
   numberOfOverlapVoxelsImg.fill(1);
   numberOfOverlapVoxelsImg =
     numberOfOverlapVoxelsImg.blockSum(movingImg.width(), movingImg.height(), movingImg.depth());
 
-  // LOG(WARNING) << "3";
+  // VLOG(1) << "3";
   localSumMoving = movingImg.blockSum(fixedImgWidth, fixedImgHeight, fixedImgDepth); // 3
   localSumMoving *= localSumMoving;
   localSumMoving /= numberOfOverlapVoxelsImg;
-  // LOG(WARNING) << "2";
+  // VLOG(1) << "2";
   numberOfOverlapVoxelsImg.clear(); // 2
 
   movingImg *= movingImg;
-  // LOG(WARNING) << "3";
+  // VLOG(1) << "3";
   ZImg denom = movingImg.blockSum(fixedImgWidth, fixedImgHeight, fixedImgDepth); // 3
   denom -= localSumMoving;
-  // LOG(WARNING) << "2";
+  // VLOG(1) << "2";
   localSumMoving.clear(); // 2
   denom.typedUnaryOperation<double>(removeNegative);
 
@@ -331,12 +331,12 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
 
   // denom.write(QString("/Users/feng/Downloads/test_xcorr_dm%1.tif").arg(m_fixedImg.width()));
   nccImg.typedBinaryOperation<double, double>(denom, secureDivideSqrt2);
-  // LOG(WARNING) << "1";
+  //VLOG(1) << "1";
   denom.clear(); // 1
 
   // numerator.write("/Users/feng/Downloads/test_xcorr_res.tif");
 
-  // LOG(WARNING) << "2";
+  // VLOG(1) << "2";
   numberOfOverlapVoxelsImg = ZImg(info); // 2
   numberOfOverlapVoxelsImg.fill(1);
   numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.blockSum(movingImgWidth, movingImgHeight, movingImgDepth);
@@ -375,15 +375,15 @@ void normXCorrPart(ZImg& fixedImg,
   }
 
   // ZVoxelCoordinate offset1(0,0,0);
-  // LOG(INFO) << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
+  // VLOG(1) << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
   // offset1 = ZVoxelCoordinate(0, 255, 0);
-  // LOG(INFO) << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
+  // VLOG(1) << offset1 << " " << getNCCOfOffset(fixedImg, movingImg, offset1);
 
   nccImg = xCorrPart(fixedImg, movingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd); //
 
   movingImg.reflect();
 
-  // LOG(INFO) << movingImg.info().toQString() << " " << fixedImg.info().toQString();
+  // VLOG(1) << movingImg.info().toQString() << " " << fixedImg.info().toQString();
 
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info); //
@@ -476,7 +476,7 @@ ZImg xCorrFFT(const ZImg& fixedImg, ZImg& movingImg, bool reflectMovingImg)
   size_t optimalWidth = findClosestValidDimension(outWidth);
   size_t optimalHeight = findClosestValidDimension(outHeight);
   size_t optimalDepth = findClosestValidDimension(outDepth);
-  // LOG(INFO) << optimalWidth << " " << optimalHeight << " " << optimalDepth;
+  // VLOG(1) << optimalWidth << " " << optimalHeight << " " << optimalDepth;
 
   ZComplexImg cfixed = fft(fixedImg, optimalWidth, optimalHeight, optimalDepth);
   // ZImg img;

@@ -75,7 +75,7 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
 
 Z3DCanvas::~Z3DCanvas()
 {
-  LOG(INFO) << "in canvas destructor";
+  VLOG(1) << "in canvas destructor";
   getGLFocus();
 }
 
@@ -180,7 +180,7 @@ void Z3DCanvas::mouseReleaseEvent(QMouseEvent* e)
 
 void Z3DCanvas::mouseMoveEvent(QMouseEvent* e)
 {
-  // LOG(INFO) << "mousemoveevent";
+  // VLOG(1) << "mousemoveevent";
   if (m_engine) {
     m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
@@ -196,7 +196,7 @@ void Z3DCanvas::mouseDoubleClickEvent(QMouseEvent* e)
 
 void Z3DCanvas::wheelEvent(QWheelEvent* e)
 {
-  // LOG(INFO) << "wheelevent";
+  // VLOG(1) << "wheelevent";
   if (m_engine && e->angleDelta().y() != 0) {
     m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());

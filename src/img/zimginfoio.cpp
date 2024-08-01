@@ -142,7 +142,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
         std::vector<char*> cStrArray(dims[0]);
         attr.read(strType, cStrArray.data());
         for (auto p : cStrArray) {
-          // LOG(INFO) << p;
+          // VLOG(1) << p;
           info.channelNames.emplace_back(p);
           free(p);
         }

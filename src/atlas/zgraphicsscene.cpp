@@ -47,7 +47,7 @@ void ZGraphicsScene::performROISubtraction(const ZROI* roi, int slice, size_t sh
 void ZGraphicsScene::escKeyPressed()
 {
   if (m_splineItem) {
-    // LOG(INFO) << m_ctrlPtsItem.size() << " " << m_spline.size();
+    // VLOG(1) << m_ctrlPtsItem.size() << " " << m_spline.size();
     if (!m_ctrlPtsItem.empty()) {
       m_ctrlPtsItem.pop_back();
       std::swap(m_spline[m_spline.size() - 1], m_spline[m_spline.size() - 2]);
@@ -60,7 +60,7 @@ void ZGraphicsScene::escKeyPressed()
     }
   }
   if (m_polygonItem) {
-    // LOG(INFO) << m_ctrlPtsItem.size() << " " << m_spline.size();
+    // VLOG(1) << m_ctrlPtsItem.size() << " " << m_spline.size();
     if (!m_ctrlPtsItem.empty()) {
       m_ctrlPtsItem.pop_back();
       std::swap(m_polygon[m_polygon.size() - 1], m_polygon[m_polygon.size() - 2]);
@@ -228,8 +228,8 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
         addItem(m_startPtItem.get());
         m_polygon.clear();
         m_polygon << m_startScenePt << m_startScenePt; // pt and next potential pt
-        LOG(INFO) << "";
-        LOG(INFO) << "first: " << m_startScenePt;
+        VLOG(1) << "";
+        VLOG(1) << "first: " << m_startScenePt;
         QPainterPath path;
         path.addPolygon(m_polygon);
         m_polygonItem = std::make_unique<QGraphicsPathItem>(path);
@@ -265,12 +265,12 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
           m_polygonItem.reset();
         } else if (!isScenePtOverlap(m_polygon.last(), m_polygon[m_polygon.size() - 2])) {
           if (m_polygon.size() == 2) {
-            LOG(INFO) << "second: " << scenePt;
+            VLOG(1) << "second: " << scenePt;
             double xdiff1 = m_polygon[0].x() - m_polygon[1].x();
             double ydiff1 = m_polygon[0].y() - m_polygon[1].y();
-            LOG(INFO) << "soma Length: " << std::sqrt(xdiff1 * xdiff1 + ydiff1 * ydiff1);
+            VLOG(1) << "soma Length: " << std::sqrt(xdiff1 * xdiff1 + ydiff1 * ydiff1);
           } else if (m_polygon.size() == 3) {
-            // LOG(INFO) << "third: " << scenePt;
+            // VLOG(1) << "third: " << scenePt;
             //             double xdiff1 = m_polygon[0].x() - m_polygon[1].x();
             //             double ydiff1 = m_polygon[0].y() - m_polygon[1].y();
             //             double xdiff2 = m_polygon[2].x() - m_polygon[1].x();
@@ -278,7 +278,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
             //             double len1 = std::sqrt(xdiff1*xdiff1 + ydiff1*ydiff1);
             //             double len2 = std::sqrt(xdiff2*xdiff2 + ydiff2*ydiff2);
 
-            //            LOG(INFO) << "length1: " << len1
+            //            VLOG(1) << "length1: " << len1
             //                    << "length2: " << len2
             //                    << "ratio: " << (len1 / (len1 + len2));
           } else if (m_polygon.size() == 4) {
@@ -291,7 +291,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
             double len1 = std::sqrt(xdiff1 * xdiff1 + ydiff1 * ydiff1);
             double len2 = std::sqrt(xdiff2 * xdiff2 + ydiff2 * ydiff2);
             double len3 = std::sqrt(xdiff3 * xdiff3 + ydiff3 * ydiff3);
-            LOG(INFO) << len1 << " " << len2 << " " << len3;
+            VLOG(1) << len1 << " " << len2 << " " << len3;
           }
 
           QPolygonF ctrlPoly = QRectF(scenePt - ctrlPtHalfWidth, scenePt + ctrlPtHalfWidth);
@@ -459,7 +459,7 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
     m_ctrlPtsItem.clear();
     m_polygonItem.reset();
   } else {
-    LOG(INFO) << "d " << event->scenePos() << " " << m_view->currentSlice();
+    VLOG(1) << "d " << event->scenePos() << " " << m_view->currentSlice();
     QGraphicsScene::mouseDoubleClickEvent(event);
   }
 }

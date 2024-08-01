@@ -127,7 +127,7 @@ void Z3DRenderTarget::release() const
   //                      m_colorTex->getWidth(), m_colorTex->getHeight(), GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
   //                      GL_LINEAR);
   //  }
-  // LOG(INFO) << m_previousDrawFBOID << " " << m_previousReadFBOID;
+  // VLOG(1) << m_previousDrawFBOID << " " << m_previousReadFBOID;
   glBindFramebuffer(GL_READ_FRAMEBUFFER, m_previousReadFBOID);
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_previousDrawFBOID);
   glViewport(m_previousViewport.x, m_previousViewport.y, m_previousViewport.z, m_previousViewport.w);
@@ -333,7 +333,7 @@ void Z3DRenderTarget::attachTextureToFBO(Z3DTexture* texture, GLenum attachment,
       glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, attachment, texture->textureTarget(), texture->id(), 0);
       break;
   }
-  // LOG(INFO) << texture->getId() << " " << texture->getTextureTarget() << " " << GL_TEXTURE_RECTANGLE << " " <<
+  // VLOG(1) << texture->getId() << " " << texture->getTextureTarget() << " " << GL_TEXTURE_RECTANGLE << " " <<
   // texture->getDimensions();
   release();
   m_attachments[attachment] = texture;

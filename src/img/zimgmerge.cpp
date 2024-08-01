@@ -249,7 +249,7 @@ QStringList ZImgMerge::resolveLocations()
   if (orderedTiles.size() == m_imgFinalCoords.size()) {
     // should be in reverse order as we write tiles from begin to end and we want lower image overwrites higher image
     for (const auto& nameBlock : makeReverse(orderedTiles)) {
-      // LOG(INFO) << nameBlock.first;
+      // VLOG(1) << nameBlock.first;
       m_tiles.emplace_back(*nameBlock.second, m_imgFinalCoords[nameBlock.second]);
     }
   } else {
@@ -367,7 +367,7 @@ QStringList ZImgMerge::resolveLocations()
 //     IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
 //   }
 //
-//   LOG(INFO) << "Assembled slice " << z << "/" << m_imgInfo.depth << ".";
+//   VLOG(1) << "Assembled slice " << z << "/" << m_imgInfo.depth << ".";
 //
 //   return res;
 // }

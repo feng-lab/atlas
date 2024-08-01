@@ -26,13 +26,13 @@ namespace nim {
       }                                                  \
       (TIMER).stop();                                    \
     }                                                    \
-    LOG(INFO) << (TIMER).toString();                     \
+    VLOG(1) << (TIMER).toString();                       \
   }
 
-#define STOP_AND_LOG(TIMER)          \
-  {                                  \
-    (TIMER).stop();                  \
-    LOG(INFO) << (TIMER).toString(); \
+#define STOP_AND_LOG(TIMER)        \
+  {                                \
+    (TIMER).stop();                \
+    VLOG(1) << (TIMER).toString(); \
   }
 
 class ZBenchTimer
