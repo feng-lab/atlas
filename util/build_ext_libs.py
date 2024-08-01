@@ -1826,8 +1826,7 @@ def build_assimp(src_dir: str, install_dir: str):
     orig_file = bak_file = None
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
-    # orig_file_3 = bak_file_3 = None
-    # orig_file_4 = bak_file_4 = None
+    orig_file4 = bak_file4 = None
     try:
         orig_file = os.path.join(src_dir, 'include', 'assimp', 'defs.h')
         from_texts = [r'#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))']
@@ -1854,20 +1853,11 @@ def build_assimp(src_dir: str, install_dir: str):
 
         os.remove(os.path.join(src_dir, 'cmake-modules', 'FindZLIB.cmake'))
 
-        # if is_mac():
-        #     orig_file_3 = os.path.join(src_dir, 'assimpTargets-release.cmake.in')
-        #     from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
-        #     to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
-        #     bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
-        #
-        #     orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
-        #     from_texts = [
-        #         r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.'
-        #         r'@ASSIMP_VERSION_MAJOR@']
-        #     to_texts = [
-        #         r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@'
-        #         r'@CMAKE_SHARED_LIBRARY_SUFFIX@']
-        #     bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
+        if is_windows():
+            orig_file4 = os.path.join(src_dir, 'contrib', 'poly2tri', 'poly2tri', 'common', 'dll_symbol.h')
+            from_texts = [r'#if defined(_WIN32)']
+            to_texts = [r'#if !defined(_WIN32)']
+            bak_file4 = patch_file(orig_file4, from_texts=from_texts, to_texts=to_texts)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
@@ -1876,10 +1866,6 @@ def build_assimp(src_dir: str, install_dir: str):
                          '-DASSIMP_BUILD_TESTS:BOOL=OFF',
                          '-DASSIMP_BUILD_ZLIB:BOOL=OFF',
                          '-DASSIMP_HUNTER_ENABLED:BOOL=OFF'])
-
-        # if is_windows():
-        #     cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-        #                      '-DZLIB_LIBRARY_REL:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -1891,18 +1877,12 @@ def build_assimp(src_dir: str, install_dir: str):
         #                     'lib/libassimp.dylib'],
         #                    cwd=install_dir, shell=False, check=True)
 
-        orig_file_5 = os.path.join(install_dir, 'include', 'assimp', 'types.h')
-        patch_file(orig_file_5,
-                   from_texts=[r'#   include "../contrib/utf8cpp/source/utf8.h"'],
-                   to_texts=[r''])
-
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
-        # if is_mac():
-        #     os.replace(bak_file_3, orig_file_3)
-        #     os.replace(bak_file_4, orig_file_4)
+        if is_windows():
+            os.replace(bak_file4, orig_file4)
         shutil.rmtree(build_dir, ignore_errors=False)
         cleanup_git_submodule(src_dir)
 

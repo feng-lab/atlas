@@ -94,8 +94,6 @@ inline void removeLogSink(const std::shared_ptr<google::LogSink>& sink)
   }
 }
 
-QString levelToString(google::LogSeverity theLevel);
-
 // enum related
 template<typename TEnum>
   requires std::is_enum_v<TEnum>

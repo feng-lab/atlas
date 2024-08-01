@@ -96,7 +96,7 @@
 	branch = dev
 [submodule "src/3rdparty/bzip2"]
 	path = src/3rdparty/bzip2
-	url = https://gitlab.com/bzip2/bzip2
+	url = https://gitlab.com/bzip2/bzip2.git
 	branch = master
 [submodule "src/3rdparty/ceres-solver"]
 	path = src/3rdparty/ceres-solver

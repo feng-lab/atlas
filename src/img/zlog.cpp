@@ -131,20 +131,4 @@ std::shared_ptr<google::LogSink> createFunctorLogSink(const LogFunction& f)
   return res->isValid() ? res : std::shared_ptr<google::LogSink>();
 }
 
-QString levelToString(google::LogSeverity theLevel)
-{
-  switch (theLevel) {
-    case google::GLOG_INFO:
-      return "Info";
-    case google::GLOG_WARNING:
-      return "Warning";
-    case google::GLOG_ERROR:
-      return "Error";
-    case google::GLOG_FATAL:
-      return "Fatal";
-    default:
-      return "Unknown";
-  }
-}
-
 } // namespace nim

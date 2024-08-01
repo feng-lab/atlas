@@ -62,7 +62,7 @@ int ZLogModelSink::rowCount(const QModelIndex& /*parent*/) const
 QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
 {
   if (!index.isValid()) {
-    return QVariant();
+    return {};
   }
 
   if (role == Qt::DisplayRole) {
@@ -74,13 +74,13 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
       case TimeColumn:
         return item.time.toLocalTime().toString();
       case LevelNameColumn:
-        return levelToString(item.level);
+        return GetLogSeverityName(item.level);
       case MessageColumn:
         return item.message;
       case FormattedMessageColumn:
         return item.formatted;
       default:
-        return QVariant();
+        return {};
     }
   }
 
@@ -94,14 +94,14 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
         return QVariant(QColor(255, 255, 128));
       case google::GLOG_ERROR:
         return QVariant(QColor(255, 128, 128));
-      case  google::GLOG_FATAL:
+      case google::GLOG_FATAL:
         return QVariant(QColor(255, 0, 0));
       default:
         break;
     }
   }
 
-  return QVariant();
+  return {};
 }
 
 QVariant ZLogModelSink::headerData(int section, Qt::Orientation orientation, int role) const
@@ -119,7 +119,7 @@ QVariant ZLogModelSink::headerData(int section, Qt::Orientation orientation, int
     }
   }
 
-  return QVariant();
+  return {};
 }
 
 } // namespace nim
