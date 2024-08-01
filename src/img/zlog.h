@@ -10,7 +10,6 @@
 #define GOOGLE_STRIP_LOG 0
 
 #include <glog/logging.h>
-#include <fmt/core.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <QDateTime>

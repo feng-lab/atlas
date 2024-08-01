@@ -727,6 +727,8 @@ double Z3DCompositor::process(Z3DEye eye)
 #if defined(ATLAS_USE_OPENGLWIDGET) || defined(ATLAS_USE_OPENGLWINDOW)
   glFinish();
 #else
+  // glFinish();
+  // VLOG(1) << "start downloading texture";
   downloadTextureToLocalColorBuffer((eye == MonoEye)   ? *m_monoCurrentTarget->colorTexture()
                                     : (eye == LeftEye) ? *m_leftCurrentTarget->colorTexture()
                                                        : *m_rightCurrentTarget->colorTexture(),
@@ -1677,8 +1679,28 @@ void Z3DCompositor::downloadTextureToLocalColorBuffer(const Z3DTexture& tex, Z3D
     localColorBuffer.data.resize(desiredSize);
   }
 
-  // Download texture data to buffer
+#if 0
+  if (true) {
+    m_PBO.bind(GL_PIXEL_PACK_BUFFER);
+    glBufferData(GL_PIXEL_PACK_BUFFER, desiredSize, nullptr, GL_STREAM_READ);
+    tex.downloadTextureToBuffer(dataFormat, dataType, nullptr);
+    // Map PBO to client memory
+    auto ptr = glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY);
+    if (ptr) {
+      std::memcpy(localColorBuffer.data.data(), ptr, desiredSize);
+      glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+    } else {
+      LOG(WARNING) << "glMapBuffer failed on PBO";
+      tex.downloadTextureToBuffer(dataFormat, dataType, localColorBuffer.data.data());
+    }
+    m_PBO.release(GL_PIXEL_PACK_BUFFER);
+  } else {
+    // Download texture data to buffer
+    tex.downloadTextureToBuffer(dataFormat, dataType, localColorBuffer.data.data());
+  }
+#else
   tex.downloadTextureToBuffer(dataFormat, dataType, localColorBuffer.data.data());
+#endif
   localColorBuffer.width = tex.width();
   localColorBuffer.height = tex.height();
 }

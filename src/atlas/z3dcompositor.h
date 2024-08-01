@@ -248,6 +248,8 @@ private:
   Z3DLocalColorBuffer* m_monoCurrentLocalBuffer = nullptr;
   Z3DLocalColorBuffer* m_leftCurrentLocalBuffer = nullptr;
   Z3DLocalColorBuffer* m_rightCurrentLocalBuffer = nullptr;
+
+  // Z3DVertexBufferObject m_PBO;
 };
 
 } // namespace nim

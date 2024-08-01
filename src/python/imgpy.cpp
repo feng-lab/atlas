@@ -15,7 +15,6 @@
 #include "zimgautothreshold.h"
 #include "zswc.h"
 #include "zmesh.h"
-#include <fmt/core.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>

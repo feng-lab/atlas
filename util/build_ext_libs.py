@@ -1143,6 +1143,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     orig_file1 = bak_file1 = None
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
+    orig_file4 = bak_file4 = None
     orig_file6 = bak_file6 = None
     try:
         orig_file1 = os.path.join(src_dir, 'CMake', 'folly-config.cmake.in')
@@ -1213,6 +1214,24 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                                ])
 
         if is_windows():
+            orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
+            bak_file4 = patch_file(orig_file4,
+                                   from_texts=[r"""file(
+  GENERATE
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libfolly.pc
+  INPUT ${CMAKE_CURRENT_BINARY_DIR}/libfolly.pc.gen
+  ${target_arg}
+)
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/libfolly.pc
+  DESTINATION ${LIB_INSTALL_DIR}/pkgconfig
+  COMPONENT dev
+)""",
+                                               ],
+                                   to_texts=[
+                                       r'',
+                                   ])
+
             orig_file6 = os.path.join(src_dir, 'CMake', 'FindLibsodium.cmake')
             bak_file6 = patch_file(orig_file6,
                                    from_texts=[r'find_library(LIBSODIUM_LIBRARY NAMES sodium)',
@@ -1256,6 +1275,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
         if is_windows():
+            os.replace(bak_file4, orig_file4)
             os.replace(bak_file6, orig_file6)
         cleanup_git_submodule(src_dir)
 
