@@ -484,25 +484,70 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
     return bak_file
 
 
+class FilePatcher:
+    def __init__(self, orig_file, from_texts, to_texts, patch_condition=lambda: True):
+        self.orig_file = orig_file
+        self.from_texts = from_texts
+        self.to_texts = to_texts
+        self.patch_condition = patch_condition
+        self.bak_file = None
+
+    def patch_file(self):
+        if not self.patch_condition():
+            # print("Patch condition not met, skipping patch.")
+            return
+
+        self.bak_file = patch_file(orig_file=self.orig_file, from_texts=self.from_texts, to_texts=self.to_texts,
+                                   keep_bak_file=True)
+        print(f'Patched {self.orig_file}')
+
+    def restore_file(self):
+        if not self.patch_condition():
+            # print("Patch condition not met, skipping restore.")
+            return
+
+        if self.bak_file and os.path.exists(self.bak_file):
+            os.replace(self.bak_file, self.orig_file)
+            print(f'Restored {self.orig_file} from backup.')
+
+
+class PatchManager:
+    def __init__(self, patches: list[FilePatcher]):
+        self.patches = patches
+
+    def apply_patches(self):
+        for patcher in self.patches:
+            patcher.patch_file()
+
+    def restore_files(self):
+        for patcher in self.patches:
+            patcher.restore_file()
+
+
 def build_zlib(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[r'install(TARGETS zlib zlibstatic',
+                        r'target_link_libraries(example zlib)',
+                        r'target_link_libraries(minigzip zlib)',
+                        r'target_link_libraries(example64 zlib)',
+                        r'target_link_libraries(minigzip64 zlib)',
+                        ],
+            to_texts=[r'install(TARGETS zlibstatic',
+                      r'target_link_libraries(example zlibstatic)',
+                      r'target_link_libraries(minigzip zlibstatic)',
+                      r'target_link_libraries(example64 zlibstatic)',
+                      r'target_link_libraries(minigzip64 zlibstatic)',
+                      ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'install(TARGETS zlib zlibstatic',
-                                          r'target_link_libraries(example zlib)',
-                                          r'target_link_libraries(minigzip zlib)',
-                                          r'target_link_libraries(example64 zlib)',
-                                          r'target_link_libraries(minigzip64 zlib)',
-                                          ],
-                              to_texts=[r'install(TARGETS zlibstatic',
-                                        r'target_link_libraries(example zlibstatic)',
-                                        r'target_link_libraries(minigzip zlibstatic)',
-                                        r'target_link_libraries(example64 zlibstatic)',
-                                        r'target_link_libraries(minigzip64 zlibstatic)',
-                                        ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
@@ -511,7 +556,7 @@ def build_zlib(src_dir: str, install_dir: str):
     finally:
         print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_boost(src_dir: str, install_dir: str):
@@ -632,16 +677,21 @@ def build_tbb(src_dir: str, install_dir: str):
 def build_eigen(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[r'add_subdirectory(blas',
+                        r'add_subdirectory(lapack',
+                        ],
+            to_texts=[r'set(blas',
+                      r'set(lapack',
+                      ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'add_subdirectory(blas',
-                                          r'add_subdirectory(lapack',
-                                          ],
-                              to_texts=[r'set(blas',
-                                        r'set(lapack',
-                                        ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
@@ -653,7 +703,7 @@ def build_eigen(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_pocketfft(src_dir: str, install_dir: str):
@@ -739,13 +789,18 @@ def build_cpuinfo(src_dir: str, install_dir: str):
 def build_gflags(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'src', 'gflags.cc'),
+            from_texts=[r'ReportError(DIE, "ERROR: something wrong with'],
+            to_texts=[r'ReportError(DO_NOT_DIE, "ERROR: something wrong with'],
+            patch_condition=is_mac,
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        if is_mac():
-            orig_file = os.path.join(src_dir, 'src', 'gflags.cc')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'ReportError(DIE, "ERROR: something wrong with'],
-                                  to_texts=[r'ReportError(DO_NOT_DIE, "ERROR: something wrong with'])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DGFLAGS_NAMESPACE=gflags',
@@ -755,21 +810,25 @@ def build_gflags(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_mac():
-            os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_glog(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file1 = orig_file1 = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'src', 'logging.cc'),
+            from_texts=[r'ColoredWriteToStderr(severity, message, message_len);',
+                        ],
+            to_texts=[r'ColoredWriteToStdout(severity, message, message_len);'
+                      ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file1 = os.path.join(src_dir, 'src', 'logging.cc')
-        bak_file1 = patch_file(orig_file1,
-                               from_texts=[r'ColoredWriteToStderr(severity, message, message_len);',
-                                           ],
-                               to_texts=[r'ColoredWriteToStdout(severity, message, message_len);'
-                                         ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
@@ -789,19 +848,23 @@ def build_glog(src_dir: str, install_dir: str):
         #                      ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file1, orig_file1)
+        patch_manager.restore_files()
 
 
 def build_benchmark(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'src', 'CMakeLists.txt'),
+            from_texts=[r'target_compile_definitions(benchmark PRIVATE -DBENCHMARK_STATIC_DEFINE)'],
+            to_texts=[r'target_compile_definitions(benchmark PUBLIC -DBENCHMARK_STATIC_DEFINE)'],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'src', 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'target_compile_definitions(benchmark PRIVATE -DBENCHMARK_STATIC_DEFINE)'],
-                              to_texts=[r'target_compile_definitions(benchmark PUBLIC -DBENCHMARK_STATIC_DEFINE)'],
-                              )
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DBENCHMARK_ENABLE_TESTING:BOOL=OFF',
@@ -816,7 +879,7 @@ def build_benchmark(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
@@ -923,19 +986,23 @@ def build_lz4(src_dir: str, install_dir: str):
 
 def build_xz(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
-    arm64_install_dir = None
 
-    bak_file = orig_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'src', 'liblzma', 'api', 'lzma.h'),
+            from_texts=[r'#ifndef LZMA_API_IMPORT',
+                        ],
+            to_texts=['#ifndef LZMA_API_STATIC\n'
+                      '#define LZMA_API_STATIC\n'
+                      '#endif\n'
+                      '#ifndef LZMA_API_IMPORT\n',
+                      ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'src', 'liblzma', 'api', 'lzma.h')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'#ifndef LZMA_API_IMPORT',
-                                          ],
-                              to_texts=['#ifndef LZMA_API_STATIC\n'
-                                        '#define LZMA_API_STATIC\n'
-                                        '#endif\n'
-                                        '#ifndef LZMA_API_IMPORT\n',
-                                        ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -962,22 +1029,27 @@ def build_xz(src_dir: str, install_dir: str):
                 shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_zstd(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'lib', 'zstd.h'),
+            from_texts=[r'#ifdef ZSTD_DISABLE_DEPRECATE_WARNINGS',
+                        ],
+            to_texts=['#define ZSTD_DISABLE_DEPRECATE_WARNINGS\n'
+                      '#ifdef ZSTD_DISABLE_DEPRECATE_WARNINGS',
+                      ],
+            patch_condition=is_mac,
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        if is_mac():
-            orig_file = os.path.join(src_dir, 'lib', 'zstd.h')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'#ifdef ZSTD_DISABLE_DEPRECATE_WARNINGS',
-                                              ],
-                                  to_texts=['#define ZSTD_DISABLE_DEPRECATE_WARNINGS\n'
-                                            '#ifdef ZSTD_DISABLE_DEPRECATE_WARNINGS',
-                                            ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DZSTD_USE_STATIC_RUNTIME:BOOL=OFF',
@@ -987,8 +1059,7 @@ def build_zstd(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_mac():
-            os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_fmt(src_dir: str, install_dir: str):
@@ -1007,15 +1078,20 @@ def build_fmt(src_dir: str, install_dir: str):
 def build_libevent(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'cmake', 'LibeventConfig.cmake.in'),
+            from_texts=[
+                r'if (${CMAKE_VERSION} VERSION_LESS "3.15.0" AND ${LIBEVENT_STATIC_LINK} AND ${OPENSSL_FOUND} AND ${Threads_FOUND})',
+            ],
+            to_texts=[r'if (0)',
+                      ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'cmake', 'LibeventConfig.cmake.in')
-        bak_file = patch_file(orig_file,
-                              from_texts=[
-                                  r'if (${CMAKE_VERSION} VERSION_LESS "3.15.0" AND ${LIBEVENT_STATIC_LINK} AND ${OPENSSL_FOUND} AND ${Threads_FOUND})',
-                              ],
-                              to_texts=[r'if (0)',
-                                        ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DEVENT__DISABLE_DEBUG_MODE:BOOL=ON',
@@ -1032,30 +1108,33 @@ def build_libevent(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_snappy(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
-    arm64_install_dir = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[r'NOT CMAKE_CXX_FLAGS MATCHES "-Werror"',
+                        r'string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")',
+                        r'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")',
+                        r'string(REGEX REPLACE "-frtti" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")',
+                        r'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")',
+                        ],
+            to_texts=[r'OFF',
+                      r'',
+                      r'',
+                      r'',
+                      r'',
+                      ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        # no-rtti cause link error
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'NOT CMAKE_CXX_FLAGS MATCHES "-Werror"',
-                                          r'string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")',
-                                          r'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")',
-                                          r'string(REGEX REPLACE "-frtti" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")',
-                                          r'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")',
-                                          ],
-                              to_texts=[r'OFF',
-                                        r'',
-                                        r'',
-                                        r'',
-                                        r'',
-                                        ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -1084,7 +1163,7 @@ def build_snappy(src_dir: str, install_dir: str):
                 shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_bzip2(src_dir: str, install_dir: str):
@@ -1177,83 +1256,77 @@ def build_libsodium(src_dir: str, install_dir: str):
 def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     build_dir = create_build_dir(src_dir)
 
-    orig_file1 = bak_file1 = None
-    orig_file2 = bak_file2 = None
-    orig_file3 = bak_file3 = None
-    orig_file4 = bak_file4 = None
-    orig_file6 = bak_file6 = None
-    try:
-        orig_file1 = os.path.join(src_dir, 'CMake', 'folly-config.cmake.in')
-        bak_file1 = patch_file(orig_file1,
-                               from_texts=[r'find_dependency(fmt)'],
-                               to_texts=['find_dependency(fmt)\n'
-                                         'find_dependency(gflags CONFIG)\n'
-                                         'find_dependency(glog CONFIG)'])
-
-        orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
-        bak_file2 = patch_file(orig_file2,
-                               from_texts=[r'${ZLIB_INCLUDE_DIRS}',
-                                           r'${BZIP2_INCLUDE_DIRS}',
-                                           r'find_package(OpenSSL MODULE REQUIRED)',
-                                           r'find_package(BZip2 MODULE)',
-                                           r'find_package(LibLZMA MODULE)',
-                                           r'find_package(LZ4 MODULE)',
-                                           r'find_package(Zstd MODULE)',
-                                           r'find_package(Snappy MODULE)',
-                                           r'find_package(Libsodium)',
-                                           r'find_package(Gflags MODULE)',
-                                           r'list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})',
-                                           r'find_package(Glog MODULE)',
-                                           r'set(FOLLY_HAVE_LIBGLOG ${GLOG_FOUND})',
-                                           r'list(APPEND FOLLY_LINK_LIBRARIES ${GLOG_LIBRARY})',
-                                           r'find_package(LibDwarf)' + ('' if is_mac() else '_NONONO'),
-                                           r'find_package(Libiberty)' + ('' if is_mac() else '_NONONO'),
-                                           r'find_package(LibAIO)' + ('' if is_mac() else '_NONONO'),
-                                           r'find_package(LibUring)' + ('' if is_mac() else '_NONONO'),
-                                           r'find_package(LibUnwind)' + ('' if is_mac() else '_NONONO'),
-                                           r'set(FOLLY_USE_SYMBOLIZER ON)',
-                                           ],
-                               to_texts=[r'',
-                                         r'',
-                                         'find_package(OpenSSL MODULE REQUIRED)\n'
-                                         'if (WIN32)\n'
-                                         'list(APPEND OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} Bcrypt.lib Crypt32.lib Ws2_32.lib)\n'
-                                         'endif (WIN32)\n',
-                                         r'find_package(BZip2 MODULE REQUIRED)',
-                                         r'find_package(LibLZMA MODULE REQUIRED)',
-                                         r'find_package(LZ4 MODULE REQUIRED)',
-                                         f'find_package({"ZSTD" if is_mac() else "Zstd"} MODULE REQUIRED)',
-                                         f'find_package({"SNAPPY" if is_mac() else "Snappy"} MODULE REQUIRED)',
-                                         f'find_package({"LIBSODIUM" if is_mac() else "Libsodium"} REQUIRED)',
-                                         r'find_package(Gflags MODULE REQUIRED)',
-                                         r'#list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})',
-                                         r'find_package(Glog CONFIG REQUIRED)',
-                                         r'set(FOLLY_HAVE_LIBGLOG ON)',
-                                         r'list(APPEND FOLLY_LINK_LIBRARIES glog::glog)',
-                                         r'find_package(LIBDWARF)',
-                                         r'find_package(LIBIBERTY)',
-                                         r'find_package(LIBAIO)',
-                                         r'find_package(LIBURING)',
-                                         r'find_package(LIBUNWIND)',
-                                         r'set(FOLLY_USE_SYMBOLIZER OFF)',
-                                         ])
-
-        orig_file3 = os.path.join(src_dir, 'CMake', 'FollyCompilerMSVC.cmake')
-        bak_file3 = patch_file(orig_file3,
-                               from_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)',
-                                           r'/std:${MSVC_LANGUAGE_VERSION}',
-                                           r'/EHs #',
-                                           ],
-                               to_texts=[
-                                   r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib Crypt32.lib)',
-                                   r'/DGLOG_NO_ABBREVIATED_SEVERITIES #/std:${MSVC_LANGUAGE_VERSION}',
-                                   r'/EHsc #',
-                               ])
-
-        if is_windows():
-            orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
-            bak_file4 = patch_file(orig_file4,
-                                   from_texts=[r"""file(
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMake', 'folly-config.cmake.in'),
+            from_texts=[r'find_dependency(fmt)'],
+            to_texts=['find_dependency(fmt)\n'
+                      'find_dependency(gflags CONFIG)\n'
+                      'find_dependency(glog CONFIG)'],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMake', 'folly-deps.cmake'),
+            from_texts=[r'${ZLIB_INCLUDE_DIRS}',
+                        r'${BZIP2_INCLUDE_DIRS}',
+                        r'find_package(OpenSSL MODULE REQUIRED)',
+                        r'find_package(BZip2 MODULE)',
+                        r'find_package(LibLZMA MODULE)',
+                        r'find_package(LZ4 MODULE)',
+                        r'find_package(Zstd MODULE)',
+                        r'find_package(Snappy MODULE)',
+                        r'find_package(Libsodium)',
+                        r'find_package(Gflags MODULE)',
+                        r'list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})',
+                        r'find_package(Glog MODULE)',
+                        r'set(FOLLY_HAVE_LIBGLOG ${GLOG_FOUND})',
+                        r'list(APPEND FOLLY_LINK_LIBRARIES ${GLOG_LIBRARY})',
+                        r'find_package(LibDwarf)' + ('' if is_mac() else '_NONONO'),
+                        r'find_package(Libiberty)' + ('' if is_mac() else '_NONONO'),
+                        r'find_package(LibAIO)' + ('' if is_mac() else '_NONONO'),
+                        r'find_package(LibUring)' + ('' if is_mac() else '_NONONO'),
+                        r'find_package(LibUnwind)' + ('' if is_mac() else '_NONONO'),
+                        r'set(FOLLY_USE_SYMBOLIZER ON)',
+                        ],
+            to_texts=[r'',
+                      r'',
+                      'find_package(OpenSSL MODULE REQUIRED)\n'
+                      'if (WIN32)\n'
+                      'list(APPEND OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} Bcrypt.lib Crypt32.lib Ws2_32.lib)\n'
+                      'endif (WIN32)\n',
+                      r'find_package(BZip2 MODULE REQUIRED)',
+                      r'find_package(LibLZMA MODULE REQUIRED)',
+                      r'find_package(LZ4 MODULE REQUIRED)',
+                      f'find_package({"ZSTD" if is_mac() else "Zstd"} MODULE REQUIRED)',
+                      f'find_package({"SNAPPY" if is_mac() else "Snappy"} MODULE REQUIRED)',
+                      f'find_package({"LIBSODIUM" if is_mac() else "Libsodium"} REQUIRED)',
+                      r'find_package(Gflags MODULE REQUIRED)',
+                      r'#list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})',
+                      r'find_package(Glog CONFIG REQUIRED)',
+                      r'set(FOLLY_HAVE_LIBGLOG ON)',
+                      r'list(APPEND FOLLY_LINK_LIBRARIES glog::glog)',
+                      r'find_package(LIBDWARF)',
+                      r'find_package(LIBIBERTY)',
+                      r'find_package(LIBAIO)',
+                      r'find_package(LIBURING)',
+                      r'find_package(LIBUNWIND)',
+                      r'set(FOLLY_USE_SYMBOLIZER OFF)',
+                      ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMake', 'FollyCompilerMSVC.cmake'),
+            from_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)',
+                        r'/std:${MSVC_LANGUAGE_VERSION}',
+                        r'/EHs #',
+                        ],
+            to_texts=[
+                r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib Crypt32.lib)',
+                r'/DGLOG_NO_ABBREVIATED_SEVERITIES #/std:${MSVC_LANGUAGE_VERSION}',
+                r'/EHsc #',
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[r"""file(
   GENERATE
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/libfolly.pc
   INPUT ${CMAKE_CURRENT_BINARY_DIR}/libfolly.pc.gen
@@ -1264,18 +1337,26 @@ install(
   DESTINATION ${LIB_INSTALL_DIR}/pkgconfig
   COMPONENT dev
 )""",
-                                               ],
-                                   to_texts=[
-                                       r'',
-                                   ])
+                        ],
+            to_texts=[
+                r'',
+            ],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMake', 'FindLibsodium.cmake'),
+            from_texts=[r'find_library(LIBSODIUM_LIBRARY NAMES sodium)',
+                        ],
+            to_texts=[
+                r'find_library(LIBSODIUM_LIBRARY NAMES sodium libsodium)',
+            ],
+            patch_condition=is_windows,
+        ),
+    ]
+    patch_manager = PatchManager(patches)
 
-            orig_file6 = os.path.join(src_dir, 'CMake', 'FindLibsodium.cmake')
-            bak_file6 = patch_file(orig_file6,
-                                   from_texts=[r'find_library(LIBSODIUM_LIBRARY NAMES sodium)',
-                                               ],
-                                   to_texts=[
-                                       r'find_library(LIBSODIUM_LIBRARY NAMES sodium libsodium)',
-                                   ])
+    try:
+        patch_manager.apply_patches()
 
         os.remove(os.path.join(src_dir, 'folly', 'logging', 'BridgeFromGoogleLogging.cpp'))
 
@@ -1308,31 +1389,31 @@ install(
         #         shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file1, orig_file1)
-        os.replace(bak_file2, orig_file2)
-        os.replace(bak_file3, orig_file3)
-        if is_windows():
-            os.replace(bak_file4, orig_file4)
-            os.replace(bak_file6, orig_file6)
+        patch_manager.restore_files()
         cleanup_git_submodule(src_dir)
 
 
 def build_suitesparse(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
-    try:
-        orig_file = os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'SuiteSparseBLAS.cmake')
-        bak_file = patch_file(orig_file,
-                              from_texts=["""set ( BLA_VENDOR Intel10_64lp )
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'SuiteSparseBLAS.cmake'),
+            from_texts=["""set ( BLA_VENDOR Intel10_64lp )
 set ( BLA_SIZEOF_INTEGER 4 )
 find_package ( BLAS )""",
-                                          ],
-                              to_texts=["""set ( BLA_VENDOR Intel10_64lp )
+                        ],
+            to_texts=["""set ( BLA_VENDOR Intel10_64lp )
 set ( BLA_SIZEOF_INTEGER 4 )
 # find_package ( BLAS )
 include(libs)""",
-                                        ])
+                      ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
+    try:
+        patch_manager.apply_patches()
 
         shutil.copy2(os.path.join(ext_dir(), 'suitesparse-cmake', 'libs.cmake'),
                      os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules'))
@@ -1372,66 +1453,72 @@ include(libs)""",
                 shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
         os.unlink(os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'libs.cmake'))
+        if is_windows():
+            cleanup_git_submodule(src_dir)
 
 
 def build_ceres_solver(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
-    orig_file1 = bak_file1 = None
-    orig_file4 = bak_file4 = None
-    orig_file5 = bak_file5 = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[r'if (HOMEBREW_EXECUTABLE)',
+                        r'EIGEN3_FOUND',
+                        r'if (TARGET gflags)'],
+            to_texts=[r'if (FALSE)',
+                      r'Eigen3_FOUND',
+                      r'if (TARGET gflags::gflags)'],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'cmake', 'FindSuiteSparse.cmake'),
+            from_texts=[r'if (HOMEBREW_EXECUTABLE)',
+                        r'${LAPACK_LIBRARIES}',
+                        r'${BLAS_LIBRARIES}',
+                        r'find_package(BLAS QUIET)',
+                        r'find_package(LAPACK QUIET)',
+                        r'find_package (METIS)',
+                        r'check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_USES_METIS)',
+                        r'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")',
+                        ],
+            to_texts=[r'if (FALSE)',
+                      r' ',
+                      r' ',
+                      r'set(BLAS_FOUND ON CACHE BOOL "")',
+                      r'set(LAPACK_FOUND ON CACHE BOOL "")',
+                      r'add_library (METIS::METIS IMPORTED INTERFACE)',
+                      r'set(SuiteSparse_CHOLMOD_USES_METIS 1)',
+                      'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")\n'
+                      r'set(CMAKE_FIND_LIBRARY_SUFFIXES "_static.lib" "${CMAKE_FIND_LIBRARY_SUFFIXES}")',
+                      ],
+        ),
+        FilePatcher(
+            # we build ceres as static lib, so no point to hard link lapack now as we might link to mkl later
+            orig_file=os.path.join(src_dir, 'internal', 'ceres', 'CMakeLists.txt'),
+            from_texts=[r' ${LAPACK_LIBRARIES}',
+                        r'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")',
+                        r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags)',
+                        ],
+            to_texts=[r' ',
+                      'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")\n'
+                      'add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")',
+                      r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags::gflags)',
+                      ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'cmake', 'CeresConfig.cmake.in'),
+            from_texts=[r'EIGEN3_FOUND',
+                        r'if (gflags_FOUND AND TARGET gflags)'],
+            to_texts=[r'Eigen3_FOUND',
+                      r'if (gflags_FOUND AND TARGET gflags::gflags)'],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'if (HOMEBREW_EXECUTABLE)',
-                                          r'EIGEN3_FOUND',
-                                          r'if (TARGET gflags)'],
-                              to_texts=[r'if (FALSE)',
-                                        r'Eigen3_FOUND',
-                                        r'if (TARGET gflags::gflags)'])
-        orig_file1 = os.path.join(src_dir, 'cmake', 'FindSuiteSparse.cmake')
-        bak_file1 = patch_file(orig_file1,
-                               from_texts=[r'if (HOMEBREW_EXECUTABLE)',
-                                           r'${LAPACK_LIBRARIES}',
-                                           r'${BLAS_LIBRARIES}',
-                                           r'find_package(BLAS QUIET)',
-                                           r'find_package(LAPACK QUIET)',
-                                           r'find_package (METIS)',
-                                           r'check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_USES_METIS)',
-                                           r'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")',
-                                           ],
-                               to_texts=[r'if (FALSE)',
-                                         r' ',
-                                         r' ',
-                                         r'set(BLAS_FOUND ON CACHE BOOL "")',
-                                         r'set(LAPACK_FOUND ON CACHE BOOL "")',
-                                         r'add_library (METIS::METIS IMPORTED INTERFACE)',
-                                         r'set(SuiteSparse_CHOLMOD_USES_METIS 1)',
-                                         'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")\n'
-                                         r'set(CMAKE_FIND_LIBRARY_SUFFIXES "_static.lib" "${CMAKE_FIND_LIBRARY_SUFFIXES}")',
-                                         ]
-                               )
-        # we build ceres as static lib, so no point to hard link lapack now as we might link to mkl later
-        orig_file4 = os.path.join(src_dir, 'internal', 'ceres', 'CMakeLists.txt')
-        bak_file4 = patch_file(orig_file4,
-                               from_texts=[r' ${LAPACK_LIBRARIES}',
-                                           r'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")',
-                                           r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags)',
-                                           ],
-                               to_texts=[r' ',
-                                         'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")\n'
-                                         'add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")',
-                                         r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags::gflags)',
-                                         ])
-        orig_file5 = os.path.join(src_dir, 'cmake', 'CeresConfig.cmake.in')
-        bak_file5 = patch_file(orig_file5,
-                               from_texts=[r'EIGEN3_FOUND',
-                                           r'if (gflags_FOUND AND TARGET gflags)'],
-                               to_texts=[r'Eigen3_FOUND',
-                                         r'if (gflags_FOUND AND TARGET gflags::gflags)'])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd_options = ['-DBUILD_TESTING:BOOL=OFF',
@@ -1477,26 +1564,28 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                    )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
-        os.replace(bak_file1, orig_file1)
-        os.replace(bak_file4, orig_file4)
-        os.replace(bak_file5, orig_file5)
+        patch_manager.restore_files()
         cleanup_git_submodule(src_dir)
 
 
 def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     print(nasm_dir)
-
     build_dir = create_build_dir(src_dir)
-    orig_file = bak_file = None
+
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'cmake', 'gRPCConfig.cmake.in'),
+            from_texts=[r'if(NOT CMAKE_CROSSCOMPILING)',
+                        ],
+            to_texts=[r'if(1)',
+                      ],
+            patch_condition=is_mac,
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        if is_mac():
-            orig_file = os.path.join(src_dir, 'cmake', 'gRPCConfig.cmake.in')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'if(NOT CMAKE_CROSSCOMPILING)',
-                                              ],
-                                  to_texts=[r'if(1)',
-                                            ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
@@ -1516,8 +1605,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_mac():
-            os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_glbinding(src_dir: str, install_dir: str):
@@ -1578,40 +1666,34 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
 def build_libpng(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = None
-    bak_file = None
-    orig_file1 = None
-    bak_file1 = None
-    orig_file2 = None
-    bak_file2 = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'pngread.c'),
+            from_texts=[r'                || (png_ptr->mode & PNG_HAVE_CHUNK_AFTER_IDAT) != 0)'],
+            to_texts=[r'                && 0)'],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'pngpriv.h'),
+            from_texts=[r'#if PNG_ZLIB_VERNUM != 0 && PNG_ZLIB_VERNUM != ZLIB_VERNUM'],
+            to_texts=[r'#if 0'],
+            patch_condition=lambda: is_mac() and os.path.exists('/usr/include')
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'pngrutil.c'),
+            from_texts=[r'#if ZLIB_VERNUM >= 0x1290'],
+            to_texts=[r'#if 0'],
+            patch_condition=is_mac,
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'pngread.c')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'                || (png_ptr->mode & PNG_HAVE_CHUNK_AFTER_IDAT) != 0)'],
-                              to_texts=[r'                && 0)'])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
                          '-DPNG_SHARED:BOOL=OFF',
                          '-DPNG_FRAMEWORK:BOOL=OFF'])
-
-        if is_windows():
-            print('')
-            # cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-            #                  '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
-        else:
-            if is_mac() and os.path.exists('/usr/include'):
-                orig_file1 = os.path.join(src_dir, 'pngpriv.h')
-                bak_file1 = patch_file(orig_file1,
-                                       from_texts=[r'#if PNG_ZLIB_VERNUM != 0 && PNG_ZLIB_VERNUM != ZLIB_VERNUM'],
-                                       to_texts=[r'#if 0'])
-
-            if is_mac():
-                orig_file2 = os.path.join(src_dir, 'pngrutil.c')
-                bak_file2 = patch_file(orig_file2,
-                                       from_texts=[r'#if ZLIB_VERNUM >= 0x1290'],
-                                       to_texts=[r'#if 0'])
-
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
@@ -1632,26 +1714,27 @@ def build_libpng(src_dir: str, install_dir: str):
             finally:
                 shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
-        os.replace(bak_file, orig_file)
-        if is_mac() and os.path.exists('/usr/include'):
-            os.replace(bak_file1, orig_file1)
-        if is_mac():
-            os.replace(bak_file2, orig_file2)
         shutil.rmtree(build_dir, ignore_errors=False)
+        patch_manager.restore_files()
 
 
 def build_openjpeg(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'src', 'lib', 'openjp2', 'openjpeg.h'),
+            from_texts=[r'#define OPENJPEG_H'],
+            to_texts=['#define OPENJPEG_H\n'
+                      '#ifndef OPJ_STATIC\n'
+                      '#define OPJ_STATIC\n'
+                      '#endif\n'],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'src', 'lib', 'openjp2', 'openjpeg.h')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'#define OPENJPEG_H'],
-                              to_texts=['#define OPENJPEG_H\n'
-                                        '#ifndef OPJ_STATIC\n'
-                                        '#define OPJ_STATIC\n'
-                                        '#endif\n'])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
@@ -1665,7 +1748,7 @@ def build_openjpeg(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
 
 
 def build_libwebp(src_dir: str, install_dir: str):
@@ -1832,41 +1915,43 @@ ERR CloseWS_File(struct WMPStream** ppWS)"""])
 def build_assimp(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
-    orig_file2 = bak_file2 = None
-    orig_file3 = bak_file3 = None
-    orig_file4 = bak_file4 = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'include', 'assimp', 'defs.h'),
+            from_texts=[r'#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))'],
+            to_texts=[r'#define AI_MAX_ALLOC(type) ((size_t(256) * 1024 * 1024 * 1024) / sizeof(type))'],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'code', 'CMakeLists.txt'),
+            from_texts=[r'-Werror',
+                        r'/WX'],
+            to_texts=[r' ',
+                      r' '],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[r'SET (ASSIMP_SOVERSION 5)',
+                        r' -lz',
+                        r' /WX',
+                        ],
+            to_texts=[r'SET (ASSIMP_SOVERSION ${ASSIMP_VERSION_MAJOR})',
+                      r' ZLIB::ZLIB',
+                      r' ',
+                      ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'contrib', 'poly2tri', 'poly2tri', 'common', 'dll_symbol.h'),
+            from_texts=[r'#if defined(_WIN32)'],
+            to_texts=[r'#if !defined(_WIN32)'],
+            patch_condition=is_windows
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'include', 'assimp', 'defs.h')
-        from_texts = [r'#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))']
-        to_texts = [r'#define AI_MAX_ALLOC(type) ((size_t(256) * 1024 * 1024 * 1024) / sizeof(type))']
-        bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
-
-        orig_file2 = os.path.join(src_dir, 'code', 'CMakeLists.txt')
-        from_texts = [r'-Werror',
-                      r'/WX']
-        to_texts = [r' ',
-                    r' ']
-        bak_file2 = patch_file(orig_file2, from_texts=from_texts, to_texts=to_texts)
-
-        orig_file3 = os.path.join(src_dir, 'CMakeLists.txt')
-        from_texts = [r'SET (ASSIMP_SOVERSION 5)',
-                      r' -lz',
-                      r' /WX',
-                      ]
-        to_texts = [r'SET (ASSIMP_SOVERSION ${ASSIMP_VERSION_MAJOR})',
-                    r' ZLIB::ZLIB',
-                    r' ',
-                    ]
-        bak_file3 = patch_file(orig_file3, from_texts=from_texts, to_texts=to_texts)
+        patch_manager.apply_patches()
 
         os.remove(os.path.join(src_dir, 'cmake-modules', 'FindZLIB.cmake'))
-
-        if is_windows():
-            orig_file4 = os.path.join(src_dir, 'contrib', 'poly2tri', 'poly2tri', 'common', 'dll_symbol.h')
-            from_texts = [r'#if defined(_WIN32)']
-            to_texts = [r'#if !defined(_WIN32)']
-            bak_file4 = patch_file(orig_file4, from_texts=from_texts, to_texts=to_texts)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
@@ -1887,12 +1972,8 @@ def build_assimp(src_dir: str, install_dir: str):
         #                    cwd=install_dir, shell=False, check=True)
 
     finally:
-        os.replace(bak_file, orig_file)
-        os.replace(bak_file2, orig_file2)
-        os.replace(bak_file3, orig_file3)
-        if is_windows():
-            os.replace(bak_file4, orig_file4)
         shutil.rmtree(build_dir, ignore_errors=False)
+        patch_manager.restore_files()
         cleanup_git_submodule(src_dir)
 
 
@@ -1911,10 +1992,6 @@ def build_hdf5(src_dir: str, install_dir: str):
                          '-DHDF5_BUILD_CPP_LIB:BOOL=1',
                          ])
 
-        # if is_windows():
-        #     cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-        #                      '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
-
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
@@ -1922,28 +1999,47 @@ def build_hdf5(src_dir: str, install_dir: str):
 
 
 def build_freeimage(src_dir: str, install_dir: str):
-    orig_file_3 = None
-    bak_file_3 = None
-    orig_file_4 = None
-    bak_file_4 = None
-    orig_file = bak_file = None
-    orig_file5 = bak_file5 = None
-    orig_file2 = bak_file2 = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'fipMakefile.srcs'),
+            from_texts=[r'Source/LibTIFF4/tif_dir.c '],
+            to_texts=[r'Source/LibTIFF4/tif_dir.c Source/LibTIFF4/tif_hash_set.c '],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'FreeImagePlus.h'),
+            from_texts=[r'#define WIN32_LEAN_AND_MEAN'],
+            to_texts=['#ifndef WIN32_LEAN_AND_MEAN\n#define WIN32_LEAN_AND_MEAN\n#endif'],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'Source', 'OpenEXR', 'IlmImf', 'ImfAttribute.cpp'),
+            from_texts=[r': std::binary_function <const char *, const char *, bool>'],
+            to_texts=[''],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'Makefile.gnu'),
+            from_texts=[r'INCDIR ?= $(DESTDIR)/usr/include',
+                        r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
+                        r' -o root -g root '],
+            to_texts=[r'INCDIR ?= $(DESTDIR)$(PREFIX)/include',
+                      r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib',
+                      r' '],
+            patch_condition=lambda: is_linux() and not use_clang_in_linux()
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'Makefile.fip'),
+            from_texts=[r'INCDIR ?= $(DESTDIR)/usr/include',
+                        r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
+                        r' -o root -g root '],
+            to_texts=[r'INCDIR ?= $(DESTDIR)$(PREFIX)/include',
+                      r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib',
+                      r' '],
+            patch_condition=lambda: is_linux() and not use_clang_in_linux()
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'fipMakefile.srcs')
-        from_texts = [r'Source/LibTIFF4/tif_dir.c ']
-        to_texts = [r'Source/LibTIFF4/tif_dir.c Source/LibTIFF4/tif_hash_set.c ']
-        bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
-
-        orig_file5 = os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'FreeImagePlus.h')
-        from_texts = [r'#define WIN32_LEAN_AND_MEAN']
-        to_texts = ['#ifndef WIN32_LEAN_AND_MEAN\n#define WIN32_LEAN_AND_MEAN\n#endif']
-        bak_file5 = patch_file(orig_file5, from_texts=from_texts, to_texts=to_texts)
-
-        orig_file2 = os.path.join(src_dir, 'Source', 'OpenEXR', 'IlmImf', 'ImfAttribute.cpp')
-        from_texts = [r': std::binary_function <const char *, const char *, bool>']
-        to_texts = ['']
-        bak_file2 = patch_file(orig_file2, from_texts=from_texts, to_texts=to_texts)
+        patch_manager.apply_patches()
 
         if os.path.exists(os.path.join(src_dir, 'Source', 'LibTIFF4', 'VERSION')):
             os.rename(os.path.join(src_dir, 'Source', 'LibTIFF4', 'VERSION'),
@@ -1975,18 +2071,6 @@ def build_freeimage(src_dir: str, install_dir: str):
                 subprocess.run(['make', '-f', 'Makefile_fip_clang_linux', 'clean'],
                                cwd=src_dir, shell=False, check=True, env=env)
             else:
-                orig_file_3 = os.path.join(src_dir, 'Makefile.gnu')
-                from_texts = [r'INCDIR ?= $(DESTDIR)/usr/include',
-                              r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
-                              r' -o root -g root ']
-                to_texts = [r'INCDIR ?= $(DESTDIR)$(PREFIX)/include',
-                            r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib',
-                            r' ']
-                bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
-
-                orig_file_4 = os.path.join(src_dir, 'Makefile.fip')
-                bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
-
                 # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
                 #                cwd=src_dir, shell=False, check=True)
                 # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count()), 'install',
@@ -2019,46 +2103,30 @@ def build_freeimage(src_dir: str, install_dir: str):
             subprocess.run(['make', '-f', 'Makefile_fip', 'clean'],
                            cwd=src_dir, shell=False, check=True)
     finally:
-        os.replace(bak_file, orig_file)
-        os.replace(bak_file5, orig_file5)
-        os.replace(bak_file2, orig_file2)
+        patch_manager.restore_files()
         if is_mac():
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))
         elif is_linux():
             if use_clang_in_linux():
                 os.remove(os.path.join(src_dir, 'Makefile_fip_clang_linux'))
-            else:
-                os.replace(bak_file_3, orig_file_3)
-                os.replace(bak_file_4, orig_file_4)
 
 
 def build_itk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
-    # orig_file_1 = bak_file_1 = None
-    # orig_file4 = bak_file4 = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'Modules', 'ThirdParty', 'NIFTI', 'src', 'nifti', 'niftilib',
+                                   'nifti1_io.c'),
+            from_texts=[r'#include <limits.h>'],
+            to_texts=['#include <limits.h>\n#include <stdint.h>'],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'NIFTI', 'src', 'nifti', 'niftilib', 'nifti1_io.c')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'#include <limits.h>'],
-                              to_texts=['#include <limits.h>\n#include <stdint.h>'])
-
-        # orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'MetaIO', 'src', 'MetaIO', 'src', 'CMakeLists.txt')
-        # bak_file = patch_file(orig_file, from_texts=[r'install(FILES ${headers}'],
-        #                       to_texts=['file(GLOB __files "${CMAKE_CURRENT_SOURCE_DIR}/*.h")\n'
-        #                                 'set(headers ${headers} ${__files})\n'
-        #                                 'install(FILES ${headers}'])
-
-        # orig_file_1 = os.path.join(src_dir, 'Modules', 'ThirdParty', 'VNL', 'src', 'vxl', 'vcl', 'CMakeLists.txt')
-        # if is_windows():
-        #     bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h'],
-        #                             to_texts=[r'vcl_legacy_aliases.h vcl_msvc_warnings.h'])
-
-        # orig_file4 = os.path.join(src_dir, 'Modules', 'ThirdParty', 'GDCM', 'src', 'gdcm', 'CMakeLists.txt')
-        # bak_file4 = patch_file(orig_file4, from_texts=[r'find_package(OpenJPEG 2.0.0 REQUIRED)'],
-        #                        to_texts=[r'find_package(OpenJPEG REQUIRED)'])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
@@ -2098,8 +2166,7 @@ def build_itk(src_dir: str, install_dir: str):
 
         # duplicated call to find_package cause cmake error
         # remove tbb from itk interface to make it work with conda tbb
-        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-6.0', 'Modules', 'ITKTBB.cmake')
-        patch_file(orig_file_2,
+        patch_file(os.path.join(install_dir, 'lib', 'cmake', 'ITK-6.0', 'Modules', 'ITKTBB.cmake'),
                    from_texts=[r'find_package(TBB REQUIRED CONFIG)',
                                r'set(ITKTBB_INCLUDE_DIRS',
                                r'set(ITKTBB_LIBRARIES',
@@ -2110,66 +2177,64 @@ def build_itk(src_dir: str, install_dir: str):
                              r'#set(TBB_DIR'])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
-        # # os.replace(bak_file4, orig_file4)
-        # if is_windows():
-        #     os.replace(bak_file_1, orig_file_1)
+        patch_manager.restore_files()
 
 
 def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
-    bak_file2 = orig_file2 = None
-    bak_file3 = orig_file3 = None
-    bak_file4 = orig_file4 = None
-    bak_file7 = orig_file7 = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt'),
+            from_texts=[r'check_type_size("uint64_t" HAVE_UINT64_T)',
+                        ],
+            to_texts=['check_type_size("uint64_t" HAVE_UINT64_T)\n'
+                      'check_type_size("uintptr_t" HAVE_UINTPTR_T)\n',
+                      ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'ThirdParty', 'eigen', 'vtkeigen', 'CMakeLists.txt'),
+            from_texts=[r'-std=c++11',
+                        r'set(CMAKE_CXX_STANDARD 11)',
+                        ],
+            to_texts=[f'-std=c++{cpp_standard()}',
+                      f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
+                      ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMake', 'vtkCompilerChecks.cmake'),
+            from_texts=[r'-std=c++11',
+                        r'set(CMAKE_CXX_STANDARD 11)',
+                        ],
+            to_texts=[f'-std=c++{cpp_standard()}',
+                      f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
+                      ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'ThirdParty', 'libproj', 'vtklibproj', 'CMakeLists.txt'),
+            from_texts=[r'-std=c++11',
+                        r'set(CMAKE_CXX_STANDARD 11)',
+                        r'-Werror -Wall',
+                        ],
+            to_texts=[f'-std=c++{cpp_standard()}',
+                      f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
+                      r'-Wall',
+                      ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'ThirdParty', 'nlohmannjson/vtknlohmannjson/include/vtknlohmann/detail',
+                                   'macro_scope.hpp'),
+            from_texts=[r'#define JSON_HAS_CPP_17',
+                        ],
+            to_texts=[r'//#define JSON_HAS_CPP_17',
+                      ],
+            patch_condition=is_linux,
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'check_type_size("uint64_t" HAVE_UINT64_T)',
-                                          ],
-                              to_texts=['check_type_size("uint64_t" HAVE_UINT64_T)\n'
-                                        'check_type_size("uintptr_t" HAVE_UINTPTR_T)\n',
-                                        ])
-
-        orig_file2 = os.path.join(src_dir, 'ThirdParty', 'eigen', 'vtkeigen', 'CMakeLists.txt')
-        bak_file2 = patch_file(orig_file2,
-                               from_texts=[r'-std=c++11',
-                                           r'set(CMAKE_CXX_STANDARD 11)',
-                                           ],
-                               to_texts=[f'-std=c++{cpp_standard()}',
-                                         f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
-                                         ])
-
-        orig_file3 = os.path.join(src_dir, 'CMake', 'vtkCompilerChecks.cmake')
-        bak_file3 = patch_file(orig_file3,
-                               from_texts=[r'-std=c++11',
-                                           r'set(CMAKE_CXX_STANDARD 11)',
-                                           ],
-                               to_texts=[f'-std=c++{cpp_standard()}',
-                                         f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
-                                         ])
-
-        orig_file4 = os.path.join(src_dir, 'ThirdParty', 'libproj', 'vtklibproj', 'CMakeLists.txt')
-        bak_file4 = patch_file(orig_file4,
-                               from_texts=[r'-std=c++11',
-                                           r'set(CMAKE_CXX_STANDARD 11)',
-                                           r'-Werror -Wall',
-                                           ],
-                               to_texts=[f'-std=c++{cpp_standard()}',
-                                         f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
-                                         r'-Wall',
-                                         ])
-
-        if is_linux():
-            orig_file7 = os.path.join(src_dir, 'ThirdParty', 'nlohmannjson/vtknlohmannjson/include/vtknlohmann/detail',
-                                      'macro_scope.hpp')
-            bak_file7 = patch_file(orig_file7,
-                                   from_texts=[r'#define JSON_HAS_CPP_17',
-                                               ],
-                                   to_texts=[r'//#define JSON_HAS_CPP_17',
-                                             ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
@@ -2199,71 +2264,71 @@ def build_vtk(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=get_tbb_env())
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
-        os.replace(bak_file2, orig_file2)
-        os.replace(bak_file3, orig_file3)
-        os.replace(bak_file4, orig_file4)
-        if is_linux():
-            os.replace(bak_file7, orig_file7)
+        patch_manager.restore_files()
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool = False):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
-    bak_file2 = orig_file2 = None
-    bak_file3 = orig_file3 = None
-    bak_file4 = orig_file4 = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'modules', 'videoio', 'src', 'cap_msmf.cpp'),
+            from_texts=[r'#include <initguid.h>',
+                        ],
+            to_texts=['#include <initguid.h>\n'
+                      '#include <ks.h>\n',
+                      ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'modules', 'imgcodecs', 'CMakeLists.txt'),
+            from_texts=[r'ocv_add_perf_tests()',
+                        ],
+            to_texts=['include_directories(BEFORE SYSTEM ' + ext_build_dir().encode(
+                'unicode_escape').decode() + '/include)\n'
+                                             'ocv_add_perf_tests()\n',
+                      ],
+            patch_condition=lambda: conda_build,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'cmake', 'OpenCVDetectPython.cmake'),
+            from_texts=[r'set(_packages_path "${_path}/Lib/site-packages")'],
+            to_texts=[r'set(_packages_path "Lib/site-packages")'],
+            patch_condition=lambda: conda_build and is_windows(),
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'cmake', 'OpenCVFindMKL.cmake'),
+            from_texts=[r'macro(mkl_fail)',
+                        r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib)',
+                        ],
+            to_texts=['set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
+                      'macro(mkl_fail)\n',
+                      r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64/gcc4.8 ${MKL_ROOT_DIR}/../tbb/lib/intel64/vc14)',
+                      ],
+            patch_condition=lambda: not conda_build,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'modules', 'calib3d', 'CMakeLists.txt'),
+            from_texts=[r'${LAPACK_LIBRARIES}'],
+            to_texts=[r''],
+            patch_condition=lambda: not conda_build,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'modules', 'core', 'CMakeLists.txt'),
+            from_texts=[r'${LAPACK_LIBRARIES}'],
+            to_texts=[r''],
+            patch_condition=lambda: not conda_build,
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file4 = os.path.join(src_dir, 'modules', 'videoio', 'src', 'cap_msmf.cpp')
-        bak_file4 = patch_file(orig_file4,
-                               from_texts=[r'#include <initguid.h>',
-                                           ],
-                               to_texts=['#include <initguid.h>\n'
-                                         '#include <ks.h>\n',
-                                         ])
+        patch_manager.apply_patches()
 
-        if conda_build:
-            orig_file = os.path.join(src_dir, 'modules', 'imgcodecs', 'CMakeLists.txt')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'ocv_add_perf_tests()',
-                                              ],
-                                  to_texts=['include_directories(BEFORE SYSTEM ' + ext_build_dir().encode(
-                                      'unicode_escape').decode() + '/include)\n'
-                                                                   'ocv_add_perf_tests()\n',
-                                            ])
-
-            if is_windows():
-                orig_file2 = os.path.join(src_dir, 'cmake', 'OpenCVDetectPython.cmake')
-                bak_file2 = patch_file(orig_file2,
-                                       from_texts=[r'set(_packages_path "${_path}/Lib/site-packages")'],
-                                       to_texts=[r'set(_packages_path "Lib/site-packages")'])
-
-            if is_mac():
-                os.rename(os.path.join(ext_build_dir(), 'include', 'tbb'),
-                          os.path.join(ext_build_dir(), 'include', '__tbb'))
-                os.rename(os.path.join(ext_build_dir(), 'include', 'oneapi'),
-                          os.path.join(ext_build_dir(), 'include', '__oneapi'))
-        else:
-            orig_file = os.path.join(src_dir, 'cmake', 'OpenCVFindMKL.cmake')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'macro(mkl_fail)',
-                                              r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib)',
-                                              ],
-                                  to_texts=['set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
-                                            'macro(mkl_fail)\n',
-                                            r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64/gcc4.8 ${MKL_ROOT_DIR}/../tbb/lib/intel64/vc14)',
-                                            ])
-
-            orig_file2 = os.path.join(src_dir, 'modules', 'calib3d', 'CMakeLists.txt')
-            bak_file2 = patch_file(orig_file2,
-                                   from_texts=[r'${LAPACK_LIBRARIES}'],
-                                   to_texts=[r''])
-
-            orig_file3 = os.path.join(src_dir, 'modules', 'core', 'CMakeLists.txt')
-            bak_file3 = patch_file(orig_file3,
-                                   from_texts=[r'${LAPACK_LIBRARIES}'],
-                                   to_texts=[r''])
+        if conda_build and is_mac():
+            os.rename(os.path.join(ext_build_dir(), 'include', 'tbb'),
+                      os.path.join(ext_build_dir(), 'include', '__tbb'))
+            os.rename(os.path.join(ext_build_dir(), 'include', 'oneapi'),
+                      os.path.join(ext_build_dir(), 'include', '__oneapi'))
 
         def get_cmakecmd_options(arm64_build: bool = False):
             cmakecmd_options = [
@@ -2452,39 +2517,38 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                                      ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
-        os.replace(bak_file4, orig_file4)
-        if conda_build and is_windows():
-            os.replace(bak_file2, orig_file2)
+        patch_manager.restore_files()
         if conda_build and is_mac():
             os.rename(os.path.join(ext_build_dir(), 'include', '__tbb'),
                       os.path.join(ext_build_dir(), 'include', 'tbb'))
             os.rename(os.path.join(ext_build_dir(), 'include', '__oneapi'),
                       os.path.join(ext_build_dir(), 'include', 'oneapi'))
-        if not conda_build:
-            os.replace(bak_file2, orig_file2)
-            os.replace(bak_file3, orig_file3)
 
 
 def build_rocksdb(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[
+                r'NONONO___CMAKE_EXE_LINKER_FLAGS' if is_linux() else r'set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
+                r'find_package(TBB REQUIRED)',
+                r'find_package(zstd REQUIRED)',
+            ],
+            to_texts=[
+                r'#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
+                'find_package(TBB REQUIRED)\n'
+                r'add_library(TBB::TBB ALIAS TBB::tbb)',
+                'find_package(zstd REQUIRED)\n'
+                r'add_library(zstd::zstd ALIAS zstd::libzstd_static)',
+            ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[
-                                  r'NONONO___CMAKE_EXE_LINKER_FLAGS' if is_linux() else r'set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
-                                  r'find_package(TBB REQUIRED)',
-                                  r'find_package(zstd REQUIRED)',
-                              ],
-                              to_texts=[
-                                  r'#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
-                                  'find_package(TBB REQUIRED)\n'
-                                  r'add_library(TBB::TBB ALIAS TBB::tbb)',
-                                  'find_package(zstd REQUIRED)\n'
-                                  r'add_library(zstd::zstd ALIAS zstd::libzstd_static)',
-                              ])
+        patch_manager.apply_patches()
 
         os.rename(os.path.join(src_dir, 'cmake', 'modules', 'FindTBB.cmake'),
                   os.path.join(src_dir, 'cmake', 'modules', '__FindTBB.cmake'))
@@ -2527,7 +2591,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
                 shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
         os.rename(os.path.join(src_dir, 'cmake', 'modules', '__FindTBB.cmake'),
                   os.path.join(src_dir, 'cmake', 'modules', 'FindTBB.cmake'))
         os.rename(os.path.join(src_dir, 'cmake', 'modules', '__Findzstd.cmake'),
@@ -2538,17 +2602,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
 def build_llfio(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    # bak_file = orig_file = None
     try:
-        # orig_file = os.path.join(src_dir, 'include', 'llfio', 'v2.0', 'detail', 'impl', 'map_handle.ipp')
-        # bak_file = patch_file(orig_file,
-        #                       from_texts=[
-        #                           r'auto *p = *it;',
-        #                       ],
-        #                       to_texts=[
-        #                           r'auto *p = &(*it);',
-        #                       ])
-
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DLLFIO_FORCE_NETWORKING_OFF:BOOL=ON',
                          '-DLLFIO_USE_EXPERIMENTAL_SG14_STATUS_CODE:BOOL=OFF',
@@ -2566,7 +2620,6 @@ def build_llfio(src_dir: str, install_dir: str):
                             dirs_exist_ok=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
-        # os.replace(bak_file, orig_file)
         print()
 
 
@@ -2602,27 +2655,31 @@ def build_pcre(src_dir: str, install_dir: str):
 def build_fizz(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
-    bak_file2 = orig_file2 = None
-    try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[
-                                  r'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)',
-                              ],
-                              to_texts=[
-                                  'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n'
-                                  'add_library(gflags::gflags ALIAS gflags)',
-                              ])
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[
+                r'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)',
+            ],
+            to_texts=[
+                'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n'
+                'add_library(gflags::gflags ALIAS gflags)',
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'record', 'Types.h'),
+            from_texts=[
+                r'auto format(fizz::ExtensionType t, format_context& ctx) {',
+            ],
+            to_texts=[
+                r'auto format(fizz::ExtensionType t, format_context& ctx) const {',
+            ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
 
-        orig_file2 = os.path.join(src_dir, 'record', 'Types.h')
-        bak_file2 = patch_file(orig_file2,
-                               from_texts=[
-                                   r'auto format(fizz::ExtensionType t, format_context& ctx) {',
-                               ],
-                               to_texts=[
-                                   r'auto format(fizz::ExtensionType t, format_context& ctx) const {',
-                               ])
+    try:
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DFIZZ_BUILD_AEGIS:BOOL=OFF',
@@ -2634,39 +2691,42 @@ def build_fizz(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
-        os.replace(bak_file2, orig_file2)
+        patch_manager.restore_files()
         print()
 
 
 def build_mvfst(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
-    bak_file1 = orig_file1 = None
-    try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[
-                                  r'list(APPEND GFLAG_DEPENDENCIES gflags)',
-                                  r'iostreams',
-                                  r'date_time',
-                              ],
-                              to_texts=[
-                                  'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
-                                  'add_library(gflags::gflags ALIAS gflags)',
-                                  r'',
-                                  r'',
-                              ])
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[
+                r'list(APPEND GFLAG_DEPENDENCIES gflags)',
+                r'iostreams',
+                r'date_time',
+            ],
+            to_texts=[
+                'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
+                'add_library(gflags::gflags ALIAS gflags)',
+                r'',
+                r'',
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'cmake', 'mvfst-config.cmake.in'),
+            from_texts=[
+                r'find_dependency(Boost COMPONENTS iostreams system thread filesystem regex context)',
+            ],
+            to_texts=[
+                r'find_dependency(Boost COMPONENTS system thread filesystem regex context)',
+            ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
 
-        orig_file1 = os.path.join(src_dir, 'cmake', 'mvfst-config.cmake.in')
-        bak_file1 = patch_file(orig_file1,
-                               from_texts=[
-                                   r'find_dependency(Boost COMPONENTS iostreams system thread filesystem regex context)',
-                               ],
-                               to_texts=[
-                                   r'find_dependency(Boost COMPONENTS system thread filesystem regex context)',
-                               ])
+    try:
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
@@ -2674,25 +2734,29 @@ def build_mvfst(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
-        os.replace(bak_file1, orig_file1)
+        patch_manager.restore_files()
         print()
 
 
 def build_wangle(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[
+                r'find_package(LibEvent MODULE REQUIRED)',
+            ],
+            to_texts=[
+                'add_library(gflags::gflags ALIAS gflags)\n'
+                'find_package(LibEvent MODULE REQUIRED)',
+            ],
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[
-                                  r'find_package(LibEvent MODULE REQUIRED)',
-                              ],
-                              to_texts=[
-                                  'add_library(gflags::gflags ALIAS gflags)\n'
-                                  'find_package(LibEvent MODULE REQUIRED)',
-                              ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DBUILD_TESTS:BOOL=OFF',
@@ -2702,96 +2766,98 @@ def build_wangle(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        patch_manager.restore_files()
         print()
 
 
 def build_proxygen(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
-    bak_file1 = orig_file1 = None
-    bak_file2 = orig_file2 = None
-    bak_file3 = orig_file3 = None
-    bak_file4 = orig_file4 = None
-    bak_file5 = orig_file5 = None
+    patches = [
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            from_texts=[
+                r'list(APPEND GFLAG_DEPENDENCIES gflags)',
+                r'find_program(PROXYGEN_PYTHON python3)',
+                r'-Wextra',
+                r'iostreams',
+            ],
+            to_texts=[
+                'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
+                'add_library(gflags::gflags ALIAS gflags)',
+                r'find_program(PROXYGEN_PYTHON python)' if is_windows() else r'find_program(PROXYGEN_PYTHON python3)',
+                r'' if is_windows() else r'-Wextra',
+                r'',
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt'),
+            from_texts=[
+                r"""${PROXYGEN_FBCODE_ROOT}
+${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
+                r'Boost::boost',
+                r'Boost::iostreams',
+                r'-lz',
+            ],
+            to_texts=[
+                "${PROXYGEN_FBCODE_ROOT}\n${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http\n${PROXYGEN_GPERF}",
+                r'',
+                r'',
+                r'',
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'proxygen', 'httpserver', 'samples', 'hq', 'ConnIdLogger.h'),
+            from_texts=[
+                r'const struct ::tm* tm_time,',
+                r'tm_time);',
+            ],
+            to_texts=[
+                r'const google::LogMessageTime& tm_time,',
+                "&(tm_time.tm()));",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'cmake', 'FindZstd.cmake'),
+            from_texts=[
+                r"""find_library(ZSTD_LIBRARIES
+NAMES zstd""",
+                r'if("${ZSTD_LIBRARIES}" MATCHES ".*.a$")',
+            ],
+            to_texts=[
+                r"""find_library(ZSTD_LIBRARIES
+NAMES zstd zstd_static""",
+                r'if(TRUE)',
+            ],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'proxygen', 'external', 'CMakeLists.txt'),
+            from_texts=[
+                r'"-Wno-implicit-fallthrough"',
+            ],
+            to_texts=[
+                r'',
+            ],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'proxygen', 'lib', 'services', 'RequestWorkerThread.cpp'),
+            from_texts=[
+                r'sigset_t ss;',
+                r'PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);',
+            ],
+            to_texts=[
+                "#ifndef _MSC_VER\nsigset_t ss;",
+                "PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);\n#endif",
+            ],
+            patch_condition=is_windows,
+        ),
+    ]
+    patch_manager = PatchManager(patches)
+
     try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[
-                                  r'list(APPEND GFLAG_DEPENDENCIES gflags)',
-                                  r'find_program(PROXYGEN_PYTHON python3)',
-                                  r'-Wextra',
-                                  r'iostreams',
-                              ],
-                              to_texts=[
-                                  'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
-                                  'add_library(gflags::gflags ALIAS gflags)',
-                                  r'find_program(PROXYGEN_PYTHON python)' if is_windows() else r'find_program(PROXYGEN_PYTHON python3)',
-                                  r'' if is_windows() else r'-Wextra',
-                                  r'',
-                              ])
-
-        orig_file4 = os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt')
-        bak_file4 = patch_file(orig_file4,
-                               from_texts=[
-                                   r"""${PROXYGEN_FBCODE_ROOT}
-        ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
-                                   r'Boost::boost',
-                                   r'Boost::iostreams',
-                                   r'-lz',
-                               ],
-                               to_texts=[
-                                   "${PROXYGEN_FBCODE_ROOT}\n${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http\n${PROXYGEN_GPERF}",
-                                   r'',
-                                   r'',
-                                   r'',
-                               ])
-
-        if is_windows():
-            orig_file1 = os.path.join(src_dir, 'cmake', 'FindZstd.cmake')
-            bak_file1 = patch_file(orig_file1,
-                                   from_texts=[
-                                       r"""find_library(ZSTD_LIBRARIES
-   NAMES zstd""",
-                                       r'if("${ZSTD_LIBRARIES}" MATCHES ".*.a$")',
-                                   ],
-                                   to_texts=[
-                                       r"""find_library(ZSTD_LIBRARIES
-   NAMES zstd zstd_static""",
-                                       r'if(TRUE)',
-                                   ])
-
-            orig_file2 = os.path.join(src_dir, 'proxygen', 'external', 'CMakeLists.txt')
-            bak_file2 = patch_file(orig_file2,
-                                   from_texts=[
-                                       r'"-Wno-implicit-fallthrough"',
-                                   ],
-                                   to_texts=[
-                                       r'',
-                                   ])
-
-            orig_file3 = os.path.join(src_dir, 'proxygen', 'lib', 'services', 'RequestWorkerThread.cpp')
-            bak_file3 = patch_file(orig_file3,
-                                   from_texts=[
-                                       r'sigset_t ss;',
-                                       r'PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);',
-                                   ],
-                                   to_texts=[
-                                       "#ifndef _MSC_VER\nsigset_t ss;",
-                                       "PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);\n#endif",
-                                   ])
-
-        orig_file5 = os.path.join(src_dir, 'proxygen', 'httpserver', 'samples', 'hq', 'ConnIdLogger.h')
-        bak_file5 = patch_file(orig_file5,
-                               from_texts=[
-                                   r'const struct ::tm* tm_time,',
-                                   r'tm_time);',
-                               ],
-                               to_texts=[
-                                   r'const google::LogMessageTime& tm_time,',
-                                   "&(tm_time.tm()));",
-                               ])
+        patch_manager.apply_patches()
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         if is_windows():
@@ -2807,13 +2873,7 @@ def build_proxygen(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
-        os.replace(bak_file4, orig_file4)
-        if is_windows():
-            os.replace(bak_file1, orig_file1)
-            os.replace(bak_file2, orig_file2)
-            os.replace(bak_file3, orig_file3)
-        os.replace(bak_file5, orig_file5)
+        patch_manager.restore_files()
         print()
 
 
