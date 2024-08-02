@@ -669,6 +669,39 @@ def build_simde(src_dir: str, install_dir: str):
                     os.path.join(install_dir, 'include', 'simde'), dirs_exist_ok=True)
 
 
+def build_glm(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+
+        cmakecmd.extend(['-DGLM_BUILD_LIBRARY:BOOL=OFF',
+                         '-DGLM_BUILD_TESTS:BOOL=OFF',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+
+    #     orig_file = os.path.join(install_dir, 'include', 'glm', 'detail', 'type_vec_simd.inl')
+    #     patch_file(orig_file,
+    #                from_texts=[r"""template<qualifier Q, int E0, int E1, int E2, int E3>
+    # struct _swizzle_base1<2, float, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, float, Q, E0, E1, E2, E3, false> {};
+    #
+    # template<qualifier Q, int E0, int E1, int E2, int E3>
+    # struct _swizzle_base1<2, int, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, int, Q, E0, E1, E2, E3, false> {};""",
+    #                            r'return !compute_vec_equal<float, Q, false, 32, true>::call(v1, v2);',
+    #                            r'return !compute_vec_equal<uint, Q, false, 32, true>::call(v1, v2);',
+    #                            r'return !compute_vec_equal<int, Q, false, 32, true>::call(v1, v2);',
+    #                            ],
+    #                to_texts=[r'',
+    #                          r'return !compute_vec_equal<L, float, Q, false, 32, true>::call(v1, v2);',
+    #                          r'return !compute_vec_equal<L, uint, Q, false, 32, true>::call(v1, v2);',
+    #                          r'return !compute_vec_equal<L, int, Q, false, 32, true>::call(v1, v2);',
+    #                          ])
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_cpuinfo(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     cmake_options = ['-DBUILD_GMOCK:BOOL=OFF',
@@ -860,65 +893,6 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
         print('done')
 
 
-def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
-    print(nasm_dir)
-
-    build_dir = create_build_dir(src_dir)
-    orig_file = bak_file = None
-    try:
-        if is_mac():
-            orig_file = os.path.join(src_dir, 'cmake', 'gRPCConfig.cmake.in')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'if(NOT CMAKE_CROSSCOMPILING)',
-                                              ],
-                                  to_texts=[r'if(1)',
-                                            ])
-
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
-                         '-DgRPC_BUILD_TESTS:BOOL=OFF',
-                         '-DgRPC_MSVC_STATIC_RUNTIME:BOOL=OFF' if is_windows() else '',
-                         '-DgRPC_ZLIB_PROVIDER:STRING=package',
-                         '-DgRPC_PROTOBUF_PROVIDER=module',
-                         '-DgRPC_CARES_PROVIDER=module',
-                         '-DgRPC_SSL_PROVIDER=package',
-                         f'-DOPENSSL_ROOT_DIR:PATH={install_dir}',
-                         '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
-                         '-DgRPC_ABSL_PROVIDER:STRING=package',
-                         '-DgRPC_RE2_PROVIDER:STRING=module',
-                         ])
-
-        cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-        if is_mac():
-            os.replace(bak_file, orig_file)
-
-
-def build_bzip2(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(['-DENABLE_DEBUG=OFF',
-                         '-DENABLE_APP=ON',
-                         '-DENABLE_DOCS=OFF',
-                         '-DENABLE_EXAMPLES=OFF',
-                         '-DENABLE_STATIC_LIB=ON',
-                         '-DENABLE_SHARED_LIB=OFF',
-                         src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-        if not is_windows():
-            shutil.copy2(os.path.join(install_dir, 'lib', 'libbz2_static.a'),
-                         os.path.join(install_dir, 'lib', 'libbz2.a'))
-        else:
-            shutil.copy2(os.path.join(install_dir, 'lib', 'bz2_static.lib'),
-                         os.path.join(install_dir, 'lib', 'bz2.lib'))
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
 def build_double_conversion(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -929,50 +903,6 @@ def build_double_conversion(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_fmt(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(['-DFMT_DOC:BOOL=OFF',
-                         '-DFMT_TEST:BOOL=OFF',
-                         src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_libevent(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    orig_file = bak_file = None
-    try:
-        orig_file = os.path.join(src_dir, 'cmake', 'LibeventConfig.cmake.in')
-        bak_file = patch_file(orig_file,
-                              from_texts=[
-                                  r'if (${CMAKE_VERSION} VERSION_LESS "3.15.0" AND ${LIBEVENT_STATIC_LINK} AND ${OPENSSL_FOUND} AND ${Threads_FOUND})',
-                              ],
-                              to_texts=[r'if (0)',
-                                        ])
-
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(['-DEVENT__DISABLE_DEBUG_MODE:BOOL=ON',
-                         '-DEVENT__DISABLE_OPENSSL:BOOL=ON',
-                         '-DEVENT__DISABLE_BENCHMARK:BOOL=ON',
-                         '-DEVENT__DISABLE_TESTS:BOOL=ON',
-                         '-DEVENT__DISABLE_REGRESS:BOOL=ON',
-                         '-DEVENT__DISABLE_SAMPLES:BOOL=ON',
-                         '-DEVENT__DISABLE_MBEDTLS:BOOL=ON',
-                         '-DEVENT__MSVC_STATIC_RUNTIME:BOOL=OFF',
-                         '-DEVENT__DOXYGEN:BOOL=OFF',
-                         '-DEVENT__LIBRARY_TYPE=STATIC',
-                         src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
 
 
 def build_lz4(src_dir: str, install_dir: str):
@@ -989,58 +919,6 @@ def build_lz4(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_snappy(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    orig_file = bak_file = None
-    arm64_install_dir = None
-    try:
-        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
-        # no-rtti cause link error
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'NOT CMAKE_CXX_FLAGS MATCHES "-Werror"',
-                                          r'string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")',
-                                          r'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")',
-                                          r'string(REGEX REPLACE "-frtti" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")',
-                                          r'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")',
-                                          ],
-                              to_texts=[r'OFF',
-                                        r'',
-                                        r'',
-                                        r'',
-                                        r'',
-                                        ])
-
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DSNAPPY_BUILD_TESTS:BOOL=OFF',
-                         '-DSNAPPY_BUILD_BENCHMARKS:BOOL=OFF',
-                         '-DSNAPPY_REQUIRE_AVX:BOOL=ON',
-                         '-DSNAPPY_REQUIRE_AVX2:BOOL=OFF',
-                         src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-
-        if is_mac():
-            build_dir = create_build_dir(src_dir)
-            arm64_install_dir = create_arm64_install_dir(src_dir)
-
-            try:
-                cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
-                cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
-                                 '-DSNAPPY_BUILD_TESTS:BOOL=OFF',
-                                 '-DSNAPPY_BUILD_BENCHMARKS:BOOL=OFF',
-                                 '-DSNAPPY_REQUIRE_AVX:BOOL=OFF',
-                                 '-DSNAPPY_REQUIRE_AVX2:BOOL=OFF',
-                                 src_dir])
-                build_and_install_cmakecmd(cmakecmd, build_dir)
-                create_universal_binaries(arm64_install_dir, install_dir)
-            finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
 
 
 def build_xz(src_dir: str, install_dir: str):
@@ -1111,6 +989,125 @@ def build_zstd(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
         if is_mac():
             os.replace(bak_file, orig_file)
+
+
+def build_fmt(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(['-DFMT_DOC:BOOL=OFF',
+                         '-DFMT_TEST:BOOL=OFF',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_libevent(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    orig_file = bak_file = None
+    try:
+        orig_file = os.path.join(src_dir, 'cmake', 'LibeventConfig.cmake.in')
+        bak_file = patch_file(orig_file,
+                              from_texts=[
+                                  r'if (${CMAKE_VERSION} VERSION_LESS "3.15.0" AND ${LIBEVENT_STATIC_LINK} AND ${OPENSSL_FOUND} AND ${Threads_FOUND})',
+                              ],
+                              to_texts=[r'if (0)',
+                                        ])
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(['-DEVENT__DISABLE_DEBUG_MODE:BOOL=ON',
+                         '-DEVENT__DISABLE_OPENSSL:BOOL=ON',
+                         '-DEVENT__DISABLE_BENCHMARK:BOOL=ON',
+                         '-DEVENT__DISABLE_TESTS:BOOL=ON',
+                         '-DEVENT__DISABLE_REGRESS:BOOL=ON',
+                         '-DEVENT__DISABLE_SAMPLES:BOOL=ON',
+                         '-DEVENT__DISABLE_MBEDTLS:BOOL=ON',
+                         '-DEVENT__MSVC_STATIC_RUNTIME:BOOL=OFF',
+                         '-DEVENT__DOXYGEN:BOOL=OFF',
+                         '-DEVENT__LIBRARY_TYPE=STATIC',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+
+
+def build_snappy(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    orig_file = bak_file = None
+    arm64_install_dir = None
+    try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        # no-rtti cause link error
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'NOT CMAKE_CXX_FLAGS MATCHES "-Werror"',
+                                          r'string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")',
+                                          r'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")',
+                                          r'string(REGEX REPLACE "-frtti" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")',
+                                          r'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")',
+                                          ],
+                              to_texts=[r'OFF',
+                                        r'',
+                                        r'',
+                                        r'',
+                                        r'',
+                                        ])
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DSNAPPY_BUILD_TESTS:BOOL=OFF',
+                         '-DSNAPPY_BUILD_BENCHMARKS:BOOL=OFF',
+                         '-DSNAPPY_REQUIRE_AVX:BOOL=ON',
+                         '-DSNAPPY_REQUIRE_AVX2:BOOL=OFF',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        if is_mac():
+            build_dir = create_build_dir(src_dir)
+            arm64_install_dir = create_arm64_install_dir(src_dir)
+
+            try:
+                cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
+                cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                                 '-DSNAPPY_BUILD_TESTS:BOOL=OFF',
+                                 '-DSNAPPY_BUILD_BENCHMARKS:BOOL=OFF',
+                                 '-DSNAPPY_REQUIRE_AVX:BOOL=OFF',
+                                 '-DSNAPPY_REQUIRE_AVX2:BOOL=OFF',
+                                 src_dir])
+                build_and_install_cmakecmd(cmakecmd, build_dir)
+                create_universal_binaries(arm64_install_dir, install_dir)
+            finally:
+                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+
+
+def build_bzip2(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(['-DENABLE_DEBUG=OFF',
+                         '-DENABLE_APP=ON',
+                         '-DENABLE_DOCS=OFF',
+                         '-DENABLE_EXAMPLES=OFF',
+                         '-DENABLE_STATIC_LIB=ON',
+                         '-DENABLE_SHARED_LIB=OFF',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+        if not is_windows():
+            shutil.copy2(os.path.join(install_dir, 'lib', 'libbz2_static.a'),
+                         os.path.join(install_dir, 'lib', 'libbz2.a'))
+        else:
+            shutil.copy2(os.path.join(install_dir, 'lib', 'bz2_static.lib'),
+                         os.path.join(install_dir, 'lib', 'bz2.lib'))
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_libsodium(src_dir: str, install_dir: str):
@@ -1320,94 +1317,6 @@ install(
         cleanup_git_submodule(src_dir)
 
 
-def build_glbinding(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(['-DOPTION_BUILD_TOOLS:BOOL=OFF',
-                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DOPTION_BUILD_TESTS:BOOL=OFF',
-                         '-DOPTION_BUILD_DOCS:BOOL=OFF',
-                         '-DOPTION_BUILD_EXAMPLES:BOOL=OFF',
-                         '-DOPTION_BUILD_OWN_KHR_HEADERS:BOOL=ON',
-                         src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
-        if is_windows():
-            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
-                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '\\nasm.exe',
-                             '-DWITH_CRT_DLL:BOOL=ON',
-                             src_dir])
-        elif is_linux():
-            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
-                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=nasm',
-                             src_dir])
-        else:
-            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
-                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
-                             src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-    if is_mac():
-        build_dir = create_build_dir(src_dir)
-        arm64_install_dir = create_arm64_install_dir(src_dir)
-
-        try:
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
-            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
-                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
-                             src_dir])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
-            create_universal_binaries(arm64_install_dir=arm64_install_dir, final_install_dir=install_dir)
-        finally:
-            shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
-
-
-def build_glm(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-
-        cmakecmd.extend(['-DGLM_BUILD_LIBRARY:BOOL=OFF',
-                         '-DGLM_BUILD_TESTS:BOOL=OFF',
-                         ])
-
-        cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-
-    #     orig_file = os.path.join(install_dir, 'include', 'glm', 'detail', 'type_vec_simd.inl')
-    #     patch_file(orig_file,
-    #                from_texts=[r"""template<qualifier Q, int E0, int E1, int E2, int E3>
-    # struct _swizzle_base1<2, float, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, float, Q, E0, E1, E2, E3, false> {};
-    #
-    # template<qualifier Q, int E0, int E1, int E2, int E3>
-    # struct _swizzle_base1<2, int, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, int, Q, E0, E1, E2, E3, false> {};""",
-    #                            r'return !compute_vec_equal<float, Q, false, 32, true>::call(v1, v2);',
-    #                            r'return !compute_vec_equal<uint, Q, false, 32, true>::call(v1, v2);',
-    #                            r'return !compute_vec_equal<int, Q, false, 32, true>::call(v1, v2);',
-    #                            ],
-    #                to_texts=[r'',
-    #                          r'return !compute_vec_equal<L, float, Q, false, 32, true>::call(v1, v2);',
-    #                          r'return !compute_vec_equal<L, uint, Q, false, 32, true>::call(v1, v2);',
-    #                          r'return !compute_vec_equal<L, int, Q, false, 32, true>::call(v1, v2);',
-    #                          ])
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
 def build_suitesparse(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -1573,6 +1482,97 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         os.replace(bak_file4, orig_file4)
         os.replace(bak_file5, orig_file5)
         cleanup_git_submodule(src_dir)
+
+
+def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
+    print(nasm_dir)
+
+    build_dir = create_build_dir(src_dir)
+    orig_file = bak_file = None
+    try:
+        if is_mac():
+            orig_file = os.path.join(src_dir, 'cmake', 'gRPCConfig.cmake.in')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'if(NOT CMAKE_CROSSCOMPILING)',
+                                              ],
+                                  to_texts=[r'if(1)',
+                                            ])
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
+                         '-DgRPC_BUILD_TESTS:BOOL=OFF',
+                         '-DgRPC_MSVC_STATIC_RUNTIME:BOOL=OFF' if is_windows() else '',
+                         '-DgRPC_ZLIB_PROVIDER:STRING=package',
+                         '-DgRPC_PROTOBUF_PROVIDER=module',
+                         '-DgRPC_CARES_PROVIDER=module',
+                         '-DgRPC_SSL_PROVIDER=package',
+                         f'-DOPENSSL_ROOT_DIR:PATH={install_dir}',
+                         '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
+                         '-DgRPC_ABSL_PROVIDER:STRING=package',
+                         '-DgRPC_RE2_PROVIDER:STRING=module',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        if is_mac():
+            os.replace(bak_file, orig_file)
+
+
+def build_glbinding(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(['-DOPTION_BUILD_TOOLS:BOOL=OFF',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DOPTION_BUILD_TESTS:BOOL=OFF',
+                         '-DOPTION_BUILD_DOCS:BOOL=OFF',
+                         '-DOPTION_BUILD_EXAMPLES:BOOL=OFF',
+                         '-DOPTION_BUILD_OWN_KHR_HEADERS:BOOL=ON',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        if is_windows():
+            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
+                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '\\nasm.exe',
+                             '-DWITH_CRT_DLL:BOOL=ON',
+                             src_dir])
+        elif is_linux():
+            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
+                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=nasm',
+                             src_dir])
+        else:
+            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
+                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
+                             src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+    if is_mac():
+        build_dir = create_build_dir(src_dir)
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
+            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
+                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
+                             src_dir])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+            create_universal_binaries(arm64_install_dir=arm64_install_dir, final_install_dir=install_dir)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
 
 def build_libpng(src_dir: str, install_dir: str):
@@ -2570,94 +2570,6 @@ def build_llfio(src_dir: str, install_dir: str):
         print()
 
 
-def build_conda_zimg(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        if is_mac():
-            os.rename(os.path.join(ext_build_dir(), 'include', 'tbb'),
-                      os.path.join(ext_build_dir(), 'include', '__tbb'))
-            os.rename(os.path.join(ext_build_dir(), 'include', 'oneapi'),
-                      os.path.join(ext_build_dir(), 'include', '__oneapi'))
-
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
-
-        if is_windows():
-            env = get_enviroment_from_shell_script(os.path.join(os.environ['CONDA_PREFIX'], 'condabin',
-                                                                'conda.bat'),
-                                                   para='activate',
-                                                   start_env=get_vcvars_environment(),
-                                                   remove_conda_from_path=False)
-        else:
-            env = os.environ.copy()
-        env['PREFIX'] = env['CONDA_PREFIX']
-
-        cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
-    finally:
-        print('done')
-        shutil.rmtree(build_dir, ignore_errors=False)
-        if is_mac():
-            os.rename(os.path.join(ext_build_dir(), 'include', '__tbb'),
-                      os.path.join(ext_build_dir(), 'include', 'tbb'))
-            os.rename(os.path.join(ext_build_dir(), 'include', '__oneapi'),
-                      os.path.join(ext_build_dir(), 'include', 'oneapi'))
-
-
-def build_ospray(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, use_ninja=False)
-        cmakecmd.extend(['-DDOWNLOAD_ISPC=ON',
-                         '-DDOWNLOAD_TBB=OFF',
-                         '-DBUILD_EMBREE_FROM_SOURCE=OFF',
-                         '-DBUILD_GLFW=ON',
-                         '-DBUILD_OIDN_FROM_SOURCE=OFF',
-                         ])
-
-        cmakecmd.extend([os.path.join(src_dir, 'scripts', 'superbuild')])
-        build_and_install_cmakecmd(cmakecmd, build_dir, use_ninja=False, use_cmake=True)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_ants(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, use_ninja=False)
-
-        cmakecmd.extend([src_dir])
-        # build_cmakecmd(cmakecmd, build_dir, use_ninja=False)
-        subprocess.run(['make', 'install'],
-                       cwd=os.path.join(build_dir, 'ANTS-build'), shell=False, check=True)
-    finally:
-        print('done')
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_skia(src_dir: str, install_dir: str):
-    try:
-        subprocess.run(['python', 'tools/git-sync-deps'],
-                       cwd=src_dir, shell=False, check=True)
-        subprocess.run(['bin/gn', 'gen', 'out/Static',
-                        "--args=is_official_build=true skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_use_libpng_decode=false skia_use_libpng_encode=false skia_use_libwebp_decode=false skia_use_libwebp_encode=false skia_use_icu=false skia_use_harfbuzz=false skia_use_fontconfig=false skia_use_expat=false skia_use_freetype=false skia_use_gl=false skia_use_x11=false skia_enable_gpu=false"],
-                       cwd=src_dir, shell=False, check=True)
-        subprocess.run([get_ninja_binary(), '-C', 'out/Static'],
-                       cwd=src_dir, shell=False, check=True)
-        skia_include_dir = os.path.join(install_dir, 'include', 'skia', 'include')
-        if os.path.exists(skia_include_dir):
-            shutil.rmtree(skia_include_dir, ignore_errors=False)
-        shutil.copytree(os.path.join(src_dir, 'include'), skia_include_dir)
-        skia_lib_dir = os.path.join(install_dir, 'lib', 'skia')
-        if os.path.exists(skia_lib_dir):
-            shutil.rmtree(skia_lib_dir, ignore_errors=False)
-        glob_copy(os.path.join(src_dir, 'out', 'Static', '*.a'), skia_lib_dir)
-    finally:
-        print('done')
-
-
 def build_jansson(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -2905,6 +2817,94 @@ def build_proxygen(src_dir: str, install_dir: str):
         print()
 
 
+def build_conda_zimg(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        if is_mac():
+            os.rename(os.path.join(ext_build_dir(), 'include', 'tbb'),
+                      os.path.join(ext_build_dir(), 'include', '__tbb'))
+            os.rename(os.path.join(ext_build_dir(), 'include', 'oneapi'),
+                      os.path.join(ext_build_dir(), 'include', '__oneapi'))
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        if is_windows():
+            env = get_enviroment_from_shell_script(os.path.join(os.environ['CONDA_PREFIX'], 'condabin',
+                                                                'conda.bat'),
+                                                   para='activate',
+                                                   start_env=get_vcvars_environment(),
+                                                   remove_conda_from_path=False)
+        else:
+            env = os.environ.copy()
+        env['PREFIX'] = env['CONDA_PREFIX']
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
+    finally:
+        print('done')
+        shutil.rmtree(build_dir, ignore_errors=False)
+        if is_mac():
+            os.rename(os.path.join(ext_build_dir(), 'include', '__tbb'),
+                      os.path.join(ext_build_dir(), 'include', 'tbb'))
+            os.rename(os.path.join(ext_build_dir(), 'include', '__oneapi'),
+                      os.path.join(ext_build_dir(), 'include', 'oneapi'))
+
+
+def build_ospray(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, use_ninja=False)
+        cmakecmd.extend(['-DDOWNLOAD_ISPC=ON',
+                         '-DDOWNLOAD_TBB=OFF',
+                         '-DBUILD_EMBREE_FROM_SOURCE=OFF',
+                         '-DBUILD_GLFW=ON',
+                         '-DBUILD_OIDN_FROM_SOURCE=OFF',
+                         ])
+
+        cmakecmd.extend([os.path.join(src_dir, 'scripts', 'superbuild')])
+        build_and_install_cmakecmd(cmakecmd, build_dir, use_ninja=False, use_cmake=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_ants(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, use_ninja=False)
+
+        cmakecmd.extend([src_dir])
+        # build_cmakecmd(cmakecmd, build_dir, use_ninja=False)
+        subprocess.run(['make', 'install'],
+                       cwd=os.path.join(build_dir, 'ANTS-build'), shell=False, check=True)
+    finally:
+        print('done')
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_skia(src_dir: str, install_dir: str):
+    try:
+        subprocess.run(['python', 'tools/git-sync-deps'],
+                       cwd=src_dir, shell=False, check=True)
+        subprocess.run(['bin/gn', 'gen', 'out/Static',
+                        "--args=is_official_build=true skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_use_libpng_decode=false skia_use_libpng_encode=false skia_use_libwebp_decode=false skia_use_libwebp_encode=false skia_use_icu=false skia_use_harfbuzz=false skia_use_fontconfig=false skia_use_expat=false skia_use_freetype=false skia_use_gl=false skia_use_x11=false skia_enable_gpu=false"],
+                       cwd=src_dir, shell=False, check=True)
+        subprocess.run([get_ninja_binary(), '-C', 'out/Static'],
+                       cwd=src_dir, shell=False, check=True)
+        skia_include_dir = os.path.join(install_dir, 'include', 'skia', 'include')
+        if os.path.exists(skia_include_dir):
+            shutil.rmtree(skia_include_dir, ignore_errors=False)
+        shutil.copytree(os.path.join(src_dir, 'include'), skia_include_dir)
+        skia_lib_dir = os.path.join(install_dir, 'lib', 'skia')
+        if os.path.exists(skia_lib_dir):
+            shutil.rmtree(skia_lib_dir, ignore_errors=False)
+        glob_copy(os.path.join(src_dir, 'out', 'Static', '*.a'), skia_lib_dir)
+    finally:
+        print('done')
+
+
 def build_libs(libs: OrderedDict, use_asan: bool):
     # print('extDIR:', ext_dir())
     # print('srcPackageDIR:', src_package_dir())
@@ -2937,6 +2937,57 @@ def build_libs(libs: OrderedDict, use_asan: bool):
         if lib_name == 'gperf':
             if is_windows():
                 install_gperf()
+
+        if lib_name == 'ffmpeg':
+            install_ffmpeg()
+            if is_windows() or is_linux():
+                shutil.copy2(get_ffmpeg_binary(), ext_build_dir())
+
+        if lib_name == 'java':
+            shutil.rmtree(os.path.join(ext_build_dir(), 'jars'), ignore_errors=True)
+            shutil.copytree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'),
+                            dirs_exist_ok=True)
+
+            if is_mac():
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*mac*'))
+            elif is_linux():
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*linux*'))
+            else:
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*windows*'))
+            jre_dir = os.path.join(ext_build_dir(), get_package_top_level_folder(package_name))
+            print(jre_dir)
+            if not os.path.exists(jre_dir):
+                if os.path.exists(os.path.join(ext_build_dir(), 'jre')):
+                    os.unlink(os.path.join(ext_build_dir(), 'jre'))
+                remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jre*'))
+                unpack_file_to_folder(package_name, ext_build_dir())
+                assert os.path.exists(jre_dir)
+                if os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
+                    os.unlink(os.path.join(ext_build_dir(), 'jre'))
+                    print('link jre')
+                    os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
+            if not os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
+                print('link jre')
+                os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
+
+            if is_mac():
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_aarch64*mac*'))
+                if not os.path.lexists(os.path.join(ext_build_dir(), 'jrearm')):
+                    os.mkdir(os.path.join(ext_build_dir(), 'jrearm'))
+                jre_dir = os.path.join(ext_build_dir(), 'jrearm', get_package_top_level_folder(package_name))
+                print(jre_dir)
+                if not os.path.exists(jre_dir):
+                    if os.path.exists(os.path.join(ext_build_dir(), 'jre-arm')):
+                        os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
+                    unpack_file_to_folder(package_name, os.path.join(ext_build_dir(), 'jrearm'))
+                    assert os.path.exists(jre_dir)
+                    if os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
+                        os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
+                        print('link jre-arm')
+                        os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
+                if not os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
+                    print('link jre-arm')
+                    os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
 
         if lib_name == 'qt':
             print(f'Qt {qt_ver()} in {qt_base_dir()}')
@@ -3001,11 +3052,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 assert os.path.exists(src_dir)
             build_zlib(src_dir, ext_build_dir())
 
-        if lib_name == 'ffmpeg':
-            install_ffmpeg()
-            if is_windows() or is_linux():
-                shutil.copy2(get_ffmpeg_binary(), ext_build_dir())
-
         if lib_name == 'boost':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'boost*'))
             src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
@@ -3043,9 +3089,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
         if lib_name == 'glm':
             src_dir = os.path.join(ext_dir(), 'glm')
             build_glm(src_dir, ext_build_dir())
-
-        if lib_name == 'magic_enum':
-            print('magic_enum')
 
         if lib_name == 'googletest':
             print('googletest')
@@ -3237,103 +3280,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
             build_opencv(src_dir, src_contrib_dir, ext_build_dir())
 
-        # if lib_name == 'botan':
-        #     src_dir = os.path.join(ext_dir(), 'botan')
-        #     assert os.path.exists(src_dir)
-        #     build_botan(src_dir, ext_build_dir())
-        #
-        # if lib_name == 'ospray':
-        #     if is_windows():
-        #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*win*')
-        #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*win*')
-        #     elif is_linux():
-        #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*linux*')
-        #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*linux*')
-        #     else:
-        #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*osx*')
-        #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*osx*')
-        #     src_dir = os.path.join(ext_dir(), 'OSPRay')
-        #     assert os.path.exists(src_dir)
-        #     assert os.path.exists(ispc_dir)
-        #     assert os.path.exists(embree_dir)
-        #     build_ospray(src_dir, ext_build_dir(), ispc_dir=ispc_dir, embree_dir=embree_dir)
-
-        if lib_name == 'ospray':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ospray*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
-            if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'ospray*'))
-                unpack_file_to_folder(package_name, ext_dir())
-                assert os.path.exists(src_dir)
-            build_ospray(src_dir, ext_build_dir())
-
-        if lib_name == 'java':
-            shutil.rmtree(os.path.join(ext_build_dir(), 'jars'), ignore_errors=True)
-            shutil.copytree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'),
-                            dirs_exist_ok=True)
-
-            if is_mac():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*mac*'))
-            elif is_linux():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*linux*'))
-            else:
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*windows*'))
-            jre_dir = os.path.join(ext_build_dir(), get_package_top_level_folder(package_name))
-            print(jre_dir)
-            if not os.path.exists(jre_dir):
-                if os.path.exists(os.path.join(ext_build_dir(), 'jre')):
-                    os.unlink(os.path.join(ext_build_dir(), 'jre'))
-                remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jre*'))
-                unpack_file_to_folder(package_name, ext_build_dir())
-                assert os.path.exists(jre_dir)
-                if os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
-                    os.unlink(os.path.join(ext_build_dir(), 'jre'))
-                    print('link jre')
-                    os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
-            if not os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
-                print('link jre')
-                os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
-
-            if is_mac():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_aarch64*mac*'))
-                if not os.path.lexists(os.path.join(ext_build_dir(), 'jrearm')):
-                    os.mkdir(os.path.join(ext_build_dir(), 'jrearm'))
-                jre_dir = os.path.join(ext_build_dir(), 'jrearm', get_package_top_level_folder(package_name))
-                print(jre_dir)
-                if not os.path.exists(jre_dir):
-                    if os.path.exists(os.path.join(ext_build_dir(), 'jre-arm')):
-                        os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
-                    unpack_file_to_folder(package_name, os.path.join(ext_build_dir(), 'jrearm'))
-                    assert os.path.exists(jre_dir)
-                    if os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
-                        os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
-                        print('link jre-arm')
-                        os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
-                if not os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
-                    print('link jre-arm')
-                    os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
-
-        if lib_name == 'ants':
-            src_dir = os.path.join(atlas_repository_dir(), '..', 'ANTs')
-            update_or_clone_git_repository(src_dir, 'git@github.com:ANTsX/ANTs.git')
-            if not os.path.exists(src_dir):
-                print('no ANTs')
-            else:
-                build_ants(src_dir, os.path.join(ext_build_dir(), 'ANTs'))
-
-        if lib_name == 'conda-opencv':
-            src_dir = os.path.join(ext_dir(), 'opencv')
-            src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
-            build_opencv(src_dir, src_contrib_dir, ext_conda_build_dir(), conda_build=True)
-
-        if lib_name == 'skia':
-            src_dir = os.path.join(atlas_repository_dir(), '..', 'skia')
-            update_or_clone_git_repository(src_dir, 'https://github.com/google/skia.git')
-            if not os.path.exists(src_dir):
-                print('no skia')
-            else:
-                build_skia(src_dir, ext_build_dir())
-
         if lib_name == 'neuTube':
             if is_windows():
                 suffix = 'Windows'
@@ -3352,10 +3298,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
         if lib_name == 'llfio':
             src_dir = os.path.join(ext_dir(), 'llfio')
             build_llfio(src_dir, ext_build_dir())
-
-        if lib_name == 'conda-zimg':
-            src_dir = os.path.join(atlas_src_dir(), 'python')
-            build_conda_zimg(src_dir, ext_conda_build_dir())
 
         if lib_name == 'jansson':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'jansson*'))
@@ -3392,24 +3334,71 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(ext_dir(), 'proxygen')
             build_proxygen(src_dir, ext_build_dir())
 
+        if lib_name == 'conda-zimg':
+            src_dir = os.path.join(atlas_src_dir(), 'python')
+            build_conda_zimg(src_dir, ext_conda_build_dir())
+
+        if lib_name == 'conda-opencv':
+            src_dir = os.path.join(ext_dir(), 'opencv')
+            src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
+            build_opencv(src_dir, src_contrib_dir, ext_conda_build_dir(), conda_build=True)
+
+        # if lib_name == 'ospray':
+        #     if is_windows():
+        #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*win*')
+        #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*win*')
+        #     elif is_linux():
+        #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*linux*')
+        #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*linux*')
+        #     else:
+        #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*osx*')
+        #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*osx*')
+        #     src_dir = os.path.join(ext_dir(), 'OSPRay')
+        #     assert os.path.exists(src_dir)
+        #     assert os.path.exists(ispc_dir)
+        #     assert os.path.exists(embree_dir)
+        #     build_ospray(src_dir, ext_build_dir(), ispc_dir=ispc_dir, embree_dir=embree_dir)
+
+        if lib_name == 'ospray':
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ospray*'))
+            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+            if not os.path.exists(src_dir):
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'ospray*'))
+                unpack_file_to_folder(package_name, ext_dir())
+                assert os.path.exists(src_dir)
+            build_ospray(src_dir, ext_build_dir())
+
+        if lib_name == 'ants':
+            src_dir = os.path.join(atlas_repository_dir(), '..', 'ANTs')
+            update_or_clone_git_repository(src_dir, 'git@github.com:ANTsX/ANTs.git')
+            if not os.path.exists(src_dir):
+                print('no ANTs')
+            else:
+                build_ants(src_dir, os.path.join(ext_build_dir(), 'ANTs'))
+
+        if lib_name == 'skia':
+            src_dir = os.path.join(atlas_repository_dir(), '..', 'skia')
+            update_or_clone_git_repository(src_dir, 'https://github.com/google/skia.git')
+            if not os.path.exists(src_dir):
+                print('no skia')
+            else:
+                build_skia(src_dir, ext_build_dir())
+
 
 def parse_inputs(argv: list):
-    lib_list = ['cmake', 'ninja', 'curl', 'gperf', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'tbb',
-                'eigen', 'pocketfft', 'reflect', 'simde',
-                'pybind11', 'glm', 'magic_enum', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
-                'openssl', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'snappy', 'bzip2',
-                'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'grpc', 'glbinding', 'libjpeg', 'libpng',
-                'openjpeg',
-                'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java', 'ants', 'skia',
-                'neuTube', 'rocksdb', 'llfio', 'jansson', 'pcre',
-                'fizz', 'mvfst', 'wangle', 'proxygen',
-                'conda-zimg', 'conda-opencv',
+    lib_list = ['cmake', 'ninja', 'curl', 'gperf', 'ffmpeg', 'java', 'qt', 'make-cmake-pathlist',
+                'zlib', 'boost', 'tbb', 'eigen', 'pocketfft', 'reflect', 'simde', 'pybind11', 'glm', 'googletest',
+                'cpuinfo', 'gflags', 'glog', 'benchmark', 'openssl', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt',
+                'libevent', 'snappy', 'bzip2', 'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'grpc',
+                'glbinding', 'libjpeg', 'libpng', 'openjpeg',
+                'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk', 'opencv',
+                'neuTube', 'rocksdb', 'llfio', 'jansson', 'pcre', 'fizz', 'mvfst', 'wangle', 'proxygen',
+                'conda-zimg', 'conda-opencv', 'ospray', 'ants', 'skia',
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
     # not used now
-    lib_skip_list = ['botan', 'ospray', 'ants', 'skia', 'rocksdb', 'conda-opencv', 'llfio']
+    lib_skip_list = ['ospray', 'ants', 'skia', 'rocksdb', 'conda-opencv', 'llfio']
 
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
