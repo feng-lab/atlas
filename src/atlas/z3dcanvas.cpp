@@ -27,7 +27,6 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   m_scene = std::make_unique<QGraphicsScene>(0, 0, width, height);
   m_pixmapItem = new QGraphicsPixmapItem();
   // m_pixmapItem->setTransformationMode(Qt::SmoothTransformation);
-  m_pixmapItem->setScale(1.0 / devicePixelRatio());
   m_scene->addItem(m_pixmapItem);
   setScene(m_scene.get());
 #endif
@@ -121,11 +120,11 @@ void Z3DCanvas::renderingFinished()
     const std::lock_guard<std::mutex> lock(m_engine->targetSwitchMutex());
     auto localBuffer = m_engine->monoReadyLocalBuffer();
     // CHECK(localBuffer);
-    QImage image(localBuffer->data.data(),
-                 localBuffer->width,
-                 localBuffer->height,
-                 QImage::Format_ARGB32_Premultiplied);
-    m_pixmapItem->setPixmap(QPixmap::fromImage(image.mirrored()));
+    auto pixmap = QPixmap::fromImage(
+      QImage(localBuffer->data.data(), localBuffer->width, localBuffer->height, QImage::Format_ARGB32_Premultiplied)
+        .mirrored());
+    pixmap.setDevicePixelRatio(devicePixelRatio());
+    m_pixmapItem->setPixmap(pixmap);
 
     m_engine->clearNewRenderingFlag();
     VLOG(1) << localBuffer << " " << localBuffer->width << " " << localBuffer->height;
@@ -220,7 +219,7 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
   m_scene->setSceneRect(QRect(QPoint(0, 0), event->size()));
 #endif
 
-  VLOG(1) << devicePixelRatio() << " " << event->size();
+  // VLOG(1) << devicePixelRatio() << " " << event->size() << " " << logicalDpiX() << " " << physicalDpiX();
   Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatio(), event->size().height() * devicePixelRatio());
 }
 
