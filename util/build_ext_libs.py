@@ -2794,7 +2794,7 @@ def build_proxygen(src_dir: str, install_dir: str):
             orig_file=os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt'),
             from_texts=[
                 r"""${PROXYGEN_FBCODE_ROOT}
-${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
+        ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
                 r'Boost::boost',
                 r'Boost::iostreams',
                 r'-lz',
@@ -2820,13 +2820,13 @@ ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
         FilePatcher(
             orig_file=os.path.join(src_dir, 'cmake', 'FindZstd.cmake'),
             from_texts=[
-                r"""find_library(ZSTD_LIBRARIES
-NAMES zstd""",
+                r"""ZSTD_LIBRARIES
+  NAMES zstd""",
                 r'if("${ZSTD_LIBRARIES}" MATCHES ".*.a$")',
             ],
             to_texts=[
                 r"""find_library(ZSTD_LIBRARIES
-NAMES zstd zstd_static""",
+  NAMES zstd zstd_static""",
                 r'if(TRUE)',
             ],
             patch_condition=is_windows,
