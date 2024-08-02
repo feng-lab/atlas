@@ -220,6 +220,7 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
   m_scene->setSceneRect(QRect(QPoint(0, 0), event->size()));
 #endif
 
+  VLOG(1) << devicePixelRatio() << " " << event->size();
   Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatio(), event->size().height() * devicePixelRatio());
 }
 

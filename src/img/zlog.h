@@ -304,6 +304,11 @@ inline std::ostream& operator<<(std::ostream& s, const QRectF& v)
   OUTPUT_QT_TYPE_VALUE(v)
 }
 
+inline std::ostream& operator<<(std::ostream& s, const QSize& v)
+{
+  OUTPUT_QT_TYPE_VALUE(v)
+}
+
 template<class T>
 std::ostream& operator<<(std::ostream& s, const QList<T>& v)
 {
