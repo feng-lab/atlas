@@ -3039,9 +3039,10 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 file.write(f'set(QT_VERSION {qt_ver()})\n')
                 if is_windows():
                     file.write('set(QT_HOST_PATH "{0}")\n'.format(qt_base_dir().replace("\\", "/")))
+                    file.write('set(ENV{VULKAN_SDK} ' + '"{0}")\n'.format(vulkan_SDK_env_dir().replace("\\", "/")))
                 else:
                     file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
-                file.write('set(ENV{VULKAN_SDK} ' + f'{vulkan_SDK_env_dir()})\n')
+                    file.write('set(ENV{VULKAN_SDK} ' + f'{vulkan_SDK_env_dir()})\n')
 
         if lib_name == 'zlib':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))
