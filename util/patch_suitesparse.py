@@ -2,6 +2,9 @@ import difflib
 import re
 
 from common_dirs import *
+from logger import setup_logger
+
+logger = logging.getLogger(__name__)
 
 
 def get_bak_file_name(orig_file: str):
@@ -41,13 +44,15 @@ def patch_file_line(orig_file: str, process_line, keep_bak_file: bool = True) ->
             last_line = line
             f.write(nline)
             to_lines.append(nline)
-    print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+    logger.info(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
     if not keep_bak_file:
         os.remove(bak_file)
     return bak_file
 
 
 if __name__ == "__main__":
+    logger = setup_logger()
+
     suitesparse_path = os.path.join(atlas_repository_dir(), '..', 'SuiteSparse')
     for file in glob.glob(os.path.join(suitesparse_path, 'CXSparse', 'Source', '*.c')):
         patch_file_line(file, process_CXSparse_line, keep_bak_file=False)

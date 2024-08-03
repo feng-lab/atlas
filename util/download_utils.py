@@ -6,7 +6,11 @@ import urllib.request
 import random
 import time
 from functools import wraps
+import logging
+
 import common_dirs
+
+logger = logging.getLogger(__name__)
 
 
 def retry_with_backoff(retries=5, backoff_in_seconds=1):
@@ -23,7 +27,7 @@ def retry_with_backoff(retries=5, backoff_in_seconds=1):
                     sleep = (backoff_in_seconds * 2 ** x + random.uniform(0, 1))
                     time.sleep(sleep)
                     x += 1
-                    print(f"Retrying {func.__name__}... (attempt {x + 1})")
+                    logger.info(f"Retrying {func.__name__}... (attempt {x + 1})")
 
         return wrapper
 
@@ -48,10 +52,10 @@ def calculate_checksum(file_path):
 def validate_checksum(file_path, expected_sha256):
     calculated_hash = calculate_checksum(file_path)
     if calculated_hash == expected_sha256:
-        print(f"Checksum validation successful for {file_path}")
+        logger.info(f"Checksum validation successful for {file_path}")
         return True
     else:
-        print(f"Checksum validation failed for {file_path}")
+        logger.warning(f"Checksum validation failed for {file_path}")
         return False
 
 
@@ -73,13 +77,13 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
     if os.path.exists(target_path):
         current_size = os.path.getsize(target_path)
         if current_size == expected_size:
-            print(f"File {target_path} already exists with correct size. Skipping download.")
+            logger.info(f"File {target_path} already exists with correct size. Skipping download.")
             return validate_checksum(target_path, expected_sha256)
         elif current_size > expected_size:
-            print(f"File {target_path} is larger than expected. Re-downloading.")
+            logger.warning(f"File {target_path} is larger than expected. Re-downloading.")
             current_size = 0
         else:
-            print(f"Resuming download for {target_path}")
+            logger.info(f"Resuming download for {target_path}")
     else:
         current_size = 0
 
@@ -90,16 +94,16 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
     }
     # Print proxy information
     if http_proxy or https_proxy:
-        print("Using proxy:")
+        logger.info("Using proxy:")
         if http_proxy:
-            print(f"  HTTP Proxy: {http_proxy}")
+            logger.info(f"  HTTP Proxy: {http_proxy}")
         if https_proxy:
-            print(f"  HTTPS Proxy: {https_proxy}")
+            logger.info(f"  HTTPS Proxy: {https_proxy}")
 
     urls = [url, backup_url]
     for current_url in urls:
         try:
-            print(f"Downloading from {current_url}")
+            logger.info(f"Downloading from {current_url}")
 
             # Set up headers
             headers = {
@@ -117,7 +121,7 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
 
             # If we get a 406 or 416 error, try again without range header
             if response.status_code in [406, 416]:
-                print(f"Range request not supported or invalid. Downloading entire file.")
+                logger.info(f"Range request not supported or invalid. Downloading entire file.")
                 headers.pop('Range', None)
                 response = requests.get(current_url, stream=True, proxies=proxies, headers=headers)
                 current_size = 0  # Reset current_size as we're downloading from the beginning
@@ -143,21 +147,21 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
                         sys.stdout.write(f"\rProgress: {progress:.2f}% | Speed: {speed:.2f} MB/s")
                         sys.stdout.flush()
 
-            print()  # New line after download completes
+            logger.info('')  # New line after download completes
 
             if os.path.getsize(target_path) != expected_size:
-                print(f"Downloaded file size does not match expected size. Trying next URL.")
+                logger.warning(f"Downloaded file size does not match expected size. Trying next URL.")
                 continue
 
             if validate_checksum(target_path, expected_sha256):
-                print(f"File downloaded successfully: {target_path}")
+                logger.info(f"File downloaded successfully: {target_path}")
                 return True
             else:
-                print(f"Checksum validation failed. Trying next URL.")
+                logger.warning(f"Checksum validation failed. Trying next URL.")
         except requests.RequestException as e:
-            print(f"Error downloading from {current_url}: {e}")
+            logger.error(f"Error downloading from {current_url}: {e}")
 
-    print(f"Failed to download file from all URLs.")
+    logger.error(f"Failed to download file from all URLs.")
     return False
 
 
@@ -193,10 +197,10 @@ def sync_files(files_to_download, target_directory, check_os: bool = True):
         )
 
         if not success:
-            sys.stderr.write(f"Failed to download {file_info['filename']}")
+            logger.error(f"Failed to download {file_info['filename']}")
             sys.exit(1)
 
-        print()
+        logger.info('')
 
     # Remove files that are not in the download list
     for root, dirs, files in os.walk(target_directory):
@@ -204,7 +208,7 @@ def sync_files(files_to_download, target_directory, check_os: bool = True):
             file_path = os.path.join(root, file)
             relative_path = os.path.relpath(file_path, target_directory)
             if relative_path not in expected_files:
-                print(f"Removing file not in download list: {relative_path}")
+                logger.info(f"Removing file not in download list: {relative_path}")
                 os.remove(file_path)
 
     # Remove empty directories
@@ -213,4 +217,4 @@ def sync_files(files_to_download, target_directory, check_os: bool = True):
             dir_path = os.path.join(root, dir)
             if not os.listdir(dir_path):
                 os.rmdir(dir_path)
-                print(f"Removed empty directory: {dir_path}")
+                logger.info(f"Removed empty directory: {dir_path}")

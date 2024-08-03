@@ -3,6 +3,9 @@ import argparse
 from common_dirs import *
 import build_ext_libs
 from download_atlas_test_data import *
+from logger import setup_logger
+
+logger = logging.getLogger(__name__)
 
 
 def get_cmake_cmd_common_part(arm64: bool = False):
@@ -45,9 +48,9 @@ def get_cmake_cmd_common_part(arm64: bool = False):
 
 
 def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: bool = False, arm64: bool = False):
-    print('srcDIR:', atlas_repository_dir())
-    print('buildDIR:', atlas_build_dir(arm64=arm64))
-    print('useNinja:', use_ninja())
+    logger.info(f'srcDIR: {atlas_repository_dir()}')
+    logger.info(f'buildDIR: {atlas_build_dir(arm64=arm64)}')
+    logger.info(f'useNinja: {use_ninja()}')
 
     skip_test = skip_test or use_asan or debug_version
 
@@ -71,7 +74,7 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
                                          r'C:\Strawberry\perl\bin',
                                          ])
         env['PATH'] = f'{env["PATH"]};{tbb_redist_dir()};{qt_bin_dir()};{freeimage_redist_dir()}'
-        print(env['PATH'])
+        logger.info(env['PATH'])
         subprocess.run(cmakecmd,
                        cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
         if use_ninja():
@@ -93,7 +96,7 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
             env['CXX'] = build_ext_libs.get_clangplus_in_linux()
         subprocess.run(cmakecmd, cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
         if use_ninja():
-            subprocess.run([build_ext_libs.get_ninja_binary()],
+            subprocess.run([get_ninja_binary()],
                            cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
         else:
             subprocess.run(['make', '-j' + str(os.cpu_count())],
@@ -107,6 +110,8 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
 
 
 if __name__ == "__main__":
+    logger = setup_logger()
+
     parser = argparse.ArgumentParser(
         epilog=f"""
 Examples:

@@ -8,6 +8,9 @@ from pathlib import Path
 
 from common_dirs import *
 from download_atlas_deps import *
+from logger import setup_logger
+
+logger = logging.getLogger(__name__)
 
 
 def macos_min_version():
@@ -32,7 +35,7 @@ def get_clangplus_in_linux() -> str:
 
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
-        print('git', 'pull', Path(repository_folder).name)
+        logger.info(f'git pull {Path(repository_folder).name}')
         subprocess.run(['git', 'pull'], cwd=repository_folder, shell=False, check=False)
     else:
         subprocess.run(['git', 'clone', repository_url, repository_folder], shell=False, check=True)
@@ -40,7 +43,7 @@ def update_or_clone_git_repository(repository_folder: str, repository_url: str):
 
 def update_or_clone_git_repository_with_submodules(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
-        print(f'git pull {Path(repository_folder).name}')
+        logger.info(f'git pull {Path(repository_folder).name}')
         subprocess.run(['git', 'pull'], cwd=repository_folder, shell=False, check=False)
         subprocess.run(['git', 'submodule', 'update', '--init', '--recursive'],
                        cwd=repository_folder, shell=False, check=False)
@@ -63,7 +66,7 @@ def update_or_clone_git_repository_with_submodules(repository_folder: str, repos
 
 def update_git_submodule(target_folder: str, tag: str = None):
     assert os.path.exists(target_folder)
-    print('update', 'submodule', Path(target_folder).name)
+    logger.info(f'update submodule {Path(target_folder).name}')
     subprocess.run(['git', 'submodule', 'update', '--init', '--remote', '--',
                     f'src/3rdparty/{Path(target_folder).name}'],
                    cwd=atlas_repository_dir(), shell=False, check=True)
@@ -86,6 +89,7 @@ def create_build_dir(src_dir: str):
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
     os.mkdir(build_dir)
+    logger.info(f'created build dir: {build_dir}')
     return build_dir
 
 
@@ -99,14 +103,14 @@ def create_arm64_install_dir(src_dir: str):
 
 def create_universal_binaries(arm64_install_dir, final_install_dir, remove_dylib: bool = False):
     assert is_mac()
-    print(f'{arm64_install_dir} to {final_install_dir}')
+    logger.info(f'{arm64_install_dir} to {final_install_dir}')
     for root, dirs, files in os.walk(arm64_install_dir):
         for name in files:
             filename = os.path.join(root, name)
             if Path(filename).is_symlink():
                 if remove_dylib and filename.endswith('.dylib'):
                     target_filename = filename.replace(arm64_install_dir, final_install_dir)
-                    print(f'deleting {target_filename}')
+                    logger.info(f'deleting {target_filename}')
                     os.unlink(target_filename)
                 continue
             if filename.endswith('.a') or filename.endswith('.dylib') or root.endswith('bin'):
@@ -120,17 +124,17 @@ def create_universal_binaries(arm64_install_dir, final_install_dir, remove_dylib
                     continue
                 target_filename = filename.replace(arm64_install_dir, final_install_dir)
                 if name.startswith('libtegra_hal.a'):
-                    print(f'copy {filename} to {target_filename}')
+                    logger.info(f'copy {filename} to {target_filename}')
                     shutil.copyfile(filename, target_filename)
                     continue
                 if remove_dylib and filename.endswith('.dylib'):
-                    print(f'deleting {target_filename}')
+                    logger.info(f'deleting {target_filename}')
                     os.unlink(target_filename)
                 elif not os.path.exists(target_filename):
-                    print(f'copy {filename} to {target_filename}')
+                    logger.info(f'copy {filename} to {target_filename}')
                     shutil.copyfile(filename, target_filename)
                 else:
-                    print(f'merge {filename} to {target_filename}')
+                    logger.info(f'merge {filename} to {target_filename}')
                     subprocess.run(['lipo', '-create', filename, target_filename, '-output', target_filename],
                                    shell=False, check=True)
 
@@ -157,7 +161,7 @@ def glob_remove(files: str):
             shutil.rmtree(file, ignore_errors=True)
         else:
             os.remove(file)
-        print(f'{file} removed')
+        logger.info(f'{file} removed')
 
 
 def remove_installed_dynamic_library(install_dir: str, libnames: list):
@@ -167,11 +171,11 @@ def remove_installed_dynamic_library(install_dir: str, libnames: list):
         elif is_windows():
             filename = os.path.join(install_dir, 'lib', f'{libname}.lib')
             if os.path.exists(filename):
-                print(f'deleting {filename}')
+                logger.info(f'deleting {filename}')
                 os.unlink(filename)
             filename = os.path.join(install_dir, 'bin', f'{libname}.dll')
             if os.path.exists(filename):
-                print(f'deleting {filename}')
+                logger.info(f'deleting {filename}')
                 os.unlink(filename)
         else:
             glob_remove(os.path.join(install_dir, 'lib', f'lib{libname}.*dylib'))
@@ -206,10 +210,9 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     stdout, stderr = process.communicate()
     exitcode = process.wait()
     if exitcode != 0:
-        print(stdout, flush=True)
-        print(stderr, flush=True)
+        logger.info(stdout)
+        logger.info(stderr)
         raise Exception("Got error code {} from subprocess.".format(exitcode))
-    # print(stdout.strip())
     env = json.loads(stdout.strip())
     if remove_conda_from_path:
         remove_path_contains('miniconda', env)
@@ -472,13 +475,14 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
     txt = Path(bak_file).read_text(errors='ignore')
     with open(orig_file, mode='w', encoding='utf-8') as f:
         for from_text, to_text in zip(from_texts, to_texts):
+            assert from_text in txt, from_text
             txt = txt.replace(from_text, to_text)
         f.write(txt)
     with open(bak_file, mode='r', encoding='utf-8', errors='ignore') as f:
         from_lines = f.readlines()
     with open(orig_file, mode='r', encoding='utf-8') as f:
         to_lines = f.readlines()
-    print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+    logger.info(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
     if not keep_bak_file:
         os.remove(bak_file)
     return bak_file
@@ -494,21 +498,21 @@ class FilePatcher:
 
     def patch_file(self):
         if not self.patch_condition():
-            # print("Patch condition not met, skipping patch.")
+            # logger.debug("Patch condition not met, skipping patch.")
             return
 
         self.bak_file = patch_file(orig_file=self.orig_file, from_texts=self.from_texts, to_texts=self.to_texts,
                                    keep_bak_file=True)
-        print(f'Patched {self.orig_file}')
+        logger.info(f'Patched {self.orig_file}')
 
     def restore_file(self):
         if not self.patch_condition():
-            # print("Patch condition not met, skipping restore.")
+            # logger.debug("Patch condition not met, skipping restore.")
             return
 
         if self.bak_file and os.path.exists(self.bak_file):
             os.replace(self.bak_file, self.orig_file)
-            print(f'Restored {self.orig_file} from backup.')
+            logger.info(f'Restored {self.orig_file} from backup.')
 
 
 class PatchManager:
@@ -554,7 +558,6 @@ def build_zlib(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
-        print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
 
@@ -649,7 +652,7 @@ def build_boost(src_dir: str, install_dir: str):
                             ],
                            cwd=src_dir, shell=False, check=True, env=env)
     finally:
-        print('done')
+        logger.info('done')
 
 
 def clean_boost(install_dir: str):
@@ -671,7 +674,6 @@ def build_tbb(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        print()
 
 
 def build_eigen(src_dir: str, install_dir: str):
@@ -936,7 +938,6 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
 
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                print()
                 shutil.rmtree(arm64_install_dir, ignore_errors=False)
         elif is_windows():
             env = get_env_for_config_make(remove_scoop_from_path=False)
@@ -953,7 +954,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
             subprocess.run(['nmake', 'install_sw'],
                            cwd=src_dir, shell=True, check=True, env=env)
     finally:
-        print('done')
+        logger.info('done')
 
 
 def build_double_conversion(src_dir: str, install_dir: str):
@@ -1247,10 +1248,9 @@ def build_libsodium(src_dir: str, install_dir: str):
 
                     create_universal_binaries(arm64_install_dir, install_dir)
                 finally:
-                    print()
                     shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
-        print('done')
+        logger.info('done')
 
 
 def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
@@ -1569,7 +1569,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
 
 
 def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
-    print(nasm_dir)
+    logger.info(f'nasm_dir: {nasm_dir}')
     build_dir = create_build_dir(src_dir)
 
     patches = [
@@ -1771,7 +1771,6 @@ def build_libwebp(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
-        print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
 
     if is_mac():
@@ -1784,7 +1783,6 @@ def build_libwebp(src_dir: str, install_dir: str):
             build_and_install_cmakecmd(cmakecmd, build_dir)
             create_universal_binaries(arm64_install_dir, install_dir)
         finally:
-            print('done')
             shutil.rmtree(build_dir, ignore_errors=False)
             shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
@@ -2414,7 +2412,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             ]
 
             if conda_build:
-                print('CONDA_PREFIX', os.environ['CONDA_PREFIX'])
+                logger.info(f'CONDA_PREFIX {os.environ["CONDA_PREFIX"]}')
                 if is_windows():
                     cmakecmd_options.extend([
                         '-DTBB_DIR=' + os.environ['CONDA_PREFIX'] + '/Library/lib/cmake/tbb',
@@ -2464,7 +2462,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                 if cmd.startswith('-DCMAKE_CXX_FLAGS:'):
                     cmakecmd[idx] = cmd + ' /DWIN32_LEAN_AND_MEAN'
         cmakecmd.extend(get_cmakecmd_options(arm64_build=False))
-        # print(cmakecmd)
+        # logger.debug(cmakecmd)
         cmakecmd.extend([src_dir])
 
         if conda_build and is_windows():
@@ -2475,7 +2473,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                                                    remove_conda_from_path=False)
             build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
         else:
-            print()
             build_and_install_cmakecmd(cmakecmd, build_dir)
 
         if is_mac() and not conda_build:
@@ -2484,7 +2481,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             try:
                 cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
                 cmakecmd.extend(get_cmakecmd_options(arm64_build=True))
-                # print(cmakecmd)
+                # logger.debug(cmakecmd)
                 cmakecmd.extend([src_dir])
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
@@ -2596,7 +2593,6 @@ def build_rocksdb(src_dir: str, install_dir: str):
                   os.path.join(src_dir, 'cmake', 'modules', 'FindTBB.cmake'))
         os.rename(os.path.join(src_dir, 'cmake', 'modules', '__Findzstd.cmake'),
                   os.path.join(src_dir, 'cmake', 'modules', 'Findzstd.cmake'))
-        print()
 
 
 def build_llfio(src_dir: str, install_dir: str):
@@ -2620,7 +2616,6 @@ def build_llfio(src_dir: str, install_dir: str):
                             dirs_exist_ok=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
-        print()
 
 
 def build_jansson(src_dir: str, install_dir: str):
@@ -2692,7 +2687,6 @@ def build_fizz(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
-        print()
 
 
 def build_mvfst(src_dir: str, install_dir: str):
@@ -2735,7 +2729,6 @@ def build_mvfst(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
-        print()
 
 
 def build_wangle(src_dir: str, install_dir: str):
@@ -2767,7 +2760,6 @@ def build_wangle(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
-        print()
 
 
 def build_proxygen(src_dir: str, install_dir: str):
@@ -2874,7 +2866,6 @@ def build_proxygen(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
-        print()
 
 
 def build_conda_zimg(src_dir: str, install_dir: str):
@@ -2902,7 +2893,6 @@ def build_conda_zimg(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
     finally:
-        print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
         if is_mac():
             os.rename(os.path.join(ext_build_dir(), 'include', '__tbb'),
@@ -2940,7 +2930,6 @@ def build_ants(src_dir: str, install_dir: str):
         subprocess.run(['make', 'install'],
                        cwd=os.path.join(build_dir, 'ANTS-build'), shell=False, check=True)
     finally:
-        print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -2962,21 +2951,21 @@ def build_skia(src_dir: str, install_dir: str):
             shutil.rmtree(skia_lib_dir, ignore_errors=False)
         glob_copy(os.path.join(src_dir, 'out', 'Static', '*.a'), skia_lib_dir)
     finally:
-        print('done')
+        logger.info('done')
 
 
 def build_libs(libs: OrderedDict, use_asan: bool):
-    # print('extDIR:', ext_dir())
-    # print('srcPackageDIR:', src_package_dir())
+    logger.info(f'extDIR: {ext_dir()}')
+    logger.info(f'srcPackageDIR: {src_package_dir()}')
 
     remove_path_contains('miniconda')
     remove_path_contains('anaconda')
-    print('PATH:', os.environ['PATH'])
+    logger.info(f'PATH: {os.environ['PATH']}')
 
     if is_windows():
         os.environ['HOME'] = os.path.expanduser("~")
 
-    print('HOME:', os.environ['HOME'])
+    logger.info(f'HOME: {os.environ['HOME']}')
 
     download_atlas_deps()
 
@@ -3015,7 +3004,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             else:
                 package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*windows*'))
             jre_dir = os.path.join(ext_build_dir(), get_package_top_level_folder(package_name))
-            print(jre_dir)
+            logger.info(jre_dir)
             if not os.path.exists(jre_dir):
                 if os.path.exists(os.path.join(ext_build_dir(), 'jre')):
                     os.unlink(os.path.join(ext_build_dir(), 'jre'))
@@ -3024,10 +3013,10 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 assert os.path.exists(jre_dir)
                 if os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
                     os.unlink(os.path.join(ext_build_dir(), 'jre'))
-                    print('link jre')
+                    logger.info('link jre')
                     os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
             if not os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
-                print('link jre')
+                logger.info('link jre')
                 os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
 
             if is_mac():
@@ -3035,7 +3024,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 if not os.path.lexists(os.path.join(ext_build_dir(), 'jrearm')):
                     os.mkdir(os.path.join(ext_build_dir(), 'jrearm'))
                 jre_dir = os.path.join(ext_build_dir(), 'jrearm', get_package_top_level_folder(package_name))
-                print(jre_dir)
+                logger.info(jre_dir)
                 if not os.path.exists(jre_dir):
                     if os.path.exists(os.path.join(ext_build_dir(), 'jre-arm')):
                         os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
@@ -3043,14 +3032,14 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                     assert os.path.exists(jre_dir)
                     if os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
                         os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
-                        print('link jre-arm')
+                        logger.info('link jre-arm')
                         os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
                 if not os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
-                    print('link jre-arm')
+                    logger.info('link jre-arm')
                     os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
 
         if lib_name == 'qt':
-            print(f'Qt {qt_ver()} in {qt_base_dir()}')
+            logger.info(f'Qt {qt_ver()} in {qt_base_dir()}')
             # if is_windows():
             #     # patch Qt, not necessary for qt6
             #     orig_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h')
@@ -3068,7 +3057,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             #                     r'defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14')
             #                 f.write(line)
             #                 to_lines.append(line)
-            #         print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+            #         logger.info(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
 
             # patch installer framework
             pattern_bytes = b'Mozilla/5.0'
@@ -3084,14 +3073,14 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                         all_indexes.append(index)
                         index = mm.find(pattern_bytes, index + len(pattern_bytes))
                     if not all_indexes:
-                        print("Pattern not found in {0}, skip patching.".format(file))
+                        logger.info(f"Pattern not found in {file}, skip patching.")
                     else:
                         # make backup
                         shutil.copy2(file, file + '.bak')
                         for index in all_indexes:
                             mm[index:index + len(replace_bytes)] = replace_bytes
                         mm.flush()
-                        print("{0} successfully patched at {1} places.".format(file, len(all_indexes)))
+                        logger.info(f"{file} successfully patched at {len(all_indexes)} places.")
 
         if lib_name == 'make-cmake-pathlist':
             with open(os.path.join(ext_build_dir(), 'PathList.cmake'), mode='w', encoding='utf-8') as file:
@@ -3145,14 +3134,14 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             build_simde(src_dir, ext_build_dir())
 
         if lib_name == 'pybind11':
-            print('pybind11')
+            logger.info('pybind11')
 
         if lib_name == 'glm':
             src_dir = os.path.join(ext_dir(), 'glm')
             build_glm(src_dir, ext_build_dir())
 
         if lib_name == 'googletest':
-            print('googletest')
+            logger.info('googletest')
 
         if lib_name == 'cpuinfo':
             src_dir = os.path.join(ext_dir(), 'cpuinfo')
@@ -3304,7 +3293,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             build_jxrlib(src_dir, ext_build_dir())
 
         if lib_name == 'geometrictools':
-            print('geometrictools')
+            logger.info('geometrictools')
 
         if lib_name == 'assimp':
             src_dir = os.path.join(ext_dir(), 'assimp')
@@ -3433,7 +3422,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(atlas_repository_dir(), '..', 'ANTs')
             update_or_clone_git_repository(src_dir, 'git@github.com:ANTsX/ANTs.git')
             if not os.path.exists(src_dir):
-                print('no ANTs')
+                logger.info('no ANTs')
             else:
                 build_ants(src_dir, os.path.join(ext_build_dir(), 'ANTs'))
 
@@ -3441,7 +3430,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(atlas_repository_dir(), '..', 'skia')
             update_or_clone_git_repository(src_dir, 'https://github.com/google/skia.git')
             if not os.path.exists(src_dir):
-                print('no skia')
+                logger.info('no skia')
             else:
                 build_skia(src_dir, ext_build_dir())
 
@@ -3492,7 +3481,7 @@ def parse_inputs(argv: list):
                             'fizz': ['mvfst'],
                             }
 
-    print('current interpreter: ' + sys.executable)
+    logger.info(f'current interpreter: {sys.executable}')
 
     parser = argparse.ArgumentParser(
         epilog=f"""
@@ -3551,4 +3540,6 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
 
 
 if __name__ == "__main__":
+    logger = setup_logger()
+
     build_libs(*parse_inputs(sys.argv))

@@ -3,8 +3,11 @@ import argparse
 import build_atlas
 import deploy_atlas
 import common_dirs
+from logger import setup_logger
 
 if __name__ == "__main__":
+    logger = setup_logger()
+
     parser = argparse.ArgumentParser(
         epilog=f"""
 Examples:

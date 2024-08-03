@@ -6,10 +6,14 @@ import subprocess
 import xml.etree.ElementTree as eTree
 import datetime
 import zipfile
+import logging
 
 import common_dirs
 import linuxdeployqt
 import build_ext_libs
+from logger import setup_logger
+
+logger = logging.getLogger(__name__)
 
 
 def get_bak_file_name(orig_file: str):
@@ -33,12 +37,12 @@ def update_maintenance_pacakge_xml_version(template_file: str, file: str):
 
 
 def build_atlas_package(is_debug_version: bool = False):
-    print('current interpreter: ' + sys.executable)
+    logger.info(f'current interpreter: {sys.executable}')
 
     binary_dir = common_dirs.atlas_binary_dir()
-    print('binaryDIR:', binary_dir)
-    print('deployTargetDIR:', common_dirs.deploy_target_dir())
-    print('qtBaseDIR:', common_dirs.qt_base_dir())
+    logger.info(f'binaryDIR: {binary_dir}')
+    logger.info(f'deployTargetDIR: {common_dirs.deploy_target_dir()}')
+    logger.info(f'qtBaseDIR: {common_dirs.qt_base_dir()}')
 
     if common_dirs.is_mac():
         app_name = 'Atlas.app'
@@ -56,7 +60,7 @@ def build_atlas_package(is_debug_version: bool = False):
             sys.exit(1)
 
         binary_dir = common_dirs.atlas_binary_dir(arm64=True)
-        print('arm64 binaryDIR:', binary_dir)
+        logger.info(f'arm64 binaryDIR: {binary_dir}')
         arm64_app_name = 'Atlas_arm64.app'
 
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), arm64_app_name), ignore_errors=True)
@@ -73,7 +77,7 @@ def build_atlas_package(is_debug_version: bool = False):
 
         filename = os.path.join(common_dirs.deploy_target_dir(), arm64_app_name, 'Contents', 'MacOS', 'Atlas')
         target_filename = os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas')
-        print(f'merge {filename} to {target_filename}')
+        logger.info(f'merge {filename} to {target_filename}')
         subprocess.run(['lipo', '-create', filename, target_filename, '-output', target_filename],
                        shell=False, check=True)
         subprocess.run(['codesign', '--force', '--deep', '--sign', '-',
@@ -289,6 +293,8 @@ def deploy_atlas(is_debug_version: bool = False):
 
 
 if __name__ == "__main__":
+    logger = setup_logger()
+
     parser = argparse.ArgumentParser(
         epilog=f"""
 Examples:

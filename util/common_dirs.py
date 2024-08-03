@@ -7,7 +7,10 @@ import zipfile
 import stat
 import subprocess
 import errno
+import logging
 from packaging import version
+
+logger = logging.getLogger(__name__)
 
 
 def is_windows() -> bool:
@@ -412,7 +415,7 @@ def get_package_top_level_folder(file: str):
     res = ''
     if file.lower().endswith('.zip'):
         with zipfile.ZipFile(file, mode='r') as zf:
-            print(zf.namelist())
+            logger.info(zf.namelist())
             res = os.path.commonpath(
                 [nm for nm in zf.namelist() if not nm.endswith('/') and not nm.startswith('__MACOSX')])
     elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
@@ -440,7 +443,7 @@ def get_package_top_level_folder(file: str):
 
 
 def unpack_file_to_folder(file: str, folder: str):
-    print('unpacking', file)
+    logger.info(f'unpacking {file}')
     if file.lower().endswith('.zip'):
         with zipfile.ZipFile(file, mode='r') as zf:
             zf.extractall(path=folder)
@@ -462,7 +465,7 @@ def unpack_tool_to_target_dir(tool_package_folder: str, tool_package_glob_name: 
         package_unpack_folder = os.path.join(target_dir, os.path.splitext(os.path.basename(package_name))[0])
     else:
         package_unpack_folder = os.path.join(target_dir, package_folder)
-    print(package_unpack_folder)
+    logger.info(f'package unpack folder: {package_unpack_folder}')
     if not os.path.exists(package_unpack_folder):
         remove_old_src_folder_with_glob(os.path.join(target_dir, tool_folder_glob_name))
         unpack_file_to_folder(package_name, target_dir if package_folder else package_unpack_folder)

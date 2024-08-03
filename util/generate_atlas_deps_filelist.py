@@ -1,6 +1,11 @@
 from ftplib import FTP
+import logging
+
 from download_utils import *
 import common_dirs
+from logger import setup_logger
+
+logger = logging.getLogger(__name__)
 
 
 @retry_with_backoff()
@@ -14,7 +19,7 @@ def ftp_delete(ftp, filename):
 
 
 def sync_via_ftp(local_folder, hostname, username, password, remote_folder):
-    print(hostname, username)
+    logger.info(f'{username}@{hostname}')
     ftp = FTP(hostname)
     ftp.login(user=username, passwd=password)
 
@@ -41,18 +46,18 @@ def sync_via_ftp(local_folder, hostname, username, password, remote_folder):
             local_size = os.path.getsize(local_path)
             if filename in remote_files:
                 if local_size == remote_files[filename]:
-                    print(f"Skipping {filename} (already exists with correct size on FTP server)")
+                    logger.info(f"Skipping {filename} (already exists with correct size on FTP server)")
                     remote_files.pop(filename)
                     continue
                 remote_files.pop(filename)
 
             with open(local_path, 'rb') as file:
                 ftp_store(ftp, f'STOR {os.path.basename(remote_path)}', file)
-            print(f"Uploaded {filename} to FTP server")
+            logger.info(f"Uploaded {filename} to FTP server")
 
     for old_file in remote_files:
         ftp_delete(ftp, old_file)
-        print(f"Removed old file {old_file} from FTP server")
+        logger.info(f"Removed old file {old_file} from FTP server")
 
     ftp.quit()
 
@@ -67,7 +72,7 @@ def process_files(folder_path, base_url, backup_base_url):
             local_path = os.path.join(root, filename)
             relative_path = os.path.relpath(local_path, folder_path)
 
-            print(f"Processing {relative_path}...")
+            logger.info(f"Processing {relative_path}...")
 
             checksum = calculate_checksum(local_path)
             size = os.path.getsize(local_path)
@@ -101,6 +106,8 @@ def generate_atlas_deps_filelist(files_info, output_file):
 
 
 if __name__ == "__main__":
+    logger = setup_logger()
+
     ftp_info = {
         'hostname': os.getenv('FTP_HOSTNAME'),
         'username': os.getenv('FTP_USERNAME'),

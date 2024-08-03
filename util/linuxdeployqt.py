@@ -3,23 +3,9 @@ import shutil
 import subprocess
 import tempfile
 import glob
+import logging
 
-
-def error(s):
-    print("ERROR: " + s)
-    exit(1)
-
-
-def warn(s):
-    print("WARNING: " + s)
-
-
-def info(s):
-    print("INFO: " + s)
-
-
-def debug(s):
-    print("DEBUG: " + s)
+logger = logging.getLogger(__name__)
 
 
 def merge_dicts(x, y):
@@ -79,7 +65,7 @@ def objdumpr(executable, libs, blacklist):
             continue
 
         if split[1] in blacklist or os.path.basename(split[0]) in blacklist:
-            debug("'%s' is blacklisted. Skipping..." % (split[0]))
+            logger.debug("'%s' is blacklisted. Skipping...", (split[0]))
             continue
 
         so = split[1]
@@ -87,14 +73,14 @@ def objdumpr(executable, libs, blacklist):
         realpath = os.path.realpath(path)
 
         if not os.path.exists(path):
-            debug("Can't find path for %s (resolved to %s). Skipping..." % (so, path))
+            logger.debug("Can't find path for %s (resolved to %s). Skipping...", so, path)
             continue
 
         if so not in libs:
             details = {'so': so, 'path': path, 'realpath': realpath, 'dependants': {executable}, 'type': 'lib'}
             libs[so] = details
 
-            debug("Resolved %s to %s" % (so, realpath))
+            logger.debug("Resolved %s to %s", so, realpath)
 
             libs = merge_dicts(libs, lddr(realpath, libs, blacklist))
         else:
@@ -127,12 +113,12 @@ def lddr(executable, libs, blacklist):
             continue
 
         if split[0] == 'statically' and split[1] == 'linked':
-            debug("'%s' is statically linked. Skipping..." % (os.path.basename(executable)))
+            logger.debug("'%s' is statically linked. Skipping...", (os.path.basename(executable)))
             continue
 
         if len(split) < 3:
-            warn("Could not determine path of %s %s for ldd output line '%s'. Skipping..."
-                 % (os.path.basename(executable), split, line))
+            logger.warning("Could not determine path of %s %s for ldd output line '%s'. Skipping...",
+                           os.path.basename(executable), split, line)
             continue
 
         so = split[0]
@@ -140,14 +126,14 @@ def lddr(executable, libs, blacklist):
         realpath = os.path.realpath(path)
 
         if not os.path.exists(path):
-            debug("Can't find path for %s (resolved to %s). Skipping..." % (so, path))
+            logger.debug("Can't find path for %s (resolved to %s). Skipping...", so, path)
             continue
 
         if so not in libs:
             details = {'so': so, 'path': path, 'realpath': realpath, 'dependants': {executable}, 'type': 'lib'}
             libs[so] = details
 
-            debug("Resolved %s to %s" % (so, realpath))
+            logger.debug("Resolved %s to %s", so, realpath)
 
             libs = merge_dicts(libs, lddr(realpath, libs, blacklist))
         else:
@@ -160,9 +146,9 @@ def strip(f):
     cp = subprocess.run(['file', f], stdout=subprocess.PIPE, encoding='utf-8')
     if 'not stripped' in cp.stdout:
         res = subprocess.call(('strip', "-x", f))
-        debug("Stripping '%s'" % f)
+        logger.debug("Stripping '%s'", f)
         if res > 0:
-            warn("'strip' command failed with return code '%s' on file '%s'" % (res, f))
+            logger.warning("'strip' command failed with return code '%s' on file '%s'", res, f)
         return res
     else:
         return 0
@@ -171,9 +157,9 @@ def strip(f):
 def patch_elf(options, f):
     arguments = ['patchelf'] + options + [f]
     res = subprocess.call(arguments)
-    debug("Running patchelf '%s'" % arguments)
+    logger.debug("Running patchelf '%s'", arguments)
     if res > 0:
-        warn("'patchelf' command failed with return code '%s' on file '%s'" % (res, f))
+        logger.warning("'patchelf' command failed with return code '%s' on file '%s'", res, f)
     return res
 
 
@@ -185,7 +171,7 @@ def create_qt_conf(conf_path):
     qt_conf += "Qml2Imports = qml\n"
 
     qc = conf_path + os.sep + "qt.conf"
-    debug("Writing qt.conf to '%s'" % qc)
+    logger.debug("Writing qt.conf to '%s'", qc)
     text_file = open(qc, "w")
     text_file.write(qt_conf)
     text_file.close()
@@ -205,7 +191,7 @@ def create_desktop_file(path):
     d += "StartupWMClass=Atlas\n"
 
     f = path + os.sep + "atlas.desktop"
-    debug("Writing desktop to '%s'" % f)
+    logger.debug("Writing desktop to '%s'", f)
     text_file = open(f, "w")
     text_file.write(d)
     text_file.close()
@@ -256,7 +242,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
                     details['so'].startswith('libatomic.so') or \
                     (not src.startswith('/usr/lib/') and not src.startswith('/lib/')):
                 dst = dest_dir + os.sep + appdir_libs + os.sep + dep
-                debug("Copying library " + dep + ": " + src + ' -> ' + dst)
+                logger.debug("Copying library " + dep + ": " + src + ' -> ' + dst)
                 shutil.copyfile(src, dst)  # overrides dest no questions asked
                 strip(dst)
 
@@ -268,26 +254,26 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
             dst_dir = os.path.dirname(dst)
             src_dir = os.path.dirname(src)
 
-            debug("Copying qml plugin dir " + dep + ": " + src_dir + ' -> ' + dst_dir)
+            logger.debug("Copying qml plugin dir " + dep + ": " + src_dir + ' -> ' + dst_dir)
             shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
             strip(dst)
         else:
             src = details['realpath']
-            debug("Unhandled type '%s' (%s)" % (details['type'], src))
+            logger.debug("Unhandled type '%s' (%s)", details['type'], src)
 
     for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6XcbQpa.so*')):
         dst = dest_dir + os.sep + appdir_libs
-        debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
+        logger.debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
         shutil.copy2(dep, dst)  # overrides dest no questions asked
 
     for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6WaylandClient.so*')):
         dst = dest_dir + os.sep + appdir_libs
-        debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
+        logger.debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
         shutil.copy2(dep, dst)  # overrides dest no questions asked
 
     for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6WaylandEglClientHwIntegration.so*')):
         dst = dest_dir + os.sep + appdir_libs
-        debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
+        logger.debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
         shutil.copy2(dep, dst)  # overrides dest no questions asked
 
     # for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6Egl*')):
@@ -315,7 +301,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
 
 
 def build_appimage(appdir, appimage):
-    debug("Building AppImage %s from %s" % (appimage, appdir))
+    logger.debug("Building AppImage %s from %s", appimage, appdir)
     res = subprocess.call(('AppImageAssistant', appdir, appimage))
     return res
 
@@ -330,9 +316,9 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_
     update_blacklist_cmd = r'wget --quiet https://raw.githubusercontent.com/probonopd/AppImages/master/excludelist' \
                            r' -O - | sort | uniq | grep -v "^#.*" | grep "[^-\s]"'
     blacklist += os.popen(update_blacklist_cmd).read().split('\n')
-    print(blacklist)
+    logger.info(blacklist)
     blacklist = [p for p in blacklist if not p.startswith("libstdc++.so") and not p.startswith("libgcc_s.so")]
-    print(blacklist)
+    logger.info(blacklist)
     # exit(0)
 
     qt_qml_dir = qt_base_dir + os.sep + 'qml'
@@ -346,20 +332,20 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_
         shutil.rmtree(tmp_dir)
     os.makedirs(tmp_dir)
 
-    info('Executable: ' + binary_name)
-    info('Qt install directory: ' + qt_base_dir)
-    info('Qt QML directory: ' + qt_qml_dir)
-    info('Qt bin directory: ' + qt_bin_dir)
-    info('Qt plugin directory: ' + qt_plugin_dir)
-    info('Qt lib directory: ' + qt_lib_dir)
+    logger.info('Executable: ' + binary_name)
+    logger.info('Qt install directory: ' + qt_base_dir)
+    logger.info('Qt QML directory: ' + qt_qml_dir)
+    logger.info('Qt bin directory: ' + qt_bin_dir)
+    logger.info('Qt plugin directory: ' + qt_plugin_dir)
+    logger.info('Qt lib directory: ' + qt_lib_dir)
 
     dependencies = {}
 
-    info("Resolving shared object dependencies for '%s'" % os.path.basename(binary_name))
+    logger.info("Resolving shared object dependencies for '%s'", os.path.basename(binary_name))
     exedeps = resolve_dependencies(binary_name, blacklist)
 
     dependencies = merge_dicts(dependencies, exedeps)
 
-    info("Building AppDir in '%s'" % deploy_dir)
+    logger.info("Building AppDir in '%s'", deploy_dir)
     build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir,
                  is_debug_version=is_debug_version)
