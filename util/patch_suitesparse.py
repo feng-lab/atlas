@@ -1,7 +1,10 @@
 import difflib
 import re
+import logging
+import os
+import glob
 
-from common_dirs import *
+import common_dirs
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -53,6 +56,6 @@ def patch_file_line(orig_file: str, process_line, keep_bak_file: bool = True) ->
 if __name__ == "__main__":
     logger = setup_logger()
 
-    suitesparse_path = os.path.join(atlas_repository_dir(), '..', 'SuiteSparse')
+    suitesparse_path = os.path.join(common_dirs.atlas_repository_dir(), '..', 'SuiteSparse')
     for file in glob.glob(os.path.join(suitesparse_path, 'CXSparse', 'Source', '*.c')):
         patch_file_line(file, process_CXSparse_line, keep_bak_file=False)

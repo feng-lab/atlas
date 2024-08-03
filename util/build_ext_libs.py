@@ -2,12 +2,14 @@ import argparse
 import difflib
 import json
 import mmap
-import os.path
+import os
+import shutil
+import sys
 from collections import OrderedDict
 from pathlib import Path
 
 from common_dirs import *
-from download_atlas_deps import *
+from download_atlas_deps import download_atlas_deps
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)

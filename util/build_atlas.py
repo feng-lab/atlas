@@ -1,56 +1,59 @@
 import argparse
+import subprocess
+import logging
+import os
 
-from common_dirs import *
+import common_dirs
 import build_ext_libs
-from download_atlas_test_data import *
+from download_atlas_test_data import download_atlas_test_data
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
 
 
 def get_cmake_cmd_common_part(arm64: bool = False):
-    if is_windows():
-        if use_ninja():
-            res = [get_cmake_binary(),  # '-E', 'echo',
+    if common_dirs.is_windows():
+        if common_dirs.use_ninja():
+            res = [common_dirs.get_cmake_binary(),  # '-E', 'echo',
                    '-DCMAKE_BUILD_TYPE=Release',
-                   '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
+                   '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + common_dirs.get_ninja_binary(),
                    ]
-            if use_clang_cl():
+            if common_dirs.use_clang_cl():
                 res.extend(['-DCMAKE_CXX_COMPILER=clang-cl',
                             '-DCMAKE_C_COMPILER=clang-cl',
                             ])
             return res
         else:
-            return [get_cmake_binary(),  # '-E', 'echo',
+            return [common_dirs.get_cmake_binary(),  # '-E', 'echo',
                     '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'host=x64'
                     ]
-    elif is_linux():
-        res = [get_cmake_binary(),  # '-E', 'echo',
+    elif common_dirs.is_linux():
+        res = [common_dirs.get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
                '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
                ]
-        if use_ninja():
-            res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()
+        if common_dirs.use_ninja():
+            res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + common_dirs.get_ninja_binary()
                         ])
         return res
-    elif is_mac():
-        res = [get_cmake_binary(),  # '-E', 'echo',
+    elif common_dirs.is_mac():
+        res = [common_dirs.get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
                '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
                '' if not arm64 else '-DCMAKE_SYSTEM_NAME=Darwin',
                '' if not arm64 else '-DCMAKE_SYSTEM_PROCESSOR=arm64',
                '' if not arm64 else '-DCMAKE_OSX_ARCHITECTURES=arm64',
                ]
-        if use_ninja():
-            res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()
+        if common_dirs.use_ninja():
+            res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + common_dirs.get_ninja_binary()
                         ])
         return res
 
 
 def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: bool = False, arm64: bool = False):
-    logger.info(f'srcDIR: {atlas_repository_dir()}')
-    logger.info(f'buildDIR: {atlas_build_dir(arm64=arm64)}')
-    logger.info(f'useNinja: {use_ninja()}')
+    logger.info(f'srcDIR: {common_dirs.atlas_repository_dir()}')
+    logger.info(f'buildDIR: {common_dirs.atlas_build_dir(arm64=arm64)}')
+    logger.info(f'useNinja: {common_dirs.use_ninja()}')
 
     skip_test = skip_test or use_asan or debug_version
 
@@ -63,50 +66,51 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
     if debug_version:
         cmakecmd.extend(['-DATLAS_DEBUG_VERSION:BOOL=ON',
                          ])
-    cmakecmd.extend([atlas_repository_dir()])
+    cmakecmd.extend([common_dirs.atlas_repository_dir()])
 
-    if is_windows():
+    if common_dirs.is_windows():
         env = build_ext_libs.get_vcvars_environment()
-        env['caexcludepath'] = ';'.join([os.path.join(atlas_repository_dir(), 'src', '3rdparty'),
-                                         intel_sw_dir(),
+        env['caexcludepath'] = ';'.join([os.path.join(common_dirs.atlas_repository_dir(), 'src', '3rdparty'),
+                                         common_dirs.intel_sw_dir(),
                                          r'C:\Program Files (x86)\Windows Kits',
-                                         os.path.join(atlas_repository_dir(), 'test'),
+                                         os.path.join(common_dirs.atlas_repository_dir(), 'test'),
                                          r'C:\Strawberry\perl\bin',
                                          ])
-        env['PATH'] = f'{env["PATH"]};{tbb_redist_dir()};{qt_bin_dir()};{freeimage_redist_dir()}'
+        env['PATH'] = (f'{env["PATH"]};{common_dirs.tbb_redist_dir()};{common_dirs.qt_bin_dir()};'
+                       f'{common_dirs.freeimage_redist_dir()}')
         logger.info(env['PATH'])
         subprocess.run(cmakecmd,
-                       cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
-        if use_ninja():
+                       cwd=common_dirs.atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
+        if common_dirs.use_ninja():
             subprocess.run([build_ext_libs.get_ninja_binary()],
-                           cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
+                           cwd=common_dirs.atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
         else:
             subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=atlas_build_dir(arm64=arm64), shell=True, check=True, env=env)
+                           cwd=common_dirs.atlas_build_dir(arm64=arm64), shell=True, check=True, env=env)
 
         if not skip_test:
             download_atlas_test_data()
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
-            subprocess.run([get_ctest_binary(), '--extra-verbose'],
-                           cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
+            subprocess.run([common_dirs.get_ctest_binary(), '--extra-verbose'],
+                           cwd=common_dirs.atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
     else:
         env = os.environ.copy()
-        if is_linux() and build_ext_libs.use_clang_in_linux():
+        if common_dirs.is_linux() and build_ext_libs.use_clang_in_linux():
             env['CC'] = build_ext_libs.get_clang_in_linux()
             env['CXX'] = build_ext_libs.get_clangplus_in_linux()
-        subprocess.run(cmakecmd, cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
-        if use_ninja():
-            subprocess.run([get_ninja_binary()],
-                           cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
+        subprocess.run(cmakecmd, cwd=common_dirs.atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
+        if common_dirs.use_ninja():
+            subprocess.run([common_dirs.get_ninja_binary()],
+                           cwd=common_dirs.atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
         else:
             subprocess.run(['make', '-j' + str(os.cpu_count())],
-                           cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
+                           cwd=common_dirs.atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
 
         if not skip_test:
             download_atlas_test_data()
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
-            subprocess.run([get_ctest_binary(), '--extra-verbose'],
-                           cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
+            subprocess.run([common_dirs.get_ctest_binary(), '--extra-verbose'],
+                           cwd=common_dirs.atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
 
 
 if __name__ == "__main__":

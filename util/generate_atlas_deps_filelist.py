@@ -1,19 +1,20 @@
 from ftplib import FTP
 import logging
+import os
 
-from download_utils import *
+import download_utils
 import common_dirs
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
 
 
-@retry_with_backoff()
+@download_utils.retry_with_backoff()
 def ftp_store(ftp, cmd, file):
     ftp.storbinary(cmd, file)
 
 
-@retry_with_backoff()
+@download_utils.retry_with_backoff()
 def ftp_delete(ftp, filename):
     ftp.delete(filename)
 
@@ -74,7 +75,7 @@ def process_files(folder_path, base_url, backup_base_url):
 
             logger.info(f"Processing {relative_path}...")
 
-            checksum = calculate_checksum(local_path)
+            checksum = download_utils.calculate_checksum(local_path)
             size = os.path.getsize(local_path)
 
             url = f"{base_url}/{relative_path.replace(os.sep, '/')}"

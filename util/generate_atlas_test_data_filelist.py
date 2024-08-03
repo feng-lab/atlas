@@ -1,4 +1,6 @@
-from generate_atlas_deps_filelist import *
+import os
+
+from generate_atlas_deps_filelist import generate_atlas_deps_filelist, process_files
 import common_dirs
 
 if __name__ == "__main__":
