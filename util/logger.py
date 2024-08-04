@@ -1,5 +1,4 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
-import atexit
 import functools
 import logging
 import os
@@ -59,7 +58,7 @@ def setup_logger(
 
     plain_formatter = logging.Formatter(
         # "[%(asctime)s] %(name)s %(levelname)s: %(message)s", datefmt="%m/%d %H:%M:%S"
-        "[%(asctime)s %(process)d %(filename)s:%(lineno)d %(levelname)s]: %(message)s",
+        "[%(levelname)s %(asctime)s %(process)d %(name)s:%(lineno)d]: %(message)s",
     )
     # stdout logging: master only
     if configure_stdout and distributed_rank == 0:
@@ -69,7 +68,7 @@ def setup_logger(
             formatter = _ColorfulFormatter(
                 # colored("[%(asctime)s %(name)s]: ", "green") + "%(message)s",
                 # datefmt="%m/%d %H:%M:%S",
-                colored("[%(asctime)s %(process)d %(filename)s:%(lineno)d]:", "green") + " %(message)s",
+                colored("[%(asctime)s %(process)d %(name)s:%(lineno)d]:", "green") + " %(message)s",
             )
         else:
             formatter = plain_formatter
