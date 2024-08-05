@@ -441,7 +441,7 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, additional_env=None,
             env.update(additional_env)
         subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
         if use_cmake:
-            subprocess.run([get_cmake_binary(), '--build', '.'],
+            subprocess.run([get_cmake_binary(), '--build', '.', '--target', 'install'],
                            cwd=build_dir, shell=False, check=True, env=env)
         elif use_ninja:
             subprocess.run([get_ninja_binary(), ninja_para],
@@ -455,7 +455,7 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, additional_env=None,
             env.update(additional_env)
         if use_cmake:
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-            subprocess.run([get_cmake_binary(), '--build', '.'],
+            subprocess.run([get_cmake_binary(), '--build', '.', '--target', 'install'],
                            cwd=build_dir, shell=False, check=True, env=env)
         elif use_ninja:
             subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
@@ -869,7 +869,7 @@ def build_benchmark(src_dir: str, install_dir: str):
             cmakecmd.extend(['-DBENCHMARK_USE_LIBCXX:BOOL=ON'])
 
         cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
+        build_and_install_cmakecmd(cmakecmd, build_dir, use_cmake=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
