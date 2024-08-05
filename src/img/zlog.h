@@ -168,12 +168,18 @@ QString qtTypeToQString(const T& v)
   return buffer;
 }
 
+template<typename T>
+concept CanConvertToUtf8QByteArray = requires(T a)
+{
+  { a.toUtf8() } -> std::same_as<QByteArray>;
+};
+
 } // namespace nim
 
-template<>
-struct fmt::formatter<QString> : fmt::formatter<fmt::string_view>
+template<nim::CanConvertToUtf8QByteArray T>
+struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 {
-  auto format(const QString& s, format_context& ctx) const
+  auto format(const T& s, format_context& ctx) const
   {
     auto u8 = s.toUtf8();
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
@@ -191,15 +197,6 @@ struct fmt::formatter<QByteArray> : fmt::formatter<fmt::string_view>
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 template<>
-struct fmt::formatter<QStringView> : fmt::formatter<fmt::string_view>
-{
-  auto format(QStringView s, format_context& ctx) const
-  {
-    auto u8 = s.toUtf8();
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
-  }
-};
-template<>
 struct fmt::formatter<QUtf8StringView> : fmt::formatter<fmt::string_view>
 {
   auto format(QUtf8StringView s, format_context& ctx) const
@@ -215,24 +212,10 @@ struct fmt::formatter<QByteArrayView> : fmt::formatter<fmt::string_view>
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
   }
 };
-#else
-template<>
-struct fmt::formatter<QStringRef> : fmt::formatter<fmt::string_view>
-{
-  auto format(QStringRef s, format_context& ctx) const
-  {
-    auto u8 = s.toUtf8();
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
-  }
-};
 #endif
 
 #define OUTPUT_QT_TYPE_VALUE(v)               \
   auto u8 = nim::qtTypeToQString(v).toUtf8(); \
-  return (s << std::string_view(u8.data(), u8.size()));
-
-#define OUTPUT_QSTRING(v) \
-  auto u8 = v.toUtf8();   \
   return (s << std::string_view(u8.data(), u8.size()));
 
 #define OUTPUT_QBYTEARRAY(v) return (s << std::string_view(v.data(), v.size()));
@@ -242,16 +225,14 @@ inline std::ostream& operator<<(std::ostream& s, const QByteArray& v)
   OUTPUT_QBYTEARRAY(v)
 }
 
-inline std::ostream& operator<<(std::ostream& s, const QString& v)
+template<nim::CanConvertToUtf8QByteArray T>
+std::ostream& operator<<(std::ostream& s, const T& v)
 {
-  OUTPUT_QSTRING(v)
+  auto u8 = v.toUtf8();
+  return (s << std::string_view(u8.data(), u8.size()));
 }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-inline std::ostream& operator<<(std::ostream& s, QStringView v)
-{
-  OUTPUT_QSTRING(v)
-}
 inline std::ostream& operator<<(std::ostream& s, QUtf8StringView v)
 {
   OUTPUT_QBYTEARRAY(v)
@@ -259,11 +240,6 @@ inline std::ostream& operator<<(std::ostream& s, QUtf8StringView v)
 inline std::ostream& operator<<(std::ostream& s, QByteArrayView v)
 {
   OUTPUT_QBYTEARRAY(v)
-}
-#else
-inline std::ostream& operator<<(std::ostream& s, QStringRef v)
-{
-  OUTPUT_QSTRING(v)
 }
 #endif
 
