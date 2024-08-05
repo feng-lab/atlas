@@ -472,6 +472,8 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
 
     txt = Path(orig_file).read_text(errors='ignore')
     for from_text, to_text in zip(from_texts, to_texts):
+        if not from_text:
+            continue
         assert from_text in txt, from_text
         txt = txt.replace(from_text, to_text)
 
@@ -1272,11 +1274,11 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                         r'find_package(Glog MODULE)',
                         r'set(FOLLY_HAVE_LIBGLOG ${GLOG_FOUND})',
                         r'list(APPEND FOLLY_LINK_LIBRARIES ${GLOG_LIBRARY})',
-                        r'find_package(LibDwarf)' + ('' if is_mac() else '_NONONO'),
-                        r'find_package(Libiberty)' + ('' if is_mac() else '_NONONO'),
-                        r'find_package(LibAIO)' + ('' if is_mac() else '_NONONO'),
-                        r'find_package(LibUring)' + ('' if is_mac() else '_NONONO'),
-                        r'find_package(LibUnwind)' + ('' if is_mac() else '_NONONO'),
+                        r'find_package(LibDwarf)' if is_mac() else '',
+                        r'find_package(Libiberty)' if is_mac() else '',
+                        r'find_package(LibAIO)' if is_mac() else '',
+                        r'find_package(LibUring)' if is_mac() else '',
+                        r'find_package(LibUnwind)' if is_mac() else '',
                         r'set(FOLLY_USE_SYMBOLIZER ON)',
                         ],
             to_texts=[r'',
@@ -2521,7 +2523,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
         FilePatcher(
             orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
             from_texts=[
-                r'NONONO___CMAKE_EXE_LINKER_FLAGS' if is_linux() else r'set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
+                r'' if is_linux() else r'set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
                 r'find_package(TBB REQUIRED)',
                 r'find_package(zstd REQUIRED)',
             ],
