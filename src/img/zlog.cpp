@@ -131,4 +131,70 @@ std::shared_ptr<google::LogSink> createFunctorLogSink(const LogFunction& f)
   return res->isValid() ? res : std::shared_ptr<google::LogSink>();
 }
 
+// test code:
+
+// Helper function to check if a type is formattable with fmt
+template<typename T>
+constexpr bool is_formattable()
+{
+  return fmt::is_formattable<T>::value;
+}
+
+// Helper function to check if a type is streamable to std::ostream
+template<typename T>
+constexpr bool is_streamable()
+{
+  return std::is_convertible_v<decltype(std::declval<std::ostream&>() << std::declval<T>()), std::ostream&>;
+}
+
+// Static assertions for fmt::formatter
+static_assert(IsUtf8ArrayType<QByteArray>, "QByteArray should satisfy IsUtf8ArrayType");
+static_assert(is_formattable<QString>(), "QString should be formattable");
+static_assert(is_formattable<QByteArray>(), "QByteArray should be formattable");
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+static_assert(is_formattable<QStringView>(), "QStringView should be formattable");
+static_assert(IsUtf8ArrayType<QByteArrayView>, "QByteArrayView should satisfy IsUtf8ArrayType");
+static_assert(IsUtf8ArrayType<QUtf8StringView>, "QUtf8StringView should satisfy IsUtf8ArrayType");
+static_assert(is_formattable<QByteArrayView>(), "QByteArrayView should be formattable");
+static_assert(is_formattable<QUtf8StringView>(), "QUtf8StringView should be formattable");
+#else
+static_assert(is_formattable<QStringRef>(), "QStringRef should be formattable");
+#endif
+
+// Static assertions for std::ostream operator
+static_assert(is_streamable<QString>(), "QString should be streamable");
+static_assert(is_streamable<QByteArray>(), "QByteArray should be streamable");
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+static_assert(is_streamable<QStringView>(), "QStringView should be streamable");
+static_assert(is_streamable<QByteArrayView>(), "QByteArrayView should be streamable");
+static_assert(is_streamable<QUtf8StringView>(), "QUtf8StringView should be streamable");
+#else
+static_assert(is_streamable<QStringRef>(), "QStringRef should be streamable");
+#endif
+static_assert(is_streamable<QPoint>(), "QPoint should be streamable");
+static_assert(is_streamable<QPointF>(), "QPointF should be streamable");
+static_assert(is_streamable<QRect>(), "QRect should be streamable");
+static_assert(is_streamable<QRectF>(), "QRectF should be streamable");
+static_assert(is_streamable<QSize>(), "QSize should be streamable");
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+static_assert(is_streamable<QKeyCombination>(), "QKeyCombination should be streamable");
+#endif
+static_assert(is_streamable<QList<int>>(), "QList<int> should be streamable");
+static_assert(is_streamable<QContiguousCache<int>>(), "QContiguousCache<int> should be streamable");
+static_assert(is_streamable<QSharedPointer<int>>(), "QSharedPointer<int> should be streamable");
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+static_assert(is_streamable<QTaggedPointer<int, int>>(), "QTaggedPointer<int, int> should be streamable");
+#endif
+
+// Example QFlags for testing
+enum class TestFlag
+{
+  Flag1 = 0x1,
+  Flag2 = 0x2,
+  Flag3 = 0x4
+};
+Q_DECLARE_FLAGS(TestFlags, TestFlag)
+
+static_assert(is_streamable<TestFlags>(), "TestFlags (QFlags) should be streamable");
+
 } // namespace nim
