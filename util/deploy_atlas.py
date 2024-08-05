@@ -56,8 +56,9 @@ def build_atlas_package(is_debug_version: bool = False):
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
-            sys.stderr.write('Error: atlas is not built yet.\n')
-            sys.exit(1)
+            err = 'Error: atlas is not built yet'
+            logger.critical(err)
+            raise RuntimeError(err)
 
         binary_dir = common_dirs.atlas_binary_dir(arm64=True)
         logger.info(f'arm64 binaryDIR: {binary_dir}')
@@ -72,8 +73,9 @@ def build_atlas_package(is_debug_version: bool = False):
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), arm64_app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
-            sys.stderr.write('Error: arm64 atlas is not built yet.\n')
-            sys.exit(1)
+            err = 'Error: arm64 atlas is not built yet'
+            logger.critical(err)
+            raise RuntimeError(err)
 
         filename = os.path.join(common_dirs.deploy_target_dir(), arm64_app_name, 'Contents', 'MacOS', 'Atlas')
         target_filename = os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas')
@@ -93,8 +95,9 @@ def build_atlas_package(is_debug_version: bool = False):
                                         common_dirs.qt_base_dir(),
                                         is_debug_version=is_debug_version)
         else:
-            sys.stderr.write('Error: atlas is not built yet.\n')
-            sys.exit(1)
+            err = 'Error: atlas is not built yet'
+            logger.critical(err)
+            raise RuntimeError(err)
     else:
         app_name = 'Atlas.exe'
 
@@ -132,8 +135,9 @@ def build_atlas_package(is_debug_version: bool = False):
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), '--no-translations', app_name],
                            cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
         else:
-            sys.stderr.write('Error: atlas is not built yet.\n')
-            sys.exit(1)
+            err = 'Error: atlas is not built yet'
+            logger.critical(err)
+            raise RuntimeError(err)
 
 
 def pack_atlas_package():
