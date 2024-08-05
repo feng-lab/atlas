@@ -469,16 +469,18 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, additional_env=None,
 
 def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: bool = True) -> str:
     assert len(from_texts) == len(to_texts)
+
+    txt = Path(orig_file).read_text(errors='ignore')
+    for from_text, to_text in zip(from_texts, to_texts):
+        assert from_text in txt, from_text
+        txt = txt.replace(from_text, to_text)
+
     bak_file = get_bak_file_name(orig_file)
     if os.path.exists(bak_file):
         os.remove(bak_file)
     os.rename(orig_file, bak_file)
 
-    txt = Path(bak_file).read_text(errors='ignore')
     with open(orig_file, mode='w', encoding='utf-8') as f:
-        for from_text, to_text in zip(from_texts, to_texts):
-            assert from_text in txt, from_text
-            txt = txt.replace(from_text, to_text)
         f.write(txt)
     with open(bak_file, mode='r', encoding='utf-8', errors='ignore') as f:
         from_lines = f.readlines()
@@ -869,7 +871,7 @@ def build_benchmark(src_dir: str, install_dir: str):
             cmakecmd.extend(['-DBENCHMARK_USE_LIBCXX:BOOL=ON'])
 
         cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir, use_cmake=True)
+        build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -1258,7 +1260,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
             orig_file=os.path.join(src_dir, 'CMake', 'folly-deps.cmake'),
             from_texts=[r'${ZLIB_INCLUDE_DIRS}',
                         r'${BZIP2_INCLUDE_DIRS}',
-                        r'find_package(OpenSSL MODULE REQUIRED)',
+                        r'find_package(OpenSSL 1.1.1 MODULE REQUIRED)',
                         r'find_package(BZip2 MODULE)',
                         r'find_package(LibLZMA MODULE)',
                         r'find_package(LZ4 MODULE)',
@@ -1279,7 +1281,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                         ],
             to_texts=[r'',
                       r'',
-                      'find_package(OpenSSL MODULE REQUIRED)\n'
+                      'find_package(OpenSSL 1.1.1 MODULE REQUIRED)\n'
                       'if (WIN32)\n'
                       'list(APPEND OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} Bcrypt.lib Crypt32.lib Ws2_32.lib)\n'
                       'endif (WIN32)\n',
