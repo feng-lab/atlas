@@ -474,7 +474,7 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
     for from_text, to_text in zip(from_texts, to_texts):
         if not from_text:
             continue
-        assert from_text in txt, from_text
+        assert from_text in txt, f'{orig_file}: {from_text}'
         txt = txt.replace(from_text, to_text)
 
     bak_file = get_bak_file_name(orig_file)
@@ -484,6 +484,7 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
 
     with open(orig_file, mode='w', encoding='utf-8') as f:
         f.write(txt)
+
     with open(bak_file, mode='r', encoding='utf-8', errors='ignore') as f:
         from_lines = f.readlines()
     with open(orig_file, mode='r', encoding='utf-8') as f:
@@ -1458,18 +1459,8 @@ def build_ceres_solver(src_dir: str, install_dir: str):
 
     patches = [
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
-            from_texts=[r'if (HOMEBREW_EXECUTABLE)',
-                        r'EIGEN3_FOUND',
-                        r'if (TARGET gflags)'],
-            to_texts=[r'if (FALSE)',
-                      r'Eigen3_FOUND',
-                      r'if (TARGET gflags::gflags)'],
-        ),
-        FilePatcher(
             orig_file=os.path.join(src_dir, 'cmake', 'FindSuiteSparse.cmake'),
-            from_texts=[r'if (HOMEBREW_EXECUTABLE)',
-                        r'${LAPACK_LIBRARIES}',
+            from_texts=[r'${LAPACK_LIBRARIES}',
                         r'${BLAS_LIBRARIES}',
                         r'find_package(BLAS QUIET)',
                         r'find_package(LAPACK QUIET)',
@@ -1477,8 +1468,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                         r'check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_USES_METIS)',
                         r'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")',
                         ],
-            to_texts=[r'if (FALSE)',
-                      r' ',
+            to_texts=[r' ',
                       r' ',
                       r'set(BLAS_FOUND ON CACHE BOOL "")',
                       r'set(LAPACK_FOUND ON CACHE BOOL "")',
@@ -1493,20 +1483,11 @@ def build_ceres_solver(src_dir: str, install_dir: str):
             orig_file=os.path.join(src_dir, 'internal', 'ceres', 'CMakeLists.txt'),
             from_texts=[r' ${LAPACK_LIBRARIES}',
                         r'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")',
-                        r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags)',
                         ],
             to_texts=[r' ',
                       'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")\n'
                       'add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")',
-                      r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags::gflags)',
                       ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, 'cmake', 'CeresConfig.cmake.in'),
-            from_texts=[r'EIGEN3_FOUND',
-                        r'if (gflags_FOUND AND TARGET gflags)'],
-            to_texts=[r'Eigen3_FOUND',
-                      r'if (gflags_FOUND AND TARGET gflags::gflags)'],
         ),
     ]
     patch_manager = PatchManager(patches)
