@@ -303,6 +303,7 @@ vk::raii::Instance createVulkanInstance(vk::raii::Context& context)
     .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
                    vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
     .pfnUserCallback = debugUtilsMessengerCallback};
+
   if (FLAGS_atlas_debug_vulkan) {
     instanceCreateInfo.setPNext(&debugUtilsMessengerCreateInfo);
   }
@@ -425,10 +426,18 @@ void initVulkan()
       LOG(INFO) << "-------------------------";
 
       std::vector<const char*> enabledDeviceExtensions;
-      vk::PhysicalDeviceVulkan12Features enabledPhysicalDeviceVulkan12Features{};
-      vk::PhysicalDeviceVulkan13Features enabledPhysicalDeviceVulkan13Features{};
-      vk::PhysicalDeviceFeatures2 enabledPhysicalDeviceFeatures{.features = physicalDeviceFeatures,
-                                                                .pNext = &enabledPhysicalDeviceVulkan12Features};
+      vk::StructureChain<vk::PhysicalDeviceFeatures2,
+                         vk::PhysicalDeviceVulkan12Features,
+                         vk::PhysicalDeviceVulkan13Features>
+        enabledFeatures2;
+      auto& enabledPhysicalDeviceFeatures2 = enabledFeatures2.get<vk::PhysicalDeviceFeatures2>();
+      auto& enabledPhysicalDeviceVulkan12Features = enabledFeatures2.get<vk::PhysicalDeviceVulkan12Features>();
+      auto& enabledPhysicalDeviceVulkan13Features = enabledFeatures2.get<vk::PhysicalDeviceVulkan13Features>();
+      enabledPhysicalDeviceFeatures2.features = physicalDeviceFeatures;
+      // disable some features in release mode
+      if (!FLAGS_atlas_debug_vulkan) {
+        enabledPhysicalDeviceFeatures2.features.robustBufferAccess = false;
+      }
 
       if (deviceProperties.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0)) {
         if (!physicalDeviceVulkan13Features.dynamicRendering) {
@@ -441,7 +450,6 @@ void initVulkan()
         }
         enabledPhysicalDeviceVulkan13Features.dynamicRendering = true;
         enabledPhysicalDeviceVulkan13Features.synchronization2 = true;
-        enabledPhysicalDeviceVulkan12Features.pNext = &enabledPhysicalDeviceVulkan13Features;
         desiredPhysicalDevices.push_back(physicalDevice);
       } else if (deviceProperties.apiVersion >= VK_MAKE_API_VERSION(0, 1, 2, 0)) {
         if (!physicalDeviceVulkan12Features.descriptorIndexing) {
@@ -462,6 +470,7 @@ void initVulkan()
         }
         enabledPhysicalDeviceVulkan12Features.descriptorIndexing = true;
         enabledPhysicalDeviceVulkan12Features.bufferDeviceAddress = true;
+        enabledFeatures2.unlink<vk::PhysicalDeviceVulkan13Features>();
         addRequiredExtension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
                              enabledDeviceExtensions,
                              deviceExtensionProperties,
@@ -508,7 +517,15 @@ void initVulkan()
           .pQueueCreateInfos = &deviceQueueCreateInfo,
           .enabledExtensionCount = static_cast<uint32_t>(enabledDeviceExtensions.size()),
           .ppEnabledExtensionNames = enabledDeviceExtensions.empty() ? nullptr : enabledDeviceExtensions.data()};
-        deviceCreateInfo.pNext = &enabledPhysicalDeviceFeatures;
+
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#features
+        // Fine-grained features used by a logical device must be enabled at VkDevice creation time.
+        // If an application wishes to enable all features supported by a device, it can simply pass in the
+        // VkPhysicalDeviceFeatures structure that was previously returned by vkGetPhysicalDeviceFeatures. To disable an
+        // individual feature, the application can set the desired member to VK_FALSE in the same structure. Setting
+        // pEnabledFeatures to NULL and not including a VkPhysicalDeviceFeatures2 in the pNext chain of
+        // VkDeviceCreateInfo is equivalent to setting all members of the structure to VK_FALSE.
+        deviceCreateInfo.pNext = &enabledPhysicalDeviceFeatures2;
 
         vk::raii::Device device(physicalDevice, deviceCreateInfo);
 

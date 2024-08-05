@@ -2814,7 +2814,7 @@ def build_proxygen(src_dir: str, install_dir: str):
         FilePatcher(
             orig_file=os.path.join(src_dir, 'cmake', 'FindZstd.cmake'),
             from_texts=[
-                r"""ZSTD_LIBRARIES
+                r"""find_library(ZSTD_LIBRARIES
   NAMES zstd""",
                 r'if("${ZSTD_LIBRARIES}" MATCHES ".*.a$")',
             ],
