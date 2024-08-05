@@ -1653,12 +1653,6 @@ def build_libpng(src_dir: str, install_dir: str):
             to_texts=[r'#if 0'],
             patch_condition=lambda: is_mac() and os.path.exists('/usr/include')
         ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, 'pngrutil.c'),
-            from_texts=[r'#if ZLIB_VERNUM >= 0x1290'],
-            to_texts=[r'#if 0'],
-            patch_condition=is_mac,
-        ),
     ]
     patch_manager = PatchManager(patches)
 

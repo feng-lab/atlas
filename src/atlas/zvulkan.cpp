@@ -330,8 +330,6 @@ void initVulkan()
     // instantiate a vk::raii::Context
     vk::raii::Context context;
 
-    LOG(INFO) << fmt::format("{}", QByteArray());
-
     // Because Vulkan 1.0 implementations may fail with VK_ERROR_INCOMPATIBLE_DRIVER, applications should determine the
     // version of Vulkan available before calling vkCreateInstance. If the vkGetInstanceProcAddr returns NULL for
     // vkEnumerateInstanceVersion, it is a Vulkan 1.0 implementation. Otherwise, the application can call
