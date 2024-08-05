@@ -168,6 +168,8 @@ QString qtTypeToQString(const T& v)
   return buffer;
 }
 
+} // namespace nim
+
 template<typename T>
 concept CanConvertToUtf8QByteArray = requires(const T& a) {
   {
@@ -176,18 +178,29 @@ concept CanConvertToUtf8QByteArray = requires(const T& a) {
 };
 
 template<class T>
-concept IsUtf8ArrayType = IsAnyOf<T,
-                                  QByteArray
+concept IsUtf8ArrayType = nim::IsAnyOf<T,
+                                       QByteArray
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-                                  ,
-                                  QByteArrayView,
-                                  QUtf8StringView
+                                       ,
+                                       QByteArrayView,
+                                       QUtf8StringView
 #endif
-                                  >;
+                                       >;
 
-} // namespace nim
+template<class T>
+concept IsSupportedQtTypeForPrint = nim::IsAnyOf<T,
+                                                 QPoint,
+                                                 QPointF,
+                                                 QRect,
+                                                 QRectF,
+                                                 QSize
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+                                                 ,
+                                                 QKeyCombination
+#endif
+                                                 >;
 
-template<nim::CanConvertToUtf8QByteArray T>
+template<CanConvertToUtf8QByteArray T>
 struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 {
   auto format(const T& s, format_context& ctx) const
@@ -197,7 +210,7 @@ struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
   }
 };
 
-template<nim::IsUtf8ArrayType T>
+template<IsUtf8ArrayType T>
 struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 {
   auto format(const T& s, format_context& ctx) const
@@ -206,61 +219,25 @@ struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
   }
 };
 
-template<nim::CanConvertToUtf8QByteArray T>
+template<CanConvertToUtf8QByteArray T>
 std::ostream& operator<<(std::ostream& s, const T& v)
 {
   auto u8 = v.toUtf8();
   return (s << std::string_view(u8.data(), u8.size()));
 }
 
-template<nim::IsUtf8ArrayType T>
+template<IsUtf8ArrayType T>
 std::ostream& operator<<(std::ostream& s, const T& v)
 {
   return (s << std::string_view(v.data(), v.size()));
-}
-
-inline void logLongString(const QString& q)
-{
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-  for (qsizetype i = 0; i < q.size(); i += 10000) { // glog limit is 30000
-    auto length = std::min(qsizetype(10000), q.size() - i);
-    QStringView qView(q.data() + i, length);
-    LOG(INFO) << qView;
-  }
-#else
-  for (int i = 0; i < q.size(); i += 10000) { // glog limit is 30000
-    int length = std::min(10000, q.size() - i);
-    QStringRef qRef(&q, i, length);
-    LOG(INFO) << qRef;
-  }
-#endif
 }
 
 #define OUTPUT_QT_TYPE_VALUE(v)               \
   auto u8 = nim::qtTypeToQString(v).toUtf8(); \
   return (s << std::string_view(u8.data(), u8.size()));
 
-inline std::ostream& operator<<(std::ostream& s, const QPoint& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-inline std::ostream& operator<<(std::ostream& s, const QPointF& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-inline std::ostream& operator<<(std::ostream& s, const QRect& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-inline std::ostream& operator<<(std::ostream& s, const QRectF& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-inline std::ostream& operator<<(std::ostream& s, const QSize& v)
+template<IsSupportedQtTypeForPrint T>
+std::ostream& operator<<(std::ostream& s, const T& v)
 {
   OUTPUT_QT_TYPE_VALUE(v)
 }
@@ -313,9 +290,19 @@ std::ostream& operator<<(std::ostream& s, const QFlags<T>& v)
   OUTPUT_QT_TYPE_VALUE(v)
 }
 
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-inline std::ostream& operator<<(std::ostream& s, QKeyCombination v)
+inline void logLongString(const QString& q)
 {
-  OUTPUT_QT_TYPE_VALUE(v)
-}
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  for (qsizetype i = 0; i < q.size(); i += 10000) { // glog limit is 30000
+    auto length = std::min(qsizetype(10000), q.size() - i);
+    QStringView qView(q.data() + i, length);
+    LOG(INFO) << qView;
+  }
+#else
+  for (int i = 0; i < q.size(); i += 10000) { // glog limit is 30000
+    int length = std::min(10000, q.size() - i);
+    QStringRef qRef(&q, i, length);
+    LOG(INFO) << qRef;
+  }
 #endif
+}
