@@ -244,4 +244,7 @@ template<typename T, std::size_t N>
 struct IsStdArray<std::array<T, N>> : std::true_type
 {};
 
+template <class T, class... U>
+concept IsAnyOf = std::disjunction_v<std::is_same<T, U>...>;
+
 } // namespace nim

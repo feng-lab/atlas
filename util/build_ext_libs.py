@@ -2190,15 +2190,6 @@ def build_vtk(src_dir: str, install_dir: str):
                       r'-Wall',
                       ],
         ),
-        # FilePatcher(
-        #     orig_file=os.path.join(src_dir, 'ThirdParty', 'nlohmannjson/vtknlohmannjson/include/vtknlohmann/detail',
-        #                            'macro_scope.hpp'),
-        #     from_texts=[r'#define JSON_HAS_CPP_17',
-        #                 ],
-        #     to_texts=[r'//#define JSON_HAS_CPP_17',
-        #               ],
-        #     patch_condition=is_linux,
-        # ),
     ]
     patch_manager = PatchManager(patches)
 
@@ -2468,20 +2459,16 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             if is_mac():
                 patch_file(orig_file_2,
                            from_texts=[r';\$<LINK_ONLY:tbb>',
-                                       r'\$<LINK_ONLY:tbb>;',
                                        r';\$<LINK_ONLY:ittnotify>"',
                                        ],
                            to_texts=[r'',
-                                     r'',
                                      r';\$<LINK_ONLY:ittnotify>;${OpenCV_INSTALL_PATH}/lib/opencv4/3rdparty/libtegra_hal.a"',
                                      ])
             else:
                 patch_file(orig_file_2,
                            from_texts=[r';\$<LINK_ONLY:tbb>',
-                                       r'\$<LINK_ONLY:tbb>;',
                                        ],
                            to_texts=[r'',
-                                     r'',
                                      ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
