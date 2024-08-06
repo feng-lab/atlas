@@ -1,6 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 import functools
 import logging
+import traceback
 import os
 import sys
 import io
@@ -18,13 +19,35 @@ class _ColorfulFormatter(logging.Formatter):
         log = super(_ColorfulFormatter, self).formatMessage(record)
         if record.levelno == logging.WARNING:
             prefix = colored("WARNING", "red")
-        elif record.levelno == logging.ERROR :
+        elif record.levelno == logging.ERROR:
             prefix = colored("ERROR", "red", attrs=["underline"])
         elif record.levelno == logging.CRITICAL:
             prefix = colored("CRITICAL", "red", attrs=["underline"])
         else:
             return log
         return prefix + " " + log
+
+
+class CriticalExitStreamHandler(logging.StreamHandler):
+    def emit(self, record):
+        # Process the log message normally first
+        super().emit(record)
+
+        # Check if the log level is CRITICAL
+        if record.levelno >= logging.CRITICAL:
+            # If there's exception info, print the exception traceback
+            if record.exc_info:
+                traceback.print_exception(*record.exc_info)
+            else:
+                # Otherwise, print the current stack trace
+                print('Stack trace before exit:', file=sys.stderr)
+                traceback.print_stack(file=sys.stderr)
+
+            # Flush the stream to ensure all log messages are outputted
+            self.flush()
+
+            # Exit the program
+            sys.exit('Exiting due to critical log: ' + record.getMessage())
 
 
 @functools.lru_cache()  # so that calling setup_logger multiple times won't add many handlers
@@ -62,7 +85,7 @@ def setup_logger(
     )
     # stdout logging: master only
     if configure_stdout and distributed_rank == 0:
-        ch = logging.StreamHandler(stream=sys.stdout)
+        ch = CriticalExitStreamHandler(stream=sys.stdout)
         ch.setLevel(logging.DEBUG)
         if color and _can_do_colour():
             formatter = _ColorfulFormatter(

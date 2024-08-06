@@ -197,9 +197,7 @@ def sync_files(files_to_download, target_directory: str, check_os: bool = True):
         )
 
         if not success:
-            err = f"Failed to download {file_info['filename']}"
-            logger.critical(err)
-            raise RuntimeError(err)
+            logger.critical(f"Failed to download {file_info['filename']}")
 
         logger.info('')
 
