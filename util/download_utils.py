@@ -165,7 +165,7 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
     return False
 
 
-def sync_files(files_to_download, target_directory, check_os: bool = True):
+def sync_files(files_to_download, target_directory: str, check_os: bool = True):
     """
     Synchronize files in the target directory with the provided list of files to download.
 

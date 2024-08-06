@@ -24,6 +24,7 @@
 
 #include <functional>
 #include <iosfwd>
+#include <concepts>
 
 namespace nim {
 
@@ -176,27 +177,25 @@ concept CanConvertToUtf8QByteArray = requires(const T& a) {
 };
 
 template<class T>
-concept IsUtf8ArrayType = nim::IsAnyOf<T,
-                                       QByteArray
+concept IsUtf8ArrayType = IsAnyOf<T,
+                                  QByteArray
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-                                       ,
-                                       QByteArrayView,
-                                       QUtf8StringView
+                                  ,
+                                  QByteArrayView,
+                                  QUtf8StringView
 #endif
-                                       >;
+                                  >;
 
-template<class T>
-concept IsSupportedQtTypeForPrint = nim::IsAnyOf<T,
-                                                 QPoint,
-                                                 QPointF,
-                                                 QRect,
-                                                 QRectF,
-                                                 QSize
+template<typename T>
+concept IsSupportedQtTypeForPrint =
+  std::same_as<T, QPoint> || std::same_as<T, QPointF> || std::same_as<T, QRect> || std::same_as<T, QRectF> ||
+  std::same_as<T, QSize> || std::same_as<T, QList<typename T::value_type>> ||
+  std::same_as<T, QContiguousCache<typename T::value_type>> ||
+  std::same_as<T, QSharedPointer<typename T::value_type>> || std::same_as<T, QFlags<typename T::enum_type>>
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-                                                 ,
-                                                 QKeyCombination
+  || std::same_as<T, QKeyCombination> || std::same_as<T, QTaggedPointer<typename T::Type, typename T::TagType>>
 #endif
-                                                 >;
+  ;
 
 } // namespace nim
 
@@ -221,31 +220,20 @@ struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 };
 #else
 
-template<>
-struct fmt::formatter<QByteArray> : fmt::formatter<fmt::string_view>
-{
-  auto format(const QByteArray& s, format_context& ctx) const
-  {
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
-  }
-};
+#define DEFINE_FMT_SPECIALIAZATION_FOR_UTF8_ARRAY_TYPE(T)                                         \
+  template<>                                                                                      \
+  struct fmt::formatter<T> : fmt::formatter<fmt::string_view>                                     \
+  {                                                                                               \
+    auto format(const T& s, format_context& ctx) const                                            \
+    {                                                                                             \
+      return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx); \
+    }                                                                                             \
+  };
+
+DEFINE_FMT_SPECIALIAZATION_FOR_UTF8_ARRAY_TYPE(QByteArray)
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-template<>
-struct fmt::formatter<QByteArrayView> : fmt::formatter<fmt::string_view>
-{
-  auto format(const QByteArrayView& s, format_context& ctx) const
-  {
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
-  }
-};
-template<>
-struct fmt::formatter<QUtf8StringView> : fmt::formatter<fmt::string_view>
-{
-  auto format(const QUtf8StringView& s, format_context& ctx) const
-  {
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
-  }
-};
+DEFINE_FMT_SPECIALIAZATION_FOR_UTF8_ARRAY_TYPE(QByteArrayView)
+DEFINE_FMT_SPECIALIAZATION_FOR_UTF8_ARRAY_TYPE(QUtf8StringView)
 #endif
 
 #endif
@@ -263,62 +251,11 @@ std::ostream& operator<<(std::ostream& s, const T& v)
   return (s << std::string_view(v.data(), v.size()));
 }
 
-#define OUTPUT_QT_TYPE_VALUE(v)               \
-  auto u8 = nim::qtTypeToQString(v).toUtf8(); \
-  return (s << std::string_view(u8.data(), u8.size()));
-
 template<nim::IsSupportedQtTypeForPrint T>
 std::ostream& operator<<(std::ostream& s, const T& v)
 {
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<class T>
-std::ostream& operator<<(std::ostream& s, const QList<T>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<class T>
-std::ostream& operator<<(std::ostream& s, const QContiguousCache<T>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<class T>
-std::ostream& operator<<(std::ostream& s, const QSharedPointer<T>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-template<typename T, typename Tag>
-std::ostream& operator<<(std::ostream& s, const QTaggedPointer<T, Tag>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-#endif
-
-template<typename T>
-typename std::enable_if<QtPrivate::IsQEnumHelper<T>::Value, std::ostream&>::Type operator<<(std::ostream& s, T v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<typename T,
-         typename A = std::enable_if_t<std::is_enum_v<T>, void>,
-         typename B = std::enable_if_t<sizeof(T) <= sizeof(int), void>,
-         typename C = std::enable_if_t<!QtPrivate::IsQEnumHelper<T>::Value, void>,
-         typename D = std::enable_if_t<QtPrivate::IsQEnumHelper<QFlags<T>>::Value, void>>
-std::ostream& operator<<(std::ostream& s, T v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
-}
-
-template<typename T>
-std::ostream& operator<<(std::ostream& s, const QFlags<T>& v)
-{
-  OUTPUT_QT_TYPE_VALUE(v)
+  auto u8 = nim::qtTypeToQString(v).toUtf8();
+  return (s << std::string_view(u8.data(), u8.size()));
 }
 
 inline void logLongString(const QString& q)

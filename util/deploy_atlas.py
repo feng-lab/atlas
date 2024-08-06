@@ -56,7 +56,7 @@ def build_atlas_package(is_debug_version: bool = False):
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
-            err = 'Error: atlas is not built yet'
+            err = 'atlas is not built yet'
             logger.critical(err)
             raise RuntimeError(err)
 
@@ -73,7 +73,7 @@ def build_atlas_package(is_debug_version: bool = False):
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), arm64_app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
-            err = 'Error: arm64 atlas is not built yet'
+            err = 'arm64 atlas is not built yet'
             logger.critical(err)
             raise RuntimeError(err)
 
@@ -95,7 +95,7 @@ def build_atlas_package(is_debug_version: bool = False):
                                         common_dirs.qt_base_dir(),
                                         is_debug_version=is_debug_version)
         else:
-            err = 'Error: atlas is not built yet'
+            err = 'atlas is not built yet'
             logger.critical(err)
             raise RuntimeError(err)
     else:
@@ -135,7 +135,7 @@ def build_atlas_package(is_debug_version: bool = False):
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), '--no-translations', app_name],
                            cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
         else:
-            err = 'Error: atlas is not built yet'
+            err = 'atlas is not built yet'
             logger.critical(err)
             raise RuntimeError(err)
 
