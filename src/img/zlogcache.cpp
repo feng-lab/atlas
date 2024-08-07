@@ -11,7 +11,7 @@ ZLogCache& ZLogCache::instance()
 }
 
 void ZLogCache::send(google::LogSeverity severity,
-                     const char* full_filename,
+                     const char* /*full_filename*/,
                      const char* base_filename,
                      int line,
                      const google::LogMessageTime& logmsgtime,
@@ -30,12 +30,7 @@ void ZLogCache::send(google::LogSeverity severity,
     }
   }
   m_logDatas.emplace_back(severity,
-                          full_filename,
-                          base_filename,
-                          line,
-                          logmsgtime.tm(),
-                          message,
-                          message_len,
+                          logmsgtime,
                           ToString(severity, base_filename, line, logmsgtime, message, message_len));
 }
 

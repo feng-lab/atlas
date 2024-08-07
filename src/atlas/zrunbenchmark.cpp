@@ -5,6 +5,10 @@
 #include "zrandom.h"
 #include "zsaturateoperation.h"
 #include <boost/multiprecision/cpp_int.hpp>
+#if __has_include(<absl/numeric/int128.h>)
+#define ATLAS_HAS_ABSL
+#include <absl/numeric/int128.h>
+#endif
 #include <QReadWriteLock>
 #include <QMutexLocker>
 #include <mutex>
@@ -61,38 +65,15 @@ inline int64_t saturate_mul_boost(int64_t x, int64_t y)
                                                    : static_cast<int64_t>(res);
 }
 
-#ifdef __GNUG__ // clang or gcc
-inline int64_t saturate_mul_buildin128(int64_t x, int64_t y)
+#ifdef ATLAS_HAS_ABSL
+inline int64_t saturate_mul_absl(int64_t x, int64_t y)
 {
-  static_assert((static_cast<__int128_t>(-1) >> 1) == static_cast<__int128_t>(-1), "need arithmetic right shift.");
-  static_assert((static_cast<int64_t>(-1) >> 1) == static_cast<int64_t>(-1), "need arithmetic right shift.");
+  using namespace absl;
 
-  __int128_t res = static_cast<__int128_t>(x) * static_cast<__int128_t>(y);
-  if (static_cast<int64_t>(res >> 64) != (static_cast<int64_t>(res) >> 63)) {
-    res = (static_cast<uint64_t>(x ^ y) >> 63) + INT64_MAX;
-  }
-  return res;
+  int128 res = int128(x) * int128(y);
+  return res <= int128(INT64_MIN) ? INT64_MIN : res >= int128(INT64_MAX) ? INT64_MAX : static_cast<int64_t>(res);
 }
-
-static void BM_saturate_mul_i64_buildin128(benchmark::State& state)
-{
-  std::vector<int64_t> vec1(state.range(0));
-  std::vector<int64_t> vec2(state.range(0));
-  for (auto& v1 : vec1) {
-    v1 = ZRandom::instance().randInt<int64_t>(INT64_MAX, INT64_MIN) * 100000;
-  }
-  for (auto& v2 : vec2) {
-    v2 = ZRandom::instance().randInt<int64_t>(INT64_MAX, INT64_MIN) * 100000;
-  }
-  while (state.KeepRunning()) {
-    for (size_t i = 0; i < vec1.size(); ++i) {
-      auto a = saturate_mul_buildin128(vec1[i], vec2[i]);
-      benchmark::DoNotOptimize(a);
-    }
-  }
-  state.SetItemsProcessed(state.iterations() * state.range(0));
-}
-#endif // __GNUG__
+#endif
 
 static void BM_saturate_mul_i64(benchmark::State& state)
 {
@@ -131,6 +112,27 @@ static void BM_saturate_mul_i64_boost(benchmark::State& state)
   }
   state.SetItemsProcessed(state.iterations() * state.range(0));
 }
+
+#ifdef ATLAS_HAS_ABSL
+static void BM_saturate_mul_i64_absl(benchmark::State& state)
+{
+  std::vector<int64_t> vec1(state.range(0));
+  std::vector<int64_t> vec2(state.range(0));
+  for (auto& v1 : vec1) {
+    v1 = ZRandom::instance().randInt<int64_t>(INT64_MAX, INT64_MIN) * 100000;
+  }
+  for (auto& v2 : vec2) {
+    v2 = ZRandom::instance().randInt<int64_t>(INT64_MAX, INT64_MIN) * 100000;
+  }
+  while (state.KeepRunning()) {
+    for (size_t i = 0; i < vec1.size(); ++i) {
+      auto a = saturate_mul_absl(vec1[i], vec2[i]);
+      benchmark::DoNotOptimize(a);
+    }
+  }
+  state.SetItemsProcessed(state.iterations() * state.range(0));
+}
+#endif
 
 static void BM_saturate_mul_i32(benchmark::State& state)
 {
@@ -174,8 +176,8 @@ static void addSaturateMulBench()
 {
   BENCHMARK(BM_saturate_mul_i64)->Range(8, 8 << 10);
   BENCHMARK(BM_saturate_mul_i64_boost)->Range(8, 8 << 10);
-#ifdef __GNUG__ // clang or gcc
-  BENCHMARK(BM_saturate_mul_i64_buildin128)->Range(8, 8 << 10);
+#ifdef ATLAS_HAS_ABSL
+  BENCHMARK(BM_saturate_mul_i64_absl)->Range(8, 8 << 10);
 #endif
   BENCHMARK(BM_saturate_mul_i32)->Range(8, 8 << 10);
   BENCHMARK(BM_saturate_mul_i16)->Range(8, 8 << 10);

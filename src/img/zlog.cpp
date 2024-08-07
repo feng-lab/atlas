@@ -99,7 +99,7 @@ public:
 
 public:
   void send(google::LogSeverity severity,
-            const char* full_filename,
+            const char* /*full_filename*/,
             const char* base_filename,
             int line,
             const google::LogMessageTime& logmsgtime,
@@ -107,14 +107,8 @@ public:
             size_t message_len) override
   {
     if (isValid()) {
-      m_logFunction(LogData(severity,
-                            full_filename,
-                            base_filename,
-                            line,
-                            logmsgtime.tm(),
-                            message,
-                            message_len,
-                            ToString(severity, base_filename, line, logmsgtime, message, message_len)));
+      m_logFunction(
+        LogData(severity, logmsgtime, ToString(severity, base_filename, line, logmsgtime, message, message_len)));
     }
   }
 };

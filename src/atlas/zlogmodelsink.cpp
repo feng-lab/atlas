@@ -76,8 +76,6 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
       case LevelNameColumn:
         return GetLogSeverityName(item.level);
       case MessageColumn:
-        return item.message;
-      case FormattedMessageColumn:
         return item.formatted;
       default:
         return {};

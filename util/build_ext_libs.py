@@ -2906,6 +2906,29 @@ def build_skia(src_dir: str, install_dir: str):
         logger.info('done')
 
 
+def build_or_tools(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(['-DBUILD_DEPS:BOOL=OFF',
+                         '-DBUILD_CoinUtils:BOOL=ON',
+                         '-DBUILD_Osi:BOOL=ON',
+                         '-DBUILD_Clp:BOOL=ON',
+                         '-DBUILD_Cgl:BOOL=ON',
+                         '-DBUILD_Cbc:BOOL=ON',
+                         '-DBUILD_HIGHS:BOOL=ON',
+                         '-DBUILD_SCIP:BOOL=ON',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DBUILD_TESTING:BOOL=OFF',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_libs(libs: OrderedDict, use_asan: bool):
     logger.info(f'extDIR: {ext_dir()}')
     logger.info(f'srcPackageDIR: {src_package_dir()}')
@@ -3345,22 +3368,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
             build_opencv(src_dir, src_contrib_dir, ext_conda_build_dir(), conda_build=True)
 
-        # if lib_name == 'ospray':
-        #     if is_windows():
-        #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*win*')
-        #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*win*')
-        #     elif is_linux():
-        #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*linux*')
-        #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*linux*')
-        #     else:
-        #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*osx*')
-        #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*osx*')
-        #     src_dir = os.path.join(ext_dir(), 'OSPRay')
-        #     assert os.path.exists(src_dir)
-        #     assert os.path.exists(ispc_dir)
-        #     assert os.path.exists(embree_dir)
-        #     build_ospray(src_dir, ext_build_dir(), ispc_dir=ispc_dir, embree_dir=embree_dir)
-
         if lib_name == 'ospray':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ospray*'))
             src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
@@ -3372,7 +3379,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'ants':
             src_dir = os.path.join(atlas_repository_dir(), '..', 'ANTs')
-            update_or_clone_git_repository(src_dir, 'git@github.com:ANTsX/ANTs.git')
             if not os.path.exists(src_dir):
                 logger.info('no ANTs')
             else:
@@ -3380,11 +3386,17 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'skia':
             src_dir = os.path.join(atlas_repository_dir(), '..', 'skia')
-            update_or_clone_git_repository(src_dir, 'https://github.com/google/skia.git')
             if not os.path.exists(src_dir):
                 logger.info('no skia')
             else:
                 build_skia(src_dir, ext_build_dir())
+
+        if lib_name == 'or-tools':
+            src_dir = os.path.join(atlas_repository_dir(), '..', 'or-tools')
+            if not os.path.exists(src_dir):
+                logger.info('no or-tools')
+            else:
+                build_or_tools(src_dir, ext_build_dir())
 
 
 def parse_inputs(argv: list):
@@ -3395,12 +3407,12 @@ def parse_inputs(argv: list):
                 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk', 'opencv',
                 'neuTube', 'rocksdb', 'llfio', 'jansson', 'pcre', 'fizz', 'mvfst', 'wangle', 'proxygen',
-                'conda-zimg', 'conda-opencv', 'ospray', 'ants', 'skia',
+                'conda-zimg', 'conda-opencv', 'ospray', 'ants', 'skia', 'or-tools'
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
     # not used now
-    lib_skip_list = ['ospray', 'ants', 'skia', 'rocksdb', 'conda-opencv', 'llfio']
+    lib_skip_list = ['ospray', 'ants', 'skia', 'rocksdb', 'conda-opencv', 'llfio', 'or-tools']
 
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],

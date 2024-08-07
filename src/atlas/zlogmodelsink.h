@@ -45,7 +45,6 @@ public:
     TimeColumn = 0,
     LevelNameColumn = 1,
     MessageColumn = 2,
-    FormattedMessageColumn = 100
   };
 
   explicit ZLogModelSink(size_t max_items = size_t(std::numeric_limits<int>::max()));

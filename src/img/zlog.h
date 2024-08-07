@@ -34,29 +34,15 @@ void shutdownLogging();
 
 struct LogData
 {
-  LogData(google::LogSeverity severity,
-          const char* full_filename,
-          const char* base_filename,
-          int line_,
-          const std::tm& tm,
-          const char* msg,
-          size_t message_len,
-          const std::string& formatted_msg)
+  LogData(google::LogSeverity severity, const google::LogMessageTime& logmsgtime, const std::string& formatted_msg)
     : level(severity)
-    , fullFilename(full_filename)
-    , baseFilename(base_filename)
-    , line(line_)
-    , time(QDate(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday), QTime(tm.tm_hour, tm.tm_min, tm.tm_sec))
-    , message(msg, message_len)
+    , time(QDate(logmsgtime.year() + 1900, logmsgtime.month() + 1, logmsgtime.day()),
+           QTime(logmsgtime.hour(), logmsgtime.min(), logmsgtime.sec(), logmsgtime.usec() / 1000))
     , formatted(QString::fromStdString(formatted_msg))
   {}
 
   google::LogSeverity level;
-  std::string fullFilename;
-  std::string baseFilename;
-  int line;
   QDateTime time;
-  QByteArray message; // main log message
   QString formatted; // formatted log message with level, time, threadid, filename, line, and message
 };
 

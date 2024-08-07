@@ -24,7 +24,6 @@
 #include "zjson.h"
 #include "zfileutils.h"
 #include "ztheme.h"
-#include "zlogdialog.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>

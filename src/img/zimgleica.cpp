@@ -4,12 +4,10 @@
 #include "zioutils.h"
 #include "zimgio.h"
 #include "zstructutils.h"
-#include <QUuid>
 #include <QXmlStreamReader>
 #include <QFile>
 #include <QTextStream>
 #include <QUrl>
-#include <boost/iostreams/categories.hpp>
 
 namespace {
 
@@ -63,8 +61,6 @@ struct MemoryBlock64
 } // namespace
 
 namespace nim {
-
-static_assert(sizeof(QUuid) == 16 && std::is_trivially_copyable_v<QUuid>, "wrong uuid type");
 
 bool ZImgLeica::supportRead() const
 {
