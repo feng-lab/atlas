@@ -81,47 +81,9 @@ public:
   }
 };
 
-class FunctionLogSink : public google::LogSink
-{
-  LogFunction m_logFunction;
-
-public:
-  explicit FunctionLogSink(LogFunction f)
-    : m_logFunction(std::move(f))
-  {}
-
-  [[nodiscard]] bool isValid() const
-  {
-    return m_logFunction.operator bool();
-  }
-
-  // LogSink interface
-
-public:
-  void send(google::LogSeverity severity,
-            const char* /*full_filename*/,
-            const char* base_filename,
-            int line,
-            const google::LogMessageTime& logmsgtime,
-            const char* message,
-            size_t message_len) override
-  {
-    if (isValid()) {
-      m_logFunction(
-        LogData(severity, logmsgtime, ToString(severity, base_filename, line, logmsgtime, message, message_len)));
-    }
-  }
-};
-
 std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename)
 {
   auto res = std::make_shared<FileLogSink>(filename);
-  return res->isValid() ? res : std::shared_ptr<google::LogSink>();
-}
-
-std::shared_ptr<google::LogSink> createFunctorLogSink(const LogFunction& f)
-{
-  auto res = std::make_shared<FunctionLogSink>(f);
   return res->isValid() ? res : std::shared_ptr<google::LogSink>();
 }
 

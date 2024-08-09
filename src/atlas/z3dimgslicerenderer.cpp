@@ -175,7 +175,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
   for (size_t i = 0; i < m_img->numChannels(); ++i) {
     LOG(INFO) << "";
-    ZBenchTimer bt("render and collect blockids");
+    ZBenchTimer bt(fmt::format("render slice ch{}", i));
 
     processEventsAndMaybeCancel(cancellationToken);
 
@@ -230,13 +230,12 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       }
       // glFinish();
     }
-    STOP_AND_LOG(bt)
+    bt.recordEvent("render and collect blockids");
 
     processEventsAndMaybeCancel(cancellationToken);
 
-    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, i, cancellationToken);
+    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, i, cancellationToken, bt);
 
-    bt.resetAndStart("render image3d slice");
     // render channels one by one
     m_image3DSliceWithColorMapShader.bind();
 
@@ -279,7 +278,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
     m_image3DSliceWithColorMapShader.release();
     // glFinish();
-    STOP_AND_LOG(bt)
+    bt.recordEvent("render image3d slice");
   }
 
   if (m_img->numChannels() > 1) {

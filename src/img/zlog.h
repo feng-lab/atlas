@@ -46,12 +46,8 @@ struct LogData
   QString formatted; // formatted log message with level, time, threadid, filename, line, and message
 };
 
-using LogFunction = std::function<void(const LogData&)>;
-
 // might return nullptr
 std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename);
-
-std::shared_ptr<google::LogSink> createFunctorLogSink(const LogFunction& f);
 
 inline void addLogSink(google::LogSink* sink)
 {

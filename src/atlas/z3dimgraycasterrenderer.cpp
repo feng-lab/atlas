@@ -493,7 +493,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
   size_t idx = 0;
   for (auto c : visibleIdxs) {
     LOG(INFO) << "";
-    ZBenchTimer bt("render and collect blockids");
+    ZBenchTimer bt(fmt::format("render 2d slice of 3d image ch{}", c));
 
     processEventsAndMaybeCancel(cancellationToken);
 
@@ -549,13 +549,12 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
       }
       // glFinish();
     }
-    STOP_AND_LOG(bt)
+    bt.recordEvent("render and collect blockids");
 
     processEventsAndMaybeCancel(cancellationToken);
 
-    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
+    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt);
 
-    bt.resetAndStart("render image3d slice");
     // render channels one by one
     m_image3DSliceWithTransferfunShader.bind();
 
@@ -586,6 +585,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
 
     m_image3DSliceWithTransferfunShader.release();
     // glFinish();
+    bt.recordEvent("render image3d slice");
     STOP_AND_LOG(bt)
   }
 
@@ -819,7 +819,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
                              : folly::CancellationToken();
 
   LOG(INFO) << "channel " << c << " round " << round;
-  ZBenchTimer btrb("render blockids");
+  ZBenchTimer bt(fmt::format("render 3D image channel {} round {}", c, round));
 
   processEventsAndMaybeCancel(cancellationToken);
 
@@ -864,11 +864,10 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   m_blockIDsRenderTarget->release();
   m_image3DRaycasterBlockIDsShader.release();
   // glFinish();
-  STOP_AND_LOG(btrb)
+  bt.recordEvent("render blockids");
 
   processEventsAndMaybeCancel(cancellationToken);
 
-  ZBenchTimer btcb("collect blockids");
   // check missed blocks and upload
   const Z3DTexture* missingBlockIDsTexture = m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0);
   if (missingBlockIDsTexture->numPixels() * 4 != m_blockIDs.size()) {
@@ -905,7 +904,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
       // otherwise still need to render empty blocks
       return lastRound;
     }
-    STOP_AND_LOG(btcb)
+    bt.recordEvent("collect blockids");
   } else {
     // need to upload some image blocks to GPU
     bool hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
@@ -951,16 +950,15 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
       }
     }
     // VLOG(1) << missingBlockIDs.size() << " " << usedBlockIDs.size();
-    STOP_AND_LOG(btcb)
+    bt.recordEvent("collect blockids");
 
     processEventsAndMaybeCancel(cancellationToken);
 
-    lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken) && lastRound;
+    lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt) && lastRound;
 
     processEventsAndMaybeCancel(cancellationToken);
   }
 
-  ZBenchTimer btri("render image");
   // render channels one by one
   m_image3DRaycasterShader.bind();
 
@@ -997,7 +995,8 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
   m_image3DRaycasterShader.release();
   glFinish();
-  STOP_AND_LOG(btri)
+  bt.recordEvent("render image");
+  STOP_AND_LOG(bt)
 
   std::swap(m_lastImageRenderTargets[eye], m_currentImageRenderTargets[eye]);
 

@@ -52,7 +52,7 @@ Q_SIGNALS:
   void logDataReady(const std::deque<LogData>* messages, size_t start, size_t end);
 
 protected:
-  explicit ZLogCache(size_t maxNumItems = 1000000);
+  explicit ZLogCache(size_t maxNumItems = 1 << 20);
 
 private:
   void sendLogData();
@@ -63,7 +63,6 @@ private:
   size_t m_maxNumItems;
   QTimer* m_timer;
   size_t m_unsendLogDataStart = 0;
-  size_t m_logCounter = 0;
 };
 
 } // namespace nim

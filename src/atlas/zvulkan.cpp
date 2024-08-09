@@ -8,7 +8,7 @@ DEFINE_bool(atlas_debug_vulkan,
 
 namespace nim {
 
-std::string uuidToString(const uint8_t uuid[VK_UUID_SIZE])
+std::string uuidToString(const vk::ArrayWrapper1D<unsigned char, VK_UUID_SIZE>& uuid)
 {
   return fmt::format(
     "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",

@@ -114,8 +114,6 @@ class Z3DProfileFilterWrapper : public Z3DFilterWrapper
   ZBenchTimer m_benchTimer;
 
 public:
-  void beforeFilterProcess(const Z3DFilter*) override;
-
   void afterFilterProcess(const Z3DFilter* p) override;
 
   void beforeNetworkProcess() override;

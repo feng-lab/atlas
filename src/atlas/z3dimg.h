@@ -20,6 +20,8 @@ namespace nim {
 
 class Z3DShaderProgram;
 
+class ZBenchTimer;
+
 // Z3DVolume coordinates:
 // 1. Voxel Coordinate:    [0, dim.x-1] x [0, dim.y-1] x [0, dim.z-1]
 //                     in which (0,0,0) is LeftUpFront Corner (LUF)
@@ -158,7 +160,8 @@ public:
 
   bool updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                           size_t c,
-                                          const folly::CancellationToken& cancellationToken);
+                                          const folly::CancellationToken& cancellationToken,
+                                          ZBenchTimer& bt);
 
 Q_SIGNALS:
   void renderingError(const QString& error) const;
@@ -190,7 +193,8 @@ protected:
   // return number of empty (all zero) image blocks
   size_t readAndUploadImageBlocks(size_t c,
                                   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
-                                  const folly::CancellationToken& cancellationToken);
+                                  const folly::CancellationToken& cancellationToken,
+                                  ZBenchTimer& bt);
 
   void checkPageSystemError(size_t c, bool strict = true);
 

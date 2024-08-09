@@ -66,8 +66,7 @@ ZImgInfo ZImgPackSubBlock::readInfo() const
   return m_img->info();
 }
 
-ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo,
-                   std::vector<std::shared_ptr<ZImgSubBlock>>* pSceneSubBlocks)
+ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::shared_ptr<ZImgSubBlock>>* pSceneSubBlocks)
   : QObject()
   , m_imgSource(std::move(imgSource))
   , m_hasUnsavedChange(false)
@@ -653,7 +652,8 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         }
 
         if (res->isSameType(resInfo)) {
-          if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax()) {
+          if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax() ||
+              resInfo.validBitCount != m_imgInfo.validBitCount) {
             maybeCancel(cancellationToken);
             res->normalize(displayRangeMin, displayRangeMax);
           }
@@ -804,7 +804,8 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         }
 
         if (res->isSameType(resInfo)) {
-          if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax()) {
+          if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax() ||
+              resInfo.validBitCount != m_imgInfo.validBitCount) {
             maybeCancel(cancellationToken);
             res->normalize(displayRangeMin, displayRangeMax);
           }

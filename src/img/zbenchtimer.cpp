@@ -1,83 +1,39 @@
 #include "zbenchtimer.h"
 
-#include <utility>
+#include <fmt/chrono.h>
 
 #include "zlog.h"
 
 namespace nim {
 
-ZBenchTimer::ZBenchTimer(std::string funName)
-  : m_name(std::move(funName))
+void ZBenchTimer::recordEvent(const std::string& eventName)
 {
-  reset();
-  start();
-}
-
-void ZBenchTimer::start()
-{
-  m_time = 0.0;
-  m_pauseTime = 0.0;
-  m_paused = false;
-  m_start = std::chrono::high_resolution_clock::now();
-}
-
-void ZBenchTimer::stop()
-{
-  double elapsed = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start).count();
-  if (m_paused) {
-    m_pauseTime += elapsed;
-  } else {
-    m_time += elapsed;
-  }
-
-  m_paused = false;
-
-  m_best = std::min(m_best, m_time);
-  m_worst = std::max(m_worst, m_time);
-  m_rep++;
-  m_total += m_time;
-  m_average = m_total / m_rep;
-  m_totalPauseTime += m_pauseTime;
-  m_averagePauseTime = m_totalPauseTime / m_rep;
-}
-
-void ZBenchTimer::pause()
-{
-  if (m_paused) {
-    return;
-  }
-
-  m_time += std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start).count();
-  m_paused = true;
-  m_start = std::chrono::high_resolution_clock::now();
-}
-
-void ZBenchTimer::resume()
-{
-  if (!m_paused) {
-    return;
-  }
-
-  m_pauseTime += std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start).count();
-  m_paused = false;
-  m_start = std::chrono::high_resolution_clock::now();
+  auto now = std::chrono::high_resolution_clock::now();
+  fmt::format_to(std::back_inserter(m_events),
+                 "  {:>30} : {:>16.6} {:>16.6}\n",
+                 eventName,
+                 std::chrono::duration<double>(now - m_lastEventTime),
+                 std::chrono::duration<double>(now - m_start));
+  m_lastEventTime = now;
 }
 
 std::string ZBenchTimer::toString() const
 {
   if (m_rep == 1) {
-    return fmt::format("{} took {} seconds (paused {} seconds)",
-                       m_name.empty() ? "Function" : m_name,
-                       m_time,
-                       m_pauseTime);
+    if (m_events.empty()) {
+      return fmt::format("{} took {}", m_name, std::chrono::duration<double>(m_time));
+    }
+    return fmt::format("{} took {} :\n                           Event :       Since Last      Since Start\n{}",
+                       m_name,
+                       std::chrono::duration<double>(m_time),
+                       m_events);
   } else if (m_rep > 1) {
-    return fmt::format("{} took on average {} seconds (out of {} repeats, best: {} worst: {} paused on average: {})",
-                       m_name.empty() ? "Function" : m_name,
-                       m_average,
+    return fmt::format("{} took on average {} (out of {} repeats, best: {} worst: {})",
+                       m_name,
+                       std::chrono::duration<double>(m_time) / m_rep,
                        m_rep,
                        m_best,
-                       m_worst,
-                       m_averagePauseTime);
+                       m_worst);
   }
   return {};
 }

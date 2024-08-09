@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <queue>
 
-// #define PROFILE3DRENDERERS
+#define PROFILE3DRENDERERS
 #define CHECKOPENGLSTATE
 
 namespace nim {
@@ -350,25 +350,20 @@ void Z3DCheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p, const char* mess
   }
 }
 
-void Z3DProfileFilterWrapper::beforeFilterProcess(const Z3DFilter*)
-{
-  m_benchTimer.start();
-}
-
 void Z3DProfileFilterWrapper::afterFilterProcess(const Z3DFilter* p)
 {
-  m_benchTimer.stop();
-  LOG(INFO) << "Filter " << p->className() << " took time: " << m_benchTimer.time() << " seconds.";
+  m_benchTimer.recordEvent(p->className().toStdString());
 }
 
 void Z3DProfileFilterWrapper::beforeNetworkProcess()
 {
-  m_benchTimer.reset();
+  m_benchTimer.resetAndStart("Network");
 }
 
 void Z3DProfileFilterWrapper::afterNetworkProcess()
 {
-  LOG(INFO) << "Network took time: " << m_benchTimer.total() << " seconds.";
+  m_benchTimer.stop();
+  LOG(INFO) << m_benchTimer.toString();
 }
 
 } // namespace nim

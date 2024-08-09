@@ -41,6 +41,9 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
   , m_imgPack(imgPack)
   , m_channelDisplayRanges(displayRanges)
 {
+  for (const auto& dr : m_channelDisplayRanges) {
+    VLOG(1) << dr;
+  }
   const ZImgInfo& info = m_imgPack.imgInfo();
   if (info.depth > 1) {
     m_widthScale = info.width <= 512_uz ? 1.0 : 512.0 / info.width;
@@ -470,6 +473,9 @@ void Z3DImg::setScale(const glm::vec3& scale)
 void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRanges)
 {
   m_channelDisplayRanges = displayRanges;
+  for (const auto& dr : m_channelDisplayRanges) {
+    VLOG(1) << dr;
+  }
   CHECK(m_imgPack.imgInfo().numChannels == m_channelDisplayRanges.size())
     << m_imgPack.imgInfo().numChannels << " " << m_channelDisplayRanges.size();
   readVolumes();
@@ -512,7 +518,8 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
 
 bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                                 size_t c,
-                                                const folly::CancellationToken& cancellationToken)
+                                                const folly::CancellationToken& cancellationToken,
+                                                ZBenchTimer& bt)
 {
   if (missingBlockIDs.empty()) {
     LOG(INFO) << "no missing blocks";
@@ -520,8 +527,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   }
   auto numBlocksToRead = m_channelImageCacheManagers[c]->size();
   LOG(INFO) << "total " << m_channelImageCacheManagers[c]->size() << " need " << missingBlockIDs.size();
-
-  ZBenchTimer bt("update page table");
 
   checkPageSystemError(c, true);
 
@@ -600,7 +605,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                      << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
                      << pageTableEntryCoord; // block id shader should not collect mapped empty block
           resetCacheSystem(c);
-          return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
+          return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken, bt);
 #else
           CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
                        << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
@@ -684,6 +689,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     ++count;
   }
   clearAndDeallocate(pendingBlocks);
+  bt.recordEvent("update cache system");
 
   //  for (size_t i = 0; i < pendingTasks.size(); ++i) {
   //    const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
@@ -699,17 +705,16 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   size_t readEmptyBlockCount = 0;
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
-    auto uploadGuard = folly::makeGuard([=, this]() {
-      ZBenchTimer btu("upload page table");
+    auto uploadGuard = folly::makeGuard([=, this, &bt]() {
       checkPageSystemError(c, false);
       m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
       m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
-      STOP_AND_LOG(btu)
+      bt.recordEvent("upload page table");
     });
 
     // read image
     if (!pendingTasks.empty()) {
-      readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken);
+      readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken, bt);
     }
   }
 
@@ -725,7 +730,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     << m_usedPageTableEntry.size();
 #endif
   // glFinish();
-  STOP_AND_LOG(bt)
 
   // checkPageSystemError();
 
@@ -864,11 +868,10 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
 
 size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                         const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
-                                        const folly::CancellationToken& cancellationToken)
+                                        const folly::CancellationToken& cancellationToken,
+                                        ZBenchTimer& bt)
 {
   size_t emptyBlockCount = 0;
-
-  ZBenchTimer bti(fmt::format("upload image ch{} cache", c));
 
   processEventsAndMaybeCancel(cancellationToken);
 
@@ -930,9 +933,10 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
           });
       }));
     }
-    auto f = folly::collect(blockFutures).via(cpuExecutor).thenValue([=](auto&&) {
+    auto f = folly::collect(blockFutures).via(cpuExecutor).thenValue([=, &bt](auto&&) {
       maybeCancel(cancellationToken);
       LOG(INFO) << "image blocks reading finished.";
+      bt.recordEvent("image blocks reading");
     });
 
     processEventsAndMaybeCancel(cancellationToken);
@@ -973,6 +977,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         lastLogTime = std::chrono::steady_clock::now();
       }
     }
+    bt.recordEvent("image blocks uploading");
   } else {
     // use PBO
     { // scope for glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
@@ -1048,9 +1053,9 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
       clearAndDeallocate(pboLocalBuffer);
       LOG(INFO) << "image blocks reading finished.";
+      bt.recordEvent("image blocks reading to PBO");
     }
 
-    ZBenchTimer bt_pboUpload("PBO uploading");
     for (size_t i = 0; i < pendingTasks.size(); ++i) {
       processEventsAndMaybeCancel(cancellationToken);
 
@@ -1068,9 +1073,8 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                                      imageBlockSize,
                                                      (const void*)(i * blockSizeInByte));
     }
-    STOP_AND_LOG(bt_pboUpload)
+    bt.recordEvent("PBO uploading");
   }
-  STOP_AND_LOG(bti)
 
   return emptyBlockCount;
 }

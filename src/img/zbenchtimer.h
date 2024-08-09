@@ -38,25 +38,30 @@ namespace nim {
 class ZBenchTimer
 {
 public:
-  explicit ZBenchTimer(std::string funName = "");
+  explicit ZBenchTimer(std::string funName = "Function")
+    : m_name(std::move(funName))
+  {
+    start();
+  }
 
   void reset()
   {
-    m_best = std::numeric_limits<double>::max();
-    m_worst = -1;
-    m_total = 0;
+    m_best = {};
+    m_worst = {};
     m_rep = 0;
-    m_time = 0;
-    m_pauseTime = 0;
-    m_totalPauseTime = 0;
-    m_paused = false;
-    m_average = 0;
-    m_averagePauseTime = 0;
+    m_time = {};
+    m_events = {};
+  }
+
+  void start()
+  {
+    m_start = std::chrono::high_resolution_clock::now();
+    m_lastEventTime = m_start;
   }
 
   void resetAndStart(const std::string& newName)
   {
-    setName(newName);
+    m_name = newName;
     reset();
     start();
   }
@@ -67,48 +72,16 @@ public:
     start();
   }
 
-  void start();
+  void recordEvent(const std::string& eventName);
 
-  void stop();
-
-  void pause();
-
-  void resume();
-
-  // elapsed time in seconds
-  [[nodiscard]] double time() const
+  void stop()
   {
-    return m_time;
-  }
+    auto elapsed = std::chrono::high_resolution_clock::now() - m_start;
+    m_time += elapsed;
 
-  // average elapsed time in seconds.
-  [[nodiscard]] double average() const
-  {
-    return m_average;
-  }
-
-  // best elapsed time in seconds
-  [[nodiscard]] double best() const
-  {
-    return m_best;
-  }
-
-  // total elapsed time in seconds.
-  [[nodiscard]] double total() const
-  {
-    return m_total;
-  }
-
-  // elapsed pause time in seconds
-  [[nodiscard]] double pauseTime() const
-  {
-    return m_pauseTime;
-  }
-
-  // total elapsed pause time in seconds.
-  [[nodiscard]] double totalPauseTime() const
-  {
-    return m_totalPauseTime;
+    m_best = m_best == std::chrono::high_resolution_clock::duration::zero() ? elapsed : std::min(m_best, elapsed);
+    m_worst = std::max(m_worst, elapsed);
+    m_rep++;
   }
 
   void setName(const std::string& str)
@@ -120,18 +93,14 @@ public:
 
 protected:
   std::chrono::time_point<std::chrono::high_resolution_clock> m_start;
-  double m_time;
-  double m_best;
-  double m_worst;
-  double m_average;
-  size_t m_rep;
-  double m_total;
+  std::chrono::high_resolution_clock::duration m_time{};
+  std::chrono::high_resolution_clock::duration m_best{};
+  std::chrono::high_resolution_clock::duration m_worst{};
+  int m_rep = 0;
   std::string m_name;
 
-  double m_pauseTime;
-  double m_totalPauseTime;
-  double m_averagePauseTime;
-  bool m_paused;
+  std::chrono::time_point<std::chrono::high_resolution_clock> m_lastEventTime;
+  std::string m_events;
 };
 
 } // namespace nim
