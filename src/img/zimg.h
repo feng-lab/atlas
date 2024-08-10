@@ -368,10 +368,16 @@ struct ZImgWriteParameters
 template<>
 QString ZImgMetadataBase<ZImgMetatag>::toQString() const;
 
+template<>
+std::string ZImgMetadataBase<ZImgMetatag>::toString() const;
+
 class ZImg;
 
 template<>
 QString ZImgMetadataBase<ZImg>::toQString() const;
+
+template<>
+std::string ZImgMetadataBase<ZImg>::toString() const;
 
 using ZImgMetadata = ZImgMetadataBase<ZImgMetatag>;
 using ZImgThumbernail = ZImgMetadataBase<ZImg>;

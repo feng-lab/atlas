@@ -870,8 +870,6 @@ void moveObjectToCorrectLocation(const QString& fn,
         json::value_from(glm::vec4(0, 1, 0, 1));
     }
     glm::dvec3 loc = cellNameToLocations.at(filename);
-    QString locString = toQString(loc);
-    QString scaleString = toQString(glm::dvec3(1, 1, 5));
 
     *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Coord Transform 3DTransform"]["Scale Vec3"] =
       json::value_from(glm::dvec3(1, 1, 5));

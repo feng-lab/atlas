@@ -63,6 +63,27 @@ QString ZImgMetadataBase<ZImgMetatag>::toQString() const
 }
 
 template<>
+std::string ZImgMetadataBase<ZImgMetatag>::toString() const
+{
+  std::string res;
+
+  for (const auto& attachPointTags : m_data) {
+    if (!attachPointTags.second.empty()) {
+      fmt::format_to(std::back_inserter(res),
+                     "Attach Point: z: {}, c: {}, t: {}\n",
+                     attachPointTags.first.z,
+                     attachPointTags.first.c,
+                     attachPointTags.first.t);
+      for (const auto& tag : attachPointTags.second) {
+        fmt::format_to(std::back_inserter(res), "  {}\n", tag.toString());
+      }
+    }
+  }
+
+  return res;
+}
+
+template<>
 QString ZImgMetadataBase<ZImg>::toQString() const
 {
   QString res;
@@ -76,6 +97,28 @@ QString ZImgMetadataBase<ZImg>::toQString() const
                     .arg(attachPointsImgs.second.size());
       for (const auto& img : attachPointsImgs.second) {
         res = res % "  thumb <" % img.info().toQString() % ">\n";
+      }
+    }
+  }
+
+  return res;
+}
+
+template<>
+std::string ZImgMetadataBase<ZImg>::toString() const
+{
+  std::string res;
+
+  for (const auto& attachPointsImgs : m_data) {
+    if (!attachPointsImgs.second.empty()) {
+      fmt::format_to(std::back_inserter(res),
+                     "Attach Point: z: {}, c: {}, t: {}, Number of Thumbnails: {}\n",
+                     attachPointsImgs.first.z,
+                     attachPointsImgs.first.c,
+                     attachPointsImgs.first.t,
+                     attachPointsImgs.second.size());
+      for (const auto& img : attachPointsImgs.second) {
+        fmt::format_to(std::back_inserter(res), "  thumb <{}>\n", img.info().toString());
       }
     }
   }
@@ -3259,7 +3302,13 @@ void ZImg::showContentAsString_Impl(std::string& res) const
       for (size_t z = 0; z < depth(); ++z) {
         for (size_t y = 0; y < height(); ++y) {
           auto data = rowData<TVoxel>(y, z, c, t);
-          fmt::format_to(std::back_inserter(res), "{}:{}:{}:{}: {}\n", t, c, z, y, fmt::join(data, data + width(), " "));
+          fmt::format_to(std::back_inserter(res),
+                         "{}:{}:{}:{}: {}\n",
+                         t,
+                         c,
+                         z,
+                         y,
+                         fmt::join(data, data + width(), " "));
         }
         res += "\n";
       }

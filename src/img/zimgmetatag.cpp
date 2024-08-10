@@ -15,11 +15,7 @@ ZImgMetatag::ZImgMetatag(QString name, const QString& value)
 
 QString ZImgMetatag::toQString() const
 {
-  QString res = m_name;
-  if (m_tag != 0) {
-    res = res % QString(" (tag:%1)").arg(m_tag);
-  }
-  res = res % QString(" %1 %2<").arg(enumToQString(m_dataType)).arg(m_count);
+  QString res = QString(" %1 (tag:%2) %3 %4<").arg(m_name).arg(m_tag).arg(enumToQString(m_dataType)).arg(m_count);
   QString sep;
   uint64_t ct = m_count;
 
@@ -36,7 +32,7 @@ QString ZImgMetatag::toQString() const
       }
       break;
     case DataType::Ascii:
-      if (!m_data.empty()) {
+      if (m_data.size() > 1) {
         res = res % QString::fromUtf8(dataArray<char>(), m_data.size() - 1);
       }
       break;
@@ -131,102 +127,119 @@ QString ZImgMetatag::toQString() const
   return res % QString(">");
 }
 
-/*
 std::string ZImgMetatag::toString() const
 {
-  std::ostringstream res;
-  if (m_tag != 0)
-    res << m_name << " (tag:" << m_tag << ") " << DataTypeString[m_dataType] << " " << m_count << "<";
-  else
-    res << m_name << " " << DataTypeString[m_dataType] << " " << m_count << "<";
-  const char* sep = "";
-  uint64_t ct = m_count;
+  std::string res;
+  // res.reserve(256); // Pre-allocate some space to reduce reallocations
+
+  fmt::format_to(std::back_inserter(res), "{} (tag:{}) {} {}<", m_name, m_tag, enumToString(m_dataType), m_count);
 
   switch (m_dataType) {
-  case DataType::Undefined:
-  case DataType::Byte:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << std::hex << static_cast<int>(dataAt<uint8_t>(i)), sep = " ";
-    break;
-  case DataType::SByte:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << static_cast<int>(dataAt<char>(i)), sep = " ";
-    break;
-  case DataType::Ascii:
-    res << sep << dataArray<char>(), sep = " ";
-    break;
-  case DataType::Short:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << dataAt<uint16_t>(i), sep = " ";
-    break;
-  case DataType::SShort:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << dataAt<int16_t>(i), sep = " ";
-    break;
-  case DataType::Long:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << dataAt<uint32_t>(i), sep = " ";
-    break;
-  case DataType::SLong:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << dataAt<int32_t>(i), sep = " ";
-    break;
-  case DataType::Long8:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << dataAt<uint64_t>(i), sep = " ";
-    break;
-  case DataType::SLong8:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << dataAt<int64_t>(i), sep = " ";
-    break;
-  case DataType::Rational: {
-    const uint32_t *lp = dataArray<uint32_t>();
-    while (ct-- > 0) {
-      if (lp[1] == 0)
-        res << sep << "Nan (" << lp[0] << "/" << lp[1] << ")";
-      else
-        res << sep << ((double)lp[0] / (double)lp[1]);
-      sep = " ";
-      lp += 2;
+    case DataType::Undefined:
+    case DataType::Byte:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     fmt::join(dataArray<uint8_t>(), dataArray<uint8_t>() + m_count, " "));
+      break;
+    case DataType::SByte:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     fmt::join(dataArray<int8_t>(), dataArray<int8_t>() + m_count, " "));
+      break;
+    case DataType::Ascii:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     m_data.size() > 1 ? std::string_view(dataArray<char>(), m_data.size() - 1) : std::string_view());
+      break;
+    case DataType::Short:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     fmt::join(dataArray<uint16_t>(), dataArray<uint16_t>() + m_count, " "));
+      break;
+    case DataType::SShort:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     fmt::join(dataArray<int16_t>(), dataArray<int16_t>() + m_count, " "));
+      break;
+    case DataType::Long:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     fmt::join(dataArray<uint32_t>(), dataArray<uint32_t>() + m_count, " "));
+      break;
+    case DataType::SLong:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     fmt::join(dataArray<int32_t>(), dataArray<int32_t>() + m_count, " "));
+      break;
+    case DataType::Long8:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     fmt::join(dataArray<uint64_t>(), dataArray<uint64_t>() + m_count, " "));
+      break;
+    case DataType::SLong8:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     fmt::join(dataArray<int64_t>(), dataArray<int64_t>() + m_count, " "));
+      break;
+    case DataType::Rational: {
+      const auto* lp = dataArray<uint32_t>();
+      uint64_t ct = m_count;
+      while (ct-- > 0) {
+        if (lp[1] == 0) {
+          fmt::format_to(std::back_inserter(res), " Nan ({} / 0)", lp[0]);
+        } else {
+          fmt::format_to(std::back_inserter(res),
+                         " {} ({} / {})",
+                         static_cast<double>(lp[0]) / static_cast<double>(lp[1]),
+                         lp[0],
+                         lp[1]);
+        }
+        lp += 2;
+      }
+      res.append(">");
+      break;
     }
-    break;
-  }
-  case DataType::SRational: {
-    const int32_t *lp = dataArray<int32_t>();
-    while (ct-- > 0) {
-      if (lp[1] == 0)
-        res << sep << "Nan (" << lp[0] << "/" << lp[1] << ")";
-      else
-        res << sep << ((double)lp[0] / (double)lp[1]);
-      sep = " ";
-      lp += 2;
+    case DataType::SRational: {
+      const auto* lp = dataArray<int32_t>();
+      uint64_t ct = m_count;
+      while (ct-- > 0) {
+        if (lp[1] == 0) {
+          fmt::format_to(std::back_inserter(res), " Nan ({} / 0)", lp[0]);
+        } else {
+          fmt::format_to(std::back_inserter(res),
+                         " {} ({} / {})",
+                         static_cast<double>(lp[0]) / static_cast<double>(lp[1]),
+                         lp[0],
+                         lp[1]);
+        }
+        lp += 2;
+      }
+      res.append(">");
+      break;
     }
-    break;
-  }
-  case DataType::Float:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << dataAt<float>(i), sep = " ";
-    break;
-  case DataType::Double:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << dataAt<double>(i), sep = " ";
-    break;
-  case DataType::IFD:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << std::hex << dataAt<uint32_t>(i), sep = " ";
-    break;
-  case DataType::IFD8:
-    for (size_t i=0; i<m_count; ++i)
-      res << sep << std::hex << dataAt<uint64_t>(i), sep = " ";
-    break;
-  case DataType::None:
-  case DTNUMBER:
-    break;
+    case DataType::Float:
+      fmt::format_to(std::back_inserter(res), "{}>", fmt::join(dataArray<float>(), dataArray<float>() + m_count, " "));
+      break;
+    case DataType::Double:
+      fmt::format_to(std::back_inserter(res),
+                     "{}>",
+                     fmt::join(dataArray<double>(), dataArray<double>() + m_count, " "));
+      break;
+    case DataType::IFD:
+      fmt::format_to(std::back_inserter(res),
+                     "{:#x}>",
+                     fmt::join(dataArray<uint32_t>(), dataArray<uint32_t>() + m_count, " "));
+      break;
+    case DataType::IFD8:
+      fmt::format_to(std::back_inserter(res),
+                     "{:#x}>",
+                     fmt::join(dataArray<uint64_t>(), dataArray<uint64_t>() + m_count, " "));
+      break;
+    default:
+      break;
   }
 
-  res << ">";
-  return res.str();
+  return res;
 }
-*/
 
 } // namespace nim

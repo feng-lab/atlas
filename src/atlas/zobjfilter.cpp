@@ -92,7 +92,7 @@ void ZObjFilter::updateBoundBoxWithOffsetPara(ZBBox<glm::ivec4>& boundBox) const
 QTransform ZObjFilter::getQTransform() const
 {
   const glm::dmat3& m = m_transform.get();
-  // VLOG(1) << toQString(m) << " " << m[2][0] << " " << m[2][1];
+  // VLOG(1) << m << " " << m[2][0] << " " << m[2][1];
   return QTransform(m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2], m[2][0], m[2][1], m[2][2]);
 }
 

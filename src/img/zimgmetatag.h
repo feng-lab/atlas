@@ -37,6 +37,8 @@ public:
 
   [[nodiscard]] QString toQString() const;
 
+  [[nodiscard]] std::string toString() const;
+
   [[nodiscard]] const QString& name() const
   {
     return m_name;

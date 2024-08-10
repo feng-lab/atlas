@@ -38,6 +38,11 @@ public:
     return {};
   }
 
+  [[nodiscard]] std::string toString() const
+  {
+    return {};
+  }
+
   void swap(ZImgMetadataBase& other) noexcept
   {
     m_data.swap(other.m_data);
