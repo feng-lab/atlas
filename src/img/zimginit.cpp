@@ -79,11 +79,11 @@ void initImgLib(const char* argv0,
       javahome = qEnvironmentVariable("JAVA_HOME");
       if (javahome.isEmpty()) {
         ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
-        VLOG(1) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
-        VLOG(1) << "no jreDIR and environment variable JAVA_HOME, will try to use java in system path";
+        LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
+        LOG(INFO) << "no jreDIR and environment variable JAVA_HOME, will try to use java in system path";
       } else {
-        VLOG(1) << "try java from JAVA_HOME: " << javahome
-                << ", note: might crash if the java version is not compatible";
+        LOG(INFO) << "try java from JAVA_HOME: " << javahome
+                  << ", note: might crash if the java version is not compatible";
         jreD = QDir(javahome);
       }
     } else {

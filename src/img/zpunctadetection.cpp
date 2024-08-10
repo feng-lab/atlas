@@ -204,10 +204,10 @@ void ZPunctaDetection::doWork()
 
   LOG(INFO) << "";
   LOG(INFO) << "Start Detect Puncta";
-  logLongString(toQString());
+  logLongString(toString());
   LOG(INFO) << "";
 
-  LOG(INFO) << m_imgInfo.toQString();
+  LOG(INFO) << m_imgInfo.toString();
 
   if (m_punctaChannel < m_imgInfo.numChannels) {
     LOG(INFO) << "Puncta Channel: " << m_punctaChannel + 1 << " (start from 1)";
@@ -1256,7 +1256,7 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
   ConnComp CC;
   ZImg labelImg;
   auto* imgData = img.channelData<uint8_t>(0, 0);
-  LOG(INFO) << img.toQString();
+  LOG(INFO) << img.toString();
   for (auto level = m_startLevel; level >= m_stopLevel; level -= m_floodStep) {
     ZImg bim = img.binarized(level, ZImg::ThresholdMode::IncludeThreshold);
 
@@ -1337,7 +1337,7 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
     }
   }
 
-  LOG(INFO) << labelImg.toQString();
+  LOG(INFO) << labelImg.toString();
   LOG(INFO) << "number of voxels after watershed: " << CC.toatalNumVoxels() << " " << m_barrierVoxels.size();
 
   std::vector<Eigen::MatrixXi> m_labelObjects;

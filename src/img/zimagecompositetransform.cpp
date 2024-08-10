@@ -86,7 +86,7 @@ std::string ZImageCompositeTransform::toString() const
   std::string res;
   size_t idx = 1;
   for (const auto& tfm : m_tfms) {
-    res += fmt::format("Transform {}: {}\n", idx++, tfm->toString());
+    fmt::format_to(std::back_inserter(res), "Transform {}: {}\n", idx++, tfm->toString());
   }
   return res;
 }

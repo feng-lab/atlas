@@ -54,7 +54,7 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
   }
 
   for (int i = 0; i < argc; ++i) {
-    VLOG(1) << argv[i];
+    LOG(INFO) << argv[i];
   }
 
   m_configDir = ZSystemInfo::jsonDirPath().toStdString();
@@ -67,16 +67,16 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
   }
 
   auto configJson = loadConfig(configPath);
-  // VLOG(1) << configJson.dumpString(2);
+  // LOG(INFO) << configJson.dumpString(2);
 
   ECommand command = UNKNOWN_COMMAND;
   if (!configJson.isEmpty()) {
     command = getCommand(ZJsonParser::stringValue(configJson["command"]).c_str());
     m_input.push_back(ZJsonParser::stringValue(configJson["input"]));
     m_output = ZJsonParser::stringValue(configJson["output"]);
-    // VLOG(1) << ZJsonParser::stringValue(configJson["command"]);
-    // VLOG(1) << ZJsonParser::stringValue(configJson["input"]);
-    // VLOG(1) << ZJsonParser::stringValue(configJson["output"]);
+    // LOG(INFO) << ZJsonParser::stringValue(configJson["command"]);
+    // LOG(INFO) << ZJsonParser::stringValue(configJson["input"]);
+    // LOG(INFO) << ZJsonParser::stringValue(configJson["output"]);
   }
 
   if (Is_Arg_Matched(const_cast<char*>("--scale"))) {
@@ -127,7 +127,7 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
     } else if (Is_Arg_Matched(const_cast<char*>("--general"))) {
       command = GENERAL_COMMAND;
       m_generalConfig = Get_String_Arg(const_cast<char*>("--general"));
-      VLOG(1) << "Config: " << m_generalConfig;
+      LOG(INFO) << "Config: " << m_generalConfig;
     }
   }
 
@@ -518,9 +518,9 @@ ZJsonObject ZRunNeuTuCommand::loadConfig(const std::string& filePath)
   expandConfig(filePath, "skeletonize", configJson);
   expandConfig(filePath, "trace", configJson);
 
-  VLOG(1) << "==========Command configuration========";
-  VLOG(1) << configJson.dumpString(2);
-  VLOG(1) << "=======================================";
+  LOG(INFO) << "==========Command configuration========";
+  LOG(INFO) << configJson.dumpString(2);
+  LOG(INFO) << "=======================================";
 
   return configJson;
 }

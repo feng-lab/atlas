@@ -829,7 +829,7 @@ void ZImgIO::readImg(const QStringList& fileList,
   ZImgInfo& info = infos[scene];
   if (regionIn.isEmpty() || !regionIn.isValid(info)) {
     throw ZException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), regionIn.toQString()));
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), regionIn.toString()));
   }
   ZImgRegion region = regionIn;
   region.resolveRegionEnd(info);

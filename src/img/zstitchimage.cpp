@@ -384,7 +384,7 @@ void ZStitchImage::doWork()
 {
   LOG(INFO) << "";
   LOG(INFO) << "Start Stitching";
-  logLongString(toQString());
+  logLongString(toString());
   LOG(INFO) << "";
 
   QFileInfo outputFI(m_resFileName);
@@ -553,11 +553,11 @@ void ZStitchImage::doWork()
 
     LOG(INFO) << fmt::format("Stitching {} images ...", nStacks);
     for (const auto& ss : inputStackSources) {
-      LOG(INFO) << ss.toQString();
+      LOG(INFO) << ss.toString();
     }
     if (hasStack2) {
       for (const auto& ss : input2ndStackSources) {
-        LOG(INFO) << ss.toQString();
+        LOG(INFO) << ss.toString();
       }
       inputStackSources.insert(inputStackSources.end(), input2ndStackSources.begin(), input2ndStackSources.end());
     }

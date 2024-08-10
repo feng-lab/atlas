@@ -311,7 +311,7 @@ void logCPUInfo()
 #else
   message = "Packages:\n";
   for (uint32_t i = 0; i < cpuinfo_get_packages_count(); i++) {
-    message += fmt::format("\t{}: {}\n", i, cpuinfo_get_package(i)->name);
+    fmt::format_to(std::back_inserter(message), "\t{}: {}\n", i, cpuinfo_get_package(i)->name);
   }
 #endif
   LOG(INFO) << message;
@@ -320,16 +320,20 @@ void logCPUInfo()
     const cpuinfo_uarch_info* uarch_info = cpuinfo_get_uarch(i);
     const char* uarch_string = uarch_to_string(uarch_info->uarch);
     if (uarch_string == nullptr) {
-      message += fmt::format("\t{}x Unknown (0x{:08x})\n", uarch_info->core_count, (uint32_t)uarch_info->uarch);
+      fmt::format_to(std::back_inserter(message),
+                     "\t{}x Unknown (0x{:08x})\n",
+                     uarch_info->core_count,
+                     (uint32_t)uarch_info->uarch);
     } else {
-      message += fmt::format("\t{}x {}\n", uarch_info->core_count, uarch_string);
+      fmt::format_to(std::back_inserter(message), "\t{}x {}\n", uarch_info->core_count, uarch_string);
     }
   }
   LOG(INFO) << message;
   message = "Cores:\n";
   for (uint32_t i = 0; i < cpuinfo_get_cores_count(); i++) {
     const cpuinfo_core* core = cpuinfo_get_core(i);
-    message += fmt::format(
+    fmt::format_to(
+      std::back_inserter(message),
       "\t{}: {} processor{} ({}{})",
       i,
       core->processor_count,
@@ -340,42 +344,50 @@ void logCPUInfo()
     const char* vendor_string = vendor_to_string(core->vendor);
     const char* uarch_string = uarch_to_string(core->uarch);
     if (vendor_string == nullptr) {
-      message += fmt::format(", vendor 0x{:08x} uarch 0x{:08x}\n", (uint32_t)core->vendor, (uint32_t)core->uarch);
+      fmt::format_to(std::back_inserter(message),
+                     ", vendor 0x{:08x} uarch 0x{:08x}\n",
+                     (uint32_t)core->vendor,
+                     (uint32_t)core->uarch);
     } else if (uarch_string == nullptr) {
-      message += fmt::format(", {} uarch 0x{:08x}\n", vendor_string, (uint32_t)core->uarch);
+      fmt::format_to(std::back_inserter(message), ", {} uarch 0x{:08x}\n", vendor_string, (uint32_t)core->uarch);
     } else {
-      message += fmt::format(", {} {}\n", vendor_string, uarch_string);
+      fmt::format_to(std::back_inserter(message), ", {} {}\n", vendor_string, uarch_string);
     }
   }
   message += "Clusters:\n";
   for (uint32_t i = 0; i < cpuinfo_get_clusters_count(); i++) {
     const struct cpuinfo_cluster* cluster = cpuinfo_get_cluster(i);
     if (cluster->processor_count == 1) {
-      message += fmt::format("\t{}: 1 processor ({})", i, cluster->processor_start);
+      fmt::format_to(std::back_inserter(message), "\t{}: 1 processor ({})", i, cluster->processor_start);
     } else {
-      message += fmt::format("\t{}: {} processors ({}-{})",
-                             i,
-                             cluster->processor_count,
-                             cluster->processor_start,
-                             cluster->processor_start + cluster->processor_count - 1);
+      fmt::format_to(std::back_inserter(message),
+                     "\t{}: {} processors ({}-{})",
+                     i,
+                     cluster->processor_count,
+                     cluster->processor_start,
+                     cluster->processor_start + cluster->processor_count - 1);
     }
     if (cluster->core_count == 1) {
-      message += fmt::format(",\t{}: 1 core ({})", i, cluster->core_start);
+      fmt::format_to(std::back_inserter(message), ",\t{}: 1 core ({})", i, cluster->core_start);
     } else {
-      message += fmt::format(",\t{}: {} cores ({}-{})",
-                             i,
-                             cluster->core_count,
-                             cluster->core_start,
-                             cluster->core_start + cluster->core_count - 1);
+      fmt::format_to(std::back_inserter(message),
+                     ",\t{}: {} cores ({}-{})",
+                     i,
+                     cluster->core_count,
+                     cluster->core_start,
+                     cluster->core_start + cluster->core_count - 1);
     }
     const char* vendor_string = vendor_to_string(cluster->vendor);
     const char* uarch_string = uarch_to_string(cluster->uarch);
     if (vendor_string == nullptr) {
-      message += fmt::format(", vendor 0x{:08x} uarch 0x{:08x}\n", (uint32_t)cluster->vendor, (uint32_t)cluster->uarch);
+      fmt::format_to(std::back_inserter(message),
+                     ", vendor 0x{:08x} uarch 0x{:08x}\n",
+                     (uint32_t)cluster->vendor,
+                     (uint32_t)cluster->uarch);
     } else if (uarch_string == nullptr) {
-      message += fmt::format(", {} uarch 0x{:08x}\n", vendor_string, (uint32_t)cluster->uarch);
+      fmt::format_to(std::back_inserter(message), ", {} uarch 0x{:08x}\n", vendor_string, (uint32_t)cluster->uarch);
     } else {
-      message += fmt::format(", {} {}\n", vendor_string, uarch_string);
+      fmt::format_to(std::back_inserter(message), ", {} {}\n", vendor_string, uarch_string);
     }
   }
   LOG(INFO) << message;
@@ -386,14 +398,14 @@ void logCPUInfo()
   message += ":\n";
   for (uint32_t i = 0; i < cpuinfo_get_processors_count(); i++) {
     [[maybe_unused]] const cpuinfo_processor* processor = cpuinfo_get_processor(i);
-    message += fmt::format("\t{}", i);
+    fmt::format_to(std::back_inserter(message), "\t{}", i);
 
 #if defined(__linux__)
-    message += fmt::format(" ({})", processor->linux_id);
+    fmt::format_to(std::back_inserter(message), " ({})", processor->linux_id);
 #endif
 
 #if CPUINFO_ARCH_X86 || CPUINFO_ARCH_X86_64
-    message += fmt::format(": APIC ID 0x{:08x}\n", processor->apic_id);
+    fmt::format_to(std::back_inserter(message), ": APIC ID 0x{:08x}\n", processor->apic_id);
 #else
     message += "\n";
 #endif
@@ -417,24 +429,27 @@ void report_cache(uint32_t count, const cpuinfo_cache* cache, uint32_t level, co
     units = "KB";
   }
   if (count != 1) {
-    message += fmt::format("{} x ", count);
+    fmt::format_to(std::back_inserter(message), "{} x ", count);
   }
   if (level == 1) {
-    message += fmt::format("{} {}, ", size, units);
+    fmt::format_to(std::back_inserter(message), "{} {}, ", size, units);
   } else {
-    message +=
-      fmt::format("{} {} ({}), ", size, units, (cache->flags & CPUINFO_CACHE_INCLUSIVE) ? "inclusive" : "exclusive");
+    fmt::format_to(std::back_inserter(message),
+                   "{} {} ({}), ",
+                   size,
+                   units,
+                   (cache->flags & CPUINFO_CACHE_INCLUSIVE) ? "inclusive" : "exclusive");
   }
 
   if (cache->associativity * cache->line_size == cache->size) {
     message += "fully associative";
   } else {
-    message += fmt::format("{}-way set associative", cache->associativity);
+    fmt::format_to(std::back_inserter(message), "{}-way set associative", cache->associativity);
   }
   if (cache->sets != 0) {
-    message += fmt::format(" ({} sets", cache->sets);
+    fmt::format_to(std::back_inserter(message), " ({} sets", cache->sets);
     if (cache->partitions != 1) {
-      message += fmt::format(", {} partitions", cache->partitions);
+      fmt::format_to(std::back_inserter(message), ", {} partitions", cache->partitions);
     }
     if (cache->flags & CPUINFO_CACHE_COMPLEX_INDEXING) {
       message += ", complex indexing), ";
@@ -443,9 +458,9 @@ void report_cache(uint32_t count, const cpuinfo_cache* cache, uint32_t level, co
     }
   }
 
-  message += fmt::format("{} byte lines", cache->line_size);
+  fmt::format_to(std::back_inserter(message), "{} byte lines", cache->line_size);
   if (cache->processor_count != 0) {
-    message += fmt::format(", shared by {} processors\n", cache->processor_count);
+    fmt::format_to(std::back_inserter(message), ", shared by {} processors\n", cache->processor_count);
   } else {
     message += "\n";
   }

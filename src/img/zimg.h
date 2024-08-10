@@ -1082,7 +1082,7 @@ public:
   void reverseEndianness();
 
   // output img as values row by row, for debug
-  [[nodiscard]] QString toQString() const;
+  [[nodiscard]] std::string toString() const;
 
   // img view is a virtual img that doesn't own any img data, usually it is a channel or a time spot or a location from
   // original img operate on img view is same as operate on partial img img view will automatically become to a real img
@@ -2445,7 +2445,7 @@ private:
   }
 
   template<typename TVoxel>
-  void showContentAsQString_Impl(QString& res) const;
+  void showContentAsString_Impl(std::string& res) const;
 
 private:
   std::vector<uint8_t*> m_data;

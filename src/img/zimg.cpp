@@ -639,13 +639,13 @@ void ZImg::reverseEndianness()
   }
 }
 
-QString ZImg::toQString() const
+std::string ZImg::toString() const
 {
-  QString res;
+  std::string res;
   if (isEmpty()) {
     return res;
   }
-  IMG_TYPED_CALL(showContentAsQString_Impl, m_info, res)
+  IMG_TYPED_CALL(showContentAsString_Impl, m_info, res)
   return res;
 }
 
@@ -3251,29 +3251,23 @@ template void ZImg::binarized_Impl<float>(ZImg&, float, ThresholdMode) const;
 template void ZImg::binarized_Impl<double>(ZImg&, double, ThresholdMode) const;
 
 template<typename TVoxel>
-void ZImg::showContentAsQString_Impl(QString& res) const
+void ZImg::showContentAsString_Impl(std::string& res) const
 {
-  QTextStream os(&res, QIODevice::WriteOnly);
-  os << "start img\n";
+  res += "start img\n";
   for (size_t t = 0; t < numTimes(); ++t) {
     for (size_t c = 0; c < numChannels(); ++c) {
       for (size_t z = 0; z < depth(); ++z) {
         for (size_t y = 0; y < height(); ++y) {
-          os << t << ":" << c << ":" << z << ":" << y << ": ";
           auto data = rowData<TVoxel>(y, z, c, t);
-          for (size_t x = 0; x < width(); ++x) {
-            os << data[x] << " ";
-          }
-          os << "\n";
+          fmt::format_to(std::back_inserter(res), "{}:{}:{}:{}: {}\n", t, c, z, y, fmt::join(data, data + width(), " "));
         }
-        os << "\n";
+        res += "\n";
       }
-      os << "\n";
+      res += "\n";
     }
-    os << "\n";
+    res += "\n";
   }
-  os << "\n";
-  os << "end img\n";
+  res += "\nend img\n";
 }
 
 void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImg& img)

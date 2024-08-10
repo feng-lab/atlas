@@ -814,23 +814,23 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg& fixedImg,
 {
   ZImgInfo fixedImgInfo = fixedImg.info();
   ZImgInfo movingImgInfo = movingImg.info();
-  LOG(INFO) << fixedImgInfo.toQString();
-  LOG(INFO) << movingImgInfo.toQString();
+  LOG(INFO) << fixedImgInfo.toString();
+  LOG(INFO) << movingImgInfo.toString();
 
   ZImg nccImg;
   ZImg numberOfOverlapVoxelsImg;
   normXCorr(fixedImg, movingImg, nccImg, numberOfOverlapVoxelsImg);
-  //  VLOG(1) << nccImg.info().toQString();
-  //  VLOG(1) << numberOfOverlapVoxelsImg.info().toQString();
-  //  VLOG(1) << nccImgValidRegion.toQString();
+  //  VLOG(1) << nccImg.info().toString();
+  //  VLOG(1) << numberOfOverlapVoxelsImg.info().toString();
+  //  VLOG(1) << nccImgValidRegion.toString();
 
   CHECK(!nccImg.isTimeSeries() && !nccImg.isMultiChannelsImg());
   if (!nccImgValidRegion.containsWholeImg(nccImg.info())) {
     nccImg = nccImg.crop(nccImgValidRegion);
     numberOfOverlapVoxelsImg = numberOfOverlapVoxelsImg.crop(nccImgValidRegion);
   }
-  //  VLOG(1) << nccImg.info().toQString();
-  //  VLOG(1) << numberOfOverlapVoxelsImg.info().toQString();
+  //  VLOG(1) << nccImg.info().toString();
+  //  VLOG(1) << numberOfOverlapVoxelsImg.info().toString();
   size_t maxNCCIdx = getMaxWeightedNCCIdx(nccImg.channelData<double>(0),
                                           numberOfOverlapVoxelsImg.channelData<double>(0),
                                           requiredNumberOfOverlapPixels,
@@ -843,7 +843,7 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg& fixedImg,
     maxNCCCoord + nccImgValidRegion.start -
     ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1, movingImgInfo.depth - 1);
   LOG(INFO) << "max NCC coord: " << json::value_from(maxNCCCoord);
-  LOG(INFO) << nccImgValidRegion.toQString();
+  LOG(INFO) << nccImgValidRegion.toString();
   LOG(INFO) << "moving image offset: " << json::value_from(offset);
 
   return offset;
@@ -1057,10 +1057,10 @@ ZImgNCCMatch::getRequiredSrcImgRegionAndValidNccRegion(const ZVoxelCoordinate& o
   validNccRgn.start.t = 0;
   validNccRgn.end.t = 1;
 
-  LOG(INFO) << offset.toQString();
-  LOG(INFO) << fixedRgn.toQString();
-  LOG(INFO) << movingRgn.toQString();
-  LOG(INFO) << validNccRgn.toQString();
+  LOG(INFO) << offset.toString();
+  LOG(INFO) << fixedRgn.toString();
+  LOG(INFO) << movingRgn.toString();
+  LOG(INFO) << validNccRgn.toString();
 
   return std::tie(fixedRgn, movingRgn, validNccRgn);
 }
@@ -1086,8 +1086,8 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(const PositionHint& moving
 
   constructSingleChannelFixedImg(fixedRgn, fixedImg);
   constructSingleChannelMovingImg(movingRgn, movingImg);
-  // VLOG(1) << fixedImg.info().toQString();
-  // VLOG(1) << movingImg.info().toQString();
+  // VLOG(1) << fixedImg.info().toString();
+  // VLOG(1) << movingImg.info().toString();
 
   res = maxNormXCorrLoc_S(fixedImg,
                           movingImg,
@@ -1144,8 +1144,8 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint& movi
 
   constructSingleChannelFixedImg(fixedRgn, fixedImg);
   constructSingleChannelMovingImg(movingRgn, movingImg);
-  // VLOG(1) << fixedImg.info().toQString();
-  // VLOG(1) << movingImg.info().toQString();
+  // VLOG(1) << fixedImg.info().toString();
+  // VLOG(1) << movingImg.info().toString();
 
 #if 0
   double scaleX = 1. / (intvX + 1.);
@@ -1228,8 +1228,8 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffset(const ZVoxelCoordinate& iof
   ZImg movingImg;
   constructSingleChannelFixedImg(ZImgRegion(), fixedImg);
   constructSingleChannelMovingImg(ZImgRegion(), movingImg);
-  //VLOG(1) << fixedImg.info().toQString();
-  //VLOG(1) << movingImg.info().toQString();
+  //VLOG(1) << fixedImg.info().toString();
+  //VLOG(1) << movingImg.info().toString();
 
   ZImg subFixedImg;
   ZImg subMovingImg;
@@ -1260,8 +1260,8 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffset(const ZVoxelCoordinate& iof
 
   constructSingleChannelFixedImg(fixedRgn, fixedImg);
   constructSingleChannelMovingImg(movingRgn, movingImg);
-  // VLOG(1) << fixedImg.info().toQString();
-  // VLOG(1) << movingImg.info().toQString();
+  // VLOG(1) << fixedImg.info().toString();
+  // VLOG(1) << movingImg.info().toString();
 
   res = maxNormXCorrLoc_S(fixedImg, movingImg, validNccRgn, 1e4, maxNCC, maxWeightedNCC, numOverlapVoxels);
   res = mapOffsetToSrcImg(res, fixedRgn, movingRgn);
@@ -1317,8 +1317,8 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffsetMR(const ZVoxelCoordinate& i
 
   constructSingleChannelFixedImg(fixedRgn, fixedImg);
   constructSingleChannelMovingImg(movingRgn, movingImg);
-  // VLOG(1) << fixedImg.info().toQString();
-  // VLOG(1) << movingImg.info().toQString();
+  // VLOG(1) << fixedImg.info().toString();
+  // VLOG(1) << movingImg.info().toString();
 
 #if 0
   double scaleX = 1. / (intvX + 1.);

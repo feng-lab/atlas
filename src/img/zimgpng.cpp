@@ -469,7 +469,7 @@ void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWrite
   png_write_info(png.pngPtr, png.infoPtr);
 
   ZImg tmp(img.info());
-  CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info().toQString();
+  CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info().toString();
   ZImgFormat::XYZCtoCXYZ(img, tmp);
   for (size_t r = 0; r < tmp.height(); ++r) {
     png_write_row(png.pngPtr, tmp.channelData<uint8_t>(0) + r * tmp.rowByteNumber() * tmp.numChannels());

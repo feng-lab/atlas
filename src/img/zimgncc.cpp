@@ -169,7 +169,7 @@ void normXCorr(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOver
 
   movingImg.reflect();
 
-  // VLOG(1) << movingImg.info().toQString() << " " << fixedImg.info().toQString();
+  // VLOG(1) << movingImg.info().toString() << " " << fixedImg.info().toString();
 
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info); // 1
@@ -250,7 +250,7 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
 
   movingImg.reflect();
 
-  // VLOG(1) << movingImg.info().toQString() << " " << fixedImg.info().toQString();
+  // VLOG(1) << movingImg.info().toString() << " " << fixedImg.info().toString();
 
   // VLOG(1) << "1";
   nccImg = xCorrFFT(fixedImg, movingImg, false); // 1, I think peak is 3
@@ -383,7 +383,7 @@ void normXCorrPart(ZImg& fixedImg,
 
   movingImg.reflect();
 
-  // VLOG(1) << movingImg.info().toQString() << " " << fixedImg.info().toQString();
+  // VLOG(1) << movingImg.info().toString() << " " << fixedImg.info().toString();
 
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info); //

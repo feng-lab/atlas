@@ -807,7 +807,7 @@ void ZImgZeissCZI::readInfo(const QString& filename,
   }
 
   for (const auto& info : infos) {
-    VLOG(1) << info.toQString();
+    VLOG(1) << info.toString();
   }
   VLOG(1) << "";
 }

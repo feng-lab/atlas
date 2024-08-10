@@ -38,7 +38,7 @@ void ZImgMetaImage::readInfo(const QString& filename,
   }
   infos.resize(1);
   parseInfo(metaImage, infos[0]);
-  LOG(INFO) << infos[0].toQString();
+  VLOG(1) << infos[0].toString();
 
   createDefaultSubBlocks(filename, infos, subBlocks);
 }

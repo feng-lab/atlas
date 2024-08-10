@@ -179,6 +179,14 @@ concept IsSupportedQtTypeForPrint =
 #endif
   ;
 
+inline void logLongString(const std::string& q)
+{
+  for (size_t i = 0; i < q.size(); i += 10000) { // glog limit is 30000
+    auto length = std::min(10000_uz, q.size() - i);
+    LOG(INFO) << std::string_view(q.data() + i, length);
+  }
+}
+
 } // namespace nim
 
 template<nim::CanConvertToUtf8QByteArray T>

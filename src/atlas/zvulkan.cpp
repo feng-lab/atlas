@@ -93,6 +93,9 @@ bool addRequiredExtension(const char* extensionName,
 
 void logVulkan12Features(const vk::PhysicalDeviceVulkan12Features& features)
 {
+  if (!VLOG_IS_ON(1)) {
+    return;
+  }
   VLOG(1) << "Vulkan 1.2 Features:";
   VLOG(1) << fmt::format("  samplerMirrorClampToEdge: {}", features.samplerMirrorClampToEdge);
   VLOG(1) << fmt::format("  drawIndirectCount: {}", features.drawIndirectCount);
@@ -164,6 +167,9 @@ void logVulkan12Features(const vk::PhysicalDeviceVulkan12Features& features)
 
 void logVulkan13Features(const vk::PhysicalDeviceVulkan13Features& features)
 {
+  if (!VLOG_IS_ON(1)) {
+    return;
+  }
   VLOG(1) << "Vulkan 1.3 Features:";
   VLOG(1) << fmt::format("  robustImageAccess: {}", features.robustImageAccess);
   VLOG(1) << fmt::format("  inlineUniformBlock: {}", features.inlineUniformBlock);
@@ -206,14 +212,14 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(VkDebugUtilsMessageSe
   if (pCallbackData->queueLabelCount > 0) {
     message += "\n\tQueue Labels:";
     for (uint32_t i = 0; i < pCallbackData->queueLabelCount; i++) {
-      message += fmt::format("\n\t\tlabelName = <{}>", pCallbackData->pQueueLabels[i].pLabelName);
+      fmt::format_to(std::back_inserter(message), "\n\t\tlabelName = <{}>", pCallbackData->pQueueLabels[i].pLabelName);
     }
   }
 
   if (pCallbackData->cmdBufLabelCount > 0) {
     message += "\n\tCommandBuffer Labels:";
     for (uint32_t i = 0; i < pCallbackData->cmdBufLabelCount; i++) {
-      message += fmt::format("\n\t\tlabelName = <{}>", pCallbackData->pCmdBufLabels[i].pLabelName);
+      fmt::format_to(std::back_inserter(message), "\n\t\tlabelName = <{}>", pCallbackData->pCmdBufLabels[i].pLabelName);
     }
   }
 
@@ -409,18 +415,20 @@ void initVulkan()
       LOG(INFO) << fmt::format("Driver Version:       {} ({})",
                                versionToString(deviceProperties.driverVersion),
                                deviceProperties.driverVersion);
-      VLOG(1) << fmt::format("Vendor ID:            0x{:04x}", deviceProperties.vendorID);
       LOG(INFO) << fmt::format("Device ID:            0x{:04x}", deviceProperties.deviceID);
       LOG(INFO) << fmt::format("Device Type:          {}", vk::to_string(deviceProperties.deviceType));
-      VLOG(1) << fmt::format("Pipeline Cache UUID:  {}", uuidToString(deviceProperties.pipelineCacheUUID));
       LOG(INFO) << fmt::format("Dedicated GPU Memory: {} MB", dedicatedMemory / (1024 * 1024));
-      VLOG(1) << "Supported Device Extensions: ";
-      for (const auto& ext : deviceExtensionProperties) {
-        VLOG(1) << fmt::format("  - {} (version {})", ext.extensionName.data(), ext.specVersion);
-      }
-      logVulkan12Features(physicalDeviceVulkan12Features);
-      if (deviceProperties.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0)) {
-        logVulkan13Features(physicalDeviceVulkan13Features);
+      if (VLOG_IS_ON(1)) {
+        VLOG(1) << fmt::format("Vendor ID:            0x{:04x}", deviceProperties.vendorID);
+        VLOG(1) << fmt::format("Pipeline Cache UUID:  {}", uuidToString(deviceProperties.pipelineCacheUUID));
+        VLOG(1) << "Supported Device Extensions: ";
+        for (const auto& ext : deviceExtensionProperties) {
+          VLOG(1) << fmt::format("  - {} (version {})", ext.extensionName.data(), ext.specVersion);
+        }
+        logVulkan12Features(physicalDeviceVulkan12Features);
+        if (deviceProperties.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0)) {
+          logVulkan13Features(physicalDeviceVulkan13Features);
+        }
       }
 
       LOG(INFO) << "-------------------------";
