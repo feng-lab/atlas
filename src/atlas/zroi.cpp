@@ -749,7 +749,7 @@ void ZROI::importMaskImage(const QString& fn, FileFormat format)
 
   LOG(INFO) << "Finish importing mask image";
 
-  STOP_AND_LOG(bt)
+  STOP_AND_VLOG(bt)
 }
 
 ZImg ZROI::toMaskImg(int outWidth,

@@ -111,7 +111,7 @@ private:
 // profile each filter and whole network
 class Z3DProfileFilterWrapper : public Z3DFilterWrapper
 {
-  ZBenchTimer m_benchTimer;
+  ZBenchTimer m_benchTimer{"Network"};
 
 public:
   void afterFilterProcess(const Z3DFilter* p) override;

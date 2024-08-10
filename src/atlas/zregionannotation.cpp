@@ -252,7 +252,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn,
   //  }
   LOG(INFO) << "Finish importing label image";
 
-  STOP_AND_LOG(bt)
+  STOP_AND_VLOG(bt)
 
   if (createMesh) {
     Q_EMIT allMeshChanged();
@@ -521,7 +521,7 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
 
   LOG(INFO) << "Finish importing label image";
 
-  STOP_AND_LOG(bt)
+  STOP_AND_VLOG(bt)
 }
 
 void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)

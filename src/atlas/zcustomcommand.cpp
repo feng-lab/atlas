@@ -1025,7 +1025,7 @@ void testLogSpeed()
   for (const auto& i : logList) {
     LOG(INFO) << i;
   }
-  STOP_AND_LOG(bt)
+  STOP_AND_VLOG(bt)
 }
 
 void tmp()
@@ -1867,7 +1867,7 @@ void imgResizeBenchmark()
     img.fillRandom();
     ZBenchTimer bt;
     img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
-    STOP_AND_LOG(bt)
+    STOP_AND_VLOG(bt)
     if (img.depth() < 24) {
       LOG(INFO) << img.depth();
     }
@@ -1876,7 +1876,7 @@ void imgResizeBenchmark()
     img.fillRandom();
     bt.resetAndStart();
     img.resize(64, 64, 64);
-    STOP_AND_LOG(bt)
+    STOP_AND_VLOG(bt)
     if (img.depth() < 24) {
       LOG(INFO) << img.depth();
     }

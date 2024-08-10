@@ -163,16 +163,15 @@ TEST(cluster, KMeans)
     ZTermCriteria<double>(),
     ZKMeans<double, double, ZDistanceManhattan<double>>::InitCentersMethod::KmeansPP,
     IterAlgorithmLogLevel::Final);
-  bt.resetAndStart();
-  kmtest2.run(false);
-  STOP_AND_LOG(bt)
+
+  BENCH_AND_LOG(bt, 1, 1, kmtest2.run(false), "pp_st_w_mh")
 
   BENCH_AND_LOG(bt, 1, 1, kmtest2.run(), "pp_mt_w_mh")
 
   int a[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 0};
   int b[10] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1};
-  std::cout << weightedMedian(a, a + 10, b, b + 10) << std::endl;
-  std::cout << weightedMedian(a, a + 10, b, b + 10, true) << std::endl;
+  LOG(INFO) << weightedMedian(a, a + 10, b, b + 10);
+  LOG(INFO) << weightedMedian(a, a + 10, b, b + 10, true);
 
   MatrixXd mat3 = mat.replicate(2, 1);
 
@@ -183,9 +182,8 @@ TEST(cluster, KMeans)
     ZTermCriteria<double>(),
     ZKMeans<double, double, ZDistanceManhattan<double>>::InitCentersMethod::KmeansPP,
     IterAlgorithmLogLevel::Final);
-  bt.resetAndStart();
-  kmtest22.run(false);
-  STOP_AND_LOG(bt)
+
+  BENCH_AND_LOG(bt, 1, 1, kmtest22.run(false), "pp_st_mh")
 
   BENCH_AND_LOG(bt, 1, 1, kmtest22.run(), "pp_mt_mh")
 
@@ -196,16 +194,15 @@ TEST(cluster, KMeans)
     ZTermCriteria<double>(),
     ZKMeans<double, double, ZDistanceManhattan<double>>::InitCentersMethod::KmeansPP,
     IterAlgorithmLogLevel::Final);
-  bt.resetAndStart();
-  kmtest21.run(false);
-  STOP_AND_LOG(bt)
+
+  BENCH_AND_LOG(bt, 1, 1, kmtest21.run(false), "pp_st_mh")
 
   BENCH_AND_LOG(bt, 1, 1, kmtest21.run(), "pp_mt_mh")
 
   ZKMeans<double, double> kmtest(mat, weight, 3, 10);
   double bestCompactness = kmtest.run();
-  std::cout << "final centroids: " << kmtest.centroids() << std::endl;
-  std::cout << "final potential: " << bestCompactness << std::endl << std::endl;
+  LOG(INFO) <<  "final centroids: " << kmtest.centroids();
+  LOG(INFO) <<  "final potential: " << bestCompactness;
 
   // std::cout << "clamp matrix: " << ZEigenUtils::clampMatrix(mat, 6, 20) << std::endl;
 

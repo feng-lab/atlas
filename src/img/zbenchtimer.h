@@ -12,6 +12,12 @@ namespace nim {
   bench without repeats:
     ZBenchTimer bt;
     testFun();
+    bt.recordEvent("testFun");  // optional
+    ...
+    testFun1();
+    bt.recordEvent("testFun1");  // optional
+    testFun2();
+    bt.recordEvent("testFun2");  // optional
     STOP_AND_LOG(bt)
   */
 
@@ -26,10 +32,16 @@ namespace nim {
       }                                                  \
       (TIMER).stop();                                    \
     }                                                    \
-    VLOG(1) << (TIMER).toString();                       \
+    LOG(INFO) << (TIMER).toString();                     \
   }
 
-#define STOP_AND_LOG(TIMER)        \
+#define STOP_AND_LOG(TIMER)          \
+  {                                  \
+    (TIMER).stop();                  \
+    LOG(INFO) << (TIMER).toString(); \
+  }
+
+#define STOP_AND_VLOG(TIMER)       \
   {                                \
     (TIMER).stop();                \
     VLOG(1) << (TIMER).toString(); \
@@ -55,7 +67,7 @@ public:
 
   void start()
   {
-    m_start = std::chrono::high_resolution_clock::now();
+    m_start = std::chrono::steady_clock::now();
     m_lastEventTime = m_start;
   }
 
@@ -76,10 +88,10 @@ public:
 
   void stop()
   {
-    auto elapsed = std::chrono::high_resolution_clock::now() - m_start;
+    auto elapsed = std::chrono::steady_clock::now() - m_start;
     m_time += elapsed;
 
-    m_best = m_best == std::chrono::high_resolution_clock::duration::zero() ? elapsed : std::min(m_best, elapsed);
+    m_best = m_best == std::chrono::steady_clock::duration::zero() ? elapsed : std::min(m_best, elapsed);
     m_worst = std::max(m_worst, elapsed);
     m_rep++;
   }
@@ -92,14 +104,14 @@ public:
   [[nodiscard]] std::string toString() const;
 
 protected:
-  std::chrono::time_point<std::chrono::high_resolution_clock> m_start;
-  std::chrono::high_resolution_clock::duration m_time{};
-  std::chrono::high_resolution_clock::duration m_best{};
-  std::chrono::high_resolution_clock::duration m_worst{};
+  std::chrono::time_point<std::chrono::steady_clock> m_start;
+  std::chrono::steady_clock::duration m_time{};
+  std::chrono::steady_clock::duration m_best{};
+  std::chrono::steady_clock::duration m_worst{};
   int m_rep = 0;
   std::string m_name;
 
-  std::chrono::time_point<std::chrono::high_resolution_clock> m_lastEventTime;
+  std::chrono::time_point<std::chrono::steady_clock> m_lastEventTime;
   std::string m_events;
 };
 

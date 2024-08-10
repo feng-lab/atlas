@@ -319,7 +319,7 @@ double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
       } else {
         render3DImageFast(eye, visibleIdxs);
       }
-      STOP_AND_LOG(bta)
+      STOP_AND_VLOG(bta)
     }
     return progress;
   }
@@ -380,7 +380,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
       render3DImageFast(eye, visibleIdxs);
     }
-    STOP_AND_LOG(bta)
+    STOP_AND_VLOG(bta)
   }
 }
 
@@ -586,7 +586,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     m_image3DSliceWithTransferfunShader.release();
     // glFinish();
     bt.recordEvent("render image3d slice");
-    STOP_AND_LOG(bt)
+    STOP_AND_VLOG(bt)
   }
 
   if (visibleIdxs.size() > 1) {
@@ -994,9 +994,9 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   m_currentImageRenderTargets[eye]->release();
 
   m_image3DRaycasterShader.release();
-  glFinish();
+  //glFinish();
   bt.recordEvent("render image");
-  STOP_AND_LOG(bt)
+  STOP_AND_VLOG(bt)
 
   std::swap(m_lastImageRenderTargets[eye], m_currentImageRenderTargets[eye]);
 

@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <queue>
 
-#define PROFILE3DRENDERERS
 #define CHECKOPENGLSTATE
 
 namespace nim {
@@ -22,9 +21,9 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* par
 #if defined(CHECKOPENGLSTATE) || defined(ATLAS_SANITIZE_ADDRESS)
   m_filterWrappers.emplace_back(std::make_unique<Z3DCheckOpenGLStateFilterWrapper>());
 #endif
-#if defined(PROFILE3DRENDERERS)
-  m_filterWrappers.emplace_back(std::make_unique<Z3DProfileFilterWrapper>());
-#endif
+  if (VLOG_IS_ON(1)) {
+    m_filterWrappers.emplace_back(std::make_unique<Z3DProfileFilterWrapper>());
+  }
 
   updateNetwork();
 }
@@ -357,13 +356,12 @@ void Z3DProfileFilterWrapper::afterFilterProcess(const Z3DFilter* p)
 
 void Z3DProfileFilterWrapper::beforeNetworkProcess()
 {
-  m_benchTimer.resetAndStart("Network");
+  m_benchTimer.resetAndStart();
 }
 
 void Z3DProfileFilterWrapper::afterNetworkProcess()
 {
-  m_benchTimer.stop();
-  LOG(INFO) << m_benchTimer.toString();
+  STOP_AND_VLOG(m_benchTimer)
 }
 
 } // namespace nim
