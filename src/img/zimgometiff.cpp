@@ -32,9 +32,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
   if (m_imgInfo[0].width != m_omeImgInfo.width || m_imgInfo[0].height != m_omeImgInfo.height ||
       m_imgInfo[0].numChannels != 1 || m_imgInfo[0].bytesPerVoxel != m_omeImgInfo.bytesPerVoxel ||
       m_imgInfo[0].voxelFormat != m_omeImgInfo.voxelFormat) {
-    throw ZException(fmt::format("ome meta info <{}> doesn't match image data <{}>",
-                                 m_omeImgInfo.toString(),
-                                 m_imgInfo[0].toString()));
+    throw ZException(fmt::format("ome meta info <{}> doesn't match image data <{}>", m_omeImgInfo, m_imgInfo[0]));
   }
 
   m_imgInfo[0].numChannels = m_omeImgInfo.numChannels;

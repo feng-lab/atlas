@@ -171,8 +171,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     parseInfo(imageIO.GetPointer(), imgInfo, isNd2);
 
     if (region.isEmpty() || !region.isValid(imgInfo)) {
-      throw ZException(
-        fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo.toString(), region.toString()));
+      throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
     }
 
     if (isNd2) {

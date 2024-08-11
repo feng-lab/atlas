@@ -13,12 +13,10 @@ template<typename TVoxel>
 typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img, size_t c = 0, size_t t = 0)
 {
   if (!img.isType<TVoxel>()) {
-    throw ZException(
-      fmt::format("wrapZImgChannelAsITKImg wrap img <{}> to wrong type of itk img", img.info().toString()));
+    throw ZException(fmt::format("wrapZImgChannelAsITKImg wrap img <{}> to wrong type of itk img", img.info()));
   }
   if (c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
-    throw ZException(
-      fmt::format("wrapZImgChannelAsITKImg invalid pos of img, c:{}, t:{}, img:<{}>", c, t, img.info().toString()));
+    throw ZException(fmt::format("wrapZImgChannelAsITKImg invalid pos of img, c:{}, t:{}, img:<{}>", c, t, img.info()));
   }
   using ImportFilterType = itk::ImportImageFilter<TVoxel, 3>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
@@ -63,15 +61,11 @@ template<typename TVoxel>
 typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, size_t z, size_t c = 0, size_t t = 0)
 {
   if (!img.isType<TVoxel>()) {
-    throw ZException(
-      fmt::format("wrapZImgPlaneAsITKImg wrap img <{}> to wrong type of itk img", img.info().toString()));
+    throw ZException(fmt::format("wrapZImgPlaneAsITKImg wrap img <{}> to wrong type of itk img", img.info()));
   }
   if (z >= img.depth() || c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
-    throw ZException(fmt::format("wrapZImgPlaneAsITKImg invalid pos of img, z:{} c:{}, t:{}, img:<{}>",
-                                 z,
-                                 c,
-                                 t,
-                                 img.info().toString()));
+    throw ZException(
+      fmt::format("wrapZImgPlaneAsITKImg invalid pos of img, z:{} c:{}, t:{}, img:<{}>", z, c, t, img.info()));
   }
   using ImportFilterType = itk::ImportImageFilter<TVoxel, 2>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();

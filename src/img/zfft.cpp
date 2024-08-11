@@ -41,7 +41,7 @@ namespace nim {
 ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDepth)
 {
   if (img.isEmpty() || img.numChannels() != 1 || img.numTimes() != 1) {
-    throw ZException(fmt::format("fft: input img dimension is not supported: <{}>", img.info().toString()));
+    throw ZException(fmt::format("fft: input img dimension is not supported: <{}>", img.info()));
   }
 
   ZComplexImg res;

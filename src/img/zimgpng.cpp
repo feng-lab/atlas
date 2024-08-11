@@ -347,8 +347,7 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
   readInfoFromBuf(png.pngPtr, png.infoPtr, info);
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", info, region));
   }
 
   png_byte colorType = png_get_color_type(png.pngPtr, png.infoPtr);
@@ -403,13 +402,13 @@ void ZImgPng::checkImgBeforeWriting(const QString& filename, const ZImgInfo& inf
     throw ZException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1 || info.depth != 1) {
-    throw ZException(fmt::format("only 2d image is supported: {}", info.toString()));
+    throw ZException(fmt::format("only 2d image is supported: {}", info));
   }
   if (!(info.numChannels == 1 || (info.numChannels == 2 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
       info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel > 2) {
-    throw ZException(fmt::format("image can not be represented as png: {}", info.toString()));
+    throw ZException(fmt::format("image can not be represented as png: {}", info));
   }
 }
 

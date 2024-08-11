@@ -151,8 +151,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
   ZImgInfo& info = infos[scene];
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", info, region));
   }
 
   ZImgRegion rgn = region;

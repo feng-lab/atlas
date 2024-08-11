@@ -440,10 +440,10 @@ void ZStitchImage::doWork()
       auto tmpInfo = ZImg::readImgInfo(input2ndStackSources[0]);
       if (!tmpInfo.isSameType(info)) {
         throw ZException(fmt::format("Image type of {} <{}> and {} <{}> don't match",
-                                     inputStackSources[0].toString(),
-                                     info.toString(),
-                                     input2ndStackSources[0].toString(),
-                                     tmpInfo.toString()));
+                                     inputStackSources[0],
+                                     info,
+                                     input2ndStackSources[0],
+                                     tmpInfo));
       }
     } else {
       if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
@@ -472,10 +472,10 @@ void ZStitchImage::doWork()
         auto tmpInfo = ZImg::readImgInfo(inputStackSources[i]);
         if (!tmpInfo.isSameType(info)) {
           throw ZException(fmt::format("Image type of {} <{}> and {} <{}> don't match",
-                                       inputStackSources[0].toString(),
-                                       info.toString(),
-                                       inputStackSources[i].toString(),
-                                       tmpInfo.toString()));
+                                       inputStackSources[0],
+                                       info,
+                                       inputStackSources[i],
+                                       tmpInfo));
         }
       }
       if (hasStack2) {
@@ -486,10 +486,10 @@ void ZStitchImage::doWork()
           auto tmpInfo = ZImg::readImgInfo(input2ndStackSource);
           if (!tmpInfo.isSameType(info)) {
             throw ZException(fmt::format("Image type of {} <{}> and {} <{}> don't match",
-                                         inputStackSources[0].toString(),
-                                         info.toString(),
-                                         input2ndStackSource.toString(),
-                                         tmpInfo.toString()));
+                                         inputStackSources[0],
+                                         info,
+                                         input2ndStackSource,
+                                         tmpInfo));
           }
         }
       }

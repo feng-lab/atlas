@@ -170,8 +170,7 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   ZImgInfo info = infoFromHead(colorSpec, geometry);
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", info, region));
   }
 
   Image imagePn;

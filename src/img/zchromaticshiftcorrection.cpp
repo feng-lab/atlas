@@ -29,7 +29,7 @@ void ZChromaticShiftCorrection::doWork()
     throw ZException("Only one channel. Do not need correction");
   }
   if (srcImg.numTimes() > 1) {
-    throw ZException(fmt::format("Can not align time sequence image: {}", srcImg.info().toString()));
+    throw ZException(fmt::format("Can not align time sequence image: {}", srcImg.info()));
   }
 
   if (m_targetChannel >= 0 && static_cast<size_t>(m_targetChannel) < srcImg.numChannels() &&

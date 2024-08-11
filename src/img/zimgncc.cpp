@@ -129,8 +129,8 @@ void checkInputImgs(const ZImg& fixedImg, const ZImg& movingImg, const QString& 
       movingImg.numChannels() != 1 || movingImg.numTimes() != 1) {
     throw ZException(fmt::format("{} input img dimension is not supported: fixed img <{}>, moving img <{}>",
                                  name,
-                                 fixedImg.info().toString(),
-                                 movingImg.info().toString()));
+                                 fixedImg.info(),
+                                 movingImg.info()));
   }
 }
 
@@ -363,8 +363,8 @@ void normXCorrPart(ZImg& fixedImg,
                                  yEnd,
                                  zStart,
                                  zEnd,
-                                 fixedImg.info().toString(),
-                                 movingImg.info().toString()));
+                                 fixedImg.info(),
+                                 movingImg.info()));
   }
 
   if (!fixedImg.isType<double>()) {
@@ -515,8 +515,8 @@ ZImg xCorrPart(const ZImg& fixedImg,
                                  yEnd,
                                  zStart,
                                  zEnd,
-                                 fixedImg.info().toString(),
-                                 movingImg.info().toString()));
+                                 fixedImg.info(),
+                                 movingImg.info()));
   }
 
   ZImgInfo info = fixedImg.info();
@@ -554,8 +554,8 @@ void cropOverlapSubImg(const ZImg& fixedImgIn,
   ZVoxelCoordinate fixedEnd = min(offset + movingImgIn.endCoord(), fixedImgIn.endCoord());
   if (fixedEnd.anyLessEqual(fixedStart)) {
     throw ZException(fmt::format("Trying to crop overlap region of non-overlap img1 <{}> and img2 <{}> with offset: {}",
-                                 fixedImgIn.info().toString(),
-                                 movingImgIn.info().toString(),
+                                 fixedImgIn.info(),
+                                 movingImgIn.info(),
                                  offset));
   }
   ZImgRegion fixedRegion(fixedStart, fixedEnd);

@@ -631,14 +631,14 @@ void ZImgNCCMatch::init()
 void ZImgNCCMatch::checkFixedImgChannel(size_t ch)
 {
   if (ch >= m_fixedImg.numChannels()) {
-    throw ZException(fmt::format("Wrong channel {} for fixed img <{}>", ch, m_fixedImg.info().toString()));
+    throw ZException(fmt::format("Wrong channel {} for fixed img <{}>", ch, m_fixedImg.info()));
   }
 }
 
 void ZImgNCCMatch::checkMovingImgChannel(size_t ch)
 {
   if (ch >= m_movingImg.numChannels()) {
-    throw ZException(fmt::format("Wrong channel {} for moving img <{}>", ch, m_movingImg.info().toString()));
+    throw ZException(fmt::format("Wrong channel {} for moving img <{}>", ch, m_movingImg.info()));
   }
 }
 
@@ -1059,9 +1059,9 @@ ZImgNCCMatch::getRequiredSrcImgRegionAndValidNccRegion(const ZVoxelCoordinate& o
 
   VLOG(1) << fmt::format("offset: {}, fixedRgn: {}, movingRgn: {}, validNccRgn: {}",
                          offset,
-                         fixedRgn.toString(),
-                         movingRgn.toString(),
-                         validNccRgn.toString());
+                         fixedRgn,
+                         movingRgn,
+                         validNccRgn);
 
   return std::tie(fixedRgn, movingRgn, validNccRgn);
 }

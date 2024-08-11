@@ -66,9 +66,7 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
        m_imgInfo[0].depth % (m_lsmImgInfo.depth * m_lsmImgInfo.numTimes) != 0) ||
       m_imgInfo[0].bytesPerVoxel != m_lsmImgInfo.bytesPerVoxel ||
       m_imgInfo[0].voxelFormat != m_lsmImgInfo.voxelFormat) {
-    throw ZException(fmt::format("lsm meta info <{}> doesn't match image data <{}>",
-                                 m_lsmImgInfo.toString(),
-                                 m_imgInfo[0].toString()));
+    throw ZException(fmt::format("lsm meta info <{}> doesn't match image data <{}>", m_lsmImgInfo, m_imgInfo[0]));
   }
 
   size_t numLocations;

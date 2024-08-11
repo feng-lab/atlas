@@ -32,7 +32,7 @@ void ZSectionsRegistration::doWork()
     throw ZException("Only one slice. Do not need alignment.");
   }
   if (srcImg.numTimes() > 1) {
-    throw ZException(fmt::format("Can not align time sequence image: {}", srcImg.info().toString()));
+    throw ZException(fmt::format("Can not align time sequence image: {}", srcImg.info()));
   }
 
   if (m_fixedSliceIndex >= 0 && static_cast<size_t>(m_fixedSliceIndex) < srcImg.depth()) {

@@ -166,8 +166,8 @@ void ZImgIO::readInfos(const QStringList& fileList,
               if (!res[s].isSameType(res[0])) {
                 throw ZException(
                   fmt::format("Read sequence failed: image type don't match, can not cat Img <{}> to Img 0 <{}>",
-                              res[s].toString(),
-                              res[0].toString()));
+                              res[s],
+                              res[0]));
               }
               // check whether dimension size match
               for (auto dim : ZImgInfo::dimensions()) {
@@ -176,15 +176,15 @@ void ZImgIO::readInfos(const QStringList& fileList,
                       res[s].size(dim) != res[0].size(dim)) {
                     throw ZException(fmt::format(
                       "Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
-                      res[s].toString(),
-                      res[0].toString()));
+                      res[s],
+                      res[0]));
                   }
                 } else {
                   if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
                     throw ZException(fmt::format(
                       "Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
-                      res[s].toString(),
-                      res[0].toString()));
+                      res[s],
+                      res[0]));
                   }
                 }
                 if (dim == catDim) {
@@ -236,8 +236,8 @@ void ZImgIO::readInfos(const QStringList& fileList,
                   throw ZException(
                     fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
                                 i,
-                                tmpInfo[s].toString(),
-                                res[s].toString()));
+                                tmpInfo[s],
+                                res[s]));
                 }
                 // check whether dimension size match
                 for (auto dim : ZImgInfo::dimensions()) {
@@ -247,16 +247,16 @@ void ZImgIO::readInfos(const QStringList& fileList,
                       throw ZException(fmt::format(
                         "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                         i,
-                        tmpInfo[s].toString(),
-                        res[s].toString()));
+                        tmpInfo[s],
+                        res[s]));
                     }
                   } else {
                     if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
                       throw ZException(fmt::format(
                         "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                         i,
-                        tmpInfo[s].toString(),
-                        res[s].toString()));
+                        tmpInfo[s],
+                        res[s]));
                     }
                   }
                   if (dim == catDim) {
@@ -330,8 +330,8 @@ void ZImgIO::readInfos(const QStringList& fileList,
         if (!res[s].isSameType(res[0])) {
           throw ZException(
             fmt::format("Read sequence failed: image type don't match, can not cat Img <{}> to Img 0 <{}>",
-                        res[s].toString(),
-                        res[0].toString()));
+                        res[s],
+                        res[0]));
         }
         // check whether dimension size match
         for (auto dim : ZImgInfo::dimensions()) {
@@ -339,15 +339,15 @@ void ZImgIO::readInfos(const QStringList& fileList,
             if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && res[s].size(dim) != res[0].size(dim)) {
               throw ZException(
                 fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
-                            res[s].toString(),
-                            res[0].toString()));
+                            res[s],
+                            res[0]));
             }
           } else {
             if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
               throw ZException(
                 fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
-                            res[s].toString(),
-                            res[0].toString()));
+                            res[s],
+                            res[0]));
             }
           }
           if (dim == catDim) {
@@ -403,8 +403,8 @@ void ZImgIO::readInfos(const QStringList& fileList,
             throw ZException(
               fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
                           i,
-                          tmpInfo[s].toString(),
-                          res[s].toString()));
+                          tmpInfo[s],
+                          res[s]));
           }
           // check whether dimension size match
           for (auto dim : ZImgInfo::dimensions()) {
@@ -414,16 +414,16 @@ void ZImgIO::readInfos(const QStringList& fileList,
                 throw ZException(fmt::format(
                   "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                   i,
-                  tmpInfo[s].toString(),
-                  res[s].toString()));
+                  tmpInfo[s],
+                  res[s]));
               }
             } else {
               if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
                 throw ZException(fmt::format(
                   "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
                   i,
-                  tmpInfo[s].toString(),
-                  res[s].toString()));
+                  tmpInfo[s],
+                  res[s]));
               }
             }
             if (dim == catDim) {
@@ -828,8 +828,7 @@ void ZImgIO::readImg(const QStringList& fileList,
   }
   ZImgInfo& info = infos[scene];
   if (regionIn.isEmpty() || !regionIn.isValid(info)) {
-    throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), regionIn.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", info, regionIn));
   }
   ZImgRegion region = regionIn;
   region.resolveRegionEnd(info);

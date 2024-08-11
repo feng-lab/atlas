@@ -211,7 +211,7 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo.toString(), region.toString()));
+      fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
   }
 
   ZImgInfo partialImgInfo = region.clip(imgInfo);
@@ -528,12 +528,12 @@ void ZImgJpeg::checkImgBeforeWriting(const QString& filename, const ZImgInfo& in
     throw ZException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1 || info.depth != 1) {
-    throw ZException(fmt::format("only 2d image is supported: {}", info.toString()));
+    throw ZException(fmt::format("only 2d image is supported: {}", info));
   }
   if (!(info.numChannels == 1 || (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
       info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel > 1) {
-    throw ZException(fmt::format("image can not be represented as jpeg: {}", info.toString()));
+    throw ZException(fmt::format("image can not be represented as jpeg: {}", info));
   }
   if (paras.jpegChrominanceSubsampling != 444 && paras.jpegChrominanceSubsampling != 422 &&
       paras.jpegChrominanceSubsampling != 420) {

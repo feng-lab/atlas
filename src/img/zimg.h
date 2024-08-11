@@ -82,56 +82,56 @@ class ZImgBlockProvider;
     }                                                        \
   }
 
-#define IMG_RETURN_TYPED_CALL(function, imgInfo, ...)                                     \
-  {                                                                                       \
-    if (imgInfo.voxelFormat == VoxelFormat::Unsigned) {                                   \
-      switch (imgInfo.bytesPerVoxel) {                                                    \
-        case 1:                                                                           \
-          return function<uint8_t>(__VA_ARGS__);                                          \
-          break;                                                                          \
-        case 2:                                                                           \
-          return function<uint16_t>(__VA_ARGS__);                                         \
-          break;                                                                          \
-        case 4:                                                                           \
-          return function<uint32_t>(__VA_ARGS__);                                         \
-          break;                                                                          \
-        case 8:                                                                           \
-          return function<uint64_t>(__VA_ARGS__);                                         \
-          break;                                                                          \
-        default:                                                                          \
-          throw ZException(fmt::format("unsupported image type {}", imgInfo.toString())); \
-      }                                                                                   \
-    } else if (imgInfo.voxelFormat == VoxelFormat::Float) {                               \
-      switch (imgInfo.bytesPerVoxel) {                                                    \
-        case 4:                                                                           \
-          return function<float>(__VA_ARGS__);                                            \
-          break;                                                                          \
-        case 8:                                                                           \
-          return function<double>(__VA_ARGS__);                                           \
-          break;                                                                          \
-        default:                                                                          \
-          throw ZException(fmt::format("unsupported image type {}", imgInfo.toString())); \
-      }                                                                                   \
-    } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {                              \
-      switch (imgInfo.bytesPerVoxel) {                                                    \
-        case 1:                                                                           \
-          return function<int8_t>(__VA_ARGS__);                                           \
-          break;                                                                          \
-        case 2:                                                                           \
-          return function<int16_t>(__VA_ARGS__);                                          \
-          break;                                                                          \
-        case 4:                                                                           \
-          return function<int32_t>(__VA_ARGS__);                                          \
-          break;                                                                          \
-        case 8:                                                                           \
-          return function<int64_t>(__VA_ARGS__);                                          \
-          break;                                                                          \
-        default:                                                                          \
-          throw ZException(fmt::format("unsupported image type {}", imgInfo.toString())); \
-      }                                                                                   \
-    } else {                                                                              \
-      throw ZException(fmt::format("unsupported image type {}", imgInfo.toString()));     \
-    }                                                                                     \
+#define IMG_RETURN_TYPED_CALL(function, imgInfo, ...)                          \
+  {                                                                            \
+    if (imgInfo.voxelFormat == VoxelFormat::Unsigned) {                        \
+      switch (imgInfo.bytesPerVoxel) {                                         \
+        case 1:                                                                \
+          return function<uint8_t>(__VA_ARGS__);                               \
+          break;                                                               \
+        case 2:                                                                \
+          return function<uint16_t>(__VA_ARGS__);                              \
+          break;                                                               \
+        case 4:                                                                \
+          return function<uint32_t>(__VA_ARGS__);                              \
+          break;                                                               \
+        case 8:                                                                \
+          return function<uint64_t>(__VA_ARGS__);                              \
+          break;                                                               \
+        default:                                                               \
+          throw ZException(fmt::format("unsupported image type {}", imgInfo)); \
+      }                                                                        \
+    } else if (imgInfo.voxelFormat == VoxelFormat::Float) {                    \
+      switch (imgInfo.bytesPerVoxel) {                                         \
+        case 4:                                                                \
+          return function<float>(__VA_ARGS__);                                 \
+          break;                                                               \
+        case 8:                                                                \
+          return function<double>(__VA_ARGS__);                                \
+          break;                                                               \
+        default:                                                               \
+          throw ZException(fmt::format("unsupported image type {}", imgInfo)); \
+      }                                                                        \
+    } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {                   \
+      switch (imgInfo.bytesPerVoxel) {                                         \
+        case 1:                                                                \
+          return function<int8_t>(__VA_ARGS__);                                \
+          break;                                                               \
+        case 2:                                                                \
+          return function<int16_t>(__VA_ARGS__);                               \
+          break;                                                               \
+        case 4:                                                                \
+          return function<int32_t>(__VA_ARGS__);                               \
+          break;                                                               \
+        case 8:                                                                \
+          return function<int64_t>(__VA_ARGS__);                               \
+          break;                                                               \
+        default:                                                               \
+          throw ZException(fmt::format("unsupported image type {}", imgInfo)); \
+      }                                                                        \
+    } else {                                                                   \
+      throw ZException(fmt::format("unsupported image type {}", imgInfo));     \
+    }                                                                          \
   }
 
 // for function that take 2 template argument
@@ -1143,9 +1143,8 @@ public:
     } else if (isSameSize(mask)) {
       IMG_TYPED_CALL_2TYPE(histogramMask_Impl, m_info, mask.info(), res, minData, maxData, mask)
     } else {
-      throw ZException(fmt::format("histogram mask has different size <{}> than current img <{}>",
-                                   mask.info().toString(),
-                                   m_info.toString()));
+      throw ZException(
+        fmt::format("histogram mask has different size <{}> than current img <{}>", mask.info(), m_info));
     }
 
     return res;
@@ -1193,7 +1192,7 @@ public:
     ZImg res;
 
     if (isEmpty()) {
-      throw ZException(fmt::format("Can not crop empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not crop empty img <{}>", m_info));
     }
     if (endCoord.anyLessThan(startCoord)) {
       throw ZException(fmt::format("Try to crop pad img with invalid region <{}> to <{}>", startCoord, endCoord));
@@ -1742,8 +1741,8 @@ public:
   {
     if (!isSameSize(other)) {
       throw ZException(fmt::format("img binary operation requires same size img as input: this <{}>, other <{}>",
-                                   m_info.toString(),
-                                   other.info().toString()));
+                                   m_info,
+                                   other.info()));
     }
     IMG_TYPED_CALL_2TYPE(binaryOp_Impl, m_info, other.info(), other, op)
     return *this;
@@ -1762,8 +1761,8 @@ public:
     }
     if (!isSameSize(other)) {
       throw ZException(fmt::format("img binary operation requires same size img as input: this <{}>, other <{}>",
-                                   m_info.toString(),
-                                   other.info().toString()));
+                                   m_info,
+                                   other.info()));
     }
     binaryOp_Impl<TVoxel, TVoxelOther>(other, op);
     return *this;
@@ -1822,9 +1821,8 @@ public:
     ZVoxelCoordinate res;
     ZImgRegion rgn = region;
     if (rgn.isEmpty() || !rgn.isValid(m_info)) {
-      throw ZException(fmt::format("Try to find max value location of img <{}> within invalid region <{}>",
-                                   m_info.toString(),
-                                   rgn.toString()));
+      throw ZException(
+        fmt::format("Try to find max value location of img <{}> within invalid region <{}>", m_info, rgn));
     }
     rgn.resolveRegionEnd(m_info);
     IMG_TYPED_CALL(firstMaxValueCoord_Impl, m_info, res, max, rgn)
@@ -1838,9 +1836,8 @@ public:
     std::vector<ZVoxelCoordinate> res;
     ZImgRegion rgn = region;
     if (rgn.isEmpty() || !rgn.isValid(m_info)) {
-      throw ZException(fmt::format("Try to find max value locations of img <{}> within invalid region <{}>",
-                                   m_info.toString(),
-                                   rgn.toString()));
+      throw ZException(
+        fmt::format("Try to find max value locations of img <{}> within invalid region <{}>", m_info, rgn));
     }
     rgn.resolveRegionEnd(m_info);
     IMG_TYPED_CALL(maxValueCoords_Impl, m_info, res, max, rgn)
@@ -1855,12 +1852,12 @@ public:
   TValue value(const ZVoxelCoordinate& coord) const
   {
     if (isEmpty()) {
-      throw ZException(fmt::format("Can not get voxel value of empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not get voxel value of empty img <{}>", m_info));
     }
     if (isCoordValid(coord)) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, coord)
     } else {
-      throw ZException(fmt::format("value: Invalid coordinate {} of img <{}>", coord, m_info.toString()));
+      throw ZException(fmt::format("value: Invalid coordinate {} of img <{}>", coord, m_info));
     }
   }
 
@@ -1869,13 +1866,12 @@ public:
   TValue value(size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0) const
   {
     if (isEmpty()) {
-      throw ZException(fmt::format("Can not get voxel value of empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not get voxel value of empty img <{}>", m_info));
     }
     if (x < m_info.width && y < m_info.height && z < m_info.depth && c < m_info.numChannels && t < m_info.numTimes) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, x, y, z, c, t)
     } else {
-      throw ZException(
-        fmt::format("value: Invalid coordinate ({},{},{},{},{}) of img <{}>", x, y, z, c, t, m_info.toString()));
+      throw ZException(fmt::format("value: Invalid coordinate ({},{},{},{},{}) of img <{}>", x, y, z, c, t, m_info));
     }
   }
 
@@ -1884,12 +1880,12 @@ public:
   TValue value(size_t idx) const
   {
     if (isEmpty()) {
-      throw ZException(fmt::format("Can not get voxel value of empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not get voxel value of empty img <{}>", m_info));
     }
     if (idx < voxelNumber()) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, idx)
     } else {
-      throw ZException(fmt::format("value: Invalid voxel idx {} of img <{}>", idx, m_info.toString()));
+      throw ZException(fmt::format("value: Invalid voxel idx {} of img <{}>", idx, m_info));
     }
   }
 
@@ -1926,12 +1922,12 @@ public:
   void setValue(TValue value, const ZVoxelCoordinate& coord)
   {
     if (isEmpty()) {
-      throw ZException(fmt::format("Can not set voxel value to empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not set voxel value to empty img <{}>", m_info));
     }
     if (isCoordValid(coord)) {
       IMG_TYPED_CALL(setValue_Impl, m_info, value, coord)
     } else {
-      throw ZException(fmt::format("setValue: Invalid coordinate {} of img <{}>", coord, m_info.toString()));
+      throw ZException(fmt::format("setValue: Invalid coordinate {} of img <{}>", coord, m_info));
     }
   }
 
@@ -1940,13 +1936,12 @@ public:
   void setValue(TValue value, size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0)
   {
     if (isEmpty()) {
-      throw ZException(fmt::format("Can not set voxel value to empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not set voxel value to empty img <{}>", m_info));
     }
     if (x < m_info.width && y < m_info.height && z < m_info.depth && c < m_info.numChannels && t < m_info.numTimes) {
       IMG_TYPED_CALL(setValue_Impl, m_info, value, x, y, z, c, t)
     } else {
-      throw ZException(
-        fmt::format("setValue: Invalid coordinate ({},{},{},{},{}) of img <{}>", x, y, z, c, t, m_info.toString()));
+      throw ZException(fmt::format("setValue: Invalid coordinate ({},{},{},{},{}) of img <{}>", x, y, z, c, t, m_info));
     }
   }
 
@@ -1955,12 +1950,12 @@ public:
   void setValue(TValue value, size_t idx)
   {
     if (isEmpty()) {
-      throw ZException(fmt::format("Can not set voxel value to empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not set voxel value to empty img <{}>", m_info));
     }
     if (idx < voxelNumber()) {
       IMG_TYPED_CALL(setValue_Impl, m_info, value, idx)
     } else {
-      throw ZException(fmt::format("value: Invalid voxel idx {} of img <{}>", idx, m_info.toString()));
+      throw ZException(fmt::format("value: Invalid voxel idx {} of img <{}>", idx, m_info));
     }
   }
 
@@ -2491,3 +2486,12 @@ template<typename TVoxel>
 ZImg tag_invoke_img_Impl(ZImg& img, const json::value& jv);
 
 } // namespace nim
+
+template<>
+struct fmt::formatter<nim::ZImgSource> : fmt::formatter<std::string>
+{
+  auto format(const nim::ZImgSource& a, fmt::format_context& ctx) const
+  {
+    return formatter<std::string>::format(a.toString(), ctx);
+  }
+};

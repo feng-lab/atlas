@@ -287,8 +287,7 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   readInfoFromDecoder(pDecoder, PI, info);
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", info, region));
   }
 
   if (PI.grBit & PK_pixfmtHasAlpha) {
@@ -712,12 +711,12 @@ void ZImgJpegXR::checkBeforeWriting(const ZImgInfo& info, const ZImgWriteParamet
     throw ZException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1 || info.depth != 1) {
-    throw ZException(fmt::format("only 2d image is supported: {}", info.toString()));
+    throw ZException(fmt::format("only 2d image is supported: {}", info));
   }
   if (!(info.numChannels == 1 || (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
       info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel > 2) {
-    throw ZException(fmt::format("image type currently not supported: {}", info.toString()));
+    throw ZException(fmt::format("image type currently not supported: {}", info));
   }
   if (paras.jpegXRQuality < 0.01 || paras.jpegXRQuality > 1.) {
     throw ZException(fmt::format("invalid jpeg xr quality: {}", paras.jpegXRQuality));

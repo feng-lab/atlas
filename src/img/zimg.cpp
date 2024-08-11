@@ -118,7 +118,7 @@ std::string ZImgMetadataBase<ZImg>::toString() const
                      attachPointsImgs.first.t,
                      attachPointsImgs.second.size());
       for (const auto& img : attachPointsImgs.second) {
-        fmt::format_to(std::back_inserter(res), "  thumb <{}>\n", img.info().toString());
+        fmt::format_to(std::back_inserter(res), "  thumb <{}>\n", img.info());
       }
     }
   }
@@ -704,8 +704,7 @@ ZImg ZImg::createView(index_t c, index_t t)
     rgn.end.t = t + 1;
   }
   if (!rgn.isValid(m_info)) {
-    throw ZException(
-      fmt::format("Invalid view of img, c:{}, t:{}, rgn:{}, img:{}", c, t, rgn.toString(), m_info.toString()));
+    throw ZException(fmt::format("Invalid view of img, c:{}, t:{}, rgn:{}, img:{}", c, t, rgn, m_info));
   }
   ZImg res;
   res.m_info = rgn.clip(m_info);
@@ -729,8 +728,7 @@ ZImg ZImg::createView(index_t c, index_t t) const
     rgn.end.t = t + 1;
   }
   if (!rgn.isValid(m_info)) {
-    throw ZException(
-      fmt::format("Invalid view of img, c:{}, t:{}, rgn:{}, img:{}", c, t, rgn.toString(), m_info.toString()));
+    throw ZException(fmt::format("Invalid view of img, c:{}, t:{}, rgn:{}, img:{}", c, t, rgn, m_info));
   }
   ZImg res;
   res.m_info = rgn.clip(m_info);
@@ -752,8 +750,7 @@ ZImg ZImg::createView(size_t z, size_t c, size_t t)
   rgn.start.t = t;
   rgn.end.t = t + 1;
   if (!rgn.isValid(m_info)) {
-    throw ZException(
-      fmt::format("Invalid view of img, z:{}, c:{}, t:{}, rgn:{}, img:{}", z, c, t, rgn.toString(), m_info.toString()));
+    throw ZException(fmt::format("Invalid view of img, z:{}, c:{}, t:{}, rgn:{}, img:{}", z, c, t, rgn, m_info));
   }
   ZImg res;
   res.m_info = rgn.clip(m_info);
@@ -775,8 +772,7 @@ ZImg ZImg::createView(size_t z, size_t c, size_t t) const
   rgn.start.t = t;
   rgn.end.t = t + 1;
   if (!rgn.isValid(m_info)) {
-    throw ZException(
-      fmt::format("Invalid view of img, z:{}, c:{}, t:{}, rgn:{}, img:{}", z, c, t, rgn.toString(), m_info.toString()));
+    throw ZException(fmt::format("Invalid view of img, z:{}, c:{}, t:{}, rgn:{}, img:{}", z, c, t, rgn, m_info));
   }
   ZImg res;
   res.m_info = rgn.clip(m_info);
@@ -827,9 +823,7 @@ std::vector<size_t> ZImg::histogram(size_t nbins, const ZImg& mask) const
   } else if (isSameSize(mask)) {
     IMG_TYPED_CALL_2TYPE(histogramMask_Impl, m_info, mask.info(), res, mask)
   } else {
-    throw ZException(fmt::format("histogram mask has different size <{}> than current img <{}>",
-                                 mask.info().toString(),
-                                 m_info.toString()));
+    throw ZException(fmt::format("histogram mask has different size <{}> than current img <{}>", mask.info(), m_info));
   }
 
   return res;
@@ -843,7 +837,7 @@ ZImg ZImg::crop(const ZImgRegion& region) const
   }
   ZImgRegion rgn = region;
   if (!rgn.isValid(m_info)) {
-    throw ZException(fmt::format("Try to crop img <{}> with invalid region <{}>", m_info.toString(), rgn.toString()));
+    throw ZException(fmt::format("Try to crop img <{}> with invalid region <{}>", m_info, rgn));
   }
 
   rgn.resolveRegionEnd(m_info);
@@ -1192,7 +1186,7 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
     resInfo.setSize(dim, resInfo.size(dim) + info.size(dim));
     info.setSize(dim, 0);
     if (!info.isSameType(firstInfo) || !info.isSameSize(firstInfo)) {
-      throw ZException(fmt::format("Can not concat img <{}> and img <{}>", info.toString(), firstInfo.toString()));
+      throw ZException(fmt::format("Can not concat img <{}> and img <{}>", info, firstInfo));
     }
   }
   if (dim == Dimension::C) {
@@ -1304,7 +1298,7 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
   for (size_t idx = 1; idx < imgs.size(); ++idx) {
     ZImgInfo info = imgs[idx]->info();
     if (!info.isSameType(firstInfo) || !info.isSameSize(firstInfo)) {
-      throw ZException(fmt::format("Can not combine img <{}> and img <{}>", info.toString(), firstInfo.toString()));
+      throw ZException(fmt::format("Can not combine img <{}> and img <{}>", info, firstInfo));
     }
   }
 
@@ -1899,9 +1893,8 @@ ZImg ZImg::blockSumPart(size_t twidth,
 ZImg& ZImg::operator+=(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZException(fmt::format("img addition requires same size img as input: this <{}>, other <{}>",
-                                 m_info.toString(),
-                                 rhs.info().toString()));
+    throw ZException(
+      fmt::format("img addition requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
   IMG_TYPED_CALL_2TYPE(addImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1910,9 +1903,8 @@ ZImg& ZImg::operator+=(const ZImg& rhs)
 ZImg& ZImg::operator-=(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZException(fmt::format("img subtraction requires same size img as input: this <{}>, other <{}>",
-                                 m_info.toString(),
-                                 rhs.info().toString()));
+    throw ZException(
+      fmt::format("img subtraction requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
   IMG_TYPED_CALL_2TYPE(subImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1921,9 +1913,8 @@ ZImg& ZImg::operator-=(const ZImg& rhs)
 ZImg& ZImg::operator*=(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZException(fmt::format("img multiplies requires same size img as input: this <{}>, other <{}>",
-                                 m_info.toString(),
-                                 rhs.info().toString()));
+    throw ZException(
+      fmt::format("img multiplies requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
   IMG_TYPED_CALL_2TYPE(mulImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1932,9 +1923,8 @@ ZImg& ZImg::operator*=(const ZImg& rhs)
 ZImg& ZImg::operator/=(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZException(fmt::format("img divides requires same size img as input: this <{}>, other <{}>",
-                                 m_info.toString(),
-                                 rhs.info().toString()));
+    throw ZException(
+      fmt::format("img divides requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
   IMG_TYPED_CALL_2TYPE(divImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1943,9 +1933,8 @@ ZImg& ZImg::operator/=(const ZImg& rhs)
 ZImg& ZImg::secureDivideBy(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZException(fmt::format("img divides requires same size img as input: this <{}>, other <{}>",
-                                 m_info.toString(),
-                                 rhs.info().toString()));
+    throw ZException(
+      fmt::format("img divides requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
   IMG_TYPED_CALL_2TYPE(secureDivImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1969,7 +1958,7 @@ bool ZImg::operator==(const ZImg& other) const
 ZVoxelCoordinate ZImg::indexToCoord(index_t idx, const ZImgInfo& info)
 {
   if (info.isEmpty()) {
-    throw ZException(fmt::format("Can not convert index to coord with empty img info <{}>", info.toString()));
+    throw ZException(fmt::format("Can not convert index to coord with empty img info <{}>", info));
   }
   ZVoxelCoordinate res;
   //  res.l = idx >= 0 ? (idx / info.locationVoxelNumber()) : (- 1 - ((-idx-1) / info.locationVoxelNumber()));
@@ -2078,7 +2067,7 @@ void ZImg::allocate(bool init)
       clearData();
       ZImgInfo info = m_info;
       m_info.clear();
-      throw ZException(fmt::format("Can not allocate memory for img <{}>", info.toString()));
+      throw ZException(fmt::format("Can not allocate memory for img <{}>", info));
     } else if (init) {
       std::memset(m_data[t], 0, timeByteNumber());
     }

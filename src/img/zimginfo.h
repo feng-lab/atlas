@@ -421,3 +421,12 @@ inline ZImgInfo tag_invoke(const json::value_to_tag<ZImgInfo>&, const json::valu
 }
 
 } // namespace nim
+
+template<>
+struct fmt::formatter<nim::ZImgInfo> : fmt::formatter<std::string>
+{
+  auto format(const nim::ZImgInfo& a, fmt::format_context& ctx) const
+  {
+    return formatter<std::string>::format(a.toString(), ctx);
+  }
+};

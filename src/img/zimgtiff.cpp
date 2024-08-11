@@ -101,9 +101,7 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   }
 
   if (region.isEmpty() || !region.isValid(m_imgInfo[scene])) {
-    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'",
-                                 m_imgInfo[scene].toString(),
-                                 region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", m_imgInfo[scene], region));
   }
 
   ZImgInfo imgInfo2D(m_imgInfo[scene]);
@@ -334,9 +332,7 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
   const std::vector<ZTiffIFD>& ifds = tiff.ifds();
 
   if (region.isEmpty() || !region.isValid(m_imgInfo[scene])) {
-    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'",
-                                 m_imgInfo[scene].toString(),
-                                 region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", m_imgInfo[scene], region));
   }
 
   // thumbnail follows image or in subifd

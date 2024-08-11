@@ -66,8 +66,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
                             size_t timeStride)
 {
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo.toString(), region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
   }
   if (dimensionOrderIn != "XYZCT" && dimensionOrderIn != "XYCZT" && dimensionOrderIn != "CXYZT") {
     throw ZException(fmt::format("Not supported dimension order: {}", dimensionOrderIn));
@@ -192,8 +191,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
   ZImg res;
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo.toString(), region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
   }
 
   CHECK(dimensionStrides.size() == 5);
@@ -207,7 +205,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
     auto idx = sortedIndexes[i];
     packedStrides[idx] = packedPrev;
     if (dimensionStrides[idx] < prev) {
-      throw ZException(fmt::format("invalid dimensionStrides {} for image {}", dimensionStrides, imgInfo.toString()));
+      throw ZException(fmt::format("invalid dimensionStrides {} for image {}", dimensionStrides, imgInfo));
     }
     packedPrev = packedStrides[idx] * imgInfo.size(idx);
     prev = dimensionStrides[idx] * imgInfo.size(idx);

@@ -337,7 +337,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
     if (m_pageDirectorySize.x > Z3DGpuInfo::instance().max3DTextureSize() ||
         m_pageDirectorySize.y > Z3DGpuInfo::instance().max3DTextureSize() ||
         m_pageDirectorySize.z > Z3DGpuInfo::instance().max3DTextureSize()) {
-      throw ZException(fmt::format("Image ({}) is not supported", info.toString()));
+      throw ZException(fmt::format("Image ({}) is not supported", info));
     }
   }
 

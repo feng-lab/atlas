@@ -18,7 +18,7 @@ void FreeImageErrorHandler(FREE_IMAGE_FORMAT fif, const char* message)
   if (fif != FIF_UNKNOWN) {
     LOG(WARNING) << fmt::format("FreeImage {} Format: {}", FreeImage_GetFormatFromFIF(fif), message);
   } else {
-    LOG(WARNING) << fmt::format("FreeImage: {}", message);;
+    LOG(WARNING) << fmt::format("FreeImage: {}", message);
   }
 }
 
@@ -304,8 +304,7 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   ZImgInfo& info = infos[0];
 
   if (region.isEmpty() || !region.isValid(info)) {
-    throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", info, region));
   }
 
   img = ZImg(info);

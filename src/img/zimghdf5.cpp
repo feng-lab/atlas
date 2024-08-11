@@ -957,8 +957,7 @@ void ZImgHDF5::readImg(const QString& filename,
     ZImgInfo info = ZImgInfoIO::load(allGrp);
 
     if (region.isEmpty() || !region.isValid(info)) {
-      throw ZException(
-        fmt::format("Invalid image region. Image info: '{}', region: '{}'", info.toString(), region.toString()));
+      throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", info, region));
     }
 
     ZImgRegion rgn = region;

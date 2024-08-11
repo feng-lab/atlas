@@ -37,15 +37,15 @@ public:
     , m_padValue(padValue)
   {
     if (!m_img->template isType<TVoxel>()) {
-      throw ZException(fmt::format("Iterator type doesn't match image type <{}>", m_img->info().toString()));
+      throw ZException(fmt::format("Iterator type doesn't match image type <{}>", m_img->info()));
     }
     if (m_img->isEmpty()) {
       m_endIdx = -1;
     } else if (!m_region.isValid(m_img->info())) {
       throw ZException(
         fmt::format("Can not construct iterator over invalid image region. Image info: '{}', region: '{}'",
-                    m_img->info().toString(),
-                    m_region.toString()));
+                    m_img->info(),
+                    m_region));
     } else if (m_region.isEmpty()) {
       m_endIdx = -1;
     } else {
