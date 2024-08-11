@@ -1196,9 +1196,7 @@ public:
       throw ZException(fmt::format("Can not crop empty img <{}>", m_info.toString()));
     }
     if (endCoord.anyLessThan(startCoord)) {
-      throw ZException(fmt::format("Try to crop pad img with invalid region <{}> to <{}>",
-                                   startCoord.toString(),
-                                   endCoord.toString()));
+      throw ZException(fmt::format("Try to crop pad img with invalid region <{}> to <{}>", startCoord, endCoord));
     }
     if (endCoord.anyEqual(startCoord)) {
       return res;
@@ -1862,7 +1860,7 @@ public:
     if (isCoordValid(coord)) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, coord)
     } else {
-      throw ZException(fmt::format("value: Invalid coordinate {} of img <{}>", coord.toString(), m_info.toString()));
+      throw ZException(fmt::format("value: Invalid coordinate {} of img <{}>", coord, m_info.toString()));
     }
   }
 
@@ -1933,7 +1931,7 @@ public:
     if (isCoordValid(coord)) {
       IMG_TYPED_CALL(setValue_Impl, m_info, value, coord)
     } else {
-      throw ZException(fmt::format("setValue: Invalid coordinate {} of img <{}>", coord.toString(), m_info.toString()));
+      throw ZException(fmt::format("setValue: Invalid coordinate {} of img <{}>", coord, m_info.toString()));
     }
   }
 

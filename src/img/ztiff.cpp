@@ -298,30 +298,27 @@ const struct exiftagname
   {4,                                "GPSLongitude"                },
 };
 
-#ifdef _MSC_VER
-#define snprintf _snprintf
-#endif
-
 void LibtiffErrorHandler(const char* /*module*/, const char* fmt, va_list ap)
 {
-  char buf[2048];
-
-  auto off = std::max(0, snprintf(buf, 2048, "libtiff: "));
-  vsnprintf(buf + off, 2048 - off, fmt, ap);
-  throw nim::ZException(buf);
+  std::array<char, 512> buf{"libtiff: "};
+  CHECK(buf[buf.size() - 1] == 0) << buf[buf.size() - 1];
+  auto off = std::strlen(buf.data());
+  CHECK(buf[off] == 0) << buf[off];
+  std::vsnprintf(buf.data() + off, buf.size() - off, fmt, ap);
+  throw nim::ZException(buf.data());
 }
 
 void LibtiffErrorHandlerIgnoreColormapError(const char* /*module*/, const char* fmt, va_list ap)
 {
-  char buf[2048];
-
-  auto off = std::max(0, snprintf(buf, 2048, "libtiff: "));
-  vsnprintf(buf + off, 2048 - off, fmt, ap);
-  QString str(buf);
-  if (str.contains("Colormap", Qt::CaseInsensitive)) {
+  std::array<char, 512> buf{"libtiff: "};
+  CHECK(buf[buf.size() - 1] == 0) << buf[buf.size() - 1];
+  auto off = std::strlen(buf.data());
+  CHECK(buf[off] == 0) << buf[off];
+  std::vsnprintf(buf.data() + off, buf.size() - off, fmt, ap);
+  if (QString(buf.data()).contains("Colormap", Qt::CaseInsensitive)) {
     return;
   }
-  throw nim::ZException(str);
+  throw nim::ZException(buf.data());
 }
 
 constexpr uint8_t bitmasks1[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};

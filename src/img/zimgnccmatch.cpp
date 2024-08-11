@@ -1057,10 +1057,11 @@ ZImgNCCMatch::getRequiredSrcImgRegionAndValidNccRegion(const ZVoxelCoordinate& o
   validNccRgn.start.t = 0;
   validNccRgn.end.t = 1;
 
-  LOG(INFO) << offset.toString();
-  LOG(INFO) << fixedRgn.toString();
-  LOG(INFO) << movingRgn.toString();
-  LOG(INFO) << validNccRgn.toString();
+  VLOG(1) << fmt::format("offset: {}, fixedRgn: {}, movingRgn: {}, validNccRgn: {}",
+                         offset,
+                         fixedRgn.toString(),
+                         movingRgn.toString(),
+                         validNccRgn.toString());
 
   return std::tie(fixedRgn, movingRgn, validNccRgn);
 }

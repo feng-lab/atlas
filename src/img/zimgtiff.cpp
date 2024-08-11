@@ -305,7 +305,7 @@ void ZImgTiff::readMetadataInternal(ZImgMetadata& meta, size_t scene, ZTiff& tif
   index_t l = 0;
   size_t ifdIdx = 0;
   if (!m_imageDescription.isEmpty()) {
-    ZImgMetatag tag("metadata", m_imageDescription.toStdString());
+    ZImgMetatag tag("metadata", m_imageDescription);
     meta.attachToTopLevel(tag);
   }
   for (const auto& ifd : ifds) {

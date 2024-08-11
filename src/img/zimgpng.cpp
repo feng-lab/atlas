@@ -63,12 +63,12 @@ void readMetaDataFromState(png_const_structrp pngPtr, png_inforp infoPtr, png_in
   int numText;
   if (png_get_text(pngPtr, infoPtr, &textPtr, &numText)) {
     for (auto i = 0; i < numText; ++i) {
-      meta.attachToTopLevel(ZImgMetatag(textPtr[i].key, textPtr[i].text));
+      meta.attachToTopLevel(ZImgMetatag(textPtr[i].key, textPtr[i].text, textPtr[i].text_length));
     }
   }
   if (png_get_text(pngPtr, endPtr, &textPtr, &numText)) {
     for (auto i = 0; i < numText; ++i) {
-      meta.attachToTopLevel(ZImgMetatag(textPtr[i].key, textPtr[i].text));
+      meta.attachToTopLevel(ZImgMetatag(textPtr[i].key, textPtr[i].text, textPtr[i].text_length));
     }
   }
 }

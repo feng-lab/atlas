@@ -186,7 +186,7 @@ void ZImgOmeTiff::readOmeInfo(ZTiff& tiff)
 
 void ZImgOmeTiff::makeImageDescriptionTag(const ZImgInfo& info, const QString& dimensionOrder, ZImgMetatag& tag)
 {
-  ZImgMetatag("ImageDescription", createOmeXml(info, dimensionOrder).toStdString(), 270).swap(tag);
+  ZImgMetatag("ImageDescription", createOmeXml(info, dimensionOrder), 270).swap(tag);
 }
 
 void ZImgOmeTiff::parseOME(QXmlStreamReader& xml, ZTiff& tiff)

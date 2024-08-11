@@ -20,6 +20,10 @@ public:
   // input value string should has utf-8 encoding
   ZImgMetatag(std::string name, const std::string& value, uint32_t tag = 0);
 
+  ZImgMetatag(std::string name, const char* value, size_t maxLen, uint32_t tag = 0);
+
+  ZImgMetatag(std::string name, const QString& value, uint32_t tag = 0);
+
   ZImgMetatag(ZImgMetatag&&) = default;
 
   ZImgMetatag& operator=(ZImgMetatag&&) = default;

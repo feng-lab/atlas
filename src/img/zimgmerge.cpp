@@ -206,9 +206,9 @@ void ZImgMerge::removeImgPair(const ZImgSubBlock& img1, const ZImgSubBlock& img2
   }
 }
 
-QStringList ZImgMerge::resolveLocations()
+std::vector<std::string> ZImgMerge::resolveLocations()
 {
-  QStringList summ;
+  std::vector<std::string> summ;
   m_imgFinalCoords.clear();
   m_imgInfo.clear();
   m_tiles.clear();
@@ -298,7 +298,8 @@ QStringList ZImgMerge::resolveLocations()
 
   for (const auto& m_tile : m_tiles) {
     ZVoxelCoordinate tileLoc = m_tile.location() - m_minCoord;
-    summ.push_back(QString("tile %1 final offset %2").arg(m_imgNames.at(&(m_tile.imgBlock())), tileLoc.toQString()));
+    // summ.push_back(QString("tile %1 final offset %2").arg(m_imgNames.at(&(m_tile.imgBlock())), tileLoc.toQString()));
+    summ.push_back(fmt::format("tile {} final offset {}", m_imgNames.at(&m_tile.imgBlock()), tileLoc));
 
     if (!neededChannelInfo.empty()) { // some channnel info need to be filled
       size_t tileStartC = tileLoc.c;
@@ -488,7 +489,7 @@ void ZImgMerge::save(const QString& fileName, FileFormat format, const ZImgWrite
 void ZImgMerge::resolveLocations_impl(std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgCoords,
                                       const ZImgSubBlock& refImg,
                                       double minCost,
-                                      QStringList& summary) const
+                                      std::vector<std::string>& summary) const
 {
   imgCoords = m_imgCoords;
 
@@ -560,11 +561,16 @@ void ZImgMerge::resolveLocations_impl(std::map<const ZImgSubBlock*, ZVoxelCoordi
         pairIt = m_imgPairs.find(std::make_pair(img2, img1)); // must exist
         imgCoords[img2] = imgCoords[img1] - pairIt->second.first;
       }
-      summary.push_back(QString("tile %1 connects to tile %2 with cost %3, offset %4")
-                          .arg(m_imgNames.at(pairIt->first.first))
-                          .arg(m_imgNames.at(pairIt->first.second))
-                          .arg(pairIt->second.second)
-                          .arg(pairIt->second.first.toQString()));
+      // summary.push_back(QString("tile %1 connects to tile %2 with cost %3, offset %4")
+      //                     .arg(m_imgNames.at(pairIt->first.first))
+      //                     .arg(m_imgNames.at(pairIt->first.second))
+      //                     .arg(pairIt->second.second)
+      //                     .arg(pairIt->second.first.toQString()));
+      summary.push_back(fmt::format("tile {} connects to tile {} with cost {}, offset {}",
+                                    m_imgNames.at(pairIt->first.first),
+                                    m_imgNames.at(pairIt->first.second),
+                                    pairIt->second.second,
+                                    pairIt->second.first));
     } else if (!img1HasLocation && img2HasLocation) {
       auto pairIt = m_imgPairs.find(std::make_pair(img1, img2));
       if (pairIt != m_imgPairs.end()) {
@@ -573,11 +579,16 @@ void ZImgMerge::resolveLocations_impl(std::map<const ZImgSubBlock*, ZVoxelCoordi
         pairIt = m_imgPairs.find(std::make_pair(img2, img1)); // must exist
         imgCoords[img1] = imgCoords[img2] + pairIt->second.first;
       }
-      summary.push_back(QString("tile %1 connects to tile %2 with cost %3, offset %4")
-                          .arg(m_imgNames.at(pairIt->first.first))
-                          .arg(m_imgNames.at(pairIt->first.second))
-                          .arg(pairIt->second.second)
-                          .arg(pairIt->second.first.toQString()));
+      // summary.push_back(QString("tile %1 connects to tile %2 with cost %3, offset %4")
+      //                     .arg(m_imgNames.at(pairIt->first.first))
+      //                     .arg(m_imgNames.at(pairIt->first.second))
+      //                     .arg(pairIt->second.second)
+      //                     .arg(pairIt->second.first.toQString()));
+      summary.push_back(fmt::format("tile {} connects to tile {} with cost {}, offset {}",
+                                    m_imgNames.at(pairIt->first.first),
+                                    m_imgNames.at(pairIt->first.second),
+                                    pairIt->second.second,
+                                    pairIt->second.first));
     } else {
       CHECK(img1HasLocation && img2HasLocation);
     }
@@ -587,7 +598,7 @@ void ZImgMerge::resolveLocations_impl(std::map<const ZImgSubBlock*, ZVoxelCoordi
 void ZImgMerge::mergeImgs(ZImg& res,
                           const std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
                           ImgMergeMode mode,
-                          QString& summary) const
+                          std::string& summary) const
 {
   std::vector<ZImgTile> tiles;
   for (const auto& imgCoord : imgs) {
@@ -643,7 +654,8 @@ void ZImgMerge::mergeImgs(ZImg& res,
     } else {
       res.pasteImg(tile.img(), tileLoc);
     }
-    summary += QString("tile %1 final offset %2\n").arg(m_imgNames.at(&(tile.imgBlock())), tileLoc.toQString());
+    fmt::format_to(std::back_inserter(summary), "tile {} final offset {}\n", m_imgNames.at(&tile.imgBlock()), tileLoc);
+    // summary += QString("tile %1 final offset %2\n").arg(m_imgNames.at(&(tile.imgBlock())), tileLoc.toQString());
 
     if (!neededChannelInfo.empty()) { // some channel info need to be filled
       size_t tileStartC = tileLoc.c;

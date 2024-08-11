@@ -636,7 +636,7 @@ void ZStitchImage::doWork()
                                    f + 1,
                                    m + 1,
                                    imgNCCMatch.positionHintToQString(),
-                                   movingImgOffset.toString(),
+                                   movingImgOffset,
                                    maxNCC);
           ;
         } else {
@@ -661,7 +661,7 @@ void ZStitchImage::doWork()
                                    f + 1,
                                    m + 1,
                                    imgNCCMatch.positionHintToQString(),
-                                   movingImgOffset.toString(),
+                                   movingImgOffset,
                                    maxNCC);
         }
       }
@@ -712,7 +712,7 @@ void ZStitchImage::doWork()
     }
 
     imgMerge.setMergeMode(m_mergeMode);
-    QStringList summary = imgMerge.resolveLocations();
+    auto summary = imgMerge.resolveLocations();
 
 #if 0
     QString stitchInfoOutputName = m_resFileName;
@@ -1018,11 +1018,11 @@ void ZStitchImage::doRestitch()
       LOG(INFO) << fmt::format(
         "tile {0} ({1}) -- tile {2} ({3}), tile {2} initial offset: {4}, final offset: {5}, NCC: {6}",
         f + 1,
-        rgns[f].start.toString(),
+        rgns[f].start,
         m + 1,
-        rgns[m].start.toString(),
-        initOffset.toString(),
-        movingImgOffset.toString(),
+        rgns[m].start,
+        initOffset,
+        movingImgOffset,
         maxNCC);
     };
 
@@ -1071,7 +1071,7 @@ void ZStitchImage::doRestitch()
     }
 
     imgMerge.setMergeMode(m_mergeMode);
-    QStringList summary = imgMerge.resolveLocations();
+    auto summary = imgMerge.resolveLocations();
 
 #if 0
     QString stitchInfoOutputName = m_resFileName;

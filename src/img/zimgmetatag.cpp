@@ -1,6 +1,7 @@
 #include "zimgmetatag.h"
 
 #include <utility>
+#include <cstring>
 
 namespace nim {
 
@@ -10,7 +11,31 @@ ZImgMetatag::ZImgMetatag(std::string name, const std::string& value, uint32_t ta
   , m_dataType(DataType::Ascii)
 {
   setCount(value.size() + 1);
-  std::memcpy(dataArray<char>(), value.data(), value.size() + 1);
+  CHECK(dataArray()[m_count - 1] == 0) << dataArray()[m_count - 1];
+  std::memcpy(dataArray<char>(), value.data(), value.size());
+}
+
+ZImgMetatag::ZImgMetatag(std::string name, const char* value, size_t maxLen, uint32_t tag)
+  : m_name(std::move(name))
+  , m_tag(tag)
+  , m_dataType(DataType::Ascii)
+{
+  // VLOG(1) << value << " " << maxLen;
+  auto len = strnlen(value, maxLen);
+  setCount(len + 1);
+  CHECK(dataArray()[m_count - 1] == 0) << dataArray()[m_count - 1];
+  std::memcpy(dataArray<char>(), value, len);
+}
+
+ZImgMetatag::ZImgMetatag(std::string name, const QString& value, uint32_t tag)
+  : m_name(std::move(name))
+  , m_tag(tag)
+  , m_dataType(DataType::Ascii)
+{
+  auto u8 = value.toUtf8();
+  setCount(u8.size() + 1);
+  CHECK(dataArray()[m_count - 1] == 0) << dataArray()[m_count - 1];
+  std::memcpy(dataArray<char>(), u8.data(), u8.size());
 }
 
 QString ZImgMetatag::toQString() const

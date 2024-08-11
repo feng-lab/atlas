@@ -814,7 +814,7 @@ void ZImgZeissCZI::readInfo(const QString& filename,
 
 void ZImgZeissCZI::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)
 {
-  ZImgMetatag tag("metadata", dump(filename).toStdString());
+  ZImgMetatag tag("metadata", dump(filename));
   meta.attachToTopLevel(tag);
 }
 
@@ -974,7 +974,7 @@ void ZImgZeissCZI::readImg(const QString& filename,
     //    }
   }
 
-  ZImgMetatag tag("metadata", dump(filename).toStdString());
+  ZImgMetatag tag("metadata", dump(filename));
   img.metadataRef().attachToTopLevel(tag);
 
   if (xRatio != readRatio || yRatio != readRatio || zRatio > 1) {

@@ -207,9 +207,8 @@ std::vector<double> ZImgGraph::shortestPaths(size_t startIdx, std::vector<size_t
 std::vector<double> ZImgGraph::shortestPaths(const ZVoxelCoordinate& startCoord, std::vector<size_t>* predecessor)
 {
   if (!m_region.containsCoord(startCoord, m_img.info())) {
-    throw ZException(fmt::format("Invalid start coord {} for shortest path in img region <{}>",
-                                 startCoord.toString(),
-                                 m_region.toString()));
+    throw ZException(
+      fmt::format("Invalid start coord {} for shortest path in img region <{}>", startCoord, m_region.toString()));
   }
   size_t startIdx = ZImg::coordToIndex(startCoord - m_region.start, m_regionInfo);
   return shortestPaths(startIdx, predecessor);

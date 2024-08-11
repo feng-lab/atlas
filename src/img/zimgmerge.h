@@ -36,7 +36,7 @@ public:
 
   // return summary info
   // throw ZException if error
-  QStringList resolveLocations();
+  std::vector<std::string> resolveLocations();
 
   void setMergeMode(ImgMergeMode mode = ImgMergeMode::Max)
   {
@@ -71,12 +71,12 @@ protected:
   void resolveLocations_impl(std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
                              const ZImgSubBlock& refImg,
                              double minCost,
-                             QStringList& summary) const;
+                             std::vector<std::string>& summary) const;
 
   void mergeImgs(ZImg& res,
                  const std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
                  ImgMergeMode mode,
-                 QString& summary) const;
+                 std::string& summary) const;
 
 private:
   std::map<const ZImgSubBlock*, ZVoxelCoordinate> m_imgCoords;

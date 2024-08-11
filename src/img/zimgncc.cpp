@@ -331,7 +331,7 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
 
   // denom.write(QString("/Users/feng/Downloads/test_xcorr_dm%1.tif").arg(m_fixedImg.width()));
   nccImg.typedBinaryOperation<double, double>(denom, secureDivideSqrt2);
-  //VLOG(1) << "1";
+  // VLOG(1) << "1";
   denom.clear(); // 1
 
   // numerator.write("/Users/feng/Downloads/test_xcorr_res.tif");
@@ -556,7 +556,7 @@ void cropOverlapSubImg(const ZImg& fixedImgIn,
     throw ZException(fmt::format("Trying to crop overlap region of non-overlap img1 <{}> and img2 <{}> with offset: {}",
                                  fixedImgIn.info().toString(),
                                  movingImgIn.info().toString(),
-                                 offset.toString()));
+                                 offset));
   }
   ZImgRegion fixedRegion(fixedStart, fixedEnd);
   subFixedImg = fixedImgIn.crop(fixedRegion);
