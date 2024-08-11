@@ -2,6 +2,7 @@
 
 #include "zimginterface.h"
 #include <boost/align/aligned_allocator.hpp>
+#include <utility>
 #include <vector>
 
 namespace nim {
@@ -16,7 +17,8 @@ public:
 
   // convenient function to create a name-value pair meta data
   // value will be stored as utf-8 string with datatype DataType::Ascii
-  ZImgMetatag(QString name, const QString& value);
+  // input value string should has utf-8 encoding
+  ZImgMetatag(std::string name, const std::string& value, uint32_t tag = 0);
 
   ZImgMetatag(ZImgMetatag&&) = default;
 
@@ -39,12 +41,12 @@ public:
 
   [[nodiscard]] std::string toString() const;
 
-  [[nodiscard]] const QString& name() const
+  [[nodiscard]] const std::string& name() const
   {
     return m_name;
   }
 
-  void setName(const QString& n)
+  void setName(const std::string& n)
   {
     m_name = n;
   }
@@ -118,7 +120,7 @@ private:
   }
 
 private:
-  QString m_name;
+  std::string m_name;
   uint32_t m_tag = 0;
   DataType m_dataType = DataType::Byte;
   uint64_t m_count = 0;

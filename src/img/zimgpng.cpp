@@ -41,34 +41,34 @@ void readMetaDataFromState(png_const_structrp pngPtr, png_inforp infoPtr, png_in
   png_timep modTime;
   if (png_get_tIME(pngPtr, infoPtr, &modTime)) {
     meta.attachToTopLevel(ZImgMetatag("Time",
-                                      QString("%1-%2-%3T%4:%5:%6")
-                                        .arg(modTime->year)
-                                        .arg(modTime->month)
-                                        .arg(modTime->day)
-                                        .arg(modTime->hour)
-                                        .arg(modTime->minute)
-                                        .arg(modTime->second)));
+                                      fmt::format("{}-%{}-%{}T{}:{}:{}",
+                                                  modTime->year,
+                                                  modTime->month,
+                                                  modTime->day,
+                                                  modTime->hour,
+                                                  modTime->minute,
+                                                  modTime->second)));
   }
   if (png_get_tIME(pngPtr, endPtr, &modTime)) {
     meta.attachToTopLevel(ZImgMetatag("Time",
-                                      QString("%1-%2-%3T%4:%5:%6")
-                                        .arg(modTime->year)
-                                        .arg(modTime->month)
-                                        .arg(modTime->day)
-                                        .arg(modTime->hour)
-                                        .arg(modTime->minute)
-                                        .arg(modTime->second)));
+                                      fmt::format("{}-%{}-%{}T{}:{}:{}",
+                                                  modTime->year,
+                                                  modTime->month,
+                                                  modTime->day,
+                                                  modTime->hour,
+                                                  modTime->minute,
+                                                  modTime->second)));
   }
   png_textp textPtr;
   int numText;
   if (png_get_text(pngPtr, infoPtr, &textPtr, &numText)) {
     for (auto i = 0; i < numText; ++i) {
-      meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(textPtr[i].key), QString::fromUtf8(textPtr[i].text)));
+      meta.attachToTopLevel(ZImgMetatag(textPtr[i].key, textPtr[i].text));
     }
   }
   if (png_get_text(pngPtr, endPtr, &textPtr, &numText)) {
     for (auto i = 0; i < numText; ++i) {
-      meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(textPtr[i].key), QString::fromUtf8(textPtr[i].text)));
+      meta.attachToTopLevel(ZImgMetatag(textPtr[i].key, textPtr[i].text));
     }
   }
 }

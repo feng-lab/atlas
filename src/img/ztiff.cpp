@@ -677,6 +677,30 @@ QString ZTiffIFD::toQString() const
   return res;
 }
 
+std::string ZTiffIFD::toString() const
+{
+  std::string res;
+  for (const auto& entry : m_entries) {
+    fmt::format_to(std::back_inserter(res), "{}\n", entry.toString());
+  }
+  if (!m_subIFDs.empty()) {
+    res.append("\n");
+    for (size_t i = 0; i < m_subIFDs.size(); ++i) {
+      fmt::format_to(std::back_inserter(res), "Sub IFD {}\n{}", i, m_subIFDs[i].toString());
+    }
+  }
+  if (!m_exifIFD.empty()) {
+    fmt::format_to(std::back_inserter(res), "\nExif IFD\n{}", m_exifIFD[0].toString());
+  }
+  if (!m_gpsIFD.empty()) {
+    fmt::format_to(std::back_inserter(res), "\nGPS IFD\n{}", m_gpsIFD[0].toString());
+  }
+  if (!m_interoperabilityIFD.empty()) {
+    fmt::format_to(std::back_inserter(res), "\nInteroperability IFD\n{}", m_interoperabilityIFD[0].toString());
+  }
+  return res;
+}
+
 bool ZTiffIFD::isGrayscaleColormap() const
 {
   auto i = indexOf(TIFFTAG_COLORMAP);
@@ -761,12 +785,26 @@ QString ZTiff::toQString() const
   return res;
 }
 
+std::string ZTiff::toString() const
+{
+  std::string res;
+  for (size_t i = 0; i < m_ifds.size(); ++i) {
+    fmt::format_to(std::back_inserter(res),
+                   "Directory {0}: offset {1} ({1:#x}) next {2} ({2:#x})\n{3}\n",
+                   i,
+                   m_ifds[i].offset(),
+                   m_ifds[i].nextIFDOffset(),
+                   m_ifds[i].toString());
+  }
+  return res;
+}
+
 void ZTiff::load(const QString& filename, bool tagOnly)
 {
   close();
 
   readIFDs(filename, m_ifds, m_isNativeEndianness);
-  // VLOG(1) << toQString();
+  // VLOG(1) << toString();
 
   if (m_useColormap) {
     bool allGray = true;
@@ -1282,7 +1320,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
   return nextdiroff;
 }
 
-QString ZTiff::tagToName(uint32_t tag) const
+std::string ZTiff::tagToName(uint32_t tag)
 {
   for (const auto& tagName : tiftagnames) {
     if (tagName.tag == tag) {

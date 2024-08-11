@@ -117,6 +117,8 @@ public:
 
   [[nodiscard]] QString toQString() const;
 
+  [[nodiscard]] std::string toString() const;
+
   [[nodiscard]] const std::vector<ZTiffIFD>& subIFDs() const
   {
     return m_subIFDs;
@@ -212,6 +214,8 @@ public:
 
   [[nodiscard]] QString toQString() const;
 
+  [[nodiscard]] std::string toString() const;
+
   [[nodiscard]] const std::vector<ZTiffIFD>& ifds() const
   {
     return m_ifds;
@@ -286,7 +290,7 @@ public:
 protected:
   uint64_t readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigtiff, bool swabflag) const;
 
-  [[nodiscard]] QString tagToName(uint32_t tag) const;
+  [[nodiscard]] static std::string tagToName(uint32_t tag) ;
 
   void readIFDs(const QString& filename, std::vector<ZTiffIFD>& ifds, bool& reverseEndianness) const;
 

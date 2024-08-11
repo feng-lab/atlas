@@ -120,7 +120,7 @@ void ZImgLeica::readMetadata(const QString& filename, ZImgMetadata& meta, size_t
   std::vector<std::tuple<size_t, QString, size_t>> memoryOffsetNameLength;
   readXml(filename, xml, memoryOffsetNameLength);
 
-  ZImgMetatag tag("metadata", xml);
+  ZImgMetatag tag("metadata", xml.toStdString());
   meta.attachToTopLevel(tag);
 }
 
@@ -271,7 +271,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
     }
   }
 
-  ZImgMetatag tag("metadata", xml);
+  ZImgMetatag tag("metadata", xml.toStdString());
   img.metadataRef().attachToTopLevel(tag);
 }
 

@@ -186,13 +186,7 @@ void ZImgOmeTiff::readOmeInfo(ZTiff& tiff)
 
 void ZImgOmeTiff::makeImageDescriptionTag(const ZImgInfo& info, const QString& dimensionOrder, ZImgMetatag& tag)
 {
-  tag.setTag(270); // TIFFTAG_IMAGEDESCRIPTION
-  tag.setName("ImageDescription");
-  tag.setDataType(DataType::Ascii);
-
-  auto xml = createOmeXml(info, dimensionOrder).toUtf8();
-  tag.setCount(xml.size() + 1);
-  std::memcpy(tag.dataArray<char>(), xml.constData(), tag.dataByteNumber());
+  ZImgMetatag("ImageDescription", createOmeXml(info, dimensionOrder).toStdString(), 270).swap(tag);
 }
 
 void ZImgOmeTiff::parseOME(QXmlStreamReader& xml, ZTiff& tiff)

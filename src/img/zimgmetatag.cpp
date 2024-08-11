@@ -4,18 +4,19 @@
 
 namespace nim {
 
-ZImgMetatag::ZImgMetatag(QString name, const QString& value)
+ZImgMetatag::ZImgMetatag(std::string name, const std::string& value, uint32_t tag)
   : m_name(std::move(name))
+  , m_tag(tag)
   , m_dataType(DataType::Ascii)
 {
-  auto utf8array = value.toUtf8();
-  setCount(utf8array.size() + 1);
-  std::memcpy(dataArray<char>(), utf8array.constData(), dataByteNumber());
+  setCount(value.size() + 1);
+  std::memcpy(dataArray<char>(), value.data(), value.size() + 1);
 }
 
 QString ZImgMetatag::toQString() const
 {
-  QString res = QString(" %1 (tag:%2) %3 %4<").arg(m_name).arg(m_tag).arg(enumToQString(m_dataType)).arg(m_count);
+  QString res =
+    QString(" %1 (tag:%2) %3 %4<").arg(m_name.c_str()).arg(m_tag).arg(enumToQString(m_dataType)).arg(m_count);
   QString sep;
   uint64_t ct = m_count;
 

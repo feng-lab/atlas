@@ -6,22 +6,21 @@
 
 namespace {
 
-void pretty_print(std::ostream& os, const json::value& jv, std::string* indent = nullptr)
+void pretty_print(std::ostream& os, const boost::json::value& jv, std::string* indent = nullptr)
 {
-  using namespace boost;
   std::string indent_;
   if (!indent) {
     indent = &indent_;
   }
   switch (jv.kind()) {
-    case json::kind::object: {
+    case boost::json::kind::object: {
       os << "{\n";
       indent->append(4, ' ');
       const auto& obj = jv.get_object();
       if (!obj.empty()) {
         auto it = obj.begin();
         for (;;) {
-          os << *indent << json::serialize(it->key()) << " : ";
+          os << *indent << boost::json::serialize(it->key()) << " : ";
           pretty_print(os, it->value(), indent);
           if (++it == obj.end()) {
             break;
@@ -35,7 +34,7 @@ void pretty_print(std::ostream& os, const json::value& jv, std::string* indent =
       break;
     }
 
-    case json::kind::array: {
+    case boost::json::kind::array: {
       os << "[\n";
       indent->append(4, ' ');
       const auto& arr = jv.get_array();
@@ -56,25 +55,18 @@ void pretty_print(std::ostream& os, const json::value& jv, std::string* indent =
       break;
     }
 
-    case json::kind::string: {
-      os << json::serialize(jv.get_string());
+    case boost::json::kind::string: {
+      os << boost::json::serialize(jv.get_string());
       break;
     }
 
-    case json::kind::uint64:
-      os << jv.get_uint64();
+    case boost::json::kind::uint64:
+    case boost::json::kind::int64:
+    case boost::json::kind::double_:
+      os << jv;
       break;
 
-    case json::kind::int64:
-      os << jv.get_int64();
-      break;
-
-    case json::kind::double_:
-      // os << jv.get_double();
-      os << json::serialize(jv);
-      break;
-
-    case json::kind::bool_:
+    case boost::json::kind::bool_:
       if (jv.get_bool()) {
         os << "true";
       } else {
@@ -82,7 +74,7 @@ void pretty_print(std::ostream& os, const json::value& jv, std::string* indent =
       }
       break;
 
-    case json::kind::null:
+    case boost::json::kind::null:
       os << "null";
       break;
   }

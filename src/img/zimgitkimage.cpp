@@ -531,7 +531,7 @@ void ZImgITKImage::parseMetadata(const itk::ImageIOBase* imageIO, ZImgMetadata& 
       std::string tagkey = itr->first;
       std::string tagvalue = entryvalue->GetMetaDataObjectValue();
       // std::cout << tagkey << " = " << tagvalue << std::endl;
-      meta.attachToTopLevel(ZImgMetatag(QString::fromStdString(tagkey), QString::fromStdString(tagvalue)));
+      meta.attachToTopLevel(ZImgMetatag(tagkey, tagvalue));
     }
     ++itr;
   }

@@ -68,25 +68,6 @@ void ZImgInfo::swap(ZImgInfo& other) noexcept
   std::swap(lastChannelIsAlphaChannel, other.lastChannelIsAlphaChannel);
 }
 
-// std::string ZImgInfo::toString() const
-//{
-//   std::ostringstream res;
-//   res << "width:" << width
-//       << ", height:" << height
-//       << ", depth:" << depth
-//       << ", numChannels:" << numChannels
-//       << ", numTimes:" << numTimes
-//       << ", numLocations:" << numLocations
-//       << ", bytesPerVoxel:" << bytesPerVoxel
-//       << ", voxelFormat:" << VoxelFormatString[voxelFormat]
-//       << ", voxelSizeUnit:" << VoxelSizeUnitString[voxelSizeUnit]
-//       << ", voxelSizeX:" << voxelSizeX
-//       << ", voxelSizeY:" << voxelSizeY
-//       << ", voxelSizeZ:" << voxelSizeZ;
-
-//  return res.str();
-//}
-
 QString ZImgInfo::displayChannelName(size_t c) const
 {
   QString res;
