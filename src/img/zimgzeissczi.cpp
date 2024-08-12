@@ -637,7 +637,7 @@ void ZImgZeissCZI::readInfo(const QString& filename,
                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
 #ifdef DUMP_CZI_INFO
-  LOG(INFO) << dump(filename);
+  logLongString(toString(filename));
 #endif
   clearInternalState();
 
@@ -814,7 +814,7 @@ void ZImgZeissCZI::readInfo(const QString& filename,
 
 void ZImgZeissCZI::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)
 {
-  ZImgMetatag tag("metadata", dump(filename));
+  ZImgMetatag tag("metadata", toString(filename));
   meta.attachToTopLevel(tag);
 }
 
@@ -973,7 +973,7 @@ void ZImgZeissCZI::readImg(const QString& filename,
     //    }
   }
 
-  ZImgMetatag tag("metadata", dump(filename));
+  ZImgMetatag tag("metadata", toString(filename));
   img.metadataRef().attachToTopLevel(tag);
 
   if (xRatio != readRatio || yRatio != readRatio || zRatio > 1) {
@@ -1782,7 +1782,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
   }
 }
 
-QString ZImgZeissCZI::dump(const QString& filename)
+QString ZImgZeissCZI::toQString(const QString& filename)
 {
   int64_t filesize = checkFilename(filename);
 
@@ -1794,10 +1794,38 @@ QString ZImgZeissCZI::dump(const QString& filename)
   return str;
 }
 
+std::string ZImgZeissCZI::toString(const QString& filename)
+{
+  int64_t filesize = checkFilename(filename);
+
+  std::ifstream inputFileStream;
+  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+
+  std::string str("\n");
+  dumpCZIStream(inputFileStream, filesize, 0, str, 0);
+  return str;
+}
+
 void ZImgZeissCZI::dumpCZIStream(std::ifstream& inputFileStream,
                                  int64_t filesize,
                                  int64_t offset,
                                  QString& str,
+                                 index_t indent)
+{
+  int64_t nextSegPos = offset;
+  do {
+    inputFileStream.seekg(nextSegPos);
+    SegmentHeader sh;
+    readStructFromFileStream(sh, inputFileStream);
+    dumpSegmentInfo(sh, inputFileStream, str, indent);
+    nextSegPos += compactSize<SegmentHeader>() + sh.allocatedSize;
+  } while (nextSegPos - offset < filesize - 1);
+}
+
+void ZImgZeissCZI::dumpCZIStream(std::ifstream& inputFileStream,
+                                 int64_t filesize,
+                                 int64_t offset,
+                                 std::string& str,
                                  index_t indent)
 {
   int64_t nextSegPos = offset;
@@ -1835,6 +1863,31 @@ void ZImgZeissCZI::dumpSegmentInfo(const SegmentHeader& sh,
   }
 }
 
+void ZImgZeissCZI::dumpSegmentInfo(const SegmentHeader& sh,
+                                   std::ifstream& inputFileStream,
+                                   std::string& str,
+                                   index_t indent)
+{
+  if (std::strncmp(sh.id.data(), "ZISRAWFILE", sh.id.size() - 1) == 0) {
+    dumpFileHeaderSegment(inputFileStream, str, indent);
+  } else if (std::strncmp(sh.id.data(), "ZISRAWDIRECTORY", sh.id.size() - 1) == 0) {
+    dumpSubBlockDirectory(inputFileStream, str, indent);
+  } else if (std::strncmp(sh.id.data(), "ZISRAWSUBBLOCK", sh.id.size() - 1) == 0) {
+    dumpSubBlockSegment(inputFileStream, str, indent);
+  } else if (std::strncmp(sh.id.data(), "ZISRAWMETADATA", sh.id.size() - 1) == 0) {
+    dumpMetadataSegment(inputFileStream, str, indent);
+  } else if (std::strncmp(sh.id.data(), "ZISRAWATTACH", sh.id.size() - 1) == 0) {
+    dumpAttachmentSegment(inputFileStream, str, indent);
+  } else if (std::strncmp(sh.id.data(), "ZISRAWATTDIR", sh.id.size() - 1) == 0) {
+    dumpAttachmentDirectory(inputFileStream, str, indent);
+  } else if (std::strncmp(sh.id.data(), "DELETED", sh.id.size() - 1) == 0) {
+    std::string ind(indent, ' ');
+    fmt::format_to(std::back_inserter(str), "{}Deleted Segment\n\n", ind);
+  } else {
+    throw ZException("Invalid Segment ID");
+  }
+}
+
 void ZImgZeissCZI::dumpFileHeaderSegment(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
@@ -1854,6 +1907,25 @@ void ZImgZeissCZI::dumpFileHeaderSegment(std::ifstream& inputFileStream, QString
   str += "\n";
 }
 
+void ZImgZeissCZI::dumpFileHeaderSegment(std::ifstream& inputFileStream, std::string& str, index_t indent)
+{
+  std::string ind(indent, ' ');
+  FileHeader fh;
+  readStructFromFileStream(fh, inputFileStream);
+  fmt::format_to(std::back_inserter(str), "{}FileHeaderSegment\n", ind);
+  fmt::format_to(std::back_inserter(str), "{}Major: {}\n", ind, fh.major);
+  fmt::format_to(std::back_inserter(str), "{}Minor: {}\n", ind, fh.minor);
+  fmt::format_to(std::back_inserter(str), "{}PrimaryFileGuid: {}\n", ind, fh.primaryFileGuid.toByteArray());
+  fmt::format_to(std::back_inserter(str), "{}FileGuid: {}\n", ind, fh.fileGuid.toByteArray());
+  fmt::format_to(std::back_inserter(str), "{}FilePart: {}\n", ind, fh.filePart);
+  fmt::format_to(std::back_inserter(str), "{}DirectoryPosition: {}\n", ind, fh.directoryPosition);
+  fmt::format_to(std::back_inserter(str), "{}MetadataPosition: {}\n", ind, fh.metaDataPosition);
+  fmt::format_to(std::back_inserter(str), "{}UpdatePending: {}\n", ind, fh.updatePending > 0);
+  fmt::format_to(std::back_inserter(str), "{}AttachmentDirectoryPosition: {}\n", ind, fh.attachmentDirectoryPosition);
+
+  str += "\n";
+}
+
 void ZImgZeissCZI::dumpMetadataSegment(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
@@ -1867,6 +1939,21 @@ void ZImgZeissCZI::dumpMetadataSegment(std::ifstream& inputFileStream, QString& 
   QString xmlString = QString::fromUtf8(xmlBuffer.data(), md.xmlSize);
   xmlString.remove(QChar::Null);
   str += QString("%1XML: %2\n").arg(ind, xmlString);
+
+  str += "\n";
+}
+
+void ZImgZeissCZI::dumpMetadataSegment(std::ifstream& inputFileStream, std::string& str, index_t indent)
+{
+  std::string ind(indent, ' ');
+  MetaDataSegment md;
+  readStructFromFileStream(md, inputFileStream);
+  fmt::format_to(std::back_inserter(str), "{}MetadataSegment\n", ind);
+  fmt::format_to(std::back_inserter(str), "{}XmlSize: {}\n", ind, md.xmlSize);
+  fmt::format_to(std::back_inserter(str), "{}AttachmentSize: {}\n", ind, md.attachmentSize);
+  std::vector<char> xmlBuffer(md.xmlSize);
+  readStream(inputFileStream, xmlBuffer.data(), md.xmlSize);
+  fmt::format_to(std::back_inserter(str), "{}XML: {}\n", ind, std::string_view(xmlBuffer.data(), md.xmlSize));
 
   str += "\n";
 }
@@ -1899,6 +1986,48 @@ void ZImgZeissCZI::dumpSubBlockSegment(std::ifstream& inputFileStream, QString& 
   QString xmlString = QString::fromUtf8(xmlBuffer.data(), sb.metaDataSize);
   xmlString.remove(QChar::Null);
   str += QString("%1Metadata: %2\n").arg(ind, xmlString);
+  // followed by data and attachment
+
+  //  QString filename = "/Users/feng/Downloads/czi_tile_dump_2.tif";
+  //  if (!QFile::exists(filename)) {
+  //    std::vector<uint8_t> fileBuf(sb.dataSize);
+  //    readStream(inputFileStream, fileBuf.data(), sb.dataSize);
+  //    ZImgInfo info;
+  //    m_jxrReader.readInfo(fileBuf.data(), fileBuf.size(), info);
+  //    ZImg img(info);
+  //    m_jxrReader.readImg(fileBuf.data(), fileBuf.size(), img.channelData<uint8_t>(0));
+  //    img.save(filename);
+  //  }
+
+  str += "\n";
+}
+
+void ZImgZeissCZI::dumpSubBlockSegment(std::ifstream& inputFileStream, std::string& str, index_t indent)
+{
+  std::string ind(indent, ' ');
+  SubBlockSegment sb;
+  readStructFromFileStream(sb, inputFileStream);
+  fmt::format_to(std::back_inserter(str), "{}SubBlockSegment\n", ind);
+  fmt::format_to(std::back_inserter(str), "{}MetadataSize: {}\n", ind, sb.metaDataSize);
+  fmt::format_to(std::back_inserter(str), "{}AttachmentSize: {}\n", ind, sb.attachmentSize);
+  fmt::format_to(std::back_inserter(str), "{}DataSize: {}\n", ind, sb.dataSize);
+  std::vector<DimensionEntryDV1> dimensionEntries(sb.directoryEntry.dimensionCount);
+  for (auto& dimE : dimensionEntries) {
+    readStructFromFileStream(dimE, inputFileStream);
+  }
+  dumpDirectoryEntry(sb.directoryEntry, str, indent);
+  for (auto& dimensionEntrie : dimensionEntries) {
+    dumpDimensionEntry(dimensionEntrie, str, indent);
+  }
+  index_t directoryEntrySize =
+    compactSize<DirectoryEntryDV>() + compactSize<DimensionEntryDV1>() * sb.directoryEntry.dimensionCount;
+  auto fill = std::max(0_z, 256 - directoryEntrySize - 16);
+  if (fill > 0) {
+    inputFileStream.seekg(fill, std::ios_base::cur);
+  }
+  std::vector<char> xmlBuffer(sb.metaDataSize);
+  readStream(inputFileStream, xmlBuffer.data(), sb.metaDataSize);
+  fmt::format_to(std::back_inserter(str), "{}Metadata: {}\n", ind, std::string_view(xmlBuffer.data(), sb.metaDataSize));
   // followed by data and attachment
 
   //  QString filename = "/Users/feng/Downloads/czi_tile_dump_2.tif";
@@ -1980,15 +2109,14 @@ void ZImgZeissCZI::dumpDirectoryEntry(const DirectoryEntryDV& de, QString& str, 
     case 4:
       compressionStr = "JpegXrFile";
       break;
-    default:
-      compressionStr = QString("%1").arg(de.compression);
-      break;
   }
   if (compressionStr.isEmpty()) {
     if (de.compression >= 100 && de.compression < 1000) {
       compressionStr = QString("Camera specific RAW data %1").arg(de.compression);
     } else if (de.compression > 1000) {
       compressionStr = QString("System specific RAW data %1").arg(de.compression);
+    } else {
+      compressionStr = QString("Unknown compression %1").arg(de.compression);
     }
   }
   str += QString("%1Compression: %2\n").arg(ind, compressionStr);
@@ -2004,11 +2132,102 @@ void ZImgZeissCZI::dumpDirectoryEntry(const DirectoryEntryDV& de, QString& str, 
       pyramidTypeStr = "Multisubblock";
       break;
     default:
-      pyramidTypeStr = "Unknown";
+      pyramidTypeStr = QString("Unknown %1").arg(de.pyramidType);
       break;
   }
   str += QString("%1PyramidType: %2\n").arg(ind, pyramidTypeStr);
   str += QString("%1DimensionCount: %2\n").arg(ind).arg(de.dimensionCount);
+}
+
+void ZImgZeissCZI::dumpDirectoryEntry(const DirectoryEntryDV& de, std::string& str, index_t indent)
+{
+  std::string ind(indent, ' ');
+  fmt::format_to(std::back_inserter(str), "{}SchemaType: {}{}\n", ind, de.schemaType[0], de.schemaType[1]);
+  if (de.schemaType[0] != 'D' || de.schemaType[1] != 'V') {
+    fmt::format_to(std::back_inserter(str), "{}Not Supported Directory Entry Schema Type\n", ind);
+    return;
+  }
+  std::string_view pixelTypeStr;
+  switch (de.pixelType) {
+    case 0:
+      pixelTypeStr = "Gray8";
+      break;
+    case 1:
+      pixelTypeStr = "Gray16";
+      break;
+    case 2:
+      pixelTypeStr = "Gray32Float";
+      break;
+    case 3:
+      pixelTypeStr = "Bgr24";
+      break;
+    case 4:
+      pixelTypeStr = "Bgr48";
+      break;
+    case 8:
+      pixelTypeStr = "Bgr96Float";
+      break;
+    case 9:
+      pixelTypeStr = "Bgra32";
+      break;
+    case 10:
+      pixelTypeStr = "Gray64ComplexFloat";
+      break;
+    case 11:
+      pixelTypeStr = "Bgr192ComplexFloat";
+      break;
+    case 12:
+      pixelTypeStr = "Gray32 (32 Bit integer)";
+      break;
+    case 13:
+      pixelTypeStr = "Gray64 (Double precision floating point)";
+      break;
+    default:
+      pixelTypeStr = "Unknown";
+      throw ZException("Unknown Pixel Type");
+      break;
+  }
+  fmt::format_to(std::back_inserter(str), "{}PixelType: {}\n", ind, pixelTypeStr);
+  fmt::format_to(std::back_inserter(str), "{}FilePosition: {}\n", ind, de.filePosition);
+  fmt::format_to(std::back_inserter(str), "{}FilePart: {}\n", ind, de.filePart);
+  std::string_view compressionStr;
+  switch (de.compression) {
+    case 0:
+      compressionStr = "Uncompressed";
+      break;
+    case 2:
+      compressionStr = "LZW";
+      break;
+    case 1:
+      compressionStr = "JpgFile";
+      break;
+    case 4:
+      compressionStr = "JpegXrFile";
+      break;
+  }
+  if (compressionStr.empty()) {
+    fmt::format_to(std::back_inserter(str), "{}Compression: Unknown({})\n", ind, de.compression);
+  } else {
+    fmt::format_to(std::back_inserter(str), "{}Compression: {}\n", ind, compressionStr);
+  }
+  std::string_view pyramidTypeStr;
+  switch (de.pyramidType) {
+    case 0:
+      pyramidTypeStr = "None";
+      break;
+    case 1:
+      pyramidTypeStr = "SingleSubblock";
+      break;
+    case 2:
+      pyramidTypeStr = "Multisubblock";
+      break;
+  }
+  if (pyramidTypeStr.empty()) {
+    fmt::format_to(std::back_inserter(str), "{}PyramidType: Unknown({})\n", ind, de.pyramidType);
+  } else {
+    fmt::format_to(std::back_inserter(str), "{}PyramidType: {}\n", ind, pyramidTypeStr);
+  }
+  fmt::format_to(std::back_inserter(str), "{}DimensionCount: {}\n", ind, de.dimensionCount);
 }
 
 void ZImgZeissCZI::dumpDimensionEntry(const DimensionEntryDV1& de, QString& str, index_t indent)
@@ -2026,6 +2245,19 @@ void ZImgZeissCZI::dumpDimensionEntry(const DimensionEntryDV1& de, QString& str,
            .arg(de.storedSize);
 }
 
+void ZImgZeissCZI::dumpDimensionEntry(const DimensionEntryDV1& de, std::string& str, index_t indent)
+{
+  std::string ind(indent, ' ');
+  fmt::format_to(std::back_inserter(str),
+                 "{}Dimension: {}; Start: {}; Size: {}; StartCoordinate: {}; StoredSize: {}\n",
+                 ind,
+                 de.dimension.data(),
+                 de.start,
+                 de.size,
+                 de.startCoordinate,
+                 de.storedSize);
+}
+
 void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
@@ -2037,6 +2269,33 @@ void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream& inputFileStream, QString
   int32_t idx = 0;
   while (idx < sd.entryCount) {
     str += QString("%1Entry %2:\n").arg(ind).arg(idx);
+    DirectoryEntryDV de;
+    readStructFromFileStream(de, inputFileStream);
+    std::vector<DimensionEntryDV1> dimensionEntries(de.dimensionCount);
+    for (auto& dimE : dimensionEntries) {
+      readStructFromFileStream(dimE, inputFileStream);
+    }
+    dumpDirectoryEntry(de, str, indent);
+    for (auto& dimensionEntry : dimensionEntries) {
+      dumpDimensionEntry(dimensionEntry, str, indent);
+    }
+    ++idx;
+  }
+
+  str += "\n";
+}
+
+void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream& inputFileStream, std::string& str, index_t indent)
+{
+  std::string ind(indent, ' ');
+  subBlockDirectorySegment sd;
+  readStructFromFileStream(sd, inputFileStream);
+  fmt::format_to(std::back_inserter(str), "{}SubBlockDirectorySegment\n", ind);
+  fmt::format_to(std::back_inserter(str), "{}EntryCount: {}\n", ind, sd.entryCount);
+
+  int32_t idx = 0;
+  while (idx < sd.entryCount) {
+    fmt::format_to(std::back_inserter(str), "{}Entry {}:\n", ind, idx);
     DirectoryEntryDV de;
     readStructFromFileStream(de, inputFileStream);
     std::vector<DimensionEntryDV1> dimensionEntries(de.dimensionCount);
@@ -2148,6 +2407,94 @@ void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream& inputFileStream, QString
   str += "\n";
 }
 
+void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream& inputFileStream, std::string& str, index_t indent)
+{
+  std::string ind(indent, ' ');
+  AttachmentSegment as;
+  readStructFromFileStream(as, inputFileStream);
+  fmt::format_to(std::back_inserter(str), "{}AttachmentSegment\n", ind);
+  fmt::format_to(std::back_inserter(str), "{}DataSize: {}\n", ind, as.dataSize);
+  dumpAttachmentEntry(as.attachmentEntry, str, indent);
+  if (std::strncmp(as.attachmentEntry.name.data(), "Experiment", as.attachmentEntry.name.size()) == 0 ||
+      std::strncmp(as.attachmentEntry.name.data(), "HardwareSetting", as.attachmentEntry.name.size()) == 0 ||
+      std::strncmp(as.attachmentEntry.name.data(), "MVM", as.attachmentEntry.name.size()) == 0) {
+    std::vector<char> xmlBuffer(as.dataSize);
+    readStream(inputFileStream, xmlBuffer.data(), as.dataSize);
+    fmt::format_to(std::back_inserter(str), "{}Data: {}\n", ind, std::string_view(xmlBuffer.data(), as.dataSize));
+  } else if (std::strncmp(as.attachmentEntry.name.data(), "TimeStamps", as.attachmentEntry.name.size()) == 0) {
+    TimeStampSegment ts;
+    readStructFromFileStream(ts, inputFileStream);
+    fmt::format_to(std::back_inserter(str), "{}Size: {}\n", ind, ts.size);
+    fmt::format_to(std::back_inserter(str), "{}NumberTimeStamps: {}\n", ind, ts.numberTimeStamps);
+    if (ts.numberTimeStamps > 0) {
+      std::vector<double> timeStamps(ts.numberTimeStamps);
+      readStream(inputFileStream, timeStamps.data(), 8 * ts.numberTimeStamps);
+      fmt::format_to(std::back_inserter(str), "{}TimeStamps (s): {}\n", ind, fmt::join(timeStamps, " "));
+    }
+  } else if (std::strncmp(as.attachmentEntry.name.data(), "EventList", as.attachmentEntry.name.size()) == 0) {
+    EventListSegment el;
+    readStructFromFileStream(el, inputFileStream);
+    fmt::format_to(std::back_inserter(str), "{}Size: {}\n", ind, el.size);
+    fmt::format_to(std::back_inserter(str), "{}NumberEvents: {}\n", ind, el.numberEvents);
+    if (el.numberEvents > 0) {
+      int32_t eventIdx = 0;
+      while (eventIdx < el.numberEvents) {
+        EventListEntry ele;
+        readStructFromFileStream(ele, inputFileStream);
+        std::vector<char> descriptionBuffer(ele.descriptionSize);
+        readStream(inputFileStream, descriptionBuffer.data(), ele.descriptionSize);
+        fmt::format_to(std::back_inserter(str), "{}Size: {}\n", ind, ele.size);
+        fmt::format_to(std::back_inserter(str), "{}Time (s): {}\n", ind, ele.time);
+        std::string_view eventTypeStr;
+        switch (ele.eventType) {
+          case 0:
+            eventTypeStr = "Experimental annotation";
+            break;
+          case 1:
+            eventTypeStr = "The time interval has changed";
+            break;
+          case 2:
+            eventTypeStr = "Start of a bleach operation";
+            break;
+          case 3:
+            eventTypeStr = "End of a bleach operation";
+            break;
+          case 4:
+            eventTypeStr = "A trigger signal was detected on the user port of the electronic module.";
+            break;
+        }
+        if (eventTypeStr.empty()) {
+          fmt::format_to(std::back_inserter(str), "{}EventType: Unknown Type ({})\n", ind, ele.eventType);
+        } else {
+          fmt::format_to(std::back_inserter(str), "{}EventType: {}\n", ind, eventTypeStr);
+        }
+        fmt::format_to(std::back_inserter(str), "{}DescriptionSize: {}\n", ind, ele.descriptionSize);
+        fmt::format_to(std::back_inserter(str),
+                       "{}Description: {}\n",
+                       ind,
+                       std::string_view(descriptionBuffer.data(), ele.descriptionSize));
+        ++eventIdx;
+      }
+    }
+  } else if (std::strncmp(as.attachmentEntry.name.data(), "FocusPositions", as.attachmentEntry.name.size()) == 0) {
+    FocusPositions fp;
+    readStructFromFileStream(fp, inputFileStream);
+    fmt::format_to(std::back_inserter(str), "{}Size: {}\n", ind, fp.size);
+    fmt::format_to(std::back_inserter(str), "{}NumberPositions: {}\n", ind, fp.numberPositions);
+    if (fp.numberPositions > 0) {
+      std::vector<double> positions(fp.numberPositions);
+      readStream(inputFileStream, positions.data(), 8 * fp.numberPositions);
+      fmt::format_to(std::back_inserter(str), "{}Positions (um): {}\n", ind, fmt::join(positions, " "));
+    }
+  } else if (std::strncmp(as.attachmentEntry.name.data(), "Label", as.attachmentEntry.name.size()) == 0 ||
+             std::strncmp(as.attachmentEntry.name.data(), "Prescan", as.attachmentEntry.name.size()) == 0 ||
+             std::strncmp(as.attachmentEntry.name.data(), "SlidePreview", as.attachmentEntry.name.size()) == 0) {
+    dumpCZIStream(inputFileStream, as.dataSize, inputFileStream.tellg(), str, indent + 4);
+  }
+
+  str += "\n";
+}
+
 void ZImgZeissCZI::dumpAttachmentEntry(const AttachmentEntryA1& ae, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
@@ -2166,6 +2513,21 @@ void ZImgZeissCZI::dumpAttachmentEntry(const AttachmentEntryA1& ae, QString& str
   str += QString("%1Name: %2\n").arg(ind, ae.name.data());
 }
 
+void ZImgZeissCZI::dumpAttachmentEntry(const AttachmentEntryA1& ae, std::string& str, index_t indent)
+{
+  std::string ind(indent, ' ');
+  fmt::format_to(std::back_inserter(str), "{}SchemaType: {}{}\n", ind, ae.schemaType[0], ae.schemaType[1]);
+  if (ae.schemaType[0] != 'A' || ae.schemaType[1] != '1') {
+    fmt::format_to(std::back_inserter(str), "{}Not Supported Attachment Entry Schema Type\n", ind);
+    return;
+  }
+  fmt::format_to(std::back_inserter(str), "{}FilePosition: {}\n", ind, ae.filePosition);
+  fmt::format_to(std::back_inserter(str), "{}FilePart: {}\n", ind, ae.filePart);
+  fmt::format_to(std::back_inserter(str), "{}ContentGuid: {}\n", ind, ae.contentGuid.toByteArray());
+  fmt::format_to(std::back_inserter(str), "{}ContentFileType: {}\n", ind, ae.contentFileType.data());
+  fmt::format_to(std::back_inserter(str), "{}Name: {}\n", ind, ae.name.data());
+}
+
 void ZImgZeissCZI::dumpAttachmentDirectory(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
@@ -2179,6 +2541,25 @@ void ZImgZeissCZI::dumpAttachmentDirectory(std::ifstream& inputFileStream, QStri
   }
   for (size_t i = 0; i < entries.size(); ++i) {
     str += QString("%1Entry %2:\n").arg(ind).arg(i);
+    dumpAttachmentEntry(entries[i], str, indent);
+  }
+
+  str += "\n";
+}
+
+void ZImgZeissCZI::dumpAttachmentDirectory(std::ifstream& inputFileStream, std::string& str, index_t indent)
+{
+  std::string ind(indent, ' ');
+  AttachmentDirectorySegment ad;
+  readStructFromFileStream(ad, inputFileStream);
+  fmt::format_to(std::back_inserter(str), "{}AttachmentDirectorySegment\n", ind);
+  fmt::format_to(std::back_inserter(str), "{}EntryCount: {}\n", ind, ad.entryCount);
+  std::vector<AttachmentEntryA1> entries(ad.entryCount);
+  for (auto& aea : entries) {
+    readStructFromFileStream(aea, inputFileStream);
+  }
+  for (size_t i = 0; i < entries.size(); ++i) {
+    fmt::format_to(std::back_inserter(str), "{}Entry {}:\n", ind, i);
     dumpAttachmentEntry(entries[i], str, indent);
   }
 
