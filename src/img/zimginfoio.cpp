@@ -234,7 +234,7 @@ void ZImgInfoIO::save(H5::Group& grp, const ZImgInfo& info)
     depthAttr.write(uint64Type, &d);
 
     H5::Attribute dt = grp.createAttribute("DataType", strType, attrDataSpace);
-    dt.write(strType, info.typeAsQString().toStdString());
+    dt.write(strType, info.typeAsString());
 
     uint64_t vbc = info.validBitCount;
     H5::Attribute vbcAttr = grp.createAttribute("ValidBitCount", uint64Type, attrDataSpace);

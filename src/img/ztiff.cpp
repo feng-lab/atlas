@@ -646,34 +646,6 @@ uint64_t ZTiffIFD::tileByteCounts(size_t idx) const
   return 0;
 }
 
-QString ZTiffIFD::toQString() const
-{
-  QString res;
-  for (const auto& entry : m_entries) {
-    res = res % entry.toQString() % QString("\n");
-  }
-  if (!m_subIFDs.empty()) {
-    res = res % QString("\n");
-    for (size_t i = 0; i < m_subIFDs.size(); ++i) {
-      res = res % QString("Sub IFD %1\n").arg(i);
-      res = res % m_subIFDs[i].toQString();
-    }
-  }
-  if (!m_exifIFD.empty()) {
-    res = res % QString("\nExif IFD\n");
-    res = res % m_exifIFD[0].toQString();
-  }
-  if (!m_gpsIFD.empty()) {
-    res = res % QString("\nGPS IFD\n");
-    res = res % m_gpsIFD[0].toQString();
-  }
-  if (!m_interoperabilityIFD.empty()) {
-    res = res % QString("\nInteroperability IFD\n");
-    res = res % m_interoperabilityIFD[0].toQString();
-  }
-  return res;
-}
-
 std::string ZTiffIFD::toString() const
 {
   std::string res;
@@ -766,21 +738,6 @@ uint32_t ZTiffIFD::subfileTypeData() const
 ZTiff::ZTiff()
   : m_tif(nullptr, TIFFClose)
 {}
-
-QString ZTiff::toQString() const
-{
-  QString res;
-  for (size_t i = 0; i < m_ifds.size(); ++i) {
-    res = res % QString("Directory %1: offset %2 (%3) next %4 (%5)\n")
-                  .arg(i)
-                  .arg(m_ifds[i].offset())
-                  .arg(m_ifds[i].offset(), 0, 16)
-                  .arg(m_ifds[i].nextIFDOffset())
-                  .arg(m_ifds[i].nextIFDOffset(), 0, 16);
-    res = res % m_ifds[i].toQString() % QString("\n");
-  }
-  return res;
-}
 
 std::string ZTiff::toString() const
 {

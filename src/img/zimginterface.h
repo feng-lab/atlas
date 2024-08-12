@@ -180,11 +180,6 @@ struct col4
     }
   }
 
-  [[nodiscard]] QString toQString() const
-  {
-    return jsonToQString(*this);
-  }
-
   [[nodiscard]] std::string toString() const
   {
     return jsonToString(*this);

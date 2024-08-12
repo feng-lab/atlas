@@ -23,11 +23,6 @@ struct ZImgInfo
 
   void swap(ZImgInfo& other) noexcept;
 
-  [[nodiscard]] QString toQString() const
-  {
-    return jsonToQString(*this);
-  }
-
   [[nodiscard]] std::string toString() const
   {
     return jsonToString(*this);
@@ -40,6 +35,15 @@ struct ZImgInfo
             : voxelFormat == VoxelFormat::Signed ? "int"
                                                  : "uint") +
            QString::number(bytesPerVoxel * 8);
+  }
+
+  [[nodiscard]] std::string typeAsString() const
+  {
+    return fmt::format("{}{}",
+                       (voxelFormat == VoxelFormat::Float    ? "float"
+                        : voxelFormat == VoxelFormat::Signed ? "int"
+                                                             : "uint"),
+                       bytesPerVoxel * 8);
   }
 
   // channel name for interface, prepend ch1, ch2, ...

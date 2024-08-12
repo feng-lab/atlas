@@ -35,14 +35,6 @@ public:
     saveJsonObject(jo, file);
   }
 
-  [[nodiscard]] QString toQString() const
-  {
-    json::object jo;
-    jo["log_file"] = json::value_from(m_logFile);
-    write(jo);
-    return jsonToFormattedQString(jo);
-  }
-
   [[nodiscard]] std::string toString() const
   {
     json::object jo;

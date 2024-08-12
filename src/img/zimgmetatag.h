@@ -41,9 +41,12 @@ public:
     m_data.swap(other.m_data);
   }
 
-  [[nodiscard]] QString toQString() const;
-
   [[nodiscard]] std::string toString() const;
+
+  [[nodiscard]] QString toQString() const
+  {
+    return QString::fromStdString(toString());
+  }
 
   [[nodiscard]] const std::string& name() const
   {

@@ -27,9 +27,9 @@ TEST(ZImgRegionalExtrema, max)
   for (ZImgRegionConstIterator<uint8_t> it = ZImgRegionConstIterator<uint8_t>(mask); !it.isAtEnd(); ++it) {
     ZVoxelCoordinate coord = it.coord();
     if (rgn1.containsCoord(coord, info) || rgn2.containsCoord(coord, info) || (coord.x == 2 && coord.y == 7)) {
-      ASSERT_EQ(1, *it) << qUtf8Printable(coord.toQString());
+      ASSERT_EQ(1, *it) << coord.toString();
     } else {
-      ASSERT_EQ(0, *it) << qUtf8Printable(coord.toQString());
+      ASSERT_EQ(0, *it) << coord.toString();
     }
   }
 }
@@ -56,9 +56,9 @@ TEST(ZImgRegionalExtrema, min)
   for (ZImgRegionConstIterator<uint8_t> it = ZImgRegionConstIterator<uint8_t>(mask); !it.isAtEnd(); ++it) {
     ZVoxelCoordinate coord = it.coord();
     if (rgn1.containsCoord(coord, info) || rgn2.containsCoord(coord, info)) {
-      ASSERT_EQ(1, *it) << qUtf8Printable(coord.toQString());
+      ASSERT_EQ(1, *it) << coord.toString();
     } else {
-      ASSERT_EQ(0, *it) << qUtf8Printable(coord.toQString());
+      ASSERT_EQ(0, *it) << coord.toString();
     }
   }
 }

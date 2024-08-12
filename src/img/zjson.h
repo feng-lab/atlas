@@ -46,15 +46,7 @@ inline QStringList tag_invoke(const json::value_to_tag<QStringList>&, const json
 
 namespace nim {
 
-QString jsonToFormattedQString(const json::value& jv);
-
 std::string jsonToFormattedString(const json::value& jv);
-
-template<typename T>
-QString jsonToFormattedQString(const T& v)
-{
-  return jsonToFormattedQString(json::value_from(v));
-}
 
 template<typename T>
 std::string jsonToFormattedString(const T& v)
@@ -62,15 +54,18 @@ std::string jsonToFormattedString(const T& v)
   return jsonToFormattedString(json::value_from(v));
 }
 
-QString jsonToQString(const json::value& jv);
-
-std::string jsonToString(const json::value& jv);
+inline QString jsonToFormattedQString(const json::value& jv)
+{
+  return QString::fromStdString(jsonToFormattedString(jv));
+}
 
 template<typename T>
-QString jsonToQString(const T& v)
+QString jsonToFormattedQString(const T& v)
 {
-  return jsonToQString(json::value_from(v));
+  return QString::fromStdString(jsonToFormattedString(json::value_from(v)));
 }
+
+std::string jsonToString(const json::value& jv);
 
 template<typename T>
 std::string jsonToString(const T& v)
@@ -89,23 +84,6 @@ inline QString asQString(const json::value& jv)
   return json::value_to<QString>(jv);
 }
 
-//// tuple-like types
-// template<class T,
-//   typename std::enable_if<(std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
-// inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
-//{
-//   constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
-//   const auto& ja = jv.as_array();
-//   if (ja.size() < n) {
-//     throw ZException("json array too short");
-//   }
-//   T res;
-//   for (size_t i = 0; i < n; ++i) {
-//     res[i] = json::value_to<typename T::value_type>(ja[i]);
-//   }
-//   return res;
-// }
-
 // json::value jv;
 //*JsonValueProxy(jv)["user:config"]["authority"]["router"][0]["users"] = 42;
 
@@ -118,7 +96,7 @@ public:
     : jv_(jv)
   {}
 
-  JsonValueProxy operator[](json::string_view key)
+  JsonValueProxy operator[](json::string_view key) const
   {
     json::object* obj;
     if (jv_.is_null()) {
@@ -129,7 +107,7 @@ public:
     return JsonValueProxy((*obj)[key]);
   }
 
-  JsonValueProxy operator[](std::size_t index)
+  JsonValueProxy operator[](std::size_t index) const
   {
     json::array* arr;
     if (jv_.is_null()) {
@@ -143,7 +121,7 @@ public:
     return JsonValueProxy((*arr)[index]);
   }
 
-  json::value& operator*() noexcept
+  json::value& operator*() const noexcept
   {
     return jv_;
   }

@@ -88,25 +88,11 @@ void pretty_print(std::ostream& os, const boost::json::value& jv, std::string* i
 
 namespace nim {
 
-QString jsonToFormattedQString(const json::value& jv)
-{
-  std::ostringstream oss;
-  pretty_print(oss, jv);
-  return QString::fromStdString(oss.str());
-}
-
 std::string jsonToFormattedString(const json::value& jv)
 {
   std::ostringstream oss;
   pretty_print(oss, jv);
   return oss.str();
-}
-
-QString jsonToQString(const json::value& jv)
-{
-  std::ostringstream oss;
-  oss << jv;
-  return QString::fromStdString(oss.str());
 }
 
 std::string jsonToString(const json::value& jv)

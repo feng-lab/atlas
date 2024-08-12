@@ -366,15 +366,9 @@ struct ZImgWriteParameters
 };
 
 template<>
-QString ZImgMetadataBase<ZImgMetatag>::toQString() const;
-
-template<>
 std::string ZImgMetadataBase<ZImgMetatag>::toString() const;
 
 class ZImg;
-
-template<>
-QString ZImgMetadataBase<ZImg>::toQString() const;
 
 template<>
 std::string ZImgMetadataBase<ZImg>::toString() const;
@@ -411,11 +405,6 @@ struct ZImgSource
              expandXY == other.expandXY && expandWithMaxValue == other.expandWithMaxValue;
     }
     return false;
-  }
-
-  [[nodiscard]] QString toQString() const
-  {
-    return jsonToQString(*this);
   }
 
   [[nodiscard]] std::string toString() const

@@ -33,11 +33,6 @@ protected:
 public:
   ZImgMetadataBase() = default;
 
-  [[nodiscard]] QString toQString() const
-  {
-    return {};
-  }
-
   [[nodiscard]] std::string toString() const
   {
     return {};

@@ -476,8 +476,7 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
 
   ZImgRegion rgn = region;
   if (!rgn.isValid(m_imgInfo)) {
-    throw ZException(
-      QString("Try to crop img <%1> with invalid region <%2>").arg(m_imgInfo.toQString(), rgn.toQString()));
+    throw ZException(fmt::format("Try to crop img <{}> with invalid region <{}>", m_imgInfo, rgn));
   }
 
   rgn.resolveRegionEnd(m_imgInfo);

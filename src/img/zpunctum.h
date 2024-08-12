@@ -290,11 +290,6 @@ public:
     m_mass = m_volSize * m_meanIntensity;
   }
 
-  [[nodiscard]] QString toQString() const
-  {
-    return QString("Puncta (%1): (%2, %3, %4, %5)").arg(m_name).arg(m_x).arg(m_y).arg(m_z).arg(m_radius);
-  }
-
   [[nodiscard]] std::string toString() const
   {
     return fmt::format("Puncta ({}): ({}, {}, {}, {})", m_name.toStdString(), m_x, m_y, m_z, m_radius);

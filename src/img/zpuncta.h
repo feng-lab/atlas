@@ -57,11 +57,6 @@ public:
 
   void save(const QString& filename, const QString& format = "") const;
 
-  [[nodiscard]] QString toQString() const
-  {
-    return QString("%1 puncta").arg(data.size());
-  }
-
   [[nodiscard]] std::string toString() const
   {
     return fmt::format("{} puncta", data.size());

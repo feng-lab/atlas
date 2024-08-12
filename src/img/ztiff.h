@@ -115,8 +115,6 @@ public:
     m_nextIFDOffset = off;
   }
 
-  [[nodiscard]] QString toQString() const;
-
   [[nodiscard]] std::string toString() const;
 
   [[nodiscard]] const std::vector<ZTiffIFD>& subIFDs() const
@@ -211,8 +209,6 @@ public:
   {
     m_ifds.push_back(ifd);
   }
-
-  [[nodiscard]] QString toQString() const;
 
   [[nodiscard]] std::string toString() const;
 

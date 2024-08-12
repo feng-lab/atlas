@@ -308,11 +308,6 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  [[nodiscard]] QString toQString() const
-  {
-    return jsonToQString(*this);
-  }
-
   [[nodiscard]] std::string toString() const
   {
     return jsonToString(*this);

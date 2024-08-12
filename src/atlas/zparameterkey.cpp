@@ -115,7 +115,7 @@ bool ZParameterKey::readValue(const json::value& value)
   }
   const auto& obj = value.as_object();
   if (!obj.contains("time") || !obj.contains("type") || !obj.contains("value")) {
-    LOG(WARNING) << "Invalid key " << jsonToFormattedQString(obj) << " time, type and value are required field.";
+    LOG(WARNING) << "Invalid key " << jsonToFormattedString(obj) << " time, type and value are required field.";
     return false;
   }
   m_time = json::value_to<double>(obj.at("time"));

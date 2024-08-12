@@ -102,11 +102,6 @@ struct ZImgRegion
     return containsWholeTime(info) && start.t == 0 && (end.t == -1 || end.t == static_cast<value_type>(info.numTimes));
   }
 
-  [[nodiscard]] QString toQString() const
-  {
-    return jsonToQString(*this);
-  }
-
   [[nodiscard]] std::string toString() const
   {
     return jsonToString(*this);

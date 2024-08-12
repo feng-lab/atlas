@@ -61,7 +61,7 @@ TEST(ZImgNCC, normXCorr_S_mkl)
 
     // ZVoxelCoordinate cd;
     // while (cd.advance(nccImg.info())) {
-    //   LOG(INFO) << nccImg.info().toQString() << cd.toQString();
+    //   LOG(INFO) << nccImg.info().toString() << cd.toString();
     //   LOG(INFO) << *nccImg.data<double>(cd);
     // }
 
@@ -70,7 +70,7 @@ TEST(ZImgNCC, normXCorr_S_mkl)
       ZVoxelCoordinate coord = ZVoxelCoordinate::random(nccImg.info());
       ZVoxelCoordinate offset = coord - ZVoxelCoordinate::lastCoordinate(movingImg.info());
       double ncc = getNCCOfOffset(fixedImg, movingImg, offset);
-      // LOG(INFO) << nccImg.info().toQString() << coord.toQString();
+      // LOG(INFO) << nccImg.info().toString() << coord.toString();
       // LOG(INFO) << *nccImg.data<double>(coord);
       EXPECT_NEAR(ncc, *nccImg.data<double>(coord), 1e-8);
       // LOG(INFO) << "1";
@@ -139,7 +139,7 @@ TEST(ZImgNCC, normXCorr_mkl)
       ZVoxelCoordinate coord = ZVoxelCoordinate::random(nccImg.info());
       ZVoxelCoordinate offset = coord - ZVoxelCoordinate::lastCoordinate(movingImg.info());
       double ncc = getNCCOfOffset(fixedImg, movingImg, offset);
-      // LOG(INFO) << nccImg.info().toQString() << coord.toQString();
+      // LOG(INFO) << nccImg.info().toString() << coord.toString();
       // LOG(INFO) << *nccImg.data<double>(coord);
       EXPECT_NEAR(ncc, *nccImg.data<double>(coord), 1e-8);
       // LOG(INFO) << "1";
