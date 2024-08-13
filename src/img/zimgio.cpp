@@ -55,13 +55,13 @@ void ZImgIO::readInfos(const QString& filename,
                        FileFormat format)
 {
   res.clear();
-  QString error;
 
   if (format == FileFormat::Unknown) {
     std::vector<ZImgFormat*> readers = getSupportedReader(filename);
     if (readers.empty()) {
-      error = QString("File %1 is not supported.").arg(filename);
+      throw ZException(fmt::format("File {} is not supported", filename));
     } else {
+      std::string error;
       for (auto reader : readers) {
         try {
           std::vector<ZImgInfo> tmpInfo;
@@ -77,13 +77,17 @@ void ZImgIO::readInfos(const QString& filename,
           }
         }
         catch (const ZException& e) {
-          error +=
-            QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename, reader->fullName(), e.what());
+          fmt::format_to(std::back_inserter(error),
+                         "\nTry read file {} as '{}' format, failed: {}",
+                         filename,
+                         reader->fullName(),
+                         e.what());
         }
       }
+      throw ZException(error);
     }
   } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportRead()) {
-    error = QString("Read format '%1' is not supported").arg(m_ioFormats[format]->fullName());
+    throw ZException(fmt::format("Read format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
     try {
       std::vector<ZImgInfo> tmpInfo;
@@ -98,12 +102,12 @@ void ZImgIO::readInfos(const QString& filename,
       throw ZException("empty image");
     }
     catch (const ZException& e) {
-      error =
-        QString("Try read file %1 as '%2' format, failed: %3").arg(filename, m_ioFormats[format]->fullName(), e.what());
+      throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
+                                   filename,
+                                   m_ioFormats[format]->fullName(),
+                                   e.what()));
     }
   }
-
-  throw ZException(error);
 }
 
 void ZImgIO::readInfos(const QStringList& fileList,
@@ -574,14 +578,14 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
 void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
 {
   meta.clear();
-  QString error;
 
   if (imgSource.format == FileFormat::Unknown) {
     for (const auto& filename : imgSource.filenames) {
       std::vector<ZImgFormat*> readers = getSupportedReader(filename);
       if (readers.empty()) {
-        error = QString("File %1 is not supported.").arg(filename);
+        throw ZException(fmt::format("File {} is not supported", filename));
       } else {
+        std::string error;
         for (auto reader : readers) {
           try {
             ZImgMetadata tmpMeta;
@@ -590,14 +594,18 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
             return;
           }
           catch (const ZException& e) {
-            error +=
-              QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename, reader->fullName(), e.what());
+            fmt::format_to(std::back_inserter(error),
+                           "\nTry read file {} as '{}' format, failed: {}",
+                           filename,
+                           reader->fullName(),
+                           e.what());
           }
         }
+        throw ZException(error);
       }
     }
   } else if (!m_ioFormats.contains(imgSource.format) || !m_ioFormats[imgSource.format]->supportRead()) {
-    error = QString("Read format '%1' is not supported").arg(m_ioFormats[imgSource.format]->fullName());
+    throw ZException(fmt::format("Read format '{}' is not supported", m_ioFormats[imgSource.format]->fullName()));
   } else {
     for (const auto& filename : imgSource.filenames) {
       try {
@@ -607,13 +615,13 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
         return;
       }
       catch (const ZException& e) {
-        error = QString("Try read file %1 as '%2' format, failed: %3")
-                  .arg(filename, m_ioFormats[imgSource.format]->fullName(), e.what());
+        throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
+                                     filename,
+                                     m_ioFormats[imgSource.format]->fullName(),
+                                     e.what()));
       }
     }
   }
-
-  throw ZException(error);
 }
 
 void ZImgIO::readThumbnail(const QString& filename,
@@ -623,13 +631,13 @@ void ZImgIO::readThumbnail(const QString& filename,
                            FileFormat format)
 {
   thumbnail.clear();
-  QString error;
 
   if (format == FileFormat::Unknown) {
     std::vector<ZImgFormat*> readers = getSupportedReader(filename);
     if (readers.empty()) {
-      error = QString("File %1 is not supported.").arg(filename);
+      throw ZException(fmt::format("File {} is not supported", filename));
     } else {
+      std::string error;
       for (auto reader : readers) {
         try {
           ZImgThumbernail tmpThumbnail;
@@ -638,13 +646,17 @@ void ZImgIO::readThumbnail(const QString& filename,
           return;
         }
         catch (const ZException& e) {
-          error +=
-            QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename, reader->fullName(), e.what());
+          fmt::format_to(std::back_inserter(error),
+                         "\nTry read file {} as '{}' format, failed: {}",
+                         filename,
+                         reader->fullName(),
+                         e.what());
         }
       }
+      throw ZException(error);
     }
   } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportRead()) {
-    error = QString("Read format '%1' is not supported").arg(m_ioFormats[format]->fullName());
+    throw ZException(fmt::format("Read format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
     try {
       ZImgThumbernail tmpThumbnail;
@@ -653,12 +665,12 @@ void ZImgIO::readThumbnail(const QString& filename,
       return;
     }
     catch (const ZException& e) {
-      error =
-        QString("Try read file %1 as '%2' format, failed: %3").arg(filename, m_ioFormats[format]->fullName(), e.what());
+      throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
+                                   filename,
+                                   m_ioFormats[format]->fullName(),
+                                   e.what()));
     }
   }
-
-  throw ZException(error);
 }
 
 void ZImgIO::readImg(const QString& filename,
@@ -671,13 +683,13 @@ void ZImgIO::readImg(const QString& filename,
                      FileFormat format)
 {
   img.clear();
-  QString error;
 
   if (format == FileFormat::Unknown) {
     std::vector<ZImgFormat*> readers = getSupportedReader(filename);
     if (readers.empty()) {
-      error = QString("File %1 is not supported.").arg(filename);
+      throw ZException(fmt::format("File {} is not supported", filename));
     } else {
+      std::string error;
       for (auto reader : readers) {
         try {
           ZImg tmpImg;
@@ -686,13 +698,17 @@ void ZImgIO::readImg(const QString& filename,
           return;
         }
         catch (const ZException& e) {
-          error +=
-            QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename, reader->fullName(), e.what());
+          fmt::format_to(std::back_inserter(error),
+                         "\nTry read file {} as '{}' format, failed: {}",
+                         filename,
+                         reader->fullName(),
+                         e.what());
         }
       }
+      throw ZException(error);
     }
   } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportRead()) {
-    error = QString("Read format '%1' is not supported").arg(m_ioFormats[format]->fullName());
+    throw ZException(fmt::format("Read format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
     try {
       ZImg tmpImg;
@@ -701,12 +717,12 @@ void ZImgIO::readImg(const QString& filename,
       return;
     }
     catch (const ZException& e) {
-      error =
-        QString("Try read file %1 as '%2' format, failed: %3").arg(filename, m_ioFormats[format]->fullName(), e.what());
+      throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
+                                   filename,
+                                   m_ioFormats[format]->fullName(),
+                                   e.what()));
     }
   }
-
-  throw ZException(error);
 }
 
 void ZImgIO::readImg(const QStringList& fileList,
@@ -967,12 +983,12 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     throw ZException("Can not write empty image.");
   }
 
-  QString error;
   if (format == FileFormat::Unknown) {
     std::vector<ZImgFormat*> writers = getSupportedWriter(filename);
     if (writers.empty()) {
-      error = QString("Write file %1 is not supported.").arg(filename);
+      throw ZException(fmt::format("Write file {} is not supported", filename));
     } else {
+      std::string error;
       for (auto writer : writers) {
         try {
           if (filename.endsWith(".mhd", Qt::CaseInsensitive)) {
@@ -985,12 +1001,17 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
           return;
         }
         catch (const ZException& e) {
-          error += QString("Try write %1 as '%2' format, failed: %3 ").arg(filename, writer->fullName(), e.what());
+          fmt::format_to(std::back_inserter(error),
+                         "\nTry write {} as '{}' format, failed: {}",
+                         filename,
+                         writer->fullName(),
+                         e.what());
         }
       }
+      throw ZException(error);
     }
   } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportWrite()) {
-    error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
+    throw ZException(fmt::format("Write format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
     try {
       if (format == FileFormat::MetaImage) {
@@ -1003,12 +1024,12 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
       return;
     }
     catch (const ZException& e) {
-      error = QString("Try write file %1 as '%2' format, failed: %3")
-                .arg(filename, m_ioFormats[format]->fullName(), e.what());
+      throw ZException(fmt::format("Try write file {} as '{}' format, failed: {}",
+                                   filename,
+                                   m_ioFormats[format]->fullName(),
+                                   e.what()));
     }
   }
-
-  throw ZException(error);
 }
 
 void ZImgIO::writeImg(const QString& filename,
@@ -1020,12 +1041,12 @@ void ZImgIO::writeImg(const QString& filename,
     throw ZException("Can not write empty image.");
   }
 
-  QString error;
   if (format == FileFormat::Unknown) {
     std::vector<ZImgFormat*> writers = getSupportedWriter(filename);
     if (writers.empty()) {
-      error = QString("Write file %1 is not supported.").arg(filename);
+      throw ZException(fmt::format("Write file {} is not supported", filename));
     } else {
+      std::string error;
       for (auto writer : writers) {
         try {
           if (filename.endsWith(".mhd", Qt::CaseInsensitive)) {
@@ -1038,12 +1059,17 @@ void ZImgIO::writeImg(const QString& filename,
           return;
         }
         catch (const ZException& e) {
-          error += QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename, writer->fullName(), e.what());
+          fmt::format_to(std::back_inserter(error),
+                         "\nTry write {} as '{}' format, failed: {}",
+                         filename,
+                         writer->fullName(),
+                         e.what());
         }
       }
+      throw ZException(error);
     }
   } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportWrite()) {
-    error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
+    throw ZException(fmt::format("Write format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
     try {
       if (format == FileFormat::MetaImage) {
@@ -1056,12 +1082,12 @@ void ZImgIO::writeImg(const QString& filename,
       return;
     }
     catch (const ZException& e) {
-      error = QString("Try write file %1 as '%2' format, failed: %3")
-                .arg(filename, m_ioFormats[format]->fullName(), e.what());
+      throw ZException(fmt::format("Try write file {} as '{}' format, failed: {}",
+                                   filename,
+                                   m_ioFormats[format]->fullName(),
+                                   e.what()));
     }
   }
-
-  throw ZException(error);
 }
 
 void ZImgIO::writeImg(const QString& filename,
@@ -1073,12 +1099,12 @@ void ZImgIO::writeImg(const QString& filename,
     throw ZException("Can not write empty image.");
   }
 
-  QString error;
   if (format == FileFormat::Unknown) {
     std::vector<ZImgFormat*> writers = getSupportedWriter(filename);
     if (writers.empty()) {
-      error = QString("Write file %1 is not supported.").arg(filename);
+      throw ZException(fmt::format("Write file {} is not supported", filename));
     } else {
+      std::string error;
       for (auto writer : writers) {
         try {
           if (filename.endsWith(".mhd", Qt::CaseInsensitive)) {
@@ -1091,12 +1117,17 @@ void ZImgIO::writeImg(const QString& filename,
           return;
         }
         catch (const ZException& e) {
-          error += QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename, writer->fullName(), e.what());
+          fmt::format_to(std::back_inserter(error),
+                         "\nTry write {} as '{}' format, failed: {}",
+                         filename,
+                         writer->fullName(),
+                         e.what());
         }
       }
+      throw ZException(error);
     }
   } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportWrite()) {
-    error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
+    throw ZException(fmt::format("Write format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
     try {
       if (format == FileFormat::MetaImage) {
@@ -1109,12 +1140,12 @@ void ZImgIO::writeImg(const QString& filename,
       return;
     }
     catch (const ZException& e) {
-      error = QString("Try write file %1 as '%2' format, failed: %3")
-                .arg(filename, m_ioFormats[format]->fullName(), e.what());
+      throw ZException(fmt::format("Try write file {} as '{}' format, failed: {}",
+                                   filename,
+                                   m_ioFormats[format]->fullName(),
+                                   e.what()));
     }
   }
-
-  throw ZException(error);
 }
 
 void ZImgIO::getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& formats) const

@@ -141,13 +141,12 @@ bool Z3DGpuInfo::isImagingSupported() const
   return isExtensionSupported("GL_ARB_imaging");
 }
 
-QStringList Z3DGpuInfo::gpuInfo() const
+void Z3DGpuInfo::logGpuInfo() const
 {
-  QStringList info;
   if (!isSupported()) {
-    info << QString("Current GPU card is not supported. Reason: %1").arg(m_notSupportedReason);
-    info << "3D functions will be disabled.";
-    return info;
+    LOG(INFO) << "Current GPU card is not supported. Reason: " << m_notSupportedReason;
+    LOG(INFO) << "3D functions will be disabled.";
+    return;
   }
 
 #ifdef __APPLE__
@@ -155,61 +154,51 @@ QStringList Z3DGpuInfo::gpuInfo() const
   dispInfo.start("system_profiler", QStringList() << "SPDisplaysDataType");
 
   if (dispInfo.waitForFinished(-1)) {
-    info << dispInfo.readAllStandardOutput();
+    LOG(INFO) << dispInfo.readAllStandardOutput();
   } else {
-    info << dispInfo.readAllStandardError();
+    LOG(INFO) << dispInfo.readAllStandardError();
   }
 #endif
 
-  info << QString("OpenGL Vendor:                 %1").arg(m_glVendorString);
-  info << QString("OpenGL Renderer:               %1").arg(m_glRendererString);
-  info << QString("OpenGL Version:                %1").arg(m_glVersionString);
-  info << QString("OpenGL SL Version:             %1").arg(m_glslVersionString);
-  info << QString("Context Core Profile Bit: %1").arg(m_contextCoreProfileBit);
-  info << QString("Context Compatibility Profile Bit: %1").arg(m_contextCompatibilityProfileBit);
-  info << QString("Context Flag Forward Compatible Bit: %1").arg(m_contextFlagForwardCompatibleBit);
-  info << QString("Context Flag Debug Bit: %1").arg(m_contextFlagDebugBit);
-  info << QString("Context Flag Robust Access Bit: %1").arg(m_contextFlagRobustAccessBit);
-  info << QString("OpenGL Extensions: %1").arg(m_glExtensionsString);
-  info << QString("Max Viewport Dimensions:       %1").arg(m_maxViewportDims);
-  info << QString("Max Renderbuffer Size:         %1").arg(m_maxRenderbufferSize);
-  info << QString("Max Texture Size:              %1 (use %2)").arg(m_maxTexureSize).arg(maxTextureSize());
-  info << QString("Max 3D Texture Size:           %1 (use %2)").arg(m_max3DTextureSize).arg(max3DTextureSize());
-  info << QString("Max Color Attachments:         %1").arg(m_maxColorAttachments);
-  info << QString("Max Draw Buffer:               %1").arg(m_maxDrawBuffer);
+  LOG(INFO) << "OpenGL Vendor:                 " << m_glVendorString;
+  LOG(INFO) << "OpenGL Renderer:               " << m_glRendererString;
+  LOG(INFO) << "OpenGL Version:                " << m_glVersionString;
+  LOG(INFO) << "OpenGL SL Version:             " << m_glslVersionString;
+  LOG(INFO) << "Context Core Profile Bit: " << m_contextCoreProfileBit;
+  LOG(INFO) << "Context Compatibility Profile Bit: " << m_contextCompatibilityProfileBit;
+  LOG(INFO) << "Context Flag Forward Compatible Bit: " << m_contextFlagForwardCompatibleBit;
+  LOG(INFO) << "Context Flag Debug Bit: " << m_contextFlagDebugBit;
+  LOG(INFO) << "Context Flag Robust Access Bit: " << m_contextFlagRobustAccessBit;
+  LOG(INFO) << "OpenGL Extensions: " << m_glExtensionsString;
+  LOG(INFO) << "Max Viewport Dimensions:       " << m_maxViewportDims;
+  LOG(INFO) << "Max Renderbuffer Size:         " << m_maxRenderbufferSize;
+  LOG(INFO) << fmt::format("Max Texture Size:              {} (use {})", m_maxTexureSize, maxTextureSize());
+  LOG(INFO) << fmt::format("Max 3D Texture Size:           {} (use {})", m_max3DTextureSize, max3DTextureSize());
+  LOG(INFO) << "Max Color Attachments:         " << m_maxColorAttachments;
+  LOG(INFO) << "Max Draw Buffer:               " << m_maxDrawBuffer;
   if (m_maxGeometryOutputVertices > 0) {
-    info << QString("Max GS Output Vertices:        %1").arg(m_maxGeometryOutputVertices);
+    LOG(INFO) << "Max GS Output Vertices:        " << m_maxGeometryOutputVertices;
   }
-  info << QString("Max VS Texture Image Units:    %1").arg(m_maxVertexTextureImageUnits);
+  LOG(INFO) << "Max VS Texture Image Units:    " << m_maxVertexTextureImageUnits;
   if (m_maxGeometryTextureImageUnits > 0) {
-    info << QString("Max GS Texture Image Units:    %1").arg(m_maxGeometryTextureImageUnits);
+    LOG(INFO) << "Max GS Texture Image Units:    " << m_maxGeometryTextureImageUnits;
   }
-  info << QString("Max FS Texture Image Units:    %1").arg(m_maxTextureImageUnits);
-  info << QString("VS+GS+FS Texture Image Units:  %1").arg(m_maxCombinedTextureImageUnits);
-  // info << QString("Max Texture Coordinates:       %1").arg(m_maxTextureCoords);
-  info << QString("Max Array Texture Layers:      %1").arg(m_maxArrayTextureLayers);
+  LOG(INFO) << "Max FS Texture Image Units:    " << m_maxTextureImageUnits;
+  LOG(INFO) << "VS+GS+FS Texture Image Units:  " << m_maxCombinedTextureImageUnits;
+  // LOG(INFO) << "Max Texture Coordinates:       " << m_maxTextureCoords;
+  LOG(INFO) << "Max Array Texture Layers:      " << m_maxArrayTextureLayers;
 
-  info << QString("Total Graphics Memory Size:    %1 MB").arg(dedicatedVideoMemoryMB());
+  LOG(INFO) << fmt::format("Total Graphics Memory Size:    {} MB", dedicatedVideoMemoryMB());
 
-  info << QString("Smooth Point Size Range:       (%1, %2)").arg(m_minSmoothPointSize).arg(m_maxSmoothPointSize);
-  info << QString("Smooth Point Size Granularity: %1").arg(m_smoothPointSizeGranularity);
-  // info << QString("Aliased Point Size Range:      (%1, %2)").arg(m_minAliasedPointSize).arg(m_maxAliasedPointSize);
+  LOG(INFO) << fmt::format("Smooth Point Size Range:       ({}, {})", m_minSmoothPointSize, m_maxSmoothPointSize);
+  LOG(INFO) << "Smooth Point Size Granularity: " << m_smoothPointSizeGranularity;
+  // LOG(INFO) << fmt::format("Aliased Point Size Range:      ({}, {})", m_minAliasedPointSize, m_maxAliasedPointSize);
 
-  info << QString("Smooth Line Width Range:       (%1, %2)").arg(m_minSmoothLineWidth).arg(m_maxSmoothLineWidth);
-  info << QString("Smooth Line Width Granularity: %1").arg(m_smoothLineWidthGranularity);
-  info << QString("Aliased Line Width Range:      (%1, %2)").arg(m_minAliasedLineWidth).arg(m_maxAliasedLineWidth);
+  LOG(INFO) << fmt::format("Smooth Line Width Range:       ({}, {})", m_minSmoothLineWidth, m_maxSmoothLineWidth);
+  LOG(INFO) << "Smooth Line Width Granularity: " << m_smoothLineWidthGranularity;
+  LOG(INFO) << fmt::format("Aliased Line Width Range:      ({}, {})", m_minAliasedLineWidth, m_maxAliasedLineWidth);
 
-  info << QString("Max Texture Buffer Size:       %1").arg(m_maxTextureBufferSize);
-
-  return info;
-}
-
-void Z3DGpuInfo::logGpuInfo() const
-{
-  QStringList info = gpuInfo();
-  for (auto& i : info) {
-    LOG(INFO) << i;
-  }
+  LOG(INFO) << "Max Texture Buffer Size:       " << m_maxTextureBufferSize;
 
   LOG(INFO) << "";
 }

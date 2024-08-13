@@ -91,13 +91,11 @@ void Z3DShader::compileSourceCode(const char* source)
         sourceCodeBuffer.resize(sourceCodeLength);
         glGetShaderSource(m_id, sourceCodeLength, &temp, sourceCodeBuffer.data());
       }
-      QString log =
-        QString("Z3DShader::compileSourceCode(%1): %2").arg(type).arg(logBuffer.empty() ? "failed" : logBuffer.data());
+      std::string log =
+        fmt::format("Z3DShader::compileSourceCode({}): {}", type, logBuffer.empty() ? "failed" : logBuffer.data());
       // Dump the source code if we got it
       if (!sourceCodeBuffer.empty()) {
-        log += QString("\n*** source code ***\n");
-        log += source;
-        log += QString("\n***");
+        fmt::format_to(std::back_inserter(log), "\n*** source code ***\n{}\n***", source);
       }
       throw ZException(log);
     }

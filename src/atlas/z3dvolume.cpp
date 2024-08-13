@@ -251,12 +251,11 @@ void Z3DVolume::setHistogram()
 void Z3DVolume::generateTexture() const
 {
   if (dimensions().x == 0 || dimensions().y == 0 || dimensions().z == 0) {
-    QString message =
-      QString("OpenGL volumes must have a size greater than 0 in all dimensions. Actual size: (%1, %2, %3)")
-        .arg(m_img.width())
-        .arg(m_img.height())
-        .arg(m_img.depth());
-    LOG(ERROR) << message;
+    LOG(ERROR) << fmt::format(
+      "OpenGL volumes must have a size greater than 0 in all dimensions. Actual size: ({}, {}, {})",
+      m_img.width(),
+      m_img.height(),
+      m_img.depth());
     return;
   }
 

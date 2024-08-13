@@ -223,8 +223,6 @@ public:
   // log useful gpu info
   void logGpuInfo() const;
 
-  [[nodiscard]] QStringList gpuInfo() const;
-
   [[nodiscard]] bool isLinkedListSupported() const;
 
 protected:

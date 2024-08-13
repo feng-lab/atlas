@@ -80,16 +80,14 @@ void Z3DShaderProgram::link()
   } else {
     value = 0;
     glGetProgramiv(m_id, GL_INFO_LOG_LENGTH, &value);
-    QString log;
     if (value > 1) {
       std::vector<char> logbuf(value);
       GLint len;
       glGetProgramInfoLog(m_id, value, &len, logbuf.data());
-      log = QString::fromUtf8(logbuf.data());
+      throw ZException(fmt::format("Z3DShaderProgram::Link: {}", logbuf.data()));
     } else {
-      log = "failed";
+      throw ZException("Z3DShaderProgram::Link: failed");
     }
-    throw ZException(QString("Z3DShaderProgram::Link: %1").arg(log));
   }
 }
 

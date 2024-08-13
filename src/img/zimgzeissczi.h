@@ -308,7 +308,7 @@ public:
 private:
   void clearInternalState();
 
-  int64_t checkFilename(const QString& filename);
+  static int64_t checkFilename(const QString& filename);
 
   void readCZIInfo(const QString& xmlString);
 
@@ -324,30 +324,31 @@ private:
 
   void detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inputFileStream, FileHeader& fh);
 
-  std::string toString(const QString& filename);
+  static std::string toString(const QString& filename);
 
-  void
+  static void
   dumpCZIStream(std::ifstream& inputFileStream, int64_t filesize, int64_t offset, std::string& str, index_t indent = 0);
 
-  void dumpSegmentInfo(const SegmentHeader& sh, std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
+  static void
+  dumpSegmentInfo(const SegmentHeader& sh, std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
 
-  void dumpFileHeaderSegment(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
+  static void dumpFileHeaderSegment(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
 
-  void dumpMetadataSegment(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
+  static void dumpMetadataSegment(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
 
-  void dumpSubBlockSegment(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
+  static void dumpSubBlockSegment(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
 
-  void dumpDirectoryEntry(const DirectoryEntryDV& de, std::string& str, index_t indent = 0);
+  static void dumpDirectoryEntry(const DirectoryEntryDV& de, std::string& str, index_t indent = 0);
 
-  void dumpDimensionEntry(const DimensionEntryDV1& de, std::string& str, index_t indent = 0);
+  static void dumpDimensionEntry(const DimensionEntryDV1& de, std::string& str, index_t indent = 0);
 
-  void dumpSubBlockDirectory(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
+  static void dumpSubBlockDirectory(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
 
-  void dumpAttachmentSegment(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
+  static void dumpAttachmentSegment(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
 
-  void dumpAttachmentEntry(const AttachmentEntryA1& ae, std::string& str, index_t indent = 0);
+  static void dumpAttachmentEntry(const AttachmentEntryA1& ae, std::string& str, index_t indent = 0);
 
-  void dumpAttachmentDirectory(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
+  static void dumpAttachmentDirectory(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
 
 private:
   QString m_metadataXmlString;
