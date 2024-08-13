@@ -120,3 +120,79 @@ TEST_ENUM_CONVERSIONS(ImgMergeMode,
                       {ImgMergeMode::Median, "Median"},
                       {ImgMergeMode::First, "First"},
                       {ImgMergeMode::Interpolation, "Interpolation"});
+
+namespace nim {
+
+enum class PositionHint
+{
+  None = 0, // no hint, any position can be possible
+  Left = 1, // img is in left side, only overlap with left part of another img
+  Right = 1 << 1, // img is in right side, only overlap with right part of another img
+  Up = 1 << 2,
+  Down = 1 << 3,
+  Front = 1 << 4,
+  Back = 1 << 5
+};
+
+DECLARE_OPERATORS_FOR_ENUM(PositionHint)
+
+} // namespace nim
+
+TEST(FlagsToStringTest, NoFlagSet)
+{
+  using namespace nim;
+  EXPECT_EQ(flagsToString(PositionHint::None), "None");
+}
+
+TEST(FlagsToStringTest, SingleFlagSet)
+{
+  EXPECT_EQ(flagsToString(PositionHint::Left), "Left");
+  EXPECT_EQ(flagsToString(PositionHint::Right), "Right");
+  EXPECT_EQ(flagsToString(PositionHint::Up), "Up");
+  EXPECT_EQ(flagsToString(PositionHint::Down), "Down");
+  EXPECT_EQ(flagsToString(PositionHint::Front), "Front");
+  EXPECT_EQ(flagsToString(PositionHint::Back), "Back");
+}
+
+TEST(FlagsToStringTest, MultipleFlagsSet)
+{
+  EXPECT_EQ(flagsToString(PositionHint(PositionHint::Left | PositionHint::Down)), "Left | Down");
+  EXPECT_EQ(flagsToString(PositionHint(PositionHint::Right | PositionHint::Up)), "Right | Up");
+  EXPECT_EQ(flagsToString(PositionHint(PositionHint::Front | PositionHint::Back)), "Front | Back");
+  EXPECT_EQ(flagsToString(PositionHint(PositionHint::Left | PositionHint::Right | PositionHint::Up)),
+            "Left | Right | Up");
+  EXPECT_EQ(flagsToString(PositionHint::Left | PositionHint::Up | PositionHint::Front), "Left | Up | Front");
+  EXPECT_EQ(flagsToString(PositionHint::Right | PositionHint::Down | PositionHint::Back), "Right | Down | Back");
+}
+
+TEST(FlagsToStringTest, AllFlagsSet)
+{
+  EXPECT_EQ(flagsToString(PositionHint(PositionHint::Left | PositionHint::Right | PositionHint::Up |
+                                       PositionHint::Down | PositionHint::Front | PositionHint::Back)),
+            "Left | Right | Up | Down | Front | Back");
+}
+
+TEST(FlagsToStringTest, NonAdjacentFlags)
+{
+  EXPECT_EQ(flagsToString(PositionHint::Left | PositionHint::Front), "Left | Front");
+  EXPECT_EQ(flagsToString(PositionHint::Right | PositionHint::Up | PositionHint::Back), "Right | Up | Back");
+}
+
+TEST(FlagsToStringTest, CombinationWithNone)
+{
+  EXPECT_EQ(flagsToString(PositionHint(PositionHint::None | PositionHint::Left)), "Left");
+  EXPECT_EQ(flagsToString(PositionHint(PositionHint::None | PositionHint::Right | PositionHint::Down)), "Right | Down");
+}
+
+TEST(FlagsToStringTest, OrderIndependence)
+{
+  auto flags1 = PositionHint::Left | PositionHint::Up;
+  auto flags2 = PositionHint::Up | PositionHint::Left;
+  EXPECT_EQ(flagsToString(flags1), flagsToString(flags2));
+}
+
+TEST(FlagsToStringTest, InvalidFlag)
+{
+  // Assuming your function handles invalid flags gracefully
+  EXPECT_EQ(flagsToString(static_cast<PositionHint>(1 << 6)), "");
+}

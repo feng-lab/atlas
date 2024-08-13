@@ -196,11 +196,11 @@ glm::uvec2 Z3DCompositor::outputSize() const
 void Z3DCompositor::invalidate(State inv)
 {
   CHECK(inv != State::Valid);
-  if (is_flag_set(m_state, inv)) {
+  if (isFlagSet(m_state, inv)) {
     return;
   }
   // VLOG(1) << std::to_underlying(m_state) << " " << to_underlying(inv);
-  set_flag(m_state, inv);
+  setFlag(m_state, inv);
 
   Q_EMIT sceneParaUpdated();
 }

@@ -30,11 +30,11 @@ public:
 
   void setMovingImgPositionHint(PositionHint hint, double maxOverlapRate = 1.0);
 
-  QString positionHintToQString() const;
+  [[nodiscard]] std::string positionHintToString() const;
 
   static void reversePositionHint(PositionHint& hint);
 
-  static QString positionHintToQString(PositionHint hint, double maxOverlapRate);
+  static std::string positionHintToString(PositionHint hint, double maxOverlapRate);
 
   // NCC works for single channel, if img contains many channels, these methods control
   // which channels to use. Default use average of all channels

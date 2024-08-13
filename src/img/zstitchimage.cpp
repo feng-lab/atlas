@@ -53,8 +53,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
   QFile inputFile(filename);
   if (inputFile.open(QIODevice::ReadOnly)) {
     QTextStream in(&inputFile);
-    while (!in.atEnd()) {
-      QString line = in.readLine();
+    for (QString line = in.readLine(); !line.isNull(); line = in.readLine()) {
       QStringList list = line.split(rx, Qt::SkipEmptyParts);
 
       if (list.empty() || list.at(0).startsWith("#")) {
@@ -635,7 +634,7 @@ void ZStitchImage::doWork()
           LOG(INFO) << fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
                                    f + 1,
                                    m + 1,
-                                   imgNCCMatch.positionHintToQString(),
+                                   imgNCCMatch.positionHintToString(),
                                    movingImgOffset,
                                    maxNCC);
           ;
@@ -660,7 +659,7 @@ void ZStitchImage::doWork()
           LOG(INFO) << fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
                                    f + 1,
                                    m + 1,
-                                   imgNCCMatch.positionHintToQString(),
+                                   imgNCCMatch.positionHintToString(),
                                    movingImgOffset,
                                    maxNCC);
         }

@@ -3,7 +3,6 @@
 #include "z3dcanvas.h"
 #include "z3dcompositor.h"
 #include "z3dcameraparameter.h"
-#include "z3dinteractionhandler.h"
 #include "z3dnetworkevaluator.h"
 #include "zwidgetsgroup.h"
 #include "zimgdoc.h"

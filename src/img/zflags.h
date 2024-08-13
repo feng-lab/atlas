@@ -5,13 +5,13 @@
 namespace nim {
 
 template<typename TEnum>
-struct is_flags : public std::false_type
+struct IsFlags : public std::false_type
 {};
 
 // usage:
 #define DECLARE_OPERATORS_FOR_ENUM(TEnum)                                 \
   template<>                                                              \
-  struct is_flags<TEnum> : public std::true_type                          \
+  struct IsFlags<TEnum> : public std::true_type                           \
   {                                                                       \
     static_assert(std::is_enum<TEnum>::value, "TEnum must be enum type"); \
   };
@@ -23,7 +23,7 @@ struct is_flags : public std::false_type
 // impl:
 #define INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_UNARY_OPERATOR(OP) \
   template<typename TEnum>                                                        \
-    requires nim::is_flags<TEnum>::value                                          \
+    requires nim::IsFlags<TEnum>::value                                           \
   constexpr TEnum operator OP(TEnum value) noexcept                               \
   {                                                                               \
     using underlyingT = typename std::underlying_type<TEnum>::type;               \
@@ -32,14 +32,14 @@ struct is_flags : public std::false_type
 
 #define INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR(OP)         \
   template<typename TEnum>                                                                 \
-    requires nim::is_flags<TEnum>::value                                                   \
+    requires nim::IsFlags<TEnum>::value                                                    \
   constexpr TEnum operator OP(TEnum l, TEnum r) noexcept                                   \
   {                                                                                        \
     using underlyingT = typename std::underlying_type<TEnum>::type;                        \
     return static_cast<TEnum>(static_cast<underlyingT>(l) OP static_cast<underlyingT>(r)); \
   }                                                                                        \
   template<typename TEnum>                                                                 \
-    requires nim::is_flags<TEnum>::value                                                   \
+    requires nim::IsFlags<TEnum>::value                                                    \
   constexpr TEnum& operator OP##=(TEnum & l, TEnum r) noexcept                             \
   {                                                                                        \
     return l = l OP r;                                                                     \
@@ -59,51 +59,51 @@ INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR(^)
 namespace nim {
 
 template<typename TEnum>
-  requires is_flags<TEnum>::value
-constexpr bool is_flag_set(TEnum value, TEnum flag) noexcept
+  requires IsFlags<TEnum>::value
+constexpr bool isFlagSet(TEnum value, TEnum flag) noexcept
 {
   using underlyingT = std::underlying_type_t<TEnum>;
   return (static_cast<underlyingT>(value) & static_cast<underlyingT>(flag)) == static_cast<underlyingT>(flag);
 }
 
 template<typename TEnum>
-  requires is_flags<TEnum>::value
-constexpr void set_flag(TEnum& value) noexcept
+  requires IsFlags<TEnum>::value
+constexpr void setFlag(TEnum& value) noexcept
 {
   value |= ~value;
 }
 
 template<typename TEnum>
-  requires is_flags<TEnum>::value
-constexpr void set_flag(TEnum& value, TEnum flag) noexcept
+  requires IsFlags<TEnum>::value
+constexpr void setFlag(TEnum& value, TEnum flag) noexcept
 {
   value |= flag;
 }
 
 template<typename TEnum>
-  requires is_flags<TEnum>::value
-constexpr void reset_flag(TEnum& value) noexcept
+  requires IsFlags<TEnum>::value
+constexpr void resetFlag(TEnum& value) noexcept
 {
   value &= ~value;
 }
 
 template<typename TEnum>
-  requires is_flags<TEnum>::value
-constexpr void reset_flag(TEnum& value, TEnum flag) noexcept
+  requires IsFlags<TEnum>::value
+constexpr void resetFlag(TEnum& value, TEnum flag) noexcept
 {
   value &= ~flag;
 }
 
 template<typename TEnum>
-  requires is_flags<TEnum>::value
-constexpr void flip_flag(TEnum& value) noexcept
+  requires IsFlags<TEnum>::value
+constexpr void flipFlag(TEnum& value) noexcept
 {
   value = ~value;
 }
 
 template<typename TEnum>
-  requires is_flags<TEnum>::value
-constexpr void flip_flag(TEnum& value, TEnum flag) noexcept
+  requires IsFlags<TEnum>::value
+constexpr void flipFlag(TEnum& value, TEnum flag) noexcept
 {
   value ^= flag;
 }

@@ -318,8 +318,8 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   stream.setCodec("UTF-8");
 #endif
-  while (!stream.atEnd()) {
-    QString line = stream.readLine().trimmed();
+  for (QString line = stream.readLine(); !line.isNull(); line = stream.readLine()) {
+    line = line.trimmed();
     if (stream.status() != QTextStream::Ok) {
       throw ZException("Error while reading file.", ZException::Option::CheckErrno);
     }
@@ -452,8 +452,8 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   stream.setCodec("UTF-8");
 #endif
-  while (!stream.atEnd()) {
-    QString line = stream.readLine().trimmed();
+  for (QString line = stream.readLine(); !line.isNull(); line = stream.readLine()) {
+    line = line.trimmed();
     if (stream.status() != QTextStream::Ok) {
       throw ZException("Error while reading file.", ZException::Option::CheckErrno);
     }

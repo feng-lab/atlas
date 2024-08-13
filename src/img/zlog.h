@@ -2,6 +2,7 @@
 
 #include "zglobal.h"
 #include "zexception.h"
+#include "zflags.h"
 
 #ifdef _WIN32
 #undef ERROR
@@ -124,6 +125,28 @@ template<typename TEnum>
 auto format_as(TEnum f)
 {
   return enumToString(f);
+}
+
+// flags
+template<typename TEnum>
+  requires IsFlags<TEnum>::value
+std::string flagsToString(TEnum e)
+{
+  std::string res = std::string(reflect::enum_name(e));
+  if (res.empty()) {
+    static constexpr auto enumerators =
+      reflect::enumerators<TEnum, reflect::enum_min(TEnum{}), reflect::enum_max(TEnum{})>;
+    for (size_t i = 0; i < enumerators.size(); ++i) {
+      if (enumerators[i].first != 0 && isFlagSet(e, static_cast<TEnum>(enumerators[i].first))) {
+        if (res.empty()) {
+          res = std::string(enumerators[i].second);
+        } else {
+          fmt::format_to(std::back_inserter(res), " | {}", enumerators[i].second);
+        }
+      }
+    }
+  }
+  return res;
 }
 
 inline QByteArray toUtf8QByteArray(const std::wstring& s)

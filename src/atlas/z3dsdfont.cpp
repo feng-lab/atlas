@@ -64,8 +64,7 @@ void Z3DSDFont::parseFontFile()
 
   QTextStream stream(&qFile);
   size_t numCharFromFile = 0;
-  while (!stream.atEnd()) {
-    QString line = stream.readLine();
+  for (QString line = stream.readLine(); !line.isNull(); line = stream.readLine()) {
     line = line.trimmed();
     if (line.startsWith("info face=")) {
       m_fontName = line.section('\"', 1, 1);

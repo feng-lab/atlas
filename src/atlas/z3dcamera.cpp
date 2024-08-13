@@ -55,7 +55,7 @@ void Z3DCamera::resetCamera(const ZBBox<glm::dvec3>& bound, ResetOption options)
 {
   glm::vec3 center = glm::vec3((bound.minCorner + bound.maxCorner) / 2.0);
 
-  if (!is_flag_set(options, ResetOption::PreserveCenterDistance)) {
+  if (!isFlagSet(options, ResetOption::PreserveCenterDistance)) {
     auto boundSize = bound.size();
     float w1 = boundSize.x;
     float w2 = boundSize.y;
@@ -88,7 +88,7 @@ void Z3DCamera::resetCamera(const ZBBox<glm::dvec3>& bound, ResetOption options)
 
     m_centerDist = radius / std::sin(angle * 0.5);
   }
-  if (!is_flag_set(options, ResetOption::PreserveViewVector)) {
+  if (!isFlagSet(options, ResetOption::PreserveViewVector)) {
     m_viewVector = glm::vec3(0.f, 0.f, 1.f);
     m_upVector = glm::vec3(0.f, -1.f, 0.f);
   }

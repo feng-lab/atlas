@@ -30,11 +30,11 @@ ZParameter* Z3DFilter::parameter(const QString& name) const
 void Z3DFilter::invalidate(State inv)
 {
   CHECK(inv != State::Valid);
-  if (is_flag_set(m_state, inv)) {
+  if (isFlagSet(m_state, inv)) {
     return;
   }
 
-  set_flag(m_state, inv);
+  setFlag(m_state, inv);
 
   if (!m_invalidationVisited) {
     m_invalidationVisited = true;
@@ -113,22 +113,22 @@ void Z3DFilter::write(json::object& json) const
 void Z3DFilter::setValid(Z3DEye eye)
 {
   if (eye == MonoEye) {
-    reset_flag(m_state, State::MonoViewResultInvalid);
+    resetFlag(m_state, State::MonoViewResultInvalid);
   } else if (eye == LeftEye) {
-    reset_flag(m_state, State::LeftEyeResultInvalid);
+    resetFlag(m_state, State::LeftEyeResultInvalid);
   } else {
-    reset_flag(m_state, State::RightEyeResultInvalid);
+    resetFlag(m_state, State::RightEyeResultInvalid);
   }
 }
 
 bool Z3DFilter::isValid(Z3DEye eye) const
 {
   if (eye == MonoEye) {
-    return !is_flag_set(m_state, State::MonoViewResultInvalid);
+    return !isFlagSet(m_state, State::MonoViewResultInvalid);
   } else if (eye == LeftEye) {
-    return !is_flag_set(m_state, State::LeftEyeResultInvalid);
+    return !isFlagSet(m_state, State::LeftEyeResultInvalid);
   } else {
-    return !is_flag_set(m_state, State::RightEyeResultInvalid);
+    return !isFlagSet(m_state, State::RightEyeResultInvalid);
   }
 }
 
