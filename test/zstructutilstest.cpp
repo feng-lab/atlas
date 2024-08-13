@@ -102,3 +102,72 @@ TEST(CompactStructTest, WriteAndReadStruct)
   readStructFromCompactMemory(restored, buffer, sizeof(buffer));
   ASSERT_EQ(original, restored);
 }
+
+namespace nim {
+
+// Simple struct
+struct Simple {
+  int a;
+  char b;
+  double c;
+};
+
+// Nested struct
+struct Nested {
+  Simple s;
+  float f;
+};
+
+// Struct with std::array
+struct WithArray {
+  std::array<int, 5> arr;
+  char c;
+};
+
+// Complex nested struct
+struct Complex {
+  Nested n;
+  WithArray w;
+  std::array<double, 3> d;
+};
+
+TEST(CompactSizeTest, SimpleStruct) {
+  EXPECT_EQ(compactSize<Simple>(), sizeof(int) + sizeof(char) + sizeof(double));
+}
+
+TEST(CompactSizeTest, NestedStruct) {
+  EXPECT_EQ(compactSize<Nested>(), compactSize<Simple>() + sizeof(float));
+}
+
+TEST(CompactSizeTest, StructWithArray) {
+  EXPECT_EQ(compactSize<WithArray>(), sizeof(int) * 5 + sizeof(char));
+}
+
+TEST(CompactSizeTest, ComplexNestedStruct) {
+  EXPECT_EQ(compactSize<Complex>(),
+            compactSize<Nested>() +
+            compactSize<WithArray>() +
+            sizeof(double) * 3);
+}
+
+TEST(CompactSizeTest, CompareWithSizeof) {
+  EXPECT_LE(compactSize<Simple>(), sizeof(Simple));
+  EXPECT_LE(compactSize<Nested>(), sizeof(Nested));
+  EXPECT_LE(compactSize<WithArray>(), sizeof(WithArray));
+  EXPECT_LE(compactSize<Complex>(), sizeof(Complex));
+}
+
+TEST(CompactSizeTest, EmptyStruct) {
+  struct Empty {};
+  EXPECT_EQ(compactSize<Empty>(), 0);
+}
+
+TEST(CompactSizeTest, FormatOutput) {
+  Simple s{};
+  std::string expected = fmt::format("Compact size: {}",
+      sizeof(int) + sizeof(char) + sizeof(double));
+  std::string actual = fmt::format("Compact size: {}", compactSize(s));
+  EXPECT_EQ(actual, expected);
+}
+
+} // namespace nim
