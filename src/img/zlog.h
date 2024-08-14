@@ -102,6 +102,11 @@ TEnum stringToEnum(std::string_view s)
   static constexpr auto enumerators =
     reflect::enumerators<TEnum, reflect::enum_min(TEnum{}), reflect::enum_max(TEnum{})>;
   for (size_t i = 0; i < enumerators.size(); ++i) {
+#ifdef _MSC_VER
+    if (std::string_view(enumerators[i].second).find("0x"sv) != std::string_view::npos) {
+      continue;
+    }
+#endif
     if (s == enumerators[i].second) {
       return static_cast<TEnum>(enumerators[i].first);
     }
@@ -149,7 +154,7 @@ std::string flagsToString(TEnum e)
       reflect::enumerators<TEnum, reflect::enum_min(TEnum{}), reflect::enum_max(TEnum{})>;
     for (size_t i = 0; i < enumerators.size(); ++i) {
 #ifdef _MSC_VER
-      if (enumerators[i].second.find("0x"sv) != std::string_view::npos) {
+      if (std::string_view(enumerators[i].second).find("0x"sv) != std::string_view::npos) {
         continue;
       }
 #endif
