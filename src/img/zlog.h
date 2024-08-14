@@ -99,6 +99,9 @@ template<typename TEnum>
   requires std::is_enum_v<TEnum>
 TEnum stringToEnum(std::string_view s)
 {
+#ifdef _MSC_VER
+    using namespace std::literals;
+#endif
   static constexpr auto enumerators =
     reflect::enumerators<TEnum, reflect::enum_min(TEnum{}), reflect::enum_max(TEnum{})>;
   for (size_t i = 0; i < enumerators.size(); ++i) {
