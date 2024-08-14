@@ -52,16 +52,13 @@ void ZImgNCCMatch::setMovingImgPositionHint(PositionHint hint, double maxOverlap
 {
   // make it correct
   if (isFlagSet(hint, PositionHint::Left) && isFlagSet(hint, PositionHint::Right)) {
-    flipFlag(hint, PositionHint::Left);
-    flipFlag(hint, PositionHint::Right);
+    flipFlag(hint, PositionHint::Left | PositionHint::Right);
   }
   if (isFlagSet(hint, PositionHint::Up) && isFlagSet(hint, PositionHint::Down)) {
-    flipFlag(hint, PositionHint::Up);
-    flipFlag(hint, PositionHint::Down);
+    flipFlag(hint, PositionHint::Up | PositionHint::Down);
   }
   if (isFlagSet(hint, PositionHint::Front) && isFlagSet(hint, PositionHint::Back)) {
-    flipFlag(hint, PositionHint::Front);
-    flipFlag(hint, PositionHint::Back);
+    flipFlag(hint, PositionHint::Front | PositionHint::Back);
   }
   m_movingImgPosHint = hint;
   CHECK(maxOverlapRate >= 0.01 && maxOverlapRate <= 1.0);
@@ -75,40 +72,14 @@ std::string ZImgNCCMatch::positionHintToString() const
 
 void ZImgNCCMatch::reversePositionHint(PositionHint& hint)
 {
-  // make it correct
-  if (isFlagSet(hint, PositionHint::Left) && isFlagSet(hint, PositionHint::Right)) {
-    flipFlag(hint, PositionHint::Left);
-    flipFlag(hint, PositionHint::Right);
+  if (isFlagSet(hint, PositionHint::Left) || isFlagSet(hint, PositionHint::Right)) {
+    flipFlag(hint, PositionHint::Left | PositionHint::Right);
   }
-  if (isFlagSet(hint, PositionHint::Up) && isFlagSet(hint, PositionHint::Down)) {
-    flipFlag(hint, PositionHint::Up);
-    flipFlag(hint, PositionHint::Down);
+  if (isFlagSet(hint, PositionHint::Up) || isFlagSet(hint, PositionHint::Down)) {
+    flipFlag(hint, PositionHint::Up | PositionHint::Down);
   }
-  if (isFlagSet(hint, PositionHint::Front) && isFlagSet(hint, PositionHint::Back)) {
-    flipFlag(hint, PositionHint::Front);
-    flipFlag(hint, PositionHint::Back);
-  }
-  // reverse
-  if (isFlagSet(hint, PositionHint::Left)) {
-    flipFlag(hint, PositionHint::Left);
-    setFlag(hint, PositionHint::Right);
-  } else if (isFlagSet(hint, PositionHint::Right)) {
-    flipFlag(hint, PositionHint::Right);
-    setFlag(hint, PositionHint::Left);
-  }
-  if (isFlagSet(hint, PositionHint::Up)) {
-    flipFlag(hint, PositionHint::Up);
-    setFlag(hint, PositionHint::Down);
-  } else if (isFlagSet(hint, PositionHint::Down)) {
-    flipFlag(hint, PositionHint::Down);
-    setFlag(hint, PositionHint::Up);
-  }
-  if (isFlagSet(hint, PositionHint::Front)) {
-    flipFlag(hint, PositionHint::Front);
-    setFlag(hint, PositionHint::Back);
-  } else if (isFlagSet(hint, PositionHint::Back)) {
-    flipFlag(hint, PositionHint::Back);
-    setFlag(hint, PositionHint::Front);
+  if (isFlagSet(hint, PositionHint::Front) || isFlagSet(hint, PositionHint::Back)) {
+    flipFlag(hint, PositionHint::Front | PositionHint::Back);
   }
 }
 

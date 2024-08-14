@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zexception.h"
 #include <type_traits>
 
 namespace nim {
@@ -68,7 +69,7 @@ constexpr bool isFlagSet(TEnum value, TEnum flag) noexcept
 
 template<typename TEnum>
   requires IsFlags<TEnum>::value
-constexpr void setFlag(TEnum& value) noexcept
+constexpr void setAllFlags(TEnum& value) noexcept
 {
   value |= ~value;
 }
@@ -82,21 +83,21 @@ constexpr void setFlag(TEnum& value, TEnum flag) noexcept
 
 template<typename TEnum>
   requires IsFlags<TEnum>::value
-constexpr void resetFlag(TEnum& value) noexcept
+constexpr void unsetAllFlags(TEnum& value) noexcept
 {
   value &= ~value;
 }
 
 template<typename TEnum>
   requires IsFlags<TEnum>::value
-constexpr void resetFlag(TEnum& value, TEnum flag) noexcept
+constexpr void unsetFlag(TEnum& value, TEnum flag) noexcept
 {
   value &= ~flag;
 }
 
 template<typename TEnum>
   requires IsFlags<TEnum>::value
-constexpr void flipFlag(TEnum& value) noexcept
+constexpr void flipAllFlags(TEnum& value) noexcept
 {
   value = ~value;
 }

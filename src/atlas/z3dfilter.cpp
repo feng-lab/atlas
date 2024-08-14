@@ -113,11 +113,11 @@ void Z3DFilter::write(json::object& json) const
 void Z3DFilter::setValid(Z3DEye eye)
 {
   if (eye == MonoEye) {
-    resetFlag(m_state, State::MonoViewResultInvalid);
+    unsetFlag(m_state, State::MonoViewResultInvalid);
   } else if (eye == LeftEye) {
-    resetFlag(m_state, State::LeftEyeResultInvalid);
+    unsetFlag(m_state, State::LeftEyeResultInvalid);
   } else {
-    resetFlag(m_state, State::RightEyeResultInvalid);
+    unsetFlag(m_state, State::RightEyeResultInvalid);
   }
 }
 

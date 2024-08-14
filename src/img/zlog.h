@@ -84,7 +84,12 @@ template<typename TEnum>
 std::string_view enumToString(TEnum e)
 {
   auto res = reflect::enum_name(e);
+#ifdef _MSC_VER
+  using namespace std::literals;
+  if (res.empty() || res.find("0x"sv) != res.npos) {
+#else
   if (res.empty()) {
+#endif
     throw ZException(fmt::format("invalid enum value: {}", std::to_underlying(e)));
   }
   return res;
@@ -133,10 +138,21 @@ template<typename TEnum>
 std::string flagsToString(TEnum e)
 {
   std::string res = std::string(reflect::enum_name(e));
+#ifdef _MSC_VER
+  using namespace std::literals;
+  if (res.empty() || res.find("0x") != res.npos) {
+    res.clear();
+#else
   if (res.empty()) {
+#endif
     static constexpr auto enumerators =
       reflect::enumerators<TEnum, reflect::enum_min(TEnum{}), reflect::enum_max(TEnum{})>;
     for (size_t i = 0; i < enumerators.size(); ++i) {
+#ifdef _MSC_VER
+      if (enumerators[i].second.find("0x"sv) != std::string_view::npos) {
+        continue;
+      }
+#endif
       if (enumerators[i].first != 0 && isFlagSet(e, static_cast<TEnum>(enumerators[i].first))) {
         if (res.empty()) {
           res = std::string(enumerators[i].second);

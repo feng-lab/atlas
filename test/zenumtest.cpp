@@ -44,10 +44,26 @@ TEST_ENUM_CONVERSIONS(DataType,
                       {DataType::SLong8, "SLong8"},
                       {DataType::IFD8, "IFD8"});
 
+TEST(EnumConversionTests, DataTypeInvalidEnum2)
+{
+  using TEnum = DataType;
+  EXPECT_THROW(enumToString(static_cast<TEnum>(0)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(14)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(15)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(DataType::IFD8) + 1)), nim::ZException);
+}
+
 TEST_ENUM_CONVERSIONS(VoxelFormat,
                       {VoxelFormat::Unsigned, "Unsigned"},
                       {VoxelFormat::Signed, "Signed"},
                       {VoxelFormat::Float, "Float"});
+
+TEST(EnumConversionTests, VoxelFormatInvalidEnum2)
+{
+  using TEnum = VoxelFormat;
+  EXPECT_THROW(enumToString(static_cast<TEnum>(0)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(VoxelFormat::Float) + 1)), nim::ZException);
+}
 
 TEST_ENUM_CONVERSIONS(VoxelSizeUnit,
                       {VoxelSizeUnit::none, "none"},
@@ -59,6 +75,13 @@ TEST_ENUM_CONVERSIONS(VoxelSizeUnit,
                       {VoxelSizeUnit::m, "m"},
                       {VoxelSizeUnit::hm, "hm"},
                       {VoxelSizeUnit::km, "km"});
+
+TEST(EnumConversionTests, VoxelSizeUnitInvalidEnum2)
+{
+  using TEnum = VoxelFormat;
+  EXPECT_THROW(enumToString(static_cast<TEnum>(-1)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(VoxelSizeUnit::km) + 1)), nim::ZException);
+}
 
 TEST_ENUM_CONVERSIONS(FileFormat,
                       {FileFormat::Unknown, "Unknown"},
@@ -75,6 +98,13 @@ TEST_ENUM_CONVERSIONS(FileFormat,
                       {FileFormat::ZeissCZI, "ZeissCZI"},
                       {FileFormat::ITKImage, "ITKImage"},
                       {FileFormat::Leica, "Leica"});
+
+TEST(EnumConversionTests, FileFormatInvalidEnum2)
+{
+  using TEnum = FileFormat;
+  EXPECT_THROW(enumToString(static_cast<TEnum>(-1)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(FileFormat::Leica) + 1)), nim::ZException);
+}
 
 TEST_ENUM_CONVERSIONS(Compression,
                       {Compression::AUTO, "AUTO"},
@@ -93,11 +123,25 @@ TEST_ENUM_CONVERSIONS(Compression,
                       {Compression::WEBP, "WEBP"},
                       {Compression::JPEGXR, "JPEGXR"});
 
+TEST(EnumConversionTests, CompressionInvalidEnum2)
+{
+  using TEnum = Compression;
+  EXPECT_THROW(enumToString(static_cast<TEnum>(-1)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(Compression::JPEGXR) + 1)), nim::ZException);
+}
+
 TEST_ENUM_CONVERSIONS(PadOption,
                       {PadOption::Constant, "Constant"},
                       {PadOption::Symmetric, "Symmetric"},
                       {PadOption::Replicate, "Replicate"},
                       {PadOption::Circular, "Circular"});
+
+TEST(EnumConversionTests, PadOptionInvalidEnum2)
+{
+  using TEnum = PadOption;
+  EXPECT_THROW(enumToString(static_cast<TEnum>(-1)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(PadOption::Circular) + 1)), nim::ZException);
+}
 
 TEST_ENUM_CONVERSIONS(Interpolant,
                       {Interpolant::Nearest, "Nearest"},
@@ -106,12 +150,26 @@ TEST_ENUM_CONVERSIONS(Interpolant,
                       {Interpolant::Lanczos2, "Lanczos2"},
                       {Interpolant::Lanczos3, "Lanczos3"});
 
+TEST(EnumConversionTests, InterpolantInvalidEnum2)
+{
+  using TEnum = Interpolant;
+  EXPECT_THROW(enumToString(static_cast<TEnum>(-1)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(Interpolant::Lanczos3) + 1)), nim::ZException);
+}
+
 TEST_ENUM_CONVERSIONS(Dimension,
                       {Dimension::X, "X"},
                       {Dimension::Y, "Y"},
                       {Dimension::Z, "Z"},
                       {Dimension::C, "C"},
                       {Dimension::T, "T"});
+
+TEST(EnumConversionTests, DimensionInvalidEnum2)
+{
+  using TEnum = Dimension;
+  EXPECT_THROW(enumToString(static_cast<TEnum>(-1)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(Dimension::T) + 1)), nim::ZException);
+}
 
 TEST_ENUM_CONVERSIONS(ImgMergeMode,
                       {ImgMergeMode::Max, "Max"},
@@ -120,6 +178,13 @@ TEST_ENUM_CONVERSIONS(ImgMergeMode,
                       {ImgMergeMode::Median, "Median"},
                       {ImgMergeMode::First, "First"},
                       {ImgMergeMode::Interpolation, "Interpolation"});
+
+TEST(EnumConversionTests, ImgMergeModeInvalidEnum2)
+{
+  using TEnum = ImgMergeMode;
+  EXPECT_THROW(enumToString(static_cast<TEnum>(-1)), nim::ZException);
+  EXPECT_THROW(enumToString(static_cast<TEnum>(std::to_underlying(ImgMergeMode::Interpolation) + 1)), nim::ZException);
+}
 
 namespace nim {
 
