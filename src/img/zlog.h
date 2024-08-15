@@ -210,7 +210,7 @@ concept IsUtf8ArrayType = IsAnyOf<T,
 template<typename T>
 concept IsSupportedQtTypeForPrint =
   std::same_as<T, QPoint> || std::same_as<T, QPointF> || std::same_as<T, QRect> || std::same_as<T, QRectF> ||
-  std::same_as<T, QSize> || std::same_as<T, QList<typename T::value_type>> ||
+  std::same_as<T, QSize> || std::same_as<T, QStringList> || std::same_as<T, QList<typename T::value_type>> ||
   std::same_as<T, QContiguousCache<typename T::value_type>> ||
   std::same_as<T, QSharedPointer<typename T::value_type>> || std::same_as<T, QFlags<typename T::enum_type>>
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))

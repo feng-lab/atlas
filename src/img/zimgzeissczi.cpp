@@ -1843,8 +1843,8 @@ void ZImgZeissCZI::dumpFileHeaderSegment(std::ifstream& inputFileStream, std::st
   fmt::format_to(std::back_inserter(str), "{}FileHeaderSegment\n", ind);
   fmt::format_to(std::back_inserter(str), "{}Major: {}\n", ind, fh.major);
   fmt::format_to(std::back_inserter(str), "{}Minor: {}\n", ind, fh.minor);
-  fmt::format_to(std::back_inserter(str), "{}PrimaryFileGuid: {}\n", ind, fh.primaryFileGuid.toByteArray());
-  fmt::format_to(std::back_inserter(str), "{}FileGuid: {}\n", ind, fh.fileGuid.toByteArray());
+  fmt::format_to(std::back_inserter(str), "{}PrimaryFileGuid: {}\n", ind, boost::uuids::to_string(fh.primaryFileGuid));
+  fmt::format_to(std::back_inserter(str), "{}FileGuid: {}\n", ind, boost::uuids::to_string(fh.fileGuid));
   fmt::format_to(std::back_inserter(str), "{}FilePart: {}\n", ind, fh.filePart);
   fmt::format_to(std::back_inserter(str), "{}DirectoryPosition: {}\n", ind, fh.directoryPosition);
   fmt::format_to(std::back_inserter(str), "{}MetadataPosition: {}\n", ind, fh.metaDataPosition);
@@ -2140,7 +2140,7 @@ void ZImgZeissCZI::dumpAttachmentEntry(const AttachmentEntryA1& ae, std::string&
   }
   fmt::format_to(std::back_inserter(str), "{}FilePosition: {}\n", ind, ae.filePosition);
   fmt::format_to(std::back_inserter(str), "{}FilePart: {}\n", ind, ae.filePart);
-  fmt::format_to(std::back_inserter(str), "{}ContentGuid: {}\n", ind, ae.contentGuid.toByteArray());
+  fmt::format_to(std::back_inserter(str), "{}ContentGuid: {}\n", ind, boost::uuids::to_string(ae.contentGuid));
   fmt::format_to(std::back_inserter(str), "{}ContentFileType: {}\n", ind, ae.contentFileType.data());
   fmt::format_to(std::back_inserter(str), "{}Name: {}\n", ind, ae.name.data());
 }

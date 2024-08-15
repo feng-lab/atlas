@@ -10,6 +10,10 @@
 
 namespace nim {
 
+using namespace std::literals::string_view_literals;
+
+using namespace std::literals::string_literals;
+
 class ZException : public std::exception
 {
 public:
@@ -37,9 +41,19 @@ public:
     }
   }
 
-  explicit ZException(const QString& what, Option option = Option::Default)
-    : m_what(what.toStdString())
+  explicit ZException(std::string what, Option option = Option::Default)
+    : m_what(std::move(what))
   {
+    if (option == Option::CheckErrno && errno != 0) {
+      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
+      errno = 0;
+    }
+  }
+
+  explicit ZException(QStringView what, Option option = Option::Default)
+  {
+    auto u8 = what.toUtf8();
+    std::string(u8.data(), u8.size()).swap(m_what);
     if (option == Option::CheckErrno && errno != 0) {
       m_what = m_what + " <errno: " + std::strerror(errno) + ">";
       errno = 0;

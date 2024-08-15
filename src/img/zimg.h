@@ -1562,7 +1562,7 @@ public:
   ZImg typedBinarized(const ForegroundPredictor& isForeground) const
   {
     if (!isType<TVoxel>()) {
-      throw ZException("Call typedBinarized with wrong type");
+      throw ZException("Call typedBinarized with wrong type"s);
     }
 
     ZImgInfo info = m_info;
@@ -1650,7 +1650,7 @@ public:
     if (scalar != TScalar(0)) {
       IMG_TYPED_CALL(divScalar_Impl, m_info, scalar)
     } else {
-      throw ZException("Can not divide img by zero");
+      throw ZException("Can not divide img by zero"s);
     }
     return *this;
   }
@@ -1704,7 +1704,7 @@ public:
   ZImg& typedUnaryOperation(const CustomUnaryOp& op)
   {
     if (!isType<TVoxel>()) {
-      throw ZException("Call typedUnaryOperation with wrong type");
+      throw ZException("Call typedUnaryOperation with wrong type"s);
     }
     unaryOp_Impl<TVoxel>(op);
     return *this;
@@ -1746,7 +1746,7 @@ public:
   ZImg& typedBinaryOperation(const ZImg& other, const CustomBinaryOp& op)
   {
     if (!isType<TVoxel>() || !other.isType<TVoxelOther>()) {
-      throw ZException("Call typedBinaryOperation with wrong type");
+      throw ZException("Call typedBinaryOperation with wrong type"s);
     }
     if (!isSameSize(other)) {
       throw ZException(fmt::format("img binary operation requires same size img as input: this <{}>, other <{}>",

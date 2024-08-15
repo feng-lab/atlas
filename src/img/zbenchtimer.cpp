@@ -9,7 +9,7 @@ namespace nim {
 static_assert(std::ratio_less_equal_v<std::chrono::steady_clock::period, std::micro>,
               "Current C++ compiler doesn't provide a precise enough steady_clock.");
 
-void ZBenchTimer::recordEvent(const std::string& eventName)
+void ZBenchTimer::recordEvent(std::string_view eventName)
 {
   auto now = std::chrono::steady_clock::now();
   fmt::format_to(std::back_inserter(m_events),

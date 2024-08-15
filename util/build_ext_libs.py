@@ -2827,12 +2827,12 @@ def build_conda_zimg(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
     finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
         if is_mac():
             os.rename(os.path.join(ext_build_dir(), 'include', '__tbb'),
                       os.path.join(ext_build_dir(), 'include', 'tbb'))
             os.rename(os.path.join(ext_build_dir(), 'include', '__oneapi'),
                       os.path.join(ext_build_dir(), 'include', 'oneapi'))
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_ospray(src_dir: str, install_dir: str):

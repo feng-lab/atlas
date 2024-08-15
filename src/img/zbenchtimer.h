@@ -84,7 +84,7 @@ public:
     start();
   }
 
-  void recordEvent(const std::string& eventName);
+  void recordEvent(std::string_view eventName);
 
   void stop()
   {

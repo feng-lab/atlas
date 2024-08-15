@@ -5,7 +5,7 @@
 
 namespace nim {
 
-ZImgMetatag::ZImgMetatag(std::string name, const std::string& value, uint32_t tag)
+ZImgMetatag::ZImgMetatag(std::string name, std::string_view value, uint32_t tag)
   : m_name(std::move(name))
   , m_tag(tag)
   , m_dataType(DataType::Ascii)
@@ -15,19 +15,7 @@ ZImgMetatag::ZImgMetatag(std::string name, const std::string& value, uint32_t ta
   std::memcpy(dataArray<char>(), value.data(), value.size());
 }
 
-ZImgMetatag::ZImgMetatag(std::string name, const char* value, size_t maxLen, uint32_t tag)
-  : m_name(std::move(name))
-  , m_tag(tag)
-  , m_dataType(DataType::Ascii)
-{
-  // VLOG(1) << value << " " << maxLen;
-  auto len = strnlen(value, maxLen);
-  setCount(len + 1);
-  CHECK(dataArray()[m_count - 1] == 0) << dataArray()[m_count - 1];
-  std::memcpy(dataArray<char>(), value, len);
-}
-
-ZImgMetatag::ZImgMetatag(std::string name, const QString& value, uint32_t tag)
+ZImgMetatag::ZImgMetatag(std::string name, QStringView value, uint32_t tag)
   : m_name(std::move(name))
   , m_tag(tag)
   , m_dataType(DataType::Ascii)

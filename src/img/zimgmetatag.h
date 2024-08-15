@@ -15,14 +15,12 @@ class ZImgMetatag
 public:
   ZImgMetatag() = default;
 
-  // convenient function to create a name-value pair meta data
-  // value will be stored as utf-8 string with datatype DataType::Ascii
+  // convenient function to create a name-value pair metadata
+  // value will be stored as utf-8 string with datatype::Ascii
   // input value string should has utf-8 encoding
-  ZImgMetatag(std::string name, const std::string& value, uint32_t tag = 0);
+  ZImgMetatag(std::string name, std::string_view value, uint32_t tag = 0);
 
-  ZImgMetatag(std::string name, const char* value, size_t maxLen, uint32_t tag = 0);
-
-  ZImgMetatag(std::string name, const QString& value, uint32_t tag = 0);
+  ZImgMetatag(std::string name, QStringView value, uint32_t tag = 0);
 
   ZImgMetatag(ZImgMetatag&&) = default;
 
