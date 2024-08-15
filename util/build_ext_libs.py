@@ -1906,12 +1906,6 @@ def build_assimp(src_dir: str, install_dir: str):
                       r' ',
                       ],
         ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, 'contrib', 'poly2tri', 'poly2tri', 'common', 'dll_symbol.h'),
-            from_texts=[r'#if defined(_WIN32)'],
-            to_texts=[r'#if !defined(_WIN32)'],
-            patch_condition=is_windows
-        ),
     ]
     patch_manager = PatchManager(patches)
 
@@ -2553,11 +2547,9 @@ def build_llfio(src_dir: str, install_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DLLFIO_FORCE_NETWORKING_OFF:BOOL=ON',
-                         '-DLLFIO_USE_EXPERIMENTAL_SG14_STATUS_CODE:BOOL=OFF',
-                         '-DLLFIO_FORCE_COROUTINES_OFF:BOOL=ON',
-                         '-DLLFIO_FORCE_CONCEPTS_OFF:BOOL=ON',
+                         # '-DLLFIO_FORCE_COROUTINES_OFF:BOOL=ON',
+                         # '-DLLFIO_FORCE_CONCEPTS_OFF:BOOL=ON',
                          '-DLLFIO_FORCE_OPENSSL_OFF:BOOL=ON',
-                         '-DPROJECT_IS_DEPENDENCY:BOOL=ON',
                          ])
 
         cmakecmd.extend([src_dir])
@@ -2611,15 +2603,6 @@ def build_fizz(src_dir: str, install_dir: str):
             to_texts=[
                 'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n'
                 'add_library(gflags::gflags ALIAS gflags)',
-            ],
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, 'record', 'Types.h'),
-            from_texts=[
-                r'auto format(fizz::ExtensionType t, format_context& ctx) {',
-            ],
-            to_texts=[
-                r'auto format(fizz::ExtensionType t, format_context& ctx) const {',
             ],
         ),
     ]
@@ -3412,7 +3395,7 @@ def parse_inputs(argv: list):
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
     # not used now
-    lib_skip_list = ['ospray', 'ants', 'skia', 'rocksdb', 'conda-opencv', 'llfio', 'or-tools']
+    lib_skip_list = ['ospray', 'ants', 'skia', 'rocksdb', 'llfio', 'conda-opencv', 'or-tools']
 
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
