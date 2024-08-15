@@ -1450,8 +1450,7 @@ include(libs)""",
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
         os.unlink(os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'libs.cmake'))
-        if is_windows():
-            cleanup_git_submodule(src_dir)
+        cleanup_git_submodule(src_dir)
 
 
 def build_ceres_solver(src_dir: str, install_dir: str):

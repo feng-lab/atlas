@@ -106,9 +106,9 @@ constexpr bool is_streamable()
 // Static assertions for fmt::formatter
 static_assert(IsUtf8ArrayType<QByteArray>, "QByteArray should satisfy IsUtf8ArrayType");
 static_assert(is_formattable<QString>(), "QString should be formattable");
+static_assert(is_formattable<QStringView>(), "QStringView should be formattable");
 static_assert(is_formattable<QByteArray>(), "QByteArray should be formattable");
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-static_assert(is_formattable<QStringView>(), "QStringView should be formattable");
 static_assert(IsUtf8ArrayType<QByteArrayView>, "QByteArrayView should satisfy IsUtf8ArrayType");
 static_assert(IsUtf8ArrayType<QUtf8StringView>, "QUtf8StringView should satisfy IsUtf8ArrayType");
 static_assert(is_formattable<QByteArrayView>(), "QByteArrayView should be formattable");
@@ -119,9 +119,9 @@ static_assert(is_formattable<QStringRef>(), "QStringRef should be formattable");
 
 // Static assertions for std::ostream operator
 static_assert(is_streamable<QString>(), "QString should be streamable");
+static_assert(is_streamable<QStringView>(), "QStringView should be streamable");
 static_assert(is_streamable<QByteArray>(), "QByteArray should be streamable");
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-static_assert(is_streamable<QStringView>(), "QStringView should be streamable");
 static_assert(is_streamable<QByteArrayView>(), "QByteArrayView should be streamable");
 static_assert(is_streamable<QUtf8StringView>(), "QUtf8StringView should be streamable");
 #else

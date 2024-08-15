@@ -126,14 +126,6 @@ QString enumToQString(TEnum e)
 }
 
 template<typename TEnum>
-  requires std::is_enum_v<TEnum>
-TEnum stringToEnum(QStringView s)
-{
-  auto str = s.toUtf8();
-  return stringToEnum<TEnum>(std::string_view(str.data(), str.size()));
-}
-
-template<typename TEnum>
   requires std::is_scoped_enum_v<TEnum>
 auto format_as(TEnum f)
 {
@@ -234,6 +226,14 @@ inline void logLongString(const std::string& q)
   }
 }
 
+template<typename TEnum, CanConvertToUtf8QByteArray T>
+  requires std::is_enum_v<TEnum>
+TEnum stringToEnum(const T& s)
+{
+  auto u8 = s.toUtf8();
+  return stringToEnum<TEnum>(std::string_view(u8.data(), u8.size()));
+}
+
 } // namespace nim
 
 template<nim::CanConvertToUtf8QByteArray T>
@@ -297,17 +297,9 @@ std::ostream& operator<<(std::ostream& s, const T& v)
 
 inline void logLongString(const QString& q)
 {
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   for (qsizetype i = 0; i < q.size(); i += 10000) { // glog limit is 30000
     auto length = std::min(qsizetype(10000), q.size() - i);
     QStringView qView(q.data() + i, length);
     LOG(INFO) << qView;
   }
-#else
-  for (int i = 0; i < q.size(); i += 10000) { // glog limit is 30000
-    int length = std::min(10000, q.size() - i);
-    QStringRef qRef(&q, i, length);
-    LOG(INFO) << qRef;
-  }
-#endif
 }
