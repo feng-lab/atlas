@@ -45,14 +45,11 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
 
 void initImgLib(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool isApp, bool isGUIMode)
 {
-  ZImgGlobal::instance().isApp = isApp;
-
   if (isApp) {
     if (isGUIMode) {
       addLogSink(&ZLogCache::instance());
     }
     qInstallMessageHandler(myMessageOutput);
-    LOG(INFO) << "--- App Log Start ---";
   }
 
   // if jarsDIR exist and is valid, try jreDIR first, then try JAVA_HOME
@@ -269,10 +266,6 @@ void shutdownImgLib()
 #endif
 
   folly::SingletonVault::singleton()->destroyInstancesFinal();
-
-  if (ZImgGlobal::instance().isApp) {
-    LOG(INFO) << "--- App Log End ---";
-  }
 }
 
 } // namespace nim

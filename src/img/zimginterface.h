@@ -14,7 +14,6 @@ public:
   QString jreDIR;
   QString jarsDIR;
   QString resourcesDIR;
-  bool isApp = false;
 
 private:
   ZImgGlobal() = default;

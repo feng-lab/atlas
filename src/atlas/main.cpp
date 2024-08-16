@@ -117,9 +117,13 @@ int main(int argc, char* argv[])
 
   if (argc > 1 && strcmp(argv[1], "--command") == 0) {
     initLogging(argv[0]);
+    LOG(INFO) << "--- App Log Start ---";
     [[maybe_unused]] auto guardLogging = folly::makeGuard([]() {
+      LOG(INFO) << "--- App Log End ---";
       shutdownLogging();
     });
+
+    LOG(INFO) << "Version: " << GIT_VERSION;
 
     ZApplication app(argc, argv);
 
@@ -131,8 +135,6 @@ int main(int argc, char* argv[])
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
       shutdownImgLib();
     });
-
-    LOG(INFO) << "Version: " << GIT_VERSION;
 
     return ZRunNeuTuCommand().run(argc, argv);
   }
@@ -163,6 +165,16 @@ int main(int argc, char* argv[])
 
   ZApplication app(argc, argv);
 
+  // init the logging mechanism
+  QDir logDir = ZSystemInfo::logDir();
+  ZSystemInfo::removeOldLogs();
+  initLogging(argv[0], logDir.filePath("atlas"));
+  LOG(INFO) << "--- App Log Start ---";
+  [[maybe_unused]] auto guardLogging = folly::makeGuard([]() {
+    LOG(INFO) << "--- App Log End ---";
+    shutdownLogging();
+  });
+
   if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
     FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
   }
@@ -172,28 +184,16 @@ int main(int argc, char* argv[])
   gflags::SetVersionString(GIT_VERSION);
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
-  // init the logging mechanism
-  QDir logDir = ZSystemInfo::logDir();
-  ZSystemInfo::removeOldLogs();
-  initLogging(argv[0], logDir.filePath("atlas"));
-  [[maybe_unused]] auto guardLogging = folly::makeGuard([]() {
-    shutdownLogging();
-  });
-
   bool isGUIMode = !(FLAGS_run_benchmarks || FLAGS_run_export_3d_animation);
   try {
-    initImgLib(ZSystemInfo::resourcesDirPath(),
-               ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
-               ZSystemInfo::jarsDirPath(),
-               true,
-               isGUIMode);
-    [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
-      shutdownImgLib();
-    });
-
     LOG(INFO) << "Version: " << GIT_VERSION;
-
     LOG(INFO) << "log location: " << logDir.absolutePath();
+
+    ZSystemInfo::instance().logOSInfo();
+#ifdef _WIN32
+    logActiveCodePage();
+#endif
+    LOG(INFO) << "ASAN_OPTIONS: " << __asan_default_options();
 
     if (!FLAGS_flagfile.empty()) {
       LOG(INFO) << "user setting file loaded: " << FLAGS_flagfile;
@@ -202,13 +202,14 @@ int main(int argc, char* argv[])
     }
     LOG(INFO) << "current settings: \n" << gflags::CommandlineFlagsIntoString();
 
-    ZSystemInfo::instance().logOSInfo();
-
-#ifdef _WIN32
-    logActiveCodePage();
-#endif
-
-    LOG(INFO) << "ASAN_OPTIONS: " << __asan_default_options();
+    initImgLib(ZSystemInfo::resourcesDirPath(),
+               ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
+               ZSystemInfo::jarsDirPath(),
+               true,
+               isGUIMode);
+    [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
+      shutdownImgLib();
+    });
 
     initVulkan();
 

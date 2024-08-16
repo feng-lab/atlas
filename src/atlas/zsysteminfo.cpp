@@ -54,10 +54,10 @@ void ZSystemInfo::logOSInfo() const
             << 1e9 * std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den << " ns";
   LOG(INFO) << "steady_clock is_steady = " << std::boolalpha << std::chrono::steady_clock::is_steady;
 
-  LOG(INFO) << "high_resolution_clock res: "
-            << 1e9 * std::chrono::high_resolution_clock::period::num / std::chrono::high_resolution_clock::period::den
-            << " ns";
-  LOG(INFO) << "high_resolution_clock is_steady = " << std::boolalpha << std::chrono::high_resolution_clock::is_steady;
+  VLOG(1) << "high_resolution_clock res: "
+          << 1e9 * std::chrono::high_resolution_clock::period::num / std::chrono::high_resolution_clock::period::den
+          << " ns";
+  VLOG(1) << "high_resolution_clock is_steady = " << std::boolalpha << std::chrono::high_resolution_clock::is_steady;
 }
 
 QString ZSystemInfo::shaderPath(const QString& filename) const
