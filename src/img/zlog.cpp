@@ -85,6 +85,9 @@ public:
 
 std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename)
 {
+  if (filename.isEmpty()) {
+    return {};
+  }
   auto res = std::make_shared<FileLogSink>(filename);
   return res->isValid() ? res : std::shared_ptr<google::LogSink>();
 }

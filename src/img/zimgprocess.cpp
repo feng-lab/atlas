@@ -59,6 +59,15 @@ void ZImgProcess::run()
       throw; // notify parent
     }
   }
+  catch (const std::exception& e) {
+    QString errMsg = QString("Caught std exception: %1").arg(e.what());
+    LOG(ERROR) << errMsg;
+    Q_EMIT processError(errMsg);
+    if (hasParent()) {
+      LOG(ERROR) << "notifying parent operation..";
+      throw; // notify parent
+    }
+  }
 }
 
 void ZImgProcess::runInPython()
@@ -93,7 +102,14 @@ void ZImgProcess::runInPython()
     throw ZException(excp.what());
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Caught exception: " << e.what();
+    LOG(ERROR) << "Caught ZException: " << e.what();
+    if (hasParent()) {
+      LOG(ERROR) << "notifying parent operation..";
+    }
+    throw;
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "Caught std exception: " << e.what();
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
     }

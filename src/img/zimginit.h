@@ -4,13 +4,11 @@
 
 namespace nim {
 
-void initImgLib(const char* argv0,
-                const QString& resourcesDIR = "",
+void initImgLib(const QString& resourcesDIR = "",
                 const QString& jreDIR = "",
                 const QString& jarsDIR = "",
-                const QString& logFilename = "",
-                bool isApp = true,
-                bool isGUIMode = true);
+                bool isApp = false,
+                bool isGUIMode = false);
 
 void shutdownImgLib();
 

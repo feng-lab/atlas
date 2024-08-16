@@ -1,6 +1,7 @@
 #include "zjson.h"
 
 #include "zexception.h"
+#include "zlog.h"
 #include "zioutils.h"
 #include <boost/json/src.hpp>
 
@@ -104,7 +105,11 @@ std::string jsonToString(const json::value& jv)
 
 json::object loadJsonObject(const QString& file)
 {
+  // do not use readFileIntoString as the file might be qt specific
   auto fileString = readFileIntoByteArray(file);
+  if (fileString.isEmpty()) {
+    return {};
+  }
 
   json::parse_options opt; // all extensions default to off
   // opt.numbers = json::number_precision::precise;

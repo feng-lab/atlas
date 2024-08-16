@@ -291,7 +291,8 @@ py::array_t<T, py::array::c_style | py::array::forcecast> vectorToArray(const st
 
 PYBIND11_MODULE(_imgpy, m)
 {
-  initImgLib("_imgpy", qgetenv("Resources_DIR"), "", qgetenv("ZIMG_JARS_DIR"), "", false, false);
+  initLogging("_imgpy");
+  initImgLib(qgetenv("Resources_DIR"), "", qgetenv("ZIMG_JARS_DIR"), false, false);
 
   m.doc() = R"pbdoc(
         Python interface to img lib.
@@ -1411,6 +1412,7 @@ Overloaded Operators:
   //  auto cleanup_callback = []() {
   //    // perform cleanup here -- this function is called with the GIL held
   //    shutdownImgLib();
+  //    shutdownLogging();
   //  };
   //
   //  m.add_object("_cleanup", py::capsule(cleanup_callback));

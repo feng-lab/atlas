@@ -50,31 +50,23 @@ std::ofstream openOFStream(const QString& filename, std::ios_base::openmode mode
 
 void readStream_impl(std::istream& fs, char* buf, size_t count)
 {
-#if defined(__APPLE__)
-  if (count < 1024_uz * 1024 * 1024 * 2) {
+  static size_t chunkSize = 1024_uz * 1024 * 1024;
+  if (count <= chunkSize) {
     if (!fs.read(buf, count)) {
-      throw ZException(fmt::format("Expect {} bytes, only read {} bytes.", count, fs.gcount()),
+      throw ZException(fmt::format("Expect {} bytes, only read {} bytes", count, fs.gcount()),
                        ZException::Option::CheckErrno);
     }
     return;
   }
-  static size_t chunkSize = 1024_uz * 1024 * 1024;
-  size_t bytesRemaining = count;
-  while (bytesRemaining > 0) {
-    size_t bytesToRead = std::min(bytesRemaining, chunkSize);
+  while (count > 0) {
+    size_t bytesToRead = std::min(count, chunkSize);
     if (!fs.read(buf, bytesToRead)) {
-      throw ZException(fmt::format("Expect {} bytes, only read {} bytes.", bytesToRead, fs.gcount()),
+      throw ZException(fmt::format("Expect {} bytes, only read {} bytes", bytesToRead, fs.gcount()),
                        ZException::Option::CheckErrno);
     }
-    bytesRemaining -= bytesToRead;
+    count -= bytesToRead;
     buf += bytesToRead;
   }
-#else
-  if (!fs.read(buf, count)) {
-    throw ZException(fmt::format("Expect {} bytes, only read {} bytes.", count, fs.gcount()),
-                     ZException::Option::CheckErrno);
-  }
-#endif
 }
 
 void writeStream_impl(std::ostream& fs, const char* buf, size_t count)
@@ -135,21 +127,11 @@ std::string readFileIntoString(const QString& filename, std::ios_base::openmode 
 {
   std::string res;
   auto fileSize = QFileInfo(filename).size();
-  if (fileSize == 0) {
-    return res;
+  if (fileSize > 0) {
+    std::ifstream fs = openIFStream(filename, mode);
+    res.resize(fileSize);
+    readStream_impl(fs, res.data(), res.size());
   }
-
-  std::ifstream fs;
-#ifdef _MSC_VER
-  fs.open(filename.toStdWString().c_str(), mode); // use msvc extension
-#else
-  fs.open(QFile::encodeName(filename).constData(), mode);
-#endif
-  if (!fs.is_open()) {
-    throw ZException(fmt::format("Could not open file {}", filename), ZException::Option::CheckErrno);
-  }
-  res.resize(fileSize);
-  fs.read(&res[0], res.size());
   return res;
 }
 

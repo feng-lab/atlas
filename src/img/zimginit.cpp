@@ -43,16 +43,8 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
   }
 }
 
-void initImgLib(const char* argv0,
-                const QString& resourcesDIR,
-                const QString& jreDIR,
-                const QString& jarsDIR,
-                const QString& logFilename,
-                bool isApp,
-                bool isGUIMode)
+void initImgLib(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool isApp, bool isGUIMode)
 {
-  initLogging(argv0, logFilename);
-
   ZImgGlobal::instance().isApp = isApp;
 
   if (isApp) {
@@ -272,17 +264,15 @@ void initImgLib(const char* argv0,
 
 void shutdownImgLib()
 {
-  if (ZImgGlobal::instance().isApp) {
-    LOG(INFO) << "--- App Log End ---";
-  }
-
 #ifdef ZIMG_USE_FFTW
   fftw_cleanup_threads();
 #endif
 
   folly::SingletonVault::singleton()->destroyInstancesFinal();
 
-  shutdownLogging();
+  if (ZImgGlobal::instance().isApp) {
+    LOG(INFO) << "--- App Log End ---";
+  }
 }
 
 } // namespace nim

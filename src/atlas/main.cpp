@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
 #endif
   // Set the environment variable
   qputenv("VK_ADD_LAYER_PATH", vulkanLayerPath.toUtf8());
-  qputenv("VK_LAYER_PATH", vulkanLayerPath.toUtf8());  // should remove in later version
+  qputenv("VK_LAYER_PATH", vulkanLayerPath.toUtf8()); // should remove in later version
 #endif
 
   QCoreApplication::setOrganizationName("fenglab");
@@ -114,71 +114,77 @@ int main(int argc, char* argv[])
   QCoreApplication::setOrganizationDomain("fenglab.xyz");
 #endif
   QCoreApplication::setApplicationName("Atlas");
-  try {
-    if (argc > 1 && strcmp(argv[1], "--command") == 0) {
-      ZApplication app(argc, argv);
 
-      initImgLib(argv[0],
-                 ZSystemInfo::resourcesDirPath(),
-                 ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
-                 ZSystemInfo::jarsDirPath(),
-                 "",
-                 true,
-                 false);
-      [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
-        shutdownImgLib();
-      });
-
-      LOG(INFO) << "Version: " << GIT_VERSION;
-
-      return ZRunNeuTuCommand().run(argc, argv);
-    }
-
-    QSurfaceFormat format;
-#if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
-    format.setVersion(3, 3);
-    format.setProfile(QSurfaceFormat::CoreProfile);
-#endif
-    // format.setStereo(true);
-    QSurfaceFormat::setDefaultFormat(format);
-
-    QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
-#ifdef Q_OS_LINUX
-    QCoreApplication::setAttribute(Qt::AA_DontUseNativeMenuBar, true); // do not use linux global menu bar
-#endif
-#ifdef Q_OS_MACOS
-    QCoreApplication::setAttribute(Qt::AA_DontShowIconsInMenus, true);
-#endif
-#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-    QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
-#endif
-    QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL, true);
-    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
-    QCoreApplication::setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
-    QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, true);
+  if (argc > 1 && strcmp(argv[1], "--command") == 0) {
+    initLogging(argv[0]);
+    [[maybe_unused]] auto guardLogging = folly::makeGuard([]() {
+      shutdownLogging();
+    });
 
     ZApplication app(argc, argv);
 
-    if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
-      FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
-    }
-    std::string usage("Atlas is a brain mapping platform.  Usage:\n");
-    usage += std::string(argv[0]) + "";
-    gflags::SetUsageMessage(usage);
-    gflags::SetVersionString(GIT_VERSION);
-    gflags::ParseCommandLineFlags(&argc, &argv, false);
-
-    // init the logging mechanism
-    QDir logDir = ZSystemInfo::logDir();
-    ZSystemInfo::removeOldLogs();
-
-    bool isGUIMode = !(FLAGS_run_benchmarks || FLAGS_run_export_3d_animation);
-    initImgLib(argv[0],
-               ZSystemInfo::resourcesDirPath(),
+    initImgLib(ZSystemInfo::resourcesDirPath(),
                ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
                ZSystemInfo::jarsDirPath(),
-               logDir.filePath("atlas"),
+               true,
+               false);
+    [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
+      shutdownImgLib();
+    });
+
+    LOG(INFO) << "Version: " << GIT_VERSION;
+
+    return ZRunNeuTuCommand().run(argc, argv);
+  }
+
+  QSurfaceFormat format;
+#if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
+  format.setVersion(3, 3);
+  format.setProfile(QSurfaceFormat::CoreProfile);
+#endif
+  // format.setStereo(true);
+  QSurfaceFormat::setDefaultFormat(format);
+
+  QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
+#ifdef Q_OS_LINUX
+  QCoreApplication::setAttribute(Qt::AA_DontUseNativeMenuBar, true); // do not use linux global menu bar
+#endif
+#ifdef Q_OS_MACOS
+  QCoreApplication::setAttribute(Qt::AA_DontShowIconsInMenus, true);
+#endif
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
+  QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+  QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
+#endif
+  QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL, true);
+  QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
+  QCoreApplication::setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
+  QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, true);
+
+  ZApplication app(argc, argv);
+
+  if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
+    FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
+  }
+  std::string usage("Atlas is a brain mapping platform.  Usage:\n");
+  usage += std::string(argv[0]) + "";
+  gflags::SetUsageMessage(usage);
+  gflags::SetVersionString(GIT_VERSION);
+  gflags::ParseCommandLineFlags(&argc, &argv, false);
+
+  // init the logging mechanism
+  QDir logDir = ZSystemInfo::logDir();
+  ZSystemInfo::removeOldLogs();
+  initLogging(argv[0], logDir.filePath("atlas"));
+  [[maybe_unused]] auto guardLogging = folly::makeGuard([]() {
+    shutdownLogging();
+  });
+
+  bool isGUIMode = !(FLAGS_run_benchmarks || FLAGS_run_export_3d_animation);
+  try {
+    initImgLib(ZSystemInfo::resourcesDirPath(),
+               ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
+               ZSystemInfo::jarsDirPath(),
                true,
                isGUIMode);
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
@@ -208,7 +214,17 @@ int main(int argc, char* argv[])
 
     // ZServiceManager sm;
 
-    if (isGUIMode) {
+    if (!isGUIMode) {
+      // start non-GUI version...
+      LOG(INFO) << "console mode";
+      if (FLAGS_run_benchmarks) {
+        return ZRunBenchmark::run();
+      }
+      if (FLAGS_run_export_3d_animation) {
+        ZRunExport3DAnimation rea;
+        return rea.run();
+      }
+    } else {
       // start GUI version...
       LOG(INFO) << "GUI mode";
       ZTheme::instance();
@@ -217,33 +233,16 @@ int main(int argc, char* argv[])
       auto mainWin = new ZMainWindow(GIT_VERSION);
       QObject::connect(&app, &ZApplication::fileOpenRequest, mainWin, &ZMainWindow::loadUrls);
       mainWin->show();
-    } else {
-      // start non-GUI version...
-      try {
-        LOG(INFO) << "console mode";
-        if (FLAGS_run_benchmarks) {
-          return ZRunBenchmark::run();
-        }
-        if (FLAGS_run_export_3d_animation) {
-          ZRunExport3DAnimation rea;
-          return rea.run();
-        }
-      }
-      catch (const ZException& e) {
-        LOG(ERROR) << "exit with " << typeid(e).name() << ": " << e.what();
-        return 1;
-      }
-      catch (const std::exception& e) {
-        LOG(ERROR) << "exit with " << typeid(e).name() << ": " << e.what();
-        return 1;
-      }
-    }
 
-    return app.exec();
+      return app.exec();
+    }
   }
   catch (const ZException& e) {
-    QMessageBox::critical(nullptr, QCoreApplication::applicationName(), e.what());
-    LOG(FATAL) << "exit with " << typeid(e).name() << ": " << e.what();
+    if (isGUIMode) {
+      QMessageBox::critical(nullptr, QCoreApplication::applicationName(), e.what());
+    }
+    LOG(ERROR) << "exit with " << typeid(e).name() << ": " << e.what();
+    return 1;
   }
   catch (const std::exception& e) {
     LOG(FATAL) << "exit with " << typeid(e).name() << ": " << e.what();
