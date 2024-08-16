@@ -332,8 +332,7 @@ void ZMeshIO::readAllenAtlasMesh(const QString& filename,
                                  std::vector<glm::vec3>& vertices,
                                  std::vector<uint32_t>& indices)
 {
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios::in | std::ios::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios::in | std::ios::binary);
 
   uint32_t numPoints;
   readStream(inputFileStream, &numPoints, 4);
@@ -399,8 +398,7 @@ void ZMeshIO::readPrecomputed(const QString& filename, std::vector<glm::vec3>& v
     LOG(WARNING) << "empty precomputed file " << filename;
     return;
   }
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios::in | std::ios::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios::in | std::ios::binary);
 
   uint32_t numVertices;
   readStream(inputFileStream, &numVertices, 4);
@@ -421,8 +419,7 @@ void ZMeshIO::readPrecomputed(const QString& filename, std::vector<glm::vec3>& v
 
 void ZMeshIO::writePrecomputed(const ZMesh& mesh, const QString& filename)
 {
-  std::ofstream outFileStream;
-  openFileStream(outFileStream, filename, std::ios::out | std::ios::binary);
+  std::ofstream outFileStream = openOFStream(filename, std::ios::out | std::ios::binary);
 
   uint32_t numVertices = mesh.numVertices();
   writeStream(outFileStream, &numVertices, 4);

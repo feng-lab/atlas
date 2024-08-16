@@ -320,8 +320,7 @@ void ZImgLeica::readXml(const QString& filename,
     QTextStream in(&f);
     xml = in.readAll();
   } else {
-    std::ifstream inputFileStream;
-    openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+    std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
     NextBlock nb;
     readStructFromFileStream(nb, inputFileStream);

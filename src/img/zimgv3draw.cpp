@@ -29,8 +29,7 @@ void ZImgV3DRaw::readInfo(const QString& filename,
                           std::vector<ZImgInfo>& infos,
                           std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   std::array<char, sizeof("raw_image_stack_by_hpeng")> formatKey = {"raw_image_stack_by_hpeng"};
   auto realKey = formatKey;
@@ -95,8 +94,7 @@ void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata& /*meta*/, s
   if (scene != 0) {
     throw ZException("invalid scene");
   }
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   std::array<char, sizeof("raw_image_stack_by_hpeng")> formatKey = {"raw_image_stack_by_hpeng"};
   auto realKey = formatKey;
@@ -114,8 +112,7 @@ void ZImgV3DRaw::readThumbnail(const QString& filename,
   if (scene != 0) {
     throw ZException("invalid scene");
   }
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   std::array<char, sizeof("raw_image_stack_by_hpeng")> formatKey = {"raw_image_stack_by_hpeng"};
   auto realKey = formatKey;
@@ -130,8 +127,7 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   if (scene != 0) {
     throw ZException("invalid scene");
   }
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   std::array<char, sizeof("raw_image_stack_by_hpeng")> formatKey = {"raw_image_stack_by_hpeng"};
   auto realKey = formatKey;
@@ -211,8 +207,8 @@ void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, const ZImgWr
 {
   checkImgBeforeWriting(filename, img.info(), paras);
 
-  std::ofstream outputFileStream;
-  openFileStream(outputFileStream, filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+  std::ofstream outputFileStream =
+    openOFStream(filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
 
   constexpr char formatkey[] = "raw_image_stack_by_hpeng";
   writeStream(outputFileStream, formatkey, std::strlen(formatkey));
@@ -239,8 +235,8 @@ void ZImgV3DRaw::writeImg(const QString& filename,
 {
   checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
 
-  std::ofstream outputFileStream;
-  openFileStream(outputFileStream, filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+  std::ofstream outputFileStream =
+    openOFStream(filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
 
   constexpr char formatkey[] = "raw_image_stack_by_hpeng";
   writeStream(outputFileStream, formatkey, std::strlen(formatkey));

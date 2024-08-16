@@ -16,8 +16,7 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename,
   MatrixXd mat;
   MatrixXd emptyMat;
 
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios::in);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios::in);
 
   auto nRow = std::count(std::istreambuf_iterator<char>(inputFileStream), std::istreambuf_iterator<char>(), '\n') + 1;
   inputFileStream.clear();
@@ -52,7 +51,6 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename,
     throw ZException(fmt::format("Error while reading file {}", filename), ZException::Option::CheckErrno);
   }
 
-  inputFileStream.close();
   if (notEmptyLineIdx > 0) {
     mat.conservativeResize(notEmptyLineIdx, Eigen::NoChange);
     return mat;

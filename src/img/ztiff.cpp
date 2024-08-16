@@ -1291,8 +1291,7 @@ std::string ZTiff::tagToName(uint32_t tag)
 
 void ZTiff::readIFDs(const QString& filename, std::vector<ZTiffIFD>& ifds, bool& isNativeEndianness) const
 {
-  std::ifstream fs;
-  openFileStream(fs, filename, std::ios_base::binary | std::ios_base::in);
+  std::ifstream fs = openIFStream(filename, std::ios_base::binary | std::ios_base::in);
   readIFDs(fs, ifds, isNativeEndianness);
 }
 

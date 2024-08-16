@@ -54,7 +54,7 @@ public:
   explicit FileLogSink(const QString& filename)
   {
     try {
-      openFileStream(m_fileStream, filename, std::ios_base::out);
+      openOFStream(m_fileStream, filename, std::ios_base::out);
     }
     catch (const ZException& e) {
       LOG(ERROR) << fmt::format("glog: could not write log file {}, error: {}", filename, e.what());

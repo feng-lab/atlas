@@ -102,8 +102,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
       res = tmpRes.crop(tmpRgn);
     }
   } else {
-    std::ifstream inputFileStream;
-    openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+    std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
     if (timeStride == 0) {
       timeStride = imgInfo.timeByteNumber();
@@ -220,8 +219,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
     ZImgInfo partialImgInfo = region.clip(imgInfo);
     res = ZImg(partialImgInfo);
 
-    std::ifstream inputFileStream;
-    openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+    std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
     auto tEnd = region.end.t == -1 ? ZImgRegion::value_type(imgInfo.numTimes) : region.end.t;
     auto cEnd = region.end.c == -1 ? ZImgRegion::value_type(imgInfo.numChannels) : region.end.c;

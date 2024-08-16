@@ -111,8 +111,7 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
     setDimensionOrder("ZTL");
   }
 
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   if (m_lsmInfo.u32OffsetChannelColors != 0) {
     inputFileStream.seekg(m_lsmInfo.u32OffsetChannelColors);

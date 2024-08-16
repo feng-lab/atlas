@@ -895,8 +895,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
   QString somaPunctaFilename = outputDir.filePath(somaPunctaFileInfo.fileName()) + "_puncta.txt";
 
   ZPuncta punctaList(m_input.somaPunctaFilename);
-  std::ofstream somaPunctaStream;
-  openFileStream(somaPunctaStream, somaPunctaFilename, std::ios_base::out | std::ios_base::trunc);
+  std::ofstream somaPunctaStream = openOFStream(somaPunctaFilename, std::ios_base::out | std::ios_base::trunc);
   somaPunctaStream << "# puncta id, x, y, z, volsize, meanIntensity, maxIntensity\n";
 
   size_t idx = 0;
@@ -957,8 +956,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
     }
   }
 
-  std::ofstream branchStream;
-  openFileStream(branchStream, branchFilename, std::ios_base::out | std::ios_base::trunc);
+  std::ofstream branchStream = openOFStream(branchFilename, std::ios_base::out | std::ios_base::trunc);
   branchStream << "# branch id, type, x, y, z, radius, blueness, layer, topological type, "
                   "distToBranchStart, distToSoma\n";
 
@@ -972,8 +970,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
   }
   branchStream.close();
 
-  std::ofstream punctaStream;
-  openFileStream(punctaStream, punctaFilename, std::ios_base::out | std::ios_base::trunc);
+  std::ofstream punctaStream = openOFStream(punctaFilename, std::ios_base::out | std::ios_base::trunc);
   punctaStream << "# puncta id, x, y, z, branch id, offset, volsize, meanIntensity, maxIntensity, "
                   "distToBranchStart, distToSoma\n";
 
@@ -1003,16 +1000,13 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
     QString outPunctaTxtName = technicalBranchFolder.filePath(
       QString("branch_%1_%2.txt").arg(branch.id, 4, 10, QChar('0')).arg(QFileInfo(m_input.punctaFilename).fileName()));
 
-    std::ofstream outSwcStream;
-    openFileStream(outSwcStream, outSwcName, std::ios_base::out | std::ios_base::trunc);
+    std::ofstream outSwcStream = openOFStream(outSwcName, std::ios_base::out | std::ios_base::trunc);
 
-    std::ofstream outSwcTxtStream;
-    openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
+    std::ofstream outSwcTxtStream = openOFStream(outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
     outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, "
                        "distToBranchStart, distToSoma\n";
 
-    std::ofstream outPunctaTxtStream;
-    openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
+    std::ofstream outPunctaTxtStream = openOFStream(outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
     outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, "
                           "distToBranchStart, distToSoma\n";
 
@@ -1088,16 +1082,13 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
         branchIdList.insert(branchIdList.begin(), parentBranchId);
       }
 
-      std::ofstream outSwcStream;
-      openFileStream(outSwcStream, outSwcName, std::ios_base::out | std::ios_base::trunc);
+      std::ofstream outSwcStream = openOFStream(outSwcName, std::ios_base::out | std::ios_base::trunc);
 
-      std::ofstream outSwcTxtStream;
-      openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
+      std::ofstream outSwcTxtStream = openOFStream(outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
       outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, "
                          "distToBranchStart, distToSoma\n";
 
-      std::ofstream outPunctaTxtStream;
-      openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
+      std::ofstream outPunctaTxtStream = openOFStream(outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
       outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, "
                             "distToBranchStart, distToSoma\n";
 
@@ -1233,16 +1224,13 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                                                                  .arg(QFileInfo(m_input.punctaFilename).fileName()));
       (*currentBranchIndex) += 1;
 
-      std::ofstream outSwcStream;
-      openFileStream(outSwcStream, outSwcName, std::ios_base::out | std::ios_base::trunc);
+      std::ofstream outSwcStream = openOFStream(outSwcName, std::ios_base::out | std::ios_base::trunc);
 
-      std::ofstream outSwcTxtStream;
-      openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
+      std::ofstream outSwcTxtStream = openOFStream(outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
       outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, "
                          "distToBranchStart, distToSoma\n";
 
-      std::ofstream outPunctaTxtStream;
-      openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
+      std::ofstream outPunctaTxtStream = openOFStream(outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
       outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, "
                             "distToBranchStart, distToSoma\n";
 
@@ -1315,16 +1303,13 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
                                                                    .arg(QFileInfo(m_input.punctaFilename).fileName()));
         (*currentBranchIndex) += 1;
 
-        std::ofstream outSwcStream;
-        openFileStream(outSwcStream, outSwcName, std::ios_base::out | std::ios_base::trunc);
+        std::ofstream outSwcStream = openOFStream(outSwcName, std::ios_base::out | std::ios_base::trunc);
 
-        std::ofstream outSwcTxtStream;
-        openFileStream(outSwcTxtStream, outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
+        std::ofstream outSwcTxtStream = openOFStream(outSwcTxtName, std::ios_base::out | std::ios_base::trunc);
         outSwcTxtStream << "# Branch Part, Branch Type, x, y, z, radius, blueness, layer, topological type, "
                            "distToBranchStart, distToSoma\n";
 
-        std::ofstream outPunctaTxtStream;
-        openFileStream(outPunctaTxtStream, outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
+        std::ofstream outPunctaTxtStream = openOFStream(outPunctaTxtName, std::ios_base::out | std::ios_base::trunc);
         outPunctaTxtStream << "# Branch location, x, y, z, offset, volsize, meanIntensity, maxIntensity, "
                               "distToBranchStart, distToSoma\n";
 

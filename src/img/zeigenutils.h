@@ -154,8 +154,7 @@ public:
     }
 
     // open file
-    std::ofstream outFile;
-    openFileStream(outFile, filename, std::ios_base::out);
+    std::ofstream outFile = openOFStream(filename, std::ios_base::out);
 
     std::string sepstr(sep);
     if (sepstr == " " || sepstr.empty()) {
@@ -174,7 +173,6 @@ public:
       }
     }
 
-    outFile.close();
     return true;
   }
 

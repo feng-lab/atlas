@@ -10,7 +10,7 @@
 
 namespace nim {
 
-void openFileStream(std::ifstream& fs, const QString& filename, std::ios_base::openmode mode)
+void openIFStream(std::ifstream& fs, const QString& filename, std::ios_base::openmode mode)
 {
 #ifdef _MSC_VER
   fs.open(filename.toStdWString().c_str(), mode); // use msvc extension
@@ -25,11 +25,11 @@ void openFileStream(std::ifstream& fs, const QString& filename, std::ios_base::o
 std::ifstream openIFStream(const QString& filename, std::ios_base::openmode mode)
 {
   std::ifstream res;
-  openFileStream(res, filename, mode);
+  openIFStream(res, filename, mode);
   return res;
 }
 
-void openFileStream(std::ofstream& fs, const QString& filename, std::ios_base::openmode mode)
+void openOFStream(std::ofstream& fs, const QString& filename, std::ios_base::openmode mode)
 {
 #ifdef _MSC_VER
   fs.open(filename.toStdWString().c_str(), mode); // use msvc extension
@@ -44,7 +44,7 @@ void openFileStream(std::ofstream& fs, const QString& filename, std::ios_base::o
 std::ofstream openOFStream(const QString& filename, std::ios_base::openmode mode)
 {
   std::ofstream res;
-  openFileStream(res, filename, mode);
+  openOFStream(res, filename, mode);
   return res;
 }
 

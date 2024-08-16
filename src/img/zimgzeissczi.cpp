@@ -363,8 +363,7 @@ std::shared_ptr<ZImg> ZImgCZISubBlock::read() const
       throw ZException("empty czi sub block");
     }
     auto res = std::make_shared<ZImg>();
-    std::ifstream inputFileStream;
-    openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
+    std::ifstream inputFileStream = openIFStream(m_filename, std::ios_base::in | std::ios_base::binary);
     if (m_mixedTiles) {
       *res = ZImg(ZImgInfo(m_width, m_height, 1, m_numChannels, 1, m_bytePerVoxel, m_voxelFormat));
       for (const auto& tile : m_tiles) {
@@ -399,8 +398,7 @@ ZImgInfo ZImgCZISubBlock::readInfo() const
       throw ZException("empty czi sub block");
     }
     ZImgInfo res;
-    std::ifstream inputFileStream;
-    openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
+    std::ifstream inputFileStream = openIFStream(m_filename, std::ios_base::in | std::ios_base::binary);
     if (m_mixedTiles) {
       res = ZImgInfo(m_width, m_height, 1, m_numChannels, 1, m_bytePerVoxel, m_voxelFormat);
     } else {
@@ -428,8 +426,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene, 
 {
   clearInternalState();
 
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
   readStructFromFileStream(sh, inputFileStream);
@@ -473,8 +470,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString& filename,
 {
   clearInternalState();
 
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
   readStructFromFileStream(sh, inputFileStream);
@@ -538,8 +534,7 @@ ZImg ZImgZeissCZI::correctShading(const QString& filename,
   CHECK(modelZ.isType<double>() && modelV.isType<double>() && modelZ.isSameSize(modelV));
   clearInternalState();
 
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
   readStructFromFileStream(sh, inputFileStream);
@@ -641,8 +636,7 @@ void ZImgZeissCZI::readInfo(const QString& filename,
 #endif
   clearInternalState();
 
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
   readStructFromFileStream(sh, inputFileStream);
@@ -836,8 +830,7 @@ void ZImgZeissCZI::readImg(const QString& filename,
 {
   clearInternalState();
 
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   SegmentHeader sh;
   readStructFromFileStream(sh, inputFileStream);
@@ -1786,8 +1779,7 @@ std::string ZImgZeissCZI::toString(const QString& filename)
 {
   int64_t filesize = checkFilename(filename);
 
-  std::ifstream inputFileStream;
-  openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
+  std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
   std::string str("\n");
   dumpCZIStream(inputFileStream, filesize, 0, str, 0);

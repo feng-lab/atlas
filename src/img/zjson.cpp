@@ -118,15 +118,13 @@ json::object loadJsonObject(const QString& file)
 
 void saveJsonObject(const json::object& jo, const QString& file)
 {
-  std::ofstream fs;
-  openFileStream(fs, file, std::ios_base::out);
+  auto fs = openOFStream(file, std::ios_base::out);
   pretty_print(fs, jo);
 }
 
 void saveJsonArray(const json::array& ja, const QString& file)
 {
-  std::ofstream fs;
-  openFileStream(fs, file, std::ios_base::out);
+  auto fs = openOFStream(file, std::ios_base::out);
   pretty_print(fs, ja);
 }
 
