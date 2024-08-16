@@ -181,30 +181,16 @@ void ZSwc::load(const QString& filename)
 void ZSwc::save(const QString& filename) const
 {
   try {
-    QFile qFile(filename);
-    if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-      throw ZException("Can not open file.", ZException::Option::CheckErrno);
-    }
+    auto of = openOFStream(filename, std::ios_base::out);
 
-    QTextStream out(&qFile);
-#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-    out.setCodec("UTF-8");
-#endif
-    out << "#id type x y z radius parentID\n";
-    if (out.status() != QTextStream::Ok) {
-      throw ZException("Error while writing file.", ZException::Option::CheckErrno);
+    of << "#id type x y z radius parentID\n";
+    if (!of) {
+      throw ZException("Error while writing file header", ZException::Option::CheckErrno);
     }
     for (ConstBreadthFirstIterator it = beginBreadthFirst(); it != endBreadthFirst(); ++it) {
-      out << QString("%1 %2 %3 %4 %5 %6 %7\n")
-               .arg(it->id)
-               .arg(it->type)
-               .arg(it->x)
-               .arg(it->y)
-               .arg(it->z)
-               .arg(it->radius)
-               .arg(parentID(it));
-      if (out.status() != QTextStream::Ok) {
-        throw ZException("Error while writing file.", ZException::Option::CheckErrno);
+      of << fmt::format("{} {} {} {} {} {} {}\n", it->id, it->type, it->x, it->y, it->z, it->radius, parentID(it));
+      if (!of) {
+        throw ZException("Error while writing file", ZException::Option::CheckErrno);
       }
     }
   }

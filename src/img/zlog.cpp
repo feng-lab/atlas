@@ -1,7 +1,10 @@
 #include "zlog.h"
 
+#include "zioutils.h"
+
 #include <QFile>
 #include <utility>
+#include <boost/geometry/core/closure.hpp>
 
 namespace nim {
 
@@ -45,20 +48,22 @@ void shutdownLogging()
 
 class FileLogSink : public google::LogSink
 {
-  QFile m_file;
+  std::ofstream m_fileStream;
 
 public:
   explicit FileLogSink(const QString& filename)
   {
-    m_file.setFileName(filename);
-    if (!m_file.open(QFile::WriteOnly | QFile::Text)) {
-      LOG(ERROR) << "glog: could not open log file: " << filename;
+    try {
+      openFileStream(m_fileStream, filename, std::ios_base::out);
+    }
+    catch (const ZException& e) {
+      LOG(ERROR) << fmt::format("glog: could not write log file {}, error: {}", filename, e.what());
     }
   }
 
   [[nodiscard]] bool isValid() const
   {
-    return m_file.isOpen();
+    return m_fileStream.is_open() && m_fileStream;
   }
 
   // LogSink interface
@@ -73,10 +78,7 @@ public:
             size_t message_len) override
   {
     if (isValid()) {
-      auto str = ToString(severity, base_filename, line, time, message, message_len);
-      m_file.write(str.c_str(), str.length());
-      m_file.putChar('\n');
-      m_file.flush();
+      m_fileStream << ToString(severity, base_filename, line, time, message, message_len) << std::endl;
     }
   }
 };

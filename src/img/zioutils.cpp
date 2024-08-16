@@ -18,8 +18,15 @@ void openFileStream(std::ifstream& fs, const QString& filename, std::ios_base::o
   fs.open(QFile::encodeName(filename).constData(), mode);
 #endif
   if (!fs.is_open()) {
-    throw ZException("Can not open file for reading.", ZException::Option::CheckErrno);
+    throw ZException(fmt::format("Could not open file {} for reading", filename), ZException::Option::CheckErrno);
   }
+}
+
+std::ifstream openIFStream(const QString& filename, std::ios_base::openmode mode)
+{
+  std::ifstream res;
+  openFileStream(res, filename, mode);
+  return res;
 }
 
 void openFileStream(std::ofstream& fs, const QString& filename, std::ios_base::openmode mode)
@@ -30,8 +37,15 @@ void openFileStream(std::ofstream& fs, const QString& filename, std::ios_base::o
   fs.open(QFile::encodeName(filename).constData(), mode);
 #endif
   if (!fs.is_open()) {
-    throw ZException("Can not open file for writing.", ZException::Option::CheckErrno);
+    throw ZException(fmt::format("Could not open file {} for writing", filename), ZException::Option::CheckErrno);
   }
+}
+
+std::ofstream openOFStream(const QString& filename, std::ios_base::openmode mode)
+{
+  std::ofstream res;
+  openFileStream(res, filename, mode);
+  return res;
 }
 
 void readStream_impl(std::istream& fs, char* buf, size_t count)
@@ -66,7 +80,7 @@ void readStream_impl(std::istream& fs, char* buf, size_t count)
 void writeStream_impl(std::ostream& fs, const char* buf, size_t count)
 {
   if (!fs.write(buf, count)) {
-    throw ZException("File write failed.", ZException::Option::CheckErrno);
+    throw ZException("File write failed", ZException::Option::CheckErrno);
   }
 }
 
@@ -77,7 +91,7 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
   errno = 0;
   std::FILE* tmpf = nullptr;
   if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), mode.toStdWString().c_str()) != 0) {
-    throw ZException("Can not open file", ZException::Option::CheckErrno);
+    throw ZException(fmt::format("Could not open file {}", filename), ZException::Option::CheckErrno);
   }
   return std::unique_ptr<std::FILE, decltype(&std::fclose)>(tmpf, std::fclose);
 }
@@ -89,7 +103,7 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
   errno = 0;
   std::FILE* tmpf = std::fopen(QFile::encodeName(filename).constData(), mode);
   if (!tmpf) {
-    throw ZException("Can not open file", ZException::Option::CheckErrno);
+    throw ZException(fmt::format("Could not open file {}", filename), ZException::Option::CheckErrno);
   }
   return std::unique_ptr<std::FILE, decltype(&std::fclose)>(tmpf, std::fclose);
 }
@@ -132,7 +146,7 @@ std::string readFileIntoString(const QString& filename, std::ios_base::openmode 
   fs.open(QFile::encodeName(filename).constData(), mode);
 #endif
   if (!fs.is_open()) {
-    throw ZException("Can not open file for reading.", ZException::Option::CheckErrno);
+    throw ZException(fmt::format("Could not open file {}", filename), ZException::Option::CheckErrno);
   }
   res.resize(fileSize);
   fs.read(&res[0], res.size());
@@ -144,7 +158,7 @@ QByteArray readFileIntoByteArray(const QString& filename, QIODevice::OpenMode op
   QFile loadFile(filename);
 
   if (!loadFile.open(openMode)) {
-    throw ZException(fmt::format("could not open: {}", filename), ZException::Option::CheckErrno);
+    throw ZException(fmt::format("Could not open file {}", filename), ZException::Option::CheckErrno);
   }
 
   return loadFile.readAll();

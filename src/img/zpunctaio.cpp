@@ -400,43 +400,36 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
 
 void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file)
 {
-  QFile qFile(file);
-  if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-    throw ZException("Can not open file.", ZException::Option::CheckErrno);
-  }
+  auto of = openOFStream(file, std::ios_base::out);
 
-  QTextStream out(&qFile);
-#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-  out.setCodec("UTF-8");
-#endif
-  size_t idx = 0;
-  out
-    << "#id, , name, comment, z, x, y, maxIntensity, meanIntensity, sDevOfIntensity, volSize, mass, property1, property2, property3, red, green, blue\n";
-  if (out.status() != QTextStream::Ok) {
-    throw ZException("Error while writing file.", ZException::Option::CheckErrno);
+  of << "#id, , name, comment, z, x, y, maxIntensity, meanIntensity, sDevOfIntensity, volSize, mass, property1, "
+        "property2, property3, red, green, blue\n";
+  if (!of) {
+    throw ZException("Error while writing file header", ZException::Option::CheckErrno);
   }
+  size_t idx = 1;
   for (const auto& pun : puncta.data) {
-    out << QString("%1,,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15,%16,%17\n")
-             .arg(idx + 1)
-             .arg(pun.name())
-             .arg(pun.comment())
-             .arg(pun.z())
-             .arg(pun.x())
-             .arg(pun.y())
-             .arg(pun.maxIntensity())
-             .arg(pun.meanIntensity())
-             .arg(pun.sDevOfIntensity())
-             .arg(pun.volSize())
-             .arg(pun.mass())
-             .arg(pun.property1())
-             .arg(pun.property2())
-             .arg(pun.property3())
-             .arg(pun.color().r)
-             .arg(pun.color().g)
-             .arg(pun.color().b);
+    of << fmt::format("{},,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
+                      idx,
+                      pun.name(),
+                      pun.comment(),
+                      pun.z(),
+                      pun.x(),
+                      pun.y(),
+                      pun.maxIntensity(),
+                      pun.meanIntensity(),
+                      pun.sDevOfIntensity(),
+                      pun.volSize(),
+                      pun.mass(),
+                      pun.property1(),
+                      pun.property2(),
+                      pun.property3(),
+                      pun.color().r,
+                      pun.color().g,
+                      pun.color().b);
     ++idx;
-    if (out.status() != QTextStream::Ok) {
-      throw ZException("Error while writing file.", ZException::Option::CheckErrno);
+    if (!of) {
+      throw ZException("Error while writing file", ZException::Option::CheckErrno);
     }
   }
 }
@@ -531,23 +524,15 @@ void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta)
 
 void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file)
 {
-  QFile qFile(file);
-  if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-    throw ZException("Can not open file.", ZException::Option::CheckErrno);
-  }
-
-  QTextStream out(&qFile);
-#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-  out.setCodec("UTF-8");
-#endif
-  out << "# x y z radius\n";
-  if (out.status() != QTextStream::Ok) {
-    throw ZException("Error while writing file.", ZException::Option::CheckErrno);
+  auto of = openOFStream(file, std::ios_base::out);
+  of << "# x y z radius\n";
+  if (!of) {
+    throw ZException("Error while writing file header", ZException::Option::CheckErrno);
   }
   for (const auto& pun : puncta.data) {
-    out << QString("%1 %2 %3 %4\n").arg(pun.x()).arg(pun.y()).arg(pun.z()).arg(pun.radius());
-    if (out.status() != QTextStream::Ok) {
-      throw ZException("Error while writing file.", ZException::Option::CheckErrno);
+    of << fmt::format("{} {} {} {}\n", pun.x(), pun.y(), pun.z(), pun.radius());
+    if (!of) {
+      throw ZException("Error while writing file", ZException::Option::CheckErrno);
     }
   }
 }

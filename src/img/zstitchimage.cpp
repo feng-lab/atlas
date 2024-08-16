@@ -713,17 +713,6 @@ void ZStitchImage::doWork()
     imgMerge.setMergeMode(m_mergeMode);
     auto summary = imgMerge.resolveLocations();
 
-#if 0
-    QString stitchInfoOutputName = m_resFileName;
-    stitchInfoOutputName.append("_info.txt");
-    QFile fOut(stitchInfoOutputName);
-    if (fOut.open(QFile::WriteOnly | QFile::Text)) {
-      QTextStream s(&fOut);
-      for (const auto& mes : summary)
-        s << mes << '\n';
-    }
-    fOut.close();
-#endif
     imgMerge.save(m_resFileName);
     if (true) {
       for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
@@ -1072,17 +1061,6 @@ void ZStitchImage::doRestitch()
     imgMerge.setMergeMode(m_mergeMode);
     auto summary = imgMerge.resolveLocations();
 
-#if 0
-    QString stitchInfoOutputName = m_resFileName;
-    stitchInfoOutputName.append("_info.txt");
-    QFile fOut(stitchInfoOutputName);
-    if (fOut.open(QFile::WriteOnly | QFile::Text)) {
-      QTextStream s(&fOut);
-      for (const auto& mes : summary)
-        s << mes << '\n';
-    }
-    fOut.close();
-#endif
     imgMerge.save(m_resFileName);
     if (true) {
       for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {

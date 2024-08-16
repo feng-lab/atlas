@@ -11,9 +11,15 @@ void openFileStream(std::ifstream& fs,
                     const QString& filename,
                     std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary);
 
+std::ifstream openIFStream(const QString& filename,
+                           std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary);
+
 void openFileStream(std::ofstream& fs,
                     const QString& filename,
                     std::ios_base::openmode mode = std::ios_base::out | std::ios_base::binary);
+
+std::ofstream openOFStream(const QString& filename,
+                           std::ios_base::openmode mode = std::ios_base::out | std::ios_base::binary);
 
 // mac: if count >= 2G, fs.read() will fail, this is a workaround
 void readStream_impl(std::istream& fs, char* buf, size_t count);
