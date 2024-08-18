@@ -117,8 +117,12 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const json:
     return nullptr;
   }
   const auto& obj = value.as_object();
-  if (obj.contains("color") && obj.at("color").is_string()) {
-    toVal(asQString(obj.at("color")), color);
+  if (obj.contains("color")) {
+    if (obj.at("color").is_string()) {
+      toVal(asQString(obj.at("color")), color);
+    } else {
+      color = json::value_to<QColor>(obj.at("color"));
+    }
   }
   if (type == "3DCamera") {
     auto res = new ZCameraParameterAnimation(name, color, parent);
@@ -150,7 +154,8 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const json:
 void ZParameterAnimation::write(json::object& json) const
 {
   json::object obj;
-  obj["color"] = json::value_from(toQString(m_color));
+  // obj["color"] = json::value_from(toQString(m_color));
+  obj["color"] = json::value_from(m_color);
   if (!m_keys.empty()) {
     json::array keysArray;
     for (const auto& key : m_keys) {

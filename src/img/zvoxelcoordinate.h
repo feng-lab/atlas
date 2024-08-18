@@ -459,13 +459,13 @@ constexpr auto&& get(const ZVoxelCoordinate& v) noexcept
 template<std::size_t Index>
 constexpr auto&& get(ZVoxelCoordinate&& v) noexcept
 {
-  return tupleLikeGetHelper<Index, 5>(v);
+  return tupleLikeGetHelper<Index, 5>(std::move(v));
 }
 
 template<std::size_t Index>
 constexpr auto&& get(const ZVoxelCoordinate&& v) noexcept
 {
-  return tupleLikeGetHelper<Index, 5>(v);
+  return tupleLikeGetHelper<Index, 5>(std::move(v));
 }
 
 } // namespace nim

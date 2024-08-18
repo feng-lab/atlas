@@ -497,7 +497,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
           }
           col4 col;
           std::memcpy(&col, &color, 3);
-          col.a = 255;
+          CHECK(col.a == 255);
           info.channelColors[ch] = col;
         }
       }

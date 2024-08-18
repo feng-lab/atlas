@@ -292,6 +292,7 @@ __forceinline void toVal(const std::string& str, T& v)
   toVal(QString::fromStdString(str), v);
 }
 
+#if 0
 template<typename T>
 __forceinline QString toQString(T v)
 {
@@ -320,6 +321,7 @@ QString toQString(const glm::vec<L, T, Q>& v)
   res += "]";
   return res;
 }
+#endif
 
 template<size_t L, typename T, glm::qualifier Q>
 void toVal(const QString& str, glm::vec<L, T, Q>& v)
@@ -331,6 +333,7 @@ void toVal(const QString& str, glm::vec<L, T, Q>& v)
   }
 }
 
+#if 0
 template<size_t C, size_t R, typename T, glm::qualifier Q>
 QString toQString(const glm::mat<C, R, T, Q>& m)
 {
@@ -349,6 +352,7 @@ QString toQString(const glm::mat<C, R, T, Q>& m)
   res += "]";
   return res;
 }
+#endif
 
 template<size_t C, size_t R, typename T, glm::qualifier Q>
 void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
@@ -360,11 +364,13 @@ void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
   }
 }
 
+#if 0
 template<typename T, glm::qualifier Q>
 QString toQString(const glm::tquat<T, Q>& v)
 {
   return "[" + toQString(v[0]) + ", " + toQString(v[1]) + ", " + toQString(v[2]) + ", " + toQString(v[3]) + "]";
 }
+#endif
 
 template<typename T, glm::qualifier Q>
 void toVal(const QString& str, glm::tquat<T, Q>& q)

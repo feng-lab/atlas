@@ -75,7 +75,17 @@ struct col4
 {
   using value_type = uint8_t;
 
-  value_type r, g, b, a = 255_u8;
+  col4() = default;
+
+  template<typename R, typename G, typename B, typename A = value_type>
+  col4(R _r, G _g, B _b, A _a = static_cast<A>(255))
+    : r(static_cast<value_type>(_r))
+    , g(static_cast<value_type>(_g))
+    , b(static_cast<value_type>(_b))
+    , a(static_cast<value_type>(_a))
+  {}
+
+  value_type r = 0, g = 0, b = 0, a = 255;
 
   bool operator==(const col4& c) const
   {
@@ -84,22 +94,22 @@ struct col4
 
   [[nodiscard]] float redF() const
   {
-    return float(r) / 255.f;
+    return static_cast<float>(r) / 255.f;
   }
 
   [[nodiscard]] float greenF() const
   {
-    return float(g) / 255.f;
+    return static_cast<float>(g) / 255.f;
   }
 
   [[nodiscard]] float blueF() const
   {
-    return float(b) / 255.f;
+    return static_cast<float>(b) / 255.f;
   }
 
   [[nodiscard]] float alphaF() const
   {
-    return float(a) / 255.f;
+    return static_cast<float>(a) / 255.f;
   }
 
   col4& max(const col4& c)
@@ -295,29 +305,13 @@ constexpr auto&& get(const col4& v) noexcept
 template<std::size_t Index>
 constexpr auto&& get(col4&& v) noexcept
 {
-  return tupleLikeGetHelper<Index, 4>(v);
+  return tupleLikeGetHelper<Index, 4>(std::move(v));
 }
 
 template<std::size_t Index>
 constexpr auto&& get(const col4&& v) noexcept
 {
-  return tupleLikeGetHelper<Index, 4>(v);
-}
-
-template<class T>
-  requires std::is_same_v<json::detail::remove_cvref<T>, col4>
-T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
-{
-  constexpr std::size_t n = std::tuple_size_v<json::detail::remove_cvref<T>>;
-  const auto& ja = jv.as_array();
-  if (ja.size() < n) {
-    throw ZException("json array too short");
-  }
-  T res;
-  for (size_t i = 0; i < n; ++i) {
-    res[i] = json::value_to<typename T::value_type>(ja[i]);
-  }
-  return res;
+  return tupleLikeGetHelper<Index, 4>(std::move(v));
 }
 
 } // namespace nim

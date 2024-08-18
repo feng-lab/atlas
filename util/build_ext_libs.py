@@ -587,6 +587,7 @@ def build_boost(src_dir: str, install_dir: str):
                             '--with-regex',
                             '--with-thread',
                             '--with-system',
+                            '--with-charconv',
                             'address-model=64',
                             'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                             'install',
@@ -598,7 +599,7 @@ def build_boost(src_dir: str, install_dir: str):
                 cbf = get_common_build_flags(with_optimization=True)
                 env = get_env_for_config_make()
                 subprocess.run(['./bootstrap.sh',
-                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
+                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,charconv',
                                 '--without-icu',
                                 '--prefix=' + install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -621,7 +622,7 @@ def build_boost(src_dir: str, install_dir: str):
                 cbf = get_common_build_flags(with_optimization=True, arm64_only=True)
                 env = get_env_for_config_make(arm64_only=True)
                 subprocess.run(['./bootstrap.sh',
-                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
+                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,charconv',
                                 '--without-icu',
                                 '--prefix=' + arm64_install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -644,7 +645,7 @@ def build_boost(src_dir: str, install_dir: str):
             env = get_env_for_config_make()
             subprocess.run(['./bootstrap.sh',
                             '--with-toolset=clang' if use_clang_in_linux() else '',
-                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
+                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,charconv',
                             '--without-icu',
                             '--prefix=' + install_dir],
                            cwd=src_dir, shell=False, check=True, env=env)
