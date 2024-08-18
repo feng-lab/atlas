@@ -1,15 +1,29 @@
 #include "zlog.h"
 
 #include "zioutils.h"
+#include "zlogcache.h"
 
 #include <QFile>
+#include <iostream>
 #include <utility>
 #include <boost/geometry/core/closure.hpp>
 
 namespace nim {
 
-void initLogging(const char* argv0, const QString& filename)
+const ZLogInit& ZLogInit::instance(std::string appName, const QString& filename)
 {
+  static ZLogInit logInit(std::move(appName), filename);
+  return logInit;
+}
+
+ZLogInit::ZLogInit(std::string appName, const QString& filename)
+  : m_appName(std::move(appName))
+{
+  if (google::IsGoogleLoggingInitialized()) {
+    LOG(WARNING) << "glog already initialized, will shutdown and reinitialize";
+    google::ShutdownGoogleLogging();
+  }
+
   if (filename.isEmpty()) {
     google::SetLogDestination(google::GLOG_INFO, "");
     google::SetLogDestination(google::GLOG_ERROR, "");
@@ -38,10 +52,12 @@ void initLogging(const char* argv0, const QString& filename)
 
   google::InstallFailureSignalHandler();
 
-  google::InitGoogleLogging(argv0);
+  google::InitGoogleLogging(m_appName.c_str());
+
+  LOG(INFO) << fmt::format("--- {} Log Start ---", m_appName);
 }
 
-void shutdownLogging()
+ZLogInit::~ZLogInit()
 {
   google::ShutdownGoogleLogging();
 }
@@ -90,6 +106,37 @@ std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename)
   }
   auto res = std::make_shared<FileLogSink>(filename);
   return res->isValid() ? res : std::shared_ptr<google::LogSink>();
+}
+
+void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
+{
+  switch (type) {
+    case QtDebugMsg:
+    case QtInfoMsg:
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_INFO).stream() << msg;
+      break;
+    case QtWarningMsg:
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_WARNING).stream() << msg;
+      break;
+    case QtCriticalMsg:
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_ERROR).stream() << msg;
+      break;
+    case QtFatalMsg:
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_FATAL).stream() << msg;
+      break;
+    default:
+      break;
+  }
+}
+
+void relayQtMessageToLog()
+{
+  qInstallMessageHandler(myMessageOutput);
+}
+
+void relayLogToQtGUI()
+{
+  addLogSink(&ZLogCache::instance());
 }
 
 // test code:

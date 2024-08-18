@@ -20,8 +20,6 @@ class ZTheme : public QObject
 public:
   static ZTheme& instance();
 
-  ZTheme();
-
   void updateTheme();
 
   QString currentTheme() const
@@ -146,6 +144,8 @@ public:
   }
 
 private:
+  ZTheme();
+
   void loadTheme(const QString& file);
 
   const QColor& color(Color role) const

@@ -291,8 +291,8 @@ py::array_t<T, py::array::c_style | py::array::forcecast> vectorToArray(const st
 
 PYBIND11_MODULE(_imgpy, m)
 {
-  initLogging("_imgpy");
-  initImgLib(qgetenv("Resources_DIR"), "", qgetenv("ZIMG_JARS_DIR"), false, false);
+  ZLogInit::instance("zimg"s);
+  ZImgInit::instance(qgetenv("Resources_DIR"), "", qgetenv("ZIMG_JARS_DIR"), false);
 
   m.doc() = R"pbdoc(
         Python interface to img lib.
@@ -1408,12 +1408,4 @@ Overloaded Operators:
     });
 
   m.attr("__version__") = GIT_VERSION;
-
-  //  auto cleanup_callback = []() {
-  //    // perform cleanup here -- this function is called with the GIL held
-  //    shutdownImgLib();
-  //    shutdownLogging();
-  //  };
-  //
-  //  m.add_object("_cleanup", py::capsule(cleanup_callback));
 }

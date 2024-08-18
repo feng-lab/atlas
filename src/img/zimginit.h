@@ -4,12 +4,18 @@
 
 namespace nim {
 
-void initImgLib(const QString& resourcesDIR = "",
-                const QString& jreDIR = "",
-                const QString& jarsDIR = "",
-                bool isApp = false,
-                bool isGUIMode = false);
+class ZImgInit
+{
+public:
+  static const ZImgInit& instance(const QString& resourcesDIR = "",
+                                  const QString& jreDIR = "",
+                                  const QString& jarsDIR = "",
+                                  bool verbose = true);
 
-void shutdownImgLib();
+private:
+  ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool verbose);
+
+  ~ZImgInit();
+};
 
 } // namespace nim

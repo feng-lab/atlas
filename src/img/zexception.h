@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <fmt/base.h>
 #include <cerrno>
 #include <cstring>
 #include <stdexcept>
@@ -23,39 +24,29 @@ public:
     CheckErrno,
   };
 
-  explicit ZException(const char* what = "", Option option = Option::Default)
-    : m_what(what)
-  {
-    if (option == Option::CheckErrno && errno != 0) {
-      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
-      errno = 0;
-    }
-  }
-
-  explicit ZException(std::string_view what, Option option = Option::Default)
-    : m_what(what)
-  {
-    if (option == Option::CheckErrno && errno != 0) {
-      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
-      errno = 0;
-    }
-  }
-
   explicit ZException(std::string what, Option option = Option::Default)
     : m_what(std::move(what))
   {
     if (option == Option::CheckErrno && errno != 0) {
-      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
+      fmt::format_to(std::back_inserter(m_what), "  <errno: {}>", std::strerror(errno));
       errno = 0;
     }
   }
+
+  explicit ZException(const char* what = "", Option option = Option::Default)
+    : ZException(std::string(what), option)
+  {}
+
+  explicit ZException(std::string_view what, Option option = Option::Default)
+    : ZException(std::string(what), option)
+  {}
 
   explicit ZException(QStringView what, Option option = Option::Default)
   {
     auto u8 = what.toUtf8();
     std::string(u8.data(), u8.size()).swap(m_what);
     if (option == Option::CheckErrno && errno != 0) {
-      m_what = m_what + " <errno: " + std::strerror(errno) + ">";
+      fmt::format_to(std::back_inserter(m_what), "  <errno: {}>", std::strerror(errno));
       errno = 0;
     }
   }

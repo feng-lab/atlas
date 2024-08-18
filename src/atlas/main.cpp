@@ -116,25 +116,17 @@ int main(int argc, char* argv[])
   QCoreApplication::setApplicationName("Atlas");
 
   if (argc > 1 && strcmp(argv[1], "--command") == 0) {
-    initLogging(argv[0]);
-    LOG(INFO) << "--- App Log Start ---";
-    [[maybe_unused]] auto guardLogging = folly::makeGuard([]() {
-      LOG(INFO) << "--- App Log End ---";
-      shutdownLogging();
-    });
+    ZLogInit::instance("Atlas"s);
+    relayQtMessageToLog();
 
     LOG(INFO) << "Version: " << GIT_VERSION;
 
     ZApplication app(argc, argv);
 
-    initImgLib(ZSystemInfo::resourcesDirPath(),
-               ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
-               ZSystemInfo::jarsDirPath(),
-               true,
-               false);
-    [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
-      shutdownImgLib();
-    });
+    ZImgInit::instance(ZSystemInfo::resourcesDirPath(),
+                       ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
+                       ZSystemInfo::jarsDirPath(),
+                       true);
 
     return ZRunNeuTuCommand().run(argc, argv);
   }
@@ -165,16 +157,6 @@ int main(int argc, char* argv[])
 
   ZApplication app(argc, argv);
 
-  // init the logging mechanism
-  QDir logDir = ZSystemInfo::logDir();
-  ZSystemInfo::removeOldLogs();
-  initLogging(argv[0], logDir.filePath("atlas"));
-  LOG(INFO) << "--- App Log Start ---";
-  [[maybe_unused]] auto guardLogging = folly::makeGuard([]() {
-    LOG(INFO) << "--- App Log End ---";
-    shutdownLogging();
-  });
-
   if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
     FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
   }
@@ -185,6 +167,16 @@ int main(int argc, char* argv[])
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
   bool isGUIMode = !(FLAGS_run_benchmarks || FLAGS_run_export_3d_animation);
+
+  // init the logging mechanism
+  QDir logDir = ZSystemInfo::logDir();
+  ZSystemInfo::removeOldLogs();
+  ZLogInit::instance("Atlas"s, logDir.filePath("atlas"));
+  relayQtMessageToLog();
+  if (isGUIMode) {
+    relayLogToQtGUI();
+  }
+
   try {
     LOG(INFO) << "Version: " << GIT_VERSION;
     LOG(INFO) << "log location: " << logDir.absolutePath();
@@ -202,14 +194,10 @@ int main(int argc, char* argv[])
     }
     LOG(INFO) << "current settings: \n" << gflags::CommandlineFlagsIntoString();
 
-    initImgLib(ZSystemInfo::resourcesDirPath(),
-               ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
-               ZSystemInfo::jarsDirPath(),
-               true,
-               isGUIMode);
-    [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
-      shutdownImgLib();
-    });
+    ZImgInit::instance(ZSystemInfo::resourcesDirPath(),
+                       ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
+                       ZSystemInfo::jarsDirPath(),
+                       true);
 
     initVulkan();
 

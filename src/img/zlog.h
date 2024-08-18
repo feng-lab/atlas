@@ -29,9 +29,19 @@
 
 namespace nim {
 
-void initLogging(const char* argv0, const QString& filename = "");
+class ZLogInit
+{
+public:
+  static const ZLogInit& instance(std::string appName, const QString& filename = "");
 
-void shutdownLogging();
+private:
+  ZLogInit(std::string appName, const QString& filename);
+
+  ~ZLogInit();
+
+private:
+  std::string m_appName;
+};
 
 struct LogData
 {
@@ -78,6 +88,10 @@ inline void removeLogSink(const std::shared_ptr<google::LogSink>& sink)
   }
 }
 
+void relayQtMessageToLog();
+
+void relayLogToQtGUI();
+
 // enum related
 template<typename TEnum>
   requires std::is_enum_v<TEnum>
@@ -100,7 +114,7 @@ template<typename TEnum>
 TEnum stringToEnum(std::string_view s)
 {
 #ifdef _MSC_VER
-    using namespace std::literals;
+  using namespace std::literals;
 #endif
   static constexpr auto enumerators =
     reflect::enumerators<TEnum, reflect::enum_min(TEnum{}), reflect::enum_max(TEnum{})>;

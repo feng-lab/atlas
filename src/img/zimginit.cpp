@@ -1,7 +1,7 @@
+#include "zimginit.h"
 #include "zlog.h"
 #include "zcpuinfo.h"
 #include "zimginterface.h"
-#include "zlogcache.h"
 #include "zh5zjpegxr.h"
 #include "zmkl.h"
 #ifdef ZIMG_USE_FFTW
@@ -22,34 +22,18 @@
 
 namespace nim {
 
-void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
+const ZImgInit&
+ZImgInit::instance(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool verbose)
 {
-  switch (type) {
-    case QtDebugMsg:
-    case QtInfoMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_INFO).stream() << msg;
-      break;
-    case QtWarningMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_WARNING).stream() << msg;
-      break;
-    case QtCriticalMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_ERROR).stream() << msg;
-      break;
-    case QtFatalMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_FATAL).stream() << msg;
-      break;
-    default:
-      break;
-  }
+  static ZImgInit imgInit(resourcesDIR, jreDIR, jarsDIR, verbose);
+  return imgInit;
 }
 
-void initImgLib(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool isApp, bool isGUIMode)
+ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QString& jarsDIR, bool verbose)
 {
-  if (isApp) {
-    if (isGUIMode) {
-      addLogSink(&ZLogCache::instance());
-    }
-    qInstallMessageHandler(myMessageOutput);
+  if (!google::IsGoogleLoggingInitialized()) {
+    ZLogInit::instance("zimg"s);
+    LOG(WARNING) << "glog is not initialized, initialize it now";
   }
 
   // if jarsDIR exist and is valid, try jreDIR first, then try JAVA_HOME
@@ -93,26 +77,26 @@ void initImgLib(const QString& resourcesDIR, const QString& jreDIR, const QStrin
       }
 
       ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
-      if (isApp) {
+      if (verbose) {
         LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
       }
       ZImgGlobal::instance().jreDIR = jreD.absolutePath();
-      if (isApp) {
+      if (verbose) {
         LOG(INFO) << "jreDIR: " << ZImgGlobal::instance().jreDIR;
       }
     }
   }
   ZImgGlobal::instance().resourcesDIR = resourcesDIR;
-  if (isApp) {
+  if (verbose) {
     LOG(INFO) << "resourcesDIR: " << ZImgGlobal::instance().resourcesDIR;
   }
 
-  if (isApp) {
+  if (verbose) {
     ZCpuInfo::instance().logCpuInfo();
   }
 
 #ifdef ZIMG_USE_MKL
-  if (isApp) {
+  if (verbose) {
     // todo: check this for amd cpu
     MKLVersion mklVer;
     MKL_Get_Version(&mklVer);
@@ -236,7 +220,7 @@ void initImgLib(const QString& resourcesDIR, const QString& jreDIR, const QStrin
   LOG(INFO) << "IPP: " << ippVer->Name << " " << ippVer->Version;
 #endif
 
-  if (isApp) {
+  if (verbose) {
     itk::MultiThreaderBase::Pointer mt = itk::MultiThreaderBase::New();
     mt.Print(std::cout);
   }
@@ -259,7 +243,7 @@ void initImgLib(const QString& resourcesDIR, const QString& jreDIR, const QStrin
   folly::enable_hazptr_thread_pool_executor();
 }
 
-void shutdownImgLib()
+ZImgInit::~ZImgInit()
 {
 #ifdef ZIMG_USE_FFTW
   fftw_cleanup_threads();
