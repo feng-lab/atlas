@@ -6,11 +6,12 @@
 #include <QString>
 #include <boost/charconv.hpp>
 #include <absl/strings/str_split.h>
+#include <concepts>
 
 namespace nim {
 
-template<typename Integral>
-__forceinline void stringToInteger(std::string_view sv, Integral& value, int base = 10)
+template<std::integral Integral>
+__forceinline void stringToValue(std::string_view sv, Integral& value, int base = 10)
 {
   auto res = boost::charconv::from_chars(sv.data(), sv.data() + sv.size(), value, base);
   if (res.ec == std::errc::invalid_argument) {
@@ -20,10 +21,10 @@ __forceinline void stringToInteger(std::string_view sv, Integral& value, int bas
   }
 }
 
-template<typename Real>
-__forceinline void stringToReal(std::string_view sv,
-                                Real& value,
-                                boost::charconv::chars_format fmt = boost::charconv::chars_format::general)
+template<std::floating_point Real>
+__forceinline void stringToValue(std::string_view sv,
+                                 Real& value,
+                                 boost::charconv::chars_format fmt = boost::charconv::chars_format::general)
 {
   auto res = boost::charconv::from_chars_erange(sv.data(), sv.data() + sv.size(), value, fmt);
   if (res.ec == std::errc::invalid_argument) {

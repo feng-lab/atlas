@@ -120,13 +120,13 @@ void ZSwc::load(const QString& filename)
           absl::StrSplit(line, absl::ByAnyChar(" \t\n\r\v\f"), absl::SkipEmpty());
         if (fieldList.size() >= 7) {
           SwcNode node;
-          stringToInteger(fieldList[0], node.id);
-          stringToInteger(fieldList[1], node.type);
-          stringToReal(fieldList[2], node.x);
-          stringToReal(fieldList[3], node.y);
-          stringToReal(fieldList[4], node.z);
-          stringToReal(fieldList[5], node.radius);
-          stringToInteger(fieldList[6], node.parentID);
+          stringToValue(fieldList[0], node.id);
+          stringToValue(fieldList[1], node.type);
+          stringToValue(fieldList[2], node.x);
+          stringToValue(fieldList[3], node.y);
+          stringToValue(fieldList[4], node.z);
+          stringToValue(fieldList[5], node.radius);
+          stringToValue(fieldList[6], node.parentID);
           nodeMap[node.id] = node;
         } else if (!line.empty()) {
           throw ZException(fmt::format("Wrong SWC format: {}.", line));
