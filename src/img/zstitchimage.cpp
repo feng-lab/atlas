@@ -2,6 +2,8 @@
 
 #include "zlog.h"
 #include "zimgnccmatch.h"
+#include "zimgregion.h"
+#include "zstringutils.h"
 #include "zeigenutils.h"
 #include "zvbgmm.h"
 #include <QDir>
@@ -337,6 +339,29 @@ namespace nim {
 ZStitchImage::ZStitchImage()
   : ZImgProcess()
 {}
+
+void ZStitchImage::setInputFilenames(const QStringList& fns, size_t scene)
+{
+  m_inputFilenames = fns;
+  std::sort(m_inputFilenames.begin(), m_inputFilenames.end(), naturalSortLessThan);
+  m_scene = scene;
+}
+
+void ZStitchImage::set2ndInput(const QStringList& fns,
+                               size_t scene,
+                               const std::vector<size_t>& useChs,
+                               const std::vector<size_t>& chsForBackgroundRemove,
+                               size_t commonChannelOfInput,
+                               size_t commonChannelof2ndInput)
+{
+  m_2ndInputFilenames = fns;
+  std::sort(m_2ndInputFilenames.begin(), m_2ndInputFilenames.end(), naturalSortLessThan);
+  m_2ndScene = scene;
+  m_2ndChannelsToUse = useChs;
+  m_2ndChannelsToRemoveBackground = chsForBackgroundRemove;
+  m_commonChannelOfInput = commonChannelOfInput;
+  m_commonChannelOf2ndInput = commonChannelof2ndInput;
+}
 
 void ZStitchImage::setTileGridFromTileSelectionImage(const QString& fn)
 {

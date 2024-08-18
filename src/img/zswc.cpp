@@ -100,59 +100,91 @@ void ZSwc::load(const QString& filename)
   try {
     clear();
 
-    QFile qFile(filename);
-    if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-      throw ZException("Can not read file.", ZException::Option::CheckErrno);
-    }
-
     std::map<int64_t, SwcNode> nodeMap;
+    int version = 1;
 
-    QTextStream stream(&qFile);
-#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-    stream.setCodec("UTF-8");
-#endif
-    for (QString line = stream.readLine(); !line.isNull(); line = stream.readLine()) {
-      line = line.trimmed();
-      if (stream.status() != QTextStream::Ok) {
-        throw ZException("Error while reading file.", ZException::Option::CheckErrno);
+    if (version == 1) {
+      std::ifstream file = openIFStream(filename, std::ios_base::in);
+
+      if (!file.is_open()) {
+        throw ZException("Can not read file.", ZException::Option::CheckErrno);
       }
-      removeComment(line, QString("#"), true);
-      static QRegularExpression rx("\\s+");
-      QStringList fieldList = line.split(rx, Qt::SkipEmptyParts);
-      if (fieldList.size() >= 7) {
-        SwcNode node;
-        bool ok;
-        node.id = fieldList[0].toInt(&ok);
-        if (!ok || node.id < 0) {
+
+      std::string line;
+      while (std::getline(file, line)) {
+        if (!file) {
+          throw ZException("Error while reading file.", ZException::Option::CheckErrno);
+        }
+        removeComment(line, "#", true);
+        std::vector<std::string_view> fieldList =
+          absl::StrSplit(line, absl::ByAnyChar(" \t\n\r\v\f"), absl::SkipEmpty());
+        if (fieldList.size() >= 7) {
+          SwcNode node;
+          stringToInteger(fieldList[0], node.id);
+          stringToInteger(fieldList[1], node.type);
+          stringToReal(fieldList[2], node.x);
+          stringToReal(fieldList[3], node.y);
+          stringToReal(fieldList[4], node.z);
+          stringToReal(fieldList[5], node.radius);
+          stringToInteger(fieldList[6], node.parentID);
+          nodeMap[node.id] = node;
+        } else if (!line.empty()) {
           throw ZException(fmt::format("Wrong SWC format: {}.", line));
         }
-        node.type = fieldList[1].toInt(&ok);
-        if (!ok) {
+      }
+    } else {
+      QFile qFile(filename);
+      if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        throw ZException("Can not read file.", ZException::Option::CheckErrno);
+      }
+
+      QTextStream stream(&qFile);
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
+      stream.setCodec("UTF-8");
+#endif
+      for (QString line = stream.readLine(); !line.isNull(); line = stream.readLine()) {
+        line = line.trimmed();
+        if (stream.status() != QTextStream::Ok) {
+          throw ZException("Error while reading file.", ZException::Option::CheckErrno);
+        }
+        removeComment(line, QString("#"), true);
+        static QRegularExpression rx("\\s+");
+        QStringList fieldList = line.split(rx, Qt::SkipEmptyParts);
+        if (fieldList.size() >= 7) {
+          SwcNode node;
+          bool ok;
+          node.id = fieldList[0].toInt(&ok);
+          if (!ok || node.id < 0) {
+            throw ZException(fmt::format("Wrong SWC format: {}.", line));
+          }
+          node.type = fieldList[1].toInt(&ok);
+          if (!ok) {
+            throw ZException(fmt::format("Wrong SWC format: {}.", line));
+          }
+          node.x = fieldList[2].toDouble(&ok);
+          if (!ok) {
+            throw ZException(fmt::format("Wrong SWC format: {}.", line));
+          }
+          node.y = fieldList[3].toDouble(&ok);
+          if (!ok) {
+            throw ZException(fmt::format("Wrong SWC format: {}.", line));
+          }
+          node.z = fieldList[4].toDouble(&ok);
+          if (!ok) {
+            throw ZException(fmt::format("Wrong SWC format: {}.", line));
+          }
+          node.radius = fieldList[5].toDouble(&ok);
+          if (!ok) {
+            throw ZException(fmt::format("Wrong SWC format: {}.", line));
+          }
+          node.parentID = fieldList[6].toInt(&ok);
+          if (!ok) {
+            throw ZException(fmt::format("Wrong SWC format: {}.", line));
+          }
+          nodeMap[node.id] = node;
+        } else if (!line.isEmpty()) {
           throw ZException(fmt::format("Wrong SWC format: {}.", line));
         }
-        node.x = fieldList[2].toDouble(&ok);
-        if (!ok) {
-          throw ZException(fmt::format("Wrong SWC format: {}.", line));
-        }
-        node.y = fieldList[3].toDouble(&ok);
-        if (!ok) {
-          throw ZException(fmt::format("Wrong SWC format: {}.", line));
-        }
-        node.z = fieldList[4].toDouble(&ok);
-        if (!ok) {
-          throw ZException(fmt::format("Wrong SWC format: {}.", line));
-        }
-        node.radius = fieldList[5].toDouble(&ok);
-        if (!ok) {
-          throw ZException(fmt::format("Wrong SWC format: {}.", line));
-        }
-        node.parentID = fieldList[6].toInt(&ok);
-        if (!ok) {
-          throw ZException(fmt::format("Wrong SWC format: {}.", line));
-        }
-        nodeMap[node.id] = node;
-      } else if (!line.isEmpty()) {
-        throw ZException(fmt::format("Wrong SWC format: {}.", line));
       }
     }
 

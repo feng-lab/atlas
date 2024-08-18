@@ -3,9 +3,7 @@
 #include "zimgprocess.h"
 #include "zimg.h"
 #include "zimginfo.h"
-#include "zimgregion.h"
 #include "zimgmerge.h"
-#include "zstringutils.h"
 
 namespace nim {
 
@@ -16,12 +14,7 @@ class ZStitchImage : public ZImgProcess
 public:
   ZStitchImage();
 
-  void setInputFilenames(const QStringList& fns, size_t scene = 0)
-  {
-    m_inputFilenames = fns;
-    std::sort(m_inputFilenames.begin(), m_inputFilenames.end(), naturalSortLessThan);
-    m_scene = scene;
-  }
+  void setInputFilenames(const QStringList& fns, size_t scene = 0);
 
   // if set, result will be saved to these files
   void setResultFilename(const QString& fn)
@@ -47,16 +40,7 @@ public:
                    const std::vector<size_t>& useChs,
                    const std::vector<size_t>& chsForBackgroundRemove,
                    size_t commonChannelOfInput,
-                   size_t commonChannelof2ndInput)
-  {
-    m_2ndInputFilenames = fns;
-    std::sort(m_2ndInputFilenames.begin(), m_2ndInputFilenames.end(), naturalSortLessThan);
-    m_2ndScene = scene;
-    m_2ndChannelsToUse = useChs;
-    m_2ndChannelsToRemoveBackground = chsForBackgroundRemove;
-    m_commonChannelOfInput = commonChannelOfInput;
-    m_commonChannelOf2ndInput = commonChannelof2ndInput;
-  }
+                   size_t commonChannelof2ndInput);
 
   // default Max
   void setMergeMode(ImgMergeMode mode)
