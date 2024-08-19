@@ -503,7 +503,7 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
 
 void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta)
 {
-  Eigen::MatrixXd mat = ZEigenUtils::readMatrix(file, "", false, 0, "#");
+  Eigen::MatrixXd mat = ZEigenUtils::readMatrix(file, 0);
   mat = ZEigenUtils::removeRowsContainNaNOrInF(mat);
   if (mat.rows() > 0 && mat.cols() == 2) {
     for (Eigen::Index i = 0; i < mat.rows(); ++i) {

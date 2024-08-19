@@ -3,7 +3,6 @@
 #include "zglobal.h"
 #include "zlog.h"
 #include <QFile>
-#include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
 #include <vector>

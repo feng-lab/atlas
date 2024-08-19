@@ -8,7 +8,7 @@ TEST(fileread, text)
 
   try {
     QString file = getTestDataDir().filePath("img/fileread.txt");
-    MatrixXd mat = ZEigenUtils::readMatrix(file, "", false, 0, "#");
+    MatrixXd mat = ZEigenUtils::readMatrix(file, 0);
 
     ASSERT_EQ(6, mat.rows());
     ASSERT_EQ(4, mat.cols());

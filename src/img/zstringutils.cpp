@@ -58,6 +58,42 @@ const QCollator& myCollator()
 
 namespace nim {
 
+std::string_view removeComment(std::string_view line, std::string_view commentStart, bool checkSpecialNumber)
+{
+  auto pos = line.find(commentStart);
+  if (pos == std::string_view::npos) {
+    return line;
+  }
+  // can not be any of 1.#INF, 1.#SNAN, 1.#QNAN, 1.#IND
+  if (pos < 2) {
+    return line.substr(0, pos);
+  }
+
+  if (commentStart != "#"sv) {
+    checkSpecialNumber = false;
+  }
+  if (!checkSpecialNumber) {
+    return line.substr(0, pos);
+  }
+
+  // handle 1.#INF, 1.#SNAN, 1.#QNAN, 1.#IND
+  while (pos != std::string_view::npos) {
+    auto str1 = line.substr(pos - 2, 6);
+    if (absl::EqualsIgnoreCase(str1, "1.#INF"sv) || absl::EqualsIgnoreCase(str1, "1.#IND"sv)) {
+      pos = line.find(commentStart, pos + 1);
+      continue;
+    }
+    auto str2 = line.substr(pos - 2, 7);
+    if (absl::EqualsIgnoreCase(str2, "1.#SNAN"sv) || absl::EqualsIgnoreCase(str2, "1.#QNAN"sv)) {
+      pos = line.find(commentStart, pos + 1);
+      continue;
+    }
+    break;
+  }
+
+  return pos == std::string_view::npos ? line : line.substr(0, pos);
+}
+
 QString randomString(index_t minLength, index_t maxLength)
 {
   static const QString possibleCharacters(
@@ -190,71 +226,6 @@ QString replaceLastInteger(const QString& str, const QString& replacement)
   QString res = str;
   res.replace(startNumPos, endNumPos - startNumPos + 1, replacement);
   return res;
-}
-
-void removeComment(std::string& line, const std::string& commentStart, bool checkSpecialNumber)
-{
-  if (commentStart == "#" && checkSpecialNumber) {
-    std::vector<size_t> poses;
-
-    std::string lineCopy = line;
-    std::transform(lineCopy.begin(), lineCopy.end(), lineCopy.begin(), ::tolower);
-    std::string str("1.#inf");
-    size_t idx = std::string::npos;
-    do {
-      idx = lineCopy.find(str, idx + 1);
-      if (idx != std::string::npos) {
-        poses.push_back(idx + 2);
-        line[idx + 2] = '&';
-      }
-    } while (idx != std::string::npos);
-
-    str = std::string("1.#ind");
-    idx = std::string::npos;
-    do {
-      idx = lineCopy.find(str, idx + 1);
-      if (idx != std::string::npos) {
-        poses.push_back(idx + 2);
-        line[idx + 2] = '&';
-      }
-    } while (idx != std::string::npos);
-
-    str = std::string("1.#qnan");
-    idx = std::string::npos;
-    do {
-      idx = lineCopy.find(str, idx + 1);
-      if (idx != std::string::npos) {
-        poses.push_back(idx + 2);
-        line[idx + 2] = '&';
-      }
-    } while (idx != std::string::npos);
-
-    str = std::string("1.#snan");
-    idx = std::string::npos;
-    do {
-      idx = lineCopy.find(str, idx + 1);
-      if (idx != std::string::npos) {
-        poses.push_back(idx + 2);
-        line[idx + 2] = '&';
-      }
-    } while (idx != std::string::npos);
-
-    idx = line.find(commentStart);
-    if (idx != std::string::npos) {
-      line = line.substr(0, idx);
-    }
-
-    for (auto pose : poses) {
-      if (pose < line.size()) {
-        line[pose] = '#';
-      }
-    }
-  } else {
-    size_t idx = line.find(commentStart);
-    if (idx != std::string::npos) {
-      line = line.substr(0, idx);
-    }
-  }
 }
 
 void removeComment(QString& line, const QString& commentStart, bool checkSpecialNumber)

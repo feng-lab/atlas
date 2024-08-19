@@ -10,6 +10,16 @@
 
 namespace nim {
 
+// Space: ( ) - U+0020
+// Tab: (\t) - U+0009
+// Newline: (\n) - U+000A
+// Carriage return: (\r) - U+000D
+// Vertical tab: (\v) - U+000B
+// Form feed: (\f) - U+000C
+static constexpr auto spaces_literal = " \t\n\r\v\f"sv;
+
+static constexpr auto delimiter_literal = " ,\t:;[]\n\r\v\f"sv;
+
 template<std::integral Integral>
 __forceinline void stringToValue(std::string_view sv, Integral& value, int base = 10)
 {
@@ -35,6 +45,10 @@ __forceinline void stringToValue(std::string_view sv,
   }
 }
 
+// checkSpecialNumber takes care of 1.#qnan, 1.#ind ... when "#" is start of comment
+std::string_view
+removeComment(std::string_view line, std::string_view commentStart = "#"sv, bool checkSpecialNumber = true);
+
 QString randomString(index_t minLength, index_t maxLength);
 
 inline QString randomString(index_t size)
@@ -47,9 +61,6 @@ bool naturalSortLessThan(const QString& s1, const QString& s2);
 bool lastIntegerLessThan(const QString& s1, const QString& s2);
 
 QString replaceLastInteger(const QString& str, const QString& replacement = "");
-
-// checkSpecialNumber takes care of 1.#qnan, 1.#ind ... when "#" is start of comment
-void removeComment(std::string& line, const std::string& commentStart = "#", bool checkSpecialNumber = true);
 
 void removeComment(QString& line, const QString& commentStart = "#", bool checkSpecialNumber = true);
 

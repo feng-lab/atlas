@@ -108,29 +108,12 @@ struct MaxFloatType
 class ZEigenUtils
 {
 public:
-  // result matrix **do not** include endRow and endCol, if there are empty lines between [startRow endRow),
-  // the result matrix size will be smaller. Number of cols are detected from statrRow
-  // By default consecutive delimiters are seen as one, unless you set strictDelimiter to true.
-  // Strict delimiter should be given in uSep. It **can not** be empty or space or tab.
+  // By default consecutive delimiters are seen as one, unless you set strictDelimiter
+  // If strict delimiter is empty, delimiter_literal = " ,\t:;[]\n\r\v\f"sv will be used
   static Eigen::MatrixXd readMatrix(const QString& filename,
-                                    const char* uSep = "",
-                                    bool strictDelimiter = false,
                                     double fillValue = std::numeric_limits<double>::quiet_NaN(),
-                                    const std::string& commentStart = "#");
-
-  // Read numbers in the string to a row vector. Number of data in this line will be in actualNumOfData
-  // if it is not nullptr.
-  // nReadData can be used to control the length of the output vector, if actual number of data is less than nReadData,
-  // the rest will be filled with fillValue. If nData is -1, vector length will be same as nActualData.
-  // If strictDelimiter is used, empty data will be filled with fillValue.
-  // Strict delimiter should be given in uSep. It **can not** be empty or space or tab.
-  static Eigen::RowVectorXd readRowVector(const std::string& line,
-                                          const char* uSep = "",
-                                          Eigen::Index* nActualData = nullptr,
-                                          Eigen::Index nReadData = -1,
-                                          bool strictDelimiter = false,
-                                          double fillValue = std::numeric_limits<double>::quiet_NaN(),
-                                          const std::string& commentStart = "#");
+                                    std::string_view strictDelimiter = ""sv,
+                                    std::string_view commentStart = "#"sv);
 
   template<typename Derived>
   static bool writeMatrix(const Eigen::DenseBase<Derived>& mat,

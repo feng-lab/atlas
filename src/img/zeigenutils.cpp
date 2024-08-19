@@ -7,15 +7,70 @@ namespace nim {
 
 using namespace Eigen;
 
-MatrixXd ZEigenUtils::readMatrix(const QString& filename,
-                                 const char* uSep,
-                                 bool strictDelimiter,
-                                 double fillValue,
-                                 const std::string& commentStart)
+// Read numbers in the string to a row vector
+// nDataToRead can be used to control the length of the output vector, if actual number of data is less than nDataToRead,
+// the rest will be filled with fillValue. Will read all data to the row vector if nDataToRead is -1
+// If strictDelimiter is used, empty data will be filled with fillValue.
+RowVectorXd readRowVector(std::string_view line,
+                          double fillValue,
+                          std::string_view strictDelimiter,
+                          std::string_view commentStart,
+                          Eigen::Index nDataToRead)
 {
-  MatrixXd mat;
-  MatrixXd emptyMat;
+  RowVectorXd rowVector;
+  // remove comment
+  line = absl::StripAsciiWhitespace(removeComment(line, commentStart, true));
+  std::vector<std::string_view> parts;
+  if (strictDelimiter.empty()) {
+    parts = absl::StrSplit(line, absl::ByAnyChar(delimiter_literal), absl::SkipEmpty());
+  } else {
+    parts = absl::StrSplit(line, absl::ByString(strictDelimiter));
+  }
+  if (parts.empty()) {
+    return rowVector;
+  }
 
+  if (nDataToRead < 0) {
+    nDataToRead = parts.size();
+  }
+  rowVector.resize(nDataToRead);
+  for (Eigen::Index i = 0; i < nDataToRead; ++i) {
+    if (static_cast<size_t>(i) >= parts.size()) {
+      rowVector(i) = fillValue;
+    } else {
+      auto sv = parts[i];
+      if (sv.empty()) {
+        rowVector(i) = fillValue;
+      }
+      if (absl::EqualsIgnoreCase(sv, "-inf"sv) || absl::EqualsIgnoreCase(sv, "-1.#inf"sv)) {
+        rowVector(i) = -std::numeric_limits<double>::infinity();
+      } else if (absl::EqualsIgnoreCase(sv, "inf"sv) || absl::EqualsIgnoreCase(sv, "+inf"sv) ||
+                 absl::EqualsIgnoreCase(sv, "1.#inf"sv) || absl::EqualsIgnoreCase(sv, "+1.#inf"sv)) {
+        rowVector(i) = std::numeric_limits<double>::infinity();
+      } else if ((absl::StartsWithIgnoreCase(sv, "1.#"sv) || absl::StartsWithIgnoreCase(sv, "-1.#"sv) ||
+                  absl::StartsWithIgnoreCase(sv, "+1.#"sv)) &&
+                 (absl::EndsWithIgnoreCase(sv, "ind"sv) || absl::EndsWithIgnoreCase(sv, "nan"sv))) {
+        rowVector(i) = std::numeric_limits<double>::quiet_NaN();
+      } else {
+        auto res = boost::charconv::from_chars_erange(sv.data(), sv.data() + sv.size(), rowVector(i));
+        if (res.ec == std::errc::result_out_of_range) {
+          // throw ZException(fmt::format("error: result_out_of_range when converting {} to Real number", sv));
+          LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
+        } else if (res.ec == std::errc::invalid_argument) {
+          rowVector(i) = std::numeric_limits<double>::quiet_NaN();
+        }
+      }
+    }
+  }
+
+  return rowVector;
+}
+
+MatrixXd ZEigenUtils::readMatrix(const QString& filename,
+                                 double fillValue,
+                                 std::string_view strictDelimiter,
+                                 std::string_view commentStart)
+{
   std::ifstream inputFileStream = openIFStream(filename, std::ios::in);
 
   auto nRow = std::count(std::istreambuf_iterator<char>(inputFileStream), std::istreambuf_iterator<char>(), '\n') + 1;
@@ -26,24 +81,22 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename,
     throw ZException(fmt::format("Error while reading file {}", filename), ZException::Option::CheckErrno);
   }
 
-  Eigen::Index nCol = 0;
+  MatrixXd mat;
   Eigen::Index notEmptyLineIdx = 0;
   std::string line;
   while (std::getline(inputFileStream, line)) {
-    if (nCol == 0) { // get number of col and make space in mat
-      readRowVector(line, uSep, &nCol, -1, strictDelimiter, fillValue, commentStart);
-      if (nCol == 0) {
+    if (mat.cols() == 0) { // get number of col and make space in mat
+      RowVectorXd rowVector = readRowVector(line, fillValue, strictDelimiter, commentStart, -1);
+      if (rowVector.size() == 0) {
         continue;
       }
-      mat.resize(nRow, nCol);
-    }
-
-    Eigen::Index nAData;
-    RowVectorXd rowVector = readRowVector(line, uSep, &nAData, nCol, strictDelimiter, fillValue, commentStart);
-    if (nAData == 0) {
-      continue;
-    } else {
+      mat.resize(nRow, rowVector.size());
       mat.row(notEmptyLineIdx++) = rowVector;
+    } else {
+      RowVectorXd rowVector = readRowVector(line, fillValue, strictDelimiter, commentStart, mat.cols());
+      if (rowVector.size() > 0) {
+        mat.row(notEmptyLineIdx++) = rowVector;
+      }
     }
   }
 
@@ -53,140 +106,8 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename,
 
   if (notEmptyLineIdx > 0) {
     mat.conservativeResize(notEmptyLineIdx, Eigen::NoChange);
-    return mat;
   }
-  return emptyMat;
-}
-
-RowVectorXd ZEigenUtils::readRowVector(const std::string& iline,
-                                       const char* uSep,
-                                       Eigen::Index* nActualData,
-                                       Eigen::Index nReadData,
-                                       bool strictDelimiter,
-                                       double fillValue,
-                                       const std::string& commentStart)
-{
-  RowVectorXd rowVector;
-  std::string line = iline.substr(0, iline.find_first_of('\n')); // extract only one line to process
-  // remove comment
-  removeComment(line, commentStart, true);
-  Eigen::Index nData = 0;
-  std::string sep;
-  std::string possiblespace = " \t\r";
-  if (strictDelimiter) {
-    sep = uSep;
-    CHECK(sep.size() == 1 && sep.find_first_not_of(possiblespace) != std::string::npos);
-  } else {
-    sep = ",:; \t\r[]"; // \r for windows file
-    sep += uSep;
-  }
-  if (nActualData || nReadData == -1) {
-    if (strictDelimiter) {
-      size_t startPos = line.find_first_not_of(possiblespace); // skip leading space
-      if (startPos == std::string::npos) {
-        nData = 0;
-        if (nActualData) {
-          *nActualData = nData;
-        }
-        return rowVector;
-      }
-      std::istringstream tmpStream;
-      tmpStream.str(line);
-      nData = std::count(std::istreambuf_iterator<char>(tmpStream), std::istreambuf_iterator<char>(), sep[0]) + 1;
-    } else {
-      size_t startPos = line.find_first_not_of(sep); // skip leading space
-      if (startPos == std::string::npos) {
-        nData = 0;
-        if (nActualData) {
-          *nActualData = nData;
-        }
-        return rowVector;
-      }
-      do {
-        size_t ePos = line.find_first_of(sep, startPos); // start of separator
-        if (ePos != std::string::npos) { // skip consecutive separator
-          ePos = line.find_first_not_of(sep, ePos);
-        }
-        nData++;
-        startPos = ePos;
-      } while (startPos != std::string::npos);
-    }
-  }
-
-  if (nActualData) {
-    *nActualData = nData;
-  }
-
-  if (nReadData == -1) {
-    nReadData = nData;
-  }
-  rowVector.resize(nReadData);
-
-  // read data
-  bool hasData = true;
-  size_t sPos;
-  if (strictDelimiter) {
-    sPos = line.find_first_not_of(possiblespace);
-  } else {
-    sPos = line.find_first_not_of(sep); // skip spaces
-  }
-  for (Eigen::Index i = 0; i < nReadData; ++i) {
-    if (!hasData) {
-      rowVector(i) = fillValue;
-      continue;
-    }
-    size_t ePos = line.find_first_of(sep, sPos);
-    std::string valString = line.substr(sPos, ePos - sPos);
-    // convert valString to double
-    if (strictDelimiter && valString.empty()) {
-      rowVector(i) = fillValue;
-    } else {
-      std::transform(valString.begin(), valString.end(), valString.begin(), ::tolower);
-
-      if (valString == "-inf" || valString == "-1.#inf") {
-        rowVector(i) = -std::numeric_limits<double>::infinity();
-      } else if (valString == "inf" || valString == "+inf" || valString == "1.#inf" || valString == "+1.#inf") {
-        rowVector(i) = std::numeric_limits<double>::infinity();
-      } else if (valString == "nan" || valString == "-nan" || valString == "+nan" || valString == "1.#qnan" ||
-                 valString == "-1.#qnan" || valString == "+1.#qnan" || valString == "1.#ind" ||
-                 valString == "-1.#ind" || valString == "+1.#ind" || valString == "1.#snan" ||
-                 valString == "-1.#snan" || valString == "+1.#snan") {
-        rowVector(i) = std::numeric_limits<double>::quiet_NaN();
-      } else {
-#if 0
-        std::istringstream tmpStream;
-        tmpStream.str(valString);
-        tmpStream.clear();
-        double val;
-        tmpStream >> val;
-        if (!tmpStream)
-          rowVector(i) = std::numeric_limits<double>::quiet_NaN();
-        else
-          rowVector(i) = val;
-#else
-        double val = std::strtod(valString.c_str(), nullptr);
-        rowVector(i) = (val == HUGE_VAL)    ? std::numeric_limits<double>::infinity()
-                       : (val == -HUGE_VAL) ? -std::numeric_limits<double>::infinity()
-                                            : val;
-#endif
-      }
-    }
-
-    if (ePos == std::string::npos) {
-      hasData = false;
-      continue;
-    }
-    if (strictDelimiter) {
-      sPos = ePos + 1;
-    } else {
-      sPos = line.find_first_not_of(sep, ePos); // skip seps
-    }
-    if (sPos >= line.size() || sPos == std::string::npos) {
-      hasData = false;
-      continue;
-    }
-  }
-  return rowVector;
+  return mat;
 }
 
 MatrixXd ZEigenUtils::removeRowsContainNaNOrInF(const Eigen::MatrixXd& srcMat)

@@ -6,7 +6,6 @@
 #include "zstatisticsutils.h"
 #include "zrandom.h"
 #include "zbenchtimer.h"
-#include <QTextStream>
 #include <QFileInfo>
 #include <QImage>
 #include <folly/ScopeGuard.h>
