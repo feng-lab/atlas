@@ -105,7 +105,8 @@ public:
   template<typename Iter>
   static int64_t parentID(const Iter& pos)
   {
-    return isNull(parent(pos)) ? -1 : parent(pos)->id;
+    auto res = parent(ConstSwcTreeNode(pos));
+    return isNull(res) ? -1 : res->id;
   }
 
   SwcTreeNode thickestNode();

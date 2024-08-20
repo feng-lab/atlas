@@ -4,7 +4,6 @@
 #include "zlog.h"
 #include "zsubrange.h"
 #include <boost/stl_interfaces/iterator_interface.hpp>
-#include <deque>
 #include <vector>
 #include <list>
 
@@ -37,6 +36,8 @@ struct TreeNode
   TreeNode<T>* lastChild = nullptr;
   TreeNode<T>* prevSibling = nullptr;
   TreeNode<T>* nextSibling = nullptr;
+  TreeNode<T>* prev = nullptr;
+  TreeNode<T>* next = nullptr;
   typename std::list<TreeNode<T>>::const_iterator iteratorOfContainer; // point to its own container
   T data;
 };
@@ -55,6 +56,11 @@ protected:
   bool isTail(const NodeType* node_)
   {
     return !node_->parent && !node_->nextSibling;
+  }
+
+  bool isHead(const NodeType* node_)
+  {
+    return !node_->parent && !node_->prevSibling;
   }
 };
 
@@ -199,74 +205,118 @@ protected:
       }
     }
 
-    if (!this->isTail(startNode)) {
-      nodeQueue.push_back(startNode);
-      if (endNode) {
-        n = startNode->nextSibling;
-        while (n && n != endNode) {
-          nodeQueue.push_back(n);
-          n = n->nextSibling;
-        }
-      }
-
-      // if current node is equal to end node, usually it is just for equality comparison,
-      //  so we do nothing and let decrement() takes care of the rare decrement case.
-      // if current node is not equal to start node, we need to walk the tree to current node
-      if (this->node != endNode && this->node != startNode) {
-        while (nodeQueue[nodeQueueIdx] != this->node) {
-          n = nodeQueue[nodeQueueIdx]->firstChild;
-          while (n) {
-            nodeQueue.push_back(n);
-            n = n->nextSibling;
-          }
-          ++nodeQueueIdx;
-          CHECK(nodeQueueIdx < nodeQueue.size());
-        }
-      }
+    // LOG(INFO) << this->node << " " << endNode << " " << startNode;
+    // if current node is equal to end node, usually it is just for equality comparison,
+    //  so we do nothing and let decrement() takes care of the rare decrement case.
+    // if current node is not equal to start node, we need to walk the tree to current node
+    if (this->node != endNode && this->node != startNode) {
+      this->node = startNode;
+      firstOnNextLevel = nullptr;
+      lastSeenOnNextLevel = nullptr;
+      do {
+        increment();
+      } while (this->node != n);
     }
   }
 
   void increment()
   {
     // assume this->node or this->parent
-    CHECK(this->node != endNode &&
-          nodeQueueIdx < nodeQueue.size()); // crash on purpose if we are increasing past-the-end
-    CHECK(this->node == nodeQueue[nodeQueueIdx]);
-    NodeType* n = this->node->firstChild;
-    while (n) {
-      nodeQueue.push_back(n);
-      n = n->nextSibling;
+    CHECK(this->node && !this->isTail(this->node));
+    if (this->node->firstChild) {
+      if (!firstOnNextLevel) {
+        firstOnNextLevel = this->node->firstChild;
+        // cleanup
+        if (firstOnNextLevel->prev) {
+          firstOnNextLevel->prev->next = nullptr;
+          firstOnNextLevel->prev = nullptr;
+        }
+      }
+      if (lastSeenOnNextLevel) {
+        lastSeenOnNextLevel->next = this->node->firstChild;
+        this->node->firstChild->prev = lastSeenOnNextLevel;
+      }
     }
-    ++nodeQueueIdx;
-    this->node = nodeQueueIdx == nodeQueue.size() ? endNode : nodeQueue[nodeQueueIdx];
+    if (this->node->lastChild) {
+      lastSeenOnNextLevel = this->node->lastChild;
+      // cleanup
+      if (lastSeenOnNextLevel->next) {
+        lastSeenOnNextLevel->next->prev = nullptr;
+        lastSeenOnNextLevel->next = nullptr;
+      }
+    }
+    if (this->node == this->parent) {
+      const_cast<std::remove_const_t<NodeType>*>(this->node)->next = firstOnNextLevel;
+      if (firstOnNextLevel) {
+        firstOnNextLevel->prev = const_cast<std::remove_const_t<NodeType>*>(this->node);
+      }
+      this->node = firstOnNextLevel;
+      firstOnNextLevel = nullptr;
+      lastSeenOnNextLevel = nullptr;
+    } else {
+      if (this->node->nextSibling && !this->isTail(this->node->nextSibling)) {
+        this->node = this->node->nextSibling;
+      } else if (this->node->next) {
+        this->node = this->node->next;
+      } else {
+        if (firstOnNextLevel) {
+          const_cast<std::remove_const_t<NodeType>*>(this->node)->next = firstOnNextLevel;
+          firstOnNextLevel->prev = const_cast<std::remove_const_t<NodeType>*>(this->node);
+          this->node = firstOnNextLevel;
+        } else {
+          this->node = endNode;
+        }
+        firstOnNextLevel = nullptr;
+        lastSeenOnNextLevel = nullptr;
+      }
+    }
   }
 
   void decrement()
   {
     // assume this->node or this->parent
-    if (this->node == endNode && nodeQueueIdx == 0 && nodeQueueIdx < nodeQueue.size()) {
-      // decrement from endBreadthFirst() iterator, we do a forward transverse from start
-      while (nodeQueueIdx < nodeQueue.size()) {
-        NodeType* n = nodeQueue[nodeQueueIdx]->firstChild;
-        while (n) {
-          nodeQueue.push_back(n);
-          n = n->nextSibling;
+    if (this->node) {
+      if (this->isTail(this->node)) {
+        while (this->node->prevSibling->prevSibling) {
+          this->node = this->node->prevSibling;
         }
-        ++nodeQueueIdx;
+        NodeType* lastNode;
+        firstOnNextLevel = nullptr;
+        lastSeenOnNextLevel = nullptr;
+        do {
+          lastNode = this->node;
+          increment();
+        } while (!this->isTail(this->node));
+        this->node = lastNode;
+      } else {
+        CHECK(!this->isHead(this->node) && this->node != this->parent);
+        if (this->node->prevSibling) {
+          CHECK(!this->isHead(this->node->prevSibling));
+          this->node = this->node->prevSibling;
+        } else if (this->node->prev) {
+          this->node = this->node->prev;
+        } else {
+          CHECK(false);
+        }
       }
-    }
+    } else {
+      // if this->node is nullptr, then this->parent will be some valid node
+      CHECK(this->parent);
+      this->node = this->parent;
 
-    CHECK(nodeQueueIdx > 0);
-    NodeType* n = nodeQueue[nodeQueueIdx - 1];
-    while (nodeQueueIdx < nodeQueue.size() && nodeQueue.back()->parent == n) {
-      nodeQueue.pop_back();
+      NodeType* lastNode;
+      firstOnNextLevel = nullptr;
+      lastSeenOnNextLevel = nullptr;
+      do {
+        lastNode = this->node;
+        increment();
+      } while (this->node != nullptr);
+      this->node = lastNode;
     }
-    --nodeQueueIdx;
-    this->node = nodeQueue[nodeQueueIdx];
   }
 
-  std::vector<NodeType*> nodeQueue;
-  size_t nodeQueueIdx = 0;
+  std::remove_const_t<NodeType>* firstOnNextLevel = nullptr;
+  std::remove_const_t<NodeType>* lastSeenOnNextLevel = nullptr;
   NodeType* endNode = nullptr;
 };
 
