@@ -45,7 +45,7 @@ void ZSwc::labelSomaAndOthers(double radiusThre, int64_t somaType, int64_t other
       rt = rootNode;
     }
 
-    for (BreadthFirstIterator it = beginBreadthFirst(rt); it != endBreadthFirst(rt); ++it) {
+    for (auto it = begin(rt); it != end(rt); ++it) {
       if (maxRadius >= radiusThre &&
           (rootNode == it || (parent(it)->type == somaType && it->radius * 3.0 >= maxRadius))) {
         it->type = somaType;
@@ -86,7 +86,8 @@ void ZSwc::resortPyramidal(int64_t basalType, int64_t apicalType, int64_t somaTy
 void ZSwc::resortID()
 {
   int64_t id = 1;
-  for (BreadthFirstIterator it = beginBreadthFirst(); it != endBreadthFirst(); ++it) {
+  for (auto it = beginBreadthFirst(); it != endBreadthFirst(); ++it) {
+    LOG_IF(INFO, id % 10000 == 0) << id;
     it->id = id++;
     it->parentID = parentID(it);
   }
@@ -162,7 +163,11 @@ void ZSwc::save(const QString& filename) const
     if (!of) {
       throw ZException("Error while writing file header", ZException::Option::CheckErrno);
     }
-    for (ConstBreadthFirstIterator it = beginBreadthFirst(); it != endBreadthFirst(); ++it) {
+#if 0
+    for (auto it = cbeginBreadthFirst(); it != cendBreadthFirst(); ++it) {
+#else
+    for (auto it = cbegin(); it != cend(); ++it) {
+#endif
       of << fmt::format("{} {} {} {} {} {} {}\n", it->id, it->type, it->x, it->y, it->z, it->radius, parentID(it));
       if (!of) {
         throw ZException("Error while writing file", ZException::Option::CheckErrno);

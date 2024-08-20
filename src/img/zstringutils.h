@@ -24,9 +24,10 @@ template<std::integral Integral>
 __forceinline void stringToValue(std::string_view sv, Integral& value, int base = 10)
 {
   auto res = boost::charconv::from_chars(sv.data(), sv.data() + sv.size(), value, base);
-  if (res.ec == std::errc::invalid_argument) {
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
     throw ZException(fmt::format("error: invalid_argument when converting {} to Integer", sv));
-  } else if (res.ec == std::errc::result_out_of_range) {
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
     throw ZException(fmt::format("error: result_out_of_range when converting {} to Integer", sv));
   }
 }
@@ -37,9 +38,10 @@ __forceinline void stringToValue(std::string_view sv,
                                  boost::charconv::chars_format fmt = boost::charconv::chars_format::general)
 {
   auto res = boost::charconv::from_chars_erange(sv.data(), sv.data() + sv.size(), value, fmt);
-  if (res.ec == std::errc::invalid_argument) {
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
     throw ZException(fmt::format("error: invalid_argument when converting {} to Real number", sv));
-  } else if (res.ec == std::errc::result_out_of_range) {
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
     // throw ZException(fmt::format("error: result_out_of_range when converting {} to Real number", sv));
     LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
   }

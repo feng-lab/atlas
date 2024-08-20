@@ -200,11 +200,11 @@ protected:
     }
 
     if (!this->isTail(startNode)) {
-      deque.push_back(startNode);
+      nodeQueue.push_back(startNode);
       if (endNode) {
         n = startNode->nextSibling;
         while (n && n != endNode) {
-          deque.push_back(n);
+          nodeQueue.push_back(n);
           n = n->nextSibling;
         }
       }
@@ -213,15 +213,14 @@ protected:
       //  so we do nothing and let decrement() takes care of the rare decrement case.
       // if current node is not equal to start node, we need to walk the tree to current node
       if (this->node != endNode && this->node != startNode) {
-        while (deque.front() != this->node) {
-          n = deque.front()->firstChild;
+        while (nodeQueue[nodeQueueIdx] != this->node) {
+          n = nodeQueue[nodeQueueIdx]->firstChild;
           while (n) {
-            deque.push_back(n);
+            nodeQueue.push_back(n);
             n = n->nextSibling;
           }
-          prevDeque.push_back(deque.front());
-          deque.pop_front();
-          CHECK(!deque.empty());
+          ++nodeQueueIdx;
+          CHECK(nodeQueueIdx < nodeQueue.size());
         }
       }
     }
@@ -230,46 +229,44 @@ protected:
   void increment()
   {
     // assume this->node or this->parent
-    CHECK(this->node != endNode && !deque.empty()); // crash on purpose if we are increasing past-the-end
-    CHECK(this->node == deque.front());
+    CHECK(this->node != endNode &&
+          nodeQueueIdx < nodeQueue.size()); // crash on purpose if we are increasing past-the-end
+    CHECK(this->node == nodeQueue[nodeQueueIdx]);
     NodeType* n = this->node->firstChild;
     while (n) {
-      deque.push_back(n);
+      nodeQueue.push_back(n);
       n = n->nextSibling;
     }
-    prevDeque.push_back(deque.front());
-    deque.pop_front();
-    this->node = deque.empty() ? endNode : deque.front();
+    ++nodeQueueIdx;
+    this->node = nodeQueueIdx == nodeQueue.size() ? endNode : nodeQueue[nodeQueueIdx];
   }
 
   void decrement()
   {
     // assume this->node or this->parent
-    if (this->node == endNode && prevDeque.empty() && !deque.empty()) {
+    if (this->node == endNode && nodeQueueIdx == 0 && nodeQueueIdx < nodeQueue.size()) {
       // decrement from endBreadthFirst() iterator, we do a forward transverse from start
-      while (!deque.empty()) {
-        NodeType* n = deque.front()->firstChild;
+      while (nodeQueueIdx < nodeQueue.size()) {
+        NodeType* n = nodeQueue[nodeQueueIdx]->firstChild;
         while (n) {
-          deque.push_back(n);
+          nodeQueue.push_back(n);
           n = n->nextSibling;
         }
-        prevDeque.push_back(deque.front());
-        deque.pop_front();
+        ++nodeQueueIdx;
       }
     }
 
-    CHECK(!prevDeque.empty());
-    NodeType* n = prevDeque.back();
-    while (!deque.empty() && deque.back()->parent == n) {
-      deque.pop_back();
+    CHECK(nodeQueueIdx > 0);
+    NodeType* n = nodeQueue[nodeQueueIdx - 1];
+    while (nodeQueueIdx < nodeQueue.size() && nodeQueue.back()->parent == n) {
+      nodeQueue.pop_back();
     }
-    deque.push_front(n);
-    prevDeque.pop_back();
-    this->node = deque.front();
+    --nodeQueueIdx;
+    this->node = nodeQueue[nodeQueueIdx];
   }
 
-  std::deque<NodeType*> deque;
-  std::deque<NodeType*> prevDeque;
+  std::vector<NodeType*> nodeQueue;
+  size_t nodeQueueIdx = 0;
   NodeType* endNode = nullptr;
 };
 

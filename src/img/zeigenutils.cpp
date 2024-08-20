@@ -8,9 +8,9 @@ namespace nim {
 using namespace Eigen;
 
 // Read numbers in the string to a row vector
-// nDataToRead can be used to control the length of the output vector, if actual number of data is less than nDataToRead,
-// the rest will be filled with fillValue. Will read all data to the row vector if nDataToRead is -1
-// If strictDelimiter is used, empty data will be filled with fillValue.
+// nDataToRead can be used to control the length of the output vector, if actual number of data is less than
+// nDataToRead, the rest will be filled with fillValue. Will read all data to the row vector if nDataToRead is -1 If
+// strictDelimiter is used, empty data will be filled with fillValue.
 RowVectorXd readRowVector(std::string_view line,
                           double fillValue,
                           std::string_view strictDelimiter,
@@ -21,9 +21,9 @@ RowVectorXd readRowVector(std::string_view line,
   // remove comment
   line = absl::StripAsciiWhitespace(removeComment(line, commentStart, true));
   std::vector<std::string_view> parts;
-  if (strictDelimiter.empty()) {
+  if (strictDelimiter.empty()) [[likely]] {
     parts = absl::StrSplit(line, absl::ByAnyChar(delimiter_literal), absl::SkipEmpty());
-  } else {
+  } else [[unlikely]] {
     parts = absl::StrSplit(line, absl::ByString(strictDelimiter));
   }
   if (parts.empty()) {
@@ -35,23 +35,23 @@ RowVectorXd readRowVector(std::string_view line,
   }
   rowVector.resize(nDataToRead);
   for (Eigen::Index i = 0; i < nDataToRead; ++i) {
-    if (static_cast<size_t>(i) >= parts.size()) {
+    if (static_cast<size_t>(i) >= parts.size()) [[unlikely]] {
       rowVector(i) = fillValue;
-    } else {
+    } else [[likely]] {
       auto sv = parts[i];
-      if (sv.empty()) {
+      if (sv.empty()) [[unlikely]] {
         rowVector(i) = fillValue;
       }
-      if (absl::EqualsIgnoreCase(sv, "-inf"sv) || absl::EqualsIgnoreCase(sv, "-1.#inf"sv)) {
-        rowVector(i) = -std::numeric_limits<double>::infinity();
-      } else if (absl::EqualsIgnoreCase(sv, "inf"sv) || absl::EqualsIgnoreCase(sv, "+inf"sv) ||
-                 absl::EqualsIgnoreCase(sv, "1.#inf"sv) || absl::EqualsIgnoreCase(sv, "+1.#inf"sv)) {
-        rowVector(i) = std::numeric_limits<double>::infinity();
-      } else if ((absl::StartsWithIgnoreCase(sv, "1.#"sv) || absl::StartsWithIgnoreCase(sv, "-1.#"sv) ||
-                  absl::StartsWithIgnoreCase(sv, "+1.#"sv)) &&
-                 (absl::EndsWithIgnoreCase(sv, "ind"sv) || absl::EndsWithIgnoreCase(sv, "nan"sv))) {
-        rowVector(i) = std::numeric_limits<double>::quiet_NaN();
-      } else {
+
+      if (absl::StrContains(sv, "1.#"sv)) [[unlikely]] {
+        if (absl::EqualsIgnoreCase(sv, "-1.#inf"sv)) {
+          rowVector(i) = -std::numeric_limits<double>::infinity();
+        } else if (absl::EqualsIgnoreCase(sv, "1.#inf"sv)) {
+          rowVector(i) = std::numeric_limits<double>::infinity();
+        } else {
+          rowVector(i) = std::numeric_limits<double>::quiet_NaN();
+        }
+      } else [[likely]] {
         auto res = boost::charconv::from_chars_erange(sv.data(), sv.data() + sv.size(), rowVector(i));
         if (res.ec == std::errc::result_out_of_range) {
           // throw ZException(fmt::format("error: result_out_of_range when converting {} to Real number", sv));

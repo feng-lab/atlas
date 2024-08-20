@@ -6,7 +6,6 @@
 #include "zstructutils.h"
 #include <QXmlStreamReader>
 #include <QFile>
-#include <QTextStream>
 #include <QUrl>
 
 namespace {
@@ -317,8 +316,7 @@ void ZImgLeica::readXml(const QString& filename,
     if (!f.open(QFile::ReadOnly | QFile::Text)) {
       throw ZException("can not open file", ZException::Option::CheckErrno);
     }
-    QTextStream in(&f);
-    xml = in.readAll();
+    xml = f.readAll();
   } else {
     std::ifstream inputFileStream = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
 
@@ -722,8 +720,7 @@ void ZImgLeica::parseXLIF(const QString& filename, std::vector<ImageInfo>& image
   if (!f.open(QFile::ReadOnly | QFile::Text)) {
     throw ZException("can not open file", ZException::Option::CheckErrno);
   }
-  QTextStream in(&f);
-  QString xml = in.readAll();
+  QString xml = f.readAll();
 
   readLeicaInfo(xml, QFileInfo(filename).absoluteDir(), imageInfos);
 }
@@ -734,8 +731,7 @@ void ZImgLeica::parseXLCF(const QString& filename, std::vector<ImageInfo>& image
   if (!f.open(QFile::ReadOnly | QFile::Text)) {
     throw ZException("can not open file", ZException::Option::CheckErrno);
   }
-  QTextStream in(&f);
-  QString xml = in.readAll();
+  QString xml = f.readAll();
 
   readLeicaInfo(xml, QFileInfo(filename).absoluteDir(), imageInfos);
 }
