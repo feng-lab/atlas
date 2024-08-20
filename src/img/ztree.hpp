@@ -254,6 +254,11 @@ protected:
       firstOnNextLevel = nullptr;
       lastSeenOnNextLevel = nullptr;
     } else {
+      if (this->node->nextSibling && this->isTail(this->node->nextSibling) && this->node->next) {
+        // cleanup
+        this->node->next->prev = nullptr;
+        const_cast<std::remove_const_t<NodeType>*>(this->node)->next = nullptr;
+      }
       if (this->node->nextSibling && !this->isTail(this->node->nextSibling)) {
         this->node = this->node->nextSibling;
       } else if (this->node->next) {
