@@ -1804,3 +1804,210 @@ TEST(SWC, IteratorInteraction)
     LOG(WARNING) << e.what();
   }
 }
+
+TEST(TreeIteratorTest, RandomForwardBackwardTraversal)
+{
+  using namespace nim;
+
+  ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
+  const int smallSwcRes[] = {1, 2, 3, 5, 8, 9, 6, 10, 4, 7, 11, 12, 13, 14, 15};
+  size_t totalNodes = std::extent<decltype(smallSwcRes)>::value;
+
+  auto it = smallSwc.cbegin();
+  size_t currentIdx = 0;
+
+  // Setup random number generators
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> distSteps(0, 4); // Randomly select between 0 and 4 steps
+  std::uniform_int_distribution<> distDirection(0, 1); // Randomly select forward or backward
+
+  // Number of random steps to perform
+  const int randomSteps = 100000;
+
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveForward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveForward) {
+      for (int j = 0; j < steps && it != smallSwc.cend(); ++j) {
+        ++it;
+        ++currentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && it != smallSwc.cbegin(); ++j) {
+        --it;
+        --currentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (currentIdx < totalNodes) {
+      ASSERT_EQ(it->id, smallSwcRes[currentIdx]);
+    }
+  }
+
+  // Check the reverse traversal
+  auto rit = smallSwc.crbegin();
+  size_t rcurrentIdx = totalNodes - 1;
+
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveBackward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveBackward) {
+      for (int j = 0; j < steps && rit != smallSwc.crend(); ++j) {
+        ++rit;
+        --rcurrentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && rit != smallSwc.crbegin(); ++j) {
+        --rit;
+        ++rcurrentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (rcurrentIdx < totalNodes) {
+      ASSERT_EQ(rit->id, smallSwcRes[rcurrentIdx]);
+    }
+  }
+}
+
+TEST(TreeIteratorTest, PostOrderRandomForwardBackwardTraversal)
+{
+  using namespace nim;
+
+  ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
+  const int smallSwcRes[] = {2, 8, 9, 5, 10, 6, 3, 7, 4, 1, 13, 14, 12, 11, 15};
+  size_t totalNodes = std::extent<decltype(smallSwcRes)>::value;
+
+  auto it = smallSwc.cbeginPostOrder();
+  size_t currentIdx = 0;
+
+  // Setup random number generators
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> distSteps(0, 4); // Randomly select between 0 and 4 steps
+  std::uniform_int_distribution<> distDirection(0, 1); // Randomly select forward or backward
+
+  // Number of random steps to perform
+  const int randomSteps = 100000;
+
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveForward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveForward) {
+      for (int j = 0; j < steps && it != smallSwc.cendPostOrder(); ++j) {
+        ++it;
+        ++currentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && it != smallSwc.cbeginPostOrder(); ++j) {
+        --it;
+        --currentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (currentIdx < totalNodes) {
+      ASSERT_EQ(it->id, smallSwcRes[currentIdx]);
+    }
+  }
+
+  // Check the reverse traversal
+  auto rit = smallSwc.crbeginPostOrder();
+  size_t rcurrentIdx = totalNodes - 1;
+
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveBackward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveBackward) {
+      for (int j = 0; j < steps && rit != smallSwc.crendPostOrder(); ++j) {
+        ++rit;
+        --rcurrentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && rit != smallSwc.crbeginPostOrder(); ++j) {
+        --rit;
+        ++rcurrentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (rcurrentIdx < totalNodes) {
+      ASSERT_EQ(rit->id, smallSwcRes[rcurrentIdx]);
+    }
+  }
+}
+
+TEST(TreeIteratorTest, BreadthFirstRandomForwardBackwardTraversal)
+{
+  using namespace nim;
+
+  ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
+  const int smallSwcRes[] = {1, 11, 15, 2, 3, 4, 12, 5, 6, 7, 13, 14, 8, 9, 10};
+  size_t totalNodes = std::extent<decltype(smallSwcRes)>::value;
+
+  auto it = smallSwc.cbeginBreadthFirst();
+  size_t currentIdx = 0;
+
+  // Setup random number generators
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<> distSteps(0, 4); // Randomly select between 0 and 4 steps
+  std::uniform_int_distribution<> distDirection(0, 1); // Randomly select forward or backward
+
+  // Number of random steps to perform
+  const int randomSteps = 100000;
+
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveForward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveForward) {
+      for (int j = 0; j < steps && it != smallSwc.cendBreadthFirst(); ++j) {
+        ++it;
+        ++currentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && it != smallSwc.cbeginBreadthFirst(); ++j) {
+        --it;
+        --currentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (currentIdx < totalNodes) {
+      ASSERT_EQ(it->id, smallSwcRes[currentIdx]);
+    }
+  }
+
+  // Check the reverse traversal
+  auto rit = smallSwc.crbeginBreadthFirst();
+  size_t rcurrentIdx = totalNodes - 1;
+
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveBackward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveBackward) {
+      for (int j = 0; j < steps && rit != smallSwc.crendBreadthFirst(); ++j) {
+        ++rit;
+        --rcurrentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && rit != smallSwc.crbeginBreadthFirst(); ++j) {
+        --rit;
+        ++rcurrentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (rcurrentIdx < totalNodes) {
+      ASSERT_EQ(rit->id, smallSwcRes[rcurrentIdx]);
+    }
+  }
+}

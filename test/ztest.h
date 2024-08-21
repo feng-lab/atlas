@@ -3,6 +3,7 @@
 #include "zglobal.h"
 #include "zlog.h"
 #include "zbenchtimer.h"
+#include "zrandom.h"
 #include <QDir>
 #include <gtest/gtest.h>
 

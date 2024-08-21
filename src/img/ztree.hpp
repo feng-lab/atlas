@@ -180,17 +180,148 @@ protected:
   {
     this->node = n;
     this->parent = p;
-    if (!n && !p) { // default constructed
-      return;
+    if (n || p) {
+      needInit = true;
     }
+  }
 
-    NodeType* startNode;
-    if (p) { // start node is p (must be valid), current node is n, end node is nullptr
-      startNode = p;
+  void increment()
+  {
+    // assume this->node or this->parent
+    CHECK(this->node && !this->isTail(this->node));
+    if (needInit) {
+      initIt();
+    }
+    if (needToRestartInIncrement) {
+      firstOnNextLevel = nullptr;
+      lastSeenOnNextLevel = nullptr;
+      auto currentNode = startNode;
+      while (currentNode != this->node) {
+        incrementNode(currentNode);
+      }
+      needToRestartInIncrement = false;
+    }
+    incrementNode(this->node);
+  }
+
+  void decrement()
+  {
+    // assume this->node or this->parent
+    if (needInit) {
+      initIt();
+    }
+    if (this->node) {
+      if (this->isTail(this->node)) {
+        CHECK(!this->parent);
+        auto currentNode = this->node;
+        while (currentNode->prevSibling->prevSibling) {
+          currentNode = currentNode->prevSibling;
+        }
+        CHECK(!this->isTail(currentNode));
+        NodeType* lastNode;
+        firstOnNextLevel = nullptr;
+        lastSeenOnNextLevel = nullptr;
+        do {
+          lastNode = currentNode;
+          incrementNode(currentNode);
+        } while (currentNode != endNode);
+        this->node = lastNode;
+      } else {
+        CHECK(!this->isHead(this->node) && this->node != this->parent);
+        if (this->node->prevSibling) {
+          CHECK(!this->isHead(this->node->prevSibling));
+          this->node = this->node->prevSibling;
+          needToRestartInIncrement = true;
+        } else if (this->node->prev) {
+          this->node = this->node->prev;
+          needToRestartInIncrement = true;
+        } else {
+          CHECK(false);
+        }
+      }
+    } else {
+      // if this->node is nullptr, then this->parent will be some valid node
+      CHECK(this->parent);
+      auto currentNode = this->parent;
+
+      NodeType* lastNode;
+      firstOnNextLevel = nullptr;
+      lastSeenOnNextLevel = nullptr;
+      do {
+        lastNode = currentNode;
+        incrementNode(currentNode);
+      } while (currentNode != nullptr);
+      this->node = lastNode;
+    }
+  }
+
+private:
+  void incrementNode(NodeType*& currentNode)
+  {
+    // assume this->node or this->parent
+    CHECK(currentNode && !this->isTail(currentNode));
+    if (currentNode->firstChild) {
+      if (!firstOnNextLevel) {
+        firstOnNextLevel = currentNode->firstChild;
+        // cleanup
+        if (firstOnNextLevel->prev) {
+          firstOnNextLevel->prev->next = nullptr;
+          firstOnNextLevel->prev = nullptr;
+        }
+      }
+      if (lastSeenOnNextLevel) {
+        lastSeenOnNextLevel->next = currentNode->firstChild;
+        currentNode->firstChild->prev = lastSeenOnNextLevel;
+      }
+    }
+    if (currentNode->lastChild) {
+      lastSeenOnNextLevel = currentNode->lastChild;
+      // cleanup
+      if (lastSeenOnNextLevel->next) {
+        lastSeenOnNextLevel->next->prev = nullptr;
+        lastSeenOnNextLevel->next = nullptr;
+      }
+    }
+    if (currentNode == this->parent) {
+      const_cast<std::remove_const_t<NodeType>*>(currentNode)->next = firstOnNextLevel;
+      if (firstOnNextLevel) {
+        firstOnNextLevel->prev = const_cast<std::remove_const_t<NodeType>*>(currentNode);
+      }
+      currentNode = firstOnNextLevel;
+      firstOnNextLevel = nullptr;
+      lastSeenOnNextLevel = nullptr;
+    } else {
+      if (currentNode->nextSibling && this->isTail(currentNode->nextSibling) && currentNode->next) {
+        // cleanup
+        currentNode->next->prev = nullptr;
+        const_cast<std::remove_const_t<NodeType>*>(currentNode)->next = nullptr;
+      }
+      if (currentNode->nextSibling && !this->isTail(currentNode->nextSibling)) {
+        currentNode = currentNode->nextSibling;
+      } else if (currentNode->next) {
+        currentNode = currentNode->next;
+      } else {
+        if (firstOnNextLevel) {
+          const_cast<std::remove_const_t<NodeType>*>(currentNode)->next = firstOnNextLevel;
+          firstOnNextLevel->prev = const_cast<std::remove_const_t<NodeType>*>(currentNode);
+          currentNode = firstOnNextLevel;
+        } else {
+          currentNode = endNode;
+        }
+        firstOnNextLevel = nullptr;
+        lastSeenOnNextLevel = nullptr;
+      }
+    }
+  }
+
+  void initIt()
+  {
+    if (this->parent) { // start node is p (must be valid), current node is n, end node is nullptr
+      startNode = this->parent;
       endNode = nullptr;
     } else { // p is nullptr, start node is first root of tree, current node is n, end node is m_tail
       // use n to find start node
-      startNode = n;
+      startNode = this->node;
       while (startNode->parent) {
         startNode = startNode->parent;
       }
@@ -210,119 +341,23 @@ protected:
     //  so we do nothing and let decrement() takes care of the rare decrement case.
     // if current node is not equal to start node, we need to walk the tree to current node
     if (this->node != endNode && this->node != startNode) {
-      this->node = startNode;
-      firstOnNextLevel = nullptr;
-      lastSeenOnNextLevel = nullptr;
+      CHECK(firstOnNextLevel == nullptr);
+      CHECK(lastSeenOnNextLevel == nullptr);
+      auto currentNode = startNode;
       do {
-        increment();
-      } while (this->node != n);
+        incrementNode(currentNode);
+      } while (this->node != currentNode);
     }
-  }
 
-  void increment()
-  {
-    // assume this->node or this->parent
-    CHECK(this->node && !this->isTail(this->node));
-    if (this->node->firstChild) {
-      if (!firstOnNextLevel) {
-        firstOnNextLevel = this->node->firstChild;
-        // cleanup
-        if (firstOnNextLevel->prev) {
-          firstOnNextLevel->prev->next = nullptr;
-          firstOnNextLevel->prev = nullptr;
-        }
-      }
-      if (lastSeenOnNextLevel) {
-        lastSeenOnNextLevel->next = this->node->firstChild;
-        this->node->firstChild->prev = lastSeenOnNextLevel;
-      }
-    }
-    if (this->node->lastChild) {
-      lastSeenOnNextLevel = this->node->lastChild;
-      // cleanup
-      if (lastSeenOnNextLevel->next) {
-        lastSeenOnNextLevel->next->prev = nullptr;
-        lastSeenOnNextLevel->next = nullptr;
-      }
-    }
-    if (this->node == this->parent) {
-      const_cast<std::remove_const_t<NodeType>*>(this->node)->next = firstOnNextLevel;
-      if (firstOnNextLevel) {
-        firstOnNextLevel->prev = const_cast<std::remove_const_t<NodeType>*>(this->node);
-      }
-      this->node = firstOnNextLevel;
-      firstOnNextLevel = nullptr;
-      lastSeenOnNextLevel = nullptr;
-    } else {
-      if (this->node->nextSibling && this->isTail(this->node->nextSibling) && this->node->next) {
-        // cleanup
-        this->node->next->prev = nullptr;
-        const_cast<std::remove_const_t<NodeType>*>(this->node)->next = nullptr;
-      }
-      if (this->node->nextSibling && !this->isTail(this->node->nextSibling)) {
-        this->node = this->node->nextSibling;
-      } else if (this->node->next) {
-        this->node = this->node->next;
-      } else {
-        if (firstOnNextLevel) {
-          const_cast<std::remove_const_t<NodeType>*>(this->node)->next = firstOnNextLevel;
-          firstOnNextLevel->prev = const_cast<std::remove_const_t<NodeType>*>(this->node);
-          this->node = firstOnNextLevel;
-        } else {
-          this->node = endNode;
-        }
-        firstOnNextLevel = nullptr;
-        lastSeenOnNextLevel = nullptr;
-      }
-    }
-  }
-
-  void decrement()
-  {
-    // assume this->node or this->parent
-    if (this->node) {
-      if (this->isTail(this->node)) {
-        while (this->node->prevSibling->prevSibling) {
-          this->node = this->node->prevSibling;
-        }
-        NodeType* lastNode;
-        firstOnNextLevel = nullptr;
-        lastSeenOnNextLevel = nullptr;
-        do {
-          lastNode = this->node;
-          increment();
-        } while (!this->isTail(this->node));
-        this->node = lastNode;
-      } else {
-        CHECK(!this->isHead(this->node) && this->node != this->parent);
-        if (this->node->prevSibling) {
-          CHECK(!this->isHead(this->node->prevSibling));
-          this->node = this->node->prevSibling;
-        } else if (this->node->prev) {
-          this->node = this->node->prev;
-        } else {
-          CHECK(false);
-        }
-      }
-    } else {
-      // if this->node is nullptr, then this->parent will be some valid node
-      CHECK(this->parent);
-      this->node = this->parent;
-
-      NodeType* lastNode;
-      firstOnNextLevel = nullptr;
-      lastSeenOnNextLevel = nullptr;
-      do {
-        lastNode = this->node;
-        increment();
-      } while (this->node != nullptr);
-      this->node = lastNode;
-    }
+    needInit = false;
   }
 
   std::remove_const_t<NodeType>* firstOnNextLevel = nullptr;
   std::remove_const_t<NodeType>* lastSeenOnNextLevel = nullptr;
+  NodeType* startNode = nullptr;
   NodeType* endNode = nullptr;
+  bool needToRestartInIncrement = false;
+  bool needInit = false;
 };
 
 template<typename TNode>
