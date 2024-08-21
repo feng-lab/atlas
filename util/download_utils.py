@@ -158,6 +158,7 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
                 return True
             else:
                 logger.warning(f"Checksum validation failed. Trying next URL.")
+                os.remove(target_path)
         except requests.RequestException as e:
             logger.error(f"Error downloading from {current_url}: {e}")
 

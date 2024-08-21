@@ -504,7 +504,7 @@ def install_ffmpeg():
         unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*linux*')
     else:
         if os.path.lexists(os.path.join(ext_build_dir(), 'ffmpeg')):
-            os.unlink(os.path.join(ext_build_dir(), 'ffmpeg'))
+            os.remove(os.path.join(ext_build_dir(), 'ffmpeg'))
         unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*intel*')
         os.rename(os.path.join(ext_build_dir(), 'ffmpeg'), os.path.join(ext_build_dir(), 'ffmpeg-intel'))
         unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*arm*')
@@ -512,8 +512,8 @@ def install_ffmpeg():
         subprocess.run(['lipo', '-create', os.path.join(ext_build_dir(), 'ffmpeg-intel'),
                         os.path.join(ext_build_dir(), 'ffmpeg-arm'), '-output',
                         os.path.join(ext_build_dir(), 'ffmpeg')], cwd=ext_build_dir(), shell=False, check=True)
-        os.unlink(os.path.join(ext_build_dir(), 'ffmpeg-intel'))
-        os.unlink(os.path.join(ext_build_dir(), 'ffmpeg-arm'))
+        os.remove(os.path.join(ext_build_dir(), 'ffmpeg-intel'))
+        os.remove(os.path.join(ext_build_dir(), 'ffmpeg-arm'))
         subprocess.run(['xattr', '-cr', os.path.join(ext_build_dir(), 'ffmpeg')], cwd=ext_build_dir(), shell=False,
                        check=True)
         subprocess.run(['codesign', '--force', '--deep', '--sign', '-', os.path.join(ext_build_dir(), 'ffmpeg')],
@@ -524,7 +524,7 @@ def install_ffmpeg():
         if is_my_computer():
             # from https://evermeet.cx/ffmpeg/
             if os.path.lexists('/usr/local/bin/ffmpeg'):
-                os.unlink('/usr/local/bin/ffmpeg')
+                os.remove('/usr/local/bin/ffmpeg')
             os.symlink(os.path.join(ext_build_dir(), 'ffmpeg'), '/usr/local/bin/ffmpeg')
 
 

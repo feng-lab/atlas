@@ -113,7 +113,7 @@ def create_universal_binaries(arm64_install_dir, final_install_dir, remove_dylib
                 if remove_dylib and filename.endswith('.dylib'):
                     target_filename = filename.replace(arm64_install_dir, final_install_dir)
                     logger.info(f'deleting {target_filename}')
-                    os.unlink(target_filename)
+                    os.remove(target_filename)
                 continue
             if filename.endswith('.a') or filename.endswith('.dylib') or root.endswith('bin'):
                 if name.endswith('.sh'):  # text file
@@ -131,7 +131,7 @@ def create_universal_binaries(arm64_install_dir, final_install_dir, remove_dylib
                     continue
                 if remove_dylib and filename.endswith('.dylib'):
                     logger.info(f'deleting {target_filename}')
-                    os.unlink(target_filename)
+                    os.remove(target_filename)
                 elif not os.path.exists(target_filename):
                     logger.info(f'copy {filename} to {target_filename}')
                     shutil.copyfile(filename, target_filename)
@@ -174,11 +174,11 @@ def remove_installed_dynamic_library(install_dir: str, libnames: list):
             filename = os.path.join(install_dir, 'lib', f'{libname}.lib')
             if os.path.exists(filename):
                 logger.info(f'deleting {filename}')
-                os.unlink(filename)
+                os.remove(filename)
             filename = os.path.join(install_dir, 'bin', f'{libname}.dll')
             if os.path.exists(filename):
                 logger.info(f'deleting {filename}')
-                os.unlink(filename)
+                os.remove(filename)
         else:
             glob_remove(os.path.join(install_dir, 'lib', f'lib{libname}.*dylib'))
 
@@ -1450,7 +1450,7 @@ include(libs)""",
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
-        os.unlink(os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'libs.cmake'))
+        os.remove(os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'libs.cmake'))
         cleanup_git_submodule(src_dir)
 
 
@@ -2965,12 +2965,12 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             logger.info(jre_dir)
             if not os.path.exists(jre_dir):
                 if os.path.exists(os.path.join(ext_build_dir(), 'jre')):
-                    os.unlink(os.path.join(ext_build_dir(), 'jre'))
+                    os.remove(os.path.join(ext_build_dir(), 'jre'))
                 remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jre*'))
                 unpack_file_to_folder(package_name, ext_build_dir())
                 assert os.path.exists(jre_dir)
                 if os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
-                    os.unlink(os.path.join(ext_build_dir(), 'jre'))
+                    os.remove(os.path.join(ext_build_dir(), 'jre'))
                     logger.info('link jre')
                     os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
             if not os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
@@ -2985,11 +2985,11 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                 logger.info(jre_dir)
                 if not os.path.exists(jre_dir):
                     if os.path.exists(os.path.join(ext_build_dir(), 'jre-arm')):
-                        os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
+                        os.remove(os.path.join(ext_build_dir(), 'jre-arm'))
                     unpack_file_to_folder(package_name, os.path.join(ext_build_dir(), 'jrearm'))
                     assert os.path.exists(jre_dir)
                     if os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
-                        os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
+                        os.remove(os.path.join(ext_build_dir(), 'jre-arm'))
                         logger.info('link jre-arm')
                         os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
                 if not os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):

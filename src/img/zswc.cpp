@@ -86,8 +86,7 @@ void ZSwc::resortPyramidal(int64_t basalType, int64_t apicalType, int64_t somaTy
 void ZSwc::resortID()
 {
   int64_t id = 1;
-  auto endIt = endBreadthFirst();
-  for (auto it = beginBreadthFirst(); it != endIt; ++it) {
+  for (auto it = beginBreadthFirst(), endIt = endBreadthFirst(); it != endIt; ++it) {
     it->id = id++;
     it->parentID = parentID(it);
   }
@@ -164,8 +163,7 @@ void ZSwc::save(const QString& filename) const
       throw ZException("Error while writing file header", ZException::Option::CheckErrno);
     }
 #if 0
-    auto endIt = cendBreadthFirst();
-    for (auto it = cbeginBreadthFirst(); it != endIt; ++it) {
+    for (auto it = cbeginBreadthFirst(), endIt = cendBreadthFirst(); it != endIt; ++it) {
 #else
     for (auto it = cbegin(); it != cend(); ++it) {
 #endif
