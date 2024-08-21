@@ -100,7 +100,7 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
         if https_proxy:
             logger.info(f"  HTTPS Proxy: {https_proxy}")
 
-    urls = [url, backup_url]
+    urls = [url, backup_url, url, backup_url]
     for current_url in urls:
         try:
             logger.info(f"Downloading from {current_url}")

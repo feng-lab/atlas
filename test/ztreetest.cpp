@@ -1943,6 +1943,16 @@ TEST(TreeIteratorTest, PostOrderRandomForwardBackwardTraversal)
   }
 }
 
+/* treetest.swc is a forest contains three trees
+//             1             11       15
+//          /  |  \          |
+//         2   3   4         12
+//            / \   \       / \
+//           5   6   7     13 14
+//          / \  \
+//         8  9  10
+*/
+
 TEST(TreeIteratorTest, BreadthFirstRandomForwardBackwardTraversal)
 {
   using namespace nim;
@@ -2008,6 +2018,114 @@ TEST(TreeIteratorTest, BreadthFirstRandomForwardBackwardTraversal)
     // Check if we are within bounds before asserting
     if (rcurrentIdx < totalNodes) {
       ASSERT_EQ(rit->id, smallSwcRes[rcurrentIdx]);
+    }
+  }
+
+  const int firstSubTree[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  totalNodes = std::extent<decltype(firstSubTree)>::value;
+  auto sit = smallSwc.cbeginBreadthFirst();
+  currentIdx = 0;
+
+  it = smallSwc.cbeginBreadthFirst(sit);
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveForward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveForward) {
+      for (int j = 0; j < steps && it != smallSwc.cendBreadthFirst(sit); ++j) {
+        ++it;
+        ++currentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && it != smallSwc.cbeginBreadthFirst(sit); ++j) {
+        --it;
+        --currentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (currentIdx < totalNodes) {
+      ASSERT_EQ(it->id, firstSubTree[currentIdx]);
+    }
+  }
+
+  // Check the reverse traversal
+  rit = smallSwc.crbeginBreadthFirst(sit);
+  rcurrentIdx = totalNodes - 1;
+
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveBackward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveBackward) {
+      for (int j = 0; j < steps && rit != smallSwc.crendBreadthFirst(sit); ++j) {
+        ++rit;
+        --rcurrentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && rit != smallSwc.crbeginBreadthFirst(sit); ++j) {
+        --rit;
+        ++rcurrentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (rcurrentIdx < totalNodes) {
+      ASSERT_EQ(rit->id, firstSubTree[rcurrentIdx]);
+    }
+  }
+
+  const int secondSubTree[] = {11, 12, 13, 14};
+  totalNodes = std::extent<decltype(secondSubTree)>::value;
+  ++sit;
+  currentIdx = 0;
+
+  it = smallSwc.cbeginBreadthFirst(sit);
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveForward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveForward) {
+      for (int j = 0; j < steps && it != smallSwc.cendBreadthFirst(sit); ++j) {
+        ++it;
+        ++currentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && it != smallSwc.cbeginBreadthFirst(sit); ++j) {
+        --it;
+        --currentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (currentIdx < totalNodes) {
+      ASSERT_EQ(it->id, secondSubTree[currentIdx]);
+    }
+  }
+
+  // Check the reverse traversal
+  rit = smallSwc.crbeginBreadthFirst(sit);
+  rcurrentIdx = totalNodes - 1;
+
+  for (int i = 0; i < randomSteps; ++i) {
+    int steps = distSteps(gen); // Generate random steps
+    bool moveBackward = (distDirection(gen) == 0); // Randomly decide direction
+
+    if (moveBackward) {
+      for (int j = 0; j < steps && rit != smallSwc.crendBreadthFirst(sit); ++j) {
+        ++rit;
+        --rcurrentIdx;
+      }
+    } else {
+      for (int j = 0; j < steps && rit != smallSwc.crbeginBreadthFirst(sit); ++j) {
+        --rit;
+        ++rcurrentIdx;
+      }
+    }
+
+    // Check if we are within bounds before asserting
+    if (rcurrentIdx < totalNodes) {
+      ASSERT_EQ(rit->id, secondSubTree[rcurrentIdx]);
     }
   }
 }
