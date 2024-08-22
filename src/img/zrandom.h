@@ -11,9 +11,12 @@ namespace nim {
 class ZRandom
 {
 public:
-  ZRandom();
-
+  // instance is thread_local so safe to use in multiple threads
   static ZRandom& instance();
+
+  ZRandom()
+    : m_eng(rd())
+  {}
 
   template<typename IntType = int>
   IntType randInt(IntType maxValue = std::numeric_limits<IntType>::max(), IntType minValue = 0)
@@ -50,6 +53,7 @@ public:
   }
 
 private:
+  std::random_device rd;
   std::mt19937_64 m_eng;
 };
 

@@ -1966,7 +1966,7 @@ TEST(TreeIteratorTest, BreadthFirstRandomForwardBackwardTraversal)
 
   // Setup random number generators
   std::random_device rd;
-  std::mt19937 gen(rd());
+  std::mt19937_64 gen(rd());
   std::uniform_int_distribution<> distSteps(0, 4); // Randomly select between 0 and 4 steps
   std::uniform_int_distribution<> distDirection(0, 1); // Randomly select forward or backward
 

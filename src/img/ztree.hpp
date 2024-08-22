@@ -180,9 +180,7 @@ protected:
   {
     this->node = n;
     this->parent = p;
-    if (n || p) {
-      needInit = true;
-    }
+    needInit = true;
   }
 
   void increment()
@@ -212,7 +210,7 @@ protected:
     }
     if (this->node) {
       if (this->isTail(this->node)) {
-        CHECK(!this->parent);
+        CHECK(!this->parent && this->isTail(endNode));
         auto currentNode = this->node;
         while (currentNode->prevSibling->prevSibling) {
           currentNode = currentNode->prevSibling;
@@ -241,7 +239,7 @@ protected:
       }
     } else {
       // if this->node is nullptr, then this->parent will be some valid node
-      CHECK(this->parent);
+      CHECK(this->parent && !endNode);
       auto currentNode = this->parent;
 
       NodeType* lastNode;
@@ -250,7 +248,7 @@ protected:
       do {
         lastNode = currentNode;
         incrementNode(currentNode);
-      } while (currentNode != nullptr);
+      } while (currentNode);
       this->node = lastNode;
     }
   }
@@ -260,6 +258,7 @@ private:
   {
     // assume this->node or this->parent
     CHECK(currentNode && !this->isTail(currentNode));
+
     if (currentNode->firstChild) {
       if (!firstOnNextLevel) {
         firstOnNextLevel = currentNode->firstChild;
@@ -274,6 +273,7 @@ private:
         currentNode->firstChild->prev = lastSeenOnNextLevel;
       }
     }
+
     if (currentNode->lastChild) {
       lastSeenOnNextLevel = currentNode->lastChild;
       // cleanup
@@ -282,7 +282,9 @@ private:
         lastSeenOnNextLevel->next = nullptr;
       }
     }
-    if (currentNode == this->parent) {
+
+    if (currentNode == this->parent) { // in case of starting subtree tranverse, we go directly to the next level
+      CHECK(this->parent);
       const_cast<std::remove_const_t<NodeType>*>(currentNode)->next = firstOnNextLevel;
       if (firstOnNextLevel) {
         firstOnNextLevel->prev = const_cast<std::remove_const_t<NodeType>*>(currentNode);
@@ -292,7 +294,8 @@ private:
       lastSeenOnNextLevel = nullptr;
     } else {
       if (currentNode->nextSibling && this->isTail(currentNode->nextSibling) && currentNode->next) {
-        // cleanup
+        // cleanup if we are at root level and next node is m_tail, we must go to next level and can not follow the next
+        // link
         currentNode->next->prev = nullptr;
         const_cast<std::remove_const_t<NodeType>*>(currentNode)->next = nullptr;
       }
@@ -316,6 +319,10 @@ private:
 
   void initIt()
   {
+    if (!this->node && !this->parent) {
+      needInit = false;
+      return;
+    }
     if (this->parent) { // start node is p (must be valid), current node is n, end node is nullptr
       startNode = this->parent;
       endNode = nullptr;
