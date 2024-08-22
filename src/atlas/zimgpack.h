@@ -6,6 +6,7 @@
 #include <QRectF>
 #include <folly/futures/Future.h>
 #include <folly/CancellationToken.h>
+#include <folly/coro/Task.h>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/geometries/point.hpp>
@@ -185,6 +186,27 @@ public:
                                                        double displayRangeMin,
                                                        double displayRangeMax,
                                                        const folly::CancellationToken& cancellationToken) const;
+
+  folly::coro::Task<void> readTileToImgAsync(size_t tileIndex,
+                                             ZImg* img,
+                                             index_t xyRatio,
+                                             index_t zRatio,
+                                             index_t sx,
+                                             index_t sy,
+                                             index_t sz,
+                                             size_t sc,
+                                             std::array<size_t, 3> readRatio) const;
+
+  folly::coro::Task<std::shared_ptr<ZImg>> readRegionToImgAsync(index_t xyRatio,
+                                                                index_t zRatio,
+                                                                index_t sx,
+                                                                index_t sy,
+                                                                index_t sz,
+                                                                size_t sc,
+                                                                size_t t,
+                                                                const ZImgInfo& resInfo,
+                                                                double displayRangeMin,
+                                                                double displayRangeMax) const;
 
   __forceinline bool isEmptyBlock(index_t xyRatio,
                                   index_t zRatio,

@@ -9,6 +9,7 @@
 #include <QPoint>
 #include <QDir>
 #include <QMenu>
+#include <folly/coro/Collect.h>
 #include <tbb/parallel_for.h>
 #include <boost/iterator/function_output_iterator.hpp>
 #include <cmath>
@@ -843,6 +844,171 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         return res;
       });
   }
+}
+
+folly::coro::Task<void> ZImgPack::readTileToImgAsync(size_t tileIndex,
+                                                     ZImg* img,
+                                                     index_t xyRatio,
+                                                     index_t zRatio,
+                                                     index_t sx,
+                                                     index_t sy,
+                                                     index_t sz,
+                                                     size_t sc,
+                                                     std::array<size_t, 3> readRatio) const
+{
+  auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
+
+  const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
+  auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile);
+  ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
+                         std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
+                         std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
+                         -ZVoxelCoordinate::value_type(sc),
+                         0);
+  maybeCancel(cancellationToken);
+  img->pasteImg(*imgPtr, start);
+
+  co_return;
+}
+
+folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t xyRatio,
+                                                                        index_t zRatio,
+                                                                        index_t sx,
+                                                                        index_t sy,
+                                                                        index_t sz,
+                                                                        size_t sc,
+                                                                        size_t t,
+                                                                        const ZImgInfo& resInfo,
+                                                                        double displayRangeMin,
+                                                                        double displayRangeMax) const
+{
+  auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
+
+  bool needToUpdateBlockInfo = false;
+  if (auto it = m_blockInfo.find(
+        std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth));
+      it != m_blockInfo.end()) {
+    const auto [minv, maxv] = it->second;
+    if (maxv <= displayRangeMin) {
+      co_return std::shared_ptr<ZImg>();
+    }
+  } else {
+    needToUpdateBlockInfo = true;
+  }
+
+  maybeCancel(cancellationToken);
+
+  auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
+                                                                         xyRatio,
+                                                                         zRatio,
+                                                                         sx,
+                                                                         sy,
+                                                                         sz,
+                                                                         sc,
+                                                                         t,
+                                                                         resInfo.width,
+                                                                         resInfo.height,
+                                                                         resInfo.depth,
+                                                                         displayRangeMin,
+                                                                         displayRangeMax));
+  if (img) {
+    co_return img;
+  }
+
+  maybeCancel(cancellationToken);
+
+  auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
+  std::vector<size_t> queryResult;
+  if (auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
+      tiit != m_rtToTileBoxRTree.end()) {
+    TileBoxType queryBox(TileCornerType(sx * xyRatio, sy * xyRatio, sz * zRatio),
+                         TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
+                                        (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
+                                        (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
+    tiit->second->query(bgi::intersects(queryBox),
+                        boost::make_function_output_iterator([&queryResult](const auto& value) {
+                          queryResult.push_back(value.second);
+                        }));
+  }
+
+  if (queryResult.empty()) {
+    co_return std::shared_ptr<ZImg>();
+  }
+
+  maybeCancel(cancellationToken);
+
+  auto tmpResInfo = resInfo;
+  tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
+  tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
+  tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
+  tmpResInfo.voxelFormat = m_imgInfo.voxelFormat;
+  tmpResInfo.bytesPerVoxel = m_imgInfo.bytesPerVoxel;
+  auto res = std::make_shared<ZImg>(tmpResInfo);
+
+  std::vector<folly::coro::TaskWithExecutor<void>> tileTasks;
+  tileTasks.reserve(queryResult.size());
+  for (auto tileIndex : queryResult) {
+    tileTasks.push_back(readTileToImgAsync(tileIndex, res.get(), xyRatio, zRatio, sx, sy, sz, sc, readRatio)
+                          .scheduleOn(folly::getGlobalCPUExecutor()));
+  }
+
+  co_await folly::coro::collectAllRange(std::move(tileTasks));
+
+  if (needToUpdateBlockInfo) {
+    maybeCancel(cancellationToken);
+
+    double minv;
+    double maxv;
+    res->computeMinMax(minv, maxv);
+    m_blockInfo.emplace(
+      std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth),
+      std::make_pair(minv, maxv));
+    if (maxv <= displayRangeMin) {
+      co_return std::shared_ptr<ZImg>();
+    }
+  }
+
+  if (res->isSameType(resInfo)) {
+    if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax() ||
+        resInfo.validBitCount != m_imgInfo.validBitCount) {
+      maybeCancel(cancellationToken);
+      res->normalize(displayRangeMin, displayRangeMax);
+    }
+  } else {
+    maybeCancel(cancellationToken);
+    *res = res->convertTo(displayRangeMin, displayRangeMax, resInfo);
+  }
+
+  if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
+    maybeCancel(cancellationToken);
+    res->resize(resInfo.width,
+                resInfo.height,
+                resInfo.depth,
+                Interpolant::Cubic,
+                true,
+                false,
+                FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+  }
+
+  maybeCancel(cancellationToken);
+
+  ZImgRegionCache::instance().insert(ImageRegionCacheHashKeyType(this,
+                                                                 xyRatio,
+                                                                 zRatio,
+                                                                 sx,
+                                                                 sy,
+                                                                 sz,
+                                                                 sc,
+                                                                 t,
+                                                                 resInfo.width,
+                                                                 resInfo.height,
+                                                                 resInfo.depth,
+                                                                 displayRangeMin,
+                                                                 displayRangeMax),
+                                     res);
+  co_return res;
 }
 
 const ZImg& ZImgPack::maxZProjectedImg(size_t zStart, size_t zEnd) const

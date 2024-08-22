@@ -182,6 +182,7 @@ set(IMG_SOURCES
     zcachedimg.cpp zcachedimg.h
     zstructutils.h
     zwindowsheader.cpp
+    zcancellation.h
 )
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")

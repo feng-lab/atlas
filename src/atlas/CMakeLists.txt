@@ -421,7 +421,6 @@ set(SOURCES
     zimgregioncache.cpp zimgregioncache.h
     zcheckbox.cpp zcheckbox.h
     zrunexport3danimation.cpp zrunexport3danimation.h
-    zcancellation.h
     zrunneutucommand.cpp zrunneutucommand.h
     zprocess.cpp zprocess.h
     zvulkan.cpp

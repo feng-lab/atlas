@@ -17,6 +17,7 @@
 #include "zimgleica.h"
 #include "zlog.h"
 #include "zioutils.h"
+#include "zcancellation.h"
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <folly/coro/Collect.h>
 #include <folly/coro/BlockingWait.h>
@@ -112,14 +113,12 @@ void ZImgIO::readInfos(const QString& filename,
 }
 
 folly::coro::Task<std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>
-_readOneFileInfo(const QString& filename,
-                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                 FileFormat format)
+readOneFileInfoAsync(const QString& filename,
+                     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                     FileFormat format)
 {
   auto token = co_await folly::coro::co_current_cancellation_token;
-  if (token.isCancellationRequested()) {
-    throw ZCancellationException();
-  }
+  maybeCancel(token);
 
   std::vector<ZImgInfo> tmpInfo;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
@@ -130,7 +129,7 @@ _readOneFileInfo(const QString& filename,
   co_return std::make_tuple(std::move(tmpInfo), std::move(tmpSubBlocks));
 }
 
-folly::coro::Task<void> _collectFileInfo(
+folly::coro::Task<void> collectFileInfoAsync(
   const std::vector<std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>&
     infoTuple,
   Dimension catDim,
@@ -281,34 +280,35 @@ folly::coro::Task<void> _collectFileInfo(
   co_return;
 }
 
-folly::coro::Task<void> _readInfoExcludeFirstOne(const QStringList& fileList,
-                                                 Dimension catDim,
-                                                 bool catScenes,
-                                                 std::vector<ZImgInfo>& res,
-                                                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                                                 FileFormat format,
-                                                 bool expandXY)
+folly::coro::Task<void>
+readImgInfoExcludeFirstOneAsync(const QStringList& fileList,
+                                Dimension catDim,
+                                bool catScenes,
+                                std::vector<ZImgInfo>& res,
+                                std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                                FileFormat format,
+                                bool expandXY)
 {
   if (FLAGS_zimg_use_multithreaded_image_sequence_reading) {
     std::vector<folly::coro::TaskWithExecutor<
       std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>>
       tasks;
     for (int i = 1; i < fileList.size(); ++i) {
-      tasks.push_back(_readOneFileInfo(fileList[i], subBlocks, format).scheduleOn(folly::getGlobalCPUExecutor()));
+      tasks.push_back(readOneFileInfoAsync(fileList[i], subBlocks, format).scheduleOn(folly::getGlobalCPUExecutor()));
     }
 
     auto infoTuple = co_await folly::coro::collectAllRange(std::move(tasks));
-    co_await _collectFileInfo(infoTuple, catDim, catScenes, res, subBlocks, expandXY);
+    co_await collectFileInfoAsync(infoTuple, catDim, catScenes, res, subBlocks, expandXY);
   } else {
     std::vector<
       folly::coro::Task<std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>>
       tasks;
     for (int i = 1; i < fileList.size(); ++i) {
-      tasks.push_back(_readOneFileInfo(fileList[i], subBlocks, format));
+      tasks.push_back(readOneFileInfoAsync(fileList[i], subBlocks, format));
     }
 
     auto infoTuple = co_await folly::coro::collectAllRange(std::move(tasks));
-    co_await _collectFileInfo(infoTuple, catDim, catScenes, res, subBlocks, expandXY);
+    co_await collectFileInfoAsync(infoTuple, catDim, catScenes, res, subBlocks, expandXY);
   }
 }
 
@@ -336,7 +336,29 @@ void ZImgIO::readInfos(const QStringList& fileList,
     CHECK(catDim != Dimension::X && catDim != Dimension::Y);
   }
   if (FLAGS_zimg_use_multithreaded_image_sequence_reading) {
-    folly::coro::blockingWait(_readInfoExcludeFirstOne(fileList, catDim, catScenes, res, subBlocks, format, expandXY));
+#if 1
+    folly::coro::blockingWait(
+      readImgInfoExcludeFirstOneAsync(fileList, catDim, catScenes, res, subBlocks, format, expandXY));
+#else
+    auto cpuExecutor = folly::getGlobalCPUExecutor();
+    auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get());
+    CHECK(p);
+    auto f = readImgInfoExcludeFirstOneAsync(fileList, catDim, catScenes, res, subBlocks, format, expandXY)
+               .scheduleOn(cpuExecutor)
+               .start()
+               .via(cpuExecutor);
+    while (!f.wait(std::chrono::seconds(5)).isReady()) {
+      auto poolStats = p->getPoolStats();
+      LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
+                               poolStats.pendingTaskCount,
+                               poolStats.totalTaskCount,
+                               poolStats.activeThreadCount,
+                               poolStats.idleThreadCount);
+    }
+    if (f.hasException()) {
+      f.value();
+    }
+#endif
   } else {
     if (catScenes) {
       for (index_t i = 1; i < fileList.size(); ++i) {
