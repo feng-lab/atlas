@@ -49,6 +49,8 @@ ZLogInit::ZLogInit(std::string appName, const QString& filename)
   FLAGS_max_log_size = 1800;
   // Sets whether to avoid logging to the disk if the disk is full.
   FLAGS_stop_logging_if_full_disk = true;
+  //
+  FLAGS_log_utc_time = true;
 
   google::InstallFailureSignalHandler();
 

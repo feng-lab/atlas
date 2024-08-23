@@ -54,7 +54,7 @@ message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 # generate a version string from git tag-hash and current build time
 include(GetGitRevisionDescription)
 git_describe(GIT_VERSION)
-string(TIMESTAMP BUILD_DATE " build %Y-%m-%dT%H:%M:%S")
+string(TIMESTAMP BUILD_DATE " build %Y-%m-%dT%H:%M:%S%Z" UTC)
 string(APPEND GIT_VERSION ${BUILD_DATE})
 message(STATUS "GIT_VERSION: ${GIT_VERSION}")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/src/version/version.h

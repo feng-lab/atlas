@@ -286,7 +286,7 @@ QDir ZSystemInfo::createLogDir()
     logFolderName = QCoreApplication::applicationName();
   }
 #endif
-  logFolderName += QString("/%1_LOG").arg(QDateTime::currentDateTime().toString("yyyyMMdd-hhmmss.zzz"));
+  logFolderName += QString("/%1_LOG").arg(QDateTime::currentDateTimeUtc().toString("yyyyMMdd-hhmmss.zzz"));
   if (!dir.mkpath(logFolderName)) {
     dir.remove(logFolderName);
   }
