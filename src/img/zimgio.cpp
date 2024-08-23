@@ -114,8 +114,12 @@ void ZImgIO::readInfos(const QString& filename,
 
 folly::coro::Task<std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>
 readOneFileInfoAsync(const QString& filename,
+                     Dimension catDim,
+                     bool catScenes,
+                     std::vector<ZImgInfo>& res,
                      std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                     FileFormat format)
+                     FileFormat format,
+                     bool expandXY)
 {
   auto token = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(token);
@@ -126,12 +130,80 @@ readOneFileInfoAsync(const QString& filename,
   if (tmpInfo.empty()) {
     throw ZException(fmt::format("Read sequence failed: img {} is empty", filename));
   }
+  if (catScenes) {
+    for (const auto& info : tmpInfo) {
+      // check whether type match
+      if (!info.isSameType(res[0])) {
+        throw ZException(
+          fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                      filename,
+                      info,
+                      res[0]));
+      }
+      // check whether dimension size match
+      for (auto dim : ZImgInfo::dimensions()) {
+        if (expandXY) {
+          if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && info.size(dim) != res[0].size(dim)) {
+            throw ZException(
+              fmt::format("Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                          filename,
+                          info,
+                          res[0]));
+          }
+        } else {
+          if (dim != catDim && info.size(dim) != res[0].size(dim)) {
+            throw ZException(
+              fmt::format("Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                          filename,
+                          info,
+                          res[0]));
+          }
+        }
+      }
+    }
+  } else {
+    // check whether number of scenes match
+    if (tmpInfo.size() != res.size()) {
+      throw ZException("Read sequence failed: images have different number of scenes");
+    }
+    for (size_t s = 0; s < res.size(); ++s) {
+      // check whether type match
+      if (!tmpInfo[s].isSameType(res[s])) {
+        throw ZException(
+          fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                      filename,
+                      tmpInfo[s],
+                      res[s]));
+      }
+      // check whether dimension size match
+      for (auto dim : ZImgInfo::dimensions()) {
+        if (expandXY) {
+          if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
+            throw ZException(
+              fmt::format("Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                          filename,
+                          tmpInfo[s],
+                          res[s]));
+          }
+        } else {
+          if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
+            throw ZException(
+              fmt::format("Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                          filename,
+                          tmpInfo[s],
+                          res[s]));
+          }
+        }
+      }
+    }
+  }
   co_return std::make_tuple(std::move(tmpInfo), std::move(tmpSubBlocks));
 }
 
-folly::coro::Task<void> collectFileInfoAsync(
+void collectFileInfo(
   const std::vector<std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>&
     infoTuple,
+  const QStringList& fileList,
   Dimension catDim,
   bool catScenes,
   std::vector<ZImgInfo>& res,
@@ -147,54 +219,29 @@ folly::coro::Task<void> collectFileInfoAsync(
     }
 
     for (size_t s = 1; s < res.size(); ++s) {
-      // check whether type match
-      if (!res[s].isSameType(res[0])) {
-        throw ZException(fmt::format("Read sequence failed: image type don't match, can not cat Img <{}> to Img 0 <{}>",
-                                     res[s],
-                                     res[0]));
-      }
-      // check whether dimension size match
-      for (auto dim : ZImgInfo::dimensions()) {
-        if (expandXY) {
-          if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && res[s].size(dim) != res[0].size(dim)) {
-            throw ZException(
-              fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
-                          res[s],
-                          res[0]));
+      if (subBlocks) {
+        for (size_t tsidx = 0; tsidx < (*subBlocks)[s].size(); ++tsidx) {
+          switch (catDim) {
+            case Dimension::X:
+              (*subBlocks)[s][tsidx]->x += res[0].size(catDim);
+              break;
+            case Dimension::Y:
+              (*subBlocks)[s][tsidx]->y += res[0].size(catDim);
+              break;
+            case Dimension::Z:
+              (*subBlocks)[s][tsidx]->z += res[0].size(catDim);
+              break;
+            case Dimension::T:
+              (*subBlocks)[s][tsidx]->t += res[0].size(catDim);
+              break;
+            default:
+              break;
           }
-        } else {
-          if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
-            throw ZException(
-              fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
-                          res[s],
-                          res[0]));
-          }
-        }
-        if (dim == catDim) {
-          if (subBlocks) {
-            for (size_t tsidx = 0; tsidx < (*subBlocks)[s].size(); ++tsidx) {
-              switch (catDim) {
-                case Dimension::X:
-                  (*subBlocks)[s][tsidx]->x += res[0].size(dim);
-                  break;
-                case Dimension::Y:
-                  (*subBlocks)[s][tsidx]->y += res[0].size(dim);
-                  break;
-                case Dimension::Z:
-                  (*subBlocks)[s][tsidx]->z += res[0].size(dim);
-                  break;
-                case Dimension::T:
-                  (*subBlocks)[s][tsidx]->t += res[0].size(dim);
-                  break;
-                default:
-                  break;
-              }
-              (*subBlocks)[0].push_back((*subBlocks)[s][tsidx]);
-            }
-          }
-          res[0].setSize(catDim, res[0].size(dim) + res[s].size(dim));
+          (*subBlocks)[0].push_back((*subBlocks)[s][tsidx]);
         }
       }
+      res[0].setSize(catDim, res[0].size(catDim) + res[s].size(catDim));
+
       // get final width and height
       if (expandXY) {
         res[0].width = std::max(res[0].width, res[s].width);
@@ -206,67 +253,31 @@ folly::coro::Task<void> collectFileInfoAsync(
       subBlocks->resize(1);
     }
   } else {
-    int i = 0;
     for (const auto& [tmpInfo, tmpSubBlocks] : infoTuple) {
-      ++i;
-      // check whether number of scenes match
-      if (tmpInfo.size() != res.size()) {
-        throw ZException("Read sequence failed: images have different number of scenes");
-      }
       for (size_t s = 0; s < res.size(); ++s) {
-        // check whether type match
-        if (!tmpInfo[s].isSameType(res[s])) {
-          throw ZException(
-            fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
-                        i,
-                        tmpInfo[s],
-                        res[s]));
-        }
-        // check whether dimension size match
-        for (auto dim : ZImgInfo::dimensions()) {
-          if (expandXY) {
-            if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
-                res[s].size(dim) != tmpInfo[s].size(dim)) {
-              throw ZException(
-                fmt::format("Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
-                            i,
-                            tmpInfo[s],
-                            res[s]));
+        if (subBlocks) {
+          for (size_t tsidx = 0; tsidx < tmpSubBlocks[s].size(); ++tsidx) {
+            switch (catDim) {
+              case Dimension::X:
+                tmpSubBlocks[s][tsidx]->x += res[s].size(catDim);
+                break;
+              case Dimension::Y:
+                tmpSubBlocks[s][tsidx]->y += res[s].size(catDim);
+                break;
+              case Dimension::Z:
+                tmpSubBlocks[s][tsidx]->z += res[s].size(catDim);
+                break;
+              case Dimension::T:
+                tmpSubBlocks[s][tsidx]->t += res[s].size(catDim);
+                break;
+              default:
+                break;
             }
-          } else {
-            if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
-              throw ZException(
-                fmt::format("Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
-                            i,
-                            tmpInfo[s],
-                            res[s]));
-            }
-          }
-          if (dim == catDim) {
-            if (subBlocks) {
-              for (size_t tsidx = 0; tsidx < tmpSubBlocks[s].size(); ++tsidx) {
-                switch (catDim) {
-                  case Dimension::X:
-                    tmpSubBlocks[s][tsidx]->x += res[s].size(dim);
-                    break;
-                  case Dimension::Y:
-                    tmpSubBlocks[s][tsidx]->y += res[s].size(dim);
-                    break;
-                  case Dimension::Z:
-                    tmpSubBlocks[s][tsidx]->z += res[s].size(dim);
-                    break;
-                  case Dimension::T:
-                    tmpSubBlocks[s][tsidx]->t += res[s].size(dim);
-                    break;
-                  default:
-                    break;
-                }
-                (*subBlocks)[s].push_back(tmpSubBlocks[s][tsidx]);
-              }
-            }
-            res[s].setSize(catDim, res[s].size(dim) + tmpInfo[s].size(dim));
+            (*subBlocks)[s].push_back(tmpSubBlocks[s][tsidx]);
           }
         }
+        res[s].setSize(catDim, res[s].size(catDim) + tmpInfo[s].size(catDim));
+
         // get final width and height
         if (expandXY) {
           res[s].width = std::max(res[s].width, tmpInfo[s].width);
@@ -276,40 +287,26 @@ folly::coro::Task<void> collectFileInfoAsync(
     }
   }
 
-  VLOG(1) << "image sequence reading finished.";
-  co_return;
-}
-
-folly::coro::Task<void>
-readImgInfoExcludeFirstOneAsync(const QStringList& fileList,
-                                Dimension catDim,
-                                bool catScenes,
-                                std::vector<ZImgInfo>& res,
-                                std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                                FileFormat format,
-                                bool expandXY)
-{
-  if (FLAGS_zimg_use_multithreaded_image_sequence_reading) {
-    std::vector<folly::coro::TaskWithExecutor<
-      std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>>
-      tasks;
-    for (int i = 1; i < fileList.size(); ++i) {
-      tasks.push_back(readOneFileInfoAsync(fileList[i], subBlocks, format).scheduleOn(folly::getGlobalCPUExecutor()));
+  // destroy all and build simple one
+  if (subBlocks && catDim == Dimension::C) {
+    subBlocks->clear();
+    subBlocks->resize(res.size());
+    for (size_t s = 0; s < res.size(); ++s) {
+      for (size_t t = 0; t < res[s].numTimes; ++t) {
+        for (size_t z = 0; z < res[s].depth; ++z) {
+          (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(
+            ZImgSource(fileList,
+                       catDim,
+                       catScenes,
+                       ZImgRegion(ZVoxelCoordinate(0, 0, z, 0, t),
+                                  ZVoxelCoordinate(res[s].width, res[s].height, z + 1, res[s].numChannels, t + 1)),
+                       s)));
+        }
+      }
     }
-
-    auto infoTuple = co_await folly::coro::collectAllRange(std::move(tasks));
-    co_await collectFileInfoAsync(infoTuple, catDim, catScenes, res, subBlocks, expandXY);
-  } else {
-    std::vector<
-      folly::coro::Task<std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>>
-      tasks;
-    for (int i = 1; i < fileList.size(); ++i) {
-      tasks.push_back(readOneFileInfoAsync(fileList[i], subBlocks, format));
-    }
-
-    auto infoTuple = co_await folly::coro::collectAllRange(std::move(tasks));
-    co_await collectFileInfoAsync(infoTuple, catDim, catScenes, res, subBlocks, expandXY);
   }
+
+  VLOG(1) << "image sequence reading finished.";
 }
 
 void ZImgIO::readInfos(const QStringList& fileList,
@@ -335,197 +332,57 @@ void ZImgIO::readInfos(const QStringList& fileList,
   if (expandXY) {
     CHECK(catDim != Dimension::X && catDim != Dimension::Y);
   }
-  if (FLAGS_zimg_use_multithreaded_image_sequence_reading) {
-#if 1
-    folly::coro::blockingWait(
-      readImgInfoExcludeFirstOneAsync(fileList, catDim, catScenes, res, subBlocks, format, expandXY));
-#else
-    auto cpuExecutor = folly::getGlobalCPUExecutor();
-    auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get());
-    CHECK(p);
-    auto f = readImgInfoExcludeFirstOneAsync(fileList, catDim, catScenes, res, subBlocks, format, expandXY)
-               .scheduleOn(cpuExecutor)
-               .start()
-               .via(cpuExecutor);
-    while (!f.wait(std::chrono::seconds(5)).isReady()) {
-      auto poolStats = p->getPoolStats();
-      LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
-                               poolStats.pendingTaskCount,
-                               poolStats.totalTaskCount,
-                               poolStats.activeThreadCount,
-                               poolStats.idleThreadCount);
-    }
-    if (f.hasException()) {
-      f.value();
-    }
-#endif
-  } else {
-    if (catScenes) {
-      for (index_t i = 1; i < fileList.size(); ++i) {
-        std::vector<ZImgInfo> tmpInfo;
-        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
-        readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
-        if (tmpInfo.empty()) {
-          throw ZException(fmt::format("Read sequence failed: img {} is empty", i));
-        }
-        res.insert(res.end(), tmpInfo.begin(), tmpInfo.end());
-        if (subBlocks) {
-          subBlocks->insert(subBlocks->end(), tmpSubBlocks.begin(), tmpSubBlocks.end());
-        }
+
+  if (catScenes) {
+    for (size_t s = 1; s < res.size(); ++s) {
+      // check whether type match
+      if (!res[s].isSameType(res[0])) {
+        throw ZException(fmt::format("Read sequence failed: image type don't match, can not cat Img <{}> to Img 0 <{}>",
+                                     res[s],
+                                     res[0]));
       }
-      for (size_t s = 1; s < res.size(); ++s) {
-        // check whether type match
-        if (!res[s].isSameType(res[0])) {
-          throw ZException(
-            fmt::format("Read sequence failed: image type don't match, can not cat Img <{}> to Img 0 <{}>",
-                        res[s],
-                        res[0]));
-        }
-        // check whether dimension size match
-        for (auto dim : ZImgInfo::dimensions()) {
-          if (expandXY) {
-            if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && res[s].size(dim) != res[0].size(dim)) {
-              throw ZException(
-                fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
-                            res[s],
-                            res[0]));
-            }
-          } else {
-            if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
-              throw ZException(
-                fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
-                            res[s],
-                            res[0]));
-            }
-          }
-          if (dim == catDim) {
-            if (subBlocks) {
-              for (size_t tsidx = 0; tsidx < (*subBlocks)[s].size(); ++tsidx) {
-                switch (catDim) {
-                  case Dimension::X:
-                    (*subBlocks)[s][tsidx]->x += res[0].size(dim);
-                    break;
-                  case Dimension::Y:
-                    (*subBlocks)[s][tsidx]->y += res[0].size(dim);
-                    break;
-                  case Dimension::Z:
-                    (*subBlocks)[s][tsidx]->z += res[0].size(dim);
-                    break;
-                  case Dimension::T:
-                    (*subBlocks)[s][tsidx]->t += res[0].size(dim);
-                    break;
-                  default:
-                    break;
-                }
-                (*subBlocks)[0].push_back((*subBlocks)[s][tsidx]);
-              }
-            }
-            res[0].setSize(catDim, res[0].size(dim) + res[s].size(dim));
-          }
-        }
-        // get final width and height
+      // check whether dimension size match
+      for (auto dim : ZImgInfo::dimensions()) {
         if (expandXY) {
-          res[0].width = std::max(res[0].width, res[s].width);
-          res[0].height = std::max(res[0].height, res[s].height);
-        }
-      }
-      res.resize(1);
-      if (subBlocks) {
-        subBlocks->resize(1);
-      }
-    } else {
-      for (index_t i = 1; i < fileList.size(); ++i) {
-        std::vector<ZImgInfo> tmpInfo;
-        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
-        readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
-        if (tmpInfo.empty()) {
-          throw ZException(fmt::format("Read sequence failed: img {} is empty", i));
-        }
-        // check whether number of scenes match
-        if (tmpInfo.size() != res.size()) {
-          throw ZException("Read sequence failed: images have different number of scenes");
-        }
-        for (size_t s = 0; s < res.size(); ++s) {
-          // check whether type match
-          if (!tmpInfo[s].isSameType(res[s])) {
+          if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && res[s].size(dim) != res[0].size(dim)) {
             throw ZException(
-              fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
-                          i,
-                          tmpInfo[s],
-                          res[s]));
+              fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
+                          res[s],
+                          res[0]));
           }
-          // check whether dimension size match
-          for (auto dim : ZImgInfo::dimensions()) {
-            if (expandXY) {
-              if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
-                  res[s].size(dim) != tmpInfo[s].size(dim)) {
-                throw ZException(fmt::format(
-                  "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
-                  i,
-                  tmpInfo[s],
-                  res[s]));
-              }
-            } else {
-              if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
-                throw ZException(fmt::format(
-                  "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
-                  i,
-                  tmpInfo[s],
-                  res[s]));
-              }
-            }
-            if (dim == catDim) {
-              if (subBlocks) {
-                for (size_t tsidx = 0; tsidx < tmpSubBlocks[s].size(); ++tsidx) {
-                  switch (catDim) {
-                    case Dimension::X:
-                      tmpSubBlocks[s][tsidx]->x += res[s].size(dim);
-                      break;
-                    case Dimension::Y:
-                      tmpSubBlocks[s][tsidx]->y += res[s].size(dim);
-                      break;
-                    case Dimension::Z:
-                      tmpSubBlocks[s][tsidx]->z += res[s].size(dim);
-                      break;
-                    case Dimension::T:
-                      tmpSubBlocks[s][tsidx]->t += res[s].size(dim);
-                      break;
-                    default:
-                      break;
-                  }
-                  (*subBlocks)[s].push_back(tmpSubBlocks[s][tsidx]);
-                }
-              }
-              res[s].setSize(catDim, res[s].size(dim) + tmpInfo[s].size(dim));
-            }
-          }
-          // get final width and height
-          if (expandXY) {
-            res[s].width = std::max(res[s].width, tmpInfo[s].width);
-            res[s].height = std::max(res[s].height, tmpInfo[s].height);
+        } else {
+          if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
+            throw ZException(
+              fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
+                          res[s],
+                          res[0]));
           }
         }
       }
     }
   }
 
-  // destroy all and build simple one
-  if (subBlocks && catDim == Dimension::C) {
-    subBlocks->clear();
-    subBlocks->resize(res.size());
-    for (size_t s = 0; s < res.size(); ++s) {
-      for (size_t t = 0; t < res[s].numTimes; ++t) {
-        for (size_t z = 0; z < res[s].depth; ++z) {
-          (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(
-            ZImgSource(fileList,
-                       catDim,
-                       catScenes,
-                       ZImgRegion(ZVoxelCoordinate(0, 0, z, 0, t),
-                                  ZVoxelCoordinate(res[s].width, res[s].height, z + 1, res[s].numChannels, t + 1)),
-                       s)));
-        }
-      }
+  if (FLAGS_zimg_use_multithreaded_image_sequence_reading) {
+    std::vector<folly::coro::TaskWithExecutor<
+      std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>>
+      tasks;
+    for (int i = 1; i < fileList.size(); ++i) {
+      tasks.push_back(readOneFileInfoAsync(fileList[i], catDim, catScenes, res, subBlocks, format, expandXY)
+                        .scheduleOn(folly::getGlobalCPUExecutor()));
     }
+
+    auto infoTuple = folly::coro::blockingWait(folly::coro::collectAllRange(std::move(tasks)));
+    collectFileInfo(infoTuple, fileList, catDim, catScenes, res, subBlocks, expandXY);
+  } else {
+    std::vector<
+      folly::coro::Task<std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>>
+      tasks;
+    for (int i = 1; i < fileList.size(); ++i) {
+      tasks.push_back(readOneFileInfoAsync(fileList[i], catDim, catScenes, res, subBlocks, format, expandXY));
+    }
+
+    auto infoTuple = folly::coro::blockingWait(folly::coro::collectAllRange(std::move(tasks)));
+    collectFileInfo(infoTuple, fileList, catDim, catScenes, res, subBlocks, expandXY);
   }
 }
 

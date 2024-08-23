@@ -22,9 +22,14 @@ public:
 
   void updateTheme();
 
-  QString currentTheme() const
+  [[nodiscard]] QString currentTheme() const
   {
     return m_currentTheme;
+  }
+
+  [[nodiscard]] bool isDarkTheme() const
+  {
+    return m_currentTheme == "dark";
   }
 
   bool event(QEvent* event) override;

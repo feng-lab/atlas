@@ -1,5 +1,6 @@
 #include "zlogwidget.h"
 #include "zlogcache.h"
+#include "ztheme.h"
 #include <vector>
 
 namespace nim {
@@ -10,11 +11,15 @@ ZLogWidget::ZLogWidget(bool receiveOldMessages, QWidget* parent)
   // setCenterOnScroll(true);
   m_normalFormat = currentCharFormat();
   m_errorFormat = m_normalFormat;
-  m_errorFormat.setForeground(QBrush(QColor(176, 0, 0)));
+  if (ZTheme::instance().isDarkTheme()) {
+    m_errorFormat.setForeground(QBrush(QColor(242, 182, 179)));
+  } else {
+    m_errorFormat.setForeground(QBrush(QColor(176, 0, 0)));
+  }
   ZLogCache::instance().receiveLogMessages(this, &ZLogWidget::writeLogData, receiveOldMessages);
 }
 
-void ZLogWidget::writeLogData(const std::deque<LogData>* messages, size_t start, size_t end)
+void ZLogWidget::writeLogData(const std::vector<LogData>* messages, size_t start, size_t end)
 {
   if (end - start == 1) {
     const auto& logData = (*messages)[start];

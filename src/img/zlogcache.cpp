@@ -1,6 +1,7 @@
 #include "zlogcache.h"
 
 #include <QTimer>
+#include <mutex>
 
 namespace nim {
 
@@ -36,15 +37,15 @@ ZLogCache::ZLogCache(size_t maxNumItems)
 {
   connect(m_timer, &QTimer::timeout, this, &ZLogCache::sendLogData);
   // QTimer can not be started from another thread so we use a repetitive one here
-  m_timer->start(300);
+  m_timer->start(1000);
 }
 
 void ZLogCache::sendLogData()
 {
-  std::lock_guard lock(m_mutex);
-  auto start = m_unsendLogDataStart;
-  m_unsendLogDataStart = m_logDatas.size();
-  if (m_unsendLogDataStart > start) {
+  if (m_logDatas.size() > m_unsendLogDataStart) {
+    std::lock_guard lock(m_mutex);
+    auto start = m_unsendLogDataStart;
+    m_unsendLogDataStart = m_logDatas.size();
     Q_EMIT logDataReady(&m_logDatas, start, m_unsendLogDataStart);
   }
 }

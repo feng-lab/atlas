@@ -2,9 +2,8 @@
 
 #include "zlog.h"
 #include <QObject>
-#include <deque>
+#include <vector>
 #include <limits>
-#include <mutex>
 
 class QTimer;
 
@@ -49,16 +48,16 @@ public:
 
 Q_SIGNALS:
   // send the list and valid range [start, end), end is always larger than start
-  void logDataReady(const std::deque<LogData>* messages, size_t start, size_t end);
+  void logDataReady(const std::vector<LogData>* messages, size_t start, size_t end);
 
 protected:
-  explicit ZLogCache(size_t maxNumItems = 1 << 20);
+  explicit ZLogCache(size_t maxNumItems = 1 << 18);
 
 private:
   void sendLogData();
 
 private:
-  std::deque<LogData> m_logDatas;
+  std::vector<LogData> m_logDatas;
   std::mutex m_mutex;
   size_t m_maxNumItems;
   QTimer* m_timer;
