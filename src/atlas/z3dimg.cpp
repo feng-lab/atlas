@@ -965,18 +965,18 @@ Z3DImg::readImageBlocksToQueueAsync(size_t c,
                                     ZBenchTimer& bt) const
 {
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
 
   std::vector<folly::coro::TaskWithExecutor<void>> blockTasks;
   blockTasks.reserve(pendingTasks.size());
   for (size_t taskIdx = 0; taskIdx < pendingTasks.size(); ++taskIdx) {
-    processEventsAndMaybeCancel(cancellationToken);
+    maybeCancel(cancellationToken);
     blockTasks.push_back(
       readImageBlockToQueueAsync(c, pendingTasks, taskIdx, resInfo, queue).scheduleOn(folly::getGlobalCPUExecutor()));
   }
   co_await folly::coro::collectAllRange(std::move(blockTasks));
 
-  processEventsAndMaybeCancel(cancellationToken);
+  maybeCancel(cancellationToken);
   LOG(INFO) << "image blocks reading finished.";
   bt.recordEvent("image blocks reading");
 }
