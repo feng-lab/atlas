@@ -7,9 +7,12 @@
 #include "zbenchtimer.h"
 #include "zcancellation.h"
 #include "zcpuinfo.h"
+#include <folly/coro/Collect.h>
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
+#include <folly/coro/BlockingWait.h>
+#include <folly/coro/FutureUtil.h>
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <algorithm>
 #include <chrono>
@@ -32,7 +35,6 @@ DECLARE_double(atlas_image_cache_memory_proportion);
 DECLARE_double(atlas_image_region_cache_memory_proportion);
 
 namespace nim {
-
 Z3DImg::Z3DImg(const ZImgPack& imgPack,
                const glm::vec3& scale,
                const std::vector<glm::dvec2>& displayRanges,
@@ -866,6 +868,119 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
   }
 }
 
+folly::coro::Task<void>
+Z3DImg::readImageBlockToBufferAsync(size_t c,
+                                    const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                                    size_t taskIdx,
+                                    const ZImgInfo& resInfo,
+                                    uint8_t* buffer) const
+{
+  auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
+
+  const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
+  auto pageTableEntryPtr = std::get<1>(pendingTasks[taskIdx]);
+  glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
+  auto img = co_await m_imgPack.readRegionToImgAsync(m_levelScales[blockImagePos.w].x,
+                                                     m_levelScales[blockImagePos.w].z,
+                                                     index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
+                                                     index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.y) / 2,
+                                                     index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.z) / 2,
+                                                     c,
+                                                     0,
+                                                     resInfo,
+                                                     m_channelDisplayRanges[c].x,
+                                                     m_channelDisplayRanges[c].y);
+
+  maybeCancel(cancellationToken);
+  if (!img) {
+    *pageTableEntryPtr = m_emptyPageTableEntry;
+  } else {
+    memcpy(buffer + taskIdx * resInfo.byteNumber(), img->channelData(0), resInfo.byteNumber());
+  }
+}
+
+folly::coro::Task<void>
+Z3DImg::readImageBlocksToBufferAsync(size_t c,
+                                     const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                                     const ZImgInfo& resInfo,
+                                     uint8_t* buffer) const
+{
+  auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  processEventsAndMaybeCancel(cancellationToken);
+
+  size_t taskIdx = 0;
+  while (taskIdx < pendingTasks.size()) {
+    processEventsAndMaybeCancel(cancellationToken);
+
+    size_t numberOfTasks = std::min(m_blockUploadingBatchSize, pendingTasks.size() - taskIdx);
+
+    std::vector<folly::coro::TaskWithExecutor<void>> blockTasks;
+    blockTasks.reserve(numberOfTasks);
+    size_t finalTaskIdx = taskIdx + numberOfTasks;
+    for (; taskIdx < finalTaskIdx; ++taskIdx) {
+      blockTasks.push_back(readImageBlockToBufferAsync(c, pendingTasks, taskIdx, resInfo, buffer)
+                             .scheduleOn(folly::getGlobalCPUExecutor()));
+    }
+    co_await folly::coro::collectAllRange(std::move(blockTasks));
+    processEventsAndMaybeCancel(cancellationToken);
+    LOG(INFO) << fmt::format("finish block {}", taskIdx);
+  }
+}
+
+template<typename QueueType>
+folly::coro::Task<void>
+Z3DImg::readImageBlockToQueueAsync(size_t c,
+                                   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                                   size_t taskIdx,
+                                   const ZImgInfo& resInfo,
+                                   QueueType& queue) const
+{
+  auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
+
+  const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
+  glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
+  auto img = co_await m_imgPack.readRegionToImgAsync(m_levelScales[blockImagePos.w].x,
+                                                     m_levelScales[blockImagePos.w].z,
+                                                     index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
+                                                     index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.y) / 2,
+                                                     index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.z) / 2,
+                                                     c,
+                                                     0,
+                                                     resInfo,
+                                                     m_channelDisplayRanges[c].x,
+                                                     m_channelDisplayRanges[c].y);
+
+  maybeCancel(cancellationToken);
+  queue.enqueue(std::make_tuple(taskIdx, std::move(img)));
+}
+
+template<typename QueueType>
+folly::coro::Task<void>
+Z3DImg::readImageBlocksToQueueAsync(size_t c,
+                                    const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                                    const ZImgInfo& resInfo,
+                                    QueueType& queue,
+                                    ZBenchTimer& bt) const
+{
+  auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  processEventsAndMaybeCancel(cancellationToken);
+
+  std::vector<folly::coro::TaskWithExecutor<void>> blockTasks;
+  blockTasks.reserve(pendingTasks.size());
+  for (size_t taskIdx = 0; taskIdx < pendingTasks.size(); ++taskIdx) {
+    processEventsAndMaybeCancel(cancellationToken);
+    blockTasks.push_back(
+      readImageBlockToQueueAsync(c, pendingTasks, taskIdx, resInfo, queue).scheduleOn(folly::getGlobalCPUExecutor()));
+  }
+  co_await folly::coro::collectAllRange(std::move(blockTasks));
+
+  processEventsAndMaybeCancel(cancellationToken);
+  LOG(INFO) << "image blocks reading finished.";
+  bt.recordEvent("image blocks reading");
+}
+
 size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                         const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                         const folly::CancellationToken& cancellationToken,
@@ -909,6 +1024,16 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     processEventsAndMaybeCancel(cancellationToken);
 
     folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>>, true> imgQueue;
+#if 1
+    // auto f = folly::coro::co_withCancellation(cancellationToken,
+    //                                           readImageBlocksToQueueAsync(c, pendingTasks, resInfo, imgQueue, bt))
+    //            .scheduleOn(folly::getGlobalCPUExecutor())
+    //            .start();
+    auto f = folly::coro::toFuture(
+      folly::coro::co_withCancellation(cancellationToken,
+                                       readImageBlocksToQueueAsync(c, pendingTasks, resInfo, imgQueue, bt)),
+      folly::getGlobalCPUExecutor());
+#else
     std::vector<folly::Future<folly::Unit>> blockFutures;
     blockFutures.reserve(pendingTasks.size());
     for (size_t i = 0; i < pendingTasks.size(); ++i) {
@@ -938,6 +1063,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       LOG(INFO) << "image blocks reading finished.";
       bt.recordEvent("image blocks reading");
     });
+#endif
 
     processEventsAndMaybeCancel(cancellationToken);
 
@@ -989,6 +1115,11 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
       CHECK(m_blockUploadingBatchSize > 0);
 
+#if 1
+      folly::coro::blockingWait(folly::coro::co_withCancellation(
+        cancellationToken,
+        readImageBlocksToBufferAsync(c, pendingTasks, resInfo, pboLocalBuffer.data())));
+#else
       size_t taskIdx = 0;
       while (taskIdx < pendingTasks.size()) {
         processEventsAndMaybeCancel(cancellationToken);
@@ -1041,6 +1172,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                    poolStats.idleThreadCount);
         }
       }
+#endif
 
       processEventsAndMaybeCancel(cancellationToken);
 

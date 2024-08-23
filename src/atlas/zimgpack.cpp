@@ -953,7 +953,6 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
     tileTasks.push_back(readTileToImgAsync(tileIndex, res.get(), xyRatio, zRatio, sx, sy, sz, sc, readRatio)
                           .scheduleOn(folly::getGlobalCPUExecutor()));
   }
-
   co_await folly::coro::collectAllRange(std::move(tileTasks));
 
   if (needToUpdateBlockInfo) {

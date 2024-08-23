@@ -190,6 +190,35 @@ protected:
 
   void insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef);
 
+  folly::coro::Task<void>
+  readImageBlockToBufferAsync(size_t c,
+                              const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                              size_t taskIdx,
+                              const ZImgInfo& resInfo,
+                              uint8_t* buffer) const;
+
+  folly::coro::Task<void>
+  readImageBlocksToBufferAsync(size_t c,
+                               const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                               const ZImgInfo& resInfo,
+                               uint8_t* buffer) const;
+
+  template<typename QueueType>
+  folly::coro::Task<void>
+  readImageBlockToQueueAsync(size_t c,
+                             const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                             size_t taskIdx,
+                             const ZImgInfo& resInfo,
+                             QueueType& queue) const;
+
+  template<typename QueueType>
+  folly::coro::Task<void>
+  readImageBlocksToQueueAsync(size_t c,
+                              const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                              const ZImgInfo& resInfo,
+                              QueueType& queue,
+                              ZBenchTimer& bt) const;
+
   // return number of empty (all zero) image blocks
   size_t readAndUploadImageBlocks(size_t c,
                                   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
