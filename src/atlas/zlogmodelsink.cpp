@@ -72,11 +72,11 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
 
     switch (index.column()) {
       case TimeColumn:
-        return item.time.toLocalTime().toString();
+        return QByteArray::fromStdString(fmt::format("{}", item.time));
       case LevelNameColumn:
         return GetLogSeverityName(item.level);
       case MessageColumn:
-        return item.formatted;
+        return QByteArray(item.formatted.data(), item.formatted.size());
       default:
         return {};
     }

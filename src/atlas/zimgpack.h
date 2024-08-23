@@ -4,7 +4,7 @@
 #include "zimgsliceprovider.h"
 #include "zlog.h"
 #include <QRectF>
-#include <folly/futures/Future.h>
+#include <QObject>
 #include <folly/CancellationToken.h>
 #include <folly/coro/Task.h>
 #include <boost/geometry.hpp>
@@ -175,6 +175,7 @@ public:
 
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
+#if 0
   folly::Future<std::shared_ptr<ZImg>> readRegionToImg(index_t xyRatio,
                                                        index_t zRatio,
                                                        index_t sx,
@@ -186,6 +187,7 @@ public:
                                                        double displayRangeMin,
                                                        double displayRangeMax,
                                                        const folly::CancellationToken& cancellationToken) const;
+#endif
 
   folly::coro::Task<void> readTileToImgAsync(size_t tileIndex,
                                              ZImg* img,

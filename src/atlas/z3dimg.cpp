@@ -10,7 +10,7 @@
 #include <folly/coro/Collect.h>
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
-#include <folly/executors/CPUThreadPoolExecutor.h>
+#include <folly/executors/ThreadPoolExecutor.h>
 #include <folly/coro/BlockingWait.h>
 #include <folly/coro/FutureUtil.h>
 #include <boost/unordered/unordered_flat_set.hpp>
@@ -993,7 +993,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   LOG(INFO) << "reading " << pendingTasks.size() << " image blocks...";
 
   auto cpuExecutor = folly::getGlobalCPUExecutor();
-  auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get());
+  auto p = dynamic_cast<folly::ThreadPoolExecutor*>(cpuExecutor.get());
   CHECK(p);
 
   //  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {

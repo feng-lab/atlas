@@ -20,15 +20,11 @@ DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
             false,
             "Whether readRegionToImg uses multithreaded resize, default is false");
 
+#if 0
 DEFINE_uint32(atlas_readRegionToImg_version,
               1,
               "Which version of readRegionToImg to use, value can be 0-1, default is 1");
-
-// DEFINE_bool(atlas_readRegionToImg_use_ipp_resize,
-//             false,
-//             "Whether readRegionToImg uses ipp resize, default is false");
-
-// DEFINE_uint32(atlas_readRegionToImg_use_iothreadpool, 0, "Whether readRegionToImg uses iothreadpool, default is 0");
+#endif
 
 namespace {
 
@@ -536,6 +532,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
   return res;
 }
 
+#if 0
 folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                                                                index_t zRatio,
                                                                index_t sx,
@@ -845,6 +842,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       });
   }
 }
+#endif
 
 folly::coro::Task<void> ZImgPack::readTileToImgAsync(size_t tileIndex,
                                                      ZImg* img,

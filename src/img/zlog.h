@@ -13,7 +13,7 @@
 #include <glog/logging.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
-#include <QDateTime>
+#include <fmt/chrono.h>
 #include <QDebug>
 #include <QPoint>
 #include <QRect>
@@ -45,16 +45,15 @@ private:
 
 struct LogData
 {
-  LogData(google::LogSeverity severity, const google::LogMessageTime& logmsgtime, const std::string& formatted_msg)
+  LogData(google::LogSeverity severity, const google::LogMessageTime& logmsgtime, std::string formatted_msg)
     : level(severity)
-    , time(QDate(logmsgtime.year() + 1900, logmsgtime.month() + 1, logmsgtime.day()),
-           QTime(logmsgtime.hour(), logmsgtime.min(), logmsgtime.sec(), logmsgtime.usec() / 1000))
-    , formatted(QString::fromStdString(formatted_msg))
+    , time(logmsgtime.when())
+    , formatted(std::move(formatted_msg))
   {}
 
   google::LogSeverity level;
-  QDateTime time;
-  QString formatted; // formatted log message with level, time, threadid, filename, line, and message
+  std::chrono::system_clock::time_point time;
+  std::string formatted; // formatted log message with level, time, threadid, filename, line, and message
 };
 
 // might return nullptr

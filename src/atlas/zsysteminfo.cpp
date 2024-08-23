@@ -58,6 +58,9 @@ void ZSystemInfo::logOSInfo() const
           << 1e9 * std::chrono::high_resolution_clock::period::num / std::chrono::high_resolution_clock::period::den
           << " ns";
   VLOG(1) << "high_resolution_clock is_steady = " << std::boolalpha << std::chrono::high_resolution_clock::is_steady;
+
+  VLOG(1) << fmt::format("system_clock now: {}", std::chrono::system_clock::now());
+  // VLOG(1) << fmt::format("{:%Y%m%d %H:%M:%S}", std::chrono::system_clock::now());
 }
 
 QString ZSystemInfo::shaderPath(const QString& filename) const
