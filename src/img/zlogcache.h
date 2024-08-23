@@ -4,6 +4,7 @@
 #include <QObject>
 #include <vector>
 #include <limits>
+#include <mutex>
 
 class QTimer;
 
