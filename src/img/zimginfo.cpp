@@ -70,17 +70,15 @@ void ZImgInfo::swap(ZImgInfo& other) noexcept
 
 QString ZImgInfo::displayChannelName(size_t c) const
 {
-  QString res;
-  if (channelNames[c].isEmpty()) {
-    res = QString("Ch%1").arg(c + 1);
-  } else {
-    res = QString("Ch%1 (%2)").arg(c + 1).arg(channelNames[c]);
+  std::string res = fmt::format("Ch{}", c + 1);
+  if (!channelNames[c].empty()) {
+    fmt::format_to(std::back_inserter(res), " ({})", channelNames[c]);
   }
 
   if (lastChannelIsAlphaChannel && c + 1 == numChannels) {
-    res += QString(" (Alpha)");
+    res += " (Alpha)";
   }
-  return res;
+  return QString::fromStdString(res);
 }
 
 void ZImgInfo::createDefaultChannelNames()

@@ -432,7 +432,7 @@ static void addLockBench()
 int main(int argc, char* argv[])
 {
   using namespace nim;
-  
+
   addLogMessageFormatBench();
   addRoundBench();
   addSaturateMulBench();

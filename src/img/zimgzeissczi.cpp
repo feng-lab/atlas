@@ -1013,7 +1013,7 @@ int64_t ZImgZeissCZI::checkFilename(const QString& filename)
   return filesize;
 }
 
-void ZImgZeissCZI::readCZIInfo(const QString& xmlString)
+void ZImgZeissCZI::readCZIInfo(const QByteArray& xmlString)
 {
   // QXmlStreamReader takes any QIODevice.
   QXmlStreamReader xml(xmlString);
@@ -1143,7 +1143,7 @@ void ZImgZeissCZI::parseMetadata(QXmlStreamReader& xml)
 
   if (m_channelNamesFromDisplaySettings.size() == m_channelNames.size()) {
     for (size_t i = 0; i < m_channelNames.size(); ++i) {
-      if (m_channelNames[i].isEmpty()) {
+      if (m_channelNames[i].empty()) {
         m_channelNames[i] = m_channelNamesFromDisplaySettings[i];
       }
     }
@@ -1253,7 +1253,7 @@ void ZImgZeissCZI::parseChannel(QXmlStreamReader& xml)
     }
   }
 
-  m_channelNames.push_back(name);
+  m_channelNames.push_back(name.toStdString());
   if (hasBC) {
     m_channelValidBitCount.push_back(bc);
   }
@@ -1374,7 +1374,7 @@ void ZImgZeissCZI::parseDisplaySettingChannel(QXmlStreamReader& xml)
     }
   }
 
-  m_channelNamesFromDisplaySettings.push_back(name);
+  m_channelNamesFromDisplaySettings.push_back(name.toStdString());
   if (hasColor) {
     m_channelColorsFromDisplaySettings.push_back(col);
   }
@@ -1391,8 +1391,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
     readStructFromFileStream(md, inputFileStream);
     std::vector<char> xmlBuffer(md.xmlSize);
     readStream(inputFileStream, xmlBuffer.data(), md.xmlSize);
-    m_metadataXmlString = QString::fromUtf8(xmlBuffer.data(), md.xmlSize);
-    m_metadataXmlString.remove(QChar::Null);
+    m_metadataXmlString = QByteArray(xmlBuffer.data(), md.xmlSize);
 
     readCZIInfo(m_metadataXmlString);
     VLOG(1) << m_metadataXmlString;

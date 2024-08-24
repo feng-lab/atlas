@@ -31,10 +31,7 @@ struct ZImgInfo
   // return img data type as string "float32", "int8" ...
   [[nodiscard]] QString typeAsQString() const
   {
-    return (voxelFormat == VoxelFormat::Float    ? "float"
-            : voxelFormat == VoxelFormat::Signed ? "int"
-                                                 : "uint") +
-           QString::number(bytesPerVoxel * 8);
+    return QString::fromStdString(typeAsString());
   }
 
   [[nodiscard]] std::string typeAsString() const
@@ -273,7 +270,7 @@ struct ZImgInfo
   double voxelSizeZ = 1.;
 
   std::vector<double> timeStamps;
-  std::vector<QString> channelNames;
+  std::vector<std::string> channelNames;
   std::vector<col4> channelColors;
   // std::vector<Location> locations;
   std::vector<double> position;
@@ -417,7 +414,7 @@ inline ZImgInfo tag_invoke(const json::value_to_tag<ZImgInfo>&, const json::valu
   info.voxelSizeY = json::value_to<double>(jv.at("voxelSizeY"));
   info.voxelSizeZ = json::value_to<double>(jv.at("voxelSizeZ"));
   info.timeStamps = json::value_to<std::vector<double>>(jv.at("timeStamps"));
-  info.channelNames = json::value_to<std::vector<QString>>(jv.at("channelNames"));
+  info.channelNames = json::value_to<std::vector<std::string>>(jv.at("channelNames"));
   info.channelColors = json::value_to<std::vector<col4>>(jv.at("channelColors"));
   info.position = json::value_to<std::vector<double>>(jv.at("position"));
   info.lastChannelIsAlphaChannel = jv.at("lastChannelIsAlphaChannel").as_bool();

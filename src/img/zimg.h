@@ -928,7 +928,7 @@ public:
   }
 
   // inline Location location(size_t l) const { return m_info.locations[l]; }
-  [[nodiscard]] const QString& channelName(size_t c) const
+  [[nodiscard]] const std::string& channelName(size_t c) const
   {
     return m_info.channelNames[c];
   }

@@ -273,7 +273,7 @@ public:
   // ZImgFormat interface
 
 public:
-  bool supportRead() const override;
+  [[nodiscard]] bool supportRead() const override;
 
   bool supportWrite() const override;
 
@@ -310,7 +310,7 @@ private:
 
   static int64_t checkFilename(const QString& filename);
 
-  void readCZIInfo(const QString& xmlString);
+  void readCZIInfo(const QByteArray& xmlString);
 
   void parseMetadata(QXmlStreamReader& xml);
 
@@ -351,14 +351,14 @@ private:
   static void dumpAttachmentDirectory(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
 
 private:
-  QString m_metadataXmlString;
+  QByteArray m_metadataXmlString;
   bool m_hasVoxelSizeInfo;
   double m_voxelSizeX;
   double m_voxelSizeY;
   double m_voxelSizeZ;
   bool m_hasChannelInfo;
   std::vector<col4> m_channelColors;
-  std::vector<QString> m_channelNames;
+  std::vector<std::string> m_channelNames;
   std::vector<int> m_channelPixelType;
   std::vector<size_t> m_channelValidBitCount;
   bool m_hasSceneInfo;
@@ -366,7 +366,7 @@ private:
   std::vector<double> m_sceneCenterY;
 
   std::vector<col4> m_channelColorsFromDisplaySettings;
-  std::vector<QString> m_channelNamesFromDisplaySettings;
+  std::vector<std::string> m_channelNamesFromDisplaySettings;
   bool m_shouldSeparateChannelsToDifferentScenes;
   bool m_someTilesAreNot2D;
 

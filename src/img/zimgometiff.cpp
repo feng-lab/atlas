@@ -410,8 +410,7 @@ void ZImgOmeTiff::parseChannel(QXmlStreamReader& xml)
   QXmlStreamAttributes attributes = xml.attributes();
 
   if (attributes.hasAttribute("Name")) {
-    QString name = attributes.value("Name").toString();
-    m_omeImgInfo.channelNames.push_back(name);
+    m_omeImgInfo.channelNames.push_back(attributes.value("Name").toString().toStdString());
   }
   if (attributes.hasAttribute("Color")) {
     bool ok;

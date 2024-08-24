@@ -504,7 +504,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
       key = fmt::format("CH{}ChannelDyeName", actualChannel);
       if (dictionary.HasKey(key)) {
         if (auto value = dynamic_cast<const MetaDataStringType*>(dictionary.Get(key)); value) {
-          info.channelNames[ch] = QString::fromStdString(value->GetMetaDataObjectValue());
+          info.channelNames[ch] = value->GetMetaDataObjectValue();
         }
       }
     }

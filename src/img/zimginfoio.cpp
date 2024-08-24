@@ -270,13 +270,9 @@ void ZImgInfoIO::save(H5::Group& grp, const ZImgInfo& info)
       H5::DataSpace ds(1, dims);
       H5::Attribute attr = grp.createAttribute("ChannelNames", strType, ds);
       if (info.numChannels > 0) {
-        std::vector<std::string> sa;
         std::vector<const char*> cStrArray;
+        cStrArray.reserve(info.channelNames.size());
         for (const auto& str : info.channelNames) {
-          sa.push_back(str.toStdString());
-        }
-        cStrArray.reserve(sa.size());
-        for (const auto& str : sa) {
           cStrArray.push_back(str.c_str());
         }
         attr.write(strType, cStrArray.data());

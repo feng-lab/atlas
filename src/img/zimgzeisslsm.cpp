@@ -129,7 +129,7 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
     int32_t nameIdx = 0;
     while (nameIdx < m_lsmChannelColors.s32NumberNames) {
       offset += 4; // skip uint32_t name length
-      QString str(&chStruct[offset]);
+      std::string str(&chStruct[offset]);
       m_lsmImgInfo.channelNames.push_back(str);
       ++nameIdx;
       offset += str.size() + 1;
