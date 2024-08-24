@@ -131,23 +131,23 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
 
       if (H5Aexists(punctumGrp.getId(), "Name") > 0) {
         H5::Attribute name = punctumGrp.openAttribute("Name");
-        name.read(strType, p.m_name);
+        name.read(strType, p.name);
       }
       if (H5Aexists(punctumGrp.getId(), "Comment") > 0) {
         H5::Attribute comment = punctumGrp.openAttribute("Comment");
-        comment.read(strType, p.m_comment);
+        comment.read(strType, p.comment);
       }
       if (H5Aexists(punctumGrp.getId(), "Property1") > 0) {
         H5::Attribute property = punctumGrp.openAttribute("Property1");
-        property.read(strType, p.m_property1);
+        property.read(strType, p.property1);
       }
       if (H5Aexists(punctumGrp.getId(), "Property2") > 0) {
         H5::Attribute property = punctumGrp.openAttribute("Property2");
-        property.read(strType, p.m_property2);
+        property.read(strType, p.property2);
       }
       if (H5Aexists(punctumGrp.getId(), "Property3") > 0) {
         H5::Attribute property = punctumGrp.openAttribute("Property3");
-        property.read(strType, p.m_property3);
+        property.read(strType, p.property3);
       }
 
       H5::DataSet info = punctumGrp.openDataSet("Summary");
@@ -238,25 +238,25 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename)
       H5::Group punctumGrp = allGrp.createGroup(fmt::format("Punctum{}", idx + 1));
       ++idx;
 
-      if (!p.name().empty()) {
+      if (!p.name.empty()) {
         H5::Attribute name = punctumGrp.createAttribute("Name", strType, attrDataSpace);
-        name.write(strType, p.name());
+        name.write(strType, p.name);
       }
-      if (!p.comment().empty()) {
+      if (!p.comment.empty()) {
         H5::Attribute comment = punctumGrp.createAttribute("Comment", strType, attrDataSpace);
-        comment.write(strType, p.comment());
+        comment.write(strType, p.comment);
       }
-      if (!p.property1().empty()) {
+      if (!p.property1.empty()) {
         H5::Attribute property = punctumGrp.createAttribute("Property1", strType, attrDataSpace);
-        property.write(strType, p.property1());
+        property.write(strType, p.property1);
       }
-      if (!p.property2().empty()) {
+      if (!p.property2.empty()) {
         H5::Attribute property = punctumGrp.createAttribute("Property2", strType, attrDataSpace);
-        property.write(strType, p.property2());
+        property.write(strType, p.property2);
       }
-      if (!p.property3().empty()) {
+      if (!p.property3.empty()) {
         H5::Attribute property = punctumGrp.createAttribute("Property3", strType, attrDataSpace);
-        property.write(strType, p.property3());
+        property.write(strType, p.property3);
       }
 
       punctaInfo[0] = p.z();
@@ -315,8 +315,8 @@ void ZPunctaIO::readV3DApoFile(const QString& filename, ZPuncta& puncta)
         field = absl::StripAsciiWhitespace(field);
       }
       ZPunctum punctum;
-      punctum.setName(fieldList[2]);
-      punctum.setComment(fieldList[3]);
+      punctum.name = fieldList[2];
+      punctum.comment = fieldList[3];
       stringToValue(fieldList[4], punctum.m_z);
       stringToValue(fieldList[5], punctum.m_x);
       stringToValue(fieldList[6], punctum.m_y);
@@ -326,13 +326,13 @@ void ZPunctaIO::readV3DApoFile(const QString& filename, ZPuncta& puncta)
       stringToValue(fieldList[10], punctum.m_volSize);
       stringToValue(fieldList[11], punctum.m_mass);
       if (fieldList.size() > 12) {
-        punctum.setProperty1(fieldList[12]);
+        punctum.property1 = fieldList[12];
       }
       if (fieldList.size() > 13) {
-        punctum.setProperty2(fieldList[13]);
+        punctum.property2 = fieldList[13];
       }
       if (fieldList.size() > 14) {
-        punctum.setProperty3(fieldList[14]);
+        punctum.property3 = fieldList[14];
       }
       if (fieldList.size() >= 18) {
         stringToValue(fieldList[15], punctum.m_color.r);
@@ -368,8 +368,8 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file)
   for (const auto& pun : puncta.data) {
     of << fmt::format("{},,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
                       idx,
-                      pun.name(),
-                      pun.comment(),
+                      pun.name,
+                      pun.comment,
                       pun.z(),
                       pun.x(),
                       pun.y(),
@@ -378,9 +378,9 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file)
                       pun.sDevOfIntensity(),
                       pun.volSize(),
                       pun.mass(),
-                      pun.property1(),
-                      pun.property2(),
-                      pun.property3(),
+                      pun.property1,
+                      pun.property2,
+                      pun.property3,
                       pun.color().r,
                       pun.color().g,
                       pun.color().b);
@@ -419,8 +419,8 @@ void ZPunctaIO::readV3DMarkerFile(const QString& filename, ZPuncta& puncta)
       punctum.setMeanIntensity(1);
       punctum.updateMass();
 
-      punctum.setName(fieldList[5]);
-      punctum.setComment(fieldList[6]);
+      punctum.name = fieldList[5];
+      punctum.comment = fieldList[6];
       stringToValue(fieldList[7], punctum.m_color.r);
       stringToValue(fieldList[8], punctum.m_color.g);
       stringToValue(fieldList[9], punctum.m_color.b);

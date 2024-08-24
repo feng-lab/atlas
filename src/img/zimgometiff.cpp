@@ -482,7 +482,7 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimension
   for (size_t i = 0; i < info.numChannels; ++i) {
     xml.writeStartElement("Channel");
     xml.writeAttribute("ID", QString("Channel:0:%1").arg(i));
-    xml.writeAttribute("Name", info.channelNames[i]);
+    xml.writeAttribute("Name", QString::fromStdString(info.channelNames[i]));
     col4 col = info.channelColors[i];
     col.a = 0;
     std::swap(col.r, col.b);

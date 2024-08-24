@@ -26,8 +26,8 @@ public:
 
   void swap(ZPunctum& rhs) noexcept
   {
-    m_name.swap(rhs.m_name);
-    m_comment.swap(rhs.m_comment);
+    name.swap(rhs.name);
+    comment.swap(rhs.comment);
     std::swap(m_maxIntensity, rhs.m_maxIntensity);
     std::swap(m_meanIntensity, rhs.m_meanIntensity);
     std::swap(m_x, rhs.m_x);
@@ -37,9 +37,9 @@ public:
     std::swap(m_volSize, rhs.m_volSize);
     std::swap(m_mass, rhs.m_mass);
     std::swap(m_radius, rhs.m_radius);
-    m_property1.swap(rhs.m_property1);
-    m_property2.swap(rhs.m_property2);
-    m_property3.swap(rhs.m_property3);
+    property1.swap(rhs.property1);
+    property2.swap(rhs.property2);
+    property3.swap(rhs.property3);
     std::swap(m_color, rhs.m_color);
     std::swap(m_score, rhs.m_score);
     m_voxelLocations.swap(rhs.m_voxelLocations);
@@ -49,11 +49,11 @@ public:
 
   bool operator==(const ZPunctum& rhs) const
   {
-    return m_name == rhs.m_name && m_comment == rhs.m_comment && m_maxIntensity == rhs.m_maxIntensity &&
+    return name == rhs.name && comment == rhs.comment && m_maxIntensity == rhs.m_maxIntensity &&
            m_meanIntensity == rhs.m_meanIntensity && m_x == rhs.m_x && m_y == rhs.m_y && m_z == rhs.m_z &&
            m_sDevOfIntensity == rhs.m_sDevOfIntensity && m_volSize == rhs.m_volSize && m_mass == rhs.m_mass &&
-           m_radius == rhs.m_radius && m_property1 == rhs.m_property1 && m_property2 == rhs.m_property2 &&
-           m_property3 == rhs.m_property3 && m_color == rhs.m_color && m_score == rhs.m_score &&
+           m_radius == rhs.m_radius && property1 == rhs.property1 && property2 == rhs.property2 &&
+           property3 == rhs.property3 && m_color == rhs.m_color && m_score == rhs.m_score &&
            m_voxelLocations == rhs.m_voxelLocations && m_voxelIntensities == rhs.m_voxelIntensities;
   }
 
@@ -128,31 +128,6 @@ public:
     return m_radius;
   }
 
-  [[nodiscard]] const std::string& name() const
-  {
-    return m_name;
-  }
-
-  [[nodiscard]] const std::string& comment() const
-  {
-    return m_comment;
-  }
-
-  [[nodiscard]] const std::string& property1() const
-  {
-    return m_property1;
-  }
-
-  [[nodiscard]] const std::string& property2() const
-  {
-    return m_property2;
-  }
-
-  [[nodiscard]] const std::string& property3() const
-  {
-    return m_property3;
-  }
-
   [[nodiscard]] const col4& color() const
   {
     return m_color;
@@ -218,56 +193,6 @@ public:
     m_radius = n;
   }
 
-  void setName(const std::string& n)
-  {
-    m_name = n;
-  }
-
-  void setComment(const std::string& n)
-  {
-    m_comment = n;
-  }
-
-  void setProperty1(const std::string& n)
-  {
-    m_property1 = n;
-  }
-
-  void setProperty2(const std::string& n)
-  {
-    m_property2 = n;
-  }
-
-  void setProperty3(const std::string& n)
-  {
-    m_property3 = n;
-  }
-
-  void setName(std::string_view n)
-  {
-    m_name = n;
-  }
-
-  void setComment(std::string_view n)
-  {
-    m_comment = n;
-  }
-
-  void setProperty1(std::string_view n)
-  {
-    m_property1 = n;
-  }
-
-  void setProperty2(std::string_view n)
-  {
-    m_property2 = n;
-  }
-
-  void setProperty3(std::string_view n)
-  {
-    m_property3 = n;
-  }
-
   void setColor(const col4& n)
   {
     m_color = n;
@@ -317,7 +242,7 @@ public:
 
   [[nodiscard]] std::string toString() const
   {
-    return fmt::format("Puncta ({}): ({}, {}, {}, {})", m_name, m_x, m_y, m_z, m_radius);
+    return fmt::format("Puncta ({}): ({}, {}, {}, {})", name, m_x, m_y, m_z, m_radius);
   }
 
   [[nodiscard]] bool isSelected() const
@@ -330,11 +255,16 @@ public:
     m_selected = v;
   }
 
+public:
+  std::string name;
+  std::string comment;
+  std::string property1;
+  std::string property2;
+  std::string property3;
+
 private:
   friend class ZPunctaIO;
 
-  std::string m_name;
-  std::string m_comment;
   double m_maxIntensity = 255;
   double m_meanIntensity = 255;
   double m_x = -1;
@@ -342,11 +272,8 @@ private:
   double m_z = -1;
   double m_sDevOfIntensity = 0;
   size_t m_volSize = 33;
-  double m_mass = 8545.13201776424;
+  double m_mass = 8415;
   double m_radius = 2.0; // radius
-  std::string m_property1;
-  std::string m_property2;
-  std::string m_property3;
   col4 m_color{0, 255, 255};
   double m_score = 1.0; // detection score [-1.0 1.0]
 
