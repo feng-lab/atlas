@@ -432,9 +432,7 @@ static void addLockBench()
 int main(int argc, char* argv[])
 {
   using namespace nim;
-
-  LOG(INFO) << "Benchmark Start";
-
+  
   addLogMessageFormatBench();
   addRoundBench();
   addSaturateMulBench();
@@ -444,6 +442,5 @@ int main(int argc, char* argv[])
   benchmark::Initialize(&argc, argv);
   benchmark::RunSpecifiedBenchmarks();
   benchmark::Shutdown();
-  LOG(INFO) << "Benchmark End";
   return 0;
 }
