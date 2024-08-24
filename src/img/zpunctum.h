@@ -128,27 +128,27 @@ public:
     return m_radius;
   }
 
-  [[nodiscard]] const QString& name() const
+  [[nodiscard]] const std::string& name() const
   {
     return m_name;
   }
 
-  [[nodiscard]] const QString& comment() const
+  [[nodiscard]] const std::string& comment() const
   {
     return m_comment;
   }
 
-  [[nodiscard]] const QString& property1() const
+  [[nodiscard]] const std::string& property1() const
   {
     return m_property1;
   }
 
-  [[nodiscard]] const QString& property2() const
+  [[nodiscard]] const std::string& property2() const
   {
     return m_property2;
   }
 
-  [[nodiscard]] const QString& property3() const
+  [[nodiscard]] const std::string& property3() const
   {
     return m_property3;
   }
@@ -205,7 +205,7 @@ public:
 
   void setVolSize(size_t n)
   {
-    m_volSize = std::max(0_uz, n);
+    m_volSize = n;
   }
 
   void setMass(double n)
@@ -218,27 +218,52 @@ public:
     m_radius = n;
   }
 
-  void setName(const QString& n)
+  void setName(const std::string& n)
   {
     m_name = n;
   }
 
-  void setComment(const QString& n)
+  void setComment(const std::string& n)
   {
     m_comment = n;
   }
 
-  void setProperty1(const QString& n)
+  void setProperty1(const std::string& n)
   {
     m_property1 = n;
   }
 
-  void setProperty2(const QString& n)
+  void setProperty2(const std::string& n)
   {
     m_property2 = n;
   }
 
-  void setProperty3(const QString& n)
+  void setProperty3(const std::string& n)
+  {
+    m_property3 = n;
+  }
+
+  void setName(std::string_view n)
+  {
+    m_name = n;
+  }
+
+  void setComment(std::string_view n)
+  {
+    m_comment = n;
+  }
+
+  void setProperty1(std::string_view n)
+  {
+    m_property1 = n;
+  }
+
+  void setProperty2(std::string_view n)
+  {
+    m_property2 = n;
+  }
+
+  void setProperty3(std::string_view n)
   {
     m_property3 = n;
   }
@@ -292,7 +317,7 @@ public:
 
   [[nodiscard]] std::string toString() const
   {
-    return fmt::format("Puncta ({}): ({}, {}, {}, {})", m_name.toStdString(), m_x, m_y, m_z, m_radius);
+    return fmt::format("Puncta ({}): ({}, {}, {}, {})", m_name, m_x, m_y, m_z, m_radius);
   }
 
   [[nodiscard]] bool isSelected() const
@@ -306,8 +331,10 @@ public:
   }
 
 private:
-  QString m_name;
-  QString m_comment;
+  friend class ZPunctaIO;
+
+  std::string m_name;
+  std::string m_comment;
   double m_maxIntensity = 255;
   double m_meanIntensity = 255;
   double m_x = -1;
@@ -317,9 +344,9 @@ private:
   size_t m_volSize = 33;
   double m_mass = 8545.13201776424;
   double m_radius = 2.0; // radius
-  QString m_property1;
-  QString m_property2;
-  QString m_property3;
+  std::string m_property1;
+  std::string m_property2;
+  std::string m_property3;
   col4 m_color{0, 255, 255};
   double m_score = 1.0; // detection score [-1.0 1.0]
 

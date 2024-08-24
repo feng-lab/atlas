@@ -17,7 +17,7 @@ public:
 
   bool canWriteFile(const QString& filename);
 
-  const QString& getQtReadNameFilter() const
+  [[nodiscard]] const QString& getQtReadNameFilter() const
   {
     return m_readFilter;
   }
@@ -33,11 +33,11 @@ private:
 
   static void writeNimpFile(const ZPuncta& puncta, const QString& filename);
 
-  static void readV3DApoFile(const QString& file, ZPuncta& puncta);
+  static void readV3DApoFile(const QString& filename, ZPuncta& puncta);
 
   static void writeV3DApoFile(const ZPuncta& puncta, const QString& file);
 
-  static void readV3DMarkerFile(const QString& file, ZPuncta& puncta);
+  static void readV3DMarkerFile(const QString& filename, ZPuncta& puncta);
 
   static void readMatFile(const QString& file, ZPuncta& puncta);
 

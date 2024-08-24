@@ -8,7 +8,6 @@
 #include "zstringutils.h"
 #include <H5Cpp.h>
 #include <QFile>
-#include <QTextStream>
 
 namespace nim {
 
@@ -130,32 +129,25 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
       H5::Group punctumGrp = allGrp.openGroup(fmt::format("Punctum{}", i + 1));
       ZPunctum p;
 
-      H5std_string strBuf;
-
       if (H5Aexists(punctumGrp.getId(), "Name") > 0) {
         H5::Attribute name = punctumGrp.openAttribute("Name");
-        name.read(strType, strBuf);
-        p.setName(QString::fromStdString(strBuf));
+        name.read(strType, p.m_name);
       }
       if (H5Aexists(punctumGrp.getId(), "Comment") > 0) {
         H5::Attribute comment = punctumGrp.openAttribute("Comment");
-        comment.read(strType, strBuf);
-        p.setComment(QString::fromStdString(strBuf));
+        comment.read(strType, p.m_comment);
       }
       if (H5Aexists(punctumGrp.getId(), "Property1") > 0) {
         H5::Attribute property = punctumGrp.openAttribute("Property1");
-        property.read(strType, strBuf);
-        p.setProperty1(QString::fromStdString(strBuf));
+        property.read(strType, p.m_property1);
       }
       if (H5Aexists(punctumGrp.getId(), "Property2") > 0) {
         H5::Attribute property = punctumGrp.openAttribute("Property2");
-        property.read(strType, strBuf);
-        p.setProperty2(QString::fromStdString(strBuf));
+        property.read(strType, p.m_property2);
       }
       if (H5Aexists(punctumGrp.getId(), "Property3") > 0) {
         H5::Attribute property = punctumGrp.openAttribute("Property3");
-        property.read(strType, strBuf);
-        p.setProperty3(QString::fromStdString(strBuf));
+        property.read(strType, p.m_property3);
       }
 
       H5::DataSet info = punctumGrp.openDataSet("Summary");
@@ -246,25 +238,25 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename)
       H5::Group punctumGrp = allGrp.createGroup(fmt::format("Punctum{}", idx + 1));
       ++idx;
 
-      if (!p.name().isEmpty()) {
+      if (!p.name().empty()) {
         H5::Attribute name = punctumGrp.createAttribute("Name", strType, attrDataSpace);
-        name.write(strType, p.name().toStdString());
+        name.write(strType, p.name());
       }
-      if (!p.comment().isEmpty()) {
+      if (!p.comment().empty()) {
         H5::Attribute comment = punctumGrp.createAttribute("Comment", strType, attrDataSpace);
-        comment.write(strType, p.comment().toStdString());
+        comment.write(strType, p.comment());
       }
-      if (!p.property1().isEmpty()) {
+      if (!p.property1().empty()) {
         H5::Attribute property = punctumGrp.createAttribute("Property1", strType, attrDataSpace);
-        property.write(strType, p.property1().toStdString());
+        property.write(strType, p.property1());
       }
-      if (!p.property2().isEmpty()) {
+      if (!p.property2().empty()) {
         H5::Attribute property = punctumGrp.createAttribute("Property2", strType, attrDataSpace);
-        property.write(strType, p.property2().toStdString());
+        property.write(strType, p.property2());
       }
-      if (!p.property3().isEmpty()) {
+      if (!p.property3().empty()) {
         H5::Attribute property = punctumGrp.createAttribute("Property3", strType, attrDataSpace);
-        property.write(strType, p.property3().toStdString());
+        property.write(strType, p.property3());
       }
 
       punctaInfo[0] = p.z();
@@ -307,65 +299,32 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename)
   }
 }
 
-void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
+void ZPunctaIO::readV3DApoFile(const QString& filename, ZPuncta& puncta)
 {
-  QFile qFile(file);
-  if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    throw ZException("Can not read file.", ZException::Option::CheckErrno);
+  std::ifstream file = openIFStream(filename, std::ios_base::in);
+  if (!file) {
+    throw ZException("Can not open file", ZException::Option::CheckErrno);
   }
 
-  QTextStream stream(&qFile);
-#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-  stream.setCodec("UTF-8");
-#endif
-  for (QString line = stream.readLine(); !line.isNull(); line = stream.readLine()) {
-    line = line.trimmed();
-    if (stream.status() != QTextStream::Ok) {
-      throw ZException("Error while reading file.", ZException::Option::CheckErrno);
-    }
-    removeComment(line, QString("#"), true);
-    QStringList fieldList = line.split(",", Qt::KeepEmptyParts);
+  std::string line;
+  while (std::getline(file, line)) {
+    auto cleanLineView = absl::StripAsciiWhitespace(removeComment(line));
+    std::vector<std::string_view> fieldList = absl::StrSplit(cleanLineView, absl::ByChar(','));
     if (fieldList.size() >= 12) {
-      ZPunctum punctum;
-      bool ok;
-      fieldList[0].toInt(&ok);
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
+      for (auto& field : fieldList) {
+        field = absl::StripAsciiWhitespace(field);
       }
+      ZPunctum punctum;
       punctum.setName(fieldList[2]);
       punctum.setComment(fieldList[3]);
-      punctum.setZ(fieldList[4].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
-      }
-      punctum.setX(fieldList[5].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
-      }
-      punctum.setY(fieldList[6].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
-      }
-      punctum.setMaxIntensity(fieldList[7].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
-      }
-      punctum.setMeanIntensity(fieldList[8].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
-      }
-      punctum.setSDevOfIntensity(fieldList[9].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
-      }
-      punctum.setVolSize(fieldList[10].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
-      }
-      punctum.setMass(fieldList[11].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
-      }
+      stringToValue(fieldList[4], punctum.m_z);
+      stringToValue(fieldList[5], punctum.m_x);
+      stringToValue(fieldList[6], punctum.m_y);
+      stringToValue(fieldList[7], punctum.m_maxIntensity);
+      stringToValue(fieldList[8], punctum.m_meanIntensity);
+      stringToValue(fieldList[9], punctum.m_sDevOfIntensity);
+      stringToValue(fieldList[10], punctum.m_volSize);
+      stringToValue(fieldList[11], punctum.m_mass);
       if (fieldList.size() > 12) {
         punctum.setProperty1(fieldList[12]);
       }
@@ -376,25 +335,23 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
         punctum.setProperty3(fieldList[14]);
       }
       if (fieldList.size() >= 18) {
-        bool ok1, ok2;
-
-        punctum.setColor(col4{static_cast<col4::value_type>(fieldList[15].toInt(&ok)),
-                              static_cast<col4::value_type>(fieldList[16].toInt(&ok1)),
-                              static_cast<col4::value_type>(fieldList[17].toInt(&ok2))});
-        if (!ok || !ok1 || !ok2) {
-          if (fieldList[15].isEmpty() && fieldList[16].isEmpty() && fieldList[17].isEmpty()) {
-            punctum.setColor(col4{0, 0, 0});
-          } else {
-            throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
-          }
-        }
+        stringToValue(fieldList[15], punctum.m_color.r);
+        stringToValue(fieldList[16], punctum.m_color.g);
+        stringToValue(fieldList[17], punctum.m_color.b);
       }
       using namespace boost::math::double_constants;
       punctum.setRadius(std::pow(three_quarters_pi * punctum.volSize(), 1.0 / 3));
       puncta.data.push_back(std::move(punctum));
-    } else if (!line.isEmpty()) {
-      throw ZException(fmt::format("Wrong Vaa3d Apo format: {}.", line));
+    } else if (!cleanLineView.empty()) {
+      throw ZException(fmt::format("Wrong Vaa3d Apo format: {}", line));
     }
+    if (fieldList.size() > 18) {
+      LOG(WARNING) << "Potential error in Vaa3d Apo file: " << line;
+    }
+  }
+
+  if (!file.eof()) {
+    throw ZException("Error while reading file", ZException::Option::CheckErrno);
   }
 }
 
@@ -434,43 +391,26 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file)
   }
 }
 
-void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
+void ZPunctaIO::readV3DMarkerFile(const QString& filename, ZPuncta& puncta)
 {
-  QFile qFile(file);
-  if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    throw ZException("Can not read file.", ZException::Option::CheckErrno);
+  std::ifstream file = openIFStream(filename, std::ios_base::in);
+  if (!file) {
+    throw ZException("Can not open file", ZException::Option::CheckErrno);
   }
 
-  QTextStream stream(&qFile);
-#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-  stream.setCodec("UTF-8");
-#endif
-  for (QString line = stream.readLine(); !line.isNull(); line = stream.readLine()) {
-    line = line.trimmed();
-    if (stream.status() != QTextStream::Ok) {
-      throw ZException("Error while reading file.", ZException::Option::CheckErrno);
-    }
-    removeComment(line, QString("#"), true);
-    QStringList fieldList = line.split(",", Qt::KeepEmptyParts);
+  std::string line;
+  while (std::getline(file, line)) {
+    auto cleanLineView = absl::StripAsciiWhitespace(removeComment(line));
+    std::vector<std::string_view> fieldList = absl::StrSplit(cleanLineView, absl::ByChar(','));
     if (fieldList.size() >= 10) {
+      for (auto& field : fieldList) {
+        field = absl::StripAsciiWhitespace(field);
+      }
       ZPunctum punctum;
-      bool ok;
-      punctum.setX(fieldList[0].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Marker format: {}.", line));
-      }
-      punctum.setY(fieldList[1].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Marker format: {}.", line));
-      }
-      punctum.setZ(fieldList[2].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Marker format: {}.", line));
-      }
-      punctum.setRadius(fieldList[3].toDouble(&ok));
-      if (!ok) {
-        throw ZException(fmt::format("Wrong Vaa3d Marker format: {}.", line));
-      }
+      stringToValue(fieldList[0], punctum.m_x);
+      stringToValue(fieldList[1], punctum.m_y);
+      stringToValue(fieldList[2], punctum.m_z);
+      stringToValue(fieldList[3], punctum.m_radius);
       if (punctum.radius() <= 0) {
         punctum.setRadius(2.0);
       }
@@ -481,23 +421,21 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
 
       punctum.setName(fieldList[5]);
       punctum.setComment(fieldList[6]);
+      stringToValue(fieldList[7], punctum.m_color.r);
+      stringToValue(fieldList[8], punctum.m_color.g);
+      stringToValue(fieldList[9], punctum.m_color.b);
 
-      bool ok1, ok2;
-
-      punctum.setColor(col4{static_cast<col4::value_type>(fieldList[7].toInt(&ok)),
-                            static_cast<col4::value_type>(fieldList[8].toInt(&ok1)),
-                            static_cast<col4::value_type>(fieldList[9].toInt(&ok2))});
-      if (!ok || !ok1 || !ok2) {
-        if (fieldList[7].isEmpty() && fieldList[8].isEmpty() && fieldList[9].isEmpty()) {
-          punctum.setColor(col4{0, 0, 0});
-        } else {
-          throw ZException(fmt::format("Wrong Vaa3d Marker format: {}.", line));
-        }
-      }
       puncta.data.push_back(std::move(punctum));
-    } else if (!line.isEmpty()) {
-      throw ZException(fmt::format("Wrong Vaa3d Marker format: {}.", line));
+    } else if (!cleanLineView.empty()) {
+      throw ZException(fmt::format("Wrong Vaa3d Marker format: {}", line));
     }
+    if (fieldList.size() > 10) {
+      LOG(WARNING) << "Potential error in Vaa3d Marker file: " << line;
+    }
+  }
+
+  if (!file.eof()) {
+    throw ZException("Error while reading file", ZException::Option::CheckErrno);
   }
 }
 
