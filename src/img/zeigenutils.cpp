@@ -52,13 +52,7 @@ RowVectorXd readRowVector(std::string_view line,
           rowVector(i) = std::numeric_limits<double>::quiet_NaN();
         }
       } else [[likely]] {
-        auto res = boost::charconv::from_chars_erange(sv.data(), sv.data() + sv.size(), rowVector(i));
-        if (res.ec == std::errc::result_out_of_range) {
-          // throw ZException(fmt::format("error: result_out_of_range when converting {} to Real number", sv));
-          LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
-        } else if (res.ec == std::errc::invalid_argument) {
-          rowVector(i) = std::numeric_limits<double>::quiet_NaN();
-        }
+        (void)stringToValueNoThrow(sv, rowVector(i));
       }
     }
   }

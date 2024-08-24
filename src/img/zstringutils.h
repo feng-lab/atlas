@@ -4,7 +4,9 @@
 #include "zexception.h"
 #include "zlog.h"
 #include <QString>
-#include <boost/charconv.hpp>
+#include <QStringView>
+// #include <boost/charconv.hpp>
+#include <fast_float/fast_float.h>
 #include <absl/strings/str_split.h>
 #include <concepts>
 
@@ -23,7 +25,7 @@ static constexpr auto delimiter_literal = " ,\t:;[]\n\r\v\f"sv;
 template<std::integral Integral>
 __forceinline void stringToValue(std::string_view sv, Integral& value, int base = 10)
 {
-  auto res = boost::charconv::from_chars(sv.data(), sv.data() + sv.size(), value, base);
+  auto res = fast_float::from_chars(sv.data(), sv.data() + sv.size(), value, base);
   if (res.ec == std::errc::invalid_argument) [[unlikely]] {
     throw ZException(fmt::format("error: invalid_argument when converting {} to Integer", sv));
   }
@@ -32,6 +34,20 @@ __forceinline void stringToValue(std::string_view sv, Integral& value, int base 
   }
 }
 
+template<std::integral Integral>
+__forceinline void stringToValue(QStringView sv, Integral& value, int base = 10)
+{
+  auto data = sv.utf16();
+  auto res = fast_float::from_chars(data, data + sv.size(), value, base);
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
+    throw ZException(fmt::format("error: invalid_argument when converting {} to Integer", sv));
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
+    throw ZException(fmt::format("error: result_out_of_range when converting {} to Integer", sv));
+  }
+}
+
+#if 0
 template<std::floating_point Real>
 __forceinline void stringToValue(std::string_view sv,
                                  Real& value,
@@ -46,6 +62,65 @@ __forceinline void stringToValue(std::string_view sv,
     LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
   }
 }
+#else
+template<std::floating_point Real>
+__forceinline void
+stringToValue(std::string_view sv, Real& value, fast_float::chars_format fmt = fast_float::chars_format::general)
+{
+  auto res = fast_float::from_chars(sv.data(), sv.data() + sv.size(), value, fmt);
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
+    throw ZException(fmt::format("error: invalid_argument when converting {} to Real number", sv));
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
+    // throw ZException(fmt::format("error: result_out_of_range when converting {} to Real number", sv));
+    LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
+  }
+}
+
+template<std::floating_point Real>
+__forceinline void
+stringToValue(QStringView sv, Real& value, fast_float::chars_format fmt = fast_float::chars_format::general)
+{
+  auto data = sv.utf16();
+  auto res = fast_float::from_chars(data, data + sv.size(), value, fmt);
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
+    throw ZException(fmt::format("error: invalid_argument when converting {} to Real number", sv));
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
+    // throw ZException(fmt::format("error: result_out_of_range when converting {} to Real number", sv));
+    LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
+  }
+}
+
+template<std::floating_point Real>
+__forceinline std::errc
+stringToValueNoThrow(std::string_view sv, Real& value, fast_float::chars_format fmt = fast_float::chars_format::general)
+{
+  auto res = fast_float::from_chars(sv.data(), sv.data() + sv.size(), value, fmt);
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
+    value = std::numeric_limits<Real>::quiet_NaN();
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
+    LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
+  }
+  return res.ec;
+}
+
+template<std::floating_point Real>
+__forceinline std::errc
+stringToValueNoThrow(QStringView sv, Real& value, fast_float::chars_format fmt = fast_float::chars_format::general)
+{
+  auto data = sv.utf16();
+  auto res = fast_float::from_chars(data, data + sv.size(), value, fmt);
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
+    value = std::numeric_limits<Real>::quiet_NaN();
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
+    LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
+  }
+  return res.ec;
+}
+#endif
 
 // checkSpecialNumber takes care of 1.#qnan, 1.#ind ... when "#" is start of comment
 std::string_view

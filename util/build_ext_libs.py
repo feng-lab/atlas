@@ -535,6 +535,11 @@ class PatchManager:
             patcher.restore_file()
 
 
+def build_fast_float(src_dir: str, install_dir: str):
+    shutil.copytree(os.path.join(src_dir, 'include', 'fast_float'),
+                    os.path.join(install_dir, 'include', 'fast_float'), dirs_exist_ok=True)
+
+
 def build_zlib(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -3051,6 +3056,10 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                     file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
                     file.write('set(ENV{VULKAN_SDK} ' + f'{vulkan_SDK_env_dir()})\n')
 
+        if lib_name == 'fast_float':
+            src_dir = os.path.join(ext_dir(), 'fast_float')
+            build_fast_float(src_dir, ext_build_dir())
+
         if lib_name == 'zlib':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))
             src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
@@ -3383,7 +3392,7 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
 
 def parse_inputs(argv: list):
-    lib_list = ['cmake', 'ninja', 'curl', 'gperf', 'ffmpeg', 'java', 'qt', 'make-cmake-pathlist',
+    lib_list = ['cmake', 'ninja', 'curl', 'gperf', 'ffmpeg', 'java', 'qt', 'make-cmake-pathlist', 'fast_float',
                 'zlib', 'boost', 'tbb', 'eigen', 'pocketfft', 'reflect', 'simde', 'pybind11', 'glm', 'googletest',
                 'cpuinfo', 'gflags', 'glog', 'benchmark', 'openssl', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt',
                 'libevent', 'snappy', 'bzip2', 'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'grpc',
