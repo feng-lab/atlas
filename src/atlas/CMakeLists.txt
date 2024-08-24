@@ -54,10 +54,6 @@ protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY
 grpc_generate_cpp(GRPC_SRCS GRPC_HDRS ${CMAKE_CURRENT_BINARY_DIR} ${PROTOS})
 set_property(SOURCE ${PROTO_SRCS} ${GRPC_SRCS} PROPERTY SKIP_AUTOGEN ON)
 
-find_package(benchmark REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-print_target_properties(benchmark::benchmark)
-
 #find_package(HDF5 REQUIRED COMPONENTS C CXX static
 #             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 #message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
@@ -417,7 +413,6 @@ set(SOURCES
     zregionannotationpack.cpp zregionannotationpack.h
     zswccolorparameters.cpp zswccolorparameters.h
     zthreadsafelrucache.h zthreadsafescalablecache.h
-    zrunbenchmark.cpp zrunbenchmark.h
     zimgregioncache.cpp zimgregioncache.h
     zcheckbox.cpp zcheckbox.h
     zrunexport3danimation.cpp zrunexport3danimation.h
@@ -661,7 +656,6 @@ target_link_libraries(${APP_NAME} PUBLIC img neutu
                       ${OpenCV_LIBS}
                       Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
                       Qt6::CorePrivate Qt6::Test
-                      benchmark::benchmark
                       gRPC::grpc++ protobuf::libprotobuf
                       # RocksDB::rocksdb
 )

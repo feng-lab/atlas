@@ -4,7 +4,6 @@
 #include "zdoc.h"
 #include "zview.h"
 
-#include "zrunbenchmark.h"
 #include "zcustomcommand.h"
 #include "zviewsettingwidget.h"
 #include "z3drenderingengine.h"
@@ -353,11 +352,6 @@ void ZMainWindow::generateConfigFile()
   }
 }
 
-void ZMainWindow::runBenchmark()
-{
-  ZRunBenchmark::run();
-}
-
 void ZMainWindow::runCustomCommand()
 {
   ZCustomCommand::run();
@@ -597,10 +591,6 @@ void ZMainWindow::createActions()
   m_generateConfigFileAction->setStatusTip(tr("Generate Config File"));
   connect(m_generateConfigFileAction, &QAction::triggered, this, &ZMainWindow::generateConfigFile);
 
-  m_runBenchmarkAction = new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Benchmark"), this);
-  m_runBenchmarkAction->setStatusTip(tr("Run Benchmark"));
-  connect(m_runBenchmarkAction, &QAction::triggered, this, &ZMainWindow::runBenchmark);
-
   m_runCustomCommandAction =
     new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Custom Command"), this);
   m_runCustomCommandAction->setStatusTip(tr("Run Custom Command"));
@@ -677,7 +667,6 @@ void ZMainWindow::createMenus()
   m_helpMenu->addAction(m_openLogFolderAction);
   m_helpMenu->addAction(m_openConfigFolderAction);
   m_helpMenu->addAction(m_generateConfigFileAction);
-  m_helpMenu->addAction(m_runBenchmarkAction);
   m_helpMenu->addAction(m_runCustomCommandAction);
 
   m_dockMenu = new QMenu(this);

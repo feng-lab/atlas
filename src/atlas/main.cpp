@@ -9,7 +9,6 @@
 #include "zsysteminfo.h"
 #include "ztheme.h"
 
-#include "zrunbenchmark.h"
 #include "zrunexport3danimation.h"
 #include "zrunneutucommand.h"
 #include "zwindowsheader.h"
@@ -23,7 +22,6 @@
 #include <gflags/gflags.h>
 
 DECLARE_string(flagfile);
-DEFINE_bool(run_benchmarks, false, "run benchmarks");
 DECLARE_bool(run_export_3d_animation);
 
 #ifdef _WIN32
@@ -166,7 +164,7 @@ int main(int argc, char* argv[])
   gflags::SetVersionString(GIT_VERSION);
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
-  bool isGUIMode = !(FLAGS_run_benchmarks || FLAGS_run_export_3d_animation);
+  bool isGUIMode = !(FLAGS_run_export_3d_animation);
 
   // init the logging mechanism
   QDir logDir = ZSystemInfo::logDir();
@@ -206,9 +204,6 @@ int main(int argc, char* argv[])
     if (!isGUIMode) {
       // start non-GUI version...
       LOG(INFO) << "console mode";
-      if (FLAGS_run_benchmarks) {
-        return ZRunBenchmark::run();
-      }
       if (FLAGS_run_export_3d_animation) {
         ZRunExport3DAnimation rea;
         return rea.run();

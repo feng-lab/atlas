@@ -123,8 +123,6 @@ private:
 
   static void generateConfigFile();
 
-  static void runBenchmark();
-
   static void runCustomCommand();
 
   void open3DWindow();
@@ -200,7 +198,6 @@ private:
   QAction* m_openLogFolderAction = nullptr;
   QAction* m_openConfigFolderAction = nullptr;
   QAction* m_generateConfigFileAction = nullptr;
-  QAction* m_runBenchmarkAction = nullptr;
   QAction* m_runCustomCommandAction = nullptr;
 
   QAction* m_separatorAction = nullptr;

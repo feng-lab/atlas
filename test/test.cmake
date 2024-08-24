@@ -40,3 +40,10 @@ add_gtest_executable(zstatisticsutilstest)
 add_gtest_executable(zstructutilstest)
 add_gtest_executable(zenumtest)
 add_gtest_executable(zstringutilstest)
+
+find_package(benchmark REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(benchmark::benchmark)
+
+add_executable(zbenchmark ${CMAKE_CURRENT_LIST_DIR}/zbenchmark.cpp)
+target_link_libraries(zbenchmark img benchmark::benchmark)
