@@ -15,6 +15,52 @@
 
 namespace nim {
 
+void BM_glogToString(benchmark::State& state)
+{
+  std::array<const char*, 5> filenames{"aftewfw", "sfwtwtwfr", "fwtwofwojwt", "fwofjwofjwo", "sfabbb"};
+  std::vector<const char*> filename(state.range(0));
+  std::vector<int> line(state.range(0));
+  std::vector<google::LogMessageTime> time(state.range(0));
+  for (size_t i = 0; i < filename.size(); ++i) {
+    filename[i] = filenames[ZRandom::instance().randInt<int>(4)];
+    line[i] = ZRandom::instance().randInt<int>(1000);
+    time[i] = google::LogMessageTime(std::chrono::system_clock::now());
+  }
+  while (state.KeepRunning()) {
+    for (size_t i = 0; i < filename.size(); ++i) {
+      auto a = google::LogSink::ToString(google::INFO, filename[i], line[i], time[i], filename[i], 4);
+      benchmark::DoNotOptimize(a);
+    }
+  }
+  state.SetItemsProcessed(state.iterations() * state.range(0));
+}
+
+void BM_formatLogMessageToString(benchmark::State& state)
+{
+  std::array<const char*, 5> filenames{"aftewfw", "sfwtwtwfr", "fwtwofwojwt", "fwofjwofjwo", "sfabbb"};
+  std::vector<const char*> filename(state.range(0));
+  std::vector<int> line(state.range(0));
+  std::vector<google::LogMessageTime> time(state.range(0));
+  for (size_t i = 0; i < filename.size(); ++i) {
+    filename[i] = filenames[ZRandom::instance().randInt<int>(4)];
+    line[i] = ZRandom::instance().randInt<int>(1000);
+    time[i] = google::LogMessageTime(std::chrono::system_clock::now());
+  }
+  while (state.KeepRunning()) {
+    for (size_t i = 0; i < filename.size(); ++i) {
+      auto a = formatLogMessage(google::INFO, filename[i], line[i], time[i], filename[i], 4);
+      benchmark::DoNotOptimize(a);
+    }
+  }
+  state.SetItemsProcessed(state.iterations() * state.range(0));
+}
+
+static void addLogMessageFormatBench()
+{
+  BENCHMARK(BM_glogToString)->Range(8, 8 << 10);
+  BENCHMARK(BM_formatLogMessageToString)->Range(8, 8 << 10);
+}
+
 template<typename Real>
 void BM_stdRound(benchmark::State& state)
 {
@@ -312,6 +358,7 @@ int ZRunBenchmark::run()
 {
   LOG(INFO) << "Benchmark Start";
 
+  addLogMessageFormatBench();
   addRoundBench();
   addSaturateMulBench();
   addVectorLoopBench();

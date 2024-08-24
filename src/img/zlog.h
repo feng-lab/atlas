@@ -14,6 +14,8 @@
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <fmt/chrono.h>
+#include <fmt/std.h>
+#include <fmt/compile.h>
 #include <QDebug>
 #include <QPoint>
 #include <QRect>
@@ -26,6 +28,7 @@
 #include <functional>
 #include <iosfwd>
 #include <concepts>
+#include <boost/geometry/formulas/karney_direct.hpp>
 
 namespace nim {
 
@@ -55,6 +58,22 @@ struct LogData
   std::chrono::system_clock::time_point time;
   std::string formatted; // formatted log message with level, time, threadid, filename, line, and message
 };
+
+__forceinline std::string formatLogMessage(google::LogSeverity severity,
+                                           const char* file,
+                                           int line,
+                                           const google::LogMessageTime& time,
+                                           const char* message,
+                                           size_t message_len)
+{
+  return fmt::format(FMT_COMPILE("{}{:%Y%m%d %H:%M:%S} {} {}:{}] {}"),
+                     google::GetLogSeverityName(severity)[0],
+                     time.when(),
+                     std::this_thread::get_id(),
+                     file,
+                     line,
+                     fmt::string_view(message, message_len));
+}
 
 // might return nullptr
 std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename);

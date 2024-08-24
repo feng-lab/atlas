@@ -96,7 +96,7 @@ public:
             size_t message_len) override
   {
     if (isValid()) {
-      m_fileStream << ToString(severity, base_filename, line, time, message, message_len) << std::endl;
+      m_fileStream << formatLogMessage(severity, base_filename, line, time, message, message_len) << std::endl;
     }
   }
 };

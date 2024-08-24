@@ -27,7 +27,7 @@ void ZLogCache::send(google::LogSeverity severity,
   }
   m_logDatas.emplace_back(severity,
                           logmsgtime,
-                          ToString(severity, base_filename, line, logmsgtime, message, message_len));
+                          formatLogMessage(severity, base_filename, line, logmsgtime, message, message_len));
 }
 
 ZLogCache::ZLogCache(size_t maxNumItems)
