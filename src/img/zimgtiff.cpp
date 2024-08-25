@@ -3,6 +3,7 @@
 #include "zlog.h"
 #include "zimgsliceprovider.h"
 #include "ztiff.h"
+#include "zstringutils.h"
 #include <cmath>
 #include <set>
 
@@ -38,7 +39,7 @@ void ZImgTiff::readInfo(const QString& filename,
 
   createDefaultSubBlocks(filename, infos, subBlocks);
 
-  if (!m_imageDescription.isEmpty()) {
+  if (!m_imageDescription.empty()) {
     VLOG(1) << m_imageDescription;
   }
 }
@@ -196,7 +197,7 @@ void ZImgTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff)
   if (!tiff.isValid()) {
     throw ZException("No Image in Tiff", ZException::Option::CheckErrno);
   }
-  m_imageDescription = tiff.ifds()[0].imageDescriptionAsQString();
+  m_imageDescription = tiff.ifds()[0].imageDescription();
 }
 
 void ZImgTiff::clearInternalState()
@@ -244,24 +245,34 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
     }
   }
   if (m_imgInfo[0].depth > 0) {
-    if (m_imageDescription.startsWith("ImageJ=") && m_imageDescription.contains("images=")) {
+    static constexpr auto imagej_prefix = "ImageJ="sv;
+    static constexpr auto images_prefix = "images="sv;
+    static constexpr auto channels_prefix = "channels="sv;
+    static constexpr auto slices_prefix = "slices="sv;
+    static constexpr auto frames_prefix = "frames="sv;
+    static constexpr auto hyperstack_prefix = "hyperstack=true"sv;
+    if (m_imageDescription.starts_with(imagej_prefix) && absl::StrContains(m_imageDescription, images_prefix)) {
       m_isImageJTiff = true;
       size_t images = 0;
       size_t channels = 1;
       size_t slices = 1;
       size_t frames = 1;
       bool hyperstack = false;
-      QStringList fields = m_imageDescription.split("\n", Qt::SkipEmptyParts);
+      std::vector<std::string_view> fields = absl::StrSplit(m_imageDescription, '\n', absl::SkipEmpty());
       for (auto& field : fields) {
-        if (field.startsWith("images=")) {
-          images = field.remove(0, 7).toInt();
-        } else if (field.startsWith("channels=")) {
-          channels = field.remove(0, 9).toInt();
-        } else if (field.startsWith("slices=")) {
-          slices = field.remove(0, 7).toInt();
-        } else if (field.startsWith("frames=")) {
-          frames = field.remove(0, 7).toInt();
-        } else if (field.startsWith("hyperstack=true")) {
+        if (field.starts_with(images_prefix)) {
+          field.remove_prefix(images_prefix.size());
+          stringToValue(field, images);
+        } else if (field.starts_with(channels_prefix)) {
+          field.remove_prefix(channels_prefix.size());
+          stringToValue(field, channels);
+        } else if (field.starts_with(slices_prefix)) {
+          field.remove_prefix(slices_prefix.size());
+          stringToValue(field, slices);
+        } else if (field.starts_with(frames_prefix)) {
+          field.remove_prefix(frames_prefix.size());
+          stringToValue(field, frames);
+        } else if (field.starts_with(hyperstack_prefix)) {
           hyperstack = true;
         }
       }
@@ -302,7 +313,7 @@ void ZImgTiff::readMetadataInternal(ZImgMetadata& meta, size_t scene, ZTiff& tif
   index_t t = 0;
   index_t l = 0;
   size_t ifdIdx = 0;
-  if (!m_imageDescription.isEmpty()) {
+  if (!m_imageDescription.empty()) {
     ZImgMetatag tag("metadata", m_imageDescription);
     meta.attachToTopLevel(tag);
   }

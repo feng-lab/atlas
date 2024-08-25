@@ -102,7 +102,7 @@ protected:
   std::vector<ZImgInfo> m_imgInfo;
   QString m_dimensionOrder = "ZTL";
   size_t m_startIFDIndex = 0;
-  QString m_imageDescription;
+  std::string m_imageDescription;
 
 private:
   bool m_isImageJTiff = false;

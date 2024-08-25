@@ -2,6 +2,7 @@
 
 #include "ztiff.h"
 #include "zlog.h"
+#include "zstringutils.h"
 #include "zimgsliceprovider.h"
 #include <QXmlStreamReader>
 
@@ -10,8 +11,8 @@ namespace nim {
 void ZImgOmeTiff::readIntoInternalStructure(const QString& filename, ZTiff& tiff)
 {
   ZImgTiff::readIntoInternalStructure(filename, tiff);
-  if (!m_imageDescription.isEmpty() && m_imageDescription.contains("<OME") && m_imageDescription.contains("<Image") &&
-      m_imageDescription.contains("<Pixels")) {
+  if (!m_imageDescription.empty() && absl::StrContains(m_imageDescription, "<OME"sv) &&
+      absl::StrContains(m_imageDescription, "<Image"sv) && absl::StrContains(m_imageDescription, "<Pixels"sv)) {
     readOmeInfo(tiff);
   } else {
     throw ZException("Not OME Tiff file");
@@ -156,7 +157,7 @@ bool ZImgOmeTiff::supportWrite() const
 void ZImgOmeTiff::readOmeInfo(ZTiff& tiff)
 {
   // QXmlStreamReader takes any QIODevice.
-  QXmlStreamReader xml(m_imageDescription);
+  QXmlStreamReader xml(QByteArray::fromRawData(m_imageDescription.data(), m_imageDescription.size()));
 
   // We'll parse the XML until we reach end of it.
   while (!xml.atEnd() && !xml.hasError()) {

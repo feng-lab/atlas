@@ -5,6 +5,7 @@
 #include "zimage2dutils.h"
 #include "zioutils.h"
 #include "zstructutils.h"
+#include "zstringutils.h"
 
 #include <tiff.h>
 #include <tiffio.h>
@@ -459,11 +460,11 @@ uint16_t ZTiffIFD::photometricInterpretation() const
   return 0;
 }
 
-QString ZTiffIFD::imageDescriptionAsQString() const
+std::string ZTiffIFD::imageDescription() const
 {
   auto i = indexOf(TIFFTAG_IMAGEDESCRIPTION);
   if (i != -1) {
-    return QString::fromUtf8(m_entries[i].dataArray<char>(), m_entries[i].count() - 1);
+    return std::string(m_entries[i].dataArray<char>(), m_entries[i].count() - 1);
   }
 
   return {};
@@ -773,8 +774,8 @@ void ZTiff::load(const QString& filename, bool tagOnly)
     }
   }
   if (m_useColormap) {
-    QString imageDes = m_ifds[0].imageDescriptionAsQString();
-    if (imageDes.startsWith("ImageJ=") && imageDes.contains("images=")) {
+    std::string imageDes = m_ifds[0].imageDescription();
+    if (imageDes.starts_with("ImageJ="sv) && absl::StrContains(imageDes, "images="sv)) {
       m_useColormap = false;
     }
   }

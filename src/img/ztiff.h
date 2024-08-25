@@ -55,7 +55,7 @@ public:
 
   [[nodiscard]] uint16_t photometricInterpretation() const;
 
-  [[nodiscard]] QString imageDescriptionAsQString() const;
+  [[nodiscard]] std::string imageDescription() const;
 
   [[nodiscard]] uint16_t orientation() const;
 
