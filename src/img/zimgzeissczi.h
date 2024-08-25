@@ -275,15 +275,15 @@ public:
 public:
   [[nodiscard]] bool supportRead() const override;
 
-  bool supportWrite() const override;
+  [[nodiscard]] bool supportWrite() const override;
 
-  QString shortName() const override;
+  [[nodiscard]] QString shortName() const override;
 
-  QString fullName() const override;
+  [[nodiscard]] QString fullName() const override;
 
-  QStringList extensions() const override;
+  [[nodiscard]] QStringList extensions() const override;
 
-  FileFormat format() const override
+  [[nodiscard]] FileFormat format() const override
   {
     return FileFormat::ZeissCZI;
   }
@@ -310,7 +310,7 @@ private:
 
   static int64_t checkFilename(const QString& filename);
 
-  void readCZIInfo(const QByteArray& xmlString);
+  void readCZIInfo(const std::string& xmlString);
 
   void parseMetadata(QXmlStreamReader& xml);
 
@@ -351,7 +351,7 @@ private:
   static void dumpAttachmentDirectory(std::ifstream& inputFileStream, std::string& str, index_t indent = 0);
 
 private:
-  QByteArray m_metadataXmlString;
+  std::string m_metadataXmlString;
   bool m_hasVoxelSizeInfo;
   double m_voxelSizeX;
   double m_voxelSizeY;

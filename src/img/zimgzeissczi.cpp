@@ -1013,10 +1013,10 @@ int64_t ZImgZeissCZI::checkFilename(const QString& filename)
   return filesize;
 }
 
-void ZImgZeissCZI::readCZIInfo(const QByteArray& xmlString)
+void ZImgZeissCZI::readCZIInfo(const std::string& xmlString)
 {
   // QXmlStreamReader takes any QIODevice.
-  QXmlStreamReader xml(xmlString);
+  QXmlStreamReader xml(QByteArray::fromRawData(xmlString.data(), xmlString.size()));
 
   // We'll parse the XML until we reach end of it.
   while (!xml.atEnd() && !xml.hasError()) {
@@ -1391,7 +1391,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
     readStructFromFileStream(md, inputFileStream);
     std::vector<char> xmlBuffer(md.xmlSize);
     readStream(inputFileStream, xmlBuffer.data(), md.xmlSize);
-    m_metadataXmlString = QByteArray(xmlBuffer.data(), md.xmlSize);
+    m_metadataXmlString = std::string(xmlBuffer.data(), md.xmlSize);
 
     readCZIInfo(m_metadataXmlString);
     VLOG(1) << m_metadataXmlString;

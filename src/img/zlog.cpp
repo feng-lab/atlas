@@ -2,13 +2,41 @@
 
 #include "zioutils.h"
 #include "zlogcache.h"
-
 #include <QFile>
+#include <absl/log/log_sink_registry.h>
+#include <absl/log/initialize.h>
 #include <iostream>
 #include <utility>
-#include <boost/geometry/core/closure.hpp>
 
 namespace nim {
+
+class BridgeFromABSLLogging final : public absl::LogSink
+{
+public:
+  static BridgeFromABSLLogging& instance()
+  {
+    static BridgeFromABSLLogging bfal;
+    return bfal;
+  }
+
+  void Send(const absl::LogEntry& entry) override
+  {
+    switch (entry.log_severity()) {
+      case absl::LogSeverity::kInfo:
+        LOG(INFO) << entry.text_message_with_prefix();
+        break;
+      case absl::LogSeverity::kWarning:
+        LOG(WARNING) << entry.text_message_with_prefix();
+        break;
+      case absl::LogSeverity::kError:
+        LOG(ERROR) << entry.text_message_with_prefix();
+        break;
+      case absl::LogSeverity::kFatal:
+        LOG(FATAL) << entry.text_message_with_prefix();
+        break;
+    }
+  }
+};
 
 const ZLogInit& ZLogInit::instance(std::string appName, const QString& filename)
 {
@@ -57,10 +85,15 @@ ZLogInit::ZLogInit(std::string appName, const QString& filename)
   google::InitGoogleLogging(m_appName.c_str());
 
   LOG(INFO) << fmt::format("--- {} Log Start ---", m_appName);
+
+  absl::InitializeLog();
+  absl::AddLogSink(&BridgeFromABSLLogging::instance());
 }
 
 ZLogInit::~ZLogInit()
 {
+  absl::RemoveLogSink(&BridgeFromABSLLogging::instance());
+
   google::ShutdownGoogleLogging();
 }
 

@@ -212,6 +212,21 @@ inline QByteArray toUtf8QByteArray(const wchar_t* s)
   return QString::fromStdWString(std::wstring(s)).toUtf8();
 }
 
+inline std::string toUtf8String(const std::wstring& s)
+{
+  return QString::fromStdWString(s).toStdString();
+}
+
+inline std::string toUtf8String(const std::wstring_view& s)
+{
+  return QString::fromStdWString(std::wstring(s)).toStdString();
+}
+
+inline std::string toUtf8String(const wchar_t* s)
+{
+  return QString::fromStdWString(std::wstring(s)).toStdString();
+}
+
 // stream support for qt types
 template<typename T>
 QString qtTypeToQString(const T& v)
@@ -252,9 +267,9 @@ concept IsSupportedQtTypeForPrint =
 
 inline void logLongString(const std::string& q)
 {
-  for (size_t i = 0; i < q.size(); i += 10000) { // glog limit is 30000
-    auto length = std::min(10000_uz, q.size() - i);
-    LOG(INFO) << std::string_view(q.data() + i, length);
+  static const size_t maxLogLength = google::LogMessage::kMaxLogMessageLen - 500;
+  for (size_t i = 0; i < q.size(); i += maxLogLength) { // glog limit is 30000
+    LOG(INFO) << std::string_view(q.data() + i, std::min(maxLogLength, q.size() - i));
   }
 }
 
@@ -325,13 +340,4 @@ std::ostream& operator<<(std::ostream& s, const T& v)
 {
   auto u8 = nim::qtTypeToQString(v).toUtf8();
   return (s << std::string_view(u8.data(), u8.size()));
-}
-
-inline void logLongString(const QString& q)
-{
-  for (qsizetype i = 0; i < q.size(); i += 10000) { // glog limit is 30000
-    auto length = std::min(qsizetype(10000), q.size() - i);
-    QStringView qView(q.data() + i, length);
-    LOG(INFO) << qView;
-  }
 }

@@ -811,29 +811,26 @@ void ZImgIO::readImg(const QStringList& fileList,
         double min;
         double max;
         imgs[i].computeMinMax(min, max);
-        imgs[i] = imgs[i].cropWithPad(
-          ZVoxelCoordinate(-widthPadBefore + sliceRegion.start.x, -heightPadBefore + sliceRegion.start.y, 0),
-          ZVoxelCoordinate(-widthPadBefore + sliceRegion.end.x, -heightPadBefore + sliceRegion.end.y, imgs[i].depth()),
-          PadOption::Constant,
-          expandWithMaxValue ? max : min);
+        imgs[i] = imgs[i].cropWithPad(sliceRegion.start + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
+                                      sliceRegion.end + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
+                                      PadOption::Constant,
+                                      expandWithMaxValue ? max : min);
       } else if (info.voxelFormat == VoxelFormat::Unsigned) {
         uint64_t min;
         uint64_t max;
         imgs[i].computeMinMax(min, max);
-        imgs[i] = imgs[i].cropWithPad(
-          ZVoxelCoordinate(-widthPadBefore + sliceRegion.start.x, -heightPadBefore + sliceRegion.start.y, 0),
-          ZVoxelCoordinate(-widthPadBefore + sliceRegion.end.x, -heightPadBefore + sliceRegion.end.y, imgs[i].depth()),
-          PadOption::Constant,
-          expandWithMaxValue ? max : min);
+        imgs[i] = imgs[i].cropWithPad(sliceRegion.start + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
+                                      sliceRegion.end + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
+                                      PadOption::Constant,
+                                      expandWithMaxValue ? max : min);
       } else {
         int64_t min;
         int64_t max;
         imgs[i].computeMinMax(min, max);
-        imgs[i] = imgs[i].cropWithPad(
-          ZVoxelCoordinate(-widthPadBefore + sliceRegion.start.x, -heightPadBefore + sliceRegion.start.y, 0),
-          ZVoxelCoordinate(-widthPadBefore + sliceRegion.end.x, -heightPadBefore + sliceRegion.end.y, imgs[i].depth()),
-          PadOption::Constant,
-          expandWithMaxValue ? max : min);
+        imgs[i] = imgs[i].cropWithPad(sliceRegion.start + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
+                                      sliceRegion.end + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
+                                      PadOption::Constant,
+                                      expandWithMaxValue ? max : min);
       }
     } else {
       auto imgSource = imgSources[i];
