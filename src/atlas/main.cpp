@@ -115,7 +115,6 @@ int main(int argc, char* argv[])
 
   if (argc > 1 && strcmp(argv[1], "--command") == 0) {
     ZLogInit::instance("Atlas"s);
-    relayQtMessageToLog();
 
     LOG(INFO) << "Version: " << GIT_VERSION;
 
@@ -170,7 +169,6 @@ int main(int argc, char* argv[])
   QDir logDir = ZSystemInfo::logDir();
   ZSystemInfo::removeOldLogs();
   ZLogInit::instance("Atlas"s, logDir.filePath("atlas"));
-  relayQtMessageToLog();
   if (isGUIMode) {
     relayLogToQtGUI();
   }

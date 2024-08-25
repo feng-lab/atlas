@@ -23,20 +23,45 @@ public:
   {
     switch (entry.log_severity()) {
       case absl::LogSeverity::kInfo:
-        LOG(INFO) << entry.text_message_with_prefix();
+        google::LogMessage("absl", google::LogMessage::kNoLogPrefix, google::GLOG_INFO).stream()
+          << entry.text_message_with_prefix();
         break;
       case absl::LogSeverity::kWarning:
-        LOG(WARNING) << entry.text_message_with_prefix();
+        google::LogMessage("absl", google::LogMessage::kNoLogPrefix, google::GLOG_WARNING).stream()
+          << entry.text_message_with_prefix();
         break;
       case absl::LogSeverity::kError:
-        LOG(ERROR) << entry.text_message_with_prefix();
+        google::LogMessage("absl", google::LogMessage::kNoLogPrefix, google::GLOG_ERROR).stream()
+          << entry.text_message_with_prefix();
         break;
       case absl::LogSeverity::kFatal:
-        LOG(FATAL) << entry.text_message_with_prefix();
+        google::LogMessage("absl", google::LogMessage::kNoLogPrefix, google::GLOG_FATAL).stream()
+          << entry.text_message_with_prefix();
         break;
     }
   }
 };
+
+void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
+{
+  switch (type) {
+    case QtDebugMsg:
+    case QtInfoMsg:
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_INFO).stream() << msg;
+    break;
+    case QtWarningMsg:
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_WARNING).stream() << msg;
+    break;
+    case QtCriticalMsg:
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_ERROR).stream() << msg;
+    break;
+    case QtFatalMsg:
+      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_FATAL).stream() << msg;
+    break;
+    default:
+      break;
+  }
+}
 
 const ZLogInit& ZLogInit::instance(std::string appName, const QString& filename)
 {
@@ -86,8 +111,12 @@ ZLogInit::ZLogInit(std::string appName, const QString& filename)
 
   LOG(INFO) << fmt::format("--- {} Log Start ---", m_appName);
 
+  // handle absl logging message
   absl::InitializeLog();
   absl::AddLogSink(&BridgeFromABSLLogging::instance());
+
+  // handle qt message
+  qInstallMessageHandler(myMessageOutput);
 }
 
 ZLogInit::~ZLogInit()
@@ -141,32 +170,6 @@ std::shared_ptr<google::LogSink> createFileLogSink(const QString& filename)
   }
   auto res = std::make_shared<FileLogSink>(filename);
   return res->isValid() ? res : std::shared_ptr<google::LogSink>();
-}
-
-void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
-{
-  switch (type) {
-    case QtDebugMsg:
-    case QtInfoMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_INFO).stream() << msg;
-      break;
-    case QtWarningMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_WARNING).stream() << msg;
-      break;
-    case QtCriticalMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_ERROR).stream() << msg;
-      break;
-    case QtFatalMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_FATAL).stream() << msg;
-      break;
-    default:
-      break;
-  }
-}
-
-void relayQtMessageToLog()
-{
-  qInstallMessageHandler(myMessageOutput);
 }
 
 void relayLogToQtGUI()

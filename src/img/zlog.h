@@ -106,8 +106,6 @@ inline void removeLogSink(const std::shared_ptr<google::LogSink>& sink)
   }
 }
 
-void relayQtMessageToLog();
-
 void relayLogToQtGUI();
 
 // enum related

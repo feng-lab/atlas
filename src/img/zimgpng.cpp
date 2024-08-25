@@ -27,10 +27,13 @@ void pngReadWarningFunction(png_structp, const char* message)
   LOG(WARNING) << "Libpng warning: " << message;
 }
 
-int skipIDATChunk(png_structp, png_unknown_chunkp chunk)
+int skipIDATiDOTChunk(png_structp, png_unknown_chunkp chunk)
 {
   // VLOG(1) << reinterpret_cast<const char*>(chunk->name);
   if (chunk->name[0] == 'I' && chunk->name[1] == 'D' && chunk->name[2] == 'A' && chunk->name[3] == 'T') {
+    return 1;
+  }
+  if (chunk->name[0] == 'i' && chunk->name[1] == 'D' && chunk->name[2] == 'O' && chunk->name[3] == 'T') {
     return 1;
   }
   return 0;
@@ -247,10 +250,12 @@ void ZImgPng::readInfo(const QString& filename,
   png_init_io(png.pngPtr, infile.get());
   png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
 
-  png_set_read_user_chunk_fn(png.pngPtr, nullptr, skipIDATChunk);
-  unsigned char name[] = "IDAT";
+  png_set_read_user_chunk_fn(png.pngPtr, nullptr, skipIDATiDOTChunk);
   png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, nullptr, 0);
+  unsigned char name[] = "IDAT";
   png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name, 1);
+  // unsigned char name1[] = "iDOT";
+  // png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name1, 1);
 
   png_read_info(png.pngPtr, png.infoPtr);
   png_read_end(png.pngPtr, png.endPtr);
@@ -294,10 +299,12 @@ void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t s
   png_init_io(png.pngPtr, infile.get());
   png_set_crc_action(png.pngPtr, PNG_CRC_DEFAULT, PNG_CRC_DEFAULT);
 
-  png_set_read_user_chunk_fn(png.pngPtr, nullptr, skipIDATChunk);
-  unsigned char name[] = "IDAT";
+  png_set_read_user_chunk_fn(png.pngPtr, nullptr, skipIDATiDOTChunk);
   png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, nullptr, 0);
+  unsigned char name[] = "IDAT";
   png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name, 1);
+  // unsigned char name1[] = "iDOT";
+  // png_set_keep_unknown_chunks(png.pngPtr, PNG_HANDLE_CHUNK_NEVER, name1, 1);
 
   png_read_info(png.pngPtr, png.infoPtr);
   png_read_end(png.pngPtr, png.endPtr);
