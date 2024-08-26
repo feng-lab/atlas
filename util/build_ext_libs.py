@@ -1905,10 +1905,12 @@ def build_assimp(src_dir: str, install_dir: str):
             from_texts=[r'SET (ASSIMP_SOVERSION 5)',
                         r' -lz',
                         r' /WX',
+                        r'ADD_COMPILE_OPTIONS(/source-charset:utf-8)',
                         ],
             to_texts=[r'SET (ASSIMP_SOVERSION ${ASSIMP_VERSION_MAJOR})',
                       r' ZLIB::ZLIB',
                       r' ',
+                      r'',
                       ],
         ),
     ]

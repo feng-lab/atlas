@@ -306,7 +306,7 @@ void collectFileInfo(
     }
   }
 
-  VLOG(1) << "image sequence reading finished.";
+  // VLOG(1) << "image sequence reading finished.";
 }
 
 void ZImgIO::readInfos(const QStringList& fileList,

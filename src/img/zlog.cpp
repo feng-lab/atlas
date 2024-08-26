@@ -36,6 +36,10 @@ public:
           << entry.text_message_with_prefix();
         break;
       case absl::LogSeverity::kFatal:
+        if (!entry.stacktrace().empty()) {
+          google::LogMessage("absl", google::LogMessage::kNoLogPrefix, google::GLOG_FATAL).stream()
+                    << entry.stacktrace();
+        }
         google::LogMessage("absl", google::LogMessage::kNoLogPrefix, google::GLOG_FATAL).stream()
           << entry.text_message_with_prefix();
         break;
@@ -48,17 +52,17 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
   switch (type) {
     case QtDebugMsg:
     case QtInfoMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_INFO).stream() << msg;
-    break;
+      google::LogMessage(context.file ? context.file : "Qt", context.line, google::GLOG_INFO).stream() << msg;
+      break;
     case QtWarningMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_WARNING).stream() << msg;
-    break;
+      google::LogMessage(context.file ? context.file : "Qt", context.line, google::GLOG_WARNING).stream() << msg;
+      break;
     case QtCriticalMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_ERROR).stream() << msg;
-    break;
+      google::LogMessage(context.file ? context.file : "Qt", context.line, google::GLOG_ERROR).stream() << msg;
+      break;
     case QtFatalMsg:
-      google::LogMessage(context.file ? context.file : "QtFile", context.line, google::GLOG_FATAL).stream() << msg;
-    break;
+      google::LogMessage(context.file ? context.file : "Qt", context.line, google::GLOG_FATAL).stream() << msg;
+      break;
     default:
       break;
   }
