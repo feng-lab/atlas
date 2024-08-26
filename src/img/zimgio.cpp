@@ -811,24 +811,24 @@ void ZImgIO::readImg(const QStringList& fileList,
         double min;
         double max;
         imgs[i].computeMinMax(min, max);
-        imgs[i] = imgs[i].cropWithPad(sliceRegion.start + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
-                                      sliceRegion.end + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
+        imgs[i] = imgs[i].cropWithPad(sliceRegion.start + ZVoxelCoordinate(-widthPadBefore, -heightPadBefore),
+                                      sliceRegion.end + ZVoxelCoordinate(-widthPadBefore, -heightPadBefore),
                                       PadOption::Constant,
                                       expandWithMaxValue ? max : min);
       } else if (info.voxelFormat == VoxelFormat::Unsigned) {
         uint64_t min;
         uint64_t max;
         imgs[i].computeMinMax(min, max);
-        imgs[i] = imgs[i].cropWithPad(sliceRegion.start + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
-                                      sliceRegion.end + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
+        imgs[i] = imgs[i].cropWithPad(sliceRegion.start + ZVoxelCoordinate(-widthPadBefore, -heightPadBefore),
+                                      sliceRegion.end + ZVoxelCoordinate(-widthPadBefore, -heightPadBefore),
                                       PadOption::Constant,
                                       expandWithMaxValue ? max : min);
       } else {
         int64_t min;
         int64_t max;
         imgs[i].computeMinMax(min, max);
-        imgs[i] = imgs[i].cropWithPad(sliceRegion.start + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
-                                      sliceRegion.end + ZVoxelCoordinate(-widthPadBefore - heightPadBefore, 0),
+        imgs[i] = imgs[i].cropWithPad(sliceRegion.start + ZVoxelCoordinate(-widthPadBefore, -heightPadBefore),
+                                      sliceRegion.end + ZVoxelCoordinate(-widthPadBefore, -heightPadBefore),
                                       PadOption::Constant,
                                       expandWithMaxValue ? max : min);
       }

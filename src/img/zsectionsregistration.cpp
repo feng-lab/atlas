@@ -356,6 +356,9 @@ void ZSectionsRegistration::calcRefCh(const ZCachedImg& srcImg)
   double maxsum = std::accumulate(data, data + length, 0.0);
   m_referenceChannel = 0;
   for (size_t i = 1; i < srcImg.numChannels(); ++i) {
+    if (srcImg.info().lastChannelIsAlphaChannel && i + 1 == srcImg.numChannels()) {
+      continue;
+    }
     // data = srcImg.planeData<ImagePixelType>(m_fixedSliceIndex, i);
     data = fixedImage.planeData<ImagePixelType>(0, i);
     double sum = std::accumulate(data, data + length, 0.0);

@@ -195,20 +195,20 @@ std::string flagsToString(TEnum e)
   return res;
 }
 
-inline QByteArray toUtf8QByteArray(const std::wstring& s)
-{
-  return QString::fromStdWString(s).toUtf8();
-}
-
-inline QByteArray toUtf8QByteArray(const std::wstring_view& s)
-{
-  return QString::fromStdWString(std::wstring(s)).toUtf8();
-}
-
-inline QByteArray toUtf8QByteArray(const wchar_t* s)
-{
-  return QString::fromStdWString(std::wstring(s)).toUtf8();
-}
+// inline QByteArray toUtf8QByteArray(const std::wstring& s)
+// {
+//   return QString::fromStdWString(s).toUtf8();
+// }
+//
+// inline QByteArray toUtf8QByteArray(const std::wstring_view& s)
+// {
+//   return QString::fromStdWString(std::wstring(s)).toUtf8();
+// }
+//
+// inline QByteArray toUtf8QByteArray(const wchar_t* s)
+// {
+//   return QString::fromStdWString(std::wstring(s)).toUtf8();
+// }
 
 inline std::string toUtf8String(const std::wstring& s)
 {

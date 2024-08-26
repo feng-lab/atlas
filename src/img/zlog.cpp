@@ -5,6 +5,7 @@
 #include <QFile>
 #include <absl/log/log_sink_registry.h>
 #include <absl/log/initialize.h>
+#include <absl/log/internal/globals.h>
 #include <iostream>
 #include <utility>
 
@@ -112,7 +113,9 @@ ZLogInit::ZLogInit(std::string appName, const QString& filename)
   LOG(INFO) << fmt::format("--- {} Log Start ---", m_appName);
 
   // handle absl logging message
-  absl::InitializeLog();
+  if (!absl::log_internal::IsInitialized()) {
+    absl::InitializeLog();
+  }
   absl::AddLogSink(&BridgeFromABSLLogging::instance());
 
   // handle qt message
