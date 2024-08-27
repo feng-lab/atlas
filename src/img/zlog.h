@@ -28,7 +28,6 @@
 #include <functional>
 #include <iosfwd>
 #include <concepts>
-#include <boost/geometry/formulas/karney_direct.hpp>
 
 namespace nim {
 
