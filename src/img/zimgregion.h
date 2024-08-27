@@ -218,11 +218,4 @@ inline ZImgRegion tag_invoke(const json::value_to_tag<ZImgRegion>&, const json::
 
 } // namespace nim
 
-template<>
-struct fmt::formatter<nim::ZImgRegion> : fmt::formatter<std::string>
-{
-  auto format(const nim::ZImgRegion& a, fmt::format_context& ctx) const
-  {
-    return formatter<std::string>::format(a.toString(), ctx);
-  }
-};
+DEFINE_FMT_SPECIALIAZATION_FOR_HAVE_TOSTRING_TYPE(nim::ZImgRegion)

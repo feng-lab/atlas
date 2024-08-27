@@ -2476,11 +2476,4 @@ ZImg tag_invoke_img_Impl(ZImg& img, const json::value& jv);
 
 } // namespace nim
 
-template<>
-struct fmt::formatter<nim::ZImgSource> : fmt::formatter<std::string>
-{
-  auto format(const nim::ZImgSource& a, fmt::format_context& ctx) const
-  {
-    return formatter<std::string>::format(a.toString(), ctx);
-  }
-};
+DEFINE_FMT_SPECIALIAZATION_FOR_HAVE_TOSTRING_TYPE(nim::ZImgSource)

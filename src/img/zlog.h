@@ -319,6 +319,16 @@ DEFINE_FMT_SPECIALIAZATION_FOR_UTF8_ARRAY_TYPE(QUtf8StringView)
 
 #endif
 
+#define DEFINE_FMT_SPECIALIAZATION_FOR_HAVE_TOSTRING_TYPE(T)    \
+  template<>                                                    \
+  struct fmt::formatter<T> : fmt::formatter<std::string>        \
+  {                                                             \
+    auto format(const T& a, fmt::format_context& ctx) const     \
+    {                                                           \
+      return formatter<std::string>::format(a.toString(), ctx); \
+    }                                                           \
+  };
+
 template<nim::CanConvertToUtf8QByteArray T>
 std::ostream& operator<<(std::ostream& s, const T& v)
 {

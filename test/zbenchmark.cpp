@@ -59,7 +59,7 @@ static void BM_glogToString(benchmark::State& state)
   }
   while (state.KeepRunning()) {
     for (size_t i = 0; i < filename.size(); ++i) {
-      auto a = google::LogSink::ToString(google::INFO, filename[i], line[i], time[i], filename[i], 4);
+      auto a = google::LogSink::ToString(google::GLOG_INFO, filename[i], line[i], time[i], filename[i], 4);
       benchmark::DoNotOptimize(a);
     }
   }
@@ -79,7 +79,7 @@ static void BM_formatLogMessageToString(benchmark::State& state)
   }
   while (state.KeepRunning()) {
     for (size_t i = 0; i < filename.size(); ++i) {
-      auto a = formatLogMessage(google::INFO, filename[i], line[i], time[i], filename[i], 4);
+      auto a = formatLogMessage(google::GLOG_INFO, filename[i], line[i], time[i], filename[i], 4);
       benchmark::DoNotOptimize(a);
     }
   }
@@ -99,7 +99,7 @@ static void BM_formatLogMessageToStringNoCompile(benchmark::State& state)
   }
   while (state.KeepRunning()) {
     for (size_t i = 0; i < filename.size(); ++i) {
-      auto a = formatLogMessageNoCompile(google::INFO, filename[i], line[i], time[i], filename[i], 4);
+      auto a = formatLogMessageNoCompile(google::GLOG_INFO, filename[i], line[i], time[i], filename[i], 4);
       benchmark::DoNotOptimize(a);
     }
   }
@@ -119,7 +119,7 @@ static void BM_formatLogMessageToStringNoTimeFormat(benchmark::State& state)
   }
   while (state.KeepRunning()) {
     for (size_t i = 0; i < filename.size(); ++i) {
-      auto a = formatLogMessageNoTimeFormat(google::INFO, filename[i], line[i], time[i], filename[i], 4);
+      auto a = formatLogMessageNoTimeFormat(google::GLOG_INFO, filename[i], line[i], time[i], filename[i], 4);
       benchmark::DoNotOptimize(a);
     }
   }
