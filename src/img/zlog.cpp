@@ -2,6 +2,8 @@
 
 #include "zioutils.h"
 #include "zlogcache.h"
+#include "zglmutils.h"
+
 #include <QFile>
 #include <absl/log/log_sink_registry.h>
 #include <absl/log/initialize.h>
@@ -68,14 +70,13 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
   }
 }
 
-const ZLogInit& ZLogInit::instance(std::string appName, const QString& filename)
+const ZLogInit& ZLogInit::instance(const std::string& appName, const QString& filename)
 {
-  static ZLogInit logInit(std::move(appName), filename);
+  static ZLogInit logInit(appName, filename);
   return logInit;
 }
 
-ZLogInit::ZLogInit(std::string appName, const QString& filename)
-  : m_appName(std::move(appName))
+ZLogInit::ZLogInit(const std::string& appName, const QString& filename)
 {
   if (google::IsGoogleLoggingInitialized()) {
     LOG(WARNING) << "glog already initialized, will shutdown and reinitialize";
@@ -84,14 +85,14 @@ ZLogInit::ZLogInit(std::string appName, const QString& filename)
 
   if (filename.isEmpty()) {
     google::SetLogDestination(google::GLOG_INFO, "");
+    google::SetLogDestination(google::GLOG_WARNING, "");
     google::SetLogDestination(google::GLOG_ERROR, "");
     google::SetLogDestination(google::GLOG_FATAL, "");
-    google::SetLogDestination(google::GLOG_WARNING, "");
   } else {
     google::SetLogDestination(google::GLOG_INFO, QFile::encodeName(filename + "_info_").constData());
+    google::SetLogDestination(google::GLOG_WARNING, QFile::encodeName(filename + "_warning_").constData());
     google::SetLogDestination(google::GLOG_ERROR, QFile::encodeName(filename + "_error_").constData());
     google::SetLogDestination(google::GLOG_FATAL, QFile::encodeName(filename + "_fatal_").constData());
-    google::SetLogDestination(google::GLOG_WARNING, QFile::encodeName(filename + "_warning_").constData());
   }
 
   google::SetLogFilenameExtension("_log.txt");
@@ -112,9 +113,9 @@ ZLogInit::ZLogInit(std::string appName, const QString& filename)
 
   google::InstallFailureSignalHandler();
 
-  google::InitGoogleLogging(m_appName.c_str());
+  google::InitGoogleLogging(appName.c_str());
 
-  LOG(INFO) << fmt::format("--- {} Log Start ---", m_appName);
+  LOG(INFO) << fmt::format("--- {} Log Start ---", appName);
 
   // handle absl logging message
   if (!absl::log_internal::IsInitialized()) {

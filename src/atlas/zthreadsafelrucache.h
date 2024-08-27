@@ -393,7 +393,7 @@ template<class TKey, class TValue, class THash>
 void ZThreadSafeLRUCache<TKey, TValue, THash>::snapshotKeys(std::vector<TKey>& keys)
 {
   keys.reserve(keys.size() + m_size.load());
-  std::lock_guard<ListMutex> lock(m_listMutex);
+  std::scoped_lock lock(m_listMutex);
   for (ListNode* node = m_head.m_next; node != &m_tail; node = node->m_next) {
     keys.push_back(node->m_key);
   }

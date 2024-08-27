@@ -25,7 +25,7 @@ void Z3DCanvasPainter::paint(bool stereo)
     return;
   }
 
-  const std::lock_guard<std::mutex> lock(m_engine->targetSwitchMutex());
+  const std::scoped_lock lock(m_engine->targetSwitchMutex());
   // render to screen
   glViewport(0, 0, m_canvas.physicalSize().x, m_canvas.physicalSize().y);
   m_rendererBase.setViewport(m_canvas.physicalSize());

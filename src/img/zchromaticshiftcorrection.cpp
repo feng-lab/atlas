@@ -124,7 +124,7 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcI
   if (auto it = presetNameToParameters.find(presetName); it == presetNameToParameters.end()) {
     throw ZException(fmt::format("Unknown preset name: {}. Abort", presetName));
   } else {
-    LOG(INFO) << "Use " << it->first << " preset: " << json::value_from(it->second);
+    LOG(INFO) << fmt::format("Use {} preset: {}", it->first, it->second);
     transform->setParameters(it->second);
   }
 

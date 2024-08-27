@@ -739,7 +739,7 @@ double Z3DCompositor::process(Z3DEye eye)
 
   if (eye == MonoEye) {
     {
-      const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
+      const std::scoped_lock lock(m_rendererBase.globalParas().targetSwitchMutex);
       if (!m_monoReadyTarget) {
         m_monoReadyTarget = &m_outRenderTarget2 != m_monoCurrentTarget ? &m_outRenderTarget2 : &m_outRenderTarget1;
         m_monoReadyLocalBuffer =
@@ -759,7 +759,7 @@ double Z3DCompositor::process(Z3DEye eye)
 
   } else if (eye == LeftEye) {
     {
-      const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
+      const std::scoped_lock lock(m_rendererBase.globalParas().targetSwitchMutex);
       if (!m_leftReadyTarget) {
         m_leftReadyTarget =
           &m_leftEyeOutRenderTarget2 != m_leftCurrentTarget ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
@@ -775,7 +775,7 @@ double Z3DCompositor::process(Z3DEye eye)
     }
   } else {
     {
-      const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
+      const std::scoped_lock lock(m_rendererBase.globalParas().targetSwitchMutex);
       if (!m_rightReadyTarget) {
         m_rightReadyTarget = &m_outRenderTarget2 != m_rightCurrentTarget ? &m_outRenderTarget2 : &m_outRenderTarget1;
         m_rightReadyLocalBuffer =

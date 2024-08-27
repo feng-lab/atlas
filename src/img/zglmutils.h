@@ -387,19 +387,19 @@ void toVal(const QString& str, glm::tquat<T, Q>& q)
 template<size_t L, typename T, glm::qualifier Q>
 std::ostream& operator<<(std::ostream& s, const glm::vec<L, T, Q>& v)
 {
-  return (s << json::value_from(v));
+  return (s << fmt::format("{}", v));
 }
 
 template<size_t C, size_t R, typename T, glm::qualifier Q>
 std::ostream& operator<<(std::ostream& s, const glm::mat<C, R, T, Q>& m)
 {
-  return (s << json::value_from(m));
+  return (s << fmt::format("{}", m));
 }
 
 template<typename T, glm::qualifier Q>
 std::ostream& operator<<(std::ostream& s, const glm::tquat<T, Q>& q)
 {
-  return (s << json::value_from(q));
+  return (s << fmt::format("{}", q));
 }
 
 } // namespace nim

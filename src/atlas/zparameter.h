@@ -10,7 +10,7 @@
 #include "zlog.h"
 #include <QObject>
 #include <QStringList>
-#include <QMutexLocker>
+#include <mutex>
 #include <set>
 
 class QWidget;
@@ -203,7 +203,7 @@ protected:
 
 protected:
   T m_value;
-  QMutex m_mutex;
+  std::mutex m_mutex;
 };
 
 //---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ void ZSingleValueParameter<T>::set(const T& valueIn)
     T value = valueIn;
     makeValid(value);
     if (m_value != value) {
-      QMutexLocker locker(&m_mutex);
+      std::scoped_lock locker(m_mutex);
       beforeChange(value);
       m_value = value;
       VLOG(2) << m_name;

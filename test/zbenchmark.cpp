@@ -414,7 +414,7 @@ static void BM_stdMutex(benchmark::State& state)
   std::mutex lock;
   while (state.KeepRunning()) {
     for (int i = 0; i < state.range(0); ++i) {
-      std::lock_guard<std::mutex> lk(lock);
+      std::scoped_lock lk(lock);
     }
   }
   state.SetItemsProcessed(state.iterations() * state.range(0));

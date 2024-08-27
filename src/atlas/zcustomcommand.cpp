@@ -1316,7 +1316,7 @@ void channelCalibration()
     ZImg moving = img.extractChannel(1);
     moving.save(fileInfo.absoluteFilePath() + "_ch1.tif");
     ZImgNCCMatch mat(fixed, moving);
-    LOG(INFO) << json::value_from(mat.computeMovingImgOffset());
+    LOG(INFO) << fmt::format("{}", mat.computeMovingImgOffset());
   }
 }
 
@@ -1825,8 +1825,10 @@ void testLogDataSupport()
   LOG(INFO) << v4;
   LOG(INFO) << m4;
   LOG(INFO) << json::value_from(a2);
+  LOG(INFO) << fmt::format("{}", a2);
   auto t = std::make_tuple(1.7, 'D', std::string("Ralph Wiggum"));
   LOG(INFO) << json::value_from(t);
+  LOG(INFO) << fmt::format("{}", t);
   const std::map<std::string, int> init{
     {"this",  100},
     {"can",   100},
@@ -1834,9 +1836,15 @@ void testLogDataSupport()
     {"const", 100},
   };
   LOG(INFO) << json::value_from(init);
+  LOG(INFO) << fmt::format("{}", init);
   LOG(INFO) << v4 << m4 << json::value_from(a2) << json::value_from(t) << json::value_from(init);
   QString str("abdefwfgwtwfwfwfwgwgw");
   LOG(INFO) << json::value_from(str);
+  LOG(INFO) << fmt::format("{}", str);
+  QList<QKeySequence> zoomInKey;
+  zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
+  LOG(INFO) << zoomInKey;
+  // LOG(INFO) << fmt::format("{}", zoomInKey);
 }
 
 void createEeumIndexImages()
@@ -1892,7 +1900,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  someTest();
+  testLogDataSupport();
   LOG(INFO) << "done";
 }
 

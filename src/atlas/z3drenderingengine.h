@@ -7,9 +7,9 @@
 #include <QDir>
 #include <QObject>
 #include <QEvent>
-#include <QMutexLocker>
 #include <QPointer>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <mutex>
 
 class QOffscreenSurface;
 
@@ -183,24 +183,24 @@ public:
 
   void render(bool stereo = false);
 
-  Z3DRenderTarget* monoReadyTarget() const;
+  [[nodiscard]] Z3DRenderTarget* monoReadyTarget() const;
 
-  Z3DRenderTarget* leftReadyTarget() const;
+  [[nodiscard]] Z3DRenderTarget* leftReadyTarget() const;
 
-  Z3DRenderTarget* rightReadyTarget() const;
+  [[nodiscard]] Z3DRenderTarget* rightReadyTarget() const;
 
-  Z3DLocalColorBuffer* monoReadyLocalBuffer() const;
+  [[nodiscard]] Z3DLocalColorBuffer* monoReadyLocalBuffer() const;
 
-  Z3DLocalColorBuffer* leftReadyLocalBuffer() const;
+  [[nodiscard]] Z3DLocalColorBuffer* leftReadyLocalBuffer() const;
 
-  Z3DLocalColorBuffer* rightReadyLocalBuffer() const;
+  [[nodiscard]] Z3DLocalColorBuffer* rightReadyLocalBuffer() const;
 
   std::mutex& targetSwitchMutex()
   {
     return m_globalParas->targetSwitchMutex;
   }
 
-  bool hasNewRenderingFlag() const
+  [[nodiscard]] bool hasNewRenderingFlag() const
   {
     return m_globalParas->hasNewRendering.load();
   }
@@ -339,7 +339,7 @@ private:
 
   bool m_isRendering = false;
 
-  QMutex m_mutex;
+  std::mutex m_mutex;
 
   double m_progress = 0;
 };

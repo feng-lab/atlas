@@ -168,17 +168,14 @@ double ZImgRegistration::run()
     //    }
 
     LOG(INFO) << "";
-    LOG(INFO) << "  "
-              << "MultiResolution Level: " << i;
+    LOG(INFO) << "  MultiResolution Level: " << i;
 
     if (i < m_numScales - 1) {
       m_transform->adaptParameters(i + 1, i);
     }
-    LOG(INFO) << "  "
-              << "Initial Parameters: " << json::value_from(m_transform->parameters());
+    LOG(INFO) << fmt::format("  Initial Parameters: {}", m_transform->parameters());
     auto scales = m_transform->estimateParameterScales(dims);
-    LOG(INFO) << "  "
-              << "Parameter Scales: " << json::value_from(scales);
+    LOG(INFO) << fmt::format("  Parameter Scales: {}", scales);
 
     m_optimizer.setParameterScales(scales);
     m_optimizer.setInitialParameters(m_transform->parameters());
@@ -187,8 +184,7 @@ double ZImgRegistration::run()
 
     m_transform->setParameters(m_optimizer.currentParameters());
 
-    LOG(INFO) << "  "
-              << "Final Parameters: " << json::value_from(m_transform->parameters());
+    LOG(INFO) << fmt::format("  Final Parameters: {}", m_transform->parameters());
     LOG(INFO) << "Optimizer report: " << m_optimizer.fullReport();
   }
   return m_optimizer.finalCost();

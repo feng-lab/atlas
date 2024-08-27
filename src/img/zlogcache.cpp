@@ -18,7 +18,7 @@ void ZLogCache::send(google::LogSeverity severity,
                      const char* message,
                      size_t message_len)
 {
-  std::lock_guard lock(m_mutex);
+  std::scoped_lock lock(m_mutex);
   if (m_logDatas.size() == m_maxNumItems) {
     m_logDatas.shrink_to_fit();
     auto numItemsToErase = m_maxNumItems >> 4;
@@ -42,7 +42,7 @@ ZLogCache::ZLogCache(size_t maxNumItems)
 void ZLogCache::sendLogData()
 {
   if (m_logDatas.size() > m_unsendLogDataStart) {
-    std::lock_guard lock(m_mutex);
+    std::scoped_lock lock(m_mutex);
     auto start = m_unsendLogDataStart;
     m_unsendLogDataStart = m_logDatas.size();
     Q_EMIT logDataReady(&m_logDatas, start, m_unsendLogDataStart);

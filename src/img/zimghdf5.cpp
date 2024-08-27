@@ -710,7 +710,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
 
   LOG(WARNING) << "fall back to single thread hdf5 image reading!";
   static std::mutex mutex;
-  std::lock_guard<std::mutex> lock(mutex);
+  std::scoped_lock lock(mutex);
   try {
     res = std::make_shared<ZImg>(m_info);
 
@@ -806,7 +806,7 @@ void ZImgHDF5::readInfo(const QString& filename,
     size_t chunkWidth = chunkSize();
     {
       static std::mutex mutex;
-      std::lock_guard<std::mutex> lock(mutex);
+      std::scoped_lock lock(mutex);
 
       H5::Exception::dontPrint();
 
@@ -937,7 +937,7 @@ void ZImgHDF5::readImg(const QString& filename,
     throw ZException("invalid scene");
   }
   static std::mutex mutex;
-  std::lock_guard<std::mutex> lock(mutex);
+  std::scoped_lock lock(mutex);
   try {
     H5::Exception::dontPrint();
 
@@ -1023,7 +1023,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
 {
   checkImgBeforeWriting(filename, img.info(), paras);
   static std::mutex mutex;
-  std::lock_guard<std::mutex> lock(mutex);
+  std::scoped_lock lock(mutex);
   try {
     H5::Exception::dontPrint();
 
@@ -1089,7 +1089,7 @@ void ZImgHDF5::writeImg(const QString& filename,
 {
   checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
   static std::mutex mutex;
-  std::lock_guard<std::mutex> lock(mutex);
+  std::scoped_lock lock(mutex);
   try {
     H5::Exception::dontPrint();
 
@@ -1161,7 +1161,7 @@ void ZImgHDF5::writeImg(const QString& filename,
 {
   checkImgBeforeWriting(filename, imgBlockrovider.imgInfo(), paras);
   static std::mutex mutex;
-  std::lock_guard<std::mutex> lock(mutex);
+  std::scoped_lock lock(mutex);
   try {
     H5::Exception::dontPrint();
 

@@ -748,8 +748,8 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc(ZImg& fixedImg,
   ZVoxelCoordinate offset =
     maxNCCCoord + nccImgValidRegion.start -
     ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1, movingImgInfo.depth - 1);
-  LOG(INFO) << "max NCC coord: " << json::value_from(maxNCCCoord);
-  LOG(INFO) << "moving image offset: " << json::value_from(offset);
+  LOG(INFO) << fmt::format("max NCC coord: {}", maxNCCCoord);
+  LOG(INFO) << fmt::format("moving image offset: {}", offset);
 
   return offset;
 }
@@ -792,9 +792,9 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg& fixedImg,
   ZVoxelCoordinate offset =
     maxNCCCoord + nccImgValidRegion.start -
     ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1, movingImgInfo.depth - 1);
-  LOG(INFO) << "max NCC coord: " << json::value_from(maxNCCCoord);
+  LOG(INFO) << fmt::format("max NCC coord: {}", maxNCCCoord);
   LOG(INFO) << nccImgValidRegion.toString();
-  LOG(INFO) << "moving image offset: " << json::value_from(offset);
+  LOG(INFO) << fmt::format("moving image offset: {}", offset);
 
   return offset;
 }
@@ -829,9 +829,15 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLocPart(ZImg& fixedImg,
   ZVoxelCoordinate offset =
     maxNCCCoord + ZVoxelCoordinate(xStart, yStart, zStart) -
     ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1, movingImgInfo.depth - 1);
-  LOG(INFO) << "max NCC coord: " << json::value_from(maxNCCCoord)
-            << fmt::format(" region (x:{}-{}, y:{}-{}, z:{}-{})", xStart, xEnd, yStart, yEnd, zStart, zEnd);
-  LOG(INFO) << "moving image offset: " << json::value_from(offset);
+  LOG(INFO) << fmt::format("max NCC coord: {} region (x:{}-{}, y:{}-{}, z:{}-{})",
+                           maxNCCCoord,
+                           xStart,
+                           xEnd,
+                           yStart,
+                           yEnd,
+                           zStart,
+                           zEnd);
+  LOG(INFO) << fmt::format("moving image offset: {}", offset);
 
   return offset;
 }

@@ -11,9 +11,7 @@
 #include "z3dmeshrenderer.h"
 #include "zcolormap.h"
 #include "zmesh.h"
-#include <QPoint>
-#include <QMutexLocker>
-#include <map>
+#include <mutex>
 #include <vector>
 
 namespace nim {
@@ -109,7 +107,7 @@ private:
   ZMesh m_triangles;
   std::vector<ZMesh*> m_trianglesWrapper;
 
-  QMutex m_mutex;
+  std::mutex m_mutex;
 };
 
 } // namespace nim

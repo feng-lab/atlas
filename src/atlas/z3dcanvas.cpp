@@ -117,7 +117,7 @@ void Z3DCanvas::renderingFinished()
 #if defined(ATLAS_USE_OPENGLWIDGET)
     m_glWidget->update();
 #else
-    const std::lock_guard<std::mutex> lock(m_engine->targetSwitchMutex());
+    const std::scoped_lock lock(m_engine->targetSwitchMutex());
     auto localBuffer = m_engine->monoReadyLocalBuffer();
     // CHECK(localBuffer);
     auto pixmap = QPixmap::fromImage(

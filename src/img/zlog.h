@@ -34,15 +34,12 @@ namespace nim {
 class ZLogInit
 {
 public:
-  static const ZLogInit& instance(std::string appName, const QString& filename = "");
+  static const ZLogInit& instance(const std::string& appName, const QString& filename = "");
 
 private:
-  ZLogInit(std::string appName, const QString& filename);
+  ZLogInit(const std::string& appName, const QString& filename);
 
   ~ZLogInit();
-
-private:
-  std::string m_appName;
 };
 
 struct LogData
@@ -290,7 +287,22 @@ struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
   }
 };
 
-#if 0 // this version should work?
+namespace fmt {
+
+template<>
+struct is_range<QByteArray, char> : std::false_type
+{};
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+template<>
+struct is_range<QByteArrayView, char> : std::false_type
+{};
+template<>
+struct is_range<QUtf8StringView, char> : std::false_type
+{};
+#endif
+
+} // namespace fmt
+
 template<nim::IsUtf8ArrayType T>
 struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 {
@@ -299,25 +311,6 @@ struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
   }
 };
-#else
-
-#define DEFINE_FMT_SPECIALIAZATION_FOR_UTF8_ARRAY_TYPE(T)                                         \
-  template<>                                                                                      \
-  struct fmt::formatter<T> : fmt::formatter<fmt::string_view>                                     \
-  {                                                                                               \
-    auto format(const T& s, format_context& ctx) const                                            \
-    {                                                                                             \
-      return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx); \
-    }                                                                                             \
-  };
-
-DEFINE_FMT_SPECIALIAZATION_FOR_UTF8_ARRAY_TYPE(QByteArray)
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-DEFINE_FMT_SPECIALIAZATION_FOR_UTF8_ARRAY_TYPE(QByteArrayView)
-DEFINE_FMT_SPECIALIAZATION_FOR_UTF8_ARRAY_TYPE(QUtf8StringView)
-#endif
-
-#endif
 
 #define DEFINE_FMT_SPECIALIAZATION_FOR_HAVE_TOSTRING_TYPE(T)    \
   template<>                                                    \
