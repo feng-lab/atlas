@@ -929,7 +929,23 @@ public:
     res = ZImg(info);
 
     type_dispatcher(info, [&, this]<typename TVoxel>() {
-      this->cropWithPad_Impl<TVoxel>(res, startCoord, endCoord, padOption, padValue);
+      ZVoxelCoordinate coord;
+      for (coord.t = startCoord.t; coord.t < endCoord.t; ++coord.t) {
+        for (coord.c = startCoord.c; coord.c < endCoord.c; ++coord.c) {
+          for (coord.z = startCoord.z; coord.z < endCoord.z; ++coord.z) {
+            for (coord.y = startCoord.y; coord.y < endCoord.y; ++coord.y) {
+              for (coord.x = startCoord.x; coord.x < endCoord.x; ++coord.x) {
+                *(res.data<TVoxel>(coord.x - startCoord.x,
+                                   coord.y - startCoord.y,
+                                   coord.z - startCoord.z,
+                                   coord.c - startCoord.c,
+                                   coord.t - startCoord.t)) =
+                  this->valueWithPad_Impl<TVoxel>(coord, padOption, padValue);
+              }
+            }
+          }
+        }
+      }
     });
 
     return res;
@@ -1258,7 +1274,27 @@ public:
   ZImg& thresholdAbove(TValue threshold, ThresholdMode threMode, TValue outsideValue)
   {
     type_dispatcher(m_info, [=, this]<typename TVoxel>() {
-      this->thresholdAbove_Impl<TVoxel>(threshold, threMode, outsideValue);
+      auto thre = static_cast<TVoxel>(threshold);
+      auto outside = static_cast<TVoxel>(outsideValue);
+      if (threMode == ThresholdMode::IncludeThreshold) {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          auto data = timeData<TVoxel>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            if (data[v] >= thre) {
+              data[v] = outside;
+            }
+          }
+        }
+      } else if (threMode == ThresholdMode::ExcludeThreshold) {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          auto data = timeData<TVoxel>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            if (data[v] > thre) {
+              data[v] = outside;
+            }
+          }
+        }
+      }
     });
     return *this;
   }
@@ -1269,7 +1305,27 @@ public:
   ZImg& thresholdBelow(TValue threshold, ThresholdMode threMode, TValue outsideValue = TValue(0))
   {
     type_dispatcher(m_info, [=, this]<typename TVoxel>() {
-      this->thresholdBelow_Impl<TVoxel>(threshold, threMode, outsideValue);
+      auto thre = static_cast<TVoxel>(threshold);
+      auto outside = static_cast<TVoxel>(outsideValue);
+      if (threMode == ThresholdMode::IncludeThreshold) {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          auto data = timeData<TVoxel>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            if (data[v] <= thre) {
+              data[v] = outside;
+            }
+          }
+        }
+      } else if (threMode == ThresholdMode::ExcludeThreshold) {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          auto data = timeData<TVoxel>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            if (data[v] < thre) {
+              data[v] = outside;
+            }
+          }
+        }
+      }
     });
     return *this;
   }
@@ -1287,7 +1343,28 @@ public:
     ZImg res(info);
 
     type_dispatcher(m_info, [&, this]<typename TVoxel>() {
-      this->binarized_Impl<TVoxel>(res, threshold, threMode);
+      auto thre = static_cast<TVoxel>(threshold);
+      if (threMode == ThresholdMode::IncludeThreshold) {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          auto data = timeData<TVoxel>(t);
+          auto resData = res.timeData<uint8_t>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            if (data[v] >= thre) {
+              resData[v] = 1;
+            }
+          }
+        }
+      } else if (threMode == ThresholdMode::ExcludeThreshold) {
+        for (size_t t = 0; t < numTimes(); ++t) {
+          auto data = timeData<TVoxel>(t);
+          auto resData = res.timeData<uint8_t>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            if (data[v] > thre) {
+              resData[v] = 1;
+            }
+          }
+        }
+      }
     });
 
     return res;
@@ -1346,7 +1423,10 @@ public:
     static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
     if (scalar != TScalar(0)) {
       type_dispatcher(m_info, [=, this]<typename TVoxel>() {
-        this->addScalar_Impl<TVoxel>(scalar);
+        for (size_t t = 0; t < numTimes(); ++t) {
+          TVoxel* data = timeData<TVoxel>(t);
+          saturate_add(data, scalar, timeVoxelNumber(), data);
+        }
       });
     }
     return *this;
@@ -1369,7 +1449,10 @@ public:
     static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
     if (scalar != TScalar(0)) {
       type_dispatcher(m_info, [=, this]<typename TVoxel>() {
-        this->subScalar_Impl<TVoxel>(scalar);
+        for (size_t t = 0; t < numTimes(); ++t) {
+          TVoxel* data = timeData<TVoxel>(t);
+          saturate_sub(data, scalar, timeVoxelNumber(), data);
+        }
       });
     }
     return *this;
@@ -1392,7 +1475,10 @@ public:
     static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
     if (scalar != TScalar(0)) {
       type_dispatcher(m_info, [=, this]<typename TVoxel>() {
-        this->mulScalar_Impl<TVoxel>(scalar);
+        for (size_t t = 0; t < numTimes(); ++t) {
+          TVoxel* data = timeData<TVoxel>(t);
+          saturate_mul(data, scalar, timeVoxelNumber(), data);
+        }
       });
     } else {
       fill(0);
@@ -1418,7 +1504,10 @@ public:
     static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
     if (scalar != TScalar(0)) {
       type_dispatcher(m_info, [=, this]<typename TVoxel>() {
-        this->divScalar_Impl<TVoxel>(scalar);
+        for (size_t t = 0; t < numTimes(); ++t) {
+          TVoxel* data = timeData<TVoxel>(t);
+          saturate_div(data, scalar, timeVoxelNumber(), data);
+        }
       });
     } else {
       throw ZException("Can not divide img by zero"s);
@@ -1816,25 +1905,6 @@ protected:
   void checkConnInput(size_t& conn) const;
 
 private:
-  template<typename TVoxel>
-  void cropWithPad_Impl(ZImg& res,
-                        const ZVoxelCoordinate& startCoord,
-                        const ZVoxelCoordinate& endCoord,
-                        PadOption padOption,
-                        TVoxel padValue) const;
-
-  template<typename TVoxel>
-  void fillRandom_Impl();
-
-  template<typename TVoxel, typename TVoxelImg>
-  void pasteImg_Impl(const ZImg& img, const ZVoxelCoordinate& start);
-
-  template<typename TVoxel, typename TVoxelImg>
-  void pasteImgMax_Impl(const ZImg& img, const ZVoxelCoordinate& start);
-
-  template<typename TVoxel>
-  static ZImg combine_Impl(const std::vector<const ZImg*>& imgs, ImgMergeMode mode);
-
   template<typename TVoxel, typename TDesVoxel>
   static void convert_Impl(bool normalize, const ZImg* src, ZImg* des)
   {
@@ -1944,54 +2014,8 @@ private:
   void cast_Impl(ZImg& res) const;
 
   template<typename TVoxel>
-  void resize_Impl(ZImg& res,
-                   Interpolant interpolant,
-                   bool antialiasing,
-                   bool antialiasingForNearest,
-                   bool useMultithreading = true) const;
-
-  template<typename TVoxel>
   void
   blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode) const;
-
-  template<typename TVoxel, typename TValue>
-  void computeMinMax_Impl(TValue& minV, TValue& maxV) const;
-
-  template<typename TVoxel, typename TScalar>
-  void addScalar_Impl(TScalar scalar)
-  {
-    for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
-      saturate_add(data, scalar, timeVoxelNumber(), data);
-    }
-  }
-
-  template<typename TVoxel, typename TScalar>
-  void subScalar_Impl(TScalar scalar)
-  {
-    for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
-      saturate_sub(data, scalar, timeVoxelNumber(), data);
-    }
-  }
-
-  template<typename TVoxel, typename TScalar>
-  void mulScalar_Impl(TScalar scalar)
-  {
-    for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
-      saturate_mul(data, scalar, timeVoxelNumber(), data);
-    }
-  }
-
-  template<typename TVoxel, typename TScalar>
-  void divScalar_Impl(TScalar scalar)
-  {
-    for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
-      saturate_div(data, scalar, timeVoxelNumber(), data);
-    }
-  }
 
   template<typename TVoxel>
   void histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const;
@@ -2033,15 +2057,6 @@ private:
       }
     }
   }
-
-  template<typename TVoxel>
-  void flip_Impl(Dimension dim);
-
-  template<typename TVoxel>
-  void reflect_Impl();
-
-  template<typename TVoxel>
-  void cumulativeSum_Impl(ZImg& res, Dimension dim) const;
 
   template<typename TVoxel>
   void blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth) const;
@@ -2186,15 +2201,6 @@ private:
     *(data<TVoxel>(idx)) = value;
   }
 
-  template<typename TVoxel>
-  void thresholdAbove_Impl(TVoxel threshold, ThresholdMode threMode, TVoxel outsideValue);
-
-  template<typename TVoxel>
-  void thresholdBelow_Impl(TVoxel threshold, ThresholdMode threMode, TVoxel outsideValue);
-
-  template<typename TVoxel>
-  void binarized_Impl(ZImg& res, TVoxel threshold, ThresholdMode threMode) const;
-
   template<typename TVoxel, typename GenericForegroundPredictor>
   void binarized_Impl(ZImg& res, const GenericForegroundPredictor& isForeground) const
   {
@@ -2208,9 +2214,6 @@ private:
       }
     }
   }
-
-  template<typename TVoxel>
-  void showContentAsString_Impl(std::string& res) const;
 
 private:
   std::vector<uint8_t*> m_data;

@@ -124,9 +124,7 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard: Latest
 StatementAttributeLikeMacros: [emit]
-StatementMacros: [ Q_UNUSED, IMG_TYPED_CALL, IMG_RETURN_TYPED_CALL, IMGINFO_RETURN_TYPED_CALL,
-                   IMG_TYPED_CALL_FIX2NDTYPE, IMG_TYPED_CALL_FIX2ND3RDTYPE, IMG_RETURN_TYPED_CALL_FIX2NDTYPE,
-                   IMG_TYPED_CALL_2TYPE, ]
+StatementMacros: [ Q_UNUSED, ]
 TabWidth: 8
 TypenameMacros: ['STACK_OF', 'LIST']
 UseCRLF: false
