@@ -577,11 +577,11 @@ void ZStitchImage::doWork()
 
     LOG(INFO) << fmt::format("Stitching {} images ...", nStacks);
     for (const auto& ss : inputStackSources) {
-      LOG(INFO) << ss.toString();
+      LOG(INFO) << ss;
     }
     if (hasStack2) {
       for (const auto& ss : input2ndStackSources) {
-        LOG(INFO) << ss.toString();
+        LOG(INFO) << ss;
       }
       inputStackSources.insert(inputStackSources.end(), input2ndStackSources.begin(), input2ndStackSources.end());
     }

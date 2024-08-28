@@ -46,8 +46,8 @@ ZMemoryMappedFile::ZMemoryMappedFile(const QString& filename)
     flag |= llfio::mapped_file_handle::flag::anonymous_inode;
   }
   QFileInfo fi(filename);
-  auto mmfResult = llfio::mapped_file(llfio::path_handle::path(qUtf8Printable(fi.path())).value(),
-                                      qUtf8Printable(fi.fileName()),
+  auto mmfResult = llfio::mapped_file(llfio::path_handle::path(fi.path().toStdString()).value(),
+                                      fi.fileName().toStdString(),
                                       llfio::mapped_file_handle::mode::read,
                                       llfio::mapped_file_handle::creation::open_existing,
                                       llfio::mapped_file_handle::caching::all,

@@ -37,9 +37,13 @@ public:
     }
 
     if (m_region.containsWholePlane(m_img.info())) {
-      IMG_TYPED_CALL(addEdges_Opt, m_img.info(), edgeWeightFunc)
+      type_dispatcher(m_img.info(), [&, this]<typename TVoxel>() {
+        this->addEdges_Opt<TVoxel>(edgeWeightFunc);
+      });
     } else {
-      IMG_TYPED_CALL(addEdges, m_img.info(), edgeWeightFunc)
+      type_dispatcher(m_img.info(), [&, this]<typename TVoxel>() {
+        this->addEdges<TVoxel>(edgeWeightFunc);
+      });
     }
 
     m_graphIsValid = true;

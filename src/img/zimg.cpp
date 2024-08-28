@@ -54,7 +54,7 @@ std::string ZImgMetadataBase<ZImgMetatag>::toString() const
                      attachPointTags.first.c,
                      attachPointTags.first.t);
       for (const auto& tag : attachPointTags.second) {
-        fmt::format_to(std::back_inserter(res), "  {}\n", tag.toString());
+        fmt::format_to(std::back_inserter(res), "  {}\n", tag);
       }
     }
   }
@@ -629,7 +629,9 @@ std::string ZImg::toString() const
   if (isEmpty()) {
     return res;
   }
-  IMG_TYPED_CALL(showContentAsString_Impl, m_info, res)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    this->showContentAsString_Impl<TVoxel>(res);
+  });
   return res;
 }
 
@@ -729,7 +731,9 @@ ZImg ZImg::createView(size_t z, size_t c, size_t t) const
 template<typename TValue>
 void ZImg::computeMinMax(TValue& min, TValue& max) const
 {
-  IMG_TYPED_CALL(computeMinMax_Impl, m_info, min, max)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    this->computeMinMax_Impl<TVoxel>(min, max);
+  });
 }
 
 template void ZImg::computeMinMax(uint8_t&, uint8_t&) const;
@@ -760,9 +764,15 @@ std::vector<size_t> ZImg::histogram(size_t nbins, const ZImg& mask) const
   std::vector<size_t> res(nbins, 0);
 
   if (mask.isEmpty()) {
-    IMG_TYPED_CALL(histogram_Impl, m_info, res)
+    type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+      this->histogram_Impl<TVoxel>(res);
+    });
   } else if (isSameSize(mask)) {
-    IMG_TYPED_CALL_2TYPE(histogramMask_Impl, m_info, mask.info(), res, mask)
+    type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+      type_dispatcher(mask.info(), [&, this]<typename TMaskVoxel>() {
+        this->histogramMask_Impl<TVoxel, TMaskVoxel>(res, mask);
+      });
+    });
   } else {
     throw ZException(fmt::format("histogram mask has different size <{}> than current img <{}>", mask.info(), m_info));
   }
@@ -965,7 +975,9 @@ void ZImg::fillRandom_Impl()
 
 ZImg& ZImg::fillRandom()
 {
-  IMG_TYPED_CALL(fillRandom_Impl, m_info)
+  type_dispatcher(m_info, [this]<typename TVoxel>() {
+    this->fillRandom_Impl<TVoxel>();
+  });
   return *this;
 }
 
@@ -1046,7 +1058,11 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warnin
       }
     }
   } else {
-    IMG_TYPED_CALL_2TYPE(pasteImg_Impl, m_info, img.info(), img, start)
+    type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+      type_dispatcher(img.info(), [&, this]<typename TVoxelImg>() {
+        this->pasteImg_Impl<TVoxel, TVoxelImg>(img, start);
+      });
+    });
   }
 
   return *this;
@@ -1079,7 +1095,11 @@ ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool war
     return *this;
   }
 
-  IMG_TYPED_CALL_2TYPE(pasteImgMax_Impl, m_info, img.info(), img, start)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    type_dispatcher(img.info(), [&, this]<typename TVoxelImg>() {
+      this->pasteImgMax_Impl<TVoxel, TVoxelImg>(img, start);
+    });
+  });
 
   return *this;
 }
@@ -1243,7 +1263,9 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
     }
   }
 
-  IMG_RETURN_TYPED_CALL(combine_Impl, firstInfo, imgs, mode)
+  return type_dispatcher(firstInfo, [&]<typename TVoxel>() {
+    return combine_Impl<TVoxel>(imgs, mode);
+  });
 }
 
 ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, index_t startIn, index_t endIn) const
@@ -1395,7 +1417,12 @@ ZImg& ZImg::normalize()
   if (isEmpty()) {
     return *this;
   }
-  IMG_RETURN_TYPED_CALL(normalize_Impl, m_info)
+  return type_dispatcher(m_info, [this]<typename TVoxel>() -> ZImg& {
+    TVoxel minV = 0;
+    TVoxel maxV = 0;
+    computeMinMax(minV, maxV);
+    return normalize(minV, maxV);
+  });
 }
 
 template<typename TDesVoxel>
@@ -1409,7 +1436,9 @@ ZImg ZImg::castTo() const
   info.setVoxelFormat<TDesVoxel>();
   ZImg res(info);
 
-  IMG_TYPED_CALL_FIX2NDTYPE(cast_Impl, m_info, TDesVoxel, res)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    this->cast_Impl<TVoxel, TDesVoxel>(res);
+  });
 
   return res;
 }
@@ -1451,7 +1480,11 @@ template ZImg ZImg::castTo<double>() const;
   info.validBitCount = 0;
   ZImg res(info);
 
-  IMG_TYPED_CALL_2TYPE(cast_Impl, m_info, info, res)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    type_dispatcher(info, [&, this]<typename TDesVoxel>() {
+      this->cast_Impl<TVoxel, TDesVoxel>(res);
+    });
+  });
 
   return res;
 }
@@ -1482,7 +1515,9 @@ ZImg ZImg::resized(size_t desWidth,
   info.depth = desDepth;
 
   res = ZImg(info);
-  IMG_TYPED_CALL(resize_Impl, m_info, res, interpolant, antialiasing, antialiasingForNearest, useMultithreading)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    this->resize_Impl<TVoxel>(res, interpolant, antialiasing, antialiasingForNearest, useMultithreading);
+  });
 
   return res;
 }
@@ -1659,7 +1694,9 @@ ZImg ZImg::blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockD
       return res;
     }
 
-    IMG_TYPED_CALL(blockDownsampled_Impl, m_info, res, blockWidth, blockHeight, blockDepth, mode)
+    type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+      this->blockDownsampled_Impl<TVoxel>(res, blockWidth, blockHeight, blockDepth, mode);
+    });
 
     return res;
   }
@@ -1734,7 +1771,9 @@ ZImg& ZImg::flip(Dimension dim)
       }
     }
   } else if (dim < Dimension::C) {
-    IMG_TYPED_CALL(flip_Impl, m_info, dim)
+    type_dispatcher(m_info, [=, this]<typename TVoxel>() {
+      this->flip_Impl<TVoxel>(dim);
+    });
   }
   return *this;
 }
@@ -1747,7 +1786,9 @@ ZImg& ZImg::reflect()
   // reflect time
   flip(Dimension::T);
   // reflect others
-  IMG_TYPED_CALL(reflect_Impl, m_info)
+  type_dispatcher(m_info, [this]<typename TVoxel>() {
+    this->reflect_Impl<TVoxel>();
+  });
   return *this;
 }
 
@@ -1767,7 +1808,9 @@ ZImg ZImg::cumulativeSum(Dimension dim) const
       currentCh += lastCh;
     }
   } else if (dim < Dimension::C) {
-    IMG_TYPED_CALL(cumulativeSum_Impl, m_info, res, dim)
+    type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+      this->cumulativeSum_Impl<TVoxel>(res, dim);
+    });
   }
   return res;
 }
@@ -1790,7 +1833,9 @@ ZImg ZImg::blockSum(size_t twidth, size_t theight, size_t tdepth) const
     res.fill(0);
   }
 
-  IMG_TYPED_CALL(blockSum_Impl, m_info, res, twidth, theight, tdepth)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    this->blockSum_Impl<TVoxel>(res, twidth, theight, tdepth);
+  });
 
   return res;
 }
@@ -1826,7 +1871,9 @@ ZImg ZImg::blockSumPart(size_t twidth,
     res.fill(0);
   }
 
-  IMG_TYPED_CALL(blockSumPart_Impl, m_info, res, twidth, theight, tdepth, xStart, yStart, zStart)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    this->blockSumPart_Impl<TVoxel>(res, twidth, theight, tdepth, xStart, yStart, zStart);
+  });
 
   return res;
 }
@@ -1837,7 +1884,15 @@ ZImg& ZImg::operator+=(const ZImg& rhs)
     throw ZException(
       fmt::format("img addition requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
-  IMG_TYPED_CALL_2TYPE(addImg_Impl, m_info, rhs.info(), rhs)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    type_dispatcher(rhs.info(), [&, this]<typename TVoxelRhs>() {
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto data = timeData<TVoxel>(t);
+        auto rhsData = rhs.timeData<TVoxelRhs>(t);
+        saturate_add(data, rhsData, timeVoxelNumber(), data);
+      }
+    });
+  });
   return *this;
 }
 
@@ -1847,7 +1902,15 @@ ZImg& ZImg::operator-=(const ZImg& rhs)
     throw ZException(
       fmt::format("img subtraction requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
-  IMG_TYPED_CALL_2TYPE(subImg_Impl, m_info, rhs.info(), rhs)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    type_dispatcher(rhs.info(), [&, this]<typename TVoxelRhs>() {
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto data = timeData<TVoxel>(t);
+        auto rhsData = rhs.timeData<TVoxelRhs>(t);
+        saturate_sub(data, rhsData, timeVoxelNumber(), data);
+      }
+    });
+  });
   return *this;
 }
 
@@ -1857,7 +1920,15 @@ ZImg& ZImg::operator*=(const ZImg& rhs)
     throw ZException(
       fmt::format("img multiplies requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
-  IMG_TYPED_CALL_2TYPE(mulImg_Impl, m_info, rhs.info(), rhs)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    type_dispatcher(rhs.info(), [&, this]<typename TVoxelRhs>() {
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto data = timeData<TVoxel>(t);
+        auto rhsData = rhs.timeData<TVoxelRhs>(t);
+        saturate_mul(data, rhsData, timeVoxelNumber(), data);
+      }
+    });
+  });
   return *this;
 }
 
@@ -1867,7 +1938,15 @@ ZImg& ZImg::operator/=(const ZImg& rhs)
     throw ZException(
       fmt::format("img divides requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
-  IMG_TYPED_CALL_2TYPE(divImg_Impl, m_info, rhs.info(), rhs)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    type_dispatcher(rhs.info(), [&, this]<typename TVoxelRhs>() {
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto data = timeData<TVoxel>(t);
+        auto rhsData = rhs.timeData<TVoxelRhs>(t);
+        saturate_div(data, rhsData, timeVoxelNumber(), data);
+      }
+    });
+  });
   return *this;
 }
 
@@ -1877,7 +1956,15 @@ ZImg& ZImg::secureDivideBy(const ZImg& rhs)
     throw ZException(
       fmt::format("img divides requires same size img as input: this <{}>, other <{}>", m_info, rhs.info()));
   }
-  IMG_TYPED_CALL_2TYPE(secureDivImg_Impl, m_info, rhs.info(), rhs)
+  type_dispatcher(m_info, [&, this]<typename TVoxel>() {
+    type_dispatcher(rhs.info(), [&, this]<typename TVoxelRhs>() {
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto data = timeData<TVoxel>(t);
+        auto rhsData = rhs.timeData<TVoxelRhs>(t);
+        saturate_div_secure(data, rhsData, timeVoxelNumber(), data);
+      }
+    });
+  });
   return *this;
 }
 
@@ -1975,23 +2062,19 @@ ZImg ZImg::fromQImage(const QImage& image)
   return res;
 }
 
-template<typename TVoxel>
-double ZImg::sum_Impl() const
-{
-  double res = 0.0;
-  for (size_t t = 0; t < numTimes(); ++t) {
-    auto data = timeData<TVoxel>(t);
-    //    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-    //      res += data[v];
-    //    }
-    res += parallel_sum(data, data + timeVoxelNumber());
-  }
-  return res;
-}
-
 double ZImg::sum() const
 {
-  IMG_RETURN_TYPED_CALL(sum_Impl, m_info)
+  return type_dispatcher(m_info, [this]<typename TVoxel>() {
+    double res = 0.0;
+    for (size_t t = 0; t < numTimes(); ++t) {
+      auto data = timeData<TVoxel>(t);
+      //    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+      //      res += data[v];
+      //    }
+      res += parallel_sum(data, data + timeVoxelNumber());
+    }
+    return res;
+  });
 }
 
 void ZImg::allocate(bool init)
@@ -2120,35 +2203,6 @@ ZImg::cropWithPad_Impl<float>(ZImg&, const ZVoxelCoordinate&, const ZVoxelCoordi
 
 template void
 ZImg::cropWithPad_Impl<double>(ZImg&, const ZVoxelCoordinate&, const ZVoxelCoordinate&, PadOption, double) const;
-
-template<typename TVoxel>
-void ZImg::fill_Impl(TVoxel value)
-{
-  for (size_t t = 0; t < m_info.numTimes; ++t) {
-    auto data = timeData<TVoxel>(t);
-    std::fill(data, data + m_info.timeVoxelNumber(), value);
-  }
-}
-
-template void ZImg::fill_Impl<uint8_t>(uint8_t);
-
-template void ZImg::fill_Impl<uint16_t>(uint16_t);
-
-template void ZImg::fill_Impl<uint32_t>(uint32_t);
-
-template void ZImg::fill_Impl<uint64_t>(uint64_t);
-
-template void ZImg::fill_Impl<int8_t>(int8_t);
-
-template void ZImg::fill_Impl<int16_t>(int16_t);
-
-template void ZImg::fill_Impl<int32_t>(int32_t);
-
-template void ZImg::fill_Impl<int64_t>(int64_t);
-
-template void ZImg::fill_Impl<float>(float);
-
-template void ZImg::fill_Impl<double>(double);
 
 template<typename TVoxel, typename TVoxelImg>
 void ZImg::pasteImg_Impl(const ZImg& img, const ZVoxelCoordinate& start)
@@ -2320,15 +2374,6 @@ template ZImg ZImg::combine_Impl<int64_t>(const std::vector<const ZImg*>&, ImgMe
 template ZImg ZImg::combine_Impl<float>(const std::vector<const ZImg*>&, ImgMergeMode);
 
 template ZImg ZImg::combine_Impl<double>(const std::vector<const ZImg*>&, ImgMergeMode);
-
-template<typename TVoxel>
-ZImg& ZImg::normalize_Impl()
-{
-  TVoxel minV = 0;
-  TVoxel maxV = 0;
-  computeMinMax(minV, maxV);
-  return normalize(minV, maxV);
-}
 
 template<typename TVoxel, typename TDesVoxel>
 void ZImg::cast_Impl(ZImg& res) const
@@ -2566,56 +2611,6 @@ void ZImg::computeMinMax_Impl(TValue& minV, TValue& maxV) const
       minV = std::min(minV, static_cast<TValue>(resMin));
       maxV = std::max(maxV, static_cast<TValue>(resMax));
     }
-  }
-}
-
-template<typename TVoxel, typename TVoxelRhs>
-void ZImg::addImg_Impl(const ZImg& rhs)
-{
-  for (size_t t = 0; t < numTimes(); ++t) {
-    auto data = timeData<TVoxel>(t);
-    auto rhsData = rhs.timeData<TVoxelRhs>(t);
-    saturate_add(data, rhsData, timeVoxelNumber(), data);
-  }
-}
-
-template<typename TVoxel, typename TVoxelRhs>
-void ZImg::subImg_Impl(const ZImg& rhs)
-{
-  for (size_t t = 0; t < numTimes(); ++t) {
-    auto data = timeData<TVoxel>(t);
-    auto rhsData = rhs.timeData<TVoxelRhs>(t);
-    saturate_sub(data, rhsData, timeVoxelNumber(), data);
-  }
-}
-
-template<typename TVoxel, typename TVoxelRhs>
-void ZImg::mulImg_Impl(const ZImg& rhs)
-{
-  for (size_t t = 0; t < numTimes(); ++t) {
-    auto data = timeData<TVoxel>(t);
-    auto rhsData = rhs.timeData<TVoxelRhs>(t);
-    saturate_mul(data, rhsData, timeVoxelNumber(), data);
-  }
-}
-
-template<typename TVoxel, typename TVoxelRhs>
-void ZImg::divImg_Impl(const ZImg& rhs)
-{
-  for (size_t t = 0; t < numTimes(); ++t) {
-    auto data = timeData<TVoxel>(t);
-    auto rhsData = rhs.timeData<TVoxelRhs>(t);
-    saturate_div(data, rhsData, timeVoxelNumber(), data);
-  }
-}
-
-template<typename TVoxel, typename TVoxelRhs>
-void ZImg::secureDivImg_Impl(const ZImg& rhs)
-{
-  for (size_t t = 0; t < numTimes(); ++t) {
-    auto data = timeData<TVoxel>(t);
-    auto rhsData = rhs.timeData<TVoxelRhs>(t);
-    saturate_div_secure(data, rhsData, timeVoxelNumber(), data);
   }
 }
 
@@ -3251,7 +3246,9 @@ void ZImg::showContentAsString_Impl(std::string& res) const
 
 void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImg& img)
 {
-  IMG_TYPED_CALL(tag_invoke_img_Impl, img.info(), jv, img)
+  type_dispatcher(img.info(), [&]<typename TVoxel>() {
+    tag_invoke_img_Impl<TVoxel>(jv, img);
+  });
 }
 
 template<typename TVoxel>
@@ -3275,7 +3272,9 @@ ZImg tag_invoke(const json::value_to_tag<ZImg>&, const json::value& jv)
   auto info = json::value_to<ZImgInfo>(jv.at("info"));
   ZImg res(info);
 
-  IMG_RETURN_TYPED_CALL(tag_invoke_img_Impl, info, res, jv)
+  return type_dispatcher(info, [&]<typename TVoxel>() {
+    return tag_invoke_img_Impl<TVoxel>(res, jv);
+  });
 }
 
 template<typename TVoxel>

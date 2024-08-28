@@ -408,7 +408,7 @@ void ZImgJpegXR::readMemImg(void* mem, size_t size, void* des, size_t desSize)
   // Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
 
   readInfoFromDecoder(pDecoder, PI, info);
-  // VLOG(1) << info.toString();
+  // VLOG(1) << info;
 
   if (desSize < info.byteNumber()) {
     throw ZException("buffer space is not enough");

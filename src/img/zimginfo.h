@@ -422,5 +422,3 @@ inline ZImgInfo tag_invoke(const json::value_to_tag<ZImgInfo>&, const json::valu
 }
 
 } // namespace nim
-
-DEFINE_FMT_SPECIALIAZATION_FOR_HAVE_TOSTRING_TYPE(nim::ZImgInfo)

@@ -651,22 +651,22 @@ std::string ZTiffIFD::toString() const
 {
   std::string res;
   for (const auto& entry : m_entries) {
-    fmt::format_to(std::back_inserter(res), "{}\n", entry.toString());
+    fmt::format_to(std::back_inserter(res), "{}\n", entry);
   }
   if (!m_subIFDs.empty()) {
     res.append("\n");
     for (size_t i = 0; i < m_subIFDs.size(); ++i) {
-      fmt::format_to(std::back_inserter(res), "Sub IFD {}\n{}", i, m_subIFDs[i].toString());
+      fmt::format_to(std::back_inserter(res), "Sub IFD {}\n{}", i, m_subIFDs[i]);
     }
   }
   if (!m_exifIFD.empty()) {
-    fmt::format_to(std::back_inserter(res), "\nExif IFD\n{}", m_exifIFD[0].toString());
+    fmt::format_to(std::back_inserter(res), "\nExif IFD\n{}", m_exifIFD[0]);
   }
   if (!m_gpsIFD.empty()) {
-    fmt::format_to(std::back_inserter(res), "\nGPS IFD\n{}", m_gpsIFD[0].toString());
+    fmt::format_to(std::back_inserter(res), "\nGPS IFD\n{}", m_gpsIFD[0]);
   }
   if (!m_interoperabilityIFD.empty()) {
-    fmt::format_to(std::back_inserter(res), "\nInteroperability IFD\n{}", m_interoperabilityIFD[0].toString());
+    fmt::format_to(std::back_inserter(res), "\nInteroperability IFD\n{}", m_interoperabilityIFD[0]);
   }
   return res;
 }
@@ -749,7 +749,7 @@ std::string ZTiff::toString() const
                    i,
                    m_ifds[i].offset(),
                    m_ifds[i].nextIFDOffset(),
-                   m_ifds[i].toString());
+                   m_ifds[i]);
   }
   return res;
 }
@@ -1952,7 +1952,7 @@ void ZTiffWriter::writeIFD(const ZImg& img,
       CHECK(z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 &&
             (img.numChannels() == 4 || img.numChannels() == 3));
       ZImg tmp(img.info());
-      CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info().toString();
+      CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info();
       ZImgFormat::XYZCtoCXYZ(img, tmp);
       TIFFWriteEncodedStrip(m_tif.get(), 0, tmp.planeData(0, 0, 0), tmp.byteNumber());
     }

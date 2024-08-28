@@ -26,7 +26,7 @@ void ZSectionsRegistration::doWork()
 
   ZImgSource
     imgSource(m_imgFilenames, Dimension::Z, true, ZImgRegion(), 0, FileFormat::Unknown, true, m_brightBackground);
-  LOG(INFO) << "Image Info: " << imgSource.toString();
+  LOG(INFO) << "Image Info: " << imgSource;
   ZCachedImg srcImg(imgSource);
   if (srcImg.depth() <= 1) {
     throw ZException("Only one slice. Do not need alignment.");
@@ -45,7 +45,9 @@ void ZSectionsRegistration::doWork()
     if (srcImg.numChannels() == 1) {
       m_referenceChannel = 0;
     } else {
-      IMG_TYPED_CALL(calcRefCh, srcImg.info(), srcImg)
+      type_dispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
+        this->calcRefCh<TVoxel>(srcImg);
+      });
     }
   }
 
@@ -63,7 +65,9 @@ void ZSectionsRegistration::doWork()
   LOG(INFO) << "Transform: " << m_transform;
   LOG(INFO) << "Optimizer: " << m_optimizer;
 
-  IMG_TYPED_CALL(calcSecInfs, srcImg.info(), srcImg)
+  type_dispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
+    this->calcSecInfs<TVoxel>(srcImg);
+  });
 
   double totalNumPairs = srcImg.depth() * m_numNeighbors;
 
@@ -76,7 +80,9 @@ void ZSectionsRegistration::doWork()
       }
       double cost;
       ZImageTransform* tfm = nullptr;
-      IMG_TYPED_CALL(alignSection, srcImg.info(), srcImg, i, j, cost, tfm)
+      type_dispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
+        this->alignSection<TVoxel>(srcImg, i, j, cost, tfm);
+      });
       idxPairs[std::make_pair(i, j)] = std::make_pair(std::unique_ptr<ZImageTransform>(tfm), cost);
       progress += 1;
       reportProgress(progress / totalNumPairs);

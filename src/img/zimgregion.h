@@ -13,6 +13,9 @@ struct ZImgRegion
 {
   using value_type = ZVoxelCoordinate::value_type;
 
+  ZVoxelCoordinate start;
+  ZVoxelCoordinate end;
+
   ZImgRegion()
     : start(0, 0, 0, 0, 0)
     , end(-1, -1, -1, -1, -1)
@@ -193,9 +196,6 @@ struct ZImgRegion
                                                size_t expand = 0,
                                                index_t ch = -1,
                                                index_t t = -1);
-
-  ZVoxelCoordinate start;
-  ZVoxelCoordinate end;
 };
 
 inline void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgRegion& rgn)
@@ -217,5 +217,3 @@ inline ZImgRegion tag_invoke(const json::value_to_tag<ZImgRegion>&, const json::
 }
 
 } // namespace nim
-
-DEFINE_FMT_SPECIALIAZATION_FOR_HAVE_TOSTRING_TYPE(nim::ZImgRegion)

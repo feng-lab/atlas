@@ -509,7 +509,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
       }
     }
 
-    VLOG(2) << info.toString();
+    VLOG(2) << info;
   }
 }
 

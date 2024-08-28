@@ -2,7 +2,6 @@
 
 #include "zglobal.h"
 #include "zrandom.h"
-#include "zjson.h"
 #include "zlog.h"
 #include <utility>
 #include <type_traits>
@@ -306,11 +305,6 @@ struct ZVoxelCoordinate
     c /= rhs.c;
     t /= rhs.t;
     return *this;
-  }
-
-  [[nodiscard]] std::string toString() const
-  {
-    return jsonToString(*this);
   }
 
   // ttsize[0] to ttsize[4] are the sizes of x to t, advance current coord to next valid coord,

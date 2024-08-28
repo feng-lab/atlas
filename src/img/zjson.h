@@ -20,29 +20,9 @@ inline QString tag_invoke(const json::value_to_tag<QString>&, const json::value&
 
 inline void tag_invoke(const json::value_from_tag&, json::value& jv, const QString& str)
 {
-  jv.emplace_string() = qUtf8Printable(str);
+  auto u8 = str.toUtf8();
+  jv.emplace_string() = std::string_view(u8.data(), u8.size());
 }
-
-#if 0
-inline void tag_invoke(const json::value_from_tag&, json::value& jv, const QStringList& sl)
-{
-  auto& sa = jv.emplace_array();
-  sa.reserve(sl.size());
-  for (size_t i = 0; i < sa.size(); ++i) {
-    sa.emplace_back(qUtf8Printable(sl[i]));
-  }
-}
-
-inline QStringList tag_invoke(const json::value_to_tag<QStringList>&, const json::value& jv)
-{
-  QStringList res;
-  for (const auto& sv : jv.as_array()) {
-    const auto& s = sv.as_string();
-    res.push_back(QString::fromUtf8(s.data(), s.size()));
-  }
-  return res;
-}
-#endif
 
 namespace nim {
 

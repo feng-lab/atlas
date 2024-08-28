@@ -52,7 +52,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
 
   m_imgInfo[0].createDefaultDescriptions();
 
-  // VLOG(1) << m_imgInfo.toString() << " " << m_dimensionOrder;
+  // VLOG(1) << m_imgInfo << " " << m_dimensionOrder;
 }
 
 bool ZImgOmeTiff::mapIFDToImgLocation(size_t ifdIdx, index_t& z, index_t& c, index_t& t, index_t& l)
@@ -103,7 +103,7 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImg& img, const ZImgW
   for (size_t t = 0; t < img.numTimes(); ++t) {
     for (size_t c = 0; c < img.numChannels(); ++c) {
       for (size_t z = 0; z < img.depth(); ++z) {
-        // VLOG(1) << l << " " << t << " " << z << " " << c << " " << img.info().toString();
+        // VLOG(1) << l << " " << t << " " << z << " " << c << " " << img.info();
         if (t == 0 && z == 0 && c == 0) {
           tiffWriter.writeIFD(img, z, t, c, false, tags);
         } else {
@@ -133,7 +133,7 @@ void ZImgOmeTiff::writeImg(const QString& filename,
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
       ZImg img = imgSliceProvider.slice(z, t);
       for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
-        // VLOG(1) << l << " " << t << " " << z << " " << c << " " << img.info().toString();
+        // VLOG(1) << l << " " << t << " " << z << " " << c << " " << img.info();
         if (t == 0 && z == 0 && c == 0) {
           tiffWriter.writeIFD(img, 0, 0, c, false, tags);
         } else {

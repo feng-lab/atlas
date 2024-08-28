@@ -16,7 +16,9 @@ public:
   template<typename TValue = double>
   TValue triangleThre(const ZImg& img, size_t c = 0, size_t t = 0)
   {
-    IMG_RETURN_TYPED_CALL(typedTriangleThre, img.info(), img, c, t)
+    return type_dispatcher(img.info(), [&]<typename TVoxel>() {
+      return static_cast<TValue>(typedTriangleThre<TVoxel>(img, c, t));
+    });
   }
 
   // for big image
@@ -32,7 +34,9 @@ public:
     if (scene >= infos.size()) {
       throw ZException("input scene incorrect");
     }
-    IMG_RETURN_TYPED_CALL(typedTriangleThre, infos[scene], filename, c, t, scene, mask)
+    return type_dispatcher(infos[scene], [&]<typename TVoxel>() {
+      return static_cast<TValue>(typedTriangleThre<TVoxel>(filename, c, t, scene, mask));
+    });
   }
 
   // in case you already know img type, call this version and pass type as template parameter
@@ -60,7 +64,9 @@ public:
   template<typename TValue = double>
   TValue centroidThre(double& cent1, double& cent2, const ZImg& img, size_t c = 0, size_t t = 0)
   {
-    IMG_RETURN_TYPED_CALL(typedCentroidThre, img.info(), cent1, cent2, img, c, t)
+    return type_dispatcher(img.info(), [&]<typename TVoxel>() {
+      return static_cast<TValue>(typedCentroidThre<TVoxel>(cent1, cent2, img, c, t));
+    });
   }
 
   template<typename TVoxel = double>
@@ -69,7 +75,9 @@ public:
   template<typename TValue = double>
   TValue maxHistThre(const ZImg& img, size_t c = 0, size_t t = 0)
   {
-    IMG_RETURN_TYPED_CALL(typedMaxHistThre, img.info(), img, c, t)
+    return type_dispatcher(img.info(), [&]<typename TVoxel>() {
+      return static_cast<TValue>(typedMaxHistThre<TVoxel>(img, c, t));
+    });
   }
 
   template<typename TVoxel = double>

@@ -35,7 +35,11 @@ bool ZRegistrationNumericDiffCostFunction::evaluate(const double* const paramete
   // ZBenchTimer bt("Func Eval");
   // bt.start();
 
-  IMG_TYPED_CALL_2TYPE(evaluate_Impl, m_fixedImg->info(), m_movingImg->info(), parameters, cost)
+  type_dispatcher(m_fixedImg->info(), [=, this]<typename TFixed>() {
+    type_dispatcher(m_movingImg->info(), [=, this]<typename TMoving>() {
+      this->evaluate_Impl<TFixed, TMoving>(parameters, cost);
+    });
+  });
 
   if (gradient) {
     std::vector<double> paras(parameters, parameters + numParameters());
@@ -53,7 +57,15 @@ bool ZRegistrationNumericDiffCostFunction::evaluate(const double* const paramete
       }
       paraPlusDelta[i] += delta;
       double newValue = 0;
-      IMG_TYPED_CALL_2TYPE(evaluate_Impl, m_fixedImg->info(), m_movingImg->info(), paraPlusDelta.data(), &newValue)
+      type_dispatcher(
+        m_fixedImg->info(),
+        [this]<typename TFixed>(const double* const ps, double* value) {
+          type_dispatcher(m_movingImg->info(), [=, this]<typename TMoving>() {
+            this->evaluate_Impl<TFixed, TMoving>(ps, value);
+          });
+        },
+        paraPlusDelta.data(),
+        &newValue);
       gradient[i] = (newValue - *cost) / delta;
       paraPlusDelta[i] = paras[i];
     }

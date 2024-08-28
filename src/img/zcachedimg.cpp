@@ -4,7 +4,7 @@
 #include "zimagecompositetransform.h"
 #include "zcpuinfo.h"
 
-namespace  {
+namespace {
 
 template<typename ImagePixelType>
 nim::ZImg transformSlice(const std::unique_ptr<nim::ZImageCompositeTransform>& tfm, const nim::ZImg& srcImg)
@@ -37,7 +37,9 @@ ZImg ZCachedImg::slice(size_t z, size_t c, size_t t) const
   imgSource.region = ZImgRegion(0, -1, 0, -1, z, z + 1, c, c + 1, t, t + 1);
   ZImgIO::instance().readImg(imgSource, res);
   if (m_sliceTransform) {
-    IMG_RETURN_TYPED_CALL(transformSlice, res.info(), m_sliceTransform->at(z), res);
+    return type_dispatcher(res.info(), [&, this]<typename TVoxel>() {
+      return transformSlice<TVoxel>(m_sliceTransform->at(z), res);
+    });
   } else {
     return res;
   }
@@ -50,7 +52,9 @@ ZImg ZCachedImg::slice(size_t z, size_t t) const
   imgSource.region = ZImgRegion(0, -1, 0, -1, z, z + 1, 0, -1, t, t + 1);
   ZImgIO::instance().readImg(imgSource, res);
   if (m_sliceTransform) {
-    IMG_RETURN_TYPED_CALL(transformSlice, res.info(), m_sliceTransform->at(z), res);
+    return type_dispatcher(res.info(), [&, this]<typename TVoxel>() {
+      return transformSlice<TVoxel>(m_sliceTransform->at(z), res);
+    });
   } else {
     return res;
   }

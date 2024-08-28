@@ -113,8 +113,6 @@ protected:
   std::vector<double> m_parameters;
 };
 
-std::ostream& operator<<(std::ostream& s, const ZImageTransform& tfm);
-
 template<typename TPixel, typename TPixelOut>
 struct AffineTransform3DForOneBlock
 {

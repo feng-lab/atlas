@@ -8,8 +8,6 @@
 #undef ERROR
 #endif
 
-#define GOOGLE_STRIP_LOG 0
-
 #include <glog/logging.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -191,27 +189,12 @@ std::string flagsToString(TEnum e)
   return res;
 }
 
-// inline QByteArray toUtf8QByteArray(const std::wstring& s)
-// {
-//   return QString::fromStdWString(s).toUtf8();
-// }
-//
-// inline QByteArray toUtf8QByteArray(const std::wstring_view& s)
-// {
-//   return QString::fromStdWString(std::wstring(s)).toUtf8();
-// }
-//
-// inline QByteArray toUtf8QByteArray(const wchar_t* s)
-// {
-//   return QString::fromStdWString(std::wstring(s)).toUtf8();
-// }
-
 inline std::string toUtf8String(const std::wstring& s)
 {
   return QString::fromStdWString(s).toStdString();
 }
 
-inline std::string toUtf8String(const std::wstring_view& s)
+inline std::string toUtf8String(std::wstring_view s)
 {
   return QString::fromStdWString(std::wstring(s)).toStdString();
 }
@@ -236,6 +219,13 @@ concept CanConvertToUtf8QByteArray = requires(const T& a) {
   {
     a.toUtf8()
   } -> std::same_as<QByteArray>;
+};
+
+template<typename T>
+concept HaveToStringFunction = requires(const T& a) {
+  {
+    a.toString()
+  } -> std::same_as<std::string>;
 };
 
 template<class T>
@@ -275,6 +265,12 @@ TEnum stringToEnum(const T& s)
   return stringToEnum<TEnum>(std::string_view(u8.data(), u8.size()));
 }
 
+template<HaveToStringFunction T>
+std::ostream& operator<<(std::ostream& s, const T& v)
+{
+  return (s << v.toString());
+}
+
 } // namespace nim
 
 template<nim::CanConvertToUtf8QByteArray T>
@@ -289,17 +285,9 @@ struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 
 namespace fmt {
 
-template<>
-struct is_range<QByteArray, char> : std::false_type
+template<nim::IsUtf8ArrayType T>
+struct is_range<T, char> : std::false_type
 {};
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-template<>
-struct is_range<QByteArrayView, char> : std::false_type
-{};
-template<>
-struct is_range<QUtf8StringView, char> : std::false_type
-{};
-#endif
 
 } // namespace fmt
 
@@ -312,16 +300,16 @@ struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
   }
 };
 
-#define DEFINE_FMT_SPECIALIAZATION_FOR_HAVE_TOSTRING_TYPE(T)    \
-  template<>                                                    \
-  struct fmt::formatter<T> : fmt::formatter<std::string>        \
-  {                                                             \
-    auto format(const T& a, fmt::format_context& ctx) const     \
-    {                                                           \
-      return formatter<std::string>::format(a.toString(), ctx); \
-    }                                                           \
-  };
+template<nim::HaveToStringFunction T>
+struct fmt::formatter<T> : fmt::formatter<std::string>
+{
+  auto format(const T& s, format_context& ctx) const
+  {
+    return fmt::formatter<std::string>::format(s.toString(), ctx);
+  }
+};
 
+// qt type iostream support
 template<nim::CanConvertToUtf8QByteArray T>
 std::ostream& operator<<(std::ostream& s, const T& v)
 {

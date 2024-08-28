@@ -587,7 +587,7 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
   });
 
   ZImg tmp(img.info());
-  CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info().toString();
+  CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info();
   ZImgFormat::XYZCtoCXYZ(img, tmp);
   unsigned char* jpegBuf = nullptr; /* Dynamically allocate the JPEG buffer */
   auto guard2 = folly::makeGuard([&jpegBuf]() {

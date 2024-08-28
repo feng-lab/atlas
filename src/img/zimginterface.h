@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zglobal.h"
-#include "zjson.h"
 #include "zlog.h"
 
 namespace nim {
@@ -187,11 +186,6 @@ struct col4
       default:
         throw ZException(fmt::format("invalid index {}", i));
     }
-  }
-
-  [[nodiscard]] std::string toString() const
-  {
-    return jsonToString(*this);
   }
 };
 

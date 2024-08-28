@@ -32,7 +32,14 @@ ZImg ZImgRegionalExtrema<ReportProgress>::regionalExtrema(const ZImg& img, size_
   res = ZImg(info);
   res.fill(1);
 
-  IMG_TYPED_CALL_FIX2NDTYPE(regionalExtrema_Impl, img.info(), Compare, res, img, conn)
+  type_dispatcher(
+    img.info(),
+    [this]<typename TVoxel>(ZImg& res, const ZImg& img, size_t conn) {
+      this->regionalExtrema_Impl<TVoxel, Compare>(res, img, conn);
+    },
+    res,
+    img,
+    conn);
 
   return res;
 }

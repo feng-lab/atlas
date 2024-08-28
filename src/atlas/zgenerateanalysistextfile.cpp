@@ -351,7 +351,7 @@ void ZGenerateAnalysisTextFile::getAxonFeature(const ZSwc& tree,
         intensity /= count;
       } else {
         LOG(WARNING) << "node " << tn->x << " " << tn->y << " " << tn->z << " " << tn->radius;
-        LOG(WARNING) << "img info " << axonImg.info().toString();
+        LOG(WARNING) << "img info " << axonImg.info();
         throw ZException("Swc root don't overlap with img?");
       }
 
@@ -396,7 +396,7 @@ void ZGenerateAnalysisTextFile::getAxonFeature(const ZSwc& tree,
       } else {
         LOG(WARNING) << "node " << tn->x << " " << tn->y << " " << tn->z << " " << tn->radius;
         LOG(WARNING) << "parent node " << parent->x << " " << parent->y << " " << parent->z << " " << parent->radius;
-        LOG(WARNING) << "img info " << axonImg.info().toString();
+        LOG(WARNING) << "img info " << axonImg.info();
         throw ZException("Swc seg don't overlap with img?");
       }
 

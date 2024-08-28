@@ -153,7 +153,9 @@ double getNCCOfOffset(const ZImg& fixedImgIn, const ZImg& movingImgIn, const ZVo
       movingImg = movingImg.castTo<double>();
     }
   }
-  IMG_RETURN_TYPED_CALL(getNCCOfOffset_Impl, fixedImg.info(), fixedImg, movingImg)
+  return type_dispatcher(fixedImg.info(), [&]<typename TVoxel>() {
+    return getNCCOfOffset_Impl<TVoxel>(fixedImg, movingImg);
+  });
 }
 
 // reference: matlab code normxcorr2_general.m
@@ -169,7 +171,7 @@ void normXCorr(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOver
 
   movingImg.reflect();
 
-  // VLOG(1) << movingImg.info().toString() << " " << fixedImg.info().toString();
+  // VLOG(1) << movingImg.info() << " " << fixedImg.info();
 
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info); // 1
@@ -250,7 +252,7 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
 
   movingImg.reflect();
 
-  // VLOG(1) << movingImg.info().toString() << " " << fixedImg.info().toString();
+  // VLOG(1) << movingImg.info() << " " << fixedImg.info();
 
   // VLOG(1) << "1";
   nccImg = xCorrFFT(fixedImg, movingImg, false); // 1, I think peak is 3
@@ -383,7 +385,7 @@ void normXCorrPart(ZImg& fixedImg,
 
   movingImg.reflect();
 
-  // VLOG(1) << movingImg.info().toString() << " " << fixedImg.info().toString();
+  // VLOG(1) << movingImg.info() << " " << fixedImg.info();
 
   ZImgInfo info = fixedImg.info();
   numberOfOverlapVoxelsImg = ZImg(info); //
@@ -527,18 +529,11 @@ ZImg xCorrPart(const ZImg& fixedImg,
   info.bytesPerVoxel = 8;
   ZImg res(info);
 
-  IMG_TYPED_CALL_2TYPE(xCorrPart_Impl,
-                       fixedImg.info(),
-                       movingImg.info(),
-                       fixedImg,
-                       movingImg,
-                       xStart,
-                       xEnd,
-                       yStart,
-                       yEnd,
-                       zStart,
-                       zEnd,
-                       res)
+  type_dispatcher(fixedImg.info(), [&]<typename TVoxel1>() {
+    type_dispatcher(movingImg.info(), [&]<typename TVoxel2>() {
+      xCorrPart_Impl<TVoxel1, TVoxel2>(fixedImg, movingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd, res);
+    });
+  });
 
   return res;
 }

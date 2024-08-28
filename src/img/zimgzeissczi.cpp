@@ -801,7 +801,7 @@ void ZImgZeissCZI::readInfo(const QString& filename,
   }
 
   for (const auto& info : infos) {
-    VLOG(1) << info.toString();
+    VLOG(1) << info;
   }
   VLOG(1) << "";
 }
@@ -1758,8 +1758,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
       LOG(INFO) << "";
     }
     for (const auto& tile : m_sceneTiles.back()) {
-      LOG(INFO) << tile.ratio << " " << tile.start.toString() << " " << tile.size.toString() << " "
-                << tile.storedSize.toString();
+      LOG(INFO) << tile.ratio << " " << tile.start << " " << tile.size << " " << tile.storedSize;
     }
 #endif
   }

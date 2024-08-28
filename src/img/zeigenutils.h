@@ -29,14 +29,6 @@
 
 namespace nim {
 
-template<typename Derived>
-QString matrixToQString(const Eigen::DenseBase<Derived>& m)
-{
-  std::ostringstream oss;
-  oss << m;
-  return QString::fromStdString(oss.str());
-}
-
 // from eigen doc
 template<typename Scalar>
 struct CwiseClampOp

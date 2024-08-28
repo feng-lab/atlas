@@ -1375,7 +1375,7 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
 
 void ZImgPack::updateDerivedData()
 {
-  // VLOG(1) << m_imgInfo.toString();
+  // VLOG(1) << m_imgInfo;
   if (!m_diskCached) {
     m_maximumProjectedAlongZImg.clear();
     if (m_imgInfo.depth == 1) {

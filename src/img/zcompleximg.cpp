@@ -78,9 +78,8 @@ ZComplexImg& ZComplexImg::operator+=(const std::complex<double>& rhs)
 ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZException(fmt::format("complex img addition requires same size img as input: this <{}>, other <{}>",
-                                 toString(),
-                                 rhs.toString()));
+    throw ZException(
+      fmt::format("complex img addition requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #ifdef ZIMG_USE_MKL
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
@@ -117,9 +116,8 @@ ZComplexImg& ZComplexImg::operator-=(const std::complex<double>& rhs)
 ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZException(fmt::format("complex img subtraction requires same size img as input: this <{}>, other <{}>",
-                                 toString(),
-                                 rhs.toString()));
+    throw ZException(
+      fmt::format("complex img subtraction requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #ifdef ZIMG_USE_MKL
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
@@ -163,9 +161,8 @@ ZComplexImg& ZComplexImg::operator*=(const std::complex<double>& rhs)
 ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZException(fmt::format("complex img multiplies requires same size img as input: this <{}>, other <{}>",
-                                 toString(),
-                                 rhs.toString()));
+    throw ZException(
+      fmt::format("complex img multiplies requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #ifdef ZIMG_USE_MKL
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
@@ -202,9 +199,8 @@ ZComplexImg& ZComplexImg::operator/=(const std::complex<double>& rhs)
 ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZException(fmt::format("complex img divides requires same size img as input: this <{}>, other <{}>",
-                                 toString(),
-                                 rhs.toString()));
+    throw ZException(
+      fmt::format("complex img divides requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
 #ifdef ZIMG_USE_MKL
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
