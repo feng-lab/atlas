@@ -398,7 +398,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def(
       "__repr__",
       [](const col4& v) {
-        return fmt::format("<_imgpy.col4 rgba:{}>", v.toString());
+        return fmt::format("<_imgpy.col4 rgba:{}>", v);
       },
       "Returns a string representation of the color.");
   py::implicitly_convertible<py::tuple, col4>();
@@ -520,7 +520,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def(
       "__repr__",
       [](const ZVoxelCoordinate& v) {
-        return fmt::format("<_imgpy.ZVoxelCoordinate xyzct:{}>", v.toString());
+        return fmt::format("<_imgpy.ZVoxelCoordinate xyzct:{}>", v);
       },
       "Returns a string representation of the voxel coordinates.");
   py::implicitly_convertible<py::tuple, ZVoxelCoordinate>();
