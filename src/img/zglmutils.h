@@ -33,8 +33,6 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <QRegularExpression>
 #include <QStringList>
-#include <QLocale>
-#include <iosfwd>
 #include <tuple>
 #include <utility>
 #include <type_traits>
@@ -380,26 +378,6 @@ void toVal(const QString& str, glm::tquat<T, Q>& q)
   for (size_t i = 0; i < std::min(q.length(), size_t(numList.size())); ++i) {
     toVal(numList[i], q[i]);
   }
-}
-
-// std iostream print
-
-template<size_t L, typename T, glm::qualifier Q>
-std::ostream& operator<<(std::ostream& s, const glm::vec<L, T, Q>& v)
-{
-  return (s << fmt::format("{}", v));
-}
-
-template<size_t C, size_t R, typename T, glm::qualifier Q>
-std::ostream& operator<<(std::ostream& s, const glm::mat<C, R, T, Q>& m)
-{
-  return (s << fmt::format("{}", m));
-}
-
-template<typename T, glm::qualifier Q>
-std::ostream& operator<<(std::ostream& s, const glm::tquat<T, Q>& q)
-{
-  return (s << fmt::format("{}", q));
 }
 
 } // namespace nim

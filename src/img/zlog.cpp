@@ -3,13 +3,14 @@
 #include "zioutils.h"
 #include "zlogcache.h"
 #include "zglmutils.h"
-
+#include "zimginterface.h"
+#include "zvoxelcoordinate.h"
+#include <QPoint>
 #include <QFile>
 #include <absl/log/log_sink_registry.h>
 #include <absl/log/initialize.h>
 #include <absl/log/internal/globals.h>
 #include <iostream>
-#include <utility>
 
 namespace nim {
 
@@ -214,6 +215,8 @@ static_assert(is_formattable<QUtf8StringView>(), "QUtf8StringView should be form
 #else
 static_assert(is_formattable<QStringRef>(), "QStringRef should be formattable");
 #endif
+static_assert(is_formattable<col4>(), "col4 should be formattable");
+static_assert(is_formattable<ZVoxelCoordinate>(), "ZVoxelCoordinate should be formattable");
 
 // Static assertions for std::ostream operator
 static_assert(is_streamable<QString>(), "QString should be streamable");
@@ -239,6 +242,11 @@ static_assert(is_streamable<QSharedPointer<int>>(), "QSharedPointer<int> should 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 static_assert(is_streamable<QTaggedPointer<int, int>>(), "QTaggedPointer<int, int> should be streamable");
 #endif
+static_assert(is_streamable<col4>(), "col4 should be streamable");
+static_assert(is_streamable<ZVoxelCoordinate>(), "ZVoxelCoordinate should be streamable");
+static_assert(is_streamable<glm::mat4>(), "glm::mat4 should be streamable");
+static_assert(is_streamable<glm::vec3>(), "glm::vec3 should be streamable");
+static_assert(is_streamable<glm::quat>(), "glm::quat should be streamable");
 
 // Example QFlags for testing
 enum class TestFlag

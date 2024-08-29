@@ -15,7 +15,6 @@
 #include <fmt/std.h>
 #include <fmt/compile.h>
 #include <QDebug>
-#include <QPoint>
 #include <QRect>
 
 #ifndef Q_MOC_RUN
@@ -25,7 +24,6 @@
 
 #include <functional>
 #include <iosfwd>
-#include <concepts>
 
 namespace nim {
 
@@ -240,9 +238,8 @@ concept IsUtf8ArrayType = IsAnyOf<T,
 
 template<typename T>
 concept IsSupportedQtTypeForPrint =
-  std::same_as<T, QPoint> || std::same_as<T, QPointF> || std::same_as<T, QRect> || std::same_as<T, QRectF> ||
-  std::same_as<T, QSize> || std::same_as<T, QStringList> || std::same_as<T, QList<typename T::value_type>> ||
-  std::same_as<T, QContiguousCache<typename T::value_type>> ||
+  std::same_as<T, QRect> || std::same_as<T, QRectF> || std::same_as<T, QStringList> ||
+  std::same_as<T, QList<typename T::value_type>> || std::same_as<T, QContiguousCache<typename T::value_type>> ||
   std::same_as<T, QSharedPointer<typename T::value_type>> || std::same_as<T, QFlags<typename T::enum_type>>
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   || std::same_as<T, QKeyCombination> || std::same_as<T, QTaggedPointer<typename T::Type, typename T::TagType>>
@@ -269,6 +266,13 @@ template<HaveToStringFunction T>
 std::ostream& operator<<(std::ostream& s, const T& v)
 {
   return (s << v.toString());
+}
+
+template<typename T>
+  requires fmt::is_tuple_like<T>::value
+std::ostream& operator<<(std::ostream& s, const T& v)
+{
+  return (s << fmt::format("{}", v));
 }
 
 } // namespace nim

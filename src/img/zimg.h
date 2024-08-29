@@ -619,25 +619,6 @@ public:
     return m_info.voxelSizeZ;
   }
 
-  //  // if current or result voxelSizeUnit is Voxel, throw exception
-  //   double voxelSizeXInUnit(VoxelSizeUnit unit) const
-  //  { return m_info.voxelSizeXInUnit(unit); }
-  //
-  //   double voxelSizeYInUnit(VoxelSizeUnit unit) const
-  //  { return m_info.voxelSizeYInUnit(unit); }
-  //
-  //   double voxelSizeZInUnit(VoxelSizeUnit unit) const
-  //  { return m_info.voxelSizeZInUnit(unit); }
-  //
-  //   double voxelSizeXInUm() const
-  //  { return voxelSizeXInUnit(VoxelSizeUnit::um); }
-  //
-  //   double voxelSizeYInUm() const
-  //  { return voxelSizeYInUnit(VoxelSizeUnit::um); }
-  //
-  //   double voxelSizeZInUm() const
-  //  { return voxelSizeZInUnit(VoxelSizeUnit::um); }
-
   [[nodiscard]] col4 channelColor(size_t c) const
   {
     return m_info.channelColors[c];
@@ -1038,53 +1019,10 @@ public:
     if (isEmpty()) {
       return *this;
     }
-    size_t bytesPerVoxel = m_info.bytesPerVoxel;
-    if (VoxelFormat vf = m_info.voxelFormat; vf == VoxelFormat::Float) {
-      switch (bytesPerVoxel) {
-        case 4:
-          scale_Impl<float, float>(minData, maxData, this, this);
-          break;
-        case 8:
-          scale_Impl<double, double>(minData, maxData, this, this);
-          break;
-        default:
-          break;
-      }
-    } else if (vf == VoxelFormat::Signed) {
-      switch (bytesPerVoxel) {
-        case 1:
-          scale_Impl<int8_t, int8_t>(minData, maxData, this, this);
-          break;
-        case 2:
-          scale_Impl<int16_t, int16_t>(minData, maxData, this, this);
-          break;
-        case 4:
-          scale_Impl<int32_t, int32_t>(minData, maxData, this, this);
-          break;
-        case 8:
-          scale_Impl<int64_t, int64_t>(minData, maxData, this, this);
-          break;
-        default:
-          break;
-      }
-    } else {
-      switch (bytesPerVoxel) {
-        case 1:
-          scale_Impl<uint8_t, uint8_t>(minData, maxData, this, this);
-          break;
-        case 2:
-          scale_Impl<uint16_t, uint16_t>(minData, maxData, this, this);
-          break;
-        case 4:
-          scale_Impl<uint32_t, uint32_t>(minData, maxData, this, this);
-          break;
-        case 8:
-          scale_Impl<uint64_t, uint64_t>(minData, maxData, this, this);
-          break;
-        default:
-          break;
-      }
-    }
+
+    imgTypeDispatcher(m_info, [=, this]<typename TVoxel>() {
+      scale_Impl<TVoxel, TVoxel>(minData, maxData, this, this);
+    });
 
     m_info.validBitCount = 0;
     return *this;
@@ -1368,7 +1306,7 @@ public:
   // for all img type, if isForeground(voxel) return true, result mask voxel = 1
   // GenericForegroundPredictor take any numeric type as parameter and return bool
   template<typename GenericForegroundPredictor>
-  ZImg binarized(const GenericForegroundPredictor& isForeground) const
+  ZImg binarized(GenericForegroundPredictor&& isForeground) const
   {
     ZImgInfo info = m_info;
     info.voxelFormat = VoxelFormat::Unsigned;
@@ -1393,8 +1331,8 @@ public:
   // if you know the img type
   // ForegroundPredictor take TVoxel as parameter and return bool
   // throw ZException if type don't match
-  template<typename TVoxel, typename ForegroundPredictor>
-  ZImg typedBinarized(const ForegroundPredictor& isForeground) const
+  template<typename TVoxel, std::invocable<TVoxel> ForegroundPredictor>
+  ZImg typedBinarized(ForegroundPredictor&& isForeground) const
   {
     if (!isType<TVoxel>()) {
       throw ZException("Call typedBinarized with wrong type"s);
@@ -1548,9 +1486,8 @@ public:
   // };
   // and it can be used like:
   // img.unaryOperation(someGenericOp());
-  // note: this will generate about 10 switch case branches in function because we need to determine current img type
   template<typename GenericCustomUnaryOp>
-  ZImg& unaryOperation(const GenericCustomUnaryOp& op)
+  ZImg& unaryOperation(GenericCustomUnaryOp&& op)
   {
     imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
       for (size_t t = 0; t < numTimes(); ++t) {
@@ -1570,8 +1507,8 @@ public:
   // op should be a unary function that accepts current voxel as argument and return the new voxel value
   // op can be either a function pointer or an instantiated function object (can have internal state)
   // **note** throw ZException if type don't match
-  template<typename TVoxel, typename CustomUnaryOp>
-  ZImg& typedUnaryOperation(const CustomUnaryOp& op)
+  template<typename TVoxel, std::invocable<TVoxel> CustomUnaryOp>
+  ZImg& typedUnaryOperation(CustomUnaryOp&& op)
   {
     if (!isType<TVoxel>()) {
       throw ZException("Call typedUnaryOperation with wrong type"s);
@@ -1600,9 +1537,8 @@ public:
   // and it can be used like:
   // img.binaryOperation(someOp());
   // make sure input img has same size as current img, otherwise ZException will be thrown
-  // note: this will generate about 100 switch case branches in function because we need to determine two img type
   template<typename GenericCustomBinaryOp>
-  ZImg& binaryOperation(const ZImg& other, const GenericCustomBinaryOp& op)
+  ZImg& binaryOperation(const ZImg& other, GenericCustomBinaryOp&& op)
   {
     if (!isSameSize(other)) {
       throw ZException(fmt::format("img binary operation requires same size img as input: this <{}>, other <{}>",
@@ -1628,8 +1564,8 @@ public:
   // you can use the typed version which generate less code:
   // img.binaryTypedOp<double, int8_t>(other, someBinaryOp);
   // **note** throw ZException if type don't match
-  template<typename TVoxel, typename TVoxelOther, typename CustomBinaryOp>
-  ZImg& typedBinaryOperation(const ZImg& other, const CustomBinaryOp& op)
+  template<typename TVoxel, typename TVoxelOther, std::invocable<TVoxel, TVoxelOther> CustomBinaryOp>
+  ZImg& typedBinaryOperation(const ZImg& other, CustomBinaryOp&& op)
   {
     if (!isType<TVoxel>() || !other.isType<TVoxelOther>()) {
       throw ZException("Call typedBinaryOperation with wrong type"s);
@@ -2167,14 +2103,14 @@ void image3DWrite(const TPixel* data, size_t width, size_t height, size_t depth,
   img.save(filename);
 }
 
-void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImg& img);
-
 template<typename TVoxel>
 void tag_invoke_img_Impl(json::value& jv, const ZImg& img);
 
-ZImg tag_invoke(const json::value_to_tag<ZImg>&, const json::value& jv);
+void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImg& img);
 
 template<typename TVoxel>
 ZImg tag_invoke_img_Impl(ZImg& img, const json::value& jv);
+
+ZImg tag_invoke(const json::value_to_tag<ZImg>&, const json::value& jv);
 
 } // namespace nim

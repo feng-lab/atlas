@@ -11,6 +11,7 @@
 #include <vector>
 #include <algorithm>
 #include <numeric>
+#include <concepts>
 
 #ifdef _MSC_VER
 #else
