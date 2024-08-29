@@ -37,114 +37,6 @@
 #include <utility>
 #include <type_traits>
 
-namespace glm {
-
-using col3 = vec<3, unsigned char, highp>;
-using col4 = vec<4, unsigned char, highp>;
-
-// apply transform matrix
-template<typename T, qualifier Q>
-vec<3, T, Q> applyMatrix(const mat<4, 4, T, Q>& m, const vec<3, T, Q>& v)
-{
-  vec<4, T, Q> res = m * vec<4, T, Q>(v, T(1));
-  return vec<3, T, Q>(res / res.w);
-}
-
-// given vec, get normalized vector e1 and e2 to make (e1,e2,vec) orthogonal to each other
-// **crash** if vec is zero
-template<typename T, qualifier Q>
-void getOrthogonalVectors(const vec<3, T, Q>& v, vec<3, T, Q>& e1, vec<3, T, Q>& e2)
-{
-  static_assert(std::numeric_limits<T>::is_iec559, "'getOrthogonalVectors' only accept floating-point inputs");
-  T eps = std::numeric_limits<T>::epsilon() * 1e2;
-
-  e1 = cross(v, vec<3, T, Q>(T(1), T(0), T(0)));
-  if (dot(e1, e1) < eps) {
-    e1 = cross(v, vec<3, T, Q>(T(0), T(1), T(0)));
-  }
-  e1 = normalize(e1);
-  e2 = normalize(cross(e1, v));
-}
-
-inline quat mix(const quat& q1, const quat& q2, double p)
-{
-  return mix(q1, q2, float(p));
-}
-
-template<std::size_t Index, auto N, typename T, auto Q>
-constexpr auto&& get(glm::vec<N, T, Q>& v) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, N>(v);
-}
-
-template<std::size_t Index, auto N, typename T, auto Q>
-constexpr auto&& get(const glm::vec<N, T, Q>& v) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, N>(v);
-}
-
-template<std::size_t Index, auto N, typename T, auto Q>
-constexpr auto&& get(glm::vec<N, T, Q>&& v) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, N>(std::move(v));
-}
-
-template<std::size_t Index, auto N, typename T, auto Q>
-constexpr auto&& get(const glm::vec<N, T, Q>&& v) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, N>(std::move(v));
-}
-
-template<std::size_t Index, typename T, auto Q>
-constexpr auto&& get(glm::tquat<T, Q>& v) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, 4>(v);
-}
-
-template<std::size_t Index, typename T, auto Q>
-constexpr auto&& get(const glm::tquat<T, Q>& v) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, 4>(v);
-}
-
-template<std::size_t Index, typename T, auto Q>
-constexpr auto&& get(glm::tquat<T, Q>&& v) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, 4>(std::move(v));
-}
-
-template<std::size_t Index, typename T, auto Q>
-constexpr auto&& get(const glm::tquat<T, Q>&& v) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, 4>(std::move(v));
-}
-
-template<std::size_t Index, auto C, auto R, typename T, auto Q>
-constexpr auto&& get(glm::mat<C, R, T, Q>& m) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, C>(m);
-}
-
-template<std::size_t Index, auto C, auto R, typename T, auto Q>
-constexpr auto&& get(const glm::mat<C, R, T, Q>& m) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, C>(m);
-}
-
-template<std::size_t Index, auto C, auto R, typename T, auto Q>
-constexpr auto&& get(glm::mat<C, R, T, Q>&& m) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, C>(std::move(m));
-}
-
-template<std::size_t Index, auto C, auto R, typename T, auto Q>
-constexpr auto&& get(const glm::mat<C, R, T, Q>&& m) noexcept
-{
-  return nim::tupleLikeGetHelper<Index, C>(std::move(m));
-}
-
-} // namespace glm
-
 namespace std {
 
 template<auto N, typename T, auto Q>
@@ -181,6 +73,87 @@ struct tuple_element<Index, glm::mat<C, R, T, Q>>
 };
 
 } // namespace std
+
+namespace glm {
+
+using col3 = vec<3, unsigned char, highp>;
+using col4 = vec<4, unsigned char, highp>;
+
+// apply transform matrix
+template<typename T, qualifier Q>
+vec<3, T, Q> applyMatrix(const mat<4, 4, T, Q>& m, const vec<3, T, Q>& v)
+{
+  vec<4, T, Q> res = m * vec<4, T, Q>(v, T(1));
+  return vec<3, T, Q>(res / res.w);
+}
+
+// given vec, get normalized vector e1 and e2 to make (e1,e2,vec) orthogonal to each other
+// **crash** if vec is zero
+template<typename T, qualifier Q>
+void getOrthogonalVectors(const vec<3, T, Q>& v, vec<3, T, Q>& e1, vec<3, T, Q>& e2)
+{
+  static_assert(std::numeric_limits<T>::is_iec559, "'getOrthogonalVectors' only accept floating-point inputs");
+  T eps = std::numeric_limits<T>::epsilon() * 1e2;
+
+  e1 = cross(v, vec<3, T, Q>(T(1), T(0), T(0)));
+  if (dot(e1, e1) < eps) {
+    e1 = cross(v, vec<3, T, Q>(T(0), T(1), T(0)));
+  }
+  e1 = normalize(e1);
+  e2 = normalize(cross(e1, v));
+}
+
+inline quat mix(const quat& q1, const quat& q2, double p)
+{
+  return mix(q1, q2, float(p));
+}
+
+template<typename T>
+struct is_vec : std::false_type
+{};
+template<length_t L, typename T, qualifier Q>
+struct is_vec<vec<L, T, Q>> : std::true_type
+{};
+
+template<std::size_t Index, typename T>
+  requires is_vec<std::remove_cvref_t<T>>::value
+constexpr decltype(auto) get(T&& v) noexcept
+{
+  static_assert(Index < std::tuple_size<std::remove_cvref_t<T>>::value, "Index out of bounds for tuple_like");
+  return std::forward_like<decltype(v)>(v[Index]);
+}
+
+template<typename T>
+struct is_quat : std::false_type
+{};
+template<typename T, qualifier Q>
+struct is_quat<tquat<T, Q>> : std::true_type
+{};
+
+template<std::size_t Index, typename T>
+  requires is_quat<std::remove_cvref_t<T>>::value
+constexpr decltype(auto) get(T&& v) noexcept
+{
+  static_assert(Index < std::tuple_size<std::remove_cvref_t<T>>::value, "Index out of bounds for tuple_like");
+  return std::forward_like<decltype(v)>(v[Index]);
+}
+
+template<typename T>
+struct is_mat : std::false_type
+{};
+template<length_t C, length_t R, typename T, qualifier Q>
+struct is_mat<mat<C, R, T, Q>> : std::true_type
+{};
+
+template<std::size_t Index, typename T>
+  requires is_mat<std::remove_cvref_t<T>>::value
+constexpr decltype(auto) get(T&& v) noexcept
+{
+  static_assert(Index < std::tuple_size<std::remove_cvref_t<T>>::value, "Index out of bounds for tuple_like");
+  return std::forward_like<decltype(v)>(v[Index]);
+}
+
+} // namespace glm
 
 namespace nim {
 

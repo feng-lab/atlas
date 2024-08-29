@@ -245,14 +245,6 @@ __forceinline Container& uniqueIf(Container& on, Pred pred)
   return on;
 }
 
-// to support std::get for local type
-template<std::size_t Index, std::size_t N, typename T>
-constexpr auto&& tupleLikeGetHelper(T&& t) noexcept
-{
-  static_assert(Index < N, "Index out of bounds for tuple_like");
-  return std::forward<T>(t)[Index];
-}
-
 template<typename T>
 struct IsStdArray : std::false_type
 {};
