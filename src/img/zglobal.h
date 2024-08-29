@@ -50,6 +50,22 @@ inline constexpr bool is_scoped_enum_v = is_scoped_enum<T>::value;
 #endif
 }
 
+// std::forward_like
+template<class A, class B>
+using _CopyConst = std::conditional_t<std::is_const_v<A>, const B, B>;
+
+template<class A, class B>
+using _OverrideRef = std::conditional_t<std::is_rvalue_reference_v<A>, std::remove_reference_t<B>&&, B&>;
+
+template<class A, class B>
+using _ForwardLike = _OverrideRef<A&&, _CopyConst<std::remove_reference_t<A>, std::remove_reference_t<B>>>;
+
+template<class T, class U>
+[[nodiscard]] constexpr auto forward_like(U&& x) noexcept -> _ForwardLike<T, U>
+{
+  return static_cast<_ForwardLike<T, U>>(x);
+}
+
 } // namespace std
 
 namespace nim {
@@ -245,7 +261,7 @@ template<typename T, std::size_t N>
 struct IsStdArray<std::array<T, N>> : std::true_type
 {};
 
-template <class T, class... U>
+template<class T, class... U>
 concept IsAnyOf = std::disjunction_v<std::is_same<T, U>...>;
 
 } // namespace nim

@@ -438,28 +438,12 @@ inline ZVoxelCoordinate min(ZVoxelCoordinate::value_type b, const ZVoxelCoordina
   return {std::min(a.x, b), std::min(a.y, b), std::min(a.z, b), std::min(a.c, b), std::min(a.t, b)};
 }
 
-template<std::size_t Index>
-constexpr auto&& get(ZVoxelCoordinate& v) noexcept
+template<std::size_t Index, typename T>
+  requires std::is_same_v<std::remove_cvref_t<T>, ZVoxelCoordinate>
+constexpr decltype(auto) get(T&& v) noexcept
 {
-  return tupleLikeGetHelper<Index, 5>(v);
-}
-
-template<std::size_t Index>
-constexpr auto&& get(const ZVoxelCoordinate& v) noexcept
-{
-  return tupleLikeGetHelper<Index, 5>(v);
-}
-
-template<std::size_t Index>
-constexpr auto&& get(ZVoxelCoordinate&& v) noexcept
-{
-  return tupleLikeGetHelper<Index, 5>(std::move(v));
-}
-
-template<std::size_t Index>
-constexpr auto&& get(const ZVoxelCoordinate&& v) noexcept
-{
-  return tupleLikeGetHelper<Index, 5>(std::move(v));
+  static_assert(Index < 5, "Index out of bounds for tuple_like");
+  return std::forward_like<decltype(v)>(v[Index]);
 }
 
 } // namespace nim

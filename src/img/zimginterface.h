@@ -284,28 +284,12 @@ enum class ImgMergeMode
   Interpolation
 };
 
-template<std::size_t Index>
-constexpr auto&& get(col4& v) noexcept
+template<std::size_t Index, typename T>
+  requires std::is_same_v<std::remove_cvref_t<T>, col4>
+constexpr decltype(auto) get(T&& v) noexcept
 {
-  return tupleLikeGetHelper<Index, 4>(v);
-}
-
-template<std::size_t Index>
-constexpr auto&& get(const col4& v) noexcept
-{
-  return tupleLikeGetHelper<Index, 4>(v);
-}
-
-template<std::size_t Index>
-constexpr auto&& get(col4&& v) noexcept
-{
-  return tupleLikeGetHelper<Index, 4>(std::move(v));
-}
-
-template<std::size_t Index>
-constexpr auto&& get(const col4&& v) noexcept
-{
-  return tupleLikeGetHelper<Index, 4>(std::move(v));
+  static_assert(Index < 4, "Index out of bounds for tuple_like");
+  return std::forward_like<decltype(v)>(v[Index]);
 }
 
 } // namespace nim

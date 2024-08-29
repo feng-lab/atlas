@@ -1830,10 +1830,10 @@ void testLogDataSupport()
   LOG(INFO) << json::value_from(t);
   LOG(INFO) << fmt::format("{}", t);
   const std::map<std::string, int> init{
-    {"this",  100},
-    {"can",   100},
-    {"be",    100},
-    {"const", 100},
+    {"this",  -50000},
+    {"can",   10034},
+    {"be",    12},
+    {"const", -100},
   };
   LOG(INFO) << json::value_from(init);
   LOG(INFO) << fmt::format("{}", init);
@@ -1844,7 +1844,7 @@ void testLogDataSupport()
   QList<QKeySequence> zoomInKey;
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
   LOG(INFO) << zoomInKey;
-  // LOG(INFO) << fmt::format("{}", zoomInKey);
+  LOG(INFO) << fmt::format("{}", qtTypeToQString(zoomInKey));
 }
 
 void createEeumIndexImages()
