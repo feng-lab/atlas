@@ -912,9 +912,7 @@ public:
       return res;
     }
 
-    if (startCoord.allGreaterEqual(0) &&
-        endCoord.allLessEqual(
-          ZVoxelCoordinate(m_info.width, m_info.height, m_info.depth, m_info.numChannels, m_info.numTimes))) {
+    if (startCoord.allGreaterEqual(0) && endCoord.allLessEqual(endCoordinate())) {
       res = crop(ZImgRegion(startCoord, endCoord));
     }
 
@@ -940,7 +938,9 @@ public:
                                    coord.z - startCoord.z,
                                    coord.c - startCoord.c,
                                    coord.t - startCoord.t)) =
-                  this->valueWithPad_Impl<TVoxel>(coord, padOption, padValue);
+                  (coord.allGreaterEqual(0) && coord.allLessThan(endCoordinate()))
+                    ? (*(data<TVoxel>(coord)))
+                    : outBoundValue<TVoxel>(coord, padOption, padValue);
               }
             }
           }
@@ -1039,8 +1039,7 @@ public:
       return *this;
     }
     size_t bytesPerVoxel = m_info.bytesPerVoxel;
-    VoxelFormat vf = m_info.voxelFormat;
-    if (vf == VoxelFormat::Float) {
+    if (VoxelFormat vf = m_info.voxelFormat; vf == VoxelFormat::Float) {
       switch (bytesPerVoxel) {
         case 4:
           scale_Impl<float, float>(minData, maxData, this, this);
@@ -1113,7 +1112,7 @@ public:
     ZImg res(info);
 
     imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
-      this->convert_Impl<TVoxel, TDesVoxel>(false, this, &res);
+      this->scale_Impl<TVoxel, TDesVoxel>(dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>(), this, &res);
     });
     return res;
   }
@@ -1127,7 +1126,11 @@ public:
     ZImg res(info);
 
     imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
-      this->convert_Impl<TVoxel, TDesVoxel>(true, this, &res);
+      TVoxel minv;
+      TVoxel maxv;
+      this->computeMinMax(minv, maxv);
+      // VLOG(1) << minv << " " << maxv;
+      this->scale_Impl<TVoxel, TDesVoxel>(minv, maxv, this, &res);
     });
     return res;
   }
@@ -1373,7 +1376,15 @@ public:
     ZImg res(info);
 
     imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
-      this->binarized_Impl<TVoxel>(res, isForeground);
+      for (size_t t = 0; t < numTimes(); ++t) {
+        const TVoxel* data = timeData<TVoxel>(t);
+        auto resData = res.timeData<uint8_t>(t);
+        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+          if (isForeground(data[v])) {
+            resData[v] = 1;
+          }
+        }
+      }
     });
 
     return res;
@@ -1394,7 +1405,15 @@ public:
     info.bytesPerVoxel = 1;
     ZImg res(info);
 
-    binarized_Impl<TVoxel>(res, isForeground);
+    for (size_t t = 0; t < numTimes(); ++t) {
+      const TVoxel* data = timeData<TVoxel>(t);
+      auto resData = res.timeData<uint8_t>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        if (isForeground(data[v])) {
+          resData[v] = 1;
+        }
+      }
+    }
     return res;
   }
 
@@ -1534,7 +1553,12 @@ public:
   ZImg& unaryOperation(const GenericCustomUnaryOp& op)
   {
     imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
-      this->unaryOp_Impl<TVoxel>(op);
+      for (size_t t = 0; t < numTimes(); ++t) {
+        TVoxel* data = timeData<TVoxel>(t);
+        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+          data[v] = op(data[v]);
+        }
+      }
     });
     return *this;
   }
@@ -1552,7 +1576,13 @@ public:
     if (!isType<TVoxel>()) {
       throw ZException("Call typedUnaryOperation with wrong type"s);
     }
-    unaryOp_Impl<TVoxel>(op);
+
+    for (size_t t = 0; t < numTimes(); ++t) {
+      TVoxel* data = timeData<TVoxel>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        data[v] = op(data[v]);
+      }
+    }
     return *this;
   }
 
@@ -1581,7 +1611,13 @@ public:
     }
     imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
       imgTypeDispatcher(other.info(), [&, this]<typename TVoxelOther>() {
-        this->binaryOp_Impl<TVoxel, TVoxelOther>(other, op);
+        for (size_t t = 0; t < numTimes(); ++t) {
+          TVoxel* data = timeData<TVoxel>(t);
+          const TVoxelOther* rhsData = other.timeData<TVoxelOther>(t);
+          for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+            data[v] = op(data[v], rhsData[v]);
+          }
+        }
       });
     });
     return *this;
@@ -1603,7 +1639,14 @@ public:
                                    m_info,
                                    other.info()));
     }
-    binaryOp_Impl<TVoxel, TVoxelOther>(other, op);
+
+    for (size_t t = 0; t < numTimes(); ++t) {
+      TVoxel* data = timeData<TVoxel>(t);
+      const TVoxelOther* rhsData = other.timeData<TVoxelOther>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        data[v] = op(data[v], rhsData[v]);
+      }
+    }
     return *this;
   }
 
@@ -1630,6 +1673,11 @@ public:
 
   // coord of one voxel pass each dimension
   [[nodiscard]] ZVoxelCoordinate endCoord() const
+  {
+    return ZVoxelCoordinate(m_info.width, m_info.height, m_info.depth, m_info.numChannels, m_info.numTimes);
+  }
+
+  [[nodiscard]] ZVoxelCoordinate endCoordinate() const
   {
     return ZVoxelCoordinate(m_info.width, m_info.height, m_info.depth, m_info.numChannels, m_info.numTimes);
   }
@@ -1750,7 +1798,9 @@ public:
       return 0;
     }
     return imgTypeDispatcher(m_info, [=, this]<typename TVoxel>() {
-      return static_cast<TValue>(this->valueWithPad_Impl<TVoxel>(coord, padOption, padValue));
+      return static_cast<TValue>((coord.allGreaterEqual(0) && coord.allLessThan(endCoordinate()))
+                                   ? (*(data<TVoxel>(coord)))
+                                   : outBoundValue<TVoxel>(coord, padOption, padValue));
     });
   }
 
@@ -1890,21 +1940,6 @@ protected:
 
 private:
   template<typename TVoxel, typename TDesVoxel>
-  static void convert_Impl(bool normalize, const ZImg* src, ZImg* des)
-  {
-    TVoxel minv;
-    TVoxel maxv;
-    if (normalize) {
-      src->computeMinMax(minv, maxv);
-    } else {
-      minv = src->dataRangeMin<TVoxel>();
-      maxv = src->dataRangeMax<TVoxel>();
-    }
-    // VLOG(1) << minv << " " << maxv;
-    scale_Impl<TVoxel, TDesVoxel>(minv, maxv, src, des);
-  }
-
-  template<typename TVoxel, typename TDesVoxel>
   static void scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des)
   {
     CHECK(src->isType<TVoxel>());
@@ -1994,9 +2029,6 @@ private:
     }
   }
 
-  template<typename TVoxel, typename TDesVoxel>
-  void cast_Impl(ZImg& res) const;
-
   template<typename TVoxel>
   void
   blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode) const;
@@ -2006,29 +2038,6 @@ private:
 
   template<typename TVoxel, typename TMaskVoxel>
   void histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const;
-
-  template<typename TVoxel, typename GenericCustomUnaryOp>
-  void unaryOp_Impl(const GenericCustomUnaryOp& op)
-  {
-    for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
-      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-        data[v] = op(data[v]);
-      }
-    }
-  }
-
-  template<typename TVoxel, typename TVoxelOther, typename GenericCustomBinaryOp>
-  void binaryOp_Impl(const ZImg& other, const GenericCustomBinaryOp& op)
-  {
-    for (size_t t = 0; t < numTimes(); ++t) {
-      TVoxel* data = timeData<TVoxel>(t);
-      const TVoxelOther* rhsData = other.timeData<TVoxelOther>(t);
-      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-        data[v] = op(data[v], rhsData[v]);
-      }
-    }
-  }
 
   template<typename TVoxel>
   void blockSum_Impl(ZImg& res, size_t twidth, size_t theight, size_t tdepth) const;
@@ -2127,28 +2136,6 @@ private:
       }
     }
     max = static_cast<TValue>(maxValue);
-  }
-
-  template<typename TVoxel>
-  TVoxel valueWithPad_Impl(const ZVoxelCoordinate& coord, PadOption padOption, TVoxel padValue) const
-  {
-    return (coord.allGreaterEqual(0) && coord.allLessThan(endCoord()))
-             ? (*(data<TVoxel>(coord)))
-             : outBoundValue<TVoxel>(coord, padOption, padValue);
-  }
-
-  template<typename TVoxel, typename GenericForegroundPredictor>
-  void binarized_Impl(ZImg& res, const GenericForegroundPredictor& isForeground) const
-  {
-    for (size_t t = 0; t < numTimes(); ++t) {
-      const TVoxel* data = timeData<TVoxel>(t);
-      auto resData = res.timeData<uint8_t>(t);
-      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-        if (isForeground(data[v])) {
-          resData[v] = 1;
-        }
-      }
-    }
   }
 
 private:

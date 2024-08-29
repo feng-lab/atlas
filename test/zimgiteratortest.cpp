@@ -199,9 +199,9 @@ TEST(ImgIterator, neighborhoodWithPtr)
     }
     ZVoxelCoordinate coord = it.coord();
     ZVoxelCoordinate nb1 = it.coord(2);
-    ASSERT_EQ(ZVoxelCoordinate(0, 0, 1), coord - nb1) << fmt::format("{} {}", coord, nb1);
+    ASSERT_EQ(ZVoxelCoordinate(0, 0, 1), coord - nb1) << coord <<  nb1;
     ASSERT_EQ(10000_u32, *it - it.valueRef(2))
-      << *it << " " << it.valueRef(2) << fmt::format("{} {}", coord, nb1) << (&(*it) - it.valuePtr(2));
+      << *it << " " << it.valueRef(2) << coord << nb1 << (&(*it) - it.valuePtr(2));
     if (coord.z == 19) {
       for (size_t i = 0; i < it.numNeighbors(); ++i) {
         if (i < 13) {
@@ -273,7 +273,7 @@ TEST(ImgIterator, neighborhoodWithCoord)
     }
     ZVoxelCoordinate coord = it.coord();
     ZVoxelCoordinate nb1 = it.coord(2);
-    ASSERT_EQ(ZVoxelCoordinate(0, 0, 1), coord - nb1) << fmt::format("{} {}", coord, nb1);
+    ASSERT_EQ(ZVoxelCoordinate(0, 0, 1), coord - nb1) << coord << nb1;
     ASSERT_EQ(10000_u32, *it - it.valueRef(2));
     if (coord.z == 19) {
       for (size_t i = 0; i < it.numNeighbors(); ++i) {

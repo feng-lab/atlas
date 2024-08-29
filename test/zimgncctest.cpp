@@ -122,7 +122,7 @@ TEST(ZImgNCC, normXCorrPart)
               coord + ZVoxelCoordinate(xStart, yStart, zStart) - ZVoxelCoordinate::lastCoordinate(movingImg.info());
             ;
             double ncc = getNCCOfOffset(fixedImg, movingImg, offset);
-            EXPECT_NEAR(ncc, *nccImg.data<double>(coord), 1e-8) << fmt::format("{} {}", offset, coord);
+            EXPECT_NEAR(ncc, *nccImg.data<double>(coord), 1e-8) << offset << coord;
           }
         }
       }

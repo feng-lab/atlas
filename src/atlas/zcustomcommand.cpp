@@ -1316,7 +1316,7 @@ void channelCalibration()
     ZImg moving = img.extractChannel(1);
     moving.save(fileInfo.absoluteFilePath() + "_ch1.tif");
     ZImgNCCMatch mat(fixed, moving);
-    LOG(INFO) << fmt::format("{}", mat.computeMovingImgOffset());
+    LOG(INFO) << mat.computeMovingImgOffset();
   }
 }
 

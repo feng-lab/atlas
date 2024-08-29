@@ -478,3 +478,12 @@ struct tuple_element<Index, nim::ZVoxelCoordinate>
 };
 
 } // namespace std
+
+namespace nim {
+
+inline std::ostream& operator<<(std::ostream& s, const ZVoxelCoordinate& v)
+{
+  return (s << fmt::format("{}", v));
+}
+
+} // namespace nim

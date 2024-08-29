@@ -1599,7 +1599,13 @@ ZImg ZImg::castTo() const
   ZImg res(info);
 
   imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
-    this->cast_Impl<TVoxel, TDesVoxel>(res);
+    for (size_t t = 0; t < numTimes(); ++t) {
+      auto srcData = timeData<TVoxel>(t);
+      auto desData = res.timeData<TDesVoxel>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        desData[v] = static_cast<TDesVoxel>(srcData[v]);
+      }
+    }
   });
 
   return res;
@@ -1644,7 +1650,13 @@ template ZImg ZImg::castTo<double>() const;
 
   imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
     imgTypeDispatcher(info, [&, this]<typename TDesVoxel>() {
-      this->cast_Impl<TVoxel, TDesVoxel>(res);
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto srcData = timeData<TVoxel>(t);
+        auto desData = res.timeData<TDesVoxel>(t);
+        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+          desData[v] = static_cast<TDesVoxel>(srcData[v]);
+        }
+      }
     });
   });
 
@@ -2395,18 +2407,6 @@ void ZImg::checkConnInput(size_t& conn) const
   }
 }
 
-template<typename TVoxel, typename TDesVoxel>
-void ZImg::cast_Impl(ZImg& res) const
-{
-  for (size_t t = 0; t < numTimes(); ++t) {
-    auto srcData = timeData<TVoxel>(t);
-    auto desData = res.timeData<TDesVoxel>(t);
-    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      desData[v] = static_cast<TDesVoxel>(srcData[v]);
-    }
-  }
-}
-
 template<typename TVoxel>
 void ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode)
   const
@@ -2618,17 +2618,6 @@ void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxDa
     }
   }
 }
-
-// template void ZImg::histogram_Impl<uint8_t>(std::vector<size_t>&, uint8_t, uint8_t) const;
-// template void ZImg::histogram_Impl<uint16_t>(std::vector<size_t>&, uint16_t, uint16_t) const;
-// template void ZImg::histogram_Impl<uint32_t>(std::vector<size_t>&, uint32_t, uint32_t) const;
-// template void ZImg::histogram_Impl<uint64_t>(std::vector<size_t>&, uint64_t, uint64_t) const;
-// template void ZImg::histogram_Impl<int8_t>(std::vector<size_t>&, int8_t, int8_t) const;
-// template void ZImg::histogram_Impl<int16_t>(std::vector<size_t>&, int16_t, int16_t) const;
-// template void ZImg::histogram_Impl<int32_t>(std::vector<size_t>&, int32_t, int32_t) const;
-// template void ZImg::histogram_Impl<int64_t>(std::vector<size_t>&, int64_t, int64_t) const;
-// template void ZImg::histogram_Impl<float>(std::vector<size_t>&, float, float) const;
-// template void ZImg::histogram_Impl<double>(std::vector<size_t>&, double, double) const;
 
 template<typename TVoxel, typename TMaskVoxel>
 void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const
