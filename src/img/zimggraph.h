@@ -37,11 +37,11 @@ public:
     }
 
     if (m_region.containsWholePlane(m_img.info())) {
-      type_dispatcher(m_img.info(), [&, this]<typename TVoxel>() {
+      imgTypeDispatcher(m_img.info(), [&, this]<typename TVoxel>() {
         this->addEdges_Opt<TVoxel>(edgeWeightFunc);
       });
     } else {
-      type_dispatcher(m_img.info(), [&, this]<typename TVoxel>() {
+      imgTypeDispatcher(m_img.info(), [&, this]<typename TVoxel>() {
         this->addEdges<TVoxel>(edgeWeightFunc);
       });
     }

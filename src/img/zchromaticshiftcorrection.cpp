@@ -54,16 +54,16 @@ void ZChromaticShiftCorrection::doWork()
     LOG(INFO) << "Optimizer: " << m_optimizer;
   }
 
-  type_dispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
+  imgTypeDispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
     this->calcChannelInfs<TVoxel>(srcImg);
   });
   reportProgress(0.5);
   if (m_method == "Registration") {
-    type_dispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
+    imgTypeDispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
       this->alignChannel<TVoxel>(srcImg, m_referenceChannel, m_targetChannel);
     });
   } else {
-    type_dispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
+    imgTypeDispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
       this->alignChannelWithPresetTransform<TVoxel>(srcImg, m_targetChannel, m_method);
     });
   }

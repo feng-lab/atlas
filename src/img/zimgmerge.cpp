@@ -469,7 +469,7 @@ ZImg ZImgMerge::wholeImg() const
 
   if (m_mergeMode != ImgMergeMode::First && m_mergeMode != ImgMergeMode::Max) {
     // now merge overlap region
-    type_dispatcher(res.info(), [&, this]<typename TVoxel>() {
+    imgTypeDispatcher(res.info(), [&, this]<typename TVoxel>() {
       merge_Impl<TVoxel>(m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
     });
   }
@@ -682,7 +682,7 @@ void ZImgMerge::mergeImgs(ZImg& res,
 
   if (mode != ImgMergeMode::First && mode != ImgMergeMode::Max) {
     // now merge overlap region
-    type_dispatcher(res.info(), [&]<typename TVoxel>() {
+    imgTypeDispatcher(res.info(), [&]<typename TVoxel>() {
       merge_Impl<TVoxel>(overlapRegion, minCoord, mode, res, tiles);
     });
   }

@@ -714,7 +714,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
 
 void ZImgNCCMatch::removeBackground(ZImg& img)
 {
-  type_dispatcher(img.info(), [&]<typename TVoxel>() {
+  imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
     removeBG<TVoxel>(img);
   });
 }

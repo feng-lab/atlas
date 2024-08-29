@@ -45,7 +45,7 @@ void ZSectionsRegistration::doWork()
     if (srcImg.numChannels() == 1) {
       m_referenceChannel = 0;
     } else {
-      type_dispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
+      imgTypeDispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
         this->calcRefCh<TVoxel>(srcImg);
       });
     }
@@ -65,7 +65,7 @@ void ZSectionsRegistration::doWork()
   LOG(INFO) << "Transform: " << m_transform;
   LOG(INFO) << "Optimizer: " << m_optimizer;
 
-  type_dispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
+  imgTypeDispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
     this->calcSecInfs<TVoxel>(srcImg);
   });
 
@@ -80,7 +80,7 @@ void ZSectionsRegistration::doWork()
       }
       double cost;
       ZImageTransform* tfm = nullptr;
-      type_dispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
+      imgTypeDispatcher(srcImg.info(), [&, this]<typename TVoxel>() {
         this->alignSection<TVoxel>(srcImg, i, j, cost, tfm);
       });
       idxPairs[std::make_pair(i, j)] = std::make_pair(std::unique_ptr<ZImageTransform>(tfm), cost);

@@ -153,7 +153,7 @@ double getNCCOfOffset(const ZImg& fixedImgIn, const ZImg& movingImgIn, const ZVo
       movingImg = movingImg.castTo<double>();
     }
   }
-  return type_dispatcher(fixedImg.info(), [&]<typename TVoxel>() {
+  return imgTypeDispatcher(fixedImg.info(), [&]<typename TVoxel>() {
     return getNCCOfOffset_Impl<TVoxel>(fixedImg, movingImg);
   });
 }
@@ -529,8 +529,8 @@ ZImg xCorrPart(const ZImg& fixedImg,
   info.bytesPerVoxel = 8;
   ZImg res(info);
 
-  type_dispatcher(fixedImg.info(), [&]<typename TVoxel1>() {
-    type_dispatcher(movingImg.info(), [&]<typename TVoxel2>() {
+  imgTypeDispatcher(fixedImg.info(), [&]<typename TVoxel1>() {
+    imgTypeDispatcher(movingImg.info(), [&]<typename TVoxel2>() {
       xCorrPart_Impl<TVoxel1, TVoxel2>(fixedImg, movingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd, res);
     });
   });
