@@ -87,8 +87,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
     rgn.start.c = 0;
     rgn.end.c = -1;
     ZImg tmpImg = readRawImg(filename, tmpInfo, "XYZCT", dataOffset, rgn, timeStride);
-    if (region.start.c == 0 &&
-        (region.end.c == -1 || size_t(region.end.c) == imgInfo.numChannels)) { // read all channel
+    if (region.start.c == 0 && (region.end.c == -1 || region.end.c == imgInfo.sNumChannels())) { // read all channel
       tmpImg.infoRef() = res.info();
       CXYZtoXYZC(tmpImg, res);
     } else {

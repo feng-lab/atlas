@@ -219,7 +219,7 @@ TEST(Img, fill)
   for (;!lit.isAtEnd(); ++lit) {
     ASSERT_EQ(3, *lit);
   }
-  ASSERT_EQ(img.voxelNumber(), static_cast<size_t>(lit - ZImgRegionIterator<uint8_t>(img)));
+  ASSERT_EQ(img.sVoxelNumber(), lit - ZImgRegionIterator<uint8_t>(img));
 
   info.bytesPerVoxel = 4;
   img = ZImg(info);

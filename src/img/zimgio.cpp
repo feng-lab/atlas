@@ -460,7 +460,7 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
       auto [lt, lx, ly, lwidth, lheight, lz, ldepth] = lastTile;
       if (lt == t && lx == x && ly == y && lwidth == width && lheight == height) {
         auto& rgn = res[i].back();
-        if (z != size_t(rgn.end.z)) {
+        if (z != static_cast<size_t>(rgn.end.z)) {
           throw ZException("z jumping");
         } else {
           rgn.end.z += depth;
@@ -670,10 +670,10 @@ void ZImgIO::readImg(const QStringList& fileList,
   for (size_t i = 0; i < imgs.size(); ++i) {
     readImg(imgSources[i], imgs[i]);
     if (expandXY && (imgs[i].width() < info.width || imgs[i].height() < info.height)) {
-      auto widthPadBefore = index_t(info.width - imgs[i].width()) / 2;
-      auto widthPadAfter = index_t(info.width - imgs[i].width()) - widthPadBefore;
-      auto heightPadBefore = index_t(info.height - imgs[i].height()) / 2;
-      auto heightPadAfter = index_t(info.height - imgs[i].height()) - heightPadBefore;
+      auto widthPadBefore = (info.sWidth() - imgs[i].sWidth()) / 2;
+      auto widthPadAfter = (info.sWidth() - imgs[i].sWidth()) - widthPadBefore;
+      auto heightPadBefore = (info.sHeight() - imgs[i].sHeight()) / 2;
+      auto heightPadAfter = (info.sHeight() - imgs[i].sHeight()) - heightPadBefore;
       if (info.voxelFormat == VoxelFormat::Float) {
         double min;
         double max;
@@ -796,8 +796,8 @@ void ZImgIO::readImg(const QStringList& fileList,
     }
 
     if (expandXY && (sliceInfo.width < info.width || sliceInfo.height < info.height)) {
-      auto widthPadBefore = index_t(info.width - sliceInfo.width) / 2;
-      auto heightPadBefore = index_t(info.height - sliceInfo.height) / 2;
+      auto widthPadBefore = (info.sWidth() - sliceInfo.sWidth()) / 2;
+      auto heightPadBefore = (info.sHeight() - sliceInfo.sHeight()) / 2;
       ZImgRegion sliceRegionFullXY = sliceRegion;
       sliceRegionFullXY.start.x = 0;
       sliceRegionFullXY.end.x = -1;

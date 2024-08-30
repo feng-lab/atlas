@@ -246,7 +246,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       } else {
         throw ZException("image and metadata do not match, please send this file to flq@live.com");
       }
-    } else if (size_t(ii.imageMemory.fileNames.size()) == info.numTimes) {
+    } else if (ii.imageMemory.fileNames.size() == info.sNumTimes()) {
       std::vector<ZImgInfo> fileInfos;
       imgIO.readInfos(ii.imageMemory.fileNames, Dimension::T, false, fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
@@ -255,7 +255,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       } else {
         throw ZException("image and metadata do not match, please send this file to flq@live.com");
       }
-    } else if (size_t(ii.imageMemory.fileNames.size()) == info.depth) {
+    } else if (ii.imageMemory.fileNames.size() == info.sDepth()) {
       std::vector<ZImgInfo> fileInfos;
       imgIO.readInfos(ii.imageMemory.fileNames, Dimension::Z, false, fileInfos);
       if (!fileInfos.empty() && fileInfos[0].isSameType(info) && fileInfos[0].isSameSize(info)) {
@@ -355,7 +355,9 @@ void ZImgLeica::readXml(const QString& filename,
       if (memorySizeBlock.test != 0x2A) {
         throw ZException("incorrect lecia LOF memory size", ZException::Option::CheckErrno);
       }
-      memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()), QString(""), size_t(memorySizeBlock.Number));
+      memoryOffsetNameLength.emplace_back(static_cast<size_t>(inputFileStream.tellg()),
+                                          QString(""),
+                                          static_cast<size_t>(memorySizeBlock.Number));
       inputFileStream.seekg(memorySizeBlock.Number, std::ios_base::cur);
 
       readStructFromFileStream(nb, inputFileStream);
@@ -386,7 +388,9 @@ void ZImgLeica::readXml(const QString& filename,
           charBuf.resize(md.textLength);
           readStream(inputFileStream, charBuf.data(), md.textLength * 2);
           QString imageDescription(charBuf.data(), charBuf.size());
-          memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()), imageDescription, size_t(md.memorySize));
+          memoryOffsetNameLength.emplace_back(static_cast<size_t>(inputFileStream.tellg()),
+                                              imageDescription,
+                                              static_cast<size_t>(md.memorySize));
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else if (majorVersion == 2) {
@@ -398,7 +402,9 @@ void ZImgLeica::readXml(const QString& filename,
           charBuf.resize(md.textLength);
           readStream(inputFileStream, charBuf.data(), md.textLength * 2);
           QString imageDescription(charBuf.data(), charBuf.size());
-          memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()), imageDescription, size_t(md.memorySize));
+          memoryOffsetNameLength.emplace_back(static_cast<size_t>(inputFileStream.tellg()),
+                                              imageDescription,
+                                              static_cast<size_t>(md.memorySize));
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else {

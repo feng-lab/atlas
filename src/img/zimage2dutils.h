@@ -266,7 +266,7 @@ void image2DPad(const TPixel* img,
       index_t refX = width;
       for (size_t i = leftPad; i-- > 0;) {
         --refX;
-        refX = refX < 0 ? index_t(width) - 1 : refX;
+        refX = refX < 0 ? static_cast<index_t>(width) - 1 : refX;
         for (size_t j = 0; j < height; ++j) {
           imgOut[(j + upPad) * desWidth + i] = img[j * width + refX];
         }
@@ -284,7 +284,7 @@ void image2DPad(const TPixel* img,
       index_t refY = height;
       for (size_t j = upPad; j-- > 0;) {
         --refY;
-        refY = refY < 0 ? index_t(height) - 1 : refY;
+        refY = refY < 0 ? static_cast<index_t>(height) - 1 : refY;
         std::memcpy(imgOut + j * desWidth, imgOut + (refY + upPad) * desWidth, sizeof(TPixel) * desWidth);
       }
       // down

@@ -27,8 +27,7 @@ QString ZImgView::infoOfPos(double x, double y)
       QPointF p = idFilter.second->mapFromScene(QPointF(x, y));
       index_t lx = p.x();
       index_t ly = p.y();
-      if (lx >= 0 && static_cast<size_t>(lx) < imgPack.imgInfo().width && ly >= 0 &&
-          static_cast<size_t>(ly) < imgPack.imgInfo().height) {
+      if (lx >= 0 && lx < imgPack.imgInfo().sWidth() && ly >= 0 && ly < imgPack.imgInfo().sHeight()) {
         auto lz = m_view.isMaxZProjView() ? 0 : viewControl->imgSlice();
         auto lt = viewControl->imgTime();
         info += imgPack.sizeInfo();

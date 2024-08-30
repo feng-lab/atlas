@@ -307,28 +307,28 @@ ZSwc::ConstSwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x,
                                                                    bool& isAmbiguous)
 {
   // first crop out the region
-  auto left = roundTo<int>(x);
-  auto right = roundTo<int>(x);
-  auto up = roundTo<int>(y);
-  auto down = roundTo<int>(y);
-  auto zup = roundTo<int>(z);
-  auto zdown = roundTo<int>(z);
+  auto left = roundTo<index_t>(x);
+  auto right = roundTo<index_t>(x);
+  auto up = roundTo<index_t>(y);
+  auto down = roundTo<index_t>(y);
+  auto zup = roundTo<index_t>(z);
+  auto zdown = roundTo<index_t>(z);
   for (auto node : nodes) {
     auto parent = ZSwc::parent(node);
-    left = std::min(std::min(left, roundTo<int>(node->x)), roundTo<int>(parent->x));
-    right = std::max(std::max(right, roundTo<int>(node->x)), roundTo<int>(parent->x));
-    up = std::min(std::min(up, roundTo<int>(node->y)), roundTo<int>(parent->y));
-    down = std::max(std::max(down, roundTo<int>(node->y)), roundTo<int>(parent->y));
-    zup = std::min(std::min(zup, roundTo<int>(node->z)), roundTo<int>(parent->z));
-    zdown = std::max(std::max(zdown, roundTo<int>(node->z)), roundTo<int>(parent->z));
+    left = std::min(std::min(left, roundTo<index_t>(node->x)), roundTo<index_t>(parent->x));
+    right = std::max(std::max(right, roundTo<index_t>(node->x)), roundTo<index_t>(parent->x));
+    up = std::min(std::min(up, roundTo<index_t>(node->y)), roundTo<index_t>(parent->y));
+    down = std::max(std::max(down, roundTo<index_t>(node->y)), roundTo<index_t>(parent->y));
+    zup = std::min(std::min(zup, roundTo<index_t>(node->z)), roundTo<index_t>(parent->z));
+    zdown = std::max(std::max(zdown, roundTo<index_t>(node->z)), roundTo<index_t>(parent->z));
   }
 
-  left = std::max(0, left);
-  right = std::min(right, static_cast<int>(m_imgInfo.width) - 1);
-  up = std::max(0, up);
-  down = std::min(down, static_cast<int>(m_imgInfo.height) - 1);
-  zup = std::max(0, zup);
-  zdown = std::min(zdown, static_cast<int>(m_imgInfo.depth) - 1);
+  left = std::max(0_z, left);
+  right = std::min(right, m_imgInfo.sWidth() - 1);
+  up = std::max(0_z, up);
+  down = std::min(down, m_imgInfo.sHeight() - 1);
+  zup = std::max(0_z, zup);
+  zdown = std::min(zdown, m_imgInfo.sDepth() - 1);
   ZImgRegion rgn(left, right + 1, up, down + 1, zup, zdown + 1, m_dendriteChannel, m_dendriteChannel + 1, m_t, m_t + 1);
   ZImg img;
   if (m_img) {
@@ -353,7 +353,7 @@ ZSwc::ConstSwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x,
   scale /= 9.2;
   imgGraph.build(ZImgGraph::EdgeWeight2(thre1, scale));
 
-  ZVoxelCoordinate startCoord(roundTo<int>(x) - left, roundTo<int>(y) - up, roundTo<int>(z) - zup);
+  ZVoxelCoordinate startCoord(roundTo<index_t>(x) - left, roundTo<index_t>(y) - up, roundTo<index_t>(z) - zup);
   std::vector<double> dist = imgGraph.shortestPaths(startCoord);
 
   std::vector<double> nodeMinDists(nodes.size(), std::numeric_limits<double>::max());

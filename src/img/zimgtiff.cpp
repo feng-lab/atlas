@@ -129,7 +129,7 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
       if (!mapIFDToImgLocation(ifdIdx, z, c, t, l)) {
         break;
       }
-      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == size_t(l))) {
+      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == static_cast<size_t>(l))) {
         tiff.readImgFromIFD(i, buf2DImg);
         // VLOG(1) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
         cpyImg(buf2DImg, region, imgTmp, z - region.start.z, c, t - region.start.t);
@@ -322,7 +322,7 @@ void ZImgTiff::readMetadataInternal(ZImgMetadata& meta, size_t scene, ZTiff& tif
       if (!mapIFDToImgLocation(ifdIdx, z, c, t, l)) {
         break;
       }
-      if (size_t(l) != scene) {
+      if (static_cast<size_t>(l) != scene) {
         continue;
       }
       std::vector<ZImgMetatag> tags = ifd.extractMetadata();
@@ -357,7 +357,7 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
       if (!mapIFDToImgLocation(ifdIdx, z, c, t, l)) {
         break;
       }
-      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == size_t(l))) {
+      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == static_cast<size_t>(l))) {
         const std::vector<ZTiffIFD>& subifds = ifd.subIFDs();
         for (const auto& subifd : subifds) {
           ZImg thumb = tiff.readThumbnailFromIFD(subifd);
@@ -371,7 +371,7 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
       if (!mapIFDToImgLocation(ifdIdx - 1, z, c, t, l)) {
         break;
       }
-      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == size_t(l))) {
+      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == static_cast<size_t>(l))) {
         ZImg thumb = tiff.readThumbnailFromIFD(ifd);
         if (!thumb.isEmpty()) {
           thumbnail.attachToPlane(thumb, z - region.start.z, t - region.start.t);

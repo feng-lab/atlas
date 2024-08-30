@@ -486,7 +486,7 @@ void ZStitchImage::doWork()
       throw ZException("Need at least two images to do stitching.");
     }
   } else {
-    if (nStacks == size_t(m_inputFilenames.size())) {
+    if (nStacks == static_cast<size_t>(m_inputFilenames.size())) {
       // perfect
       for (const auto& filename : m_inputFilenames) {
         inputStackSources.emplace_back(filename, ZImgRegion(), m_scene);

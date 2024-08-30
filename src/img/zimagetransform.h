@@ -194,13 +194,13 @@ void ZImageTransform::transformImage(const TPixel* Iin,
                                      index_t zend) const
 {
   if (xend < xstart) {
-    xend = xstart + index_t(width);
+    xend = xstart + static_cast<index_t>(width);
   }
   if (yend < ystart) {
-    yend = ystart + index_t(height);
+    yend = ystart + static_cast<index_t>(height);
   }
   if (zend < zstart) {
-    zend = zstart + index_t(depth);
+    zend = zstart + static_cast<index_t>(depth);
   }
 
   AffineTransform3DForOneBlock<TPixel, TPixelOut>
@@ -276,10 +276,10 @@ void ZImageTransform::transformImage(const TPixel* Iin,
 {
   CHECK(is2DTransform());
   if (xend < xstart) {
-    xend = xstart + index_t(width);
+    xend = xstart + static_cast<index_t>(width);
   }
   if (yend < ystart) {
-    yend = ystart + index_t(height);
+    yend = ystart + static_cast<index_t>(height);
   }
 
   AffineTransform2DForOneBlock<TPixel, TPixelOut>

@@ -473,9 +473,19 @@ public:
     return m_info.size(dim);
   }
 
+  [[nodiscard]] index_t ssize(Dimension dim) const
+  {
+    return m_info.ssize(dim);
+  }
+
   [[nodiscard]] size_t size(size_t dim) const
   {
     return m_info.size(dim);
+  }
+
+  [[nodiscard]] index_t ssize(size_t dim) const
+  {
+    return m_info.ssize(dim);
   }
 
   // inline bool isMultiLocationsImg() const { return m_info.numLocations > 1; }
@@ -506,6 +516,11 @@ public:
     return m_info.voxelByteNumber();
   }
 
+  [[nodiscard]] index_t sVoxelByteNumber() const
+  {
+    return m_info.sVoxelByteNumber();
+  }
+
   [[nodiscard]] size_t rowVoxelNumber() const
   {
     return m_info.rowVoxelNumber();
@@ -519,6 +534,11 @@ public:
   [[nodiscard]] size_t rowByteNumber() const
   {
     return m_info.rowByteNumber();
+  }
+
+  [[nodiscard]] index_t sRowByteNumber() const
+  {
+    return m_info.sRowByteNumber();
   }
 
   [[nodiscard]] size_t planeVoxelNumber() const
@@ -536,6 +556,11 @@ public:
     return m_info.planeByteNumber();
   }
 
+  [[nodiscard]] index_t sPlaneByteNumber() const
+  {
+    return m_info.sPlaneByteNumber();
+  }
+
   [[nodiscard]] size_t channelVoxelNumber() const
   {
     return m_info.channelVoxelNumber();
@@ -549,6 +574,11 @@ public:
   [[nodiscard]] size_t channelByteNumber() const
   {
     return m_info.channelByteNumber();
+  }
+
+  [[nodiscard]] index_t sChannelByteNumber() const
+  {
+    return m_info.sChannelByteNumber();
   }
 
   [[nodiscard]] size_t timeVoxelNumber() const
@@ -566,6 +596,11 @@ public:
     return m_info.timeByteNumber();
   }
 
+  [[nodiscard]] index_t sTimeByteNumber() const
+  {
+    return m_info.sTimeByteNumber();
+  }
+
   // inline size_t locationVoxelNumber() const { return m_info.locationVoxelNumber(); }
   // inline size_t locationByteNumber() const { return m_info.locationByteNumber(); }
   [[nodiscard]] size_t voxelNumber() const
@@ -573,9 +608,19 @@ public:
     return m_info.voxelNumber();
   }
 
+  [[nodiscard]] index_t sVoxelNumber() const
+  {
+    return m_info.sVoxelNumber();
+  }
+
   [[nodiscard]] size_t byteNumber() const
   {
     return m_info.byteNumber();
+  }
+
+  [[nodiscard]] index_t sByteNumber() const
+  {
+    return m_info.sByteNumber();
   }
 
   [[nodiscard]] size_t width() const

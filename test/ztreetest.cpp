@@ -550,51 +550,51 @@ TEST(SWC, DepthFirstIterator)
     for (auto it = smallSwc.cbegin(); it != smallSwc.cend(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[sidx++]);
     }
-    ASSERT_EQ(sidx, std::extent<decltype(smallSwcRes)>::value);
+    ASSERT_EQ(sidx, std::size(smallSwcRes));
     sidx = 0;
     for (auto node : smallSwc) {
       ASSERT_EQ(node.id, smallSwcRes[sidx++]);
     }
-    ASSERT_EQ(sidx, std::extent<decltype(smallSwcRes)>::value);
+    ASSERT_EQ(sidx, std::size(smallSwcRes));
     sidx = 0;
     for (auto& node : smallSwc) {
       ASSERT_EQ(node.id, smallSwcRes[sidx++]);
     }
-    ASSERT_EQ(sidx, std::extent<decltype(smallSwcRes)>::value);
+    ASSERT_EQ(sidx, std::size(smallSwcRes));
     sidx = 0;
     for (const auto& node : smallSwc) {
       ASSERT_EQ(node.id, smallSwcRes[sidx++]);
     }
 
-    ASSERT_EQ(sidx, std::extent<decltype(smallSwcRes)>::value);
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    ASSERT_EQ(sidx, std::size(smallSwcRes));
+    sidx = std::size(smallSwcRes);
     for (auto it = smallSwc.crbegin(); it != smallSwc.crend(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto node : makeReverse(smallSwc)) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto& node : makeReverse(smallSwc)) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (const auto& node : makeReverse(smallSwc)) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
 
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto& node : smallSwc.rPreOrderRange()) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
 
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto& node : smallSwc.crPreOrderRange()) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
@@ -667,68 +667,68 @@ TEST(SWC, DepthFirstIterator)
     for (auto it = swc.cbegin(); it != swc.cend(); ++it) {
       ASSERT_EQ(it->id, dfres[idx++]);
     }
-    ASSERT_EQ(idx, std::extent<decltype(dfres)>::value);
+    ASSERT_EQ(idx, std::size(dfres));
     idx = 0;
     for (auto node : swc) {
       ASSERT_EQ(node.id, dfres[idx++]);
     }
-    ASSERT_EQ(idx, std::extent<decltype(dfres)>::value);
+    ASSERT_EQ(idx, std::size(dfres));
     idx = 0;
     for (auto& node : swc) {
       ASSERT_EQ(node.id, dfres[idx++]);
     }
-    ASSERT_EQ(idx, std::extent<decltype(dfres)>::value);
+    ASSERT_EQ(idx, std::size(dfres));
     idx = 0;
     for (const auto& node : swc) {
       ASSERT_EQ(node.id, dfres[idx++]);
     }
-    ASSERT_EQ(idx, std::extent<decltype(dfres)>::value);
+    ASSERT_EQ(idx, std::size(dfres));
 
     idx = 0;
     for (auto& node : swc.preOrderRange()) {
       ASSERT_EQ(node.id, dfres[idx++]);
     }
-    ASSERT_EQ(idx, std::extent<decltype(dfres)>::value);
+    ASSERT_EQ(idx, std::size(dfres));
 
     idx = 0;
     for (auto& node : swc.cPreOrderRange()) {
       ASSERT_EQ(node.id, dfres[idx++]);
     }
-    ASSERT_EQ(idx, std::extent<decltype(dfres)>::value);
+    ASSERT_EQ(idx, std::size(dfres));
 
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto it = --swc.cend(); it != swc.cbegin(); --it) {
       ASSERT_EQ(it->id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 1_uz);
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto it = swc.crbegin(); it != swc.crend(); ++it) {
       ASSERT_EQ(it->id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto node : makeReverse(swc)) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto& node : makeReverse(swc)) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (const auto& node : makeReverse(swc)) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);
 
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto& node : swc.rPreOrderRange()) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
 
     ASSERT_EQ(idx, 0_uz);
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto& node : swc.crPreOrderRange()) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
@@ -738,11 +738,11 @@ TEST(SWC, DepthFirstIterator)
     for (auto it = swc.cbegin(swc.cbegin()); it != swc.cend(swc.cbegin()); ++it) {
       ASSERT_EQ(it->id, dfres[idx++]);
     }
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto it = --swc.cend(swc.cbegin()); it != swc.cbegin(swc.cbegin()); --it) {
       ASSERT_EQ(it->id, dfres[--idx]);
     }
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto it = swc.crbegin(swc.cbegin()); it != swc.crend(swc.cbegin()); ++it) {
       ASSERT_EQ(it->id, dfres[--idx]);
     }
@@ -751,11 +751,11 @@ TEST(SWC, DepthFirstIterator)
     for (auto it = swc.begin(); it != swc.end(); ++it) {
       ASSERT_EQ(it->id, dfres[idx++]);
     }
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto it = --swc.end(); it != swc.begin(); --it) {
       ASSERT_EQ(it->id, dfres[--idx]);
     }
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto it = swc.rbegin(); it != swc.rend(); ++it) {
       ASSERT_EQ(it->id, dfres[--idx]);
     }
@@ -763,11 +763,11 @@ TEST(SWC, DepthFirstIterator)
     for (auto it = swc.begin(swc.begin()); it != swc.end(swc.begin()); ++it) {
       ASSERT_EQ(it->id, dfres[idx++]);
     }
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto it = --swc.end(swc.begin()); it != swc.begin(swc.begin()); --it) {
       ASSERT_EQ(it->id, dfres[--idx]);
     }
-    idx = std::extent<decltype(dfres)>::value;
+    idx = std::size(dfres);
     for (auto it = swc.rbegin(swc.begin()); it != swc.rend(swc.begin()); ++it) {
       ASSERT_EQ(it->id, dfres[--idx]);
     }
@@ -815,7 +815,7 @@ TEST(SWC, PostOrderIterator)
     for (auto it = smallSwc.cbeginPostOrder(); it != smallSwc.cendPostOrder(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[sidx++]);
     }
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto it = smallSwc.crbeginPostOrder(); it != smallSwc.crendPostOrder(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[--sidx]);
     }
@@ -905,11 +905,11 @@ TEST(SWC, PostOrderIterator)
     for (auto it = swc.cbeginPostOrder(); it != swc.cendPostOrder(); ++it) {
       ASSERT_EQ(it->id, pores[idx++]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto it = --swc.cendPostOrder(); it != swc.cbeginPostOrder(); --it) {
       ASSERT_EQ(it->id, pores[--idx]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto it = swc.crbeginPostOrder(); it != swc.crendPostOrder(); ++it) {
       ASSERT_EQ(it->id, pores[--idx]);
     }
@@ -917,11 +917,11 @@ TEST(SWC, PostOrderIterator)
     for (auto it = swc.cbeginPostOrder(swc.cbegin()); it != swc.cendPostOrder(swc.cbegin()); ++it) {
       ASSERT_EQ(it->id, pores[idx++]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto it = --swc.cendPostOrder(swc.cbegin()); it != swc.cbeginPostOrder(swc.cbegin()); --it) {
       ASSERT_EQ(it->id, pores[--idx]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto it = swc.crbeginPostOrder(swc.cbegin()); it != swc.crendPostOrder(swc.cbegin()); ++it) {
       ASSERT_EQ(it->id, pores[--idx]);
     }
@@ -929,7 +929,7 @@ TEST(SWC, PostOrderIterator)
     for (auto& node : swc.cPostOrderRange()) {
       ASSERT_EQ(node.id, pores[idx++]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto& node : swc.crPostOrderRange()) {
       ASSERT_EQ(node.id, pores[--idx]);
     }
@@ -937,7 +937,7 @@ TEST(SWC, PostOrderIterator)
     for (auto& node : swc.cPostOrderRange(swc.cbegin())) {
       ASSERT_EQ(node.id, pores[idx++]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto& node : swc.crPostOrderRange(swc.cbegin())) {
       ASSERT_EQ(node.id, pores[--idx]);
     }
@@ -946,11 +946,11 @@ TEST(SWC, PostOrderIterator)
     for (auto it = swc.beginPostOrder(); it != swc.endPostOrder(); ++it) {
       ASSERT_EQ(it->id, pores[idx++]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto it = --swc.endPostOrder(); it != swc.beginPostOrder(); --it) {
       ASSERT_EQ(it->id, pores[--idx]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto it = swc.rbeginPostOrder(); it != swc.rendPostOrder(); ++it) {
       ASSERT_EQ(it->id, pores[--idx]);
     }
@@ -958,11 +958,11 @@ TEST(SWC, PostOrderIterator)
     for (auto it = swc.beginPostOrder(swc.begin()); it != swc.endPostOrder(swc.begin()); ++it) {
       ASSERT_EQ(it->id, pores[idx++]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto it = --swc.endPostOrder(swc.begin()); it != swc.beginPostOrder(swc.begin()); --it) {
       ASSERT_EQ(it->id, pores[--idx]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto it = swc.rbeginPostOrder(swc.begin()); it != swc.rendPostOrder(swc.begin()); ++it) {
       ASSERT_EQ(it->id, pores[--idx]);
     }
@@ -970,7 +970,7 @@ TEST(SWC, PostOrderIterator)
     for (auto& node : swc.postOrderRange()) {
       ASSERT_EQ(node.id, pores[idx++]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto& node : swc.rPostOrderRange()) {
       ASSERT_EQ(node.id, pores[--idx]);
     }
@@ -978,7 +978,7 @@ TEST(SWC, PostOrderIterator)
     for (auto& node : swc.postOrderRange(swc.begin())) {
       ASSERT_EQ(node.id, pores[idx++]);
     }
-    idx = std::extent<decltype(pores)>::value;
+    idx = std::size(pores);
     for (auto& node : swc.rPostOrderRange(swc.begin())) {
       ASSERT_EQ(node.id, pores[--idx]);
     }
@@ -1026,7 +1026,7 @@ TEST(SWC, BreadthFirstIterator)
     for (auto it = smallSwc.cbeginBreadthFirst(); it != smallSwc.cendBreadthFirst(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[sidx++]);
     }
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto it = smallSwc.crbeginBreadthFirst(); it != smallSwc.crendBreadthFirst(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[--sidx]);
     }
@@ -1036,21 +1036,21 @@ TEST(SWC, BreadthFirstIterator)
     sidx = 12;
     int c = 0;
     for (auto it = smallSwc.cbeginBreadthFirst(sit); it != smallSwc.cendBreadthFirst(sit); ++it, ++c) {
-      ASSERT_EQ(it->id, static_cast<int>(sidx++)); // 12 13 14
+      ASSERT_EQ(it->id, static_cast<int64_t>(sidx++)); // 12 13 14
       ASSERT_LT(c, 3);
     }
     ASSERT_EQ(c, 3);
     c = 0;
     sidx = 15;
     for (auto it = smallSwc.crbeginBreadthFirst(sit); it != smallSwc.crendBreadthFirst(sit); ++it, ++c) {
-      ASSERT_EQ(it->id, static_cast<int>(--sidx)); // 14 13 12
+      ASSERT_EQ(it->id, static_cast<int64_t>(--sidx)); // 14 13 12
       ASSERT_LT(c, 3);
     }
     ASSERT_EQ(c, 3);
     sidx = 12;
     c = 0;
     for (auto& node : smallSwc.cBreadthFirstRange(sit)) {
-      ASSERT_EQ(node.id, static_cast<int>(sidx++)); // 12 13 14
+      ASSERT_EQ(node.id, static_cast<int64_t>(sidx++)); // 12 13 14
       ASSERT_LT(c, 3);
       ++c;
     }
@@ -1058,7 +1058,7 @@ TEST(SWC, BreadthFirstIterator)
     c = 0;
     sidx = 15;
     for (auto& node : smallSwc.crBreadthFirstRange(sit)) {
-      ASSERT_EQ(node.id, static_cast<int>(--sidx)); // 14 13 12
+      ASSERT_EQ(node.id, static_cast<int64_t>(--sidx)); // 14 13 12
       ASSERT_LT(c, 3);
       ++c;
     }
@@ -1070,7 +1070,7 @@ TEST(SWC, BreadthFirstIterator)
     sidx = 12;
     c = 0;
     for (auto& node : smallSwc.breadthFirstRange(sit2)) {
-      ASSERT_EQ(node.id, static_cast<int>(sidx++)); // 12 13 14
+      ASSERT_EQ(node.id, static_cast<int64_t>(sidx++)); // 12 13 14
       ASSERT_LT(c, 3);
       ++c;
     }
@@ -1078,7 +1078,7 @@ TEST(SWC, BreadthFirstIterator)
     c = 0;
     sidx = 15;
     for (auto& node : smallSwc.rBreadthFirstRange(sit2)) {
-      ASSERT_EQ(node.id, static_cast<int>(--sidx)); // 14 13 12
+      ASSERT_EQ(node.id, static_cast<int64_t>(--sidx)); // 14 13 12
       ASSERT_LT(c, 3);
       ++c;
     }
@@ -1212,7 +1212,7 @@ TEST(SWC, LeafIterator)
     for (auto it = smallSwc.cbeginLeaf(); it != smallSwc.cendLeaf(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[sidx++]);
     }
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto it = smallSwc.crbeginLeaf(); it != smallSwc.crendLeaf(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[--sidx]);
     }
@@ -1220,7 +1220,7 @@ TEST(SWC, LeafIterator)
     for (auto& node : smallSwc.cLeafRange()) {
       ASSERT_EQ(node.id, smallSwcRes[sidx++]);
     }
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto& node : smallSwc.crLeafRange()) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
@@ -1231,21 +1231,21 @@ TEST(SWC, LeafIterator)
     sidx = 13;
     int c = 0;
     for (auto it = smallSwc.cbeginLeaf(sit); it != smallSwc.cendLeaf(sit); ++it, ++c) {
-      ASSERT_EQ(it->id, static_cast<int>(sidx++)); // 13 14
+      ASSERT_EQ(it->id, static_cast<int64_t>(sidx++)); // 13 14
       ASSERT_LT(c, 2);
     }
     ASSERT_EQ(c, 2);
     c = 0;
     sidx = 15;
     for (auto it = smallSwc.crbeginLeaf(sit); it != smallSwc.crendLeaf(sit); ++it, ++c) {
-      ASSERT_EQ(it->id, static_cast<int>(--sidx)); // 14 13
+      ASSERT_EQ(it->id, static_cast<int64_t>(--sidx)); // 14 13
       ASSERT_LT(c, 2);
     }
     ASSERT_EQ(c, 2);
     sidx = 13;
     c = 0;
     for (auto& node : smallSwc.cLeafRange(sit)) {
-      ASSERT_EQ(node.id, static_cast<int>(sidx++)); // 13 14
+      ASSERT_EQ(node.id, static_cast<int64_t>(sidx++)); // 13 14
       ASSERT_LT(c, 2);
       ++c;
     }
@@ -1253,7 +1253,7 @@ TEST(SWC, LeafIterator)
     c = 0;
     sidx = 15;
     for (auto& node : smallSwc.crLeafRange(sit)) {
-      ASSERT_EQ(node.id, static_cast<int>(--sidx)); // 14 13
+      ASSERT_EQ(node.id, static_cast<int64_t>(--sidx)); // 14 13
       ASSERT_LT(c, 2);
       ++c;
     }
@@ -1271,11 +1271,11 @@ TEST(SWC, LeafIterator)
     for (auto it = swc.cbeginLeaf(); it != swc.cendLeaf(); ++it) {
       ASSERT_EQ(it->id, res[idx++]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto it = --swc.cendLeaf(); it != swc.cbeginLeaf(); --it) {
       ASSERT_EQ(it->id, res[--idx]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto it = swc.crbeginLeaf(); it != swc.crendLeaf(); ++it) {
       ASSERT_EQ(it->id, res[--idx]);
     }
@@ -1283,11 +1283,11 @@ TEST(SWC, LeafIterator)
     for (auto it = swc.cbeginLeaf(swc.cbegin()); it != swc.cendLeaf(swc.cbegin()); ++it) {
       ASSERT_EQ(it->id, res[idx++]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto it = --swc.cendLeaf(swc.cbegin()); it != swc.cbeginLeaf(swc.cbegin()); --it) {
       ASSERT_EQ(it->id, res[--idx]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto it = swc.crbeginLeaf(swc.cbegin()); it != swc.crendLeaf(swc.cbegin()); ++it) {
       ASSERT_EQ(it->id, res[--idx]);
     }
@@ -1295,7 +1295,7 @@ TEST(SWC, LeafIterator)
     for (auto& node : swc.cLeafRange()) {
       ASSERT_EQ(node.id, res[idx++]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto& node : swc.crLeafRange()) {
       ASSERT_EQ(node.id, res[--idx]);
     }
@@ -1303,7 +1303,7 @@ TEST(SWC, LeafIterator)
     for (auto& node : swc.cLeafRange(swc.cbegin())) {
       ASSERT_EQ(node.id, res[idx++]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto& node : swc.crLeafRange(swc.cbegin())) {
       ASSERT_EQ(node.id, res[--idx]);
     }
@@ -1312,11 +1312,11 @@ TEST(SWC, LeafIterator)
     for (auto it = swc.beginLeaf(); it != swc.endLeaf(); ++it) {
       ASSERT_EQ(it->id, res[idx++]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto it = --swc.endLeaf(); it != swc.beginLeaf(); --it) {
       ASSERT_EQ(it->id, res[--idx]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto it = swc.rbeginLeaf(); it != swc.rendLeaf(); ++it) {
       ASSERT_EQ(it->id, res[--idx]);
     }
@@ -1324,11 +1324,11 @@ TEST(SWC, LeafIterator)
     for (auto it = swc.beginLeaf(swc.begin()); it != swc.endLeaf(swc.begin()); ++it) {
       ASSERT_EQ(it->id, res[idx++]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto it = --swc.endLeaf(swc.begin()); it != swc.beginLeaf(swc.begin()); --it) {
       ASSERT_EQ(it->id, res[--idx]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto it = swc.rbeginLeaf(swc.begin()); it != swc.rendLeaf(swc.begin()); ++it) {
       ASSERT_EQ(it->id, res[--idx]);
     }
@@ -1336,7 +1336,7 @@ TEST(SWC, LeafIterator)
     for (auto& node : swc.leafRange()) {
       ASSERT_EQ(node.id, res[idx++]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto& node : swc.rLeafRange()) {
       ASSERT_EQ(node.id, res[--idx]);
     }
@@ -1344,7 +1344,7 @@ TEST(SWC, LeafIterator)
     for (auto& node : swc.leafRange(swc.begin())) {
       ASSERT_EQ(node.id, res[idx++]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto& node : swc.rLeafRange(swc.begin())) {
       ASSERT_EQ(node.id, res[--idx]);
     }
@@ -1392,7 +1392,7 @@ TEST(SWC, RootIterator)
     for (auto it = smallSwc.cbeginRoot(); it != smallSwc.cendRoot(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[sidx++]);
     }
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto it = smallSwc.crbeginRoot(); it != smallSwc.crendRoot(); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[--sidx]);
     }
@@ -1406,7 +1406,7 @@ TEST(SWC, RootIterator)
     for (auto it = swc.cbeginRoot(); it != swc.cendRoot(); ++it) {
       ASSERT_EQ(it->id, res[idx++]);
     }
-    idx = std::extent<decltype(res)>::value;
+    idx = std::size(res);
     for (auto it = --swc.cendRoot(); it != swc.cbeginRoot(); --it) {
       ASSERT_EQ(it->id, res[--idx]);
     }
@@ -1553,7 +1553,7 @@ TEST(SWC, AncestorIterator)
     for (auto it = smallSwc.cbeginAncestor(sit); it != smallSwc.cendAncestor(sit); ++it) {
       ASSERT_EQ(it->id, smallSwcRes[sidx++]);
     }
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto it = smallSwc.crbeginAncestor(sit); it != smallSwc.crendAncestor(sit); ++it, ++c) {
       ASSERT_EQ(it->id, smallSwcRes[--sidx]);
       ASSERT_LT(c, 3);
@@ -1569,7 +1569,7 @@ TEST(SWC, AncestorIterator)
       ASSERT_LT(c, 3);
     }
     c = 0;
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto it = smallSwc.crbeginAncestor(sit); it != smallSwc.crendAncestor(sit); ++it, ++c) {
       ASSERT_EQ(it->id, smallSwcRes2[--sidx]);
       ASSERT_LT(c, 3);
@@ -1583,7 +1583,7 @@ TEST(SWC, AncestorIterator)
       ++c;
     }
     c = 0;
-    sidx = std::extent<decltype(smallSwcRes)>::value;
+    sidx = std::size(smallSwcRes);
     for (auto& node : smallSwc.crAncestorRange(sit)) {
       ASSERT_EQ(node.id, smallSwcRes2[--sidx]);
       ASSERT_LT(c, 3);
@@ -1766,7 +1766,7 @@ TEST(SWC, IteratorInteraction)
 
     // do same stuff reversely, it is not as straight forward as the forward version as reverse_iterator
     // stores next position (not current position)
-    sidx = std::extent<decltype(preRes)>::value;
+    sidx = std::size(preRes);
     crpit = swc.crbegin();
     for (; crpit != swc.crend() && crpit->id != 8; ++crpit) {
       ASSERT_EQ(crpit->id, preRes[--sidx]);
@@ -1776,7 +1776,7 @@ TEST(SWC, IteratorInteraction)
     auto tmp = crpit.base();
     crbfit = std::make_reverse_iterator(--tmp);
     --crbfit;
-    sidx = std::extent<decltype(bfRes)>::value - 2;
+    sidx = std::size(bfRes) - 2;
     for (; crbfit != swc.crendBreadthFirst() && crbfit->id != 15; ++crbfit) {
       ASSERT_EQ(crbfit->id, bfRes[--sidx]);
     }
@@ -1785,7 +1785,7 @@ TEST(SWC, IteratorInteraction)
     auto tmp1 = crbfit.base();
     crrit = std::make_reverse_iterator(--tmp1);
     --crrit;
-    sidx = std::extent<decltype(rootRes)>::value;
+    sidx = std::size(rootRes);
     for (; crrit != swc.crendRoot() && crrit->id != 1; ++crrit) {
       ASSERT_EQ(crrit->id, rootRes[--sidx]);
     }
@@ -1794,7 +1794,7 @@ TEST(SWC, IteratorInteraction)
     auto tmp2 = crrit.base();
     crpoit = std::make_reverse_iterator(--tmp2);
     --crpoit;
-    sidx = std::extent<decltype(postRes)>::value - 5;
+    sidx = std::size(postRes) - 5;
     for (; crpoit != swc.crendPostOrder(); ++crpoit) {
       ASSERT_EQ(crpoit->id, postRes[--sidx]);
     }
@@ -1811,7 +1811,7 @@ TEST(TreeIteratorTest, RandomForwardBackwardTraversal)
 
   ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
   const int smallSwcRes[] = {1, 2, 3, 5, 8, 9, 6, 10, 4, 7, 11, 12, 13, 14, 15};
-  size_t totalNodes = std::extent<decltype(smallSwcRes)>::value;
+  size_t totalNodes = std::size(smallSwcRes);
 
   auto it = smallSwc.cbegin();
   size_t currentIdx = 0;
@@ -1880,7 +1880,7 @@ TEST(TreeIteratorTest, PostOrderRandomForwardBackwardTraversal)
 
   ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
   const int smallSwcRes[] = {2, 8, 9, 5, 10, 6, 3, 7, 4, 1, 13, 14, 12, 11, 15};
-  size_t totalNodes = std::extent<decltype(smallSwcRes)>::value;
+  size_t totalNodes = std::size(smallSwcRes);
 
   auto it = smallSwc.cbeginPostOrder();
   size_t currentIdx = 0;
@@ -1959,7 +1959,7 @@ TEST(TreeIteratorTest, BreadthFirstRandomForwardBackwardTraversal)
 
   ZSwc smallSwc(getTestDataDir().filePath("treetest.swc"));
   const int smallSwcRes[] = {1, 11, 15, 2, 3, 4, 12, 5, 6, 7, 13, 14, 8, 9, 10};
-  size_t totalNodes = std::extent<decltype(smallSwcRes)>::value;
+  size_t totalNodes = std::size(smallSwcRes);
 
   auto it = smallSwc.cbeginBreadthFirst();
   size_t currentIdx = 0;
@@ -2022,7 +2022,7 @@ TEST(TreeIteratorTest, BreadthFirstRandomForwardBackwardTraversal)
   }
 
   const int firstSubTree[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  totalNodes = std::extent<decltype(firstSubTree)>::value;
+  totalNodes = std::size(firstSubTree);
   auto sit = smallSwc.cbeginBreadthFirst();
   currentIdx = 0;
 
@@ -2076,7 +2076,7 @@ TEST(TreeIteratorTest, BreadthFirstRandomForwardBackwardTraversal)
   }
 
   const int secondSubTree[] = {11, 12, 13, 14};
-  totalNodes = std::extent<decltype(secondSubTree)>::value;
+  totalNodes = std::size(secondSubTree);
   ++sit;
   currentIdx = 0;
 

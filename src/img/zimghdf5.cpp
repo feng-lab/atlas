@@ -23,12 +23,12 @@ namespace {
 
 size_t chunkSize()
 {
-  return size_t(512);
+  return static_cast<size_t>(512);
 }
 
 size_t cacheSize()
 {
-  return size_t(1024) * 1024 * 4000;
+  return static_cast<size_t>(1024) * 1024 * 4000;
 }
 
 H5::FileAccPropList accPropList()
@@ -358,7 +358,7 @@ void mergeImgToH5DataSetMax(H5::DataSet& imgData,
     throw nim::ZException("wrong slice data dimension");
   }
 
-  hsize_t offset[2] = {hsize_t(imgCoord.y), hsize_t(imgCoord.x)};
+  hsize_t offset[2] = {static_cast<hsize_t>(imgCoord.y), static_cast<hsize_t>(imgCoord.x)};
   hsize_t count[2] = {img.height(), img.width()};
   // Define the memory space to read a chunk.
   H5::DataSpace mspace(2, count);
