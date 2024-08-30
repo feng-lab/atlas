@@ -249,7 +249,7 @@ template<typename T>
 struct IsStdArray : std::false_type
 {};
 
-template<typename T, std::size_t N>
+template<typename T, auto N>
 struct IsStdArray<std::array<T, N>> : std::true_type
 {};
 

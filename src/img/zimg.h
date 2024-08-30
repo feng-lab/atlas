@@ -246,7 +246,7 @@ public:
 
   // read image from file, throw ZException if read failed, might throw ZException if can't allocate memory
   explicit ZImg(const QString& filename,
-                ZImgRegion region = ZImgRegion(),
+                const ZImgRegion& region = ZImgRegion(),
                 size_t scene = 0,
                 size_t xRatio = 1,
                 size_t yRatio = 1,
@@ -300,7 +300,7 @@ public:
             FileFormat format = FileFormat::Unknown);
 
   void load(const QString& filename,
-            ZImgRegion region,
+            const ZImgRegion& region,
             size_t scene = 0,
             size_t xRatio = 1,
             size_t yRatio = 1,
@@ -511,6 +511,11 @@ public:
     return m_info.rowVoxelNumber();
   }
 
+  [[nodiscard]] index_t sRowVoxelNumber() const
+  {
+    return m_info.sRowVoxelNumber();
+  }
+
   [[nodiscard]] size_t rowByteNumber() const
   {
     return m_info.rowByteNumber();
@@ -519,6 +524,11 @@ public:
   [[nodiscard]] size_t planeVoxelNumber() const
   {
     return m_info.planeVoxelNumber();
+  }
+
+  [[nodiscard]] index_t sPlaneVoxelNumber() const
+  {
+    return m_info.sPlaneVoxelNumber();
   }
 
   [[nodiscard]] size_t planeByteNumber() const
@@ -531,6 +541,11 @@ public:
     return m_info.channelVoxelNumber();
   }
 
+  [[nodiscard]] index_t sChannelVoxelNumber() const
+  {
+    return m_info.sChannelVoxelNumber();
+  }
+
   [[nodiscard]] size_t channelByteNumber() const
   {
     return m_info.channelByteNumber();
@@ -539,6 +554,11 @@ public:
   [[nodiscard]] size_t timeVoxelNumber() const
   {
     return m_info.timeVoxelNumber();
+  }
+
+  [[nodiscard]] index_t sTimeVoxelNumber() const
+  {
+    return m_info.sTimeVoxelNumber();
   }
 
   [[nodiscard]] size_t timeByteNumber() const
@@ -581,6 +601,31 @@ public:
   [[nodiscard]] size_t numTimes() const
   {
     return m_info.numTimes;
+  }
+
+  [[nodiscard]] index_t sWidth() const
+  {
+    return static_cast<index_t>(m_info.width);
+  }
+
+  [[nodiscard]] index_t sHeight() const
+  {
+    return static_cast<index_t>(m_info.height);
+  }
+
+  [[nodiscard]] index_t sDepth() const
+  {
+    return static_cast<index_t>(m_info.depth);
+  }
+
+  [[nodiscard]] index_t sNumChannels() const
+  {
+    return static_cast<index_t>(m_info.numChannels);
+  }
+
+  [[nodiscard]] index_t sNumTimes() const
+  {
+    return static_cast<index_t>(m_info.numTimes);
   }
 
   // inline size_t numLocations() const { return m_info.numLocations; }
@@ -779,13 +824,9 @@ public:
   // img view is a virtual img that doesn't own any img data, usually it is a channel or a time spot or a location from
   // original img operate on img view is same as operate on partial img img view will automatically become to a real img
   // after some operations that need memory reallocation use img view to work with part of img
-  [[nodiscard]] ZImg createView(index_t c = -1, index_t t = -1);
-
   [[nodiscard]] ZImg createView(index_t c = -1, index_t t = -1) const;
 
   // view of one single channel slice
-  [[nodiscard]] ZImg createView(size_t z, size_t c, size_t t);
-
   [[nodiscard]] ZImg createView(size_t z, size_t c, size_t t) const;
 
   [[nodiscard]] bool isImgView() const
@@ -795,7 +836,7 @@ public:
 
   // statistics
   template<typename TValue>
-  void computeMinMax(TValue& min, TValue& max) const;
+  void computeMinMax(TValue& minV, TValue& maxV) const;
 
   // if nbins == 0, default number of bins is used
   // default number of bins for 8bit img is 256, for other type of img is 65536
@@ -1610,12 +1651,12 @@ public:
   // coord of one voxel pass each dimension
   [[nodiscard]] ZVoxelCoordinate endCoord() const
   {
-    return ZVoxelCoordinate(m_info.width, m_info.height, m_info.depth, m_info.numChannels, m_info.numTimes);
+    return {sWidth(), sHeight(), sDepth(), sNumChannels(), sNumTimes()};
   }
 
   [[nodiscard]] ZVoxelCoordinate endCoordinate() const
   {
-    return ZVoxelCoordinate(m_info.width, m_info.height, m_info.depth, m_info.numChannels, m_info.numTimes);
+    return {sWidth(), sHeight(), sDepth(), sNumChannels(), sNumTimes()};
   }
 
   // max valid coord, **note** throw ZException for empty img
@@ -1624,11 +1665,7 @@ public:
     if (isEmpty()) {
       throw ZException("No max coord for empty img");
     }
-    return ZVoxelCoordinate(m_info.width - 1,
-                            m_info.height - 1,
-                            m_info.depth - 1,
-                            m_info.numChannels - 1,
-                            m_info.numTimes - 1);
+    return {sWidth() - 1, sHeight() - 1, sDepth() - 1, sNumChannels() - 1, sNumTimes() - 1};
   }
 
   // coord will always be invalid if img is empty
@@ -1649,7 +1686,39 @@ public:
     }
     rgn.resolveRegionEnd(m_info);
     imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
-      this->firstMaxValueCoord_Impl<TVoxel>(res, max, rgn);
+      TVoxel maxValue = std::numeric_limits<TVoxel>::min();
+      if (voxelFormat() == VoxelFormat::Float) {
+        maxValue = std::numeric_limits<TVoxel>::lowest();
+      }
+      if (rgn.containsWholeTime(m_info)) {
+        for (auto t = rgn.start.t; t < rgn.end.t; ++t) {
+          const TVoxel* data = timeData<TVoxel>(t);
+          for (index_t v = 0; v < sTimeVoxelNumber(); ++v) {
+            if (data[v] > maxValue) {
+              maxValue = data[v];
+              res = indexToCoord(v);
+              res.t = t;
+            }
+          }
+        }
+      } else {
+        for (auto t = rgn.start.t; t < rgn.end.t; ++t) {
+          for (auto c = rgn.start.c; c < rgn.end.c; ++c) {
+            for (auto z = rgn.start.z; z < rgn.end.z; ++z) {
+              for (auto y = rgn.start.y; y < rgn.end.y; ++y) {
+                for (auto x = rgn.start.x; x < rgn.end.x; ++x) {
+                  TVoxel dat = *(data<TVoxel>(x, y, z, c, t));
+                  if (dat > maxValue) {
+                    maxValue = dat;
+                    res = ZVoxelCoordinate(x, y, z, c, t);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      max = static_cast<TValue>(maxValue);
     });
     return res;
   }
@@ -1666,7 +1735,48 @@ public:
     }
     rgn.resolveRegionEnd(m_info);
     imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
-      this->maxValueCoords_Impl<TVoxel>(res, max, rgn);
+      TVoxel maxValue = std::numeric_limits<TVoxel>::min();
+      if (voxelFormat() == VoxelFormat::Float) {
+        maxValue = std::numeric_limits<TVoxel>::lowest();
+      }
+      if (rgn.containsWholeTime(m_info)) {
+        for (auto t = rgn.start.t; t < rgn.end.t; ++t) {
+          const TVoxel* data = timeData<TVoxel>(t);
+          for (index_t v = 0; v < sTimeVoxelNumber(); ++v) {
+            if (data[v] > maxValue) {
+              maxValue = data[v];
+              res.clear();
+              ZVoxelCoordinate coord = indexToCoord(v);
+              coord.t = t;
+              res.push_back(coord);
+            } else if (data[v] == maxValue) {
+              ZVoxelCoordinate coord = indexToCoord(v);
+              coord.t = t;
+              res.push_back(coord);
+            }
+          }
+        }
+      } else {
+        for (auto t = rgn.start.t; t < rgn.end.t; ++t) {
+          for (auto c = rgn.start.c; c < rgn.end.c; ++c) {
+            for (auto z = rgn.start.z; z < rgn.end.z; ++z) {
+              for (auto y = rgn.start.y; y < rgn.end.y; ++y) {
+                for (auto x = rgn.start.x; x < rgn.end.x; ++x) {
+                  TVoxel dat = *(data<TVoxel>(x, y, z, c, t));
+                  if (dat > maxValue) {
+                    maxValue = dat;
+                    res.clear();
+                    res.emplace_back(x, y, z, c, t);
+                  } else if (dat == maxValue) {
+                    res.emplace_back(x, y, z, c, t);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      max = static_cast<TValue>(maxValue);
     });
     return res;
   }
@@ -1986,93 +2096,6 @@ private:
                          size_t xStart,
                          size_t yStart,
                          size_t zStart) const;
-
-  template<typename TVoxel, typename TValue>
-  void firstMaxValueCoord_Impl(ZVoxelCoordinate& res, TValue& max, const ZImgRegion& region) const
-  {
-    TVoxel maxValue = std::numeric_limits<TVoxel>::min();
-    if (voxelFormat() == VoxelFormat::Float) {
-      maxValue = std::numeric_limits<TVoxel>::lowest();
-    }
-    if (region.containsWholeTime(m_info)) {
-      for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
-        const TVoxel* data = timeData<TVoxel>(t);
-        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-          if (data[v] > maxValue) {
-            maxValue = data[v];
-            res = indexToCoord(v);
-            res.t = t;
-          }
-        }
-      }
-
-    } else {
-      for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
-        for (size_t c = region.start.c; c < static_cast<size_t>(region.end.c); ++c) {
-          for (size_t z = region.start.z; z < static_cast<size_t>(region.end.z); ++z) {
-            for (size_t y = region.start.y; y < static_cast<size_t>(region.end.y); ++y) {
-              for (size_t x = region.start.x; x < static_cast<size_t>(region.end.x); ++x) {
-                TVoxel dat = *(data<TVoxel>(x, y, z, c, t));
-                if (dat > maxValue) {
-                  maxValue = dat;
-                  res = ZVoxelCoordinate(x, y, z, c, t);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    max = static_cast<TValue>(maxValue);
-  }
-
-  // coord of all voxels with max img value
-  template<typename TVoxel, typename TValue>
-  void maxValueCoords_Impl(std::vector<ZVoxelCoordinate>& res, TValue& max, const ZImgRegion& region) const
-  {
-    TVoxel maxValue = std::numeric_limits<TVoxel>::min();
-    if (voxelFormat() == VoxelFormat::Float) {
-      maxValue = std::numeric_limits<TVoxel>::lowest();
-    }
-    if (region.containsWholeTime(m_info)) {
-      for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
-        const TVoxel* data = timeData<TVoxel>(t);
-        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-          if (data[v] > maxValue) {
-            maxValue = data[v];
-            res.clear();
-            ZVoxelCoordinate coord = indexToCoord(v);
-            coord.t = t;
-            res.push_back(coord);
-          } else if (data[v] == maxValue) {
-            ZVoxelCoordinate coord = indexToCoord(v);
-            coord.t = t;
-            res.push_back(coord);
-          }
-        }
-      }
-    } else {
-      for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
-        for (size_t c = region.start.c; c < static_cast<size_t>(region.end.c); ++c) {
-          for (size_t z = region.start.z; z < static_cast<size_t>(region.end.z); ++z) {
-            for (size_t y = region.start.y; y < static_cast<size_t>(region.end.y); ++y) {
-              for (size_t x = region.start.x; x < static_cast<size_t>(region.end.x); ++x) {
-                TVoxel dat = *(data<TVoxel>(x, y, z, c, t));
-                if (dat > maxValue) {
-                  maxValue = dat;
-                  res.clear();
-                  res.emplace_back(x, y, z, c, t);
-                } else if (dat == maxValue) {
-                  res.emplace_back(x, y, z, c, t);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    max = static_cast<TValue>(maxValue);
-  }
 
 private:
   std::vector<uint8_t*> m_data;

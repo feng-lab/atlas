@@ -51,14 +51,14 @@ struct tuple_element<Index, glm::vec<N, T, Q>>
 };
 
 template<typename T, auto Q>
-struct tuple_size<glm::tquat<T, Q>> : integral_constant<std::size_t, 4>
+struct tuple_size<glm::qua<T, Q>> : integral_constant<std::size_t, 4>
 {};
 
 template<std::size_t Index, typename T, auto Q>
-struct tuple_element<Index, glm::tquat<T, Q>>
+struct tuple_element<Index, glm::qua<T, Q>>
 {
   static_assert(Index < 4, "Index out of bounds for quat");
-  using type = typename glm::tquat<T, Q>::value_type;
+  using type = typename glm::qua<T, Q>::value_type;
 };
 
 template<auto C, auto R, typename T, auto Q>
@@ -76,8 +76,8 @@ struct tuple_element<Index, glm::mat<C, R, T, Q>>
 
 namespace glm {
 
-using col3 = vec<3, unsigned char, highp>;
-using col4 = vec<4, unsigned char, highp>;
+using col3 = vec<3, unsigned char>;
+using col4 = vec<4, unsigned char>;
 
 // apply transform matrix
 template<typename T, qualifier Q>
@@ -111,7 +111,7 @@ inline quat mix(const quat& q1, const quat& q2, double p)
 template<typename T>
 struct is_vec : std::false_type
 {};
-template<length_t L, typename T, qualifier Q>
+template<auto L, typename T, auto Q>
 struct is_vec<vec<L, T, Q>> : std::true_type
 {};
 
@@ -124,14 +124,14 @@ constexpr decltype(auto) get(T&& v) noexcept
 }
 
 template<typename T>
-struct is_quat : std::false_type
+struct is_qua : std::false_type
 {};
-template<typename T, qualifier Q>
-struct is_quat<tquat<T, Q>> : std::true_type
+template<typename T, auto Q>
+struct is_qua<qua<T, Q>> : std::true_type
 {};
 
 template<std::size_t Index, typename T>
-  requires is_quat<std::remove_cvref_t<T>>::value
+  requires is_qua<std::remove_cvref_t<T>>::value
 constexpr decltype(auto) get(T&& v) noexcept
 {
   static_assert(Index < std::tuple_size<std::remove_cvref_t<T>>::value, "Index out of bounds for tuple_like");
@@ -141,7 +141,7 @@ constexpr decltype(auto) get(T&& v) noexcept
 template<typename T>
 struct is_mat : std::false_type
 {};
-template<length_t C, length_t R, typename T, qualifier Q>
+template<auto C, auto R, typename T, auto Q>
 struct is_mat<mat<C, R, T, Q>> : std::true_type
 {};
 

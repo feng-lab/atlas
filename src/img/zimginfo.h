@@ -75,6 +75,31 @@ struct ZImgInfo
     return voxelFormat == other.voxelFormat && bytesPerVoxel == other.bytesPerVoxel;
   }
 
+  [[nodiscard]] index_t sWidth() const
+  {
+    return static_cast<index_t>(width);
+  }
+
+  [[nodiscard]] index_t sHeight() const
+  {
+    return static_cast<index_t>(height);
+  }
+
+  [[nodiscard]] index_t sDepth() const
+  {
+    return static_cast<index_t>(depth);
+  }
+
+  [[nodiscard]] index_t sNumChannels() const
+  {
+    return static_cast<index_t>(numChannels);
+  }
+
+  [[nodiscard]] index_t sNumTimes() const
+  {
+    return static_cast<index_t>(numTimes);
+  }
+
   static constexpr size_t numDimensions()
   {
     return 5;
@@ -136,6 +161,11 @@ struct ZImgInfo
   [[nodiscard]] size_t size(Dimension dim) const
   {
     return size(std::to_underlying(dim));
+  }
+
+  [[nodiscard]] index_t ssize(Dimension dim) const
+  {
+    return static_cast<index_t>(size(std::to_underlying(dim)));
   }
 
   // note: time stride is meaningless since the memory is not contiguous
@@ -286,6 +316,11 @@ struct ZImgInfo
     return width;
   }
 
+  [[nodiscard]] index_t sRowVoxelNumber() const
+  {
+    return static_cast<index_t>(width);
+  }
+
   [[nodiscard]] size_t rowByteNumber() const
   {
     return width * bytesPerVoxel;
@@ -294,6 +329,11 @@ struct ZImgInfo
   [[nodiscard]] size_t planeVoxelNumber() const
   {
     return width * height;
+  }
+
+  [[nodiscard]] index_t sPlaneVoxelNumber() const
+  {
+    return static_cast<index_t>(planeVoxelNumber());
   }
 
   [[nodiscard]] size_t planeByteNumber() const
@@ -306,6 +346,11 @@ struct ZImgInfo
     return width * height * depth;
   }
 
+  [[nodiscard]] index_t sChannelVoxelNumber() const
+  {
+    return static_cast<index_t>(channelVoxelNumber());
+  }
+
   [[nodiscard]] size_t channelByteNumber() const
   {
     return width * height * depth * bytesPerVoxel;
@@ -314,6 +359,11 @@ struct ZImgInfo
   [[nodiscard]] size_t timeVoxelNumber() const
   {
     return width * height * depth * numChannels;
+  }
+
+  [[nodiscard]] index_t sTimeVoxelNumber() const
+  {
+    return static_cast<index_t>(timeVoxelNumber());
   }
 
   [[nodiscard]] size_t timeByteNumber() const
@@ -327,6 +377,11 @@ struct ZImgInfo
   [[nodiscard]] size_t voxelNumber() const
   {
     return width * height * depth * numChannels * numTimes;
+  }
+
+  [[nodiscard]] index_t sVoxelNumber() const
+  {
+    return static_cast<index_t>(voxelNumber());
   }
 
   [[nodiscard]] size_t byteNumber() const

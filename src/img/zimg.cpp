@@ -46,14 +46,14 @@ std::string ZImgMetadataBase<ZImgMetatag>::toString() const
 {
   std::string res;
 
-  for (const auto& attachPointTags : m_data) {
-    if (!attachPointTags.second.empty()) {
+  for (const auto& [attachPoint, tags] : m_data) {
+    if (!tags.empty()) {
       fmt::format_to(std::back_inserter(res),
                      "Attach Point: z: {}, c: {}, t: {}\n",
-                     attachPointTags.first.z,
-                     attachPointTags.first.c,
-                     attachPointTags.first.t);
-      for (const auto& tag : attachPointTags.second) {
+                     attachPoint.z,
+                     attachPoint.c,
+                     attachPoint.t);
+      for (const auto& tag : tags) {
         fmt::format_to(std::back_inserter(res), "  {}\n", tag);
       }
     }
@@ -67,15 +67,15 @@ std::string ZImgMetadataBase<ZImg>::toString() const
 {
   std::string res;
 
-  for (const auto& attachPointsImgs : m_data) {
-    if (!attachPointsImgs.second.empty()) {
+  for (const auto& [attachPoint, imgs] : m_data) {
+    if (!imgs.empty()) {
       fmt::format_to(std::back_inserter(res),
                      "Attach Point: z: {}, c: {}, t: {}, Number of Thumbnails: {}\n",
-                     attachPointsImgs.first.z,
-                     attachPointsImgs.first.c,
-                     attachPointsImgs.first.t,
-                     attachPointsImgs.second.size());
-      for (const auto& img : attachPointsImgs.second) {
+                     attachPoint.z,
+                     attachPoint.c,
+                     attachPoint.t,
+                     imgs.size());
+      for (const auto& img : imgs) {
         fmt::format_to(std::back_inserter(res), "  thumb <{}>\n", img.info());
       }
     }
@@ -89,8 +89,7 @@ ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene_, 
   , scene(scene_)
   , format(format_)
 {
-  QFileInfo fi(fn);
-  if (fi.exists()) {
+  if (QFileInfo fi(fn); fi.exists()) {
     filenames << fi.canonicalFilePath();
     totalFileSize += fi.size();
   } else {
@@ -115,8 +114,7 @@ ZImgSource::ZImgSource(const QStringList& fns,
   , expandWithMaxValue(expandWithMaxValue_)
 {
   for (const auto& fn : fns) {
-    QFileInfo fi(fn);
-    if (fi.exists()) {
+    if (QFileInfo fi(fn); fi.exists()) {
       filenames << fi.canonicalFilePath();
       totalFileSize += fi.size();
     } else {
@@ -258,7 +256,7 @@ ZImg::ZImg(const ZImg& other)
 }
 
 ZImg::ZImg(const QString& filename,
-           ZImgRegion region,
+           const ZImgRegion& region,
            size_t scene,
            size_t xRatio,
            size_t yRatio,
@@ -338,7 +336,7 @@ void ZImg::load(const QString& filename, size_t scene, size_t xRatio, size_t yRa
 }
 
 void ZImg::load(const QString& filename,
-                ZImgRegion region,
+                const ZImgRegion& region,
                 size_t scene,
                 size_t xRatio,
                 size_t yRatio,
@@ -655,30 +653,6 @@ std::string ZImg::toString() const
   return res;
 }
 
-ZImg ZImg::createView(index_t c, index_t t)
-{
-  ZImgRegion rgn;
-  if (c >= 0) {
-    rgn.start.c = c;
-    rgn.end.c = c + 1;
-  }
-  if (t >= 0) {
-    rgn.start.t = t;
-    rgn.end.t = t + 1;
-  }
-  if (!rgn.isValid(m_info)) {
-    throw ZException(fmt::format("Invalid view of img, c:{}, t:{}, rgn:{}, img:{}", c, t, rgn, m_info));
-  }
-  ZImg res;
-  res.m_info = rgn.clip(m_info);
-  res.m_data.resize(res.numTimes());
-  for (size_t lt = 0; lt < res.numTimes(); ++lt) {
-    res.m_data[lt] = channelData<uint8_t>(rgn.start.c, lt + rgn.start.t);
-  }
-  res.m_ownData = false;
-  return res;
-}
-
 ZImg ZImg::createView(index_t c, index_t t) const
 {
   ZImgRegion rgn;
@@ -698,28 +672,6 @@ ZImg ZImg::createView(index_t c, index_t t) const
   res.m_data.resize(res.numTimes());
   for (size_t lt = 0; lt < res.numTimes(); ++lt) {
     res.m_data[lt] = m_data[lt + rgn.start.t] + rgn.start.c * m_info.channelByteNumber();
-  }
-  res.m_ownData = false;
-  return res;
-}
-
-ZImg ZImg::createView(size_t z, size_t c, size_t t)
-{
-  ZImgRegion rgn;
-  rgn.start.z = z;
-  rgn.end.z = z + 1;
-  rgn.start.c = c;
-  rgn.end.c = c + 1;
-  rgn.start.t = t;
-  rgn.end.t = t + 1;
-  if (!rgn.isValid(m_info)) {
-    throw ZException(fmt::format("Invalid view of img, z:{}, c:{}, t:{}, rgn:{}, img:{}", z, c, t, rgn, m_info));
-  }
-  ZImg res;
-  res.m_info = rgn.clip(m_info);
-  res.m_data.resize(res.numTimes());
-  for (size_t lt = 0; lt < res.numTimes(); ++lt) {
-    res.m_data[lt] = planeData<uint8_t>(rgn.start.z, rgn.start.c, lt + rgn.start.t);
   }
   res.m_ownData = false;
   return res;
@@ -832,21 +784,21 @@ ZImg ZImg::crop(const ZImgRegion& region) const
   // create destination
   res = ZImg(resInfo);
   // start copy data
-  for (size_t t = rgn.start.t; t < static_cast<size_t>(rgn.end.t); ++t) {
+  for (auto t = rgn.start.t; t < rgn.end.t; ++t) {
     if (rgn.containsWholeChannel(m_info)) {
       // copy continues channel blocks
       std::memcpy(res.timeData(t - rgn.start.t), channelData(rgn.start.c, t), res.timeByteNumber());
     } else if (rgn.containsWholePlane(m_info)) {
       // copy channel by channel
-      for (size_t c = rgn.start.c; c < static_cast<size_t>(rgn.end.c); ++c) {
+      for (auto c = rgn.start.c; c < rgn.end.c; ++c) {
         std::memcpy(res.channelData(c - rgn.start.c, t - rgn.start.t),
                     planeData(rgn.start.z, c, t),
                     res.channelByteNumber());
       }
     } else if (rgn.containsWholeRow(m_info)) {
       // copy plane by plane
-      for (size_t c = rgn.start.c; c < static_cast<size_t>(rgn.end.c); ++c) {
-        for (size_t z = rgn.start.z; z < static_cast<size_t>(rgn.end.z); ++z) {
+      for (auto c = rgn.start.c; c < rgn.end.c; ++c) {
+        for (auto z = rgn.start.z; z < rgn.end.z; ++z) {
           std::memcpy(res.planeData(z - rgn.start.z, c - rgn.start.c, t - rgn.start.t),
                       rowData(rgn.start.y, z, c, t),
                       res.planeByteNumber());
@@ -854,9 +806,9 @@ ZImg ZImg::crop(const ZImgRegion& region) const
       }
     } else {
       // copy row by row
-      for (size_t c = rgn.start.c; c < static_cast<size_t>(rgn.end.c); ++c) {
-        for (size_t z = rgn.start.z; z < static_cast<size_t>(rgn.end.z); ++z) {
-          for (size_t y = rgn.start.y; y < static_cast<size_t>(rgn.end.y); ++y) {
+      for (auto c = rgn.start.c; c < rgn.end.c; ++c) {
+        for (auto z = rgn.start.z; z < rgn.end.z; ++z) {
+          for (auto y = rgn.start.y; y < rgn.end.y; ++y) {
             std::memcpy(res.rowData(y - rgn.start.y, z - rgn.start.z, c - rgn.start.c, t - rgn.start.t),
                         data(rgn.start.x, y, z, c, t),
                         res.rowByteNumber());
@@ -980,7 +932,7 @@ ZImg& ZImg::fillRandom()
         }
       }
     } else if constexpr (std::is_same_v<std::uint8_t, TVoxel>) {
-      std::uniform_int_distribution<uint32_t> dist(dataRangeMin<uint32_t>(), dataRangeMax<uint32_t>());
+      std::uniform_int_distribution dist(dataRangeMin<uint16_t>(), dataRangeMax<uint16_t>());
       auto& eng = ZRandom::instance().engine();
       for (size_t t = 0; t < numTimes(); ++t) {
         auto data = timeData<uint8_t>(t);
@@ -989,12 +941,12 @@ ZImg& ZImg::fillRandom()
         }
       }
     } else if constexpr (std::is_same_v<std::int8_t, TVoxel>) {
-      std::uniform_int_distribution<int32_t> dist(dataRangeMin<int32_t>(), dataRangeMax<int32_t>());
+      std::uniform_int_distribution dist(dataRangeMin<int16_t>(), dataRangeMax<int16_t>());
       auto& eng = ZRandom::instance().engine();
       for (size_t t = 0; t < numTimes(); ++t) {
         auto data = timeData<int8_t>(t);
         for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-          data[v] = dist(eng);
+          data[v] = static_cast<int8_t>(dist(eng));
         }
       }
     } else {
@@ -1013,8 +965,6 @@ ZImg& ZImg::fillRandom()
 
 ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warningOn)
 {
-  using TCoordinate = ZVoxelCoordinate::value_type;
-
   if (isEmpty()) {
     if (warningOn) {
       LOG(WARNING) << "Trying to paste to empty img, abort";
@@ -1029,16 +979,11 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warnin
     return *this;
   }
 
-  if ((start.x < 0 && start.x + static_cast<TCoordinate>(img.width()) <= 0) ||
-      start.x >= static_cast<TCoordinate>(width()) ||
-      (start.y < 0 && start.y + static_cast<TCoordinate>(img.height()) <= 0) ||
-      start.y >= static_cast<TCoordinate>(height()) ||
-      (start.z < 0 && start.z + static_cast<TCoordinate>(img.depth()) <= 0) ||
-      start.z >= static_cast<TCoordinate>(depth()) ||
-      (start.c < 0 && start.c + static_cast<TCoordinate>(img.numChannels()) <= 0) ||
-      start.c >= static_cast<TCoordinate>(numChannels()) ||
-      (start.t < 0 && start.t + static_cast<TCoordinate>(img.numTimes()) <= 0) ||
-      start.t >= static_cast<TCoordinate>(numTimes())) {
+  if ((start.x < 0 && start.x + img.sWidth() <= 0) || start.x >= sWidth() ||
+      (start.y < 0 && start.y + img.sHeight() <= 0) || start.y >= sHeight() ||
+      (start.z < 0 && start.z + img.sDepth() <= 0) || start.z >= sDepth() ||
+      (start.c < 0 && start.c + img.sNumChannels() <= 0) || start.c >= sNumChannels() ||
+      (start.t < 0 && start.t + img.sNumTimes() <= 0) || start.t >= sNumTimes()) {
     if (warningOn) {
       LOG(WARNING) << "Trying to paste img with no overlap region, abort";
     }
@@ -1046,38 +991,28 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warnin
   }
 
   if (isSameType(img)) {
-    auto desX = std::max(start.x, TCoordinate(0));
+    auto desX = std::max(start.x, 0_z);
     size_t srcX = desX - start.x;
-    auto desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));
+    auto desXEnd = std::min(start.x + img.sWidth(), sWidth());
     size_t rowByteNumber = (desXEnd - desX) * m_info.bytesPerVoxel;
 
-    for (TCoordinate desT = std::max(start.t, TCoordinate(0));
-         desT < std::min(start.t + static_cast<TCoordinate>(img.numTimes()), static_cast<TCoordinate>(numTimes()));
-         ++desT) {
+    for (index_t desT = std::max(start.t, 0_z); desT < std::min(start.t + img.sNumTimes(), sNumTimes()); ++desT) {
       size_t srcT = desT - start.t;
-      for (TCoordinate desC = std::max(start.c, TCoordinate(0));
-           desC <
-           std::min(start.c + static_cast<TCoordinate>(img.numChannels()), static_cast<TCoordinate>(numChannels()));
+      for (index_t desC = std::max(start.c, 0_z); desC < std::min(start.c + img.sNumChannels(), sNumChannels());
            ++desC) {
         size_t srcC = desC - start.c;
-        for (TCoordinate desZ = std::max(start.z, TCoordinate(0));
-             desZ < std::min(start.z + static_cast<TCoordinate>(img.depth()), static_cast<TCoordinate>(depth()));
-             ++desZ) {
+        for (index_t desZ = std::max(start.z, 0_z); desZ < std::min(start.z + img.sDepth(), sDepth()); ++desZ) {
           size_t srcZ = desZ - start.z;
 #if 1
-          for (TCoordinate desY = std::max(start.y, TCoordinate(0));
-               desY < std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height()));
-               ++desY) {
+          for (index_t desY = std::max(start.y, 0_z); desY < std::min(start.y + img.sHeight(), sHeight()); ++desY) {
             size_t srcY = desY - start.y;
 
             std::memcpy(data(desX, desY, desZ, desC, desT), img.data(srcX, srcY, srcZ, srcC, srcT), rowByteNumber);
           }
 #else
           tbb::parallel_for(
-            tbb::blocked_range<TCoordinate>(
-              std::max(start.y, TCoordinate(0)),
-              std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height()))),
-            [&](const tbb::blocked_range<TCoordinate>& r) {
+            tbb::blocked_range<index_t>(std::max(start.y, 0_z), std::min(start.y + img.sHeight(), sHeight())),
+            [&](const tbb::blocked_range<index_t>& r) {
               for (TCoordinate desY = r.begin(); desY != r.end(); ++desY) {
                 size_t srcY = desY - start.y;
                 std::memcpy(data(desX, desY, desZ, desC, desT), img.data(srcX, srcY, srcZ, srcC, srcT), rowByteNumber);
@@ -1090,28 +1025,19 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warnin
   } else {
     imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
       imgTypeDispatcher(img.info(), [&, this]<typename TVoxelImg>() {
-        auto desX = std::max(start.x, TCoordinate(0));
+        auto desX = std::max(start.x, 0_z);
         size_t srcX = desX - start.x;
-        auto desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));
+        auto desXEnd = std::min(start.x + img.sWidth(), sWidth());
         size_t rowVoxelNumber = desXEnd - desX;
 
-        for (TCoordinate desT = std::max(start.t, TCoordinate(0));
-             desT < std::min(start.t + static_cast<TCoordinate>(img.numTimes()), static_cast<TCoordinate>(numTimes()));
-             ++desT) {
+        for (index_t desT = std::max(start.t, 0_z); desT < std::min(start.t + img.sNumTimes(), sNumTimes()); ++desT) {
           size_t srcT = desT - start.t;
-          for (TCoordinate desC = std::max(start.c, TCoordinate(0));
-               desC <
-               std::min(start.c + static_cast<TCoordinate>(img.numChannels()), static_cast<TCoordinate>(numChannels()));
+          for (index_t desC = std::max(start.c, 0_z); desC < std::min(start.c + img.sNumChannels(), sNumChannels());
                ++desC) {
             size_t srcC = desC - start.c;
-            for (TCoordinate desZ = std::max(start.z, TCoordinate(0));
-                 desZ < std::min(start.z + static_cast<TCoordinate>(img.depth()), static_cast<TCoordinate>(depth()));
-                 ++desZ) {
+            for (index_t desZ = std::max(start.z, 0_z); desZ < std::min(start.z + img.sDepth(), sDepth()); ++desZ) {
               size_t srcZ = desZ - start.z;
-              for (TCoordinate desY = std::max(start.y, TCoordinate(0));
-                   desY <
-                   std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height()));
-                   ++desY) {
+              for (index_t desY = std::max(start.y, 0_z); desY < std::min(start.y + img.sHeight(), sHeight()); ++desY) {
                 size_t srcY = desY - start.y;
 
                 auto* desData = data<TVoxel>(desX, desY, desZ, desC, desT);
@@ -1132,8 +1058,6 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warnin
 
 ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool warningOn)
 {
-  using TCoordinate = ZVoxelCoordinate::value_type;
-
   if (isEmpty() || img.isEmpty()) {
     if (warningOn) {
       LOG(WARNING) << "Trying to paste empty img, abort";
@@ -1141,16 +1065,11 @@ ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool war
     return *this;
   }
 
-  if ((start.x < 0 && start.x + static_cast<TCoordinate>(img.width()) <= 0) ||
-      start.x >= static_cast<TCoordinate>(width()) ||
-      (start.y < 0 && start.y + static_cast<TCoordinate>(img.height()) <= 0) ||
-      start.y >= static_cast<TCoordinate>(height()) ||
-      (start.z < 0 && start.z + static_cast<TCoordinate>(img.depth()) <= 0) ||
-      start.z >= static_cast<TCoordinate>(depth()) ||
-      (start.c < 0 && start.c + static_cast<TCoordinate>(img.numChannels()) <= 0) ||
-      start.c >= static_cast<TCoordinate>(numChannels()) ||
-      (start.t < 0 && start.t + static_cast<TCoordinate>(img.numTimes()) <= 0) ||
-      start.t >= static_cast<TCoordinate>(numTimes())) {
+  if ((start.x < 0 && start.x + img.sWidth() <= 0) || start.x >= sWidth() ||
+      (start.y < 0 && start.y + img.sHeight() <= 0) || start.y >= sHeight() ||
+      (start.z < 0 && start.z + img.sDepth() <= 0) || start.z >= sDepth() ||
+      (start.c < 0 && start.c + img.sNumChannels() <= 0) || start.c >= sNumChannels() ||
+      (start.t < 0 && start.t + img.sNumTimes() <= 0) || start.t >= sNumTimes()) {
     if (warningOn) {
       LOG(WARNING) << "Trying to paste img with no overlap region, abort";
     }
@@ -1159,27 +1078,19 @@ ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool war
 
   imgTypeDispatcher(m_info, [&, this]<typename TVoxel>() {
     imgTypeDispatcher(img.info(), [&, this]<typename TVoxelImg>() {
-      auto desX = std::max(start.x, TCoordinate(0));
+      auto desX = std::max(start.x, 0_z);
       size_t srcX = desX - start.x;
-      auto desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));
+      auto desXEnd = std::min(start.x + img.sWidth(), sWidth());
       size_t rowVoxelNumber = desXEnd - desX;
 
-      for (TCoordinate desT = std::max(start.t, TCoordinate(0));
-           desT < std::min(start.t + static_cast<TCoordinate>(img.numTimes()), static_cast<TCoordinate>(numTimes()));
-           ++desT) {
+      for (index_t desT = std::max(start.t, 0_z); desT < std::min(start.t + img.sNumTimes(), sNumTimes()); ++desT) {
         size_t srcT = desT - start.t;
-        for (TCoordinate desC = std::max(start.c, TCoordinate(0));
-             desC <
-             std::min(start.c + static_cast<TCoordinate>(img.numChannels()), static_cast<TCoordinate>(numChannels()));
+        for (index_t desC = std::max(start.c, 0_z); desC < std::min(start.c + img.sNumChannels(), sNumChannels());
              ++desC) {
           size_t srcC = desC - start.c;
-          for (TCoordinate desZ = std::max(start.z, TCoordinate(0));
-               desZ < std::min(start.z + static_cast<TCoordinate>(img.depth()), static_cast<TCoordinate>(depth()));
-               ++desZ) {
+          for (index_t desZ = std::max(start.z, 0_z); desZ < std::min(start.z + img.sDepth(), sDepth()); ++desZ) {
             size_t srcZ = desZ - start.z;
-            for (TCoordinate desY = std::max(start.y, TCoordinate(0));
-                 desY < std::min(start.y + static_cast<TCoordinate>(img.height()), static_cast<TCoordinate>(height()));
-                 ++desY) {
+            for (index_t desY = std::max(start.y, 0_z); desY < std::min(start.y + img.sHeight(), sHeight()); ++desY) {
               size_t srcY = desY - start.y;
 
               auto desData = data<TVoxel>(desX, desY, desZ, desC, desT);
@@ -1200,6 +1111,7 @@ ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool war
 ZImg ZImg::cat(const std::vector<ZImg>& imgsIn, Dimension dim)
 {
   std::vector<const ZImg*> imgs;
+  imgs.reserve(imgsIn.size());
   for (const auto& img : imgsIn) {
     imgs.push_back(&img);
   }
@@ -1316,6 +1228,7 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
 ZImg ZImg::combine(const std::vector<ZImg>& imgsIn, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
+  imgs.reserve(imgsIn.size());
   for (const auto& img : imgsIn) {
     imgs.push_back(&img);
   }
@@ -1440,7 +1353,7 @@ ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, index_t startIn, in
   size_t dend = m_info.size(dim);
   if (startIn >= 0 && endIn >= 0) {
     CHECK(startIn <= endIn);
-    CHECK(size_t(endIn) < m_info.size(dim));
+    CHECK(endIn < m_info.ssize(dim));
     dstart = startIn;
     dend = endIn + 1;
   }
@@ -1554,6 +1467,7 @@ ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, index_t startIn, in
     }
 
     std::vector<const ZImg*> imgs;
+    imgs.reserve(subImgs.size());
     for (const auto& subImg : subImgs) {
       imgs.push_back(&subImg);
     }
@@ -1612,23 +1526,14 @@ ZImg ZImg::castTo() const
 }
 
 template ZImg ZImg::castTo<uint8_t>() const;
-
 template ZImg ZImg::castTo<uint16_t>() const;
-
 template ZImg ZImg::castTo<uint32_t>() const;
-
 template ZImg ZImg::castTo<uint64_t>() const;
-
 template ZImg ZImg::castTo<int8_t>() const;
-
 template ZImg ZImg::castTo<int16_t>() const;
-
 template ZImg ZImg::castTo<int32_t>() const;
-
 template ZImg ZImg::castTo<int64_t>() const;
-
 template ZImg ZImg::castTo<float>() const;
-
 template ZImg ZImg::castTo<double>() const;
 
 [[nodiscard]] ZImg ZImg::castTo(VoxelFormat vf, size_t bytePerVoxel)
@@ -1681,9 +1586,9 @@ ZImg ZImg::resized(size_t desWidth,
   }
 
   ZImgInfo info = m_info;
-  info.voxelSizeX *= double(info.width) / desWidth;
-  info.voxelSizeY *= double(info.height) / desHeight;
-  info.voxelSizeZ *= double(info.depth) / desDepth;
+  info.voxelSizeX *= static_cast<double>(info.width) / desWidth;
+  info.voxelSizeY *= static_cast<double>(info.height) / desHeight;
+  info.voxelSizeZ *= static_cast<double>(info.depth) / desDepth;
   info.width = desWidth;
   info.height = desHeight;
   info.depth = desDepth;
@@ -2019,13 +1924,13 @@ ZImg ZImg::cumulativeSum(Dimension dim) const
 {
   ZImg res = *this;
   if (dim == Dimension::T) {
-    for (size_t t = 1; t < numTimes(); ++t) {
+    for (index_t t = 1; t < sNumTimes(); ++t) {
       ZImg currentTime = res.createView(-1, t);
       ZImg lastTime = res.createView(-1, t - 1);
       currentTime += lastTime;
     }
   } else if (dim == Dimension::C) {
-    for (size_t c = 1; c < numChannels(); ++c) {
+    for (index_t c = 1; c < sNumChannels(); ++c) {
       ZImg currentCh = res.createView(c, -1);
       ZImg lastCh = res.createView(c - 1, -1);
       currentCh += lastCh;
@@ -2249,40 +2154,38 @@ ZVoxelCoordinate ZImg::indexToCoord(index_t idx, const ZImgInfo& info)
   ZVoxelCoordinate res;
   //  res.l = idx >= 0 ? (idx / info.locationVoxelNumber()) : (- 1 - ((-idx-1) / info.locationVoxelNumber()));
   //  idx -= res.l * (index_t)info.locationVoxelNumber();  //idx is positive now
-  res.t = idx >= 0 ? (idx / info.timeVoxelNumber()) : (-1 - ((-idx - 1) / info.timeVoxelNumber()));
-  idx -= res.t * static_cast<index_t>(info.timeVoxelNumber()); // idx is positive now
+  res.t = idx >= 0 ? (idx / info.sTimeVoxelNumber()) : (-1 - ((-idx - 1) / info.sTimeVoxelNumber()));
+  idx -= res.t * info.sTimeVoxelNumber(); // idx is positive now
   //  res.t = idx / info.timeVoxelNumber();
   //  idx -= res.t * info.timeVoxelNumber();
-  res.c = idx / info.channelVoxelNumber();
-  idx -= res.c * info.channelVoxelNumber();
-  res.z = idx / info.planeVoxelNumber();
-  idx -= res.z * info.planeVoxelNumber();
-  res.y = idx / info.rowVoxelNumber();
-  idx -= res.y * info.rowVoxelNumber();
+  res.c = idx / info.sChannelVoxelNumber();
+  idx -= res.c * info.sChannelVoxelNumber();
+  res.z = idx / info.sPlaneVoxelNumber();
+  idx -= res.z * info.sPlaneVoxelNumber();
+  res.y = idx / info.sRowVoxelNumber();
+  idx -= res.y * info.sRowVoxelNumber();
   res.x = idx;
   return res;
 }
 
 index_t ZImg::coordToIndex(const ZVoxelCoordinate& coord, const ZImgInfo& info)
 {
-  return coord.t * static_cast<index_t>(info.timeVoxelNumber()) +
-         coord.c * static_cast<index_t>(info.channelVoxelNumber()) +
-         coord.z * static_cast<index_t>(info.planeVoxelNumber()) +
-         coord.y * static_cast<index_t>(info.rowVoxelNumber()) + coord.x;
+  return coord.t * info.sTimeVoxelNumber() + coord.c * info.sChannelVoxelNumber() + coord.z * info.sPlaneVoxelNumber() +
+         coord.y * info.sRowVoxelNumber() + coord.x;
 }
 
 ZImg& ZImg::correctPreMultipliedColor()
 {
-  if (numChannels() > 1) {
+  if (auto nc = sNumChannels(); nc > 1) {
     if (voxelFormat() == VoxelFormat::Float) {
-      ZImg divImg = createView(numChannels() - 1);
-      for (size_t c = 0; c < numChannels() - 1; ++c) {
+      ZImg divImg = createView(nc - 1);
+      for (index_t c = 0; c < nc - 1; ++c) {
         ZImg chImg = createView(c);
         chImg.secureDivideBy(divImg);
       }
     } else {
-      ZImg divImg = createView(numChannels() - 1).convertTo<double>();
-      for (size_t c = 0; c < numChannels() - 1; ++c) {
+      ZImg divImg = createView(nc - 1).convertTo<double>();
+      for (index_t c = 0; c < nc - 1; ++c) {
         ZImg chImg = createView(c);
         chImg.secureDivideBy(divImg);
       }
