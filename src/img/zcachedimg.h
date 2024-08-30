@@ -43,6 +43,31 @@ public:
     return m_imgInfo.numTimes;
   }
 
+  [[nodiscard]] index_t sWidth() const
+  {
+    return static_cast<index_t>(m_imgInfo.width);
+  }
+
+  [[nodiscard]] index_t sHeight() const
+  {
+    return static_cast<index_t>(m_imgInfo.height);
+  }
+
+  [[nodiscard]] index_t sDepth() const
+  {
+    return static_cast<index_t>(m_imgInfo.depth);
+  }
+
+  [[nodiscard]] index_t sNumChannels() const
+  {
+    return static_cast<index_t>(m_imgInfo.numChannels);
+  }
+
+  [[nodiscard]] index_t sNumTimes() const
+  {
+    return static_cast<index_t>(m_imgInfo.numTimes);
+  }
+
   void save(const QString& filename,
             FileFormat format = FileFormat::Unknown,
             const ZImgWriteParameters& paras = ZImgWriteParameters()) const;

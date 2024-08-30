@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zglobal.h"
 #include <boost/align/aligned_allocator.hpp>
 #include <complex>
 #include <string>
@@ -58,14 +59,29 @@ public:
     return sizeof(std::complex<double>);
   }
 
+  [[nodiscard]] static index_t sVoxelByteNumber()
+  {
+    return static_cast<index_t>(voxelByteNumber());
+  }
+
   [[nodiscard]] size_t rowByteNumber() const
   {
     return voxelByteNumber() * m_width;
   }
 
+  [[nodiscard]] index_t sRowByteNumber() const
+  {
+    return static_cast<index_t>(rowByteNumber());
+  }
+
   [[nodiscard]] size_t planeByteNumber() const
   {
     return voxelByteNumber() * m_width * m_height;
+  }
+
+  [[nodiscard]] index_t sPlaneByteNumber() const
+  {
+    return static_cast<index_t>(planeByteNumber());
   }
 
   [[nodiscard]] std::string toString() const;

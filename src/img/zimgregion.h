@@ -51,11 +51,9 @@ struct ZImgRegion
   {
     return start.allGreaterEqual(0) &&
            start.allLessThan(ZVoxelCoordinate(info.width, info.height, info.depth, info.numChannels, info.numTimes)) &&
-           (end.x == -1 || static_cast<size_t>(end.x) <= info.width) &&
-           (end.y == -1 || static_cast<size_t>(end.y) <= info.height) &&
-           (end.z == -1 || static_cast<size_t>(end.z) <= info.depth) &&
-           (end.c == -1 || static_cast<size_t>(end.c) <= info.numChannels) &&
-           (end.t == -1 || static_cast<size_t>(end.t) <= info.numTimes);
+           (end.x == -1 || end.x <= info.sWidth()) && (end.y == -1 || end.y <= info.sHeight()) &&
+           (end.z == -1 || end.z <= info.sDepth()) && (end.c == -1 || end.c <= info.sNumChannels()) &&
+           (end.t == -1 || end.t <= info.sNumTimes());
   }
 
   [[nodiscard]] bool isDefault() const
@@ -81,28 +79,27 @@ struct ZImgRegion
 
   [[nodiscard]] bool containsWholeRow(const ZImgInfo& info) const
   {
-    return start.x == 0 && (end.x == -1 || end.x == static_cast<value_type>(info.width));
+    return start.x == 0 && (end.x == -1 || end.x == info.sWidth());
   }
 
   [[nodiscard]] bool containsWholePlane(const ZImgInfo& info) const
   {
-    return containsWholeRow(info) && start.y == 0 && (end.y == -1 || end.y == static_cast<value_type>(info.height));
+    return containsWholeRow(info) && start.y == 0 && (end.y == -1 || end.y == info.sHeight());
   }
 
   [[nodiscard]] bool containsWholeChannel(const ZImgInfo& info) const
   {
-    return containsWholePlane(info) && start.z == 0 && (end.z == -1 || end.z == static_cast<value_type>(info.depth));
+    return containsWholePlane(info) && start.z == 0 && (end.z == -1 || end.z == info.sDepth());
   }
 
   [[nodiscard]] bool containsWholeTime(const ZImgInfo& info) const
   {
-    return containsWholeChannel(info) && start.c == 0 &&
-           (end.c == -1 || end.c == static_cast<value_type>(info.numChannels));
+    return containsWholeChannel(info) && start.c == 0 && (end.c == -1 || end.c == info.sNumChannels());
   }
 
   [[nodiscard]] bool containsWholeImg(const ZImgInfo& info) const
   {
-    return containsWholeTime(info) && start.t == 0 && (end.t == -1 || end.t == static_cast<value_type>(info.numTimes));
+    return containsWholeTime(info) && start.t == 0 && (end.t == -1 || end.t == info.sNumTimes());
   }
 
   [[nodiscard]] std::string toString() const

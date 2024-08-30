@@ -235,7 +235,7 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
 
     switch (sb.directoryEntry.compression) {
       case 0: // Uncompressed
-        if (static_cast<int64_t>(info.byteNumber()) != sb.dataSize) {
+        if (info.sByteNumber() != sb.dataSize) {
           throw ZException("stored size and tile info don't match");
         }
         res = ZImg(info);
@@ -281,7 +281,7 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
         break;
       default:
         try {
-          if (static_cast<int64_t>(info.byteNumber()) == sb.dataSize) {
+          if (info.sByteNumber() == sb.dataSize) {
             res = ZImg(info);
             ZImgFormat::fixDimensionOrder(fileBuf.data(),
                                           dimensionOrder,
@@ -454,7 +454,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene, 
   std::vector<ZImg> imgs;
   coords.clear();
   for (const auto& tile : m_sceneTiles[scene]) {
-    if (tile.ratio == 1_uz && tile.start.c == static_cast<int>(ch)) {
+    if (tile.ratio == 1_uz && tile.start.c == static_cast<index_t>(ch)) {
       imgs.push_back(readCZITile(inputFileStream, tile));
       coords.push_back(tile.start);
     }
@@ -501,7 +501,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString& filename,
 
   std::vector<ZImg> imgs;
   for (const auto& tile : m_sceneTiles[scene]) {
-    if (tile.ratio == 1_uz && tile.start.c == static_cast<int>(ch)) {
+    if (tile.ratio == 1_uz && tile.start.c == static_cast<index_t>(ch)) {
       index_t startX = std::max(0.0, std::floor(tile.start.x * scale));
       index_t endX = std::min(inverseMask.width() * 1.0, startX + std::ceil(tile.size.x * scale));
       index_t startY = std::max(0.0, std::floor(tile.start.y * scale));
@@ -572,7 +572,7 @@ ZImg ZImgZeissCZI::correctShading(const QString& filename,
     meanZ = parallel_mean(modelZ.channelData<double>(0), modelZ.channelData<double>(0) + modelZ.channelVoxelNumber());
   }
   for (const auto& tile : m_sceneTiles[scene]) {
-    if (tile.ratio == 1_uz && tile.start.c == static_cast<int>(ch)) {
+    if (tile.ratio == 1_uz && tile.start.c == static_cast<index_t>(ch)) {
       ZImg origtile = readCZITile(inputFileStream, tile);
       ZImg tileImg = origtile.castTo<double>();
       origtile.clear();

@@ -772,28 +772,27 @@ void ZImgIO::readImg(const QStringList& fileList,
   }
   imgs.resize(imgSources.size());
 
-  size_t sliceCatDimStart = 0;
-  size_t sliceCatDimEnd = 0;
+  index_t sliceCatDimStart = 0;
+  index_t sliceCatDimEnd = 0;
   for (size_t i = 0; i < imgs.size(); ++i) {
     ZImgInfo& sliceInfo = sliceInfos[i];
     sliceCatDimStart = i == 0 ? 0 : sliceCatDimEnd;
     sliceCatDimEnd = sliceCatDimStart + sliceInfo.size(catDim);
-    if (sliceCatDimStart >= static_cast<size_t>(region.end[std::to_underlying(catDim)]) ||
-        sliceCatDimEnd <= static_cast<size_t>(region.start[std::to_underlying(catDim)])) {
+    if (sliceCatDimStart >= region.end[std::to_underlying(catDim)] ||
+        sliceCatDimEnd <= region.start[std::to_underlying(catDim)]) {
       continue;
     }
     ZImgRegion sliceRegion = region;
-    if (static_cast<size_t>(region.start[std::to_underlying(catDim)]) > sliceCatDimStart) {
-      sliceRegion.start[std::to_underlying(catDim)] =
-        static_cast<size_t>(region.start[std::to_underlying(catDim)]) - sliceCatDimStart;
+    if (region.start[std::to_underlying(catDim)] > sliceCatDimStart) {
+      sliceRegion.start[std::to_underlying(catDim)] = region.start[std::to_underlying(catDim)] - sliceCatDimStart;
     } else {
       sliceRegion.start[std::to_underlying(catDim)] = 0;
     }
-    if (static_cast<size_t>(region.end[std::to_underlying(catDim)]) < sliceCatDimEnd) {
+    if (region.end[std::to_underlying(catDim)] < sliceCatDimEnd) {
       sliceRegion.end[std::to_underlying(catDim)] =
-        sliceInfo.size(catDim) - (sliceCatDimEnd - static_cast<size_t>(region.end[std::to_underlying(catDim)]));
+        sliceInfo.ssize(catDim) - (sliceCatDimEnd - region.end[std::to_underlying(catDim)]);
     } else {
-      sliceRegion.end[std::to_underlying(catDim)] = sliceInfo.size(catDim);
+      sliceRegion.end[std::to_underlying(catDim)] = sliceInfo.ssize(catDim);
     }
 
     if (expandXY && (sliceInfo.width < info.width || sliceInfo.height < info.height)) {

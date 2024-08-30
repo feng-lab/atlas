@@ -1,8 +1,6 @@
 #include "zimginfo.h"
 
 #include "zrandom.h"
-#include <QLocale>
-#include <type_traits>
 
 namespace nim {
 

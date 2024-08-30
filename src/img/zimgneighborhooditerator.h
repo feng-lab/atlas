@@ -273,9 +273,9 @@ public:
     for (size_t i = 0; i < m_coord.length() - 1; ++i) {
       m_coord[i] += coordAdvance[i];
       m_coord[i] += carry;
-      if (m_coord[i] >= static_cast<ZVoxelCoordinate::value_type>(m_regionInfo.size(i))) {
+      if (m_coord[i] >= m_regionInfo.ssize(i)) {
         carry = 1;
-        m_coord[i] -= m_regionInfo.size(i);
+        m_coord[i] -= m_regionInfo.ssize(i);
       } else {
         carry = 0;
       }
@@ -336,9 +336,8 @@ public:
       m_allNbInBound = false;
       for (size_t i = 0; i < m_nbCoords.size(); ++i) {
         m_nbCoords[i] = m_coord + m_neighborhood[i];
-        if (m_nbCoords[i].x >= 0 && m_nbCoords[i].y >= 0 && m_nbCoords[i].z >= 0 &&
-            m_nbCoords[i].x < static_cast<int>(m_img->width()) && m_nbCoords[i].y < static_cast<int>(m_img->height()) &&
-            m_nbCoords[i].z < static_cast<int>(m_img->depth())) {
+        if (m_nbCoords[i].x >= 0 && m_nbCoords[i].y >= 0 && m_nbCoords[i].z >= 0 && m_nbCoords[i].x < m_img->sWidth() &&
+            m_nbCoords[i].y < m_img->sHeight() && m_nbCoords[i].z < m_img->sDepth()) {
           m_isNbInBound[i] = true;
         } else {
           m_isNbInBound[i] = false;

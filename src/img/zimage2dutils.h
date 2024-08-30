@@ -43,7 +43,7 @@ void wrapCoordToImage(SignedIntegerType* coord, const size_t* imgSize, size_t nu
       if (coord[i] < 0) {
         coord[i] = 0;
       }
-      if (coord[i] > static_cast<int>(imgSize[i]) - 1) {
+      if (coord[i] > static_cast<SignedIntegerType>(imgSize[i]) - 1) {
         coord[i] = imgSize[i] - 1;
       }
     }
@@ -275,7 +275,7 @@ void image2DPad(const TPixel* img,
       refX = -1;
       for (size_t i = desWidth - rightPad; i < desWidth; ++i) {
         ++refX;
-        refX = refX >= static_cast<int>(width) ? 0 : refX;
+        refX = refX >= static_cast<index_t>(width) ? 0 : refX;
         for (size_t j = 0; j < height; ++j) {
           imgOut[(j + upPad) * desWidth + i] = img[j * width + refX];
         }
@@ -291,7 +291,7 @@ void image2DPad(const TPixel* img,
       refY = -1;
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
         ++refY;
-        refY = refY >= static_cast<int>(height) ? 0 : refY;
+        refY = refY >= static_cast<index_t>(height) ? 0 : refY;
         std::memcpy(imgOut + j * desWidth, imgOut + (refY + upPad) * desWidth, sizeof(TPixel) * desWidth);
       }
     }

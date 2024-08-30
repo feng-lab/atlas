@@ -158,6 +158,11 @@ struct ZImgInfo
     }
   }
 
+  [[nodiscard]] index_t ssize(size_t dim) const
+  {
+    return static_cast<index_t>(size(dim));
+  }
+
   [[nodiscard]] size_t size(Dimension dim) const
   {
     return size(std::to_underlying(dim));
@@ -311,6 +316,11 @@ struct ZImgInfo
     return bytesPerVoxel;
   } // voxel of one channel
 
+  [[nodiscard]] index_t sVoxelByteNumber() const
+  {
+    return static_cast<index_t>(bytesPerVoxel);
+  }
+
   [[nodiscard]] size_t rowVoxelNumber() const
   {
     return width;
@@ -324,6 +334,11 @@ struct ZImgInfo
   [[nodiscard]] size_t rowByteNumber() const
   {
     return width * bytesPerVoxel;
+  }
+
+  [[nodiscard]] index_t sRowByteNumber() const
+  {
+    return static_cast<index_t>(rowByteNumber());
   }
 
   [[nodiscard]] size_t planeVoxelNumber() const
@@ -341,6 +356,11 @@ struct ZImgInfo
     return width * height * bytesPerVoxel;
   }
 
+  [[nodiscard]] index_t sPlaneByteNumber() const
+  {
+    return static_cast<index_t>(planeByteNumber());
+  }
+
   [[nodiscard]] size_t channelVoxelNumber() const
   {
     return width * height * depth;
@@ -356,6 +376,11 @@ struct ZImgInfo
     return width * height * depth * bytesPerVoxel;
   }
 
+  [[nodiscard]] index_t sChannelByteNumber() const
+  {
+    return static_cast<index_t>(channelByteNumber());
+  }
+
   [[nodiscard]] size_t timeVoxelNumber() const
   {
     return width * height * depth * numChannels;
@@ -369,6 +394,11 @@ struct ZImgInfo
   [[nodiscard]] size_t timeByteNumber() const
   {
     return width * height * depth * numChannels * bytesPerVoxel;
+  }
+
+  [[nodiscard]] index_t sTimeByteNumber() const
+  {
+    return static_cast<index_t>(timeByteNumber());
   }
 
   //  size_t locationVoxelNumber() const { return width * height * depth * numChannels * numTimes; }
@@ -387,6 +417,11 @@ struct ZImgInfo
   [[nodiscard]] size_t byteNumber() const
   {
     return width * height * depth * numChannels * numTimes * bytesPerVoxel;
+  }
+
+  [[nodiscard]] index_t sByteNumber() const
+  {
+    return static_cast<index_t>(byteNumber());
   }
 
   template<typename TVoxel>

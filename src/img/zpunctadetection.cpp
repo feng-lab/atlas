@@ -104,10 +104,8 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
         for (auto lz = -w; lz <= w; ++lz) { // local z
           for (auto y = -w; y <= w; ++y) {
             for (auto x = -w; x <= w; ++x) {
-              if (x * x + y * y + lz * lz <= w * w && m.x() + x >= 0 &&
-                  m.x() + x < static_cast<nim::index_t>(img.width()) && m.y() + y >= 0 &&
-                  m.y() + y < static_cast<nim::index_t>(img.height()) && m.z() + lz >= 0 &&
-                  m.z() + lz < static_cast<nim::index_t>(img.depth())) {
+              if (x * x + y * y + lz * lz <= w * w && m.x() + x >= 0 && m.x() + x < img.sWidth() && m.y() + y >= 0 &&
+                  m.y() + y < img.sHeight() && m.z() + lz >= 0 && m.z() + lz < img.sDepth()) {
                 values.push_back(img.value<double>(m.x() + x, m.y() + y, m.z() + lz));
                 x_shifts.push_back(x);
                 y_shifts.push_back(y);
@@ -141,8 +139,8 @@ Eigen::MatrixXd meanShiftGaussianCenters(const nim::ZVBGMM<T, double>& vbgmm, co
         std::vector<double> y_shifts;
         for (auto y = -w; y <= w; ++y) {
           for (auto x = -w; x <= w; ++x) {
-            if (x * x + y * y <= w * w && m.x() + x >= 0 && m.x() + x < static_cast<nim::index_t>(img.width()) &&
-                m.y() + y >= 0 && m.y() + y < static_cast<nim::index_t>(img.height())) {
+            if (x * x + y * y <= w * w && m.x() + x >= 0 && m.x() + x < img.sWidth() && m.y() + y >= 0 &&
+                m.y() + y < img.sHeight()) {
               values.push_back(img.value<double>(m.x() + x, m.y() + y, z));
               x_shifts.push_back(x);
               y_shifts.push_back(y);
@@ -216,7 +214,7 @@ void ZPunctaDetection::doWork()
   }
 
   if (m_dendriteChannel != -1) {
-    if (m_dendriteChannel >= 0 && m_dendriteChannel < static_cast<int>(m_imgInfo.numChannels)) {
+    if (m_dendriteChannel >= 0 && m_dendriteChannel < m_imgInfo.sNumChannels()) {
       LOG(INFO) << "Dendrite Channel: " << m_dendriteChannel + 1 << " (start from 1)";
       LOG(INFO) << "Dendrite Threshold: " << m_dendriteThreshold;
       LOG(INFO) << "Max Dendrite Tube Radius: " << m_maxDendriteTubeRadius << "um";

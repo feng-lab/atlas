@@ -302,8 +302,8 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   resInfo = tmpRegion.clip(info);
 
   rect = {int32_t(tmpRegion.start.x), int32_t(tmpRegion.start.y), 0, 0};
-  rect.Width = tmpRegion.end.x < 0 ? (info.width - tmpRegion.start.x) : (region.end.x - tmpRegion.start.x);
-  rect.Height = tmpRegion.end.y < 0 ? (info.height - tmpRegion.start.y) : (region.end.y - tmpRegion.start.y);
+  rect.Width = tmpRegion.end.x < 0 ? (info.sWidth() - tmpRegion.start.x) : (region.end.x - tmpRegion.start.x);
+  rect.Height = tmpRegion.end.y < 0 ? (info.sHeight() - tmpRegion.start.y) : (region.end.y - tmpRegion.start.y);
 
   pDecoder->WMP.wmiI.cROILeftX = rect.X;
   pDecoder->WMP.wmiI.cROITopY = rect.Y;
@@ -320,13 +320,13 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
     img.swap(imgTmp);
 
     if (PI.grBit & PK_pixfmtPreMul && info.lastChannelIsAlphaChannel) {
-      if (region.start.c < static_cast<int>(img.numChannels() - 1)) { // otherwise don't need to process color channels
+      if (region.start.c < img.sNumChannels() - 1) { // otherwise don't need to process color channels
         img.correctPreMultipliedColor();
       }
     }
   }
 
-  if (region.start.c != 0 || (region.end.c > 0 && region.end.c < static_cast<int>(img.numChannels()))) {
+  if (region.start.c != 0 || (region.end.c > 0 && region.end.c < img.sNumChannels())) {
     tmpRegion = ZImgRegion();
     tmpRegion.start.c = region.start.c;
     tmpRegion.end.c = region.end.c;

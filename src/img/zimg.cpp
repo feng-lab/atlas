@@ -2802,10 +2802,10 @@ void ZImg::blockSumPart_Impl(ZImg& res,
       auto desData = res.channelData<TVoxel>(c, t);
       size_t desOffset = 0;
       for (size_t z = 0; z < res.depth(); ++z) {
-        size_t blockZStart = std::max(0, static_cast<int>(zStart + z) - static_cast<int>(tdepth) + 1);
+        size_t blockZStart = std::max(0_z, static_cast<index_t>(zStart + z) - static_cast<index_t>(tdepth) + 1);
         size_t blockZEnd = std::min(depth(), zStart + z + 1);
         for (size_t y = 0; y < res.height(); ++y) {
-          size_t blockYStart = std::max(0, static_cast<int>(yStart + y) - static_cast<int>(theight) + 1);
+          size_t blockYStart = std::max(0_z, static_cast<index_t>(yStart + y) - static_cast<index_t>(theight) + 1);
           size_t blockYEnd = std::min(height(), yStart + y + 1);
           TVoxel inc = 0;
           TVoxel dec = 0;

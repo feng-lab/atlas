@@ -218,9 +218,9 @@ public:
     for (size_t i = 0; i < m_coord.size() - 1; ++i) {
       m_coord[i] += coordAdvance[i];
       m_coord[i] += carry;
-      if (m_coord[i] >= static_cast<ZVoxelCoordinate::value_type>(m_regionInfo.size(i))) {
+      if (m_coord[i] >= m_regionInfo.ssize(i)) {
         carry = 1;
-        m_coord[i] -= m_regionInfo.size(i);
+        m_coord[i] -= m_regionInfo.ssize(i);
       } else {
         carry = 0;
       }

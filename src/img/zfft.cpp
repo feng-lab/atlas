@@ -116,12 +116,8 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
   ZImg expandedImg(expandedInfo);
   expandedImg.pasteImg(img);
   pocketfft::r2c({expandedInfo.depth, expandedInfo.height, expandedInfo.width},
-                 {static_cast<ptrdiff_t>(expandedInfo.planeByteNumber()),
-                  static_cast<ptrdiff_t>(expandedInfo.rowByteNumber()),
-                  static_cast<ptrdiff_t>(expandedInfo.voxelByteNumber())},
-                 {static_cast<ptrdiff_t>(res.planeByteNumber()),
-                  static_cast<ptrdiff_t>(res.rowByteNumber()),
-                  static_cast<ptrdiff_t>(res.voxelByteNumber())},
+                 {expandedInfo.sPlaneByteNumber(), expandedInfo.sRowByteNumber(), expandedInfo.sVoxelByteNumber()},
+                 {res.sPlaneByteNumber(), res.sRowByteNumber(), res.sVoxelByteNumber()},
                  {0, 1, 2},
                  true,
                  expandedImg.channelData<double>(0),
@@ -201,12 +197,8 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
   ZImgInfo outImgInfo(width, cimg.height(), cimg.depth(), 1, 1, 8, VoxelFormat::Float);
   ZImg outImg(outImgInfo);
   pocketfft::c2r({outImgInfo.depth, outImgInfo.height, outImgInfo.width},
-                 {static_cast<ptrdiff_t>(cimg.planeByteNumber()),
-                  static_cast<ptrdiff_t>(cimg.rowByteNumber()),
-                  static_cast<ptrdiff_t>(cimg.voxelByteNumber())},
-                 {static_cast<ptrdiff_t>(outImgInfo.planeByteNumber()),
-                  static_cast<ptrdiff_t>(outImgInfo.rowByteNumber()),
-                  static_cast<ptrdiff_t>(outImgInfo.voxelByteNumber())},
+                 {cimg.sPlaneByteNumber(), cimg.sRowByteNumber(), cimg.sVoxelByteNumber()},
+                 {outImgInfo.sPlaneByteNumber(), outImgInfo.sRowByteNumber(), outImgInfo.sVoxelByteNumber()},
                  {0, 1, 2},
                  false,
                  cimg.rawData(),

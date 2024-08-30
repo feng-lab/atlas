@@ -35,7 +35,7 @@ void ZSectionsRegistration::doWork()
     throw ZException(fmt::format("Can not align time sequence image: {}", srcImg.info()));
   }
 
-  if (m_fixedSliceIndex >= 0 && static_cast<size_t>(m_fixedSliceIndex) < srcImg.depth()) {
+  if (m_fixedSliceIndex >= 0 && m_fixedSliceIndex < srcImg.sDepth()) {
     LOG(INFO) << "Fixed Image Index: " << m_fixedSliceIndex + 1 << " (start from 1)";
   } else {
     throw ZException(fmt::format("Wrong fixed image index: {}. Abort", m_fixedSliceIndex));
@@ -51,7 +51,7 @@ void ZSectionsRegistration::doWork()
     }
   }
 
-  if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < srcImg.numChannels()) {
+  if (m_referenceChannel >= 0 && m_referenceChannel < srcImg.sNumChannels()) {
     LOG(INFO) << "Reference Channel: " << m_referenceChannel + 1 << " (start from 1)";
   } else {
     throw ZException(fmt::format("Wrong reference channel: {}. Abort", m_referenceChannel));

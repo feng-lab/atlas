@@ -327,9 +327,9 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffset(const ZVoxelCoordinate& off
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
     throw ZException("computeMovingImgOffset: Can not match empty imgs");
   }
-  if (offset.x < 1 - static_cast<int>(m_movingImg.width()) || offset.x > static_cast<int>(m_fixedImg.width()) - 1 ||
-      offset.y < 1 - static_cast<int>(m_movingImg.height()) || offset.y > static_cast<int>(m_fixedImg.height()) - 1 ||
-      offset.z < 1 - static_cast<int>(m_movingImg.depth()) || offset.z > static_cast<int>(m_fixedImg.depth()) - 1) {
+  if (offset.x < 1 - m_movingImg.sWidth() || offset.x > m_fixedImg.sWidth() - 1 ||
+      offset.y < 1 - m_movingImg.sHeight() || offset.y > m_fixedImg.sHeight() - 1 ||
+      offset.z < 1 - m_movingImg.sDepth() || offset.z > m_fixedImg.sDepth() - 1) {
     throw ZException("invalid offset");
   }
   double tmpMaxNCC;
@@ -367,9 +367,9 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffsetMR(const ZVoxelCoordinate& o
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
     throw ZException("computeMovingImgOffset: Can not match empty imgs");
   }
-  if (offset.x < 1 - static_cast<int>(m_movingImg.width()) || offset.x > static_cast<int>(m_fixedImg.width()) - 1 ||
-      offset.y < 1 - static_cast<int>(m_movingImg.height()) || offset.y > static_cast<int>(m_fixedImg.height()) - 1 ||
-      offset.z < 1 - static_cast<int>(m_movingImg.depth()) || offset.z > static_cast<int>(m_fixedImg.depth()) - 1) {
+  if (offset.x < 1 - m_movingImg.sWidth() || offset.x > m_fixedImg.sWidth() - 1 ||
+      offset.y < 1 - m_movingImg.sHeight() || offset.y > m_fixedImg.sHeight() - 1 ||
+      offset.z < 1 - m_movingImg.sDepth() || offset.z > m_fixedImg.sDepth() - 1) {
     throw ZException("invalid offset");
   }
   ZVoxelCoordinate res;
@@ -443,21 +443,21 @@ ZImgNCCMatch::getMovingImgOffsetFromHint(double exactOverlapRateX, double exactO
   ZVoxelCoordinate movingImgOffset;
   if (isFlagSet(m_movingImgPosHint, PositionHint::Left)) {
     auto shift = std::round(m_fixedImg.info().width * exactOverlapRateX);
-    movingImgOffset.x = -static_cast<ZVoxelCoordinate::value_type>(m_movingImg.info().width) + shift;
+    movingImgOffset.x = -m_movingImg.sWidth() + shift;
   } else if (isFlagSet(m_movingImgPosHint, PositionHint::Right)) {
     auto shift = std::round(m_fixedImg.info().width * exactOverlapRateX);
     movingImgOffset.x = m_fixedImg.info().width - shift;
   }
   if (isFlagSet(m_movingImgPosHint, PositionHint::Up)) {
     auto shift = std::round(m_fixedImg.info().height * exactOverlapRateY);
-    movingImgOffset.y = -static_cast<ZVoxelCoordinate::value_type>(m_movingImg.info().height) + shift;
+    movingImgOffset.y = -m_movingImg.sHeight() + shift;
   } else if (isFlagSet(m_movingImgPosHint, PositionHint::Down)) {
     auto shift = std::round(m_fixedImg.info().height * exactOverlapRateY);
     movingImgOffset.y = m_fixedImg.info().height - shift;
   }
   if (isFlagSet(m_movingImgPosHint, PositionHint::Front)) {
     auto shift = std::round(m_fixedImg.info().depth * exactOverlapRateZ);
-    movingImgOffset.z = -static_cast<ZVoxelCoordinate::value_type>(m_movingImg.info().depth) + shift;
+    movingImgOffset.z = -m_movingImg.sDepth() + shift;
   } else if (isFlagSet(m_movingImgPosHint, PositionHint::Back)) {
     auto shift = std::round(m_fixedImg.info().depth * exactOverlapRateZ);
     movingImgOffset.z = m_fixedImg.info().depth - shift;
@@ -978,20 +978,13 @@ ZImgNCCMatch::getRequiredSrcImgRegionAndValidNccRegion(const ZVoxelCoordinate& o
   ZImgRegion validNccRgn;
 
   ZVoxelCoordinate startOffset = offset - ZVoxelCoordinate(radiusX, radiusY, radiusZ);
-  startOffset.x =
-    std::clamp(startOffset.x, 1 - static_cast<index_t>(movingImg.width()), static_cast<index_t>(fixedImg.width()) - 1);
-  startOffset.y = std::clamp(startOffset.y,
-                             1 - static_cast<index_t>(movingImg.height()),
-                             static_cast<index_t>(fixedImg.height()) - 1);
-  startOffset.z =
-    std::clamp(startOffset.z, 1 - static_cast<index_t>(movingImg.depth()), static_cast<index_t>(fixedImg.depth()) - 1);
+  startOffset.x = std::clamp(startOffset.x, 1 - movingImg.sWidth(), fixedImg.sWidth() - 1);
+  startOffset.y = std::clamp(startOffset.y, 1 - movingImg.sHeight(), fixedImg.sHeight() - 1);
+  startOffset.z = std::clamp(startOffset.z, 1 - movingImg.sDepth(), fixedImg.sDepth() - 1);
   ZVoxelCoordinate endOffset = offset + ZVoxelCoordinate(radiusX, radiusY, radiusZ);
-  endOffset.x =
-    std::clamp(endOffset.x, 1 - static_cast<index_t>(movingImg.width()), static_cast<index_t>(fixedImg.width()) - 1);
-  endOffset.y =
-    std::clamp(endOffset.y, 1 - static_cast<index_t>(movingImg.height()), static_cast<index_t>(fixedImg.height()) - 1);
-  endOffset.z =
-    std::clamp(endOffset.z, 1 - static_cast<index_t>(movingImg.depth()), static_cast<index_t>(fixedImg.depth()) - 1);
+  endOffset.x = std::clamp(endOffset.x, 1 - movingImg.sWidth(), fixedImg.sWidth() - 1);
+  endOffset.y = std::clamp(endOffset.y, 1 - movingImg.sHeight(), fixedImg.sHeight() - 1);
+  endOffset.z = std::clamp(endOffset.z, 1 - movingImg.sDepth(), fixedImg.sDepth() - 1);
 
   fixedRgn.start = startOffset;
   fixedRgn.start = max(fixedRgn.start, ZVoxelCoordinate(0, 0, 0, 0, 0));
@@ -1135,12 +1128,9 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint& movi
     lowResNumOverlapVoxels);
 
   offset *= ZVoxelCoordinate(intvX + 1, intvY + 1, intvZ + 1, 1, 1);
-  offset.x =
-    std::clamp(offset.x, 1 - static_cast<index_t>(movingImg.width()), static_cast<index_t>(fixedImg.width()) - 1);
-  offset.y =
-    std::clamp(offset.y, 1 - static_cast<index_t>(movingImg.height()), static_cast<index_t>(fixedImg.height()) - 1);
-  offset.z =
-    std::clamp(offset.z, 1 - static_cast<index_t>(movingImg.depth()), static_cast<index_t>(fixedImg.depth()) - 1);
+  offset.x = std::clamp(offset.x, 1 - movingImg.sWidth(), fixedImg.sWidth() - 1);
+  offset.y = std::clamp(offset.y, 1 - movingImg.sHeight(), fixedImg.sHeight() - 1);
+  offset.z = std::clamp(offset.z, 1 - movingImg.sDepth(), fixedImg.sDepth() - 1);
 
   ZImg subFixedImg;
   ZImg subMovingImg;
@@ -1148,11 +1138,11 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(const PositionHint& movi
   size_t xEnd = subMovingImg.width() + subFixedImg.width() - 1;
   size_t yEnd = subMovingImg.height() + subFixedImg.height() - 1;
   size_t zEnd = subMovingImg.depth() + subFixedImg.depth() - 1;
-  size_t xStart = std::max(0_z, static_cast<index_t>(subMovingImg.width()) - 1 - static_cast<index_t>(intvX) - 1);
+  size_t xStart = std::max(0_z, subMovingImg.sWidth() - 1 - static_cast<index_t>(intvX) - 1);
   xEnd = std::min(xEnd, subMovingImg.width() + intvX + 1);
-  size_t yStart = std::max(0_z, static_cast<index_t>(subMovingImg.height()) - 1 - static_cast<index_t>(intvY) - 1);
+  size_t yStart = std::max(0_z, subMovingImg.sHeight() - 1 - static_cast<index_t>(intvY) - 1);
   yEnd = std::min(yEnd, subMovingImg.height() + intvY + 1);
-  size_t zStart = std::max(0_z, static_cast<index_t>(subMovingImg.depth()) - 1 - static_cast<index_t>(intvZ) - 1);
+  size_t zStart = std::max(0_z, subMovingImg.sDepth() - 1 - static_cast<index_t>(intvZ) - 1);
   zEnd = std::min(zEnd, subMovingImg.depth() + intvZ + 1);
   res = maxNormXCorrLocPart(subFixedImg,
                             subMovingImg,
@@ -1314,12 +1304,9 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffsetMR(const ZVoxelCoordinate& i
                                               lowResNumOverlapVoxels);
 
   offset *= ZVoxelCoordinate(intvX + 1, intvY + 1, intvZ + 1, 1, 1);
-  offset.x =
-    std::clamp(offset.x, 1 - static_cast<index_t>(movingImg.width()), static_cast<index_t>(fixedImg.width()) - 1);
-  offset.y =
-    std::clamp(offset.y, 1 - static_cast<index_t>(movingImg.height()), static_cast<index_t>(fixedImg.height()) - 1);
-  offset.z =
-    std::clamp(offset.z, 1 - static_cast<index_t>(movingImg.depth()), static_cast<index_t>(fixedImg.depth()) - 1);
+  offset.x = std::clamp(offset.x, 1 - movingImg.sWidth(), fixedImg.sWidth() - 1);
+  offset.y = std::clamp(offset.y, 1 - movingImg.sHeight(), fixedImg.sHeight() - 1);
+  offset.z = std::clamp(offset.z, 1 - movingImg.sDepth(), fixedImg.sDepth() - 1);
 
   ZImg subFixedImg;
   ZImg subMovingImg;
@@ -1327,11 +1314,11 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffsetMR(const ZVoxelCoordinate& i
   size_t xEnd = subMovingImg.width() + subFixedImg.width() - 1;
   size_t yEnd = subMovingImg.height() + subFixedImg.height() - 1;
   size_t zEnd = subMovingImg.depth() + subFixedImg.depth() - 1;
-  size_t xStart = std::max(0_z, static_cast<index_t>(subMovingImg.width()) - 1 - static_cast<index_t>(intvX) - 1);
+  size_t xStart = std::max(0_z, subMovingImg.sWidth() - 1 - static_cast<index_t>(intvX) - 1);
   xEnd = std::min(xEnd, subMovingImg.width() + intvX + 1);
-  size_t yStart = std::max(0_z, static_cast<index_t>(subMovingImg.height()) - 1 - static_cast<index_t>(intvY) - 1);
+  size_t yStart = std::max(0_z, subMovingImg.sHeight() - 1 - static_cast<index_t>(intvY) - 1);
   yEnd = std::min(yEnd, subMovingImg.height() + intvY + 1);
-  size_t zStart = std::max(0_z, static_cast<index_t>(subMovingImg.depth()) - 1 - static_cast<index_t>(intvZ) - 1);
+  size_t zStart = std::max(0_z, subMovingImg.sDepth() - 1 - static_cast<index_t>(intvZ) - 1);
   zEnd = std::min(zEnd, subMovingImg.depth() + intvZ + 1);
   res = maxNormXCorrLocPart(subFixedImg,
                             subMovingImg,

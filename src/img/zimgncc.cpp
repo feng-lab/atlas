@@ -71,24 +71,18 @@ void xCorrPart_Impl(const ZImg& fixedImg,
   size_t movingPlaneNum = movingImg.planeVoxelNumber();
   size_t movingRowNum = movingImg.rowVoxelNumber();
   size_t desOffset = 0;
-  for (size_t z = zStart; z < zEnd; ++z) {
-    size_t movingStartZ = std::max(0, static_cast<int>(movingImg.depth()) - 1 - static_cast<int>(z));
-    size_t movingEndZ =
-      std::min(static_cast<int>(fixedImg.depth()) + static_cast<int>(movingImg.depth()) - 1 - static_cast<int>(z),
-               static_cast<int>(movingImg.depth()));
-    size_t fixedStartZ = std::max(0, static_cast<int>(z) - static_cast<int>(movingImg.depth()) + 1);
-    for (size_t y = yStart; y < yEnd; ++y) {
-      size_t movingStartY = std::max(0, static_cast<int>(movingImg.height()) - 1 - static_cast<int>(y));
-      size_t movingEndY =
-        std::min(static_cast<int>(fixedImg.height()) + static_cast<int>(movingImg.height()) - 1 - static_cast<int>(y),
-                 static_cast<int>(movingImg.height()));
-      size_t fixedStartY = std::max(0, static_cast<int>(y) - static_cast<int>(movingImg.height()) + 1);
-      for (size_t x = xStart; x < xEnd; ++x) {
-        size_t movingStartX = std::max(0, static_cast<int>(movingImg.width()) - 1 - static_cast<int>(x));
-        size_t movingEndX =
-          std::min(static_cast<int>(fixedImg.width()) + static_cast<int>(movingImg.width()) - 1 - static_cast<int>(x),
-                   static_cast<int>(movingImg.width()));
-        size_t fixedStartX = std::max(0, static_cast<int>(x) - static_cast<int>(movingImg.width()) + 1);
+  for (auto z = static_cast<index_t>(zStart); z < static_cast<index_t>(zEnd); ++z) {
+    size_t movingStartZ = std::max(0_z, movingImg.sDepth() - 1 - z);
+    size_t movingEndZ = std::min(fixedImg.sDepth() + movingImg.sDepth() - 1 - z, movingImg.sDepth());
+    size_t fixedStartZ = std::max(0_z, z - movingImg.sDepth() + 1);
+    for (auto y = static_cast<index_t>(yStart); y < static_cast<index_t>(yEnd); ++y) {
+      size_t movingStartY = std::max(0_z, movingImg.sHeight() - 1 - y);
+      size_t movingEndY = std::min(fixedImg.sHeight() + movingImg.sHeight() - 1 - y, movingImg.sHeight());
+      size_t fixedStartY = std::max(0_z, y - movingImg.sHeight() + 1);
+      for (auto x = static_cast<index_t>(xStart); x < static_cast<index_t>(xEnd); ++x) {
+        size_t movingStartX = std::max(0_z, movingImg.sWidth() - 1 - x);
+        size_t movingEndX = std::min(fixedImg.sWidth() + movingImg.sWidth() - 1 - x, movingImg.sWidth());
+        size_t fixedStartX = std::max(0_z, x - movingImg.sWidth() + 1);
         size_t fixedOffset = fixedStartZ * fixedPlaneNum + fixedStartY * fixedRowNum + fixedStartX;
         size_t movingOffset = movingStartZ * movingPlaneNum + movingStartY * movingRowNum + movingStartX;
         for (size_t mz = movingStartZ; mz < movingEndZ; ++mz) {

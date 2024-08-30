@@ -32,7 +32,7 @@ void ZChromaticShiftCorrection::doWork()
     throw ZException(fmt::format("Can not align time sequence image: {}", srcImg.info()));
   }
 
-  if (m_targetChannel >= 0 && static_cast<size_t>(m_targetChannel) < srcImg.numChannels() &&
+  if (m_targetChannel >= 0 && m_targetChannel < srcImg.sNumChannels() &&
       (m_method != "Registration" || m_targetChannel != m_referenceChannel)) {
     LOG(INFO) << "Target Channel: " << m_targetChannel + 1 << " (start from 1)";
   } else {
@@ -40,7 +40,7 @@ void ZChromaticShiftCorrection::doWork()
   }
 
   if (m_method == "Registration") {
-    if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < srcImg.numChannels()) {
+    if (m_referenceChannel >= 0 && m_referenceChannel < srcImg.sNumChannels()) {
       LOG(INFO) << "Reference Channel: " << m_referenceChannel + 1 << " (start from 1)";
     } else {
       throw ZException(fmt::format("Wrong reference channel: {}. Abort", m_referenceChannel));
