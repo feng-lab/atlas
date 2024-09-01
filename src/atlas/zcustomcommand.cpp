@@ -1824,9 +1824,11 @@ void testLogDataSupport()
   std::array<int, 3> a2 = {1, 2, 3};
   LOG(INFO) << v4;
   LOG(INFO) << m4;
+  LOG(INFO) << a2;
   LOG(INFO) << json::value_from(a2);
   LOG(INFO) << fmt::format("{}", a2);
   auto t = std::make_tuple(1.7, 'D', std::string("Ralph Wiggum"));
+  LOG(INFO) << t;
   LOG(INFO) << json::value_from(t);
   LOG(INFO) << fmt::format("{}", t);
   const std::map<std::string, int> init{
@@ -1835,16 +1837,19 @@ void testLogDataSupport()
     {"be",    12},
     {"const", -100},
   };
+  LOG(INFO) << init;
   LOG(INFO) << json::value_from(init);
   LOG(INFO) << fmt::format("{}", init);
-  LOG(INFO) << v4 << m4 << json::value_from(a2) << json::value_from(t) << json::value_from(init);
   QString str("abdefwfgwtwfwfwfwgwgw");
+  LOG(INFO) << str;
   LOG(INFO) << json::value_from(str);
   LOG(INFO) << fmt::format("{}", str);
   QList<QKeySequence> zoomInKey;
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
   LOG(INFO) << zoomInKey;
-  LOG(INFO) << fmt::format("{}", qtTypeToQString(zoomInKey));
+  LOG(INFO) << fmt::format("{}", zoomInKey);
+  LOG(INFO) << fmt::format("[{}]", fmt::join(zoomInKey, ", "));
+  LOG(INFO) << fmt::format("{::}", zoomInKey);
 }
 
 void createEeumIndexImages()

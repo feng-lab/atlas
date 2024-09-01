@@ -242,8 +242,8 @@ void _resizeContributions(size_t inLength,
   CHECK(idx == weightsOut.size());
 
   //  VLOG(1) << kernelWidthOut;
-  //  VLOG(1) << qtTypeToQString(weightsOut);
-  //  VLOG(1) << qtTypeToQString(indicesOut);
+  //  VLOG(1) << weightsOut;
+  //  VLOG(1) << indicesOut;
 }
 
 } // namespace nim

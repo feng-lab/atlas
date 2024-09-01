@@ -645,7 +645,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     }
   }
   auto numAvailablePageCacheBlock =
-    index_t(m_channelPageTableCacheManagers[c]->size()) - index_t(usedPageDirectoryEntryKeys.size());
+    std::ssize(*m_channelPageTableCacheManagers[c]) - std::ssize(usedPageDirectoryEntryKeys);
   clearAndDeallocate(usedPageDirectoryEntryKeys);
 
   for (const auto& [pageDirectoryEntryKey, pageDirectoryEntryPtr, pageTableEntryKey] : pendingBlocks) {

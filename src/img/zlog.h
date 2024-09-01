@@ -26,7 +26,6 @@
 #include <iosfwd>
 
 namespace nim {
-
 class ZLogInit
 {
 public:
@@ -238,11 +237,11 @@ concept IsUtf8ArrayType = IsAnyOf<T,
 
 template<typename T>
 concept IsSupportedQtTypeForPrint =
-  std::same_as<T, QRect> || std::same_as<T, QRectF> || std::same_as<T, QStringList> ||
-  std::same_as<T, QList<typename T::value_type>> || std::same_as<T, QContiguousCache<typename T::value_type>> ||
-  std::same_as<T, QSharedPointer<typename T::value_type>> || std::same_as<T, QFlags<typename T::enum_type>>
+  std::same_as<T, QRect> || std::same_as<T, QRectF> || std::same_as<T, QContiguousCache<typename T::value_type>> ||
+  std::same_as<T, QSharedPointer<typename T::value_type>> || std::same_as<T, QFlags<typename T::enum_type>> ||
+  std::same_as<T, QKeySequence>
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-  || std::same_as<T, QKeyCombination> || std::same_as<T, QTaggedPointer<typename T::Type, typename T::TagType>>
+  || std::same_as<T, QKeyCombination>
 #endif
   ;
 
@@ -275,14 +274,21 @@ std::ostream& operator<<(std::ostream& s, const T& v)
   return (s << fmt::format("{}", v));
 }
 
+template<typename T>
+  requires(!CanConvertToUtf8QByteArray<T>) && fmt::is_range<T, char>::value
+std::ostream& operator<<(std::ostream& s, const T& v)
+{
+  return (s << fmt::format("{}", v));
+}
+
 } // namespace nim
 
 template<nim::CanConvertToUtf8QByteArray T>
 struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 {
-  auto format(const T& s, format_context& ctx) const
+  auto format(const T& v, format_context& ctx) const
   {
-    auto u8 = s.toUtf8();
+    auto u8 = v.toUtf8();
     return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
   }
 };
@@ -298,18 +304,28 @@ struct is_range<T, char> : std::false_type
 template<nim::IsUtf8ArrayType T>
 struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 {
-  auto format(const T& s, format_context& ctx) const
+  auto format(const T& v, format_context& ctx) const
   {
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(v.data(), v.size()), ctx);
   }
 };
 
 template<nim::HaveToStringFunction T>
 struct fmt::formatter<T> : fmt::formatter<std::string>
 {
-  auto format(const T& s, format_context& ctx) const
+  auto format(const T& v, format_context& ctx) const
   {
-    return fmt::formatter<std::string>::format(s.toString(), ctx);
+    return fmt::formatter<std::string>::format(v.toString(), ctx);
+  }
+};
+
+template<nim::IsSupportedQtTypeForPrint T>
+struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
+{
+  auto format(const T& v, format_context& ctx) const
+  {
+    auto u8 = nim::qtTypeToQString(v).toUtf8();
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
   }
 };
 

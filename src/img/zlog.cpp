@@ -7,6 +7,7 @@
 #include "zvoxelcoordinate.h"
 #include <QPoint>
 #include <QFile>
+#include <QKeySequence>
 #include <absl/log/log_sink_registry.h>
 #include <absl/log/initialize.h>
 #include <absl/log/internal/globals.h>
@@ -212,11 +213,26 @@ static_assert(IsUtf8ArrayType<QByteArrayView>, "QByteArrayView should satisfy Is
 static_assert(IsUtf8ArrayType<QUtf8StringView>, "QUtf8StringView should satisfy IsUtf8ArrayType");
 static_assert(is_formattable<QByteArrayView>(), "QByteArrayView should be formattable");
 static_assert(is_formattable<QUtf8StringView>(), "QUtf8StringView should be formattable");
-#else
-static_assert(is_formattable<QStringRef>(), "QStringRef should be formattable");
 #endif
+static_assert(is_formattable<QPoint>(), "QPoint should be formattable");
+static_assert(is_formattable<QPointF>(), "QPointF should be formattable");
+static_assert(is_formattable<QRect>(), "QRect should be formattable");
+static_assert(is_formattable<QRectF>(), "QRectF should be formattable");
+static_assert(is_formattable<QSize>(), "QSize should be formattable");
+static_assert(is_formattable<QKeySequence>(), "QKeySequence should be formattable");
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+static_assert(is_formattable<QKeyCombination>(), "QKeyCombination should be formattable");
+#endif
+static_assert(is_formattable<QStringList>(), "QStringList should be formattable");
+static_assert(is_formattable<QList<QKeySequence>>(), "QList<QKeySequence> should be formattable");
+static_assert(is_formattable<QContiguousCache<int>>(), "QContiguousCache<int> should be formattable");
+static_assert(is_formattable<QSharedPointer<int>>(), "QSharedPointer<int> should be formattable");
 static_assert(is_formattable<col4>(), "col4 should be formattable");
 static_assert(is_formattable<ZVoxelCoordinate>(), "ZVoxelCoordinate should be formattable");
+static_assert(is_formattable<glm::mat4>(), "glm::mat4 should be formattable");
+static_assert(is_formattable<glm::vec3>(), "glm::vec3 should be formattable");
+static_assert(is_formattable<glm::quat>(), "glm::quat should be formattable");
+static_assert(is_formattable<std::vector<double>>(), "std::vector<double> should be formattable");
 
 // Static assertions for std::ostream operator
 static_assert(is_streamable<QString>(), "QString should be streamable");
@@ -225,28 +241,26 @@ static_assert(is_streamable<QByteArray>(), "QByteArray should be streamable");
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 static_assert(is_streamable<QByteArrayView>(), "QByteArrayView should be streamable");
 static_assert(is_streamable<QUtf8StringView>(), "QUtf8StringView should be streamable");
-#else
-static_assert(is_streamable<QStringRef>(), "QStringRef should be streamable");
 #endif
 static_assert(is_streamable<QPoint>(), "QPoint should be streamable");
 static_assert(is_streamable<QPointF>(), "QPointF should be streamable");
 static_assert(is_streamable<QRect>(), "QRect should be streamable");
 static_assert(is_streamable<QRectF>(), "QRectF should be streamable");
 static_assert(is_streamable<QSize>(), "QSize should be streamable");
+static_assert(is_streamable<QKeySequence>(), "QKeySequence should be streamable");
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 static_assert(is_streamable<QKeyCombination>(), "QKeyCombination should be streamable");
 #endif
-static_assert(is_streamable<QList<int>>(), "QList<int> should be streamable");
+static_assert(is_streamable<QStringList>(), "QStringList should be streamable");
+static_assert(is_streamable<QList<QKeySequence>>(), "QList<QKeySequence> should be streamable");
 static_assert(is_streamable<QContiguousCache<int>>(), "QContiguousCache<int> should be streamable");
 static_assert(is_streamable<QSharedPointer<int>>(), "QSharedPointer<int> should be streamable");
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-static_assert(is_streamable<QTaggedPointer<int, int>>(), "QTaggedPointer<int, int> should be streamable");
-#endif
 static_assert(is_streamable<col4>(), "col4 should be streamable");
 static_assert(is_streamable<ZVoxelCoordinate>(), "ZVoxelCoordinate should be streamable");
 static_assert(is_streamable<glm::mat4>(), "glm::mat4 should be streamable");
 static_assert(is_streamable<glm::vec3>(), "glm::vec3 should be streamable");
 static_assert(is_streamable<glm::quat>(), "glm::quat should be streamable");
+static_assert(is_streamable<std::vector<double>>(), "std::vector<double> should be streamable");
 
 // Example QFlags for testing
 enum class TestFlag
@@ -257,6 +271,7 @@ enum class TestFlag
 };
 Q_DECLARE_FLAGS(TestFlags, TestFlag)
 
+static_assert(is_formattable<TestFlags>(), "TestFlags (QFlags) should be formattable");
 static_assert(is_streamable<TestFlags>(), "TestFlags (QFlags) should be streamable");
 
 } // namespace nim

@@ -391,9 +391,12 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
         for (auto tileIndex : tileIndice) {
           const ZImgSubBlock& tile = *m_allTiles[tileIndex].get();
           CHECK(tile.x >= 0 && tile.y >= 0 && tile.z >= 0);
-          if (static_cast<index_t>(x) >= tile.x && static_cast<index_t>(x) < tile.x + index_t(tile.width) &&
-              static_cast<index_t>(y) >= tile.y && static_cast<index_t>(y) < tile.y + index_t(tile.height) &&
-              static_cast<index_t>(z) >= tile.z && static_cast<index_t>(z) < tile.z + index_t(tile.depth)) {
+          if (static_cast<index_t>(x) >= tile.x &&
+              static_cast<index_t>(x) < tile.x + static_cast<index_t>(tile.width) &&
+              static_cast<index_t>(y) >= tile.y &&
+              static_cast<index_t>(y) < tile.y + static_cast<index_t>(tile.height) &&
+              static_cast<index_t>(z) >= tile.z &&
+              static_cast<index_t>(z) < tile.z + static_cast<index_t>(tile.depth)) {
             std::shared_ptr<ZImg> imgPtr =
               ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), tile);
             return imgPtr->value<double>(x - tile.x, y - tile.y, z - tile.z, c, 0);
@@ -430,8 +433,9 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
           const std::vector<size_t>& tileIndice = tiit->second;
           for (auto tileIndex : tileIndice) {
             const ZImgSubBlock& tile = *m_allTiles[tileIndex].get();
-            if (ix >= tile.x && ix < tile.x + index_t(tile.width) && iy >= tile.y &&
-                iy < tile.y + index_t(tile.height) && iz >= tile.z && iz < tile.z + index_t(tile.depth)) {
+            if (ix >= tile.x && ix < tile.x + static_cast<index_t>(tile.width) && iy >= tile.y &&
+                iy < tile.y + static_cast<index_t>(tile.height) && iz >= tile.z &&
+                iz < tile.z + static_cast<index_t>(tile.depth)) {
               if (ratio[0] == 1 && ratio[1] == 1 && ratio[2] == 1) {
                 hasTile = true;
               }
@@ -1356,10 +1360,11 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
     tbb::parallel_for(tbb::blocked_range<size_t>(0, tileIndice.size()), [&](const tbb::blocked_range<size_t>& r) {
       for (size_t i = r.begin(); i != r.end(); ++i) {
         const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-        if (index_t(z) >= tile.z && index_t(z) < (tile.z + index_t(tile.depth))) {
+        if (static_cast<index_t>(z) >= tile.z &&
+            static_cast<index_t>(z) < (tile.z + static_cast<index_t>(tile.depth))) {
           ZVoxelCoordinate start(std::round(tile.x * 1.0 / ratio[0]),
                                  std::round(tile.y * 1.0 / ratio[1]),
-                                 tile.z - index_t(z),
+                                 tile.z - static_cast<index_t>(z),
                                  0,
                                  0);
 
