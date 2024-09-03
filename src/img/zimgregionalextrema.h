@@ -30,9 +30,6 @@ private:
   //
   template<template<typename> class Compare>
   ZImg regionalExtrema(const ZImg& img, size_t conn = 0);
-
-  template<typename TVoxel, template<typename> class Compare>
-  void regionalExtrema_Impl(ZImg& res, const ZImg& img, size_t conn);
 };
 
 } // namespace nim

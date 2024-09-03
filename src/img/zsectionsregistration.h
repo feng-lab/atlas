@@ -127,12 +127,6 @@ private:
                     double& cost,
                     ZImageTransform*& transform);
 
-  template<typename ImagePixelType>
-  void calcRefCh(const ZCachedImg& srcImg);
-
-  template<typename ImagePixelType>
-  void calcSecInfs(const ZCachedImg& srcImg);
-
 private:
   QStringList m_imgFilenames;
   QString m_resultFilename;

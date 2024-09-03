@@ -52,71 +52,6 @@ double secureDivideSqrt2(double v1, double v2)
 
 using namespace nim;
 
-template<typename TVoxel1, typename TVoxel2>
-void xCorrPart_Impl(const ZImg& fixedImg,
-                    const ZImg& movingImg,
-                    size_t xStart,
-                    size_t xEnd,
-                    size_t yStart,
-                    size_t yEnd,
-                    size_t zStart,
-                    size_t zEnd,
-                    ZImg& res)
-{
-  const auto fixedData = fixedImg.channelData<TVoxel1>(0, 0);
-  const auto movingData = movingImg.channelData<TVoxel2>(0, 0);
-  auto desData = res.channelData<double>(0, 0);
-  size_t fixedPlaneNum = fixedImg.planeVoxelNumber();
-  size_t fixedRowNum = fixedImg.rowVoxelNumber();
-  size_t movingPlaneNum = movingImg.planeVoxelNumber();
-  size_t movingRowNum = movingImg.rowVoxelNumber();
-  size_t desOffset = 0;
-  for (auto z = static_cast<index_t>(zStart); z < static_cast<index_t>(zEnd); ++z) {
-    size_t movingStartZ = std::max(0_z, movingImg.sDepth() - 1 - z);
-    size_t movingEndZ = std::min(fixedImg.sDepth() + movingImg.sDepth() - 1 - z, movingImg.sDepth());
-    size_t fixedStartZ = std::max(0_z, z - movingImg.sDepth() + 1);
-    for (auto y = static_cast<index_t>(yStart); y < static_cast<index_t>(yEnd); ++y) {
-      size_t movingStartY = std::max(0_z, movingImg.sHeight() - 1 - y);
-      size_t movingEndY = std::min(fixedImg.sHeight() + movingImg.sHeight() - 1 - y, movingImg.sHeight());
-      size_t fixedStartY = std::max(0_z, y - movingImg.sHeight() + 1);
-      for (auto x = static_cast<index_t>(xStart); x < static_cast<index_t>(xEnd); ++x) {
-        size_t movingStartX = std::max(0_z, movingImg.sWidth() - 1 - x);
-        size_t movingEndX = std::min(fixedImg.sWidth() + movingImg.sWidth() - 1 - x, movingImg.sWidth());
-        size_t fixedStartX = std::max(0_z, x - movingImg.sWidth() + 1);
-        size_t fixedOffset = fixedStartZ * fixedPlaneNum + fixedStartY * fixedRowNum + fixedStartX;
-        size_t movingOffset = movingStartZ * movingPlaneNum + movingStartY * movingRowNum + movingStartX;
-        for (size_t mz = movingStartZ; mz < movingEndZ; ++mz) {
-          for (size_t my = movingStartY; my < movingEndY; ++my) {
-            for (size_t mx = movingStartX; mx < movingEndX; ++mx) {
-              desData[desOffset] += static_cast<double>(fixedData[fixedOffset]) * movingData[movingOffset];
-              ++fixedOffset;
-              ++movingOffset;
-            }
-            fixedOffset += fixedRowNum - (movingEndX - movingStartX);
-            movingOffset += movingRowNum - (movingEndX - movingStartX);
-          }
-          fixedOffset += fixedPlaneNum - (movingEndY - movingStartY) * fixedRowNum;
-          movingOffset += movingPlaneNum - (movingEndY - movingStartY) * movingRowNum;
-        }
-
-        ++desOffset;
-      }
-    }
-  }
-}
-
-template<typename TVoxel>
-double getNCCOfOffset_Impl(const ZImg& fixedImg, const ZImg& movingImg)
-{
-  ZImageToImageMetric metric;
-  metric.setType(ZImageToImageMetric::Type::NormalizedCrossCorrelation);
-  return -metric.value(fixedImg.channelData<TVoxel>(0),
-                       movingImg.channelData<TVoxel>(0),
-                       fixedImg.width(),
-                       fixedImg.height(),
-                       fixedImg.depth());
-}
-
 void checkInputImgs(const ZImg& fixedImg, const ZImg& movingImg, const QString& name = "")
 {
   if (fixedImg.isEmpty() || movingImg.isEmpty() || fixedImg.numChannels() != 1 || fixedImg.numTimes() != 1 ||
@@ -148,7 +83,13 @@ double getNCCOfOffset(const ZImg& fixedImgIn, const ZImg& movingImgIn, const ZVo
     }
   }
   return imgTypeDispatcher(fixedImg.info(), [&]<typename TVoxel>() {
-    return getNCCOfOffset_Impl<TVoxel>(fixedImg, movingImg);
+    ZImageToImageMetric metric;
+    metric.setType(ZImageToImageMetric::Type::NormalizedCrossCorrelation);
+    return -metric.value(fixedImg.channelData<TVoxel>(0),
+                         movingImg.channelData<TVoxel>(0),
+                         fixedImg.width(),
+                         fixedImg.height(),
+                         fixedImg.depth());
   });
 }
 
@@ -525,7 +466,46 @@ ZImg xCorrPart(const ZImg& fixedImg,
 
   imgTypeDispatcher(fixedImg.info(), [&]<typename TVoxel1>() {
     imgTypeDispatcher(movingImg.info(), [&]<typename TVoxel2>() {
-      xCorrPart_Impl<TVoxel1, TVoxel2>(fixedImg, movingImg, xStart, xEnd, yStart, yEnd, zStart, zEnd, res);
+      const auto fixedData = fixedImg.channelData<TVoxel1>(0, 0);
+      const auto movingData = movingImg.channelData<TVoxel2>(0, 0);
+      auto desData = res.channelData<double>(0, 0);
+      size_t fixedPlaneNum = fixedImg.planeVoxelNumber();
+      size_t fixedRowNum = fixedImg.rowVoxelNumber();
+      size_t movingPlaneNum = movingImg.planeVoxelNumber();
+      size_t movingRowNum = movingImg.rowVoxelNumber();
+      size_t desOffset = 0;
+      for (auto z = static_cast<index_t>(zStart); z < static_cast<index_t>(zEnd); ++z) {
+        size_t movingStartZ = std::max(0_z, movingImg.sDepth() - 1 - z);
+        size_t movingEndZ = std::min(fixedImg.sDepth() + movingImg.sDepth() - 1 - z, movingImg.sDepth());
+        size_t fixedStartZ = std::max(0_z, z - movingImg.sDepth() + 1);
+        for (auto y = static_cast<index_t>(yStart); y < static_cast<index_t>(yEnd); ++y) {
+          size_t movingStartY = std::max(0_z, movingImg.sHeight() - 1 - y);
+          size_t movingEndY = std::min(fixedImg.sHeight() + movingImg.sHeight() - 1 - y, movingImg.sHeight());
+          size_t fixedStartY = std::max(0_z, y - movingImg.sHeight() + 1);
+          for (auto x = static_cast<index_t>(xStart); x < static_cast<index_t>(xEnd); ++x) {
+            size_t movingStartX = std::max(0_z, movingImg.sWidth() - 1 - x);
+            size_t movingEndX = std::min(fixedImg.sWidth() + movingImg.sWidth() - 1 - x, movingImg.sWidth());
+            size_t fixedStartX = std::max(0_z, x - movingImg.sWidth() + 1);
+            size_t fixedOffset = fixedStartZ * fixedPlaneNum + fixedStartY * fixedRowNum + fixedStartX;
+            size_t movingOffset = movingStartZ * movingPlaneNum + movingStartY * movingRowNum + movingStartX;
+            for (size_t mz = movingStartZ; mz < movingEndZ; ++mz) {
+              for (size_t my = movingStartY; my < movingEndY; ++my) {
+                for (size_t mx = movingStartX; mx < movingEndX; ++mx) {
+                  desData[desOffset] += static_cast<double>(fixedData[fixedOffset]) * movingData[movingOffset];
+                  ++fixedOffset;
+                  ++movingOffset;
+                }
+                fixedOffset += fixedRowNum - (movingEndX - movingStartX);
+                movingOffset += movingRowNum - (movingEndX - movingStartX);
+              }
+              fixedOffset += fixedPlaneNum - (movingEndY - movingStartY) * fixedRowNum;
+              movingOffset += movingPlaneNum - (movingEndY - movingStartY) * movingRowNum;
+            }
+
+            ++desOffset;
+          }
+        }
+      }
     });
   });
 

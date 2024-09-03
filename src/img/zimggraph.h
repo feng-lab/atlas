@@ -25,7 +25,7 @@ public:
   // EdgeWeightFunctor take voxel distance and voxel intensities as parameter
   // return edge weight as double value
   template<typename EdgeWeightFunctor>
-  void build(const EdgeWeightFunctor& edgeWeightFunc)
+  void build(EdgeWeightFunctor&& edgeWeightFunc)
   {
     m_graph.clear();
     m_lowestWeight = std::numeric_limits<double>::max();
@@ -38,11 +38,33 @@ public:
 
     if (m_region.containsWholePlane(m_img.info())) {
       imgTypeDispatcher(m_img.info(), [&, this]<typename TVoxel>() {
-        this->addEdges_Opt<TVoxel>(edgeWeightFunc);
+        ZImgNeighborhoodConstIterator<TVoxel> nit =
+          ZImgNeighborhoodConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
+        const TVoxel* data = m_img.planeData<TVoxel>(m_region.zStart(), m_region.cStart(), m_region.tStart());
+        for (; !nit.isAtEnd(); ++nit) {
+          for (size_t n = 0; n < nit.numNeighbors(); ++n) {
+            if (nit.isInBound(n)) {
+              size_t nidx = nit.index(n);
+              double weight = edgeWeightFunc(m_dists[n], data[nit.index()], data[nidx]);
+              boost::add_edge(nit.index(), nidx, EdgeInfo(weight), m_graph);
+              m_lowestWeight = std::min(m_lowestWeight, weight / m_dists[n]);
+            }
+          }
+        }
       });
     } else {
       imgTypeDispatcher(m_img.info(), [&, this]<typename TVoxel>() {
-        this->addEdges<TVoxel>(edgeWeightFunc);
+        ZImgNeighborhoodWithPtrConstIterator<TVoxel> nit =
+          ZImgNeighborhoodWithPtrConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
+        for (; !nit.isAtEnd(); ++nit) {
+          for (size_t n = 0; n < nit.numNeighbors(); ++n) {
+            if (nit.isInBound(n)) {
+              double weight = edgeWeightFunc(m_dists[n], *nit, nit.valueRef(n));
+              boost::add_edge(nit.index(), nit.index(n), EdgeInfo(weight), m_graph);
+              m_lowestWeight = std::min(m_lowestWeight, weight / m_dists[n]);
+            }
+          }
+        }
       });
     }
 
@@ -62,39 +84,6 @@ public:
 
 protected:
   void updateNeighborDistances();
-
-  template<typename TVoxel, typename EdgeWeightFunctor>
-  void addEdges_Opt(const EdgeWeightFunctor& edgeWeightFunc)
-  {
-    ZImgNeighborhoodConstIterator<TVoxel> nit = ZImgNeighborhoodConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
-    const TVoxel* data = m_img.planeData<TVoxel>(m_region.zStart(), m_region.cStart(), m_region.tStart());
-    for (; !nit.isAtEnd(); ++nit) {
-      for (size_t n = 0; n < nit.numNeighbors(); ++n) {
-        if (nit.isInBound(n)) {
-          size_t nidx = nit.index(n);
-          double weight = edgeWeightFunc(m_dists[n], data[nit.index()], data[nidx]);
-          boost::add_edge(nit.index(), nidx, EdgeInfo(weight), m_graph);
-          m_lowestWeight = std::min(m_lowestWeight, weight / m_dists[n]);
-        }
-      }
-    }
-  }
-
-  template<typename TVoxel, typename EdgeWeightFunctor>
-  void addEdges(const EdgeWeightFunctor& edgeWeightFunc)
-  {
-    ZImgNeighborhoodWithPtrConstIterator<TVoxel> nit =
-      ZImgNeighborhoodWithPtrConstIterator<TVoxel>(m_neighborhood, m_img, m_region);
-    for (; !nit.isAtEnd(); ++nit) {
-      for (size_t n = 0; n < nit.numNeighbors(); ++n) {
-        if (nit.isInBound(n)) {
-          double weight = edgeWeightFunc(m_dists[n], *nit, nit.valueRef(n));
-          boost::add_edge(nit.index(), nit.index(n), EdgeInfo(weight), m_graph);
-          m_lowestWeight = std::min(m_lowestWeight, weight / m_dists[n]);
-        }
-      }
-    }
-  }
 
 private:
   const ZImg& m_img;

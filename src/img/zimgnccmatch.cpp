@@ -10,13 +10,6 @@ namespace {
 
 using namespace nim;
 
-template<typename TVoxel>
-void removeBG(ZImg& img)
-{
-  ZImgAutoThreshold<> autoThre;
-  img -= autoThre.typedMaxHistThre<TVoxel>(img);
-}
-
 // ting's method
 struct WeightNCCTing
 {
@@ -715,7 +708,8 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
 void ZImgNCCMatch::removeBackground(ZImg& img)
 {
   imgTypeDispatcher(img.info(), [&]<typename TVoxel>() {
-    removeBG<TVoxel>(img);
+    ZImgAutoThreshold<> autoThre;
+    img -= autoThre.typedMaxHistThre<TVoxel>(img);
   });
 }
 
