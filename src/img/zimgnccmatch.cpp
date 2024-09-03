@@ -988,21 +988,21 @@ ZImgNCCMatch::getRequiredSrcImgRegionAndValidNccRegion(const ZVoxelCoordinate& o
 
   fixedRgn.start = startOffset;
   fixedRgn.start = max(fixedRgn.start, ZVoxelCoordinate(0, 0, 0, 0, 0));
-  fixedRgn.end = endOffset + movingImg.maxCoord() + 1;
-  fixedRgn.end = min(fixedImg.maxCoord() + 1, fixedRgn.end);
+  fixedRgn.end = endOffset + movingImg.endCoord();
+  fixedRgn.end = min(fixedImg.endCoord(), fixedRgn.end);
 
   movingRgn.start = -endOffset;
   movingRgn.start = max(movingRgn.start, ZVoxelCoordinate(0, 0, 0, 0, 0));
-  movingRgn.end = -startOffset + fixedImg.maxCoord() + 1;
-  movingRgn.end = min(movingImg.maxCoord() + 1, movingRgn.end);
+  movingRgn.end = -startOffset + fixedImg.endCoord();
+  movingRgn.end = min(movingImg.endCoord(), movingRgn.end);
 
-  validNccRgn.start = startOffset + movingImg.maxCoord();
-  validNccRgn.end = endOffset + movingImg.maxCoord() + 1;
+  validNccRgn.start = startOffset + movingImg.endCoord() - 1;
+  validNccRgn.end = endOffset + movingImg.endCoord();
 
-  validNccRgn.start = validNccRgn.start - movingRgn.start - fixedRgn.start - (fixedImg.maxCoord() + 1 - fixedRgn.end) -
-                      (movingImg.maxCoord() + 1 - movingRgn.end);
-  validNccRgn.end = validNccRgn.end - movingRgn.start - fixedRgn.start - (fixedImg.maxCoord() + 1 - fixedRgn.end) -
-                    (movingImg.maxCoord() + 1 - movingRgn.end);
+  validNccRgn.start = validNccRgn.start - movingRgn.start - fixedRgn.start - (fixedImg.endCoord() - fixedRgn.end) -
+                      (movingImg.endCoord() - movingRgn.end);
+  validNccRgn.end = validNccRgn.end - movingRgn.start - fixedRgn.start - (fixedImg.endCoord() - fixedRgn.end) -
+                    (movingImg.endCoord() - movingRgn.end);
   validNccRgn.start.c = 0;
   validNccRgn.end.c = 1;
   validNccRgn.start.t = 0;

@@ -76,12 +76,11 @@ struct col4
 
   col4() = default;
 
-  template<typename R, typename G, typename B, typename A = value_type>
-  col4(R _r, G _g, B _b, A _a = static_cast<A>(255))
-    : r(static_cast<value_type>(_r))
-    , g(static_cast<value_type>(_g))
-    , b(static_cast<value_type>(_b))
-    , a(static_cast<value_type>(_a))
+  col4(value_type _r, value_type _g, value_type _b, value_type _a = 255_u8)
+    : r(_r)
+    , g(_g)
+    , b(_b)
+    , a(_a)
   {}
 
   value_type r = 0, g = 0, b = 0, a = 255;

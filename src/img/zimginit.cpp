@@ -11,11 +11,6 @@
 #include <QDir>
 #include <cpuinfo.h>
 
-#ifdef ZIMG_USE_IPP
-#include <ippcore.h>
-#include <ippi.h>
-#endif
-
 #include <folly/Singleton.h>
 #include <folly/init/Phase.h>
 #include <folly/synchronization/HazptrThreadPoolExecutor.h>
@@ -108,116 +103,6 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
 #ifdef ZIMG_USE_FFTW
   fftw_init_threads();
   fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
-#endif
-
-#ifdef ZIMG_USE_IPP
-  // todo: check this for amd cpu
-  IppStatus status = ippInit();
-  if (status == ippStsNonIntelCpu || status == ippStsNotSupportedCpu) {
-    Ipp64u featureMask = 0;
-    IppStatus st = ippGetCpuFeatures(&featureMask, nullptr);
-    if (st != ippStsNoErr) {
-      if (st == ippStsNotSupportedCpu) {
-        LOG(WARNING) << "IPP error: not supported cpu.";
-        // manual set mask
-        if (cpuinfo_has_x86_mmx()) {
-          featureMask |= ippCPUID_MMX;
-        }
-        if (cpuinfo_has_x86_sse()) {
-          featureMask |= ippCPUID_SSE;
-        }
-        if (cpuinfo_has_x86_sse2()) {
-          featureMask |= ippCPUID_SSE2;
-        }
-        if (cpuinfo_has_x86_sse3()) {
-          featureMask |= ippCPUID_SSE3;
-        }
-        if (cpuinfo_has_x86_ssse3()) {
-          featureMask |= ippCPUID_SSSE3;
-        }
-        if (cpuinfo_has_x86_movbe()) {
-          featureMask |= ippCPUID_MOVBE;
-        }
-        if (cpuinfo_has_x86_sse4_1()) {
-          featureMask |= ippCPUID_SSE41;
-        }
-        if (cpuinfo_has_x86_sse4_2()) {
-          featureMask |= ippCPUID_SSE42;
-        }
-        if (cpuinfo_has_x86_avx()) {
-          featureMask |= ippCPUID_AVX;
-          featureMask |= ippAVX_ENABLEDBYOS;
-        }
-        if (cpuinfo_has_x86_aes()) {
-          featureMask |= ippCPUID_AES;
-        }
-        if (cpuinfo_has_x86_pclmulqdq()) {
-          featureMask |= ippCPUID_CLMUL;
-        }
-        if (cpuinfo_has_x86_rdrand()) {
-          featureMask |= ippCPUID_RDRAND;
-        }
-        if (cpuinfo_has_x86_f16c()) {
-          featureMask |= ippCPUID_F16C;
-        }
-        if (cpuinfo_has_x86_avx2()) {
-          featureMask |= ippCPUID_AVX2;
-        }
-        if (cpuinfo_has_x86_adx()) {
-          featureMask |= ippCPUID_ADCOX;
-        }
-        if (cpuinfo_has_x86_rdseed()) {
-          featureMask |= ippCPUID_RDSEED;
-        }
-        if (cpuinfo_has_x86_prefetchw()) {
-          featureMask |= ippCPUID_PREFETCHW;
-        }
-        if (cpuinfo_has_x86_sha()) {
-          featureMask |= ippCPUID_SHA;
-        }
-        if (cpuinfo_has_x86_avx512f()) {
-          featureMask |= ippCPUID_AVX512F;
-        }
-        if (cpuinfo_has_x86_avx512cd()) {
-          featureMask |= ippCPUID_AVX512CD;
-        }
-        if (cpuinfo_has_x86_avx512er()) {
-          featureMask |= ippCPUID_AVX512ER;
-        }
-        if (cpuinfo_has_x86_avx512pf()) {
-          featureMask |= ippCPUID_AVX512PF;
-        }
-        if (cpuinfo_has_x86_avx512bw()) {
-          featureMask |= ippCPUID_AVX512BW;
-        }
-        if (cpuinfo_has_x86_avx512dq()) {
-          featureMask |= ippCPUID_AVX512DQ;
-        }
-        if (cpuinfo_has_x86_avx512vl()) {
-          featureMask |= ippCPUID_AVX512VL;
-        }
-        if (cpuinfo_has_x86_avx512vbmi()) {
-          featureMask |= ippCPUID_AVX512VBMI;
-        }
-        if (cpuinfo_has_x86_mpx()) {
-          featureMask |= ippCPUID_MPX;
-        }
-        if (cpuinfo_has_x86_avx512_4fmaps()) {
-          featureMask |= ippCPUID_AVX512_4FMADDPS;
-        }
-        if (cpuinfo_has_x86_avx512_4vnniw()) {
-          featureMask |= ippCPUID_AVX512_4VNNIW;
-        }
-        LOG(INFO) << ippSetCpuFeatures(featureMask);
-      }
-    } else {
-      LOG(INFO) << ippSetCpuFeatures(featureMask);
-    }
-  }
-
-  // pointer to static data, no need to delete
-  const IppLibraryVersion* ippVer = ippiGetLibVersion();
-  LOG(INFO) << "IPP: " << ippVer->Name << " " << ippVer->Version;
 #endif
 
   if (verbose) {

@@ -39,7 +39,7 @@ col4 scaleDownColorRGB(const col4& c, Real scale)
 {
   col4 res;
   if (scale <= Real(0)) {
-    res = col4{0, 0, 0, c.a};
+    res = col4(0, 0, 0, c.a);
   } else if (scale >= Real(1)) {
     res = c;
   } else {

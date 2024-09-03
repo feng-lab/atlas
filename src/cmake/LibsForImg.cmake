@@ -211,7 +211,7 @@ find_package(Ceres REQUIRED
 print_target_properties(Ceres::ceres)
 
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.82.0 REQUIRED
+find_package(Boost 1.86.0 REQUIRED
              COMPONENTS
              headers context filesystem program_options regex system thread charconv
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH

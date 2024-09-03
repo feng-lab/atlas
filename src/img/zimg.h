@@ -1202,10 +1202,6 @@ public:
                              bool antialiasingForNearest = false,
                              bool useMultithreading = true) const;
 
-  // intel ipp version, will crash if interpolant or data type is not supported
-  [[nodiscard]] ZImg
-  resizedIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant = Interpolant::Cubic) const;
-
   [[nodiscard]] ZImg zoomed(double scaleX,
                             double scaleY,
                             double scaleZ,
@@ -1226,17 +1222,6 @@ public:
                bool antialiasing = true,
                bool antialiasingForNearest = false,
                bool useMultithreading = true);
-
-  // intel ipp version, will crash if interpolant or data type is not supported
-  ZImg& resizeIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant = Interpolant::Cubic)
-  {
-    if (width() == desWidth && height() == desHeight && depth() == desDepth) {
-      return *this;
-    }
-    ZImg res = resizedIPP(desWidth, desHeight, desDepth, interpolant);
-    swap(res);
-    return *this;
-  }
 
   ZImg& zoom(double scaleX,
              double scaleY,
@@ -1702,15 +1687,6 @@ public:
   [[nodiscard]] ZVoxelCoordinate endCoordinate() const
   {
     return {sWidth(), sHeight(), sDepth(), sNumChannels(), sNumTimes()};
-  }
-
-  // max valid coord, **note** throw ZException for empty img
-  [[nodiscard]] ZVoxelCoordinate maxCoord() const
-  {
-    if (isEmpty()) {
-      throw ZException("No max coord for empty img");
-    }
-    return {sWidth() - 1, sHeight() - 1, sDepth() - 1, sNumChannels() - 1, sNumTimes() - 1};
   }
 
   // coord will always be invalid if img is empty

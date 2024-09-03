@@ -319,7 +319,7 @@ public:
     m_innerBoundLow =
       ZVoxelCoordinate(m_neighborhood.leftExtend(), m_neighborhood.upExtend(), m_neighborhood.frontExtend());
     m_innerBoundHigh =
-      m_img->maxCoord() -
+      m_img->endCoord() -
       ZVoxelCoordinate(m_neighborhood.rightExtend(), m_neighborhood.downExtend(), m_neighborhood.backExtend());
 
     updateNbInfoOfCurrentVoxel();
@@ -330,7 +330,7 @@ public:
     m_nbCoordsIsValid = false;
     // update nb info of current voxel
     if (m_coord.x >= m_innerBoundLow.x && m_coord.y >= m_innerBoundLow.y && m_coord.z >= m_innerBoundLow.z &&
-        m_coord.x <= m_innerBoundHigh.x && m_coord.y <= m_innerBoundHigh.y && m_coord.z <= m_innerBoundHigh.z) {
+        m_coord.x < m_innerBoundHigh.x && m_coord.y < m_innerBoundHigh.y && m_coord.z < m_innerBoundHigh.z) {
       m_allNbInBound = true;
     } else {
       m_allNbInBound = false;

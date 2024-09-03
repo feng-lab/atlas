@@ -20,15 +20,9 @@ struct ZVoxelCoordinate
     Maximum
   };
 
-  value_type x, y, z, c, t;
+  value_type x = 0, y = 0, z = 0, c = 0, t = 0;
 
-  constexpr ZVoxelCoordinate()
-    : x(0)
-    , y(0)
-    , z(0)
-    , c(0)
-    , t(0)
-  {}
+  constexpr ZVoxelCoordinate() = default;
 
   explicit ZVoxelCoordinate(Init init)
   {
@@ -48,11 +42,6 @@ struct ZVoxelCoordinate
         t = std::numeric_limits<value_type>::max();
         break;
       default:
-        x = 0;
-        y = 0;
-        z = 0;
-        c = 0;
-        t = 0;
         break;
     }
   }
