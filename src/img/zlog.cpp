@@ -213,12 +213,12 @@ static_assert(IsUtf8ArrayType<QByteArrayView>, "QByteArrayView should satisfy Is
 static_assert(IsUtf8ArrayType<QUtf8StringView>, "QUtf8StringView should satisfy IsUtf8ArrayType");
 static_assert(is_formattable<QByteArrayView>(), "QByteArrayView should be formattable");
 static_assert(is_formattable<QUtf8StringView>(), "QUtf8StringView should be formattable");
-#endif
 static_assert(is_formattable<QPoint>(), "QPoint should be formattable");
 static_assert(is_formattable<QPointF>(), "QPointF should be formattable");
+static_assert(is_formattable<QSize>(), "QSize should be formattable");
+#endif
 static_assert(is_formattable<QRect>(), "QRect should be formattable");
 static_assert(is_formattable<QRectF>(), "QRectF should be formattable");
-static_assert(is_formattable<QSize>(), "QSize should be formattable");
 static_assert(is_formattable<QKeySequence>(), "QKeySequence should be formattable");
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 static_assert(is_formattable<QKeyCombination>(), "QKeyCombination should be formattable");
@@ -241,12 +241,12 @@ static_assert(is_streamable<QByteArray>(), "QByteArray should be streamable");
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 static_assert(is_streamable<QByteArrayView>(), "QByteArrayView should be streamable");
 static_assert(is_streamable<QUtf8StringView>(), "QUtf8StringView should be streamable");
-#endif
 static_assert(is_streamable<QPoint>(), "QPoint should be streamable");
 static_assert(is_streamable<QPointF>(), "QPointF should be streamable");
+static_assert(is_streamable<QSize>(), "QSize should be streamable");
+#endif
 static_assert(is_streamable<QRect>(), "QRect should be streamable");
 static_assert(is_streamable<QRectF>(), "QRectF should be streamable");
-static_assert(is_streamable<QSize>(), "QSize should be streamable");
 static_assert(is_streamable<QKeySequence>(), "QKeySequence should be streamable");
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 static_assert(is_streamable<QKeyCombination>(), "QKeyCombination should be streamable");
