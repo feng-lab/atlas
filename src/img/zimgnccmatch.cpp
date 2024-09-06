@@ -435,25 +435,25 @@ ZImgNCCMatch::getMovingImgOffsetFromHint(double exactOverlapRateX, double exactO
   }
   ZVoxelCoordinate movingImgOffset;
   if (isFlagSet(m_movingImgPosHint, PositionHint::Left)) {
-    auto shift = std::round(m_fixedImg.info().width * exactOverlapRateX);
+    index_t shift = std::round(m_fixedImg.info().width * exactOverlapRateX);
     movingImgOffset.x = -m_movingImg.sWidth() + shift;
   } else if (isFlagSet(m_movingImgPosHint, PositionHint::Right)) {
-    auto shift = std::round(m_fixedImg.info().width * exactOverlapRateX);
-    movingImgOffset.x = m_fixedImg.info().width - shift;
+    index_t shift = std::round(m_fixedImg.info().width * exactOverlapRateX);
+    movingImgOffset.x = m_fixedImg.sWidth() - shift;
   }
   if (isFlagSet(m_movingImgPosHint, PositionHint::Up)) {
-    auto shift = std::round(m_fixedImg.info().height * exactOverlapRateY);
+    index_t shift = std::round(m_fixedImg.info().height * exactOverlapRateY);
     movingImgOffset.y = -m_movingImg.sHeight() + shift;
   } else if (isFlagSet(m_movingImgPosHint, PositionHint::Down)) {
-    auto shift = std::round(m_fixedImg.info().height * exactOverlapRateY);
-    movingImgOffset.y = m_fixedImg.info().height - shift;
+    index_t shift = std::round(m_fixedImg.info().height * exactOverlapRateY);
+    movingImgOffset.y = m_fixedImg.sHeight() - shift;
   }
   if (isFlagSet(m_movingImgPosHint, PositionHint::Front)) {
-    auto shift = std::round(m_fixedImg.info().depth * exactOverlapRateZ);
+    index_t shift = std::round(m_fixedImg.info().depth * exactOverlapRateZ);
     movingImgOffset.z = -m_movingImg.sDepth() + shift;
   } else if (isFlagSet(m_movingImgPosHint, PositionHint::Back)) {
-    auto shift = std::round(m_fixedImg.info().depth * exactOverlapRateZ);
-    movingImgOffset.z = m_fixedImg.info().depth - shift;
+    index_t shift = std::round(m_fixedImg.info().depth * exactOverlapRateZ);
+    movingImgOffset.z = m_fixedImg.sDepth() - shift;
   }
   return movingImgOffset;
 }
@@ -743,7 +743,7 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc(ZImg& fixedImg,
   ZVoxelCoordinate maxNCCCoord = nccImg.indexToCoord(maxNCCIdx);
   ZVoxelCoordinate offset =
     maxNCCCoord + nccImgValidRegion.start -
-    ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1, movingImgInfo.depth - 1);
+    ZVoxelCoordinate(movingImgInfo.sWidth() - 1, movingImgInfo.sHeight() - 1, movingImgInfo.sDepth() - 1);
   LOG(INFO) << fmt::format("max NCC coord: {}", maxNCCCoord);
   LOG(INFO) << fmt::format("moving image offset: {}", offset);
 
@@ -787,7 +787,7 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg& fixedImg,
   ZVoxelCoordinate maxNCCCoord = nccImg.indexToCoord(maxNCCIdx);
   ZVoxelCoordinate offset =
     maxNCCCoord + nccImgValidRegion.start -
-    ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1, movingImgInfo.depth - 1);
+    ZVoxelCoordinate(movingImgInfo.sWidth() - 1, movingImgInfo.sHeight() - 1, movingImgInfo.sDepth() - 1);
   LOG(INFO) << fmt::format("max NCC coord: {}", maxNCCCoord);
   LOG(INFO) << nccImgValidRegion;
   LOG(INFO) << fmt::format("moving image offset: {}", offset);
@@ -824,7 +824,7 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLocPart(ZImg& fixedImg,
   ZVoxelCoordinate maxNCCCoord = nccImg.indexToCoord(maxNCCIdx);
   ZVoxelCoordinate offset =
     maxNCCCoord + ZVoxelCoordinate(xStart, yStart, zStart) -
-    ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1, movingImgInfo.depth - 1);
+    ZVoxelCoordinate(movingImgInfo.sWidth() - 1, movingImgInfo.sHeight() - 1, movingImgInfo.sDepth() - 1);
   LOG(INFO) << fmt::format("max NCC coord: {} region (x:{}-{}, y:{}-{}, z:{}-{})",
                            maxNCCCoord,
                            xStart,
@@ -844,19 +844,19 @@ ZImgRegion ZImgNCCMatch::getNccImgValidRegion(const PositionHint& hint,
 {
   ZImgRegion rgn;
   if (isFlagSet(hint, PositionHint::Left)) {
-    rgn.end.x = fixedImgInfo.width;
+    rgn.end.x = fixedImgInfo.sWidth();
   } else if (isFlagSet(hint, PositionHint::Right)) {
-    rgn.start.x = movingImgInfo.width - 1;
+    rgn.start.x = movingImgInfo.sWidth() - 1;
   }
   if (isFlagSet(hint, PositionHint::Up)) {
-    rgn.end.y = fixedImgInfo.height;
+    rgn.end.y = fixedImgInfo.sHeight();
   } else if (isFlagSet(hint, PositionHint::Down)) {
-    rgn.start.y = movingImgInfo.height - 1;
+    rgn.start.y = movingImgInfo.sHeight() - 1;
   }
   if (isFlagSet(hint, PositionHint::Front)) {
-    rgn.end.z = fixedImgInfo.depth;
+    rgn.end.z = fixedImgInfo.sDepth();
   } else if (isFlagSet(hint, PositionHint::Back)) {
-    rgn.start.z = movingImgInfo.depth - 1;
+    rgn.start.z = movingImgInfo.sDepth() - 1;
   }
   return rgn;
 }

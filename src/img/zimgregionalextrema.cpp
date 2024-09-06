@@ -42,7 +42,7 @@ ZImg ZImgRegionalExtrema<ReportProgress>::regionalExtrema(const ZImg& img, size_
         extreme = img.dataRangeMax<TVoxel>();
       }
       auto out = res.timeData<uint8_t>(t);
-      const TVoxel* data = img.timeData<TVoxel>(t);
+      const auto data = img.timeData<TVoxel>(t);
       double voxelNumber = img.timeVoxelNumber();
 
       std::stack<size_t, std::vector<size_t>> stk;
