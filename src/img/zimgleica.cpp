@@ -7,6 +7,7 @@
 #include <QXmlStreamReader>
 #include <QFile>
 #include <QUrl>
+#include <set>
 
 namespace {
 

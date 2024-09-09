@@ -147,7 +147,7 @@ ZImgSource tag_invoke(const json::value_to_tag<ZImgSource>&, const json::value& 
 class ZImgSubBlock
 {
 public:
-  ZImgSubBlock(size_t t_,
+  ZImgSubBlock(index_t t_,
                index_t x_,
                index_t y_,
                index_t z_,
@@ -186,13 +186,13 @@ public:
 
   virtual void prefetch() const {}
 
-  size_t t; // start t
+  index_t t; // start t
   index_t x; // actual start x regardless of ratio
   index_t y; // actual start y regardless of ratio
   index_t z; // actual start z regardless of ratio
-  size_t width; // real image width regardless of ratio; if ratio is 2, the stored image will have width: width/2
-  size_t height; // real image height regardless of ratio; if ratio is 2, the stored image will have height: height/2
-  size_t depth; // real image depth regardless of ratio; if ratio is 2, the stored image will have depth: depth/2
+  index_t width; // real image width regardless of ratio; if ratio is 2, the stored image will have width: width/2
+  index_t height; // real image height regardless of ratio; if ratio is 2, the stored image will have height: height/2
+  index_t depth; // real image depth regardless of ratio; if ratio is 2, the stored image will have depth: depth/2
   size_t xRatio; // realsize / storedsize, 2 means downsampled by 2
   size_t yRatio; // realsize / storedsize, 2 means downsampled by 2
   size_t zRatio; // realsize / storedsize, 2 means downsampled by 2

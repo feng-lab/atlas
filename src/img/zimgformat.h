@@ -1,8 +1,6 @@
 #pragma once
 
 #include "zimg.h"
-#include <fstream>
-#include <set>
 
 // don't use ZImgFormat and derived class directly, use ZImgIO::instance() instead
 

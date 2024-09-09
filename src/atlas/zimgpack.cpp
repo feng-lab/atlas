@@ -41,10 +41,10 @@ struct MaxOp
 
 namespace nim {
 
-ZImgPackSubBlock::ZImgPackSubBlock(std::shared_ptr<ZImg>& img,
+ZImgPackSubBlock::ZImgPackSubBlock(const std::shared_ptr<ZImg>& img,
                                    size_t ratio,
-                                   size_t t,
-                                   size_t z,
+                                   index_t t,
+                                   index_t z,
                                    index_t x,
                                    index_t y,
                                    size_t width,
@@ -64,8 +64,7 @@ ZImgInfo ZImgPackSubBlock::readInfo() const
 }
 
 ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::shared_ptr<ZImgSubBlock>>* pSceneSubBlocks)
-  : QObject()
-  , m_imgSource(std::move(imgSource))
+  : m_imgSource(std::move(imgSource))
   , m_hasUnsavedChange(false)
   , m_diskCached(true)
 {
@@ -230,11 +229,11 @@ bool ZImgPack::needUpdate(const QRectF& viewport,
     std::set<size_t> queryResult1;
     std::set<size_t> queryResult2;
     tiit->second->query(bgi::intersects(queryBox1),
-                        boost::make_function_output_iterator([&queryResult1](auto const& val) {
+                        boost::make_function_output_iterator([&queryResult1](const auto& val) {
                           queryResult1.insert(val.second);
                         }));
     tiit->second->query(bgi::intersects(queryBox2),
-                        boost::make_function_output_iterator([&queryResult2](auto const& val) {
+                        boost::make_function_output_iterator([&queryResult2](const auto& val) {
                           queryResult2.insert(val.second);
                         }));
     return queryResult1 != queryResult2;
@@ -385,18 +384,13 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
       CHECK(m_mipImgs[t] && !m_mipImgs[t]->isEmpty());
       return m_mipImgs[t]->value<double>(x, y, 0, c, 0);
     } else {
-      auto tiit = m_rtToTileIndice.find(std::make_tuple(1_uz, 1_uz, 1_uz, t));
-      if (tiit != m_rtToTileIndice.end()) {
-        const std::vector<size_t>& tileIndice = tiit->second;
-        for (auto tileIndex : tileIndice) {
+      if (auto tiit = m_rtToTileIndice.find(std::make_tuple(1_uz, 1_uz, 1_uz, t)); tiit != m_rtToTileIndice.end()) {
+        for (const std::vector<size_t>& tileIndice = tiit->second; auto tileIndex : tileIndice) {
           const ZImgSubBlock& tile = *m_allTiles[tileIndex].get();
           CHECK(tile.x >= 0 && tile.y >= 0 && tile.z >= 0);
-          if (static_cast<index_t>(x) >= tile.x &&
-              static_cast<index_t>(x) < tile.x + static_cast<index_t>(tile.width) &&
-              static_cast<index_t>(y) >= tile.y &&
-              static_cast<index_t>(y) < tile.y + static_cast<index_t>(tile.height) &&
-              static_cast<index_t>(z) >= tile.z &&
-              static_cast<index_t>(z) < tile.z + static_cast<index_t>(tile.depth)) {
+          if (static_cast<index_t>(x) >= tile.x && static_cast<index_t>(x) < tile.x + tile.width &&
+              static_cast<index_t>(y) >= tile.y && static_cast<index_t>(y) < tile.y + tile.height &&
+              static_cast<index_t>(z) >= tile.z && static_cast<index_t>(z) < tile.z + tile.depth) {
             std::shared_ptr<ZImg> imgPtr =
               ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), tile);
             return imgPtr->value<double>(x - tile.x, y - tile.y, z - tile.z, c, 0);
@@ -428,19 +422,18 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
       hasTile = true;
     } else {
       for (const auto& ratio : m_pyramidalRatios) {
-        auto tiit = m_rtToTileIndice.find(std::make_tuple(ratio[0], ratio[1], ratio[2], t));
-        if (tiit != m_rtToTileIndice.end()) {
-          const std::vector<size_t>& tileIndice = tiit->second;
-          for (auto tileIndex : tileIndice) {
+        if (auto tiit = m_rtToTileIndice.find(std::make_tuple(ratio[0], ratio[1], ratio[2], t));
+            tiit != m_rtToTileIndice.end()) {
+          for (const std::vector<size_t>& tileIndice = tiit->second; auto tileIndex : tileIndice) {
             const ZImgSubBlock& tile = *m_allTiles[tileIndex].get();
-            if (ix >= tile.x && ix < tile.x + static_cast<index_t>(tile.width) && iy >= tile.y &&
-                iy < tile.y + static_cast<index_t>(tile.height) && iz >= tile.z &&
-                iz < tile.z + static_cast<index_t>(tile.depth)) {
+            if (ix >= tile.x && ix < tile.x + tile.width && iy >= tile.y && iy < tile.y + tile.height && iz >= tile.z &&
+                iz < tile.z + tile.depth) {
               if (ratio[0] == 1 && ratio[1] == 1 && ratio[2] == 1) {
                 hasTile = true;
               }
-              std::shared_ptr<ZImg> imgPtr = ZImgCache::instance().get(ImageCacheHashKeyType(this, tileIndex));
-              if (imgPtr) {
+
+              if (std::shared_ptr<ZImg> imgPtr = ZImgCache::instance().get(ImageCacheHashKeyType(this, tileIndex));
+                  imgPtr) {
                 return imgPtr->value<double>((ix - tile.x) / (ratio[0]),
                                              (iy - tile.y) / (ratio[1]),
                                              (iz - tile.z) / (ratio[2]),
@@ -485,22 +478,15 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
   // create destination
   res = ZImg(resInfo);
   // start copy data
-  using TCoordinate = ZVoxelCoordinate::value_type;
-
-  for (TCoordinate t = rgn.tStart(); t < rgn.tEnd(); ++t) {
-    auto tiit = m_rtToTileIndice.find(std::make_tuple(1, 1, 1, t));
-    if (tiit != m_rtToTileIndice.end()) {
-      const std::vector<size_t>& tileIndice = tiit->second;
-      for (auto tileIndex : tileIndice) {
+  for (auto t = rgn.tStart(); t < rgn.tEnd(); ++t) {
+    if (auto tiit = m_rtToTileIndice.find(std::make_tuple(1, 1, 1, t)); tiit != m_rtToTileIndice.end()) {
+      for (const std::vector<size_t>& tileIndice = tiit->second; auto tileIndex : tileIndice) {
         const ZImgSubBlock& tile = *m_allTiles[tileIndex].get();
         ZVoxelCoordinate tileStart(tile.x, tile.y, tile.z, 0, t);
         ZVoxelCoordinate start = tileStart - rgn.start;
-        if ((start.x < 0 && start.x + static_cast<TCoordinate>(tile.width) <= 0) ||
-            start.x >= static_cast<TCoordinate>(res.width()) ||
-            (start.y < 0 && start.y + static_cast<TCoordinate>(tile.height) <= 0) ||
-            start.y >= static_cast<TCoordinate>(res.height()) ||
-            (start.z < 0 && start.z + static_cast<TCoordinate>(tile.depth) <= 0) ||
-            start.z >= static_cast<TCoordinate>(res.depth())) {
+        if ((start.x < 0 && start.x + tile.width <= 0) || start.x >= res.sWidth() ||
+            (start.y < 0 && start.y + tile.height <= 0) || start.y >= res.sHeight() ||
+            (start.z < 0 && start.z + tile.depth <= 0) || start.z >= res.sDepth()) {
           continue;
         }
 
@@ -525,9 +511,9 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
     return res;
   }
 
-  auto ratio = readRatioOf(std::max(1.0, std::floor(1.0 * m_imgInfo.width / width)),
-                           std::max(1.0, std::floor(1.0 * m_imgInfo.height / height)),
-                           std::max(1.0, std::floor(1.0 * m_imgInfo.depth / depth)));
+  auto ratio = readRatioOf(std::max(1.0, std::floor(static_cast<double>(m_imgInfo.width) / width)),
+                           std::max(1.0, std::floor(static_cast<double>(m_imgInfo.height) / height)),
+                           std::max(1.0, std::floor(static_cast<double>(m_imgInfo.depth) / depth)));
 
   res = assembleImg(ratio, t);
   if (res.width() != width || res.height() != height || res.depth() != depth) {
@@ -863,10 +849,10 @@ folly::coro::Task<void> ZImgPack::readTileToImgAsync(size_t tileIndex,
 
   const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
   auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile);
-  ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
-                         std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
-                         std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
-                         -ZVoxelCoordinate::value_type(sc),
+  ZVoxelCoordinate start(std::round((static_cast<double>(tile->x) / xyRatio - sx) * xyRatio / readRatio[0]),
+                         std::round((static_cast<double>(tile->y) / xyRatio - sy) * xyRatio / readRatio[1]),
+                         std::round((static_cast<double>(tile->z) / zRatio - sz) * zRatio / readRatio[2]),
+                         -static_cast<index_t>(sc),
                          0);
   maybeCancel(cancellationToken);
   img->pasteImg(*imgPtr, start);
@@ -902,20 +888,20 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
 
   maybeCancel(cancellationToken);
 
-  auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
-                                                                         xyRatio,
-                                                                         zRatio,
-                                                                         sx,
-                                                                         sy,
-                                                                         sz,
-                                                                         sc,
-                                                                         t,
-                                                                         resInfo.width,
-                                                                         resInfo.height,
-                                                                         resInfo.depth,
-                                                                         displayRangeMin,
-                                                                         displayRangeMax));
-  if (img) {
+  if (auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
+                                                                             xyRatio,
+                                                                             zRatio,
+                                                                             sx,
+                                                                             sy,
+                                                                             sz,
+                                                                             sc,
+                                                                             t,
+                                                                             resInfo.width,
+                                                                             resInfo.height,
+                                                                             resInfo.depth,
+                                                                             displayRangeMin,
+                                                                             displayRangeMax));
+      img) {
     co_return img;
   }
 
@@ -926,9 +912,9 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
   if (auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
       tiit != m_rtToTileBoxRTree.end()) {
     TileBoxType queryBox(TileCornerType(sx * xyRatio, sy * xyRatio, sz * zRatio),
-                         TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
-                                        (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
-                                        (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
+                         TileCornerType((sx + resInfo.sWidth()) * xyRatio - 1,
+                                        (sy + resInfo.sHeight()) * xyRatio - 1,
+                                        (sz + resInfo.sDepth()) * zRatio - 1));
     tiit->second->query(bgi::intersects(queryBox),
                         boost::make_function_output_iterator([&queryResult](const auto& value) {
                           queryResult.push_back(value.second);
@@ -942,9 +928,9 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
   maybeCancel(cancellationToken);
 
   auto tmpResInfo = resInfo;
-  tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
-  tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
-  tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
+  tmpResInfo.width = std::ceil(static_cast<double>(resInfo.width) * xyRatio / readRatio[0]);
+  tmpResInfo.height = std::ceil(static_cast<double>(resInfo.height) * xyRatio / readRatio[1]);
+  tmpResInfo.depth = std::ceil(static_cast<double>(resInfo.depth) * zRatio / readRatio[2]);
   tmpResInfo.voxelFormat = m_imgInfo.voxelFormat;
   tmpResInfo.bytesPerVoxel = m_imgInfo.bytesPerVoxel;
   auto res = std::make_shared<ZImg>(tmpResInfo);
@@ -1293,9 +1279,9 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio) const
       tbb::parallel_for(tbb::blocked_range<size_t>(0, tileIndice.size()), [&](const tbb::blocked_range<size_t>& r) {
         for (size_t i = r.begin(); i != r.end(); ++i) {
           const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-          ZVoxelCoordinate start(std::round(tile.x * 1.0 / ratio[0]),
-                                 std::round(tile.y * 1.0 / ratio[1]),
-                                 std::round(tile.z * 1.0 / ratio[2]),
+          ZVoxelCoordinate start(std::round(static_cast<double>(tile.x) / ratio[0]),
+                                 std::round(static_cast<double>(tile.y) / ratio[1]),
+                                 std::round(static_cast<double>(tile.z) / ratio[2]),
                                  0,
                                  t);
 
@@ -1327,9 +1313,9 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
     tbb::parallel_for(tbb::blocked_range<size_t>(0, tileIndice.size()), [&](const tbb::blocked_range<size_t>& r) {
       for (size_t i = r.begin(); i != r.end(); ++i) {
         const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-        ZVoxelCoordinate start(std::round(tile.x * 1.0 / ratio[0]),
-                               std::round(tile.y * 1.0 / ratio[1]),
-                               std::round(tile.z * 1.0 / ratio[2]),
+        ZVoxelCoordinate start(std::round(static_cast<double>(tile.x) / ratio[0]),
+                               std::round(static_cast<double>(tile.y) / ratio[1]),
+                               std::round(static_cast<double>(tile.z) / ratio[2]),
                                0,
                                0);
 
@@ -1360,10 +1346,9 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
     tbb::parallel_for(tbb::blocked_range<size_t>(0, tileIndice.size()), [&](const tbb::blocked_range<size_t>& r) {
       for (size_t i = r.begin(); i != r.end(); ++i) {
         const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-        if (static_cast<index_t>(z) >= tile.z &&
-            static_cast<index_t>(z) < (tile.z + static_cast<index_t>(tile.depth))) {
-          ZVoxelCoordinate start(std::round(tile.x * 1.0 / ratio[0]),
-                                 std::round(tile.y * 1.0 / ratio[1]),
+        if (static_cast<index_t>(z) >= tile.z && static_cast<index_t>(z) < tile.z + tile.depth) {
+          ZVoxelCoordinate start(std::round(static_cast<double>(tile.x) / ratio[0]),
+                                 std::round(static_cast<double>(tile.y) / ratio[1]),
                                  tile.z - static_cast<index_t>(z),
                                  0,
                                  0);

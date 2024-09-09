@@ -16,6 +16,7 @@
 #include <folly/io/IOBuf.h>
 #include <utility>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <set>
 
 DEFINE_bool(zimg_use_mmap_file_for_hdf5, false, "Whether to create mmap file for nim format, default is false");
 

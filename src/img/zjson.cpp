@@ -106,7 +106,7 @@ std::string jsonToString(const json::value& jv)
 json::object loadJsonObject(const QString& file)
 {
   // do not use readFileIntoString as the file might be qt specific
-  auto fileString = readFileIntoByteArray(file);
+  auto fileString = readFileIntoQByteArray(file);
   if (fileString.isEmpty()) {
     return {};
   }

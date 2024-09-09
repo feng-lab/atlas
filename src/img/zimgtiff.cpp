@@ -5,7 +5,6 @@
 #include "ztiff.h"
 #include "zstringutils.h"
 #include <cmath>
-#include <set>
 
 namespace nim {
 

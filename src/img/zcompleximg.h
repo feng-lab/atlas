@@ -59,9 +59,9 @@ public:
     return sizeof(std::complex<double>);
   }
 
-  [[nodiscard]] static index_t sVoxelByteNumber()
+  [[nodiscard]] static constexpr index_t sVoxelByteNumber()
   {
-    return static_cast<index_t>(voxelByteNumber());
+    return voxelByteNumber();
   }
 
   [[nodiscard]] size_t rowByteNumber() const

@@ -1008,7 +1008,7 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warnin
           tbb::parallel_for(
             tbb::blocked_range<index_t>(std::max(start.y, 0_z), std::min(start.y + img.sHeight(), sHeight())),
             [&](const tbb::blocked_range<index_t>& r) {
-              for (TCoordinate desY = r.begin(); desY != r.end(); ++desY) {
+              for (auto desY = r.begin(); desY != r.end(); ++desY) {
                 size_t srcY = desY - start.y;
                 std::memcpy(data(desX, desY, desZ, desC, desT), img.data(srcX, srcY, srcZ, srcC, srcT), rowByteNumber);
               }

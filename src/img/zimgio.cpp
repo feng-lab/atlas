@@ -15,7 +15,6 @@
 #include "zimgitkimage.h"
 #include "zimghdf5.h"
 #include "zimgleica.h"
-#include "zlog.h"
 #include "zioutils.h"
 #include "zcancellation.h"
 #include <folly/executors/CPUThreadPoolExecutor.h>
@@ -223,16 +222,16 @@ void collectFileInfo(
         for (size_t tsidx = 0; tsidx < (*subBlocks)[s].size(); ++tsidx) {
           switch (catDim) {
             case Dimension::X:
-              (*subBlocks)[s][tsidx]->x += res[0].size(catDim);
+              (*subBlocks)[s][tsidx]->x += res[0].ssize(catDim);
               break;
             case Dimension::Y:
-              (*subBlocks)[s][tsidx]->y += res[0].size(catDim);
+              (*subBlocks)[s][tsidx]->y += res[0].ssize(catDim);
               break;
             case Dimension::Z:
-              (*subBlocks)[s][tsidx]->z += res[0].size(catDim);
+              (*subBlocks)[s][tsidx]->z += res[0].ssize(catDim);
               break;
             case Dimension::T:
-              (*subBlocks)[s][tsidx]->t += res[0].size(catDim);
+              (*subBlocks)[s][tsidx]->t += res[0].ssize(catDim);
               break;
             default:
               break;
@@ -259,16 +258,16 @@ void collectFileInfo(
           for (size_t tsidx = 0; tsidx < tmpSubBlocks[s].size(); ++tsidx) {
             switch (catDim) {
               case Dimension::X:
-                tmpSubBlocks[s][tsidx]->x += res[s].size(catDim);
+                tmpSubBlocks[s][tsidx]->x += res[s].ssize(catDim);
                 break;
               case Dimension::Y:
-                tmpSubBlocks[s][tsidx]->y += res[s].size(catDim);
+                tmpSubBlocks[s][tsidx]->y += res[s].ssize(catDim);
                 break;
               case Dimension::Z:
-                tmpSubBlocks[s][tsidx]->z += res[s].size(catDim);
+                tmpSubBlocks[s][tsidx]->z += res[s].ssize(catDim);
                 break;
               case Dimension::T:
-                tmpSubBlocks[s][tsidx]->t += res[s].size(catDim);
+                tmpSubBlocks[s][tsidx]->t += res[s].ssize(catDim);
                 break;
               default:
                 break;
@@ -292,15 +291,15 @@ void collectFileInfo(
     subBlocks->clear();
     subBlocks->resize(res.size());
     for (size_t s = 0; s < res.size(); ++s) {
-      for (size_t t = 0; t < res[s].numTimes; ++t) {
-        for (size_t z = 0; z < res[s].depth; ++z) {
-          (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(
-            ZImgSource(fileList,
-                       catDim,
-                       catScenes,
-                       ZImgRegion(ZVoxelCoordinate(0, 0, z, 0, t),
-                                  ZVoxelCoordinate(res[s].width, res[s].height, z + 1, res[s].numChannels, t + 1)),
-                       s)));
+      for (index_t t = 0; t < res[s].sNumTimes(); ++t) {
+        for (index_t z = 0; z < res[s].sDepth(); ++z) {
+          (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(ZImgSource(
+            fileList,
+            catDim,
+            catScenes,
+            ZImgRegion(ZVoxelCoordinate(0, 0, z, 0, t),
+                       ZVoxelCoordinate(res[s].sWidth(), res[s].sHeight(), z + 1, res[s].sNumChannels(), t + 1)),
+            s)));
         }
       }
     }
@@ -434,25 +433,19 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
   for (size_t i = 0; i < res.size(); ++i) {
     auto& blocks = subBlocks[i];
     const auto& info = infos[i];
-    std::set<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>> tiles;
+    std::set<std::tuple<index_t, index_t, index_t, index_t, index_t, index_t, index_t>> tiles;
     for (const auto& block : blocks) {
       if (block->xRatio != 1 || block->yRatio != 1 || block->zRatio != 1) {
         continue;
       }
-      tiles.insert(std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>(block->t,
-                                                                                      block->x,
-                                                                                      block->y,
-                                                                                      block->width,
-                                                                                      block->height,
-                                                                                      block->z,
-                                                                                      block->depth));
+      tiles.emplace(block->t, block->x, block->y, block->width, block->height, block->z, block->depth);
     }
-    auto lastTile = std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>();
+    auto lastTile = std::tuple<index_t, index_t, index_t, index_t, index_t, index_t, index_t>();
     for (const auto& tile : tiles) {
       auto [t, x, y, width, height, z, depth] = tile;
       if (res[i].empty()) {
         ZVoxelCoordinate startC(x, y, z, 0, t);
-        ZVoxelCoordinate endC(x + width, y + height, z + depth, info.numChannels, t + 1);
+        ZVoxelCoordinate endC(x + width, y + height, z + depth, info.sNumChannels(), t + 1);
         res[i].emplace_back(startC, endC);
         lastTile = tile;
         continue;
@@ -460,14 +453,14 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
       auto [lt, lx, ly, lwidth, lheight, lz, ldepth] = lastTile;
       if (lt == t && lx == x && ly == y && lwidth == width && lheight == height) {
         auto& rgn = res[i].back();
-        if (z != static_cast<size_t>(rgn.end.z)) {
+        if (z != rgn.end.z) {
           throw ZException("z jumping");
         } else {
           rgn.end.z += depth;
         }
       } else {
         ZVoxelCoordinate startC(x, y, z, 0, t);
-        ZVoxelCoordinate endC(x + width, y + height, z + depth, info.numChannels, t + 1);
+        ZVoxelCoordinate endC(x + width, y + height, z + depth, info.sNumChannels(), t + 1);
         res[i].emplace_back(startC, endC);
         lastTile = tile;
       }
@@ -777,7 +770,7 @@ void ZImgIO::readImg(const QStringList& fileList,
   for (size_t i = 0; i < imgs.size(); ++i) {
     ZImgInfo& sliceInfo = sliceInfos[i];
     sliceCatDimStart = i == 0 ? 0 : sliceCatDimEnd;
-    sliceCatDimEnd = sliceCatDimStart + sliceInfo.size(catDim);
+    sliceCatDimEnd = sliceCatDimStart + sliceInfo.ssize(catDim);
     if (sliceCatDimStart >= region.end[std::to_underlying(catDim)] ||
         sliceCatDimEnd <= region.start[std::to_underlying(catDim)]) {
       continue;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zimg.h"
-#include <set>
 
 namespace nim {
 
@@ -11,17 +10,17 @@ class ZImgBlockProvider
 public:
   virtual ~ZImgBlockProvider() = default;
 
-  virtual ZImgInfo imgInfo() const = 0;
+  [[nodiscard]] virtual ZImgInfo imgInfo() const = 0;
 
-  // must have 1
-  virtual size_t numBlocks() const = 0;
+  // must > 0
+  [[nodiscard]] virtual size_t numBlocks() const = 0;
 
-  virtual ZImg block(size_t blockIdx) const = 0;
+  [[nodiscard]] virtual ZImg block(size_t blockIdx) const = 0;
 
-  virtual ZVoxelCoordinate blockCoord(size_t blockIdx) const = 0;
+  [[nodiscard]] virtual ZVoxelCoordinate blockCoord(size_t blockIdx) const = 0;
 
   // default implementation assumes that blocks do not overlap
-  virtual ZImg wholeImg() const;
+  [[nodiscard]] virtual ZImg wholeImg() const;
 };
 
 } // namespace nim

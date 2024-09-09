@@ -122,23 +122,24 @@ void renameFile(const QString& oldName, const QString& newName)
   }
 }
 
-std::string readFileIntoString(const QString& filename, std::ios_base::openmode mode)
+std::string readFileIntoString(const QString& filename)
 {
-  std::string res;
-  auto fileSize = QFileInfo(filename).size();
-  if (fileSize > 0) {
-    std::ifstream fs = openIFStream(filename, mode);
-    res.resize(fileSize);
+  std::ifstream fs = openIFStream(filename, std::ios_base::in | std::ios_base::binary);
+  fs.seekg(0, std::ios::end);
+  std::string res(fs.tellg(), '\0');
+  if (!res.empty()) {
+    fs.seekg(0, std::ios::beg);
     readStream_impl(fs, res.data(), res.size());
   }
+
   return res;
 }
 
-QByteArray readFileIntoByteArray(const QString& filename, QIODevice::OpenMode openMode)
+QByteArray readFileIntoQByteArray(const QString& filename)
 {
   QFile loadFile(filename);
 
-  if (!loadFile.open(openMode)) {
+  if (!loadFile.open(QIODevice::ReadOnly)) {
     throw ZException(fmt::format("Could not open file {}", filename), ZException::Option::CheckErrno);
   }
 

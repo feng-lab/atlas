@@ -3,7 +3,6 @@
 #include "zimg.h"
 #include "zimgformat.h"
 #include <map>
-#include <set>
 
 namespace nim {
 

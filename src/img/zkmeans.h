@@ -8,7 +8,6 @@
 #include <tbb/blocked_range.h>
 #include <limits>
 #include <vector>
-#include <set>
 #include <algorithm>
 
 namespace nim {

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "zexception.h"
 #include <type_traits>
 
 namespace nim {
@@ -21,41 +20,62 @@ struct IsFlags : public std::false_type
 
 // in global namespace so it doesn't hide qt's operator
 // http://stackoverflow.com/questions/10755058/qflags-enum-type-conversion-fails-all-of-a-sudden
-// impl:
-#define INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_UNARY_OPERATOR(OP) \
-  template<typename TEnum>                                                        \
-    requires nim::IsFlags<TEnum>::value                                           \
-  constexpr TEnum operator OP(TEnum value) noexcept                               \
-  {                                                                               \
-    using underlyingT = typename std::underlying_type<TEnum>::type;               \
-    return static_cast<TEnum>(OP static_cast<underlyingT>(value));                \
-  }
 
-#define INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR(OP)         \
-  template<typename TEnum>                                                                 \
-    requires nim::IsFlags<TEnum>::value                                                    \
-  constexpr TEnum operator OP(TEnum l, TEnum r) noexcept                                   \
-  {                                                                                        \
-    using underlyingT = typename std::underlying_type<TEnum>::type;                        \
-    return static_cast<TEnum>(static_cast<underlyingT>(l) OP static_cast<underlyingT>(r)); \
-  }                                                                                        \
-  template<typename TEnum>                                                                 \
-    requires nim::IsFlags<TEnum>::value                                                    \
-  constexpr TEnum& operator OP##=(TEnum & l, TEnum r) noexcept                             \
-  {                                                                                        \
-    return l = l OP r;                                                                     \
-  }
+// Unary operator template for enums used as flags.
+template<typename TEnum>
+  requires nim::IsFlags<TEnum>::value
+constexpr TEnum operator~(TEnum value) noexcept
+{
+  using underlyingT = std::underlying_type_t<TEnum>;
+  return static_cast<TEnum>(~static_cast<underlyingT>(value));
+}
 
-INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_UNARY_OPERATOR(~)
+// Binary operator template for enums used as flags.
+template<typename TEnum>
+  requires nim::IsFlags<TEnum>::value
+constexpr TEnum operator|(TEnum l, TEnum r) noexcept
+{
+  using underlyingT = std::underlying_type_t<TEnum>;
+  return static_cast<TEnum>(static_cast<underlyingT>(l) | static_cast<underlyingT>(r));
+}
 
-INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR(|)
+template<typename TEnum>
+  requires nim::IsFlags<TEnum>::value
+constexpr TEnum operator&(TEnum l, TEnum r) noexcept
+{
+  using underlyingT = std::underlying_type_t<TEnum>;
+  return static_cast<TEnum>(static_cast<underlyingT>(l) & static_cast<underlyingT>(r));
+}
 
-INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR(&)
+template<typename TEnum>
+  requires nim::IsFlags<TEnum>::value
+constexpr TEnum operator^(TEnum l, TEnum r) noexcept
+{
+  using underlyingT = std::underlying_type_t<TEnum>;
+  return static_cast<TEnum>(static_cast<underlyingT>(l) ^ static_cast<underlyingT>(r));
+}
 
-INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR(^)
+// Compound assignment operators.
+template<typename TEnum>
+  requires nim::IsFlags<TEnum>::value
+constexpr TEnum& operator|=(TEnum& l, TEnum r) noexcept
+{
+  return l = l | r;
+}
 
-#undef INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_UNARY_OPERATOR
-#undef INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR
+template<typename TEnum>
+  requires nim::IsFlags<TEnum>::value
+constexpr TEnum& operator&=(TEnum& l, TEnum r) noexcept
+{
+  return l = l & r;
+}
+
+template<typename TEnum>
+  requires nim::IsFlags<TEnum>::value
+constexpr TEnum& operator^=(TEnum& l, TEnum r) noexcept
+{
+  return l = l ^ r;
+}
 
 namespace nim {
 

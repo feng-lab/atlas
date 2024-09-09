@@ -4,6 +4,7 @@
 #include <QXmlStreamReader>
 #include <boost/uuid.hpp>
 #include <array>
+#include <set>
 
 // todo : support multiple files czi
 
@@ -352,23 +353,23 @@ private:
 
 private:
   std::string m_metadataXmlString;
-  bool m_hasVoxelSizeInfo;
-  double m_voxelSizeX;
-  double m_voxelSizeY;
-  double m_voxelSizeZ;
-  bool m_hasChannelInfo;
+  bool m_hasVoxelSizeInfo = false;
+  double m_voxelSizeX = -1;
+  double m_voxelSizeY = -1;
+  double m_voxelSizeZ = -1;
+  bool m_hasChannelInfo = false;
   std::vector<col4> m_channelColors;
   std::vector<std::string> m_channelNames;
   std::vector<int> m_channelPixelType;
   std::vector<size_t> m_channelValidBitCount;
-  bool m_hasSceneInfo;
+  bool m_hasSceneInfo = false;
   std::vector<double> m_sceneCenterX;
   std::vector<double> m_sceneCenterY;
 
   std::vector<col4> m_channelColorsFromDisplaySettings;
   std::vector<std::string> m_channelNamesFromDisplaySettings;
-  bool m_shouldSeparateChannelsToDifferentScenes;
-  bool m_someTilesAreNot2D;
+  bool m_shouldSeparateChannelsToDifferentScenes = false;
+  bool m_someTilesAreNot2D = false;
 
   std::vector<std::set<CZITile>> m_sceneTiles;
   std::vector<ZVoxelCoordinate> m_sceneStart;

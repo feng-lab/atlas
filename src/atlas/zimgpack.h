@@ -23,10 +23,10 @@ namespace nim {
 class ZImgPackSubBlock : public ZImgSubBlock
 {
 public:
-  ZImgPackSubBlock(std::shared_ptr<ZImg>& img,
+  ZImgPackSubBlock(const std::shared_ptr<ZImg>& img,
                    size_t ratio,
-                   size_t t,
-                   size_t z,
+                   index_t t,
+                   index_t z,
                    index_t x,
                    index_t y,
                    size_t width,

@@ -3,7 +3,6 @@
 #include "zglobal.h"
 #include <utility>
 #include <vector>
-#include <set>
 
 namespace nim {
 

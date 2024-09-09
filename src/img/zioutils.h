@@ -53,9 +53,8 @@ QString getTemporaryFilename(const QString& filename);
 
 void renameFile(const QString& oldName, const QString& newName);
 
-std::string readFileIntoString(const QString& filename,
-                               std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary);
+std::string readFileIntoString(const QString& filename);
 
-QByteArray readFileIntoByteArray(const QString& filename, QIODevice::OpenMode openMode = QIODevice::ReadOnly);
+QByteArray readFileIntoQByteArray(const QString& filename);
 
 } // namespace nim
