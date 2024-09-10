@@ -2,6 +2,7 @@
 
 #include "zimgsliceprovider.h"
 #include "zglobal.h"
+#include "zstringutils.h"
 #include <itkImageIOBase.h>
 #include <itkNiftiImageIOFactory.h>
 #include <itkNrrdImageIOFactory.h>
@@ -489,12 +490,8 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
       key = fmt::format("CH{}ChannelColor", actualChannel);
       if (dictionary.HasKey(key)) {
         if (auto value = dynamic_cast<const MetaDataStringType*>(dictionary.Get(key)); value) {
-          QString tagvalue = QString::fromStdString(value->GetMetaDataObjectValue());
-          bool ok;
-          int32_t color = tagvalue.toInt(&ok);
-          if (!ok) {
-            throw ZException("Can not parse nd2 channel Color");
-          }
+          int32_t color;
+          stringToValue(value->GetMetaDataObjectValue(), color, 10, "parse nd2 channel color");
           col4 col;
           std::memcpy(&col, &color, 3);
           CHECK(col.a == 255);

@@ -12,13 +12,13 @@ public:
   // ZImgFormat interface
 
 public:
-  QString shortName() const override;
+  [[nodiscard]] QString shortName() const override;
 
-  QString fullName() const override;
+  [[nodiscard]] QString fullName() const override;
 
-  QStringList extensions() const override;
+  [[nodiscard]] QStringList extensions() const override;
 
-  FileFormat format() const override
+  [[nodiscard]] FileFormat format() const override
   {
     return FileFormat::Tiff;
   }
@@ -40,9 +40,9 @@ public:
                 const ZImgSliceProvider& imgSliceProvider,
                 const ZImgWriteParameters& paras) override;
 
-  bool supportRead() const override;
+  [[nodiscard]] bool supportRead() const override;
 
-  bool supportWrite() const override;
+  [[nodiscard]] bool supportWrite() const override;
 
 protected:
   // default read into ZTiff and detect ZImgInfo, inherit this to read more information

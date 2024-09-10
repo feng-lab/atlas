@@ -7,6 +7,7 @@
 #include "zvideoencoder.h"
 #include "zcpuinfo.h"
 #include "zprocess.h"
+#include "zstringutils.h"
 #include <folly/ScopeGuard.h>
 #include <folly/futures/Future.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
@@ -108,14 +109,13 @@ int ZRunExport3DAnimation::run()
   }
 
 #if defined(__linux__)
-  if (auto gpuDevices = QString::fromStdString(FLAGS_use_gpu_devices).trimmed(); !gpuDevices.isEmpty()) {
-    static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
-    QStringList numList = gpuDevices.split(rx, Qt::SkipEmptyParts);
+  if (std::vector<std::string_view> gpuDevices =
+        absl::StrSplit(FLAGS_use_gpu_devices, absl::ByAnyChar(delimiter_literal), absl::SkipEmpty());
+      !gpuDevices.empty()) {
     std::vector<uint32_t> gpuList;
-    bool ok;
-    for (const auto& numStr : numList) {
-      auto v = numStr.toUInt(&ok);
-      if (!ok) {
+    for (auto numStr : gpuDevices) {
+      uint32_t v;
+      if (stringToValueNoThrow(numStr, v) != std::errc()) {
         LOG(ERROR) << fmt::format("invalid gpu device {}", numStr);
         return 1;
       }

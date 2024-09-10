@@ -36,29 +36,44 @@ __forceinline void stringToValue(std::string_view sv, Integral& value, int base 
 }
 #else
 template<std::integral Integral>
-__forceinline void stringToValue(std::string_view sv, Integral& value, int base = 10)
+__forceinline void stringToValue(std::string_view sv, Integral& value, int base = 10, const std::string& message = "")
 {
   auto res = fast_float::from_chars(sv.data(), sv.data() + sv.size(), value, base);
   if (res.ec == std::errc::invalid_argument) [[unlikely]] {
-    throw ZException(fmt::format("error: invalid_argument when converting {} to Integer", sv));
+    throw ZException(fmt::format("{} error: invalid_argument when converting {} to Integer", message, sv));
   }
   if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
-    throw ZException(fmt::format("error: result_out_of_range when converting {} to Integer", sv));
+    throw ZException(fmt::format("{} error: result_out_of_range when converting {} to Integer", message, sv));
   }
 }
 #endif
 
 template<std::integral Integral>
-__forceinline void stringToValue(QStringView sv, Integral& value, int base = 10)
+__forceinline std::errc stringToValueNoThrow(std::string_view sv, Integral& value, int base = 10)
+{
+  auto res = fast_float::from_chars(sv.data(), sv.data() + sv.size(), value, base);
+  return res.ec;
+}
+
+template<std::integral Integral>
+__forceinline void stringToValue(QStringView sv, Integral& value, int base = 10, const std::string& message = "")
 {
   auto data = sv.utf16();
   auto res = fast_float::from_chars(data, data + sv.size(), value, base);
   if (res.ec == std::errc::invalid_argument) [[unlikely]] {
-    throw ZException(fmt::format("error: invalid_argument when converting {} to Integer", sv));
+    throw ZException(fmt::format("{} error: invalid_argument when converting {} to Integer", message, sv));
   }
   if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
-    throw ZException(fmt::format("error: result_out_of_range when converting {} to Integer", sv));
+    throw ZException(fmt::format("{} error: result_out_of_range when converting {} to Integer", message, sv));
   }
+}
+
+template<std::integral Integral>
+__forceinline std::errc stringToValueNoThrow(QStringView sv, Integral& value, int base = 10)
+{
+  auto data = sv.utf16();
+  auto res = fast_float::from_chars(data, data + sv.size(), value, base);
+  return res.ec;
 }
 
 #if 0

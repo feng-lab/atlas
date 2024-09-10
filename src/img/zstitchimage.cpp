@@ -6,10 +6,8 @@
 #include "zstringutils.h"
 #include "zeigenutils.h"
 #include "zvbgmm.h"
-#include <QDir>
-#include <QTextStream>
 #include <QFileInfo>
-#include <QRegularExpression>
+#include <QDir>
 #include <folly/ScopeGuard.h>
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
@@ -42,56 +40,47 @@ size_t buildConnectionFromTextFile(const QString& filename,
 {
   size_t nStacks = 0;
 
-  if (!QFile::exists(filename)) {
-    throw ZException(fmt::format("file {} doesn't exist", filename));
+  constexpr std::array headers = {"# img1"sv, "img2"sv, "img2 position"sv};
+
+  std::ifstream file = openIFStream(filename, std::ios_base::in);
+  if (!file) {
+    throw ZException("Can not open file", ZException::Option::CheckErrno);
   }
 
-  QStringList header;
-  header << "# img1"
-         << "img2"
-         << "position";
-
-  static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
-  QFile inputFile(filename);
-  if (inputFile.open(QIODevice::ReadOnly)) {
-    QTextStream in(&inputFile);
-    for (QString line = in.readLine(); !line.isNull(); line = in.readLine()) {
-      QStringList list = line.split(rx, Qt::SkipEmptyParts);
-
-      if (list.empty() || list.at(0).startsWith("#")) {
-        continue;
-      }
-      if (list.size() < header.size()) {
-        throw ZException(
-          fmt::format("Wrong number of items in line ({}), expected format: <{}>", list.join(','), header.join(',')));
-      }
-      bool ok = false;
-      auto idx1 = list[0].toInt(&ok);
-      if (!ok || idx1 <= 0) {
-        throw ZException(fmt::format("Can not parse line ({}) with format <{}>", list.join(','), header.join(',')));
-      }
-      auto idx2 = list[1].toInt(&ok);
-      if (!ok || idx2 <= 0) {
-        throw ZException(fmt::format("Can not parse line ({}) with format <{}>", list.join(','), header.join(',')));
+  std::string line;
+  while (std::getline(file, line)) {
+    auto cleanLineView = absl::StripAsciiWhitespace(removeComment(line));
+    std::vector<std::string_view> fieldList =
+      absl::StrSplit(cleanLineView, absl::ByAnyChar(delimiter_literal), absl::SkipEmpty());
+    if (fieldList.size() >= 3) {
+      int32_t idx1, idx2;
+      stringToValue(fieldList[0], idx1);
+      stringToValue(fieldList[1], idx2);
+      if (idx1 <= 0 || idx2 <= 0) {
+        throw ZException(fmt::format("Can not parse line ({}) with format <{}>", line, fmt::join(headers, ", ")));
       }
       auto stackPair = std::make_pair<size_t, size_t>(idx1 - 1, idx2 - 1);
       nStacks = std::max<size_t>(nStacks, idx1);
       nStacks = std::max<size_t>(nStacks, idx2);
       conn[stackPair] = ZImgNCCMatch::PositionHint::None;
-      for (index_t i = 2; i < list.size(); ++i) {
-        QString pos = list[i].trimmed();
-        if (pos.compare("Down", Qt::CaseInsensitive) == 0) {
+      for (size_t i = 2; i < fieldList.size(); ++i) {
+        if (absl::EqualsIgnoreCase(fieldList[i], "Down"sv)) {
           conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Down;
-        } else if (pos.compare("Right", Qt::CaseInsensitive) == 0) {
+        } else if (absl::EqualsIgnoreCase(fieldList[i], "Right"sv)) {
           conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Right;
-        } else if (pos.compare("Back", Qt::CaseInsensitive) == 0) {
+        } else if (absl::EqualsIgnoreCase(fieldList[i], "Back"sv)) {
           conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Back;
         } else {
-          throw ZException(fmt::format("Can not parse line ({}) with format <{}>", list.join(','), header.join(',')));
+          throw ZException(fmt::format("Can not parse line ({}) with format <{}>", line, fmt::join(headers, ", ")));
         }
       }
+    } else if (!cleanLineView.empty()) {
+      throw ZException(fmt::format("Wrong connection text format: {}", line));
     }
-    inputFile.close();
+  }
+
+  if (!file.eof()) {
+    throw ZException(fmt::format("Error while reading file {}", filename), ZException::Option::CheckErrno);
   }
 
   return nStacks;
