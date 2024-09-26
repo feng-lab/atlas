@@ -11,7 +11,6 @@
 
 #ifndef Q_MOC_RUN
 #include <Eigen/Dense>
-
 #include <boost/math/special_functions/digamma.hpp>
 #include <boost/math/special_functions/gamma.hpp>
 #include <boost/math/constants/constants.hpp>

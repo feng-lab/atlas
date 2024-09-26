@@ -679,7 +679,8 @@ def build_tbb(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True, no_hidden_visibility=True)
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True,
+                                             no_hidden_visibility=True)  # todo: remove visibility option on next update
         cmakecmd.extend(['-DTBB_TEST:BOOL=OFF',
                          '-DTBB_STRICT:BOOL=OFF'])
 
@@ -1680,7 +1681,9 @@ def build_libpng(src_dir: str, install_dir: str):
 
                 cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
                                  '-DPNG_SHARED:BOOL=OFF',
-                                 '-DPNG_FRAMEWORK:BOOL=OFF'])
+                                 '-DPNG_FRAMEWORK:BOOL=OFF',
+                                 '-DCMAKE_OSX_INTERNAL_ARCHITECTURES=arm64',
+                                 ])
                 cmakecmd.extend([src_dir])
 
                 build_and_install_cmakecmd(cmakecmd, build_dir)

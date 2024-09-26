@@ -1,12 +1,11 @@
 #include "zassignpuncta.h"
 
-#include <utility>
-
 #include "zimg.h"
 #include "zlog.h"
 #include "zglmutils.h"
 #include "zimggraph.h"
 #include "zimgautothreshold.h"
+#include <utility>
 
 namespace nim {
 
