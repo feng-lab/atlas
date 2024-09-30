@@ -36,14 +36,28 @@ __forceinline void stringToValue(std::string_view sv, Integral& value, int base 
 }
 #else
 template<std::integral Integral>
-__forceinline void stringToValue(std::string_view sv, Integral& value, int base = 10, const std::string& message = "")
+__forceinline void stringToValue(std::string_view sv, Integral& value, int base = 10)
 {
   auto res = fast_float::from_chars(sv.data(), sv.data() + sv.size(), value, base);
   if (res.ec == std::errc::invalid_argument) [[unlikely]] {
-    throw ZException(fmt::format("{} error: invalid_argument when converting {} to Integer", message, sv));
+    throw ZException(fmt::format("error: invalid_argument when converting {} to Integer", sv));
   }
   if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
-    throw ZException(fmt::format("{} error: result_out_of_range when converting {} to Integer", message, sv));
+    throw ZException(fmt::format("error: result_out_of_range when converting {} to Integer", sv));
+  }
+}
+
+template<std::integral Integral, class iterator>
+__forceinline void stringToValue(iterator first, iterator last, Integral& value, int base = 10)
+{
+  auto res = fast_float::from_chars(&(*first), &(*last), value, base);
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
+    throw ZException(
+      fmt::format("error: invalid_argument when converting {} to Integer", std::string_view(first, last)));
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
+    throw ZException(
+      fmt::format("error: result_out_of_range when converting {} to Integer", std::string_view(first, last)));
   }
 }
 #endif
@@ -55,16 +69,23 @@ __forceinline bool stringToValueNoThrow(std::string_view sv, Integral& value, in
   return res.ec == std::errc();
 }
 
+template<std::integral Integral, class iterator>
+__forceinline bool stringToValueNoThrow(iterator first, iterator last, Integral& value, int base = 10)
+{
+  auto res = fast_float::from_chars(&(*first), &(*last), value, base);
+  return res.ec == std::errc();
+}
+
 template<std::integral Integral>
-__forceinline void stringToValue(QStringView sv, Integral& value, int base = 10, const std::string& message = "")
+__forceinline void stringToValue(QStringView sv, Integral& value, int base = 10)
 {
   auto data = sv.utf16();
   auto res = fast_float::from_chars(data, data + sv.size(), value, base);
   if (res.ec == std::errc::invalid_argument) [[unlikely]] {
-    throw ZException(fmt::format("{} error: invalid_argument when converting {} to Integer", message, sv));
+    throw ZException(fmt::format("error: invalid_argument when converting {} to Integer", sv));
   }
   if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
-    throw ZException(fmt::format("{} error: result_out_of_range when converting {} to Integer", message, sv));
+    throw ZException(fmt::format("error: result_out_of_range when converting {} to Integer", sv));
   }
 }
 
@@ -121,6 +142,25 @@ stringToValue(std::string_view sv, Real& value, fast_float::chars_format fmt = f
   }
 }
 
+template<std::floating_point Real, class iterator>
+__forceinline void stringToValue(iterator first,
+                                 iterator last,
+                                 Real& value,
+                                 fast_float::chars_format fmt = fast_float::chars_format::general)
+{
+  auto res = fast_float::from_chars(&(*first), &(*last), value, fmt);
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
+    throw ZException(
+      fmt::format("error: invalid_argument when converting {} to Real number", std::string_view(first, last)));
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
+    // throw ZException(fmt::format("error: result_out_of_range when converting {} to Real number",
+    // std::string_view(first, last)));
+    LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number",
+                                std::string_view(first, last));
+  }
+}
+
 template<std::floating_point Real>
 __forceinline bool
 stringToValueNoThrow(std::string_view sv, Real& value, fast_float::chars_format fmt = fast_float::chars_format::general)
@@ -131,6 +171,23 @@ stringToValueNoThrow(std::string_view sv, Real& value, fast_float::chars_format 
   }
   if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
     LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
+  }
+  return res.ec == std::errc();
+}
+
+template<std::floating_point Real, class iterator>
+__forceinline bool stringToValueNoThrow(iterator first,
+                                        iterator last,
+                                        Real& value,
+                                        fast_float::chars_format fmt = fast_float::chars_format::general)
+{
+  auto res = fast_float::from_chars(&(*first), &(*last), value, fmt);
+  if (res.ec == std::errc::invalid_argument) [[unlikely]] {
+    value = std::numeric_limits<Real>::quiet_NaN();
+  }
+  if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
+    LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number",
+                                std::string_view(first, last));
   }
   return res.ec == std::errc();
 }

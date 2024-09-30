@@ -522,23 +522,24 @@ parseHDF5Chunks(const QString& filename)
     if (boost::regex_match(line.begin(), line.end(), match, dataset)) {
       dataSetStarted = true;
       std::get<0>(currentDataset) = 1;
-      stringToValue(std::string_view(match[1].first, match[1].second), std::get<1>(currentDataset));
-      stringToValue(std::string_view(match[2].first, match[2].second), std::get<2>(currentDataset));
-      stringToValue(std::string_view(match[3].first, match[3].second), std::get<3>(currentDataset));
+      stringToValue(match[1].first, match[1].second, std::get<1>(currentDataset));
+      stringToValue(match[2].first, match[2].second, std::get<2>(currentDataset));
+      stringToValue(match[3].first, match[3].second, std::get<3>(currentDataset));
       continue;
     }
     if (boost::regex_match(line.begin(), line.end(), match, dsDataset)) {
       dataSetStarted = true;
-      stringToValue(std::string_view(match[4].first, match[4].second), std::get<0>(currentDataset));
-      stringToValue(std::string_view(match[1].first, match[1].second), std::get<1>(currentDataset));
-      stringToValue(std::string_view(match[2].first, match[2].second), std::get<2>(currentDataset));
-      stringToValue(std::string_view(match[3].first, match[3].second), std::get<3>(currentDataset));
+      stringToValue(match[4].first, match[4].second, std::get<0>(currentDataset));
+      stringToValue(match[1].first, match[1].second, std::get<1>(currentDataset));
+      stringToValue(match[2].first, match[2].second, std::get<2>(currentDataset));
+      stringToValue(match[3].first, match[3].second, std::get<3>(currentDataset));
       continue;
     }
     if (boost::regex_match(line.begin(), line.end(), match, filter)) {
-      std::string_view filterType(match[2].first, match[2].second);
       currentCompression =
-        (filterType.find("jpegxr"sv) != std::string_view::npos) ? Compression::JPEGXR : Compression::AUTO;
+        (std::string_view(match[2].first, match[2].second).find("jpegxr"sv) != std::string_view::npos)
+          ? Compression::JPEGXR
+          : Compression::AUTO;
       continue;
     }
     if (boost::regex_match(line.begin(), line.end(), match, chunk)) {
@@ -548,15 +549,15 @@ parseHDF5Chunks(const QString& filename)
         return res;
       }
       uint32_t filterMask;
-      stringToValue(absl::string_view(match[1].first, match[1].second), filterMask, 16);
+      stringToValue(match[1].first, match[1].second, filterMask, 16);
       HDF5ChunkInfo info;
       info.compressed = ~filterMask & uint32_t(1); // check if the first filter, i.e. the compression filter, is skipped
       info.compression = currentCompression;
-      stringToValue(absl::string_view(match[2].first, match[2].second), info.length);
-      stringToValue(absl::string_view(match[3].first, match[3].second), info.offset);
+      stringToValue(match[2].first, match[2].second, info.length);
+      stringToValue(match[3].first, match[3].second, info.offset);
       size_t y, x;
-      stringToValue(absl::string_view(match[4].first, match[4].second), y);
-      stringToValue(absl::string_view(match[5].first, match[5].second), x);
+      stringToValue(match[4].first, match[4].second, y);
+      stringToValue(match[5].first, match[5].second, x);
       auto insertRes = res.insert({std::make_tuple(std::get<0>(currentDataset),
                                                    std::get<1>(currentDataset),
                                                    std::get<2>(currentDataset),

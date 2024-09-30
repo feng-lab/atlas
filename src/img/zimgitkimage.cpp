@@ -467,7 +467,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
           boost::match_results<std::string_view::iterator> match;
           if (boost::regex_match(line.begin(), line.end(), match, channelInfo)) {
             size_t channelNum;
-            if (stringToValueNoThrow(std::string_view(match[1].first, match[1].second), channelNum)) {
+            if (stringToValueNoThrow(match[1].first, match[1].second, channelNum)) {
               usedChannels.push_back(channelNum);
               VLOG(1) << line << " " << usedChannels.back();
             } else {
@@ -487,7 +487,9 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
       if (dictionary.HasKey(key)) {
         if (auto value = dynamic_cast<const MetaDataStringType*>(dictionary.Get(key)); value) {
           int32_t color;
-          stringToValue(value->GetMetaDataObjectValue(), color, 10, "parse nd2 channel color");
+          if (!stringToValueNoThrow(value->GetMetaDataObjectValue(), color)) {
+            throw ZException(fmt::format("parse nd2 channel color {} error", value->GetMetaDataObjectValue()));
+          }
           col4 col;
           std::memcpy(&col, &color, 3);
           CHECK(col.a == 255);
