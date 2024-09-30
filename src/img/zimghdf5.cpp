@@ -518,7 +518,7 @@ parseHDF5Chunks(const QString& filename)
   std::tuple<size_t, size_t, size_t, size_t> currentDataset;
   auto currentCompression = Compression::AUTO;
   for (auto line : lines) {
-    boost::cmatch match;
+    boost::match_results<std::string_view::iterator> match;
     if (boost::regex_match(line.begin(), line.end(), match, dataset)) {
       dataSetStarted = true;
       std::get<0>(currentDataset) = 1;

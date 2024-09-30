@@ -464,7 +464,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
         std::vector<absl::string_view> lines = absl::StrSplit(value->GetMetaDataObjectValue(), '\n');
 
         for (auto line : lines) {
-          boost::cmatch match;
+          boost::match_results<std::string_view::iterator> match;
           if (boost::regex_match(line.begin(), line.end(), match, channelInfo)) {
             size_t channelNum;
             if (stringToValueNoThrow(std::string_view(match[1].first, match[1].length()), channelNum)) {
