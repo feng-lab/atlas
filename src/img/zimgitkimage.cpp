@@ -467,7 +467,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
           boost::match_results<std::string_view::iterator> match;
           if (boost::regex_match(line.begin(), line.end(), match, channelInfo)) {
             size_t channelNum;
-            if (stringToValueNoThrow(std::string_view(match[1].first, match[1].length()), channelNum)) {
+            if (stringToValueNoThrow(std::string_view(match[1].first, match[1].second), channelNum)) {
               usedChannels.push_back(channelNum);
               VLOG(1) << line << " " << usedChannels.back();
             } else {
