@@ -363,7 +363,7 @@ endif (WIN32)
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} cpuinfo::cpuinfo
                       hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen
-                      Boost::headers Boost::charconv absl::log_initialize
+                      Boost::headers Boost::charconv Boost::regex absl::log_initialize
                       GeometricTools glm::glm-header-only
                       WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
                       ${VTK_LIBRARIES} assimp::assimp TBB::tbb

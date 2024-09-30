@@ -52,7 +52,7 @@ RowVectorXd readRowVector(std::string_view line,
           rowVector(i) = std::numeric_limits<double>::quiet_NaN();
         }
       } else [[likely]] {
-        (void)stringToValueNoThrow(sv, rowVector(i));
+        static_cast<void>(stringToValueNoThrow(sv, rowVector(i)));
       }
     }
   }

@@ -115,7 +115,7 @@ int ZRunExport3DAnimation::run()
     std::vector<uint32_t> gpuList;
     for (auto numStr : gpuDevices) {
       uint32_t v;
-      if (stringToValueNoThrow(numStr, v) != std::errc()) {
+      if (!stringToValueNoThrow(numStr, v)) {
         LOG(ERROR) << fmt::format("invalid gpu device {}", numStr);
         return 1;
       }

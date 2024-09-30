@@ -16,9 +16,8 @@
 
 #include <QFile>
 #include <QStringList>
-#include <QFileInfo>
 #include <QDir>
-#include <QRegularExpression>
+#include <boost/regex.hpp>
 
 namespace nim {
 
@@ -461,22 +460,19 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
     std::string key = "sSpecSettings";
     if (dictionary.HasKey(key)) {
       if (auto value = dynamic_cast<const MetaDataStringType*>(dictionary.Get(key)); value) {
-        QString valueStr = QString::fromStdString(value->GetMetaDataObjectValue());
-        // VLOG(2) << valueStr;
+        static const boost::regex channelInfo(R"(^CH(\d+)\s+{Laser Wavelength}:.*)");
+        std::vector<absl::string_view> lines = absl::StrSplit(value->GetMetaDataObjectValue(), '\n');
 
-        static QRegularExpression channelInfo(R"(^CH(\d+)\s+{Laser Wavelength}:.*)");
-
-        QTextStream in(&valueStr, QIODevice::ReadOnly);
-
-        QString line;
-        bool ok1;
-        while (in.readLineInto(&line)) {
-          auto match = channelInfo.match(line);
-          if (match.hasMatch()) {
-            usedChannels.push_back(match.captured(1).toUInt(&ok1));
-            VLOG(2) << line << " " << usedChannels.back();
-            CHECK(ok1) << line << " " << ok1;
-            continue;
+        for (auto line : lines) {
+          boost::cmatch match;
+          if (boost::regex_match(line.begin(), line.end(), match, channelInfo)) {
+            size_t channelNum;
+            if (stringToValueNoThrow(std::string_view(match[1].first, match[1].length()), channelNum)) {
+              usedChannels.push_back(channelNum);
+              VLOG(1) << line << " " << usedChannels.back();
+            } else {
+              LOG(ERROR) << "Failed to convert channel number: " << line;
+            }
           }
         }
       }

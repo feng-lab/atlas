@@ -57,7 +57,7 @@ QString ZSelectFileWidget::getSelectedOpenFile()
     return m_lineEdit->text();
   }
 
-  return QString();
+  return {};
 }
 
 QString ZSelectFileWidget::getSelectedSaveFile()
@@ -66,7 +66,7 @@ QString ZSelectFileWidget::getSelectedSaveFile()
     return m_lineEdit->text();
   }
 
-  return QString();
+  return {};
 }
 
 QStringList ZSelectFileWidget::getSelectedMultipleOpenFiles()
@@ -86,7 +86,7 @@ QStringList ZSelectFileWidget::getSelectedMultipleOpenFiles()
 #endif
     return m_multipleFNames.filter(regExp);
   } else {
-    return QStringList();
+    return {};
   }
 }
 
@@ -96,7 +96,7 @@ QString ZSelectFileWidget::getSelectedDirectory()
     return m_lineEdit->text();
   }
 
-  return QString();
+  return {};
 }
 
 void ZSelectFileWidget::setFile(const QString& fn)

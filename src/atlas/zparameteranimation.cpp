@@ -119,7 +119,7 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const json:
   const auto& obj = value.as_object();
   if (obj.contains("color")) {
     if (obj.at("color").is_string()) {
-      toVal(asQString(obj.at("color")), color);
+      toVal(obj.at("color").get_string(), color);
     } else {
       color = json::value_to<QColor>(obj.at("color"));
     }

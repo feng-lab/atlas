@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zjson.h"
+#include "zstringutils.h"
 #include <QColor>
 
 inline QColor tag_invoke(const json::value_to_tag<QColor>&, const json::value& jv)
@@ -41,13 +42,12 @@ namespace nim {
 }
 #endif
 
-inline void toVal(const QString& str, QColor& v)
+inline void toVal(std::string_view str, QColor& v)
 {
-  static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
-  QStringList numList = str.split(rx, Qt::SkipEmptyParts);
-  for (qsizetype i = 0; i < std::min(qsizetype(4), numList.size()); ++i) {
-    int c;
-    toVal(numList[i], c);
+  std::vector<std::string_view> numList = absl::StrSplit(str, absl::ByAnyChar(" ,[];"), absl::SkipEmpty());
+  int c;
+  for (size_t i = 0; i < std::min(4_uz, numList.size()); ++i) {
+    stringToValue(numList[i], c);
     if (i == 0) {
       v.setRed(c);
     } else if (i == 1) {

@@ -320,7 +320,7 @@ void transfromMesh()
   list.append(QDir("/Users/feng/Downloads/all_obj").entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
   QString outFolder = "/Users/feng/code/Neural-Network/models";
   glm::mat4 mat;
-  nim::toVal(QString("[1.03, 0, 0, 0; 0, 6.13928e-08, 1.03, 0; 0, -1.03, 6.13928e-08, 0; 0, 0, 0, 1]"), mat);
+  nim::toVal("[1.03, 0, 0, 0; 0, 6.13928e-08, 1.03, 0; 0, -1.03, 6.13928e-08, 0; 0, 0, 0, 1]"sv, mat);
 
   for (auto& fileInfo : list) {
     ZMesh msh(fileInfo.absoluteFilePath());
@@ -345,7 +345,7 @@ void transfromMesh2()
   list.append(QDir("/Users/feng/Downloads/all_obj").entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
   QString outFolder = "/Users/feng/Downloads/gpe_stn_traj_mesh";
   glm::mat4 mat;
-  nim::toVal(QString("[5.96047e-09, 0, -0.1, 490.6; 0, 0.1, 0, -355.6; 0.1, 0, 5.96047e-09, -513.4; 0, 0, 0, 1]"), mat);
+  nim::toVal("[5.96047e-09, 0, -0.1, 490.6; 0, 0.1, 0, -355.6; 0.1, 0, 5.96047e-09, -513.4; 0, 0, 0, 1]"sv, mat);
 
   for (auto& fileInfo : list) {
     ZMesh msh(fileInfo.absoluteFilePath());

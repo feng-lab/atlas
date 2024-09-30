@@ -979,9 +979,9 @@ void ZColorMapParameter::readValue(const json::value& jsonValue)
     if (keyObj.contains("intensity") && keyObj.contains("colorL") && keyObj.contains("colorR") &&
         keyObj.contains("split")) {
       if (keyObj.at("intensity").is_string()) {
-        toVal(asQString(keyObj.at("intensity")), key.m_intensity);
-        toVal(asQString(keyObj.at("colorL")), key.m_colorL);
-        toVal(asQString(keyObj.at("colorR")), key.m_colorR);
+        toVal(keyObj.at("intensity").get_string(), key.m_intensity);
+        toVal(keyObj.at("colorL").as_string(), key.m_colorL);
+        toVal(keyObj.at("colorR").as_string(), key.m_colorR);
       } else {
         key.m_intensity = json::value_to<double>(keyObj.at("intensity"));
         key.m_colorL = json::value_to<glm::col4>(keyObj.at("colorL"));

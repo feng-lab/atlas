@@ -6,6 +6,7 @@
 #include "zglobal.h"
 #include "zjson.h"
 #include "zlog.h"
+#include "zstringutils.h"
 
 #define GLM_FORCE_CXX20
 #if defined(__aarch64__) || defined(_M_ARM64)
@@ -31,8 +32,6 @@
 #include <glm/gtx/hash.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/matrix_transform_2d.hpp>
-#include <QRegularExpression>
-#include <QStringList>
 #include <tuple>
 #include <utility>
 #include <type_traits>
@@ -222,45 +221,39 @@ using Col4Compare = Vec4Compare<unsigned char, glm::defaultp>;
 
 // [for backward compatibility, should not be used in new code] serialization support
 
-__forceinline void toVal(const QString& str, bool& v)
+__forceinline void toVal(std::string_view str, bool& v)
 {
-  v = QString::compare(str, "false", Qt::CaseInsensitive) != 0;
+  v = !absl::EqualsIgnoreCase(str, "false"sv);
 }
 
-__forceinline void toVal(const QString& str, QString& v)
+__forceinline void toVal(std::string_view str, QString& v)
 {
-  v = str;
+  v = QString::fromUtf8(str.data(), str.size());
 }
 
-__forceinline void toVal(const QString& str, float& v)
+__forceinline void toVal(std::string_view str, float& v)
 {
-  v = str.toFloat();
+  stringToValue(str, v);
 }
 
-__forceinline void toVal(const QString& str, double& v)
+__forceinline void toVal(std::string_view str, double& v)
 {
-  v = str.toDouble();
+  stringToValue(str, v);
 }
 
-__forceinline void toVal(const QString& str, int& v)
+__forceinline void toVal(std::string_view str, int& v)
 {
-  v = str.toInt();
+  stringToValue(str, v);
 }
 
-__forceinline void toVal(const QString& str, unsigned char& v)
+__forceinline void toVal(std::string_view str, unsigned char& v)
 {
-  v = str.toUShort();
+  stringToValue(str, v);
 }
 
-__forceinline void toVal(const QString& str, size_t& v)
+__forceinline void toVal(std::string_view str, size_t& v)
 {
-  v = str.toULongLong();
-}
-
-template<typename T>
-__forceinline void toVal(const std::string& str, T& v)
-{
-  toVal(QString::fromStdString(str), v);
+  stringToValue(str, v);
 }
 
 #if 0
@@ -295,12 +288,11 @@ QString toQString(const glm::vec<L, T, Q>& v)
 #endif
 
 template<size_t L, typename T, glm::qualifier Q>
-void toVal(const QString& str, glm::vec<L, T, Q>& v)
+void toVal(std::string_view str, glm::vec<L, T, Q>& v)
 {
-  static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
-  QStringList numList = str.split(rx, Qt::SkipEmptyParts);
-  for (size_t i = 0; i < std::min(L, size_t(numList.size())); ++i) {
-    toVal(numList[i], v[i]);
+  std::vector<std::string_view> numList = absl::StrSplit(str, absl::ByAnyChar(" ,[];"), absl::SkipEmpty());
+  for (size_t i = 0; i < std::min(L, numList.size()); ++i) {
+    stringToValue(numList[i], v[i]);
   }
 }
 
@@ -326,12 +318,11 @@ QString toQString(const glm::mat<C, R, T, Q>& m)
 #endif
 
 template<size_t C, size_t R, typename T, glm::qualifier Q>
-void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
+void toVal(std::string_view str, glm::mat<C, R, T, Q>& m)
 {
-  static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
-  QStringList numList = str.split(rx, Qt::SkipEmptyParts);
-  for (size_t i = 0; i < std::min(C * R, size_t(numList.size())); ++i) {
-    toVal(numList[i], m[i % C][i / R]);
+  std::vector<std::string_view> numList = absl::StrSplit(str, absl::ByAnyChar(" ,[];"), absl::SkipEmpty());
+  for (size_t i = 0; i < std::min(C * R, numList.size()); ++i) {
+    stringToValue(numList[i], m[i % C][i / R]);
   }
 }
 
@@ -344,12 +335,11 @@ QString toQString(const glm::tquat<T, Q>& v)
 #endif
 
 template<typename T, glm::qualifier Q>
-void toVal(const QString& str, glm::tquat<T, Q>& q)
+void toVal(std::string_view str, glm::tquat<T, Q>& q)
 {
-  static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
-  QStringList numList = str.split(rx, Qt::SkipEmptyParts);
-  for (size_t i = 0; i < std::min(q.length(), size_t(numList.size())); ++i) {
-    toVal(numList[i], q[i]);
+  std::vector<std::string_view> numList = absl::StrSplit(str, absl::ByAnyChar(" ,[];"), absl::SkipEmpty());
+  for (size_t i = 0; i < std::min(q.length(), numList.size()); ++i) {
+    stringToValue(numList[i], q[i]);
   }
 }
 

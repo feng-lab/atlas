@@ -1,5 +1,5 @@
 #include "zimghdf5.h"
-#include "zglobal.h"
+#include "zstringutils.h"
 #include "zimgblockprovider.h"
 #include "zimginfoio.h"
 #include "zimgsliceprovider.h"
@@ -11,11 +11,11 @@
 #include "zimgjpegxr.h"
 #include <QFile>
 #include <QProcess>
-#include <QRegularExpression>
 #include <folly/compression/Compression.h>
 #include <folly/io/IOBuf.h>
 #include <utility>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/regex.hpp>
 #include <set>
 
 DEFINE_bool(zimg_use_mmap_file_for_hdf5, false, "Whether to create mmap file for nim format, default is false");
@@ -506,67 +506,57 @@ parseHDF5Chunks(const QString& filename)
     return res;
   }
 
-  static QRegularExpression dataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/Data\s+Dataset\s+.*)");
-  static QRegularExpression dsDataset(
+  static const boost::regex dataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/Data\s+Dataset\s+.*)");
+  static const boost::regex dsDataset(
     R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/DownsampledBy(\d+)Data\s+Dataset\s+.*)");
-  static QRegularExpression filter(R"(^\s*Filter-(\d+)\:\s+(.*))");
-  static QRegularExpression chunk(R"(^\s*([xa-fA-F0-9]+)\s+(\d+)\s+(\d+)\s+\[(\d+)[,\s]+(\d+)[,\s]+(\d+)[,\s]*\])");
+  static const boost::regex filter(R"(^\s*Filter-(\d+)\:\s+(.*))");
+  static const boost::regex chunk(R"(^\s*0x([xa-fA-F0-9]+)\s+(\d+)\s+(\d+)\s+\[(\d+)[,\s]+(\d+)[,\s]+(\d+)[,\s]*\])");
 
   auto result = printChunkInfos.readAllStandardOutput();
-  QTextStream in(result, QIODevice::ReadOnly);
-
-  QString line;
+  std::vector<std::string_view> lines = absl::StrSplit(std::string_view(result.data(), result.size()), '\n');
   bool dataSetStarted = false;
   std::tuple<size_t, size_t, size_t, size_t> currentDataset;
   auto currentCompression = Compression::AUTO;
-  bool ok1, ok2, ok3, ok4;
-  while (in.readLineInto(&line)) {
-    auto match = dataset.match(line);
-    if (match.hasMatch()) {
+  for (auto line : lines) {
+    boost::cmatch match;
+    if (boost::regex_match(line.begin(), line.end(), match, dataset)) {
       dataSetStarted = true;
-      currentDataset = std::make_tuple<size_t, size_t, size_t, size_t>(1,
-                                                                       match.captured(1).toUInt(&ok1),
-                                                                       match.captured(2).toUInt(&ok2),
-                                                                       match.captured(3).toUInt(&ok3));
-      CHECK(ok1 && ok2 && ok3) << line << ok1 << ok2 << ok3;
+      std::get<0>(currentDataset) = 1;
+      stringToValue(std::string_view(match[1].first, match[1].length()), std::get<1>(currentDataset));
+      stringToValue(std::string_view(match[2].first, match[2].length()), std::get<2>(currentDataset));
+      stringToValue(std::string_view(match[3].first, match[3].length()), std::get<3>(currentDataset));
       continue;
     }
-    match = dsDataset.match(line);
-    if (match.hasMatch()) {
+    if (boost::regex_match(line.begin(), line.end(), match, dsDataset)) {
       dataSetStarted = true;
-      currentDataset = std::make_tuple<size_t, size_t, size_t, size_t>(match.captured(4).toUInt(&ok4),
-                                                                       match.captured(1).toUInt(&ok1),
-                                                                       match.captured(2).toUInt(&ok2),
-                                                                       match.captured(3).toUInt(&ok3));
-      CHECK(ok1 && ok2 && ok3 && ok4) << line << ok1 << ok2 << ok3 << ok4;
+      stringToValue(std::string_view(match[4].first, match[4].length()), std::get<0>(currentDataset));
+      stringToValue(std::string_view(match[1].first, match[1].length()), std::get<1>(currentDataset));
+      stringToValue(std::string_view(match[2].first, match[2].length()), std::get<2>(currentDataset));
+      stringToValue(std::string_view(match[3].first, match[3].length()), std::get<3>(currentDataset));
       continue;
     }
-    match = filter.match(line);
-    if (match.hasMatch()) {
-      if (match.captured(2).contains("jpegxr")) {
-        currentCompression = Compression::JPEGXR;
-      } else {
-        currentCompression = Compression::AUTO;
-      }
+    if (boost::regex_match(line.begin(), line.end(), match, filter)) {
+      std::string_view filterType(match[2].first, match[2].length());
+      currentCompression =
+        (filterType.find("jpegxr"sv) != std::string_view::npos) ? Compression::JPEGXR : Compression::AUTO;
       continue;
     }
-    match = chunk.match(line);
-    if (match.hasMatch()) {
+    if (boost::regex_match(line.begin(), line.end(), match, chunk)) {
       if (!dataSetStarted) {
         LOG(ERROR) << "parse hdf5 chunk error: " << line;
         res.clear();
         return res;
       }
-      uint32_t filterMask = match.captured(1).toUInt(&ok1, 0);
-      CHECK(ok1) << match.captured(0);
+      uint32_t filterMask;
+      stringToValue(absl::string_view(match[1].first, match[1].length()), filterMask, 16);
       HDF5ChunkInfo info;
       info.compressed = ~filterMask & uint32_t(1); // check if the first filter, i.e. the compression filter, is skipped
       info.compression = currentCompression;
-      info.length = match.captured(2).toULongLong(&ok1);
-      info.offset = match.captured(3).toULongLong(&ok2);
-      size_t y = match.captured(4).toULongLong(&ok3);
-      size_t x = match.captured(5).toULongLong(&ok4);
-      CHECK(ok1 && ok2 && ok3 && ok4) << line << ok1 << ok2 << ok3 << ok4;
+      stringToValue(absl::string_view(match[2].first, match[2].length()), info.length);
+      stringToValue(absl::string_view(match[3].first, match[3].length()), info.offset);
+      size_t y, x;
+      stringToValue(absl::string_view(match[4].first, match[4].length()), y);
+      stringToValue(absl::string_view(match[5].first, match[5].length()), x);
       auto insertRes = res.insert({std::make_tuple(std::get<0>(currentDataset),
                                                    std::get<1>(currentDataset),
                                                    std::get<2>(currentDataset),

@@ -49,10 +49,10 @@ __forceinline void stringToValue(std::string_view sv, Integral& value, int base 
 #endif
 
 template<std::integral Integral>
-__forceinline std::errc stringToValueNoThrow(std::string_view sv, Integral& value, int base = 10)
+__forceinline bool stringToValueNoThrow(std::string_view sv, Integral& value, int base = 10)
 {
   auto res = fast_float::from_chars(sv.data(), sv.data() + sv.size(), value, base);
-  return res.ec;
+  return res.ec == std::errc();
 }
 
 template<std::integral Integral>
@@ -69,11 +69,11 @@ __forceinline void stringToValue(QStringView sv, Integral& value, int base = 10,
 }
 
 template<std::integral Integral>
-__forceinline std::errc stringToValueNoThrow(QStringView sv, Integral& value, int base = 10)
+__forceinline bool stringToValueNoThrow(QStringView sv, Integral& value, int base = 10)
 {
   auto data = sv.utf16();
   auto res = fast_float::from_chars(data, data + sv.size(), value, base);
-  return res.ec;
+  return res.ec == std::errc();
 }
 
 #if 0
@@ -93,7 +93,7 @@ __forceinline void stringToValue(std::string_view sv,
 }
 
 template<std::floating_point Real>
-__forceinline void stringToValueNoThrow(std::string_view sv,
+__forceinline bool stringToValueNoThrow(std::string_view sv,
                                         Real& value,
                                         boost::charconv::chars_format fmt = boost::charconv::chars_format::general)
 {
@@ -104,6 +104,7 @@ __forceinline void stringToValueNoThrow(std::string_view sv,
   if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
     LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
   }
+  return res.ec == std::errc();
 }
 #else
 template<std::floating_point Real>
@@ -121,7 +122,7 @@ stringToValue(std::string_view sv, Real& value, fast_float::chars_format fmt = f
 }
 
 template<std::floating_point Real>
-__forceinline std::errc
+__forceinline bool
 stringToValueNoThrow(std::string_view sv, Real& value, fast_float::chars_format fmt = fast_float::chars_format::general)
 {
   auto res = fast_float::from_chars(sv.data(), sv.data() + sv.size(), value, fmt);
@@ -131,7 +132,7 @@ stringToValueNoThrow(std::string_view sv, Real& value, fast_float::chars_format 
   if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
     LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
   }
-  return res.ec;
+  return res.ec == std::errc();
 }
 #endif
 
@@ -151,7 +152,7 @@ stringToValue(QStringView sv, Real& value, fast_float::chars_format fmt = fast_f
 }
 
 template<std::floating_point Real>
-__forceinline std::errc
+__forceinline bool
 stringToValueNoThrow(QStringView sv, Real& value, fast_float::chars_format fmt = fast_float::chars_format::general)
 {
   auto data = sv.utf16();
@@ -162,7 +163,7 @@ stringToValueNoThrow(QStringView sv, Real& value, fast_float::chars_format fmt =
   if (res.ec == std::errc::result_out_of_range) [[unlikely]] {
     LOG(WARNING) << fmt::format("warning: result_out_of_range when converting {} to Real number", sv);
   }
-  return res.ec;
+  return res.ec == std::errc();
 }
 
 // checkSpecialNumber takes care of 1.#qnan, 1.#ind ... when "#" is start of comment

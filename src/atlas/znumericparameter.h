@@ -107,7 +107,7 @@ public:
   {
     T v;
     if (jsonValue.is_string()) {
-      toVal(asQString(jsonValue), v);
+      toVal(jsonValue.get_string(), v);
     } else {
       v = json::value_to<T>(jsonValue);
     }
@@ -356,7 +356,7 @@ public:
   {
     T v;
     if (jsonValue.is_string()) {
-      toVal(asQString(jsonValue), v);
+      toVal(jsonValue.get_string(), v);
     } else {
       v = json::value_to<T>(jsonValue);
     }
@@ -811,7 +811,7 @@ public:
   {
     T v;
     if (jsonValue.is_string()) {
-      toVal(asQString(jsonValue), v);
+      toVal(jsonValue.get_string(), v);
     } else {
       v = json::value_to<T>(jsonValue);
     }
