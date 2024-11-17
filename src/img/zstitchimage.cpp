@@ -9,10 +9,9 @@
 #include <QFileInfo>
 #include <QDir>
 #include <folly/ScopeGuard.h>
-#include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
 #include <tbb/global_control.h>
-#include <boost/container_hash/hash.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
 #include <algorithm>
 #include <limits>
 
@@ -578,10 +577,7 @@ void ZStitchImage::doWork()
 
   {
     // for every pair of img
-    tbb::concurrent_unordered_map<std::pair<size_t, size_t>,
-                                  std::pair<ZVoxelCoordinate, double>,
-                                  boost::hash<std::pair<size_t, size_t>>>
-      offsets;
+    boost::concurrent_flat_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
     ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
 
     std::vector<std::tuple<size_t, size_t, ZImgNCCMatch::PositionHint>> allPairs;
@@ -614,12 +610,13 @@ void ZStitchImage::doWork()
         if ((f < nStacks && m < nStacks) || (f >= nStacks && m >= nStacks)) {
           // within same input set
           ZVoxelCoordinate movingImgOffset = imgNCCMatch.getMovingImgOffsetFromHint(0., 0., 0.);
-          offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, 0);
+          offsets.insert_or_assign(std::make_pair(f, m), std::make_pair(movingImgOffset, 0));
         } else {
           // between input set
           CHECK(m == f + nStacks);
           // append channels of 2nd input set to channels of 1st input set
-          offsets[std::make_pair(f, m)] = std::make_pair(ZVoxelCoordinate(0, 0, 0, oneImgInfo.numChannels), 0);
+          offsets.insert_or_assign(std::make_pair(f, m),
+                                   std::make_pair(ZVoxelCoordinate(0, 0, 0, oneImgInfo.numChannels), 0));
         }
       } else {
         if ((f < nStacks && m < nStacks) || (f >= nStacks && m >= nStacks)) {
@@ -643,7 +640,7 @@ void ZStitchImage::doWork()
                                                                                   m_startResolutionIntvY,
                                                                                   m_startResolutionIntvZ,
                                                                                   &maxNCC);
-          offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+          offsets.insert_or_assign(std::make_pair(f, m), std::make_pair(movingImgOffset, maxNCC));
 
           LOG(INFO) << fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
                                    f + 1,
@@ -668,7 +665,7 @@ void ZStitchImage::doWork()
                                                                                   &maxNCC);
           // append moving img channels to fixed img channels
           movingImgOffset.c = oneImgInfo.numChannels;
-          offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+          offsets.insert_or_assign(std::make_pair(f, m), std::make_pair(movingImgOffset, maxNCC));
 
           LOG(INFO) << fmt::format("img {0} -- img {1}, img {1} position hint: {2}, offset: {3}, NCC: {4}",
                                    f + 1,
@@ -713,7 +710,17 @@ void ZStitchImage::doWork()
                         m_downsampleBlockDepth,
                         m_downsampleMergeMode);
     }
-    for (const auto& fixedMovingOffsetCost : offsets) {
+    // for (const auto& fixedMovingOffsetCost : offsets) {
+    //   size_t f = fixedMovingOffsetCost.first.first;
+    //   size_t m = fixedMovingOffsetCost.first.second;
+    //   imgMerge.addImgPair(imgs[f],
+    //                       imgs[m],
+    //                       fixedMovingOffsetCost.second.first,
+    //                       -(fixedMovingOffsetCost.second.second),
+    //                       QString::number(f + 1),
+    //                       QString::number(m + 1));
+    // }
+    offsets.cvisit_all([&](const auto& fixedMovingOffsetCost) {
       size_t f = fixedMovingOffsetCost.first.first;
       size_t m = fixedMovingOffsetCost.first.second;
       imgMerge.addImgPair(imgs[f],
@@ -722,7 +729,7 @@ void ZStitchImage::doWork()
                           -(fixedMovingOffsetCost.second.second),
                           QString::number(f + 1),
                           QString::number(m + 1));
-    }
+    });
 
     imgMerge.setMergeMode(m_mergeMode);
     auto summary = imgMerge.resolveLocations();
@@ -957,10 +964,7 @@ void ZStitchImage::doRestitch()
 
   {
     // for every pair of img
-    tbb::concurrent_unordered_map<std::pair<size_t, size_t>,
-                                  std::pair<ZVoxelCoordinate, double>,
-                                  boost::hash<std::pair<size_t, size_t>>>
-      offsets;
+    boost::concurrent_flat_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
     ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
 
     std::vector<std::tuple<size_t, size_t, ZVoxelCoordinate>> allPairs;
@@ -1015,7 +1019,7 @@ void ZStitchImage::doRestitch()
                                                                              m_startResolutionIntvY,
                                                                              m_startResolutionIntvZ,
                                                                              &maxNCC);
-      offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
+      offsets.insert_or_assign(std::make_pair(f, m), std::make_pair(movingImgOffset, maxNCC));
 
       LOG(INFO) << fmt::format(
         "tile {0} ({1}) -- tile {2} ({3}), tile {2} initial offset: {4}, final offset: {5}, NCC: {6}",
@@ -1061,7 +1065,17 @@ void ZStitchImage::doRestitch()
                         m_downsampleBlockDepth,
                         m_downsampleMergeMode);
     }
-    for (const auto& fixedMovingOffsetCost : offsets) {
+    // for (const auto& fixedMovingOffsetCost : offsets) {
+    //   size_t f = fixedMovingOffsetCost.first.first;
+    //   size_t m = fixedMovingOffsetCost.first.second;
+    //   imgMerge.addImgPair(imgs[f],
+    //                       imgs[m],
+    //                       fixedMovingOffsetCost.second.first,
+    //                       -(fixedMovingOffsetCost.second.second),
+    //                       QString::number(f + 1),
+    //                       QString::number(m + 1));
+    // }
+    offsets.cvisit_all([&](const auto& fixedMovingOffsetCost) {
       size_t f = fixedMovingOffsetCost.first.first;
       size_t m = fixedMovingOffsetCost.first.second;
       imgMerge.addImgPair(imgs[f],
@@ -1070,7 +1084,7 @@ void ZStitchImage::doRestitch()
                           -(fixedMovingOffsetCost.second.second),
                           QString::number(f + 1),
                           QString::number(m + 1));
-    }
+    });
 
     imgMerge.setMergeMode(m_mergeMode);
     auto summary = imgMerge.resolveLocations();

@@ -1,0 +1,56 @@
+{
+  "version": 8,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "config-base",
+      "hidden": true,
+      "displayName": "base Configuration",
+      "description": "Default build using Ninja generator",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "Release",
+      "displayName": "Config Release",
+      "description": "Sets Release build type",
+      "inherits": "config-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/src/3rdparty/build/ninja",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-base",
+      "hidden": true,
+      "configurePreset": "Release"
+    },
+    {
+      "name": "Release",
+      "displayName": "Build Release",
+      "inherits": "build-base",
+      "configurePreset": "Release",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-all",
+      "displayName": "Test All",
+      "configurePreset": "Release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "stopOnFailure": false
+      }
+    }
+  ]
+}

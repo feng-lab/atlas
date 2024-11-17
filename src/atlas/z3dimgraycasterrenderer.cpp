@@ -503,6 +503,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     }
 
     std::vector<uint32_t> missingBlockIDs;
+    tbb::concurrent_unordered_set<uint32_t> ccSet;
     { // scope for block id shader
       m_image3DSliceWithTransferfunBlockIDsShader.bind();
       auto guard = folly::makeGuard([=, this]() {
@@ -516,8 +517,6 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
       m_image3DSliceWithTransferfunBlockIDsShader.setViewMatrixUniform(m_rendererBase.camera().viewMatrix(eye));
 
       // render block ids
-      tbb::concurrent_unordered_set<uint32_t> ccSet;
-
       const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
 
       m_img->bindFullResBlockIDsShader(m_image3DSliceWithTransferfunBlockIDsShader, c);
@@ -541,14 +540,12 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
                           });
 
         processEventsAndMaybeCancel(cancellationToken);
-
-        ccSet.unsafe_erase(0_u32);
-        ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
-        missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
-        ccSet.clear();
       }
       // glFinish();
     }
+    ccSet.unsafe_erase(0_u32);
+    ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
+    missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
     bt.recordEvent("render and collect blockids");
 
     processEventsAndMaybeCancel(cancellationToken);

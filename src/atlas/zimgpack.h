@@ -11,7 +11,7 @@
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/index/rtree.hpp>
-#include <tbb/concurrent_unordered_map.h>
+#include <boost/unordered/concurrent_flat_map.hpp>
 #include <tuple>
 #include <array>
 
@@ -222,12 +222,14 @@ public:
                                   size_t depth,
                                   double displayRangeMin) const
   {
-    if (auto it = m_blockInfo.find(std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, width, height, depth));
-        it != m_blockInfo.end()) {
-      if (const auto [minv, maxv] = it->second; maxv <= displayRangeMin) {
-        return true;
-      }
+    double maxIntensity;
+    if (m_blockInfo.cvisit(std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, width, height, depth),
+                           [&](const auto& x) {
+                             maxIntensity = x.second.second;
+                           })) {
+      return maxIntensity <= displayRangeMin;
     }
+
     return false;
   }
 
@@ -337,7 +339,7 @@ private:
 
   using BlockInfoKeyType =
     std::tuple<index_t, index_t, index_t, index_t, index_t, size_t, size_t, size_t, size_t, size_t>;
-  mutable tbb::concurrent_unordered_map<BlockInfoKeyType, std::pair<double, double>> m_blockInfo;
+  mutable boost::concurrent_flat_map<BlockInfoKeyType, std::pair<double, double>> m_blockInfo;
 };
 
 } // namespace nim

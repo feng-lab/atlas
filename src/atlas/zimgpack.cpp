@@ -875,11 +875,13 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
   maybeCancel(cancellationToken);
 
   bool needToUpdateBlockInfo = false;
-  if (auto it = m_blockInfo.find(
-        std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth));
-      it != m_blockInfo.end()) {
-    const auto [minv, maxv] = it->second;
-    if (maxv <= displayRangeMin) {
+  double maxIntensity;
+  if (m_blockInfo.cvisit(
+        std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth),
+        [&](const auto& x) {
+          maxIntensity = x.second.second;
+        })) {
+    if (maxIntensity <= displayRangeMin) {
       co_return std::shared_ptr<ZImg>();
     }
   } else {

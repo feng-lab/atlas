@@ -679,8 +679,7 @@ def build_tbb(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True,
-                                             no_hidden_visibility=True)  # todo: remove visibility option on next update
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DTBB_TEST:BOOL=OFF',
                          '-DTBB_STRICT:BOOL=OFF'])
 
@@ -1501,6 +1500,9 @@ def build_ceres_solver(src_dir: str, install_dir: str):
     try:
         patch_manager.apply_patches()
 
+        os.rename(os.path.join(src_dir, 'third_party', 'abseil-cpp', 'CMakeLists.txt'),
+                  os.path.join(src_dir, 'third_party', 'abseil-cpp', '__CMakeLists.txt'))
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd_options = ['-DBUILD_TESTING:BOOL=OFF',
                             '-DSUITESPARSE:BOOL=ON',
@@ -1545,6 +1547,8 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                    )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.rename(os.path.join(src_dir, 'third_party', 'abseil-cpp', '__CMakeLists.txt'),
+                  os.path.join(src_dir, 'third_party', 'abseil-cpp', 'CMakeLists.txt'))
         patch_manager.restore_files()
         cleanup_git_submodule(src_dir)
 
@@ -1578,7 +1582,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                          '-DgRPC_SSL_PROVIDER=package',
                          f'-DOPENSSL_ROOT_DIR:PATH={install_dir}',
                          '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
-                         '-DgRPC_ABSL_PROVIDER:STRING=package',
+                         '-DgRPC_ABSL_PROVIDER:STRING=module',
                          '-DgRPC_RE2_PROVIDER:STRING=module',
                          ])
 
@@ -3400,7 +3404,7 @@ def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'gperf', 'ffmpeg', 'java', 'qt', 'make-cmake-pathlist', 'fast_float',
                 'zlib', 'boost', 'tbb', 'eigen', 'pocketfft', 'reflect', 'simde', 'pybind11', 'glm', 'googletest',
                 'cpuinfo', 'gflags', 'glog', 'benchmark', 'openssl', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt',
-                'libevent', 'snappy', 'bzip2', 'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'grpc',
+                'libevent', 'snappy', 'bzip2', 'libsodium', 'folly', 'suitesparse', 'grpc', 'ceres-solver',
                 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk', 'opencv',
                 'neuTube', 'rocksdb', 'llfio', 'jansson', 'pcre', 'fizz', 'mvfst', 'wangle', 'proxygen',
@@ -3421,7 +3425,7 @@ def parse_inputs(argv: list):
                             'openssl': ['grpc', 'folly'],
                             'hdf5': ['itk', 'vtk'],
                             'suitesparse': ['ceres-solver'],
-                            'ceres-solver': ['opencv', 'grpc'],  # only if we need opencv sfm, let grpc use ceres absl
+                            'ceres-solver': ['opencv'],  # only if we need opencv sfm
                             'boost': ['folly'],
                             'libevent': ['folly'],
                             'double-conversion': ['folly', 'itk', 'vtk'],

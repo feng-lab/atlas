@@ -1,3 +1,5 @@
+include(CTest)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest

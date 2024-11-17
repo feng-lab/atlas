@@ -107,6 +107,7 @@ src/neurolabi/lib/png/
 src/neurolabi/lib/xml/
 src/neurolabi/lib/Mingw/64/
 src/neurolabi/c/lib/
+build/
 
 src/neurolabi/gui/gui.pro.user*
 src/neurolabi/gui/build
