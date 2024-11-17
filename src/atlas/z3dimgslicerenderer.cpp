@@ -6,7 +6,7 @@
 #include "zlog.h"
 #include "zcancellation.h"
 #include <tbb/parallel_for.h>
-#include <tbb/concurrent_unordered_set.h>
+#include <boost/unordered/concurrent_flat_set.hpp>
 
 namespace nim {
 
@@ -184,7 +184,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     }
 
     std::vector<uint32_t> missingBlockIDs;
-    tbb::concurrent_unordered_set<uint32_t> ccSet;
+    boost::concurrent_flat_set<uint32_t> ccSet;
     { // scope for block id shader
       m_image3DSliceWithColorMapBlockIDsShader.bind();
       auto guard = folly::makeGuard([=, this]() {
@@ -224,9 +224,11 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       }
       // glFinish();
     }
-    ccSet.unsafe_erase(0_u32);
-    ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
-    missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
+    ccSet.erase(0_u32);
+    ccSet.erase(std::numeric_limits<uint32_t>::max());
+    ccSet.cvisit_all([&](auto x) {
+      missingBlockIDs.push_back(x);
+    });
     bt.recordEvent("render and collect blockids");
 
     processEventsAndMaybeCancel(cancellationToken);

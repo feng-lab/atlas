@@ -2,7 +2,6 @@
 
 #include "zimg.h"
 #include "zthreadsafescalablecache.h"
-#include "zhashutils.h"
 
 // #define USE_ZSharedCache
 
@@ -229,8 +228,7 @@ using ZThreadSafeScalableImageCache =
 
 using ImageCacheHashKeyType = std::tuple<const void*, size_t>;
 
-using ZThreadSafeScalableImageCache =
-  ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ImageCacheHashKeyType>>;
+using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>>;
 
 #endif
 
@@ -253,8 +251,8 @@ public:
                                   const ZImgSubBlock& imgBlock,
                                   FindStategy findStategy = FindStategy::UpdateLRUList)
   {
-    if (ZThreadSafeScalableImageCache::ConstAccessor ca; find(ca, key, findStategy)) {
-      return *ca;
+    if (auto resOpt = find(key, findStategy); resOpt) {
+      return resOpt.value();
     } else {
       auto res = imgBlock.read();
       insert(key, res);
@@ -264,17 +262,12 @@ public:
 
   std::shared_ptr<ZImg> get(const ImageCacheHashKeyType& key, FindStategy findStategy = FindStategy::UpdateLRUList)
   {
-    if (ZThreadSafeScalableImageCache::ConstAccessor ca; find(ca, key, findStategy)) {
-      return *ca;
-    } else {
-      return {};
-    }
+    return find(key, findStategy).value_or(std::shared_ptr<ZImg>());
   }
 
   bool contains(const ImageCacheHashKeyType& key, FindStategy findStategy = FindStategy::UpdateLRUList)
   {
-    ZThreadSafeScalableImageCache::ConstAccessor ca;
-    return find(ca, key, findStategy);
+    return find(key, findStategy).has_value();
   }
 };
 

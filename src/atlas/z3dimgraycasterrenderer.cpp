@@ -9,8 +9,7 @@
 #include "zcancellation.h"
 #include "zstatisticsutils.h"
 #include <tbb/parallel_for.h>
-#include <tbb/concurrent_unordered_set.h>
-#include <QCoreApplication>
+#include <boost/unordered/concurrent_flat_set.hpp>
 
 DEFINE_bool(atlas_clear_image_cache_after_rendering,
             false,
@@ -503,7 +502,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     }
 
     std::vector<uint32_t> missingBlockIDs;
-    tbb::concurrent_unordered_set<uint32_t> ccSet;
+    boost::concurrent_flat_set<uint32_t> ccSet;
     { // scope for block id shader
       m_image3DSliceWithTransferfunBlockIDsShader.bind();
       auto guard = folly::makeGuard([=, this]() {
@@ -543,9 +542,11 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
       }
       // glFinish();
     }
-    ccSet.unsafe_erase(0_u32);
-    ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
-    missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
+    ccSet.erase(0_u32);
+    ccSet.erase(std::numeric_limits<uint32_t>::max());
+    ccSet.cvisit_all([&](auto x) {
+      missingBlockIDs.push_back(x);
+    });
     bt.recordEvent("render and collect blockids");
 
     processEventsAndMaybeCancel(cancellationToken);
@@ -884,7 +885,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
           }
 #endif
 
-  tbb::concurrent_unordered_set<uint32_t> ccSet;
+  boost::concurrent_flat_set<uint32_t> ccSet;
 
   tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
                     [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
@@ -931,15 +932,17 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
     std::vector<uint32_t> missingBlockIDs;
 
-    ccSet.unsafe_erase(0_u32);
+    ccSet.erase(0_u32);
     if (ccSet.contains(std::numeric_limits<uint32_t>::max())) {
       VLOG(1) << "use last block";
     }
-    ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
+    ccSet.erase(std::numeric_limits<uint32_t>::max());
     if (!ccSet.empty()) {
       CHECK(ccSet.size() < m_img->numCachedImages(c) * 10);
       missingBlockIDs.reserve(ccSet.size());
-      missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
+      ccSet.cvisit_all([&](auto x) {
+        missingBlockIDs.push_back(x);
+      });
       if ((round % 2 == 1) && hasEnoughMissingIDs) {
         std::sort(missingBlockIDs.begin(), missingBlockIDs.end(), std::greater<>());
       } else {
@@ -991,7 +994,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   m_currentImageRenderTargets[eye]->release();
 
   m_image3DRaycasterShader.release();
-  //glFinish();
+  // glFinish();
   bt.recordEvent("render image");
   STOP_AND_VLOG(bt)
 

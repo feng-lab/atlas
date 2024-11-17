@@ -2,7 +2,6 @@
 
 #include "zimg.h"
 #include "zthreadsafescalablecache.h"
-#include "zhashutils.h"
 
 namespace nim {
 
@@ -20,9 +19,8 @@ using ImageRegionCacheHashKeyType = std::tuple<const void*,
                                                double,
                                                double>;
 
-using ZThreadSafeScalableImageRegionCache = ZThreadSafeScalableCache<ImageRegionCacheHashKeyType,
-                                                                     std::shared_ptr<ZImg>,
-                                                                     ZHashCompare<ImageRegionCacheHashKeyType>>;
+using ZThreadSafeScalableImageRegionCache =
+  ZThreadSafeScalableCache<ImageRegionCacheHashKeyType, std::shared_ptr<ZImg>>;
 
 class ZImgRegionCache : public ZThreadSafeScalableImageRegionCache
 {
@@ -41,17 +39,12 @@ public:
   std::shared_ptr<ZImg> get(const ImageRegionCacheHashKeyType& key,
                             FindStategy findStategy = FindStategy::UpdateLRUList)
   {
-    if (ZThreadSafeScalableImageRegionCache::ConstAccessor ca; find(ca, key, findStategy)) {
-      return *ca;
-    } else {
-      return {};
-    }
+    return find(key, findStategy).value_or(std::shared_ptr<ZImg>());
   }
 
   bool contains(const ImageRegionCacheHashKeyType& key, FindStategy findStategy = FindStategy::UpdateLRUList)
   {
-    ZThreadSafeScalableImageRegionCache::ConstAccessor ca;
-    return find(ca, key, findStategy);
+    return find(key, findStategy).has_value();
   }
 };
 
