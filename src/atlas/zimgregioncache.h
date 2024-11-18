@@ -1,7 +1,9 @@
 #pragma once
 
 #include "zimg.h"
-#include "zthreadsafescalablecache.h"
+// #include "zthreadsafescalablecache.h"
+// #include "zhashutils.h"
+#include "zconcurrentlrucache.h"
 
 namespace nim {
 
@@ -19,13 +21,16 @@ using ImageRegionCacheHashKeyType = std::tuple<const void*,
                                                double,
                                                double>;
 
-using ZThreadSafeScalableImageRegionCache =
-  ZThreadSafeScalableCache<ImageRegionCacheHashKeyType, std::shared_ptr<ZImg>>;
+// using ZParentImgRegionCache = ZThreadSafeScalableCache<ImageRegionCacheHashKeyType,
+//                                                        std::shared_ptr<ZImg>,
+//                                                        ZHashCompare<ImageRegionCacheHashKeyType>>;
 
-class ZImgRegionCache : public ZThreadSafeScalableImageRegionCache
+using ZParentImgRegionCache = ZConcurrentLRUCache<ImageRegionCacheHashKeyType, std::shared_ptr<ZImg>>;
+
+class ZImgRegionCache : public ZParentImgRegionCache
 {
 public:
-  using FindStategy = ZThreadSafeScalableImageRegionCache::FindStrategy;
+  using FindStategy = ZParentImgRegionCache::FindStrategy;
 
   static ZImgRegionCache& instance();
 
@@ -33,7 +38,7 @@ public:
 
   void insert(const ImageRegionCacheHashKeyType& key, const std::shared_ptr<ZImg>& object)
   {
-    ZThreadSafeScalableImageRegionCache::insert(key, object, object->byteNumber());
+    ZParentImgRegionCache::insert(key, object, object->byteNumber());
   }
 
   std::shared_ptr<ZImg> get(const ImageRegionCacheHashKeyType& key,

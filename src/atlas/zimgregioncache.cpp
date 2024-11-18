@@ -15,10 +15,9 @@ ZImgRegionCache& ZImgRegionCache::instance()
 }
 
 ZImgRegionCache::ZImgRegionCache(bool canSkipDestructor)
-  : ZThreadSafeScalableImageRegionCache(ZCpuInfo::instance().nPhysicalRAM *
-                                          FLAGS_atlas_image_region_cache_memory_proportion,
-                                        ZCpuInfo::instance().nLogicalCores * 2,
-                                        canSkipDestructor)
+  : ZParentImgRegionCache(ZCpuInfo::instance().nPhysicalRAM * FLAGS_atlas_image_region_cache_memory_proportion,
+                          ZCpuInfo::instance().nLogicalCores * 2,
+                          canSkipDestructor)
 {}
 
 } // namespace nim

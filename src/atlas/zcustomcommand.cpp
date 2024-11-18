@@ -27,6 +27,8 @@
 #include "z3dpunctaview.h"
 #include "z3dswcview.h"
 // #include "zstructutils.h"
+#include "zconcurrentlrucache.h"
+#include "zthreadsafescalablecache.h"
 #include <qtcsv/reader.h>
 #include <itkMath.h>
 #include <QDir>
@@ -1833,9 +1835,9 @@ void testLogDataSupport()
   LOG(INFO) << fmt::format("{}", t);
   const std::map<std::string, int> init{
     {"this",  -50000},
-    {"can",   10034},
-    {"be",    12},
-    {"const", -100},
+    {"can",   10034 },
+    {"be",    12    },
+    {"const", -100  },
   };
   LOG(INFO) << init;
   LOG(INFO) << json::value_from(init);
@@ -1899,13 +1901,141 @@ void someTest()
   // printStruct<EventListSegment>();
 }
 
+template<typename CacheType>
+void concurrent_insert(CacheType& cache, int thread_id, int num_operations, int key_range)
+{
+  std::mt19937 rng(thread_id);
+  std::uniform_int_distribution<int> dist(0, key_range - 1);
+
+  for (int i = 0; i < num_operations; ++i) {
+    int key = dist(rng);
+    int value = key * 10; // Arbitrary value
+    cache.insert(key, value, sizeof(value));
+  }
+}
+
+template<typename CacheType>
+void concurrent_find(CacheType& cache, int thread_id, int num_operations, int key_range, std::atomic<int>& hits)
+{
+  std::mt19937 rng(thread_id);
+  std::uniform_int_distribution<int> dist(0, key_range - 1);
+
+  for (int i = 0; i < num_operations; ++i) {
+    int key = dist(rng);
+    auto result = cache.find(key);
+    if (result) {
+      ++hits;
+      // Optionally, verify the value
+      // assert(*result == key * 10);
+    }
+  }
+}
+
+template<typename CacheType>
+void concurrent_remove(CacheType& cache, int thread_id, int num_operations, int key_range)
+{
+  std::mt19937 rng(thread_id);
+  std::uniform_int_distribution<int> dist(0, key_range - 1);
+
+  for (int i = 0; i < num_operations; ++i) {
+    int key = dist(rng);
+    cache.remove(key);
+  }
+}
+
+template<typename CacheType>
+void mixed_operations(CacheType& cache, int thread_id, int num_operations, int key_range, std::atomic<int>& hits)
+{
+  std::mt19937 rng(thread_id);
+  std::uniform_int_distribution<int> dist_op(0, 2); // 0: insert, 1: find, 2: remove
+  std::uniform_int_distribution<int> dist_key(0, key_range - 1);
+
+  for (int i = 0; i < num_operations; ++i) {
+    int op = dist_op(rng);
+    int key = dist_key(rng);
+    int value = key * 10;
+
+    if (op == 0) {
+      // Insert
+      cache.insert(key, value, sizeof(value));
+    } else if (op == 1) {
+      // Find
+      auto result = cache.find(key);
+      if (result) {
+        ++hits;
+        // Optionally, verify the value
+        // assert(*result == value);
+      }
+    } else {
+      // Remove
+      cache.remove(key);
+    }
+  }
+}
+
+template <typename CacheType>
+void run_cache_test(const std::string& cache_name) {
+  const int num_threads = std::thread::hardware_concurrency();
+  const int num_operations = 100000;  // Total operations per thread
+  const int key_range = 10000;        // Range of keys to generate
+  const size_t max_cache_size = 1000000;  // Maximum size of the cache
+
+  CacheType cache(max_cache_size);
+
+  std::vector<std::thread> threads;
+  std::atomic<int> total_hits(0);
+
+  // Start timer
+  auto start_time = std::chrono::steady_clock::now();
+
+  // Launch threads performing mixed operations
+  for (int i = 0; i < num_threads; ++i) {
+    threads.emplace_back(mixed_operations<CacheType>, std::ref(cache), i, num_operations, key_range, std::ref(total_hits));
+  }
+
+  // Wait for all threads to finish
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  // End timer
+  auto end_time = std::chrono::steady_clock::now();
+  auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+
+  // Output performance metrics
+  int total_ops = num_threads * num_operations;
+  double ops_per_sec = (total_ops * 1000.0) / duration_ms;
+
+  LOG(INFO) << "Testing " << cache_name;
+  LOG(INFO) << "Total operations: " << total_ops;
+  LOG(INFO) << "Total hits: " << total_hits.load();
+  LOG(INFO) << "Duration: " << duration_ms << " ms";
+  LOG(INFO) << "Throughput: " << ops_per_sec << " ops/sec";
+
+  // Verify correctness (optional)
+  // Ensure cache size does not exceed maximum
+  CHECK(cache.size() <= max_cache_size);
+}
+
+void run_all_cache_test()
+{
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache");
+  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache");
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache");
+  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache");
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache");
+  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache");
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache");
+  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache");
+}
+
 } // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  testLogDataSupport();
+  run_all_cache_test();
   LOG(INFO) << "done";
 }
 

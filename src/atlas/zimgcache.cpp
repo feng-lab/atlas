@@ -27,9 +27,9 @@ ZImgCache& ZImgCache::instance()
 }
 
 ZImgCache::ZImgCache(bool canSkipDestructor)
-  : ZThreadSafeScalableImageCache(ZCpuInfo::instance().nPhysicalRAM * FLAGS_atlas_image_cache_memory_proportion,
-                                  ZCpuInfo::instance().nLogicalCores * 2,
-                                  canSkipDestructor)
+  : ZParentImgCache(ZCpuInfo::instance().nPhysicalRAM * FLAGS_atlas_image_cache_memory_proportion,
+                    ZCpuInfo::instance().nLogicalCores * 2,
+                    canSkipDestructor)
 {}
 #endif
 

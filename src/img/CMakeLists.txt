@@ -183,6 +183,7 @@ set(IMG_SOURCES
     zstructutils.h
     zwindowsheader.cpp
     zcancellation.h
+    zconcurrentlrucache.h
 )
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")

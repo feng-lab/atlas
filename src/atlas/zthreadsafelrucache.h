@@ -2,14 +2,11 @@
 
 // adapt from Tim Starling's lru-cache.h
 
-#include "c_stack.h"
-
-#include <boost/unordered/concurrent_flat_map.hpp>
+#include <tbb/concurrent_hash_map.h>
 #include <atomic>
 #include <mutex>
 #include <thread>
 #include <vector>
-#include <optional>
 
 namespace nim {
 
@@ -22,7 +19,7 @@ namespace nim {
  * deferred until all ConstAccessor objects are destroyed.
  *
  * The implementation is generally conservative, relying on the documented
- * behaviour of boost::concurrent_flat_map. LRU list transactions are protected
+ * behaviour of tbb::concurrent_hash_map. LRU list transactions are protected
  * with a single mutex. Having our own doubly-linked list implementation helps
  * to ensure that list transactions are sufficiently brief, consisting of only
  * a few loads and stores. User code is not executed while the lock is held.
@@ -36,7 +33,7 @@ namespace nim {
  * TBB::CHM. So if that is a possibility for your workload,
  * ZThreadSafeScalableCache is recommended instead.
  */
-template<class TKey, class TValue>
+template<class TKey, class TValue, class THash = tbb::tbb_hash_compare<TKey>>
 class ZThreadSafeLRUCache
 {
   /**
@@ -88,7 +85,9 @@ class ZThreadSafeLRUCache
     ListNode* m_listNode;
   };
 
-  using HashMap = boost::concurrent_flat_map<TKey, HashMapValue>;
+  using HashMap = tbb::concurrent_hash_map<TKey, HashMapValue, THash>;
+  using HashMapConstAccessor = typename HashMap::const_accessor;
+  using HashMapAccessor = typename HashMap::accessor;
 
 public:
   /**
@@ -131,7 +130,7 @@ public:
    * will not be updated, and false will be returned. Otherwise, true will be
    * returned.
    */
-  bool insert(const TKey& key, const TValue& value, size_t size);
+  bool insert(const TKey& key, const TValue& value, size_t objSize);
 
   /**
    * Clear the container. NOT THREAD SAFE -- do not use while other threads
@@ -206,12 +205,12 @@ private:
   bool m_canSkipDestructor;
 };
 
-template<class TKey, class TValue>
-typename ZThreadSafeLRUCache<TKey, TValue>::ListNode* const ZThreadSafeLRUCache<TKey, TValue>::OutOfListMarker =
-  (ListNode*)-1;
+template<class TKey, class TValue, class THash>
+typename ZThreadSafeLRUCache<TKey, TValue, THash>::ListNode* const
+  ZThreadSafeLRUCache<TKey, TValue, THash>::OutOfListMarker = (ListNode*)-1;
 
-template<class TKey, class TValue>
-ZThreadSafeLRUCache<TKey, TValue>::ZThreadSafeLRUCache(size_t maxSize, bool canSkipDestructor)
+template<class TKey, class TValue, class THash>
+ZThreadSafeLRUCache<TKey, TValue, THash>::ZThreadSafeLRUCache(size_t maxSize, bool canSkipDestructor)
   : m_maxSize(maxSize)
   , m_size(0)
   , m_map(std::thread::hardware_concurrency() * 4) // it will automatically grow
@@ -222,65 +221,62 @@ ZThreadSafeLRUCache<TKey, TValue>::ZThreadSafeLRUCache(size_t maxSize, bool canS
   m_tail.m_prev = &m_head;
 }
 
-template<class TKey, class TValue>
-std::optional<TValue> ZThreadSafeLRUCache<TKey, TValue>::find(const TKey& key, FindStrategy findStrategy)
+template<class TKey, class TValue, class THash>
+std::optional<TValue> ZThreadSafeLRUCache<TKey, TValue, THash>::find(const TKey& key, FindStrategy findStrategy)
 {
-  TValue value;
-  if (m_map.cvisit(key, [&, this](const auto& accessor) {
-        value = accessor.second.m_value;
-        if (findStrategy == FindStrategy::UpdateLRUList) {
-          std::unique_lock lock(m_listMutex);
-          ListNode* node = accessor.second.m_listNode;
-          // The list node may be out of the list if it is in the process of being
-          // inserted or evicted. Doing this check allows us to lock the list for
-          // shorter periods of time.
-          if (node->isInList()) {
-            delink(node);
-            pushFront(node);
-          }
-        } else if (findStrategy == FindStrategy::MaybeUpdateLRUList) {
-          // Acquire the lock, but don't block if it is already held
-          std::unique_lock lock(m_listMutex, std::try_to_lock);
-          if (lock) {
-            ListNode* node = accessor.second.m_listNode;
-            // The list node may be out of the list if it is in the process of being
-            // inserted or evicted. Doing this check allows us to lock the list for
-            // shorter periods of time.
-            if (node->isInList()) {
-              delink(node);
-              pushFront(node);
-            }
-            lock.unlock();
-          }
-        }
-      })) {
-    return value;
-  } else {
+  HashMapConstAccessor hashAccessor;
+  if (!m_map.find(hashAccessor, key)) {
     return {};
   }
-}
 
-template<class TKey, class TValue>
-void ZThreadSafeLRUCache<TKey, TValue>::remove(const TKey& key)
-{
-  if (m_map.cvisit(key, [&, this](const auto& accessor) {
-        std::unique_lock lock(m_listMutex);
-        ListNode* node = accessor.second.m_listNode;
-        // The list node may be out of the list if it is in the process of being
-        // inserted or evicted. Doing this check allows us to lock the list for
-        // shorter periods of time.
-        if (node->isInList()) {
-          delink(node);
-          m_size.fetch_sub(node->m_size);
-          delete node;
-        }
-      })) {
-    m_map.erase(key);
+  TValue value = hashAccessor->second.m_value;
+  ListNode* node = hashAccessor->second.m_listNode;
+  hashAccessor.release(); // Release the accessor before acquiring m_listMutex
+
+  if (findStrategy == FindStrategy::UpdateLRUList) {
+    std::unique_lock lock(m_listMutex);
+    if (node->isInList()) {
+      delink(node);
+      pushFront(node);
+    }
+  } else if (findStrategy == FindStrategy::MaybeUpdateLRUList) {
+    std::unique_lock lock(m_listMutex, std::try_to_lock);
+    if (lock && node->isInList()) {
+      delink(node);
+      pushFront(node);
+    }
   }
+
+  return value;
 }
 
-template<class TKey, class TValue>
-bool ZThreadSafeLRUCache<TKey, TValue>::insert(const TKey& key, const TValue& value, size_t objSize)
+template<class TKey, class TValue, class THash>
+void ZThreadSafeLRUCache<TKey, TValue, THash>::remove(const TKey& key)
+{
+  HashMapConstAccessor hashAccessor;
+  if (!m_map.find(hashAccessor, key)) {
+    return;
+  }
+
+  ListNode* node = hashAccessor->second.m_listNode;
+
+  {
+    std::unique_lock lock(m_listMutex);
+    if (node->isInList()) {
+      delink(node);
+      m_size.fetch_sub(node->m_size);
+    }
+  }
+
+  // Erase the key while still holding the accessor
+  m_map.erase(hashAccessor);
+
+  // Now safe to delete the node
+  delete node;
+}
+
+template<class TKey, class TValue, class THash>
+bool ZThreadSafeLRUCache<TKey, TValue, THash>::insert(const TKey& key, const TValue& value, size_t objSize)
 {
   // Insert into the CHM
   auto node = new ListNode(key, objSize);
@@ -309,8 +305,7 @@ bool ZThreadSafeLRUCache<TKey, TValue>::insert(const TKey& key, const TValue& va
   //  if (!evictionDone) {
   //    size = m_size++;
   //  }
-  auto size = m_size.fetch_add(objSize, std::memory_order_release);
-  if (size > m_maxSize) {
+  if (auto size = m_size.fetch_add(objSize, std::memory_order_release); size > m_maxSize) {
     // It is possible for the size to temporarily exceed the maximum if there is
     // a heavy insert() load, once only as the cache fills. In this situation,
     // we have to be careful not to have every thread simultaneously attempt to
@@ -328,14 +323,13 @@ bool ZThreadSafeLRUCache<TKey, TValue>::insert(const TKey& key, const TValue& va
   return true;
 }
 
-template<class TKey, class TValue>
-void ZThreadSafeLRUCache<TKey, TValue>::clear()
+template<class TKey, class TValue, class THash>
+void ZThreadSafeLRUCache<TKey, TValue, THash>::clear()
 {
   m_map.clear();
   ListNode* node = m_head.m_next;
-  ListNode* next;
   while (node != &m_tail) {
-    next = node->m_next;
+    ListNode* next = node->m_next;
     delete node;
     node = next;
   }
@@ -344,14 +338,14 @@ void ZThreadSafeLRUCache<TKey, TValue>::clear()
   m_size = 0;
 }
 
-template<class TKey, class TValue>
-void ZThreadSafeLRUCache<TKey, TValue>::squeeze()
+template<class TKey, class TValue, class THash>
+void ZThreadSafeLRUCache<TKey, TValue, THash>::squeeze()
 {
   shrinkToFit(m_map);
 }
 
-template<class TKey, class TValue>
-void ZThreadSafeLRUCache<TKey, TValue>::snapshotKeys(std::vector<TKey>& keys)
+template<class TKey, class TValue, class THash>
+void ZThreadSafeLRUCache<TKey, TValue, THash>::snapshotKeys(std::vector<TKey>& keys)
 {
   keys.reserve(keys.size() + m_size.load());
   std::scoped_lock lock(m_listMutex);
@@ -360,8 +354,8 @@ void ZThreadSafeLRUCache<TKey, TValue>::snapshotKeys(std::vector<TKey>& keys)
   }
 }
 
-template<class TKey, class TValue>
-void ZThreadSafeLRUCache<TKey, TValue>::delink(ListNode* node)
+template<class TKey, class TValue, class THash>
+void ZThreadSafeLRUCache<TKey, TValue, THash>::delink(ListNode* node)
 {
   ListNode* prev = node->m_prev;
   ListNode* next = node->m_next;
@@ -370,8 +364,8 @@ void ZThreadSafeLRUCache<TKey, TValue>::delink(ListNode* node)
   node->m_prev = OutOfListMarker;
 }
 
-template<class TKey, class TValue>
-void ZThreadSafeLRUCache<TKey, TValue>::pushFront(ListNode* node)
+template<class TKey, class TValue, class THash>
+void ZThreadSafeLRUCache<TKey, TValue, THash>::pushFront(ListNode* node)
 {
   ListNode* oldRealHead = m_head.m_next;
   node->m_prev = &m_head;
@@ -380,8 +374,8 @@ void ZThreadSafeLRUCache<TKey, TValue>::pushFront(ListNode* node)
   m_head.m_next = node;
 }
 
-template<class TKey, class TValue>
-void ZThreadSafeLRUCache<TKey, TValue>::evict()
+template<class TKey, class TValue, class THash>
+void ZThreadSafeLRUCache<TKey, TValue, THash>::evict()
 {
   while (m_size.load(std::memory_order_acquire) > m_maxSize) {
     std::unique_lock lock(m_listMutex);
@@ -393,13 +387,12 @@ void ZThreadSafeLRUCache<TKey, TValue>::evict()
     delink(moribund);
     lock.unlock();
 
-    //    HashMapAccessor hashAccessor;
-    //    if (!m_map.find(hashAccessor, moribund->m_key)) {
-    //      // Presumably unreachable
-    //      continue;
-    //    }
-    //    m_map.erase(hashAccessor);
-    m_map.erase(moribund->m_key);
+    HashMapAccessor hashAccessor;
+    if (!m_map.find(hashAccessor, moribund->m_key)) {
+      // Presumably unreachable
+      continue;
+    }
+    m_map.erase(hashAccessor);
     m_size.fetch_sub(moribund->m_size, std::memory_order_relaxed);
     delete moribund;
   }
