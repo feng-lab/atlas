@@ -1947,7 +1947,7 @@ template<typename CacheType>
 void mixed_operations(CacheType& cache, int thread_id, int num_operations, int key_range, std::atomic<int>& hits)
 {
   std::mt19937 rng(thread_id);
-  std::uniform_int_distribution<int> dist_op(0, 1); // 0: insert, 1: find, 2: remove
+  std::uniform_int_distribution<int> dist_op(0, 2); // 0: insert, 1: find, 2: remove
   std::uniform_int_distribution<int> dist_key(0, key_range - 1);
 
   for (int i = 0; i < num_operations; ++i) {

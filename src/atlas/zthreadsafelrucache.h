@@ -174,12 +174,9 @@ public:
    */
   bool insert(const TKey& key, const TValue& value, size_t objSize)
   {
-    // Create a new list node
-    auto node = std::make_unique<ListNode>(key, objSize);
-    auto nodep = node.get();
     HashMapAccessor hashAccessor;
     // Attempt to insert into the hash map
-    if (!m_map.emplace(hashAccessor, key, HashMapValue(value, std::move(node)))) {
+    if (!m_map.emplace(hashAccessor, key, HashMapValue(value, std::make_unique<ListNode>(key, objSize)))) {
       // Key already exists, do not insert
       // node will be deleted automatically when std::unique_ptr goes out of scope
       return false;
@@ -201,13 +198,14 @@ public:
     // exist.
 
     std::unique_lock lock(m_listMutex);
-    pushFront(nodep);
+    pushFront(hashAccessor->second.m_listNode.get());
+    m_size.fetch_add(objSize, std::memory_order_release);
     lock.unlock();
     hashAccessor.release();
     //  if (!evictionDone) {
     //    size = m_size++;
     //  }
-    if (auto size = m_size.fetch_add(objSize, std::memory_order_release); size > m_maxSize) {
+    if (m_size.load(std::memory_order_acquire) > m_maxSize) {
       // It is possible for the size to temporarily exceed the maximum if there is
       // a heavy insert() load, once only as the cache fills. In this situation,
       // we have to be careful not to have every thread simultaneously attempt to
@@ -266,7 +264,7 @@ private:
    * Unlink a node from the list. The caller must lock the list mutex while
    * this is called.
    */
-  void delink(ListNode* node)
+  static void delink(ListNode* node)
   {
     if (node->m_inList) {
       node->m_prev->m_next = node->m_next;
@@ -319,8 +317,6 @@ private:
       //    }
       //    m_map.erase(hashAccessor);
       m_map.erase(moribund->m_key);
-      // m_size.fetch_sub(moribund->m_size, std::memory_order_relaxed);
-      // delete moribund;
     }
   }
 
