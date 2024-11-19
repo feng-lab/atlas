@@ -37,7 +37,10 @@ struct ZThreadSafeScalableCache
     , m_numShards(numShards)
   {
     if (m_numShards == 0) {
-      m_numShards = std::thread::hardware_concurrency();
+      m_numShards = std::thread::hardware_concurrency() * 4;
+      if (m_numShards == 0) {
+        m_numShards = 8; // Fallback in case hardware_concurrency returns 0
+      }
     }
     for (size_t i = 0; i < m_numShards; i++) {
       size_t s = maxSize / m_numShards;
@@ -125,8 +128,9 @@ private:
   Shard& getShard(const TKey& key)
   {
     THash hashObj;
-    constexpr int shift = std::numeric_limits<size_t>::digits - 16;
-    size_t h = (hashObj.hash(key) >> shift) % m_numShards;
+    // constexpr int shift = std::numeric_limits<size_t>::digits - 16;
+    // size_t h = (hashObj.hash(key) >> shift) % m_numShards;
+    size_t h = hashObj.hash(key) % m_numShards;
     return *m_shards.at(h);
   }
 

@@ -80,16 +80,16 @@ public:
   /**
    * Create a container with a given maximum size and number of segments.
    */
-  explicit ZConcurrentLRUCache(size_t maxSize, size_t numSegments = 1, bool canSkipDestructor = false)
+  explicit ZConcurrentLRUCache(size_t maxSize, size_t numSegments = 0, bool canSkipDestructor = false)
     : m_maxSize(maxSize)
     , m_numSegments(numSegments)
     , m_map(std::thread::hardware_concurrency() * 4)
     , m_canSkipDestructor(canSkipDestructor)
   {
     if (numSegments == 0) {
-      m_numSegments = std::thread::hardware_concurrency();
+      m_numSegments = std::thread::hardware_concurrency() * 4;
       if (m_numSegments == 0) {
-        m_numSegments = 1; // Fallback in case hardware_concurrency returns 0
+        m_numSegments = 8; // Fallback in case hardware_concurrency returns 0
       }
     }
 
@@ -185,6 +185,8 @@ public:
     // Create a new list node
     auto node = std::make_unique<ListNode>(key, objSize);
 
+    // todo: use emplace_and_visit
+
     // Attempt to insert into the hash map
     if (!m_map.emplace(key, HashMapValue(value, std::move(node)))) {
       // Key already exists, do not insert
@@ -265,8 +267,10 @@ private:
     }
 
     boost::hash<TKey> hasher;
-    constexpr int shift = std::numeric_limits<size_t>::digits - 16;
-    return (hasher(key) >> shift) % m_numSegments;
+    // auto hashValue = hasher(key);
+    // constexpr int shift = std::numeric_limits<size_t>::digits - 16;
+    // return (hashValue >> shift + hashValue & 0xFFFF) % m_numSegments;
+    return hasher(key) % m_numSegments;
   }
 
   /**

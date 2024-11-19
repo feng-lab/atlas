@@ -85,9 +85,6 @@ using ImageCacheHashKeyType = std::tuple<const void*, size_t>;
 // using ZParentImgCache =
 //   ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ImageCacheHashKeyType>>;
 
-// using ZParentImgCache =
-//   ZThreadSafeLRUCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ImageCacheHashKeyType>>;
-
 using ZParentImgCache = ZConcurrentLRUCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>>;
 
 #endif

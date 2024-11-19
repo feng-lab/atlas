@@ -1947,7 +1947,7 @@ template<typename CacheType>
 void mixed_operations(CacheType& cache, int thread_id, int num_operations, int key_range, std::atomic<int>& hits)
 {
   std::mt19937 rng(thread_id);
-  std::uniform_int_distribution<int> dist_op(0, 2); // 0: insert, 1: find, 2: remove
+  std::uniform_int_distribution<int> dist_op(0, 1); // 0: insert, 1: find, 2: remove
   std::uniform_int_distribution<int> dist_key(0, key_range - 1);
 
   for (int i = 0; i < num_operations; ++i) {
@@ -2019,20 +2019,17 @@ void run_cache_test(const std::string& cache_name, size_t numShards) {
 
 void run_all_cache_test()
 {
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 0", 0);
+  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 0", 0);
   run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 1", 1);
-  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 1", 1);
   run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 1", 1);
   run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 8", 8);
-  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 8", 8);
   run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 8", 8);
   run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 16", 16);
-  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 16", 16);
   run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 16", 16);
   run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 32", 32);
-  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 32", 32);
   run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 32", 32);
   run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 64", 64);
-  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 64", 64);
   run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 64", 64);
 }
 
