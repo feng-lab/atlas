@@ -80,7 +80,7 @@ public:
   /**
    * Create a container with a given maximum size and number of segments.
    */
-  explicit ZConcurrentLRUCache(size_t maxSize, size_t numSegments = 0, bool canSkipDestructor = false)
+  explicit ZConcurrentLRUCache(size_t maxSize, size_t numSegments = 1, bool canSkipDestructor = false)
     : m_maxSize(maxSize)
     , m_numSegments(numSegments)
     , m_map(std::thread::hardware_concurrency() * 4)
@@ -128,8 +128,7 @@ public:
     if (m_map.cvisit(key, [&](const auto& accessor) {
           value = accessor.second.m_value;
           if (findStrategy != FindStrategy::NoUpdateLRUList) {
-            size_t index = getSegmentIndex(key);
-            auto& segment = *m_segments[index];
+            auto& segment = *m_segments[getSegmentIndex(key)];
             auto node = accessor.second.m_listNode.get();
             if (findStrategy == FindStrategy::UpdateLRUList) {
               std::unique_lock lock(segment.m_mutex);
@@ -157,8 +156,7 @@ public:
    */
   void remove(const TKey& key)
   {
-    size_t index = getSegmentIndex(key);
-    auto& segment = *m_segments[index];
+    auto& segment = *m_segments[getSegmentIndex(key)];
 
     if (m_map.cvisit(key, [&](const auto& accessor) {
           std::unique_lock lock(segment.m_mutex);
@@ -182,8 +180,7 @@ public:
    */
   bool insert(const TKey& key, const TValue& value, size_t objSize)
   {
-    size_t index = getSegmentIndex(key);
-    auto& segment = *m_segments[index];
+    auto& segment = *m_segments[getSegmentIndex(key)];
 
     // Create a new list node
     auto node = std::make_unique<ListNode>(key, objSize);
@@ -309,17 +306,18 @@ private:
    */
   void evict(Segment& segment)
   {
-    std::unique_lock lock(segment.m_mutex);
     while (segment.m_size > m_maxSizePerSegment) {
+      std::unique_lock lock(segment.m_mutex);
       ListNode* moribund = segment.m_tail.m_prev;
       if (moribund == &segment.m_head) {
         // List is empty, can't evict
-        break;
+        return;
       }
       delink(moribund);
+      segment.m_size -= moribund->m_size;
+      lock.unlock();
       // Remove from the hash map
       m_map.erase(moribund->m_key);
-      segment.m_size -= moribund->m_size;
       // Node will be deleted when unique_ptr goes out of scope
     }
   }

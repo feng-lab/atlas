@@ -32,7 +32,21 @@ struct ZThreadSafeScalableCache
    *     "hardware concurrency" will be used (typically the logical processor
    *     count).
    */
-  explicit ZThreadSafeScalableCache(size_t maxSize, size_t numShards = 0, bool canSkipDestructor = false);
+  explicit ZThreadSafeScalableCache(size_t maxSize, size_t numShards = 0, bool canSkipDestructor = false)
+    : m_maxSize(maxSize)
+    , m_numShards(numShards)
+  {
+    if (m_numShards == 0) {
+      m_numShards = std::thread::hardware_concurrency();
+    }
+    for (size_t i = 0; i < m_numShards; i++) {
+      size_t s = maxSize / m_numShards;
+      if (i == 0) {
+        s += maxSize % m_numShards;
+      }
+      m_shards.emplace_back(std::make_shared<Shard>(s, canSkipDestructor));
+    }
+  }
 
   ZThreadSafeScalableCache(const ZThreadSafeScalableCache&) = delete;
 
@@ -44,9 +58,15 @@ struct ZThreadSafeScalableCache
    * Find a value by key, and returns optional contained the value if the element was found, empty optional
    * otherwise. Updates the eviction list, making the element the most-recently used.
    */
-  std::optional<TValue> find(const TKey& key, FindStrategy findStategy = FindStrategy::UpdateLRUList);
+  std::optional<TValue> find(const TKey& key, FindStrategy findStategy = FindStrategy::UpdateLRUList)
+  {
+    return getShard(key).find(key, findStategy);
+  }
 
-  void remove(const TKey& key);
+  void remove(const TKey& key)
+  {
+    return getShard(key).remove(key);
+  }
 
   /**
    * Insert a value into the container. Both the key and value will be copied.
@@ -57,34 +77,58 @@ struct ZThreadSafeScalableCache
    * will not be updated, and false will be returned. Otherwise, true will be
    * returned.
    */
-  bool insert(const TKey& key, const TValue& value, size_t objSize);
+  bool insert(const TKey& key, const TValue& value, size_t objSize)
+  {
+    return getShard(key).insert(key, value, objSize);
+  }
 
   /**
    * Clear the container. NOT THREAD SAFE -- do not use while other threads
    * are accessing the container.
    */
-  void clear();
-
-  void squeeze();
+  void clear()
+  {
+    for (size_t i = 0; i < m_numShards; i++) {
+      m_shards[i]->clear();
+    }
+  }
 
   /**
    * Get a snapshot of the keys in the container by copying them into the
    * supplied vector. This will block inserts and prevent LRU updates while it
    * completes. The keys will be inserted in a random order.
    */
-  void snapshotKeys(std::vector<TKey>& keys);
+  void snapshotKeys(std::vector<TKey>& keys)
+  {
+    for (size_t i = 0; i < m_numShards; i++) {
+      m_shards[i]->snapshotKeys(keys);
+    }
+  }
 
   /**
    * Get the approximate size of the container. May be slightly too low when
    * insertion is in progress.
    */
-  [[nodiscard]] size_t size() const;
+  [[nodiscard]] size_t size() const
+  {
+    size_t size = 0;
+    for (size_t i = 0; i < m_numShards; i++) {
+      size += m_shards[i]->size();
+    }
+    return size;
+  }
 
 private:
   /**
    * Get the child container for a given key
    */
-  Shard& getShard(const TKey& key);
+  Shard& getShard(const TKey& key)
+  {
+    THash hashObj;
+    constexpr int shift = std::numeric_limits<size_t>::digits - 16;
+    size_t h = (hashObj.hash(key) >> shift) % m_numShards;
+    return *m_shards.at(h);
+  }
 
   /**
    * The maximum number of elements in the container.
@@ -98,87 +142,5 @@ private:
   typedef std::shared_ptr<Shard> ShardPtr;
   std::vector<ShardPtr> m_shards;
 };
-
-template<class TKey, class TValue, class THash>
-ZThreadSafeScalableCache<TKey, TValue, THash>::ZThreadSafeScalableCache(size_t maxSize,
-                                                                        size_t numShards,
-                                                                        bool canSkipDestructor)
-  : m_maxSize(maxSize)
-  , m_numShards(numShards)
-{
-  if (m_numShards == 0) {
-    m_numShards = std::thread::hardware_concurrency();
-  }
-  for (size_t i = 0; i < m_numShards; i++) {
-    size_t s = maxSize / m_numShards;
-    if (i == 0) {
-      s += maxSize % m_numShards;
-    }
-    m_shards.emplace_back(std::make_shared<Shard>(s, canSkipDestructor));
-  }
-}
-
-template<class TKey, class TValue, class THash>
-typename ZThreadSafeScalableCache<TKey, TValue, THash>::Shard&
-ZThreadSafeScalableCache<TKey, TValue, THash>::getShard(const TKey& key)
-{
-  THash hashObj;
-  constexpr int shift = std::numeric_limits<size_t>::digits - 16;
-  size_t h = (hashObj.hash(key) >> shift) % m_numShards;
-  return *m_shards.at(h);
-}
-
-template<class TKey, class TValue, class THash>
-std::optional<TValue> ZThreadSafeScalableCache<TKey, TValue, THash>::find(const TKey& key,
-                                                                          typename Shard::FindStrategy findStategy)
-{
-  return getShard(key).find(key, findStategy);
-}
-
-template<class TKey, class TValue, class THash>
-void ZThreadSafeScalableCache<TKey, TValue, THash>::remove(const TKey& key)
-{
-  return getShard(key).remove(key);
-}
-
-template<class TKey, class TValue, class THash>
-bool ZThreadSafeScalableCache<TKey, TValue, THash>::insert(const TKey& key, const TValue& value, size_t objSize)
-{
-  return getShard(key).insert(key, value, objSize);
-}
-
-template<class TKey, class TValue, class THash>
-void ZThreadSafeScalableCache<TKey, TValue, THash>::clear()
-{
-  for (size_t i = 0; i < m_numShards; i++) {
-    m_shards[i]->clear();
-  }
-}
-
-template<class TKey, class TValue, class THash>
-void ZThreadSafeScalableCache<TKey, TValue, THash>::squeeze()
-{
-  for (size_t i = 0; i < m_numShards; i++) {
-    m_shards[i]->squeeze();
-  }
-}
-
-template<class TKey, class TValue, class THash>
-void ZThreadSafeScalableCache<TKey, TValue, THash>::snapshotKeys(std::vector<TKey>& keys)
-{
-  for (size_t i = 0; i < m_numShards; i++) {
-    m_shards[i]->snapshotKeys(keys);
-  }
-}
-
-template<class TKey, class TValue, class THash>
-size_t ZThreadSafeScalableCache<TKey, TValue, THash>::size() const
-{
-  size_t size = 0;
-  for (size_t i = 0; i < m_numShards; i++) {
-    size += m_shards[i]->size();
-  }
-  return size;
-}
 
 } // namespace nim

@@ -25,6 +25,9 @@ using ImageRegionCacheHashKeyType = std::tuple<const void*,
 //                                                        std::shared_ptr<ZImg>,
 //                                                        ZHashCompare<ImageRegionCacheHashKeyType>>;
 
+// using ZParentImgRegionCache =
+//   ZThreadSafeLRUCache<ImageRegionCacheHashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ImageRegionCacheHashKeyType>>;
+
 using ZParentImgRegionCache = ZConcurrentLRUCache<ImageRegionCacheHashKeyType, std::shared_ptr<ZImg>>;
 
 class ZImgRegionCache : public ZParentImgRegionCache

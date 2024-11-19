@@ -1974,13 +1974,13 @@ void mixed_operations(CacheType& cache, int thread_id, int num_operations, int k
 }
 
 template <typename CacheType>
-void run_cache_test(const std::string& cache_name) {
+void run_cache_test(const std::string& cache_name, size_t numShards) {
   const int num_threads = std::thread::hardware_concurrency();
-  const int num_operations = 100000;  // Total operations per thread
-  const int key_range = 10000;        // Range of keys to generate
+  const int num_operations = 1000000;  // Total operations per thread
+  const int key_range = 100000;        // Range of keys to generate
   const size_t max_cache_size = 1000000;  // Maximum size of the cache
 
-  CacheType cache(max_cache_size);
+  CacheType cache(max_cache_size, numShards);
 
   std::vector<std::thread> threads;
   std::atomic<int> total_hits(0);
@@ -2019,14 +2019,21 @@ void run_cache_test(const std::string& cache_name) {
 
 void run_all_cache_test()
 {
-  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache");
-  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache");
-  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache");
-  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache");
-  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache");
-  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache");
-  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache");
-  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache");
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 1", 1);
+  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 1", 1);
+  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 1", 1);
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 8", 8);
+  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 8", 8);
+  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 8", 8);
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 16", 16);
+  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 16", 16);
+  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 16", 16);
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 32", 32);
+  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 32", 32);
+  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 32", 32);
+  run_cache_test<ZConcurrentLRUCache<int, int>>("ZConcurrentLRUCache 64", 64);
+  run_cache_test<ZThreadSafeLRUCache<int, int>>("ZThreadSafeLRUCache 64", 64);
+  run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 64", 64);
 }
 
 } // namespace nim
