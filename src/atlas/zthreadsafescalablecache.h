@@ -3,7 +3,6 @@
 // adapt from Tim Starling's scalable-cache.h
 
 #include "zthreadsafelrucache.h"
-#include <limits>
 
 namespace nim {
 

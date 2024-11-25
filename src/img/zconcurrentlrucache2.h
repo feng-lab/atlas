@@ -5,6 +5,7 @@
 #include <thread>
 #include <vector>
 #include <optional>
+#include <list>
 
 namespace nim {
 
@@ -22,20 +23,20 @@ class ZConcurrentLRUCache
   /**
    * The LRU list node.
    */
-  struct ListNode
+  struct ListNodeData
   {
-    ListNode() = default;
-
-    ListNode(const TKey& k, size_t s)
-      : key(k)
-      , size(s)
-    {}
-
     TKey key;
     size_t size = 0;
-    bool inList = false;
-    ListNode* prev = nullptr;
-    ListNode* next = nullptr;
+  };
+
+  /**
+   * Each segment contains its own LRU list and mutex.
+   */
+  struct Segment
+  {
+    std::list<ListNodeData> list;
+    std::mutex mutex;
+    size_t size = 0;
   };
 
   /**
@@ -43,35 +44,11 @@ class ZConcurrentLRUCache
    */
   struct HashMapValue
   {
-    HashMapValue() = default;
-
-    HashMapValue(const TValue& value, std::unique_ptr<ListNode>&& node)
-      : value(value)
-      , listNode(std::move(node))
-    {}
-
     TValue value;
-    std::unique_ptr<ListNode> listNode;
+    typename std::list<ListNodeData>::const_iterator listIter;
   };
 
   using HashMap = boost::concurrent_flat_map<TKey, HashMapValue>;
-
-  /**
-   * Each segment contains its own LRU list and mutex.
-   */
-  struct Segment
-  {
-    Segment()
-    {
-      head.next = &tail;
-      tail.prev = &head;
-    }
-
-    ListNode head;
-    ListNode tail;
-    std::mutex mutex;
-    size_t size = 0;
-  };
 
 public:
   /**
@@ -126,19 +103,14 @@ public:
           value = mapValue.second.value;
           if (findStrategy != FindStrategy::NoUpdateLRUList) {
             auto& segment = *m_segments[getSegmentIndex(key)];
-            auto node = mapValue.second.listNode.get();
+            auto& listIter = mapValue.second.listIter;
             if (findStrategy == FindStrategy::UpdateLRUList) {
               std::unique_lock lock(segment.mutex);
-              if (node->inList) {
-                delink(node);
-                pushFront(segment, node);
-              }
+              segment.list.splice(segment.list.begin(), segment.list, listIter);
             } else if (findStrategy == FindStrategy::MaybeUpdateLRUList) {
-              // Try to lock without blocking
               std::unique_lock lock(segment.mutex, std::try_to_lock);
-              if (lock && node->inList) {
-                delink(node);
-                pushFront(segment, node);
+              if (lock) {
+                segment.list.splice(segment.list.begin(), segment.list, listIter);
               }
             }
           }
@@ -155,13 +127,11 @@ public:
   {
     m_map.erase_if(key, [&](const auto& mapValue) {
       auto& segment = *m_segments[getSegmentIndex(key)];
-      std::unique_lock lock(segment.mutex);
-      if (auto node = mapValue.second.listNode.get(); node->inList) {
-        delink(node);
-        segment.size -= node->size;
-        // Node will be deleted when unique_ptr goes out of scope
+      if (mapValue.second.listIter != segment.list.end()) {
+        std::unique_lock lock(segment.mutex);
+        segment.size -= mapValue.second.listIter->size;
+        segment.list.erase(mapValue.second.listIter);
       }
-      lock.unlock();
       return true;
     });
   }
@@ -178,20 +148,23 @@ public:
   {
     // todo: use try_emplace_and_visit
 
+    auto& segment = *m_segments[getSegmentIndex(key)];
+
     // Attempt to insert into the hash map
-    if (!m_map.try_emplace(key, value, std::make_unique<ListNode>(key, objSize))) {
+    if (!m_map.try_emplace(key, value, segment.list.end())) {
       // Key already exists, do not insert
       // node will be deleted automatically when std::unique_ptr goes out of scope
       return false;
     }
 
-    auto& segment = *m_segments[getSegmentIndex(key)];
-
     // Retrieve the node from the map
-    m_map.cvisit(key, [&](const auto& mapValue) {
+    m_map.visit(key, [&](auto& mapValue) {
       // Add the node to the LRU list
       std::unique_lock lock(segment.mutex);
-      pushFront(segment, mapValue.second.listNode.get());
+      // Insert the node at the front of the list
+      auto listIter = segment.list.emplace(segment.list.begin(), key, objSize);
+      // Update the iterator in the map
+      mapValue.second.listIter = listIter;
       segment.size += objSize;
     });
 
@@ -215,9 +188,7 @@ public:
     // Then reset the segments
     for (auto& segmentPtr : m_segments) {
       auto& segment = *segmentPtr;
-      // No need to lock since clear() is not thread-safe
-      segment.head.next = &segment.tail;
-      segment.tail.prev = &segment.head;
+      segment.list.clear();
       segment.size = 0;
     }
   }
@@ -231,8 +202,8 @@ public:
     for (const auto& segmentPtr : m_segments) {
       auto& segment = *segmentPtr;
       std::unique_lock lock(segment.mutex);
-      for (auto node = segment.head.next; node != &segment.tail; node = node->next) {
-        keys.push_back(node->key);
+      for (const auto& node : segment.list) {
+        keys.push_back(node.key);
       }
     }
   }
@@ -263,55 +234,21 @@ private:
   }
 
   /**
-   * Unlink a node from the list. The caller must hold the segment's mutex.
-   */
-  static void delink(ListNode* node)
-  {
-    if (node->inList) {
-      node->prev->next = node->next;
-      node->next->prev = node->prev;
-      node->prev = nullptr;
-      node->next = nullptr;
-      node->inList = false;
-    }
-  }
-
-  /**
-   * Add a new node to the list in the most-recently used position. The caller
-   * must hold the segment's mutex.
-   */
-  void pushFront(Segment& segment, ListNode* node)
-  {
-    if (node->inList) {
-      // Node is already in the list, remove it first
-      delink(node);
-    }
-    auto oldHead = segment.head.next;
-    node->prev = &segment.head;
-    node->next = oldHead;
-    oldHead->prev = node;
-    segment.head.next = node;
-    node->inList = true;
-  }
-
-  /**
    * Evict items from the segment until its size is within limits.
    */
   void evict(Segment& segment)
   {
     while (segment.size > m_maxSizePerSegment) {
       std::unique_lock lock(segment.mutex);
-      auto moribund = segment.tail.prev;
-      if (moribund == &segment.head) {
-        // List is empty, can't evict
+      if (segment.list.empty()) {
         return;
       }
-      delink(moribund);
-      segment.size -= moribund->size;
-      lock.unlock();
-      // Remove from the hash map
-      m_map.erase(moribund->key);
-      // Node will be deleted when unique_ptr goes out of scope
+      auto lastIter = std::prev(segment.list.end());
+      TKey keyToRemove = std::move(lastIter->key);
+      segment.size -= lastIter->size;
+      segment.list.erase(lastIter);
+      lock.unlock(); // Release the segment mutex before interacting with the map
+      m_map.erase(keyToRemove); // Access the map after releasing the segment mutex
     }
   }
 
