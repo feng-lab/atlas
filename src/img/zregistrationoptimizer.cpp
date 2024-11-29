@@ -144,7 +144,7 @@ void ZRegistrationOptimizer::minimize()
   checkParameterNumber();
 
   m_currentParameters = m_initialParameters;
-  ceres::GradientProblem problem(new FirstOrderFunctionAdaptor(*m_costFunction));
+  ceres::GradientProblem problem(std::make_unique<FirstOrderFunctionAdaptor>(*m_costFunction));
   ceres::Solve(m_options, problem, m_currentParameters.data(), &m_summary);
 }
 

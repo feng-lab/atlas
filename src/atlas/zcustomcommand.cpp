@@ -2033,10 +2033,6 @@ void run_all_cache_test()
   run_cache_test<ZThreadSafeScalableCache<int, int>>("ZThreadSafeScalableCache 64", 64);
 }
 
-} // namespace nim
-
-namespace nim {
-
 void ZCustomCommand::run()
 {
   run_all_cache_test();

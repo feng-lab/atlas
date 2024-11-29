@@ -1,7 +1,7 @@
 #pragma once
 
-#include "zexception.h"
 #include "z3dcontext.h"
+#include <QString>
 
 namespace nim {
 

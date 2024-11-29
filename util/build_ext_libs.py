@@ -1080,21 +1080,7 @@ def build_fmt(src_dir: str, install_dir: str):
 def build_libevent(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    patches = [
-        FilePatcher(
-            orig_file=os.path.join(src_dir, 'cmake', 'LibeventConfig.cmake.in'),
-            from_texts=[
-                r'if (${CMAKE_VERSION} VERSION_LESS "3.15.0" AND ${LIBEVENT_STATIC_LINK} AND ${OPENSSL_FOUND} AND ${Threads_FOUND})',
-            ],
-            to_texts=[r'if (0)',
-                      ],
-        ),
-    ]
-    patch_manager = PatchManager(patches)
-
     try:
-        patch_manager.apply_patches()
-
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DEVENT__DISABLE_DEBUG_MODE:BOOL=ON',
                          '-DEVENT__DISABLE_OPENSSL:BOOL=ON',
@@ -1110,7 +1096,6 @@ def build_libevent(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        patch_manager.restore_files()
 
 
 def build_snappy(src_dir: str, install_dir: str):
@@ -2722,12 +2707,14 @@ def build_proxygen(src_dir: str, install_dir: str):
                 r'find_program(PROXYGEN_PYTHON python3)',
                 r'-Wextra',
                 r'iostreams',
+                r'chrono',
             ],
             to_texts=[
                 'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
                 'add_library(gflags::gflags ALIAS gflags)',
                 r'find_program(PROXYGEN_PYTHON python)' if is_windows() else r'find_program(PROXYGEN_PYTHON python3)',
                 r'' if is_windows() else r'-Wextra',
+                r'',
                 r'',
             ],
         ),

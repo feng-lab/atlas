@@ -26,6 +26,7 @@
 #include <iosfwd>
 
 namespace nim {
+
 class ZLogInit
 {
 public:
@@ -311,11 +312,12 @@ struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 };
 
 template<nim::HaveToStringFunction T>
-struct fmt::formatter<T> : fmt::formatter<std::string>
+struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
 {
   auto format(const T& v, format_context& ctx) const
   {
-    return fmt::formatter<std::string>::format(v.toString(), ctx);
+    auto s = v.toString();
+    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
   }
 };
 

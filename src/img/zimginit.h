@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zexception.h"
+#include <QString>
 
 namespace nim {
 
