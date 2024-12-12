@@ -137,9 +137,9 @@ private:
 
   void editConnFromTileImage();
 
-  void dsCheckBoxChanged(int state);
+  void dsCheckBoxChanged(Qt::CheckState state);
 
-  void hasTwoInputStackSetCheckBoxChanged(int state);
+  void hasTwoInputStackSetCheckBoxChanged(Qt::CheckState state);
 
   void setConnInfoSource();
 

@@ -1,7 +1,5 @@
 #include "zbenchtimer.h"
 
-#include <fmt/chrono.h>
-
 #include "zlog.h"
 
 namespace nim {

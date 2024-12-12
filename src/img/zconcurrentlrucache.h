@@ -176,24 +176,24 @@ public:
    */
   bool insert(const TKey& key, const TValue& value, size_t objSize)
   {
-    // todo: use try_emplace_and_visit
+    auto& segment = *m_segments[getSegmentIndex(key)];
 
     // Attempt to insert into the hash map
-    if (!m_map.try_emplace(key, value, std::make_unique<ListNode>(key, objSize))) {
+    if (!m_map.try_emplace_and_cvisit(
+          key,
+          value,
+          std::make_unique<ListNode>(key, objSize),
+          [&](const auto& mapValue) {
+            // Add the new node to the LRU list
+            std::unique_lock lock(segment.mutex);
+            pushFront(segment, mapValue.second.listNode.get());
+            segment.size += objSize;
+          },
+          [&](const auto&) {})) {
       // Key already exists, do not insert
       // node will be deleted automatically when std::unique_ptr goes out of scope
       return false;
     }
-
-    auto& segment = *m_segments[getSegmentIndex(key)];
-
-    // Retrieve the node from the map
-    m_map.cvisit(key, [&](const auto& mapValue) {
-      // Add the node to the LRU list
-      std::unique_lock lock(segment.mutex);
-      pushFront(segment, mapValue.second.listNode.get());
-      segment.size += objSize;
-    });
 
     // Check if eviction is necessary
     if (segment.size > m_maxSizePerSegment) {

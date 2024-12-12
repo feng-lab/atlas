@@ -555,7 +555,7 @@ QLayout* ZStitchImageDialog::createIOLayout()
   m_hasTwoInputStackSetCheckBox = new QCheckBox(tr("has two input stack sets"), this);
   m_hasTwoInputStackSetCheckBox->setToolTip(tr("stitch two stack sets with common channel"));
   connect(m_hasTwoInputStackSetCheckBox,
-          &QCheckBox::stateChanged,
+          &QCheckBox::checkStateChanged,
           this,
           &ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged);
   layout->addWidget(m_hasTwoInputStackSetCheckBox, row, 0);
@@ -591,7 +591,7 @@ QLayout* ZStitchImageDialog::createIOLayout()
 
   m_dsCheckBox = new QCheckBox(tr("downsample"), this);
   m_dsCheckBox->setToolTip(tr("Downsample stack before stitching"));
-  connect(m_dsCheckBox, &QCheckBox::stateChanged, this, &ZStitchImageDialog::dsCheckBoxChanged);
+  connect(m_dsCheckBox, &QCheckBox::checkStateChanged, this, &ZStitchImageDialog::dsCheckBoxChanged);
   layout->addWidget(m_dsCheckBox, row, 0);
   m_dsXSpinBox = new QSpinBox(this);
   m_dsXSpinBox->setRange(1, 10);
@@ -1237,14 +1237,14 @@ void ZStitchImageDialog::selectOutputFile()
   }
 }
 
-void ZStitchImageDialog::dsCheckBoxChanged(int state)
+void ZStitchImageDialog::dsCheckBoxChanged(Qt::CheckState state)
 {
   m_dsXSpinBox->setEnabled(state == Qt::Checked);
   m_dsYSpinBox->setEnabled(state == Qt::Checked);
   m_dsZSpinBox->setEnabled(state == Qt::Checked);
 }
 
-void ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged(int state)
+void ZStitchImageDialog::hasTwoInputStackSetCheckBoxChanged(Qt::CheckState state)
 {
   m_inputStack2FileEdit->setVisible(state == Qt::Checked);
   m_selectInputStacks2Button->setVisible(state == Qt::Checked);
