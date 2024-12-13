@@ -189,6 +189,13 @@ files_to_download = [
         'filename': 'libwebp-1.4.0.tar.gz',
     },
     {
+        'url': 'https://neutracing.com/static/atlas_deps/libjpeg-turbo-3.1.0.tar.gz',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/libjpeg-turbo-3.1.0.tar.gz',
+        'expected_size': 2507094,
+        'expected_sha256': '9564c72b1dfd1d6fe6274c5f95a8d989b59854575d4bbee44ade7bc17aa9bc93',
+        'filename': 'libjpeg-turbo-3.1.0.tar.gz',
+    },
+    {
         'url': 'https://neutracing.com/static/atlas_deps/trust_stores_as_pem.tar.gz',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/trust_stores_as_pem.tar.gz',
         'expected_size': 860760,
@@ -278,13 +285,6 @@ files_to_download = [
         'expected_size': 105431,
         'expected_sha256': '413d9f5562c39c2fcac1e48b3e2155838680a0aec1ddcb95b23cb2f092962dcc',
         'filename': 'gperf-3.0.1-bin.zip',
-    },
-    {
-        'url': 'https://neutracing.com/static/atlas_deps/libjpeg-turbo-3.0.4.tar.gz',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/libjpeg-turbo-3.0.4.tar.gz',
-        'expected_size': 2400356,
-        'expected_sha256': '99130559e7d62e8d695f2c0eaeef912c5828d5b84a0537dcb24c9678c9d5b76b',
-        'filename': 'libjpeg-turbo-3.0.4.tar.gz',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/OpenJDK21U-jre_x64_windows_hotspot_21.0.5_11.zip',
