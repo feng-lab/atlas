@@ -660,10 +660,7 @@ std::vector<ZMesh> ZMesh::split(size_t numTriangle) const
 void ZMesh::generateNormals(bool useAreaWeight)
 {
   m_normals.resize(m_vertices.size());
-  //  for (auto& normal : m_normals) {
-  //    normal = glm::vec3(0.f);
-  //  }
-  std::memset(m_normals.data(), 0, m_normals.size() * sizeof(glm::vec3));
+  std::fill(m_normals.begin(), m_normals.end(), glm::vec3(0.f));
 
   for (size_t i = 0; i < numTriangles(); ++i) {
     glm::uvec3 tri = triangleIndices(i);

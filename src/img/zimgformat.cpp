@@ -259,7 +259,7 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
   if (bufImg.numChannels() == 1) {
     CHECK(false);
     for (size_t t = 0; t < img.numTimes(); ++t) {
-      std::memcpy(img.timeData<uint8_t>(t), bufImg.timeData<uint8_t>(t), bufImg.timeByteNumber());
+      std::copy_n(bufImg.timeData<uint8_t>(t), bufImg.timeByteNumber(), img.timeData<uint8_t>(t));
     }
     return;
   }
@@ -313,7 +313,7 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
           size_t srcStride = img.numChannels() * voxelByte;
           size_t i = 0;
           while (i++ < img.channelVoxelNumber()) {
-            std::memcpy(des, src, voxelByte);
+            std::copy_n(src, voxelByte, des);
             des += voxelByte;
             src += srcStride;
           }
@@ -331,7 +331,7 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
   if (bufImg.numChannels() == 1) {
     CHECK(false);
     for (size_t t = 0; t < img.numTimes(); ++t) {
-      std::memcpy(img.timeData<uint8_t>(t), bufImg.timeData<uint8_t>(t), bufImg.timeByteNumber());
+      std::copy_n(bufImg.timeData<uint8_t>(t), bufImg.timeByteNumber(), img.timeData<uint8_t>(t));
     }
     return;
   }
@@ -371,7 +371,7 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
           size_t desStride = img.numChannels() * voxelByte;
           size_t i = 0;
           while (i++ < img.channelVoxelNumber()) {
-            std::memcpy(des, src, voxelByte);
+            std::copy_n(src, voxelByte, des);
             des += desStride;
             src += voxelByte;
           }
@@ -416,14 +416,14 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
           } else if (c == 2) {
             srcC = 0;
           }
-          std::memcpy(img.channelData<uint8_t>(c, t),
-                      buf + t * img.timeByteNumber() + srcC * img.channelByteNumber(),
-                      img.channelByteNumber());
+          std::copy_n(buf + t * img.timeByteNumber() + srcC * img.channelByteNumber(),
+                      img.channelByteNumber(),
+                      img.channelData<uint8_t>(c, t));
         }
       }
     } else {
       for (size_t t = 0; t < img.numTimes(); ++t) {
-        std::memcpy(img.timeData<uint8_t>(t), buf + t * img.timeByteNumber(), img.timeByteNumber());
+        std::copy_n(buf + t * img.timeByteNumber(), img.timeByteNumber(), img.timeData<uint8_t>(t));
       }
     }
     return;
@@ -481,7 +481,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
               }
             }
             auto* desLoc = img.channelData<uint8_t>(desC, desLocs[4]);
-            std::memcpy(desLoc, srcLoc, srcStride);
+            std::copy_n(srcLoc, srcStride, desLoc);
             srcLoc += srcStride;
           }
         }
@@ -501,7 +501,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                 }
               }
               auto* desLoc = img.planeData<uint8_t>(desLocs[2], desC, desLocs[4]);
-              std::memcpy(desLoc, srcLoc, srcStride);
+              std::copy_n(srcLoc, srcStride, desLoc);
               srcLoc += srcStride;
             }
           }
@@ -525,7 +525,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                 }
               }
               auto* desLoc = img.rowData<uint8_t>(desLocs[1], desLocs[2], desC, desLocs[4]);
-              std::memcpy(desLoc, srcLoc, srcStride);
+              std::copy_n(srcLoc, srcStride, desLoc);
               srcLoc += srcStride;
             }
           }
@@ -552,7 +552,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                 }
               }
               auto desLoc = img.data<uint8_t>(desLocs[0], desLocs[1], desLocs[2], desC, desLocs[4]);
-              std::memcpy(desLoc, srcLoc, srcStride);
+              std::copy_n(srcLoc, srcStride, desLoc);
               srcLoc += srcStride;
             }
           }

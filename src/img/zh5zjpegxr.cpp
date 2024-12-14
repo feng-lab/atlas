@@ -59,7 +59,7 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       if (byteWritten > info.byteNumber()) {
         throw ZException("compression overflow");
       }
-      memcpy(*buf, memBuf.get(), byteWritten);
+      std::memcpy(*buf, memBuf.get(), byteWritten);
       retValue = byteWritten;
     }
   }

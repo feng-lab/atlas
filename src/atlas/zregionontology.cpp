@@ -381,7 +381,7 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX, double scaleY, 
 
   for (size_t z = 0; z < img.depth(); ++z) {
     for (size_t y = 0; y < img.height(); ++y) {
-      std::memcpy(static_cast<uint8_t*>(vimg->GetScalarPointer(0, y, z)), img.rowData(y, z, 0, 0), img.rowByteNumber());
+      std::memcpy(vimg->GetScalarPointer(0, y, z), img.rowData(y, z, 0, 0), img.rowByteNumber());
     }
   }
 

@@ -128,7 +128,8 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
       if (!mapIFDToImgLocation(ifdIdx, z, c, t, l)) {
         break;
       }
-      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == static_cast<size_t>(l))) {
+      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) &&
+          (scene == static_cast<size_t>(l))) {
         tiff.readImgFromIFD(i, buf2DImg);
         // VLOG(1) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
         cpyImg(buf2DImg, region, imgTmp, z - region.start.z, c, t - region.start.t);
@@ -356,7 +357,8 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
       if (!mapIFDToImgLocation(ifdIdx, z, c, t, l)) {
         break;
       }
-      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == static_cast<size_t>(l))) {
+      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) &&
+          (scene == static_cast<size_t>(l))) {
         const std::vector<ZTiffIFD>& subifds = ifd.subIFDs();
         for (const auto& subifd : subifds) {
           ZImg thumb = tiff.readThumbnailFromIFD(subifd);
@@ -370,7 +372,8 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
       if (!mapIFDToImgLocation(ifdIdx - 1, z, c, t, l)) {
         break;
       }
-      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == static_cast<size_t>(l))) {
+      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) &&
+          (scene == static_cast<size_t>(l))) {
         ZImg thumb = tiff.readThumbnailFromIFD(ifd);
         if (!thumb.isEmpty()) {
           thumbnail.attachToPlane(thumb, z - region.start.z, t - region.start.t);
@@ -494,29 +497,29 @@ void ZImgTiff::cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, si
     auto cEnd = region.end.c == -1 ? ZImgRegion::value_type(img2D.numChannels()) : region.end.c;
     for (auto lc = region.start.c; lc < cEnd; ++lc) {
       if (region.containsWholeRow(img2D.info())) {
-        std::memcpy(img.planeData<uint8_t>(z, lc - region.start.c, t),
-                    img2D.rowData<uint8_t>(region.start.y, 0, lc, 0),
-                    img.planeByteNumber());
+        std::copy_n(img2D.rowData<uint8_t>(region.start.y, 0, lc, 0),
+                    img.planeByteNumber(),
+                    img.planeData<uint8_t>(z, lc - region.start.c, t));
       } else {
         auto yEnd = region.end.y == -1 ? ZImgRegion::value_type(img2D.height()) : region.end.y;
         for (auto y = region.start.y; y < yEnd; ++y) {
-          std::memcpy(img.rowData<uint8_t>(y - region.start.y, z, lc - region.start.c, t),
-                      img2D.data<uint8_t>(region.start.x, y, 0, lc, 0),
-                      img.rowByteNumber());
+          std::copy_n(img2D.data<uint8_t>(region.start.x, y, 0, lc, 0),
+                      img.rowByteNumber(),
+                      img.rowData<uint8_t>(y - region.start.y, z, lc - region.start.c, t));
         }
       }
     }
   } else if (region.cInRegion(c)) {
     if (region.containsWholeRow(img2D.info())) {
-      std::memcpy(img.planeData<uint8_t>(z, c - region.start.c, t),
-                  img2D.rowData<uint8_t>(region.start.y, 0, 0, 0),
-                  img.planeByteNumber());
+      std::copy_n(img2D.rowData<uint8_t>(region.start.y, 0, 0, 0),
+                  img.planeByteNumber(),
+                  img.planeData<uint8_t>(z, c - region.start.c, t));
     } else {
       auto yEnd = region.end.y == -1 ? ZImgRegion::value_type(img2D.height()) : region.end.y;
       for (auto y = region.start.y; y < yEnd; ++y) {
-        std::memcpy(img.rowData<uint8_t>(y - region.start.y, z, c - region.start.c, t),
-                    img2D.data<uint8_t>(region.start.x, y, 0, 0, 0),
-                    img.rowByteNumber());
+        std::copy_n(img2D.data<uint8_t>(region.start.x, y, 0, 0, 0),
+                    img.rowByteNumber(),
+                    img.rowData<uint8_t>(y - region.start.y, z, c - region.start.c, t));
       }
     }
   }

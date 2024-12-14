@@ -12,7 +12,7 @@ ZImgMetatag::ZImgMetatag(std::string name, std::string_view value, uint32_t tag)
 {
   setCount(value.size() + 1);
   CHECK(dataArray()[m_count - 1] == 0) << dataArray()[m_count - 1];
-  std::memcpy(dataArray<char>(), value.data(), value.size());
+  std::copy_n(value.data(), value.size(), dataArray<char>());
 }
 
 ZImgMetatag::ZImgMetatag(std::string name, QStringView value, uint32_t tag)
@@ -23,7 +23,7 @@ ZImgMetatag::ZImgMetatag(std::string name, QStringView value, uint32_t tag)
   auto u8 = value.toUtf8();
   setCount(u8.size() + 1);
   CHECK(dataArray()[m_count - 1] == 0) << dataArray()[m_count - 1];
-  std::memcpy(dataArray<char>(), u8.data(), u8.size());
+  std::copy_n(u8.data(), u8.size(), dataArray<char>());
 }
 
 std::string ZImgMetatag::toString() const

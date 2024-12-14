@@ -1035,17 +1035,9 @@ public:
   template<typename TFillValue>
   ZImg& fill(TFillValue value)
   {
-    if (bytesPerVoxel() == 1 || value == TFillValue(0)) {
-      for (size_t t = 0; t < m_info.numTimes; ++t) {
-        std::memset(timeData(t), static_cast<unsigned char>(value), timeByteNumber());
-      }
-      return *this;
-    }
-
     imgTypeDispatcher(m_info, [=, this]<typename TVoxel>() {
       for (size_t t = 0; t < m_info.numTimes; ++t) {
-        auto data = timeData<TVoxel>(t);
-        std::fill(data, data + m_info.timeVoxelNumber(), static_cast<TVoxel>(value));
+        std::fill_n(timeData<TVoxel>(t), m_info.timeVoxelNumber(), static_cast<TVoxel>(value));
       }
     });
     return *this;
@@ -2032,7 +2024,7 @@ private:
         dataRangeMin == TDesVoxel(minData) && dataRangeMax == TDesVoxel(maxData)) {
       if (src != des) {
         for (size_t t = 0; t < src->numTimes(); ++t) {
-          std::memcpy(des->timeData(t), src->timeData(t), src->timeByteNumber());
+          std::copy_n(src->timeData(t), src->timeByteNumber(), des->timeData(t));
         }
       }
       return;

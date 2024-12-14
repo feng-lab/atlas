@@ -1797,7 +1797,7 @@ void ZTiff::separateChannel(const ZImg& bufImg, ZImg& img)
         size_t srcStride = img.numChannels() * voxelByte;
         size_t i = 0;
         while (i++ < img.channelVoxelNumber()) {
-          std::memcpy(des, src, voxelByte);
+          std::copy_n(src, voxelByte, des);
           des += voxelByte;
           src += srcStride;
         }
@@ -1819,7 +1819,7 @@ void ZTiff::copyOneChannelTileToImg(const uint8_t* tileBuf,
   size_t cpysize = (xEnd - xStart) * voxelByteNumber;
   size_t yEnd = std::min(yStart + tileHeight, img.height());
   for (size_t y = yStart; y < yEnd; ++y) {
-    std::memcpy(img.data<uint8_t>(xStart, y, 0, c), tileBuf + (y - yStart) * tileWidth * voxelByteNumber, cpysize);
+    std::copy_n(tileBuf + (y - yStart) * tileWidth * voxelByteNumber, cpysize, img.data<uint8_t>(xStart, y, 0, c));
   }
 }
 
@@ -1840,7 +1840,7 @@ void ZTiff::copyTileToImg(const uint8_t* tileBuf,
         auto* des = img.data<uint8_t>(x, y, 0, c);
         const uint8_t* src = tileBuf + (y - yStart) * tileWidth * voxelByteNumber * numChannels +
                              (x - xStart) * voxelByteNumber * numChannels + c * voxelByteNumber;
-        std::memcpy(des, src, voxelByteNumber);
+        std::copy_n(src, voxelByteNumber, des);
       }
     }
   }

@@ -665,7 +665,7 @@ void ZImgJpeg::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSiz
     throw ZException("buffer space is not enough");
   }
 
-  std::memcpy(des, img.channelData<uint8_t>(0), img.byteNumber());
+  std::copy_n(img.channelData<uint8_t>(0), img.byteNumber(), des);
 }
 
 } // namespace nim

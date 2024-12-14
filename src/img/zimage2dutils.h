@@ -102,9 +102,8 @@ void image2DPad(const TPixel* img,
                 TPixel padValue = TPixel(0))
 {
   DCHECK_NE(img, imgOut);
-  size_t size = sizeof(TPixel) * width * height;
   if (leftPad == 0 && rightPad == 0 && upPad == 0 && downPad == 0) {
-    std::memcpy(imgOut, img, size);
+    std::copy_n(img, width * height, imgOut);
   } else {
     size_t desWidth = leftPad + width + rightPad;
     size_t desHeight = upPad + height + downPad;
@@ -214,7 +213,7 @@ void image2DPad(const TPixel* img,
         } else {
           refY = refY % height;
         }
-        std::memcpy(imgOut + j * desWidth + leftPad, img + refY * width, sizeof(TPixel) * width);
+        std::copy_n(img + refY * width, width, imgOut + j * desWidth + leftPad);
       }
       // down
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
@@ -224,18 +223,18 @@ void image2DPad(const TPixel* img,
         } else {
           refY = refY % height;
         }
-        std::memcpy(imgOut + j * desWidth + leftPad, img + refY * width, sizeof(TPixel) * width);
+        std::copy_n(img + refY * width, width, imgOut + j * desWidth + leftPad);
       }
     }
 
     // copy image
     if (leftPad == 0 && rightPad == 0) {
       TPixel* desStart = imgOut + upPad * width;
-      std::memcpy(desStart, img, size);
+      std::copy_n(img, width * height, desStart);
     } else {
       TPixel* desStart = imgOut + upPad * desWidth + leftPad;
       for (size_t i = 0; i < height; ++i) {
-        std::memcpy(desStart, img + i * width, sizeof(TPixel) * width);
+        std::copy_n(img + i * width, width, desStart);
         desStart += desWidth;
       }
     }
@@ -255,11 +254,11 @@ void image2DPad(const TPixel* img,
       }
       // up
       for (size_t j = 0; j < upPad; ++j) {
-        std::memcpy(imgOut + j * desWidth, imgOut + upPad * desWidth, sizeof(TPixel) * desWidth);
+        std::copy_n(imgOut + upPad * desWidth, desWidth, imgOut + j * desWidth);
       }
       // down
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
-        std::memcpy(imgOut + j * desWidth, imgOut + (desHeight - 1 - downPad) * desWidth, sizeof(TPixel) * desWidth);
+        std::copy_n(imgOut + (desHeight - 1 - downPad) * desWidth, desWidth, imgOut + j * desWidth);
       }
     } else if (padOption == PadOption::Circular) { // circular
       // left
@@ -285,14 +284,14 @@ void image2DPad(const TPixel* img,
       for (size_t j = upPad; j-- > 0;) {
         --refY;
         refY = refY < 0 ? static_cast<index_t>(height) - 1 : refY;
-        std::memcpy(imgOut + j * desWidth, imgOut + (refY + upPad) * desWidth, sizeof(TPixel) * desWidth);
+        std::copy_n(imgOut + (refY + upPad) * desWidth, desWidth, imgOut + j * desWidth);
       }
       // down
       refY = -1;
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
         ++refY;
         refY = refY >= static_cast<index_t>(height) ? 0 : refY;
-        std::memcpy(imgOut + j * desWidth, imgOut + (refY + upPad) * desWidth, sizeof(TPixel) * desWidth);
+        std::copy_n(imgOut + (refY + upPad) * desWidth, desWidth, imgOut + j * desWidth);
       }
     }
   }
@@ -316,11 +315,10 @@ void image2DFlip(TPixel* img, size_t width, size_t height, Dimension dim)
     std::vector<TPixel> buffer(width);
     size_t j = 0;
     size_t k = height - 1;
-    size_t size = sizeof(TPixel) * width;
     while (j < k) {
-      std::memcpy(buffer.data(), img + j * width, size);
-      std::memcpy(img + j * width, img + k * width, size);
-      std::memcpy(img + k * width, buffer.data(), size);
+      std::copy_n(img + j * width, width, buffer.data());
+      std::copy_n(img + k * width, width, img + j * width);
+      std::copy_n(buffer.data(), width, img + k * width);
       ++j;
       --k;
     }
@@ -358,7 +356,7 @@ void image2DTranspose(TPixel* img, size_t width, size_t height)
         }
       }
     }
-    std::memcpy(img, buf.data(), sizeof(TPixel) * width * height);
+    std::copy_n(buf.data(), width * height, img);
   }
 }
 

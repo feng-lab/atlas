@@ -19,7 +19,7 @@ public:
   void readToBuffer(size_t offset, size_t length, void* buffer) const
   {
     CHECK(m_mappedFileHandleIsValid);
-    memcpy(buffer, m_mappedFileHandle.address() + offset, length);
+    std::memcpy(buffer, m_mappedFileHandle.address() + offset, length);
   }
 
   void prefetch(size_t offset, size_t length) const

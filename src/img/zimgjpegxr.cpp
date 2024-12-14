@@ -457,8 +457,7 @@ void ZImgJpegXR::writeImg(const QString& filename, const ZImg& img, const ZImgWr
 
   auto jpegXRQuality = static_cast<float>(paras.jpegXRQuality);
 
-  CWMIStrCodecParam wmiSCP;
-  memset(&wmiSCP, 0, sizeof(wmiSCP));
+  CWMIStrCodecParam wmiSCP{};
 
   wmiSCP.bVerbose = FALSE;
   if (img.numChannels() == 1) {
@@ -582,8 +581,7 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
 
   auto jpegXRQuality = static_cast<float>(paras.jpegXRQuality);
 
-  CWMIStrCodecParam wmiSCP;
-  memset(&wmiSCP, 0, sizeof(wmiSCP));
+  CWMIStrCodecParam wmiSCP{};
 
   wmiSCP.bVerbose = FALSE;
   if (img.numChannels() == 1) {

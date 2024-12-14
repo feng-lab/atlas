@@ -47,12 +47,12 @@ namespace nim {
 bool seperate2DKernel(const double* kernel, size_t width, size_t height, double* rowKernel, double* colKernel)
 {
   if (height == 1) {
-    std::memcpy(rowKernel, kernel, sizeof(double) * width);
+    std::copy_n(kernel, width, rowKernel);
     colKernel[0] = 1;
     return true;
   }
   if (width == 1) {
-    std::memcpy(colKernel, kernel, sizeof(double) * height);
+    std::copy_n(kernel, height, colKernel);
     rowKernel[0] = 1;
     return true;
   }

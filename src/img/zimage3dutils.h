@@ -102,7 +102,7 @@ void image3DPad(const TPixel* img,
   size_t plane = width * height;
 
   if (leftPad == 0 && rightPad == 0 && upPad == 0 && downPad == 0 && frontPad == 0 && backPad == 0) {
-    std::memcpy(imgOut, img, sizeof(TPixel) * plane * depth);
+    std::copy_n(img, plane * depth, imgOut);
   } else {
     size_t desWidth = leftPad + width + rightPad;
     size_t desHeight = upPad + height + downPad;
@@ -113,11 +113,11 @@ void image3DPad(const TPixel* img,
     for (size_t j = 0; j < depth; ++j) {
       if (leftPad == 0 && rightPad == 0) {
         TPixel* desStart = imgOut + upPad * width + (j + frontPad) * desPlane;
-        std::memcpy(desStart, img + j * plane, sizeof(TPixel) * plane);
+        std::copy_n(img + j * plane, plane, desStart);
       } else {
         TPixel* desStart = imgOut + upPad * desWidth + leftPad + (j + frontPad) * desPlane;
         for (size_t i = 0; i < height; ++i) {
-          std::memcpy(desStart, img + i * width + j * plane, sizeof(TPixel) * width);
+          std::copy_n(img + i * width + j * plane, width, desStart);
           desStart += desWidth;
         }
       }
@@ -188,11 +188,10 @@ void image3DFlip(TPixel* img, size_t width, size_t height, size_t depth, Dimensi
     for (size_t d = 0; d < depth; ++d) {
       size_t j = 0;
       size_t k = height - 1;
-      size_t size = sizeof(TPixel) * width;
       while (j < k) {
-        std::memcpy(buffer.data(), img + j * width + d * width * height, size);
-        std::memcpy(img + j * width + d * width * height, img + k * width + d * width * height, size);
-        std::memcpy(img + k * width + d * width * height, buffer.data(), size);
+        std::copy_n(img + j * width + d * width * height, width, buffer.data());
+        std::copy_n(img + k * width + d * width * height, width, img + j * width + d * width * height);
+        std::copy_n(buffer.data(), width, img + k * width + d * width * height);
         ++j;
         --k;
       }
@@ -204,11 +203,11 @@ void image3DFlip(TPixel* img, size_t width, size_t height, size_t depth, Dimensi
     std::vector<TPixel> buffer(width * height);
     size_t j = 0;
     size_t k = depth - 1;
-    size_t size = sizeof(TPixel) * width * height;
+    size_t size = width * height;
     while (j < k) {
-      std::memcpy(buffer.data(), img + j * width * height, size);
-      std::memcpy(img + j * width * height, img + k * width * height, size);
-      std::memcpy(img + k * width * height, buffer.data(), size);
+      std::copy_n(img + j * width * height, size, buffer.data());
+      std::copy_n(img + k * width * height, size, img + j * width * height);
+      std::copy_n(buffer.data(), size, img + k * width * height);
       ++j;
       --k;
     }
