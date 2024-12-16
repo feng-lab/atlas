@@ -1150,7 +1150,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                 if (!img) {
                   *pageTableEntryPtr = m_emptyPageTableEntry;
                 } else {
-                  std::memcpy(pboLocalBuffer.data() + taskIdx * blockSizeInByte, img->channelData(0), blockSizeInByte);
+                  std::copy_n(img->channelData(0), blockSizeInByte, pboLocalBuffer.data() + taskIdx * blockSizeInByte);
                 }
               });
           }));

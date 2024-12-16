@@ -490,9 +490,8 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
           if (!stringToValueNoThrow(value->GetMetaDataObjectValue(), color)) {
             throw ZException(fmt::format("parse nd2 channel color {} error", value->GetMetaDataObjectValue()));
           }
-          col4 col;
-          std::memcpy(&col, &color, 3);
-          CHECK(col.a == 255);
+          col4 col = std::bit_cast<col4>(color);
+          col.a = 255;
           info.channelColors[ch] = col;
         }
       }

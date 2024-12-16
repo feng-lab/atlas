@@ -210,8 +210,7 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
   imgInfo.createDefaultDescriptions();
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
-    throw ZException(
-      fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
+    throw ZException(fmt::format("Invalid image region. Image info: '{}', region: '{}'", imgInfo, region));
   }
 
   ZImgInfo partialImgInfo = region.clip(imgInfo);
@@ -247,9 +246,9 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
     for (size_t y = lineStart; y < lineStart + lineRead; ++y) {
       if (region.yInRegion(y)) {
         if (imgInfo.numChannels == 1) {
-          std::memcpy(imgTmp.rowData<uint8_t>(y - region.start.y),
-                      &(buffer[y - lineStart][region.start.x]),
-                      imgTmp.rowByteNumber());
+          std::copy_n(&(buffer[y - lineStart][region.start.x]),
+                      imgTmp.rowByteNumber(),
+                      imgTmp.rowData<uint8_t>(y - region.start.y));
         } else {
           size_t cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
           size_t xEnd = region.end.x == -1 ? imgInfo.width : region.end.x;

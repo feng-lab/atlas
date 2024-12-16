@@ -1204,9 +1204,9 @@ void ZImgZeissCZI::parseChannel(QXmlStreamReader& xml)
       if (colorStr.size() == 6) {
         int32_t color = colorStr.toInt(&ok, 16);
         if (ok) {
-          std::memcpy(&col, &color, 3);
-          std::swap(col.r, col.b);
+          col = std::bit_cast<col4>(color);
           col.a = 255;
+          std::swap(col.r, col.b);
           hasColor = true;
         } else {
           LOG(WARNING) << "can not parse czi channel color " << colorStr;
@@ -1361,9 +1361,9 @@ void ZImgZeissCZI::parseDisplaySettingChannel(QXmlStreamReader& xml)
       if (colorStr.size() == 6) {
         int32_t color = colorStr.toInt(&ok, 16);
         if (ok) {
-          std::memcpy(&col, &color, 3);
-          std::swap(col.r, col.b);
+          col = std::bit_cast<col4>(color);
           col.a = 255;
+          std::swap(col.r, col.b);
           hasColor = true;
         } else {
           LOG(WARNING) << "can not parse czi channel color " << colorStr;
