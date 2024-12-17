@@ -192,7 +192,7 @@ def qt_install_dir() -> str:
 
 def qt_compiler_name() -> str:
     if is_windows():
-        return 'msvc2019_64'
+        return 'msvc2022_64'
     elif is_mac():
         return 'macos'
     else:
