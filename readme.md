@@ -54,7 +54,7 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     rm -r Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/
-    aqt install-qt --outputdir c:/Qt windows desktop 6.8.1 win64_msvc2019_64
+    aqt install-qt --outputdir c:/Qt windows desktop 6.8.1 win64_msvc2022_64
     aqt install-qt --outputdir c:/Qt windows desktop 6.8.1 win64_mingw
     # install tools: refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/tools_ifw/
     aqt install-tool --outputdir c:/Qt windows desktop tools_ifw qt.tools.ifw.47
