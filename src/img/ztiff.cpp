@@ -11,7 +11,6 @@
 #include <tiffio.h>
 #include <tiffio.hxx>
 #include <QFile>
-#include <boost/endian/conversion.hpp>
 #include <cmath>
 #include <set>
 
@@ -1064,14 +1063,14 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
   if (!bigtiff) {
     readStream(fs, &dircount, sizeof(uint16_t));
     if (swabflag) {
-      boost::endian::endian_reverse_inplace(dircount);
+      byteswap_inplace(dircount);
     }
     direntrysize = 12;
   } else {
     uint64_t dircount64 = 0;
     readStream(fs, &dircount64, sizeof(uint64_t));
     if (swabflag) {
-      boost::endian::endian_reverse_inplace(dircount64);
+      byteswap_inplace(dircount64);
     }
     if (dircount64 > 0xFFFF) {
       throw ZException("Sanity check on directory count failed");
@@ -1098,7 +1097,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
         nextdiroff32 = 0;
       }
       if (swabflag) {
-        boost::endian::endian_reverse_inplace(nextdiroff32);
+        byteswap_inplace(nextdiroff32);
       }
       nextdiroff = nextdiroff32;
     } else {
@@ -1107,7 +1106,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
         nextdiroff = 0;
       }
       if (swabflag) {
-        boost::endian::endian_reverse_inplace(nextdiroff);
+        byteswap_inplace(nextdiroff);
       }
     }
   }
@@ -1121,7 +1120,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
     std::memcpy(&tag, dp, sizeof(tag));
     dp += sizeof(uint16_t);
     if (swabflag) {
-      boost::endian::endian_reverse_inplace(tag);
+      byteswap_inplace(tag);
     }
     field.setTag(tag);
     field.setName(tagToName(tag));
@@ -1130,7 +1129,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
     std::memcpy(&type, dp, sizeof(type));
     dp += sizeof(uint16_t);
     if (swabflag) {
-      boost::endian::endian_reverse_inplace(type);
+      byteswap_inplace(type);
     }
     if (!isValidDataType(type)) {
       throw ZException(fmt::format("Wrong tiff tag dataType: {}", type));
@@ -1143,14 +1142,14 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
       std::memcpy(&count32, dp, sizeof(count32));
       dp += sizeof(uint32_t);
       if (swabflag) {
-        boost::endian::endian_reverse_inplace(count32);
+        byteswap_inplace(count32);
       }
       count = count32;
     } else {
       std::memcpy(&count, dp, sizeof(count));
       dp += sizeof(uint64_t);
       if (swabflag) {
-        boost::endian::endian_reverse_inplace(count);
+        byteswap_inplace(count);
       }
     }
     field.setCount(count);
@@ -1163,7 +1162,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
         uint32_t dataoffset32;
         std::memcpy(&dataoffset32, dp, sizeof(dataoffset32));
         if (swabflag) {
-          boost::endian::endian_reverse_inplace(dataoffset32);
+          byteswap_inplace(dataoffset32);
         }
         dataoffset = dataoffset32;
       } else {
@@ -1175,7 +1174,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
         datafits = false;
         std::memcpy(&dataoffset, dp, sizeof(dataoffset));
         if (swabflag) {
-          boost::endian::endian_reverse_inplace(dataoffset);
+          byteswap_inplace(dataoffset);
         }
       } else {
         std::memcpy(field.dataArray(), dp, field.dataByteNumber());
@@ -1197,7 +1196,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
         case TIFF_SHORT:
         case TIFF_SSHORT:
           for (size_t sc = 0; sc < count; ++sc) {
-            boost::endian::endian_reverse_inplace(field.dataAt<uint16_t>(sc));
+            byteswap_inplace(field.dataAt<uint16_t>(sc));
           }
           break;
         case TIFF_LONG:
@@ -1205,13 +1204,13 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
         case TIFF_FLOAT:
         case TIFF_IFD:
           for (size_t sc = 0; sc < count; ++sc) {
-            boost::endian::endian_reverse_inplace(field.dataAt<uint32_t>(sc));
+            byteswap_inplace(field.dataAt<uint32_t>(sc));
           }
           break;
         case TIFF_RATIONAL:
         case TIFF_SRATIONAL:
           for (size_t sc = 0; sc < count * 2; ++sc) {
-            boost::endian::endian_reverse_inplace(field.dataAt<uint32_t>(sc));
+            byteswap_inplace(field.dataAt<uint32_t>(sc));
           }
           break;
         case TIFF_DOUBLE:
@@ -1219,7 +1218,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
         case TIFF_SLONG8:
         case TIFF_IFD8:
           for (size_t sc = 0; sc < count; ++sc) {
-            boost::endian::endian_reverse_inplace(field.dataAt<uint64_t>(sc));
+            byteswap_inplace(field.dataAt<uint64_t>(sc));
           }
           break;
         default:
@@ -1310,21 +1309,21 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
 
   if (hdr.common.tiff_magic != TIFF_BIGENDIAN && hdr.common.tiff_magic != TIFF_LITTLEENDIAN &&
       hdr.common.tiff_magic !=
-        (boost::endian::order::native == boost::endian::order::little ? MDI_LITTLEENDIAN : MDI_BIGENDIAN)) {
+        (std::endian::native == std::endian::little ? MDI_LITTLEENDIAN : MDI_BIGENDIAN)) {
     throw ZException(fmt::format("Not a TIFF or MDI file, bad magic number {:#x}", hdr.common.tiff_magic));
   }
 
   bool swabflag;
   if (hdr.common.tiff_magic == TIFF_BIGENDIAN || hdr.common.tiff_magic == MDI_BIGENDIAN) {
-    swabflag = boost::endian::order::native == boost::endian::order::little;
+    swabflag = std::endian::native == std::endian::little;
   } else {
-    swabflag = boost::endian::order::native == boost::endian::order::big;
+    swabflag = std::endian::native == std::endian::big;
   }
   isNativeEndianness = !swabflag;
   // VLOG(1) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN);
 
   if (swabflag) {
-    boost::endian::endian_reverse_inplace(hdr.common.tiff_version);
+    byteswap_inplace(hdr.common.tiff_version);
   }
 
   // VLOG(1) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN) << " "
@@ -1335,7 +1334,7 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
   if (hdr.common.tiff_version == 42) {
     readStream(fs, &hdr.classic.tiff_diroff, 4);
     if (swabflag) {
-      boost::endian::endian_reverse_inplace(hdr.classic.tiff_diroff);
+      byteswap_inplace(hdr.classic.tiff_diroff);
     }
     //    printf("Magic: %#x <%s-endian> Version: %#x <%s>\n",
     //           hdr.classic.tiff_magic,
@@ -1347,10 +1346,9 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
   } else if (hdr.common.tiff_version == 43) {
     readStream(fs, &hdr.big.tiff_offsetsize, 12);
     if (swabflag) {
-      boost::endian::endian_reverse_inplace(hdr.big.tiff_offsetsize);
-      boost::endian::endian_reverse_inplace(hdr.big.tiff_unused);
-      // endian_reverse_inplace has no overload for unsigned long
-      hdr.big.tiff_diroff = boost::endian::endian_reverse(static_cast<uint64_t>(hdr.big.tiff_diroff));
+      byteswap_inplace(hdr.big.tiff_offsetsize);
+      byteswap_inplace(hdr.big.tiff_unused);
+      byteswap_inplace(hdr.big.tiff_diroff);
     }
     //    printf("Magic: %#x <%s-endian> Version: %#x <%s>\n",
     //           hdr.big.tiff_magic,

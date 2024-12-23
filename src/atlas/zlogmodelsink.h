@@ -29,7 +29,6 @@
 #include <QAbstractTableModel>
 #include <QReadWriteLock>
 #include <limits>
-#include <deque>
 
 namespace nim {
 
@@ -66,7 +65,7 @@ public:
   [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 
 private:
-  std::deque<LogData> m_logDatas;
+  std::vector<LogData> m_logDatas;
   mutable QReadWriteLock m_messagesLock;
   size_t m_maxItems;
 };

@@ -1,8 +1,6 @@
 #pragma once
 
 #include "zimagetransform.h"
-#include <deque>
-#include <memory>
 
 namespace nim {
 
@@ -36,7 +34,7 @@ public:
   [[nodiscard]] ZImageTransform* makeInverseTransform() const override;
 
 protected:
-  std::deque<std::unique_ptr<ZImageTransform>> m_tfms;
+  std::vector<std::unique_ptr<ZImageTransform>> m_tfms;
 };
 
 } // namespace nim

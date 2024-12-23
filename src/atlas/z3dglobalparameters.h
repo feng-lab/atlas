@@ -8,7 +8,6 @@
 #include "z3dinteractionhandler.h"
 #include <folly/CancellationToken.h>
 #include <vector>
-#include <deque>
 #include <mutex>
 
 namespace nim {

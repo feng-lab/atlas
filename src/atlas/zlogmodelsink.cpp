@@ -23,7 +23,8 @@ void ZLogModelSink::addEntry(const LogData& message)
   if (m_maxItems < std::numeric_limits<int>::max() && m_logDatas.size() > m_maxItems) {
     {
       QWriteLocker lock(&m_messagesLock);
-      m_logDatas.pop_front();
+      auto numItemsToErase = m_maxItems >> 4;
+      m_logDatas.erase(m_logDatas.begin(), m_logDatas.begin() + numItemsToErase);
     }
     // Every item changed
     const QModelIndex idx1 = index(0, 0);

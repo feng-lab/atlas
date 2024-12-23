@@ -3,7 +3,6 @@
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
 #include "zlog.h"
-#include <boost/endian/conversion.hpp>
 
 namespace nim {
 
@@ -45,7 +44,7 @@ void ZImgV3DRaw::readInfo(const QString& filename,
   uint16_t dataType;
   readStream(inputFileStream, &dataType, 2);
   if (endian == 'B' || endian == 'b') {
-    boost::endian::endian_reverse_inplace(dataType);
+    byteswap_inplace(dataType);
   }
 
   uint16_t sz_buffer[8];
@@ -54,7 +53,7 @@ void ZImgV3DRaw::readInfo(const QString& filename,
 
   for (auto i = 0; i < 4; ++i) {
     if (endian == 'B' || endian == 'b') {
-      sz[i] = boost::endian::endian_reverse(sz_buffer[i]);
+      sz[i] = std::byteswap(sz_buffer[i]);
     } else {
       sz[i] = sz_buffer[i];
     }
@@ -64,10 +63,10 @@ void ZImgV3DRaw::readInfo(const QString& filename,
     readStream(inputFileStream, sz_buffer + 4, 8);
     std::memcpy(sz, sz_buffer, 16);
     if (endian == 'B' || endian == 'b') {
-      boost::endian::endian_reverse_inplace(sz[0]);
-      boost::endian::endian_reverse_inplace(sz[1]);
-      boost::endian::endian_reverse_inplace(sz[2]);
-      boost::endian::endian_reverse_inplace(sz[3]);
+      byteswap_inplace(sz[0]);
+      byteswap_inplace(sz[1]);
+      byteswap_inplace(sz[2]);
+      byteswap_inplace(sz[3]);
     }
   }
 
@@ -143,7 +142,7 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   uint16_t dataType;
   readStream(inputFileStream, &dataType, 2);
   if (endian == 'B' || endian == 'b') {
-    boost::endian::endian_reverse_inplace(dataType);
+    byteswap_inplace(dataType);
   }
 
   uint16_t sz_buffer[8];
@@ -152,7 +151,7 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
 
   for (auto i = 0; i < 4; ++i) {
     if (endian == 'B' || endian == 'b') {
-      sz[i] = boost::endian::endian_reverse(sz_buffer[i]);
+      sz[i] = std::byteswap(sz_buffer[i]);
     } else {
       sz[i] = sz_buffer[i];
     }
@@ -163,10 +162,10 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
     readStream(inputFileStream, sz_buffer + 4, 8);
     std::memcpy(sz, sz_buffer, 16);
     if (endian == 'B' || endian == 'b') {
-      boost::endian::endian_reverse_inplace(sz[0]);
-      boost::endian::endian_reverse_inplace(sz[1]);
-      boost::endian::endian_reverse_inplace(sz[2]);
-      boost::endian::endian_reverse_inplace(sz[3]);
+      byteswap_inplace(sz[0]);
+      byteswap_inplace(sz[1]);
+      byteswap_inplace(sz[2]);
+      byteswap_inplace(sz[3]);
     }
     dataOffset += 8;
   }

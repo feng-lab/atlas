@@ -12,11 +12,16 @@
 #include <algorithm>
 #include <numeric>
 #include <concepts>
+#include <bit>
 
 #ifdef _MSC_VER
 #else
 #define __forceinline inline __attribute__((always_inline))
 #endif
+
+#if __cplusplus < 202302L
+
+#include <boost/endian/conversion.hpp>
 
 namespace std {
 
@@ -66,7 +71,15 @@ template<class T, class U>
   return static_cast<_ForwardLike<T, U>>(x);
 }
 
+template<class T>
+constexpr T byteswap(T n) noexcept
+{
+  return boost::endian::endian_reverse(n);
+}
+
 } // namespace std
+
+#endif
 
 namespace nim {
 
@@ -81,12 +94,6 @@ __forceinline bool isAligned(Type* ptr, size_t a)
 {
   return (reinterpret_cast<uintptr_t>(ptr) & (a - 1)) == 0;
 }
-
-// inline bool hostIsLittleEndian()
-//{
-//   int32_t num = 1;
-//   return *reinterpret_cast<char*>(&num) == 1;
-// }
 
 template<typename Container>
 __forceinline void clearAndDeallocate(Container& c)
@@ -255,5 +262,14 @@ struct IsStdArray<std::array<T, N>> : std::true_type
 
 template<class T, class... U>
 concept IsAnyOf = std::disjunction_v<std::is_same<T, U>...>;
+
+template<typename T>
+__forceinline void byteswap_inplace(T& value)
+{
+  static_assert(std::is_integral_v<T>, "T must be an integral type.");
+  static_assert(sizeof(T) > 1, "Byteswap is unnecessary for types with size <= 1.");
+
+  value = std::byteswap(value);
+}
 
 } // namespace nim

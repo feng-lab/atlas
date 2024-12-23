@@ -9,7 +9,6 @@
 #include <QFileInfo>
 #include <QImage>
 #include <folly/ScopeGuard.h>
-#include <boost/endian/conversion.hpp>
 #include <algorithm>
 
 namespace {
@@ -594,7 +593,7 @@ void ZImg::reverseEndianness()
       auto data = timeData<uint16_t>(t);
       size_t count = timeVoxelNumber();
       for (size_t v = 0; v < count; ++v) {
-        boost::endian::endian_reverse_inplace(data[v]);
+        byteswap_inplace(data[v]);
       }
     }
   } else if (m_info.bytesPerVoxel == 4) {
@@ -602,7 +601,7 @@ void ZImg::reverseEndianness()
       auto data = timeData<uint32_t>(t);
       size_t count = timeVoxelNumber();
       for (size_t v = 0; v < count; ++v) {
-        boost::endian::endian_reverse_inplace(data[v]);
+        byteswap_inplace(data[v]);
       }
     }
   } else if (m_info.bytesPerVoxel == 8) {
@@ -610,7 +609,7 @@ void ZImg::reverseEndianness()
       auto data = timeData<uint64_t>(t);
       size_t count = timeVoxelNumber();
       for (size_t v = 0; v < count; ++v) {
-        boost::endian::endian_reverse_inplace(data[v]);
+        byteswap_inplace(data[v]);
       }
     }
   }

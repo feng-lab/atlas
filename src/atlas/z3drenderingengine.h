@@ -166,7 +166,7 @@ public:
 
   void addEventListenerToFront(Z3DCanvasEventListener& e)
   {
-    m_listeners.push_front(&e);
+    m_listeners.insert(m_listeners.begin(), &e);
   }
 
   void removeEventListener(Z3DCanvasEventListener& e)
@@ -333,7 +333,7 @@ private:
   ZBBox<glm::dvec3> m_boundBox;
   size_t m_numObjsBefore;
 
-  std::deque<Z3DCanvasEventListener*> m_listeners;
+  std::vector<Z3DCanvasEventListener*> m_listeners;
 
   boost::unordered_flat_set<QEvent::Type> m_eventTypes;
 
