@@ -12,13 +12,14 @@
 #include <cmath>
 #include <numeric>
 #include <type_traits>
+#include <ranges>
 
 namespace nim {
 
 #define MULTITHREAD_THRESHOLD 1e7
 
-template<typename Iterator, typename Compare>
-Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
+template<typename Iterator, typename Compare = std::ranges::less>
+Iterator parallel_min_element(Iterator first, Iterator last, Compare comp = {})
 {
   if (first == last) {
     return first; // handle empty range
@@ -36,14 +37,14 @@ Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
     });
 }
 
-template<typename Iterator>
-Iterator parallel_min_element(Iterator first, Iterator last)
+template<std::ranges::input_range Range, typename Compare = std::ranges::less>
+auto parallel_min_element(Range&& r, Compare comp = {})
 {
-  return parallel_min_element(first, last, std::less<>());
+  return parallel_min_element(std::ranges::begin(r), std::ranges::end(r), comp);
 }
 
-template<typename Iterator, typename Compare>
-Iterator parallel_max_element(Iterator first, Iterator last, Compare comp)
+template<typename Iterator, typename Compare = std::ranges::less>
+Iterator parallel_max_element(Iterator first, Iterator last, Compare comp = {})
 {
   if (first == last) {
     return first; // handle empty range
@@ -61,14 +62,14 @@ Iterator parallel_max_element(Iterator first, Iterator last, Compare comp)
     });
 }
 
-template<typename Iterator>
-Iterator parallel_max_element(Iterator first, Iterator last)
+template<std::ranges::input_range Range, typename Compare = std::ranges::less>
+auto parallel_max_element(Range&& r, Compare comp = {})
 {
-  return parallel_max_element(first, last, std::less<>());
+  return parallel_max_element(std::ranges::begin(r), std::ranges::end(r), comp);
 }
 
-template<typename Iterator, typename Compare>
-std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last, Compare comp)
+template<typename Iterator, typename Compare = std::ranges::less>
+std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last, Compare comp = {})
 {
   if (first == last) {
     return std::make_pair(first, first); // handle empty range
@@ -88,15 +89,15 @@ std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator l
     });
 }
 
-template<typename Iterator>
-std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last)
+template<std::ranges::input_range Range, typename Compare = std::ranges::less>
+auto parallel_minmax_element(Range&& r, Compare comp = {})
 {
-  return parallel_minmax_element(first, last, std::less<>());
+  return parallel_minmax_element(std::ranges::begin(r), std::ranges::end(r), comp);
 }
 
-template<typename Iterator, typename Compare>
+template<typename Iterator, typename Compare = std::ranges::less>
 std::pair<typename std::iterator_traits<Iterator>::value_type, typename std::iterator_traits<Iterator>::value_type>
-parallel_minmax(Iterator first, Iterator last, Compare comp)
+parallel_minmax(Iterator first, Iterator last, Compare comp = {})
 {
   CHECK(first != last) << "At least one sample is required";
 
@@ -117,11 +118,10 @@ parallel_minmax(Iterator first, Iterator last, Compare comp)
     });
 }
 
-template<typename Iterator>
-std::pair<typename std::iterator_traits<Iterator>::value_type, typename std::iterator_traits<Iterator>::value_type>
-parallel_minmax(Iterator first, Iterator last)
+template<std::ranges::input_range Range, typename Compare = std::ranges::less>
+auto parallel_minmax(Range&& r, Compare comp = {})
 {
-  return parallel_minmax(first, last, std::less<>());
+  return parallel_minmax(std::ranges::begin(r), std::ranges::end(r), comp);
 }
 
 template<typename Iterator>
@@ -145,6 +145,12 @@ double parallel_mean(Iterator first, Iterator last)
   return sum / static_cast<ValueType>(size);
 }
 
+template<std::ranges::input_range Range>
+double parallel_mean(Range&& r)
+{
+  return parallel_mean(std::ranges::begin(r), std::ranges::end(r));
+}
+
 template<typename Iterator>
 double parallel_sum(Iterator first, Iterator last)
 {
@@ -165,6 +171,12 @@ double parallel_sum(Iterator first, Iterator last)
   return sum;
 }
 
+template<std::ranges::input_range Range>
+double parallel_sum(Range&& r)
+{
+  return parallel_sum(std::ranges::begin(r), std::ranges::end(r));
+}
+
 template<class ForwardIterator>
 std::pair<double, double> parallel_mean_and_variance(ForwardIterator first, ForwardIterator last)
 {
@@ -172,6 +184,12 @@ std::pair<double, double> parallel_mean_and_variance(ForwardIterator first, Forw
   const auto results = boost::math::statistics::detail::first_four_moments_parallel_impl<
     std::tuple<double, double, double, double, double>>(first, last);
   return std::make_pair(std::get<0>(results), std::get<1>(results) / std::get<4>(results));
+}
+
+template<std::ranges::forward_range Range>
+std::pair<double, double> parallel_mean_and_variance(Range&& r)
+{
+  return parallel_mean_and_variance(std::ranges::begin(r), std::ranges::end(r));
 }
 
 template<class ForwardIterator>
@@ -183,11 +201,23 @@ std::pair<double, double> parallel_mean_and_sample_variance(ForwardIterator firs
   return std::make_pair(std::get<0>(results), std::get<1>(results) / (std::get<4>(results) - double(1)));
 }
 
+template<std::ranges::forward_range Range>
+std::pair<double, double> parallel_mean_and_sample_variance(Range&& r)
+{
+  return parallel_mean_and_sample_variance(std::ranges::begin(r), std::ranges::end(r));
+}
+
 template<class ForwardIterator>
 std::pair<double, double> parallel_mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
 {
   const auto result = parallel_mean_and_variance(first, last);
   return std::make_pair(result.first, std::sqrt(result.second));
+}
+
+template<std::ranges::forward_range Range>
+std::pair<double, double> parallel_mean_and_standard_deviation(Range&& r)
+{
+  return parallel_mean_and_standard_deviation(std::ranges::begin(r), std::ranges::end(r));
 }
 
 template<class ForwardIterator>
@@ -197,11 +227,23 @@ std::pair<double, double> parallel_mean_and_sample_standard_deviation(ForwardIte
   return std::make_pair(result.first, std::sqrt(result.second));
 }
 
+template<std::ranges::forward_range Range>
+std::pair<double, double> parallel_mean_and_sample_standard_deviation(Range&& r)
+{
+  return parallel_mean_and_sample_standard_deviation(std::ranges::begin(r), std::ranges::end(r));
+}
+
 template<typename ForwardIterator>
 double mean(ForwardIterator first, ForwardIterator last)
 {
   CHECK(first != last) << "At least one sample is required";
   return boost::math::statistics::detail::mean_sequential_impl<double>(first, last);
+}
+
+template<std::ranges::input_range Range>
+double mean(Range&& r)
+{
+  return mean(std::ranges::begin(r), std::ranges::end(r));
 }
 
 template<typename ForwardIterator>
@@ -211,6 +253,12 @@ double sum(ForwardIterator first, ForwardIterator last)
   return std::accumulate(first, last, 0.0);
 }
 
+template<std::ranges::input_range Range>
+double sum(Range&& r)
+{
+  return sum(std::ranges::begin(r), std::ranges::end(r));
+}
+
 template<class ForwardIterator>
 std::pair<double, double> mean_and_variance(const ForwardIterator first, const ForwardIterator last)
 {
@@ -218,6 +266,12 @@ std::pair<double, double> mean_and_variance(const ForwardIterator first, const F
   const auto results =
     boost::math::statistics::detail::variance_sequential_impl<std::tuple<double, double, double, double>>(first, last);
   return std::make_pair(std::get<0>(results), std::get<3>(results) * std::get<2>(results) / std::get<3>(results));
+}
+
+template<std::ranges::forward_range Range>
+std::pair<double, double> mean_and_variance(Range&& r)
+{
+  return mean_and_variance(std::ranges::begin(r), std::ranges::end(r));
 }
 
 template<class ForwardIterator>
@@ -230,6 +284,12 @@ std::pair<double, double> mean_and_sample_variance(const ForwardIterator first, 
                         std::get<3>(results) * std::get<2>(results) / (std::get<3>(results) - 1.0));
 }
 
+template<std::ranges::forward_range Range>
+std::pair<double, double> mean_and_sample_variance(Range&& r)
+{
+  return mean_and_sample_variance(std::ranges::begin(r), std::ranges::end(r));
+}
+
 template<class ForwardIterator>
 std::pair<double, double> mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
 {
@@ -237,11 +297,23 @@ std::pair<double, double> mean_and_standard_deviation(ForwardIterator first, For
   return std::make_pair(result.first, std::sqrt(result.second));
 }
 
+template<std::ranges::forward_range Range>
+std::pair<double, double> mean_and_standard_deviation(Range&& r)
+{
+  return mean_and_standard_deviation(std::ranges::begin(r), std::ranges::end(r));
+}
+
 template<class ForwardIterator>
 std::pair<double, double> mean_and_sample_standard_deviation(ForwardIterator first, ForwardIterator last)
 {
   const auto result = mean_and_sample_variance(first, last);
   return std::make_pair(result.first, std::sqrt(result.second));
+}
+
+template<std::ranges::forward_range Range>
+std::pair<double, double> mean_and_sample_standard_deviation(Range&& r)
+{
+  return mean_and_sample_standard_deviation(std::ranges::begin(r), std::ranges::end(r));
 }
 
 // will change input data
@@ -261,6 +333,12 @@ double median(RandomAccessIterator first, RandomAccessIterator last)
     std::nth_element(middle, middle + 1, last);
     return (double(*middle) + *(middle + 1)) / 2.;
   }
+}
+
+template<std::ranges::random_access_range Range>
+double median(Range&& r)
+{
+  return median(std::ranges::begin(r), std::ranges::end(r));
 }
 
 #if 0

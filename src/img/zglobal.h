@@ -156,8 +156,8 @@ constexpr int64_t operator""_i64(unsigned long long int n) noexcept
   return static_cast<int64_t>(n);
 }
 
-template<typename Iterator, typename Compare = std::less<>>
-__forceinline std::vector<size_t> argSort(Iterator first, Iterator last, Compare comp = Compare{})
+template<typename Iterator, typename Compare = std::ranges::less>
+__forceinline std::vector<size_t> argSort(Iterator first, Iterator last, Compare comp = {})
 {
   std::vector<size_t> idx(std::distance(first, last));
   std::iota(idx.begin(), idx.end(), 0);
@@ -169,8 +169,8 @@ __forceinline std::vector<size_t> argSort(Iterator first, Iterator last, Compare
   return idx;
 }
 
-template<std::ranges::random_access_range R, typename Compare = std::less<>>
-__forceinline std::vector<size_t> argSort(const R& range, Compare comp = Compare{})
+template<std::ranges::random_access_range R, typename Compare = std::ranges::less>
+__forceinline std::vector<size_t> argSort(const R& range, Compare comp = {})
 {
   std::vector<size_t> idx(std::ranges::size(range));
   std::iota(idx.begin(), idx.end(), 0);

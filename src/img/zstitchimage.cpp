@@ -329,7 +329,11 @@ ZStitchImage::ZStitchImage()
 void ZStitchImage::setInputFilenames(const QStringList& fns, size_t scene)
 {
   m_inputFilenames = fns;
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   std::ranges::sort(m_inputFilenames, naturalSortLessThan);
+#else
+  std::sort(m_inputFilenames.begin(), m_inputFilenames.end(), naturalSortLessThan);
+#endif
   m_scene = scene;
 }
 
@@ -341,7 +345,11 @@ void ZStitchImage::set2ndInput(const QStringList& fns,
                                size_t commonChannelof2ndInput)
 {
   m_2ndInputFilenames = fns;
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   std::ranges::sort(m_2ndInputFilenames, naturalSortLessThan);
+#else
+  std::sort(m_2ndInputFilenames.begin(), m_2ndInputFilenames.end(), naturalSortLessThan);
+#endif
   m_2ndScene = scene;
   m_2ndChannelsToUse = useChs;
   m_2ndChannelsToRemoveBackground = chsForBackgroundRemove;

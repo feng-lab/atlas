@@ -85,7 +85,7 @@ void mergeMean_Impl(const ZVoxelRegion& region,
     CHECK(buf.size() > 1);
 
     ZVoxelCoordinate locInRes = coord - minCoord;
-    *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(mean(buf.begin(), buf.end()));
+    *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(mean(buf));
   }
   for (auto& tile : tiles) {
     tile.clearImgCache();
@@ -111,7 +111,7 @@ void mergeMedian_Impl(const ZVoxelRegion& region,
     CHECK(buf.size() > 1);
 
     ZVoxelCoordinate locInRes = coord - minCoord;
-    *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(median(buf.begin(), buf.end()));
+    *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(median(buf));
   }
   for (auto& tile : tiles) {
     tile.clearImgCache();

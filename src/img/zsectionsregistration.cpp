@@ -114,8 +114,8 @@ void ZSectionsRegistration::doWork()
           //                               m_sectionInfos[i].mean,
           //                               m_sectionInfos[i].std);
           std::tie(m_sectionInfos[i].mean, m_sectionInfos[i].std) =
-            parallel_mean_and_sample_standard_deviation(dataWithoutZero.begin(), dataWithoutZero.end());
-          m_sectionInfos[i].median = median(dataWithoutZero.begin(), dataWithoutZero.end());
+            parallel_mean_and_sample_standard_deviation(dataWithoutZero);
+          m_sectionInfos[i].median = median(dataWithoutZero);
         }
       }
     });

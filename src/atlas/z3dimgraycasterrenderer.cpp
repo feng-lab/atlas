@@ -906,7 +906,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
       lastRound = !hasEnoughMissingIDs && numberBlock == ccSet.size();
       if (lastRound) { // confirm
-        lastRound = *parallel_max_element(m_blockIDs.begin(), m_blockIDs.end()) == 0;
+        lastRound = *parallel_max_element(m_blockIDs) == 0;
       }
       if (lastRound) {
         VLOG(1) << "last att: " << att;

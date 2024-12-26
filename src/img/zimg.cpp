@@ -1310,7 +1310,7 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
             auto srcData = imgs[i]->timeData<TVoxel>(t);
             buf[i] = srcData[v];
           }
-          resData[v] = static_cast<TVoxel>(mean(buf.begin(), buf.end()));
+          resData[v] = static_cast<TVoxel>(mean(buf));
         }
       }
       return res;
@@ -1327,7 +1327,7 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
             auto srcData = imgs[i]->timeData<TVoxel>(t);
             buf[i] = srcData[v];
           }
-          resData[v] = static_cast<TVoxel>(median(buf.begin(), buf.end()));
+          resData[v] = static_cast<TVoxel>(median(buf));
         }
       }
       return res;

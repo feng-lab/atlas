@@ -396,8 +396,8 @@ void ZChromaticShiftCorrection::calcChannelInfs(const ZImg& srcImg)
       //                               m_channelInfos[i].mean,
       //                               m_channelInfos[i].std);
       std::tie(m_channelInfos[i].mean, m_channelInfos[i].std) =
-        parallel_mean_and_sample_standard_deviation(dataWithoutZero.begin(), dataWithoutZero.end());
-      m_channelInfos[i].median = median(dataWithoutZero.begin(), dataWithoutZero.end());
+        parallel_mean_and_sample_standard_deviation(dataWithoutZero);
+      m_channelInfos[i].median = median(dataWithoutZero);
     }
   }
 }

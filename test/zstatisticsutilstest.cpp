@@ -12,6 +12,8 @@ TEST(ParallelTest, TestParallelMaxElement)
   std::iota(data.begin(), data.end(), 1);
   auto result = parallel_max_element(data.begin(), data.end());
   EXPECT_EQ(*result, 10000);
+  result = parallel_max_element(data);
+  EXPECT_EQ(*result, 10000);
 }
 
 TEST(ParallelTest, TestParallelMinElement)
@@ -20,6 +22,8 @@ TEST(ParallelTest, TestParallelMinElement)
   std::iota(data.begin(), data.end(), 1);
   auto result = parallel_min_element(data.begin(), data.end());
   EXPECT_EQ(*result, 1);
+  result = parallel_min_element(data);
+  EXPECT_EQ(*result, 1);
 }
 
 TEST(ParallelTest, TestParallelMinMaxElement)
@@ -27,6 +31,9 @@ TEST(ParallelTest, TestParallelMinMaxElement)
   std::vector<int> data(10000);
   std::iota(data.begin(), data.end(), 1);
   auto result = parallel_minmax_element(data.begin(), data.end());
+  EXPECT_EQ(*result.first, 1);
+  EXPECT_EQ(*result.second, 10000);
+  result = parallel_minmax_element(data);
   EXPECT_EQ(*result.first, 1);
   EXPECT_EQ(*result.second, 10000);
 }
@@ -38,6 +45,9 @@ TEST(ParallelTest, TestParallelMinMax)
   auto result = parallel_minmax(data.begin(), data.end());
   EXPECT_EQ(result.first, 1);
   EXPECT_EQ(result.second, 10000);
+  result = parallel_minmax(data);
+  EXPECT_EQ(result.first, 1);
+  EXPECT_EQ(result.second, 10000);
 }
 
 TEST(ParallelTest, TestEmptyRange)
@@ -47,6 +57,10 @@ TEST(ParallelTest, TestEmptyRange)
   EXPECT_EQ(parallel_min_element(data.begin(), data.end()), data.end());
   EXPECT_EQ(parallel_minmax_element(data.begin(), data.end()).first, data.end());
   EXPECT_EQ(parallel_minmax_element(data.begin(), data.end()).second, data.end());
+  EXPECT_EQ(parallel_max_element(data), data.end());
+  EXPECT_EQ(parallel_min_element(data), data.end());
+  EXPECT_EQ(parallel_minmax_element(data).first, data.end());
+  EXPECT_EQ(parallel_minmax_element(data).second, data.end());
 }
 
 TEST(ParallelTest, TestParallelMaxElementWithComp)
@@ -55,6 +69,10 @@ TEST(ParallelTest, TestParallelMaxElementWithComp)
   std::iota(data.begin(), data.end(), 1);
   auto result = parallel_max_element(data.begin(), data.end(), std::greater<>());
   EXPECT_EQ(*result, 1); // with std::greater<>, max is the smallest number
+  result = parallel_max_element(data, std::greater<>());
+  EXPECT_EQ(*result, 1); // with std::greater<>, max is the smallest number
+  result = parallel_max_element(data, std::ranges::greater{});
+  EXPECT_EQ(*result, 1); // with std::greater<>, max is the smallest number
 }
 
 TEST(ParallelTest, TestParallelMinElementWithComp)
@@ -62,6 +80,8 @@ TEST(ParallelTest, TestParallelMinElementWithComp)
   std::vector<int> data(10000);
   std::iota(data.begin(), data.end(), 1);
   auto result = parallel_min_element(data.begin(), data.end(), std::greater<>());
+  EXPECT_EQ(*result, 10000); // with std::greater<>, min is the largest number
+  result = parallel_min_element(data, std::greater<>());
   EXPECT_EQ(*result, 10000); // with std::greater<>, min is the largest number
 }
 
@@ -72,6 +92,9 @@ TEST(ParallelTest, TestParallelMinMaxElementWithComp)
   auto result = parallel_minmax_element(data.begin(), data.end(), std::greater<>());
   EXPECT_EQ(*result.first, 10000); // with std::greater<>, min is the largest number
   EXPECT_EQ(*result.second, 1); // with std::greater<>, max is the smallest number
+  result = parallel_minmax_element(data, std::greater<>());
+  EXPECT_EQ(*result.first, 10000); // with std::greater<>, min is the largest number
+  EXPECT_EQ(*result.second, 1); // with std::greater<>, max is the smallest number
 }
 
 TEST(ParallelTest, TestParallelMinMaxWithComp)
@@ -79,6 +102,9 @@ TEST(ParallelTest, TestParallelMinMaxWithComp)
   std::vector<int> data(10000);
   std::iota(data.begin(), data.end(), 1);
   auto result = parallel_minmax(data.begin(), data.end(), std::greater<>());
+  EXPECT_EQ(result.first, 10000); // with std::greater<>, min is the largest number
+  EXPECT_EQ(result.second, 1); // with std::greater<>, max is the smallest number
+  result = parallel_minmax(data, std::greater<>());
   EXPECT_EQ(result.first, 10000); // with std::greater<>, min is the largest number
   EXPECT_EQ(result.second, 1); // with std::greater<>, max is the smallest number
 }
@@ -91,6 +117,10 @@ TEST(ParallelTest, TestParallelMeanWithInts)
   EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
   result = mean(data.begin(), data.end());
   EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
+  result = parallel_mean(data);
+  EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
+  result = mean(data);
+  EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
 }
 
 TEST(ParallelTest, TestParallelMeanWithFloats)
@@ -100,6 +130,10 @@ TEST(ParallelTest, TestParallelMeanWithFloats)
   double result = parallel_mean(data.begin(), data.end());
   EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
   result = mean(data.begin(), data.end());
+  EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
+  result = parallel_mean(data);
+  EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
+  result = mean(data);
   EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
 }
 
@@ -111,6 +145,10 @@ TEST(ParallelTest, TestParallelMeanWithDoubles)
   EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
   result = mean(data.begin(), data.end());
   EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
+  result = parallel_mean(data);
+  EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
+  result = mean(data);
+  EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
 }
 
 TEST(ParallelTest, TestParallelMeanAndVarianceWithInts)
@@ -121,6 +159,12 @@ TEST(ParallelTest, TestParallelMeanAndVarianceWithInts)
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 8333333.25, 1e-5);
   result = mean_and_variance(data.begin(), data.end());
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
+  EXPECT_NEAR(result.second, 8333333.25, 1e-5);
+  result = parallel_mean_and_variance(data);
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
+  EXPECT_NEAR(result.second, 8333333.25, 1e-5);
+  result = mean_and_variance(data);
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 8333333.25, 1e-5);
 }
@@ -135,6 +179,12 @@ TEST(ParallelTest, TestParallelMeanAndSampleVarianceWithInts)
   result = mean_and_sample_variance(data.begin(), data.end());
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 8334166.666666667, 1e-5);
+  result = parallel_mean_and_sample_variance(data);
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
+  EXPECT_NEAR(result.second, 8334166.666666667, 1e-5);
+  result = mean_and_sample_variance(data);
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
+  EXPECT_NEAR(result.second, 8334166.666666667, 1e-5);
 }
 
 TEST(ParallelTest, TestParallelMeanAndStandardDeviationWithInts)
@@ -145,6 +195,12 @@ TEST(ParallelTest, TestParallelMeanAndStandardDeviationWithInts)
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 2886.751331514372, 1e-5);
   result = mean_and_standard_deviation(data.begin(), data.end());
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
+  EXPECT_NEAR(result.second, 2886.751331514372, 1e-5);
+  result = parallel_mean_and_standard_deviation(data);
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
+  EXPECT_NEAR(result.second, 2886.751331514372, 1e-5);
+  result = mean_and_standard_deviation(data);
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 2886.751331514372, 1e-5);
 }
@@ -159,12 +215,20 @@ TEST(ParallelTest, TestParallelMeanAndSampleStandardDeviationWithInts)
   result = mean_and_sample_standard_deviation(data.begin(), data.end());
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 2886.8956799071675, 1e-5);
+  result = parallel_mean_and_sample_standard_deviation(data);
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
+  EXPECT_NEAR(result.second, 2886.8956799071675, 1e-5);
+  result = mean_and_sample_standard_deviation(data);
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
+  EXPECT_NEAR(result.second, 2886.8956799071675, 1e-5);
 }
 
 TEST(MedianTest, TestMedianOddNumberOfElements)
 {
   std::vector<int> data{5, 2, 9, 1, 6};
   double result = median(data.begin(), data.end());
+  EXPECT_EQ(result, 5);
+  result = median(data);
   EXPECT_EQ(result, 5);
 }
 
@@ -173,12 +237,16 @@ TEST(MedianTest, TestMedianEvenNumberOfElements)
   std::vector<int> data{5, 2, 9, 1};
   double result = median(data.begin(), data.end());
   EXPECT_EQ(result, (2 + 5) / 2.0);
+  result = median(data);
+  EXPECT_EQ(result, (2 + 5) / 2.0);
 }
 
 TEST(MedianTest, TestMedianSingleElement)
 {
   std::vector<int> data{7};
   double result = median(data.begin(), data.end());
+  EXPECT_EQ(result, 7);
+  result = median(data);
   EXPECT_EQ(result, 7);
 }
 
@@ -188,12 +256,16 @@ TEST(MedianTest, TestMedianLargeNumberOfElements)
   std::iota(data.begin(), data.end(), 1);
   double result = median(data.begin(), data.end());
   EXPECT_EQ(result, (data[data.size() / 2 - 1] + data[data.size() / 2]) / 2.0); // median of evenly sized dataset
+  result = median(data);
+  EXPECT_EQ(result, (data[data.size() / 2 - 1] + data[data.size() / 2]) / 2.0); // median of evenly sized dataset
 }
 
 TEST(MedianTest, TestMedianNonIntegerValues)
 {
   std::vector<double> data{5.5, 2.2, 9.9, 1.1, 6.6};
   double result = median(data.begin(), data.end());
+  EXPECT_DOUBLE_EQ(result, 5.5); // median of the sorted data
+  result = median(data);
   EXPECT_DOUBLE_EQ(result, 5.5); // median of the sorted data
 }
 
@@ -208,5 +280,7 @@ TEST(MedianTest, TestMedianRandomValues)
   });
   std::ranges::sort(data); // median requires sorted data
   double result = median(data.begin(), data.end());
+  EXPECT_NEAR(result, 0.5, 0.01); // median should be near 0.5 for uniformly distributed data
+  result = median(data);
   EXPECT_NEAR(result, 0.5, 0.01); // median should be near 0.5 for uniformly distributed data
 }
