@@ -75,8 +75,8 @@ public:
     if (index < 0) {
       return;
     }
-    removeAt(m_options, index);
-    removeAt(m_associatedDatas, index);
+    m_options.erase(m_options.begin() + index);
+    m_associatedDatas.erase(m_associatedDatas.begin() + index);
     Q_EMIT this->reservedStringSignal2(comboBoxItemString(value));
     index = indexOf(m_options, this->m_value);
     if (index >= 0) {

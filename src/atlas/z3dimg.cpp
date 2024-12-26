@@ -417,7 +417,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
   for (size_t c = 0; c < m_nChannels; ++c) {
     // page directory
     m_channelPageDirectories[c].resize(size_t(m_pageDirectorySize.x) * m_pageDirectorySize.y * m_pageDirectorySize.z);
-    std::fill(m_channelPageDirectories[c].begin(), m_channelPageDirectories[c].end(), glm::uvec4(0));
+    std::ranges::fill(m_channelPageDirectories[c], glm::uvec4(0));
     if (!m_channelPageDirectoryTextures[c] || m_channelPageDirectoryTextures[c]->dimension() != m_pageDirectorySize) {
       m_channelPageDirectoryTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
                                                                        GLint(GL_RGBA32UI),
@@ -434,7 +434,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
       std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, m_invalidKey);
     m_channelPageTableCaches[c].resize(size_t(m_pageTableCacheSize.x) * m_pageTableCacheSize.y *
                                        m_pageTableCacheSize.z);
-    std::fill(m_channelPageTableCaches[c].begin(), m_channelPageTableCaches[c].end(), glm::uvec4(0));
+    std::ranges::fill(m_channelPageTableCaches[c], glm::uvec4(0));
     if (!m_channelPageTableCacheTextures[c] ||
         m_channelPageTableCacheTextures[c]->dimension() != m_pageTableCacheSize) {
       m_channelPageTableCacheTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
@@ -1177,7 +1177,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       processEventsAndMaybeCancel(cancellationToken);
 
       //      if (true) {
-      //        auto [minv, maxv] = std::minmax_element(pboLocalBuffer.begin(), pboLocalBuffer.end());
+      //        auto [minv, maxv] = std::ranges::minmax_element(pboLocalBuffer);
       //        if (*maxv > 200) {
       //          CHECK(false) << *maxv << " " << *minv;
       //        }
@@ -1304,10 +1304,10 @@ void Z3DImg::resetCacheSystem(size_t c)
   m_channelImageCacheManagers[c] = std::make_unique<Z3DBlockCache<glm::uvec4>>(m_imageBlockSize + m_imageBlockSizePad,
                                                                                m_imageCacheNumBlocks,
                                                                                m_invalidKey);
-  std::fill(m_channelPageDirectories[c].begin(), m_channelPageDirectories[c].end(), glm::uvec4(0));
+  std::ranges::fill(m_channelPageDirectories[c], glm::uvec4(0));
   m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
 
-  std::fill(m_channelPageTableCaches[c].begin(), m_channelPageTableCaches[c].end(), glm::uvec4(0));
+  std::ranges::fill(m_channelPageTableCaches[c], glm::uvec4(0));
   m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
 }
 

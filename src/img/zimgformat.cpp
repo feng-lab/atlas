@@ -15,7 +15,7 @@ bool ZImgFormat::canRead(const QString& filename) const
     return false;
   }
   QStringList exts = extensions();
-  return std::any_of(exts.begin(), exts.end(), [&](const QString& ext) {
+  return std::ranges::any_of(exts, [&](const QString& ext) {
     return filename.endsWith(QString(".%1").arg(ext), Qt::CaseInsensitive);
   });
 }
@@ -26,7 +26,7 @@ bool ZImgFormat::canWrite(const QString& filename) const
     return false;
   }
   auto exts = extensions();
-  return std::any_of(exts.begin(), exts.end(), [&](const QString& ext) {
+  return std::ranges::any_of(exts, [&](const QString& ext) {
     return filename.endsWith(QString(".%1").arg(ext), Qt::CaseInsensitive);
   });
 }
@@ -193,7 +193,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
   }
 
   CHECK(dimensionStrides.size() == 5);
-  std::vector<size_t> sortedIndexes = argSort(dimensionStrides.begin(), dimensionStrides.end());
+  std::vector<size_t> sortedIndexes = argSort(dimensionStrides);
   QString dimensionOrderIn("XYZCT");
   QString dimensionOrder("XYZCT");
   std::vector<size_t> packedStrides(5, 0);

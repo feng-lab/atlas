@@ -207,7 +207,7 @@ TEST(ZImageUtils, ImageTranspose)
   std::default_random_engine engine; // or other engine as std::mt19937
   std::uniform_int_distribution<int> distr;
 
-  std::generate(mat.begin(), mat.end(), [&]() {
+  std::ranges::generate(mat, [&]() {
     return distr(engine);
   });
   auto oriMat = mat;
@@ -218,7 +218,7 @@ TEST(ZImageUtils, ImageTranspose)
     }
   }
 
-  std::generate(mat.begin(), mat.end(), [&]() {
+  std::ranges::generate(mat, [&]() {
     return distr(engine);
   });
   oriMat = mat;
@@ -233,7 +233,7 @@ TEST(ZImageUtils, ImageTranspose)
   h = 2238;
   mat.resize(w * h);
 
-  std::generate(mat.begin(), mat.end(), [&]() {
+  std::ranges::generate(mat, [&]() {
     return distr(engine);
   });
   oriMat = mat;
@@ -244,7 +244,7 @@ TEST(ZImageUtils, ImageTranspose)
     }
   }
 
-  std::generate(mat.begin(), mat.end(), [&]() {
+  std::ranges::generate(mat, [&]() {
     return distr(engine);
   });
   oriMat = mat;

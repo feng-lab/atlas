@@ -38,11 +38,9 @@ std::string versionToString(uint32_t version)
 // Function to check if a layer is available
 bool isLayerAvailable(const char* layerName, const std::vector<vk::LayerProperties>& availableLayers)
 {
-  return std::find_if(availableLayers.begin(),
-                      availableLayers.end(),
-                      [layerName](const vk::LayerProperties& layerProperties) {
-                        return strcmp(layerName, layerProperties.layerName) == 0;
-                      }) != availableLayers.end();
+  return std::ranges::find_if(availableLayers, [layerName](const vk::LayerProperties& layerProperties) {
+           return strcmp(layerName, layerProperties.layerName) == 0;
+         }) != availableLayers.end();
 }
 
 bool addRequiredLayers(const char* layerName,
@@ -66,11 +64,9 @@ bool addRequiredLayers(const char* layerName,
 // Function to check if an extension is available
 bool isExtensionAvailable(const char* extensionName, const std::vector<vk::ExtensionProperties>& availableExtensions)
 {
-  return std::find_if(availableExtensions.begin(),
-                      availableExtensions.end(),
-                      [extensionName](const vk::ExtensionProperties& extensionProperties) {
-                        return strcmp(extensionName, extensionProperties.extensionName) == 0;
-                      }) != availableExtensions.end();
+  return std::ranges::find_if(availableExtensions, [extensionName](const vk::ExtensionProperties& extensionProperties) {
+           return strcmp(extensionName, extensionProperties.extensionName) == 0;
+         }) != availableExtensions.end();
 }
 
 bool addRequiredExtension(const char* extensionName,
@@ -505,11 +501,9 @@ void initVulkan()
         auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
 
         // get the first index into queueFamiliyProperties which supports graphics
-        auto propertyIterator = std::find_if(queueFamilyProperties.begin(),
-                                             queueFamilyProperties.end(),
-                                             [](const vk::QueueFamilyProperties& qfp) {
-                                               return qfp.queueFlags & vk::QueueFlagBits::eGraphics;
-                                             });
+        auto propertyIterator = std::ranges::find_if(queueFamilyProperties, [](const vk::QueueFamilyProperties& qfp) {
+          return static_cast<bool>(qfp.queueFlags & vk::QueueFlagBits::eGraphics);
+        });
         CHECK(propertyIterator != queueFamilyProperties.end());
         auto graphicsQueueFamilyIndex =
           static_cast<uint32_t>(std::distance(queueFamilyProperties.begin(), propertyIterator));

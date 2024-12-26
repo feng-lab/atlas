@@ -828,7 +828,7 @@ void ZStitchImageDialog::selectInputStacks1()
       initBgsub1ComboBox(nchannel);
       m_inputStack1Filenames.clear();
       m_inputStack1Filenames = tmp;
-      std::sort(m_inputStack1Filenames.begin(), m_inputStack1Filenames.end(), naturalSortLessThan);
+      std::ranges::sort(m_inputStack1Filenames, naturalSortLessThan);
       m_inputStack1FileEdit->setText(QString("%1").arg(m_inputStack1Filenames.join("\n")));
     }
     catch (const ZException& e) {
@@ -870,7 +870,7 @@ void ZStitchImageDialog::selectInputStacks2()
       initBgsub2ComboBox(nchannel);
       m_inputStack2Filenames.clear();
       m_inputStack2Filenames = tmp;
-      std::sort(m_inputStack2Filenames.begin(), m_inputStack2Filenames.end(), naturalSortLessThan);
+      std::ranges::sort(m_inputStack2Filenames, naturalSortLessThan);
       m_inputStack2FileEdit->setText(QString("%1").arg(m_inputStack2Filenames.join("\n")));
     }
     catch (const ZException& e) {

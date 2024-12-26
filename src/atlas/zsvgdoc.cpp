@@ -150,7 +150,7 @@ bool ZSvgDoc::isAlias(size_t id) const
 {
   CHECK(m_idToSvgPacks.contains(id));
 
-  return std::any_of(m_idToSvgPacks.begin(), m_idToSvgPacks.end(), [&, this](const auto& idPack) {
+  return std::ranges::any_of(m_idToSvgPacks, [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToSvgPacks.at(id);
   });
 }

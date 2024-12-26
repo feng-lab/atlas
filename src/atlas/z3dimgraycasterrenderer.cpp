@@ -927,9 +927,9 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
       missingBlockIDs.reserve(ccSet.size());
       missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
       if ((round % 2 == 1) && hasEnoughMissingIDs) {
-        std::sort(missingBlockIDs.begin(), missingBlockIDs.end(), std::greater<>());
+        std::ranges::sort(missingBlockIDs, std::ranges::greater{});
       } else {
-        std::sort(missingBlockIDs.begin(), missingBlockIDs.end());
+        std::ranges::sort(missingBlockIDs);
       }
     }
     // VLOG(1) << missingBlockIDs.size() << " " << usedBlockIDs.size();

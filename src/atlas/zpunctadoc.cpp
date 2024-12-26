@@ -199,7 +199,7 @@ bool ZPunctaDoc::isAlias(size_t id) const
 {
   CHECK(m_idToPunctaPacks.contains(id));
 
-  return std::any_of(m_idToPunctaPacks.begin(), m_idToPunctaPacks.end(), [&, this](const auto& idPack) {
+  return std::ranges::any_of(m_idToPunctaPacks, [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToPunctaPacks.at(id);
   });
 }

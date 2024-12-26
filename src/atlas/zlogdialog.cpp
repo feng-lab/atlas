@@ -220,7 +220,7 @@ void ZLogDialog::saveSelection()
 QString ZLogDialog::getSelectionText() const
 {
   QModelIndexList rows = mUi->tableViewMessages->selectionModel()->selectedRows();
-  std::sort(rows.begin(), rows.end());
+  std::ranges::sort(rows);
 
   QString text;
 

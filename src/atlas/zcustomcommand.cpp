@@ -494,8 +494,7 @@ void stnTrajectory()
         for (size_t injectionIdx : injectionIdxs) {
           injectionMinDists.push_back(dist[injectionIdx]);
         }
-        size_t curIdx = injectionIdxs[std::min_element(injectionMinDists.begin(), injectionMinDists.end()) -
-                                      injectionMinDists.begin()];
+        size_t curIdx = injectionIdxs[std::ranges::min_element(injectionMinDists) - injectionMinDists.begin()];
         std::vector<glm::dvec3> line;
         while (true) {
           ZVoxelCoordinate coord = ZImg::indexToCoord(curIdx, projection.info());
@@ -1973,12 +1972,13 @@ void mixed_operations(CacheType& cache, int thread_id, int num_operations, int k
   }
 }
 
-template <typename CacheType>
-void run_cache_test(const std::string& cache_name, size_t numShards) {
+template<typename CacheType>
+void run_cache_test(const std::string& cache_name, size_t numShards)
+{
   const int num_threads = std::thread::hardware_concurrency();
-  const int num_operations = 1000000;  // Total operations per thread
-  const int key_range = 100000;        // Range of keys to generate
-  const size_t max_cache_size = 1000000;  // Maximum size of the cache
+  const int num_operations = 1000000; // Total operations per thread
+  const int key_range = 100000; // Range of keys to generate
+  const size_t max_cache_size = 1000000; // Maximum size of the cache
 
   CacheType cache(max_cache_size, numShards);
 
@@ -1990,7 +1990,8 @@ void run_cache_test(const std::string& cache_name, size_t numShards) {
 
   // Launch threads performing mixed operations
   for (int i = 0; i < num_threads; ++i) {
-    threads.emplace_back(mixed_operations<CacheType>, std::ref(cache), i, num_operations, key_range, std::ref(total_hits));
+    threads
+      .emplace_back(mixed_operations<CacheType>, std::ref(cache), i, num_operations, key_range, std::ref(total_hits));
   }
 
   // Wait for all threads to finish

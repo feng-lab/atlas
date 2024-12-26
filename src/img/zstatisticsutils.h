@@ -28,7 +28,7 @@ Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
     tbb::blocked_range<Iterator>(first, last),
     first,
     [&](const tbb::blocked_range<Iterator>& r, Iterator init) -> Iterator {
-      auto min = std::min_element(r.begin(), r.end(), comp);
+      auto min = std::ranges::min_element(r, comp);
       return comp(*min, *init) ? min : init;
     },
     [comp](Iterator x, Iterator y) -> Iterator {
@@ -53,7 +53,7 @@ Iterator parallel_max_element(Iterator first, Iterator last, Compare comp)
     tbb::blocked_range<Iterator>(first, last),
     first,
     [&](const tbb::blocked_range<Iterator>& r, Iterator init) -> Iterator {
-      auto max = std::max_element(r.begin(), r.end(), comp);
+      auto max = std::ranges::max_element(r, comp);
       return comp(*init, *max) ? max : init;
     },
     [comp](Iterator x, Iterator y) -> Iterator {
@@ -78,9 +78,9 @@ std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator l
     tbb::blocked_range<Iterator>(first, last),
     std::make_pair(first, first),
     [&](const tbb::blocked_range<Iterator>& r, std::pair<Iterator, Iterator> init) -> std::pair<Iterator, Iterator> {
-      auto minmax = std::minmax_element(r.begin(), r.end(), comp);
-      return std::make_pair(comp(*minmax.first, *init.first) ? minmax.first : init.first,
-                            comp(*init.second, *minmax.second) ? minmax.second : init.second);
+      auto [mine, maxe] = std::ranges::minmax_element(r, comp);
+      return std::make_pair(comp(*mine, *init.first) ? mine : init.first,
+                            comp(*init.second, *maxe) ? maxe : init.second);
     },
     [comp](std::pair<Iterator, Iterator> x, std::pair<Iterator, Iterator> y) -> std::pair<Iterator, Iterator> {
       return std::make_pair(comp(*x.first, *y.first) ? x.first : y.first,
@@ -107,9 +107,9 @@ parallel_minmax(Iterator first, Iterator last, Compare comp)
     std::make_pair(*first, *first),
     [&](const tbb::blocked_range<Iterator>& r,
         std::pair<value_type, value_type> init) -> std::pair<value_type, value_type> {
-      auto minmax = std::minmax_element(r.begin(), r.end(), comp);
-      return std::make_pair(comp(*minmax.first, init.first) ? *minmax.first : init.first,
-                            comp(init.second, *minmax.second) ? *minmax.second : init.second);
+      auto [mine, maxe] = std::ranges::minmax_element(r, comp);
+      return std::make_pair(comp(*mine, init.first) ? *mine : init.first,
+                            comp(init.second, *maxe) ? *maxe : init.second);
     },
     [comp](std::pair<value_type, value_type> x,
            std::pair<value_type, value_type> y) -> std::pair<value_type, value_type> {

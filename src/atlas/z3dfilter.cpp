@@ -134,11 +134,11 @@ bool Z3DFilter::isValid(Z3DEye eye) const
 
 bool Z3DFilter::isReady(Z3DEye) const
 {
-  bool isReady = std::all_of(m_inputPorts.begin(), m_inputPorts.end(), [](auto port) {
+  bool isReady = std::ranges::all_of(m_inputPorts, [](auto port) {
     return port->isReady();
   });
   if (isReady) {
-    isReady = std::all_of(m_outputPorts.begin(), m_outputPorts.end(), [](auto port) {
+    isReady = std::ranges::all_of(m_outputPorts, [](auto port) {
       return port->isReady();
     });
   }

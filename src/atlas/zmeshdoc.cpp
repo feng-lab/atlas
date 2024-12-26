@@ -226,7 +226,7 @@ bool ZMeshDoc::isAlias(size_t id) const
 {
   CHECK(m_idToMeshPacks.contains(id));
 
-  return std::any_of(m_idToMeshPacks.begin(), m_idToMeshPacks.end(), [&, this](const auto& idPack) {
+  return std::ranges::any_of(m_idToMeshPacks, [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToMeshPacks.at(id);
   });
 }

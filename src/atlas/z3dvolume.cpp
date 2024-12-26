@@ -295,7 +295,7 @@ void Z3DVolume::generateTexture() const
 
 void Z3DVolume::computeHistogramMaxValue()
 {
-  m_histogramMaxValue = *std::max_element(m_histogram.begin(), m_histogram.end());
+  m_histogramMaxValue = *std::ranges::max_element(m_histogram);
 }
 
 //-----------------------------------------------------------------------------------

@@ -241,7 +241,7 @@ bool ZROIDoc::isAlias(size_t id) const
 {
   CHECK(m_idToROIPacks.contains(id));
 
-  return std::any_of(m_idToROIPacks.begin(), m_idToROIPacks.end(), [&, this](const auto& idPack) {
+  return std::ranges::any_of(m_idToROIPacks, [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToROIPacks.at(id);
   });
 }

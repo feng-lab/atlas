@@ -187,7 +187,7 @@ bool ZImgDoc::isAlias(size_t id) const
 {
   CHECK(m_idToImgPacks.contains(id));
 
-  return std::any_of(m_idToImgPacks.begin(), m_idToImgPacks.end(), [&, this](const auto& idPack) {
+  return std::ranges::any_of(m_idToImgPacks, [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToImgPacks.at(id);
   });
 }

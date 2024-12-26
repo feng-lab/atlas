@@ -43,10 +43,10 @@ void Z3DShaderProgram::addShaderFromSourceCode(Z3DShader::Type type, const char*
 
 void Z3DShaderProgram::removeAllShaders()
 {
-  for (auto const& shader : m_shaders) {
+  for (const auto& shader : m_shaders) {
     glDetachShader(m_id, shader->shaderId());
   }
-  for (auto const& shader : m_anonShaders) {
+  for (const auto& shader : m_anonShaders) {
     glDetachShader(m_id, shader->shaderId());
   }
   m_shaders.clear();

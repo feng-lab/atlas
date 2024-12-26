@@ -1565,7 +1565,7 @@ void ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs,
     Eigen::VectorXd vbVoxelIntens(voxelIntens.size());
     size_t numVoxel = 0;
     for (Eigen::Index l = 0; l < labels.rows(); ++l) {
-      if (std::find(modelGroups[g].begin(), modelGroups[g].end(), labels(l)) != modelGroups[g].end()) {
+      if (contains(modelGroups[g], labels(l))) {
         vbVoxelLocs.row(numVoxel) = voxelLocs.row(l) + minLoc;
         vbVoxelIntens(numVoxel++) = voxelIntens(l);
       }

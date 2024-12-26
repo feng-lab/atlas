@@ -31,7 +31,7 @@ struct edge_in_MST
   bool operator()(const Edge& e) const
   {
     if (m_MSTEdges) {
-      return std::find(m_MSTEdges->begin(), m_MSTEdges->end(), e) != m_MSTEdges->end();
+      return nim::contains(*m_MSTEdges, e);
     } else if (m_predecessorMap) {
       return m_predecessorMap->at(boost::source(e, *m_graph)) == boost::target(e, *m_graph) ||
              m_predecessorMap->at(boost::target(e, *m_graph)) == boost::source(e, *m_graph);
@@ -112,7 +112,7 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(index_t star
   }
 
   if (mstMethod == Prim) {
-    auto minCost = *std::min_element(m_weights.begin(), m_weights.end()) - 10.0;
+    auto minCost = *std::ranges::min_element(m_weights) - 10.0;
     for (auto& cost : m_weights) {
       cost -= minCost;
     }

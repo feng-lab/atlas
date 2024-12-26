@@ -1,12 +1,12 @@
 #include "zimgmerge.h"
 
-#include <utility>
-
 #include "zstatisticsutils.h"
 #include "zlog.h"
 #include "zstringutils.h"
 #include "zcpuinfo.h"
 #include "zminimumspanningtree.h"
+#include <utility>
+#include <ranges>
 
 namespace {
 
@@ -248,7 +248,7 @@ std::vector<std::string> ZImgMerge::resolveLocations()
   // only do it when every image name is unique
   if (orderedTiles.size() == m_imgFinalCoords.size()) {
     // should be in reverse order as we write tiles from begin to end and we want lower image overwrites higher image
-    for (const auto& nameBlock : makeReverse(orderedTiles)) {
+    for (const auto& nameBlock : std::views::reverse(orderedTiles)) {
       // VLOG(1) << nameBlock.first;
       m_tiles.emplace_back(*nameBlock.second, m_imgFinalCoords[nameBlock.second]);
     }

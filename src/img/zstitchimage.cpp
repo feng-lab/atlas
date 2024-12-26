@@ -298,9 +298,7 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
       p.second = overlapToCentroid[p.second];
     }
     // VLOG(1) << valC.size();
-    std::sort(valC.begin(), valC.end(), [](const std::pair<size_t, double>& a, const std::pair<size_t, double>& b) {
-      return a.second > b.second;
-    });
+    std::ranges::sort(valC, std::ranges::greater{}, &std::pair<size_t, double>::second);
     idxToPrunedConn[key].insert(valC[0].first);
     double lastOverlap = valC[0].second;
     for (size_t i = 1; i < valC.size(); ++i) { // keep two
@@ -331,7 +329,7 @@ ZStitchImage::ZStitchImage()
 void ZStitchImage::setInputFilenames(const QStringList& fns, size_t scene)
 {
   m_inputFilenames = fns;
-  std::sort(m_inputFilenames.begin(), m_inputFilenames.end(), naturalSortLessThan);
+  std::ranges::sort(m_inputFilenames, naturalSortLessThan);
   m_scene = scene;
 }
 
@@ -343,7 +341,7 @@ void ZStitchImage::set2ndInput(const QStringList& fns,
                                size_t commonChannelof2ndInput)
 {
   m_2ndInputFilenames = fns;
-  std::sort(m_2ndInputFilenames.begin(), m_2ndInputFilenames.end(), naturalSortLessThan);
+  std::ranges::sort(m_2ndInputFilenames, naturalSortLessThan);
   m_2ndScene = scene;
   m_2ndChannelsToUse = useChs;
   m_2ndChannelsToRemoveBackground = chsForBackgroundRemove;

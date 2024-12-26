@@ -193,7 +193,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
       channelOffsets.push_back(cd.bytesInc);
     }
     if (channelOffsets.size() > 1) {
-      std::sort(channelOffsets.begin(), channelOffsets.end());
+      std::ranges::sort(channelOffsets);
       dimensionStrides[3] = channelOffsets[1] - channelOffsets[0];
     }
     for (const auto& dd : ii.dimensions) {
@@ -814,7 +814,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
         for (const auto& cd : ii.channels) {
           channelOffsets.push_back(cd.bytesInc);
         }
-        std::sort(channelOffsets.begin(), channelOffsets.end());
+        std::ranges::sort(channelOffsets);
         DimensionInfo di;
         di.name = "C";
         di.start = 0;
@@ -822,9 +822,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
         di.stride = channelOffsets[1] - channelOffsets[0];
         dims.push_back(di);
       }
-      std::sort(dims.begin(), dims.end(), [](const DimensionInfo& i1, const DimensionInfo& i2) {
-        return i1.stride < i2.stride;
-      });
+      std::ranges::sort(dims, {}, &DimensionInfo::stride);
 
       std::vector<size_t> sceneDimIdxReverseOrder;
       for (size_t i = dims.size(); i-- > 0;) {
@@ -1028,8 +1026,8 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
       info.validBitCount = resl;
       info.bytesPerVoxel = (resl + 7) / 8;
     }
-    std::vector<size_t> channelOffsetOrder = argSort(channelOffsets.begin(), channelOffsets.end());
-    std::sort(channelOffsets.begin(), channelOffsets.end());
+    std::vector<size_t> channelOffsetOrder = argSort(channelOffsets);
+    std::ranges::sort(channelOffsets);
     if (channelOffsets.size() > 1) {
       uint64_t channelStride = channelOffsets[1] - channelOffsets[0];
       if (channelStride == 0) {

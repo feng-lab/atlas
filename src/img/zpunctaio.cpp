@@ -39,14 +39,14 @@ ZPunctaIO::ZPunctaIO()
 
 bool ZPunctaIO::canReadFile(const QString& filename)
 {
-  return std::any_of(m_readExts.begin(), m_readExts.end(), [&](const QString& readExt) {
+  return std::ranges::any_of(m_readExts, [&](const QString& readExt) {
     return filename.endsWith(QString(".%1").arg(readExt), Qt::CaseInsensitive);
   });
 }
 
 bool ZPunctaIO::canWriteFile(const QString& filename)
 {
-  return std::any_of(m_writeExts.begin(), m_writeExts.end(), [&](const QString& writeExt) {
+  return std::ranges::any_of(m_writeExts, [&](const QString& writeExt) {
     return filename.endsWith(QString(".%1").arg(writeExt), Qt::CaseInsensitive);
   });
 }

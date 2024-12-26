@@ -90,7 +90,7 @@ void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRe
 
 void ZParameterAnimation::sortKeys()
 {
-  std::sort(m_keys.begin(), m_keys.end(), [](const auto& a, const auto& b) { return a->time() < b->time(); });
+  std::ranges::sort(m_keys, {}, &ZParameterKey::time);
 }
 
 QString ZParameterAnimation::jsonKey() const

@@ -1,5 +1,6 @@
 #include "zswc.h"
 #include "ztest.h"
+#include <ranges>
 
 namespace {
 
@@ -573,17 +574,17 @@ TEST(SWC, DepthFirstIterator)
     }
     ASSERT_EQ(sidx, 0_uz);
     sidx = std::size(smallSwcRes);
-    for (auto node : makeReverse(smallSwc)) {
+    for (auto node : std::views::reverse(smallSwc)) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
     sidx = std::size(smallSwcRes);
-    for (auto& node : makeReverse(smallSwc)) {
+    for (auto& node : std::views::reverse(smallSwc)) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
     sidx = std::size(smallSwcRes);
-    for (const auto& node : makeReverse(smallSwc)) {
+    for (const auto& node : std::views::reverse(smallSwc)) {
       ASSERT_EQ(node.id, smallSwcRes[--sidx]);
     }
     ASSERT_EQ(sidx, 0_uz);
@@ -707,17 +708,17 @@ TEST(SWC, DepthFirstIterator)
     }
     ASSERT_EQ(idx, 0_uz);
     idx = std::size(dfres);
-    for (auto node : makeReverse(swc)) {
+    for (auto node : std::views::reverse(swc)) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);
     idx = std::size(dfres);
-    for (auto& node : makeReverse(swc)) {
+    for (auto& node : std::views::reverse(swc)) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);
     idx = std::size(dfres);
-    for (const auto& node : makeReverse(swc)) {
+    for (const auto& node : std::views::reverse(swc)) {
       ASSERT_EQ(node.id, dfres[--idx]);
     }
     ASSERT_EQ(idx, 0_uz);

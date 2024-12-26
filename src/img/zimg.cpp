@@ -1728,7 +1728,7 @@ ZImg& ZImg::flip(Dimension dim)
     }
   } else */
   if (dim == Dimension::T) { // flip times
-    std::reverse(m_data.begin(), m_data.end());
+    std::ranges::reverse(m_data);
   } else if (dim == Dimension::C) { // flip channels
     if (numChannels() > 1) {
       auto buf = std::make_unique_for_overwrite<uint8_t[]>(channelByteNumber());

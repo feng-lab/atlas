@@ -240,7 +240,7 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
           }
         }
       }
-      std::sort(idxList.begin(), idxList.end());
+      std::ranges::sort(idxList);
       res.voxelIdxList.push_back(idxList);
     }
   }

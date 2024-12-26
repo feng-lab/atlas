@@ -243,7 +243,7 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
 
 void ZWidgetsGroup::sortChildGroups()
 {
-  std::stable_sort(m_childGroups.begin(), m_childGroups.end(), widgetGroupPtVisibleLevelLessThan);
+  std::ranges::stable_sort(m_childGroups, widgetGroupPtVisibleLevelLessThan);
   m_isSorted = true;
 }
 

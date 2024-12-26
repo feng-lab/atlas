@@ -370,10 +370,10 @@ ZSwc::ConstSwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x,
     }
   }
 
-  auto minIndex = std::min_element(nodeMinDists.begin(), nodeMinDists.end()) - nodeMinDists.begin();
+  auto minIndex = std::ranges::min_element(nodeMinDists) - nodeMinDists.begin();
   auto minDist = nodeMinDists[minIndex];
   nodeMinDists[minIndex] = std::numeric_limits<double>::max();
-  auto secondMinDist = *std::min_element(nodeMinDists.begin(), nodeMinDists.end());
+  auto secondMinDist = *std::ranges::min_element(nodeMinDists);
   // VLOG(1) << " min dist " << minDist;
   // VLOG(1) << " second min dist " << secondMinDist;
   isAmbiguous = secondMinDist < m_ambiguousFactor * minDist;

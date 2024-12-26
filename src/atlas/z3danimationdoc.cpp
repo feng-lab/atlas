@@ -212,7 +212,7 @@ bool Z3DAnimationDoc::isAlias(size_t id) const
 {
   CHECK(m_idToAnimationPacks.contains(id));
 
-  return std::any_of(m_idToAnimationPacks.begin(), m_idToAnimationPacks.end(), [&, this](const auto& idPack) {
+  return std::ranges::any_of(m_idToAnimationPacks, [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToAnimationPacks.at(id);
   });
 }

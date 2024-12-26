@@ -842,10 +842,10 @@ ZGenerateAnalysisTextFile::intensityWeightedNearestNode(double x,
     }
   }
 
-  size_t minIndex = std::min_element(nodeMinDists.begin(), nodeMinDists.end()) - nodeMinDists.begin();
+  size_t minIndex = std::ranges::min_element(nodeMinDists) - nodeMinDists.begin();
   // VLOG(1) << " min dist " << nodeMinDists[minIndex];
   // nodeMinDists[minIndex] = std::numeric_limits<double>::max();
-  // VLOG(1) << " second min dist " << *std::min_element(nodeMinDists.begin(), nodeMinDists.end());
+  // VLOG(1) << " second min dist " << *std::ranges::min_element(nodeMinDists);
 
   return nodes[minIndex];
 }

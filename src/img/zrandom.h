@@ -42,7 +42,7 @@ public:
       for (IntType i = minValue; i <= maxValue; ++i) {
         res[i - minValue] = i;
       }
-      std::shuffle(res.begin(), res.end(), m_eng);
+      std::ranges::shuffle(res, m_eng);
     }
     return res;
   }

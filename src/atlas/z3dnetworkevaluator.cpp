@@ -9,6 +9,7 @@
 #include <boost/graph/topological_sort.hpp>
 #include <algorithm>
 #include <queue>
+#include <ranges>
 
 #define CHECKOPENGLSTATE
 
@@ -196,7 +197,7 @@ void Z3DNetworkEvaluator::updateNetwork()
   // sort to get rendering order
   std::vector<Vertex> sorted;
   boost::topological_sort(m_filterGraph, std::back_inserter(sorted));
-  for (auto rv : makeReverse(sorted)) {
+  for (auto rv : std::views::reverse(sorted)) {
     m_renderingOrder.push_back(m_filterGraph[rv].filter);
   }
 
@@ -208,7 +209,7 @@ void Z3DNetworkEvaluator::updateNetwork()
 
   // update reverse sorted filters
   m_reverseSortedFilters = m_renderingOrder;
-  std::reverse(m_reverseSortedFilters.begin(), m_reverseSortedFilters.end());
+  std::ranges::reverse(m_reverseSortedFilters);
 
   // update size
   sizeChangedFromFilter();

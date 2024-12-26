@@ -219,7 +219,7 @@ weightedMedian(RandomAccessIterator dataBegin,
     }
     CHECK(data.size() > 0);
     ResultType sum = 0;
-    std::vector<size_t> sort_order = argSort(data.begin(), data.end());
+    std::vector<size_t> sort_order = argSort(data);
 
     size_t i;
     for (i = 0; i < data.size(); ++i) {

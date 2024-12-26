@@ -84,12 +84,6 @@ constexpr T byteswap(T n) noexcept
 namespace nim {
 
 template<typename Type>
-__forceinline bool isAligned(Type* ptr)
-{
-  return (reinterpret_cast<uintptr_t>(ptr) & (alignof(Type) - 1)) == 0;
-}
-
-template<typename Type>
 __forceinline bool isAligned(Type* ptr, size_t a)
 {
   return (reinterpret_cast<uintptr_t>(ptr) & (a - 1)) == 0;
@@ -162,94 +156,60 @@ constexpr int64_t operator""_i64(unsigned long long int n) noexcept
   return static_cast<int64_t>(n);
 }
 
-// http://stackoverflow.com/questions/8542591/c11-reverse-range-based-for-loop
-template<typename T>
-struct reversion_wrapper
+template<typename Iterator, typename Compare = std::less<>>
+__forceinline std::vector<size_t> argSort(Iterator first, Iterator last, Compare comp = Compare{})
 {
-  T& iterable;
-};
-
-template<typename T>
-__forceinline auto begin(reversion_wrapper<T> w)
-{
-  return std::rbegin(w.iterable);
-}
-
-template<typename T>
-__forceinline auto end(reversion_wrapper<T> w)
-{
-  return std::rend(w.iterable);
-}
-
-template<typename T>
-__forceinline reversion_wrapper<T> makeReverse(T&& iterable)
-{
-  return {iterable};
-}
-
-template<class RAIter, class Compare>
-__forceinline std::vector<size_t> argSort(RAIter first, RAIter last, Compare comp)
-{
-  std::vector<size_t> idx(last - first);
+  std::vector<size_t> idx(std::distance(first, last));
   std::iota(idx.begin(), idx.end(), 0);
 
-  auto idxComp = [&first, comp](size_t i1, size_t i2) {
-    return comp(first[i1], first[i2]);
-  };
-
-  std::stable_sort(idx.begin(), idx.end(), idxComp);
-
-  return idx;
-}
-
-template<class RAIter>
-__forceinline std::vector<size_t> argSort(RAIter first, RAIter last)
-{
-  std::vector<size_t> idx(last - first);
-  std::iota(idx.begin(), idx.end(), 0);
-
-  // sort indexes based on comparing values in v
-  std::stable_sort(idx.begin(), idx.end(), [&first](size_t i1, size_t i2) {
-    return first[i1] < first[i2];
+  std::ranges::stable_sort(idx, [&](size_t i, size_t j) {
+    return comp(first[i], first[j]);
   });
 
   return idx;
 }
 
-template<typename C, typename V>
-__forceinline bool contains(const C& iterable, const V& v)
+template<std::ranges::random_access_range R, typename Compare = std::less<>>
+__forceinline std::vector<size_t> argSort(const R& range, Compare comp = Compare{})
 {
-  return std::find(std::begin(iterable), std::end(iterable), v) != std::end(iterable);
+  std::vector<size_t> idx(std::ranges::size(range));
+  std::iota(idx.begin(), idx.end(), 0);
+
+  std::ranges::stable_sort(idx, [&](size_t i, size_t j) {
+    return comp(range[i], range[j]);
+  });
+
+  return idx;
 }
 
-template<typename C, typename V>
-__forceinline ptrdiff_t indexOf(const C& iterable, const V& v)
+// Check if a range contains a specific value
+template<std::ranges::input_range R, typename V>
+__forceinline constexpr bool contains(const R& range, const V& v)
 {
-  if (auto it = std::find(std::begin(iterable), std::end(iterable), v); it != std::end(iterable)) {
-    return std::distance(std::begin(iterable), it);
+  return std::ranges::find(range, v) != std::ranges::end(range);
+}
+
+// Get the index of a value in a range (or -1 if not found)
+template<std::ranges::input_range R, typename V>
+__forceinline constexpr ptrdiff_t indexOf(const R& range, const V& v)
+{
+  if (auto it = std::ranges::find(range, v); it != std::ranges::end(range)) {
+    return std::ranges::distance(std::ranges::begin(range), it);
   }
   return -1;
 }
 
-template<typename C>
-__forceinline void removeAt(C& iterable, size_t idx)
+// Remove duplicate elements from a container
+template<std::ranges::forward_range R,
+         std::indirect_equivalence_relation<std::ranges::iterator_t<R>> C = std::ranges::equal_to>
+__forceinline R& unique(R& range, bool doSorting = false, C comp = {})
 {
-  // CHECK(idx < iterable.size());
-  iterable.erase(iterable.begin() + idx);
-}
-
-template<class Container>
-__forceinline Container& unique(Container& on)
-{
-  on.erase(std::unique(std::begin(on), std::end(on)), std::end(on));
-  return on;
-}
-
-template<class Container, class Pred>
-__forceinline Container& uniqueIf(Container& on, Pred pred)
-{
-  on.erase(std::unique(std::begin(on), std::end(on), pred), std::end(on));
-  return on;
+  if (doSorting) {
+    std::ranges::sort(range);
+  }
+  const auto [first, last] = std::ranges::unique(range, std::move(comp));
+  range.erase(first, last);
+  return range;
 }
 
 template<typename T>

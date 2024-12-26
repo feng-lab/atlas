@@ -191,7 +191,7 @@ bool ZSwcDoc::isAlias(size_t id) const
 {
   CHECK(m_idToSwcPacks.contains(id));
 
-  return std::any_of(m_idToSwcPacks.begin(), m_idToSwcPacks.end(), [&, this](const auto& idPack) {
+  return std::ranges::any_of(m_idToSwcPacks, [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToSwcPacks.at(id);
   });
 }

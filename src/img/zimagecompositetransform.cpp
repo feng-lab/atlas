@@ -1,5 +1,7 @@
 #include "zimagecompositetransform.h"
 
+#include <ranges>
+
 namespace nim {
 
 void ZImageCompositeTransform::addTransform(const ZImageTransform& tfm)
@@ -72,7 +74,7 @@ std::vector<double> ZImageCompositeTransform::estimateParameterScales(const doub
 
 void ZImageCompositeTransform::transformPoint(double* inoutCoords) const
 {
-  for (const auto& tfm : makeReverse(m_tfms)) {
+  for (const auto& tfm : std::views::reverse(m_tfms)) {
     tfm->transformPoint(inoutCoords);
   }
 }
@@ -103,7 +105,7 @@ ZImageTransform* ZImageCompositeTransform::clone() const
 ZImageTransform* ZImageCompositeTransform::makeInverseTransform() const
 {
   auto res = new ZImageCompositeTransform();
-  for (const auto& tfm : makeReverse(m_tfms)) {
+  for (const auto& tfm : std::views::reverse(m_tfms)) {
     res->addTransform(tfm->makeInverseTransform());
   }
   return res;

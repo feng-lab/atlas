@@ -816,7 +816,7 @@ void ZColorMap::addKeyAtFraction(double fraction, double alpha, bool select)
 bool ZColorMap::removeDuplicatedKeys()
 {
   size_t sizeBefore = m_keys.size();
-  uniqueIf(m_keys, [](const std::pair<ZColorMapKey, bool>& key1, const std::pair<ZColorMapKey, bool>& key2) {
+  unique(m_keys, false, [](const std::pair<ZColorMapKey, bool>& key1, const std::pair<ZColorMapKey, bool>& key2) {
     return key1.first.intensity() == key2.first.intensity();
   });
   if (m_keys.size() != sizeBefore) {
@@ -837,7 +837,7 @@ bool ZColorMap::removeSelectedKeys()
 
 void ZColorMap::updateKeys()
 {
-  std::sort(m_keys.begin(), m_keys.end());
+  std::ranges::sort(m_keys);
 }
 
 void ZColorMap::removeKey(const ZColorMapKey& key)

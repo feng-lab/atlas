@@ -87,7 +87,7 @@ ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
     return *this;
   }
 #endif
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::plus<>());
+  std::ranges::transform(m_data, rhs.m_data, m_data.begin(), std::plus<>());
   return *this;
 }
 
@@ -125,7 +125,7 @@ ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
     return *this;
   }
 #endif
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::minus<>());
+  std::ranges::transform(m_data, rhs.m_data, m_data.begin(), std::minus<>());
   return *this;
 }
 
@@ -146,7 +146,7 @@ ZComplexImg ZComplexImg::operator-(const ZComplexImg& rhs) const
 ZComplexImg ZComplexImg::operator-() const
 {
   ZComplexImg res(*this);
-  std::transform(res.m_data.begin(), res.m_data.end(), res.m_data.begin(), std::negate<>());
+  std::ranges::transform(res.m_data, res.m_data.begin(), std::negate<>());
   return res;
 }
 
@@ -170,7 +170,7 @@ ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
     return *this;
   }
 #endif
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::multiplies<>());
+  std::ranges::transform(m_data, rhs.m_data, m_data.begin(), std::multiplies<>());
   return *this;
 }
 
@@ -208,7 +208,7 @@ ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
     return *this;
   }
 #endif
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::divides<>());
+  std::ranges::transform(m_data, rhs.m_data, m_data.begin(), std::divides<>());
   return *this;
 }
 

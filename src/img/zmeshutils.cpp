@@ -1169,7 +1169,7 @@ void vtkCCSJoinLooseEnds(std::vector<std::vector<int64_t>>& polys,
   }
 
   // Remove polys that couldn't be completed
-  std::sort(removePolys.begin(), removePolys.end());
+  std::ranges::sort(removePolys);
   size_t i = removePolys.size();
   while (i > 0) {
     // Remove items in reverse order
@@ -2102,7 +2102,7 @@ int vtkCCSFindCuts(const std::vector<std::vector<int64_t>>& polys,
         cutlist[kk].second = kk;
       }
 
-      std::sort(cutlist.begin(), cutlist.end());
+      std::ranges::sort(cutlist);
 
       for (size_t lid = 0; lid < cutlist.size(); lid++) {
         size_t k = cutlist[lid].second;

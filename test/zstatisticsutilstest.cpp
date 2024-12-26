@@ -203,10 +203,10 @@ TEST(MedianTest, TestMedianRandomValues)
   std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
   std::vector<double> data(10000); // ten thousand elements
-  std::generate(data.begin(), data.end(), [&]() {
+  std::ranges::generate(data, [&]() {
     return distribution(generator);
   });
-  std::sort(data.begin(), data.end()); // median requires sorted data
+  std::ranges::sort(data); // median requires sorted data
   double result = median(data.begin(), data.end());
   EXPECT_NEAR(result, 0.5, 0.01); // median should be near 0.5 for uniformly distributed data
 }
