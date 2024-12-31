@@ -164,7 +164,6 @@ set(IMG_SOURCES
     zroiutils.cpp zroiutils.h
     zlogcache.cpp zlogcache.h
     zminimumspanningtree.cpp zminimumspanningtree.h
-    zsubrange.h
     zmkl.h
     zsaturateoperation.cpp
     zsaturateoperation_avx2.cpp zsaturateoperation_avx512.cpp zsaturateoperation_avx2.h zsaturateoperation_avx512.h

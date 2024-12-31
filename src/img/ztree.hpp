@@ -2,7 +2,6 @@
 
 #include "zglobal.h"
 #include "zlog.h"
-#include "zsubrange.h"
 #include <boost/stl_interfaces/iterator_interface.hpp>
 #include <vector>
 #include <list>
@@ -1473,374 +1472,374 @@ public:
   // preOrder
   auto preOrderRange() noexcept
   {
-    return subrange(begin(), end());
+    return std::ranges::subrange(begin(), end());
   }
 
   auto rPreOrderRange() noexcept
   {
-    return subrange(rbegin(), rend());
+    return std::ranges::subrange(rbegin(), rend());
   }
 
   auto preOrderRange() const noexcept
   {
-    return subrange(begin(), end());
+    return std::ranges::subrange(begin(), end());
   }
 
   auto rPreOrderRange() const noexcept
   {
-    return subrange(rbegin(), rend());
+    return std::ranges::subrange(rbegin(), rend());
   }
 
   auto cPreOrderRange() const noexcept
   {
-    return subrange(cbegin(), cend());
+    return std::ranges::subrange(cbegin(), cend());
   }
 
   auto crPreOrderRange() const noexcept
   {
-    return subrange(crbegin(), crend());
+    return std::ranges::subrange(crbegin(), crend());
   }
 
   template<typename Iter>
   auto preOrderRange(const Iter& root) noexcept
   {
-    return subrange(begin(root), end(root));
+    return std::ranges::subrange(begin(root), end(root));
   }
 
   template<typename Iter>
   auto rPreOrderRange(const Iter& root) noexcept
   {
-    return subrange(rbegin(root), rend(root));
+    return std::ranges::subrange(rbegin(root), rend(root));
   }
 
   template<typename Iter>
   auto preOrderRange(const Iter& root) const noexcept
   {
-    return subrange(begin(root), end(root));
+    return std::ranges::subrange(begin(root), end(root));
   }
 
   template<typename Iter>
   auto rPreOrderRange(const Iter& root) const noexcept
   {
-    return subrange(rbegin(root), rend(root));
+    return std::ranges::subrange(rbegin(root), rend(root));
   }
 
   template<typename Iter>
   auto cPreOrderRange(const Iter& root) const noexcept
   {
-    return subrange(cbegin(root), cend(root));
+    return std::ranges::subrange(cbegin(root), cend(root));
   }
 
   template<typename Iter>
   auto crPreOrderRange(const Iter& root) const noexcept
   {
-    return subrange(crbegin(root), crend(root));
+    return std::ranges::subrange(crbegin(root), crend(root));
   }
 
   // postOrder
   auto postOrderRange() noexcept
   {
-    return subrange(beginPostOrder(), endPostOrder());
+    return std::ranges::subrange(beginPostOrder(), endPostOrder());
   }
 
   auto rPostOrderRange() noexcept
   {
-    return subrange(rbeginPostOrder(), rendPostOrder());
+    return std::ranges::subrange(rbeginPostOrder(), rendPostOrder());
   }
 
   auto postOrderRange() const noexcept
   {
-    return subrange(beginPostOrder(), endPostOrder());
+    return std::ranges::subrange(beginPostOrder(), endPostOrder());
   }
 
   auto rPostOrderRange() const noexcept
   {
-    return subrange(rbeginPostOrder(), rendPostOrder());
+    return std::ranges::subrange(rbeginPostOrder(), rendPostOrder());
   }
 
   auto cPostOrderRange() const noexcept
   {
-    return subrange(cbeginPostOrder(), cendPostOrder());
+    return std::ranges::subrange(cbeginPostOrder(), cendPostOrder());
   }
 
   auto crPostOrderRange() const noexcept
   {
-    return subrange(crbeginPostOrder(), crendPostOrder());
+    return std::ranges::subrange(crbeginPostOrder(), crendPostOrder());
   }
 
   template<typename Iter>
   auto postOrderRange(const Iter& root) noexcept
   {
-    return subrange(beginPostOrder(root), endPostOrder(root));
+    return std::ranges::subrange(beginPostOrder(root), endPostOrder(root));
   }
 
   template<typename Iter>
   auto rPostOrderRange(const Iter& root) noexcept
   {
-    return subrange(rbeginPostOrder(root), rendPostOrder(root));
+    return std::ranges::subrange(rbeginPostOrder(root), rendPostOrder(root));
   }
 
   template<typename Iter>
   auto postOrderRange(const Iter& root) const noexcept
   {
-    return subrange(beginPostOrder(root), endPostOrder(root));
+    return std::ranges::subrange(beginPostOrder(root), endPostOrder(root));
   }
 
   template<typename Iter>
   auto rPostOrderRange(const Iter& root) const noexcept
   {
-    return subrange(rbeginPostOrder(root), rendPostOrder(root));
+    return std::ranges::subrange(rbeginPostOrder(root), rendPostOrder(root));
   }
 
   template<typename Iter>
   auto cPostOrderRange(const Iter& root) const noexcept
   {
-    return subrange(cbeginPostOrder(root), cendPostOrder(root));
+    return std::ranges::subrange(cbeginPostOrder(root), cendPostOrder(root));
   }
 
   template<typename Iter>
   auto crPostOrderRange(const Iter& root) const noexcept
   {
-    return subrange(crbeginPostOrder(root), crendPostOrder(root));
+    return std::ranges::subrange(crbeginPostOrder(root), crendPostOrder(root));
   }
 
   // breadth first order
   auto breadthFirstRange() noexcept
   {
-    return subrange(beginBreadthFirst(), endBreadthFirst());
+    return std::ranges::subrange(beginBreadthFirst(), endBreadthFirst());
   }
 
   auto rBreadthFirstRange() noexcept
   {
-    return subrange(rbeginBreadthFirst(), rendBreadthFirst());
+    return std::ranges::subrange(rbeginBreadthFirst(), rendBreadthFirst());
   }
 
   auto breadthFirstRange() const noexcept
   {
-    return subrange(beginBreadthFirst(), endBreadthFirst());
+    return std::ranges::subrange(beginBreadthFirst(), endBreadthFirst());
   }
 
   auto rBreadthFirstRange() const noexcept
   {
-    return subrange(rbeginBreadthFirst(), rendBreadthFirst());
+    return std::ranges::subrange(rbeginBreadthFirst(), rendBreadthFirst());
   }
 
   auto cBreadthFirstRange() const noexcept
   {
-    return subrange(cbeginBreadthFirst(), cendBreadthFirst());
+    return std::ranges::subrange(cbeginBreadthFirst(), cendBreadthFirst());
   }
 
   auto crBreadthFirstRange() const noexcept
   {
-    return subrange(crbeginBreadthFirst(), crendBreadthFirst());
+    return std::ranges::subrange(crbeginBreadthFirst(), crendBreadthFirst());
   }
 
   template<typename Iter>
   auto breadthFirstRange(const Iter& root) noexcept
   {
-    return subrange(beginBreadthFirst(root), endBreadthFirst(root));
+    return std::ranges::subrange(beginBreadthFirst(root), endBreadthFirst(root));
   }
 
   template<typename Iter>
   auto rBreadthFirstRange(const Iter& root) noexcept
   {
-    return subrange(rbeginBreadthFirst(root), rendBreadthFirst(root));
+    return std::ranges::subrange(rbeginBreadthFirst(root), rendBreadthFirst(root));
   }
 
   template<typename Iter>
   auto breadthFirstRange(const Iter& root) const noexcept
   {
-    return subrange(beginBreadthFirst(root), endBreadthFirst(root));
+    return std::ranges::subrange(beginBreadthFirst(root), endBreadthFirst(root));
   }
 
   template<typename Iter>
   auto rBreadthFirstRange(const Iter& root) const noexcept
   {
-    return subrange(rbeginBreadthFirst(root), rendBreadthFirst(root));
+    return std::ranges::subrange(rbeginBreadthFirst(root), rendBreadthFirst(root));
   }
 
   template<typename Iter>
   auto cBreadthFirstRange(const Iter& root) const noexcept
   {
-    return subrange(cbeginBreadthFirst(root), cendBreadthFirst(root));
+    return std::ranges::subrange(cbeginBreadthFirst(root), cendBreadthFirst(root));
   }
 
   template<typename Iter>
   auto crBreadthFirstRange(const Iter& root) const noexcept
   {
-    return subrange(crbeginBreadthFirst(root), crendBreadthFirst(root));
+    return std::ranges::subrange(crbeginBreadthFirst(root), crendBreadthFirst(root));
   }
 
   // root
   auto rootRange() noexcept
   {
-    return subrange(beginRoot(), endRoot());
+    return std::ranges::subrange(beginRoot(), endRoot());
   }
 
   auto rRootRange() noexcept
   {
-    return subrange(rbeginRoot(), rendRoot());
+    return std::ranges::subrange(rbeginRoot(), rendRoot());
   }
 
   auto rootRange() const noexcept
   {
-    return subrange(beginRoot(), endRoot());
+    return std::ranges::subrange(beginRoot(), endRoot());
   }
 
   auto rRootRange() const noexcept
   {
-    return subrange(rbeginRoot(), rendRoot());
+    return std::ranges::subrange(rbeginRoot(), rendRoot());
   }
 
   auto cRootRange() const noexcept
   {
-    return subrange(cbeginRoot(), cendRoot());
+    return std::ranges::subrange(cbeginRoot(), cendRoot());
   }
 
   auto crRootRange() const noexcept
   {
-    return subrange(crbeginRoot(), crendRoot());
+    return std::ranges::subrange(crbeginRoot(), crendRoot());
   }
 
   // child
   template<typename Iter>
   auto childRange(const Iter& parent) noexcept
   {
-    return subrange(beginChild(parent), endChild(parent));
+    return std::ranges::subrange(beginChild(parent), endChild(parent));
   }
 
   template<typename Iter>
   auto rChildRange(const Iter& parent) noexcept
   {
-    return subrange(rbeginChild(parent), rendChild(parent));
+    return std::ranges::subrange(rbeginChild(parent), rendChild(parent));
   }
 
   template<typename Iter>
   auto childRange(const Iter& parent) const noexcept
   {
-    return subrange(beginChild(parent), endChild(parent));
+    return std::ranges::subrange(beginChild(parent), endChild(parent));
   }
 
   template<typename Iter>
   auto rChildRange(const Iter& parent) const noexcept
   {
-    return subrange(rbeginChild(parent), rendChild(parent));
+    return std::ranges::subrange(rbeginChild(parent), rendChild(parent));
   }
 
   template<typename Iter>
   auto cChildRange(const Iter& parent) const noexcept
   {
-    return subrange(cbeginChild(parent), cendChild(parent));
+    return std::ranges::subrange(cbeginChild(parent), cendChild(parent));
   }
 
   template<typename Iter>
   auto crChildRange(const Iter& parent) const noexcept
   {
-    return subrange(crbeginChild(parent), crendChild(parent));
+    return std::ranges::subrange(crbeginChild(parent), crendChild(parent));
   }
 
   // Ancestor
   template<typename Iter>
   auto ancestorRange(const Iter& child) noexcept
   {
-    return subrange(beginAncestor(child), endAncestor(child));
+    return std::ranges::subrange(beginAncestor(child), endAncestor(child));
   }
 
   template<typename Iter>
   auto rAncestorRange(const Iter& child) noexcept
   {
-    return subrange(rbeginAncestor(child), rendAncestor(child));
+    return std::ranges::subrange(rbeginAncestor(child), rendAncestor(child));
   }
 
   template<typename Iter>
   auto ancestorRange(const Iter& child) const noexcept
   {
-    return subrange(beginAncestor(child), endAncestor(child));
+    return std::ranges::subrange(beginAncestor(child), endAncestor(child));
   }
 
   template<typename Iter>
   auto rAncestorRange(const Iter& child) const noexcept
   {
-    return subrange(rbeginAncestor(child), rendAncestor(child));
+    return std::ranges::subrange(rbeginAncestor(child), rendAncestor(child));
   }
 
   template<typename Iter>
   auto cAncestorRange(const Iter& child) const noexcept
   {
-    return subrange(cbeginAncestor(child), cendAncestor(child));
+    return std::ranges::subrange(cbeginAncestor(child), cendAncestor(child));
   }
 
   template<typename Iter>
   auto crAncestorRange(const Iter& child) const noexcept
   {
-    return subrange(crbeginAncestor(child), crendAncestor(child));
+    return std::ranges::subrange(crbeginAncestor(child), crendAncestor(child));
   }
 
   // Leaf
   auto leafRange() noexcept
   {
-    return subrange(beginLeaf(), endLeaf());
+    return std::ranges::subrange(beginLeaf(), endLeaf());
   }
 
   auto rLeafRange() noexcept
   {
-    return subrange(rbeginLeaf(), rendLeaf());
+    return std::ranges::subrange(rbeginLeaf(), rendLeaf());
   }
 
   auto leafRange() const noexcept
   {
-    return subrange(beginLeaf(), endLeaf());
+    return std::ranges::subrange(beginLeaf(), endLeaf());
   }
 
   auto rLeafRange() const noexcept
   {
-    return subrange(rbeginLeaf(), rendLeaf());
+    return std::ranges::subrange(rbeginLeaf(), rendLeaf());
   }
 
   auto cLeafRange() const noexcept
   {
-    return subrange(cbeginLeaf(), cendLeaf());
+    return std::ranges::subrange(cbeginLeaf(), cendLeaf());
   }
 
   auto crLeafRange() const noexcept
   {
-    return subrange(crbeginLeaf(), crendLeaf());
+    return std::ranges::subrange(crbeginLeaf(), crendLeaf());
   }
 
   template<typename Iter>
   auto leafRange(const Iter& root) noexcept
   {
-    return subrange(beginLeaf(root), endLeaf(root));
+    return std::ranges::subrange(beginLeaf(root), endLeaf(root));
   }
 
   template<typename Iter>
   auto rLeafRange(const Iter& root) noexcept
   {
-    return subrange(rbeginLeaf(root), rendLeaf(root));
+    return std::ranges::subrange(rbeginLeaf(root), rendLeaf(root));
   }
 
   template<typename Iter>
   auto leafRange(const Iter& root) const noexcept
   {
-    return subrange(beginLeaf(root), endLeaf(root));
+    return std::ranges::subrange(beginLeaf(root), endLeaf(root));
   }
 
   template<typename Iter>
   auto rLeafRange(const Iter& root) const noexcept
   {
-    return subrange(rbeginLeaf(root), rendLeaf(root));
+    return std::ranges::subrange(rbeginLeaf(root), rendLeaf(root));
   }
 
   template<typename Iter>
   auto cLeafRange(const Iter& root) const noexcept
   {
-    return subrange(cbeginLeaf(root), cendLeaf(root));
+    return std::ranges::subrange(cbeginLeaf(root), cendLeaf(root));
   }
 
   template<typename Iter>
   auto crLeafRange(const Iter& root) const noexcept
   {
-    return subrange(crbeginLeaf(root), crendLeaf(root));
+    return std::ranges::subrange(crbeginLeaf(root), crendLeaf(root));
   }
 
   [[nodiscard]] size_t size() const
