@@ -3,31 +3,19 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
   set(AARCH64 1)
 endif ()
 
-if (BUILD_WITH_CONDA)
+# qt
+include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/PathList.cmake)
+if (NOT INTEL_PATH)
   if (WIN32)
-    set(CONDA_LIB_DIR $ENV{PREFIX}/Library)
+    set(INTEL_PATH "C:\\Program Files (x86)\\Intel\\oneAPI")
   else (WIN32)
-    set(CONDA_LIB_DIR $ENV{PREFIX})
-  endif ()
-  # qt
-  set(QT_HOST_PATH ${CONDA_LIB_DIR})
+    set(INTEL_PATH /opt/intel/oneapi)
+  endif (WIN32)
+endif ()
+message(STATUS "INTEL_PATH: ${INTEL_PATH}")
+if (NOT APPLE)
   # tbb
-  set(TBB_DIR ${CONDA_LIB_DIR}/lib/cmake/TBB)
-else ()
-  # qt
-  include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/PathList.cmake)
-  if (NOT INTEL_PATH)
-    if (WIN32)
-      set(INTEL_PATH "C:\\Program Files (x86)\\Intel\\oneAPI")
-    else (WIN32)
-      set(INTEL_PATH /opt/intel/oneapi)
-    endif (WIN32)
-  endif ()
-  message(STATUS "INTEL_PATH: ${INTEL_PATH}")
-  if (NOT APPLE)
-    # tbb
-    set(TBB_DIR ${INTEL_PATH}/tbb/latest/lib/cmake/tbb)
-  endif ()
+  set(TBB_DIR ${INTEL_PATH}/tbb/latest/lib/cmake/tbb)
 endif ()
 set(QT_HOST_PATH_CMAKE_DIR ${QT_HOST_PATH}/lib/cmake)
 
@@ -38,40 +26,29 @@ if (AARCH64)
   set(MKL_INCLUDE_DIRS)
   set(MKL_LIBRARIES)
 else (AARCH64)
-  if (BUILD_WITH_CONDA)
-    set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${CONDA_LIB_DIR}/include)
-    find_library(MKL_INTEL_LP64 NAMES mkl_intel_lp64 mkl_intel_lp64_dll
-                 PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
-    find_library(MKL_TBB_THREAD NAMES mkl_tbb_thread mkl_sequential_dll
-                 PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
-    find_library(MKL_CORE NAMES mkl_core mkl_core_dll
-                 PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
-    set(MKL_LIBRARIES ${MKL_INTEL_LP64} ${MKL_TBB_THREAD} ${MKL_CORE})
-  else (BUILD_WITH_CONDA)
-    if (WIN32)
-      set(MKL_PATH "${INTEL_PATH}\\mkl\\latest")
-    else (WIN32)
-      set(MKL_PATH ${INTEL_PATH}/mkl/latest)
-    endif (WIN32)
-    set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include)
-    if (WIN32)
-      # todo: fix, mkl_tbb_thread links to static version of msvc runtime so we can not use it now
-      set(MKL_LIBRARIES ${MKL_LIBRARIES}
-          ${MKL_PATH}/lib/mkl_intel_lp64.lib
-          ${MKL_PATH}/lib/mkl_sequential.lib
-          ${MKL_PATH}/lib/mkl_core.lib)
-    elseif (APPLE)
-      set(MKL_LIBRARIES ${MKL_LIBRARIES}
-          ${MKL_PATH}/lib/libmkl_intel_lp64.a
-          ${MKL_PATH}/lib/libmkl_tbb_thread.a
-          ${MKL_PATH}/lib/libmkl_core.a)
-    else ()
-      set(MKL_LIBRARIES ${MKL_LIBRARIES}
-          ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
-          ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
-          ${MKL_PATH}/lib/intel64/libmkl_core.a)
-    endif ()
-  endif (BUILD_WITH_CONDA)
+  if (WIN32)
+    set(MKL_PATH "${INTEL_PATH}\\mkl\\latest")
+  else (WIN32)
+    set(MKL_PATH ${INTEL_PATH}/mkl/latest)
+  endif (WIN32)
+  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include)
+  if (WIN32)
+    # todo: fix, mkl_tbb_thread links to static version of msvc runtime so we can not use it now
+    set(MKL_LIBRARIES ${MKL_LIBRARIES}
+        ${MKL_PATH}/lib/mkl_intel_lp64.lib
+        ${MKL_PATH}/lib/mkl_sequential.lib
+        ${MKL_PATH}/lib/mkl_core.lib)
+  elseif (APPLE)
+    set(MKL_LIBRARIES ${MKL_LIBRARIES}
+        ${MKL_PATH}/lib/libmkl_intel_lp64.a
+        ${MKL_PATH}/lib/libmkl_tbb_thread.a
+        ${MKL_PATH}/lib/libmkl_core.a)
+  else ()
+    set(MKL_LIBRARIES ${MKL_LIBRARIES}
+        ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
+        ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
+        ${MKL_PATH}/lib/intel64/libmkl_core.a)
+  endif ()
 endif (AARCH64)
 message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
 message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
@@ -243,17 +220,11 @@ print_target_properties(Threads::Threads)
 message(STATUS "QT_HOST_PATH: " ${QT_HOST_PATH})
 message(STATUS "QT_VERSION: " ${QT_VERSION})
 set(CMAKE_AUTOMOC ON)
-if (BUILD_WITH_CONDA)
-  find_package(Qt5 ${QT_VERSION} REQUIRED COMPONENTS Core Gui PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
-  print_target_properties(Qt5::Core)
-  print_target_properties(Qt5::Gui)
-  set(_QT_LIBS_ Qt5::Core Qt5::Gui)
-else ()
-  find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Gui PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
-  print_target_properties(Qt6::Core)
-  print_target_properties(Qt6::Gui)
-  set(_QT_LIBS_ Qt6::Core Qt6::Gui)
-endif ()
+
+find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Gui PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
+print_target_properties(Qt6::Core)
+print_target_properties(Qt6::Gui)
+set(_QT_LIBS_ Qt6::Core Qt6::Gui)
 
 find_package(assimp REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)

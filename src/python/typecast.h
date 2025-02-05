@@ -177,7 +177,7 @@ template<> struct type_caster<QPolygonF>
 
   static handle cast(const QPolygonF& v, return_value_policy, handle)
   {
-    return v.empty() ? array().release() : array(dtype::of<double>(), {v.size(), 2}, v.data()).release();
+    return v.empty() ? array().release() : array(dtype::of<double>(), array::ShapeContainer({v.size(), 2}), v.data()).release();
   }
 };
 

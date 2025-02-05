@@ -100,14 +100,14 @@ if (APPLE)
   set(freeimagelibname libfreeimageplus.dylib)
   add_custom_command(TARGET ${module_name}
                      POST_BUILD
-                     COMMAND install_name_tool -change
-                     @rpath/libfreeimageplus.dylib
-                     @loader_path/lib/libfreeimageplus.dylib
-                     $<TARGET_FILE:${module_name}>
                      COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
                      $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-                     COMMAND install_name_tool -id ${freeimagelibname}
-                     $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
+  )
+  set(tbblibname libtbb.12.dylib)
+  add_custom_command(TARGET ${module_name}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:TBB::tbb>
+                     $<TARGET_FILE_DIR:${module_name}>/${tbblibname}
   )
 endif ()
 if (UNIX AND NOT APPLE)
@@ -116,6 +116,12 @@ if (UNIX AND NOT APPLE)
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
                      $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
+  )
+  set(tbblibname libtbb.so.12)
+  add_custom_command(TARGET ${module_name}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:TBB::tbb>
+                     $<TARGET_FILE_DIR:${module_name}>/${tbblibname}
   )
 endif ()
 
@@ -132,9 +138,24 @@ install(TARGETS ${module_name} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
 if (WIN32)
   #  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls.exe DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
   install(FILES ${FREEIMAGE_DLLS} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+  install(FILES $<TARGET_FILE:TBB::tbb> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+  install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+  install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+  install(FILES $<TARGET_FILE:Qt6::DBus> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
 else (WIN32)
   #  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
+  install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
+  if (APPLE)
+    install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib/QtCore.framework/Versions/A)
+    install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib/QtGui.framework/Versions/A)
+    install(FILES $<TARGET_FILE:Qt6::DBus> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib/QtDBus.framework/Versions/A)
+  endif ()
+  if (UNIX AND NOT APPLE)
+    install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
+    install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
+    install(FILES $<TARGET_FILE:Qt6::DBus> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
+  endif ()
   # this fix will not work if other python module loads the lower version of libstdc++.so first, so load zimg first
   if (UNIX AND NOT APPLE)
     file(GLOB gcc_stuff /lib/x86_64-linux-gnu/libstdc++.so* /lib/x86_64-linux-gnu/libgcc_s.so*)

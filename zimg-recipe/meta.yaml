@@ -15,18 +15,10 @@ requirements:
 #    - ninja
 
   host:
-    - qt
-    - mkl-devel >=2023.1
-    - tbb-devel
     - python x.x
-    - numpy >=1.26
 
   run:
     - python
-    - numpy >=1.26
-    - qt
-    - mkl
-    - tbb
 
 test:
 

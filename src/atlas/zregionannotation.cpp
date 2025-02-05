@@ -527,7 +527,7 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
 void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
 {
   m_undoStack.beginMacro("Add Region" );
-  for (auto& region : m_ontology) {
+  for (auto& region : m_ontology ) {
     if (region.id == regionID) {
       if (!region.roi) {
         region.roi = createROI();
