@@ -349,3 +349,48 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_
     logger.info("Building AppDir in '%s'", deploy_dir)
     build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir,
                  is_debug_version=is_debug_version)
+
+
+def linux_deploy_deps_to_lib_dir(binary_name: str, lib_dir: str):
+    blacklist = [
+        'linux-vdso.so.1',
+        'ld-linux-x86-64.so.2',
+        '/lib64/ld-linux-x86-64.so.2'
+    ]
+
+    update_blacklist_cmd = r'wget --quiet https://raw.githubusercontent.com/probonopd/AppImages/master/excludelist' \
+                           r' -O - | sort | uniq | grep -v "^#.*" | grep "[^-\s]"'
+    blacklist += os.popen(update_blacklist_cmd).read().split('\n')
+    logger.info(blacklist)
+    blacklist = [p for p in blacklist if not p.startswith("libstdc++.so") and not p.startswith("libgcc_s.so")]
+    logger.info(blacklist)
+    # exit(0)
+
+    # temporary directory to work in
+    tmp_dir = os.path.join(tempfile.gettempdir(), "linuxdeployqt.py.tmp")
+    if os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir)
+    os.makedirs(tmp_dir)
+
+    logger.info('Executable: ' + binary_name)
+
+    dependencies = {}
+
+    logger.info("Resolving shared object dependencies for '%s'", os.path.basename(binary_name))
+    exedeps = resolve_dependencies(binary_name, blacklist)
+
+    dependencies = merge_dicts(dependencies, exedeps)
+
+    logger.info("To Dir in '%s'", lib_dir)
+    for dep in dependencies:
+        details = dependencies[dep]
+
+        if details['type'] == 'lib':
+            src = details['realpath']
+            if details['so'].startswith('libstdc++.so') or details['so'].startswith('libgcc_s.so') or \
+                    details['so'].startswith('libatomic.so') or \
+                    (not src.startswith('/usr/lib/') and not src.startswith('/lib/')):
+                dst = lib_dir + os.sep + dep
+                logger.debug("Copying library " + dep + ": " + src + ' -> ' + dst)
+                shutil.copyfile(src, dst)  # overrides dest no questions asked
+                strip(dst)

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from common_dirs import *
 from download_atlas_deps import download_atlas_deps
+from linuxdeployqt import linux_deploy_deps_to_lib_dir
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -2827,6 +2828,11 @@ def build_conda_zimg(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
+
+        if is_linux():
+            binary_name = find_src_package_with_glob(os.path.join(build_dir, '*imgpy.*.so'))
+            linux_deploy_deps_to_lib_dir(binary_name, lib_dir=os.path.join(install_dir, 'zimg', 'lib'))
+            
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
