@@ -382,6 +382,9 @@ def linux_deploy_deps_to_lib_dir(binary_name: str, lib_dir: str):
     dependencies = merge_dicts(dependencies, exedeps)
 
     logger.info("To Dir in '%s'", lib_dir)
+    if not os.path.exists(lib_dir):
+        os.makedirs(lib_dir)
+    
     for dep in dependencies:
         details = dependencies[dep]
 

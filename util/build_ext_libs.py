@@ -2832,7 +2832,7 @@ def build_conda_zimg(src_dir: str, install_dir: str):
         if is_linux():
             binary_name = find_src_package_with_glob(os.path.join(build_dir, '*imgpy.*.so'))
             linux_deploy_deps_to_lib_dir(binary_name, lib_dir=os.path.join(install_dir, 'zimg', 'lib'))
-            
+
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
