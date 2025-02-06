@@ -1,13 +1,16 @@
 import sys
 import os
-import numpy as np
 
-os.environ['Resources_DIR'] = os.path.dirname(os.path.abspath(__file__))
-jarsDIR = os.path.join(os.environ['Resources_DIR'], 'jars')
-os.environ['ZIMG_JARS_DIR'] = jarsDIR
+# Get the current directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+os.environ['Resources_DIR'] = current_dir
+os.environ['ZIMG_JARS_DIR'] = os.path.join(current_dir, 'jars')
+
+if sys.platform.startswith('win'):
+    os.environ['PATH'] += f';{os.path.join(current_dir, 'lib')}'
 
 from ._imgpy import *
 
-if sys.version_info[0] < 3 or sys.version_info[1] < 8:
-    sys.stderr.write('Error: need python 3.8 or higher\n')
+if sys.version_info[0] < 3 or sys.version_info[1] < 12:
+    sys.stderr.write('Error: need python 3.12 or higher\n')
     sys.exit(1)
