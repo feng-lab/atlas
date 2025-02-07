@@ -6,9 +6,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 os.environ['Resources_DIR'] = current_dir
 os.environ['ZIMG_JARS_DIR'] = os.path.join(current_dir, 'jars')
 
-if sys.platform.startswith('win'):
-    os.environ['PATH'] += f';{os.path.join(current_dir, 'lib')}'
-
 from ._imgpy import *
 
 if sys.version_info[0] < 3 or sys.version_info[1] < 12:
