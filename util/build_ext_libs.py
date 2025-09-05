@@ -1273,6 +1273,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                         r'find_package(LibUring)' if is_mac() else '',
                         r'find_package(LibUnwind)' if is_mac() else '',
                         r'set(FOLLY_USE_SYMBOLIZER ON)',
+                        r'    system',
                         ],
             to_texts=[r'',
                       r'',
@@ -1297,6 +1298,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                       r'find_package(LIBURING)',
                       r'find_package(LIBUNWIND)',
                       r'set(FOLLY_USE_SYMBOLIZER OFF)',
+                      r'',
                       ],
         ),
         FilePatcher(

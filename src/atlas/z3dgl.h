@@ -1,5 +1,6 @@
 #pragma once
 
+#include "z3dtypes.h"
 #include "zglmutils.h"
 #include "zglobal.h"
 #include "zmesh.h"
@@ -8,20 +9,6 @@
 namespace nim {
 
 using namespace gl;
-
-enum Z3DEye
-{
-  LeftEye = 0,
-  MonoEye = 1,
-  RightEye = 2
-};
-
-enum class Z3DScreenShotType
-{
-  MonoView,
-  HalfSideBySideStereoView,
-  FullSideBySideStereoView
-};
 
 bool GLVersionGE(int majorVersion, int minorVersion);
 

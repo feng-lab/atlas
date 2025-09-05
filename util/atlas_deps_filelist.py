@@ -1,5 +1,26 @@
 files_to_download = [
     {
+        'url': 'https://neutracing.com/static/atlas_deps/hdf5-1.14.6.zip',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/hdf5-1.14.6.zip',
+        'expected_size': 41748699,
+        'expected_sha256': '67c25c5e1196b3c02687722d30cda605f40a1ea64be2affaf98130ea99c7417a',
+        'filename': 'hdf5-1.14.6.zip',
+    },
+    {
+        'url': 'https://neutracing.com/static/atlas_deps/cmake-4.1.1-windows-x86_64.zip',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/cmake-4.1.1-windows-x86_64.zip',
+        'expected_size': 48627947,
+        'expected_sha256': '6f531bd4ba31a7aa0c3511082b544d306df50e7aecfbeef8bdbc1dd770736993',
+        'filename': 'cmake-4.1.1-windows-x86_64.zip',
+    },
+    {
+        'url': 'https://neutracing.com/static/atlas_deps/cmake-4.1.1-linux-x86_64.tar.gz',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/cmake-4.1.1-linux-x86_64.tar.gz',
+        'expected_size': 56395347,
+        'expected_sha256': '5a6c61cb62b38e153148a2c8d4af7b3d387f0c8c32b6dbceb5eb4af113efd65a',
+        'filename': 'cmake-4.1.1-linux-x86_64.tar.gz',
+    },
+    {
         'url': 'https://neutracing.com/static/atlas_deps/qwtpolar-code-r203-trunk.zip',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/qwtpolar-code-r203-trunk.zip',
         'expected_size': 296871,
@@ -12,13 +33,6 @@ files_to_download = [
         'expected_size': 42031398,
         'expected_sha256': '0e0dcb571f7bf7786c111fe066932066d9eab080c9f86d8178da3e564324ee81',
         'filename': 'OpenJDK21U-jre_x64_mac_hotspot_21.0.5_11.tar.gz',
-    },
-    {
-        'url': 'https://neutracing.com/static/atlas_deps/hdf5-1.14.5.zip',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/hdf5-1.14.5.zip',
-        'expected_size': 40346469,
-        'expected_sha256': '35eac0f456117c406e95872d2e5f8341a796e0a8c909e8d254255e752bb02170',
-        'filename': 'hdf5-1.14.5.zip',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/ffmpeg-n7.1-latest-win64-gpl-7.1.zip',
@@ -42,13 +56,6 @@ files_to_download = [
         'filename': 'openjpeg-2.5.3.zip',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/libpng-1.6.44.tar.gz',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/libpng-1.6.44.tar.gz',
-        'expected_size': 1545850,
-        'expected_sha256': '8c25a7792099a0089fa1cc76c94260d0bb3f1ec52b93671b572f8bb61577b732',
-        'filename': 'libpng-1.6.44.tar.gz',
-    },
-    {
         'url': 'https://neutracing.com/static/atlas_deps/OpenJDK21U-jre_x64_linux_hotspot_21.0.5_11.tar.gz',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/OpenJDK21U-jre_x64_linux_hotspot_21.0.5_11.tar.gz',
         'expected_size': 51849867,
@@ -61,13 +68,6 @@ files_to_download = [
         'expected_size': 21097245,
         'expected_sha256': '0878f3313311c2c1b2c818e7c955c0bd828c97b357fa86211b42a5c36d01e36f',
         'filename': 'ffmpeg71arm.zip',
-    },
-    {
-        'url': 'https://neutracing.com/static/atlas_deps/cmake-3.31.2-windows-x86_64.zip',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/cmake-3.31.2-windows-x86_64.zip',
-        'expected_size': 46563542,
-        'expected_sha256': '109c29a744d648863d3637b4963c90088045c8d92799c68c9b9d8713407776c8',
-        'filename': 'cmake-3.31.2-windows-x86_64.zip',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/nasm-2.16.03-macosx.zip',
@@ -112,17 +112,17 @@ files_to_download = [
         'filename': 'ffmpeg71intel.zip',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/openssl-3.4.0.tar.gz',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/openssl-3.4.0.tar.gz',
-        'expected_size': 18320899,
-        'expected_sha256': 'e15dda82fe2fe8139dc2ac21a36d4ca01d5313c75f99f46c4e8a27709b7294bf',
-        'filename': 'openssl-3.4.0.tar.gz',
+        'url': 'https://neutracing.com/static/atlas_deps/libpng-1.6.50.tar.gz',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/libpng-1.6.50.tar.gz',
+        'expected_size': 1570835,
+        'expected_sha256': '708f4398f996325819936d447f982e0db90b6b8212b7507e7672ea232210949a',
+        'filename': 'libpng-1.6.50.tar.gz',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/ninja-mac.zip',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/ninja-mac.zip',
-        'expected_size': 281130,
-        'expected_sha256': '89a287444b5b3e98f88a945afa50ce937b8ffd1dcc59c555ad9b1baf855298c9',
+        'expected_size': 314009,
+        'expected_sha256': 'da7797794153629aca5570ef7c813342d0be214ba84632af886856e8f0063dd9',
         'filename': 'ninja-mac.zip',
     },
     {
@@ -140,13 +140,6 @@ files_to_download = [
         'filename': 'OpenJDK21U-jre_aarch64_mac_hotspot_21.0.5_11.tar.gz',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/cmake-3.31.2-macos-universal.tar.gz',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/cmake-3.31.2-macos-universal.tar.gz',
-        'expected_size': 78334833,
-        'expected_sha256': '9496d48cda44d48e671a99e9f57f46d70592e9ac605d26525176eb0be7028962',
-        'filename': 'cmake-3.31.2-macos-universal.tar.gz',
-    },
-    {
         'url': 'https://neutracing.com/static/atlas_deps/qwtpolar-1.1.1.tar.bz2',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/qwtpolar-1.1.1.tar.bz2',
         'expected_size': 565546,
@@ -154,17 +147,10 @@ files_to_download = [
         'filename': 'qwtpolar-1.1.1.tar.bz2',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/boost_1_87_0.7z',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/boost_1_87_0.7z',
-        'expected_size': 113978335,
-        'expected_sha256': 'db6b7d77a2286ebe79d4aa7252c08b051d271fd8b013b6b18bc7a966552c1139',
-        'filename': 'boost_1_87_0.7z',
-    },
-    {
         'url': 'https://neutracing.com/static/atlas_deps/ninja-win.zip',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/ninja-win.zip',
-        'expected_size': 275425,
-        'expected_sha256': 'f550fec705b6d6ff58f2db3c374c2277a37691678d6aba463adcbb129108467a',
+        'expected_size': 289808,
+        'expected_sha256': '26a40fa8595694dec2fad4911e62d29e10525d2133c9a4230b66397774ae25bf',
         'filename': 'ninja-win.zip',
     },
     {
@@ -182,18 +168,25 @@ files_to_download = [
         'filename': 'gawk-3.1.6-1-bin.zip',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/libwebp-1.4.0.tar.gz',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/libwebp-1.4.0.tar.gz',
-        'expected_size': 3800514,
-        'expected_sha256': '12af50c45530f0a292d39a88d952637e43fb2d4ab1883c44ae729840f7273381',
-        'filename': 'libwebp-1.4.0.tar.gz',
+        'url': 'https://neutracing.com/static/atlas_deps/openssl-3.5.2.tar.gz',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/openssl-3.5.2.tar.gz',
+        'expected_size': 53180161,
+        'expected_sha256': 'c53a47e5e441c930c3928cf7bf6fb00e5d129b630e0aa873b08258656e7345ec',
+        'filename': 'openssl-3.5.2.tar.gz',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/libjpeg-turbo-3.1.0.tar.gz',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/libjpeg-turbo-3.1.0.tar.gz',
-        'expected_size': 2507094,
-        'expected_sha256': '9564c72b1dfd1d6fe6274c5f95a8d989b59854575d4bbee44ade7bc17aa9bc93',
-        'filename': 'libjpeg-turbo-3.1.0.tar.gz',
+        'url': 'https://neutracing.com/static/atlas_deps/boost_1_89_0.7z',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/boost_1_89_0.7z',
+        'expected_size': 123506971,
+        'expected_sha256': 'd8b0c1d593d68fe359616aa2fae4b3e258ca1f90ed57eb46c5494c29cdd1d49d',
+        'filename': 'boost_1_89_0.7z',
+    },
+    {
+        'url': 'https://neutracing.com/static/atlas_deps/cmake-4.1.1-macos-universal.tar.gz',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/cmake-4.1.1-macos-universal.tar.gz',
+        'expected_size': 81096477,
+        'expected_sha256': '3cd1da5341618645bdc85a3b99e273f29c4d48db2f545925a658db992e61f6f9',
+        'filename': 'cmake-4.1.1-macos-universal.tar.gz',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/trust_stores_as_pem.tar.gz',
@@ -224,13 +217,6 @@ files_to_download = [
         'filename': 'qwt-6.1.5.tar.bz2',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/cmake-3.31.2-linux-x86_64.tar.gz',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/cmake-3.31.2-linux-x86_64.tar.gz',
-        'expected_size': 54991715,
-        'expected_sha256': 'fd76a2201de23a5cb392f2d2abe3a0aa40d4870c39fd92ed52c896daf55e4aa1',
-        'filename': 'cmake-3.31.2-linux-x86_64.tar.gz',
-    },
-    {
         'url': 'https://neutracing.com/static/atlas_deps/nasm-2.16.03-win64.zip',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/nasm-2.16.03-win64.zip',
         'expected_size': 513543,
@@ -240,8 +226,8 @@ files_to_download = [
     {
         'url': 'https://neutracing.com/static/atlas_deps/ninja-linux.zip',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/ninja-linux.zip',
-        'expected_size': 123084,
-        'expected_sha256': '6f98805688d19672bd699fbbfa2c2cf0fc054ac3df1f0e6a47664d963d530255',
+        'expected_size': 134048,
+        'expected_sha256': '0830252db77884957a1a4b87b05a1e2d9b5f658b8367f82999a941884cbe0238',
         'filename': 'ninja-linux.zip',
     },
     {
@@ -250,6 +236,13 @@ files_to_download = [
         'expected_size': 9778734,
         'expected_sha256': '40d6bcfdefd2b5ae1a57380510e166a18fce8883d42263f0952befbe6dd3f0e9',
         'filename': 'libqxt-libqxt-696423b68972.zip',
+    },
+    {
+        'url': 'https://neutracing.com/static/atlas_deps/libjpeg-turbo-3.1.2.tar.gz',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/libjpeg-turbo-3.1.2.tar.gz',
+        'expected_size': 2512033,
+        'expected_sha256': '8f0012234b464ce50890c490f18194f913a7b1f4e6a03d6644179fa0f867d0cf',
+        'filename': 'libjpeg-turbo-3.1.2.tar.gz',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-linux-x86_64-1.3.296.0.tar.xz',
@@ -264,6 +257,13 @@ files_to_download = [
         'expected_size': 112829816,
         'expected_sha256': 'b14d55d25d78e307d19bb46cb93278d76745bdc1e814727a6e0511615ab763ab',
         'filename': 'ffmpeg-n7.1-latest-linux64-gpl-7.1.tar.xz',
+    },
+    {
+        'url': 'https://neutracing.com/static/atlas_deps/libwebp-1.6.0.tar.gz',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/libwebp-1.6.0.tar.gz',
+        'expected_size': 3833512,
+        'expected_sha256': '93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136',
+        'filename': 'libwebp-1.6.0.tar.gz',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/strawberry-perl-5.32.1.1-64bit.msi',

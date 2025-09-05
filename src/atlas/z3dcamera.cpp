@@ -5,10 +5,20 @@
 
 namespace nim {
 
-Z3DCamera::Z3DCamera()
+Z3DCamera::Z3DCamera(Z3DCoordinateSystem coordinateSystem)
+    : m_coordinateSystem(coordinateSystem)
 {
   updateCamera();
   updateFrustum();
+}
+
+void Z3DCamera::setCoordinateSystem(Z3DCoordinateSystem system)
+{
+  if (m_coordinateSystem != system) {
+    m_coordinateSystem = system;
+    // Recalculate projection matrices for the new coordinate system
+    makeProjectionMatrices();
+  }
 }
 
 void Z3DCamera::setCamera(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& upVector)
@@ -380,6 +390,17 @@ void Z3DCamera::makeProjectionMatrices()
 {
   if (m_projectionType == ProjectionType::Orthographic) {
     glm::mat4 pmat = glm::ortho(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
+    
+    // For Vulkan, adjust the depth range from [0,1] instead of [-1,1]
+    if (m_coordinateSystem == Z3DCoordinateSystem::Vulkan) {
+      // Adjust for Vulkan's coordinate system (Y is inverted and depth range is [0,1])
+      pmat[1][1] *= -1;  // Flip Y axis
+      
+      // Transform Z from [-1,1] to [0,1]
+      pmat[2][2] = pmat[2][2] * 0.5f;
+      pmat[3][2] = pmat[3][2] + 0.5f * pmat[2][3];
+    }
+    
     m_projectionMatrices[LeftEye] = pmat;
     m_projectionMatrices[MonoEye] = pmat;
     m_projectionMatrices[RightEye] = pmat;
@@ -388,13 +409,32 @@ void Z3DCamera::makeProjectionMatrices()
     m_inverseProjectionMatrices[MonoEye] = pmat;
     m_inverseProjectionMatrices[RightEye] = pmat;
   } else {
+    // Create perspective projection matrices
+    auto createFrustum = [this](float left, float right, float bottom, float top, float near, float far) -> glm::mat4 {
+      glm::mat4 mat = glm::frustum(left, right, bottom, top, near, far);
+      
+      // For Vulkan, adjust the Y axis and depth range
+      if (m_coordinateSystem == Z3DCoordinateSystem::Vulkan) {
+        // Flip Y axis
+        mat[1][1] *= -1;
+        
+        // Transform Z from [-1,1] to [0,1]
+        mat[2][2] = mat[2][2] * 0.5f;
+        mat[3][2] = mat[3][2] + 0.5f * mat[2][3];
+      }
+      
+      return mat;
+    };
+    
     // VLOG(1) << fmt::format("{}, {}, {}, {}", m_left, m_right, m_bottom, m_top);
-    m_projectionMatrices[MonoEye] = glm::frustum(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
+    m_projectionMatrices[MonoEye] = createFrustum(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
+    
     float frustumShift = 0.5f * m_eyeSeparation * m_nearDist / m_focusDistance;
-    m_projectionMatrices[LeftEye] =
-      glm::frustum(m_left + frustumShift, m_right + frustumShift, m_bottom, m_top, m_nearDist, m_farDist);
-    m_projectionMatrices[RightEye] =
-      glm::frustum(m_left - frustumShift, m_right - frustumShift, m_bottom, m_top, m_nearDist, m_farDist);
+    m_projectionMatrices[LeftEye] = 
+      createFrustum(m_left + frustumShift, m_right + frustumShift, m_bottom, m_top, m_nearDist, m_farDist);
+      
+    m_projectionMatrices[RightEye] = 
+      createFrustum(m_left - frustumShift, m_right - frustumShift, m_bottom, m_top, m_nearDist, m_farDist);
 
     m_inverseProjectionMatrices[LeftEye] = glm::inverse(m_projectionMatrices[LeftEye]);
     m_inverseProjectionMatrices[MonoEye] = glm::inverse(m_projectionMatrices[MonoEye]);

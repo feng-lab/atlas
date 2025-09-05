@@ -1,6 +1,6 @@
 #pragma once
 
-#include "z3dgl.h"
+#include "z3dtypes.h"
 #include "zflags.h"
 #include "zglmutils.h"
 #include "zbbox.h"
@@ -34,7 +34,13 @@ public:
     PreserveViewVector = 1 << 1
   };
 
-  Z3DCamera();
+  Z3DCamera(Z3DCoordinateSystem coordinateSystem = Z3DCoordinateSystem::OpenGL);
+
+  // Set the coordinate system to use (OpenGL or Vulkan)
+  void setCoordinateSystem(Z3DCoordinateSystem system);
+  
+  // Get the current coordinate system
+  Z3DCoordinateSystem getCoordinateSystem() const { return m_coordinateSystem; }
 
   [[nodiscard]] const glm::vec3& eye() const
   {
@@ -399,6 +405,9 @@ private:
   glm::mat4 m_inverseProjectionMatrices[3];
   glm::mat3 m_normalMatrices[3];
   glm::mat4 m_projectionViewMatrices[3];
+
+  // Add the coordinate system member
+  Z3DCoordinateSystem m_coordinateSystem;
 };
 
 DECLARE_OPERATORS_FOR_ENUM(Z3DCamera::ResetOption)

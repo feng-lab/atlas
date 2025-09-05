@@ -418,6 +418,14 @@ set(SOURCES
     zprocess.cpp zprocess.h
     zvulkan.cpp
     zvulkan.h
+    z3dtypes.h
+    zvulkanshaderstate.h
+    zvulkanlinerenderer.h
+    zvulkanlinerenderer.cpp
+    zvulkanrenderer.h
+    zvulkanrenderer.cpp
+    zvulkanrendererbase.h
+    zvulkanrendererbase.cpp
 )
 
 # our target
