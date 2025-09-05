@@ -190,7 +190,7 @@ print_target_properties(Ceres::ceres)
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.86.0 REQUIRED
              COMPONENTS
-             headers context filesystem program_options regex system thread charconv
+             headers context filesystem program_options regex thread charconv
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
 )
 print_target_properties(Boost::headers)

@@ -366,8 +366,9 @@ void ZImgIO::readInfos(const QStringList& fileList,
       std::tuple<std::vector<ZImgInfo>, std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>>>>
       tasks;
     for (int i = 1; i < fileList.size(); ++i) {
-      tasks.push_back(readOneFileInfoAsync(fileList[i], catDim, catScenes, res, subBlocks, format, expandXY)
-                        .scheduleOn(folly::getGlobalCPUExecutor()));
+      tasks.push_back(folly::coro::co_withExecutor(
+        folly::getGlobalCPUExecutor(),
+        readOneFileInfoAsync(fileList[i], catDim, catScenes, res, subBlocks, format, expandXY)));
     }
 
     auto infoTuple = folly::coro::blockingWait(folly::coro::collectAllRange(std::move(tasks)));

@@ -919,8 +919,9 @@ Z3DImg::readImageBlocksToBufferAsync(size_t c,
     blockTasks.reserve(numberOfTasks);
     size_t finalTaskIdx = taskIdx + numberOfTasks;
     for (; taskIdx < finalTaskIdx; ++taskIdx) {
-      blockTasks.push_back(readImageBlockToBufferAsync(c, pendingTasks, taskIdx, resInfo, buffer)
-                             .scheduleOn(folly::getGlobalCPUExecutor()));
+      blockTasks.push_back(
+        folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(),
+                                     readImageBlockToBufferAsync(c, pendingTasks, taskIdx, resInfo, buffer)));
     }
     co_await folly::coro::collectAllRange(std::move(blockTasks));
     processEventsAndMaybeCancel(cancellationToken);
@@ -972,7 +973,8 @@ Z3DImg::readImageBlocksToQueueAsync(size_t c,
   for (size_t taskIdx = 0; taskIdx < pendingTasks.size(); ++taskIdx) {
     maybeCancel(cancellationToken);
     blockTasks.push_back(
-      readImageBlockToQueueAsync(c, pendingTasks, taskIdx, resInfo, queue).scheduleOn(folly::getGlobalCPUExecutor()));
+      folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(),
+                                   readImageBlockToQueueAsync(c, pendingTasks, taskIdx, resInfo, queue)));
   }
   co_await folly::coro::collectAllRange(std::move(blockTasks));
 

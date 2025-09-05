@@ -420,8 +420,8 @@ set(SOURCES
     zvulkan.h
     z3dtypes.h
     zvulkanshaderstate.h
-    zvulkanlinerenderer.h
-    zvulkanlinerenderer.cpp
+#    zvulkanlinerenderer.h
+#    zvulkanlinerenderer.cpp
     zvulkanrenderer.h
     zvulkanrenderer.cpp
     zvulkanrendererbase.h

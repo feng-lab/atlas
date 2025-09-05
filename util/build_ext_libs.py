@@ -1246,10 +1246,14 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     patches = [
         FilePatcher(
             orig_file=os.path.join(src_dir, 'CMake', 'folly-config.cmake.in'),
-            from_texts=[r'find_dependency(fmt)'],
+            from_texts=[r'find_dependency(fmt)',
+                        r'    system',
+                        ],
             to_texts=['find_dependency(fmt)\n'
                       'find_dependency(gflags CONFIG)\n'
-                      'find_dependency(glog CONFIG)'],
+                      'find_dependency(glog CONFIG)',
+                      r'',
+                      ],
         ),
         FilePatcher(
             orig_file=os.path.join(src_dir, 'CMake', 'folly-deps.cmake'),
@@ -2166,13 +2170,6 @@ def build_vtk(src_dir: str, install_dir: str):
                       ],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'CMake', 'vtkCompilerChecks.cmake'),
-            from_texts=[r'set(CMAKE_CXX_STANDARD 11)',
-                        ],
-            to_texts=[f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
-                      ],
-        ),
-        FilePatcher(
             orig_file=os.path.join(src_dir, 'ThirdParty', 'libproj', 'vtklibproj', 'CMakeLists.txt'),
             from_texts=[r'set(CMAKE_CXX_STANDARD 11)',
                         r'-Werror -Wall',
@@ -2572,6 +2569,7 @@ def build_jansson(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DJANSSON_STATIC_CRT:BOOL=OFF',
                          '-DJANSSON_EXAMPLES:BOOL=OFF',
+                         '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
                          ])
 
         cmakecmd.extend([src_dir])
@@ -2637,10 +2635,12 @@ def build_mvfst(src_dir: str, install_dir: str):
                 r'list(APPEND GFLAG_DEPENDENCIES gflags)',
                 r'iostreams',
                 r'date_time',
+                r'  system',
             ],
             to_texts=[
                 'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
                 'add_library(gflags::gflags ALIAS gflags)',
+                r'',
                 r'',
                 r'',
             ],
@@ -2651,7 +2651,7 @@ def build_mvfst(src_dir: str, install_dir: str):
                 r'find_dependency(Boost COMPONENTS iostreams system thread filesystem regex context)',
             ],
             to_texts=[
-                r'find_dependency(Boost COMPONENTS system thread filesystem regex context)',
+                r'find_dependency(Boost COMPONENTS thread filesystem regex context)',
             ],
         ),
     ]
@@ -2712,12 +2712,14 @@ def build_proxygen(src_dir: str, install_dir: str):
                 r'-Wextra',
                 r'iostreams',
                 r'chrono',
+                r'    system',
             ],
             to_texts=[
                 'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
                 'add_library(gflags::gflags ALIAS gflags)',
                 r'find_program(PROXYGEN_PYTHON python)' if is_windows() else r'find_program(PROXYGEN_PYTHON python3)',
                 r'' if is_windows() else r'-Wextra',
+                r'',
                 r'',
                 r'',
             ],
@@ -2729,11 +2731,9 @@ def build_proxygen(src_dir: str, install_dir: str):
         ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
                 r'Boost::boost',
                 r'Boost::iostreams',
-                r'-lz',
             ],
             to_texts=[
                 "${PROXYGEN_FBCODE_ROOT}\n${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http\n${PROXYGEN_GPERF}",
-                r'',
                 r'',
                 r'',
             ],

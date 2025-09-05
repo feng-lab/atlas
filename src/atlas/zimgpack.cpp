@@ -940,8 +940,9 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
   std::vector<folly::coro::TaskWithExecutor<void>> tileTasks;
   tileTasks.reserve(queryResult.size());
   for (auto tileIndex : queryResult) {
-    tileTasks.push_back(readTileToImgAsync(tileIndex, res.get(), xyRatio, zRatio, sx, sy, sz, sc, readRatio)
-                          .scheduleOn(folly::getGlobalCPUExecutor()));
+    tileTasks.push_back(folly::coro::co_withExecutor(
+      folly::getGlobalCPUExecutor(),
+      readTileToImgAsync(tileIndex, res.get(), xyRatio, zRatio, sx, sy, sz, sc, readRatio)));
   }
   co_await folly::coro::collectAllRange(std::move(tileTasks));
 

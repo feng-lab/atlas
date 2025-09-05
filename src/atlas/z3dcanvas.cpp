@@ -122,7 +122,7 @@ void Z3DCanvas::renderingFinished()
     // CHECK(localBuffer);
     auto pixmap = QPixmap::fromImage(
       QImage(localBuffer->data.data(), localBuffer->width, localBuffer->height, QImage::Format_ARGB32_Premultiplied)
-        .mirrored());
+        .flipped(Qt::Vertical));
     pixmap.setDevicePixelRatio(devicePixelRatio());
     m_pixmapItem->setPixmap(pixmap);
 

@@ -621,7 +621,8 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
       }
 
       // ZBenchTimer bt;
-      auto codec = folly::io::getCodec(folly::io::CodecType::ZLIB, folly::io::COMPRESSION_LEVEL_DEFAULT);
+      auto codec = folly::compression::getCodec(folly::compression::CodecType::ZLIB,
+                                                folly::compression::COMPRESSION_LEVEL_DEFAULT);
       // STOP_AND_LOG(bt);
       res = std::make_shared<ZImg>(m_chunkImgInfo);
       if (m_mmf) {
