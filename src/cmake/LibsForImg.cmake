@@ -188,9 +188,9 @@ find_package(Ceres REQUIRED
 print_target_properties(Ceres::ceres)
 
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.86.0 REQUIRED
+find_package(Boost 1.89.0 REQUIRED
              COMPONENTS
-             headers context filesystem program_options regex thread charconv
+             headers context filesystem program_options thread charconv
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
 )
 print_target_properties(Boost::headers)
@@ -208,8 +208,6 @@ find_package(folly REQUIRED
 print_target_properties(Boost::context)
 print_target_properties(Boost::filesystem)
 print_target_properties(Boost::program_options)
-print_target_properties(Boost::regex)
-print_target_properties(Boost::system)
 print_target_properties(Boost::thread)
 print_target_properties(Boost::charconv)
 print_target_properties(Folly::folly)

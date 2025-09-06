@@ -590,9 +590,7 @@ def build_boost(src_dir: str, install_dir: str):
                             '--with-context',
                             '--with-filesystem',
                             '--with-program_options',
-                            '--with-regex',
                             '--with-thread',
-                            '--with-system',
                             '--with-charconv',
                             'address-model=64',
                             'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
@@ -605,7 +603,7 @@ def build_boost(src_dir: str, install_dir: str):
                 cbf = get_common_build_flags(with_optimization=True)
                 env = get_env_for_config_make()
                 subprocess.run(['./bootstrap.sh',
-                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,charconv',
+                                '--with-libraries=headers,context,filesystem,program_options,thread,charconv',
                                 '--without-icu',
                                 '--prefix=' + install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -628,7 +626,7 @@ def build_boost(src_dir: str, install_dir: str):
                 cbf = get_common_build_flags(with_optimization=True, arm64_only=True)
                 env = get_env_for_config_make(arm64_only=True)
                 subprocess.run(['./bootstrap.sh',
-                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,charconv',
+                                '--with-libraries=headers,context,filesystem,program_options,thread,charconv',
                                 '--without-icu',
                                 '--prefix=' + arm64_install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -651,7 +649,7 @@ def build_boost(src_dir: str, install_dir: str):
             env = get_env_for_config_make()
             subprocess.run(['./bootstrap.sh',
                             '--with-toolset=clang' if use_clang_in_linux() else '',
-                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,charconv',
+                            '--with-libraries=headers,context,filesystem,program_options,thread,charconv',
                             '--without-icu',
                             '--prefix=' + install_dir],
                            cwd=src_dir, shell=False, check=True, env=env)
@@ -1247,11 +1245,13 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         FilePatcher(
             orig_file=os.path.join(src_dir, 'CMake', 'folly-config.cmake.in'),
             from_texts=[r'find_dependency(fmt)',
+                        r'    regex',
                         r'    system',
                         ],
             to_texts=['find_dependency(fmt)\n'
                       'find_dependency(gflags CONFIG)\n'
                       'find_dependency(glog CONFIG)',
+                      r'',
                       r'',
                       ],
         ),
@@ -1277,6 +1277,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                         r'find_package(LibUring)' if is_mac() else '',
                         r'find_package(LibUnwind)' if is_mac() else '',
                         r'set(FOLLY_USE_SYMBOLIZER ON)',
+                        r'    regex',
                         r'    system',
                         ],
             to_texts=[r'',
@@ -1302,6 +1303,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                       r'find_package(LIBURING)',
                       r'find_package(LIBUNWIND)',
                       r'set(FOLLY_USE_SYMBOLIZER OFF)',
+                      r'',
                       r'',
                       ],
         ),
@@ -2447,10 +2449,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             if is_mac():
                 patch_file(orig_file_2,
                            from_texts=[r';\$<LINK_ONLY:tbb>',
-                                       r';\$<LINK_ONLY:ittnotify>"',
+                                       r';\$<LINK_ONLY:ipphal>',
                                        ],
                            to_texts=[r'',
-                                     r';\$<LINK_ONLY:ittnotify>;${OpenCV_INSTALL_PATH}/lib/opencv4/3rdparty/libtegra_hal.a"',
+                                     r';\$<LINK_ONLY:ipphal>;${OpenCV_INSTALL_PATH}/lib/opencv4/3rdparty/libtegra_hal.a',
                                      ])
             else:
                 patch_file(orig_file_2,
@@ -2633,13 +2635,15 @@ def build_mvfst(src_dir: str, install_dir: str):
             orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
             from_texts=[
                 r'list(APPEND GFLAG_DEPENDENCIES gflags)',
-                r'iostreams',
-                r'date_time',
+                r'  iostreams',
+                r'  date_time',
                 r'  system',
+                r'  regex',
             ],
             to_texts=[
                 'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
                 'add_library(gflags::gflags ALIAS gflags)',
+                r'',
                 r'',
                 r'',
                 r'',
@@ -2651,7 +2655,7 @@ def build_mvfst(src_dir: str, install_dir: str):
                 r'find_dependency(Boost COMPONENTS iostreams system thread filesystem regex context)',
             ],
             to_texts=[
-                r'find_dependency(Boost COMPONENTS thread filesystem regex context)',
+                r'find_dependency(Boost COMPONENTS thread filesystem context)',
             ],
         ),
     ]
@@ -2710,8 +2714,9 @@ def build_proxygen(src_dir: str, install_dir: str):
                 r'list(APPEND GFLAG_DEPENDENCIES gflags)',
                 r'find_program(PROXYGEN_PYTHON python3)',
                 r'-Wextra',
-                r'iostreams',
-                r'chrono',
+                r'    iostreams',
+                r'    chrono',
+                r'    regex',
                 r'    system',
             ],
             to_texts=[
@@ -2719,6 +2724,7 @@ def build_proxygen(src_dir: str, install_dir: str):
                 'add_library(gflags::gflags ALIAS gflags)',
                 r'find_program(PROXYGEN_PYTHON python)' if is_windows() else r'find_program(PROXYGEN_PYTHON python3)',
                 r'' if is_windows() else r'-Wextra',
+                r'',
                 r'',
                 r'',
                 r'',
