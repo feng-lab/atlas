@@ -217,3 +217,6 @@ src/neurolabi/python/QMakeParser.pyc
 /.vscode
 /atlas_deps/
 /atlas_test_data/
+
+# Vulkan compiled SPIR-V outputs (built by CMake)
+src/atlas/Resources/shader/vulkan/spv/
