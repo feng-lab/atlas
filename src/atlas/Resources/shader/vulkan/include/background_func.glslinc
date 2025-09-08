@@ -1,0 +1,34 @@
+// Specialization constants for mode selection
+layout(constant_id = 30) const bool MODE_UNIFORM              = true;
+layout(constant_id = 31) const bool MODE_GRADIENT_L2R         = false;
+layout(constant_id = 32) const bool MODE_GRADIENT_R2L         = false;
+layout(constant_id = 33) const bool MODE_GRADIENT_T2B         = false;
+layout(constant_id = 34) const bool MODE_GRADIENT_B2T         = false;
+
+// Small push constant block for parameters
+layout(push_constant) uniform BackgroundPC {
+  vec2  screen_dim_RCP;
+  vec2  _pad0;
+  vec4  color1;
+  vec4  color2;
+  vec4  region; // {x0, xScale, y0, yScale}
+} bg;
+
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  if (MODE_UNIFORM) {
+    fragColor = bg.color1;
+  } else if (MODE_GRADIENT_L2R) {
+    fragColor = mix(bg.color1, bg.color2, bg.region.x + gl_FragCoord.x * bg.screen_dim_RCP.x * bg.region.y);
+  } else if (MODE_GRADIENT_R2L) {
+    fragColor = mix(bg.color2, bg.color1, bg.region.x + gl_FragCoord.x * bg.screen_dim_RCP.x * bg.region.y);
+  } else if (MODE_GRADIENT_T2B) {
+    fragColor = mix(bg.color2, bg.color1, bg.region.z + gl_FragCoord.y * bg.screen_dim_RCP.y * bg.region.w);
+  } else if (MODE_GRADIENT_B2T) {
+    fragColor = mix(bg.color1, bg.color2, bg.region.z + gl_FragCoord.y * bg.screen_dim_RCP.y * bg.region.w);
+  } else {
+    fragColor = vec4(0,0,0,1);
+  }
+
+  fragDepth = gl_FragCoord.z;
+}

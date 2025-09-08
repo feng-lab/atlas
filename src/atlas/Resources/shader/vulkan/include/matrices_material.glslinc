@@ -1,0 +1,19 @@
+// Shared transform and material UBOs for mesh-like pipelines
+layout(set = 2, binding = 0) uniform Transforms {
+  mat4 projection_view_matrix;
+  mat4 view_matrix;
+  mat4 pos_transform;
+  mat3 pos_transform_normal_matrix;
+} xf;
+
+layout(set = 2, binding = 1) uniform MaterialUBO {
+  vec4 scene_ambient;
+  vec4 material_ambient;
+  vec4 material_specular;
+  float material_shininess;
+  float alpha;
+  int   use_custom_color;
+  float _pad0;
+  vec4  custom_color;
+} matu;
+

@@ -1,0 +1,41 @@
+#include "lighting.glslinc"
+
+// Specialization constants for mesh sources
+layout(constant_id = 40) const bool USE_MESH_COLOR     = true;
+layout(constant_id = 41) const bool USE_MESH_1DTEXTURE = false;
+layout(constant_id = 42) const bool USE_MESH_2DTEXTURE = false;
+layout(constant_id = 43) const bool USE_MESH_3DTEXTURE = false;
+
+// Descriptor set for textures (mutually exclusive usage per pipeline)
+layout(set = 0, binding = 0) uniform sampler1D tex1D;
+layout(set = 0, binding = 1) uniform sampler2D tex2D;
+layout(set = 0, binding = 2) uniform sampler3D tex3D;
+
+// Shared UBOs for transforms and material
+#include "matrices_material.glslinc"
+
+// Varyings from vertex
+layout(location = 0) in vec4 v_color;      // when USE_MESH_COLOR
+layout(location = 1) in float v_tc1d;      // when USE_MESH_1DTEXTURE
+layout(location = 2) in vec2  v_tc2d;      // when USE_MESH_2DTEXTURE
+layout(location = 3) in vec3  v_tc3d;      // when USE_MESH_3DTEXTURE
+layout(location = 4) in vec3  v_normal;
+layout(location = 5) in vec3  v_point;
+
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  vec4 color;
+  if (matu.use_custom_color != 0) {
+    color = matu.custom_color;
+  } else {
+    if (USE_MESH_COLOR)      color = v_color;
+    else if (USE_MESH_2DTEXTURE) color = texture(tex2D, v_tc2d);
+    else if (USE_MESH_3DTEXTURE) color = texture(tex3D, v_tc3d);
+    else if (USE_MESH_1DTEXTURE) color = texture(tex1D, v_tc1d);
+    else color = vec4(1.0);
+  }
+
+  fragDepth = gl_FragCoord.z;
+  fragColor = apply_lighting_and_fog(matu.scene_ambient, matu.material_shininess, matu.material_ambient, matu.material_specular,
+                                     v_normal, v_point, color, matu.alpha);
+}

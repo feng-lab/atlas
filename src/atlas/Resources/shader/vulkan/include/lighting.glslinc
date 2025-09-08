@@ -1,0 +1,109 @@
+// Fog toggles as specialization constants
+layout(constant_id = 20) const bool USE_LINEAR_FOG = false;
+layout(constant_id = 21) const bool USE_EXPONENTIAL_FOG = false;
+layout(constant_id = 22) const bool USE_SQUARED_EXPONENTIAL_FOG = false;
+
+// Fixed upper bound for lights; actual count provided via uLighting.numLights
+const int MAX_LIGHTS = 16;
+
+// Define light struct at global scope (cannot nest a struct inside a UBO)
+struct LightSource {
+  vec4 position;
+  vec4 ambient;
+  vec4 diffuse;
+  vec4 specular;
+  vec3 attenuation; float _padL0;
+  float spotCutoff; float spotExponent; vec2 _padL1;
+  vec3 spotDirection; float _padL2;
+};
+
+// Lighting parameters in a single UBO (std140 layout)
+layout(std140, set = 1, binding = 0) uniform LightingUBO {
+  int  lighting_enabled;   // bool as int
+  int  numLights;
+  vec2 _pad0;
+
+  // Fog
+  vec3 fog_color_top;      float fog_end;
+  vec3 fog_color_bottom;   float fog_scale;
+  float fog_density_log2e; float fog_density_density_log2e;
+  vec2  screen_dim_RCP;    vec2  _pad1;
+
+  // Lights
+  LightSource lights[MAX_LIGHTS];
+} uLighting;
+
+vec4 computeColorFromLight(const in vec3 normalDirection, const in int lightIdx, const in vec3 position,
+                           const in float materialShininess, const in vec4 materialAmbient, const in vec4 materialSpecular,
+                           const in vec4 color)
+{
+  vec3 lightDirection;
+  float attenuation;
+  vec4 lpos = uLighting.lights[lightIdx].position;
+  if (lpos.w == 0.0) { // directional light
+    attenuation = 1.0;
+    lightDirection = normalize(lpos.xyz);
+  } else {             // point/spot light
+    vec3 positionToLightSource = lpos.xyz - position;
+    float distance = length(positionToLightSource);
+    lightDirection = normalize(positionToLightSource);
+    vec3 att = uLighting.lights[lightIdx].attenuation;
+    attenuation = 1.0 / (att.x + att.y * distance + att.z * distance * distance);
+
+    float spotCutoff = uLighting.lights[lightIdx].spotCutoff;
+    if (spotCutoff <= 90.0) {
+      float clampedCosine = max(0.0, dot(-lightDirection, normalize(uLighting.lights[lightIdx].spotDirection)));
+      if (clampedCosine < cos(radians(spotCutoff))) {
+        attenuation = 0.0;
+      } else {
+        attenuation *= pow(clampedCosine, uLighting.lights[lightIdx].spotExponent);
+      }
+    }
+  }
+
+  vec4 retVal = vec4(0.0);
+  retVal += uLighting.lights[lightIdx].ambient * materialAmbient;
+  float NdotL = dot(normalDirection, lightDirection);
+  if (NdotL > 0.0) {
+    retVal += attenuation * uLighting.lights[lightIdx].diffuse * NdotL * color;
+    vec3 cameraDirection = normalize(-position);
+    float NdotH = max(dot(reflect(-lightDirection, normalDirection), cameraDirection), 0.0);
+    retVal += attenuation * uLighting.lights[lightIdx].specular * materialSpecular * pow(NdotH, materialShininess);
+  }
+  return retVal;
+}
+
+vec4 apply_lighting_and_fog(const in vec4 sceneAmbient,
+                            const in float materialShininess, const in vec4 materialAmbient, const in vec4 materialSpecular,
+                            const in vec3 normalDirection, const in vec3 position, const in vec4 color, const in float alpha)
+{
+  if ((uLighting.lighting_enabled != 0) && (uLighting.numLights > 0)) {
+    vec4 finalColor = sceneAmbient * materialAmbient;
+    int count = min(uLighting.numLights, MAX_LIGHTS);
+    for (int i = 0; i < count; ++i) {
+      finalColor += computeColorFromLight(normalDirection, i, position,
+                                          materialShininess, materialAmbient, materialSpecular, color);
+    }
+
+    // Fog
+    if (USE_LINEAR_FOG) {
+      float fog = clamp((uLighting.fog_end + position.z) * uLighting.fog_scale, 0.0, 1.0);
+      vec3 fogColor = mix(uLighting.fog_color_bottom, uLighting.fog_color_top, gl_FragCoord.y * uLighting.screen_dim_RCP.y);
+      finalColor.rgb = mix(fogColor, finalColor.rgb, fog);
+    }
+    if (USE_EXPONENTIAL_FOG) {
+      float fog = clamp(exp2(position.z * uLighting.fog_density_log2e), 0.0, 1.0);
+      vec3 fogColor = mix(uLighting.fog_color_bottom, uLighting.fog_color_top, gl_FragCoord.y * uLighting.screen_dim_RCP.y);
+      finalColor.rgb = mix(fogColor, finalColor.rgb, fog);
+    }
+    if (USE_SQUARED_EXPONENTIAL_FOG) {
+      float fog = clamp(exp2(-position.z * position.z * uLighting.fog_density_density_log2e), 0.0, 1.0);
+      vec3 fogColor = mix(uLighting.fog_color_bottom, uLighting.fog_color_top, gl_FragCoord.y * uLighting.screen_dim_RCP.y);
+      finalColor.rgb = mix(fogColor, finalColor.rgb, fog);
+    }
+
+    return vec4(finalColor.rgb * color.a * alpha, color.a * alpha);
+  } else {
+    return color;
+  }
+}

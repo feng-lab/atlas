@@ -109,6 +109,51 @@ endif ()
 
 message(STATUS "ENV{VULKAN_SDK}: $ENV{VULKAN_SDK}")
 find_package(Vulkan REQUIRED COMPONENTS glslc glslangValidator)
+print_target_properties(Vulkan::glslc)
+
+# Vulkan shader offline build (SPIR-V)
+set(ATLAS_VULKAN_SHADER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Resources/shader/vulkan)
+set(ATLAS_VULKAN_SHADER_OUT ${ATLAS_VULKAN_SHADER_DIR}/spv)
+
+file(GLOB ATLAS_VK_SHADERS
+        RELATIVE ${ATLAS_VULKAN_SHADER_DIR}
+        ${ATLAS_VULKAN_SHADER_DIR}/*.vert
+        ${ATLAS_VULKAN_SHADER_DIR}/*.frag
+        ${ATLAS_VULKAN_SHADER_DIR}/*.geom)
+
+set(_GLSLC_EXE "")
+if (TARGET Vulkan::glslc)
+  get_target_property(_GLSLC_EXE Vulkan::glslc IMPORTED_LOCATION)
+endif ()
+if (NOT _GLSLC_EXE)
+  if (DEFINED Vulkan_GLSLC_EXECUTABLE)
+    set(_GLSLC_EXE ${Vulkan_GLSLC_EXECUTABLE})
+  elseif (DEFINED VULKAN_GLSLC_EXECUTABLE)
+    set(_GLSLC_EXE ${VULKAN_GLSLC_EXECUTABLE})
+  else ()
+    set(_GLSLC_EXE glslc)
+  endif ()
+endif ()
+
+set(ATLAS_VK_SPV_OUTPUTS)
+foreach(SRC ${ATLAS_VK_SHADERS})
+  get_filename_component(BN ${SRC} NAME)
+  set(OUT ${ATLAS_VULKAN_SHADER_OUT}/${BN}.spv)
+  add_custom_command(
+          OUTPUT ${OUT}
+          COMMAND ${CMAKE_COMMAND} -E make_directory ${ATLAS_VULKAN_SHADER_OUT}
+          COMMAND ${_GLSLC_EXE}
+          -O
+          -I ${CMAKE_CURRENT_SOURCE_DIR}/Resources/shader
+          -o ${OUT}
+          ${ATLAS_VULKAN_SHADER_DIR}/${BN}
+          DEPENDS ${ATLAS_VULKAN_SHADER_DIR}/${BN}
+          COMMENT "[glslc] ${BN} -> ${OUT}"
+          VERBATIM)
+  list(APPEND ATLAS_VK_SPV_OUTPUTS ${OUT})
+endforeach()
+
+add_custom_target(vulkan_shaders ALL DEPENDS ${ATLAS_VK_SPV_OUTPUTS})
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -416,12 +461,28 @@ set(SOURCES
     zrunexport3danimation.cpp zrunexport3danimation.h
     zrunneutucommand.cpp zrunneutucommand.h
     zprocess.cpp zprocess.h
-    zvulkan.cpp
     zvulkan.h
+    zvulkancontext.h
+    zvulkancontext.cpp
+    zvulkandevice.h
+    zvulkandevice.cpp
+    zvulkanbuffer.h
+    zvulkanbuffer.cpp
+    zvulkantexture.h
+    zvulkantexture.cpp
+    zvulkandescriptorpool.h
+    zvulkandescriptorpool.cpp
+    zvulkandescriptorset.h
+    zvulkandescriptorset.cpp
+    zvulkanswapchain.h
+    zvulkanswapchain.cpp
+    zvulkan.cpp
+    zvulkanshader.h
+    zvulkanshader.cpp
+    zvulkanpipeline.h
+    zvulkanpipeline.cpp
     z3dtypes.h
     zvulkanshaderstate.h
-#    zvulkanlinerenderer.h
-#    zvulkanlinerenderer.cpp
     zvulkanrenderer.h
     zvulkanrenderer.cpp
     zvulkanrendererbase.h
@@ -436,6 +497,8 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
                ${SOURCES} ${FORMS} ${RESOURCES} ${ASSETS}
                ${PROTO_SRCS} ${GRPC_SRCS})
+
+add_dependencies(${APP_NAME} vulkan_shaders)
 
 target_include_directories(${APP_NAME} SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${APP_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
@@ -554,6 +617,9 @@ else (WIN32)
     )
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/shader/vulkan/spv
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Resources/shader/vulkan/spv
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/shader/vulkan/spv
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jre/Contents/Home
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jre)
     add_custom_command(TARGET ${APP_NAME}
@@ -607,6 +673,9 @@ else (WIN32)
   else ()
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/Resources/shader/vulkan/spv
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Resources/shader/vulkan/spv
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/shader/vulkan/spv
                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/Resources/Atlas.png
                        $<TARGET_FILE_DIR:${APP_NAME}>)
     add_custom_command(TARGET ${APP_NAME}
