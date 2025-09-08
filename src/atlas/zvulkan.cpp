@@ -185,21 +185,21 @@ void logVulkan13Features(const vk::PhysicalDeviceVulkan13Features& features)
   VLOG(1) << fmt::format("  maintenance4: {}", features.maintenance4);
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-                                                           VkDebugUtilsMessageTypeFlagsEXT /*messageTypes*/,
-                                                           const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                                           vk::DebugUtilsMessageTypeFlagsEXT /*messageTypes*/,
+                                                           const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
                                                            void* /*pUserData*/)
 {
   // Determine the appropriate log level based on message severity
-  if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+  if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
     // For verbose messages, use VLOG(1)
     VLOG(1) << pCallbackData->pMessage;
     return VK_FALSE; // Return early since we already logged the verbose message
   }
   auto logLevel = google::GLOG_INFO;
-  if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+  if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
     logLevel = google::GLOG_WARNING;
-  } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+  } else if (messageSeverity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
     logLevel = google::GLOG_ERROR;
   }
 
