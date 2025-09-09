@@ -115,11 +115,98 @@ print_target_properties(Vulkan::glslc)
 set(ATLAS_VULKAN_SHADER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Resources/shader/vulkan)
 set(ATLAS_VULKAN_SHADER_OUT ${ATLAS_VULKAN_SHADER_DIR}/spv)
 
-file(GLOB ATLAS_VK_SHADERS
-        RELATIVE ${ATLAS_VULKAN_SHADER_DIR}
-        ${ATLAS_VULKAN_SHADER_DIR}/*.vert
-        ${ATLAS_VULKAN_SHADER_DIR}/*.frag
-        ${ATLAS_VULKAN_SHADER_DIR}/*.geom)
+set(ATLAS_VK_SHADER_SOURCES
+    # Core
+    almag.vert
+    almag.frag
+    background.frag
+    line.vert
+    line.frag
+    sphere.vert
+    sphere.frag
+    mesh.vert
+    mesh.frag
+    pass.vert
+    pass_with_2dtexture.vert
+
+    # 2D single-channel
+    image2d_with_colormap_single_channel.frag
+    image2d_with_transfun_single_channel.frag
+
+    # Copy
+    copyimage.frag
+    glow.frag
+    blur.frag
+
+    # 3D slice and transforms
+    transform_with_3dtexture_and_eye_coordinate.vert
+    image3d_slice_with_colormap.frag
+    image3d_slice_with_transfun.frag
+    image3d_slice_with_transfun_blockID.frag
+    render_3dtexture_coordinate.frag
+    render_3dtexture_coordinate_and_eye_coordinate.frag
+
+    # 3D raycasters
+    image3d_raycaster.frag
+    image3d_raycaster_blockID.frag
+
+    # Volume single-channel
+    volume_slice_with_colormap_single_channel.frag
+    volume_slice_with_transfun_single_channel.frag
+    volume_raycaster_single_channel.frag
+
+    # Ellipsoid
+    ellipsoid.vert
+    ellipsoid.frag
+
+    # Cone
+    cone.vert
+    cone.frag
+
+    # Compositors and copy
+    compositor.frag
+    image2d_array_compositor.frag
+    copy_raycaster_image.frag
+
+    # Wide line (non-GS)
+    wideline1.vert
+    wideline1.frag
+
+    # Wide line (GS-based)
+    wideline.vert
+    wideline.geom
+    wideline.frag
+
+    # Dual depth peeling (final passes)
+    dual_peeling_blend.frag
+    dual_peeling_final.frag
+    # Dual depth peeling (shape init/peel)
+    dual_peeling_init_cone.frag
+    dual_peeling_peel_cone.frag
+    dual_peeling_init_sphere.frag
+    dual_peeling_peel_sphere.frag
+    dual_peeling_init_ellipsoid.frag
+    dual_peeling_peel_ellipsoid.frag
+    dual_peeling_init_mesh.frag
+    dual_peeling_peel_mesh.frag
+    dual_peeling_init_wideline.frag
+    dual_peeling_peel_wideline.frag
+
+    # Weighted OIT (final passes)
+    wavg_final.frag
+    wblended_final.frag
+    # Weighted OIT (shape init passes)
+    wavg_init_cone.frag
+    wavg_init_sphere.frag
+    wavg_init_ellipsoid.frag
+    wavg_init_mesh.frag
+    wavg_init_wideline.frag
+    wblended_init_cone.frag
+    wblended_init_sphere.frag
+    wblended_init_ellipsoid.frag
+    wblended_init_mesh.frag
+    wblended_init_wideline.frag
+)
 
 set(_GLSLC_EXE "")
 if (TARGET Vulkan::glslc)
@@ -136,9 +223,8 @@ if (NOT _GLSLC_EXE)
 endif ()
 
 set(ATLAS_VK_SPV_OUTPUTS)
-foreach(SRC ${ATLAS_VK_SHADERS})
-  get_filename_component(BN ${SRC} NAME)
-  set(OUT ${ATLAS_VULKAN_SHADER_OUT}/${BN}.spv)
+foreach(SRC ${ATLAS_VK_SHADER_SOURCES})
+  set(OUT ${ATLAS_VULKAN_SHADER_OUT}/${SRC}.spv)
   add_custom_command(
           OUTPUT ${OUT}
           COMMAND ${CMAKE_COMMAND} -E make_directory ${ATLAS_VULKAN_SHADER_OUT}
@@ -146,9 +232,9 @@ foreach(SRC ${ATLAS_VK_SHADERS})
           -O
           -I ${CMAKE_CURRENT_SOURCE_DIR}/Resources/shader
           -o ${OUT}
-          ${ATLAS_VULKAN_SHADER_DIR}/${BN}
-          DEPENDS ${ATLAS_VULKAN_SHADER_DIR}/${BN}
-          COMMENT "[glslc] ${BN} -> ${OUT}"
+          ${ATLAS_VULKAN_SHADER_DIR}/${SRC}
+          DEPENDS ${ATLAS_VULKAN_SHADER_DIR}/${SRC}
+          COMMENT "[glslc] ${SRC} -> ${OUT}"
           VERBATIM)
   list(APPEND ATLAS_VK_SPV_OUTPUTS ${OUT})
 endforeach()

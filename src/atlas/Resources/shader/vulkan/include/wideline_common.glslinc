@@ -1,0 +1,8 @@
+// Common push constants for wide-line shaders (VS/GS/FS)
+layout(push_constant) uniform WideLinePC {
+  mat4 viewport_matrix;
+  mat4 viewport_matrix_inverse;
+  float line_width;
+  float size_scale;
+} wpc;
+

@@ -1,0 +1,44 @@
+#include "lighting.glslinc"
+
+// Per-fragment push constants
+layout(push_constant) uniform EllipsoidPC {
+  mat4 projection_matrix; // for depth
+  float ortho;
+  vec3 _pad;
+} epcf;
+
+layout(location = 0) in vec4 v_color;
+layout(location = 1) in mat4 v_MT_inverse;
+layout(location = 5) in vec3 v_point;
+
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  vec3 rayOrigin    = mix(vec3(0.0, 0.0, 0.0), v_point, epcf.ortho);
+  vec3 rayDirection = mix(normalize(v_point), vec3(0.0, 0.0, -1.0), epcf.ortho);
+
+  vec4 xfpp = v_MT_inverse * vec4(rayOrigin, 1.0);
+  vec4 c3   = v_MT_inverse * vec4(rayDirection, 0.0);
+
+  vec4 D = vec4(1.0, 1.0, 1.0, -1.0);
+  float a = dot(c3 * D, xfpp + c3) - dot(c3 * D, xfpp);
+  // Expanded form: a = dot(c3 * D, c3)
+  a = dot(c3 * D, c3);
+  float b = 2.0 * dot(xfpp * D, c3);
+  float c = dot(xfpp * D, xfpp);
+  float disc = b*b - 4.0*a*c;
+  if (disc < 0.0) discard;
+  float dist = (-b - sqrt(disc)) / (2.0*a);
+
+  vec3 ipoint = dist * rayDirection + rayOrigin;
+
+  vec2 clipZW = ipoint.z * epcf.projection_matrix[2].zw + epcf.projection_matrix[3].zw;
+  float depth = 0.5 + 0.5 * clipZW.x / clipZW.y;
+  if (depth <= 0.0 || depth >= 1.0) discard;
+  fragDepth = depth;
+
+  vec4 normal4 = transpose(v_MT_inverse) * (xfpp + dist * c3);
+  vec3 normalDirection = normalize(normal4.xyz);
+
+  fragColor = apply_lighting_and_fog(matu.scene_ambient, matu.material_shininess, matu.material_ambient, matu.material_specular,
+                                     normalDirection, ipoint, v_color, matu.alpha);
+}

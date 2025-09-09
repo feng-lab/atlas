@@ -1,0 +1,52 @@
+#include "lighting.glslinc"
+#include "matrices_material.glslinc"
+
+// Push constants specific to spheres
+layout(push_constant) uniform SpherePC {
+  float size_scale;
+  float box_correction;
+  float ortho;
+  float _pad_sp;
+} spc;
+
+layout(location = 0) in vec4 v_color;
+layout(location = 1) in vec3 v_sphere_center;
+layout(location = 2) in float v_radius2;
+layout(location = 3) in vec3 v_point;
+
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  vec3 rayOrigin = v_point;
+  vec3 rayDirection = mix(normalize(v_point), vec3(0.0, 0.0, -1.0), spc.ortho);
+
+  vec3 sphereVector = v_sphere_center - rayOrigin;
+  float b = dot(sphereVector, rayDirection);
+  float position = b * b + v_radius2 - dot(sphereVector, sphereVector);
+
+#ifdef ANTI_ALIASING
+  float delta = fwidth(position);
+  float edgeAlpha = smoothstep(0.0, delta, position);
+#endif
+  if (position < 0.0) discard;
+
+  float dist = b - sqrt(position);
+  vec3 ipoint = dist * rayDirection + rayOrigin;
+
+  // Compute depth in NDC using projection matrix
+  vec2 clipZW = ipoint.z * xf.projection_view_matrix[2].zw + xf.projection_view_matrix[3].zw;
+  float depth = 0.5 + 0.5 * clipZW.x / clipZW.y;
+  if (depth <= 0.0) discard;
+  if (depth >= 1.0) discard;
+  fragDepth = depth;
+
+  vec3 normalDirection = normalize(ipoint - v_sphere_center);
+
+#ifdef ANTI_ALIASING
+  float alphaScale = edgeAlpha;
+#else
+  float alphaScale = 1.0;
+#endif
+
+  fragColor = apply_lighting_and_fog(matu.scene_ambient, matu.material_shininess, matu.material_ambient, matu.material_specular,
+                                     normalDirection, ipoint, v_color, matu.alpha * alphaScale);
+}

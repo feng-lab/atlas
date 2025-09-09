@@ -561,6 +561,10 @@ void ZVulkanContext::createLogicalDevice()
   enabledPhysicalDeviceFeatures2.features.samplerAnisotropy = physicalDeviceFeatures.samplerAnisotropy;
   enabledPhysicalDeviceFeatures2.features.fillModeNonSolid = physicalDeviceFeatures.fillModeNonSolid;
 
+  if (FLAGS_atlas_debug_vulkan) {
+    enabledPhysicalDeviceFeatures2.features.robustBufferAccess = physicalDeviceFeatures.robustBufferAccess;
+  }
+
   // Get device properties to determine API version
   auto deviceProperties = m_physicalDevices[0].getProperties();
 
@@ -589,12 +593,13 @@ void ZVulkanContext::createLogicalDevice()
 #endif
 
   // Create the logical device
-  vk::DeviceCreateInfo deviceCreateInfo{.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
-                                        .pQueueCreateInfos = queueCreateInfos.data(),
-                                        .enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size()),
-                                        .ppEnabledExtensionNames = enabledExtensions.data()};
-
-  deviceCreateInfo.pNext = &enabledPhysicalDeviceFeatures2;
+  vk::DeviceCreateInfo deviceCreateInfo{
+    .pNext = &enabledPhysicalDeviceFeatures2,
+    .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+    .pQueueCreateInfos = queueCreateInfos.data(),
+    .enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size()),
+    .ppEnabledExtensionNames = enabledExtensions.data(),
+  };
 
   m_device.emplace(m_physicalDevices[0], deviceCreateInfo);
   LOG(INFO) << "Logical device created successfully";

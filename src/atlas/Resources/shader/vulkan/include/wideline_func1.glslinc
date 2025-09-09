@@ -1,0 +1,56 @@
+// Specialization constants
+layout(constant_id = 98) const bool USE_1DTEXTURE = false;
+layout(constant_id = 99) const bool ROUND_CAP     = false;
+layout(constant_id = 100) const bool LIGHTING_ENABLED = true;
+
+// Push constants for screen-space line expansion
+layout(push_constant) uniform WideLinePC {
+  mat4 viewport_matrix;
+  mat4 viewport_matrix_inverse;
+  float line_width;
+  float size_scale;
+} wpc;
+
+// Inputs
+layout(location = 0) in vec4 v_color;  // only when not USE_1DTEXTURE
+layout(location = 1) flat in vec3 plane1;
+layout(location = 2) flat in vec3 plane2;
+layout(location = 3) flat in vec3 plane3;
+layout(location = 4) flat in vec3 plane4;
+layout(location = 5) flat in vec4 p0p1; // only when ROUND_CAP
+
+// Optional texture
+layout(set = 0, binding = 0) uniform sampler1D line_texture;
+
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  vec3 pos = vec3(gl_FragCoord.xy, 1.0);
+  vec4 dist = vec4(dot(pos, plane1), dot(pos, plane2), dot(pos, plane3), dot(pos, plane4));
+
+  if (ROUND_CAP) {
+    if (dist.x < 0.0 || dist.y < 0.0) discard;
+    if (dist.z < 0.0 && wpc.line_width * wpc.size_scale / 2.0 - distance(pos.xy, p0p1.xy) < 0.0) discard;
+    if (dist.w < 0.0 && wpc.line_width * wpc.size_scale / 2.0 - distance(pos.xy, p0p1.zw) < 0.0) discard;
+  } else {
+    if (any(lessThan(dist, vec4(0.0)))) discard;
+  }
+
+  float d = min(dist.x, dist.y);
+
+  vec4 col;
+  if (USE_1DTEXTURE) {
+    float texCoord0 = 1.0 - (d - 1.0) * 2.0 * wpc.size_scale / wpc.line_width;
+    col = texture(line_texture, texCoord0);
+  } else {
+    col = v_color;
+  }
+
+  if (LIGHTING_ENABLED) {
+    float f = smoothstep(0.0, 1.0, d);
+    fragColor = vec4(col.rgb * col.a * f, col.a * f);
+  } else {
+    fragColor = col;
+  }
+
+  fragDepth = gl_FragDepth; // keep current depth
+}

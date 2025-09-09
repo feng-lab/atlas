@@ -169,10 +169,10 @@ Deliverable: Stable and performant Vulkan backend in releases.
 ## Detailed Task Breakdown (Checklist)
 
 - [x] Implement SPIR-V shader module loading in `ZVulkanShader`.
-- [ ] Add CMake/custom target to compile Vulkan GLSL to SPIR-V offline.
+- [x] Add CMake/custom target to compile Vulkan GLSL to SPIR-V offline.
 - [ ] Map OpenGL `#define`s to specialization constants or push constants; keep only interface-changing options as variants.
 - [ ] Define per-shader “variant key” structs (only for interface-changing bits) and persist `vk::PipelineCache`.
-- [ ] Add/minify shader compilation script outputs to `Resources/shader/vulkan/spv/`.
+- [x] Add/minify shader compilation script outputs to `Resources/shader/vulkan/spv/`.
 - [ ] Minimal background clear frame using dynamic rendering, plus CPU readback test.
 - [ ] Fullscreen triangle pipeline for background gradient (optional, parity with GL background renderer).
 - [ ] Finalize `ZVulkanLineRenderer` (buffers, descriptors, pipelines, draw calls).
@@ -209,4 +209,13 @@ Deliverable: Stable and performant Vulkan backend in releases.
 
 ## Next Action
 
-- Build shaders to SPIR-V and implement a minimal Vulkan “clear + present to CPU” path to validate basic rendering with the new SPIR-V module loader.
+- Implement a minimal Vulkan “clear + CPU readback” path using dynamic rendering and the existing `vulkan/background.frag` + `pass.vert` pair.
+  - Add descriptor set layouts for existing UBOs (lights/fog `set=1`, transforms/material `set=2`) and the new OIT params UBO (`set=3`) where needed.
+  - Create a simple graphics pipeline via `ZVulkanPipeline` using the SPIR-V modules for background.
+  - Record a command buffer that:
+    1) Transitions an offscreen color+depth image to attachment layouts
+    2) Begins dynamic rendering, binds the pipeline, sets viewport/scissor, pushes background PC, draws a fullscreen tri
+    3) Ends rendering, transitions color image to transfer-src, copies to a staging buffer, maps and verifies pixels.
+  - Log success and a small hash of the readback contents for quick validation.
+
+- After the background smoke test, proceed to Phase 2: finalize `ZVulkanLineRenderer` and bind per-frame UBOs.

@@ -1,0 +1,209 @@
+#include "lighting.glslinc"
+
+// Cap modes: 0=NO_CAPS, 1=FLAT_CAPS, 2=ROUND_CAPS, 3=FLAT_BASE_CAP_ROUND_TOP_CAP, 4=ROUND_BASE_CAP_FLAT_TOP_CAP
+layout(constant_id = 90) const int CAPS_MODE = 1;
+// Note: ANTI_ALIASING is controlled via compile-time define for consistency with other shaders.
+// The following specialization constant is unused but kept for potential pipeline control.
+layout(constant_id = 91) const bool _AA_UNUSED = false;
+
+layout(push_constant) uniform ConePC {
+  mat4 projection_matrix; // for depth
+  float ortho;
+  vec3 _pad;
+} cpc;
+
+// Inputs from vertex stage
+layout(location = 0) in vec4 v_color1;
+layout(location = 1) in vec4 v_color2;
+layout(location = 2) in vec3 v_point;
+layout(location = 3) in vec3 v_axis;
+layout(location = 4) in vec3 v_base;
+layout(location = 5) in vec3 v_top;
+layout(location = 6) in vec3 v_U;
+layout(location = 7) in vec3 v_V;
+layout(location = 8) in vec4 v_combo1; // x=bradius, y=tradius, z=height, w=inv_sqr_height
+
+void fragment_func(out vec4 fragColor, out float fragDepth)
+{
+  if (!gl_FrontFacing) discard;
+
+  float bradius = v_combo1.x;
+  float tradius = v_combo1.y;
+  float height  = v_combo1.z;
+  float inv_sqr_height = v_combo1.w;
+
+  vec3 rayOrigin    = mix(vec3(0.0), v_point, cpc.ortho);
+  vec3 rayDirection = mix(normalize(v_point), vec3(0.0, 0.0, -1.0), cpc.ortho);
+
+  // Local basis for the cone
+  mat3 basis = mat3(v_U, v_V, v_axis);
+  vec3 D = rayDirection * basis;
+
+  float bradius2 = bradius * bradius;
+  float tradius2 = tradius * tradius;
+  vec3 coneTip = v_base - v_axis * bradius * height / max(tradius - bradius, 1e-6);
+
+  // Quadratic coefficients for side surface
+  float a0, a1, a2;
+  if (abs(tradius - bradius) < 1e-3) {
+    // Cylinder
+    vec3 P = (v_point - v_base) * basis;
+    a0 = P.x*P.x + P.y*P.y - bradius2;
+    a1 = P.x*D.x + P.y*D.y;
+    a2 = D.x*D.x + D.y*D.y;
+  } else {
+    // Cone
+    vec3 P = (v_point - coneTip) * basis;
+    vec3 factor = vec3(1.0, 1.0, - (tradius - bradius) * (tradius - bradius) * inv_sqr_height);
+    a0 = dot(P * P, factor);
+    a1 = dot(P * D, factor);
+    a2 = dot(D * D, factor);
+  }
+
+  float disc = a1*a1 - a0*a2;
+
+#ifdef ANTI_ALIASING
+  float delta = fwidth(disc);
+  float edgeAlpha = smoothstep(0.0, delta, disc);
+#endif
+
+  if (disc < 0.0) discard; // outside the double cone
+
+  float dist = (-a1 - sqrt(disc)) / a2;
+  vec3 ipoint = v_point + dist * rayDirection; // intersection point
+
+  // Compute normal from side surface
+  vec3 tmpPoint = ipoint - v_base;
+  vec3 planeNormalDirection = cross(v_axis, tmpPoint);
+  vec3 centerToSurfaceDirection = normalize(cross(planeNormalDirection, v_axis));
+  vec3 baseEdge = v_base + centerToSurfaceDirection * bradius;
+  vec3 topEdge  = v_top  + centerToSurfaceDirection * tradius;
+  vec3 normalDirection = normalize(cross(planeNormalDirection, topEdge - baseEdge));
+
+  float ratio = dot(ipoint - v_base, vec3(v_top - v_base)) * inv_sqr_height;
+  vec4 color = mix(v_color1, v_color2, ratio);
+
+  // Top cap test
+  float capTest = dot((ipoint - v_top), v_axis);
+
+  if (CAPS_MODE == 0) {
+    if (capTest > 0.0 || dot(rayDirection, -v_axis) > dot(normalize(baseEdge - topEdge), -v_axis)) {
+      if (abs(dot(v_point - v_top, v_axis)) > 0.001 || dot(v_point - v_top, v_point - v_top) > tradius2) discard;
+      dist = (-a1 + sqrt(disc)) / a2;
+      ipoint = v_point + dist * rayDirection;
+      if (dot(ipoint - v_base, v_axis) < 0.0 || dot(ipoint - v_top, v_axis) > 0.0) discard;
+      tmpPoint = ipoint - v_base;
+      planeNormalDirection = cross(v_axis, tmpPoint);
+      centerToSurfaceDirection = normalize(cross(planeNormalDirection, v_axis));
+      baseEdge = v_base + centerToSurfaceDirection * bradius;
+      topEdge  = v_top  + centerToSurfaceDirection * tradius;
+      normalDirection = normalize(cross(planeNormalDirection, topEdge - baseEdge));
+      ratio = dot(ipoint - v_base, vec3(v_top - v_base)) * inv_sqr_height;
+      color = mix(v_color1, v_color2, ratio);
+    }
+  } else if (CAPS_MODE == 1) { // FLAT_CAPS
+    if (capTest > 0.0 || dot(rayDirection, -v_axis) > dot(normalize(baseEdge - topEdge), -v_axis)) {
+      if (abs(dot(v_point - v_top, v_axis)) > 0.001 || dot(v_point - v_top, v_point - v_top) > tradius2) discard;
+      color = v_color2;
+      ipoint = v_point;
+      normalDirection = v_axis;
+    }
+  } else if (CAPS_MODE == 3) { // FLAT_BASE_CAP_ROUND_TOP_CAP
+    if (capTest > 0.0 || dot(rayDirection, -v_axis) > dot(normalize(baseEdge - topEdge), -v_axis)) {
+      color = v_color2;
+      float dNV = dot(-v_axis, rayDirection);
+      if (dNV < 0.0) discard;
+      float t = dot(-v_axis, v_top - rayOrigin) / dNV;
+      ipoint = rayDirection * t + rayOrigin;
+      if (dot(ipoint - v_top, ipoint - v_top) > tradius2) discard;
+      normalDirection = v_axis;
+    }
+  } else if (CAPS_MODE == 2 || CAPS_MODE == 4) { // ROUND_CAPS or ROUND_BASE_CAP_FLAT_TOP_CAP (top round)
+    if (capTest > 0.0 || dot(rayDirection, -v_axis) > dot(normalize(baseEdge - topEdge), -v_axis)) {
+      color = v_color2;
+      vec3 sphereVector = v_top - rayOrigin;
+      float b = dot(sphereVector, rayDirection);
+      float pos = b*b + tradius2 - dot(sphereVector, sphereVector);
+      if (pos < 0.0) discard;
+      float t = b - sqrt(pos);
+      ipoint = t * rayDirection + rayOrigin;
+      normalDirection = normalize(ipoint - v_top);
+    }
+  }
+
+  // Base cap tests
+  capTest = dot((ipoint - v_base), v_axis);
+  if (CAPS_MODE == 0) {
+    if (capTest < 0.0) {
+      if (dot(v_point - v_base, v_point - v_base) > bradius2) discard;
+      dist = (-a1 + sqrt(disc)) / a2;
+      ipoint = v_point + dist * rayDirection;
+      if (dot(ipoint - v_base, v_axis) < 0.0 || dot(ipoint - v_top, v_axis) > 0.0) discard;
+      tmpPoint = ipoint - v_base;
+      planeNormalDirection = cross(v_axis, tmpPoint);
+      centerToSurfaceDirection = normalize(cross(planeNormalDirection, v_axis));
+      baseEdge = v_base + centerToSurfaceDirection * bradius;
+      topEdge  = v_top  + centerToSurfaceDirection * tradius;
+      normalDirection = normalize(cross(planeNormalDirection, topEdge - baseEdge));
+      ratio = dot(ipoint - v_base, vec3(v_top - v_base)) * inv_sqr_height;
+      color = mix(v_color1, v_color2, ratio);
+    }
+  } else if (CAPS_MODE == 1) { // FLAT_CAPS
+    if (capTest < 0.0) {
+      if (dot(v_point - v_base, v_point - v_base) > bradius2) discard;
+      color = v_color1;
+      ipoint = v_point;
+      normalDirection = -v_axis;
+    }
+  } else if (CAPS_MODE == 4) { // ROUND_BASE_CAP_FLAT_TOP_CAP (base round)
+    if (capTest < 0.0) {
+      if (dot(ipoint - coneTip, v_axis) < 0.0) discard;
+      color = v_color1;
+      vec3 sphereVector = v_base - rayOrigin;
+      float b = dot(sphereVector, rayDirection);
+      float pos = b*b + bradius2 - dot(sphereVector, sphereVector);
+      if (pos < 0.0) discard;
+      float t = b - sqrt(pos);
+      ipoint = t * rayDirection + rayOrigin;
+      normalDirection = normalize(ipoint - v_base);
+    }
+  } else if (CAPS_MODE == 3) { // FLAT_BASE_CAP_ROUND_TOP_CAP -> base flat
+    if (capTest < 0.0) {
+      color = v_color1;
+      float dNV = dot(v_axis, rayDirection);
+      if (dNV < 0.0) discard;
+      float t = dot(v_axis, v_base - rayOrigin) / dNV;
+      ipoint = rayDirection * t + rayOrigin;
+      if (dot(ipoint - v_base, ipoint - v_base) > bradius2) discard;
+      normalDirection = -v_axis;
+    }
+  } else if (CAPS_MODE == 2) { // ROUND_CAPS -> base round too
+    if (capTest < 0.0) {
+      if (dot(ipoint - coneTip, v_axis) < 0.0) discard;
+      color = v_color1;
+      vec3 sphereVector = v_base - rayOrigin;
+      float b = dot(sphereVector, rayDirection);
+      float pos = b*b + bradius2 - dot(sphereVector, sphereVector);
+      if (pos < 0.0) discard;
+      float t = b - sqrt(pos);
+      ipoint = t * rayDirection + rayOrigin;
+      normalDirection = normalize(ipoint - v_base);
+    }
+  }
+
+  // Depth from projection matrix
+  vec2 clipZW = ipoint.z * cpc.projection_matrix[2].zw + cpc.projection_matrix[3].zw;
+  float depth = 0.5 + 0.5 * clipZW.x / clipZW.y;
+  if (depth <= 0.0 || depth >= 1.0) discard;
+
+  fragDepth = depth;
+
+#ifdef ANTI_ALIASING
+  float alphaScale = edgeAlpha;
+#else
+  float alphaScale = 1.0;
+#endif
+
+  fragColor = apply_lighting_and_fog(matu.scene_ambient, matu.material_shininess, matu.material_ambient, matu.material_specular,
+                                     normalDirection, ipoint, color, matu.alpha * alphaScale);
+}
