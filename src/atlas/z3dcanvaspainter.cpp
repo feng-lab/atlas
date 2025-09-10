@@ -1,5 +1,7 @@
 #include "z3dcanvaspainter.h"
 
+#if defined(ATLAS_USE_OPENGLWIDGET)
+
 #include "z3dgl.h"
 #include "z3dcanvas.h"
 #include "z3drenderingengine.h"
@@ -54,3 +56,5 @@ void Z3DCanvasPainter::paint(bool stereo)
 }
 
 } // namespace nim
+
+#endif

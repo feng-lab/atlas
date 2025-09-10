@@ -79,11 +79,27 @@ void ZVulkanTexture::createImage()
 
 void ZVulkanTexture::createImageView()
 {
+  vk::ImageAspectFlags aspect = {};
+  switch (m_format) {
+    case vk::Format::eD16Unorm:
+    case vk::Format::eX8D24UnormPack32:
+    case vk::Format::eD32Sfloat:
+      aspect = vk::ImageAspectFlagBits::eDepth;
+      break;
+    case vk::Format::eD24UnormS8Uint:
+    case vk::Format::eD32SfloatS8Uint:
+      aspect = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+      break;
+    default:
+      aspect = vk::ImageAspectFlagBits::eColor;
+      break;
+  }
+
   vk::ImageViewCreateInfo viewInfo{
     .image = *m_image,
     .viewType = vk::ImageViewType::e2D,
     .format = m_format,
-    .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
+    .subresourceRange = {aspect, 0, 1, 0, 1}
   };
   m_imageView.emplace(m_device.context().device(), viewInfo);
 }
@@ -179,6 +195,28 @@ void ZVulkanTexture::transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
     barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
     srcStage = vk::PipelineStageFlagBits::eTransfer;
     dstStage = vk::PipelineStageFlagBits::eFragmentShader;
+  } else if (oldLayout == vk::ImageLayout::eColorAttachmentOptimal &&
+             newLayout == vk::ImageLayout::eTransferSrcOptimal) {
+    // Prepare color attachment for copy/read
+    barrier.srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+    barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+    srcStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    dstStage = vk::PipelineStageFlagBits::eTransfer;
+    barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+  } else if (oldLayout == vk::ImageLayout::eTransferSrcOptimal &&
+             newLayout == vk::ImageLayout::eColorAttachmentOptimal) {
+    // Restore for rendering
+    barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+    barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+    srcStage = vk::PipelineStageFlagBits::eTransfer;
+    dstStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+  } else if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eColorAttachmentOptimal) {
+    barrier.srcAccessMask = {};
+    barrier.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+    srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
+    dstStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
   } else {
     throw ZException("Unsupported layout transition");
   }

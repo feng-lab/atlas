@@ -9,6 +9,113 @@ This plan guides the migration of the Z3D OpenGL renderer to a Vulkan backend, i
 - Adopt explicit, robust resource management, validation, and repeatable shader compilation to SPIR-V.
 - Maintain clean abstractions that mirror existing Z3D architecture to lower risk and churn.
 
+## Parity And Swappable Backend
+
+To ensure the Vulkan backend is a drop‑in replacement for the OpenGL engine (files starting with `z3d*`), we will:
+
+- Preserve public APIs and parameter semantics of the OpenGL renderers when adding Vulkan counterparts.
+- Provide adapter classes or matching method names on Vulkan renderers so existing UI, frontend, and configuration code do not change.
+- Introduce a backend switch in `Z3DRenderingEngine` that selects OpenGL or Vulkan at runtime, without altering higher‑level code.
+
+Implementation approach:
+
+- Renderer API invariants: For each renderer family, define a short list of methods/parameters that must remain identical (names, value ranges, behavior). Vulkan renderers will expose the same signatures where feasible, or thin adapters will translate to Vulkan‑native settings.
+- Parameter bridging: Reuse `Z3DGlobalParameters` as the single source of truth. Vulkan renderers read the same settings (camera, fog, OIT, clip planes, devicePixelRatio, etc.) from a bridge in `ZVulkanRendererBase`.
+- Feature matching: When hardware features differ (e.g., wide lines), emulate in shaders/CPU so behavior stays consistent.
+
+Data/API Abstraction Layer
+
+- Add a small DTO layer for CPU→GPU hand‑off shared by both backends. New file `src/atlas/zrenderdto.h` defines:
+  - `BackgroundSettings`, `LineListData`, `MeshData`, `Image2DData`, `Volume3DData`.
+- Preserve renderer method names across backends (e.g., `setData`, `setDataColors`, `setLineWidth`, etc.) so filters/compositor can keep calling the same functions.
+- Extract an interface from `Z3DCompositor` so that Vulkan compositor can implement the same surface used by the engine. Introduce `src/atlas/zcompositorbase.h` (abstract) as the target interface.
+
+## GL Dependency Classification (Current Engine)
+
+- API‑independent core (keep as is):
+  - Engine scaffolding (minus GL readback): `z3drenderingengine.*`
+  - Scene/camera/parameters/UI: `z3dscene.*`, `z3dcamera.*`, `z3dglobalparameters.*`, `z*parameter.*`, widget groups
+  - Graph: `z3dport.*` (ports), `z3dnetworkevaluator.*`
+  - Views/docs: `z3d*view.*`, `z*doc.*`
+- OpenGL‑specific (keep GL here; add Vulkan counterparts):
+  - GL context/helpers: `z3dgl.*`, `z3dcontext.*`
+  - Shaders: `z3dshaderprogram.*`, `z3dshadergroup.*`, `z3dshadermanager.*`
+  - Buffers/VAO: `z3dvertexarrayobject.*`, `z3dvertexbufferobject.*`
+  - Textures/FBO: `z3dtexture.*`, `z3drendertarget.*`, `z3drenderport.*`
+  - Renderers: `z3d*renderer.*` (background, line, mesh, images/volumes)
+  - Compositor: `z3dcompositor.*`
+- Mixed (to clean):
+  - `z3dfilter.*` previously included GL in header; refactor to avoid leaking GL.
+
+Status of decoupling (done):
+
+- `z3dport.h` no longer includes `z3dfilter.h` (avoids pulling GL transitively); forward‑declares `Z3DFilter` instead. Impl includes moved to cpp.
+- Removed GL helper from `z3dfilter` base; header no longer includes `z3dgl.h`.
+
+Next refactors:
+
+- Sweep headers included by API‑independent layers; replace GL includes with forward declarations + cpp includes.
+- Keep all GL calls in compositor + renderer layers; remove GL code from filters by moving those bits into compositor.
+- In engine, isolate GL readback behind a tiny helper to be matched by Vulkan compositor readback later.
+
+### Renderer Parity Checklist
+
+Background renderer (OpenGL: `Z3DBackgroundRenderer`, Vulkan: `ZVulkanBackgroundRenderer`)
+
+- Mode: Uniform vs Gradient
+- Gradient orientation: LeftToRight, RightToLeft, TopToBottom, BottomToTop
+- Colors: first/second color, and region `{x0, xScale, y0, yScale}`
+- Screen‑size awareness: uses `screen_dim_RCP` consistently
+
+Vulkan mapping:
+
+- Use specialization constants (constant IDs 30–34) to select mode/orientation in `background_func.glslinc`.
+- Push constants carry colors and region, same as GL uniforms.
+
+Line renderer (OpenGL: `Z3DLineRenderer`, Vulkan: `ZVulkanLineRenderer`)
+
+- Data: `setData(std::vector<glm::vec3>*)`, `setDataColors(std::vector<glm::vec4>*)`, optional `setTexture(1D)`
+- Picking colors: `setDataPickingColors(std::vector<glm::vec4>*)`
+- Line width: scalar and per‑segment array; follows `sizeScale` and devicePixelRatio; 1px fallback when smooth off
+- Modes: smooth wide lines, screen‑aligned, round caps; line strip vs line list
+- Multisample interaction: width adjustment for MSAA modes
+
+Vulkan mapping:
+
+- Emulate wide lines with a quad strip (no dependence on `VK_EXT_line_rasterization`). Two shader paths:
+  - Geometry‑free expansion: `wideline1.vert + wideline.frag` (preferred; Metal‑friendly)
+  - Optional GS path: `wideline.vert + wideline.geom + wideline.frag` (where supported)
+- Specialization constants for `USE_1DTEXTURE`, `ROUND_CAP`, `LIGHTING_ENABLED` (see `wideline_func1.glslinc`).
+- Vertex attributes: p0/p1 endpoints, per‑endpoint colors, corner flags; CPU builds batches exactly as in GL non‑GS path.
+- Screen‑aligned mode: same math as GL macro `LINE_SCREEN_ALIGNED` in shaders.
+- Picking: separate pipeline with a minimal FS writing picking color output.
+- Per‑segment width array: provide secondary attribute or storage buffer and pass as push constant when constant width; scale with `sizeScale` and devicePixelRatio.
+
+Acceptance for parity: visual match on reference scenes for widths, caps, and smoothness; identical picking IDs.
+
+Mesh renderer (OpenGL: `Z3DMeshRenderer`, Vulkan: `ZVulkanMeshRenderer`)
+
+- Data: positions, normals, colors/UVs, triangle indices; front/back cull and depth settings.
+- Lighting/material: same UBOs as GL. Push constants for small params.
+
+Vulkan mapping:
+
+- Use `MeshData` DTO and device‑local VB/IB with staging. Keep transforms/material/lighting UBOs aligned with GL.
+
+### Backend Switch Plan
+
+- Add an enum `RenderBackend { OpenGL, Vulkan }` and a runtime switch in `Z3DRenderingEngine`.
+- Provide `ZVulkanCompositor` mirroring `Z3DCompositor` APIs invoked by the engine.
+- Expose factory helpers in the engine/compositor that construct either `Z3D*` or `ZVulkan*` renderers but return a common interface (or adapters exposing the `Z3D*` methods).
+- Keep all UI code using existing `Z3D*` method names; adapters translate calls to Vulkan renderers.
+
+Minimal invasive path:
+
+- For each Vulkan renderer, add methods named like the GL counterpart where feasible so adapters are trivial.
+- Where not feasible, implement a tiny adapter class that implements the GL signature and forwards to the Vulkan object.
+
+## Shader Strategy
+
 ## Current State Summary
 
 - OpenGL engine is mature with:
@@ -173,15 +280,33 @@ Deliverable: Stable and performant Vulkan backend in releases.
 - [ ] Map OpenGL `#define`s to specialization constants or push constants; keep only interface-changing options as variants.
 - [ ] Define per-shader “variant key” structs (only for interface-changing bits) and persist `vk::PipelineCache`.
 - [x] Add/minify shader compilation script outputs to `Resources/shader/vulkan/spv/`.
-- [ ] Minimal background clear frame using dynamic rendering, plus CPU readback test.
-- [ ] Fullscreen triangle pipeline for background gradient (optional, parity with GL background renderer).
+- [x] Minimal background clear frame using dynamic rendering, plus CPU readback test.
+- [x] Fullscreen triangle pipeline for background gradient base.
+- [ ] Background renderer parity: wire specialization constants for Uniform/Gradient orientations; API shim for `mode`/`orientation`/`region`.
 - [ ] Finalize `ZVulkanLineRenderer` (buffers, descriptors, pipelines, draw calls).
+- [ ] Line renderer parity: smooth wide lines, round caps, screen‑aligned mode, per‑segment widths, 1D texture color, line strip batching; picking pass.
 - [ ] Implement per-frame UBO for camera matrices, fog, lights; push constants for small params.
 - [ ] Implement `ZVulkanMeshRenderer` with lighting.
 - [ ] Implement Vulkan image/volume paths (2D, slice, raycaster v1).
 - [ ] Add `ZVulkanCompositor` mirroring GL compositor functionality and transparency methods.
+- [x] Add a minimal Vulkan compositor with background + lines (`ZVulkanCompositor`).
 - [ ] Backend switch and engine integration (screenshots, tiling, stereo, picking, progressive).
 - [ ] Validation, perf polishing, MSAA/resolve, packaging.
+
+Abstraction/Reuse tasks
+
+- [x] Define DTOs for background/lines/meshes/images/volumes (`zrenderdto.h`).
+- [x] Add abstract compositor interface extracted from Z3D (`zcompositorbase.h`).
+- [x] Implement minimal Vulkan compositor to ingest DTOs and produce RGBA readbacks.
+- [ ] Expand Vulkan compositor to ingest DTOs and provide equivalent outputs (ready targets/readback).
+- [ ] Migrate engine to hold a `std::unique_ptr` to the facade and switch backend at runtime.
+- [ ] Add DTO emitters in critical filters and reuse them in GL paths to reduce duplicated logic.
+
+## API Parity Acceptance Criteria
+
+- Background: identical color/gradient appearance across modes and orientations on the same inputs; region respected. No UI changes.
+- Line: identical thickness, caps, strip behavior, and color mapping on representative datasets; matching picking IDs. No UI or configuration changes.
+- Engine switch: Users can toggle OpenGL/Vulkan in the same UI; scenes render equivalently; screenshots and tiling produce the same outputs within small numerical tolerances.
 
 ## Success Criteria per Phase
 

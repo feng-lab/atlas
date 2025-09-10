@@ -573,6 +573,10 @@ set(SOURCES
     zvulkanrenderer.cpp
     zvulkanrendererbase.h
     zvulkanrendererbase.cpp
+    zvulkanbackgroundrenderer.h
+    zvulkanbackgroundrenderer.cpp
+    zvulkanlinerenderer.h
+    zvulkanlinerenderer.cpp
 )
 
 # our target

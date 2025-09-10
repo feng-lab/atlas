@@ -1,7 +1,8 @@
 #pragma once
 
 #include "z3dfilter.h"
-#include "zlog.h"
+#include "zglmutils.h"
+#include <QString>
 #include <vector>
 
 namespace nim {

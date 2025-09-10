@@ -29,6 +29,8 @@ class Z3DCanvasEventListener;
 
 class ZAnimation;
 
+// Vulkan compositor forward decl removed (classification phase)
+
 class Z3DRenderingEngine
   : public QObject
   , public ZViewSettingInterface
@@ -183,12 +185,6 @@ public:
 
   void render(bool stereo = false);
 
-  [[nodiscard]] Z3DRenderTarget* monoReadyTarget() const;
-
-  [[nodiscard]] Z3DRenderTarget* leftReadyTarget() const;
-
-  [[nodiscard]] Z3DRenderTarget* rightReadyTarget() const;
-
   [[nodiscard]] Z3DLocalColorBuffer* monoReadyLocalBuffer() const;
 
   [[nodiscard]] Z3DLocalColorBuffer* leftReadyLocalBuffer() const;
@@ -253,6 +249,8 @@ Q_SIGNALS:
 
   void initialized();
 
+  void backendChanged();
+
 protected:
   bool event(QEvent* e) override;
 
@@ -284,6 +282,7 @@ private:
   void onCanvasResized(size_t w, size_t h);
 
   void initGL();
+  // Vulkan init deferred
 
   void rotateX();
 
@@ -329,6 +328,7 @@ private:
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
   std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
   std::unique_ptr<Z3DCompositor> m_compositor;
+  // Vulkan compositor bridge deferred
 
   ZBBox<glm::dvec3> m_boundBox;
   size_t m_numObjsBefore;
@@ -342,6 +342,8 @@ private:
   std::mutex m_mutex;
 
   double m_progress = 0;
+
+  // Backend switch deferred
 };
 
 } // namespace nim

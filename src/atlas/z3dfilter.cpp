@@ -4,10 +4,8 @@
 #include "zsysteminfo.h"
 #include "z3dport.h"
 #include "z3dinteractionhandler.h"
-#include "z3dshaderprogram.h"
 #include "zeventlistenerparameter.h"
 #include "zparameter.h"
-#include "z3dvertexarrayobject.h"
 
 namespace nim {
 
@@ -216,49 +214,7 @@ void Z3DFilter::addInteractionHandler(Z3DInteractionHandler& handler)
   m_interactionHandlers.push_back(&handler);
 }
 
-void Z3DFilter::renderScreenQuad(const Z3DVertexArrayObject& vao, const Z3DShaderProgram& shader)
-{
-  if (!shader.isLinked()) {
-    return;
-  }
-
-  glDepthFunc(GL_ALWAYS);
-
-  vao.bind();
-
-  const GLfloat vertices[] = {-1.f,
-                              1.f,
-                              0.f, // top left corner
-                              -1.f,
-                              -1.f,
-                              0.f, // bottom left corner
-                              1.f,
-                              1.f,
-                              0.f, // top right corner
-                              1.f,
-                              -1.f,
-                              0.f}; // bottom right rocner
-  auto attr_vertex = shader.vertexAttributeLocation();
-
-  GLuint bufObjects[1];
-  glGenBuffers(1, bufObjects);
-
-  glEnableVertexAttribArray(attr_vertex);
-  glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
-  glBufferData(GL_ARRAY_BUFFER, 3 * 4 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-  glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
-
-  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
-  glDeleteBuffers(1, bufObjects);
-
-  glDisableVertexAttribArray(attr_vertex);
-
-  vao.release();
-
-  glDepthFunc(GL_LESS);
-}
+// Note: GL helper renderScreenQuad has been removed from filter base.
 
 void Z3DFilter::updateSize()
 {

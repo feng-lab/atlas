@@ -23,6 +23,8 @@
 #include <QOffscreenSurface>
 #include <QCoreApplication>
 #include <memory>
+#include "zvulkan.h"
+// Vulkan compositor removed for now (classification phase)
 
 DEFINE_bool(atlas_debug_opengl,
             false,
@@ -735,6 +737,7 @@ void Z3DRenderingEngine::init()
 
   // filters
   m_compositor = std::make_unique<Z3DCompositor>(*m_globalParas);
+  // Vulkan bridge deferred
   addEventListenerToBack(*m_compositor);
   connect(m_compositor.get(), &Z3DCompositor::sceneParaUpdated, this, &Z3DRenderingEngine::sceneParaUpdated);
   connect(m_compositor.get(), &Z3DCompositor::renderingFinished, this, &Z3DRenderingEngine::renderingFinished);
@@ -1074,21 +1077,6 @@ void Z3DRenderingEngine::render(bool stereo)
   m_globalParas->cancellationSource.reset();
 }
 
-Z3DRenderTarget* Z3DRenderingEngine::monoReadyTarget() const
-{
-  return m_compositor->monoReadyTarget();
-}
-
-Z3DRenderTarget* Z3DRenderingEngine::leftReadyTarget() const
-{
-  return m_compositor->leftReadyTarget();
-}
-
-Z3DRenderTarget* Z3DRenderingEngine::rightReadyTarget() const
-{
-  return m_compositor->rightReadyTarget();
-}
-
 Z3DLocalColorBuffer* Z3DRenderingEngine::monoReadyLocalBuffer() const
 {
   return m_compositor->monoReadyLocalBuffer();
@@ -1315,5 +1303,7 @@ void Z3DRenderingEngine::resetOutputSizeToMatchCanvasSize()
     setOutputSize(m_canvas->physicalSize());
   }
 }
+
+// Backend switch removed for now; to be reintroduced post-classification
 
 } // namespace nim

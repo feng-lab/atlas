@@ -15,33 +15,33 @@ ZVulkanRenderer::~ZVulkanRenderer()
     m_rendererBase.unregisterRenderer(this);
 }
 
-glm::mat4 ZVulkanRenderer::getCoordTransform() const
+glm::mat4 ZVulkanRenderer::coordTransform() const
 {
     if (m_followCoordTransform) {
         // Return the coordinate transform from the renderer base
-        return m_rendererBase.getCoordTransform();
+        return m_rendererBase.coordTransform();
     } else {
         // Return identity matrix if not following coordinate transform
         return glm::mat4(1.0f);
     }
 }
 
-float ZVulkanRenderer::getOpacity() const
+float ZVulkanRenderer::opacity() const
 {
     if (m_followOpacity) {
         // Return the opacity from the renderer base
-        return m_rendererBase.getOpacity();
+        return m_rendererBase.opacity();
     } else {
         // Return full opacity if not following global opacity
         return 1.0f;
     }
 }
 
-float ZVulkanRenderer::getSizeScale() const
+float ZVulkanRenderer::sizeScale() const
 {
     if (m_followSizeScale) {
         // Return the size scale from the renderer base
-        return m_rendererBase.getSizeScale();
+        return m_rendererBase.sizeScale();
     } else {
         // Return unit scale if not following global size scale
         return 1.0f;
@@ -53,7 +53,7 @@ ZVulkanRenderer::PushConstants ZVulkanRenderer::preparePushConstants() const
     PushConstants constants;
     
     // Get the camera from the renderer base
-    auto& camera = m_rendererBase.getCamera();
+    auto& camera = m_rendererBase.camera();
     
     // Get the matrices for the mono eye (center view)
     glm::mat4 viewMatrix = camera.viewMatrix(MonoEye);
@@ -63,11 +63,11 @@ ZVulkanRenderer::PushConstants ZVulkanRenderer::preparePushConstants() const
     constants.projectionViewMatrix = projMatrix * viewMatrix;
     
     // Set the model matrix with coordinate transform
-    constants.modelMatrix = getCoordTransform();
+    constants.modelMatrix = coordTransform();
     
     // Set other parameters
-    constants.opacity = getOpacity();
-    constants.sizeScale = getSizeScale();
+    constants.opacity = opacity();
+    constants.sizeScale = sizeScale();
     constants.enableLighting = m_needLighting ? 1 : 0;
     constants.padding = 0;  // Padding for alignment
     

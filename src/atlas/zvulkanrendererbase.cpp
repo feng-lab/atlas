@@ -115,7 +115,7 @@ void ZVulkanRendererBase::copyToMemory(void* data, size_t size)
   m_swapChain->copyToMemory(data, size);
 }
 
-glm::mat4 ZVulkanRendererBase::getCoordTransform() const
+glm::mat4 ZVulkanRendererBase::coordTransform() const
 {
   // Return identity matrix for now
   // This could be extended to support more complex transformations
@@ -144,7 +144,7 @@ void ZVulkanRendererBase::setClipPlanes(const std::vector<glm::vec4>& clipPlanes
 void ZVulkanRendererBase::updatePushConstants()
 {
   // Update projection-view matrix from camera
-  auto& camera = getCamera();
+  auto& camera = this->camera();
 
   // Get the matrices for the mono eye (center view)
   glm::mat4 viewMatrix = camera.viewMatrix(MonoEye);
@@ -152,7 +152,7 @@ void ZVulkanRendererBase::updatePushConstants()
 
   // Combine into a projection-view matrix
   m_pushConstants.projectionViewMatrix = projMatrix * viewMatrix;
-  m_pushConstants.modelMatrix = getCoordTransform();
+  m_pushConstants.modelMatrix = coordTransform();
 }
 
 } // namespace nim

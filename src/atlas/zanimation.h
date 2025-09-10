@@ -1,6 +1,6 @@
 #pragma once
 
-#include "z3dgl.h"
+#include "z3dtypes.h"
 #include "zparameteranimation.h"
 #include "zviewsettinginterface.h"
 #include "zjson.h"

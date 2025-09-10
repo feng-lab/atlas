@@ -17,8 +17,8 @@ public:
     virtual ~ZVulkanRenderer();
     
     // Get the renderer base
-    ZVulkanRendererBase& getRendererBase() { return m_rendererBase; }
-    const ZVulkanRendererBase& getRendererBase() const { return m_rendererBase; }
+    ZVulkanRendererBase& rendererBase() { return m_rendererBase; }
+    const ZVulkanRendererBase& rendererBase() const { return m_rendererBase; }
     
     // Enable/disable lighting for this renderer
     void setNeedLighting(bool enable) { m_needLighting = enable; }
@@ -36,14 +36,14 @@ public:
     void setFollowSizeScale(bool enable) { m_followSizeScale = enable; }
     bool followSizeScale() const { return m_followSizeScale; }
     
-    // Get coordinate transformation matrix
-    glm::mat4 getCoordTransform() const;
+    // Coordinate transformation matrix
+    glm::mat4 coordTransform() const;
     
-    // Get opacity value
-    float getOpacity() const;
+    // Opacity value
+    float opacity() const;
     
-    // Get size scale value
-    float getSizeScale() const;
+    // Size scale value
+    float sizeScale() const;
     
     // Compile the renderer (to be implemented by derived classes)
     virtual void compile() = 0;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "z3dgl.h"
+#include "z3dtypes.h"
 #include "z3dcanvaseventlistener.h"
 #include "zflags.h"
 #include "zjson.h"
@@ -20,16 +20,6 @@ class Z3DInteractionHandler;
 class ZParameter;
 
 class ZEventListenerParameter;
-
-class Z3DRenderOutputPort;
-
-class Z3DRenderTarget;
-
-class Z3DTexture;
-
-class Z3DShaderProgram;
-
-class Z3DVertexArrayObject;
 
 class Z3DFilter
   : public QObject
@@ -177,8 +167,6 @@ protected:
   virtual void enterInteractionMode() {}
 
   virtual void exitInteractionMode() {}
-
-  static void renderScreenQuad(const Z3DVertexArrayObject& vao, const Z3DShaderProgram& shader);
 
   // 1. for each outport, get all expected size from all connected inports, and use the maximum one
   //    as the new size of the outport

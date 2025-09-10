@@ -800,7 +800,8 @@ void ZMainWindow::createDockWindows()
 void ZMainWindow::readSettings()
 {
   QSettings settings;
-  QPoint pos = settings.value("pos", QPoint(200, 200)).toPoint();
+  // cause problem on windows with multiple monitors
+  // QPoint pos = settings.value("pos", QPoint(200, 200)).toPoint();
   QSize size = settings.value("size", QSize(400, 400)).toSize();
   // move(pos);
   resize(size);

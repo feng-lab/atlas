@@ -1115,7 +1115,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
     m_rendererBase.setViewport(m_ddpRT->size());
     m_rendererBase.setGlobalShaderParameters(m_ddpBlendShader, eye);
 
-    renderScreenQuad(m_screenQuadVAO, m_ddpBlendShader);
+    Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, m_ddpBlendShader);
     m_ddpBlendShader.release();
 
     if (g_useOQ) {
@@ -1164,7 +1164,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   m_rendererBase.setViewport(m_ddpRT->size());
   m_rendererBase.setGlobalShaderParameters(m_ddpFinalShader, eye);
 
-  renderScreenQuad(m_screenQuadVAO, m_ddpFinalShader);
+  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, m_ddpFinalShader);
   m_ddpFinalShader.release();
   renderTarget.release();
 
@@ -1330,7 +1330,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   m_rendererBase.setViewport(m_waRT->size());
   m_rendererBase.setGlobalShaderParameters(m_waFinalShader, eye);
 
-  renderScreenQuad(m_screenQuadVAO, m_waFinalShader);
+  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, m_waFinalShader);
   m_waFinalShader.release();
   renderTarget.release();
 
@@ -1461,7 +1461,7 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   m_rendererBase.setViewport(m_wbRT->size());
   m_rendererBase.setGlobalShaderParameters(m_wbFinalShader, eye);
 
-  renderScreenQuad(m_screenQuadVAO, m_wbFinalShader);
+  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, m_wbFinalShader);
   m_wbFinalShader.release();
   renderTarget.release();
 

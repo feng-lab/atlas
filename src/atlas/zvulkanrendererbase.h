@@ -25,11 +25,11 @@ public:
   virtual ~ZVulkanRendererBase();
 
   // Device access
-  ZVulkanDevice& getDevice()
+  ZVulkanDevice& device()
   {
     return m_device;
   }
-  const ZVulkanDevice& getDevice() const
+  const ZVulkanDevice& device() const
   {
     return m_device;
   }
@@ -38,11 +38,11 @@ public:
   const vk::PhysicalDeviceFeatures& getPhysicalDeviceFeatures() const;
 
   // Dimension access
-  uint32_t getWidth() const
+  uint32_t width() const
   {
     return m_width;
   }
-  uint32_t getHeight() const
+  uint32_t height() const
   {
     return m_height;
   }
@@ -50,8 +50,8 @@ public:
   // Resize the renderer
   void resize(uint32_t width, uint32_t height);
 
-  // Get the swapchain for rendering
-  ZVulkanSwapChain& getSwapChain()
+  // Swapchain for rendering
+  ZVulkanSwapChain& swapChain()
   {
     return *m_swapChain;
   }
@@ -81,26 +81,30 @@ public:
     m_hasCustomCamera = false;
   }
 
-  Z3DCamera& getCamera()
+  Z3DCamera& camera()
   {
     return m_hasCustomCamera ? m_camera : m_globalCamera;
   }
 
-  const Z3DCamera& getCamera() const
+  const Z3DCamera& camera() const
   {
     return m_hasCustomCamera ? m_camera : m_globalCamera;
   }
 
-  Z3DCamera& getGlobalCamera()
+  Z3DCamera& globalCamera()
   {
     return m_globalCamera;
   }
 
-  // Get coordinate transform matrix
-  glm::mat4 getCoordTransform() const;
+  // Coordinate transform matrix
+  glm::mat4 coordTransform() const;
+
+  // Viewport matrices (NDC <-> window) used by some shaders (e.g., wide lines)
+  const glm::mat4& viewportMatrix() const { return m_viewportMatrix; }
+  const glm::mat4& viewportMatrixInverse() const { return m_viewportMatrixInverse; }
 
   // Global rendering parameters
-  float getOpacity() const
+  float opacity() const
   {
     return m_globalOpacity;
   }
@@ -109,7 +113,7 @@ public:
     m_globalOpacity = opacity;
   }
 
-  float getSizeScale() const
+  float sizeScale() const
   {
     return m_globalSizeScale;
   }
@@ -125,8 +129,8 @@ public:
     glm::mat4 modelMatrix;
   };
 
-  // Get push constants for the current frame
-  const PushConstants& getPushConstants() const
+  // Push constants for the current frame
+  const PushConstants& pushConstants() const
   {
     return m_pushConstants;
   }
@@ -137,7 +141,7 @@ public:
 
   // Clip plane management
   void setClipPlanes(const std::vector<glm::vec4>& clipPlanes);
-  const std::vector<glm::vec4>& getClipPlanes() const
+  const std::vector<glm::vec4>& clipPlanes() const
   {
     return m_clipPlanes;
   }
@@ -145,7 +149,7 @@ public:
   {
     m_clipEnabled = enable;
   }
-  bool isClippingEnabled() const
+  bool clippingEnabled() const
   {
     return m_clipEnabled;
   }

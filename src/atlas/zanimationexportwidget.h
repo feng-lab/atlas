@@ -1,6 +1,7 @@
 #pragma once
 
-#include "z3dgl.h"
+#include "z3dtypes.h"
+#include "zglmutils.h"
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
 #include "zstringparameter.h"

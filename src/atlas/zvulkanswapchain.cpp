@@ -102,6 +102,18 @@ vk::raii::CommandBuffer ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearCo
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   (*m_commandBuffers)[m_currentBuffer].begin(beginInfo);
 
+  // Ensure attachments are in the correct layouts for rendering
+  {
+    auto& cmd = (*m_commandBuffers)[m_currentBuffer];
+    if (m_colorAttachment->layout() != vk::ImageLayout::eColorAttachmentOptimal) {
+      m_colorAttachment->transitionLayout(cmd, m_colorAttachment->layout(), vk::ImageLayout::eColorAttachmentOptimal);
+    }
+    if (m_depthAttachment->layout() != vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+      m_depthAttachment->transitionLayout(cmd, m_depthAttachment->layout(),
+                                          vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    }
+  }
+
   VkClearValue colorClearValue{};
   colorClearValue.color.float32[0] = clearColor.float32[0];
   colorClearValue.color.float32[1] = clearColor.float32[1];
@@ -151,10 +163,11 @@ void ZVulkanSwapChain::endFrame(vk::raii::CommandBuffer& commandBuffer)
   vk::CommandBuffer cmdBuffers[] = {*commandBuffer};
   submitInfo.pCommandBuffers = cmdBuffers;
 
+  // Fence must be unsignaled before submission
+  m_device.context().device().resetFences({*m_inFlightFence});
   m_device.context().graphicsQueue().submit(submitInfo, *m_inFlightFence);
   auto waitStatus = m_device.context().device().waitForFences({*m_inFlightFence}, VK_TRUE, UINT64_MAX);
   (void)waitStatus;
-  m_device.context().device().resetFences({*m_inFlightFence});
 }
 
 void ZVulkanSwapChain::copyToMemory(void* data, size_t size)
@@ -164,33 +177,33 @@ void ZVulkanSwapChain::copyToMemory(void* data, size_t size)
                           vk::BufferUsageFlagBits::eTransferDst,
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-  vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
-  (*m_commandBuffers)[m_currentBuffer].begin(beginInfo);
+  // One-shot copy via device helper (waits idle)
+  {
+    auto cmd = m_device.beginSingleTimeCommands();
+    // Ensure source image layout
+    if (m_colorAttachment->layout() != vk::ImageLayout::eTransferSrcOptimal) {
+      m_colorAttachment->transitionLayout(cmd, m_colorAttachment->layout(), vk::ImageLayout::eTransferSrcOptimal);
+    }
 
-  vk::BufferImageCopy region{};
-  region.bufferOffset = 0;
-  region.bufferRowLength = 0;
-  region.bufferImageHeight = 0;
-  region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
-  region.imageSubresource.mipLevel = 0;
-  region.imageSubresource.baseArrayLayer = 0;
-  region.imageSubresource.layerCount = 1;
-  region.imageOffset = vk::Offset3D{0, 0, 0};
-  region.imageExtent = vk::Extent3D{m_width, m_height, 1};
+    vk::BufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = vk::Offset3D{0, 0, 0};
+    region.imageExtent = vk::Extent3D{m_width, m_height, 1};
 
-  (*m_commandBuffers)[m_currentBuffer].copyImageToBuffer(m_colorAttachment->image(),
-                                                         vk::ImageLayout::eTransferSrcOptimal,
-                                                         stagingBuffer->buffer(),
-                                                         region);
-  (*m_commandBuffers)[m_currentBuffer].end();
+    cmd.copyImageToBuffer(m_colorAttachment->image(), vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
 
-  vk::SubmitInfo submitInfo{};
-  submitInfo.commandBufferCount = 1;
-  vk::CommandBuffer cmdBuffers[] = {*(*m_commandBuffers)[m_currentBuffer]};
-  submitInfo.pCommandBuffers = cmdBuffers;
-  m_device.context().graphicsQueue().submit(submitInfo, *m_inFlightFence);
-  m_device.context().device().waitForFences({*m_inFlightFence}, VK_TRUE, UINT64_MAX);
-  m_device.context().device().resetFences({*m_inFlightFence});
+    // Restore color attachment layout
+    m_colorAttachment->transitionLayout(cmd, vk::ImageLayout::eTransferSrcOptimal,
+                                        vk::ImageLayout::eColorAttachmentOptimal);
+
+    m_device.endSingleTimeCommands(cmd);
+  }
 
   void* mapped = stagingBuffer->map(0, size);
   std::memcpy(data, mapped, size);

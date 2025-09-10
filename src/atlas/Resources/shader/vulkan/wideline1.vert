@@ -19,6 +19,9 @@ layout(location = 5) flat out vec4 p0p1;
 #include "include/matrices_material.glslinc"
 #include "include/wideline_common.glslinc"
 
+// Specialization constant for screen-aligned mode (parity with GL macro)
+layout(constant_id = 101) const bool LINE_SCREEN_ALIGNED = false;
+
 void ClipSegmentToPlane(inout vec4 p0, inout vec4 p1, vec4 plane)
 {
   float dist0 = dot(p0, plane);
@@ -51,29 +54,25 @@ void main()
   float R = (wpc.line_width * wpc.size_scale / 2.0 + 1.0);
   vec2 L = normalize(p1.xy - p0.xy);
   vec2 P = vec2(-L.y, L.x);
-  vec2 LR = vec2(0.0);
-#ifndef LINE_SCREEN_ALIGNED
-  LR = L * R;
-#endif
+  vec2 LR = LINE_SCREEN_ALIGNED ? vec2(0.0) : L * R;
   vec2 PR = P * R;
-
-#ifdef LINE_SCREEN_ALIGNED
-  vec2 Lmajor = abs(L.y) >= abs(L.x) ? vec2(0, sign(L.y)) : vec2(sign(L.x), 0);
-  PR -= dot(PR, Lmajor) / max(dot(L, Lmajor), 1e-6) * L;
-#endif
+  if (LINE_SCREEN_ALIGNED) {
+    vec2 Lmajor = abs(L.y) >= abs(L.x) ? vec2(0, sign(L.y)) : vec2(sign(L.x), 0);
+    PR -= dot(PR, Lmajor) / max(dot(L, Lmajor), 1e-6) * L;
+  }
 
   vec2 qcorner = upFlag * PR + (rightFlag > 0.0 ? (p1.xy + LR) : (p0.xy - LR));
 
   plane1 = vec3(+P, -(dot(p0.xy, +P) - R));
   plane2 = vec3(-P, -(dot(p1.xy, -P) - R));
-#ifdef LINE_SCREEN_ALIGNED
-  vec2 Lmajor2 = abs(L.y) >= abs(L.x) ? vec2(0, sign(L.y)) : vec2(sign(L.x), 0);
-  plane3 = vec3(+Lmajor2, -(dot(p0.xy, +Lmajor2) - 1.0));
-  plane4 = vec3(-Lmajor2, -(dot(p1.xy, -Lmajor2) - 1.0));
-#else
-  plane3 = vec3(+L, -(dot(p0.xy, +L) - 1.0));
-  plane4 = vec3(-L, -(dot(p1.xy, -L) - 1.0));
-#endif
+  if (LINE_SCREEN_ALIGNED) {
+    vec2 Lmajor2 = abs(L.y) >= abs(L.x) ? vec2(0, sign(L.y)) : vec2(sign(L.x), 0);
+    plane3 = vec3(+Lmajor2, -(dot(p0.xy, +Lmajor2) - 1.0));
+    plane4 = vec3(-Lmajor2, -(dot(p1.xy, -Lmajor2) - 1.0));
+  } else {
+    plane3 = vec3(+L, -(dot(p0.xy, +L) - 1.0));
+    plane4 = vec3(-L, -(dot(p1.xy, -L) - 1.0));
+  }
 
   // interpolate color per-segment end
   v_color = rightFlag > 0.0 ? attr_p1color : attr_p0color;
