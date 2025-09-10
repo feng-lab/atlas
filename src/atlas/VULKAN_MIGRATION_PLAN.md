@@ -52,11 +52,46 @@ Status of decoupling (done):
 - `z3dport.h` no longer includes `z3dfilter.h` (avoids pulling GL transitively); forward‑declares `Z3DFilter` instead. Impl includes moved to cpp.
 - Removed GL helper from `z3dfilter` base; header no longer includes `z3dgl.h`.
 
+Progress Update — GL out of Z3DMeshFilter (Completed)
+
+- Removed all filter-owned GL render targets and copy path from `Z3DMeshFilter`.
+  - Deleted private `Z3DRenderOutputPort` members and `Z3DTextureCopyRenderer` from the filter.
+  - Removed the filter-owned `Z3DTextureGlowRenderer`; kept a small set of glow parameters on the filter for UI/state only.
+- Centralized glow in the compositor with a single hook:
+  - Added `renderTransparentFilter(filter, target, eye)` in `Z3DCompositor` that decides glow vs normal rendering.
+  - Uses dedicated glow temps (`m_glowTempRenderTarget1/2`) and a depth-aware compositor shader (`m_alphaBlendRenderer`) to blend glow results, avoiding fixed-function blend pitfalls.
+  - Ensures depth test and depth writes are enabled for the glow geometry prepass, and restores previous GL state after.
+- OIT compatibility:
+  - Glow is precomputed before OIT into a single color/depth pair and merged with any existing image pair, then passed to OIT as `imageColorTex/imageDepthTex`.
+  - During OIT init/peel passes the compositor does not switch FBOs; it feeds the merged image pair into the existing OIT pipeline (DDP/WA/WB).
+- Result:
+  - `Z3DMeshFilter` now contains no GL calls; filters are backend-agnostic coordinators of data/parameters.
+  - All GL state is owned by renderers and the compositor, matching the Vulkan migration goal.
+
 Next refactors:
 
 - Sweep headers included by API‑independent layers; replace GL includes with forward declarations + cpp includes.
 - Keep all GL calls in compositor + renderer layers; remove GL code from filters by moving those bits into compositor.
 - In engine, isolate GL readback behind a tiny helper to be matched by Vulkan compositor readback later.
+
+Upcoming Tasks (proposed order)
+
+1) Move GL resource ownership out of image/volume filters
+   - `Z3DImgFilter`/`Z3DVolumeFilter` currently create FBOs/textures (entry/exit/layer, blockID targets) directly.
+   - Action: Shift creation/resize/attach into their renderers (raycaster/slice/volume), expose init/resize methods; filters set parameters and call renderers only.
+
+2) Extract a compositor interface (`ZCompositorBase`)
+   - Define a small abstract interface implemented by `Z3DCompositor` (GL) and to be implemented by `ZVulkanCompositor`.
+   - `Z3DRenderingEngine` depends on the interface to allow backend switching.
+
+3) Vulkan compositor skeleton
+   - Add `ZVulkanCompositor` stub that mirrors the interface; start by wiring background + line rendering with the existing Vulkan renderer base.
+
+4) Backend switch in engine
+   - Add a runtime/backend setting in `Z3DRenderingEngine` to create GL or Vulkan compositor.
+
+5) OIT in Vulkan (later)
+   - Port DDP/WA/WB paths to Vulkan once the compositor scaffolding is in place.
 
 ### Renderer Parity Checklist
 

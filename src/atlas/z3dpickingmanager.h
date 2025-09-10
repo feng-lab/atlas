@@ -41,6 +41,9 @@ public:
 
   const void* objectAtWidgetPos(glm::ivec2 pos);
 
+  // Depth at widget pixel (accounts for devicePixelRatio and y-flip)
+  GLfloat depthAtWidgetPos(glm::ivec2 pos);
+
   // find all objects within a radius of pos, sort by distance
   // if radius is -1, search the whole image
   std::vector<const void*> sortObjectsByDistanceToPos(const glm::ivec2& pos, int radius = -1, bool ascend = true);

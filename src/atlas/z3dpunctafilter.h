@@ -8,9 +8,7 @@
 #include "z3dsphererenderer.h"
 #include "zeventlistenerparameter.h"
 #include "zpunctapack.h"
-#include "z3dtextureglowrenderer.h"
 #include "z3drenderport.h"
-#include "z3dtexturecopyrenderer.h"
 #include <QPoint>
 #include <map>
 #include <vector>

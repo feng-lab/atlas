@@ -1,7 +1,6 @@
 #include "z3dmeshfilter.h"
 
 #include "zregionannotation.h"
-#include "z3drenderport.h"
 #include "zmesh.h"
 #include "zrandom.h"
 #include <QFileInfo>
@@ -10,12 +9,6 @@ namespace nim {
 
 Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode* regionNode, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
-  , m_monoEyeOutport("Image", this)
-  , m_leftEyeOutport("LeftEyeImage", this)
-  , m_rightEyeOutport("RightEyeImage", this)
-  , m_monoEyeOutport2("Image2", this)
-  , m_leftEyeOutport2("LeftEyeImage2", this)
-  , m_rightEyeOutport2("RightEyeImage2", this)
   , m_triangleListRenderer(m_rendererBase)
   , m_colorMode("Color Mode")
   , m_singleColorForAllMesh("Mesh Color",
@@ -23,17 +16,17 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
                                       ZRandom::instance().randReal<float>(),
                                       ZRandom::instance().randReal<float>(),
                                       1.f))
-  , m_textureGlowRenderer(m_rendererBase)
   , m_glow("Glow", false)
-  , m_textureCopyRenderer(m_rendererBase)
+  , m_glowMode("Glow Mode")
+  , m_glowBlurRadius("Glow Blur Radius", 10, 2, 1000)
+  , m_glowBlurScale("Glow Blur Scale", 1.f, 1.f, 5.f)
+  , m_glowBlurStrength("Glow Blur Strength", .5f, 0.f, 1.f)
   , m_selectMeshEvent("Select Mesh", false)
   , m_pressedMesh(nullptr)
   , m_selectedMeshes(nullptr)
   , m_dataIsInvalid(false)
   , m_regionNode(regionNode)
 {
-  m_textureCopyRenderer.setDiscardTransparent(true);
-
   m_singleColorForAllMesh.setStyle("COLOR");
   connect(&m_singleColorForAllMesh, &ZVec4Parameter::valueChanged, this, &Z3DMeshFilter::prepareColor);
 
@@ -50,10 +43,17 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
 
   connect(&m_glow, &ZBoolParameter::valueChanged, this, &Z3DMeshFilter::adjustWidgets);
   addParameter(m_glow);
-  addParameter(m_textureGlowRenderer.glowModePara());
-  addParameter(m_textureGlowRenderer.blurRadiusPara());
-  addParameter(m_textureGlowRenderer.blurScalePara());
-  addParameter(m_textureGlowRenderer.blurStrengthPara());
+  // Initialize glow parameter defaults to match previous behavior
+  m_glowMode.addOptionsWithData(std::make_pair<QString, QString>("Additive", "ADDITIVE_BLENDING"),
+                                std::make_pair<QString, QString>("Screen", "SCREEN_BLENDING"));
+  m_glowMode.addOptionsWithData(std::make_pair<QString, QString>("Softlight", "SOFTLIGHT_BLENDING"),
+                                std::make_pair<QString, QString>("Glowmap", "GLOWMAP"));
+  m_glowMode.select("Screen");
+  m_glowBlurScale.setSingleStep(0.5f);
+  addParameter(m_glowMode);
+  addParameter(m_glowBlurRadius);
+  addParameter(m_glowBlurScale);
+  addParameter(m_glowBlurStrength);
 
   m_selectMeshEvent.listenTo("select mesh", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
   m_selectMeshEvent.listenTo("select mesh", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
@@ -75,45 +75,10 @@ QString Z3DMeshFilter::regionName() const
   return m_regionNode ? m_regionNode->name : QString();
 }
 
-double Z3DMeshFilter::process(Z3DEye eye)
+double Z3DMeshFilter::process(Z3DEye)
 {
   if (m_dataIsInvalid) {
     prepareData();
-  }
-  if (m_glow.get()) {
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-    Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_monoEyeOutport
-                                          : (eye == LeftEye) ? m_leftEyeOutport
-                                                             : m_rightEyeOutport;
-    currentOutport.resize(m_outPort.size());
-
-    currentOutport.bindTarget();
-    currentOutport.clearTarget();
-    m_rendererBase.setViewport(currentOutport.size());
-    m_rendererBase.render(eye, m_triangleListRenderer);
-    CHECK_GL_ERROR
-    currentOutport.releaseTarget();
-
-    Z3DRenderOutputPort& currentOutport2 = (eye == MonoEye)   ? m_monoEyeOutport2
-                                           : (eye == LeftEye) ? m_leftEyeOutport2
-                                                              : m_rightEyeOutport2;
-    currentOutport2.resize(m_outPort.size());
-
-    currentOutport2.bindTarget();
-    currentOutport2.clearTarget();
-    m_rendererBase.setViewport(currentOutport2.size());
-    m_textureGlowRenderer.setColorTexture(currentOutport.colorTexture());
-    m_textureGlowRenderer.setDepthTexture(currentOutport.depthTexture());
-    m_rendererBase.render(eye, m_textureGlowRenderer);
-    CHECK_GL_ERROR
-    currentOutport2.releaseTarget();
-
-    glBlendFunc(GL_ONE, GL_ZERO);
-    glDisable(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
   }
 
   return 1.;
@@ -182,10 +147,10 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroup()
     }
 
     m_widgetsGroup->addChild(m_glow, 5);
-    m_widgetsGroup->addChild(m_textureGlowRenderer.glowModePara(), 5);
-    m_widgetsGroup->addChild(m_textureGlowRenderer.blurRadiusPara(), 5);
-    m_widgetsGroup->addChild(m_textureGlowRenderer.blurScalePara(), 5);
-    m_widgetsGroup->addChild(m_textureGlowRenderer.blurStrengthPara(), 5);
+    m_widgetsGroup->addChild(m_glowMode, 5);
+    m_widgetsGroup->addChild(m_glowBlurRadius, 5);
+    m_widgetsGroup->addChild(m_glowBlurScale, 5);
+    m_widgetsGroup->addChild(m_glowBlurStrength, 5);
 
     m_widgetsGroup->addChild(m_xCut, 5);
     m_widgetsGroup->addChild(m_yCut, 5);
@@ -236,12 +201,7 @@ void Z3DMeshFilter::renderOpaque(Z3DEye eye)
 void Z3DMeshFilter::renderTransparent(Z3DEye eye)
 {
   if (m_glow.get()) {
-    Z3DRenderOutputPort& currentOutport2 = (eye == MonoEye)   ? m_monoEyeOutport2
-                                           : (eye == LeftEye) ? m_leftEyeOutport2
-                                                              : m_rightEyeOutport2;
-    m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());
-    m_textureCopyRenderer.setDepthTexture(currentOutport2.depthTexture());
-    m_rendererBase.render(eye, m_textureCopyRenderer);
+    // Compositor owns glow composition; only render bound box here
     renderBoundBox(eye);
   } else {
     m_rendererBase.render(eye, m_triangleListRenderer);
@@ -360,10 +320,10 @@ void Z3DMeshFilter::adjustWidgets()
 {
   m_singleColorForAllMesh.setVisible(m_colorMode.isSelected("Single Color"));
 
-  m_textureGlowRenderer.glowModePara().setVisible(m_glow.get());
-  m_textureGlowRenderer.blurRadiusPara().setVisible(m_glow.get());
-  m_textureGlowRenderer.blurScalePara().setVisible(m_glow.get());
-  m_textureGlowRenderer.blurStrengthPara().setVisible(m_glow.get());
+  m_glowMode.setVisible(m_glow.get());
+  m_glowBlurRadius.setVisible(m_glow.get());
+  m_glowBlurScale.setVisible(m_glow.get());
+  m_glowBlurStrength.setVisible(m_glow.get());
 }
 
 void Z3DMeshFilter::selectMesh(QMouseEvent* e, int /*w*/, int /*h*/)

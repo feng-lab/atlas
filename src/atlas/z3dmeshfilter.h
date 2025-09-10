@@ -6,9 +6,6 @@
 #include "znumericparameter.h"
 #include "z3dmeshrenderer.h"
 #include "zeventlistenerparameter.h"
-#include "z3dtextureglowrenderer.h"
-#include "z3drenderport.h"
-#include "z3dtexturecopyrenderer.h"
 #include <QObject>
 #include <QPoint>
 #include <map>
@@ -110,21 +107,16 @@ private:
   void getVisibleData();
 
 private:
-  Z3DRenderOutputPort m_monoEyeOutport;
-  Z3DRenderOutputPort m_leftEyeOutport;
-  Z3DRenderOutputPort m_rightEyeOutport;
-  Z3DRenderOutputPort m_monoEyeOutport2;
-  Z3DRenderOutputPort m_leftEyeOutport2;
-  Z3DRenderOutputPort m_rightEyeOutport2;
-
   Z3DMeshRenderer m_triangleListRenderer;
 
   ZStringIntOptionParameter m_colorMode;
   ZVec4Parameter m_singleColorForAllMesh;
-
-  Z3DTextureGlowRenderer m_textureGlowRenderer;
   ZBoolParameter m_glow;
-  Z3DTextureCopyRenderer m_textureCopyRenderer;
+  // Glow parameters now live on the filter for compositor to read
+  ZStringStringOptionParameter m_glowMode;
+  ZIntParameter m_glowBlurRadius;
+  ZFloatParameter m_glowBlurScale;
+  ZFloatParameter m_glowBlurStrength;
 
   // std::map<QString, size_t> m_sourceColorMapper;   // should use unordered_map
   //  mesh list used for rendering, it is a subset of m_origMeshList. Some mesh are

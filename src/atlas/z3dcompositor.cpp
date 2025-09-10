@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "z3dgl.h"
-#include "z3dgpuinfo.h"
 #include "z3drendertarget.h"
 #include "z3dtexture.h"
 #include "zbenchtimer.h"
@@ -17,6 +16,7 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_firstOnTopRenderer(m_rendererBase, "FirstOnTop")
   , m_MIPImageAlphaBlendRenderer(m_rendererBase, "MIPImageDepthTestBlending")
   , m_textureCopyRenderer(m_rendererBase)
+  , m_glowRenderer(m_rendererBase)
   , m_backgroundRenderer(m_rendererBase)
   //, m_renderGeometries("Render Geometries", true)
   , m_inport("Image", true, this, State::MonoViewResultInvalid)
@@ -64,6 +64,8 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_backgroundRenderer.secondColorPara());
   addParameter(m_backgroundRenderer.gradientOrientationPara());
 
+  // Glow renderer is compositor-owned; parameters are synced from filters per-draw
+
   m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
 
   m_wbFinalShader.loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
@@ -101,6 +103,82 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
 #endif
   m_fontRenderer.setFollowCoordTransform(false);
   setupAxisCamera();
+}
+
+void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderTarget& renderTarget, Z3DEye eye)
+{
+  if (!filter) {
+    return;
+  }
+  auto glowPara = filter->parameter("Glow");
+  auto* glowBool = glowPara ? dynamic_cast<ZBoolParameter*>(glowPara) : nullptr;
+  if (glowBool && glowBool->get()) {
+    GLboolean prevDepthMask = GL_TRUE;
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &prevDepthMask);
+    if (prevDepthMask == GL_FALSE) {
+      glDepthMask(GL_TRUE);
+    }
+    // 1) render filter geometry to dedicated glow temp target 1
+    m_glowTempRenderTarget1.resize(renderTarget.size());
+    m_glowTempRenderTarget1.bind();
+    m_glowTempRenderTarget1.clear();
+    filter->setViewport(m_glowTempRenderTarget1.size());
+    filter->renderOpaque(eye);
+    m_glowTempRenderTarget1.release();
+
+    // 2) sync glow params and render glow into temp2
+    if (auto* mode = dynamic_cast<ZStringStringOptionParameter*>(filter->parameter("Glow Mode"))) {
+      m_glowRenderer.glowModePara().select(mode->get());
+    }
+    if (auto* radius = dynamic_cast<ZIntParameter*>(filter->parameter("Glow Blur Radius"))) {
+      m_glowRenderer.blurRadiusPara().set(radius->get());
+    }
+    if (auto* scale = dynamic_cast<ZFloatParameter*>(filter->parameter("Glow Blur Scale"))) {
+      m_glowRenderer.blurScalePara().set(scale->get());
+    }
+    if (auto* strength = dynamic_cast<ZFloatParameter*>(filter->parameter("Glow Blur Strength"))) {
+      m_glowRenderer.blurStrengthPara().set(strength->get());
+    }
+
+    m_glowTempRenderTarget2.resize(renderTarget.size());
+    m_glowTempRenderTarget2.bind();
+    m_glowTempRenderTarget2.clear();
+    m_rendererBase.setViewport(m_glowTempRenderTarget2.size());
+    m_glowRenderer.setColorTexture(m_glowTempRenderTarget1.colorTexture());
+    m_glowRenderer.setDepthTexture(m_glowTempRenderTarget1.depthTexture());
+    m_rendererBase.render(eye, m_glowRenderer);
+    m_glowTempRenderTarget2.release();
+
+    // Restore previous depth state
+    if (prevDepthMask == GL_FALSE) {
+      glDepthMask(GL_FALSE);
+    }
+
+    // 3) composite glow with current renderTarget using depth-aware alpha blend
+    m_tempRenderTarget5.resize(renderTarget.size());
+    m_tempRenderTarget5.bind();
+    m_tempRenderTarget5.clear();
+    m_rendererBase.setViewport(m_tempRenderTarget5.size());
+    m_alphaBlendRenderer.setColorTexture1(renderTarget.colorTexture());
+    m_alphaBlendRenderer.setDepthTexture1(renderTarget.depthTexture());
+    m_alphaBlendRenderer.setColorTexture2(m_glowTempRenderTarget2.colorTexture());
+    m_alphaBlendRenderer.setDepthTexture2(m_glowTempRenderTarget2.depthTexture());
+    m_rendererBase.render(eye, m_alphaBlendRenderer);
+    m_tempRenderTarget5.release();
+
+    // copy blended result back to renderTarget
+    renderTarget.bind();
+    renderTarget.clear();
+    m_rendererBase.setViewport(renderTarget.size());
+    m_textureCopyRenderer.setColorTexture(m_tempRenderTarget5.colorTexture());
+    m_textureCopyRenderer.setDepthTexture(m_tempRenderTarget5.depthTexture());
+    m_rendererBase.render(eye, m_textureCopyRenderer);
+    renderTarget.release();
+  } else {
+    // default path
+    filter->setViewport(renderTarget.size());
+    filter->renderTransparent(eye);
+  }
 }
 
 bool Z3DCompositor::isReady(Z3DEye) const
@@ -844,8 +922,7 @@ void Z3DCompositor::renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*>
   for (auto filter : transparentFilters) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    filter->setViewport(renderTarget.size());
-    filter->renderTransparent(eye);
+    renderTransparentFilter(filter, renderTarget, eye);
     glBlendFunc(GL_ONE, GL_ZERO);
     glDisable(GL_BLEND);
   }
@@ -870,8 +947,7 @@ void Z3DCompositor::renderGeomsBlendNoDepthMask(const std::vector<Z3DBoundedFilt
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE);
-    filter->setViewport(renderTarget.size());
-    filter->renderTransparent(eye);
+    renderTransparentFilter(filter, renderTarget, eye);
     glBlendFunc(GL_ONE, GL_ZERO);
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
@@ -888,6 +964,127 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
                                    const Z3DTexture* imageColorTex,
                                    const Z3DTexture* imageDepthTex)
 {
+  // Precompute glow-enabled filters into a single color/depth image pair
+  std::vector<Z3DBoundedFilter*> glowFilters;
+  glowFilters.reserve(transparentFilters.size());
+  for (auto f : transparentFilters) {
+    if (auto p = f->parameter("Glow")) {
+      if (auto* b = dynamic_cast<ZBoolParameter*>(p); b && b->get()) {
+        glowFilters.push_back(f);
+      }
+    }
+  }
+  const Z3DTexture* glowColorTex = nullptr;
+  const Z3DTexture* glowDepthTex = nullptr;
+  if (!glowFilters.empty()) {
+    m_glowAccumRenderTarget.resize(renderTarget.size());
+    // Clear accumulation target
+    m_glowAccumRenderTarget.bind();
+    m_glowAccumRenderTarget.clear();
+    m_glowAccumRenderTarget.release();
+
+    bool firstGlow = true;
+    for (auto gf : glowFilters) {
+      // Compute glow result (color+depth) for this filter into m_glowTempRenderTarget2
+      // Ensure depth test/writes for geometry prepass
+      GLboolean prevDepthMask = GL_TRUE;
+      glGetBooleanv(GL_DEPTH_WRITEMASK, &prevDepthMask);
+      GLboolean prevDepthTest = glIsEnabled(GL_DEPTH_TEST);
+      if (prevDepthTest == GL_FALSE) glEnable(GL_DEPTH_TEST);
+      if (prevDepthMask == GL_FALSE) glDepthMask(GL_TRUE);
+
+      // Geometry prepass
+      m_glowTempRenderTarget1.resize(renderTarget.size());
+      m_glowTempRenderTarget1.bind();
+      m_glowTempRenderTarget1.clear();
+      gf->setViewport(m_glowTempRenderTarget1.size());
+      gf->renderOpaque(eye);
+      m_glowTempRenderTarget1.release();
+
+      // Glow blur/composition for this object into temp2
+      m_glowTempRenderTarget2.resize(renderTarget.size());
+      m_glowTempRenderTarget2.bind();
+      m_glowTempRenderTarget2.clear();
+      m_rendererBase.setViewport(m_glowTempRenderTarget2.size());
+      if (auto* mode = dynamic_cast<ZStringStringOptionParameter*>(gf->parameter("Glow Mode"))) {
+        m_glowRenderer.glowModePara().select(mode->get());
+      }
+      if (auto* radius = dynamic_cast<ZIntParameter*>(gf->parameter("Glow Blur Radius"))) {
+        m_glowRenderer.blurRadiusPara().set(radius->get());
+      }
+      if (auto* scale = dynamic_cast<ZFloatParameter*>(gf->parameter("Glow Blur Scale"))) {
+        m_glowRenderer.blurScalePara().set(scale->get());
+      }
+      if (auto* strength = dynamic_cast<ZFloatParameter*>(gf->parameter("Glow Blur Strength"))) {
+        m_glowRenderer.blurStrengthPara().set(strength->get());
+      }
+      m_glowRenderer.setColorTexture(m_glowTempRenderTarget1.colorTexture());
+      m_glowRenderer.setDepthTexture(m_glowTempRenderTarget1.depthTexture());
+      m_rendererBase.render(eye, m_glowRenderer);
+      m_glowTempRenderTarget2.release();
+
+      // Restore depth state
+      if (prevDepthMask == GL_FALSE) glDepthMask(GL_FALSE);
+      if (prevDepthTest == GL_FALSE) glDisable(GL_DEPTH_TEST);
+
+      // Accumulate: if first, copy; else depth-aware blend accum + current glow
+      if (firstGlow) {
+        m_glowAccumRenderTarget.bind();
+        m_glowAccumRenderTarget.clear();
+        m_rendererBase.setViewport(m_glowAccumRenderTarget.size());
+        m_textureCopyRenderer.setColorTexture(m_glowTempRenderTarget2.colorTexture());
+        m_textureCopyRenderer.setDepthTexture(m_glowTempRenderTarget2.depthTexture());
+        m_rendererBase.render(eye, m_textureCopyRenderer);
+        m_glowAccumRenderTarget.release();
+        firstGlow = false;
+      } else {
+        // accum + current -> temp5
+        m_tempRenderTarget5.resize(renderTarget.size());
+        m_tempRenderTarget5.bind();
+        m_tempRenderTarget5.clear();
+        m_rendererBase.setViewport(m_tempRenderTarget5.size());
+        m_alphaBlendRenderer.setColorTexture1(m_glowAccumRenderTarget.colorTexture());
+        m_alphaBlendRenderer.setDepthTexture1(m_glowAccumRenderTarget.depthTexture());
+        m_alphaBlendRenderer.setColorTexture2(m_glowTempRenderTarget2.colorTexture());
+        m_alphaBlendRenderer.setDepthTexture2(m_glowTempRenderTarget2.depthTexture());
+        m_rendererBase.render(eye, m_alphaBlendRenderer);
+        m_tempRenderTarget5.release();
+
+        // copy back to accumulation
+        m_glowAccumRenderTarget.bind();
+        m_glowAccumRenderTarget.clear();
+        m_rendererBase.setViewport(m_glowAccumRenderTarget.size());
+        m_textureCopyRenderer.setColorTexture(m_tempRenderTarget5.colorTexture());
+        m_textureCopyRenderer.setDepthTexture(m_tempRenderTarget5.depthTexture());
+        m_rendererBase.render(eye, m_textureCopyRenderer);
+        m_glowAccumRenderTarget.release();
+      }
+    }
+
+    glowColorTex = m_glowAccumRenderTarget.colorTexture();
+    glowDepthTex = m_glowAccumRenderTarget.depthTexture();
+  }
+
+  // If there is both image textures and glow textures, merge them into a single pair
+  if (imageColorTex && glowColorTex) {
+    // Depth-aware composite: base image pair + glow pair => temp
+    m_imgTempRenderTarget1.resize(renderTarget.size());
+    m_imgTempRenderTarget1.bind();
+    m_imgTempRenderTarget1.clear();
+    m_rendererBase.setViewport(m_imgTempRenderTarget1.size());
+    m_alphaBlendRenderer.setColorTexture1(imageColorTex);
+    m_alphaBlendRenderer.setDepthTexture1(imageDepthTex);
+    m_alphaBlendRenderer.setColorTexture2(glowColorTex);
+    m_alphaBlendRenderer.setDepthTexture2(glowDepthTex);
+    m_rendererBase.render(eye, m_alphaBlendRenderer);
+    m_imgTempRenderTarget1.release();
+    imageColorTex = m_imgTempRenderTarget1.colorTexture();
+    imageDepthTex = m_imgTempRenderTarget1.depthTexture();
+  } else if (!imageColorTex && glowColorTex) {
+    imageColorTex = glowColorTex;
+    imageDepthTex = glowDepthTex;
+  }
+
   //  std::vector<Z3DBoundedFilter*> allFilters;
   //  allFilters.insert(allFilters.end(), opaqueFilters.begin(), opaqueFilters.end());
   //  allFilters.insert(allFilters.end(), transparentFilters.begin(), transparentFilters.end());
@@ -950,6 +1147,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
     m_alphaBlendRenderer.setColorTexture2(m_tempRenderTarget4.colorTexture());
     m_alphaBlendRenderer.setDepthTexture2(m_tempRenderTarget4.depthTexture());
     m_rendererBase.render(eye, m_alphaBlendRenderer);
+
     renderTarget.release();
   }
 }

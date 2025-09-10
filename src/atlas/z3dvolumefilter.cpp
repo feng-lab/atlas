@@ -1277,11 +1277,7 @@ glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, int width, int height
   viewport[2] = width;
   viewport[3] = height;
 
-  GLfloat WindowPosZ;
-  port.bindTarget();
-  glPixelStorei(GL_PACK_ALIGNMENT, 1);
-  glReadPixels(pos2D.x, pos2D.y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
-  port.releaseTarget();
+  GLfloat WindowPosZ = port.renderTarget().depthAtPos(pos2D);
 
   CHECK_GL_ERROR
   glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, WindowPosZ), modelview, projection, viewport);

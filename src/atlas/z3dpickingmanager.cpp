@@ -81,6 +81,17 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
   return objectOfColor(m_renderTarget->colorAtPos(pos));
 }
 
+GLfloat Z3DPickingManager::depthAtWidgetPos(glm::ivec2 pos)
+{
+  assert(m_devicePixelRatio >= 1);
+  pos[0] = pos[0] * m_devicePixelRatio;
+  pos[1] = pos[1] * m_devicePixelRatio;
+
+  auto texSize = glm::ivec2(m_renderTarget->size());
+  pos[1] = texSize[1] - pos[1];
+  return m_renderTarget->depthAtPos(pos);
+}
+
 std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm::ivec2& pos, int radius, bool ascend)
 {
   boost::unordered_flat_map<glm::col4, int> col2dist;

@@ -9,10 +9,14 @@
 #include "z3dpickingmanager.h"
 #include "z3dtextureblendrenderer.h"
 #include "z3dtexturecopyrenderer.h"
+#include "z3dtextureglowrenderer.h"
 #include "z3dfontrenderer.h"
 #include "z3dinteractionhandler.h"
 #include "zwidgetsgroup.h"
 #include "z3dshaderprogram.h"
+#include "zparameter.h"
+#include "zoptionparameter.h"
+#include "znumericparameter.h"
 
 namespace nim {
 
@@ -161,6 +165,7 @@ private:
   Z3DTextureBlendRenderer m_firstOnTopRenderer;
   Z3DTextureBlendRenderer m_MIPImageAlphaBlendRenderer;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
+  Z3DTextureGlowRenderer m_glowRenderer;
   Z3DBackgroundRenderer m_backgroundRenderer;
 
   // ZBoolParameter m_renderGeometries;
@@ -189,9 +194,18 @@ private:
   Z3DRenderTarget m_tempRenderTarget3;
   Z3DRenderTarget m_tempRenderTarget4;
   Z3DRenderTarget m_tempRenderTarget5;
+  // Dedicated glow intermediates to avoid clashing with caller-provided temps
+  Z3DRenderTarget m_glowTempRenderTarget1;
+  Z3DRenderTarget m_glowTempRenderTarget2;
+  Z3DRenderTarget m_glowAccumRenderTarget;
   Z3DRenderTarget m_imgTempRenderTarget1;
   Z3DRenderTarget m_imgTempRenderTarget2;
   Z3DRenderTarget m_pickingRenderTarget;
+  
+  // Internal helper: hooked transparent rendering with optional glow overlay
+  void renderTransparentFilter(Z3DBoundedFilter* filter,
+                               Z3DRenderTarget& renderTarget,
+                               Z3DEye eye);
 
   std::unique_ptr<Z3DRenderTarget> m_ddpRT;
   Z3DShaderProgram m_ddpBlendShader;
