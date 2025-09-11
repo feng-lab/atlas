@@ -4,8 +4,8 @@
 #include "ztiff.h"
 #include "zioutils.h"
 #include "zimage2dutils.h"
-#include <jpeglib.h>
-#include <turbojpeg.h>
+#include "../3rdparty/build/include/jpeglib.h"
+#include "../3rdparty/build/include/turbojpeg.h"
 #include <QFile>
 #include <folly/ScopeGuard.h>
 #include <boost/iostreams/device/array.hpp>

@@ -964,7 +964,15 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
                                    const Z3DTexture* imageColorTex,
                                    const Z3DTexture* imageDepthTex)
 {
-  // Precompute glow-enabled filters into a single color/depth image pair
+  // Build per-layer lists for OIT: start with the base image pair if present
+  std::vector<const Z3DTexture*> imageColorTexList;
+  std::vector<const Z3DTexture*> imageDepthTexList;
+  if (imageColorTex) {
+    imageColorTexList.push_back(imageColorTex);
+    imageDepthTexList.push_back(imageDepthTex);
+  }
+
+  // Precompute per-glow color/depth layers (one pair per glow-enabled filter)
   std::vector<Z3DBoundedFilter*> glowFilters;
   glowFilters.reserve(transparentFilters.size());
   for (auto f : transparentFilters) {
@@ -974,17 +982,23 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       }
     }
   }
-  const Z3DTexture* glowColorTex = nullptr;
-  const Z3DTexture* glowDepthTex = nullptr;
   if (!glowFilters.empty()) {
-    m_glowAccumRenderTarget.resize(renderTarget.size());
-    // Clear accumulation target
-    m_glowAccumRenderTarget.bind();
-    m_glowAccumRenderTarget.clear();
-    m_glowAccumRenderTarget.release();
+    // Prepare a pool of layer render targets (one per glow)
+    if (m_glowLayerPool.size() < glowFilters.size()) {
+      size_t old = m_glowLayerPool.size();
+      m_glowLayerPool.resize(glowFilters.size());
+      for (size_t i = old; i < m_glowLayerPool.size(); ++i) {
+        // Use default constructor so attachments are created internally
+        m_glowLayerPool[i] = std::make_unique<Z3DRenderTarget>();
+      }
+    }
+    // Ensure all RTs match current size
+    for (auto& rt : m_glowLayerPool) {
+      if (rt) rt->resize(renderTarget.size());
+    }
 
-    bool firstGlow = true;
-    for (auto gf : glowFilters) {
+    for (size_t gi = 0; gi < glowFilters.size(); ++gi) {
+      auto* gf = glowFilters[gi];
       // Compute glow result (color+depth) for this filter into m_glowTempRenderTarget2
       // Ensure depth test/writes for geometry prepass
       GLboolean prevDepthMask = GL_TRUE;
@@ -1001,11 +1015,11 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       gf->renderOpaque(eye);
       m_glowTempRenderTarget1.release();
 
-      // Glow blur/composition for this object into temp2
-      m_glowTempRenderTarget2.resize(renderTarget.size());
-      m_glowTempRenderTarget2.bind();
-      m_glowTempRenderTarget2.clear();
-      m_rendererBase.setViewport(m_glowTempRenderTarget2.size());
+      // Glow blur/composition for this object directly into its layer RT
+      auto& layerRT = m_glowLayerPool[gi];
+      layerRT->bind();
+      layerRT->clear();
+      m_rendererBase.setViewport(layerRT->size());
       if (auto* mode = dynamic_cast<ZStringStringOptionParameter*>(gf->parameter("Glow Mode"))) {
         m_glowRenderer.glowModePara().select(mode->get());
       }
@@ -1021,68 +1035,15 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       m_glowRenderer.setColorTexture(m_glowTempRenderTarget1.colorTexture());
       m_glowRenderer.setDepthTexture(m_glowTempRenderTarget1.depthTexture());
       m_rendererBase.render(eye, m_glowRenderer);
-      m_glowTempRenderTarget2.release();
+      layerRT->release();
 
       // Restore depth state
       if (prevDepthMask == GL_FALSE) glDepthMask(GL_FALSE);
       if (prevDepthTest == GL_FALSE) glDisable(GL_DEPTH_TEST);
 
-      // Accumulate: if first, copy; else depth-aware blend accum + current glow
-      if (firstGlow) {
-        m_glowAccumRenderTarget.bind();
-        m_glowAccumRenderTarget.clear();
-        m_rendererBase.setViewport(m_glowAccumRenderTarget.size());
-        m_textureCopyRenderer.setColorTexture(m_glowTempRenderTarget2.colorTexture());
-        m_textureCopyRenderer.setDepthTexture(m_glowTempRenderTarget2.depthTexture());
-        m_rendererBase.render(eye, m_textureCopyRenderer);
-        m_glowAccumRenderTarget.release();
-        firstGlow = false;
-      } else {
-        // accum + current -> temp5
-        m_tempRenderTarget5.resize(renderTarget.size());
-        m_tempRenderTarget5.bind();
-        m_tempRenderTarget5.clear();
-        m_rendererBase.setViewport(m_tempRenderTarget5.size());
-        m_alphaBlendRenderer.setColorTexture1(m_glowAccumRenderTarget.colorTexture());
-        m_alphaBlendRenderer.setDepthTexture1(m_glowAccumRenderTarget.depthTexture());
-        m_alphaBlendRenderer.setColorTexture2(m_glowTempRenderTarget2.colorTexture());
-        m_alphaBlendRenderer.setDepthTexture2(m_glowTempRenderTarget2.depthTexture());
-        m_rendererBase.render(eye, m_alphaBlendRenderer);
-        m_tempRenderTarget5.release();
-
-        // copy back to accumulation
-        m_glowAccumRenderTarget.bind();
-        m_glowAccumRenderTarget.clear();
-        m_rendererBase.setViewport(m_glowAccumRenderTarget.size());
-        m_textureCopyRenderer.setColorTexture(m_tempRenderTarget5.colorTexture());
-        m_textureCopyRenderer.setDepthTexture(m_tempRenderTarget5.depthTexture());
-        m_rendererBase.render(eye, m_textureCopyRenderer);
-        m_glowAccumRenderTarget.release();
-      }
+      imageColorTexList.push_back(layerRT->colorTexture());
+      imageDepthTexList.push_back(layerRT->depthTexture());
     }
-
-    glowColorTex = m_glowAccumRenderTarget.colorTexture();
-    glowDepthTex = m_glowAccumRenderTarget.depthTexture();
-  }
-
-  // If there is both image textures and glow textures, merge them into a single pair
-  if (imageColorTex && glowColorTex) {
-    // Depth-aware composite: base image pair + glow pair => temp
-    m_imgTempRenderTarget1.resize(renderTarget.size());
-    m_imgTempRenderTarget1.bind();
-    m_imgTempRenderTarget1.clear();
-    m_rendererBase.setViewport(m_imgTempRenderTarget1.size());
-    m_alphaBlendRenderer.setColorTexture1(imageColorTex);
-    m_alphaBlendRenderer.setDepthTexture1(imageDepthTex);
-    m_alphaBlendRenderer.setColorTexture2(glowColorTex);
-    m_alphaBlendRenderer.setDepthTexture2(glowDepthTex);
-    m_rendererBase.render(eye, m_alphaBlendRenderer);
-    m_imgTempRenderTarget1.release();
-    imageColorTex = m_imgTempRenderTarget1.colorTexture();
-    imageDepthTex = m_imgTempRenderTarget1.depthTexture();
-  } else if (!imageColorTex && glowColorTex) {
-    imageColorTex = glowColorTex;
-    imageDepthTex = glowDepthTex;
   }
 
   //  std::vector<Z3DBoundedFilter*> allFilters;
@@ -1094,7 +1055,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
   //    renderTransparentWA(allFilters, port, eye);
   //  }
   //  return;
-  if (transparentFilters.empty() && !imageColorTex) {
+  if (transparentFilters.empty() && imageColorTexList.empty()) {
     renderOpaqueFilters(opaqueFilters, renderTarget, eye);
   }
   //  else {
@@ -1104,11 +1065,11 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
   //  }
   else if (opaqueFilters.empty()) {
     if (method == "Dual Depth Peeling") {
-      renderTransparentDDP(transparentFilters, renderTarget, eye, nullptr, imageColorTex, imageDepthTex);
+      renderTransparentDDP(transparentFilters, renderTarget, eye, nullptr, imageColorTexList, imageDepthTexList);
     } else if (method == "Weighted Average") {
-      renderTransparentWA(transparentFilters, renderTarget, eye, nullptr, imageColorTex, imageDepthTex);
+      renderTransparentWA(transparentFilters, renderTarget, eye, nullptr, imageColorTexList, imageDepthTexList);
     } else if (method == "Weighted Blended") {
-      renderTransparentWB(transparentFilters, renderTarget, eye, nullptr, imageColorTex, imageDepthTex);
+      renderTransparentWB(transparentFilters, renderTarget, eye, nullptr, imageColorTexList, imageDepthTexList);
     }
   } else {
     m_tempRenderTarget3.resize(renderTarget.size());
@@ -1120,22 +1081,22 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
                            m_tempRenderTarget4,
                            eye,
                            m_tempRenderTarget3.depthTexture(),
-                           imageColorTex,
-                           imageDepthTex);
+                           imageColorTexList,
+                           imageDepthTexList);
     } else if (method == "Weighted Average") {
       renderTransparentWA(transparentFilters,
                           m_tempRenderTarget4,
                           eye,
                           m_tempRenderTarget3.depthTexture(),
-                          imageColorTex,
-                          imageDepthTex);
+                          imageColorTexList,
+                          imageDepthTexList);
     } else if (method == "Weighted Blended") {
       renderTransparentWB(transparentFilters,
                           m_tempRenderTarget4,
                           eye,
                           m_tempRenderTarget3.depthTexture(),
-                          imageColorTex,
-                          imageDepthTex);
+                          imageColorTexList,
+                          imageDepthTexList);
     }
 
     // blend temport3 and temport4 into outport
@@ -1165,12 +1126,13 @@ void Z3DCompositor::renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& fi
   renderTarget.release();
 }
 
+// Vector-list overload: feeds multiple image pairs through DDP
 void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& filters,
                                          Z3DRenderTarget& renderTarget,
                                          Z3DEye eye,
                                          Z3DTexture* depthTexture,
-                                         const Z3DTexture* imageColorTex,
-                                         const Z3DTexture* imageDepthTex)
+                                         const std::vector<const Z3DTexture*>& imageColorTexList,
+                                         const std::vector<const Z3DTexture*>& imageDepthTexList)
 {
   if (!m_ddpRT) {
     if (!createDDPRenderTarget(renderTarget.size())) {
@@ -1241,12 +1203,15 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
     filter->renderTransparent(eye);
   }
-  if (imageColorTex) {
+  if (!imageColorTexList.empty()) {
     m_rendererBase.setViewport(m_ddpRT->size());
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
-    m_textureCopyRenderer.setColorTexture(imageColorTex);
-    m_textureCopyRenderer.setDepthTexture(imageDepthTex);
-    m_rendererBase.render(eye, m_textureCopyRenderer);
+    size_t n = std::min(imageColorTexList.size(), imageDepthTexList.size());
+    for (size_t i = 0; i < n; ++i) {
+      m_textureCopyRenderer.setColorTexture(imageColorTexList[i]);
+      m_textureCopyRenderer.setDepthTexture(imageDepthTexList[i]);
+      m_rendererBase.render(eye, m_textureCopyRenderer);
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -1287,12 +1252,15 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
       filter->setShaderHookParaDDPFrontBlenderTexture(g_dualFrontBlenderTexId[prevId]);
       filter->renderTransparent(eye);
     }
-    if (imageColorTex) {
+    if (!imageColorTexList.empty()) {
       m_rendererBase.setViewport(m_ddpRT->size());
       m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-      m_textureCopyRenderer.setColorTexture(imageColorTex);
-      m_textureCopyRenderer.setDepthTexture(imageDepthTex);
-      m_rendererBase.render(eye, m_textureCopyRenderer);
+      size_t n = std::min(imageColorTexList.size(), imageDepthTexList.size());
+      for (size_t i = 0; i < n; ++i) {
+        m_textureCopyRenderer.setColorTexture(imageColorTexList[i]);
+        m_textureCopyRenderer.setDepthTexture(imageDepthTexList[i]);
+        m_rendererBase.render(eye, m_textureCopyRenderer);
+      }
     }
 
     // Full screen pass to alpha-blend the back color
@@ -1344,7 +1312,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   for (auto filter : filters) {
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
-  if (imageColorTex) {
+  if (!imageColorTexList.empty()) {
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
 
@@ -1368,6 +1336,8 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
 
   glEnable(GL_DEPTH_TEST);
 }
+
+// Removed single-image overload: use list-based API
 
 bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
 {
@@ -1440,11 +1410,11 @@ bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
 }
 
 void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
-                                        Z3DRenderTarget& renderTarget,
-                                        Z3DEye eye,
-                                        Z3DTexture* depthTexture,
-                                        const Z3DTexture* imageColorTex,
-                                        const Z3DTexture* imageDepthTex)
+                                         Z3DRenderTarget& renderTarget,
+                                         Z3DEye eye,
+                                         Z3DTexture* depthTexture,
+                                         const std::vector<const Z3DTexture*>& imageColorTexList,
+                                         const std::vector<const Z3DTexture*>& imageDepthTexList)
 {
   if (!m_waRT) {
     if (!createWARenderTarget(renderTarget.size())) {
@@ -1488,12 +1458,15 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
     filter->renderTransparent(eye);
   }
-  if (imageColorTex) {
+  if (!imageColorTexList.empty()) {
     m_rendererBase.setViewport(m_waRT->size());
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
-    m_textureCopyRenderer.setColorTexture(imageColorTex);
-    m_textureCopyRenderer.setDepthTexture(imageDepthTex);
-    m_rendererBase.render(eye, m_textureCopyRenderer);
+    size_t n = std::min(imageColorTexList.size(), imageDepthTexList.size());
+    for (size_t i = 0; i < n; ++i) {
+      m_textureCopyRenderer.setColorTexture(imageColorTexList[i]);
+      m_textureCopyRenderer.setDepthTexture(imageDepthTexList[i]);
+      m_rendererBase.render(eye, m_textureCopyRenderer);
+    }
   }
 
   if (depthTexture) {
@@ -1511,7 +1484,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   for (auto filter : filters) {
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
-  if (imageColorTex) {
+  if (!imageColorTexList.empty()) {
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
 
@@ -1534,6 +1507,9 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
 
   glEnable(GL_DEPTH_TEST);
 }
+
+// Backward-compatible wrapper for WA (single image pair)
+/* removed single-image overload for WA */
 
 bool Z3DCompositor::createWARenderTarget(const glm::uvec2& size)
 {
@@ -1565,11 +1541,11 @@ bool Z3DCompositor::createWARenderTarget(const glm::uvec2& size)
 }
 
 void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
-                                        Z3DRenderTarget& renderTarget,
-                                        Z3DEye eye,
-                                        Z3DTexture* depthTexture,
-                                        const Z3DTexture* imageColorTex,
-                                        const Z3DTexture* imageDepthTex)
+                                         Z3DRenderTarget& renderTarget,
+                                         Z3DEye eye,
+                                         Z3DTexture* depthTexture,
+                                         const std::vector<const Z3DTexture*>& imageColorTexList,
+                                         const std::vector<const Z3DTexture*>& imageDepthTexList)
 {
   if (!m_wbRT) {
     if (!createWBRenderTarget(renderTarget.size())) {
@@ -1619,12 +1595,15 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
     filter->renderTransparent(eye);
   }
-  if (imageColorTex) {
+  if (!imageColorTexList.empty()) {
     m_rendererBase.setViewport(m_wbRT->size());
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
-    m_textureCopyRenderer.setColorTexture(imageColorTex);
-    m_textureCopyRenderer.setDepthTexture(imageDepthTex);
-    m_rendererBase.render(eye, m_textureCopyRenderer);
+    size_t n = std::min(imageColorTexList.size(), imageDepthTexList.size());
+    for (size_t i = 0; i < n; ++i) {
+      m_textureCopyRenderer.setColorTexture(imageColorTexList[i]);
+      m_textureCopyRenderer.setDepthTexture(imageDepthTexList[i]);
+      m_rendererBase.render(eye, m_textureCopyRenderer);
+    }
   }
 
   if (depthTexture) {
@@ -1642,7 +1621,7 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   for (auto filter : filters) {
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
-  if (imageColorTex) {
+  if (!imageColorTexList.empty()) {
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   }
 
@@ -1665,6 +1644,9 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
 
   glEnable(GL_DEPTH_TEST);
 }
+
+// Backward-compatible wrapper for WB (single image pair)
+/* removed single-image overload for WB */
 
 bool Z3DCompositor::createWBRenderTarget(const glm::uvec2& size)
 {

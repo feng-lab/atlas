@@ -114,30 +114,33 @@ private:
 
   void renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& filters, Z3DRenderTarget& renderTarget, Z3DEye eye);
 
+  // DDP with multiple image layers
   void renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& filters,
                             Z3DRenderTarget& renderTarget,
                             Z3DEye eye,
-                            Z3DTexture* depthTexture = nullptr,
-                            const Z3DTexture* imageColorTex = nullptr,
-                            const Z3DTexture* imageDepthTex = nullptr);
+                            Z3DTexture* depthTexture,
+                            const std::vector<const Z3DTexture*>& imageColorTexList,
+                            const std::vector<const Z3DTexture*>& imageDepthTexList);
 
   bool createDDPRenderTarget(const glm::uvec2& size);
 
+  // Weighted Average with multiple image layers
   void renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
                            Z3DRenderTarget& renderTarget,
                            Z3DEye eye,
-                           Z3DTexture* depthTexture = nullptr,
-                           const Z3DTexture* imageColorTex = nullptr,
-                           const Z3DTexture* imageDepthTex = nullptr);
+                           Z3DTexture* depthTexture,
+                           const std::vector<const Z3DTexture*>& imageColorTexList,
+                           const std::vector<const Z3DTexture*>& imageDepthTexList);
 
   bool createWARenderTarget(const glm::uvec2& size);
 
+  // Weighted Blended with multiple image layers
   void renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
                            Z3DRenderTarget& renderTarget,
                            Z3DEye eye,
-                           Z3DTexture* depthTexture = nullptr,
-                           const Z3DTexture* imageColorTex = nullptr,
-                           const Z3DTexture* imageDepthTex = nullptr);
+                           Z3DTexture* depthTexture,
+                           const std::vector<const Z3DTexture*>& imageColorTexList,
+                           const std::vector<const Z3DTexture*>& imageDepthTexList);
 
   bool createWBRenderTarget(const glm::uvec2& size);
 
@@ -198,6 +201,7 @@ private:
   Z3DRenderTarget m_glowTempRenderTarget1;
   Z3DRenderTarget m_glowTempRenderTarget2;
   Z3DRenderTarget m_glowAccumRenderTarget;
+  std::vector<std::unique_ptr<Z3DRenderTarget>> m_glowLayerPool;
   Z3DRenderTarget m_imgTempRenderTarget1;
   Z3DRenderTarget m_imgTempRenderTarget2;
   Z3DRenderTarget m_pickingRenderTarget;

@@ -74,6 +74,51 @@ Next refactors:
 - Keep all GL calls in compositor + renderer layers; remove GL code from filters by moving those bits into compositor.
 - In engine, isolate GL readback behind a tiny helper to be matched by Vulkan compositor readback later.
 
+## Filters Backend‑Agnostic (In Progress)
+
+Goal: Filters own data/parameters and describe what to render; renderers/compositor own GPU resources and GL/Vulkan calls. Filters must not include GL types in headers.
+
+Why: Enables a swappable backend without duplicating filter logic; reduces churn by confining API‑specific code to renderers/compositor.
+
+Approach (incremental):
+
+- Header decoupling: convert filter headers to forward‑declare renderer classes and use pointers/`pimpl` for API‑specific members; move includes to `.cpp`.
+- Resource ownership move: shift FBO/texture creation/resize/attach from filters into their corresponding renderers (raycaster/slice/volume) and/or compositor scratch targets.
+- Compositor hooks: add seam(s) so compositor orchestrates opaque/transparent/picking passes, not filters directly binding FBOs or toggling state.
+- Output handoff: introduce a small `RenderOutput` DTO and adapter so filters no longer depend on `Z3DRenderOutputPort` directly.
+- Picking: centralize picking in compositor/renderer; filters register objects and provide IDs/boxes only.
+
+Status by filter:
+
+- `Z3DMeshFilter`: GL calls removed; compositor controls glow. Header still includes `z3dmeshrenderer.h` (acceptable short‑term) — convert to forward decl later.
+- `Z3DImgFilter`: Heavy GL in header and ctor (FBOs/textures, blend, cull). Next to tackle.
+- `Z3DVolumeFilter`: Same pattern as image; follows after image.
+- `Z3DSwcFilter`/`Z3DPunctaFilter`/`Z3DAnimationFilter`: Mostly renderer‑driven already; ensure headers forward‑declare renderers and push GL state to compositor.
+
+Immediate Work Items
+
+1) Z3DImgFilter — header decoupling
+   - Replace by‑value renderer members with `std::unique_ptr<...>` and forward‑declare renderer classes in header.
+   - Hide GL targets/textures behind a private `pimpl` declared in `.cpp`.
+   - Move GL includes (`z3d*renderer.h`, `z3drenderport.h`, `z3drendertarget.h`, `z3dtexture.h`) from header to `.cpp`.
+
+2) Z3DImgFilter — resource ownership move (step 1)
+   - Move creation/resize/attach of `m_entryExitTarget`, `m_layerTarget`, blockID textures, and image render targets into `Z3DImgRaycasterRenderer`/`Z3DImgSliceRenderer` as internal scratch.
+   - Expose minimal methods on renderers: `initTargets(size)`, `resizeTargets(size)`, `setEntryExitInfo(...)`, `getOutput(eye)`.
+   - Filter calls renderer methods but does not touch GL/FBOs directly.
+
+3) Z3DImgFilter — compositor orchestration (step 2)
+   - Replace `bindTarget/clearTarget` and blend/cull toggles in the filter with a compositor call: `compositor.renderTransparentFilter(*this, eye)`.
+   - Compositor chooses glow/OIT path and manages GL state; filter only sets renderer parameters and invokes renderer.
+
+4) Z3DVolumeFilter — repeat (header decouple → resource move → compositor seam).
+
+5) Convert remaining filters (Swc/Puncta/Animation): forward‑decl headers; push any stray GL state to compositor.
+
+Acceptance:
+
+- Filter headers compile without including GL types. No direct FBO/texture creation in filters. Visual parity maintained on representative scenes (opaque/transparent/picking).
+
 Upcoming Tasks (proposed order)
 
 1) Move GL resource ownership out of image/volume filters
