@@ -144,13 +144,16 @@ private:
 
   bool createWBRenderTarget(const glm::uvec2& size);
 
-  // if image inport has more than 1 image, blend use tempport3 and tempport4,
-  // send output to colorTex and depthTex
-  void renderImages(Z3DRenderInputPort& currentInport,
-                    Z3DRenderTarget& renderTarget,
-                    Z3DEye eye,
-                    const Z3DTexture*& colorTex,
-                    const Z3DTexture*& depthTex);
+
+  // Build a list of non-opaque image layers (color/depth) from connected image filters
+  std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> collectNonOpaqueImageLayers(Z3DEye eye) const;
+
+  // Merge a list of image layers into a single pair using the same blending as renderImages
+  bool mergeImageLayers(const std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>>& layers,
+                        Z3DEye eye,
+                        Z3DRenderTarget& renderTarget,
+                        const Z3DTexture*& colorTex,
+                        const Z3DTexture*& depthTex);
 
   void renderAxis(Z3DEye eye);
 

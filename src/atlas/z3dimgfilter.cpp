@@ -397,19 +397,33 @@ bool Z3DImgFilter::isReady(Z3DEye eye) const
 
 bool Z3DImgFilter::hasOpaque(Z3DEye) const
 {
-  return hasSlices();
+  // Slice rendering is inherently opaque. Also treat opaque MIP modes as
+  // opaque so they occlude correctly when multiple images are present.
+  if (hasSlices()) {
+    return true;
+  }
+  const QString mode = m_imgRaycasterRenderer.compositeMode();
+  if ((mode == "MIP Opaque" || mode == "Local MIP Opaque") && m_outport.hasValidData()) {
+    return true;
+  }
+  return false;
 }
 
 void Z3DImgFilter::renderOpaque(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_opaqueOutport
-                                        : (eye == LeftEye) ? m_opaqueLeftEyeOutport
-                                                           : m_opaqueRightEyeOutport;
+  // Slices are rendered into the dedicated opaque outports; in opaque MIP
+  // modes the image output lives in the standard outport but should be
+  // composited via the opaque path.
+  const QString mode = m_imgRaycasterRenderer.compositeMode();
+  Z3DRenderOutputPort& currentOutport =
+    (mode == "MIP Opaque" || mode == "Local MIP Opaque")
+      ? ((eye == MonoEye) ? m_outport : (eye == LeftEye) ? m_leftEyeOutport : m_rightEyeOutport)
+      : ((eye == MonoEye) ? m_opaqueOutport
+                          : (eye == LeftEye) ? m_opaqueLeftEyeOutport : m_opaqueRightEyeOutport);
+
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
-  // glFinish();
-  // currentOutport.colorTexture()->saveAsColorImage("/Users/feng/Downloads/abc.tif");
 }
 
 bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
@@ -417,6 +431,11 @@ bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
   const Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
                                               : (eye == LeftEye) ? m_leftEyeOutport
                                                                  : m_rightEyeOutport;
+  // When in opaque MIP modes, draw via the opaque path (and avoid double-render).
+  const QString mode = m_imgRaycasterRenderer.compositeMode();
+  if (mode == "MIP Opaque" || mode == "Local MIP Opaque") {
+    return false;
+  }
   return currentOutport.hasValidData();
 }
 

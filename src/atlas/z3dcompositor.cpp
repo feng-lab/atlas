@@ -430,10 +430,20 @@ double Z3DCompositor::process(Z3DEye eye)
         currentOutRenderTarget.release();
       }
     } else { // with volume
+      // Classify volumes: some may be opaque (e.g., MIP Opaque), others transparent
+      bool hasOpaqueVolumes = false;
+      for (auto* vf : vFilters) {
+        if (vf && vf->isReady(eye) && vf->hasOpaque(eye)) { hasOpaqueVolumes = true; break; }
+      }
+      auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
+      bool hasTransparentVolumes = !nonOpaqueLayers.empty();
       if (numNormalFilters == 0 && numOnTopFilters == 0) { // directly copy inport image to outport
         const Z3DTexture* colorTex = nullptr;
         const Z3DTexture* depthTex = nullptr;
-        renderImages(currentInport, currentOutRenderTarget, eye, colorTex, depthTex);
+        // Merge only non-opaque images; opaque ones render via opaque pass and are already in normal filters
+        if (!mergeImageLayers(nonOpaqueLayers, eye, currentOutRenderTarget, colorTex, depthTex)) {
+          colorTex = nullptr; depthTex = nullptr;
+        }
 
         currentOutRenderTarget.bind();
         currentOutRenderTarget.clear();
@@ -479,7 +489,9 @@ double Z3DCompositor::process(Z3DEye eye)
 
         const Z3DTexture* colorTex = nullptr;
         const Z3DTexture* depthTex = nullptr;
-        renderImages(currentInport, currentOutRenderTarget, eye, colorTex, depthTex);
+        if (hasTransparentVolumes) {
+          mergeImageLayers(nonOpaqueLayers, eye, currentOutRenderTarget, colorTex, depthTex);
+        }
 
         // blend tempPort with volume
         currentOutRenderTarget.bind();
@@ -491,18 +503,27 @@ double Z3DCompositor::process(Z3DEye eye)
           glEnable(GL_BLEND);
           glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
-        if (numOnTopFilters == 0) {
-          m_alphaBlendRenderer.setColorTexture1(m_tempRenderTarget1.colorTexture());
-          m_alphaBlendRenderer.setDepthTexture1(m_tempRenderTarget1.depthTexture());
-          m_alphaBlendRenderer.setColorTexture2(colorTex);
-          m_alphaBlendRenderer.setDepthTexture2(depthTex);
-          m_rendererBase.render(eye, m_alphaBlendRenderer);
+        if (hasTransparentVolumes && colorTex && depthTex) {
+          if (numOnTopFilters == 0) {
+            m_alphaBlendRenderer.setColorTexture1(m_tempRenderTarget1.colorTexture());
+            m_alphaBlendRenderer.setDepthTexture1(m_tempRenderTarget1.depthTexture());
+            m_alphaBlendRenderer.setColorTexture2(colorTex);
+            m_alphaBlendRenderer.setDepthTexture2(depthTex);
+            m_rendererBase.render(eye, m_alphaBlendRenderer);
+          } else {
+            m_firstOnTopBlendRenderer.setColorTexture1(m_tempRenderTarget1.colorTexture());
+            m_firstOnTopBlendRenderer.setDepthTexture1(m_tempRenderTarget1.depthTexture());
+            m_firstOnTopBlendRenderer.setColorTexture2(colorTex);
+            m_firstOnTopBlendRenderer.setDepthTexture2(depthTex);
+            m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+          }
         } else {
-          m_firstOnTopBlendRenderer.setColorTexture1(m_tempRenderTarget1.colorTexture());
-          m_firstOnTopBlendRenderer.setDepthTexture1(m_tempRenderTarget1.depthTexture());
-          m_firstOnTopBlendRenderer.setColorTexture2(colorTex);
-          m_firstOnTopBlendRenderer.setDepthTexture2(depthTex);
-          m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+          // No transparent volume layers to blend; just copy geometries to output
+          glDepthFunc(GL_ALWAYS);
+          m_textureCopyRenderer.setColorTexture(m_tempRenderTarget1.colorTexture());
+          m_textureCopyRenderer.setDepthTexture(m_tempRenderTarget1.depthTexture());
+          m_rendererBase.render(eye, m_textureCopyRenderer);
+          glDepthFunc(GL_LESS);
         }
         if (m_showAxis.get()) {
           if (!m_showBackground.get()) {
@@ -533,38 +554,56 @@ double Z3DCompositor::process(Z3DEye eye)
 
         const Z3DTexture* colorTex = nullptr;
         const Z3DTexture* depthTex = nullptr;
-        renderImages(currentInport, currentOutRenderTarget, eye, colorTex, depthTex);
-
-        // blend inport and tempport into tempport2
-        m_tempRenderTarget2.bind();
-
-        m_rendererBase.setViewport(m_tempRenderTarget2.size());
-        m_alphaBlendRenderer.setColorTexture1(m_tempRenderTarget1.colorTexture());
-        m_alphaBlendRenderer.setDepthTexture1(m_tempRenderTarget1.depthTexture());
-        m_alphaBlendRenderer.setColorTexture2(colorTex);
-        m_alphaBlendRenderer.setDepthTexture2(depthTex);
-        m_rendererBase.render(eye, m_alphaBlendRenderer);
-
-        m_tempRenderTarget2.release();
-
-        // render on top geometries into tempport
-        renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, m_tempRenderTarget1, eye);
-
-        // blend temport and temport2 into outport
-        currentOutRenderTarget.bind();
-        currentOutRenderTarget.clear();
-        m_rendererBase.setViewport(currentOutRenderTarget.size());
-
-        if (m_showBackground.get()) {
-          m_rendererBase.render(eye, m_backgroundRenderer);
-          glEnable(GL_BLEND);
-          glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        if (hasTransparentVolumes) {
+          mergeImageLayers(nonOpaqueLayers, eye, currentOutRenderTarget, colorTex, depthTex);
         }
-        m_firstOnTopBlendRenderer.setColorTexture1(m_tempRenderTarget1.colorTexture());
-        m_firstOnTopBlendRenderer.setDepthTexture1(m_tempRenderTarget1.depthTexture());
-        m_firstOnTopBlendRenderer.setColorTexture2(m_tempRenderTarget2.colorTexture());
-        m_firstOnTopBlendRenderer.setDepthTexture2(m_tempRenderTarget2.depthTexture());
-        m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+
+        if (hasTransparentVolumes && colorTex && depthTex) {
+          // blend inport and tempport into tempport2
+          m_tempRenderTarget2.bind();
+          m_rendererBase.setViewport(m_tempRenderTarget2.size());
+          m_alphaBlendRenderer.setColorTexture1(m_tempRenderTarget1.colorTexture());
+          m_alphaBlendRenderer.setDepthTexture1(m_tempRenderTarget1.depthTexture());
+          m_alphaBlendRenderer.setColorTexture2(colorTex);
+          m_alphaBlendRenderer.setDepthTexture2(depthTex);
+          m_rendererBase.render(eye, m_alphaBlendRenderer);
+          m_tempRenderTarget2.release();
+
+          // render on top geometries into tempport
+          renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, m_tempRenderTarget1, eye);
+
+          // blend temport and temport2 into outport
+          currentOutRenderTarget.bind();
+          currentOutRenderTarget.clear();
+          m_rendererBase.setViewport(currentOutRenderTarget.size());
+
+          if (m_showBackground.get()) {
+            m_rendererBase.render(eye, m_backgroundRenderer);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+          }
+          m_firstOnTopBlendRenderer.setColorTexture1(m_tempRenderTarget1.colorTexture());
+          m_firstOnTopBlendRenderer.setDepthTexture1(m_tempRenderTarget1.depthTexture());
+          m_firstOnTopBlendRenderer.setColorTexture2(m_tempRenderTarget2.colorTexture());
+          m_firstOnTopBlendRenderer.setDepthTexture2(m_tempRenderTarget2.depthTexture());
+          m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+        } else {
+          // Fallback: no transparent volume layers; render on-top geoms to temp2 and blend geoms only
+          renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, m_tempRenderTarget2, eye);
+          currentOutRenderTarget.bind();
+          currentOutRenderTarget.clear();
+          m_rendererBase.setViewport(currentOutRenderTarget.size());
+          if (m_showBackground.get()) {
+            m_rendererBase.render(eye, m_backgroundRenderer);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+          }
+          m_firstOnTopBlendRenderer.setColorTexture1(m_tempRenderTarget2.colorTexture());
+          m_firstOnTopBlendRenderer.setDepthTexture1(m_tempRenderTarget2.depthTexture());
+          m_firstOnTopBlendRenderer.setColorTexture2(m_tempRenderTarget1.colorTexture());
+          m_firstOnTopBlendRenderer.setDepthTexture2(m_tempRenderTarget1.depthTexture());
+          m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
+        }
         if (m_showAxis.get()) {
           if (!m_showBackground.get()) {
             glEnable(GL_BLEND);
@@ -588,9 +627,8 @@ double Z3DCompositor::process(Z3DEye eye)
     //    }
     const Z3DTexture* imageColorTex = nullptr;
     const Z3DTexture* imageDepthTex = nullptr;
-    if (currentInport.isReady()) {
-      renderImages(currentInport, currentOutRenderTarget, eye, imageColorTex, imageDepthTex);
-    }
+    // Do not pre-merge image layers here; OIT path collects each non-opaque layer
+    // individually in renderGeomsOIT for correct per-layer composition.
     numNormalFilters = normalOpaqueFilters.size() + normalTransparentFilters.size() + vFilters.size();
     if (numNormalFilters == 0 || numOnTopFilters == 0) {
       if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
@@ -958,6 +996,14 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
   if (imageColorTex) {
     imageColorTexList.push_back(imageColorTex);
     imageDepthTexList.push_back(imageDepthTex);
+  }
+
+  // Append each non-opaque image layer from connected image filters so they
+  // participate individually in OIT, instead of a pre-merged single layer.
+  auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
+  for (const auto& p : nonOpaqueLayers) {
+    imageColorTexList.push_back(p.first);
+    imageDepthTexList.push_back(p.second);
   }
 
   // Precompute per-glow color/depth layers (one pair per glow-enabled filter)
@@ -1665,58 +1711,7 @@ bool Z3DCompositor::createWBRenderTarget(const glm::uvec2& size)
   return comp;
 }
 
-void Z3DCompositor::renderImages(Z3DRenderInputPort& currentInport,
-                                 Z3DRenderTarget& renderTarget,
-                                 Z3DEye eye,
-                                 const Z3DTexture*& colorTex,
-                                 const Z3DTexture*& depthTex)
-{
-  size_t numImages = currentInport.numValidInputs();
-  // VLOG(1) << numImages;
-  if (numImages == 0) {
-    CHECK(false);
-  }
-  if (numImages == 1) {
-    colorTex = currentInport.colorTexture(0);
-    depthTex = currentInport.depthTexture(0);
-  } else {
-    m_imgTempRenderTarget1.resize(renderTarget.size());
-    m_imgTempRenderTarget2.resize(renderTarget.size());
-
-    // blend inport1 and inport2 into tempport3
-    m_imgTempRenderTarget1.bind();
-    m_imgTempRenderTarget1.clear();
-
-    m_rendererBase.setViewport(m_imgTempRenderTarget1.size());
-    m_MIPImageAlphaBlendRenderer.setColorTexture1(currentInport.colorTexture(0));
-    m_MIPImageAlphaBlendRenderer.setDepthTexture1(currentInport.depthTexture(0));
-    m_MIPImageAlphaBlendRenderer.setColorTexture2(currentInport.colorTexture(1));
-    m_MIPImageAlphaBlendRenderer.setDepthTexture2(currentInport.depthTexture(1));
-    m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
-
-    m_imgTempRenderTarget1.release();
-
-    auto* resRT = &m_imgTempRenderTarget1;
-    auto* nextResRT = &m_imgTempRenderTarget2;
-    for (size_t i = 2; i < numImages; ++i) {
-      nextResRT->bind();
-      nextResRT->clear();
-
-      m_MIPImageAlphaBlendRenderer.setColorTexture1(resRT->colorTexture());
-      m_MIPImageAlphaBlendRenderer.setDepthTexture1(resRT->depthTexture());
-      m_MIPImageAlphaBlendRenderer.setColorTexture2(currentInport.colorTexture(i));
-      m_MIPImageAlphaBlendRenderer.setDepthTexture2(currentInport.depthTexture(i));
-      m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
-
-      nextResRT->release();
-
-      std::swap(resRT, nextResRT);
-    }
-
-    colorTex = resRT->colorTexture();
-    depthTex = resRT->depthTexture();
-  }
-}
+// renderImages is removed. Use collectNonOpaqueImageLayers + mergeImageLayers instead.
 
 void Z3DCompositor::renderAxis(Z3DEye eye)
 {
@@ -1833,6 +1828,84 @@ void Z3DCompositor::setupAxisCamera()
   m_arrowRenderer.setArrowData(&m_tailPosAndTailRadius, &m_headPosAndHeadRadius, .1f);
   m_arrowRenderer.setArrowColors(&m_textColors);
   m_fontRenderer.setDataColors(&m_textColors);
+}
+
+// Collect non-opaque image layers (color/depth) from connected image filters
+std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> Z3DCompositor::collectNonOpaqueImageLayers(Z3DEye eye) const
+{
+  std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> layers;
+  auto vFilters = m_vPPort.connectedFilters();
+  for (auto* vf : vFilters) {
+    if (!vf || !vf->isReady(eye) || vf->hasOpaque(eye)) {
+      continue;
+    }
+    // Access outports directly (friend access)
+    const Z3DRenderOutputPort* out = nullptr;
+    if (eye == MonoEye) {
+      out = &vf->m_outport;
+    } else if (eye == LeftEye) {
+      out = &vf->m_leftEyeOutport;
+    } else {
+      out = &vf->m_rightEyeOutport;
+    }
+    if (out && out->hasValidData()) {
+      layers.emplace_back(out->colorTexture(), out->depthTexture());
+    }
+  }
+  return layers;
+}
+
+// Merge a list of image layers using the same shader/path as renderImages
+bool Z3DCompositor::mergeImageLayers(
+  const std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>>& layers,
+  Z3DEye eye,
+  Z3DRenderTarget& renderTarget,
+  const Z3DTexture*& colorTex,
+  const Z3DTexture*& depthTex)
+{
+  colorTex = nullptr;
+  depthTex = nullptr;
+  if (layers.empty()) {
+    return false;
+  }
+  if (layers.size() == 1) {
+    colorTex = layers[0].first;
+    depthTex = layers[0].second;
+    return true;
+  }
+
+  m_imgTempRenderTarget1.resize(renderTarget.size());
+  m_imgTempRenderTarget2.resize(renderTarget.size());
+
+  // Blend first two layers into imgTemp1
+  m_imgTempRenderTarget1.bind();
+  m_imgTempRenderTarget1.clear();
+  m_rendererBase.setViewport(m_imgTempRenderTarget1.size());
+  m_MIPImageAlphaBlendRenderer.setColorTexture1(layers[0].first);
+  m_MIPImageAlphaBlendRenderer.setDepthTexture1(layers[0].second);
+  m_MIPImageAlphaBlendRenderer.setColorTexture2(layers[1].first);
+  m_MIPImageAlphaBlendRenderer.setDepthTexture2(layers[1].second);
+  m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
+  m_imgTempRenderTarget1.release();
+
+  auto* resRT = &m_imgTempRenderTarget1;
+  auto* nextResRT = &m_imgTempRenderTarget2;
+  for (size_t i = 2; i < layers.size(); ++i) {
+    nextResRT->bind();
+    nextResRT->clear();
+    m_rendererBase.setViewport(nextResRT->size());
+    m_MIPImageAlphaBlendRenderer.setColorTexture1(resRT->colorTexture());
+    m_MIPImageAlphaBlendRenderer.setDepthTexture1(resRT->depthTexture());
+    m_MIPImageAlphaBlendRenderer.setColorTexture2(layers[i].first);
+    m_MIPImageAlphaBlendRenderer.setDepthTexture2(layers[i].second);
+    m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
+    nextResRT->release();
+    std::swap(resRT, nextResRT);
+  }
+
+  colorTex = resRT->colorTexture();
+  depthTex = resRT->depthTexture();
+  return true;
 }
 
 void Z3DCompositor::downloadTextureToLocalColorBuffer(const Z3DTexture& tex, Z3DLocalColorBuffer& localColorBuffer)
