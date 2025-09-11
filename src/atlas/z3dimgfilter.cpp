@@ -16,92 +16,12 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DBoundedFilter(globalParas, parent)
   , m_imgRaycasterRenderer(m_rendererBase)
   , m_imgSliceRenderer(m_rendererBase)
-  , m_textureAndEyeCoordinateRenderer(m_rendererBase)
   , m_textureCopyRenderer(m_rendererBase)
   , m_stayOnTop("Stay On Top", false)
   , m_fullResolutionRendering("Full Resolution Rendering", false)
   , m_numParas(0)
   //, m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   //, m_smoothInteraction("Smooth Interaction", true)
-  , m_entryExitTarget(glm::uvec2(32, 32))
-  , m_layerTarget(glm::uvec2(32, 32))
-  , m_layerColorTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA16), glm::uvec3(32, 32, 3), GL_RGBA, GL_FLOAT)
-  , m_layerDepthTexture(GL_TEXTURE_2D_ARRAY,
-                        GLint(GL_DEPTH_COMPONENT24),
-                        glm::uvec3(32, 32, 3),
-                        GL_DEPTH_COMPONENT,
-                        GL_FLOAT)
-  , m_missBlocksTexture0(GL_TEXTURE_2D,
-                         GLint(GL_RGBA32UI),
-                         glm::uvec3(32, 32, 1),
-                         GL_RGBA_INTEGER,
-                         GL_UNSIGNED_INT,
-                         nullptr,
-                         GLint(GL_NEAREST),
-                         GLint(GL_NEAREST))
-  , m_missBlocksTexture1(GL_TEXTURE_2D,
-                         GLint(GL_RGBA32UI),
-                         glm::uvec3(32, 32, 1),
-                         GL_RGBA_INTEGER,
-                         GL_UNSIGNED_INT,
-                         nullptr,
-                         GLint(GL_NEAREST),
-                         GLint(GL_NEAREST))
-  , m_missBlocksTexture2(GL_TEXTURE_2D,
-                         GLint(GL_RGBA32UI),
-                         glm::uvec3(32, 32, 1),
-                         GL_RGBA_INTEGER,
-                         GL_UNSIGNED_INT,
-                         nullptr,
-                         GLint(GL_NEAREST),
-                         GLint(GL_NEAREST))
-  , m_missBlocksTexture3(GL_TEXTURE_2D,
-                         GLint(GL_RGBA32UI),
-                         glm::uvec3(32, 32, 1),
-                         GL_RGBA_INTEGER,
-                         GL_UNSIGNED_INT,
-                         nullptr,
-                         GLint(GL_NEAREST),
-                         GLint(GL_NEAREST))
-  , m_missBlocksTexture4(GL_TEXTURE_2D,
-                         GLint(GL_RGBA32UI),
-                         glm::uvec3(32, 32, 1),
-                         GL_RGBA_INTEGER,
-                         GL_UNSIGNED_INT,
-                         nullptr,
-                         GLint(GL_NEAREST),
-                         GLint(GL_NEAREST))
-  , m_missBlocksTexture5(GL_TEXTURE_2D,
-                         GLint(GL_RGBA32UI),
-                         glm::uvec3(32, 32, 1),
-                         GL_RGBA_INTEGER,
-                         GL_UNSIGNED_INT,
-                         nullptr,
-                         GLint(GL_NEAREST),
-                         GLint(GL_NEAREST))
-  , m_missBlocksTexture6(GL_TEXTURE_2D,
-                         GLint(GL_RGBA32UI),
-                         glm::uvec3(32, 32, 1),
-                         GL_RGBA_INTEGER,
-                         GL_UNSIGNED_INT,
-                         nullptr,
-                         GLint(GL_NEAREST),
-                         GLint(GL_NEAREST))
-  , m_missBlocksTexture7(GL_TEXTURE_2D,
-                         GLint(GL_RGBA32UI),
-                         glm::uvec3(32, 32, 1),
-                         GL_RGBA_INTEGER,
-                         GL_UNSIGNED_INT,
-                         nullptr,
-                         GLint(GL_NEAREST),
-                         GLint(GL_NEAREST))
-  , m_blockIDsRenderTarget(glm::uvec2(32, 32))
-  , m_imageRenderTarget1(glm::uvec2(32, 32))
-  , m_imageRenderTarget2(glm::uvec2(32, 32))
-  , m_imageRenderTarget1Left(glm::uvec2(32, 32))
-  , m_imageRenderTarget2Left(glm::uvec2(32, 32))
-  , m_imageRenderTarget1Right(glm::uvec2(32, 32))
-  , m_imageRenderTarget2Right(glm::uvec2(32, 32))
   , m_outport("Image", this)
   , m_leftEyeOutport("LeftEyeImage", this)
   , m_rightEyeOutport("RightEyeImage", this)
@@ -151,75 +71,9 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   // addParameter(m_interactionDownsample);
   // addParameter(m_smoothInteraction);
 
-  Z3DTexture* g_TexId[2];
+  // renderer-owned targets will be sized on demand
 
-  g_TexId[0] = new Z3DTexture(GL_TEXTURE_2D_ARRAY,
-                              GLint(GL_RGBA32F),
-                              glm::uvec3(32, 32, 2),
-                              GL_RGBA,
-                              GL_FLOAT,
-                              nullptr,
-                              GLint(GL_NEAREST),
-                              GLint(GL_NEAREST));
-  m_entryExitTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
-  m_entryExitTarget.isFBOComplete();
-
-  m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
-  m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
-  m_layerTarget.isFBOComplete();
-
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture0, GL_COLOR_ATTACHMENT0, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture1, GL_COLOR_ATTACHMENT1, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture2, GL_COLOR_ATTACHMENT2, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture3, GL_COLOR_ATTACHMENT3, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture4, GL_COLOR_ATTACHMENT4, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture5, GL_COLOR_ATTACHMENT5, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture6, GL_COLOR_ATTACHMENT6, false);
-  m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture7, GL_COLOR_ATTACHMENT7, false);
-  m_blockIDsRenderTarget.isFBOComplete();
-
-  m_imageRenderTarget1s[0] = &m_imageRenderTarget1Left;
-  m_imageRenderTarget1s[1] = &m_imageRenderTarget1;
-  m_imageRenderTarget1s[2] = &m_imageRenderTarget1Right;
-  m_imageRenderTarget2s[0] = &m_imageRenderTarget2Left;
-  m_imageRenderTarget2s[1] = &m_imageRenderTarget2;
-  m_imageRenderTarget2s[2] = &m_imageRenderTarget2Right;
-  for (int i = 0; i < 3; ++i) {
-    g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16),
-                                glm::uvec3(32, 32, 1),
-                                GL_RGBA,
-                                GL_FLOAT,
-                                nullptr,
-                                GLint(GL_NEAREST),
-                                GLint(GL_NEAREST));
-    g_TexId[1] = new Z3DTexture(GLint(GL_RG32F),
-                                glm::uvec3(32, 32, 1),
-                                GL_RG,
-                                GL_FLOAT,
-                                nullptr,
-                                GLint(GL_NEAREST),
-                                GLint(GL_NEAREST));
-    m_imageRenderTarget1s[i]->attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
-    m_imageRenderTarget1s[i]->attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
-    m_imageRenderTarget1s[i]->isFBOComplete();
-    g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16),
-                                glm::uvec3(32, 32, 1),
-                                GL_RGBA,
-                                GL_FLOAT,
-                                nullptr,
-                                GLint(GL_NEAREST),
-                                GLint(GL_NEAREST));
-    g_TexId[1] = new Z3DTexture(GLint(GL_RG32F),
-                                glm::uvec3(32, 32, 1),
-                                GL_RG,
-                                GL_FLOAT,
-                                nullptr,
-                                GLint(GL_NEAREST),
-                                GLint(GL_NEAREST));
-    m_imageRenderTarget2s[i]->attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
-    m_imageRenderTarget2s[i]->attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
-    m_imageRenderTarget2s[i]->isFBOComplete();
-  }
+  // layer, block-id, and progressive render targets are now owned by renderers
 
   // ports
   addPort(m_outport);
@@ -281,11 +135,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
           &Z3DImgFilter::contextMenuEvent);
   addEventListener(m_contextMenuEvent);
 
-  m_imgRaycasterRenderer.setLayerTarget(m_layerTarget);
-  m_imgSliceRenderer.setLayerTarget(m_layerTarget);
-  m_imgRaycasterRenderer.setBlockIDsRenderTarget(m_blockIDsRenderTarget);
-  m_imgSliceRenderer.setBlockIDsRenderTarget(m_blockIDsRenderTarget);
-  m_imgRaycasterRenderer.setImageRenderTargetWithRayDepthLayer(m_imageRenderTarget1s, m_imageRenderTarget2s);
+  // renderer internal targets are managed by the renderers themselves
   //  for (size_t i=0; i<m_maxNumOfFullResolutionVolumeSlice; ++i) {
   //    m_image2DRenderers.emplace_back(std::make_unique<Z3DImage2DRenderer>(m_rendererBase));
   //    m_image2DRenderers[i]->setLayerTarget(&m_layerTarget);
@@ -358,15 +208,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
 
     updateBlockIDTarget();
 
-    if (m_3dImg->numChannels() > m_layerColorTexture.depth()) {
-      m_layerColorTexture.setDimension(
-        glm::uvec3(m_layerColorTexture.width(), m_layerColorTexture.height(), m_3dImg->numChannels()));
-      m_layerDepthTexture.setDimension(
-        glm::uvec3(m_layerDepthTexture.width(), m_layerDepthTexture.height(), m_3dImg->numChannels()));
-      m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
-      m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
-      m_layerTarget.isFBOComplete();
-    }
+    // Layer target channel depth managed inside renderers now
     m_fullResolutionRendering.set(!m_3dImg->isVolumeDownsampled());
     m_fullResolutionRendering.setEnabled(m_3dImg->isVolumeDownsampled());
     // m_smoothInteraction.setVisible(m_3dImg->isVolumeDownsampled());
@@ -770,10 +612,7 @@ double Z3DImgFilter::process(Z3DEye eye)
     m_channelRangeChanged = false;
   }
 
-  glEnable(GL_DEPTH_TEST);
-  auto openGLStateGuard = folly::makeGuard([]() {
-    glDisable(GL_DEPTH_TEST);
-  });
+  // Depth testing is managed by renderers/compositor now
 
   double currentProgress = 0.0;
   double totalProgress = 0.0;
@@ -814,7 +653,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
 
   if (!(m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye))) {
     currentOutport.resize(m_outport.size());
-    m_layerTarget.resize(currentOutport.size());
+    m_imgSliceRenderer.ensureInternalTargets(currentOutport.size(), m_3dImg->numChannels());
 
     glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
     glm::vec3 coordLuf = m_3dImg->physicalLUF();
@@ -934,10 +773,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
                                                            : m_rightEyeOutport;
 
   if (!(m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye))) {
-    m_layerTarget.resize(currentOutport.size());
-    m_blockIDsRenderTarget.resize(currentOutport.size());
-    m_imageRenderTarget1s[eye]->resize(currentOutport.size());
-    m_imageRenderTarget2s[eye]->resize(currentOutport.size());
+    m_imgRaycasterRenderer.ensureInternalTargets(currentOutport.size(), m_3dImg->numChannels());
 
     glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
     glm::vec3 coordLuf = m_3dImg->physicalLUF();
@@ -1006,9 +842,6 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
       cube.transformVerticesByMatrix(m_rendererBase.coordTransform());
       bool flipped = glm::determinant(glm::mat3(m_rendererBase.coordTransform())) < 0.0;
 
-      // enable culling
-      glEnable(GL_CULL_FACE);
-
       m_rendererBase.setViewport(currentOutport.size());
       CHECK_GL_ERROR
 
@@ -1069,56 +902,16 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
     auto clipped = ZMeshUtils::clipClosedSurface(cube, planes);
 #endif
 
-      // render back texture
-      const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
-      m_entryExitTarget.resize(currentOutport.size());
-
-      m_entryExitTarget.attachSlice(1);
-      m_entryExitTarget.bind();
-      glDrawBuffers(1, g_drawBuffers);
-      glClear(GL_COLOR_BUFFER_BIT);
-      glCullFace(flipped ? GL_BACK : GL_FRONT);
-
-      m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
-      m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
-      m_entryExitTarget.release();
-      CHECK_GL_ERROR
-
-      // render front texture
-      m_entryExitTarget.attachSlice(0);
-      m_entryExitTarget.bind();
-      glDrawBuffers(1, g_drawBuffers);
-      glClear(GL_COLOR_BUFFER_BIT);
-      glCullFace(flipped ? GL_FRONT : GL_BACK);
-
-      m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
-      m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
-      m_entryExitTarget.release();
-      CHECK_GL_ERROR
-
-      // restore OpenGL state
-      glCullFace(GL_BACK);
-      glDisable(GL_CULL_FACE);
-
-      // m_entryExitTarget.attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("/Users/feng/Downloads/test1rayeye.tif");
-
-      m_imgRaycasterRenderer.setEntryExitInfo(m_entryExitTarget.attachment(GL_COLOR_ATTACHMENT0));
+      // prepare entry/exit in renderer
+      m_imgRaycasterRenderer.prepareEntryExit(clipped, flipped, eye, currentOutport.size());
     }
   }
-
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
   currentOutport.bindTarget();
   currentOutport.clearTarget();
   m_rendererBase.setViewport(currentOutport.size());
 
-  auto openGLStateGuard = folly::makeGuard([&currentOutport]() {
-    currentOutport.releaseTarget();
-
-    glBlendFunc(GL_ONE, GL_ZERO);
-    glDisable(GL_BLEND);
-  });
+  auto outportGuard = folly::makeGuard([&currentOutport]() { currentOutport.releaseTarget(); });
 
   double progress = 1.0;
   if (!m_progressiveRendering) {
@@ -1127,7 +920,8 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
     progress = m_imgRaycasterRenderer.renderProgressively(eye);
   }
 
-  renderBoundBox(eye);
+  // Draw bound box with local overlay state
+  renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
   CHECK_GL_ERROR
 
   return progress;
@@ -1140,9 +934,6 @@ bool Z3DImgFilter::onlyBoundBox() const
 
 void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
 {
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
   Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
                                         : (eye == LeftEye) ? m_leftEyeOutport
                                                            : m_rightEyeOutport;
@@ -1151,13 +942,11 @@ void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
   currentOutport.clearTarget();
   m_rendererBase.setViewport(currentOutport.size());
 
-  renderBoundBox(eye);
+  // Draw bound box with local overlay state
+  renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
   CHECK_GL_ERROR
 
   currentOutport.releaseTarget();
-
-  glBlendFunc(GL_ONE, GL_ZERO);
-  glDisable(GL_BLEND);
 }
 
 void Z3DImgFilter::updateNotTransformedBoundBoxImpl()
@@ -1272,13 +1061,7 @@ glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z
   viewport[2] = width;
   viewport[3] = height;
 
-  GLfloat WindowPosZ;
-  port.bindTarget();
-  glPixelStorei(GL_PACK_ALIGNMENT, 1);
-  glReadPixels(pos2D.x, pos2D.y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
-  port.releaseTarget();
-
-  CHECK_GL_ERROR
+  GLfloat WindowPosZ = port.renderTarget().depthAtPos(pos2D);
   glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, WindowPosZ), modelview, projection, viewport);
 
   return pos;

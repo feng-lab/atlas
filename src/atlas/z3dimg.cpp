@@ -224,6 +224,13 @@ void Z3DImg::setScale(const glm::vec3& scale)
     return;
   }
 
+  // Fast-path: skip work if effective voxel-world dimension would not change
+  // New voxel world dimension depends on abs(scale) and fixed m_volumeSpacing
+  glm::vec3 newVoxelWorldDimension = glm::abs(scale) * m_volumeSpacing;
+  if (glm::all(glm::epsilonEqual(newVoxelWorldDimension, m_volumeVoxelWorldDimension, 1e-6f))) {
+    return;
+  }
+
   const ZImgInfo& info = m_imgPack.imgInfo();
   glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
   glm::dvec3 relativeResolution = glm::dvec3(glm::abs(scale));

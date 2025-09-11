@@ -1,6 +1,9 @@
 #include "z3dboundedfilter.h"
+#include "z3dgl.h"
 
 #include "zlog.h"
+#include <folly/ScopeGuard.h>
+
 #include <Mathematics/DistLineRay.h>
 #include <boost/math/constants/constants.hpp>
 
@@ -343,8 +346,7 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
       m_startMouseWorldPos =
         camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), m_startDepth), viewport);
     } else {
-      GLfloat WindowPosZ =
-        pickingManager().depthAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
+      GLfloat WindowPosZ = pickingManager().depthAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
       CHECK_GL_ERROR
       m_startMouseWorldPos =
         camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), WindowPosZ), viewport);
@@ -420,6 +422,27 @@ void Z3DBoundedFilter::initializeRotationCenter()
 void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)
 {
   if (!m_boundBoxMode.isSelected("No Bound Box")) {
+    m_rendererBase.setClipEnabled(false);
+    m_rendererBase.render(eye, m_baseBoundBoxRenderer);
+    m_rendererBase.setClipEnabled(true);
+  }
+}
+
+void Z3DBoundedFilter::renderBoundBox(Z3DEye eye, BoundBoxRenderStyle style)
+{
+  if (style == BoundBoxRenderStyle::InheritState) {
+    renderBoundBox(eye);
+    return;
+  }
+  if (!m_boundBoxMode.isSelected("No Bound Box")) {
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    auto guard = folly::makeGuard([]() {
+      glBlendFunc(GL_ONE, GL_ZERO);
+      glDisable(GL_BLEND);
+      glDisable(GL_DEPTH_TEST);
+    });
     m_rendererBase.setClipEnabled(false);
     m_rendererBase.render(eye, m_baseBoundBoxRenderer);
     m_rendererBase.setClipEnabled(true);

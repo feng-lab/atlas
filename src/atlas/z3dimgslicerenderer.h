@@ -4,6 +4,8 @@
 #include "z3dshaderprogram.h"
 #include "zcolormap.h"
 #include "zmesh.h"
+#include "z3drendertarget.h"
+#include "z3dtexture.h"
 
 namespace nim {
 
@@ -30,15 +32,7 @@ public:
     return m_fastRendering;
   }
 
-  void setLayerTarget(Z3DRenderTarget& target)
-  {
-    m_layerTarget = &target;
-  }
-
-  void setBlockIDsRenderTarget(Z3DRenderTarget& target)
-  {
-    m_blockIDsRenderTarget = &target;
-  }
+  // Targets are owned internally; no external override needed
 
   //  [[nodiscard]] bool lastRenderingIsFastRendering() const
   //  {
@@ -56,6 +50,9 @@ public:
   void addSlice(const ZMesh& slice);
 
   void compile() override;
+
+  // Ensure internal FBOs/textures are sized and configured
+  void ensureInternalTargets(const glm::uvec2& size, size_t numChannels);
 
   double renderProgressively(Z3DEye eye);
 
@@ -86,8 +83,9 @@ private:
 protected:
   // Z3DShaderProgram m_volumeSliceShader;
   Z3DShaderProgram m_scVolumeSliceShader;
-  Z3DRenderTarget* m_layerTarget = nullptr;
-  Z3DRenderTarget* m_blockIDsRenderTarget = nullptr;
+  // Internal targets
+  Z3DRenderTarget m_layerTarget{glm::uvec2(32, 32)};
+  Z3DRenderTarget m_blockIDsRenderTarget{glm::uvec2(32, 32)};
   Z3DShaderProgram m_mergeChannelShader;
   Z3DShaderProgram m_image3DSliceWithColorMapBlockIDsShader;
   Z3DShaderProgram m_image3DSliceWithColorMapShader;
@@ -106,6 +104,78 @@ private:
   // bool m_lastRenderingIsFastRendering = false;
 
   double m_progress[3] = {0, 0, 0};
+
+  // Textures moved from filter
+  Z3DTexture m_layerColorTexture{GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA16), glm::uvec3(32, 32, 3), GL_RGBA, GL_FLOAT};
+  Z3DTexture m_layerDepthTexture{GL_TEXTURE_2D_ARRAY,
+                                 GLint(GL_DEPTH_COMPONENT24),
+                                 glm::uvec3(32, 32, 3),
+                                 GL_DEPTH_COMPONENT,
+                                 GL_FLOAT};
+  Z3DTexture m_missBlocksTexture0{GL_TEXTURE_2D,
+                                  GLint(GL_RGBA32UI),
+                                  glm::uvec3(32, 32, 1),
+                                  GL_RGBA_INTEGER,
+                                  GL_UNSIGNED_INT,
+                                  nullptr,
+                                  GLint(GL_NEAREST),
+                                  GLint(GL_NEAREST)};
+  Z3DTexture m_missBlocksTexture1{GL_TEXTURE_2D,
+                                  GLint(GL_RGBA32UI),
+                                  glm::uvec3(32, 32, 1),
+                                  GL_RGBA_INTEGER,
+                                  GL_UNSIGNED_INT,
+                                  nullptr,
+                                  GLint(GL_NEAREST),
+                                  GLint(GL_NEAREST)};
+  Z3DTexture m_missBlocksTexture2{GL_TEXTURE_2D,
+                                  GLint(GL_RGBA32UI),
+                                  glm::uvec3(32, 32, 1),
+                                  GL_RGBA_INTEGER,
+                                  GL_UNSIGNED_INT,
+                                  nullptr,
+                                  GLint(GL_NEAREST),
+                                  GLint(GL_NEAREST)};
+  Z3DTexture m_missBlocksTexture3{GL_TEXTURE_2D,
+                                  GLint(GL_RGBA32UI),
+                                  glm::uvec3(32, 32, 1),
+                                  GL_RGBA_INTEGER,
+                                  GL_UNSIGNED_INT,
+                                  nullptr,
+                                  GLint(GL_NEAREST),
+                                  GLint(GL_NEAREST)};
+  Z3DTexture m_missBlocksTexture4{GL_TEXTURE_2D,
+                                  GLint(GL_RGBA32UI),
+                                  glm::uvec3(32, 32, 1),
+                                  GL_RGBA_INTEGER,
+                                  GL_UNSIGNED_INT,
+                                  nullptr,
+                                  GLint(GL_NEAREST),
+                                  GLint(GL_NEAREST)};
+  Z3DTexture m_missBlocksTexture5{GL_TEXTURE_2D,
+                                  GLint(GL_RGBA32UI),
+                                  glm::uvec3(32, 32, 1),
+                                  GL_RGBA_INTEGER,
+                                  GL_UNSIGNED_INT,
+                                  nullptr,
+                                  GLint(GL_NEAREST),
+                                  GLint(GL_NEAREST)};
+  Z3DTexture m_missBlocksTexture6{GL_TEXTURE_2D,
+                                  GLint(GL_RGBA32UI),
+                                  glm::uvec3(32, 32, 1),
+                                  GL_RGBA_INTEGER,
+                                  GL_UNSIGNED_INT,
+                                  nullptr,
+                                  GLint(GL_NEAREST),
+                                  GLint(GL_NEAREST)};
+  Z3DTexture m_missBlocksTexture7{GL_TEXTURE_2D,
+                                  GLint(GL_RGBA32UI),
+                                  glm::uvec3(32, 32, 1),
+                                  GL_RGBA_INTEGER,
+                                  GL_UNSIGNED_INT,
+                                  nullptr,
+                                  GLint(GL_NEAREST),
+                                  GLint(GL_NEAREST)};
 };
 
 } // namespace nim

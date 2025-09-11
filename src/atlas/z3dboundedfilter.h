@@ -16,6 +16,12 @@ class Z3DBoundedFilter : public Z3DFilter
   Q_OBJECT
 
 public:
+  enum class BoundBoxRenderStyle
+  {
+    InheritState, // Do not modify GL state; caller is responsible
+    OverlayAlphaDepth // Enable depth test + alpha blend locally
+  };
+
   explicit Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* parent = nullptr);
 
   void setVisible(bool v)
@@ -262,6 +268,9 @@ protected:
   }
 
   void renderBoundBox(Z3DEye eye);
+
+  // Optional state-aware variant; InheritState matches renderBoundBox(eye)
+  void renderBoundBox(Z3DEye eye, BoundBoxRenderStyle style);
 
   static void appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::vector<glm::vec3>& lines);
 

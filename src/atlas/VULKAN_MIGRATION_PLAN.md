@@ -412,6 +412,20 @@ Abstraction/Reuse tasks
   - Header: `src/atlas/zvulkan.h:219`
   - Impl: `src/atlas/zvulkan.cpp:880`
 
+Progress Update — Image Filter GL Decoupling (Completed)
+
+- z3dimgfilter is now GL-agnostic for image/volume rendering paths:
+  - All GL work for images/volumes moved into `Z3DImgRaycasterRenderer` and `Z3DImgSliceRenderer`.
+  - No direct `glReadPixels`; picking depth fetched via `Z3DRenderTarget::depthAtPos()`.
+- Entry/Exit is produced inside the raycaster:
+  - Raycaster owns an entry/exit render target (2-layer RGBA32F) and prepares it via `prepareEntryExit()`.
+- Renderer-owned FBOs/textures:
+  - Layer and block-ID targets live in renderers; per-eye ping-pong image targets are created in the raycaster constructor and resized on demand.
+- Local GL state in renderers:
+  - Raycaster and slicer manage `GL_BLEND` and `GL_DEPTH_TEST` in their render paths.
+- Bound box overlay depth/blend (temporary):
+  - The image filter enables depth/blend only around `renderBoundBox()` to ensure proper depth; this can be centralized in `Z3DBoundedFilter` later.
+
 ## Next Action
 
 - Implement a minimal Vulkan “clear + CPU readback” path using dynamic rendering and the existing `vulkan/background.frag` + `pass.vert` pair.

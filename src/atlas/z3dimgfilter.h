@@ -8,7 +8,6 @@
 #include "zwidgetsgroup.h"
 #include "z3dimgraycasterrenderer.h"
 #include "z3dimgslicerenderer.h"
-#include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dimage2drenderer.h"
 #include "zeventlistenerparameter.h"
 #include "z3dtexturecopyrenderer.h"
@@ -139,7 +138,6 @@ private:
 private:
   Z3DImgRaycasterRenderer m_imgRaycasterRenderer;
   Z3DImgSliceRenderer m_imgSliceRenderer;
-  Z3DTextureAndEyeCoordinateRenderer m_textureAndEyeCoordinateRenderer;
   // std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
@@ -152,28 +150,6 @@ private:
 
   // ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
   // ZBoolParameter m_smoothInteraction;
-
-  Z3DRenderTarget m_entryExitTarget;
-  Z3DRenderTarget m_layerTarget;
-  Z3DTexture m_layerColorTexture;
-  Z3DTexture m_layerDepthTexture;
-  Z3DTexture m_missBlocksTexture0;
-  Z3DTexture m_missBlocksTexture1;
-  Z3DTexture m_missBlocksTexture2;
-  Z3DTexture m_missBlocksTexture3;
-  Z3DTexture m_missBlocksTexture4;
-  Z3DTexture m_missBlocksTexture5;
-  Z3DTexture m_missBlocksTexture6;
-  Z3DTexture m_missBlocksTexture7;
-  Z3DRenderTarget m_blockIDsRenderTarget;
-  Z3DRenderTarget m_imageRenderTarget1;
-  Z3DRenderTarget m_imageRenderTarget2;
-  Z3DRenderTarget m_imageRenderTarget1Left;
-  Z3DRenderTarget m_imageRenderTarget2Left;
-  Z3DRenderTarget m_imageRenderTarget1Right;
-  Z3DRenderTarget m_imageRenderTarget2Right;
-  Z3DRenderTarget* m_imageRenderTarget1s[3] = {nullptr, nullptr, nullptr};
-  Z3DRenderTarget* m_imageRenderTarget2s[3] = {nullptr, nullptr, nullptr};
 
   Z3DRenderOutputPort m_outport;
   Z3DRenderOutputPort m_leftEyeOutport;

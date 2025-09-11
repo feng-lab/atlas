@@ -154,24 +154,12 @@ void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderT
       glDepthMask(GL_FALSE);
     }
 
-    // 3) composite glow with current renderTarget using depth-aware alpha blend
-    m_tempRenderTarget5.resize(renderTarget.size());
-    m_tempRenderTarget5.bind();
-    m_tempRenderTarget5.clear();
-    m_rendererBase.setViewport(m_tempRenderTarget5.size());
-    m_alphaBlendRenderer.setColorTexture1(renderTarget.colorTexture());
-    m_alphaBlendRenderer.setDepthTexture1(renderTarget.depthTexture());
-    m_alphaBlendRenderer.setColorTexture2(m_glowTempRenderTarget2.colorTexture());
-    m_alphaBlendRenderer.setDepthTexture2(m_glowTempRenderTarget2.depthTexture());
-    m_rendererBase.render(eye, m_alphaBlendRenderer);
-    m_tempRenderTarget5.release();
-
-    // copy blended result back to renderTarget
+    // 3) copy glow result directly into renderTarget (skip alpha blend)
     renderTarget.bind();
     renderTarget.clear();
     m_rendererBase.setViewport(renderTarget.size());
-    m_textureCopyRenderer.setColorTexture(m_tempRenderTarget5.colorTexture());
-    m_textureCopyRenderer.setDepthTexture(m_tempRenderTarget5.depthTexture());
+    m_textureCopyRenderer.setColorTexture(m_glowTempRenderTarget2.colorTexture());
+    m_textureCopyRenderer.setDepthTexture(m_glowTempRenderTarget2.depthTexture());
     m_rendererBase.render(eye, m_textureCopyRenderer);
     renderTarget.release();
   } else {
