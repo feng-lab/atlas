@@ -323,7 +323,7 @@ void ZPunctaIO::readV3DApoFile(const QString& filename, ZPuncta& puncta)
       stringToValue(fieldList[7], punctum.m_maxIntensity);
       stringToValue(fieldList[8], punctum.m_meanIntensity);
       stringToValue(fieldList[9], punctum.m_sDevOfIntensity);
-      stringToValue(fieldList[10], punctum.m_volSize);
+      stringToValueNoThrow(fieldList[10], punctum.m_volSize);
       stringToValue(fieldList[11], punctum.m_mass);
       if (fieldList.size() > 12) {
         punctum.property1 = fieldList[12];
