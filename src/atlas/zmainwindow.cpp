@@ -867,9 +867,6 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
 
     const auto& sceneObj = loadObj.at("Scene").as_object();
 
-    QDir::setCurrent(QFileInfo(fn).absolutePath());
-
-    std::map<size_t, size_t> idmap = m_doc->read(sceneObj.at("Doc").as_object(), err);
     if (sceneObj.contains("View3DGeneral")) {
       if (!m_3dWindow) {
         QSignalSpy spy(this, &ZMainWindow::window3DReady);
@@ -879,6 +876,10 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
         }
       }
     }
+
+    QDir::setCurrent(QFileInfo(fn).absolutePath());
+
+    std::map<size_t, size_t> idmap = m_doc->read(sceneObj.at("Doc").as_object(), err);
 
     if (idmap.empty()) {
       LOG(WARNING) << "Scene " << fn << " contains zero objects";
