@@ -430,11 +430,7 @@ double Z3DCompositor::process(Z3DEye eye)
         currentOutRenderTarget.release();
       }
     } else { // with volume
-      // Classify volumes: some may be opaque (e.g., MIP Opaque), others transparent
-      bool hasOpaqueVolumes = false;
-      for (auto* vf : vFilters) {
-        if (vf && vf->isReady(eye) && vf->hasOpaque(eye)) { hasOpaqueVolumes = true; break; }
-      }
+      // Only collect non-opaque image layers; opaque ones were rendered via the opaque pass
       auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
       bool hasTransparentVolumes = !nonOpaqueLayers.empty();
       if (numNormalFilters == 0 && numOnTopFilters == 0) { // directly copy inport image to outport
@@ -442,7 +438,8 @@ double Z3DCompositor::process(Z3DEye eye)
         const Z3DTexture* depthTex = nullptr;
         // Merge only non-opaque images; opaque ones render via opaque pass and are already in normal filters
         if (!mergeImageLayers(nonOpaqueLayers, eye, currentOutRenderTarget, colorTex, depthTex)) {
-          colorTex = nullptr; depthTex = nullptr;
+          colorTex = nullptr;
+          depthTex = nullptr;
         }
 
         currentOutRenderTarget.bind();
@@ -1028,7 +1025,9 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
     }
     // Ensure all RTs match current size
     for (auto& rt : m_glowLayerPool) {
-      if (rt) rt->resize(renderTarget.size());
+      if (rt) {
+        rt->resize(renderTarget.size());
+      }
     }
 
     for (size_t gi = 0; gi < glowFilters.size(); ++gi) {
@@ -1038,8 +1037,12 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       GLboolean prevDepthMask = GL_TRUE;
       glGetBooleanv(GL_DEPTH_WRITEMASK, &prevDepthMask);
       GLboolean prevDepthTest = glIsEnabled(GL_DEPTH_TEST);
-      if (prevDepthTest == GL_FALSE) glEnable(GL_DEPTH_TEST);
-      if (prevDepthMask == GL_FALSE) glDepthMask(GL_TRUE);
+      if (prevDepthTest == GL_FALSE) {
+        glEnable(GL_DEPTH_TEST);
+      }
+      if (prevDepthMask == GL_FALSE) {
+        glDepthMask(GL_TRUE);
+      }
 
       // Geometry prepass
       m_glowTempRenderTarget1.resize(renderTarget.size());
@@ -1072,8 +1075,12 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       layerRT->release();
 
       // Restore depth state
-      if (prevDepthMask == GL_FALSE) glDepthMask(GL_FALSE);
-      if (prevDepthTest == GL_FALSE) glDisable(GL_DEPTH_TEST);
+      if (prevDepthMask == GL_FALSE) {
+        glDepthMask(GL_FALSE);
+      }
+      if (prevDepthTest == GL_FALSE) {
+        glDisable(GL_DEPTH_TEST);
+      }
 
       imageColorTexList.push_back(layerRT->colorTexture());
       imageDepthTexList.push_back(layerRT->depthTexture());
@@ -1444,11 +1451,11 @@ bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
 }
 
 void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
-                                         Z3DRenderTarget& renderTarget,
-                                         Z3DEye eye,
-                                         Z3DTexture* depthTexture,
-                                         const std::vector<const Z3DTexture*>& imageColorTexList,
-                                         const std::vector<const Z3DTexture*>& imageDepthTexList)
+                                        Z3DRenderTarget& renderTarget,
+                                        Z3DEye eye,
+                                        Z3DTexture* depthTexture,
+                                        const std::vector<const Z3DTexture*>& imageColorTexList,
+                                        const std::vector<const Z3DTexture*>& imageDepthTexList)
 {
   if (!m_waRT) {
     if (!createWARenderTarget(renderTarget.size())) {
@@ -1575,11 +1582,11 @@ bool Z3DCompositor::createWARenderTarget(const glm::uvec2& size)
 }
 
 void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
-                                         Z3DRenderTarget& renderTarget,
-                                         Z3DEye eye,
-                                         Z3DTexture* depthTexture,
-                                         const std::vector<const Z3DTexture*>& imageColorTexList,
-                                         const std::vector<const Z3DTexture*>& imageDepthTexList)
+                                        Z3DRenderTarget& renderTarget,
+                                        Z3DEye eye,
+                                        Z3DTexture* depthTexture,
+                                        const std::vector<const Z3DTexture*>& imageColorTexList,
+                                        const std::vector<const Z3DTexture*>& imageDepthTexList)
 {
   if (!m_wbRT) {
     if (!createWBRenderTarget(renderTarget.size())) {
@@ -1831,7 +1838,8 @@ void Z3DCompositor::setupAxisCamera()
 }
 
 // Collect non-opaque image layers (color/depth) from connected image filters
-std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> Z3DCompositor::collectNonOpaqueImageLayers(Z3DEye eye) const
+std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>>
+Z3DCompositor::collectNonOpaqueImageLayers(Z3DEye eye) const
 {
   std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> layers;
   auto vFilters = m_vPPort.connectedFilters();
@@ -1856,12 +1864,11 @@ std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> Z3DCompositor::coll
 }
 
 // Merge a list of image layers using the same shader/path as renderImages
-bool Z3DCompositor::mergeImageLayers(
-  const std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>>& layers,
-  Z3DEye eye,
-  Z3DRenderTarget& renderTarget,
-  const Z3DTexture*& colorTex,
-  const Z3DTexture*& depthTex)
+bool Z3DCompositor::mergeImageLayers(const std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>>& layers,
+                                     Z3DEye eye,
+                                     Z3DRenderTarget& renderTarget,
+                                     const Z3DTexture*& colorTex,
+                                     const Z3DTexture*& depthTex)
 {
   colorTex = nullptr;
   depthTex = nullptr;
