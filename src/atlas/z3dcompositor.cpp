@@ -1844,7 +1844,7 @@ Z3DCompositor::collectNonOpaqueImageLayers(Z3DEye eye) const
   std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> layers;
   auto vFilters = m_vPPort.connectedFilters();
   for (auto* vf : vFilters) {
-    if (!vf || !vf->isReady(eye) || vf->hasOpaque(eye)) {
+    if (!vf || !vf->isReady(eye) || !vf->hasTransparent(eye)) {
       continue;
     }
     // Access outports directly (friend access)
