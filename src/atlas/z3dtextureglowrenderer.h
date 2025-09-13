@@ -52,9 +52,6 @@ protected:
   const Z3DTexture* m_colorTexture = nullptr;
   const Z3DTexture* m_depthTexture = nullptr;
 
-  Z3DRenderTarget m_blurXTarget;
-  Z3DRenderTarget m_blurYTarget;
-
   Z3DShaderProgram m_blurXTextureShader;
   Z3DShaderProgram m_blurYTextureShader;
   Z3DShaderGroup m_glowTextureShaderGrp;

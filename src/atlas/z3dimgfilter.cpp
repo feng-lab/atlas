@@ -397,30 +397,14 @@ bool Z3DImgFilter::isReady(Z3DEye eye) const
 
 bool Z3DImgFilter::hasOpaque(Z3DEye) const
 {
-  // Slice rendering is inherently opaque. Also treat opaque MIP modes as
-  // opaque so they occlude correctly when multiple images are present.
-  if (hasSlices()) {
-    return true;
-  }
-  const QString mode = m_imgRaycasterRenderer.compositeMode();
-  if ((mode == "MIP Opaque" || mode == "Local MIP Opaque") && m_outport.hasValidData()) {
-    return true;
-  }
-  return false;
+  return hasSlices();
 }
 
 void Z3DImgFilter::renderOpaque(Z3DEye eye)
 {
-  // Slices are rendered into the dedicated opaque outports; in opaque MIP
-  // modes the image output lives in the standard outport but should be
-  // composited via the opaque path.
-  const QString mode = m_imgRaycasterRenderer.compositeMode();
-  Z3DRenderOutputPort& currentOutport =
-    (mode == "MIP Opaque" || mode == "Local MIP Opaque")
-      ? ((eye == MonoEye) ? m_outport : (eye == LeftEye) ? m_leftEyeOutport : m_rightEyeOutport)
-      : ((eye == MonoEye) ? m_opaqueOutport
-                          : (eye == LeftEye) ? m_opaqueLeftEyeOutport : m_opaqueRightEyeOutport);
-
+  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_opaqueOutport
+                                        : (eye == LeftEye) ? m_opaqueLeftEyeOutport
+                                                           : m_opaqueRightEyeOutport;
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -431,11 +415,6 @@ bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
   const Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
                                               : (eye == LeftEye) ? m_leftEyeOutport
                                                                  : m_rightEyeOutport;
-  // When in opaque MIP modes, draw via the opaque path (and avoid double-render).
-  const QString mode = m_imgRaycasterRenderer.compositeMode();
-  if (mode == "MIP Opaque" || mode == "Local MIP Opaque") {
-    return false;
-  }
   return currentOutport.hasValidData();
 }
 
@@ -672,7 +651,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
 
   if (!(m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye))) {
     currentOutport.resize(m_outport.size());
-    m_imgSliceRenderer.ensureInternalTargets(currentOutport.size(), m_3dImg->numChannels());
+    m_imgSliceRenderer.setOutputSize(currentOutport.size());
 
     glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
     glm::vec3 coordLuf = m_3dImg->physicalLUF();
@@ -792,7 +771,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
                                                            : m_rightEyeOutport;
 
   if (!(m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye))) {
-    m_imgRaycasterRenderer.ensureInternalTargets(currentOutport.size(), m_3dImg->numChannels());
+    m_imgRaycasterRenderer.setOutputSize(currentOutport.size());
 
     glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
     glm::vec3 coordLuf = m_3dImg->physicalLUF();

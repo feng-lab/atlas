@@ -223,6 +223,8 @@ if (NOT _GLSLC_EXE)
 endif ()
 
 set(ATLAS_VK_SPV_OUTPUTS)
+# Track GLSL include changes to trigger SPIR-V rebuilds
+file(GLOB ATLAS_VK_SHADER_INCLUDES ${ATLAS_VULKAN_SHADER_DIR}/include/*.glslinc)
 foreach(SRC ${ATLAS_VK_SHADER_SOURCES})
   set(OUT ${ATLAS_VULKAN_SHADER_OUT}/${SRC}.spv)
   add_custom_command(
@@ -233,7 +235,7 @@ foreach(SRC ${ATLAS_VK_SHADER_SOURCES})
           -I ${CMAKE_CURRENT_SOURCE_DIR}/Resources/shader
           -o ${OUT}
           ${ATLAS_VULKAN_SHADER_DIR}/${SRC}
-          DEPENDS ${ATLAS_VULKAN_SHADER_DIR}/${SRC}
+          DEPENDS ${ATLAS_VULKAN_SHADER_DIR}/${SRC} ${ATLAS_VK_SHADER_INCLUDES}
           COMMENT "[glslc] ${SRC} -> ${OUT}"
           VERBATIM)
   list(APPEND ATLAS_VK_SPV_OUTPUTS ${OUT})
@@ -394,6 +396,8 @@ set(SOURCES
     z3danimationview.h z3danimationview.cpp
     z3danimationfilter.h z3danimationfilter.cpp
     z3dcompositor.h z3dcompositor.cpp
+    zcompositorbase.h zcompositorbase.cpp
+    zglcompositoradapter.h zglcompositoradapter.cpp
     z3dgeometryfilter.h z3dgeometryfilter.cpp
     z3daxisfilter.h z3daxisfilter.cpp
     z3dboundedfilter.h z3dboundedfilter.cpp
@@ -421,6 +425,7 @@ set(SOURCES
     z3dport.h z3dport.cpp
     z3drenderport.h z3drenderport.cpp
     z3dglobalparameters.h z3dglobalparameters.cpp
+    z3dscratchresourcepool.h z3dscratchresourcepool.cpp
     z3dshaderprogram.h z3dshaderprogram.cpp
     z3dvolume.h z3dvolume.cpp
     z3dtransferfunction.h z3dtransferfunction.cpp
@@ -577,6 +582,8 @@ set(SOURCES
     zvulkanbackgroundrenderer.cpp
     zvulkanlinerenderer.h
     zvulkanlinerenderer.cpp
+    zvulkancompositor.h
+    zvulkancompositor.cpp
 )
 
 # our target

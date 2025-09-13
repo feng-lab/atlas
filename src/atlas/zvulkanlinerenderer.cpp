@@ -166,20 +166,13 @@ void ZVulkanLineRenderer::ensureWideBuffers()
 void ZVulkanLineRenderer::createDescriptorLayouts()
 {
   auto& dev = m_rendererBase.device().context().device();
-  // Dummy set 0
-  vk::DescriptorSetLayoutCreateInfo d0{};
-  m_set0Dummy.emplace(dev, d0);
-  // Optional set 0: combined image sampler for 1D texture color
-  if (m_useTextureColor) {
-    vk::DescriptorSetLayoutBinding t0{.binding = 0,
-                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                      .descriptorCount = 1,
-                                      .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo set0{.bindingCount = 1, .pBindings = &t0};
-    m_set0Texture.emplace(dev, set0);
-  } else {
-    m_set0Texture.reset();
-  }
+  // set=0: combined image sampler for 1D texture color (always present to satisfy shader interface)
+  vk::DescriptorSetLayoutBinding t0{.binding = 0,
+                                    .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                    .descriptorCount = 1,
+                                    .stageFlags = vk::ShaderStageFlagBits::eFragment};
+  vk::DescriptorSetLayoutCreateInfo set0{.bindingCount = 1, .pBindings = &t0};
+  m_set0Texture.emplace(dev, set0);
 
   // set=1, binding 0: Lighting UBO
   vk::DescriptorSetLayoutBinding l0{.binding = 0,
@@ -270,9 +263,7 @@ void ZVulkanLineRenderer::createPipelines()
 
   auto viW = viWide();
   m_pipelineWide = device.createPipeline(*m_shaderWide, viW, vk::PrimitiveTopology::eTriangleList);
-  std::vector<vk::DescriptorSetLayout> setLayoutsW = {m_set0Texture ? **m_set0Texture : **m_set0Dummy,
-                                                      **m_set1Lighting,
-                                                      **m_set2Transforms};
+  std::vector<vk::DescriptorSetLayout> setLayoutsW = {**m_set0Texture, **m_set1Lighting, **m_set2Transforms};
   // Push constants for wideline
   vk::PushConstantRange pcW{.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                             .offset = 0,
@@ -303,7 +294,7 @@ void ZVulkanLineRenderer::createPipelines()
   m_shaderThin = std::make_unique<ZVulkanShader>(device, base + "line.vert.spv", base + "line.frag.spv", std::nullopt);
   auto viT = viThin();
   m_pipelineThin = device.createPipeline(*m_shaderThin, viT, vk::PrimitiveTopology::eLineList);
-  std::vector<vk::DescriptorSetLayout> setLayoutsT = {**m_set0Dummy, **m_set1Lighting, **m_set2Transforms};
+  std::vector<vk::DescriptorSetLayout> setLayoutsT = {**m_set0Texture, **m_set1Lighting, **m_set2Transforms};
   m_pipelineThin->setDescriptorSetLayouts(setLayoutsT);
   m_pipelineThin->create();
 
@@ -362,22 +353,36 @@ void ZVulkanLineRenderer::createDescriptorSets()
   // Allocate sets
   auto ds1 = m_descPool->allocateDescriptorSet(**m_set1Lighting);
   auto ds2 = m_descPool->allocateDescriptorSet(**m_set2Transforms);
+  auto ds0 = m_descPool->allocateDescriptorSet(**m_set0Texture);
   m_dsLighting = std::make_unique<ZVulkanDescriptorSet>(dev, std::move(ds1));
   m_dsTransforms = std::make_unique<ZVulkanDescriptorSet>(dev, std::move(ds2));
-  if (m_set0Texture) {
-    auto ds0 = m_descPool->allocateDescriptorSet(**m_set0Texture);
-    m_dsTexture = std::make_unique<ZVulkanDescriptorSet>(dev, std::move(ds0));
-  } else {
-    m_dsTexture.reset();
-  }
+  m_dsTexture = std::make_unique<ZVulkanDescriptorSet>(dev, std::move(ds0));
 
   // Update
   m_dsLighting->updateUniformBuffer(0, *m_uboLighting);
   m_dsTransforms->updateUniformBuffer(0, *m_uboTransforms);
   m_dsTransforms->updateUniformBuffer(1, *m_uboMaterial);
-  if (m_dsTexture && m_tex1D && m_sampler) {
-    m_dsTexture->updateTexture(0, *m_tex1D, **m_sampler);
+  // Ensure a valid bound texture/sampler at set=0 even when not using texture colors
+  if (!m_sampler) {
+    vk::SamplerCreateInfo samplerInfo{.magFilter = vk::Filter::eLinear,
+                                      .minFilter = vk::Filter::eLinear,
+                                      .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+                                      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+                                      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+                                      .borderColor = vk::BorderColor::eIntOpaqueWhite};
+    m_sampler.emplace(m_rendererBase.device().context().device(), samplerInfo);
   }
+
+  if (!m_tex1D) {
+    // Create a 1x1 2D texture as placeholder (white)
+    m_tex1D = m_rendererBase.device().createTexture(1, 1, vk::Format::eR8G8B8A8Unorm,
+                                                    vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
+    uint32_t pixel = 0xffffffffu; // RGBA8 white
+    m_tex1D->uploadData(&pixel, sizeof(pixel));
+  }
+  m_dsTexture->updateTexture(0, *m_tex1D, **m_sampler);
 }
 
 void ZVulkanLineRenderer::compile()

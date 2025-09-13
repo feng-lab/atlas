@@ -16,6 +16,8 @@ class ZWidgetsGroup;
 
 class Z3DRenderingEngine;
 
+class Z3DScratchResourcePool;
+
 struct Z3DLocalColorBuffer
 {
   std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> data;
@@ -98,6 +100,11 @@ public:
 
   void cameraPointsTo(const ZBBox<glm::dvec3>& bound);
 
+  // Scratch pool access and management
+  Z3DScratchResourcePool& scratchPool();
+  const Z3DScratchResourcePool& scratchPool() const;
+  void trimScratchMemory();
+
 private:
   void updateLightsArray();
 
@@ -160,6 +167,8 @@ private:
   std::vector<glm::vec3> m_lightSpotDirectionArray;
 
   size_t m_cameraParameterIndex = 0;
+
+  std::unique_ptr<Z3DScratchResourcePool> m_scratchPool;
 };
 
 } // namespace nim

@@ -75,7 +75,7 @@ if (ATLAS_SANITIZE_ADDRESS)
 endif ()
 message(STATUS "ATLAS_SANITIZE_ADDRESS: ${ATLAS_SANITIZE_ADDRESS}")
 
-option(ATLAS_DEBUG_VERSION "Build Atlas with debug symbols and O1." OFF)
+option(ATLAS_DEBUG_VERSION "Build Atlas with debug symbols and O1." ON)
 if (ATLAS_DEBUG_VERSION)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -O1")
   add_compile_definitions(ATLAS_DEBUG_VERSION)

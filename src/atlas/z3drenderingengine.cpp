@@ -267,7 +267,7 @@ void Z3DRenderingEngine::updateBoundBox()
   }
   m_numObjsBefore = m_doc.numObjs();
 
-  LOG(INFO) << json::value_from(m_boundBox);
+  VLOG(2) << json::value_from(m_boundBox);
   // update global cut
   m_globalParas->globalXCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.x) - 1,
                                                  std::ceil(m_boundBox.maxCorner.x) + 1);

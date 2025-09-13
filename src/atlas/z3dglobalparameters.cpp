@@ -3,6 +3,7 @@
 #include "zwidgetsgroup.h"
 #include "z3dgpuinfo.h"
 #include "z3dcameracontrolwidget.h"
+#include "z3dscratchresourcepool.h"
 
 namespace nim {
 
@@ -232,6 +233,9 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   devicePixelRatio.setEnabled(false);
 
   pickingManager.setDevicePixelRatio(devicePixelRatio.get());
+
+  // Initialize scratch resource pool
+  m_scratchPool = std::make_unique<Z3DScratchResourcePool>();
 }
 
 void Z3DGlobalParameters::setDevicePixelRatio(float f)
@@ -320,6 +324,23 @@ void Z3DGlobalParameters::cameraPointsTo(const ZBBox<glm::dvec3>& bound)
   }
   auto cent = glm::vec3((bound.minCorner + bound.maxCorner) / 2.);
   camera.setCenter(cent);
+}
+
+Z3DScratchResourcePool& Z3DGlobalParameters::scratchPool()
+{
+  return *m_scratchPool;
+}
+
+const Z3DScratchResourcePool& Z3DGlobalParameters::scratchPool() const
+{
+  return *m_scratchPool;
+}
+
+void Z3DGlobalParameters::trimScratchMemory()
+{
+  if (m_scratchPool) {
+    m_scratchPool->trim();
+  }
 }
 
 } // namespace nim

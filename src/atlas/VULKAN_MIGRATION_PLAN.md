@@ -59,7 +59,7 @@ Progress Update — GL out of Z3DMeshFilter (Completed)
   - Removed the filter-owned `Z3DTextureGlowRenderer`; kept a small set of glow parameters on the filter for UI/state only.
 - Centralized glow in the compositor with a single hook:
   - Added `renderTransparentFilter(filter, target, eye)` in `Z3DCompositor` that decides glow vs normal rendering.
-  - Uses dedicated glow temps (`m_glowTempRenderTarget1/2`) and a depth-aware compositor shader (`m_alphaBlendRenderer`) to blend glow results, avoiding fixed-function blend pitfalls.
+  - Uses pooled glow temps via `Z3DScratchResourcePool` (per-glow leases) and a depth-aware compositor shader (`m_alphaBlendRenderer`) to blend glow results, avoiding fixed-function blend pitfalls.
   - Ensures depth test and depth writes are enabled for the glow geometry prepass, and restores previous GL state after.
 - OIT compatibility:
   - Glow is precomputed before OIT into a single color/depth pair and merged with any existing image pair, then passed to OIT as `imageColorTex/imageDepthTex`.
@@ -293,6 +293,36 @@ shader.setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
                                                        reinterpret_cast<uint8_t*>(data.data()) + sizeof(data)));
 ```
 
+## API‑Independent Compositor Interface
+
+Introduce a minimal, engine‑facing façade to eliminate GL leakage from engine/UI code. Backends (OpenGL, Vulkan) implement this façade behind the scenes.
+
+Interface sketch (QObject to preserve signals):
+
+- Lifecycle/size
+  - `setOutputSize(glm::uvec2)`, `outputSize() const`
+  - `setRenderingRegion(double left, double right, double bottom, double top)`
+  - `setProgressiveRenderingMode(bool)`
+- Rendering
+  - `requestRender(bool stereo)` or alternatively `process(Z3DEye)`
+- Readback (engine screenshot paths)
+  - `monoReadyLocalBuffer()`, `leftReadyLocalBuffer()`, `rightReadyLocalBuffer()`
+- Signals
+  - `sceneParaUpdated`, `renderingFinished`, `renderingError(QString)`
+
+Notes:
+- Keep interface small and tailored to existing engine usage.
+- Do not expose low‑level concepts (FBOs, pipelines, descriptors) across the façade.
+
+GL Adapter (Phase 3):
+- `ZGLCompositorAdapter` implements the façade by delegating to `Z3DCompositor` with 1:1 behavior, wiring signals through.
+- No behavior change; keeps all graph/ports inside the existing GL compositor.
+
+Vulkan Implementation (Phase 4+):
+- `ZVulkanCompositor` implements the façade using Vulkan renderers/targets.
+- Start with background + axis lines; then add Lines → Mesh → Images/Volumes → OIT → Picking.
+- For readback, provide RGBA8 buffers identical to GL’s local color buffers.
+
 ## Migration Phases & Milestones
 
 ### Phase 0 — Foundations (DONE/ONGOING)
@@ -362,7 +392,9 @@ Deliverable: Stable and performant Vulkan backend in releases.
 - [x] Add/minify shader compilation script outputs to `Resources/shader/vulkan/spv/`.
 - [x] Minimal background clear frame using dynamic rendering, plus CPU readback test.
 - [x] Fullscreen triangle pipeline for background gradient base.
-- [ ] Background renderer parity: wire specialization constants for Uniform/Gradient orientations; API shim for `mode`/`orientation`/`region`.
+ - [x] Fix line renderer pipeline layout and descriptor binding (always include set=0 combined image sampler).
+ - [x] Convert 1D LUT usage to 2D Wx1 to improve portability.
+ - [ ] Background renderer parity: wire specialization constants for Uniform/Gradient orientations; API shim for `mode`/`orientation`/`region`.
 - [ ] Finalize `ZVulkanLineRenderer` (buffers, descriptors, pipelines, draw calls).
 - [ ] Line renderer parity: smooth wide lines, round caps, screen‑aligned mode, per‑segment widths, 1D texture color, line strip batching; picking pass.
 - [ ] Implement per-frame UBO for camera matrices, fog, lights; push constants for small params.
@@ -375,9 +407,9 @@ Deliverable: Stable and performant Vulkan backend in releases.
 
 Abstraction/Reuse tasks
 
-- [x] Define DTOs for background/lines/meshes/images/volumes (`zrenderdto.h`).
-- [x] Add abstract compositor interface extracted from Z3D (`zcompositorbase.h`).
-- [x] Implement minimal Vulkan compositor to ingest DTOs and produce RGBA readbacks.
+- [ ] Define DTOs for background/lines/meshes/images/volumes (`zrenderdto.h`).
+ - [x] Add abstract compositor interface extracted from Z3D (`zcompositorbase.h`).
+- [x] Implement minimal Vulkan compositor to produce RGBA readbacks (background + axis lines).
 - [ ] Expand Vulkan compositor to ingest DTOs and provide equivalent outputs (ready targets/readback).
 - [ ] Migrate engine to hold a `std::unique_ptr` to the facade and switch backend at runtime.
 - [ ] Add DTO emitters in critical filters and reuse them in GL paths to reduce duplicated logic.

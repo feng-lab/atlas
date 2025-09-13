@@ -95,7 +95,8 @@ void sampleVolume(in vec3 startRayPosition, in vec3 exitRayPosition, in float st
       vec4 color = texture(transfer_function, voxel);
 
       if (color.a > 0.0) {
-        color.a / sampling_rate;
+        // Scale opacity by sampling rate to keep integration stable
+        color.a /= sampling_rate;
         result = COMPOSITING(result, color, currentRayLength, rayDepth);
         if (result.a >= 1.0) {
           result.a = 1.0;
@@ -288,7 +289,8 @@ void main()
 #else
       FragData0 = result;
 #endif
-      FragData1.xy = vec2(currentRayLength, rayDepth);
+      // Write full vec4 to avoid undefined blend artifacts if state leaks
+      FragData1 = vec4(currentRayLength, rayDepth, 0.0, 1.0);
       return;
     }
 
@@ -313,7 +315,7 @@ void main()
 
     result.rgb *= result.a;
     FragData0 = result;
-    FragData1.xy = vec2(1.0, fragDepth);
+    // Mark fully completed ray (length=1) and export resolved depth
+    FragData1 = vec4(1.0, fragDepth, 0.0, 1.0);
   }
 }
-

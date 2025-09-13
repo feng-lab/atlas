@@ -19,8 +19,8 @@ layout(location = 3) flat in vec3 plane3;
 layout(location = 4) flat in vec3 plane4;
 layout(location = 5) flat in vec4 p0p1; // only when ROUND_CAP
 
-// Optional texture
-layout(set = 0, binding = 0) uniform sampler1D line_texture;
+// Optional texture (emulate 1D with Wx1 2D texture)
+layout(set = 0, binding = 0) uniform sampler2D line_texture;
 
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
@@ -40,7 +40,7 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   vec4 col;
   if (USE_1DTEXTURE) {
     float texCoord0 = 1.0 - (d - 1.0) * 2.0 * wpc.size_scale / wpc.line_width;
-    col = texture(line_texture, texCoord0);
+    col = texture(line_texture, vec2(texCoord0, 0.5));
   } else {
     col = v_color;
   }

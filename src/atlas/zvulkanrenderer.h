@@ -52,7 +52,7 @@ public:
     virtual void render(vk::raii::CommandBuffer& cmdBuffer) = 0;
     
     // Render for picking (optional, can be implemented by derived classes)
-    virtual void renderPicking(vk::raii::CommandBuffer& _cmdBuffer) {}
+    virtual void renderPicking(vk::raii::CommandBuffer&) {}
     
 protected:
     // Reference to the renderer base (provides global parameters and context)

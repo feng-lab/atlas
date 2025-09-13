@@ -1,6 +1,7 @@
 #include "z3dtextureglowrenderer.h"
 
 #include "z3dtexture.h"
+#include "z3dscratchresourcepool.h"
 
 namespace nim {
 
@@ -53,13 +54,13 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
   }
 
   glm::uvec2 size = m_colorTexture->dimension().xy();
-  // glm::ivec2 size = glm::ivec2(glm::vec2(m_colorTexture->dimensions()) * 128.f /
-  // float(std::min(m_colorTexture->dimensions().x, m_colorTexture->dimensions().y)));
-  m_blurXTarget.resize(size);
-  m_blurYTarget.resize(size);
 
-  m_blurXTarget.bind();
-  m_blurXTarget.clear();
+  // Acquire temporary targets from the scratch pool for blur passes
+  auto blurXLease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(size);
+  auto blurYLease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(size);
+
+  blurXLease.renderTarget->bind();
+  blurXLease.renderTarget->clear();
   m_blurXTextureShader.bind();
   m_blurXTextureShader.setUniform("blur_radius", m_blurRadius.get());
   m_blurXTextureShader.setUniform("blur_scale", m_blurScale.get());
@@ -69,28 +70,28 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
   m_blurXTextureShader.bindTexture("depth_texture", m_depthTexture);
   renderScreenQuad(m_VAO, m_blurXTextureShader);
   m_blurXTextureShader.release();
-  m_blurXTarget.release();
+  blurXLease.renderTarget->release();
 
-  m_blurYTarget.bind();
-  m_blurYTarget.clear();
+  blurYLease.renderTarget->bind();
+  blurYLease.renderTarget->clear();
   m_blurYTextureShader.bind();
   m_blurYTextureShader.setUniform("blur_radius", m_blurRadius.get());
   m_blurYTextureShader.setUniform("blur_scale", m_blurScale.get());
   m_blurYTextureShader.setUniform("blur_strength", m_blurStrength.get());
   m_blurYTextureShader.setUniform("screen_dim_RCP", 1.f / glm::vec2(size));
-  m_blurYTextureShader.bindTexture("color_texture", m_blurXTarget.attachment(GL_COLOR_ATTACHMENT0));
-  m_blurYTextureShader.bindTexture("depth_texture", m_blurXTarget.attachment(GL_DEPTH_ATTACHMENT));
+  m_blurYTextureShader.bindTexture("color_texture", blurXLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  m_blurYTextureShader.bindTexture("depth_texture", blurXLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
   renderScreenQuad(m_VAO, m_blurYTextureShader);
   m_blurYTextureShader.release();
-  m_blurYTarget.release();
+  blurYLease.renderTarget->release();
 
   m_glowTextureShaderGrp.bind();
   Z3DShaderProgram& shader = m_glowTextureShaderGrp.get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   shader.bindTexture("color_texture", m_colorTexture);
   shader.bindTexture("depth_texture", m_depthTexture);
-  shader.bindTexture("glowmap_color_texture", m_blurYTarget.attachment(GL_COLOR_ATTACHMENT0));
-  shader.bindTexture("glowmap_depth_texture", m_blurYTarget.attachment(GL_DEPTH_ATTACHMENT));
+  shader.bindTexture("glowmap_color_texture", blurYLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  shader.bindTexture("glowmap_depth_texture", blurYLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
   renderScreenQuad(m_VAO, shader);
   m_glowTextureShaderGrp.release();
 }

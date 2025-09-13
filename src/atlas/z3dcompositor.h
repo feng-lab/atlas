@@ -90,9 +90,7 @@ private:
   void renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                         const std::vector<Z3DBoundedFilter*>& transparentFilters,
                         Z3DRenderTarget& renderTarget,
-                        Z3DEye eye,
-                        const Z3DTexture* imageColorTex = nullptr,
-                        const Z3DTexture* imageDepthTex = nullptr);
+                        Z3DEye eye);
 
   void renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                const std::vector<Z3DBoundedFilter*>& transparentFilters,
@@ -108,9 +106,7 @@ private:
                       const std::vector<Z3DBoundedFilter*>& transparentFilters,
                       Z3DRenderTarget& renderTarget,
                       Z3DEye eye,
-                      const QString& method,
-                      const Z3DTexture* imageColorTex = nullptr,
-                      const Z3DTexture* imageDepthTex = nullptr);
+                      const QString& method);
 
   void renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& filters, Z3DRenderTarget& renderTarget, Z3DEye eye);
 
@@ -143,7 +139,6 @@ private:
                            const std::vector<const Z3DTexture*>& imageDepthTexList);
 
   bool createWBRenderTarget(const glm::uvec2& size);
-
 
   // Build a list of non-opaque image layers (color/depth) from connected image filters
   std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> collectNonOpaqueImageLayers(Z3DEye eye) const;
@@ -195,24 +190,11 @@ private:
   Z3DRenderTarget* m_leftCurrentTarget = nullptr;
   Z3DRenderTarget* m_rightCurrentTarget = nullptr;
 
-  Z3DRenderTarget m_tempRenderTarget1;
-  Z3DRenderTarget m_tempRenderTarget2;
-  Z3DRenderTarget m_tempRenderTarget3;
-  Z3DRenderTarget m_tempRenderTarget4;
-  Z3DRenderTarget m_tempRenderTarget5;
-  // Dedicated glow intermediates to avoid clashing with caller-provided temps
-  Z3DRenderTarget m_glowTempRenderTarget1;
-  Z3DRenderTarget m_glowTempRenderTarget2;
-  Z3DRenderTarget m_glowAccumRenderTarget;
-  std::vector<std::unique_ptr<Z3DRenderTarget>> m_glowLayerPool;
-  Z3DRenderTarget m_imgTempRenderTarget1;
-  Z3DRenderTarget m_imgTempRenderTarget2;
+  // Temps are now acquired from Z3DScratchResourcePool on demand
   Z3DRenderTarget m_pickingRenderTarget;
-  
+
   // Internal helper: hooked transparent rendering with optional glow overlay
-  void renderTransparentFilter(Z3DBoundedFilter* filter,
-                               Z3DRenderTarget& renderTarget,
-                               Z3DEye eye);
+  void renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderTarget& renderTarget, Z3DEye eye);
 
   std::unique_ptr<Z3DRenderTarget> m_ddpRT;
   Z3DShaderProgram m_ddpBlendShader;

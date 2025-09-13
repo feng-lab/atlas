@@ -8,6 +8,7 @@
 #include "z3dtexture.h"
 #include <memory>
 #include "z3dtextureandeyecoordinaterenderer.h"
+#include "z3dscratchresourcepool.h"
 
 namespace nim {
 
@@ -38,14 +39,6 @@ public:
 
   // add quad
   void addQuad(const ZMesh& quad);
-
-  // For 3D Raycasting rendering, once called, 2d quads will be cleared and renderer
-  // switch to 3D mode
-  void setEntryExitInfo(const Z3DTexture* entryExitTexCoordAndZeTexture)
-  {
-    m_entryExitTexCoordAndZeTexture = entryExitTexCoordAndZeTexture;
-    m_quads.clear();
-  }
 
   void setFastRendering(bool v)
   {
@@ -113,10 +106,19 @@ public:
     return m_channelIdx[eye] > -1;
   }
 
-  // Ensure internal render targets and textures exist and match size/channel count
-  void ensureInternalTargets(const glm::uvec2& size, size_t numChannels);
+  // Ensure internal targets are sized; size is provided by filter
+  void setOutputSize(const glm::uvec2& size)
+  {
+    // Store output size and resize per-eye ping-pong targets
+    m_outputSize = size;
+    for (int e = 0; e < 3; ++e) {
+      m_imageRenderTarget1s[e]->resize(size);
+      m_imageRenderTarget2s[e]->resize(size);
+    }
+  }
 
-  // Compute entry/exit texture for a clipped volume surface
+  // Compute entry/exit texture for a clipped volume surface, For 3D Raycasting rendering, once called, 2d quads will be
+  // cleared and renderer switch to 3D mode
   void prepareEntryExit(const ZMesh& clipped, bool flipped, Z3DEye eye, const glm::uvec2& size);
 
 protected:
@@ -178,8 +180,7 @@ protected:
   Z3DShaderProgram m_copyTextureShader;
 
   // Internal targets
-  Z3DRenderTarget m_layerTarget{glm::uvec2(32, 32)};
-  Z3DRenderTarget m_blockIDsRenderTarget{glm::uvec2(32, 32)};
+  // Internal targets are acquired from the scratch pool
   Z3DRenderTarget* m_lastImageRenderTargets[3] = {nullptr, nullptr, nullptr};
   Z3DRenderTarget* m_currentImageRenderTargets[3] = {nullptr, nullptr, nullptr};
 
@@ -212,83 +213,16 @@ private:
   int m_channelIdx[3] = {-1, -1, -1};
   int m_round[3] = {0, 0, 0};
 
+  // Output size provided via ensureInternalTargets()
+  glm::uvec2 m_outputSize{32, 32};
+
   // Owned GL resources (moved from filter)
   // Layer textures
-  Z3DTexture m_layerColorTexture{GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA16), glm::uvec3(32, 32, 3), GL_RGBA, GL_FLOAT};
-  Z3DTexture m_layerDepthTexture{GL_TEXTURE_2D_ARRAY,
-                                 GLint(GL_DEPTH_COMPONENT24),
-                                 glm::uvec3(32, 32, 3),
-                                 GL_DEPTH_COMPONENT,
-                                 GL_FLOAT};
-  Z3DTexture m_missBlocksTexture0{GL_TEXTURE_2D,
-                                  GLint(GL_RGBA32UI),
-                                  glm::uvec3(32, 32, 1),
-                                  GL_RGBA_INTEGER,
-                                  GL_UNSIGNED_INT,
-                                  nullptr,
-                                  GLint(GL_NEAREST),
-                                  GLint(GL_NEAREST)};
-  Z3DTexture m_missBlocksTexture1{GL_TEXTURE_2D,
-                                  GLint(GL_RGBA32UI),
-                                  glm::uvec3(32, 32, 1),
-                                  GL_RGBA_INTEGER,
-                                  GL_UNSIGNED_INT,
-                                  nullptr,
-                                  GLint(GL_NEAREST),
-                                  GLint(GL_NEAREST)};
-  Z3DTexture m_missBlocksTexture2{GL_TEXTURE_2D,
-                                  GLint(GL_RGBA32UI),
-                                  glm::uvec3(32, 32, 1),
-                                  GL_RGBA_INTEGER,
-                                  GL_UNSIGNED_INT,
-                                  nullptr,
-                                  GLint(GL_NEAREST),
-                                  GLint(GL_NEAREST)};
-  Z3DTexture m_missBlocksTexture3{GL_TEXTURE_2D,
-                                  GLint(GL_RGBA32UI),
-                                  glm::uvec3(32, 32, 1),
-                                  GL_RGBA_INTEGER,
-                                  GL_UNSIGNED_INT,
-                                  nullptr,
-                                  GLint(GL_NEAREST),
-                                  GLint(GL_NEAREST)};
-  Z3DTexture m_missBlocksTexture4{GL_TEXTURE_2D,
-                                  GLint(GL_RGBA32UI),
-                                  glm::uvec3(32, 32, 1),
-                                  GL_RGBA_INTEGER,
-                                  GL_UNSIGNED_INT,
-                                  nullptr,
-                                  GLint(GL_NEAREST),
-                                  GLint(GL_NEAREST)};
-  Z3DTexture m_missBlocksTexture5{GL_TEXTURE_2D,
-                                  GLint(GL_RGBA32UI),
-                                  glm::uvec3(32, 32, 1),
-                                  GL_RGBA_INTEGER,
-                                  GL_UNSIGNED_INT,
-                                  nullptr,
-                                  GLint(GL_NEAREST),
-                                  GLint(GL_NEAREST)};
-  Z3DTexture m_missBlocksTexture6{GL_TEXTURE_2D,
-                                  GLint(GL_RGBA32UI),
-                                  glm::uvec3(32, 32, 1),
-                                  GL_RGBA_INTEGER,
-                                  GL_UNSIGNED_INT,
-                                  nullptr,
-                                  GLint(GL_NEAREST),
-                                  GLint(GL_NEAREST)};
-  Z3DTexture m_missBlocksTexture7{GL_TEXTURE_2D,
-                                  GLint(GL_RGBA32UI),
-                                  glm::uvec3(32, 32, 1),
-                                  GL_RGBA_INTEGER,
-                                  GL_UNSIGNED_INT,
-                                  nullptr,
-                                  GLint(GL_NEAREST),
-                                  GLint(GL_NEAREST)};
-
-  // Entry/exit target (2-layer RGBA32F texture storing entry/exit texcoord + ze)
-  Z3DRenderTarget m_entryExitTarget{glm::uvec2(32, 32)};
-  Z3DTexture m_entryExitTexture{GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA32F), glm::uvec3(32, 32, 2), GL_RGBA, GL_FLOAT};
+  // No per-renderer textures; entry/exit obtained from scratch pool
   Z3DTextureAndEyeCoordinateRenderer m_textureAndEyeCoordinateRenderer;
+  Z3DScratchResourcePool::RenderTargetLease
+    m_entryExitLease; // holds lifetime of entry/exit render target during a frame
+  Z3DScratchResourcePool::RenderTargetLease m_progressiveLayerLease; // persistent across progressive rounds
 
   std::unique_ptr<Z3DRenderTarget> m_imageRenderTarget1s[3];
   std::unique_ptr<Z3DRenderTarget> m_imageRenderTarget2s[3];

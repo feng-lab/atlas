@@ -5,6 +5,7 @@
 #include "zglobal.h"
 #include "zmesh.h"
 #include <glbinding/gl/gl.h>
+#include <glbinding-aux/Meta.h>
 
 namespace nim {
 

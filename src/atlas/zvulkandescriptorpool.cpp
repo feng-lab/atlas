@@ -8,11 +8,14 @@ namespace nim {
 ZVulkanDescriptorPool::ZVulkanDescriptorPool(ZVulkanDevice& device)
   : m_device(device)
 {
-  vk::DescriptorPoolSize poolSize{.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 100};
+  std::array<vk::DescriptorPoolSize, 2> poolSizes{
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 256},
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 256},
+  };
   vk::DescriptorPoolCreateInfo poolInfo{.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-                                        .maxSets = 100,
-                                        .poolSizeCount = 1,
-                                        .pPoolSizes = &poolSize};
+                                        .maxSets = 256,
+                                        .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+                                        .pPoolSizes = poolSizes.data()};
   m_descriptorPool.emplace(m_device.context().device(), poolInfo);
   LOG(INFO) << "ZVulkanDescriptorPool created";
 }
