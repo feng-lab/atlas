@@ -7,6 +7,81 @@
 
 namespace nim {
 
+// Return the GL_TEXTURE_BINDING_* enum corresponding to a texture target.
+static GLenum bindingEnumForTarget(GLenum target)
+{
+  switch (target) {
+    case GL_TEXTURE_1D:
+    case GL_PROXY_TEXTURE_1D:
+      return GL_TEXTURE_BINDING_1D;
+
+    case GL_TEXTURE_2D:
+    case GL_PROXY_TEXTURE_2D:
+      return GL_TEXTURE_BINDING_2D;
+
+    case GL_TEXTURE_3D:
+    case GL_PROXY_TEXTURE_3D:
+      return GL_TEXTURE_BINDING_3D;
+
+    case GL_TEXTURE_RECTANGLE:
+    case GL_PROXY_TEXTURE_RECTANGLE:
+      return GL_TEXTURE_BINDING_RECTANGLE;
+
+    case GL_TEXTURE_1D_ARRAY:
+    case GL_PROXY_TEXTURE_1D_ARRAY:
+      return GL_TEXTURE_BINDING_1D_ARRAY;
+
+    case GL_TEXTURE_2D_ARRAY:
+    case GL_PROXY_TEXTURE_2D_ARRAY:
+      return GL_TEXTURE_BINDING_2D_ARRAY;
+
+    case GL_TEXTURE_CUBE_MAP:
+    case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+    case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+    case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+    case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+    case GL_PROXY_TEXTURE_CUBE_MAP:
+      return GL_TEXTURE_BINDING_CUBE_MAP;
+
+    case GL_TEXTURE_CUBE_MAP_ARRAY:
+    case GL_PROXY_TEXTURE_CUBE_MAP_ARRAY:
+      return GL_TEXTURE_BINDING_CUBE_MAP_ARRAY;
+
+#ifdef GL_TEXTURE_2D_MULTISAMPLE
+    case GL_TEXTURE_2D_MULTISAMPLE:
+      return GL_TEXTURE_BINDING_2D_MULTISAMPLE;
+#endif
+#ifdef GL_TEXTURE_2D_MULTISAMPLE_ARRAY
+    case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
+      return GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY;
+#endif
+    default:
+      // Fallback to 2D binding; callers should only pass valid targets used in this app.
+      return GL_TEXTURE_BINDING_2D;
+  }
+}
+
+// RAII helper: temporarily bind a texture on the current active unit and
+// restore the previous binding on destruction.
+struct ScopedTextureBinding
+{
+  GLenum target;
+  GLint prevBinding = 0;
+  ScopedTextureBinding(GLenum t, GLuint id)
+    : target(t)
+  {
+    GLenum binding = bindingEnumForTarget(target);
+    glGetIntegerv(binding, &prevBinding);
+    glBindTexture(target, id);
+  }
+  ~ScopedTextureBinding()
+  {
+    glBindTexture(target, static_cast<GLuint>(prevBinding));
+  }
+};
+
 Z3DTexture::Z3DTexture(GLenum textureTarget,
                        GLint internalFormat,
                        const glm::uvec3& dimension,
@@ -71,14 +146,14 @@ Z3DTexture::~Z3DTexture()
 
 void Z3DTexture::setFilter(GLint minFilter, GLint magFilter) const
 {
-  bind();
+  ScopedTextureBinding guard(m_textureTarget, m_id);
   glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, magFilter);
   glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, minFilter);
 }
 
 void Z3DTexture::setWrap(GLint wrap) const
 {
-  bind();
+  ScopedTextureBinding guard(m_textureTarget, m_id);
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_S, wrap);
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_T, wrap);
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_R, wrap);
@@ -86,13 +161,13 @@ void Z3DTexture::setWrap(GLint wrap) const
 
 void Z3DTexture::generateMipmap() const
 {
-  bind();
+  ScopedTextureBinding guard(m_textureTarget, m_id);
   glGenerateMipmap(m_textureTarget);
 }
 
 void Z3DTexture::initializeImage(const void* data) const
 {
-  bind();
+  ScopedTextureBinding guard(m_textureTarget, m_id);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   switch (m_type) {
@@ -131,7 +206,7 @@ void Z3DTexture::updateImage(const GLvoid* data) const
 {
   // CHECK(data);  should not check when we use PBO
 
-  bind();
+  ScopedTextureBinding guard(m_textureTarget, m_id);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   switch (m_type) {
@@ -164,7 +239,7 @@ void Z3DTexture::updateSubImage(const glm::uvec3& offset, const glm::uvec3& size
   // CHECK(data);  should not check when we use PBO
   CHECK(glm::all(glm::lessThanEqual(offset + size, m_dimension))) << offset << " " << size << " " << m_dimension;
 
-  bind();
+  ScopedTextureBinding guard(m_textureTarget, m_id);
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   switch (m_type) {
@@ -396,7 +471,7 @@ size_t Z3DTexture::bypePerPixel(GLint internalFormat)
 
 void Z3DTexture::downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLvoid* buffer) const
 {
-  bind();
+  ScopedTextureBinding guard(m_textureTarget, m_id);
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
   glGetTexImage(m_textureTarget, 0, dataFormat, dataType, buffer);
 }

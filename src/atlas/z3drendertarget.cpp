@@ -202,19 +202,11 @@ bool Z3DRenderTarget::resize(const glm::uvec2& newsize)
   }
 
   m_size = newsize;
-  // Avoid clobbering whatever texture unit the caller (e.g., shaders) bound.
-  // Use a "safe" high-numbered unit for internal texture reallocation and
-  // restore the previous active unit afterwards.
-  GLint prevActiveUnit = Z3DTextureUnitManager::activeTextureUnit();
-  GLint maxUnits = Z3DGpuInfo::instance().maxCombinedTextureImageUnits();
-  GLint safeUnitEnumInt = GLint(GL_TEXTURE0) + std::max(0, maxUnits - 1);
-  glActiveTexture(GLenum(safeUnitEnumInt));
   for (const auto& enumAttach : m_attachments) {
     if (enumAttach.second) {
       enumAttach.second->setDimension(glm::uvec3(m_size.x, m_size.y, enumAttach.second->depth()));
     }
   }
-  glActiveTexture(GLenum(prevActiveUnit));
   isFBOComplete();
 
   //  if (m_multisample) {
