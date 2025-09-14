@@ -309,24 +309,13 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size, uin
     });
 
   if (slot) {
-    // Existing slot path: adjust size and layers as needed.
-    bool changed = false;
+    // Existing slot path: single-pass resize; grow Z only if XY unchanged.
     const uint32_t prevLayers = slot->layers;
-    Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
-    const glm::uvec3 curDim = colorTex->dimension();
-    const bool xyResize = (slot->fbo->size() != size);
-    const uint32_t wantedZ = xyResize ? layers : std::max<uint32_t>(curDim.z, layers);
-    if (xyResize) {
-      slot->fbo->resize(size);
-      changed = true;
-    }
-    if (curDim.z != wantedZ) {
-      colorTex->setDimension(glm::uvec3(size.x, size.y, wantedZ));
-      changed = true;
-    }
+    bool changed = slot->fbo->resize(glm::uvec3(size.x, size.y, layers), /*growLayersOnlyWhenNoXYChange=*/true);
     slot->fbo->isFBOComplete();
     slot->inUse = true;
-    slot->layers = static_cast<uint32_t>(colorTex->dimension().z);
+    Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
+    slot->layers = colorTex ? static_cast<uint32_t>(colorTex->dimension().z) : layers;
     if (slot->layers != prevLayers) {
       changed = true;
     }
@@ -376,34 +365,13 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
     });
 
   if (slot) {
-    // Existing slot path: adjust size and layers as needed.
-    bool changed = false;
+    // Existing slot path: single-pass resize; grow Z only if XY unchanged.
     const uint32_t prevLayers = slot->layers;
-
-    // Color + Depth array attachments, minimize reallocs
-    Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
-    Z3DTexture* depthTex = slot->fbo->attachment(GL_DEPTH_ATTACHMENT);
-    const glm::uvec3 colorDim = colorTex->dimension();
-    const glm::uvec3 depthDim = depthTex->dimension();
-    const bool xyResize = (slot->fbo->size() != size);
-    uint32_t wantedZ_color = xyResize ? layers : std::max<uint32_t>(colorDim.z, layers);
-    uint32_t wantedZ_depth = xyResize ? layers : std::max<uint32_t>(depthDim.z, layers);
-    if (xyResize) {
-      slot->fbo->resize(size);
-      changed = true;
-    }
-    if (colorDim.z != wantedZ_color) {
-      colorTex->setDimension(glm::uvec3(size.x, size.y, wantedZ_color));
-      changed = true;
-    }
-    if (depthDim.z != wantedZ_depth) {
-      depthTex->setDimension(glm::uvec3(size.x, size.y, wantedZ_depth));
-      changed = true;
-    }
-
+    bool changed = slot->fbo->resize(glm::uvec3(size.x, size.y, layers), /*growLayersOnlyWhenNoXYChange=*/true);
     slot->fbo->isFBOComplete();
     slot->inUse = true;
-    slot->layers = static_cast<uint32_t>(colorTex->dimension().z);
+    Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
+    slot->layers = colorTex ? static_cast<uint32_t>(colorTex->dimension().z) : layers;
     if (slot->layers != prevLayers) {
       changed = true;
     }
@@ -467,17 +435,6 @@ Z3DScratchResourcePool::RenderTargetLease Z3DScratchResourcePool::acquireTempRen
     if (slot->fbo->size() != size) {
       slot->fbo->resize(size);
       changed = true;
-    }
-    // Ensure 2D color and depth attachments (existing slot must have attachments)
-    {
-      Z3DTexture* ctex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
-      if (ctex->dimension() != glm::uvec3(size.x, size.y, 1)) {
-        ctex->setDimension(glm::uvec3(size.x, size.y, 1));
-      }
-      Z3DTexture* dtex = slot->fbo->attachment(GL_DEPTH_ATTACHMENT);
-      if (dtex->dimension() != glm::uvec3(size.x, size.y, 1)) {
-        dtex->setDimension(glm::uvec3(size.x, size.y, 1));
-      }
     }
     slot->fbo->isFBOComplete();
     slot->inUse = true;

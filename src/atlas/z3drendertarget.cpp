@@ -7,6 +7,7 @@
 #include "zimg.h"
 #include "zimgformat.h"
 #include <memory>
+#include <algorithm>
 
 namespace nim {
 
@@ -220,6 +221,60 @@ bool Z3DRenderTarget::resize(const glm::uvec2& newsize)
   //                                     m_depthTex->getWidth(), m_depthTex->getHeight());
   //  }
   return true;
+}
+
+bool Z3DRenderTarget::resize(const glm::uvec3& newdim, bool growLayersOnlyWhenNoXYChange)
+{
+  // Validate inputs similar to 2D resize
+  if (newdim.xy() == m_size) {
+    // Only Z may change
+  } else {
+    if (newdim.xy() == glm::uvec2(0)) {
+      LOG(WARNING) << "invalid size: " << newdim.xy();
+      return false;
+    }
+    if (newdim.x > Z3DGpuInfo::instance().maxTextureSize() || newdim.y > Z3DGpuInfo::instance().maxTextureSize()) {
+      LOG(WARNING) << "size " << newdim.xy() << " exceeds texture size limit: "
+                   << Z3DGpuInfo::instance().maxTextureSize();
+      return false;
+    }
+  }
+
+  const bool xyChanged = (newdim.xy() != m_size);
+  bool changed = xyChanged;
+  m_size = newdim.xy();
+
+  for (const auto& enumAttach : m_attachments) {
+    if (!enumAttach.second) {
+      continue;
+    }
+    auto* tex = enumAttach.second;
+    const GLenum tgt = tex->textureTarget();
+    const bool isLayered = (tgt == GL_TEXTURE_2D_ARRAY) || (tgt == GL_TEXTURE_3D) || (tgt == GL_TEXTURE_CUBE_MAP_ARRAY);
+    const auto curDim = tex->dimension();
+
+    uint32_t desiredZ = curDim.z;
+    if (isLayered) {
+      if (!xyChanged) {
+        // XY unchanged: optionally grow-only
+        desiredZ = growLayersOnlyWhenNoXYChange ? std::max<uint32_t>(curDim.z, newdim.z) : newdim.z;
+      } else {
+        // XY changed: set exactly to requested Z
+        desiredZ = newdim.z;
+      }
+    } else {
+      desiredZ = 1; // non-layered attachments stay 2D
+    }
+
+    const glm::uvec3 wanted(m_size.x, m_size.y, desiredZ);
+    if (wanted != curDim) {
+      tex->setDimension(wanted);
+      changed = true;
+    }
+  }
+
+  isFBOComplete();
+  return changed;
 }
 
 void Z3DRenderTarget::changeColorAttachmentFormat(GLint internalColorFormat, GLenum attachment)
