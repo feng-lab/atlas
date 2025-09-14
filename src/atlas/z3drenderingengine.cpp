@@ -206,6 +206,7 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
 {
   VLOG(1) << "in engine destructor";
   detachCanvas();
+  VLOG(1) << "canvas detached";
   getGLFocus();
 }
 

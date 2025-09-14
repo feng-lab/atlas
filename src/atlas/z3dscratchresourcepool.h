@@ -73,6 +73,7 @@ public:
     ~RenderTargetLease()
     {
       release();
+      VLOG(1) << "lease released";
     }
     explicit operator bool() const
     {
@@ -144,7 +145,8 @@ private:
 
 private:
   // Keep a small number of slots to allow limited concurrency and avoid thrash.
-  std::vector<BlockIdRenderTargetSlot> m_blockIdRenderTargetSlots;
+  // Store slots via unique_ptr to keep Slot* addresses stable across vector reallocations.
+  std::vector<std::unique_ptr<BlockIdRenderTargetSlot>> m_blockIdRenderTargetSlots;
   uint64_t m_usageTick = 0;
   uint64_t m_creationCounter = 0;
   uint64_t m_changeCounter = 0;
@@ -157,7 +159,7 @@ private:
     GLint colorFormat = GLint(GL_RGBA32F);
     bool inUse = false;
   };
-  std::vector<EntryExitRenderTargetSlot> m_entryExitRenderTargetSlots;
+  std::vector<std::unique_ptr<EntryExitRenderTargetSlot>> m_entryExitRenderTargetSlots;
 
   // Layer array RenderTarget slots (color+depth array attachments)
   struct LayerArrayRenderTargetSlot
@@ -168,7 +170,7 @@ private:
     GLint depthFormat = GLint(GL_DEPTH_COMPONENT24);
     bool inUse = false;
   };
-  std::vector<LayerArrayRenderTargetSlot> m_layerArrayRenderTargetSlots;
+  std::vector<std::unique_ptr<LayerArrayRenderTargetSlot>> m_layerArrayRenderTargetSlots;
 
   // 2D temp RenderTarget slots (single 2D color + depth attachments)
   struct Temp2DRenderTargetSlot
@@ -178,7 +180,7 @@ private:
     GLint depthFormat = GLint(GL_DEPTH_COMPONENT24);
     bool inUse = false;
   };
-  std::vector<Temp2DRenderTargetSlot> m_temp2DRenderTargetSlots;
+  std::vector<std::unique_ptr<Temp2DRenderTargetSlot>> m_temp2DRenderTargetSlots;
 };
 
 } // namespace nim

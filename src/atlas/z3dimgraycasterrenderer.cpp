@@ -360,6 +360,14 @@ QString Z3DImgRaycasterRenderer::generateHeader()
 double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
 {
   double progress = 1;
+
+  // // Manage blending for raycaster output
+  // glEnable(GL_BLEND);
+  // glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+  // auto blendGuard = folly::makeGuard([]() {
+  //   glBlendFunc(GL_ONE, GL_ZERO);
+  //   glDisable(GL_BLEND);
+  // });
   // Ensure depth testing during raycaster rendering
   glEnable(GL_DEPTH_TEST);
   auto depthGuard = folly::makeGuard([]() {
@@ -436,6 +444,13 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
     return;
   }
 
+  // // Manage blending for raycaster output
+  // glEnable(GL_BLEND);
+  // glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+  // auto blendGuard = folly::makeGuard([]() {
+  //   glBlendFunc(GL_ONE, GL_ZERO);
+  //   glDisable(GL_BLEND);
+  // });
   // Ensure depth testing during raycaster rendering
   glEnable(GL_DEPTH_TEST);
   auto depthGuard = folly::makeGuard([]() {

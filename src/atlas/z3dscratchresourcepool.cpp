@@ -11,12 +11,15 @@ using namespace nim;
 
 // Variant that only considers slots where predicate(slot) is true.
 template<typename Slot, typename Predicate>
-Slot* findClosestFreeSlotIf(std::vector<Slot>& slots, const glm::uvec2& requestedSize, Predicate pred)
+Slot* findClosestFreeSlotIf(std::vector<std::unique_ptr<Slot>>& slots,
+                            const glm::uvec2& requestedSize,
+                            Predicate pred)
 {
   Slot* best = nullptr;
   uint64_t bestDelta = std::numeric_limits<uint64_t>::max();
   const uint64_t reqPixels = static_cast<uint64_t>(requestedSize.x) * static_cast<uint64_t>(requestedSize.y);
-  for (auto& s : slots) {
+  for (auto& up : slots) {
+    Slot& s = *up;
     if (s.inUse) {
       continue;
     }
@@ -36,7 +39,7 @@ Slot* findClosestFreeSlotIf(std::vector<Slot>& slots, const glm::uvec2& requeste
 }
 
 template<typename Slot>
-Slot* findClosestFreeSlot(std::vector<Slot>& slots, const glm::uvec2& requestedSize)
+Slot* findClosestFreeSlot(std::vector<std::unique_ptr<Slot>>& slots, const glm::uvec2& requestedSize)
 {
   return findClosestFreeSlotIf(slots, requestedSize, [](const Slot&) {
     return true;
@@ -81,7 +84,7 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
 
   // Block ID slots
   for (size_t i = 0; i < m_blockIdRenderTargetSlots.size(); ++i) {
-    const auto& s = m_blockIdRenderTargetSlots[i];
+    const auto& s = *m_blockIdRenderTargetSlots[i];
     const glm::uvec2 sz = s.fbo->size();
     const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
     const uint64_t bpp = 16; // GL_RGBA32UI = 4 * 32-bit
@@ -100,7 +103,7 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
 
   // Entry/Exit slots (single color array)
   for (size_t i = 0; i < m_entryExitRenderTargetSlots.size(); ++i) {
-    const auto& s = m_entryExitRenderTargetSlots[i];
+    const auto& s = *m_entryExitRenderTargetSlots[i];
     const glm::uvec2 sz = s.fbo->size();
     const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y * std::max<uint32_t>(1, s.layers);
     const uint64_t bpp = bytesPerPixelFromInternal(s.colorFormat);
@@ -120,7 +123,7 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
 
   // Layer Array slots (color + depth arrays)
   for (size_t i = 0; i < m_layerArrayRenderTargetSlots.size(); ++i) {
-    const auto& s = m_layerArrayRenderTargetSlots[i];
+    const auto& s = *m_layerArrayRenderTargetSlots[i];
     const glm::uvec2 sz = s.fbo->size();
     const uint64_t layerPixels = static_cast<uint64_t>(sz.x) * sz.y * std::max<uint32_t>(1, s.layers);
     const uint64_t colorBpp = bytesPerPixelFromInternal(s.colorFormat);
@@ -142,7 +145,7 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
 
   // Temp 2D slots (color + depth 2D)
   for (size_t i = 0; i < m_temp2DRenderTargetSlots.size(); ++i) {
-    const auto& s = m_temp2DRenderTargetSlots[i];
+    const auto& s = *m_temp2DRenderTargetSlots[i];
     const glm::uvec2 sz = s.fbo->size();
     const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
     const uint64_t colorBpp = bytesPerPixelFromInternal(s.colorFormat);
@@ -193,11 +196,11 @@ Z3DScratchResourcePool::BlockIdRenderTargetSlot* Z3DScratchResourcePool::acquire
   if (auto* best = findClosestFreeSlot(m_blockIdRenderTargetSlots, size)) {
     return best;
   }
-  m_blockIdRenderTargetSlots.emplace_back();
-  auto& created = m_blockIdRenderTargetSlots.back();
-  created.fbo = std::make_unique<Z3DRenderTarget>(size);
-  created.attachments = 0;
-  return &created;
+  m_blockIdRenderTargetSlots.emplace_back(std::make_unique<BlockIdRenderTargetSlot>());
+  auto* created = m_blockIdRenderTargetSlots.back().get();
+  created->fbo = std::make_unique<Z3DRenderTarget>(size);
+  created->attachments = 0;
+  return created;
 }
 
 void Z3DScratchResourcePool::growSlotIfNeeded(BlockIdRenderTargetSlot& slot,
@@ -260,7 +263,8 @@ Z3DScratchResourcePool::acquireBlockIdRenderTarget(const glm::uvec2& viewport, i
 void Z3DScratchResourcePool::trim()
 {
   auto trimCategory = [](auto& vec, size_t& kept, size_t& freed) {
-    auto it = std::remove_if(vec.begin(), vec.end(), [&](auto& slot) {
+    auto it = std::remove_if(vec.begin(), vec.end(), [&](auto& uptr) {
+      auto& slot = *uptr;
       if (slot.inUse) {
         ++kept;
         return false; // keep in-use slots
@@ -311,7 +315,6 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size, uin
     bool changed = false;
     const uint32_t prevLayers = slot->layers;
     Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
-    CHECK(colorTex != nullptr) << "EntryExit existing slot missing color attachment";
     const glm::uvec3 curDim = colorTex->dimension();
     const bool xyResize = (slot->fbo->size() != size);
     const uint32_t wantedZ = xyResize ? layers : std::max<uint32_t>(curDim.z, layers);
@@ -334,8 +337,8 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size, uin
     }
   } else {
     // Creation path: make a fresh slot and attachments.
-    m_entryExitRenderTargetSlots.emplace_back();
-    slot = &m_entryExitRenderTargetSlots.back();
+    m_entryExitRenderTargetSlots.emplace_back(std::make_unique<EntryExitRenderTargetSlot>());
+    slot = m_entryExitRenderTargetSlots.back().get();
     slot->fbo = std::make_unique<Z3DRenderTarget>(size);
     ++m_creationCounter;
 
@@ -382,8 +385,6 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
     // Color + Depth array attachments, minimize reallocs
     Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
     Z3DTexture* depthTex = slot->fbo->attachment(GL_DEPTH_ATTACHMENT);
-    CHECK(colorTex != nullptr) << "LayerArray existing slot missing color attachment";
-    CHECK(depthTex != nullptr) << "LayerArray existing slot missing depth attachment";
     const glm::uvec3 colorDim = colorTex->dimension();
     const glm::uvec3 depthDim = depthTex->dimension();
     const bool xyResize = (slot->fbo->size() != size);
@@ -413,8 +414,8 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
     }
   } else {
     // Creation path: make a fresh slot and attachments.
-    m_layerArrayRenderTargetSlots.emplace_back();
-    slot = &m_layerArrayRenderTargetSlots.back();
+    m_layerArrayRenderTargetSlots.emplace_back(std::make_unique<LayerArrayRenderTargetSlot>());
+    slot = m_layerArrayRenderTargetSlots.back().get();
     slot->fbo = std::make_unique<Z3DRenderTarget>(size);
     ++m_creationCounter;
 
@@ -472,12 +473,10 @@ Z3DScratchResourcePool::RenderTargetLease Z3DScratchResourcePool::acquireTempRen
     // Ensure 2D color and depth attachments (existing slot must have attachments)
     {
       Z3DTexture* ctex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
-      CHECK(ctex != nullptr) << "Temp2D existing slot missing color attachment";
       if (ctex->dimension() != glm::uvec3(size.x, size.y, 1)) {
         ctex->setDimension(glm::uvec3(size.x, size.y, 1));
       }
       Z3DTexture* dtex = slot->fbo->attachment(GL_DEPTH_ATTACHMENT);
-      CHECK(dtex != nullptr) << "Temp2D existing slot missing depth attachment";
       if (dtex->dimension() != glm::uvec3(size.x, size.y, 1)) {
         dtex->setDimension(glm::uvec3(size.x, size.y, 1));
       }
@@ -491,8 +490,8 @@ Z3DScratchResourcePool::RenderTargetLease Z3DScratchResourcePool::acquireTempRen
     }
   } else {
     // Creation path: make a fresh slot and attachments.
-    m_temp2DRenderTargetSlots.emplace_back();
-    slot = &m_temp2DRenderTargetSlots.back();
+    m_temp2DRenderTargetSlots.emplace_back(std::make_unique<Temp2DRenderTargetSlot>());
+    slot = m_temp2DRenderTargetSlots.back().get();
     slot->fbo = std::make_unique<Z3DRenderTarget>(size);
     ++m_creationCounter;
 
@@ -516,6 +515,7 @@ Z3DScratchResourcePool::RenderTargetLease Z3DScratchResourcePool::acquireTempRen
   lease.releaser = [slot]() {
     slot->inUse = false;
   };
+
   return lease;
 }
 

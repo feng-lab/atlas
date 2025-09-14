@@ -333,6 +333,7 @@ double Z3DCompositor::process(Z3DEye eye)
   Z3DRenderTarget* currentOutPtr = nullptr;
   if (!showHandleFilters.empty()) {
     overlayLease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(m_monoCurrentTarget->size());
+    VLOG(1) << "overlay lease acquired";
     currentOutPtr = overlayLease.renderTarget;
   } else {
     currentOutPtr = (eye == MonoEye)   ? m_monoCurrentTarget
@@ -355,6 +356,7 @@ double Z3DCompositor::process(Z3DEye eye)
           m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(
             m_rendererBase.geometriesMultisampleModePara().isSelected("2x2") ? (currentOutRenderTarget.size() * 2_u32)
                                                                              : currentOutRenderTarget.size());
+        VLOG(1) << "temp1Lease lease acquired";
 
         if (numOnTopFilters == 0) {
           renderGeometries(normalOpaqueFilters, normalTransparentFilters, *temp1Lease.renderTarget, eye);
@@ -396,8 +398,10 @@ double Z3DCompositor::process(Z3DEye eye)
                           : currentOutRenderTarget.size();
         Z3DScratchResourcePool::RenderTargetLease temp1Lease =
           m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(tempSize);
+        VLOG(1) << "lease acquired";
         Z3DScratchResourcePool::RenderTargetLease temp2Lease =
           m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(tempSize);
+        VLOG(1) << "lease acquired";
 
         // render normal geometries to tempport
         renderGeometries(normalOpaqueFilters, normalTransparentFilters, *temp1Lease.renderTarget, eye);
@@ -476,6 +480,7 @@ double Z3DCompositor::process(Z3DEye eye)
           m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(
             m_rendererBase.geometriesMultisampleModePara().isSelected("2x2") ? (currentOutRenderTarget.size() * 2_u32)
                                                                              : currentOutRenderTarget.size());
+        VLOG(1) << "lease acquired";
 
         // render geometries into one temp port
         if (numOnTopFilters == 0) {
@@ -534,8 +539,10 @@ double Z3DCompositor::process(Z3DEye eye)
                            : currentOutRenderTarget.size();
         Z3DScratchResourcePool::RenderTargetLease temp1LeaseA =
           m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(tempSize2);
+        VLOG(1) << "lease acquired";
         Z3DScratchResourcePool::RenderTargetLease temp2LeaseA =
           m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(tempSize2);
+        VLOG(1) << "lease acquired";
 
         // render normal geometries into tempport
         renderGeometries(normalOpaqueFilters, normalTransparentFilters, *temp1LeaseA.renderTarget, eye);
@@ -603,6 +610,7 @@ double Z3DCompositor::process(Z3DEye eye)
         m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(
           m_rendererBase.geometriesMultisampleModePara().isSelected("2x2") ? (currentOutRenderTarget.size() * 2_u32)
                                                                            : currentOutRenderTarget.size());
+      VLOG(1) << "lease acquired";
 
       if (numOnTopFilters == 0) {
         renderGeometries(normalOpaqueFilters, normalTransparentFilters, *temp1Lease.renderTarget, eye);
@@ -644,8 +652,10 @@ double Z3DCompositor::process(Z3DEye eye)
                         : currentOutRenderTarget.size();
       Z3DScratchResourcePool::RenderTargetLease temp1Lease2 =
         m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(tempSize);
+      VLOG(1) << "lease acquired";
       Z3DScratchResourcePool::RenderTargetLease temp2Lease2 =
         m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(tempSize);
+      VLOG(1) << "lease acquired";
 
       // render normal geometries to tempport
       renderGeometries(normalOpaqueFilters, normalTransparentFilters, *temp1Lease2.renderTarget, eye);
@@ -690,6 +700,7 @@ double Z3DCompositor::process(Z3DEye eye)
                                                     : *m_rightCurrentTarget;
     Z3DScratchResourcePool::RenderTargetLease handleLease =
       m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(finalOutRenderTarget.size());
+    VLOG(1) << "lease acquired";
 
     handleLease.renderTarget->bind();
     handleLease.renderTarget->clear();
@@ -754,7 +765,9 @@ double Z3DCompositor::process(Z3DEye eye)
   } else if (!filters.empty() && !showHandleFilters.empty()) {
     auto pickSize = pickingManager().renderTarget().size();
     auto leaseHandles = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(pickSize);
+    VLOG(1) << "lease acquired";
     auto leaseGeoms = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(pickSize);
+    VLOG(1) << "lease acquired";
 
     leaseHandles.renderTarget->bind();
     leaseHandles.renderTarget->clear();
@@ -814,10 +827,11 @@ double Z3DCompositor::process(Z3DEye eye)
     }
 
     m_rendererBase.globalParas().hasNewRendering = true;
-    VLOG(1) << fmt::format("{} finished", m_progressiveRendering ? "progressive rendering" : "rendering");
+    VLOG(1) << fmt::format("{} finished to {}",
+                           m_progressiveRendering ? "progressive rendering" : "rendering",
+                           (void*)m_monoReadyLocalBuffer);
     // Log scratch pool memory usage after the mono render completes
     const auto& pool = m_rendererBase.globalParas().scratchPool();
-    VLOG(1) << pool.describeMemoryUsage(false);
     static uint64_t s_lastCreate = 0;
     static uint64_t s_lastChange = 0;
     const uint64_t curCreate = pool.creationCounter();
@@ -826,6 +840,8 @@ double Z3DCompositor::process(Z3DEye eye)
       VLOG(1) << pool.describeMemoryUsage(true);
       s_lastCreate = curCreate;
       s_lastChange = curChange;
+    } else {
+      VLOG(1) << pool.describeMemoryUsage(false);
     }
     Q_EMIT renderingFinished();
 
@@ -994,6 +1010,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
 
       // Geometry prepass (use pooled temp)
       auto glowGeomLease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(renderTarget.size());
+      VLOG(1) << "lease acquired";
       glowGeomLease.renderTarget->bind();
       glowGeomLease.renderTarget->clear();
       gf->setViewport(glowGeomLease.renderTarget->size());
@@ -1003,6 +1020,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       // Glow blur/composition for this object directly into a pooled layer RT
       glowLayerLeases.emplace_back(
         m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(renderTarget.size()));
+      VLOG(1) << "lease acquired";
       auto* layerRT = glowLayerLeases.back().renderTarget;
       layerRT->bind();
       layerRT->clear();
@@ -1064,9 +1082,11 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
     }
   } else {
     auto leaseOpaque = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(renderTarget.size());
+    VLOG(1) << "lease acquired";
     renderOpaqueFilters(opaqueFilters, *leaseOpaque.renderTarget, eye);
 
     auto leaseTrans = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(renderTarget.size());
+    VLOG(1) << "lease acquired";
     if (method == "Dual Depth Peeling") {
       renderTransparentDDP(transparentFilters,
                            *leaseTrans.renderTarget,
