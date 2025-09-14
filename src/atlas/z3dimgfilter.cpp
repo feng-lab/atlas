@@ -477,6 +477,7 @@ void Z3DImgFilter::updateSize()
 
 void Z3DImgFilter::changeCoordTransform()
 {
+  VLOG(1) << "image coord changed";
   // invalidateAllFRVolumeSlices();
   if (m_3dImg) {
     m_3dImg->setScale(m_rendererBase.coordTransformPara().scale());
@@ -770,6 +771,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
                                         : (eye == LeftEye) ? m_leftEyeOutport
                                                            : m_rightEyeOutport;
 
+  // VLOG(1) << m_progressiveRendering << " " << m_imgRaycasterRenderer.renderingStarted(eye);
   if (!(m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye))) {
     m_imgRaycasterRenderer.setOutputSize(currentOutport.size());
 

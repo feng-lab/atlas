@@ -73,7 +73,7 @@ public:
     ~RenderTargetLease()
     {
       release();
-      VLOG(1) << "lease released";
+      // VLOG(1) << "lease released";
     }
     explicit operator bool() const
     {

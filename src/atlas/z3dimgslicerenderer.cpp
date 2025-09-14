@@ -193,6 +193,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
       m_outputSize,
       static_cast<uint32_t>(m_img->numChannels()));
+    // VLOG(1) << "lease acquired";
   }
   for (size_t i = 0; i < m_img->numChannels(); ++i) {
     LOG(INFO) << "";
@@ -330,6 +331,7 @@ void Z3DImgSliceRenderer::renderSliceFast(Z3DEye eye)
     layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
       m_outputSize,
       static_cast<uint32_t>(m_img->numChannels()));
+    // VLOG(1) << "lease acquired";
     for (size_t j = 0; j < m_img->numChannels(); ++j) {
       layerLease.renderTarget->attachSlice(j);
       layerLease.renderTarget->bind();

@@ -11,9 +11,7 @@ using namespace nim;
 
 // Variant that only considers slots where predicate(slot) is true.
 template<typename Slot, typename Predicate>
-Slot* findClosestFreeSlotIf(std::vector<std::unique_ptr<Slot>>& slots,
-                            const glm::uvec2& requestedSize,
-                            Predicate pred)
+Slot* findClosestFreeSlotIf(std::vector<std::unique_ptr<Slot>>& slots, const glm::uvec2& requestedSize, Predicate pred)
 {
   Slot* best = nullptr;
   uint64_t bestDelta = std::numeric_limits<uint64_t>::max();
@@ -388,8 +386,8 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
     const glm::uvec3 colorDim = colorTex->dimension();
     const glm::uvec3 depthDim = depthTex->dimension();
     const bool xyResize = (slot->fbo->size() != size);
-    const uint32_t wantedZ_color = xyResize ? layers : std::max<uint32_t>(colorDim.z, layers);
-    const uint32_t wantedZ_depth = xyResize ? layers : std::max<uint32_t>(depthDim.z, layers);
+    uint32_t wantedZ_color = xyResize ? layers : std::max<uint32_t>(colorDim.z, layers);
+    uint32_t wantedZ_depth = xyResize ? layers : std::max<uint32_t>(depthDim.z, layers);
     if (xyResize) {
       slot->fbo->resize(size);
       changed = true;
