@@ -96,6 +96,12 @@ public:
     return m_textureTarget;
   }
 
+  // Returns true for layered textures (2D array / 3D / cube map array)
+  [[nodiscard]] bool isLayeredTexture() const
+  {
+    return is3DTexture();
+  }
+
   [[nodiscard]] glm::uvec3 dimension() const
   {
     return m_dimension;

@@ -223,7 +223,7 @@ bool Z3DRenderTarget::resize(const glm::uvec2& newsize)
   return true;
 }
 
-bool Z3DRenderTarget::resize(const glm::uvec3& newdim, bool growLayersOnlyWhenNoXYChange)
+bool Z3DRenderTarget::resize(const glm::uvec3& newdim)
 {
   // Validate inputs similar to 2D resize
   if (newdim.xy() == m_size) {
@@ -241,33 +241,27 @@ bool Z3DRenderTarget::resize(const glm::uvec3& newdim, bool growLayersOnlyWhenNo
   }
 
   const bool xyChanged = (newdim.xy() != m_size);
-  bool changed = xyChanged;
+  bool changed = false;
   m_size = newdim.xy();
+
+  // Early out: if there are no attachments, treat XY-only change as a change
+  // (consistent with resize(glm::uvec2&)) and skip further work.
+  if (m_attachments.empty()) {
+    if (xyChanged) {
+      changed = true;
+    }
+    isFBOComplete();
+    return changed;
+  }
 
   for (const auto& enumAttach : m_attachments) {
     if (!enumAttach.second) {
       continue;
     }
     auto* tex = enumAttach.second;
-    const GLenum tgt = tex->textureTarget();
-    const bool isLayered = (tgt == GL_TEXTURE_2D_ARRAY) || (tgt == GL_TEXTURE_3D) || (tgt == GL_TEXTURE_CUBE_MAP_ARRAY);
-    const auto curDim = tex->dimension();
-
-    uint32_t desiredZ = curDim.z;
-    if (isLayered) {
-      if (!xyChanged) {
-        // XY unchanged: optionally grow-only
-        desiredZ = growLayersOnlyWhenNoXYChange ? std::max<uint32_t>(curDim.z, newdim.z) : newdim.z;
-      } else {
-        // XY changed: set exactly to requested Z
-        desiredZ = newdim.z;
-      }
-    } else {
-      desiredZ = 1; // non-layered attachments stay 2D
-    }
-
+    const uint32_t desiredZ = tex->isLayeredTexture() ? newdim.z : 1;
     const glm::uvec3 wanted(m_size.x, m_size.y, desiredZ);
-    if (wanted != curDim) {
+    if (wanted != tex->dimension()) {
       tex->setDimension(wanted);
       changed = true;
     }

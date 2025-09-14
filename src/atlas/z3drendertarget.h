@@ -75,10 +75,9 @@ public:
 
   bool resize(const glm::uvec2& newsize);
 
-  // Resize XY and adjust Z for layered attachments (2D array / 3D / cube map array)
-  // If growLayersOnlyWhenNoXYChange is true, Z only grows when XY is unchanged; if XY changes, Z is set to newdim.z.
-  // Returns true if any change was applied.
-  bool resize(const glm::uvec3& newdim, bool growLayersOnlyWhenNoXYChange = true);
+  // Resize XY and set Z for layered attachments (2D array / 3D / cube map array).
+  // Non-layered attachments are kept at Z=1. Returns true if any change was applied.
+  bool resize(const glm::uvec3& newdim);
 
   void changeColorAttachmentFormat(GLint internalColorFormat, GLenum attachment = GL_COLOR_ATTACHMENT0);
 

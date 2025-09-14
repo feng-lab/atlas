@@ -311,7 +311,12 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size, uin
   if (slot) {
     // Existing slot path: single-pass resize; grow Z only if XY unchanged.
     const uint32_t prevLayers = slot->layers;
-    bool changed = slot->fbo->resize(glm::uvec3(size.x, size.y, layers), /*growLayersOnlyWhenNoXYChange=*/true);
+    const bool xyChanged = (slot->fbo->size() != size);
+    uint32_t desiredZ = layers;
+    if (!xyChanged) {
+      desiredZ = std::max<uint32_t>(slot->layers, layers);
+    }
+    bool changed = slot->fbo->resize(glm::uvec3(size.x, size.y, desiredZ));
     slot->fbo->isFBOComplete();
     slot->inUse = true;
     Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
@@ -367,7 +372,12 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
   if (slot) {
     // Existing slot path: single-pass resize; grow Z only if XY unchanged.
     const uint32_t prevLayers = slot->layers;
-    bool changed = slot->fbo->resize(glm::uvec3(size.x, size.y, layers), /*growLayersOnlyWhenNoXYChange=*/true);
+    const bool xyChanged = (slot->fbo->size() != size);
+    uint32_t desiredZ = layers;
+    if (!xyChanged) {
+      desiredZ = std::max<uint32_t>(slot->layers, layers);
+    }
+    bool changed = slot->fbo->resize(glm::uvec3(size.x, size.y, desiredZ));
     slot->fbo->isFBOComplete();
     slot->inUse = true;
     Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
