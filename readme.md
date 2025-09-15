@@ -4,6 +4,11 @@
 [![Linux](https://github.com/feng-lab/atlas/workflows/Linux/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:Linux)
 [![Windows](https://github.com/feng-lab/atlas/workflows/Windows/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:Windows)
 
+## Documentation
+
+- User Guide: [Scene and Animation](docs/Scene-Animation-User-Guide.md)
+- Developer Guide: [3D Rendering Engine](docs/3D-Dev-Guide.md)
+
 ## Installation
 ### All: install python3 for build scripts and for building the zimg conda package
 ```bash
