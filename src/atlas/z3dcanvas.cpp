@@ -111,7 +111,8 @@ void Z3DCanvas::sceneParaUpdated()
 
 void Z3DCanvas::renderingFinished()
 {
-  if (m_engine->hasNewRenderingFlag()) {
+  // Engine may have been detached/destroyed while a queued signal is in flight
+  if (m_engine && m_engine->hasNewRenderingFlag()) {
     VLOG(1) << "update";
 
 #if defined(ATLAS_USE_OPENGLWIDGET)
@@ -126,7 +127,9 @@ void Z3DCanvas::renderingFinished()
     pixmap.setDevicePixelRatio(devicePixelRatio());
     m_pixmapItem->setPixmap(pixmap);
 
-    m_engine->clearNewRenderingFlag();
+    if (m_engine) {
+      m_engine->clearNewRenderingFlag();
+    }
     VLOG(1) << localBuffer << " " << localBuffer->width << " " << localBuffer->height;
 #endif
   }

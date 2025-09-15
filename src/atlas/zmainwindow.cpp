@@ -40,6 +40,11 @@
 #include <QProcess>
 #include <QSignalSpy>
 #include <utility>
+#include <memory>
+
+DEFINE_bool(atlas_block_scene_3d_apply,
+            false,
+            "If true, block scene loading until all 3D settings have been applied by the rendering engine");
 
 namespace nim {
 
@@ -867,16 +872,6 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
 
     const auto& sceneObj = loadObj.at("Scene").as_object();
 
-    if (sceneObj.contains("View3DGeneral")) {
-      if (!m_3dWindow) {
-        QSignalSpy spy(this, &ZMainWindow::window3DReady);
-        open3DWindow();
-        while (!spy.wait(5000)) {
-          LOG(INFO) << "waiting for 3d window initialization";
-        }
-      }
-    }
-
     QDir::setCurrent(QFileInfo(fn).absolutePath());
 
     std::map<size_t, size_t> idmap = m_doc->read(sceneObj.at("Doc").as_object(), err);
@@ -885,12 +880,45 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
       LOG(WARNING) << "Scene " << fn << " contains zero objects";
     }
 
+    // If 3D state exists, ensure 3D window/engine is ready and set up a deferred apply session
+    bool has3DGeneral = sceneObj.contains("View3DGeneral");
+    size_t numView3DPerObject = 0;
+    for (const auto& [key, value] : sceneObj) {
+      if (key != "Doc" && key != "Version" && key != "View2DGeneral" && key != "View3DGeneral") {
+        const auto& viewObjCandidate = value.as_object();
+        if (viewObjCandidate.contains("View3D")) {
+          ++numView3DPerObject;
+        }
+      }
+    }
+
+    if ((has3DGeneral || numView3DPerObject > 0) && !m_3dWindow) {
+      QSignalSpy spy(this, &ZMainWindow::window3DReady);
+      open3DWindow();
+      while (!spy.wait(5000)) {
+        LOG(INFO) << "waiting for 3d window initialization";
+      }
+    }
+
+    std::unique_ptr<QSignalSpy> sceneApplySpy;
+    if (m_3dWindow && (has3DGeneral || numView3DPerObject > 0)) {
+      // Listen before posting tasks to avoid missing early finish
+      sceneApplySpy = std::make_unique<QSignalSpy>(m_3dWindow->engine(), &Z3DRenderingEngine::scene3DApplyFinished);
+      // Reset engine-side apply session
+      QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine()]() {
+        eng->beginScene3DApply();
+      }, Qt::BlockingQueuedConnection);
+    }
+
     for (const auto& [key, value] : sceneObj) {
       if (key == "View2DGeneral") {
         m_view->read(value.as_object());
       } else if (key == "View3DGeneral") {
         if (m_3dWindow) {
-          m_3dWindow->engine()->read(value.as_object());
+          auto j = value.as_object();
+          QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine(), j]() {
+            eng->applyView3DGeneral(j);
+          }, Qt::QueuedConnection);
         }
       } else if (key != "Doc" && key != "Version") {
         QString qkey = QString::fromUtf8(key.data(), key.size());
@@ -905,21 +933,23 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
               m_view->read(id, viewObj.at("View2D").as_object());
             }
             if (viewObj.contains("View3D")) {
-              if (!m_3dWindow) {
-                QSignalSpy spy(this, &ZMainWindow::window3DReady);
-                open3DWindow();
-                while (!spy.wait(5000)) {
-                  LOG(INFO) << "waiting for 3d window initialization";
-                }
-              }
               if (m_3dWindow) {
-                m_3dWindow->engine()->read(id, viewObj.at("View3D").as_object());
+                auto j = viewObj.at("View3D").as_object();
+                QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine(), id, j]() {
+                  eng->applyView3DForId(id, j);
+                }, Qt::QueuedConnection);
               }
             }
           }
         } else {
           err += QString("Unknown scene key %1\n").arg(qkey);
         }
+      }
+    }
+    // Optionally wait until all 3D settings have been applied
+    if (m_3dWindow && (has3DGeneral || numView3DPerObject > 0) && FLAGS_atlas_block_scene_3d_apply) {
+      while (sceneApplySpy && sceneApplySpy->count() == 0 && !sceneApplySpy->wait(5000)) {
+        LOG(INFO) << "waiting for 3D scene apply to finish";
       }
     }
     LOG(INFO) << "Finish loading scene";
@@ -952,7 +982,9 @@ bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
 
       if (m_3dWindow) {
         json::object view3DObj;
-        m_3dWindow->engine()->write(id, view3DObj);
+        QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine(), id, &view3DObj]() {
+          eng->write(id, view3DObj);
+        }, Qt::BlockingQueuedConnection);
         jObj["View3D"] = view3DObj;
       }
 
@@ -965,7 +997,9 @@ bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
 
     if (m_3dWindow) {
       json::object view3DGeneralObj;
-      m_3dWindow->engine()->write(view3DGeneralObj);
+      QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine(), &view3DGeneralObj]() {
+        eng->write(view3DGeneralObj);
+      }, Qt::BlockingQueuedConnection);
       sceneObj["View3DGeneral"] = view3DGeneralObj;
     }
 

@@ -7,6 +7,7 @@
 #include "zglobal.h"
 #include <algorithm>
 #include <utility>
+#include <QThread>
 
 namespace nim {
 
@@ -179,7 +180,17 @@ void ZParameterAnimation::setCurrentTime(double secs) const
   if (!m_boundPara) {
     return;
   }
-  updateParaToTime(secs, m_boundPara);
+  // Ensure parameter updates run on the parameter's owning thread.
+  if (m_boundPara->thread() == QThread::currentThread()) {
+    updateParaToTime(secs, m_boundPara);
+  } else {
+    ZParameter* para = m_boundPara;
+    QMetaObject::invokeMethod(para, [this, secs, para]() {
+      if (para == m_boundPara) {
+        updateParaToTime(secs, para);
+      }
+    }, Qt::QueuedConnection);
+  }
 }
 
 void ZParameterAnimation::updateParaToTime(double secs, ZParameter* para) const

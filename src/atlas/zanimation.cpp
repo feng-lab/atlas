@@ -16,7 +16,9 @@
 #include <QSettings>
 #include <QDir>
 #include <QProgressDialog>
+#include <QThread>
 #include <utility>
+#include "zlog.h"
 
 DEFINE_string(output_image_name_prefix, "video", "Prefix for naming output images. Default is video");
 
@@ -241,6 +243,7 @@ void ZAnimation::setDuration(double duration)
 void ZAnimation::setCurrentTime(double time) const
 {
   time = std::max(0.0, time);
+  m_currentTime = time;
 
   for (const auto& obj : m_objList) {
     if (obj->boundId == 0) {
@@ -302,21 +305,34 @@ void ZAnimation::rebindView()
 
   bool sorted = false;
 
+  if (auto engineObj = dynamic_cast<Z3DRenderingEngine*>(m_engine)) {
+    connect(engineObj, &Z3DRenderingEngine::viewSettingWidgetsGroupChanged, this, &ZAnimation::rebindView, Qt::UniqueConnection);
+  }
+
   for (const auto& obj : m_objList) {
     size_t id = obj->boundId;
     if (id == 0) {
       continue;
     }
-    std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
-    CHECK(wg) << id;
-    connect(wg.get(), &ZWidgetsGroup::widgetsGroupChanged, this, &ZAnimation::rebindView);
-    sorted = bind(obj->objParaAnimations, wg->getParameterList()) || sorted;
+    std::vector<ZParameter*> params;
+    if (auto engObj = dynamic_cast<Z3DRenderingEngine*>(m_engine)) {
+      if (engObj->thread() == QThread::currentThread()) {
+        params = engObj->parametersOfViewSetting(id);
+      } else {
+        QMetaObject::invokeMethod(engObj, [&params, engObj, id]() {
+          params = engObj->parametersOfViewSetting(id);
+        }, Qt::BlockingQueuedConnection);
+      }
+    }
+    sorted = bind(obj->objParaAnimations, params) || sorted;
   }
 
   if (sorted) {
     buildDisplayPacks();
     Q_EMIT objViewChanged();
   }
+
+  LOG_FIRST_N(INFO, 1) << "3D animation parameters bound";
 }
 
 void ZAnimation::releaseView()
@@ -572,9 +588,21 @@ void ZAnimation::tryLinkAnimationWith(size_t id)
   for (const auto& obj : m_objList) {
     if (obj->boundId == 0 && obj->objType == doc->typeName() && doc->isSameObj(obj->objJsonValue, jv)) {
       obj->boundId = id;
-      std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
-      CHECK(wg);
-      bind(obj->objParaAnimations, wg->getParameterList());
+      std::vector<ZParameter*> params;
+      if (auto engObj = dynamic_cast<Z3DRenderingEngine*>(m_engine)) {
+        if (engObj->thread() == QThread::currentThread()) {
+          params = engObj->parametersOfViewSetting(id);
+        } else {
+          QMetaObject::invokeMethod(engObj, [&params, engObj, id]() {
+            params = engObj->parametersOfViewSetting(id);
+          }, Qt::BlockingQueuedConnection);
+        }
+      }
+      bind(obj->objParaAnimations, params);
+      // Ensure newly linked object's params reflect the current animation time
+      for (const auto& pa : obj->objParaAnimations) {
+        pa->setCurrentTime(m_currentTime);
+      }
       buildDisplayPacks();
       Q_EMIT objViewChanged();
       return;

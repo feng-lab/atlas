@@ -10,6 +10,8 @@
 #include <QPointer>
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <mutex>
+#include <unordered_map>
+#include <unordered_set>
 
 class QOffscreenSurface;
 
@@ -234,6 +236,16 @@ public:
     Q_EMIT renderingError("cancelled");
   }
 
+  // Scene apply helpers (run on engine thread)
+  void beginScene3DApply();
+
+  void applyView3DGeneral(const json::object& json);
+
+  void applyView3DForId(size_t id, json::object json);
+
+  // Return parameter list for a view-setting group without exposing the group itself
+  std::vector<ZParameter*> parametersOfViewSetting(size_t id);
+
 Q_SIGNALS:
   void objViewReady(size_t id);
 
@@ -250,6 +262,12 @@ Q_SIGNALS:
   void initialized();
 
   void backendChanged();
+
+  // Emitted when all queued scene 3D apply operations finish
+  void scene3DApplyFinished();
+
+  // Emitted when a view setting widgets group changes (any id)
+  void viewSettingWidgetsGroupChanged(size_t id);
 
 protected:
   bool event(QEvent* e) override;
@@ -344,6 +362,13 @@ private:
   double m_progress = 0;
 
   // Backend switch deferred
+
+  // Pending per-object View3D json waiting for objViewReady
+  std::unordered_map<size_t, json::object> m_pendingObjViewJson;
+  int m_sceneApplyOutstanding = 0;
+
+  // Track widget groups we've already connected to avoid duplicate connects
+  std::unordered_set<const ZWidgetsGroup*> m_observedWGs;
 };
 
 } // namespace nim

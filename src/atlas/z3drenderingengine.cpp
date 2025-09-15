@@ -795,6 +795,21 @@ void Z3DRenderingEngine::init()
   Q_EMIT progressChanged(100);
 
   Q_EMIT initialized();
+
+  // When object views become ready, apply any pending per-object View3D JSON
+  connect(this, &Z3DRenderingEngine::objViewReady, this, [this](size_t id) {
+    auto it = m_pendingObjViewJson.find(id);
+    if (it != m_pendingObjViewJson.end()) {
+      this->read(id, it->second);
+      m_pendingObjViewJson.erase(it);
+      if (m_sceneApplyOutstanding > 0) {
+        --m_sceneApplyOutstanding;
+        if (m_sceneApplyOutstanding == 0) {
+          Q_EMIT scene3DApplyFinished();
+        }
+      }
+    }
+  });
 }
 
 void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
@@ -857,6 +872,93 @@ ZImg Z3DRenderingEngine::textureToRGBAImg(const Z3DTexture& tex)
   ZImgFormat::CXYZtoXYZC(bufImg, res, true);
   res.infoRef().lastChannelIsAlphaChannel = true;
   res.correctPreMultipliedColor();
+  return res;
+}
+
+void Z3DRenderingEngine::beginScene3DApply()
+{
+  // Reset apply session
+  m_pendingObjViewJson.clear();
+  m_sceneApplyOutstanding = 0;
+}
+
+void Z3DRenderingEngine::applyView3DGeneral(const json::object& json)
+{
+  // One job starts
+  ++m_sceneApplyOutstanding;
+  // Apply immediately on engine thread
+  this->read(json);
+  // Job finished
+  --m_sceneApplyOutstanding;
+  if (m_sceneApplyOutstanding == 0) {
+    LOG(INFO) << "3D scene parameters applied";
+    Q_EMIT scene3DApplyFinished();
+  }
+}
+
+void Z3DRenderingEngine::applyView3DForId(size_t id, json::object json)
+{
+  // One job starts
+  ++m_sceneApplyOutstanding;
+  bool found = false;
+  for (auto& objView : m_3dObjViews) {
+    if (objView->hasObj(id)) {
+      found = true;
+      break;
+    }
+  }
+  if (found) {
+    this->read(id, json);
+    --m_sceneApplyOutstanding;
+    if (m_sceneApplyOutstanding == 0) {
+      LOG(INFO) << "3D scene parameters applied";
+      Q_EMIT scene3DApplyFinished();
+    }
+  } else {
+    // Queue it until objViewReady(id)
+    m_pendingObjViewJson[id] = std::move(json);
+  }
+}
+
+std::vector<ZParameter*> Z3DRenderingEngine::parametersOfViewSetting(size_t id)
+{
+  std::vector<ZParameter*> res;
+  auto installWatcher = [this, id](const std::shared_ptr<ZWidgetsGroup>& wg) {
+    if (!wg) {
+      return;
+    }
+    const ZWidgetsGroup* wgPtr = wg.get();
+    if (m_observedWGs.find(wgPtr) == m_observedWGs.end()) {
+      m_observedWGs.insert(wgPtr);
+      QObject::connect(wgPtr, &ZWidgetsGroup::widgetsGroupChanged, this, [this, id]() {
+        Q_EMIT viewSettingWidgetsGroupChanged(id);
+      });
+      QObject::connect(wgPtr, &QObject::destroyed, this, [this, wgPtr]() {
+        m_observedWGs.erase(wgPtr);
+      });
+    }
+  };
+
+  if (id == 1) {
+    auto wg = m_compositor->backgroundWidgetsGroup();
+    installWatcher(wg);
+    return wg->getParameterList();
+  } else if (id == 2) {
+    auto wg = m_compositor->axisWidgetsGroup();
+    installWatcher(wg);
+    return wg->getParameterList();
+  } else if (id == 3) {
+    auto wg = m_globalParas->widgetsGroup(false, *this);
+    installWatcher(wg);
+    return wg->getParameterList();
+  }
+  for (auto& objView : m_3dObjViews) {
+    if (objView->hasObj(id)) {
+      auto wg = objView->viewSettingWidgetsGroupOf(id);
+      installWatcher(wg);
+      return wg ? wg->getParameterList() : res;
+    }
+  }
   return res;
 }
 

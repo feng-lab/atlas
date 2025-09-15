@@ -242,6 +242,8 @@ protected:
   ZViewSettingInterface* m_engine;
 
   double m_duration;
+  // Remember last applied time so late-linked objects can be synced immediately
+  mutable double m_currentTime = 0.0;
 
   std::vector<std::unique_ptr<ZParameterAnimation>> m_globalParaAnimations;
   std::vector<std::unique_ptr<AnimationObj>> m_objList;
