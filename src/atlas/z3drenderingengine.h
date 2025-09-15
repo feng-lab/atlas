@@ -336,6 +336,12 @@ private:
   void resetOutputSizeToMatchCanvasSize();
 
 private:
+  // Track widget groups we've already connected to avoid duplicate connects. Must outlive compositor.
+  std::unordered_set<const ZWidgetsGroup*> m_observedWGs;
+
+  // Set true during destruction to ignore late events and postings
+  std::atomic_bool m_shuttingDown = false;
+
   std::unique_ptr<QOffscreenSurface> m_offscreenSurface;
   std::unique_ptr<Z3DContext> m_context;
   ZDoc& m_doc;
@@ -367,8 +373,7 @@ private:
   std::unordered_map<size_t, json::object> m_pendingObjViewJson;
   int m_sceneApplyOutstanding = 0;
 
-  // Track widget groups we've already connected to avoid duplicate connects
-  std::unordered_set<const ZWidgetsGroup*> m_observedWGs;
+  // (m_observedWGs and m_shuttingDown declared above to ensure lifetime beyond compositor)
 };
 
 } // namespace nim

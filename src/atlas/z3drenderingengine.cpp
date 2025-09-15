@@ -205,6 +205,7 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
 Z3DRenderingEngine::~Z3DRenderingEngine()
 {
   VLOG(1) << "in engine destructor";
+  m_shuttingDown = true;
   detachCanvas();
   VLOG(1) << "canvas detached";
   getGLFocus();
@@ -835,17 +836,18 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
 
 void Z3DRenderingEngine::detachCanvas()
 {
-  m_globalParas->setDevicePixelRatio(1);
-
-  if (!m_canvas) {
-    return;
+  // Disconnect UI first to avoid any queued signal posting back to engine/canvas during teardown
+  if (m_canvas) {
+    m_canvas->disconnect(this);
+    disconnect(m_canvas);
+    m_canvas->setRenderingEngine(nullptr);
+    m_canvas.clear();
   }
 
-  m_canvas->disconnect(this);
-  disconnect(m_canvas);
-  m_canvas->setRenderingEngine(nullptr);
-
-  m_canvas.clear();
+  // Now safe to update DPI etc. without waking the canvas
+  if (m_globalParas) {
+    m_globalParas->setDevicePixelRatio(1);
+  }
 }
 
 glm::uvec2 Z3DRenderingEngine::outputSize() const
@@ -931,10 +933,14 @@ std::vector<ZParameter*> Z3DRenderingEngine::parametersOfViewSetting(size_t id)
     if (m_observedWGs.find(wgPtr) == m_observedWGs.end()) {
       m_observedWGs.insert(wgPtr);
       QObject::connect(wgPtr, &ZWidgetsGroup::widgetsGroupChanged, this, [this, id]() {
-        Q_EMIT viewSettingWidgetsGroupChanged(id);
+        if (!m_shuttingDown.load(std::memory_order_relaxed)) {
+          Q_EMIT viewSettingWidgetsGroupChanged(id);
+        }
       });
       QObject::connect(wgPtr, &QObject::destroyed, this, [this, wgPtr]() {
-        m_observedWGs.erase(wgPtr);
+        if (!m_shuttingDown.load(std::memory_order_relaxed)) {
+          m_observedWGs.erase(wgPtr);
+        }
       });
     }
   };
@@ -1090,6 +1096,11 @@ void Z3DRenderingEngine::rotateZM()
 bool Z3DRenderingEngine::event(QEvent* e)
 {
   // VLOG(1) << e->type();
+  if (m_shuttingDown.load(std::memory_order_relaxed)) {
+    // Ignore any late events posted during shutdown
+    e->ignore();
+    return true;
+  }
   if (m_eventTypes.contains(e->type())) {
     if (e->type() == QEvent::UpdateRequest) {
       renderFast();

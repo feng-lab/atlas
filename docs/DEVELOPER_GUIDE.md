@@ -54,7 +54,12 @@ Compositor and Rendering
 Canvas and Lifecycle
 
 - `Z3DCanvas` posts UI events to engine. It updates its view on `renderingFinished`.
-- Teardown: queued signals can arrive after detaching/destroying engine; `renderingFinished` now guards engine pointer before access.
+- Teardown (ordering and guards):
+  - Queued signals can arrive after detaching/destroying engine.
+  - `Z3DCanvas::renderingFinished` guards its engine pointer before access.
+  - Engine destructor sets a shutdown flag (`m_shuttingDown`) so `event()` ignores late posts.
+  - `detachCanvas()` first disconnects and clears the canvas, then adjusts `devicePixelRatio` to avoid signaling during teardown.
+  - Watcher lifetime: engine tracks observed `ZWidgetsGroup*` in `m_observedWGs` and erases on `destroyed`. The set is declared before the compositor so it outlives the groups during destruction.
 
 Logging
 
@@ -83,4 +88,3 @@ Testing and Diagnostics
 - Prefer small, focused tests for views/components (where available).
 - Use verbose logging (`--v=1`) to trace rendering progress and apply order.
 - For headless animation export, try small sizes first, then scale up with `--output_tile_size` and `--output_tile_border`.
-
