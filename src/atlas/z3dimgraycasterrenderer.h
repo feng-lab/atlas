@@ -121,6 +121,13 @@ public:
   // cleared and renderer switch to 3D mode
   void prepareEntryExit(const ZMesh& clipped, bool flipped, Z3DEye eye, const glm::uvec2& size);
 
+  // Expose progress reset so filters can explicitly restart progressive accumulation
+  void resetProgress(Z3DEye eye)
+  {
+    m_channelIdx[eye] = -1;
+    m_round[eye] = 0;
+  }
+
 protected:
   void adjustWidgets();
 
@@ -157,11 +164,7 @@ private:
 
   void render3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
 
-  void resetProgress(Z3DEye eye)
-  {
-    m_channelIdx[eye] = -1;
-    m_round[eye] = 0;
-  }
+  // (resetProgress declared public above)
 
 protected:
   //  Z3DShaderProgram m_raycasterShader;
@@ -226,6 +229,8 @@ private:
 
   std::unique_ptr<Z3DRenderTarget> m_imageRenderTarget1s[3];
   std::unique_ptr<Z3DRenderTarget> m_imageRenderTarget2s[3];
+
+  // (No internal camera state tracking; filter triggers resetProgress on invalidate.)
 };
 
 } // namespace nim

@@ -255,6 +255,11 @@ void Z3DImgRaycasterRenderer::compile()
 
 void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flipped, Z3DEye eye, const glm::uvec2& size)
 {
+  // Release any previous entry/exit lease before acquiring a new one to
+  // avoid growing the scratch pool unnecessarily.
+  if (m_entryExitLease) {
+    m_entryExitLease.release();
+  }
   m_quads.clear();
 
   // Acquire entry/exit RT from scratch pool (2-layer RGBA32F array)
@@ -421,16 +426,10 @@ double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
       }
       STOP_AND_VLOG(bta)
     }
-    if (m_entryExitLease) {
-      m_entryExitLease.release();
-    }
     return progress;
   }
   catch (const ZException&) {
     resetProgress(eye);
-    if (m_entryExitLease) {
-      m_entryExitLease.release();
-    }
     throw;
   }
 }
@@ -500,9 +499,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       render3DImageFast(eye, visibleIdxs);
     }
     STOP_AND_VLOG(bta)
-  }
-  if (m_entryExitLease) {
-    m_entryExitLease.release();
   }
 }
 

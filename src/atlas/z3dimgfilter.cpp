@@ -467,6 +467,28 @@ void Z3DImgFilter::exitSubregionView()
 void Z3DImgFilter::invalidate(State inv)
 {
   Z3DBoundedFilter::invalidate(inv);
+  // Progressive raycasting accumulates across rounds using ping-pong RTs.
+  // When this filter is invalidated (camera/viewport/object transform/params),
+  // reset accumulation for affected eyes so the next round starts from clean state.
+  // This relies on round==0 path clearing m_lastImageRenderTargets per eye.
+  if (m_3dImg) {
+    using S = Z3DFilter::State;
+    if (isFlagSet(inv, S::AllResultInvalid)) {
+      m_imgRaycasterRenderer.resetProgress(MonoEye);
+      m_imgRaycasterRenderer.resetProgress(LeftEye);
+      m_imgRaycasterRenderer.resetProgress(RightEye);
+    } else {
+      if (isFlagSet(inv, S::MonoViewResultInvalid)) {
+        m_imgRaycasterRenderer.resetProgress(MonoEye);
+      }
+      if (isFlagSet(inv, S::LeftEyeResultInvalid)) {
+        m_imgRaycasterRenderer.resetProgress(LeftEye);
+      }
+      if (isFlagSet(inv, S::RightEyeResultInvalid)) {
+        m_imgRaycasterRenderer.resetProgress(RightEye);
+      }
+    }
+  }
 }
 
 void Z3DImgFilter::updateSize()

@@ -94,4 +94,33 @@ Logging Tips
 
 - Set verbosity: `--v=1` (or higher) to enable `VLOG` messages.
 - Look for “3D scene parameters applied” and “3D animation parameters bound” for scene/animation status.
+Image Rendering
+
+- Full Resolution Rendering
+  - When enabled for a 3D image that was downsampled on load, Atlas progressively refines the image by streaming full-resolution blocks to the GPU.
+  - You will see an immediate fast preview, then the image sharpens over time; cancel or disable full-res to stop refinement.
+  - Performance depends on view, sampling rate, and available GPU memory; use global cuts to limit the volume and speed up.
+
+- Channel and Slice Controls
+  - Use the object’s 3D View Setting to toggle channels, adjust transfer functions (volume), or colormaps (slices).
+  - Enable X/Y/Z/Oblique slice to view specific planes; positions and normals can be edited interactively via the widgets.
+
+- Image Aliases
+  - You can duplicate an image in the Object Manager to create an alias. Aliases share the original data to save memory but have independent 3D view settings (transform, visibility, rendering parameters).
+  - Each alias can choose whether to render in fast or full-res mode; they will appear correctly at their own 3D locations.
+
+Tips for Better Performance and Quality
+
+- Limit the volume with Global X/Y/Z Cuts to reduce work and memory.
+- Increase Sampling Rate for smoother DVR at the cost of performance.
+- Use MIP/Local MIP modes to emphasize bright structures; ISO surface mode finds density isosurfaces.
+- For huge outputs, use tiled screenshots in the Capture dock or via CLI flags (`--output_tile_size`, `--output_tile_border`).
+
+Troubleshooting Full-Resolution Rendering
+
+- Full-res not refining:
+  - Check GPU memory availability; try smaller `atlas_image_block_size` or reduce the visible region.
+  - Ensure “Full Resolution Rendering” is enabled for the image.
+- After moving the camera, the image should update to the new location immediately with a fast preview, then refine.
+  - If refinement doesn’t start, interact again or toggle full-res to restart.
 

@@ -88,3 +88,113 @@ Testing and Diagnostics
 - Prefer small, focused tests for views/components (where available).
 - Use verbose logging (`--v=1`) to trace rendering progress and apply order.
 - For headless animation export, try small sizes first, then scale up with `--output_tile_size` and `--output_tile_border`.
+Image Rendering Pipeline
+
+- Overview
+  - 3D images are rendered via `Z3DImgFilter`, which hosts two renderer paths:
+    - `Z3DImgRaycasterRenderer` for volumes and 2D images (depth==1) with transfer functions.
+    - `Z3DImgSliceRenderer` for explicit plane slices with colormaps.
+  - The filter outputs multiple ports (`Image`, `OpaqueImage`, stereo variants) consumed by the compositor.
+
+- Fast vs Full-Resolution
+  - On load, large volumes are downsampled to fit GPU constraints. `Z3DImg::isVolumeDownsampled()` indicates this.
+  - The UI toggle “Full Resolution Rendering” switches the filter/renderer into a progressive mode that:
+    1) Renders a fast result first (downsampled path) for instant feedback.
+    2) Iteratively fills a GPU cache of full-res blocks and accumulates a refined image across rounds per channel.
+  - Progressive state and cache uploads are cancellation-aware through `Z3DGlobalParameters::cancellationSource`.
+
+- Entry/Exit and Ray Setup
+  - For 3D raycasting, the front/back faces of the clipped volume are rendered with `Z3DTextureAndEyeCoordinateRenderer` into a 2-layer 2D array texture (entry at layer 0, exit at layer 1). This is managed by `Z3DImgRaycasterRenderer::prepareEntryExit()`.
+  - That entry/exit texture is sampled by `image3d_raycaster*.frag` to integrate along the ray per pixel.
+  - To reduce GL object churn, temporary FBOs/textures are leased from `Z3DScratchResourcePool`.
+  - Important: we retain the entry/exit lease until the next `prepareEntryExit()` call; see “Alias correctness” below.
+
+- Block-ID pass and Full-Res Cache
+  - When full-res is active (`!fast && isVolumeDownsampled()`), the renderer:
+    - Renders a “block-id” pass (`image3d_raycaster_blockID.frag`) to discover which cache blocks are needed along the rays for the current view.
+    - Downloads per-pixel block IDs to CPU, compacts/deduplicates them, and asks `Z3DImg::updateAndUploadPageDirectoryCaches()` to read/upload those blocks.
+    - Then renders per-channel into a layer-array RT; multi-channel results are merged via `image2d_array_compositor.frag`.
+  - `Z3DImg` owns:
+    - Page directory and page table cache textures (3D integer textures) per channel.
+    - The image block cache texture per channel (3D texture storing block bricks).
+    - Mapping logic (`m_levelScales`, `m_posToBlockIDs`, `m_pageTableBlockSize`, etc.).
+
+- Progressive Accumulation
+  - Raycaster maintains per-eye `m_channelIdx[eye]` and `m_round[eye]` and persistent `m_progressiveLayerLease` across rounds.
+  - Each round renders a subset of rays/blocks; after enough rounds or when all requested blocks are uploaded, the channel is complete.
+  - Depth/color ping-pong RTs (`m_lastImageRenderTargets`/`m_currentImageRenderTargets`) support iterative integration.
+
+- Aliases and Correctness
+  - `ZImgDoc::makeAlias(id)` returns a new ID pointing to the same `ZImgPack` (shared backing data). Each 3D alias gets its own `Z3DImgFilter` with independent transforms and parameters.
+  - Shared scratch resources (entry/exit RTs, layer-array RTs) must not be reused across aliases within the same frame while GPU work may still reference them.
+  - Fix in `Z3DImgRaycasterRenderer`:
+    - We release any old entry/exit lease at the start of `prepareEntryExit()`.
+    - We no longer release the entry/exit lease at the end of a draw; it stays alive until the next `prepareEntryExit()` (move-assign releases the previous lease). This prevents the pool from handing the same underlying texture to another alias in the same pass, which previously caused a visible misplacement when mixing full-res and fast paths.
+
+- Slices Path
+  - `Z3DImgSliceRenderer` renders plane geometry with 3D texture coordinates and merges channels; full-res block-ID/voxel cache logic mirrors the raycaster’s but for slice geometry.
+
+- Compositor Integration
+  - Filters render into their own RTs per eye and then copy/blend into the compositing chain using `Z3DTextureCopyRenderer`.
+  - Bound boxes are drawn as local overlay with depth test and alpha blend after the main pass.
+
+User-Facing Behavior (summary)
+
+- Toggling full-res on a downsampled volume triggers a quick preview followed by progressive refinement. Disabling full-res reverts to fast rendering.
+- Aliases of the same image share memory but keep independent view settings and transforms.
+
+Invalidation and Progressive Reset Policy
+
+- Invalidation: Filters are invalidated by upstream changes (ports/parameters) and by global camera/viewport changes.
+  - `Z3DBoundedFilter` connects camera changes (line width 141–143 in `z3dboundedfilter.cpp`) and calls `invalidateResult()` which marks outputs invalid.
+  - `updateSize()` on any filter propagates expected sizes and ends with `invalidate(AllResultInvalid)`.
+- Reset policy (centralized in `Z3DImgFilter::invalidate`):
+  - On any invalidation, the image filter resets the raycaster’s progressive state for the affected eyes via `resetProgress(eye)`.
+  - This ensures the next progressive pass starts at round 0, and the raycaster clears its “last” ping-pong target before sampling, preventing stale accumulation.
+  - This keeps the renderer “dumb”; no per-frame PV/size checks are needed in the raycaster.
+
+Scratch Resource Pool (`Z3DScratchResourcePool`)
+
+- Purpose: reuse heavy render targets (block-id FBOs with multiple integer attachments, entry/exit 2D arrays, layer arrays, temp 2D FBOs) across passes and filters.
+- Leases: move-only RAII (`RenderTargetLease`) that marks a slot in-use until released or destroyed.
+- Growth: slots grow to match requested size/attachments; they don’t shrink until `trim()`.
+- Debugging/memory: `describeMemoryUsage(detailed)` returns a breakdown; counters `creationCounter()` and `changeCounter()` help detect churn.
+- Best practices:
+  - Acquire–use–release within the same frame.
+  - Prefer release-before-acquire when you know you’re about to re-request the same category to avoid transient duplication.
+
+Transparency Methods
+
+- Geometry transparency:
+  - Blend No Depth Mask / Blend Delayed (dual FBO passes)
+  - Dual Depth Peeling (multiple layers with depth/alpha peeling)
+  - Weighted Average and Weighted Blended (OIT approximations)
+- Images are blended via `Z3DTextureBlendRenderer` and the compositor’s merge shaders; image layers from multiple filters are collected/merged consistently.
+
+Stereo and Screenshots
+
+- Stereo: left/right eyes rendered separately; compositor holds per-eye ready/current targets.
+- Screenshots: single shot uses current canvas size; tiled output computes normalized left/right/bottom/top and sets tile frustum on `Z3DCameraParameter` and compositor region, then composites tiles to an image (mono or stereo).
+
+OpenGL Context and Shaders
+
+- Context: offscreen `QOffscreenSurface` + `Z3DContext`; `glbinding` used for function resolution and optional debug callbacks.
+- Shader headers: `Z3DRendererBase::generateHeader()` injects `#version`, fog, clip planes, light count; renderers add feature defines (NUM_VOLUMES, MAX_PROJ_MERGE, ISO, etc.).
+
+Ports and Parameters
+
+- Ports: `Z3DInputPortBase`/`Z3DOutputPortBase` connect filters; invalidation propagates downstream from outputs to connected inputs.
+- Parameters: `ZParameter` subclasses emit `valueChanged`; `Z3DFilter::addParameter` wires them to `invalidateResult()` by default.
+- WidgetsGroup: `ZWidgetsGroup` trees drive UI construction and change notifications; engine watches these groups to emit view-setting change signals.
+
+Aliases
+
+- Docs (e.g., `ZImgDoc::makeAlias`) create a new id referencing the same backing pack; views/filters are instantiated per-id, so transforms and rendering parameters are independent.
+- Rendering state (progressive caches) remains per-filter; scratch resources are shared via the pool but guarded by lease lifetime to prevent cross-alias reuse bugs.
+
+Performance Tips (dev)
+
+- Avoid reallocating FBOs mid-frame — stick to pool leases.
+- Keep `m_outputSize` consistent across renderers that collaborate in a pass.
+- Use `--v=1` to sample stage timings; wrap expensive sections with `ZBenchTimer`.
+- For very large volumes, tune `atlas_image_block_size` and sampling rates; avoid over-aggressive sampling in DVR.
