@@ -85,11 +85,6 @@ private:
 
   void renderSliceFast(Z3DEye eye);
 
-  void resetProgress(Z3DEye eye)
-  {
-    m_progress[eye] = 0;
-  }
-
 protected:
   // Z3DShaderProgram m_volumeSliceShader;
   Z3DShaderProgram m_scVolumeSliceShader;

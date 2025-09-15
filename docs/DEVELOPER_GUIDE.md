@@ -146,12 +146,12 @@ User-Facing Behavior (summary)
 Invalidation and Progressive Reset Policy
 
 - Invalidation: Filters are invalidated by upstream changes (ports/parameters) and by global camera/viewport changes.
-  - `Z3DBoundedFilter` connects camera changes (line width 141–143 in `z3dboundedfilter.cpp`) and calls `invalidateResult()` which marks outputs invalid.
+  - `Z3DBoundedFilter` connects camera changes (see `z3dboundedfilter.cpp`) and calls `invalidateResult()` which marks outputs invalid.
   - `updateSize()` on any filter propagates expected sizes and ends with `invalidate(AllResultInvalid)`.
-- Reset policy (centralized in `Z3DImgFilter::invalidate`):
-  - On any invalidation, the image filter resets the raycaster’s progressive state for the affected eyes via `resetProgress(eye)`.
-  - This ensures the next progressive pass starts at round 0, and the raycaster clears its “last” ping-pong target before sampling, preventing stale accumulation.
-  - This keeps the renderer “dumb”; no per-frame PV/size checks are needed in the raycaster.
+- Cancellation-first policy (centralized in `Z3DImgFilter::invalidate`):
+  - On invalidation, the image filter requests cancellation via `globalParas().cancellationSource->requestCancellation()` if a render is in progress.
+  - Renderers periodically check the token, throw a cancellation exception, and perform `resetProgress(eye)` in their catch blocks to safely restart progressive rendering on the next pass.
+  - This avoids mutating renderer state mid-pass and prevents crashes when the invalidation arrives during rendering.
 
 Scratch Resource Pool (`Z3DScratchResourcePool`)
 
