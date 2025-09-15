@@ -6,8 +6,8 @@
 
 ## Documentation
 
-- User Guide: [Scene and Animation](docs/Scene-Animation-User-Guide.md)
-- Developer Guide: [3D Rendering Engine](docs/3D-Dev-Guide.md)
+- User Guide: [Atlas User Guide](docs/USER_GUIDE.md)
+- Developer Guide: [Atlas Developer Guide](docs/DEVELOPER_GUIDE.md)
 
 ## Installation
 ### All: install python3 for build scripts and for building the zimg conda package
