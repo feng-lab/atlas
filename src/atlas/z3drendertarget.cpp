@@ -402,7 +402,7 @@ void Z3DRenderTarget::attachSlice(size_t zSlice)
   for (const auto& enumAttach : m_attachments) {
     Z3DTexture* texture = enumAttach.second;
     CHECK(texture->textureTarget() == GL_TEXTURE_2D_ARRAY || texture->textureTarget() == GL_TEXTURE_3D);
-    CHECK(zSlice < texture->depth());
+    CHECK(zSlice < texture->depth()) << zSlice << " " << texture->depth();
     glFramebufferTextureLayer(GL_DRAW_FRAMEBUFFER, enumAttach.first, texture->id(), 0, zSlice);
   }
   isFBOComplete();

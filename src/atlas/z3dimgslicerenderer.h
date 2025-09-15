@@ -65,6 +65,12 @@ public:
     return m_progress[eye] > 0;
   }
 
+  // Expose progress reset so filters can restart the 2-stage progressive flow
+  void resetProgress(Z3DEye eye)
+  {
+    m_progress[eye] = 0;
+  }
+
 protected:
   void bindVolumes(Z3DShaderProgram& shader) const;
 

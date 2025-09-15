@@ -833,7 +833,8 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 #endif
 
   if (progressive) {
-    CHECK(m_channelIdx[eye] < static_cast<int>(visibleIdxs.size())) << m_channelIdx[eye] << " " << visibleIdxs.size();
+    CHECK(m_channelIdx[eye] >= 0 && m_channelIdx[eye] < static_cast<int>(visibleIdxs.size()))
+      << m_channelIdx[eye] << " " << visibleIdxs.size();
     bool lastRound = render3DImageForOneRound(eye,
                                               visibleIdxs[m_channelIdx[eye]],
                                               m_round[eye],

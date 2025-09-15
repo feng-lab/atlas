@@ -477,15 +477,21 @@ void Z3DImgFilter::invalidate(State inv)
       m_imgRaycasterRenderer.resetProgress(MonoEye);
       m_imgRaycasterRenderer.resetProgress(LeftEye);
       m_imgRaycasterRenderer.resetProgress(RightEye);
+      m_imgSliceRenderer.resetProgress(MonoEye);
+      m_imgSliceRenderer.resetProgress(LeftEye);
+      m_imgSliceRenderer.resetProgress(RightEye);
     } else {
       if (isFlagSet(inv, S::MonoViewResultInvalid)) {
         m_imgRaycasterRenderer.resetProgress(MonoEye);
+        m_imgSliceRenderer.resetProgress(MonoEye);
       }
       if (isFlagSet(inv, S::LeftEyeResultInvalid)) {
         m_imgRaycasterRenderer.resetProgress(LeftEye);
+        m_imgSliceRenderer.resetProgress(LeftEye);
       }
       if (isFlagSet(inv, S::RightEyeResultInvalid)) {
         m_imgRaycasterRenderer.resetProgress(RightEye);
+        m_imgSliceRenderer.resetProgress(RightEye);
       }
     }
   }
