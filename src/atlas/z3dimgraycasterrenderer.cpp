@@ -255,6 +255,7 @@ void Z3DImgRaycasterRenderer::compile()
 
 void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flipped, Z3DEye eye, const glm::uvec2& size)
 {
+  // VLOG(1) << "prepareEntryExit";
   // Release any previous entry/exit lease before acquiring a new one to
   // avoid growing the scratch pool unnecessarily.
   if (m_entryExitLease) {
@@ -428,7 +429,8 @@ double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
     }
     return progress;
   }
-  catch (const ZException&) {
+  catch (const ZCancellationException&) {
+    // VLOG(1) << "cancel renderProgressively";
     resetProgress(eye);
     throw;
   }
@@ -780,6 +782,7 @@ void Z3DImgRaycasterRenderer::render2DSliceOf3DImageFast(Z3DEye eye, const std::
 
 double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs, bool progressive)
 {
+  // VLOG(1) << "render3DImage";
   Z3DScratchResourcePool::RenderTargetLease layerLease;
   if (progressive && m_channelIdx[eye] < 0) {
     // Acquire and clear the persistent layer array lease used across rounds
@@ -824,6 +827,8 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
           << " " << ze_to_zw_b;
 
   CHECK(m_lastImageRenderTargets[eye]->size() == m_outputSize) << m_lastImageRenderTargets[eye]->size();
+
+  processEventsAndMaybeCancel(cancellationToken);
 
 #if defined(__linux__)
   static int dummyidx = -1;

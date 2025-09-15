@@ -469,11 +469,14 @@ void Z3DImgFilter::invalidate(State inv)
   Z3DBoundedFilter::invalidate(inv);
   // If rendering is in progress, request cancellation; renderers will
   // catch cancellation and perform a safe reset of progressive state.
+  // VLOG(1) << "image filter invalidate";
   auto& gp = m_rendererBase.globalParas();
   if (gp.cancellationSource && !gp.cancellationSource->isCancellationRequested()) {
     gp.cancellationSource->requestCancellation();
     VLOG(1) << "requested cancellation on invalidate";
   }
+  // Mark for safe reset at the beginning of next process
+  m_resetProgressPending = true;
 }
 
 void Z3DImgFilter::updateSize()
@@ -605,6 +608,17 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
 
 double Z3DImgFilter::process(Z3DEye eye)
 {
+  // Apply any deferred progressive reset at a safe point
+  if (m_resetProgressPending) {
+    m_imgRaycasterRenderer.resetProgress(MonoEye);
+    m_imgRaycasterRenderer.resetProgress(LeftEye);
+    m_imgRaycasterRenderer.resetProgress(RightEye);
+    m_imgSliceRenderer.resetProgress(MonoEye);
+    m_imgSliceRenderer.resetProgress(LeftEye);
+    m_imgSliceRenderer.resetProgress(RightEye);
+    m_resetProgressPending = false;
+  }
+
   if (m_channelRangeChanged) {
     if (m_3dImg) {
       std::vector<glm::dvec2> channelDisplayRanges;
@@ -918,7 +932,9 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
   currentOutport.clearTarget();
   m_rendererBase.setViewport(currentOutport.size());
 
-  auto outportGuard = folly::makeGuard([&currentOutport]() { currentOutport.releaseTarget(); });
+  auto outportGuard = folly::makeGuard([&currentOutport]() {
+    currentOutport.releaseTarget();
+  });
 
   double progress = 1.0;
   if (!m_progressiveRendering) {

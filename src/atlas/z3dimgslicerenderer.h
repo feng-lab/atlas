@@ -65,11 +65,7 @@ public:
     return m_progress[eye] > 0;
   }
 
-  // Expose progress reset so filters can restart the 2-stage progressive flow
-  void resetProgress(Z3DEye eye)
-  {
-    m_progress[eye] = 0;
-  }
+  // Public API minimal; progressive reset is internal and coordinated by filter
 
 protected:
   void bindVolumes(Z3DShaderProgram& shader) const;
@@ -81,6 +77,12 @@ protected:
   void render(Z3DEye eye) override;
 
 private:
+  friend class Z3DImgFilter; // allow filter to request a reset at a safe point
+
+  void resetProgress(Z3DEye eye)
+  {
+    m_progress[eye] = 0;
+  }
   double renderSlice(Z3DEye eye, bool progressive = false);
 
   void renderSliceFast(Z3DEye eye);

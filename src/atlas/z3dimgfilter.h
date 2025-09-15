@@ -196,6 +196,10 @@ private:
   bool m_channelRangeChanged = false;
 
   bool m_progressiveRendering = false;
+
+  // Defer renderer progress reset to the start of process() to avoid
+  // mutating renderer state mid-pass when invalidation arrives.
+  bool m_resetProgressPending = false;
 };
 
 } // namespace nim

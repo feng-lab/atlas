@@ -145,7 +145,7 @@ double Z3DImgSliceRenderer::renderProgressively(Z3DEye eye)
 
     return progress;
   }
-  catch (const ZException&) {
+  catch (const ZCancellationException&) {
     resetProgress(eye);
     throw;
   }

@@ -150,8 +150,8 @@ Invalidation and Progressive Reset Policy
   - `updateSize()` on any filter propagates expected sizes and ends with `invalidate(AllResultInvalid)`.
 - Cancellation-first policy (centralized in `Z3DImgFilter::invalidate`):
   - On invalidation, the image filter requests cancellation via `globalParas().cancellationSource->requestCancellation()` if a render is in progress.
-  - Renderers periodically check the token, throw a cancellation exception, and perform `resetProgress(eye)` in their catch blocks to safely restart progressive rendering on the next pass.
-  - This avoids mutating renderer state mid-pass and prevents crashes when the invalidation arrives during rendering.
+  - Each `Z3DImgFilter` also sets a small internal flag so it can ask its renderers to reset at the start of the next `process()` call (a safe point). Renderers expose reset as an internal operation (friend access) — it is not part of the public API.
+  - Renderers also periodically check the token and may throw a cancellation exception during long passes; they perform their own safe reset in the catch paths. Together, this guarantees a clean progressive restart across all image filters without mutating state mid-pass.
 
 Scratch Resource Pool (`Z3DScratchResourcePool`)
 
@@ -198,3 +198,20 @@ Performance Tips (dev)
 - Keep `m_outputSize` consistent across renderers that collaborate in a pass.
 - Use `--v=1` to sample stage timings; wrap expensive sections with `ZBenchTimer`.
 - For very large volumes, tune `atlas_image_block_size` and sampling rates; avoid over-aggressive sampling in DVR.
+
+Additional Architecture Notes
+
+- Object/Pack/View separation
+  - Documents own object lifecycles and actions; packs back data; views/filters encapsulate render logic and parameters.
+  - Aliases share packs only; everything above the pack (parameters, transforms, selections) is per-ID.
+
+- Frame orchestration
+  - Rendering thread drives a loop of: size propagation → invalidation → progressive processing → compositor blend.
+  - Engine exposes `renderFast()` (single progressive step) and `render()` (loop until complete or canceled).
+
+- Device Pixel Ratio (HiDPI)
+  - `Z3DGlobalParameters::devicePixelRatio` feeds into pixel-to-eye conversion (e.g., `ze_to_screen_pixel_voxel_size`) to keep sampling consistent across displays.
+
+- Debugging GL state
+  - Enable `--atlas_debug_opengl` for per-call error checks (costly); `--atlas_log_glbinding_context_switch` to audit context switches.
+  - When diagnosing rendering differences across devices, log `Z3DGpuInfo::instance().logGpuInfo()` output for driver/features.

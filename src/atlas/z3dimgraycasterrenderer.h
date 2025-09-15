@@ -121,12 +121,7 @@ public:
   // cleared and renderer switch to 3D mode
   void prepareEntryExit(const ZMesh& clipped, bool flipped, Z3DEye eye, const glm::uvec2& size);
 
-  // Expose progress reset so filters can explicitly restart progressive accumulation
-  void resetProgress(Z3DEye eye)
-  {
-    m_channelIdx[eye] = -1;
-    m_round[eye] = 0;
-  }
+  // Public API minimal; progressive reset is an internal operation
 
 protected:
   void adjustWidgets();
@@ -142,6 +137,14 @@ protected:
   void renderPicking(Z3DEye) override;
 
 private:
+  friend class Z3DImgFilter; // allow filter to coordinate resets safely
+
+  // Reset progressive accumulation state for an eye
+  void resetProgress(Z3DEye eye)
+  {
+    m_channelIdx[eye] = -1;
+    m_round[eye] = 0;
+  }
   // this function is used to get proper default
   // transfer functions (grey or color depends on current number of channel)
   void resetTransferFunctions();

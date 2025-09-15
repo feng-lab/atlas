@@ -109,6 +109,54 @@ Image Rendering
   - You can duplicate an image in the Object Manager to create an alias. Aliases share the original data to save memory but have independent 3D view settings (transform, visibility, rendering parameters).
   - Each alias can choose whether to render in fast or full-res mode; they will appear correctly at their own 3D locations.
 
+Keyboard/Mouse Quick Reference (3D View)
+
+- Rotate: click-drag with left mouse button; or Command/Ctrl + Arrow keys.
+- Pan: Shift + drag.
+- Roll: Alt + drag; or Alt + Left/Right.
+- Zoom: mouse wheel; or Command/Ctrl + +/- keys.
+- Context menu: right-click on the canvas or object widgets (additional actions).
+- Reset camera: use the toolbar button or menu (resets to fit visible objects).
+
+Common Workflows
+
+- Create an Image Alias
+  - In Object Manager, right‑click the image and choose “Make Alias”.
+  - A new object ID referencing the same image data is created; adjust its 3D View settings independently (transform, visibility, channels).
+
+- Enable Full‑Resolution on One Alias Only
+  - Select the alias object, open its 3D View Setting dock.
+  - Toggle “Full Resolution Rendering” on for that alias; leave others off to save memory and keep interaction smooth.
+  - Use Global X/Y/Z Cuts to limit refinement to the region of interest.
+
+- Take a Stereo Capture
+  - Open the Capture/Export panel.
+  - Choose output size, set Stereo mode (Half or Full side‑by‑side).
+  - Optionally enable tiled output for very large resolutions.
+  - Start capture/export; Atlas renders left/right eyes and composites them into the chosen stereo format.
+
+Global vs Per-Object Settings
+
+- Global View Setting (3D window) controls camera, background, axis, fog, transparency method, lights, and global cuts.
+- Per-object 3D View Setting controls visibility, transform, bounding box style, image channels and transfer functions/colormaps, slice toggles and positions.
+
+Transparency Methods (Geometries)
+
+- Blend No Depth Mask / Blend Delayed: simple alpha blending with or without depth mask.
+- Dual Depth Peeling: order-independent transparency via peeling multiple layers.
+- Weighted Average / Weighted Blended: fast approximations for many overlapping/translucent objects.
+
+Stereo Rendering
+
+- Choose mono or stereo (half/full side-by-side) in the Capture/Export UI; stereo renders left/right eyes separately and composites them.
+- For best results, set the camera eye separation angle in the Global View Setting.
+
+Working With Large Data
+
+- GPU memory limits affect full-resolution caching. If refinement stops, reduce visible region (Global Cuts), lower sampling rate, or decrease block size via the `atlas_image_block_size` setting.
+- For ultra-high-resolution captures, use tiled export; tiles are rendered with adjusted frusta and stitched, avoiding GPU texture size limits.
+
+
 Tips for Better Performance and Quality
 
 - Limit the volume with Global X/Y/Z Cuts to reduce work and memory.
@@ -123,4 +171,3 @@ Troubleshooting Full-Resolution Rendering
   - Ensure “Full Resolution Rendering” is enabled for the image.
 - After moving the camera, the image should update to the new location immediately with a fast preview, then refine.
   - If refinement doesn’t start, interact again or toggle full-res to restart.
-
