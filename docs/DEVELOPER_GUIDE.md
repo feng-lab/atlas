@@ -51,6 +51,23 @@ Compositor and Rendering
 - `Z3DNetworkEvaluator` executes the filter graph and drives progressive updates.
 - `Z3DGlobalParameters` holds camera, lights, fog, global cuts, device pixel ratio, and scratch resource pool.
 
+Invalidation & Progressive Rendering
+
+- A `Z3DFilter` tracks invalidation bits (mono/left/right). When a bit is set, the network evaluator knows that eye needs processing.
+- Causes of invalidation:
+  - Parameter changes (wired in `Z3DFilter::addParameter`)
+  - Upstream port invalidations (output → connected inputs)
+  - Global camera/viewport changes
+  - `updateSize()` (propagates sizes, then invalidates all results)
+- Image filters request cancellation on invalidate and defer renderer resets to the next `process()` to avoid mutating state mid-pass.
+
+Debug reason plumbing (debug builds only)
+
+- `Z3DFilter` exposes `debugSetInvalidateReason` and `debugTakeInvalidateReason` (no-ops in release).
+- `addParameter` tags a human-readable reason with a JSON snapshot; ports tag their own reasons on propagation.
+- `Z3DImgFilter::invalidate` prints reasons (with `inv` and current `m_state`) and suppresses duplicate messages for the same state.
+- For analysis only, `Z3DImgFilter` also skips global-cut invalidations that don’t change the effective cut against the image AABB (epsilon-based).
+
 Canvas and Lifecycle
 
 - `Z3DCanvas` posts UI events to engine. It updates its view on `renderingFinished`.
@@ -67,6 +84,12 @@ Logging
 - Notable info logs:
   - “3D scene parameters applied” — deferred scene apply queue drained.
   - “3D animation parameters bound” — first animation binding completed.
+  - In debug builds (`ATLAS_DEBUG_VERSION`), you’ll also see: “image filter invalidate: …” with parameter/global/port reasons and state bits.
+
+Debug/Release Builds
+
+- Define `ATLAS_DEBUG_VERSION` at compile time to enable extra diagnostics for invalidation attribution.
+- Run with `--v=1` (or set env `GLOG_v=1`) to see `VLOG` output.
 
 Adding a New 3D Object View
 

@@ -90,16 +90,28 @@ Troubleshooting
 - Animation not reflecting settings immediately
   - Fixed: parameter updates run on the engine thread; late-linked objects are synced to the current time.
 
+Advanced Diagnostics (optional)
+
+- Log verbosity: launch Atlas with `--v=1` (or set env `GLOG_v=1`) to print helpful status such as scene/animation binding and rendering progress.
+- Debug builds: if your Atlas was built with `ATLAS_DEBUG_VERSION`, additional diagnostic messages are available:
+  - Parameter-change reasons: prints which parameter changed (and the new value) when a re-render is triggered.
+  - Port propagation: attributes invalidations to upstream ports/filters.
+  - Image filter cut checks: global X/Y/Z cuts that do not intersect an image’s 3D bounds are recognized as no-ops and skipped, reducing needless re-renders during other object toggles.
+  - Camera logs include near/far planes so small camera updates are visible.
+  - These diagnostics do not change rendering results and are compiled out of release builds.
+
 Logging Tips
 
 - Set verbosity: `--v=1` (or higher) to enable `VLOG` messages.
 - Look for “3D scene parameters applied” and “3D animation parameters bound” for scene/animation status.
+ - In debug builds (`ATLAS_DEBUG_VERSION`), look for “image filter invalidate: …” lines to understand which change triggered a redraw.
 Image Rendering
 
 - Full Resolution Rendering
   - When enabled for a 3D image that was downsampled on load, Atlas progressively refines the image by streaming full-resolution blocks to the GPU.
   - You will see an immediate fast preview, then the image sharpens over time; cancel or disable full-res to stop refinement.
   - Performance depends on view, sampling rate, and available GPU memory; use global cuts to limit the volume and speed up.
+  - While refining, if you change camera or parameters Atlas cancels the current pass and restarts from a fast preview automatically. This is expected.
 
 - Channel and Slice Controls
   - Use the object’s 3D View Setting to toggle channels, adjust transfer functions (volume), or colormaps (slices).
@@ -139,6 +151,7 @@ Global vs Per-Object Settings
 
 - Global View Setting (3D window) controls camera, background, axis, fog, transparency method, lights, and global cuts.
 - Per-object 3D View Setting controls visibility, transform, bounding box style, image channels and transfer functions/colormaps, slice toggles and positions.
+ - Note: changing other objects can alter the overall scene bounds. In that case the range of Global X/Y/Z Cuts may update, potentially triggering image redraws. In debug builds Atlas will skip redraws when the effective cut doesn’t affect a given image.
 
 Transparency Methods (Geometries)
 
