@@ -189,7 +189,21 @@ void Z3DFilter::addParameter(ZParameter& para, State inv)
   m_parameters.push_back(&para);
   m_parameterNames.insert(para.name());
   if (inv != State::Valid) {
+#ifdef ATLAS_DEBUG_VERSION
+    // Capture and tag parameter changes (debug-only) before invalidation.
+    connect(&para, &ZParameter::valueChanged, this, [this, &para]() {
+      try {
+        QString valueStr = nim::jsonToFormattedQString(para.jsonValue());
+        debugSetInvalidateReason(QString("parameter '%1' changed to %2").arg(para.name(), valueStr));
+      }
+      catch (...) {
+        debugSetInvalidateReason(QString("parameter '%1' changed").arg(para.name()));
+      }
+      invalidateResult();
+    });
+#else
     connect(&para, &ZParameter::valueChanged, this, &Z3DFilter::invalidateResult);
+#endif
   }
 }
 
@@ -243,7 +257,10 @@ void Z3DFilter::updateSize()
   for (auto port : m_inputPorts) {
     port->setExpectedSize(maxOutportSize);
   }
-
+  // Provide a reason so downstream logs can attribute this invalidation.
+#ifdef ATLAS_DEBUG_VERSION
+  debugSetInvalidateReason("updateSize");
+#endif
   invalidate(State::AllResultInvalid);
 }
 

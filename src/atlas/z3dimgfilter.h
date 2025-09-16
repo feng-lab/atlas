@@ -200,6 +200,12 @@ private:
   // Defer renderer progress reset to the start of process() to avoid
   // mutating renderer state mid-pass when invalidation arrives.
   bool m_resetProgressPending = false;
+
+  // Cache effective global cuts intersected with this filter's world AABB to avoid redundant redraws
+  bool m_cachedGlobalCutsInitialized = false;
+  glm::vec2 m_cachedEffXCut{}; // [low, high] after clamping to axisAlignedBoundBox()
+  glm::vec2 m_cachedEffYCut{};
+  glm::vec2 m_cachedEffZCut{};
 };
 
 } // namespace nim

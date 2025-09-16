@@ -117,6 +117,23 @@ public:
     invalidate(State::AllResultInvalid);
   }
 
+  // Debugging aid: record a short reason before calling invalidate.
+  // Set by parameter-change hooks or port invalidations.
+#ifdef ATLAS_DEBUG_VERSION
+  void debugSetInvalidateReason(const QString& reason)
+  {
+    m_lastInvalidateReason = reason;
+  }
+
+  // Retrieve and clear the last reason. Intended for logging at invalidate sites.
+  QString debugTakeInvalidateReason()
+  {
+    QString r = m_lastInvalidateReason;
+    m_lastInvalidateReason.clear();
+    return r;
+  }
+#endif
+
 Q_SIGNALS:
   // Q_EMIT this only if resize starts from current filter.
   void requestUpstreamSizeChange(Z3DFilter*);
@@ -199,6 +216,11 @@ protected:
 
   // used for cycle prevention during invalidation propagation
   bool m_invalidationVisited;
+
+  // Debug: last invalidate reason string (optional)
+#ifdef ATLAS_DEBUG_VERSION
+  QString m_lastInvalidateReason;
+#endif
 };
 
 DECLARE_OPERATORS_FOR_ENUM(Z3DFilter::State)

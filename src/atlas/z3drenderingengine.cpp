@@ -1137,9 +1137,7 @@ void Z3DRenderingEngine::getGLFocus()
 void Z3DRenderingEngine::renderFast(bool stereo)
 {
   if (m_globalParas->cancellationSource) {
-    if (!m_globalParas->cancellationSource->isCancellationRequested()) {
-      m_globalParas->cancellationSource->requestCancellation();
-    }
+    m_globalParas->cancellationSource->requestCancellation();
     LOG(INFO) << "cancel rendering, schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
     return;

@@ -155,10 +155,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
           this,
           &Z3DImgFilter::fullResolutionRenderingToggled);
 
-  connect(&m_rendererBase.globalXCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DImgFilter::invalidateResult);
-  connect(&m_rendererBase.globalYCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DImgFilter::invalidateResult);
-  connect(&m_rendererBase.globalZCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DImgFilter::invalidateResult);
-
   adjustWidget();
   CHECK_GL_ERROR
 
@@ -334,6 +330,11 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     Q_EMIT renderingError(QString("import 3d img error: %1").arg(e.what()));
   }
 
+#ifdef ATLAS_DEBUG_VERSION
+  // Reset cached global cuts since our bounds may have changed with new data
+  m_cachedGlobalCutsInitialized = false;
+  debugSetInvalidateReason("setData");
+#endif
   invalidateResult();
 }
 
@@ -466,14 +467,73 @@ void Z3DImgFilter::exitSubregionView()
 
 void Z3DImgFilter::invalidate(State inv)
 {
+  // Check for global cut churn that doesn't affect this image and skip invalidation if so.
+#if 0 // ATLAS_DEBUG_VERSION
+  QString reason = debugTakeInvalidateReason();
+  if (!reason.isEmpty()) {
+    if (reason.startsWith("global ")) {
+      bool isCut =
+        reason.contains("Global X Cut") || reason.contains("Global Y Cut") || reason.contains("Global Z Cut");
+      if (isCut) {
+        const auto& worldAABB = axisAlignedBoundBox();
+        if (!worldAABB.empty()) {
+          auto gx = m_rendererBase.globalParas().globalXCut.get();
+          auto gy = m_rendererBase.globalParas().globalYCut.get();
+          auto gz = m_rendererBase.globalParas().globalZCut.get();
+          glm::vec2 effX{std::clamp(gx[0], float(worldAABB.minCorner.x), float(worldAABB.maxCorner.x)),
+                         std::clamp(gx[1], float(worldAABB.minCorner.x), float(worldAABB.maxCorner.x))};
+          glm::vec2 effY{std::clamp(gy[0], float(worldAABB.minCorner.y), float(worldAABB.maxCorner.y)),
+                         std::clamp(gy[1], float(worldAABB.minCorner.y), float(worldAABB.maxCorner.y))};
+          glm::vec2 effZ{std::clamp(gz[0], float(worldAABB.minCorner.z), float(worldAABB.maxCorner.z)),
+                         std::clamp(gz[1], float(worldAABB.minCorner.z), float(worldAABB.maxCorner.z))};
+          if (effX.x > effX.y) {
+            std::swap(effX.x, effX.y);
+          }
+          if (effY.x > effY.y) {
+            std::swap(effY.x, effY.y);
+          }
+          if (effZ.x > effZ.y) {
+            std::swap(effZ.x, effZ.y);
+          }
+          auto diffGt = [](const glm::vec2& a, const glm::vec2& b, float eps) {
+            return std::abs(a.x - b.x) > eps || std::abs(a.y - b.y) > eps;
+          };
+          constexpr float eps = 1e-4f;
+          bool changed = !m_cachedGlobalCutsInitialized || diffGt(effX, m_cachedEffXCut, eps) ||
+                         diffGt(effY, m_cachedEffYCut, eps) || diffGt(effZ, m_cachedEffZCut, eps);
+          if (!changed) {
+            VLOG(1) << "skip invalidate: global cut changed but no effect on image AABB";
+            return;
+          }
+          m_cachedGlobalCutsInitialized = true;
+          m_cachedEffXCut = effX;
+          m_cachedEffYCut = effY;
+          m_cachedEffZCut = effZ;
+        }
+      }
+    }
+  }
+#endif
+
   Z3DBoundedFilter::invalidate(inv);
   // If rendering is in progress, request cancellation; renderers will
   // catch cancellation and perform a safe reset of progressive state.
-  // VLOG(1) << "image filter invalidate";
-  auto& gp = m_rendererBase.globalParas();
-  if (gp.cancellationSource && !gp.cancellationSource->isCancellationRequested()) {
-    gp.cancellationSource->requestCancellation();
+#if 0 // ATLAS_DEBUG_VERSION
+  auto invStr = flagsToString(inv);
+  auto stateStr = flagsToString(m_state);
+  auto reason2 = reason;
+  if (!reason2.isEmpty()) {
+    VLOG(1) << "image filter invalidate: " << reason2 << ", inv=" << invStr << ", state=" << stateStr;
+  } else {
+    VLOG(1) << "image filter invalidate, inv=" << invStr << ", state=" << stateStr;
+  }
+#endif
+
+  if (m_rendererBase.globalParas().cancellationSource) {
+    m_rendererBase.globalParas().cancellationSource->requestCancellation();
+#ifdef ATLAS_DEBUG_VERSION
     VLOG(1) << "requested cancellation on invalidate";
+#endif
   }
   // Mark for safe reset at the beginning of next process
   m_resetProgressPending = true;
@@ -494,6 +554,11 @@ void Z3DImgFilter::changeCoordTransform()
   }
   m_imgRaycasterRenderer.compile();
   m_imgSliceRenderer.compile();
+
+#ifdef ATLAS_DEBUG_VERSION
+  // World AABB changed; invalidate cached effective cuts
+  m_cachedGlobalCutsInitialized = false;
+#endif
 }
 
 void Z3DImgFilter::adjustWidget()

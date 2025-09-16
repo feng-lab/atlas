@@ -210,7 +210,7 @@ public:
 
   void cancelLongRendering()
   {
-    if (m_globalParas->cancellationSource && !m_globalParas->cancellationSource->isCancellationRequested()) {
+    if (m_globalParas->cancellationSource) {
       // VLOG(1) << "request cancel";
       m_globalParas->cancellationSource->requestCancellation();
     }
