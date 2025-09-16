@@ -60,10 +60,12 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
     cmakecmd = get_cmake_cmd_common_part(arm64=arm64)
     cmakecmd[:] = [x for x in cmakecmd if x]
 
-    cmakecmd.extend(['-DATLAS_SANITIZE_ADDRESS:BOOL=' + 'ON' if use_asan else 'OFF',
-                     '-DATLAS_DEBUG_VERSION:BOOL=' + 'ON' if debug_version else 'OFF',
+    cmakecmd.extend(['-DATLAS_SANITIZE_ADDRESS:BOOL=' + ('ON' if use_asan else 'OFF'),
+                     '-DATLAS_DEBUG_VERSION:BOOL=' + ('ON' if debug_version else 'OFF'),
                      ])
     cmakecmd.extend([common_dirs.atlas_repository_dir()])
+
+    print(cmakecmd)
 
     if common_dirs.is_windows():
         env = build_ext_libs.get_vcvars_environment()
