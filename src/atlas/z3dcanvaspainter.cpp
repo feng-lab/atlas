@@ -20,10 +20,11 @@ void Z3DCanvasPainter::paint(bool stereo)
   if (!m_engine) {
     return;
   }
-  if (!stereo && !m_engine->monoReadyTarget()) {
+  auto& compositor = m_engine->compositor();
+  if (!stereo && !compositor.monoReadyTarget()) {
     return;
   }
-  if (stereo && (!m_engine->leftReadyTarget() || !m_engine->rightReadyTarget())) {
+  if (stereo && (!compositor.leftReadyTarget() || !compositor.rightReadyTarget())) {
     return;
   }
 
@@ -33,21 +34,21 @@ void Z3DCanvasPainter::paint(bool stereo)
   m_rendererBase.setViewport(m_canvas.physicalSize());
   if (stereo) {
     glDrawBuffer(GL_BACK_LEFT);
-    m_textureCopyRenderer.setColorTexture(m_engine->leftReadyTarget()->colorTexture());
-    m_textureCopyRenderer.setDepthTexture(m_engine->leftReadyTarget()->depthTexture());
+    m_textureCopyRenderer.setColorTexture(compositor.leftReadyTarget()->colorTexture());
+    m_textureCopyRenderer.setDepthTexture(compositor.leftReadyTarget()->depthTexture());
     m_rendererBase.render(LeftEye, m_textureCopyRenderer);
 
     glDrawBuffer(GL_BACK_RIGHT);
-    m_textureCopyRenderer.setColorTexture(m_engine->rightReadyTarget()->colorTexture());
-    m_textureCopyRenderer.setDepthTexture(m_engine->rightReadyTarget()->depthTexture());
+    m_textureCopyRenderer.setColorTexture(compositor.rightReadyTarget()->colorTexture());
+    m_textureCopyRenderer.setDepthTexture(compositor.rightReadyTarget()->depthTexture());
     m_rendererBase.render(RightEye, m_textureCopyRenderer);
 
     m_engine->clearNewRenderingFlag();
   } else {
-    auto startTarget = m_engine->monoReadyTarget();
-    m_textureCopyRenderer.setColorTexture(m_engine->monoReadyTarget()->colorTexture());
-    m_textureCopyRenderer.setDepthTexture(m_engine->monoReadyTarget()->depthTexture());
-    auto endTarget = m_engine->monoReadyTarget();
+    auto startTarget = compositor.monoReadyTarget();
+    m_textureCopyRenderer.setColorTexture(compositor.monoReadyTarget()->colorTexture());
+    m_textureCopyRenderer.setDepthTexture(compositor.monoReadyTarget()->depthTexture());
+    auto endTarget = compositor.monoReadyTarget();
     m_rendererBase.render(MonoEye, m_textureCopyRenderer);
 
     m_engine->clearNewRenderingFlag();

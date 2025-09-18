@@ -861,15 +861,14 @@ void Z3DRenderingEngine::setOutputSize(const glm::uvec2& size)
   m_compositor->setOutputSize(size);
 }
 
-ZImg Z3DRenderingEngine::textureToRGBAImg(const Z3DTexture& tex)
+ZImg Z3DRenderingEngine::localColorBufferToRGBAImg(const Z3DLocalColorBuffer& buffer)
 {
-  GLenum dataFormat = GL_BGRA;
-  GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-  std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> colorBuffer(
-    Z3DTexture::bypePerPixel(dataFormat, dataType) * tex.numPixels());
-  tex.downloadTextureToBuffer(dataFormat, dataType, colorBuffer.data());
+  if (buffer.width == 0 || buffer.height == 0 || buffer.data.empty()) {
+    return {};
+  }
+
   ZImg bufImg;
-  bufImg.wrapData(colorBuffer.data(), ZImgInfo(tex.width(), tex.height(), 1, 4));
+  bufImg.wrapData(const_cast<uint8_t*>(buffer.data.data()), ZImgInfo(buffer.width, buffer.height, 1, 4));
   ZImg res(bufImg.info());
   ZImgFormat::CXYZtoXYZC(bufImg, res, true);
   res.infoRef().lastChannelIsAlphaChannel = true;
@@ -1264,12 +1263,12 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
         m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
 
         if (sst == Z3DScreenShotType::MonoView) {
-          img.pasteImg(textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture()).crop(validRegion),
+          img.pasteImg(localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion),
                        ZVoxelCoordinate(tileStartX, tileStartY));
         } else {
-          img.pasteImg(textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture()).crop(validRegion),
+          img.pasteImg(localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer()).crop(validRegion),
                        ZVoxelCoordinate(tileStartX, tileStartY));
-          rightImg.pasteImg(textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture()).crop(validRegion),
+          rightImg.pasteImg(localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer()).crop(validRegion),
                             ZVoxelCoordinate(tileStartX, tileStartY));
         }
       }
@@ -1343,7 +1342,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
 
   if (sst == Z3DScreenShotType::MonoView) {
-    textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture()).crop(validRegion).save(filename);
+    localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion).save(filename);
     LOG(INFO) << fmt::format("Saved tiled rendering (total: {} x {}, tile: X {}, Y {}, size {}, border {}) to file: {}",
                              width,
                              height,
@@ -1353,7 +1352,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
                              tileBorder,
                              filename);
   } else {
-    textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture()).crop(validRegion).save(filename);
+    localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer()).crop(validRegion).save(filename);
     LOG(INFO) << fmt::format(
       "Saved left tiled rendering (total: {} x {}, tile: X {}, Y {}, size {}, border {}) to file: {}",
       width,
@@ -1363,7 +1362,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
       tileSize,
       tileBorder,
       filename);
-    textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture()).crop(validRegion).save(rightFilename);
+    localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer()).crop(validRegion).save(rightFilename);
     LOG(INFO) << fmt::format(
       "Saved right tiled rendering (total: {} x {}, tile: X {}, Y {}, size {}, border {}) to file: {}",
       width,
@@ -1387,12 +1386,12 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
   m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
 
   if (sst == Z3DScreenShotType::MonoView) {
-    auto img = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture());
+    auto img = localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer());
     img.flip(Dimension::Y).save(filename);
     LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
   } else {
-    auto leftImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture());
-    auto rightImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture());
+    auto leftImg = localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer());
+    auto rightImg = localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer());
 
     if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
       ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);

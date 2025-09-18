@@ -12,6 +12,7 @@ namespace nim {
 class ZVulkanRenderer;
 class ZVulkanDevice;
 class ZVulkanSwapChain;
+class Z3DGlobalParameters;
 
 /**
  * @brief Base class for Vulkan renderers
@@ -154,6 +155,18 @@ public:
     return m_clipEnabled;
   }
 
+  void setGlobalParameters(Z3DGlobalParameters* globals)
+  {
+    m_globals = globals;
+  }
+
+  const Z3DGlobalParameters* globalParameters() const
+  {
+    return m_globals;
+  }
+
+  void syncFromGlobalParameters();
+
 protected:
   // Update push constants based on current state
   void updatePushConstants();
@@ -188,6 +201,8 @@ private:
   // Clipping planes
   std::vector<glm::vec4> m_clipPlanes;
   bool m_clipEnabled = false;
+
+  Z3DGlobalParameters* m_globals = nullptr;
 };
 
 } // namespace nim

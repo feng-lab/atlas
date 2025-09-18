@@ -1,18 +1,25 @@
 #pragma once
 
+#include "z3dcompositorbase.h"
+#include "z3dglobalparameters.h"
 #include "zvulkanrendererbase.h"
 #include "zvulkanbackgroundrenderer.h"
 #include "zvulkanlinerenderer.h"
 #include "z3dcamera.h"
 #include "zglmutils.h"
+#include <memory>
 
 namespace nim {
 
 // Minimal Vulkan compositor: draws background + optional axis lines into the offscreen swapchain
-class ZVulkanCompositor
+class ZVulkanCompositor : public Z3DCompositorBase
 {
 public:
-  ZVulkanCompositor(ZVulkanDevice& device, uint32_t width, uint32_t height);
+  ZVulkanCompositor(ZVulkanDevice& device,
+                    Z3DGlobalParameters& globals,
+                    uint32_t width,
+                    uint32_t height,
+                    QObject* parent = nullptr);
 
   // Resize output
   void resize(uint32_t width, uint32_t height);
@@ -41,11 +48,32 @@ public:
   // Expose renderer base for advanced control/tests
   ZVulkanRendererBase& rendererBase() { return m_rendererBase; }
 
+  // Z3DCompositorBase interface
+  void setOutputSize(const glm::uvec2& size) override;
+  glm::uvec2 outputSize() const override;
+  void setRenderingRegion(double left, double right, double bottom, double top) override;
+  void setProgressiveRenderingMode(bool v) override;
+  void requestRender(bool stereo) override;
+
+  std::shared_ptr<ZWidgetsGroup> backgroundWidgetsGroup() override;
+  std::shared_ptr<ZWidgetsGroup> axisWidgetsGroup() override;
+
+  void read(const json::object& json) override;
+  void write(json::object& json) const override;
+
+  Z3DLocalColorBuffer* monoReadyLocalBuffer() const override;
+  Z3DLocalColorBuffer* leftReadyLocalBuffer() const override;
+  Z3DLocalColorBuffer* rightReadyLocalBuffer() const override;
+
+  void savePickingBufferToImage(const QString& filename) override;
+
 private:
+  void syncFromGlobalParameters();
   void ensureBackgroundState();
   void buildAxisLines();
 
 private:
+  Z3DGlobalParameters& m_globals;
   ZVulkanRendererBase m_rendererBase;
   ZVulkanBackgroundRenderer m_bg;
   ZVulkanLineRenderer m_lines;
@@ -70,7 +98,20 @@ private:
   // Axis geometry (line list p0,p1,...)
   std::vector<glm::vec3> m_axisLines;
   std::vector<glm::vec4> m_axisLineColors;
+
+  glm::uvec2 m_outputSize;
+  struct
+  {
+    double left = 0.0;
+    double right = 1.0;
+    double bottom = 0.0;
+    double top = 1.0;
+  } m_renderRegion;
+  bool m_progressive = false;
+  std::shared_ptr<ZWidgetsGroup> m_backgroundWidgetsGroup;
+  std::shared_ptr<ZWidgetsGroup> m_axisWidgetsGroup;
+  Z3DLocalColorBuffer m_monoLocalBuffer{};
+  Z3DLocalColorBuffer* m_monoReadyLocalBuffer = nullptr;
 };
 
 } // namespace nim
-

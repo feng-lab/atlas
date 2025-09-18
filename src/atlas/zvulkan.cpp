@@ -1,10 +1,13 @@
 #include "zvulkan.h"
 
 #include "zvulkancontext.h"
+#include "z3dglobalparameters.h"
 #include "zvulkandevice.h"
 #include "zvulkanrendererbase.h"
 #include "zvulkanbackgroundrenderer.h"
 #include "zvulkancompositor.h"
+#include "z3dscratchresourcepool.h"
+#include "zglmutils.h"
 #include "zexception.h"
 #include "zlog.h"
 #include <fmt/format.h>
@@ -33,7 +36,9 @@ void initVulkan()
 
     // Minimal compositor demo: background + axis lines + readback
     const uint32_t W = 320, H = 200;
-    ZVulkanCompositor comp(*device, W, H);
+    Z3DGlobalParameters globals;
+    ZVulkanCompositor comp(*device, globals, W, H);
+    comp.setOutputSize(glm::uvec2(W, H));
     comp.setShowBackground(true);
     comp.setBackgroundMode(ZVulkanBackgroundRenderer::Mode::Gradient);
     comp.setBackgroundOrientation(ZVulkanBackgroundRenderer::GradientOrientation::TopToBottom);
@@ -41,10 +46,17 @@ void initVulkan()
     comp.setBackgroundRegion(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
     comp.setShowAxis(true);
 
-    auto pixels = comp.renderAndReadback();
+    comp.requestRender(false);
     uint64_t hash = 1469598103934665603ull; // FNV-1a
-    for (auto b : pixels) { hash ^= b; hash *= 1099511628211ull; }
-    LOG(INFO) << fmt::format("Vulkan compositor (bg+axis) readback hash: 0x{:016x}", hash);
+    if (auto* buffer = comp.monoReadyLocalBuffer()) {
+      for (auto b : buffer->data) {
+        hash ^= b;
+        hash *= 1099511628211ull;
+      }
+      LOG(INFO) << fmt::format("Vulkan compositor (bg+axis) staged mono hash: 0x{:016x}", hash);
+    } else {
+      LOG(WARNING) << "Vulkan compositor did not produce a mono buffer";
+    }
   }
   catch (const vk::SystemError& e) {
     LOG(ERROR) << "Vulkan system error: " << e.what();

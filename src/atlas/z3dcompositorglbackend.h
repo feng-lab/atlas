@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zcompositorbase.h"
+#include "z3dcompositorbase.h"
 #include <memory>
 
 namespace nim {
@@ -9,12 +9,12 @@ class Z3DCompositor;
 class Z3DGlobalParameters;
 
 // Adapter that exposes the API-neutral façade while using the existing GL compositor under the hood
-class ZGLCompositorAdapter : public ZCompositorBase
+class Z3DCompositorGLBackend : public Z3DCompositorBase
 {
   Q_OBJECT
 public:
-  explicit ZGLCompositorAdapter(Z3DGlobalParameters& globals, QObject* parent = nullptr);
-  ~ZGLCompositorAdapter() override;
+  explicit Z3DCompositorGLBackend(Z3DGlobalParameters& globals, QObject* parent = nullptr);
+  ~Z3DCompositorGLBackend() override;
 
   // façade API
   void setOutputSize(const glm::uvec2& size) override;
@@ -23,9 +23,17 @@ public:
   void setProgressiveRenderingMode(bool v) override;
   void requestRender(bool stereo) override;
 
+  std::shared_ptr<ZWidgetsGroup> backgroundWidgetsGroup() override;
+  std::shared_ptr<ZWidgetsGroup> axisWidgetsGroup() override;
+
+  void read(const json::object& json) override;
+  void write(json::object& json) const override;
+
   Z3DLocalColorBuffer* monoReadyLocalBuffer() const override;
   Z3DLocalColorBuffer* leftReadyLocalBuffer() const override;
   Z3DLocalColorBuffer* rightReadyLocalBuffer() const override;
+
+  void savePickingBufferToImage(const QString& filename) override;
 
   // Transitional: access underlying GL compositor for network wiring while we migrate
   Z3DCompositor& glCompositor();
@@ -35,4 +43,3 @@ private:
 };
 
 } // namespace nim
-

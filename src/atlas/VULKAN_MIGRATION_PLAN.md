@@ -25,10 +25,8 @@ Implementation approach:
 
 Data/API Abstraction Layer
 
-- Add a small DTO layer for CPU→GPU hand‑off shared by both backends. New file `src/atlas/zrenderdto.h` defines:
-  - `BackgroundSettings`, `LineListData`, `MeshData`, `Image2DData`, `Volume3DData`.
 - Preserve renderer method names across backends (e.g., `setData`, `setDataColors`, `setLineWidth`, etc.) so filters/compositor can keep calling the same functions.
-- Extract an interface from `Z3DCompositor` so that Vulkan compositor can implement the same surface used by the engine. Introduce `src/atlas/zcompositorbase.h` (abstract) as the target interface.
+- Extract an interface from `Z3DCompositor` so that Vulkan compositor can implement the same surface used by the engine. Introduce `src/atlas/z3dcompositorbase.h` (abstract) as the target interface.
 
 ## GL Dependency Classification (Current Engine)
 
@@ -85,7 +83,7 @@ Approach (incremental):
 - Header decoupling: convert filter headers to forward‑declare renderer classes and use pointers/`pimpl` for API‑specific members; move includes to `.cpp`.
 - Resource ownership move: shift FBO/texture creation/resize/attach from filters into their corresponding renderers (raycaster/slice/volume) and/or compositor scratch targets.
 - Compositor hooks: add seam(s) so compositor orchestrates opaque/transparent/picking passes, not filters directly binding FBOs or toggling state.
-- Output handoff: introduce a small `RenderOutput` DTO and adapter so filters no longer depend on `Z3DRenderOutputPort` directly.
+- Output handoff: ensure filters communicate through existing API-neutral ports/parameters and avoid binding backend-specific resources directly inside filters.
 - Picking: centralize picking in compositor/renderer; filters register objects and provide IDs/boxes only.
 
 Status by filter:
@@ -119,13 +117,19 @@ Acceptance:
 
 - Filter headers compile without including GL types. No direct FBO/texture creation in filters. Visual parity maintained on representative scenes (opaque/transparent/picking).
 
+Progress Update — Compositor Façade Simplification (In Progress)
+
+- Introduced `Z3DCompositorBase`/`Z3DCompositorGLBackend` under the new façade and scaffolded `Z3DCompositorFilter` so the engine can hold an adapter instead of the GL compositor directly.
+- Trimmed the shared interface to expose only CPU-side readback (`mono/left/rightReadyLocalBuffer()`); GL render targets stay backend-private and are accessed only when the canvas is using the legacy GL compositor directly.
+- Reworked `Z3DRenderingEngine` screenshots/tiling to consume the compositor’s staged `Z3DLocalColorBuffer` objects, eliminating ad-hoc texture downloads and keeping the readback path API-neutral.
+
 Upcoming Tasks (proposed order)
 
 1) Move GL resource ownership out of image/volume filters
    - `Z3DImgFilter`/`Z3DVolumeFilter` currently create FBOs/textures (entry/exit/layer, blockID targets) directly.
    - Action: Shift creation/resize/attach into their renderers (raycaster/slice/volume), expose init/resize methods; filters set parameters and call renderers only.
 
-2) Extract a compositor interface (`ZCompositorBase`)
+2) Extract a compositor interface (`Z3DCompositorBase`)
    - Define a small abstract interface implemented by `Z3DCompositor` (GL) and to be implemented by `ZVulkanCompositor`.
    - `Z3DRenderingEngine` depends on the interface to allow backend switching.
 
@@ -137,6 +141,50 @@ Upcoming Tasks (proposed order)
 
 5) OIT in Vulkan (later)
    - Port DDP/WA/WB paths to Vulkan once the compositor scaffolding is in place.
+
+## Detailed Migration Backlog (mirrors OpenGL pipeline)
+
+1. **Compositor Filter Shell**
+   - Introduce `Z3DCompositorFilter` derived from `Z3DBoundedFilter` that owns invalidation, progressive flags, widget plumbing, JSON I/O, and render requests.
+   - The shell holds `std::unique_ptr<Z3DCompositorBase>` and delegates to either `Z3DCompositorGLBackend` or `ZVulkanCompositor` depending on runtime config.
+   - Adjust `Z3DRenderingEngine` to construct the shell, keep its pointer instead of the GL compositor, and expose accessor helpers that forward to the active backend.
+
+2. **Filter/Compositor Decoupling (No DTO layer)**
+   - Continue moving GL resource ownership out of filters into renderers/compositor while keeping filter data structures unchanged.
+   - Audit filters to ensure headers stay backend-agnostic and only expose existing parameter/state surfaces.
+
+3. **Render Target Parity**
+   - Implement `ZVulkanRenderTarget` (mono/left/right) with color/depth attachments, resolve images, and CPU staging buffers analogous to GL `Z3DRenderTarget`.
+   - Mirror progressive ping-pong management (`m_monoCurrentTarget`, etc.) inside the Vulkan compositor while exposing ready local buffers for engine readback (render targets remain backend-private).
+   - Integrate `Z3DScratchResourcePool` usage for transient buffers so allocation patterns stay identical.
+
+4. **Progressive & Invalidation Flow**
+   - Ensure the shell propagates `invalidate(State)` to the backend, toggles progressive rendering, and broker requests from `Z3DNetworkEvaluator` exactly as the GL compositor did.
+   - Vulkan backend should honour mono/stereo flags even if stereo rendering initially falls back to mono.
+   - Keep signal semantics (`sceneParaUpdated`, `renderingFinished`, `renderingError`) consistent across backends.
+
+5. **Widget Groups & Parameters**
+   - Populate Vulkan widget groups with real `ZParameter` instances backed by `Z3DGlobalParameters` (background/axis/fog toggles, colors, etc.).
+   - Reuse existing parameter binding logic so UI controls work identically regardless of backend.
+
+6. **Picking & Screenshot Readback**
+   - Implement Vulkan picking renders + CPU readback; reuse GL helper logic for saving PNGs/hashes to avoid UI regressions.
+   - Ensure local color buffers use the same layout and alignment so downstream consumers remain unchanged.
+
+7. **Renderer Parity Milestones**
+   - **Lines:** Ensure devicePixelRatio scaling, picking outputs, and progressive invalidation hooks mirror GL behaviour.
+   - **Meshes:** Port material/light UBOs, depth/cull states, and transparency paths; add placeholder features (e.g., OIT) with stubs until Vulkan parity lands.
+   - **Images/Volumes:** Rebuild 2D/3D pipelines around Vulkan dynamic rendering or subpasses, matching GL render target chaining.
+   - Each Vulkan renderer should expose GL-compatible entry points to minimise filter churn.
+
+8. **Backend Selection & Persistence**
+   - Add `RenderBackend` enum to settings, serialize the chosen backend with docs/views, and surface in preferences/UI.
+   - Provide runtime switch that tears down and recreates the compositor shell while preserving filter/back-end state where possible.
+
+9. **Validation, Tooling, and CI Hooks**
+   - Expand the existing Vulkan smoke test to hash staged buffers for representative scenes (background-only, lines, mesh sample).
+   - Add optional developer script comparing GL vs Vulkan readbacks for a canned network to catch regressions early.
+   - Document expected warnings (OpenCV fat binaries, etc.) so CI logs stay actionable.
 
 ### Renderer Parity Checklist
 
@@ -180,7 +228,7 @@ Mesh renderer (OpenGL: `Z3DMeshRenderer`, Vulkan: `ZVulkanMeshRenderer`)
 
 Vulkan mapping:
 
-- Use `MeshData` DTO and device‑local VB/IB with staging. Keep transforms/material/lighting UBOs aligned with GL.
+- Stage mesh vertex/index data into device-local buffers with staging copies. Keep transforms/material/lighting UBOs aligned with GL.
 
 ### Backend Switch Plan
 
@@ -315,7 +363,7 @@ Notes:
 - Do not expose low‑level concepts (FBOs, pipelines, descriptors) across the façade.
 
 GL Adapter (Phase 3):
-- `ZGLCompositorAdapter` implements the façade by delegating to `Z3DCompositor` with 1:1 behavior, wiring signals through.
+- `Z3DCompositorGLBackend` implements the façade by delegating to `Z3DCompositor` with 1:1 behavior, wiring signals through.
 - No behavior change; keeps all graph/ports inside the existing GL compositor.
 
 Vulkan Implementation (Phase 4+):
@@ -407,12 +455,12 @@ Deliverable: Stable and performant Vulkan backend in releases.
 
 Abstraction/Reuse tasks
 
-- [ ] Define DTOs for background/lines/meshes/images/volumes (`zrenderdto.h`).
- - [x] Add abstract compositor interface extracted from Z3D (`zcompositorbase.h`).
+- [x] Add abstract compositor interface extracted from Z3D (`z3dcompositorbase.h`).
 - [x] Implement minimal Vulkan compositor to produce RGBA readbacks (background + axis lines).
-- [ ] Expand Vulkan compositor to ingest DTOs and provide equivalent outputs (ready targets/readback).
+- [x] Simplify compositor façade/readback to rely on `Z3DLocalColorBuffer` snapshots (engine screenshots now API-neutral).
+- [ ] Expand Vulkan compositor to provide equivalent outputs (ready targets/readback).
 - [ ] Migrate engine to hold a `std::unique_ptr` to the facade and switch backend at runtime.
-- [ ] Add DTO emitters in critical filters and reuse them in GL paths to reduce duplicated logic.
+- [ ] Audit filters for GL leakage and continue moving API-specific ownership into renderers/compositor.
 
 ## API Parity Acceptance Criteria
 

@@ -396,8 +396,9 @@ set(SOURCES
     z3danimationview.h z3danimationview.cpp
     z3danimationfilter.h z3danimationfilter.cpp
     z3dcompositor.h z3dcompositor.cpp
-    zcompositorbase.h zcompositorbase.cpp
-    zglcompositoradapter.h zglcompositoradapter.cpp
+    z3dcompositorbase.h z3dcompositorbase.cpp
+    z3dcompositorglbackend.h z3dcompositorglbackend.cpp
+    z3dcompositorfilter.h z3dcompositorfilter.cpp
     z3dgeometryfilter.h z3dgeometryfilter.cpp
     z3daxisfilter.h z3daxisfilter.cpp
     z3dboundedfilter.h z3dboundedfilter.cpp

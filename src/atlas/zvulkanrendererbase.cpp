@@ -1,5 +1,6 @@
 #include "zvulkanrendererbase.h"
 
+#include "z3dglobalparameters.h"
 #include "zvulkandevice.h"
 #include "zvulkanrenderer.h"
 #include "zvulkanswapchain.h"
@@ -153,6 +154,38 @@ void ZVulkanRendererBase::updatePushConstants()
   // Combine into a projection-view matrix
   m_pushConstants.projectionViewMatrix = projMatrix * viewMatrix;
   m_pushConstants.modelMatrix = coordTransform();
+}
+
+void ZVulkanRendererBase::syncFromGlobalParameters()
+{
+  if (!m_globals) {
+    return;
+  }
+
+  m_globalCamera = m_globals->camera.get();
+  if (!m_hasCustomCamera) {
+    m_camera = m_globalCamera;
+  }
+
+  std::vector<glm::vec4> derivedClipPlanes;
+  auto appendIfRange = [&](const auto& span, const glm::vec3& normal)
+  {
+    if (span.lowerValue() != span.minimum()) {
+      derivedClipPlanes.emplace_back(normal.x, normal.y, normal.z, static_cast<float>(-span.lowerValue()));
+    }
+    if (span.upperValue() != span.maximum()) {
+      derivedClipPlanes.emplace_back(-normal.x, -normal.y, -normal.z, static_cast<float>(span.upperValue()));
+    }
+  };
+
+  appendIfRange(m_globals->globalXCut, glm::vec3(1.f, 0.f, 0.f));
+  appendIfRange(m_globals->globalYCut, glm::vec3(0.f, 1.f, 0.f));
+  appendIfRange(m_globals->globalZCut, glm::vec3(0.f, 0.f, 1.f));
+
+  setClipPlanes(derivedClipPlanes);
+  enableClipping(!derivedClipPlanes.empty());
+
+  updatePushConstants();
 }
 
 } // namespace nim
