@@ -8,9 +8,6 @@
 #include "z3dsphererenderer.h"
 #include "zeventlistenerparameter.h"
 #include "zpunctapack.h"
-#include "z3drenderport.h"
-#include <QPoint>
-#include <map>
 #include <vector>
 
 namespace nim {
@@ -80,13 +77,6 @@ private:
   void deleteSelectedPuncta();
 
 private:
-  Z3DRenderOutputPort m_monoEyeOutport;
-  Z3DRenderOutputPort m_leftEyeOutport;
-  Z3DRenderOutputPort m_rightEyeOutport;
-  Z3DRenderOutputPort m_monoEyeOutport2;
-  Z3DRenderOutputPort m_leftEyeOutport2;
-  Z3DRenderOutputPort m_rightEyeOutport2;
-
   Z3DSphereRenderer m_sphereRenderer;
 
   ZStringIntOptionParameter m_colorMode;

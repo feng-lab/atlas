@@ -2,7 +2,6 @@
 
 #include "z3dboundedfilter.h"
 #include "z3dgeometryfilter.h"
-#include "z3drenderport.h"
 #include "z3dimgfilter.h"
 #include "z3dbackgroundrenderer.h"
 #include "z3dcameraparameter.h"
@@ -180,9 +179,6 @@ private:
 
   // ZBoolParameter m_renderGeometries;
 
-  Z3DRenderInputPort m_inport;
-  Z3DRenderInputPort m_leftEyeInport;
-  Z3DRenderInputPort m_rightEyeInport;
   Z3DFilterInputPort<Z3DGeometryFilter> m_gPPort;
   Z3DFilterInputPort<Z3DImgFilter> m_vPPort;
 

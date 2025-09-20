@@ -23,9 +23,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_backgroundSecondColor("Second Color", glm::vec4(0.2f, 0.2f, 0.2f, 1.0f))
   , m_backgroundGradientOrientation("Gradient Orientation")
   //, m_renderGeometries("Render Geometries", true)
-  , m_inport("Image", true, this, State::MonoViewResultInvalid)
-  , m_leftEyeInport("LeftEyeImage", true, this, State::LeftEyeResultInvalid)
-  , m_rightEyeInport("RightEyeImage", true, this, State::RightEyeResultInvalid)
   , m_gPPort("GeometryFilters", true, this)
   , m_vPPort("VolumeFilters", true, this)
   , m_pickingRenderTarget(GLint(GL_RGBA8))
@@ -64,9 +61,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
 
   addParameter(m_showBackground);
 
-  addPort(m_inport);
-  addPort(m_leftEyeInport);
-  addPort(m_rightEyeInport);
   addPort(m_gPPort);
   addPort(m_vPPort);
 
@@ -376,11 +370,8 @@ void Z3DCompositor::setOutputSize(const glm::uvec2& size)
   m_leftCurrentTarget->resize(size);
   m_rightCurrentTarget->resize(size);
 
-  if (size != m_inport.expectedSize() || size != m_leftEyeInport.expectedSize() ||
-      size != m_rightEyeInport.expectedSize()) {
-    m_inport.setExpectedSize(size);
-    m_leftEyeInport.setExpectedSize(size);
-    m_rightEyeInport.setExpectedSize(size);
+  if (size != m_vPPort.expectedSize()) {
+    m_vPPort.setExpectedSize(size);
     globalCameraPara().viewportChanged(size);
     Q_EMIT requestUpstreamSizeChange(this);
   }
@@ -472,15 +463,18 @@ double Z3DCompositor::process(Z3DEye eye)
                                        : m_rightCurrentTarget;
   }
   auto& currentOutRenderTarget = *currentOutPtr;
-  Z3DRenderInputPort& currentInport = (eye == MonoEye)   ? m_inport
-                                      : (eye == LeftEye) ? m_leftEyeInport
-                                                         : m_rightEyeInport;
+
+  const bool anyVolumeReady = std::any_of(
+    vFilters.begin(), vFilters.end(),
+    [eye](const Z3DImgFilter* filter) {
+      return filter && filter->isReady(eye) && filter->hasTransparent(eye);
+    });
 
   glEnable(GL_DEPTH_TEST);
 
   if (m_rendererBase.transparencyMethodPara().isSelected("Blend No Depth Mask") ||
       m_rendererBase.transparencyMethodPara().isSelected("Blend Delayed")) {
-    if (!currentInport.isReady()) { // no volume, only geometrys to render
+    if (!anyVolumeReady) { // no volume, only geometrys to render
       if (numNormalFilters == 0 || numOnTopFilters == 0) {
         // Acquire temp for geometry-only path (optionally twice the size)
         Z3DScratchResourcePool::RenderTargetLease temp1Lease =
@@ -1948,18 +1942,8 @@ Z3DCompositor::collectNonOpaqueImageLayers(Z3DEye eye) const
     if (!vf || !vf->isReady(eye) || !vf->hasTransparent(eye)) {
       continue;
     }
-    // Access outports directly (friend access)
-    const Z3DRenderOutputPort* out = nullptr;
-    if (eye == MonoEye) {
-      out = &vf->m_outport;
-    } else if (eye == LeftEye) {
-      out = &vf->m_leftEyeOutport;
-    } else {
-      out = &vf->m_rightEyeOutport;
-    }
-    if (out && out->hasValidData()) {
-      layers.emplace_back(out->colorTexture(), out->depthTexture());
-    }
+    const auto& target = vf->transparentTarget(eye);
+    layers.emplace_back(target.attachment(GL_COLOR_ATTACHMENT0), target.attachment(GL_DEPTH_ATTACHMENT));
   }
   return layers;
 }

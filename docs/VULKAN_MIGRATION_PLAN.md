@@ -142,6 +142,13 @@ Upcoming Tasks (proposed order)
 5) OIT in Vulkan (later)
    - Port DDP/WA/WB paths to Vulkan once the compositor scaffolding is in place.
 
+Render Surface Port Work (to be reimagined)
+
+- Define a lightweight descriptor/handle model for cross-API surfaces once Vulkan outputs need to flow through the network again.
+- Provide explicit helpers for GL↔Vulkan format translation instead of relying on opaque `uint32_t` casts.
+- Keep GL-specific headers in `.cpp` files; expose only minimal texture accessors from filters.
+- When the new façade is ready, add convenience helpers and validation utilities plus unit/integration coverage.
+
 ## Detailed Migration Backlog (mirrors OpenGL pipeline)
 
 1. **Compositor Filter Shell**
@@ -461,7 +468,10 @@ Abstraction/Reuse tasks
 - [ ] Expand Vulkan compositor to provide equivalent outputs (ready targets/readback).
 - [ ] Migrate engine to hold a `std::unique_ptr` to the facade and switch backend at runtime.
 - [ ] Audit filters for GL leakage and continue moving API-specific ownership into renderers/compositor.
-- [ ] Render-surface façade: introduce API-neutral ports/leases (`RenderSurfacePort` prototype landed) and replace `Z3DRenderPort` usage once Vulkan buffers are ready.
+- [ ] Render-surface façade (reset after pipeline simplification):
+  - [ ] Reintroduce an API-neutral lease system that can wrap scratch-pool render targets and future Vulkan surfaces without adding indirection to the hot GL path.
+  - [ ] Define a minimal descriptor/handle vocabulary that covers size/formats/sample count while keeping consumers free of backend headers.
+  - [ ] Update filters/compositor to adopt the redesigned façade once Vulkan surfaces are available.
 - [ ] Renderer parameter audit: hoist persistent `ZParameter` state out of GL renderers so backend swaps don’t drop user settings (see checklist below).
   - [x] Image raycaster: sampling rate, ISO value, local MIP threshold, and compositing mode now live on `Z3DImgFilter` and are injected into the renderer.
   - [x] Volume raycaster: sampling rate, ISO value, local MIP threshold, and compositing mode are filter-owned (`Z3DVolumeFilter`) and passed into the renderer via setter hooks.

@@ -5,6 +5,7 @@
 #include "zeventlistenerparameter.h"
 #include "zlog.h"
 #include "zmesh.h"
+#include <folly/ScopeGuard.h>
 #include <QMenu>
 #include <memory>
 
@@ -26,13 +27,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_numParas(0)
   //, m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   //, m_smoothInteraction("Smooth Interaction", true)
-  , m_outport("Image", this)
-  , m_leftEyeOutport("LeftEyeImage", this)
-  , m_rightEyeOutport("RightEyeImage", this)
   , m_vPPort("VolumeFilter", this)
-  , m_opaqueOutport("OpaqueImage", this)
-  , m_opaqueLeftEyeOutport("OpaqueLeftEyeImage", this)
-  , m_opaqueRightEyeOutport("OpaqueRightEyeImage", this)
   //, m_FRVolumeSlices(m_maxNumOfFullResolutionVolumeSlice)
   //, m_FRVolumeSlicesValidState(m_maxNumOfFullResolutionVolumeSlice, false)
   //, m_useFRVolumeSlice("Use Full Resolution Volume Slice", true)
@@ -109,11 +104,9 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   // layer, block-id, and progressive render targets are now owned by renderers
 
-  // ports
-  addPort(m_outport);
-  addPort(m_leftEyeOutport);
-  addPort(m_rightEyeOutport);
+  // port exposing this filter to the compositor network
   addPort(m_vPPort);
+  markTargetsInvalid();
 
   m_obliqueSliceNormal.setNameForEachValue({"x", "y", "z"});
   m_obliqueSlice2Normal.setNameForEachValue({"x", "y", "z"});
@@ -471,29 +464,30 @@ bool Z3DImgFilter::hasOpaque(Z3DEye) const
 
 void Z3DImgFilter::renderOpaque(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_opaqueOutport
-                                        : (eye == LeftEye) ? m_opaqueLeftEyeOutport
-                                                           : m_opaqueRightEyeOutport;
-  m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
-  m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
+  const size_t idx = eyeIndex(eye);
+  if (!m_opaqueValid[idx]) {
+    return;
+  }
+  const auto& target = opaqueTarget(eye);
+  m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
+  m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
   m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
 bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
 {
-  const Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
-                                              : (eye == LeftEye) ? m_leftEyeOutport
-                                                                 : m_rightEyeOutport;
-  return currentOutport.hasValidData();
+  return m_transparentValid[eyeIndex(eye)];
 }
 
 void Z3DImgFilter::renderTransparent(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
-                                        : (eye == LeftEye) ? m_leftEyeOutport
-                                                           : m_rightEyeOutport;
-  m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
-  m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
+  const size_t idx = eyeIndex(eye);
+  if (!m_transparentValid[idx]) {
+    return;
+  }
+  const auto& target = transparentTarget(eye);
+  m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
+  m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
   m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
@@ -615,6 +609,7 @@ void Z3DImgFilter::invalidate(State inv)
 #endif
 
   Z3DBoundedFilter::invalidate(inv);
+  markTargetsInvalid();
   // If rendering is in progress, request cancellation; renderers will
   // catch cancellation and perform a safe reset of progressive state.
 #if 0 // ATLAS_DEBUG_VERSION
@@ -642,6 +637,16 @@ void Z3DImgFilter::updateSize()
 {
   Z3DBoundedFilter::updateSize();
   updateBlockIDTarget();
+
+  const glm::uvec2 requestedSize = m_vPPort.size();
+  if (requestedSize.x == 0 || requestedSize.y == 0) {
+    return;
+  }
+
+  if (m_outputSize != requestedSize) {
+    m_outputSize = requestedSize;
+    releaseAllRenderTargets();
+  }
 }
 
 void Z3DImgFilter::changeCoordTransform()
@@ -833,13 +838,12 @@ bool Z3DImgFilter::hasSlices() const
 
 double Z3DImgFilter::renderSlices(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_opaqueOutport
-                                        : (eye == LeftEye) ? m_opaqueLeftEyeOutport
-                                                           : m_opaqueRightEyeOutport;
+  Z3DRenderTarget& currentTarget = opaqueTarget(eye);
+  const size_t idx = eyeIndex(eye);
 
-  if (!(m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye))) {
-    currentOutport.resize(m_outport.size());
-    m_imgSliceRenderer.setOutputSize(currentOutport.size());
+  const bool progressiveStep = m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye);
+  if (!progressiveStep) {
+    m_imgSliceRenderer.setOutputSize(currentTarget.size());
 
     glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
     glm::vec3 coordLuf = m_3dImg->physicalLUF();
@@ -925,9 +929,16 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
     }
   }
 
-  currentOutport.bindTarget();
-  currentOutport.clearTarget();
-  m_rendererBase.setViewport(currentOutport.size());
+  currentTarget.bind();
+  currentTarget.clear();
+  m_rendererBase.setViewport(currentTarget.size());
+
+  m_opaqueValid[idx] = false;
+
+  auto targetGuard = folly::makeGuard([&currentTarget, this, idx]() {
+    currentTarget.release();
+    m_opaqueValid[idx] = true;
+  });
 
   double progress = 1.0;
   if (!m_progressiveRendering) {
@@ -935,11 +946,6 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
   } else {
     progress = m_imgSliceRenderer.renderProgressively(eye);
   }
-
-  currentOutport.releaseTarget();
-
-  // glFinish();
-  // currentOutport.colorTexture()->saveAsColorImage("/Users/feng/Downloads/abc.tif");
 
   return progress;
 }
@@ -954,13 +960,12 @@ bool Z3DImgFilter::hasImage() const
 
 double Z3DImgFilter::renderImage(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
-                                        : (eye == LeftEye) ? m_leftEyeOutport
-                                                           : m_rightEyeOutport;
+  Z3DRenderTarget& currentTarget = transparentTarget(eye);
+  const size_t idx = eyeIndex(eye);
 
   // VLOG(1) << m_progressiveRendering << " " << m_imgRaycasterRenderer.renderingStarted(eye);
   if (!(m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye))) {
-    m_imgRaycasterRenderer.setOutputSize(currentOutport.size());
+    m_imgRaycasterRenderer.setOutputSize(currentTarget.size());
 
     glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
     glm::vec3 coordLuf = m_3dImg->physicalLUF();
@@ -1029,7 +1034,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
       cube.transformVerticesByMatrix(m_rendererBase.coordTransform());
       bool flipped = glm::determinant(glm::mat3(m_rendererBase.coordTransform())) < 0.0;
 
-      m_rendererBase.setViewport(currentOutport.size());
+      m_rendererBase.setViewport(currentTarget.size());
       CHECK_GL_ERROR
 
       std::vector<glm::vec3> planeNormals;
@@ -1090,16 +1095,18 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 #endif
 
       // prepare entry/exit in renderer
-      m_imgRaycasterRenderer.prepareEntryExit(clipped, flipped, eye, currentOutport.size());
+      m_imgRaycasterRenderer.prepareEntryExit(clipped, flipped, eye, currentTarget.size());
     }
   }
 
-  currentOutport.bindTarget();
-  currentOutport.clearTarget();
-  m_rendererBase.setViewport(currentOutport.size());
+  currentTarget.bind();
+  currentTarget.clear();
+  m_rendererBase.setViewport(currentTarget.size());
 
-  auto outportGuard = folly::makeGuard([&currentOutport]() {
-    currentOutport.releaseTarget();
+  m_transparentValid[idx] = false;
+  auto targetGuard = folly::makeGuard([&currentTarget, this, idx]() {
+    currentTarget.release();
+    m_transparentValid[idx] = true;
   });
 
   double progress = 1.0;
@@ -1123,19 +1130,22 @@ bool Z3DImgFilter::onlyBoundBox() const
 
 void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
-                                        : (eye == LeftEye) ? m_leftEyeOutport
-                                                           : m_rightEyeOutport;
+  Z3DRenderTarget& currentTarget = transparentTarget(eye);
+  const size_t idx = eyeIndex(eye);
 
-  currentOutport.bindTarget();
-  currentOutport.clearTarget();
-  m_rendererBase.setViewport(currentOutport.size());
+  currentTarget.bind();
+  currentTarget.clear();
+  m_rendererBase.setViewport(currentTarget.size());
+
+  m_transparentValid[idx] = false;
+  auto targetGuard = folly::makeGuard([&currentTarget, this, idx]() {
+    currentTarget.release();
+    m_transparentValid[idx] = true;
+  });
 
   // Draw bound box with local overlay state
   renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
   CHECK_GL_ERROR
-
-  currentOutport.releaseTarget();
 }
 
 void Z3DImgFilter::updateNotTransformedBoundBoxImpl()
@@ -1174,11 +1184,13 @@ glm::vec3 Z3DImgFilter::getFirstHit3DPosition(int x, int y, int width, int heigh
 {
   glm::vec3 res(-1);
   success = false;
-  if (m_imgRaycasterRenderer.hasVisibleRendering() && (m_outport.hasValidData() || m_rightEyeOutport.hasValidData())) {
+  const bool monoValid = m_transparentValid[eyeIndex(MonoEye)];
+  const bool rightValid = m_transparentValid[eyeIndex(RightEye)];
+  if (m_imgRaycasterRenderer.hasVisibleRendering() && (monoValid || rightValid)) {
     glm::ivec2 pos2D = glm::ivec2(x, height - y);
-    Z3DRenderOutputPort& port = m_outport.hasValidData() ? m_outport : m_rightEyeOutport;
+    Z3DRenderTarget& target = monoValid ? transparentTarget(MonoEye) : transparentTarget(RightEye);
 
-    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
+    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, target);
     res = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
     if (glm::all(glm::greaterThanEqual(res, glm::vec3(0.f))) &&
         glm::all(glm::lessThan(res, glm::vec3(m_3dImg->dimensions())))) {
@@ -1193,12 +1205,13 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
   glm::vec3 res(-1);
   glm::vec3 des(-1);
   success = false;
-  if (m_imgRaycasterRenderer.hasVisibleRendering() && m_3dImg &&
-      (m_outport.hasValidData() || m_rightEyeOutport.hasValidData())) {
+  const bool monoValid = m_transparentValid[eyeIndex(MonoEye)];
+  const bool rightValid = m_transparentValid[eyeIndex(RightEye)];
+  if (m_imgRaycasterRenderer.hasVisibleRendering() && m_3dImg && (monoValid || rightValid)) {
     glm::ivec2 pos2D = glm::ivec2(x, height - y);
-    Z3DRenderOutputPort& port = m_outport.hasValidData() ? m_outport : m_rightEyeOutport;
+    Z3DRenderTarget& target = monoValid ? transparentTarget(MonoEye) : transparentTarget(RightEye);
 
-    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
+    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, target);
     res = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
     if (glm::all(glm::greaterThanEqual(res, glm::vec3(0.f))) &&
         glm::all(glm::lessThan(res, glm::vec3(m_3dImg->dimensions())))) {
@@ -1239,7 +1252,7 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
   return res;
 }
 
-glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port)
+glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderTarget& target)
 {
   glm::mat4 projection = globalCamera().projectionMatrix(MonoEye);
   glm::mat4 modelview = globalCamera().viewMatrix(MonoEye);
@@ -1250,7 +1263,7 @@ glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z
   viewport[2] = width;
   viewport[3] = height;
 
-  GLfloat WindowPosZ = port.renderTarget().depthAtPos(pos2D);
+  GLfloat WindowPosZ = target.depthAtPos(pos2D);
   glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, WindowPosZ), modelview, projection, viewport);
 
   return pos;
@@ -1270,6 +1283,70 @@ glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, double depth, int width,
   glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, depth), modelview, projection, viewport);
 
   return pos;
+}
+
+size_t Z3DImgFilter::eyeIndex(Z3DEye eye)
+{
+  switch (eye) {
+    case MonoEye:
+      return 0;
+    case LeftEye:
+      return 1;
+    case RightEye:
+      return 2;
+  }
+  return 0;
+}
+
+Z3DRenderTarget& Z3DImgFilter::transparentTarget(Z3DEye eye)
+{
+  return ensureRenderTarget(m_transparentTargets[eyeIndex(eye)]);
+}
+
+const Z3DRenderTarget& Z3DImgFilter::transparentTarget(Z3DEye eye) const
+{
+  const auto& lease = m_transparentTargets[eyeIndex(eye)];
+  CHECK(lease.renderTarget) << "transparent target requested before rendering";
+  return *lease.renderTarget;
+}
+
+Z3DRenderTarget& Z3DImgFilter::opaqueTarget(Z3DEye eye)
+{
+  return ensureRenderTarget(m_opaqueTargets[eyeIndex(eye)]);
+}
+
+const Z3DRenderTarget& Z3DImgFilter::opaqueTarget(Z3DEye eye) const
+{
+  const auto& lease = m_opaqueTargets[eyeIndex(eye)];
+  CHECK(lease.renderTarget) << "opaque target requested before rendering";
+  return *lease.renderTarget;
+}
+
+Z3DRenderTarget& Z3DImgFilter::ensureRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease)
+{
+  if (!lease.renderTarget || lease.renderTarget->size() != m_outputSize) {
+    lease.release();
+    CHECK_GT(m_outputSize.x, 0u);
+    CHECK_GT(m_outputSize.y, 0u);
+    lease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(m_outputSize);
+  }
+  return *lease.renderTarget;
+}
+
+void Z3DImgFilter::releaseAllRenderTargets()
+{
+  for (auto& lease : m_transparentTargets) {
+    lease.release();
+  }
+  for (auto& lease : m_opaqueTargets) {
+    lease.release();
+  }
+}
+
+void Z3DImgFilter::markTargetsInvalid()
+{
+  m_transparentValid.fill(false);
+  m_opaqueValid.fill(false);
 }
 
 } // namespace nim

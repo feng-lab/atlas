@@ -7,12 +7,6 @@ namespace nim {
 
 Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
-  , m_monoEyeOutport("Image", this)
-  , m_leftEyeOutport("LeftEyeImage", this)
-  , m_rightEyeOutport("RightEyeImage", this)
-  , m_monoEyeOutport2("Image2", this)
-  , m_leftEyeOutport2("LeftEyeImage2", this)
-  , m_rightEyeOutport2("RightEyeImage2", this)
   , m_sphereRenderer(m_rendererBase)
   , m_colorMode("Color Mode")
   , m_singleColorForAllPuncta("Puncta Color",

@@ -3,6 +3,7 @@
 #include "z3dglobalparameters.h"
 #include "zlog.h"
 #include "zwidgetsgroup.h"
+#include "zvulkanswapchain.h"
 
 #include <algorithm>
 #include <cmath>

@@ -7,6 +7,7 @@
 #include "zbenchtimer.h"
 #include "zmeshutils.h"
 #include "zlog.h"
+#include <folly/ScopeGuard.h>
 #include <QApplication>
 #include <QMessageBox>
 
@@ -40,13 +41,7 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
                         glm::uvec3(32, 32, 3),
                         GL_DEPTH_COMPONENT,
                         GL_FLOAT)
-  , m_outport("Image", this)
-  , m_leftEyeOutport("LeftEyeImage", this)
-  , m_rightEyeOutport("RightEyeImage", this)
   , m_vPPort("VolumeFilter", this)
-  , m_opaqueOutport("OpaqueImage", this)
-  , m_opaqueLeftEyeOutport("OpaqueLeftEyeImage", this)
-  , m_opaqueRightEyeOutport("OpaqueRightEyeImage", this)
   , m_FRVolumeSlices(m_maxNumOfFullResolutionVolumeSlice)
   , m_FRVolumeSlicesValidState(m_maxNumOfFullResolutionVolumeSlice, false)
   , m_useFRVolumeSlice("Use Full Resolution Volume Slice", true)
@@ -155,13 +150,7 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   addPrivateRenderTarget(m_entryTarget);
   addPrivateRenderTarget(m_exitTarget);
   addPrivateRenderTarget(m_layerTarget);
-  addPort(m_outport);
-  addPort(m_leftEyeOutport);
-  addPort(m_rightEyeOutport);
   addPort(m_vPPort);
-  addPrivateRenderPort(m_opaqueOutport);
-  addPrivateRenderPort(m_opaqueLeftEyeOutport);
-  addPrivateRenderPort(m_opaqueRightEyeOutport);
 
   addParameter(m_useFRVolumeSlice);
   addParameter(m_showXSlice);
@@ -458,52 +447,62 @@ std::shared_ptr<ZWidgetsGroup> Z3DVolumeFilter::widgetsGroup()
 
 void Z3DVolumeFilter::enterInteractionMode()
 {
-  glm::uvec2 expectedSize = m_outport.expectedSize();
-  if (m_interactionDownsample.get() != 1) {
-    for (auto port : outputPorts()) {
-      port->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
-    for (auto port : m_privateRenderPorts) {
-      port->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
-    for (auto target : m_privateRenderTargets) {
-      target->resize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
-
-    for (auto port : inputPorts()) {
-      port->setExpectedSize(expectedSize / uint32_t(m_interactionDownsample.get()));
-    }
-    Q_EMIT requestUpstreamSizeChange(this);
-
-    // upstream will invalidate the network, but in case there are no upstream
-    // do one more invalidation
-    invalidateResult();
+  const uint32_t factor = static_cast<uint32_t>(m_interactionDownsample.get());
+  if (factor <= 1 || m_outputSize.x == 0 || m_outputSize.y == 0) {
+    return;
   }
+
+  if (!m_interactionDownsampleActive) {
+    m_interactionBaseSize = m_outputSize;
+  }
+
+  glm::uvec2 newSize = glm::max(m_outputSize / factor, glm::uvec2(1u, 1u));
+  if (newSize == m_outputSize) {
+    return;
+  }
+
+  m_outputSize = newSize;
+  m_entryTarget.resize(newSize);
+  m_exitTarget.resize(newSize);
+  m_layerTarget.resize(newSize);
+  releaseAllRenderTargets();
+  markTargetsInvalid();
+
+  for (auto port : inputPorts()) {
+    port->setExpectedSize(newSize);
+  }
+
+  m_interactionDownsampleActive = true;
+  Q_EMIT requestUpstreamSizeChange(this);
+  invalidateResult();
 }
 
 void Z3DVolumeFilter::exitInteractionMode()
 {
-  glm::uvec2 expectedSize = m_outport.expectedSize();
-  if (m_interactionDownsample.get() != 1) {
-    for (auto port : outputPorts()) {
-      port->resize(expectedSize);
-    }
-    for (auto port : m_privateRenderPorts) {
-      port->resize(expectedSize);
-    }
-    for (auto target : m_privateRenderTargets) {
-      target->resize(expectedSize);
-    }
-
-    for (auto port : inputPorts()) {
-      port->setExpectedSize(expectedSize);
-    }
-    Q_EMIT requestUpstreamSizeChange(this);
-
-    // upstream will invalidate the network, but in case there are no upstream
-    // do one more invalidation
-    invalidateResult();
+  if (!m_interactionDownsampleActive) {
+    return;
   }
+
+  glm::uvec2 restoreSize = m_interactionBaseSize;
+  if (restoreSize.x == 0 || restoreSize.y == 0) {
+    restoreSize = m_outputSize;
+  }
+
+  m_outputSize = restoreSize;
+  m_entryTarget.resize(restoreSize);
+  m_exitTarget.resize(restoreSize);
+  m_layerTarget.resize(restoreSize);
+  releaseAllRenderTargets();
+  markTargetsInvalid();
+
+  for (auto port : inputPorts()) {
+    port->setExpectedSize(restoreSize);
+  }
+
+  m_interactionDownsampleActive = false;
+  m_interactionBaseSize = glm::uvec2(0u, 0u);
+  Q_EMIT requestUpstreamSizeChange(this);
+  invalidateResult();
 }
 
 void Z3DVolumeFilter::updateRaycasterSamplingRate()
@@ -551,37 +550,37 @@ glm::vec3 Z3DVolumeFilter::get3DPosition(int x, int y, int width, int height, bo
   }
 }
 
-bool Z3DVolumeFilter::hasOpaque(Z3DEye) const
+bool Z3DVolumeFilter::hasOpaque(Z3DEye eye) const
 {
-  return hasSlices();
+  return m_opaqueValid[eyeIndex(eye)];
 }
 
 void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_opaqueOutport
-                                        : (eye == Left) ? m_opaqueLeftEyeOutport
-                                                        : m_opaqueRightEyeOutport;
-  currentOutport.resize(m_outport.size());
-  m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
-  m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
+  const size_t idx = eyeIndex(eye);
+  if (!m_opaqueValid[idx]) {
+    return;
+  }
+  const auto& target = opaqueTarget(eye);
+  m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
+  m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
   m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
 bool Z3DVolumeFilter::hasTransparent(Z3DEye eye) const
 {
-  const Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_outport
-                                              : (eye == Left) ? m_leftEyeOutport
-                                                              : m_rightEyeOutport;
-  return currentOutport.hasValidData();
+  return m_transparentValid[eyeIndex(eye)];
 }
 
 void Z3DVolumeFilter::renderTransparent(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_outport
-                                        : (eye == Left) ? m_leftEyeOutport
-                                                        : m_rightEyeOutport;
-  m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
-  m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
+  const size_t idx = eyeIndex(eye);
+  if (!m_transparentValid[idx]) {
+    return;
+  }
+  const auto& target = transparentTarget(eye);
+  m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
+  m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
   m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
@@ -618,6 +617,27 @@ void Z3DVolumeFilter::adjustWidget()
   m_xSlice2Position.setVisible(m_showXSlice2.get());
 }
 
+void Z3DVolumeFilter::updateSize()
+{
+  Z3DBoundedFilter::updateSize();
+
+  const glm::uvec2 requestedSize = m_vPPort.size();
+  if (requestedSize.x == 0 || requestedSize.y == 0) {
+    return;
+  }
+
+  if (m_interactionDownsampleActive && m_interactionBaseSize.x != 0 && m_interactionBaseSize.y != 0) {
+    m_interactionBaseSize = requestedSize;
+  }
+
+  if (m_outputSize != requestedSize) {
+    m_outputSize = requestedSize;
+    m_entryTarget.resize(m_outputSize);
+    m_exitTarget.resize(m_outputSize);
+    m_layerTarget.resize(m_outputSize);
+    releaseAllRenderTargets();
+  }
+}
 void Z3DVolumeFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
 {
   e->ignore();
@@ -754,6 +774,12 @@ void Z3DVolumeFilter::invalidateFRVolumeXSlice2()
                                                            glm::vec3(xTexCoordStart, yTexCoordEnd, zTexCoordEnd));
 }
 
+void Z3DVolumeFilter::invalidate(State inv)
+{
+  Z3DBoundedFilter::invalidate(inv);
+  markTargetsInvalid();
+}
+
 void Z3DVolumeFilter::process(Z3DEye eye)
 {
   glEnable(GL_DEPTH_TEST);
@@ -767,13 +793,18 @@ void Z3DVolumeFilter::process(Z3DEye eye)
                    m_zCut.upperValue() < m_zCut.minimum() + 1 || m_xCut.lowerValue() > m_xCut.maximum() - 1 ||
                    m_yCut.lowerValue() > m_yCut.maximum() - 1 || m_zCut.lowerValue() > m_zCut.maximum() - 1;
 
-  Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_outport
-                                        : (eye == Left) ? m_leftEyeOutport
-                                                        : m_rightEyeOutport;
+  Z3DRenderTarget& currentTarget = transparentTarget(eye);
+  const size_t idx = eyeIndex(eye);
 
-  currentOutport.bindTarget();
-  currentOutport.clearTarget();
-  m_rendererBase.setViewport(currentOutport.size());
+  currentTarget.bind();
+  currentTarget.clear();
+  m_rendererBase.setViewport(currentTarget.size());
+
+  m_transparentValid[idx] = false;
+  auto targetGuard = folly::makeGuard([&currentTarget, this, idx]() {
+    currentTarget.release();
+    m_transparentValid[idx] = true;
+  });
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -785,8 +816,6 @@ void Z3DVolumeFilter::process(Z3DEye eye)
 
   renderBoundBox(eye);
   CHECK_GL_ERROR
-
-  currentOutport.releaseTarget();
 
   glBlendFunc(GL_ONE, GL_ZERO);
   glDisable(GL_BLEND);
@@ -808,16 +837,20 @@ bool Z3DVolumeFilter::hasSlices() const
 
 void Z3DVolumeFilter::renderSlices(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_opaqueOutport
-                                        : (eye == Left) ? m_opaqueLeftEyeOutport
-                                                        : m_opaqueRightEyeOutport;
-  currentOutport.resize(m_outport.size());
+  Z3DRenderTarget& currentTarget = opaqueTarget(eye);
+  const size_t idx = eyeIndex(eye);
 
-  m_layerTarget.resize(currentOutport.size());
+  m_layerTarget.resize(currentTarget.size());
 
-  currentOutport.bindTarget();
-  currentOutport.clearTarget();
-  m_rendererBase.setViewport(currentOutport.size());
+  currentTarget.bind();
+  currentTarget.clear();
+  m_rendererBase.setViewport(currentTarget.size());
+
+  m_opaqueValid[idx] = false;
+  auto targetGuard = folly::makeGuard([&currentTarget, this, idx]() {
+    currentTarget.release();
+    m_opaqueValid[idx] = true;
+  });
 
   Z3DVolume* volume = getVolumes()[0].get();
   glm::uvec3 volDim = volume->originalDimensions();
@@ -1111,8 +1144,6 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
     }
     m_rendererBase.render(eye, m_volumeSliceRenderer);
   }
-
-  currentOutport.releaseTarget();
 }
 
 const std::vector<std::unique_ptr<Z3DVolume>>& Z3DVolumeFilter::getVolumes() const
@@ -1291,16 +1322,18 @@ glm::vec3 Z3DVolumeFilter::getFirstHit3DPosition(int x, int y, int width, int he
 {
   glm::vec3 res(-1);
   success = false;
-  if (m_volumeRaycasterRenderer.hasVisibleRendering() &&
-      (m_outport.hasValidData() || m_rightEyeOutport.hasValidData())) {
+  const bool monoValid = m_transparentValid[eyeIndex(Mono)];
+  const bool rightValid = m_transparentValid[eyeIndex(Right)];
+  if (m_volumeRaycasterRenderer.hasVisibleRendering() && (monoValid || rightValid)) {
     glm::ivec2 pos2D = glm::ivec2(x, height - y);
-    Z3DRenderOutputPort& port = m_outport.hasValidData() ? m_outport : m_rightEyeOutport;
-    if (port.size() == port.expectedSize() / uint32_t(m_interactionDownsample.get())) {
-      pos2D /= m_interactionDownsample.get();
-      width /= m_interactionDownsample.get();
-      height /= m_interactionDownsample.get();
+    Z3DRenderTarget& target = monoValid ? transparentTarget(Mono) : transparentTarget(Right);
+    const uint32_t factor = static_cast<uint32_t>(m_interactionDownsample.get());
+    if (m_interactionDownsampleActive && factor > 1) {
+      pos2D /= factor;
+      width /= static_cast<int>(factor);
+      height /= static_cast<int>(factor);
     }
-    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
+    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, target);
     res = glm::round(glm::applyMatrix(getVolumes()[0]->worldToPhysicalMatrix(), fpos3D));
     if (res.x >= 0 && res.x < m_imgPack->imgInfo().width && res.y >= 0 && res.y < m_imgPack->imgInfo().height &&
         res.z >= 0 && res.z < m_imgPack->imgInfo().depth) {
@@ -1315,16 +1348,18 @@ glm::vec3 Z3DVolumeFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, i
   glm::vec3 res(-1);
   glm::vec3 des(-1);
   success = false;
-  if (m_volumeRaycasterRenderer.hasVisibleRendering() &&
-      (m_outport.hasValidData() || m_rightEyeOutport.hasValidData())) {
+  const bool monoValid = m_transparentValid[eyeIndex(Mono)];
+  const bool rightValid = m_transparentValid[eyeIndex(Right)];
+  if (m_volumeRaycasterRenderer.hasVisibleRendering() && (monoValid || rightValid)) {
     glm::ivec2 pos2D = glm::ivec2(x, height - y);
-    Z3DRenderOutputPort& port = m_outport.hasValidData() ? m_outport : m_rightEyeOutport;
-    if (port.size() == port.expectedSize() / uint32_t(m_interactionDownsample.get())) {
-      pos2D /= m_interactionDownsample.get();
-      width /= m_interactionDownsample.get();
-      height /= m_interactionDownsample.get();
+    Z3DRenderTarget& target = monoValid ? transparentTarget(Mono) : transparentTarget(Right);
+    const uint32_t factor = static_cast<uint32_t>(m_interactionDownsample.get());
+    if (m_interactionDownsampleActive && factor > 1) {
+      pos2D /= factor;
+      width /= static_cast<int>(factor);
+      height /= static_cast<int>(factor);
     }
-    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
+    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, target);
     res = glm::round(glm::applyMatrix(getVolumes()[0]->worldToPhysicalMatrix(), fpos3D));
     if (res.x >= 0 && res.x < m_imgPack->imgInfo().width && res.y >= 0 && res.y < m_imgPack->imgInfo().height &&
         res.z >= 0 && res.z < m_imgPack->imgInfo().depth) {
@@ -1366,7 +1401,7 @@ glm::vec3 Z3DVolumeFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, i
   return res;
 }
 
-glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port)
+glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderTarget& target)
 {
   glm::mat4 projection = globalCamera().projectionMatrix(Mono);
   glm::mat4 modelview = globalCamera().viewMatrix(Mono);
@@ -1377,7 +1412,7 @@ glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, int width, int height
   viewport[2] = width;
   viewport[3] = height;
 
-  GLfloat WindowPosZ = port.renderTarget().depthAtPos(pos2D);
+  GLfloat WindowPosZ = target.depthAtPos(pos2D);
 
   CHECK_GL_ERROR
   glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, WindowPosZ), modelview, projection, viewport);
@@ -1498,8 +1533,8 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
   // enable culling
   glEnable(GL_CULL_FACE);
 
-  m_exitTarget.resize(m_outport.size());
-  m_entryTarget.resize(m_outport.size());
+  m_exitTarget.resize(m_outputSize);
+  m_entryTarget.resize(m_outputSize);
 
   m_rendererBase.setViewport(m_exitTarget.size());
   CHECK_GL_ERROR
@@ -1594,6 +1629,70 @@ void Z3DVolumeFilter::volumeChanged()
   if (!is2DImage) {
     m_volumeSliceRenderer.setData(getVolumes(), m_sliceColormaps);
   }
+}
+
+size_t Z3DVolumeFilter::eyeIndex(Z3DEye eye)
+{
+  switch (eye) {
+    case Mono:
+      return 0;
+    case Left:
+      return 1;
+    case Right:
+      return 2;
+  }
+  return 0;
+}
+
+Z3DRenderTarget& Z3DVolumeFilter::transparentTarget(Z3DEye eye)
+{
+  return ensureRenderTarget(m_transparentTargets[eyeIndex(eye)]);
+}
+
+const Z3DRenderTarget& Z3DVolumeFilter::transparentTarget(Z3DEye eye) const
+{
+  const auto& lease = m_transparentTargets[eyeIndex(eye)];
+  CHECK(lease.renderTarget) << "transparent target requested before rendering";
+  return *lease.renderTarget;
+}
+
+Z3DRenderTarget& Z3DVolumeFilter::opaqueTarget(Z3DEye eye)
+{
+  return ensureRenderTarget(m_opaqueTargets[eyeIndex(eye)]);
+}
+
+const Z3DRenderTarget& Z3DVolumeFilter::opaqueTarget(Z3DEye eye) const
+{
+  const auto& lease = m_opaqueTargets[eyeIndex(eye)];
+  CHECK(lease.renderTarget) << "opaque target requested before rendering";
+  return *lease.renderTarget;
+}
+
+Z3DRenderTarget& Z3DVolumeFilter::ensureRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease)
+{
+  if (!lease.renderTarget || lease.renderTarget->size() != m_outputSize) {
+    lease.release();
+    CHECK_GT(m_outputSize.x, 0u);
+    CHECK_GT(m_outputSize.y, 0u);
+    lease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(m_outputSize);
+  }
+  return *lease.renderTarget;
+}
+
+void Z3DVolumeFilter::releaseAllRenderTargets()
+{
+  for (auto& lease : m_transparentTargets) {
+    lease.release();
+  }
+  for (auto& lease : m_opaqueTargets) {
+    lease.release();
+  }
+}
+
+void Z3DVolumeFilter::markTargetsInvalid()
+{
+  m_transparentValid.fill(false);
+  m_opaqueValid.fill(false);
 }
 
 } // namespace nim

@@ -1,20 +1,20 @@
 #pragma once
 
 #include "z3dboundedfilter.h"
-#include "z3dcameraparameter.h"
+#include "z3dport.h"
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
 #include "z3dimg.h"
 #include "z3dtransferfunction.h"
-#include "z3dtransformparameter.h"
 #include "zwidgetsgroup.h"
 #include "z3dimgraycasterrenderer.h"
 #include "z3dimgslicerenderer.h"
-#include "z3dimage2drenderer.h"
 #include "zeventlistenerparameter.h"
 #include "z3dtexturecopyrenderer.h"
 #include "zimgpack.h"
-#include "z3drenderport.h"
+#include "z3dscratchresourcepool.h"
+
+#include <array>
 #include <vector>
 
 namespace nim {
@@ -127,6 +127,14 @@ private:
   void updateRaycasterSamplingRate();
   void updateRaycasterIsoValue();
   void updateRaycasterLocalMIPThreshold();
+  [[nodiscard]] static size_t eyeIndex(Z3DEye eye);
+  [[nodiscard]] Z3DRenderTarget& transparentTarget(Z3DEye eye);
+  [[nodiscard]] const Z3DRenderTarget& transparentTarget(Z3DEye eye) const;
+  [[nodiscard]] Z3DRenderTarget& opaqueTarget(Z3DEye eye);
+  [[nodiscard]] const Z3DRenderTarget& opaqueTarget(Z3DEye eye) const;
+  [[nodiscard]] Z3DRenderTarget& ensureRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease);
+  void releaseAllRenderTargets();
+  void markTargetsInvalid();
 
   // check success before using the returned value
   // if first hit 3d position is in volume, success will be true,
@@ -137,7 +145,7 @@ private:
   glm::vec3 getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool& success);
 
   // get 3D position from 2D screen position
-  glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port);
+  glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderTarget& target);
 
   // get 3D position from 2D screen position and depth
   glm::vec3 get3DPosition(glm::ivec2 pos2D, double depth, int width, int height);
@@ -162,13 +170,12 @@ private:
   // ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
   // ZBoolParameter m_smoothInteraction;
 
-  Z3DRenderOutputPort m_outport;
-  Z3DRenderOutputPort m_leftEyeOutport;
-  Z3DRenderOutputPort m_rightEyeOutport;
+  std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_transparentTargets;
   Z3DFilterOutputPort<Z3DImgFilter> m_vPPort;
-  Z3DRenderOutputPort m_opaqueOutport;
-  Z3DRenderOutputPort m_opaqueLeftEyeOutport;
-  Z3DRenderOutputPort m_opaqueRightEyeOutport;
+  std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_opaqueTargets;
+  std::array<bool, 3> m_transparentValid{};
+  std::array<bool, 3> m_opaqueValid{};
+  glm::uvec2 m_outputSize{32u, 32u};
 
   std::vector<std::unique_ptr<ZDoubleSpanParameter>> m_doubleChannelRangeParas;
   std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;

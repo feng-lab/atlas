@@ -96,7 +96,7 @@ if (QT4_FOUND)
     z3dpunctarenderer.h z3dchainrenderer.h zcolormapwidgetwitheditorwindow.h
     z3dbackgroundrenderer.h z3dbackground.h z3daxis.h zwidgetsgroup.h
     z3dcanvas.h zspinbox.h z3dgeometryrenderprocessor.h zparameter.h
-    zstringparameter.h z3drenderprocessor.h z3drenderport.h
+    zstringparameter.h z3drenderprocessor.h
     z3dnetworkevaluator.h z3dprocessor.h z3dprocessornetwork.h
     z3dport.h z3dapplication.h zoptionparameter.h zcombobox.h
     znumericparameter.h zspinboxwithslider.h z3dcameraparameter.h

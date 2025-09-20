@@ -9,6 +9,7 @@
 #include "zmesh.h"
 #include "zwidgetsgroup.h"
 #include "zoptionparameter.h"
+#include <array>
 #include <vector>
 #include "z3dvolumeraycasterrenderer.h"
 #include "z3dtransferfunction.h"
@@ -18,7 +19,7 @@
 #include "zeventlistenerparameter.h"
 #include "z3dtexturecopyrenderer.h"
 #include "zimgpack.h"
-#include "z3drenderport.h"
+#include "z3dscratchresourcepool.h"
 
 namespace nim {
 
@@ -120,6 +121,7 @@ protected:
   void setClipPlanes() override {}
 
 protected:
+  void invalidate(State inv) override;
   void process(Z3DEye eye) override;
 
   [[nodiscard]] bool hasSlices() const;
@@ -130,6 +132,7 @@ protected:
 
   void updateNotTransformedBoundBoxImpl() override;
 
+  void updateSize() override;
   void expandCutRange() override {}
 
 private:
@@ -146,7 +149,7 @@ private:
   glm::vec3 getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool& success);
 
   // get 3D position from 2D screen position
-  glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port);
+  glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderTarget& target);
 
   // get 3D position from 2D screen position and depth
   glm::vec3 get3DPosition(glm::ivec2 pos2D, double depth, int width, int height);
@@ -162,6 +165,14 @@ private:
   void updateRaycasterSamplingRate();
   void updateRaycasterIsoValue();
   void updateRaycasterLocalMIPThreshold();
+  [[nodiscard]] static size_t eyeIndex(Z3DEye eye);
+  [[nodiscard]] Z3DRenderTarget& transparentTarget(Z3DEye eye);
+  [[nodiscard]] const Z3DRenderTarget& transparentTarget(Z3DEye eye) const;
+  [[nodiscard]] Z3DRenderTarget& opaqueTarget(Z3DEye eye);
+  [[nodiscard]] const Z3DRenderTarget& opaqueTarget(Z3DEye eye) const;
+  [[nodiscard]] Z3DRenderTarget& ensureRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease);
+  void releaseAllRenderTargets();
+  void markTargetsInvalid();
 
   Z3DVolumeRaycasterRenderer m_volumeRaycasterRenderer;
   Z3DVolumeSliceRenderer m_volumeSliceRenderer;
@@ -197,13 +208,14 @@ private:
   Z3DTexture m_layerColorTexture;
   Z3DTexture m_layerDepthTexture;
 
-  Z3DRenderOutputPort m_outport;
-  Z3DRenderOutputPort m_leftEyeOutport;
-  Z3DRenderOutputPort m_rightEyeOutport;
   Z3DFilterOutputPort<Z3DVolumeFilter> m_vPPort;
-  Z3DRenderOutputPort m_opaqueOutport;
-  Z3DRenderOutputPort m_opaqueLeftEyeOutport;
-  Z3DRenderOutputPort m_opaqueRightEyeOutport;
+  std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_transparentTargets;
+  std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_opaqueTargets;
+  std::array<bool, 3> m_transparentValid{};
+  std::array<bool, 3> m_opaqueValid{};
+  glm::uvec2 m_outputSize{32u, 32u};
+  glm::uvec2 m_interactionBaseSize{0u, 0u};
+  bool m_interactionDownsampleActive = false;
 
   static const size_t m_maxNumOfFullResolutionVolumeSlice;
   // each channel is represented by a Z3DVolume

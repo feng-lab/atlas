@@ -35,7 +35,6 @@ HEADERS += \
     $$PWD/z3dprimitiverenderer.h \
     $$PWD/z3dpunctafilter.h \
     $$PWD/z3drendererbase.h \
-    $$PWD/z3drenderport.h \
     $$PWD/z3drendertarget.h \
     $$PWD/z3drotation.h \
     $$PWD/z3dscene.h \

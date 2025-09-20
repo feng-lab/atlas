@@ -21,6 +21,7 @@ macro(add_gtest_executable test_name)
   gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
 endmacro()
 
+
 add_gtest_executable(zclustertest)
 add_gtest_executable(zfilereadtest)
 add_gtest_executable(zimageaffinetransformtest)
@@ -43,6 +44,8 @@ add_gtest_executable(zstructutilstest)
 add_gtest_executable(zenumtest)
 add_gtest_executable(zstringutilstest)
 add_gtest_executable(ztupleliketest)
+
+# Atlas-side tests
 
 find_package(benchmark REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/build NO_DEFAULT_PATH)

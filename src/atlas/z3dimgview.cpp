@@ -19,9 +19,6 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("Image")->connect(m_engine.compositor().inputPort("Image"));
-      viewControl->outputPort("LeftEyeImage")->connect(m_engine.compositor().inputPort("LeftEyeImage"));
-      viewControl->outputPort("RightEyeImage")->connect(m_engine.compositor().inputPort("RightEyeImage"));
       viewControl->outputPort("VolumeFilter")->connect(m_engine.compositor().inputPort("VolumeFilters"));
       connect(viewControl, &Z3DImgFilter::boundBoxChanged, this, &Z3DImgView::updateBoundBox);
       connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
@@ -55,9 +52,6 @@ void Z3DImgView::docImgAdded(size_t id)
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("Image")->connect(m_engine.compositor().inputPort("Image"));
-    viewControl->outputPort("LeftEyeImage")->connect(m_engine.compositor().inputPort("LeftEyeImage"));
-    viewControl->outputPort("RightEyeImage")->connect(m_engine.compositor().inputPort("RightEyeImage"));
     viewControl->outputPort("VolumeFilter")->connect(m_engine.compositor().inputPort("VolumeFilters"));
     connect(viewControl, &Z3DImgFilter::boundBoxChanged, this, &Z3DImgView::updateBoundBox);
     connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
