@@ -239,14 +239,6 @@ void Z3DRendererBase::registerRenderer(Z3DPrimitiveRenderer* renderer)
 {
   CHECK(renderer && !m_renderers.contains(renderer));
 
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  connect(renderer, &Z3DPrimitiveRenderer::openglRendererInvalid, this, &Z3DRendererBase::invalidateDisplayList);
-  connect(renderer,
-          &Z3DPrimitiveRenderer::openglPickingRendererInvalid,
-          this,
-          &Z3DRendererBase::invalidatePickingDisplayList);
-#endif
-
   m_renderers.insert(renderer);
 }
 

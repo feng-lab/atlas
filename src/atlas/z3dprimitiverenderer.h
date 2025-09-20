@@ -4,18 +4,17 @@
 #include "z3dshadergroup.h"
 #include "z3dvertexarrayobject.h"
 #include "z3dvertexbufferobject.h"
-#include <QObject>
 
 namespace nim {
 
 class ZMesh;
 
-class Z3DPrimitiveRenderer : public QObject
+class Z3DPrimitiveRenderer
 {
 public:
   explicit Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase);
 
-  ~Z3DPrimitiveRenderer() override;
+  virtual ~Z3DPrimitiveRenderer();
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   // for opengl mode only, if set, display list will be build in opengl mode.
@@ -79,12 +78,6 @@ public:
 
   // render a trianglelist with whatever it contains
   static void renderTriangleList(const Z3DVertexArrayObject& vao, const Z3DShaderProgram& shader, const ZMesh& mesh);
-
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-Q_SIGNALS:
-  void openglRendererInvalid();
-  void openglPickingRendererInvalid();
-#endif
 
 protected:
   virtual void compile() = 0;

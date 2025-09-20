@@ -11,6 +11,7 @@
 #include "zoptionparameter.h"
 #include <vector>
 #include "z3dvolumeraycasterrenderer.h"
+#include "z3dtransferfunction.h"
 #include "z3dvolumeslicerenderer.h"
 #include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dimage2drenderer.h"
@@ -215,6 +216,9 @@ private:
   ZIntParameter m_ySlicePosition;
   ZBoolParameter m_showZSlice;
   ZIntParameter m_zSlicePosition;
+  std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
+  std::vector<std::unique_ptr<Z3DTransferFunctionParameter>> m_transferFuncParas;
+  std::vector<std::unique_ptr<ZStringIntOptionParameter>> m_texFilterModeParas;
   std::vector<std::unique_ptr<ZColorMapParameter>> m_sliceColormaps;
   ZBoolParameter m_showXSlice2;
   ZIntParameter m_xSlice2Position;

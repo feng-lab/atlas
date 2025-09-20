@@ -2,7 +2,6 @@
 
 #include "z3dgl.h"
 #include "zmesh.h"
-#include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
 namespace nim {
@@ -196,14 +195,14 @@ void Z3DPrimitiveRenderer::renderTriangleList(const Z3DVertexArrayObject& vao,
 void Z3DPrimitiveRenderer::invalidateOpenglRenderer()
 {
   if (m_useDisplayList) {
-    Q_EMIT openglRendererInvalid();
+    m_rendererBase.invalidateDisplayList();
   }
 }
 
 void Z3DPrimitiveRenderer::invalidateOpenglPickingRenderer()
 {
   if (m_useDisplayList) {
-    Q_EMIT openglPickingRendererInvalid();
+    m_rendererBase.invalidatePickingDisplayList();
   }
 }
 #endif

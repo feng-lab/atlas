@@ -36,10 +36,6 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   , m_useGeomLineShader(true)
 {
   updateLineWidth();
-  connect(&m_rendererBase.geometriesMultisampleModePara(),
-          &ZStringIntOptionParameter::valueChanged,
-          this,
-          &Z3DLineRenderer::updateLineWidth);
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
 #endif
@@ -416,6 +412,8 @@ void Z3DLineRenderer::render(Z3DEye eye)
     return;
   }
 
+  updateLineWidth();
+
   if (!m_useGeomLineShader && m_useSmoothLine) {
     renderSmooth(eye);
     return;
@@ -657,6 +655,8 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
 
 void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 {
+  updateLineWidth();
+
   if (m_smoothLineP0Colors.size() < m_smoothLineP0s.size()) {
     for (size_t i = m_smoothLineP0Colors.size(); i < m_smoothLineP0s.size(); ++i) {
       m_smoothLineP0Colors.emplace_back(0.f, 0.f, 0.f, 1.f);
@@ -838,6 +838,8 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 
 void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
 {
+  updateLineWidth();
+
   m_smoothLineShaderGrp1.bind();
   Z3DShaderProgram& shader = m_smoothLineShaderGrp1.get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);

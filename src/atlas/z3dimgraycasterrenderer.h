@@ -67,24 +67,7 @@ public:
   // return true if something is rendered by this renderer
   [[nodiscard]] bool hasVisibleRendering() const;
 
-  [[nodiscard]] const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const
-  {
-    return m_channelVisibleParas;
-  }
-
-  [[nodiscard]] const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const
-  {
-    return m_transferFuncParas;
-  }
-
-  //  [[nodiscard]] const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
-  //  {
-  //    return m_texFilterModeParas;
-  //  }
-
   void compile() override;
-
-  void updateDisplayRanges();
 
   double renderProgressively(Z3DEye eye);
 
@@ -115,6 +98,21 @@ public:
     }
     m_compositingModeValue = mode;
     compile();
+  }
+
+  void setChannelCount(size_t count);
+
+  void setChannelVisibility(size_t index, bool visible);
+
+  void setChannelVisibilities(const std::vector<bool>& visibilities);
+
+  void setTransferFunction(size_t index, Z3DTransferFunction* transferFunction);
+
+  void setTransferFunctions(const std::vector<Z3DTransferFunction*>& transferFunctions);
+
+  [[nodiscard]] const std::vector<bool>& channelVisibilities() const
+  {
+    return m_channelVisibilities;
   }
 
   // Ensure internal targets are sized; size is provided by filter
@@ -154,10 +152,6 @@ private:
     m_channelIdx[eye] = -1;
     m_round[eye] = 0;
   }
-  // this function is used to get proper default
-  // transfer functions (grey or color depends on current number of channel)
-  void resetTransferFunctions();
-
   void render2DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
 
   double render2DSliceOf3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs, bool progressive = false);
@@ -209,16 +203,13 @@ protected:
   std::vector<QString> m_volumeUniformNames;
   std::vector<QString> m_volumeDimensionNames;
   std::vector<QString> m_transferFuncUniformNames;
-  std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
-  std::vector<std::unique_ptr<Z3DTransferFunctionParameter>> m_transferFuncParas;
-  // std::vector<std::unique_ptr<ZStringIntOptionParameter>> m_texFilterModeParas;
+  std::vector<bool> m_channelVisibilities;
+  std::vector<Z3DTransferFunction*> m_transferFunctions;
 
 private:
   std::vector<ZMesh> m_quads;
   const Z3DTexture* m_entryExitTexCoordAndZeTexture = nullptr;
 
-  bool m_opaque;
-  // double m_alpha; // only takes effect when m_opaque is true
   Z3DVertexArrayObject m_VAO;
 
   std::vector<uint32_t> m_blockIDs;

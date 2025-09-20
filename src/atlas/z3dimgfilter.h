@@ -5,6 +5,7 @@
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
 #include "z3dimg.h"
+#include "z3dtransferfunction.h"
 #include "z3dtransformparameter.h"
 #include "zwidgetsgroup.h"
 #include "z3dimgraycasterrenderer.h"
@@ -170,6 +171,8 @@ private:
   Z3DRenderOutputPort m_opaqueRightEyeOutport;
 
   std::vector<std::unique_ptr<ZDoubleSpanParameter>> m_doubleChannelRangeParas;
+  std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
+  std::vector<std::unique_ptr<Z3DTransferFunctionParameter>> m_transferFuncParas;
 
   // static const size_t m_maxNumOfFullResolutionVolumeSlice;
   //  each channel is represented by a Z3DVolume

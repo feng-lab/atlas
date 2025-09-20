@@ -89,19 +89,23 @@ public:
     compile();
   }
 
-  const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const
-  {
-    return m_channelVisibleParas;
-  }
+  void setChannelCount(size_t count);
 
-  const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const
-  {
-    return m_transferFuncParas;
-  }
+  void setChannelVisibility(size_t index, bool visible);
 
-  const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
+  void setChannelVisibilities(const std::vector<bool>& visibilities);
+
+  void setTransferFunction(size_t index, Z3DTransferFunction* transferFunction);
+
+  void setTransferFunctions(const std::vector<Z3DTransferFunction*>& transferFunctions);
+
+  void setTexFilterMode(size_t index, GLint mode);
+
+  void setTexFilterModes(const std::vector<GLint>& modes);
+
+  [[nodiscard]] const std::vector<bool>& channelVisibilities() const
   {
-    return m_texFilterModeParas;
+    return m_channelVisibilities;
   }
 
 protected:
@@ -137,15 +141,11 @@ protected:
   std::vector<QString> m_volumeUniformNames;
   std::vector<QString> m_volumeDimensionNames;
   std::vector<QString> m_transferFuncUniformNames;
-  std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
-  std::vector<std::unique_ptr<Z3DTransferFunctionParameter>> m_transferFuncParas;
-  std::vector<std::unique_ptr<ZStringIntOptionParameter>> m_texFilterModeParas;
+  std::vector<bool> m_channelVisibilities;
+  std::vector<Z3DTransferFunction*> m_transferFunctions;
+  std::vector<GLint> m_texFilterModes;
 
 private:
-  // this function is used to get proper default
-  // transfer functions (grey or color depends on current number of channel)
-  void resetTransferFunctions();
-
   bool m_is2DImage;
 
   std::vector<ZMesh> m_quads;
@@ -154,8 +154,6 @@ private:
   const Z3DTexture* m_exitTexCoordTexture;
   const Z3DTexture* m_exitEyeCoordTexture;
 
-  bool m_opaque;
-  double m_alpha; // only takes effect when m_opaque is true
   ZVertexArrayObject m_VAO;
 };
 

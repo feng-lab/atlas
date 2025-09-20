@@ -198,13 +198,13 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 void Z3DImgFilter::setData(const ZImgPack& imgPack)
 {
   if (m_widgetsGroup) {
-    for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+    for (const auto& para : m_channelVisibleParas) {
       m_widgetsGroup->removeChild(*para);
     }
     for (const auto& para : m_doubleChannelRangeParas) {
       m_widgetsGroup->removeChild(*para);
     }
-    for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+    for (const auto& para : m_transferFuncParas) {
       m_widgetsGroup->removeChild(*para);
     }
     //    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
@@ -219,6 +219,8 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
   }
 
   try {
+    m_channelVisibleParas.clear();
+    m_transferFuncParas.clear();
     std::vector<glm::dvec2> drs;
     if (imgPack.imgInfo().isType<uint8_t>()) {
       drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels, glm::dvec2(0, 255));
@@ -313,41 +315,76 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     m_showZSlice2.setVisible(!is2DImage);
 
     m_imgRaycasterRenderer.setData(*m_3dImg);
+
+    std::vector<bool> channelVisibilities;
+    channelVisibilities.reserve(m_3dImg->numChannels());
+    std::vector<Z3DTransferFunction*> transferFunctions;
+    transferFunctions.reserve(m_3dImg->numChannels());
+
+    for (size_t c = 0; c < m_3dImg->numChannels(); ++c) {
+      auto visiblePara = std::make_unique<ZBoolParameter>(QString("Show Channel %1").arg(c + 1), true);
+      channelVisibilities.push_back(visiblePara->get());
+      connect(visiblePara.get(), &ZBoolParameter::boolChanged, this, [this, c](bool value) {
+        m_imgRaycasterRenderer.setChannelVisibility(c, value);
+        invalidateResult();
+      });
+      m_channelVisibleParas.emplace_back(std::move(visiblePara));
+
+      auto transferPara = std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(c + 1));
+      transferPara->setMinMaxIntensity(m_3dImg->displayRange(c).x, m_3dImg->displayRange(c).y);
+      connect(transferPara.get(), &Z3DTransferFunctionParameter::valueChanged, this, [this]() {
+        invalidateResult();
+      });
+      transferFunctions.push_back(&transferPara->get());
+
+      auto& transferFunction = transferPara->get();
+      transferFunction.reset(0.0,
+                             1.0,
+                             glm::vec4(0.f),
+                             glm::vec4(m_3dImg->channelColor(c).r / 255.,
+                                       m_3dImg->channelColor(c).g / 255.,
+                                       m_3dImg->channelColor(c).b / 255.,
+                                       1.f));
+      if (false) {
+        transferFunction.addKey(ZColorMapKey(0.001, glm::vec4(0.01f, 0.01f, 0.01f, 0.0f)));
+        transferFunction.addKey(ZColorMapKey(0.01, glm::vec4(0.01f, 0.01f, 0.01f, 1.0f)));
+      }
+
+      m_transferFuncParas.emplace_back(std::move(transferPara));
+    }
+
+    m_imgRaycasterRenderer.setChannelVisibilities(channelVisibilities);
+    m_imgRaycasterRenderer.setTransferFunctions(transferFunctions);
+
     if (!is2DImage) {
       m_imgSliceRenderer.setData(*m_3dImg, m_sliceColormaps);
     }
 
     updateBoundBox();
 
-    for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+    for (const auto& para : m_channelVisibleParas) {
       addParameter(*para);
     }
     for (const auto& para : m_doubleChannelRangeParas) {
       addParameter(*para);
     }
-    for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+    for (const auto& para : m_transferFuncParas) {
       addParameter(*para);
     }
-    //    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
-    //      addParameter(*para);
-    //    }
     for (const auto& cm : m_sliceColormaps) {
       addParameter(*cm);
     }
 
     if (m_widgetsGroup) {
-      for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+      for (const auto& para : m_channelVisibleParas) {
         m_widgetsGroup->addChild(*para, 2);
       }
       for (const auto& para : m_doubleChannelRangeParas) {
         m_widgetsGroup->addChild(*para, 3);
       }
-      for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+      for (const auto& para : m_transferFuncParas) {
         m_widgetsGroup->addChild(*para, 3);
       }
-      //      for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
-      //        m_widgetsGroup->addChild(*para, 15);
-      //      }
       for (const auto& cm : m_sliceColormaps) {
         m_widgetsGroup->addChild(*cm, 11);
       }
@@ -382,22 +419,19 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_fullResolutionRendering, 1);
     // m_widgetsGroup->addChild(m_smoothInteraction, 1);
 
-    for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
+    for (const auto& para : m_channelVisibleParas) {
       m_widgetsGroup->addChild(*para, 2);
     }
     for (const auto& para : m_doubleChannelRangeParas) {
       m_widgetsGroup->addChild(*para, 3);
     }
-    for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
+    for (const auto& para : m_transferFuncParas) {
       m_widgetsGroup->addChild(*para, 3);
     }
     m_widgetsGroup->addChild(m_raycasterCompositingMode, 4);
     m_widgetsGroup->addChild(m_raycasterIsoValue, 4);
     m_widgetsGroup->addChild(m_raycasterLocalMIPThreshold, 4);
     m_widgetsGroup->addChild(m_raycasterSamplingRate, 15);
-    //    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
-    //      m_widgetsGroup->addChild(*para, 15);
-    //    }
 
     m_widgetsGroup->addChild(m_xCut, 12);
     m_widgetsGroup->addChild(m_yCut, 12);
@@ -756,7 +790,9 @@ double Z3DImgFilter::process(Z3DEye eye)
         channelDisplayRanges.push_back(para->get());
       }
       m_3dImg->setChannelDisplayRanges(channelDisplayRanges);
-      m_imgRaycasterRenderer.updateDisplayRanges();
+      for (size_t i = 0; i < m_transferFuncParas.size() && i < m_3dImg->numChannels(); ++i) {
+        m_transferFuncParas[i]->setMinMaxIntensity(m_3dImg->displayRange(i).x, m_3dImg->displayRange(i).y);
+      }
     }
 
     m_channelRangeChanged = false;

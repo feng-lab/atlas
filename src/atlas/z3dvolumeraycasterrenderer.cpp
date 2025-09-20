@@ -13,8 +13,6 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase& renderer
   , m_entryEyeCoordTexture(nullptr)
   , m_exitTexCoordTexture(nullptr)
   , m_exitEyeCoordTexture(nullptr)
-  , m_opaque(false)
-  , m_alpha(1.0)
   , m_VAO(1)
 {
   // m_gradientMode.addOptions("None", "Forward Differences", "Central Differences", "Filtered");
@@ -54,10 +52,8 @@ void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z
     bool numChannelsChanged = m_volumes.size() != vols.size();
     if (numChannelsChanged) {
       m_volumeUniformNames.clear();
+      m_volumeDimensionNames.clear();
       m_transferFuncUniformNames.clear();
-      m_channelVisibleParas.clear();
-      m_transferFuncParas.clear();
-      m_texFilterModeParas.clear();
     }
 
     m_volumes = vols;
@@ -67,31 +63,14 @@ void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z
         m_volumeUniformNames.push_back(QString("volume_%1").arg(i + 1));
         m_volumeDimensionNames.push_back(QString("volume_dimensions_%1").arg(i + 1));
         m_transferFuncUniformNames.push_back(QString("transfer_function_%1").arg(i + 1));
-        m_channelVisibleParas.emplace_back(
-          std::make_unique<ZBoolParameter>(QString("Show Channel %1").arg(i + 1), true));
-        connect(m_channelVisibleParas[i].get(),
-                &ZBoolParameter::valueChanged,
-                this,
-                &Z3DVolumeRaycasterRenderer::compile);
-        m_transferFuncParas.emplace_back(
-          std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i + 1)));
-        m_texFilterModeParas.emplace_back(
-          std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));
-        m_texFilterModeParas[i]->addOptionsWithData(std::make_pair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
-                                                    std::make_pair(QString("Linear"), static_cast<int>(GL_LINEAR)));
-        m_texFilterModeParas[i]->select("Linear");
       }
-    }
-
-    for (size_t i = 0; i < m_volumes.size(); ++i) {
-      m_transferFuncParas[i]->setVolume(m_volumes[i]);
+      setChannelCount(m_volumes.size());
     }
 
     m_is2DImage = !m_volumes.empty() && m_volumes[0]->is2DData();
 
     if (numChannelsChanged) {
       compile();
-      resetTransferFunctions();
     }
   }
 }
@@ -99,6 +78,57 @@ void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z
 void Z3DVolumeRaycasterRenderer::setChannels(const Z3DImg& img)
 {
   setChannels(img.volumes());
+}
+
+void Z3DVolumeRaycasterRenderer::setChannelCount(size_t count)
+{
+  m_channelVisibilities.assign(count, false);
+  m_transferFunctions.assign(count, nullptr);
+  m_texFilterModes.assign(count, GL_LINEAR);
+}
+
+void Z3DVolumeRaycasterRenderer::setChannelVisibility(size_t index, bool visible)
+{
+  CHECK_LT(index, m_channelVisibilities.size());
+  if (m_channelVisibilities[index] == visible) {
+    return;
+  }
+  m_channelVisibilities[index] = visible;
+  compile();
+}
+
+void Z3DVolumeRaycasterRenderer::setChannelVisibilities(const std::vector<bool>& visibilities)
+{
+  CHECK_EQ(m_channelVisibilities.size(), visibilities.size());
+  if (m_channelVisibilities == visibilities) {
+    return;
+  }
+  m_channelVisibilities = visibilities;
+  compile();
+}
+
+void Z3DVolumeRaycasterRenderer::setTransferFunction(size_t index, Z3DTransferFunction* transferFunction)
+{
+  CHECK_LT(index, m_transferFunctions.size());
+  m_transferFunctions[index] = transferFunction;
+}
+
+void Z3DVolumeRaycasterRenderer::setTransferFunctions(const std::vector<Z3DTransferFunction*>& transferFunctions)
+{
+  CHECK_EQ(m_transferFunctions.size(), transferFunctions.size());
+  m_transferFunctions = transferFunctions;
+}
+
+void Z3DVolumeRaycasterRenderer::setTexFilterMode(size_t index, GLint mode)
+{
+  CHECK_LT(index, m_texFilterModes.size());
+  m_texFilterModes[index] = mode;
+}
+
+void Z3DVolumeRaycasterRenderer::setTexFilterModes(const std::vector<GLint>& modes)
+{
+  CHECK_EQ(m_texFilterModes.size(), modes.size());
+  m_texFilterModes = modes;
 }
 
 void Z3DVolumeRaycasterRenderer::addQuad(const ZMesh& quad)
@@ -133,19 +163,17 @@ void Z3DVolumeRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& s
 
   size_t idx = 0;
   for (size_t i = 0; i < m_volumes.size(); ++i) {
-    if (!m_channelVisibleParas[i]->get()) {
+    if (!m_channelVisibilities[i]) {
       continue;
     }
+    CHECK(m_transferFunctions[i] != nullptr);
 
     // volumes
-    shader.bindTexture(m_volumeUniformNames[idx],
-                       m_volumes[i]->texture(),
-                       m_texFilterModeParas[i]->associatedData(),
-                       m_texFilterModeParas[i]->associatedData());
+    shader.bindTexture(m_volumeUniformNames[idx], m_volumes[i]->texture(), m_texFilterModes[i], m_texFilterModes[i]);
     shader.setUniform(m_volumeDimensionNames[idx], glm::vec3(m_volumes[i]->dimensions()));
 
     // transfer functions
-    shader.bindTexture(m_transferFuncUniformNames[idx++], m_transferFuncParas[i]->get().texture());
+    shader.bindTexture(m_transferFuncUniformNames[idx++], m_transferFunctions[i]->texture());
   }
 
   shader.setLogUniformLocationError(true);
@@ -155,14 +183,13 @@ void Z3DVolumeRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& sha
 {
   shader.setLogUniformLocationError(false);
 
-  shader.bindTexture(m_volumeUniformNames[0],
-                     m_volumes[idx]->texture(),
-                     m_texFilterModeParas[idx]->associatedData(),
-                     m_texFilterModeParas[idx]->associatedData());
+  shader.bindTexture(m_volumeUniformNames[0], m_volumes[idx]->texture(), m_texFilterModes[idx], m_texFilterModes[idx]);
   shader.setUniform(m_volumeDimensionNames[0], glm::vec3(m_volumes[idx]->dimensions()));
 
   // transfer functions
-  shader.bindTexture(m_transferFuncUniformNames[0], m_transferFuncParas[idx]->get().texture());
+  CHECK(idx < m_transferFunctions.size());
+  CHECK(m_transferFunctions[idx] != nullptr);
+  shader.bindTexture(m_transferFuncUniformNames[0], m_transferFunctions[idx]->texture());
 
   shader.setLogUniformLocationError(true);
 }
@@ -186,7 +213,7 @@ QString Z3DVolumeRaycasterRenderer::generateHeader()
   if (hasVisibleRendering()) {
     size_t numVisibleChannels = 0;
     for (size_t i = 0; i < m_volumes.size(); ++i) {
-      if (m_channelVisibleParas[i]->get()) {
+      if (m_channelVisibilities[i]) {
         ++numVisibleChannels;
       }
     }
@@ -267,7 +294,7 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
 
   std::vector<size_t> visibleIdxs;
   for (size_t i = 0; i < m_volumes.size(); ++i) {
-    if (m_channelVisibleParas[i]->get()) {
+    if (m_channelVisibilities[i]) {
       visibleIdxs.push_back(i);
     }
   }
@@ -391,21 +418,6 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
 
 void Z3DVolumeRaycasterRenderer::renderPicking(Z3DEye) {}
 
-void Z3DVolumeRaycasterRenderer::resetTransferFunctions()
-{
-  for (size_t i = 0; i < m_transferFuncParas.size(); ++i) {
-    if (m_opaque) {
-      m_transferFuncParas[i]->get().reset(0.0, 1.0, glm::vec4(0.f), glm::vec4(m_volumes[i]->volColor(), 1.0f));
-      m_transferFuncParas[i]->get().addKey(ZColorMapKey(0.001, glm::vec4(0.01f, 0.01f, 0.01f, 0.0f)));
-      m_transferFuncParas[i]->get().addKey(ZColorMapKey(0.01, glm::vec4(0.01f, 0.01f, 0.01f, 1.0f)));
-    } else {
-      m_transferFuncParas[i]->get().reset(0.0, 1.0, glm::vec4(0.f), glm::vec4(m_volumes[i]->volColor(), 1.f));
-      // m_transferFuncParas[i]->get().addKey(ZColorMapKey(0.1, glm::vec4(m_volumes[i]->volColor(), 1.f) *
-      //                                                   glm::vec4(.1f,.1f,.1f,0.f)));
-    }
-  }
-}
-
 void Z3DVolumeRaycasterRenderer::translate(double dx, double dy, double dz)
 {
   for (auto vol : m_volumes) {
@@ -418,7 +430,7 @@ void Z3DVolumeRaycasterRenderer::translate(double dx, double dy, double dz)
 bool Z3DVolumeRaycasterRenderer::hasVisibleRendering() const
 {
   for (size_t i = 0; i < m_volumes.size(); ++i) {
-    if (m_channelVisibleParas[i]->get()) {
+    if (m_channelVisibilities[i]) {
       return true;
     }
   }

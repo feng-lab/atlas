@@ -222,20 +222,14 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
 void Z3DVolumeFilter::setData(const ZImgPack& img)
 {
   if (m_widgetsGroup) {
-    for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
-         it != m_volumeRaycasterRenderer.channelVisibleParas().end();
-         ++it) {
-      m_widgetsGroup->removeChild(*it->get());
+    for (const auto& para : m_channelVisibleParas) {
+      m_widgetsGroup->removeChild(*para);
     }
-    for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
-         it != m_volumeRaycasterRenderer.transferFuncParas().end();
-         ++it) {
-      m_widgetsGroup->removeChild(*it->get());
+    for (const auto& para : m_transferFuncParas) {
+      m_widgetsGroup->removeChild(*para);
     }
-    for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
-         it != m_volumeRaycasterRenderer.texFilterModeParas().end();
-         ++it) {
-      m_widgetsGroup->removeChild(*it->get());
+    for (const auto& para : m_texFilterModeParas) {
+      m_widgetsGroup->removeChild(*para);
     }
     for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
       m_widgetsGroup->removeChild(*it->get());
@@ -252,40 +246,83 @@ void Z3DVolumeFilter::setData(const ZImgPack& img)
   readVolumes();
   updateBoundBox();
 
-  for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
-       it != m_volumeRaycasterRenderer.channelVisibleParas().end();
-       ++it) {
-    addParameter(*it->get());
+  m_channelVisibleParas.clear();
+  m_transferFuncParas.clear();
+  m_texFilterModeParas.clear();
+
+  std::vector<bool> channelVisibilities;
+  channelVisibilities.reserve(m_volumes.size());
+  std::vector<Z3DTransferFunction*> transferFunctions;
+  transferFunctions.reserve(m_volumes.size());
+  std::vector<GLint> texFilterModes;
+  texFilterModes.reserve(m_volumes.size());
+
+  for (size_t i = 0; i < m_volumes.size(); ++i) {
+    auto visiblePara = std::make_unique<ZBoolParameter>(QString("Show Channel %1").arg(i + 1), true);
+    channelVisibilities.push_back(visiblePara->get());
+    connect(visiblePara.get(), &ZBoolParameter::boolChanged, this, [this, i](bool value) {
+      m_volumeRaycasterRenderer.setChannelVisibility(i, value);
+      invalidateResult();
+    });
+    m_channelVisibleParas.emplace_back(std::move(visiblePara));
+
+    auto transferPara = std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i + 1));
+    transferPara->setVolume(m_volumes[i].get());
+    connect(transferPara.get(), &Z3DTransferFunctionParameter::valueChanged, this, [this]() {
+      invalidateResult();
+    });
+    transferFunctions.push_back(&transferPara->get());
+
+    auto& transferFunction = transferPara->get();
+    transferFunction.reset(0.0, 1.0, glm::vec4(0.f), glm::vec4(m_volumes[i]->volColor(), 1.f));
+    if (false) {
+      transferFunction.addKey(ZColorMapKey(0.001, glm::vec4(0.01f, 0.01f, 0.01f, 0.0f)));
+      transferFunction.addKey(ZColorMapKey(0.01, glm::vec4(0.01f, 0.01f, 0.01f, 1.0f)));
+    }
+
+    m_transferFuncParas.emplace_back(std::move(transferPara));
+
+    auto texFilterPara = std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1));
+    texFilterPara->addOptionsWithData(std::make_pair(QStringLiteral("Nearest"), static_cast<int>(GL_NEAREST)),
+                                      std::make_pair(QStringLiteral("Linear"), static_cast<int>(GL_LINEAR)));
+    texFilterPara->select(QStringLiteral("Linear"));
+    texFilterModes.push_back(texFilterPara->associatedData());
+    connect(texFilterPara.get(),
+            &ZStringIntOptionParameter::valueChanged,
+            this,
+            [this, i, para = texFilterPara.get()]() {
+              m_volumeRaycasterRenderer.setTexFilterMode(i, para->associatedData());
+              invalidateResult();
+            });
+    m_texFilterModeParas.emplace_back(std::move(texFilterPara));
   }
-  for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
-       it != m_volumeRaycasterRenderer.transferFuncParas().end();
-       ++it) {
-    addParameter(*it->get());
+
+  m_volumeRaycasterRenderer.setChannelVisibilities(channelVisibilities);
+  m_volumeRaycasterRenderer.setTransferFunctions(transferFunctions);
+  m_volumeRaycasterRenderer.setTexFilterModes(texFilterModes);
+
+  for (const auto& para : m_channelVisibleParas) {
+    addParameter(*para);
   }
-  for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
-       it != m_volumeRaycasterRenderer.texFilterModeParas().end();
-       ++it) {
-    addParameter(*it->get());
+  for (const auto& para : m_transferFuncParas) {
+    addParameter(*para);
+  }
+  for (const auto& para : m_texFilterModeParas) {
+    addParameter(*para);
   }
   for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
     addParameter(*it->get());
   }
 
   if (m_widgetsGroup) {
-    for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
-         it != m_volumeRaycasterRenderer.channelVisibleParas().end();
-         ++it) {
-      m_widgetsGroup->addChild(*it->get(), 2);
+    for (const auto& para : m_channelVisibleParas) {
+      m_widgetsGroup->addChild(*para, 2);
     }
-    for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
-         it != m_volumeRaycasterRenderer.transferFuncParas().end();
-         ++it) {
-      m_widgetsGroup->addChild(*it->get(), 3);
+    for (const auto& para : m_transferFuncParas) {
+      m_widgetsGroup->addChild(*para, 3);
     }
-    for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
-         it != m_volumeRaycasterRenderer.texFilterModeParas().end();
-         ++it) {
-      m_widgetsGroup->addChild(*it->get(), 15);
+    for (const auto& para : m_texFilterModeParas) {
+      m_widgetsGroup->addChild(*para, 15);
     }
     for (auto it = m_sliceColormaps.begin(); it != m_sliceColormaps.end(); ++it) {
       m_widgetsGroup->addChild(*it->get(), 11);
@@ -380,24 +417,18 @@ std::shared_ptr<ZWidgetsGroup> Z3DVolumeFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_isSubVolume, 2);
     m_widgetsGroup->addChild(m_zoomInViewSize, 2);
 
-    for (auto it = m_volumeRaycasterRenderer.channelVisibleParas().begin();
-         it != m_volumeRaycasterRenderer.channelVisibleParas().end();
-         ++it) {
-      m_widgetsGroup->addChild(*it->get(), 2);
+    for (const auto& para : m_channelVisibleParas) {
+      m_widgetsGroup->addChild(*para, 2);
     }
-    for (auto it = m_volumeRaycasterRenderer.transferFuncParas().begin();
-         it != m_volumeRaycasterRenderer.transferFuncParas().end();
-         ++it) {
-      m_widgetsGroup->addChild(*it->get(), 3);
+    for (const auto& para : m_transferFuncParas) {
+      m_widgetsGroup->addChild(*para, 3);
     }
     m_widgetsGroup->addChild(m_raycasterCompositingMode, 4);
     m_widgetsGroup->addChild(m_raycasterIsoValue, 4);
     m_widgetsGroup->addChild(m_raycasterLocalMIPThreshold, 4);
     m_widgetsGroup->addChild(m_raycasterSamplingRate, 15);
-    for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
-         it != m_volumeRaycasterRenderer.texFilterModeParas().end();
-         ++it) {
-      m_widgetsGroup->addChild(*it->get(), 15);
+    for (const auto& para : m_texFilterModeParas) {
+      m_widgetsGroup->addChild(*para, 15);
     }
 
     m_widgetsGroup->addChild(m_xCut, 12);
@@ -1556,6 +1587,9 @@ void Z3DVolumeFilter::volumeChanged()
   }
 
   m_volumeRaycasterRenderer.setChannels(getVolumes());
+  for (size_t i = 0; i < m_transferFuncParas.size() && i < m_volumes.size(); ++i) {
+    m_transferFuncParas[i]->setVolume(m_volumes[i].get());
+  }
   // todo
   if (!is2DImage) {
     m_volumeSliceRenderer.setData(getVolumes(), m_sliceColormaps);
