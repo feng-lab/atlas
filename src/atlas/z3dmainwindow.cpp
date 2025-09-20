@@ -12,6 +12,7 @@
 #include "zmainwindow.h"
 #include "zsysteminfo.h"
 #include "ztheme.h"
+#include "zmessageboxhelpers.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -588,7 +589,7 @@ void Z3DMainWindow::initRenderingEngine()
 
 void Z3DMainWindow::onRenderingError(const QString& error)
 {
-  QMessageBox::critical(this, QApplication::applicationName(), error);
+  showCriticalWithDetails(this, tr("Rendering error"), error);
 }
 
 QWidget* Z3DMainWindow::createHelpWidget()

@@ -5,8 +5,8 @@
 #include "zanalysisworklistdialog.h"
 #include "ztheme.h"
 #include "zpunctawidget.h"
+#include "zmessageboxhelpers.h"
 #include <QFileDialog>
-#include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 
@@ -31,7 +31,7 @@ bool ZPunctaDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save puncta %1").arg(pack->path()), err);
     return false;
   }
   return saveAs(id);
@@ -52,12 +52,13 @@ bool ZPunctaDoc::saveAs(size_t id)
   if (dialog.exec()) {
     QString err;
     auto& pack = m_idToPunctaPacks.at(id);
+    const QString targetPath = dialog.selectedFiles().at(0);
     if (auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-        savePuncta(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
+        savePuncta(pack.get(), targetPath, err, formats[fmtIdx])) {
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save As Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save puncta %1").arg(targetPath), err);
   }
   return false;
 }
@@ -222,10 +223,9 @@ void ZPunctaDoc::loadPuncta()
     QString errorMsg;
     // auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
-      if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(),
-                              QApplication::applicationName(),
-                              "Can not read puncta.\n" + errorMsg);
+      const QString filePath = dialog.selectedFiles().at(i);
+      if (!loadFile(filePath, errorMsg)) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load puncta %1").arg(filePath), errorMsg);
       }
     }
   }

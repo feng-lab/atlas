@@ -2,8 +2,8 @@
 
 #include "zimgdisplay.h"
 #include "zlog.h"
+#include "zmessageboxhelpers.h"
 #include <QApplication>
-#include <QMessageBox>
 #include <tbb/parallel_for.h>
 #include <functional>
 
@@ -135,9 +135,7 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
     }
   }
   catch (const ZException& e) {
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          QString("img error: %1").arg(e.what()));
+    showCriticalWithDetails(QApplication::activeWindow(), QStringLiteral("Can not compose image pack"), e.what());
   }
 
   return resV;

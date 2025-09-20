@@ -8,6 +8,7 @@
 #include "zwidgetsgroup.h"
 #include "zchooseregiondialog.h"
 #include "zregionannotation.h"
+#include "zmessageboxhelpers.h"
 #include <QGraphicsSceneContextMenuEvent>
 #include <QToolTip>
 #include <QPushButton>
@@ -216,9 +217,9 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
           }
         }
         catch (const ZException& e) {
-          QMessageBox::critical(QApplication::activeWindow(),
-                                QApplication::applicationName(),
-                                QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
+          showCriticalWithDetails(QApplication::activeWindow(),
+                                  QObject::tr("Can not create region annotation"),
+                                  e.what());
         }
       } else if (subtractNextSelectedShapeAction && selectedAction == subtractNextSelectedShapeAction) {
         m_view.scene().registerROIForSubtraction(&m_roi, m_slice, m_id);
@@ -426,9 +427,9 @@ void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
           }
         }
         catch (const ZException& e) {
-          QMessageBox::critical(QApplication::activeWindow(),
-                                QApplication::applicationName(),
-                                QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
+          showCriticalWithDetails(QApplication::activeWindow(),
+                                  QObject::tr("Can not create region annotation"),
+                                  e.what());
         }
       } else if (subtractNextSelectedShapeAction && selectedAction == subtractNextSelectedShapeAction) {
         m_view.scene().registerROIForSubtraction(&m_roi, m_controlPoint.slice, m_controlPoint.shapeID);
@@ -802,11 +803,7 @@ void ZROIFilter::pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFli
   m_ROI->pasteROIToCoord(slice, point, m_ROI->copiedItemBoundBox(), hFlip, vFlip);
 }
 
-void ZROIFilter::pasteKeyPressed(int slice,
-                                 QPointF point,
-                                 const ZBBox<glm::ivec4>& srcBoundBox,
-                                 bool hFlip,
-                                 bool vFlip)
+void ZROIFilter::pasteKeyPressed(int slice, QPointF point, const ZBBox<glm::ivec4>& srcBoundBox, bool hFlip, bool vFlip)
 {
   if (isLocked()) {
     return;

@@ -4,8 +4,8 @@
 #include "zlog.h"
 #include "ztheme.h"
 #include "zswcwidget.h"
+#include "zmessageboxhelpers.h"
 #include <QFileDialog>
-#include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <set>
@@ -31,9 +31,9 @@ bool ZSwcDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path()).arg(err));
+    showCriticalWithDetails(QApplication::activeWindow(),
+                            tr("Can not save SWC %1").arg(pack->path()),
+                            tr("Object: %1\n%2").arg(objName(id), err));
     return false;
   }
   return saveAs(id);
@@ -50,11 +50,12 @@ bool ZSwcDoc::saveAs(size_t id)
   if (dialog.exec()) {
     QString err;
     auto& pack = m_idToSwcPacks.at(id);
-    if (saveSwc(pack.get(), dialog.selectedFiles().at(0), err)) {
+    const QString targetPath = dialog.selectedFiles().at(0);
+    if (saveSwc(pack.get(), targetPath, err)) {
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save As Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save SWC %1").arg(targetPath), err);
   }
   return false;
 }
@@ -214,10 +215,9 @@ void ZSwcDoc::loadSwc()
     QString errorMsg;
     // auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
-      if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(),
-                              QApplication::applicationName(),
-                              "Can not read swc.\n" + errorMsg);
+      const QString filePath = dialog.selectedFiles().at(i);
+      if (!loadFile(filePath, errorMsg)) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load SWC %1").arg(filePath), errorMsg);
       }
     }
   }

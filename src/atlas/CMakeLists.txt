@@ -354,6 +354,7 @@ set(SOURCES
     zobjwidget.h zobjwidget.cpp
     zshareitemselectionmodel.h zshareitemselectionmodel.cpp
     zitemselectionmodel.h zitemselectionmodel.cpp
+    zmessageboxhelpers.h zmessageboxhelpers.cpp
     zviewsettingwidget.h zviewsettingwidget.cpp
     z3dmainwindow.h z3dmainwindow.cpp
     z3drenderingengine.h z3drenderingengine.cpp

@@ -2,7 +2,7 @@
 
 #include "zobjview.h"
 #include "zexception.h"
-#include <QMessageBox>
+#include "zmessageboxhelpers.h"
 #include <QApplication>
 
 namespace nim {
@@ -62,7 +62,7 @@ public:
         idFilter.second->setNormalView(slice, time);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("set normal view"), e);
       }
     }
   }
@@ -74,7 +74,7 @@ public:
         idFilter.second->setMaxZProjView(time);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("set max Z projection view"), e);
       }
     }
   }
@@ -95,7 +95,7 @@ public:
         idFilter.second->deleteKeyPressed();
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("handle delete key"), e);
       }
     }
   }
@@ -107,7 +107,7 @@ public:
         idFilter.second->copyKeyPressed();
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("handle copy key"), e);
       }
     }
   }
@@ -119,7 +119,7 @@ public:
         idFilter.second->pasteKeyPressed(slice, point, hFlip, vFlip);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("handle paste"), e);
       }
     }
   }
@@ -131,7 +131,7 @@ public:
         idFilter.second->mousePressed(scenePos, modifiers);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("handle mouse press"), e);
       }
     }
   }
@@ -143,7 +143,7 @@ public:
         idFilter.second->mouseMoved(scenePos, modifiers);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("handle mouse move"), e);
       }
     }
   }
@@ -155,7 +155,7 @@ public:
         idFilter.second->mouseReleased(scenePos);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("handle mouse release"), e);
       }
     }
   }
@@ -169,7 +169,7 @@ public:
         idFilter.second->rotateClockwise(x, y);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("rotate clockwise"), e);
       }
     }
   }
@@ -181,7 +181,7 @@ public:
         idFilter.second->rotateCounterclockwise(x, y);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
+        showFilterException(QStringLiteral("rotate counterclockwise"), e);
       }
     }
   }
@@ -205,6 +205,13 @@ public:
   }
 
 protected:
+  void showFilterException(const QString& action, const ZException& e) const
+  {
+    showCriticalWithDetails(QApplication::activeWindow(),
+                            QStringLiteral("Filter error during %1").arg(action),
+                            e.what());
+  }
+
   void updateBoundBox() override
   {
     resetBoundBox();

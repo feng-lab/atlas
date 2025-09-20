@@ -6,9 +6,9 @@
 #include "zchromaticshiftcorrectiondialog.h"
 #include "zlog.h"
 #include "ztheme.h"
+#include "zmessageboxhelpers.h"
 #include <QApplication>
 #include <QFileDialog>
-#include <QMessageBox>
 #include <QSettings>
 #include <cmath>
 #include <set>
@@ -40,7 +40,7 @@ bool ZImgDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save image %1").arg(pack->paths()[0]), err);
     return false;
   }
   return saveAs(id);
@@ -69,7 +69,9 @@ bool ZImgDoc::saveAs(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save As Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(),
+                            tr("Can not save image %1").arg(dialog.selectedFiles().at(0)),
+                            err);
   }
   return false;
 }
@@ -207,10 +209,9 @@ void ZImgDoc::loadImg()
     QString errorMsg;
     auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
-      if (!loadImg(dialog.selectedFiles().at(i), formats[fmtIdx], errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(),
-                              QApplication::applicationName(),
-                              "Can not read image.\n" + errorMsg);
+      const QString filePath = dialog.selectedFiles().at(i);
+      if (!loadImg(filePath, formats[fmtIdx], errorMsg)) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load image %1").arg(filePath), errorMsg);
       }
     }
   }
@@ -227,9 +228,7 @@ void ZImgDoc::importImgSequence()
 
     QString errorMsg;
     if (!loadImg(files, dlg.alongDimension(), dlg.catScences(), FileFormat::Unknown, errorMsg)) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            "Can not load image sequence.\n" + errorMsg);
+      showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load image sequence"), errorMsg);
     }
   }
 }

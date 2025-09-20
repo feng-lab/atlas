@@ -11,12 +11,12 @@
 #include "ztakescreenshotwidget.h"
 #include "zlog.h"
 #include "ztheme.h"
+#include "zmessageboxhelpers.h"
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QKeyEvent>
 #include <QActionGroup>
 #include <QToolButton>
-#include <QMessageBox>
 #include <QGraphicsPixmapItem>
 #include <QApplication>
 
@@ -575,7 +575,7 @@ void ZView::takeFixedSizeScreenShot(const QString& filename, int width, int heig
 {
   QString err;
   if (!m_view->renderToImage(filename, width, height, &err)) {
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save screenshot %1").arg(filename), err);
   }
 }
 
@@ -583,7 +583,7 @@ void ZView::takeScreenShot(const QString& filename)
 {
   QString err;
   if (!m_view->renderToImage(filename, &err)) {
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save screenshot %1").arg(filename), err);
   }
 }
 

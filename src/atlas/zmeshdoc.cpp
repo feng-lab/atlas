@@ -3,8 +3,8 @@
 #include "zexception.h"
 #include "zlog.h"
 #include "ztheme.h"
+#include "zmessageboxhelpers.h"
 #include <QFileDialog>
-#include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <set>
@@ -44,9 +44,9 @@ void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
       setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            QString("Save Mesh Error:\n%1").arg(e.what()));
+      showCriticalWithDetails(QApplication::activeWindow(),
+                              tr("Can not save mesh %1").arg(dialog.selectedFiles().at(0)),
+                              e.what());
     }
   }
 }
@@ -64,7 +64,7 @@ bool ZMeshDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save Error:\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save mesh %1").arg(pack->path), err);
     return false;
   }
   return saveAs(id);
@@ -86,11 +86,12 @@ bool ZMeshDoc::saveAs(size_t id)
     QString err;
     auto& pack = m_idToMeshPacks.at(id);
     auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    if (saveMesh(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
+    const QString targetPath = dialog.selectedFiles().at(0);
+    if (saveMesh(pack.get(), targetPath, err, formats[fmtIdx])) {
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save As Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save mesh %1").arg(targetPath), err);
   }
   return false;
 }
@@ -242,10 +243,9 @@ void ZMeshDoc::loadMesh()
     QString errorMsg;
     // auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
-      if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(),
-                              QApplication::applicationName(),
-                              "Can not read mesh.\n" + errorMsg);
+      const QString filePath = dialog.selectedFiles().at(i);
+      if (!loadFile(filePath, errorMsg)) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load mesh %1").arg(filePath), errorMsg);
       }
     }
   }

@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
+#include "zmessageboxhelpers.h"
 #include <QApplication>
 #include <QSettings>
 #include <QDir>
@@ -306,7 +307,11 @@ void ZAnimation::rebindView()
   bool sorted = false;
 
   if (auto engineObj = dynamic_cast<Z3DRenderingEngine*>(m_engine)) {
-    connect(engineObj, &Z3DRenderingEngine::viewSettingWidgetsGroupChanged, this, &ZAnimation::rebindView, Qt::UniqueConnection);
+    connect(engineObj,
+            &Z3DRenderingEngine::viewSettingWidgetsGroupChanged,
+            this,
+            &ZAnimation::rebindView,
+            Qt::UniqueConnection);
   }
 
   for (const auto& obj : m_objList) {
@@ -319,9 +324,12 @@ void ZAnimation::rebindView()
       if (engObj->thread() == QThread::currentThread()) {
         params = engObj->parametersOfViewSetting(id);
       } else {
-        QMetaObject::invokeMethod(engObj, [&params, engObj, id]() {
-          params = engObj->parametersOfViewSetting(id);
-        }, Qt::BlockingQueuedConnection);
+        QMetaObject::invokeMethod(
+          engObj,
+          [&params, engObj, id]() {
+            params = engObj->parametersOfViewSetting(id);
+          },
+          Qt::BlockingQueuedConnection);
       }
     }
     sorted = bind(obj->objParaAnimations, params) || sorted;
@@ -540,7 +548,7 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
     QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (!canvasPainter.renderToImage(filepath, width, height, &err)) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), err);
+      showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save frame %1").arg(filepath), err);
       break;
     }
   }
@@ -593,9 +601,12 @@ void ZAnimation::tryLinkAnimationWith(size_t id)
         if (engObj->thread() == QThread::currentThread()) {
           params = engObj->parametersOfViewSetting(id);
         } else {
-          QMetaObject::invokeMethod(engObj, [&params, engObj, id]() {
-            params = engObj->parametersOfViewSetting(id);
-          }, Qt::BlockingQueuedConnection);
+          QMetaObject::invokeMethod(
+            engObj,
+            [&params, engObj, id]() {
+              params = engObj->parametersOfViewSetting(id);
+            },
+            Qt::BlockingQueuedConnection);
         }
       }
       bind(obj->objParaAnimations, params);
@@ -906,7 +917,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     }
 
     if (!err.isEmpty()) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Load File Error.\n" + err);
+      showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load animation %1").arg(fn), err);
       LOG(WARNING) << err;
     }
 

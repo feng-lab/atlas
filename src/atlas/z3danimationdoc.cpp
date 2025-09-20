@@ -4,9 +4,9 @@
 #include "z3drenderingengine.h"
 #include "zexception.h"
 #include "zlog.h"
+#include "zmessageboxhelpers.h"
 #include "ztheme.h"
 #include <QFileDialog>
-#include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <set>
@@ -51,7 +51,7 @@ bool Z3DAnimationDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save animation %1").arg(pack->path), err);
     return false;
   }
   return saveAs(id);
@@ -71,11 +71,12 @@ bool Z3DAnimationDoc::saveAs(size_t id)
   if (dialog.exec()) {
     QString err;
     auto& pack = m_idToAnimationPacks.at(id);
-    if (saveAnimation(pack.get(), dialog.selectedFiles().at(0), err)) {
+    const QString targetPath = dialog.selectedFiles().at(0);
+    if (saveAnimation(pack.get(), targetPath, err)) {
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save As Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save animation %1").arg(targetPath), err);
   }
   return false;
 }
@@ -236,10 +237,9 @@ void Z3DAnimationDoc::loadAnimation()
     QString errorMsg;
     // int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
-      if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(),
-                              QApplication::applicationName(),
-                              "Can not read Animation.\n" + errorMsg);
+      const QString filePath = dialog.selectedFiles().at(i);
+      if (!loadFile(filePath, errorMsg)) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load animation %1").arg(filePath), errorMsg);
       }
     }
   }

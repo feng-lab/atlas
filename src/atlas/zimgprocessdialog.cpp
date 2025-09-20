@@ -2,6 +2,7 @@
 
 #include "zimgprocess.h"
 #include "zlog.h"
+#include "zmessageboxhelpers.h"
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QThread>
@@ -24,7 +25,7 @@ void ZImgProcessDialog::processFinished()
 void ZImgProcessDialog::processError(const QString& e)
 {
   m_hasError = true;
-  QMessageBox::critical(this, QApplication::applicationName(), QString("Error during %1: %2").arg(m_workerName, e));
+  showCriticalWithDetails(this, tr("Error during %1").arg(m_workerName), e);
 }
 
 void ZImgProcessDialog::cancelButtonPressed()
@@ -96,7 +97,7 @@ void ZImgProcessDialog::runWorker()
     m_progressDialog->exec();
   }
   catch (const ZException& e) {
-    QMessageBox::critical(this, QApplication::applicationName(), QString("%1 Error.\n").arg(m_workerName) + e.what());
+    showCriticalWithDetails(this, tr("Error during %1").arg(m_workerName), e.what());
   }
 }
 

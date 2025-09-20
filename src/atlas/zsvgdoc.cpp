@@ -3,8 +3,8 @@
 #include "zlog.h"
 #include "zexception.h"
 #include "ztheme.h"
+#include "zmessageboxhelpers.h"
 #include <QFileDialog>
-#include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
 #include <set>
@@ -165,10 +165,9 @@ void ZSvgDoc::loadSvg()
   if (dialog.exec()) {
     QString errorMsg;
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
-      if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(),
-                              QApplication::applicationName(),
-                              "Can not read svg.\n" + errorMsg);
+      const QString filePath = dialog.selectedFiles().at(i);
+      if (!loadFile(filePath, errorMsg)) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load svg %1").arg(filePath), errorMsg);
       }
     }
   }

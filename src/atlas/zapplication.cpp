@@ -1,8 +1,8 @@
 #include "zapplication.h"
 #include "zexception.h"
 #include "zlog.h"
+#include "zmessageboxhelpers.h"
 #include <QFileOpenEvent>
-#include <QMessageBox>
 
 namespace nim {
 
@@ -18,7 +18,7 @@ bool ZApplication::notify(QObject* object, QEvent* event)
                          typeid(*event).name(),
                          object->objectName(),
                          object->metaObject()->className());
-    QMessageBox::critical(activeWindow(), applicationName(), err);
+    showCriticalWithDetails(activeWindow(), tr("Unhandled exception"), err);
     LOG(FATAL) << err;
   }
   catch (const std::exception& e) {
@@ -28,7 +28,7 @@ bool ZApplication::notify(QObject* object, QEvent* event)
                          typeid(*event).name(),
                          object->objectName(),
                          object->metaObject()->className());
-    QMessageBox::critical(activeWindow(), applicationName(), err);
+    showCriticalWithDetails(activeWindow(), tr("Unhandled exception"), err);
     LOG(FATAL) << err;
   }
 

@@ -5,6 +5,7 @@
 #include "zlog.h"
 #include "zsysteminfo.h"
 #include "ztheme.h"
+#include "zmessageboxhelpers.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -45,7 +46,9 @@ bool ZRegionAnnotationDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(),
+                            tr("Can not save region annotation %1").arg(pack->path()),
+                            err);
     return false;
   }
   return saveAs(id);
@@ -62,11 +65,12 @@ bool ZRegionAnnotationDoc::saveAs(size_t id)
   if (dialog.exec()) {
     QString err;
     auto& pack = m_idToRegionAnnotationPacks.at(id);
-    if (saveRegionAnnotation(pack.get(), dialog.selectedFiles().at(0), err)) {
+    const QString targetPath = dialog.selectedFiles().at(0);
+    if (saveRegionAnnotation(pack.get(), targetPath, err)) {
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save As Error.\n" + err);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save region annotation %1").arg(targetPath), err);
   }
   return false;
 }
@@ -234,10 +238,11 @@ void ZRegionAnnotationDoc::loadRegionAnnotation()
     QString errorMsg;
     // auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
-      if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(),
-                              QApplication::applicationName(),
-                              "Can not read regionAnnotation.\n" + errorMsg);
+      const QString filePath = dialog.selectedFiles().at(i);
+      if (!loadFile(filePath, errorMsg)) {
+        showCriticalWithDetails(QApplication::activeWindow(),
+                                tr("Can not load region annotation %1").arg(filePath),
+                                errorMsg);
       }
     }
   }
@@ -274,9 +279,7 @@ void ZRegionAnnotationDoc::importLabelImage()
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            QString("Can not import label image:\n%1").arg(e.what()));
+      showCriticalWithDetails(QApplication::activeWindow(), tr("Can not import label image %1").arg(fn), e.what());
     }
   }
 }
@@ -339,9 +342,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            QString("Can not export label image:\n%1").arg(e.what()));
+      showCriticalWithDetails(QApplication::activeWindow(), tr("Can not export label image %1").arg(fn), e.what());
     }
   }
 }

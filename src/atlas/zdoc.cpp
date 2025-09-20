@@ -17,10 +17,11 @@
 #include "zmeshdoc.h"
 #include "ztheme.h"
 #include "zchooseobjdialog.h"
+#include "zmessageboxhelpers.h"
 #include <QUndoGroup>
 #include <QAction>
-#include <QMessageBox>
 #include <QApplication>
+#include <QMessageBox>
 #include <QFile>
 #include <QSettings>
 #include <QInputDialog>
@@ -419,9 +420,7 @@ void ZDoc::loadFile(const QString& fileName)
 {
   QString error;
   if (!loadFile(fileName, error)) {
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          tr("Can not read file %1. Error: %2").arg(fileName).arg(error));
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load file %1").arg(fileName), error);
   }
 }
 
@@ -438,7 +437,7 @@ void ZDoc::loadFileList(const QStringList& fileList)
     }
   }
   if (!error.isEmpty()) {
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), error);
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load one or more files"), error);
   }
 }
 

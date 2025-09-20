@@ -22,6 +22,7 @@
 #include "zsvgview.h"
 #include "zjson.h"
 #include "zfileutils.h"
+#include "zmessageboxhelpers.h"
 #include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
@@ -399,9 +400,7 @@ void ZMainWindow::loadScene()
   if (!fn.isEmpty()) {
     QString err;
     if (!loadJsonSceneImpl(fn, err)) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            tr("Can not load scene %1: %2").arg(fn).arg(err));
+      showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load scene %1").arg(fn), err);
     } else {
       m_doc->setLastOpenedFilePath(fn);
       ZSystemInfo::instance().addFileToRecentFileList(fn);
@@ -425,9 +424,7 @@ void ZMainWindow::saveScene()
   if (!fn.isEmpty()) {
     QString err;
     if (!saveJsonSceneImpl(fn, err)) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            tr("Can not save scene %1: %2").arg(fn).arg(err));
+      showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save scene %1").arg(fn), err);
     } else {
       m_doc->setLastOpenedFilePath(fn);
       ZSystemInfo::instance().addFileToRecentFileList(fn);
@@ -443,14 +440,10 @@ void ZMainWindow::loadJsonScene(const QString& fn)
 {
   QString err;
   if (!loadJsonSceneImpl(fn, err)) {
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          tr("Can not load scene %1: %2").arg(fn).arg(err));
+    showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load scene %1").arg(fn), err);
   } else {
     if (!err.isEmpty()) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            tr("Error while loading scene %1: %2").arg(fn).arg(err));
+      showCriticalWithDetails(QApplication::activeWindow(), tr("Error while loading scene %1").arg(fn), err);
     }
     ZSystemInfo::instance().addFileToRecentFileList(fn);
   }
@@ -905,9 +898,12 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
       // Listen before posting tasks to avoid missing early finish
       sceneApplySpy = std::make_unique<QSignalSpy>(m_3dWindow->engine(), &Z3DRenderingEngine::scene3DApplyFinished);
       // Reset engine-side apply session
-      QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine()]() {
-        eng->beginScene3DApply();
-      }, Qt::BlockingQueuedConnection);
+      QMetaObject::invokeMethod(
+        m_3dWindow->engine(),
+        [eng = m_3dWindow->engine()]() {
+          eng->beginScene3DApply();
+        },
+        Qt::BlockingQueuedConnection);
     }
 
     for (const auto& [key, value] : sceneObj) {
@@ -916,9 +912,12 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
       } else if (key == "View3DGeneral") {
         if (m_3dWindow) {
           auto j = value.as_object();
-          QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine(), j]() {
-            eng->applyView3DGeneral(j);
-          }, Qt::QueuedConnection);
+          QMetaObject::invokeMethod(
+            m_3dWindow->engine(),
+            [eng = m_3dWindow->engine(), j]() {
+              eng->applyView3DGeneral(j);
+            },
+            Qt::QueuedConnection);
         }
       } else if (key != "Doc" && key != "Version") {
         QString qkey = QString::fromUtf8(key.data(), key.size());
@@ -935,9 +934,12 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
             if (viewObj.contains("View3D")) {
               if (m_3dWindow) {
                 auto j = viewObj.at("View3D").as_object();
-                QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine(), id, j]() {
-                  eng->applyView3DForId(id, j);
-                }, Qt::QueuedConnection);
+                QMetaObject::invokeMethod(
+                  m_3dWindow->engine(),
+                  [eng = m_3dWindow->engine(), id, j]() {
+                    eng->applyView3DForId(id, j);
+                  },
+                  Qt::QueuedConnection);
               }
             }
           }
@@ -982,9 +984,12 @@ bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
 
       if (m_3dWindow) {
         json::object view3DObj;
-        QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine(), id, &view3DObj]() {
-          eng->write(id, view3DObj);
-        }, Qt::BlockingQueuedConnection);
+        QMetaObject::invokeMethod(
+          m_3dWindow->engine(),
+          [eng = m_3dWindow->engine(), id, &view3DObj]() {
+            eng->write(id, view3DObj);
+          },
+          Qt::BlockingQueuedConnection);
         jObj["View3D"] = view3DObj;
       }
 
@@ -997,9 +1002,12 @@ bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
 
     if (m_3dWindow) {
       json::object view3DGeneralObj;
-      QMetaObject::invokeMethod(m_3dWindow->engine(), [eng = m_3dWindow->engine(), &view3DGeneralObj]() {
-        eng->write(view3DGeneralObj);
-      }, Qt::BlockingQueuedConnection);
+      QMetaObject::invokeMethod(
+        m_3dWindow->engine(),
+        [eng = m_3dWindow->engine(), &view3DGeneralObj]() {
+          eng->write(view3DGeneralObj);
+        },
+        Qt::BlockingQueuedConnection);
       sceneObj["View3DGeneral"] = view3DGeneralObj;
     }
 
