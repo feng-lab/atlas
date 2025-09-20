@@ -55,6 +55,14 @@ protected:
   ZVec4Parameter m_ZAxisColor;
   ZFloatParameter m_axisRegionRatio;
   ZStringIntOptionParameter m_mode;
+  ZStringIntOptionParameter m_fontName;
+  ZFloatParameter m_fontSize;
+  ZFloatParameter m_fontSoftEdgeScale;
+  ZBoolParameter m_showFontOutline;
+  ZStringIntOptionParameter m_fontOutlineMode;
+  ZVec4Parameter m_fontOutlineColor;
+  ZBoolParameter m_showFontShadow;
+  ZVec4Parameter m_fontShadowColor;
 
   std::vector<glm::vec4> m_tailPosAndTailRadius;
   std::vector<glm::vec4> m_headPosAndHeadRadius;

@@ -1,10 +1,17 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
-#include "z3drendertarget.h"
 #include "z3dshaderprogram.h"
 
 namespace nim {
+
+enum class GlowMode
+{
+  Additive,
+  Screen,
+  Softlight,
+  Glowmap
+};
 
 class Z3DTextureGlowRenderer : public Z3DPrimitiveRenderer
 {
@@ -21,25 +28,13 @@ public:
     m_depthTexture = depthTex;
   }
 
-  ZStringStringOptionParameter& glowModePara()
-  {
-    return m_glowMode;
-  }
+  void setGlowMode(GlowMode mode);
 
-  ZIntParameter& blurRadiusPara()
-  {
-    return m_blurRadius;
-  }
+  void setBlurRadius(int radius);
 
-  ZFloatParameter& blurScalePara()
-  {
-    return m_blurScale;
-  }
+  void setBlurScale(float scale);
 
-  ZFloatParameter& blurStrengthPara()
-  {
-    return m_blurStrength;
-  }
+  void setBlurStrength(float strength);
 
 protected:
   void compile() override;
@@ -56,10 +51,10 @@ protected:
   Z3DShaderProgram m_blurYTextureShader;
   Z3DShaderGroup m_glowTextureShaderGrp;
 
-  ZStringStringOptionParameter m_glowMode;
-  ZIntParameter m_blurRadius;
-  ZFloatParameter m_blurScale;
-  ZFloatParameter m_blurStrength;
+  GlowMode m_glowMode = GlowMode::Screen;
+  int m_blurRadius = 10;
+  float m_blurScale = 1.f;
+  float m_blurStrength = 0.5f;
 
   Z3DVertexArrayObject m_VAO;
 };

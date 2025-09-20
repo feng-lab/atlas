@@ -6,6 +6,8 @@
 #include "z3dtexture.h"
 #include "zlog.h"
 #include "zmesh.h"
+#include "zoptionparameter.h"
+#include "znumericparameter.h"
 
 namespace nim {
 
@@ -21,20 +23,10 @@ Z3DMeshRenderer::Z3DMeshRenderer(Z3DRendererBase& rendererBase)
   , m_texture(nullptr)
   , m_meshColorReady(false)
   , m_meshPickingColorReady(false)
-  , m_colorSource("Color Source")
   , m_dataChanged(false)
   , m_pickingDataChanged(false)
-  , m_wireframeMode("Wireframe Option")
-  , m_wireframeColor("Wireframe Color", glm::vec4(1), glm::vec4(0), glm::vec4(1))
 {
-  m_colorSource.addOptions("MeshColor", "Mesh1DTexture", "Mesh2DTexture", "Mesh3DTexture", "CustomColor");
-  m_colorSource.select("MeshColor");
-  connect(&m_colorSource, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshRenderer::compile);
-
-  m_wireframeMode.addOptions("No Wireframe", "With Wireframe", "Only Wireframe");
-  m_wireframeMode.select("No Wireframe");
-  connect(&m_wireframeMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshRenderer::adjustWidgets);
-  m_wireframeColor.setStyle("COLOR");
+  m_colorSource = MeshColorSource::MeshColor;
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
@@ -95,6 +87,15 @@ void Z3DMeshRenderer::setDataPickingColors(std::vector<glm::vec4>* meshPickingCo
   m_pickingDataChanged = true;
 }
 
+void Z3DMeshRenderer::setColorSource(MeshColorSource source)
+{
+  if (m_colorSource == source) {
+    return;
+  }
+  m_colorSource = source;
+  compile();
+}
+
 void Z3DMeshRenderer::compile()
 {
   m_dataChanged = true;
@@ -104,14 +105,21 @@ void Z3DMeshRenderer::compile()
 QString Z3DMeshRenderer::generateHeader()
 {
   QString headerSource;
-  if (m_colorSource.isSelected("MeshColor")) {
-    headerSource += "#define USE_MESH_COLOR\n";
-  } else if (m_colorSource.isSelected("Mesh1DTexture")) {
-    headerSource += "#define USE_MESH_1DTEXTURE\n";
-  } else if (m_colorSource.isSelected("Mesh2DTexture")) {
-    headerSource += "#define USE_MESH_2DTEXTURE\n";
-  } else if (m_colorSource.isSelected("Mesh3DTexture")) {
-    headerSource += "#define USE_MESH_3DTEXTURE\n";
+  switch (m_colorSource) {
+    case MeshColorSource::MeshColor:
+      headerSource += "#define USE_MESH_COLOR\n";
+      break;
+    case MeshColorSource::Mesh1DTexture:
+      headerSource += "#define USE_MESH_1DTEXTURE\n";
+      break;
+    case MeshColorSource::Mesh2DTexture:
+      headerSource += "#define USE_MESH_2DTEXTURE\n";
+      break;
+    case MeshColorSource::Mesh3DTexture:
+      headerSource += "#define USE_MESH_3DTEXTURE\n";
+      break;
+    case MeshColorSource::CustomColor:
+      break;
   }
   return headerSource;
 }
@@ -205,30 +213,31 @@ void Z3DMeshRenderer::renderUsingOpengl()
     return;
   }
 
-  if (m_colorSource.isSelected("CustomColor") && !m_meshColorReady) {
+  if (m_colorSource == MeshColorSource::CustomColor && !m_meshColorReady) {
     prepareMeshColor();
   }
 
   for (size_t i = 0; i < m_meshPt->size(); ++i) {
-    if (m_colorSource.isSelected("MeshColor") && (*m_meshPt)[i]->numColors() < (*m_meshPt)[i]->numVertices()) {
+    if (m_colorSource == MeshColorSource::MeshColor && (*m_meshPt)[i]->numColors() < (*m_meshPt)[i]->numVertices()) {
       return;
     }
-    if (m_colorSource.isSelected("Mesh1DTexture") &&
+    if (m_colorSource == MeshColorSource::Mesh1DTexture &&
         ((*m_meshPt)[i]->num1DTextureCoordinates() < (*m_meshPt)[i]->numVertices() || !m_texture ||
          m_texture->textureTarget() != GL_TEXTURE_1D)) {
       return;
     }
-    if (m_colorSource.isSelected("Mesh2DTexture") &&
+    if (m_colorSource == MeshColorSource::Mesh2DTexture &&
         ((*m_meshPt)[i]->num2DTextureCoordinates() < (*m_meshPt)[i]->numVertices() || !m_texture ||
          m_texture->textureTarget() != GL_TEXTURE_2D)) {
       return;
     }
-    if (m_colorSource.isSelected("Mesh3DTexture") &&
+    if (m_colorSource == MeshColorSource::Mesh3DTexture &&
         ((*m_meshPt)[i]->num3DTextureCoordinates() < (*m_meshPt)[i]->numVertices() || !m_texture ||
          m_texture->textureTarget() != GL_TEXTURE_3D)) {
       return;
     }
-    if (m_colorSource.isSelected("CustomColor") && (!m_meshColorsPt || m_meshColorsPt->size() < m_meshPt->size())) {
+    if (m_colorSource == MeshColorSource::CustomColor &&
+        (!m_meshColorsPt || m_meshColorsPt->size() < m_meshPt->size())) {
       return;
     }
     if ((*m_meshPt)[i]->numNormals() != (*m_meshPt)[i]->numVertices()) {
@@ -241,7 +250,7 @@ void Z3DMeshRenderer::renderUsingOpengl()
   // glScalef(getCoordTransform().x, getCoordTransform().y, getCoordTransform().z);
   glMultMatrixf(&coordTransform()[0][0]); // not sure, todo check
 
-  if (m_colorSource.isSelected("Mesh2DTexture") || m_colorSource.isSelected("Mesh3DTexture")) {
+  if (m_colorSource == MeshColorSource::Mesh2DTexture || m_colorSource == MeshColorSource::Mesh3DTexture) {
     glActiveTexture(GL_TEXTURE0);
     m_texture->bind();
   }
@@ -264,23 +273,23 @@ void Z3DMeshRenderer::renderUsingOpengl()
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
     glVertexPointer(3, GL_FLOAT, 0, 0);
 
-    if (m_colorSource.isSelected("MeshColor")) {
+    if (m_colorSource == MeshColorSource::MeshColor) {
       glEnableClientState(GL_COLOR_ARRAY);
       glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
       glBufferData(GL_ARRAY_BUFFER, colors.size() * 4 * sizeof(GLfloat), colors.data(), GL_STATIC_DRAW);
       glColorPointer(4, GL_FLOAT, 0, 0);
-    } else if (m_colorSource.isSelected("CustomColor")) {
+    } else if (m_colorSource == MeshColorSource::CustomColor) {
       glColor4f((*m_meshColorsPt)[i].r,
                 (*m_meshColorsPt)[i].g,
                 (*m_meshColorsPt)[i].b,
                 (*m_meshColorsPt)[i].a * opacity());
-    } else if (m_colorSource.isSelected("Mesh1DTexture")) {
+    } else if (m_colorSource == MeshColorSource::Mesh1DTexture) {
       glClientActiveTexture(GL_TEXTURE0);
       glEnableClientState(GL_TEXTURE_COORD_ARRAY);
       glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
       glBufferData(GL_ARRAY_BUFFER, texture1DCoords.size() * sizeof(GLfloat), texture1DCoords.data(), GL_STATIC_DRAW);
       glTexCoordPointer(1, GL_FLOAT, 0, 0);
-    } else if (m_colorSource.isSelected("Mesh2DTexture")) {
+    } else if (m_colorSource == MeshColorSource::Mesh2DTexture) {
       glClientActiveTexture(GL_TEXTURE0);
       glEnableClientState(GL_TEXTURE_COORD_ARRAY);
       glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
@@ -289,7 +298,7 @@ void Z3DMeshRenderer::renderUsingOpengl()
                    texture2DCoords.data(),
                    GL_STATIC_DRAW);
       glTexCoordPointer(2, GL_FLOAT, 0, 0);
-    } else if (m_colorSource.isSelected("Mesh3DTexture")) {
+    } else if (m_colorSource == MeshColorSource::Mesh3DTexture) {
       glClientActiveTexture(GL_TEXTURE0);
       glEnableClientState(GL_TEXTURE_COORD_ARRAY);
       glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
@@ -320,13 +329,13 @@ void Z3DMeshRenderer::renderUsingOpengl()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glDeleteBuffers(4, bufObjects);
     glDisableClientState(GL_VERTEX_ARRAY);
-    if (m_colorSource.isSelected("MeshColor")) {
+    if (m_colorSource == MeshColorSource::MeshColor) {
       glDisableClientState(GL_COLOR_ARRAY);
-    } else if (m_colorSource.isSelected("Mesh1DTexture")) {
+    } else if (m_colorSource == MeshColorSource::Mesh1DTexture) {
       glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-    } else if (m_colorSource.isSelected("Mesh2DTexture")) {
+    } else if (m_colorSource == MeshColorSource::Mesh2DTexture) {
       glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-    } else if (m_colorSource.isSelected("Mesh3DTexture")) {
+    } else if (m_colorSource == MeshColorSource::Mesh3DTexture) {
       glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     }
     glDisableClientState(GL_NORMAL_ARRAY);
@@ -408,26 +417,30 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     return;
   }
 
-  if (m_colorSource.isSelected("CustomColor") && !m_meshColorReady) {
+  if (m_colorSource == MeshColorSource::CustomColor && !m_meshColorReady) {
     prepareMeshColor();
   }
 
   for (auto mesh : *m_meshPt) {
-    // if (m_colorSource.isSelected("MeshColor") && mesh->numColors() < mesh->numVertices())
+    // if (m_colorSource == MeshColorSource::MeshColor && mesh->numColors() < mesh->numVertices())
     // return;
-    if (m_colorSource.isSelected("Mesh1DTexture") && (mesh->num1DTextureCoordinates() < mesh->numVertices() ||
-                                                      !m_texture || m_texture->textureTarget() != GL_TEXTURE_1D)) {
+    if (m_colorSource == MeshColorSource::Mesh1DTexture &&
+        (mesh->num1DTextureCoordinates() < mesh->numVertices() || !m_texture ||
+         m_texture->textureTarget() != GL_TEXTURE_1D)) {
       return;
     }
-    if (m_colorSource.isSelected("Mesh2DTexture") && (mesh->num2DTextureCoordinates() < mesh->numVertices() ||
-                                                      !m_texture || m_texture->textureTarget() != GL_TEXTURE_2D)) {
+    if (m_colorSource == MeshColorSource::Mesh2DTexture &&
+        (mesh->num2DTextureCoordinates() < mesh->numVertices() || !m_texture ||
+         m_texture->textureTarget() != GL_TEXTURE_2D)) {
       return;
     }
-    if (m_colorSource.isSelected("Mesh3DTexture") && (mesh->num3DTextureCoordinates() < mesh->numVertices() ||
-                                                      !m_texture || m_texture->textureTarget() != GL_TEXTURE_3D)) {
+    if (m_colorSource == MeshColorSource::Mesh3DTexture &&
+        (mesh->num3DTextureCoordinates() < mesh->numVertices() || !m_texture ||
+         m_texture->textureTarget() != GL_TEXTURE_3D)) {
       return;
     }
-    if (m_colorSource.isSelected("CustomColor") && (!m_meshColorsPt || m_meshColorsPt->size() < m_meshPt->size())) {
+    if (m_colorSource == MeshColorSource::CustomColor &&
+        (!m_meshColorsPt || m_meshColorsPt->size() < m_meshPt->size())) {
       return;
     }
     if (mesh->numNormals() != mesh->numVertices()) {
@@ -435,13 +448,16 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     }
   }
 
+  const bool drawSurface = m_wireframeModeValue != WireframeMode::OnlyWireframe;
+  const bool drawWireframe = m_wireframeModeValue != WireframeMode::NoWireframe;
+
   m_meshShaderGrp.bind();
   Z3DShaderProgram& shader = m_meshShaderGrp.get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setShaderParameters(shader);
 
-  if (m_colorSource.isSelected("Mesh2DTexture") || m_colorSource.isSelected("Mesh3DTexture") ||
-      m_colorSource.isSelected("Mesh1DTexture")) {
+  if (m_colorSource == MeshColorSource::Mesh2DTexture || m_colorSource == MeshColorSource::Mesh3DTexture ||
+      m_colorSource == MeshColorSource::Mesh1DTexture) {
     shader.bindTexture("texture", m_texture);
   }
 
@@ -493,7 +509,8 @@ void Z3DMeshRenderer::render(Z3DEye eye)
                        GL_STATIC_DRAW);
         }
 
-        if (m_colorSource.isSelected("Mesh1DTexture") && attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
+        if (m_colorSource == MeshColorSource::Mesh1DTexture && attr_1dTexCoord0 != -1 &&
+            !textureCoordinates1D.empty()) {
           glEnableVertexAttribArray(attr_1dTexCoord0);
           m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER,
@@ -503,7 +520,8 @@ void Z3DMeshRenderer::render(Z3DEye eye)
           glVertexAttribPointer(attr_1dTexCoord0, 1, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
-        if (m_colorSource.isSelected("Mesh2DTexture") && attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
+        if (m_colorSource == MeshColorSource::Mesh2DTexture && attr_2dTexCoord0 != -1 &&
+            !textureCoordinates2D.empty()) {
           glEnableVertexAttribArray(attr_2dTexCoord0);
           m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER,
@@ -513,7 +531,8 @@ void Z3DMeshRenderer::render(Z3DEye eye)
           glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
-        if (m_colorSource.isSelected("Mesh3DTexture") && attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
+        if (m_colorSource == MeshColorSource::Mesh3DTexture && attr_3dTexCoord0 != -1 &&
+            !textureCoordinates3D.empty()) {
           glEnableVertexAttribArray(attr_3dTexCoord0);
           m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER,
@@ -523,7 +542,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
           glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
-        if (m_colorSource.isSelected("MeshColor") && attr_color != -1 && colors.size() >= vertices.size()) {
+        if (m_colorSource == MeshColorSource::MeshColor && attr_color != -1 && colors.size() >= vertices.size()) {
           glEnableVertexAttribArray(attr_color);
           m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER, colors.size() * 4 * sizeof(GLfloat), colors.data(), GL_STATIC_DRAW);
@@ -538,12 +557,12 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       m_dataChanged = false;
     }
 
-    if (!m_wireframeMode.isSelected("Only Wireframe")) {
+    if (drawSurface) {
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
-        if (m_colorSource.isSelected("CustomColor")) {
+        if (m_colorSource == MeshColorSource::CustomColor) {
           shader.setUseCustomColorUniform(true);
           shader.setCustomColorUniform((*m_meshColorsPt)[i]);
-        } else if (m_colorSource.isSelected("MeshColor") &&
+        } else if (m_colorSource == MeshColorSource::MeshColor &&
                    (*m_meshPt)[i]->numColors() < (*m_meshPt)[i]->numVertices()) {
           shader.setUseCustomColorUniform(true);
           shader.setCustomColorUniform(glm::vec4(0.f, 0.f, 0.f, 1.f));
@@ -564,7 +583,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       }
     }
 
-    if (!m_wireframeMode.isSelected("No Wireframe")) {
+    if (drawWireframe) {
       // offset the wireframe
       glEnable(GL_POLYGON_OFFSET_LINE);
       glPolygonOffset(-1, -1);
@@ -573,7 +592,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
         shader.setUseCustomColorUniform(true);
-        shader.setCustomColorUniform(m_wireframeColor.get());
+        shader.setCustomColorUniform(m_wireframeColorValue);
 
         auto type = toGLType((*m_meshPt)[i]->type());
         const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
@@ -594,7 +613,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
   } else {
     //    for (size_t i=0; i<m_meshPt->size(); ++i) {
     //      shader.setUniformValue("lighting_enabled", m_needLighting);
-    //      if (m_colorSource.isSelected("CustomColor"))
+    //      if (m_colorSource == MeshColorSource::CustomColor)
     //        renderTriangleList(shader, *((*m_meshPt)[i]), (*m_meshColorsPt)[i]);
     //      else
     //        renderTriangleList(shader, *((*m_meshPt)[i]));
@@ -607,10 +626,11 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     }
 
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
-      if (m_colorSource.isSelected("CustomColor")) {
+      if (m_colorSource == MeshColorSource::CustomColor) {
         shader.setUseCustomColorUniform(true);
         shader.setCustomColorUniform((*m_meshColorsPt)[i]);
-      } else if (m_colorSource.isSelected("MeshColor") && (*m_meshPt)[i]->numColors() < (*m_meshPt)[i]->numVertices()) {
+      } else if (m_colorSource == MeshColorSource::MeshColor &&
+                 (*m_meshPt)[i]->numColors() < (*m_meshPt)[i]->numVertices()) {
         shader.setUseCustomColorUniform(true);
         shader.setCustomColorUniform(glm::vec4(0.f, 0.f, 0.f, 1.f));
       } else {
@@ -653,7 +673,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         }
       }
 
-      if (m_colorSource.isSelected("Mesh1DTexture") && attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
+      if (m_colorSource == MeshColorSource::Mesh1DTexture && attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
         glEnableVertexAttribArray(attr_1dTexCoord0);
         m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
@@ -665,7 +685,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         glVertexAttribPointer(attr_1dTexCoord0, 1, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
-      if (m_colorSource.isSelected("Mesh2DTexture") && attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
+      if (m_colorSource == MeshColorSource::Mesh2DTexture && attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
         glEnableVertexAttribArray(attr_2dTexCoord0);
         m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
@@ -677,7 +697,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
-      if (m_colorSource.isSelected("Mesh3DTexture") && attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
+      if (m_colorSource == MeshColorSource::Mesh3DTexture && attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
         glEnableVertexAttribArray(attr_3dTexCoord0);
         m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
@@ -689,7 +709,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
-      if (m_colorSource.isSelected("MeshColor") && attr_color != -1 && colors.size() >= vertices.size()) {
+      if (m_colorSource == MeshColorSource::MeshColor && attr_color != -1 && colors.size() >= vertices.size()) {
         glEnableVertexAttribArray(attr_color);
         m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
@@ -698,7 +718,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
-      if (!m_wireframeMode.isSelected("Only Wireframe")) {
+      if (drawSurface) {
         if (triangleIndexes.empty()) {
           glDrawArrays(type, 0, vertices.size());
         } else {
@@ -706,9 +726,9 @@ void Z3DMeshRenderer::render(Z3DEye eye)
           glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         }
       }
-      if (!m_wireframeMode.isSelected("No Wireframe")) {
+      if (drawWireframe) {
         shader.setUseCustomColorUniform(true);
-        shader.setCustomColorUniform(m_wireframeColor.get());
+        shader.setCustomColorUniform(m_wireframeColorValue);
 
         // offset the wireframe
         glEnable(GL_POLYGON_OFFSET_LINE);
@@ -733,16 +753,16 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       if (attr_normal != -1) {
         glDisableVertexAttribArray(attr_normal);
       }
-      if (m_colorSource.isSelected("Mesh1DTexture") && attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
+      if (m_colorSource == MeshColorSource::Mesh1DTexture && attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
         glDisableVertexAttribArray(attr_1dTexCoord0);
       }
-      if (m_colorSource.isSelected("Mesh2DTexture") && attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
+      if (m_colorSource == MeshColorSource::Mesh2DTexture && attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
         glDisableVertexAttribArray(attr_2dTexCoord0);
       }
-      if (m_colorSource.isSelected("Mesh3DTexture") && attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
+      if (m_colorSource == MeshColorSource::Mesh3DTexture && attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
         glDisableVertexAttribArray(attr_3dTexCoord0);
       }
-      if (m_colorSource.isSelected("MeshColor") && attr_color != -1 && colors.size() >= vertices.size()) {
+      if (m_colorSource == MeshColorSource::MeshColor && attr_color != -1 && colors.size() >= vertices.size()) {
         glDisableVertexAttribArray(attr_color);
       }
     }
@@ -833,7 +853,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       m_pickingDataChanged = false;
     }
 
-    if (m_wireframeMode.isSelected("Only Wireframe")) {
+    if (m_wireframeModeValue == WireframeMode::OnlyWireframe) {
       // offset the wireframe
       glEnable(GL_POLYGON_OFFSET_LINE);
       glPolygonOffset(-1, -1);
@@ -858,7 +878,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       m_pickingVAOs.release();
     }
 
-    if (m_wireframeMode.isSelected("Only Wireframe")) {
+    if (m_wireframeModeValue == WireframeMode::OnlyWireframe) {
       // restore default polygon mode
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
       glDisable(GL_POLYGON_OFFSET_LINE);
@@ -875,7 +895,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       }
     }
 
-    if (m_wireframeMode.isSelected("Only Wireframe")) {
+    if (m_wireframeModeValue == WireframeMode::OnlyWireframe) {
       // offset the wireframe
       glEnable(GL_POLYGON_OFFSET_LINE);
       glPolygonOffset(-1, -1);
@@ -943,7 +963,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       }
     }
 
-    if (m_wireframeMode.isSelected("Only Wireframe")) {
+    if (m_wireframeModeValue == WireframeMode::OnlyWireframe) {
       // restore default polygon mode
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
       glDisable(GL_POLYGON_OFFSET_LINE);
@@ -953,11 +973,6 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
   }
 
   m_meshShaderGrp.release();
-}
-
-void Z3DMeshRenderer::adjustWidgets()
-{
-  m_wireframeColor.setVisible(!m_wireframeMode.isSelected("No Wireframe"));
 }
 
 } // namespace nim

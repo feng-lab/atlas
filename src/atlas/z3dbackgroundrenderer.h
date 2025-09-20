@@ -4,35 +4,40 @@
 
 namespace nim {
 
+enum class BackgroundMode
+{
+  Uniform,
+  Gradient
+};
+
+enum class BackgroundGradientOrientation
+{
+  LeftToRight,
+  RightToLeft,
+  TopToBottom,
+  BottomToTop
+};
+
 class Z3DBackgroundRenderer : public Z3DPrimitiveRenderer
 {
 public:
   explicit Z3DBackgroundRenderer(Z3DRendererBase& rendererBase);
 
-  ZStringIntOptionParameter& modePara()
+  void setMode(BackgroundMode mode);
+
+  void setFirstColor(const glm::vec4& color)
   {
-    return m_mode;
+    m_firstColorValue = color;
   }
 
-  ZVec4Parameter& firstColorPara()
+  void setSecondColor(const glm::vec4& color)
   {
-    return m_firstColor;
+    m_secondColorValue = color;
   }
 
-  ZVec4Parameter& secondColorPara()
-  {
-    return m_secondColor;
-  }
-
-  ZStringIntOptionParameter& gradientOrientationPara()
-  {
-    return m_gradientOrientation;
-  }
+  void setGradientOrientation(BackgroundGradientOrientation orientation);
 
   void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
-
-protected:
-  void adjustWidgets();
 
   void compile() override;
 
@@ -50,15 +55,15 @@ protected:
 protected:
   Z3DShaderGroup m_backgroundShaderGrp;
 
-  ZVec4Parameter m_firstColor;
-  ZVec4Parameter m_secondColor;
-  ZStringIntOptionParameter m_gradientOrientation;
-  ZStringIntOptionParameter m_mode;
+  glm::vec4 m_region{0.f, 1.f, 0.f, 1.f};
+
+  BackgroundMode m_modeValue = BackgroundMode::Gradient;
+  BackgroundGradientOrientation m_orientationValue = BackgroundGradientOrientation::BottomToTop;
+  glm::vec4 m_firstColorValue{1.f, 1.f, 1.f, 1.f};
+  glm::vec4 m_secondColorValue{0.2f, 0.2f, 0.2f, 1.f};
 
   Z3DVertexArrayObject m_VAO;
   Z3DVertexBufferObject m_VBO;
-
-  glm::vec4 m_region;
 };
 
 } // namespace nim

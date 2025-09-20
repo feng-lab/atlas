@@ -6,6 +6,7 @@
 #include "zmesh.h"
 #include "zbenchtimer.h"
 #include "zmeshutils.h"
+#include "zlog.h"
 #include <QApplication>
 #include <QMessageBox>
 
@@ -19,6 +20,10 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_volumeSliceRenderer(m_rendererBase)
   , m_textureAndEyeCoordinateRenderer(m_rendererBase)
   , m_textureCopyRenderer(m_rendererBase)
+  , m_raycasterCompositingMode("Compositing")
+  , m_raycasterSamplingRate("Sampling Rate", 2.f, 0.01f, 20.f)
+  , m_raycasterIsoValue("ISO Value", 0.5f, 0.0f, 1.0f)
+  , m_raycasterLocalMIPThreshold("Local MIP Threshold", 0.8f, 0.01f, 1.f)
   , m_imgPack(nullptr)
   , m_stayOnTop("Stay On Top", false)
   , m_isVolumeDownsampled("Volume Is Downsampled", false)
@@ -63,6 +68,39 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
 {
   m_baseBoundBoxRenderer.setEnableMultisample(false);
   m_textureCopyRenderer.setDiscardTransparent(true);
+
+  updateRaycasterSamplingRate();
+  updateRaycasterIsoValue();
+  updateRaycasterLocalMIPThreshold();
+
+  connect(&m_raycasterSamplingRate,
+          &ZFloatParameter::valueChanged,
+          this,
+          &Z3DVolumeFilter::updateRaycasterSamplingRate);
+  connect(&m_raycasterIsoValue, &ZFloatParameter::valueChanged, this, &Z3DVolumeFilter::updateRaycasterIsoValue);
+  connect(&m_raycasterLocalMIPThreshold,
+          &ZFloatParameter::valueChanged,
+          this,
+          &Z3DVolumeFilter::updateRaycasterLocalMIPThreshold);
+
+  m_raycasterCompositingMode.clearOptions();
+  m_raycasterCompositingMode.addOptionsWithData(
+    std::make_pair(QStringLiteral("Direct Volume Rendering"),
+                   static_cast<int>(VolumeCompositingMode::DirectVolumeRendering)),
+    std::make_pair(QStringLiteral("Maximum Intensity Projection"),
+                   static_cast<int>(VolumeCompositingMode::MaximumIntensityProjection)),
+    std::make_pair(QStringLiteral("MIP Opaque"), static_cast<int>(VolumeCompositingMode::MIPOpaque)),
+    std::make_pair(QStringLiteral("Local MIP"), static_cast<int>(VolumeCompositingMode::LocalMIP)),
+    std::make_pair(QStringLiteral("Local MIP Opaque"), static_cast<int>(VolumeCompositingMode::LocalMIPOpaque)),
+    std::make_pair(QStringLiteral("ISO Surface"), static_cast<int>(VolumeCompositingMode::IsoSurface)),
+    std::make_pair(QStringLiteral("X Ray"), static_cast<int>(VolumeCompositingMode::XRay)));
+  m_raycasterCompositingMode.select(QStringLiteral("MIP Opaque"));
+
+  updateRaycasterCompositingMode();
+  connect(&m_raycasterCompositingMode,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &Z3DVolumeFilter::updateRaycasterCompositingMode);
 
   // directX 10 resource limit
   // 128 MB
@@ -170,10 +208,10 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   m_boundBoxLineWidth.set(1);
   m_boundBoxMode.select("Bound Box");
 
-  addParameter(m_volumeRaycasterRenderer.compositingModePara());
-  addParameter(m_volumeRaycasterRenderer.isoValuePara());
-  addParameter(m_volumeRaycasterRenderer.localMIPThresholdPara());
-  addParameter(m_volumeRaycasterRenderer.samplingRatePara());
+  addParameter(m_raycasterCompositingMode);
+  addParameter(m_raycasterIsoValue);
+  addParameter(m_raycasterLocalMIPThreshold);
+  addParameter(m_raycasterSamplingRate);
 
   adjustWidget();
   CHECK_GL_ERROR
@@ -352,10 +390,10 @@ std::shared_ptr<ZWidgetsGroup> Z3DVolumeFilter::widgetsGroup()
          ++it) {
       m_widgetsGroup->addChild(*it->get(), 3);
     }
-    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.compositingModePara(), 4);
-    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.isoValuePara(), 4);
-    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.localMIPThresholdPara(), 4);
-    m_widgetsGroup->addChild(m_volumeRaycasterRenderer.samplingRatePara(), 15);
+    m_widgetsGroup->addChild(m_raycasterCompositingMode, 4);
+    m_widgetsGroup->addChild(m_raycasterIsoValue, 4);
+    m_widgetsGroup->addChild(m_raycasterLocalMIPThreshold, 4);
+    m_widgetsGroup->addChild(m_raycasterSamplingRate, 15);
     for (auto it = m_volumeRaycasterRenderer.texFilterModeParas().begin();
          it != m_volumeRaycasterRenderer.texFilterModeParas().end();
          ++it) {
@@ -437,6 +475,35 @@ void Z3DVolumeFilter::exitInteractionMode()
   }
 }
 
+void Z3DVolumeFilter::updateRaycasterSamplingRate()
+{
+  m_volumeRaycasterRenderer.setSamplingRate(m_raycasterSamplingRate.get());
+}
+
+void Z3DVolumeFilter::updateRaycasterIsoValue()
+{
+  m_volumeRaycasterRenderer.setIsoValue(m_raycasterIsoValue.get());
+}
+
+void Z3DVolumeFilter::updateRaycasterLocalMIPThreshold()
+{
+  m_volumeRaycasterRenderer.setLocalMIPThreshold(m_raycasterLocalMIPThreshold.get());
+}
+
+void Z3DVolumeFilter::updateRaycasterCompositingMode()
+{
+  const auto mode = static_cast<VolumeCompositingMode>(m_raycasterCompositingMode.associatedData());
+  m_volumeRaycasterRenderer.setCompositingMode(mode);
+
+  const bool showIso = mode == VolumeCompositingMode::IsoSurface;
+  const bool showLocal = mode == VolumeCompositingMode::LocalMIP || mode == VolumeCompositingMode::LocalMIPOpaque;
+  m_raycasterIsoValue.setVisible(showIso);
+  m_raycasterLocalMIPThreshold.setVisible(showLocal);
+
+  updateRaycasterIsoValue();
+  updateRaycasterLocalMIPThreshold();
+}
+
 bool Z3DVolumeFilter::isReady(Z3DEye eye) const
 {
   return Z3DBoundedFilter::isReady(eye) && m_visible.get() && m_imgPack;
@@ -444,7 +511,9 @@ bool Z3DVolumeFilter::isReady(Z3DEye eye) const
 
 glm::vec3 Z3DVolumeFilter::get3DPosition(int x, int y, int width, int height, bool& success)
 {
-  if (m_volumeRaycasterRenderer.compositeMode() == "Direct Volume Rendering") {
+  const auto mode = static_cast<VolumeCompositingMode>(m_raycasterCompositingMode.associatedData());
+
+  if (mode == VolumeCompositingMode::DirectVolumeRendering) {
     return getMaxInten3DPositionUnderScreenPoint(x, y, width, height, success);
   } else {
     return getFirstHit3DPosition(x, y, width, height, success);
@@ -460,7 +529,7 @@ void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
 {
   Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_opaqueOutport
                                         : (eye == Left) ? m_opaqueLeftEyeOutport
-                                                                : m_opaqueRightEyeOutport;
+                                                        : m_opaqueRightEyeOutport;
   currentOutport.resize(m_outport.size());
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
@@ -471,7 +540,7 @@ bool Z3DVolumeFilter::hasTransparent(Z3DEye eye) const
 {
   const Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_outport
                                               : (eye == Left) ? m_leftEyeOutport
-                                                                      : m_rightEyeOutport;
+                                                              : m_rightEyeOutport;
   return currentOutport.hasValidData();
 }
 
@@ -479,7 +548,7 @@ void Z3DVolumeFilter::renderTransparent(Z3DEye eye)
 {
   Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_outport
                                         : (eye == Left) ? m_leftEyeOutport
-                                                                : m_rightEyeOutport;
+                                                        : m_rightEyeOutport;
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -669,7 +738,7 @@ void Z3DVolumeFilter::process(Z3DEye eye)
 
   Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_outport
                                         : (eye == Left) ? m_leftEyeOutport
-                                                                : m_rightEyeOutport;
+                                                        : m_rightEyeOutport;
 
   currentOutport.bindTarget();
   currentOutport.clearTarget();
@@ -710,7 +779,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
 {
   Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_opaqueOutport
                                         : (eye == Left) ? m_opaqueLeftEyeOutport
-                                                                : m_opaqueRightEyeOutport;
+                                                        : m_opaqueRightEyeOutport;
   currentOutport.resize(m_outport.size());
 
   m_layerTarget.resize(currentOutport.size());

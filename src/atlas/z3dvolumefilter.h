@@ -8,6 +8,7 @@
 #include "z3dtransformparameter.h"
 #include "zmesh.h"
 #include "zwidgetsgroup.h"
+#include "zoptionparameter.h"
 #include <vector>
 #include "z3dvolumeraycasterrenderer.h"
 #include "z3dvolumeslicerenderer.h"
@@ -156,11 +157,21 @@ private:
 
   void volumeChanged();
 
+  void updateRaycasterCompositingMode();
+  void updateRaycasterSamplingRate();
+  void updateRaycasterIsoValue();
+  void updateRaycasterLocalMIPThreshold();
+
   Z3DVolumeRaycasterRenderer m_volumeRaycasterRenderer;
   Z3DVolumeSliceRenderer m_volumeSliceRenderer;
   Z3DTextureAndEyeCoordinateRenderer m_textureAndEyeCoordinateRenderer;
   std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
+
+  ZStringIntOptionParameter m_raycasterCompositingMode;
+  ZFloatParameter m_raycasterSamplingRate;
+  ZFloatParameter m_raycasterIsoValue;
+  ZFloatParameter m_raycasterLocalMIPThreshold;
 
   const ZImgPack* m_imgPack;
   std::vector<std::unique_ptr<Z3DVolume>> m_volumes;

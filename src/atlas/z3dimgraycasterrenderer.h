@@ -6,13 +6,22 @@
 #include "z3dshaderprogram.h"
 #include "z3drendertarget.h"
 #include "z3dtexture.h"
-#include <memory>
 #include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dscratchresourcepool.h"
 
 namespace nim {
 
 class Z3DImg;
+enum class ImgCompositingMode
+{
+  DirectVolumeRendering,
+  MaximumIntensityProjection,
+  MIPOpaque,
+  LocalMIP,
+  LocalMIPOpaque,
+  IsoSurface,
+  XRay
+};
 
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions
@@ -58,28 +67,6 @@ public:
   // return true if something is rendered by this renderer
   [[nodiscard]] bool hasVisibleRendering() const;
 
-  [[nodiscard]] QString compositeMode() const;
-
-  ZStringIntOptionParameter& compositingModePara()
-  {
-    return m_compositingMode;
-  }
-
-  ZFloatParameter& samplingRatePara()
-  {
-    return m_samplingRate;
-  }
-
-  ZFloatParameter& isoValuePara()
-  {
-    return m_isoValue;
-  }
-
-  ZFloatParameter& localMIPThresholdPara()
-  {
-    return m_localMIPThreshold;
-  }
-
   [[nodiscard]] const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const
   {
     return m_channelVisibleParas;
@@ -106,6 +93,30 @@ public:
     return m_channelIdx[eye] > -1;
   }
 
+  void setSamplingRate(float value)
+  {
+    m_samplingRateValue = value;
+  }
+
+  void setIsoValue(float value)
+  {
+    m_isoValue = value;
+  }
+
+  void setLocalMIPThreshold(float value)
+  {
+    m_localMIPThreshold = value;
+  }
+
+  void setCompositingMode(ImgCompositingMode mode)
+  {
+    if (m_compositingModeValue == mode) {
+      return;
+    }
+    m_compositingModeValue = mode;
+    compile();
+  }
+
   // Ensure internal targets are sized; size is provided by filter
   void setOutputSize(const glm::uvec2& size)
   {
@@ -124,8 +135,6 @@ public:
   // Public API minimal; progressive reset is an internal operation
 
 protected:
-  void adjustWidgets();
-
   void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader) const;
 
   void bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx) const;
@@ -190,11 +199,11 @@ protected:
   Z3DRenderTarget* m_lastImageRenderTargets[3] = {nullptr, nullptr, nullptr};
   Z3DRenderTarget* m_currentImageRenderTargets[3] = {nullptr, nullptr, nullptr};
 
-  ZFloatParameter m_samplingRate; // Sampling rate of the raycasting, specified relative to the size of one voxel
-  ZFloatParameter m_isoValue; // The used isovalue, when isosurface raycasting is enabled
-  ZFloatParameter m_localMIPThreshold;
+  float m_samplingRateValue = 1.f; // Sampling rate of the raycasting, specified relative to the size of one voxel
+  float m_isoValue = 0.5f; // The used isovalue, when isosurface raycasting is enabled
+  float m_localMIPThreshold = 0.8f;
 
-  ZStringIntOptionParameter m_compositingMode;
+  ImgCompositingMode m_compositingModeValue = ImgCompositingMode::DirectVolumeRendering;
 
   Z3DImg* m_img = nullptr;
   std::vector<QString> m_volumeUniformNames;

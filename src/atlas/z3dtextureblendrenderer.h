@@ -2,8 +2,20 @@
 
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
+#include <QString>
 
 namespace nim {
+
+enum class TextureBlendMode
+{
+  DepthTest,
+  FirstOnTop,
+  SecondOnTop,
+  DepthTestBlending,
+  FirstOnTopBlending,
+  SecondOnTopBlending,
+  MIPImageDepthTestBlending
+};
 
 class Z3DTextureBlendRenderer : public Z3DPrimitiveRenderer
 {
@@ -12,7 +24,8 @@ public:
   // "DepthTest", "FirstOnTop", "SecondOnTop"
   // "DepthTestBlending", "FirstOnTopBlending", "SecondOnTopBlending"
   // "MIPImageDepthTestBlending"
-  explicit Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase, const QString& mode = "DepthTestBlending");
+  explicit Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase,
+                                   TextureBlendMode mode = TextureBlendMode::DepthTestBlending);
 
   void setColorTexture1(const Z3DTexture* colorTex)
   {
@@ -34,10 +47,7 @@ public:
     m_depthTexture2 = depthTex;
   }
 
-  ZStringStringOptionParameter& blendModePara()
-  {
-    return m_blendMode;
-  }
+  void setBlendMode(TextureBlendMode mode);
 
 protected:
   void compile() override;
@@ -54,7 +64,7 @@ protected:
 
   Z3DShaderProgram m_blendTextureShader;
 
-  ZStringStringOptionParameter m_blendMode;
+  TextureBlendMode m_blendMode;
   Z3DVertexArrayObject m_VAO;
 };
 

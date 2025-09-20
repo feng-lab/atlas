@@ -24,6 +24,7 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_colorMapMeanIntensity("Mean Intensity Color Map", 0., 1., QColor(255, 0, 0), QColor(0, 0, 0))
   , m_colorMapMaxIntensity("Max Intensity Color Map", 0., 1., QColor(255, 0, 0), QColor(0, 0, 0))
   , m_useSameSizeForAllPuncta("Use Same Size", false)
+  , m_useDynamicMaterial("Calculate Material Property From Intensity", true)
   //  , m_glowSphereRenderer(m_rendererBase)
   //  , m_textureGlowRenderer(m_rendererBase)
   //  , m_randomGlow("Random Glow", false)
@@ -66,7 +67,11 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
 
   addParameter(m_useSameSizeForAllPuncta);
 
-  addParameter(m_sphereRenderer.useDynamicMaterialPara());
+  addParameter(m_useDynamicMaterial);
+  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, [this]() {
+    m_sphereRenderer.setUseDynamicMaterial(m_useDynamicMaterial.get());
+  });
+  m_sphereRenderer.setUseDynamicMaterial(m_useDynamicMaterial.get());
 
   //  m_glowSphereRenderer.useDynamicMaterialPara().set(false);
   //  connect(&m_randomGlow, &ZBoolParameter::valueChanged, this, &Z3DPunctaFilter::adjustWidgets);
@@ -212,7 +217,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_colorMapMeanIntensity, 1);
     m_widgetsGroup->addChild(m_colorMapMaxIntensity, 1);
     m_widgetsGroup->addChild(m_useSameSizeForAllPuncta, 1);
-    m_widgetsGroup->addChild(m_sphereRenderer.useDynamicMaterialPara(), 7);
+    m_widgetsGroup->addChild(m_useDynamicMaterial, 7);
 
     const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
     for (auto para : paras) {

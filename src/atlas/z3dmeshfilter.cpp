@@ -1,8 +1,11 @@
 #include "z3dmeshfilter.h"
 
+#include "z3dmeshrenderer.h"
 #include "zregionannotation.h"
 #include "zmesh.h"
 #include "zrandom.h"
+#include "z3dtextureglowrenderer.h"
+#include "zlog.h"
 #include <QFileInfo>
 
 namespace nim {
@@ -10,6 +13,8 @@ namespace nim {
 Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode* regionNode, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
   , m_triangleListRenderer(m_rendererBase)
+  , m_wireframeMode("Wireframe Option")
+  , m_wireframeColor("Wireframe Color", glm::vec4(1), glm::vec4(0), glm::vec4(1))
   , m_colorMode("Color Mode")
   , m_singleColorForAllMesh("Mesh Color",
                             glm::vec4(ZRandom::instance().randReal<float>(),
@@ -37,18 +42,34 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::prepareColor);
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::adjustWidgets);
 
+  m_wireframeMode.addOptionsWithData(
+    std::make_pair("No Wireframe", static_cast<int>(Z3DMeshRenderer::WireframeMode::NoWireframe)),
+    std::make_pair("With Wireframe", static_cast<int>(Z3DMeshRenderer::WireframeMode::WithWireframe)),
+    std::make_pair("Only Wireframe", static_cast<int>(Z3DMeshRenderer::WireframeMode::OnlyWireframe)));
+  m_wireframeMode.select("No Wireframe");
+  m_wireframeColor.setStyle("COLOR");
+  updateWireframeMode();
+  updateWireframeColor();
+  connect(&m_wireframeMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::updateWireframeMode);
+  connect(&m_wireframeColor, &ZVec4Parameter::valueChanged, this, &Z3DMeshFilter::updateWireframeColor);
+
   addParameter(m_colorMode);
 
   addParameter(m_singleColorForAllMesh);
 
+  addParameter(m_wireframeMode);
+  addParameter(m_wireframeColor);
+
   connect(&m_glow, &ZBoolParameter::valueChanged, this, &Z3DMeshFilter::adjustWidgets);
   addParameter(m_glow);
   // Initialize glow parameter defaults to match previous behavior
-  m_glowMode.addOptionsWithData(std::make_pair<QString, QString>("Additive", "ADDITIVE_BLENDING"),
-                                std::make_pair<QString, QString>("Screen", "SCREEN_BLENDING"));
-  m_glowMode.addOptionsWithData(std::make_pair<QString, QString>("Softlight", "SOFTLIGHT_BLENDING"),
-                                std::make_pair<QString, QString>("Glowmap", "GLOWMAP"));
-  m_glowMode.select("Screen");
+  m_glowMode.clearOptions();
+  m_glowMode.addOptionsWithData(
+    std::make_pair(enumToQString(GlowMode::Additive), static_cast<int>(GlowMode::Additive)),
+    std::make_pair(enumToQString(GlowMode::Screen), static_cast<int>(GlowMode::Screen)),
+    std::make_pair(enumToQString(GlowMode::Softlight), static_cast<int>(GlowMode::Softlight)),
+    std::make_pair(enumToQString(GlowMode::Glowmap), static_cast<int>(GlowMode::Glowmap)));
+  m_glowMode.select(enumToQString(GlowMode::Screen));
   m_glowBlurScale.setSingleStep(0.5f);
   addParameter(m_glowMode);
   addParameter(m_glowBlurRadius);
@@ -65,9 +86,6 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
   addEventListener(m_selectMeshEvent);
 
   adjustWidgets();
-
-  addParameter(m_triangleListRenderer.wireframeModePara());
-  addParameter(m_triangleListRenderer.wireframeColorPara());
 }
 
 QString Z3DMeshFilter::regionName() const
@@ -124,8 +142,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_stayOnTop, 1);
     m_widgetsGroup->addChild(m_colorMode, 1);
     m_widgetsGroup->addChild(m_singleColorForAllMesh, 1);
-    m_widgetsGroup->addChild(m_triangleListRenderer.wireframeModePara(), 1);
-    m_widgetsGroup->addChild(m_triangleListRenderer.wireframeColorPara(), 1);
+    m_widgetsGroup->addChild(m_wireframeMode, 1);
+    m_widgetsGroup->addChild(m_wireframeColor, 1);
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
     for (auto para : paras) {
@@ -172,8 +190,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroupForAnnotationFilter()
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Mesh", 1);
     m_widgetsGroup->addChild(m_visible, 1);
     m_widgetsGroup->addChild(m_singleColorForAllMesh, 1);
-    m_widgetsGroup->addChild(m_triangleListRenderer.wireframeModePara(), 1);
-    m_widgetsGroup->addChild(m_triangleListRenderer.wireframeColorPara(), 1);
+    m_widgetsGroup->addChild(m_wireframeMode, 1);
+    m_widgetsGroup->addChild(m_wireframeColor, 1);
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
     for (auto para : paras) {
@@ -310,10 +328,22 @@ void Z3DMeshFilter::prepareColor()
       m_meshColors.push_back(m_singleColorForAllMesh.get());
     }
     m_triangleListRenderer.setDataColors(&m_meshColors);
-    m_triangleListRenderer.setColorSource("CustomColor");
+    m_triangleListRenderer.setColorSource(MeshColorSource::CustomColor);
   } else if (m_colorMode.isSelected("Mesh Color")) {
-    m_triangleListRenderer.setColorSource("MeshColor");
+    m_triangleListRenderer.setColorSource(MeshColorSource::MeshColor);
   }
+}
+
+void Z3DMeshFilter::updateWireframeMode()
+{
+  m_triangleListRenderer.setWireframeMode(
+    static_cast<Z3DMeshRenderer::WireframeMode>(m_wireframeMode.associatedData()));
+  adjustWidgets();
+}
+
+void Z3DMeshFilter::updateWireframeColor()
+{
+  m_triangleListRenderer.setWireframeColor(m_wireframeColor.get());
 }
 
 void Z3DMeshFilter::adjustWidgets()
@@ -324,6 +354,7 @@ void Z3DMeshFilter::adjustWidgets()
   m_glowBlurRadius.setVisible(m_glow.get());
   m_glowBlurScale.setVisible(m_glow.get());
   m_glowBlurStrength.setVisible(m_glow.get());
+  m_wireframeColor.setVisible(!m_wireframeMode.isSelected("No Wireframe"));
 }
 
 void Z3DMeshFilter::selectMesh(QMouseEvent* e, int /*w*/, int /*h*/)

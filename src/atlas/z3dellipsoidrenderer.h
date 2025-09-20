@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include <algorithm>
 
 namespace nim {
 
@@ -20,10 +21,19 @@ public:
 
   void setDataPickingColors(std::vector<glm::vec4>* ellipsoidPickingColorsInput = nullptr);
 
-  ZBoolParameter& useDynamicMaterialPara()
+  void setUseDynamicMaterial(bool enabled);
+
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  void setSphereSlicesStacks(int value)
   {
-    return m_useDynamicMaterial;
+    int clamped = std::max(value, 3);
+    if (m_sphereSlicesStacks == clamped) {
+      return;
+    }
+    m_sphereSlicesStacks = clamped;
+    invalidateOpenglRenderer();
   }
+#endif
 
 protected:
   void compile() override;
@@ -44,8 +54,11 @@ protected:
 protected:
   Z3DShaderGroup m_ellipsoidShaderGrp;
 
-  ZIntParameter m_sphereSlicesStacks;
-  ZBoolParameter m_useDynamicMaterial;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  int m_sphereSlicesStacks = 36;
+#endif
+
+  bool m_useDynamicMaterial = true;
 
 private:
   std::vector<glm::vec4> m_axis1;

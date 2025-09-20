@@ -160,6 +160,11 @@ private:
 
   static void downloadTextureToLocalColorBuffer(const Z3DTexture& tex, Z3DLocalColorBuffer& localColorBuffer);
 
+  void updateBackgroundMode();
+  void updateBackgroundFirstColor();
+  void updateBackgroundSecondColor();
+  void updateBackgroundOrientation();
+
 private:
   Z3DTextureBlendRenderer m_alphaBlendRenderer;
   Z3DTextureBlendRenderer m_firstOnTopBlendRenderer;
@@ -168,6 +173,10 @@ private:
   Z3DTextureCopyRenderer m_textureCopyRenderer;
   Z3DTextureGlowRenderer m_glowRenderer;
   Z3DBackgroundRenderer m_backgroundRenderer;
+  ZStringIntOptionParameter m_backgroundMode;
+  ZVec4Parameter m_backgroundFirstColor;
+  ZVec4Parameter m_backgroundSecondColor;
+  ZStringIntOptionParameter m_backgroundGradientOrientation;
 
   // ZBoolParameter m_renderGeometries;
 
@@ -219,6 +228,14 @@ private:
   ZVec4Parameter m_ZAxisColor;
   ZFloatParameter m_axisRegionRatio;
   ZStringIntOptionParameter m_axisMode;
+  ZStringIntOptionParameter m_axisFontName;
+  ZFloatParameter m_axisFontSize;
+  ZFloatParameter m_axisFontSoftEdgeScale;
+  ZBoolParameter m_axisShowFontOutline;
+  ZStringIntOptionParameter m_axisFontOutlineMode;
+  ZVec4Parameter m_axisFontOutlineColor;
+  ZBoolParameter m_axisShowFontShadow;
+  ZVec4Parameter m_axisFontShadowColor;
 
   std::vector<glm::vec4> m_tailPosAndTailRadius;
   std::vector<glm::vec4> m_headPosAndHeadRadius;

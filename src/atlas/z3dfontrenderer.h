@@ -1,10 +1,17 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
-#include "zfontparameter.h"
 #include "z3dsdfont.h"
+#include <QString>
+#include <QStringList>
 
 namespace nim {
+
+enum class FontOutlineMode
+{
+  Glow,
+  Outline
+};
 
 class Z3DFontRenderer : public Z3DPrimitiveRenderer
 {
@@ -17,53 +24,31 @@ public:
 
   void setDataPickingColors(std::vector<glm::vec4>* pickingColors = nullptr);
 
-  ZStringIntOptionParameter& allFontNamesPara()
+  const QStringList& fontNames() const
   {
-    return m_allFontNames;
+    return m_fontNames;
   }
 
-  ZFontParameter& fontPara()
+  QString selectedFontName() const
   {
-    return m_font;
+    return m_selectedFontName;
   }
 
-  ZFloatParameter& fontSizePara()
-  {
-    return m_fontSize;
-  }
+  void setFontName(const QString& fontName);
 
-  ZFloatParameter& fontSoftEdgeScalePara()
-  {
-    return m_fontSoftEdgeScale;
-  }
+  void setFontSize(float size);
 
-  ZBoolParameter& showFontOutlinePara()
-  {
-    return m_showFontOutline;
-  }
+  void setFontSoftEdgeScale(float scale);
 
-  ZStringIntOptionParameter& fontOutlineModePara()
-  {
-    return m_fontOutlineMode;
-  }
+  void setShowFontOutline(bool show);
 
-  ZVec4Parameter& fontOutlineColorPara()
-  {
-    return m_fontOutlineColor;
-  }
+  void setFontOutlineMode(FontOutlineMode mode);
 
-  ZBoolParameter& showFontShadowPara()
-  {
-    return m_showFontShadow;
-  }
+  void setFontOutlineColor(const glm::vec4& color);
 
-  ZVec4Parameter& fontShadowColorPara()
-  {
-    return m_fontShadowColor;
-  }
+  void setShowFontShadow(bool show);
 
-protected:
-  void adjustWidgets();
+  void setFontShadowColor(const glm::vec4& color);
 
   void compile() override;
 
@@ -80,16 +65,16 @@ protected:
 protected:
   Z3DShaderGroup m_fontShaderGrp;
 
-  ZStringIntOptionParameter m_allFontNames; // font name and index into m_allFonts
-  ZFontParameter m_font;
-  ZFloatParameter m_fontSize; // font size in world coordinate
-  ZBoolParameter m_fontUseSoftEdge;
-  ZFloatParameter m_fontSoftEdgeScale;
-  ZBoolParameter m_showFontOutline;
-  ZStringIntOptionParameter m_fontOutlineMode;
-  ZVec4Parameter m_fontOutlineColor;
-  ZBoolParameter m_showFontShadow;
-  ZVec4Parameter m_fontShadowColor;
+  QStringList m_fontNames;
+  QString m_selectedFontName;
+  int m_selectedFontIndex = 0;
+  float m_fontSize = 32.f;
+  float m_fontSoftEdgeScale = 80.f;
+  bool m_showFontOutline = false;
+  FontOutlineMode m_fontOutlineMode = FontOutlineMode::Glow;
+  glm::vec4 m_fontOutlineColor = glm::vec4(1.f);
+  bool m_showFontShadow = false;
+  glm::vec4 m_fontShadowColor = glm::vec4(0.f, 0.f, 0.f, 1.f);
 
   std::vector<std::unique_ptr<Z3DSDFont>> m_allFonts;
 

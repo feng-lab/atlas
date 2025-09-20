@@ -83,6 +83,9 @@ protected:
 
   void adjustWidgets();
 
+  void updateWireframeMode();
+  void updateWireframeColor();
+
   void selectMesh(QMouseEvent* e, int w, int h);
 
   void onApplyTransform();
@@ -108,12 +111,14 @@ private:
 
 private:
   Z3DMeshRenderer m_triangleListRenderer;
+  ZStringIntOptionParameter m_wireframeMode;
+  ZVec4Parameter m_wireframeColor;
 
   ZStringIntOptionParameter m_colorMode;
   ZVec4Parameter m_singleColorForAllMesh;
   ZBoolParameter m_glow;
   // Glow parameters now live on the filter for compositor to read
-  ZStringStringOptionParameter m_glowMode;
+  ZStringIntOptionParameter m_glowMode;
   ZIntParameter m_glowBlurRadius;
   ZFloatParameter m_glowBlurScale;
   ZFloatParameter m_glowBlurStrength;

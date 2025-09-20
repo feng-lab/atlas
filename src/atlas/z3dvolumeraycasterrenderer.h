@@ -5,10 +5,21 @@
 #include "zmesh.h"
 #include "z3dshaderprogram.h"
 #include "z3drendertarget.h"
+#include <QString>
 
 namespace nim {
 
 class Z3DImg;
+enum class VolumeCompositingMode
+{
+  DirectVolumeRendering,
+  MaximumIntensityProjection,
+  MIPOpaque,
+  LocalMIP,
+  LocalMIPOpaque,
+  IsoSurface,
+  XRay
+};
 
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions
@@ -54,29 +65,28 @@ public:
   // return true if something is rendered by this renderer
   bool hasVisibleRendering() const;
 
-  QString compositeMode() const
+  void setSamplingRate(float value)
   {
-    return m_compositingMode.get();
+    m_samplingRateValue = value;
   }
 
-  ZStringIntOptionParameter& compositingModePara()
+  void setIsoValue(float value)
   {
-    return m_compositingMode;
+    m_isoValue = value;
   }
 
-  ZFloatParameter& samplingRatePara()
+  void setLocalMIPThreshold(float value)
   {
-    return m_samplingRate;
+    m_localMIPThreshold = value;
   }
 
-  ZFloatParameter& isoValuePara()
+  void setCompositingMode(VolumeCompositingMode mode)
   {
-    return m_isoValue;
-  }
-
-  ZFloatParameter& localMIPThresholdPara()
-  {
-    return m_localMIPThreshold;
+    if (m_compositingModeValue == mode) {
+      return;
+    }
+    m_compositingModeValue = mode;
+    compile();
   }
 
   const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const
@@ -95,8 +105,6 @@ public:
   }
 
 protected:
-  void adjustWidgets();
-
   void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader);
 
   void bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx);
@@ -119,12 +127,11 @@ protected:
   Z3DShaderProgram m_scVolumeSliceWithTransferfunShader;
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DShaderProgram m_mergeChannelShader;
+  float m_samplingRateValue = 1.f; // Sampling rate of the raycasting, specified relative to the size of one voxel
+  float m_isoValue = 0.5f; // The used isovalue, when isosurface raycasting is enabled
+  float m_localMIPThreshold = 0.8f;
 
-  ZFloatParameter m_samplingRate; // Sampling rate of the raycasting, specified relative to the size of one voxel
-  ZFloatParameter m_isoValue; // The used isovalue, when isosurface raycasting is enabled
-  ZFloatParameter m_localMIPThreshold;
-
-  ZStringIntOptionParameter m_compositingMode;
+  VolumeCompositingMode m_compositingModeValue = VolumeCompositingMode::DirectVolumeRendering;
 
   std::vector<Z3DVolume*> m_volumes;
   std::vector<QString> m_volumeUniformNames;

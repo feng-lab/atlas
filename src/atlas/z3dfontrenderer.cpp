@@ -7,22 +7,13 @@
 #include "z3dshaderprogram.h"
 #include "zlog.h"
 #include <QDir>
+#include <algorithm>
 
 namespace nim {
 
 Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_fontShaderGrp(rendererBase)
-  , m_allFontNames("Font")
-  , m_font("Font_")
-  , m_fontSize("Font Size", 32.f, .1f, 5000.f)
-  , m_fontUseSoftEdge("Font Use Softedge", true)
-  , m_fontSoftEdgeScale("Font Softedge Scale", 80.f, 0.f, 200.f)
-  , m_showFontOutline("Show Font Outline", false)
-  , m_fontOutlineMode("Font Outline Mode")
-  , m_fontOutlineColor("Font Outline Color", glm::vec4(1.f))
-  , m_showFontShadow("Show Font Shadow", false)
-  , m_fontShadowColor("Font Shadow Color", glm::vec4(0.f, 0.f, 0.f, 1.f))
   , m_positionsPt(nullptr)
   , m_colorsPt(nullptr)
   , m_pickingColorsPt(nullptr)
@@ -32,19 +23,6 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
   , m_dataChanged(false)
   , m_pickingDataChanged(false)
 {
-  m_fontSize.setSingleStep(0.1);
-  m_fontSize.setDecimal(1);
-  m_fontOutlineMode.addOptions("Glow", "Outline");
-  m_fontOutlineMode.select("Glow");
-  m_fontOutlineColor.setStyle("COLOR");
-  m_fontShadowColor.setStyle("COLOR");
-  adjustWidgets();
-  connect(&m_showFontOutline, &ZBoolParameter::valueChanged, this, &Z3DFontRenderer::adjustWidgets);
-  connect(&m_showFontOutline, &ZBoolParameter::valueChanged, this, &Z3DFontRenderer::compile);
-  connect(&m_fontOutlineMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DFontRenderer::compile);
-  connect(&m_showFontShadow, &ZBoolParameter::valueChanged, this, &Z3DFontRenderer::adjustWidgets);
-  connect(&m_showFontShadow, &ZBoolParameter::valueChanged, this, &Z3DFontRenderer::compile);
-
   QStringList allshaders;
   allshaders << "almag.vert"
              << "almag_func.frag";
@@ -66,9 +44,13 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
     }
     auto sdFont = std::make_unique<Z3DSDFont>(fileInfo.absoluteFilePath(), txtFileInfo.absoluteFilePath());
     if (!sdFont->isEmpty()) {
-      m_allFontNames.addOptionWithData(std::make_pair(sdFont->fontName(), static_cast<int>(m_allFonts.size())));
+      m_fontNames.push_back(sdFont->fontName());
       m_allFonts.emplace_back(std::move(sdFont));
     }
+  }
+  if (!m_fontNames.isEmpty()) {
+    m_selectedFontName = m_fontNames.front();
+    m_selectedFontIndex = 0;
   }
 }
 
@@ -103,14 +85,6 @@ void Z3DFontRenderer::setDataPickingColors(std::vector<glm::vec4>* pickingColors
   m_pickingDataChanged = true;
 }
 
-void Z3DFontRenderer::adjustWidgets()
-{
-  // m_fontSoftEdgeScale.setVisible(m_fontUseSoftEdge.get());
-  m_fontOutlineColor.setVisible(m_showFontOutline.get());
-  m_fontOutlineMode.setVisible(m_showFontOutline.get());
-  m_fontShadowColor.setVisible(m_showFontShadow.get());
-}
-
 void Z3DFontRenderer::compile()
 {
   m_fontShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
@@ -139,14 +113,14 @@ QString Z3DFontRenderer::generateHeader()
 {
   // if (m_fontUseSoftEdge.get())
   QString headerSource = "#define USE_SOFTEDGE\n";
-  if (m_showFontOutline.get()) {
-    if (m_fontOutlineMode.isSelected("Glow")) {
+  if (m_showFontOutline) {
+    if (m_fontOutlineMode == FontOutlineMode::Glow) {
       headerSource += "#define SHOW_GLOW\n";
     } else {
       headerSource += "#define SHOW_OUTLINE\n";
     }
   }
-  if (m_showFontShadow.get()) {
+  if (m_showFontShadow) {
     headerSource += "#define SHOW_SHADOW\n";
   }
   return headerSource;
@@ -154,7 +128,7 @@ QString Z3DFontRenderer::generateHeader()
 
 void Z3DFontRenderer::render(Z3DEye eye)
 {
-  if (m_allFontNames.isEmpty()) {
+  if (m_allFonts.empty()) {
     LOG(ERROR) << "Can not find any font.";
     return;
   }
@@ -164,7 +138,11 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
   prepareFontShaderData(eye);
 
-  Z3DSDFont* font = m_allFonts[m_allFontNames.associatedData()].get();
+  m_selectedFontIndex = std::clamp(m_selectedFontIndex, 0, static_cast<int>(m_allFonts.size()) - 1);
+  Z3DSDFont* font = m_allFonts[m_selectedFontIndex].get();
+  if (fontNames().size() > m_selectedFontIndex) {
+    m_selectedFontName = m_fontNames[m_selectedFontIndex];
+  }
 
   if (m_rendererBase.shaderHookType() == Z3DRendererBase::ShaderHookType::Normal) {
     glEnable(GL_BLEND);
@@ -176,13 +154,12 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   shader.bindTexture("tex", font->texture());
-  // if (m_fontUseSoftEdge.get())
-  shader.setUniform("softedge_scale", m_fontSoftEdgeScale.get());
-  if (m_showFontOutline.get()) {
-    shader.setUniform("outline_color", m_fontOutlineColor.get());
+  shader.setUniform("softedge_scale", m_fontSoftEdgeScale);
+  if (m_showFontOutline) {
+    shader.setUniform("outline_color", m_fontOutlineColor);
   }
-  if (m_showFontShadow.get()) {
-    shader.setUniform("shadow_color", m_fontShadowColor.get());
+  if (m_showFontShadow) {
+    shader.setUniform("shadow_color", m_fontShadowColor);
   }
 
   if (m_useVAO) {
@@ -273,7 +250,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
 void Z3DFontRenderer::renderPicking(Z3DEye)
 {
-  if (m_allFontNames.isEmpty()) {
+  if (m_allFonts.empty()) {
     LOG(ERROR) << "Can not find any font.";
     return;
   }
@@ -295,8 +272,9 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
   glm::mat4 viewMatrix = m_rendererBase.camera().viewMatrix(eye);
   glm::vec3 rightVector(viewMatrix[0][0], viewMatrix[0][1], viewMatrix[0][2]);
   glm::vec3 upVector(viewMatrix[1][0], viewMatrix[1][1], viewMatrix[1][2]);
-  Z3DSDFont* font = m_allFonts[m_allFontNames.associatedData()].get();
-  float scale = m_fontSize.get() / static_cast<float>(font->maxFontHeight());
+  m_selectedFontIndex = std::clamp(m_selectedFontIndex, 0, static_cast<int>(m_allFonts.size()) - 1);
+  Z3DSDFont* font = m_allFonts[m_selectedFontIndex].get();
+  float scale = m_fontSize / static_cast<float>(font->maxFontHeight());
   GLuint indices[6] = {0, 1, 2, 2, 1, 3};
   GLuint quadIdx = 0;
   for (index_t strIdx = 0; strIdx < m_texts.size(); strIdx++) {
@@ -342,6 +320,90 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
       loc += rightVector * charInfo.xadvance * scale;
     }
   }
+}
+
+void Z3DFontRenderer::setFontName(const QString& fontName)
+{
+  if (m_fontNames.isEmpty()) {
+    return;
+  }
+  const QString normalized = fontName.isEmpty() ? m_fontNames.front() : fontName;
+  int index = m_fontNames.indexOf(normalized);
+  if (index < 0) {
+    index = 0;
+  }
+  if (index == m_selectedFontIndex) {
+    return;
+  }
+  m_selectedFontIndex = index;
+  m_selectedFontName = m_fontNames[m_selectedFontIndex];
+  m_dataChanged = true;
+  m_pickingDataChanged = true;
+}
+
+void Z3DFontRenderer::setFontSize(float size)
+{
+  float clamped = std::clamp(size, 0.1f, 5000.f);
+  if (m_fontSize == clamped) {
+    return;
+  }
+  m_fontSize = clamped;
+  m_dataChanged = true;
+  m_pickingDataChanged = true;
+}
+
+void Z3DFontRenderer::setFontSoftEdgeScale(float scale)
+{
+  float clamped = std::clamp(scale, 0.f, 200.f);
+  if (m_fontSoftEdgeScale == clamped) {
+    return;
+  }
+  m_fontSoftEdgeScale = clamped;
+}
+
+void Z3DFontRenderer::setShowFontOutline(bool show)
+{
+  if (m_showFontOutline == show) {
+    return;
+  }
+  m_showFontOutline = show;
+  m_dataChanged = true;
+  compile();
+}
+
+void Z3DFontRenderer::setFontOutlineMode(FontOutlineMode mode)
+{
+  if (m_fontOutlineMode == mode) {
+    return;
+  }
+  m_fontOutlineMode = mode;
+  compile();
+}
+
+void Z3DFontRenderer::setFontOutlineColor(const glm::vec4& color)
+{
+  if (m_fontOutlineColor == color) {
+    return;
+  }
+  m_fontOutlineColor = color;
+}
+
+void Z3DFontRenderer::setShowFontShadow(bool show)
+{
+  if (m_showFontShadow == show) {
+    return;
+  }
+  m_showFontShadow = show;
+  m_dataChanged = true;
+  compile();
+}
+
+void Z3DFontRenderer::setFontShadowColor(const glm::vec4& color)
+{
+  if (m_fontShadowColor == color) {
+    return;
+  }
+  m_fontShadowColor = color;
 }
 
 } // namespace nim

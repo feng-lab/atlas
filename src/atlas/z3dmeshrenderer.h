@@ -2,6 +2,7 @@
 
 #include "z3dprimitiverenderer.h"
 #include "zmesh.h"
+#include <QString>
 
 class Z3DTexture;
 
@@ -13,6 +14,15 @@ namespace nim {
 // "Mesh2DTexture" : 2DTextureCoord field of ZMesh is used, setTexture must be called
 // "Mesh3DTexture" : 3DTextureCoord field of ZMesh is used, setTexture must be called
 // "CustomColor" : setDataColors must be called to set color of each mesh
+enum class MeshColorSource
+{
+  MeshColor,
+  Mesh1DTexture,
+  Mesh2DTexture,
+  Mesh3DTexture,
+  CustomColor
+};
+
 class Z3DMeshRenderer : public Z3DPrimitiveRenderer
 {
 public:
@@ -31,19 +41,23 @@ public:
   void setDataPickingColors(std::vector<glm::vec4>* meshPickingColorsInput = nullptr);
 
   // One of "MeshColor", "Mesh1DTexture", "Mesh2DTexture", "Mesh3DTexture", "CustomColor"
-  void setColorSource(const QString& sc)
+  void setColorSource(MeshColorSource source);
+
+  enum class WireframeMode
   {
-    m_colorSource.select(sc);
+    NoWireframe,
+    WithWireframe,
+    OnlyWireframe
+  };
+
+  void setWireframeMode(WireframeMode mode)
+  {
+    m_wireframeModeValue = mode;
   }
 
-  ZStringIntOptionParameter& wireframeModePara()
+  void setWireframeColor(const glm::vec4& color)
   {
-    return m_wireframeMode;
-  }
-
-  ZVec4Parameter& wireframeColorPara()
-  {
-    return m_wireframeColor;
+    m_wireframeColorValue = color;
   }
 
 protected:
@@ -59,8 +73,6 @@ protected:
   void render(Z3DEye eye) override;
 
   void renderPicking(Z3DEye eye) override;
-
-  void adjustWidgets();
 
 private:
   void prepareMesh();
@@ -91,7 +103,7 @@ private:
   bool m_meshColorReady;
   bool m_meshPickingColorReady;
 
-  ZStringIntOptionParameter m_colorSource;
+  MeshColorSource m_colorSource;
 
   bool m_dataChanged;
   bool m_pickingDataChanged;
@@ -101,8 +113,8 @@ private:
   std::vector<Z3DVertexBufferObject> m_VBOs;
   std::vector<Z3DVertexBufferObject> m_pickingVBOs;
 
-  ZStringIntOptionParameter m_wireframeMode;
-  ZVec4Parameter m_wireframeColor;
+  WireframeMode m_wireframeModeValue = WireframeMode::NoWireframe;
+  glm::vec4 m_wireframeColorValue{1.f};
 };
 
 } // namespace nim

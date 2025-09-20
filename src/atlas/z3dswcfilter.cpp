@@ -90,6 +90,9 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
           this,
           &Z3DSwcFilter::contextMenuEvent);
   addEventListener(m_contextMenuEvent);
+
+  m_sphereRenderer.setUseDynamicMaterial(true);
+  m_sphereRendererForCone.setUseDynamicMaterial(true);
 }
 
 double Z3DSwcFilter::process(Z3DEye)

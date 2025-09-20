@@ -9,8 +9,6 @@ namespace nim {
 Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_ellipsoidShaderGrp(rendererBase)
-  , m_sphereSlicesStacks("Sphere Slices Stacks", 36, 20, 100)
-  , m_useDynamicMaterial("Calculate Material Property From Intensity", true)
   , m_VAO(1)
   , m_pickingVAO(1)
   , m_VBOs(8)
@@ -20,11 +18,7 @@ Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase)
 {
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
-  connect(&m_sphereSlicesStacks, &ZIntParameter::valueChanged, this, &Z3DEllipsoidRenderer::invalidateOpenglRenderer);
-  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DEllipsoidRenderer::invalidateOpenglRenderer);
 #endif
-
-  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DEllipsoidRenderer::compile);
 
   QStringList allshaders;
   allshaders << "ellipsoid.vert"
@@ -75,9 +69,7 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers,
     }
     quadIdx++;
   }
-  if (!specularAndShininessInput) {
-    m_useDynamicMaterial.set(false);
-  } else {
+  if (specularAndShininessInput) {
     for (auto ss : *specularAndShininessInput) {
       m_specularAndShininess.push_back(ss);
       m_specularAndShininess.push_back(ss);
@@ -152,7 +144,7 @@ void Z3DEllipsoidRenderer::compile()
 QString Z3DEllipsoidRenderer::generateHeader()
 {
   QString headerSource;
-  if (m_useDynamicMaterial.get()) {
+  if (m_useDynamicMaterial) {
     headerSource += "#define DYNAMIC_MATERIAL_PROPERTY\n";
   }
   return headerSource;
@@ -176,12 +168,12 @@ void Z3DEllipsoidRenderer::renderUsingOpengl()
                 coordTransform() * m_centers[i]);
     glMultMatrixf(&m[0][0]);
     // overwrite material property setted by z3drendererbase
-    if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+    if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
       glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, m_specularAndShininess[i].w);
       glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, glm::value_ptr(glm::vec4(m_specularAndShininess[i].xyz(), 1.f)));
     }
     glColor4fv(glm::value_ptr(glm::vec4(m_ellipsoidColors[i].rgb(), m_ellipsoidColors[i].a * opacity())));
-    gluSphere(quadric, .5, m_sphereSlicesStacks.get(), m_sphereSlicesStacks.get());
+    gluSphere(quadric, .5, m_sphereSlicesStacks, m_sphereSlicesStacks);
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
   }
@@ -232,7 +224,7 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
       // set vertex data
       auto attr_T = shader.TAttributeLocation();
       GLint attr_a_specular_shininess = -1;
-      if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+      if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
         attr_a_specular_shininess = shader.specularShininessAttributeLocation();
       }
       auto attr_color = shader.colorAttributeLocation();
@@ -258,7 +250,7 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
       glBufferData(GL_ARRAY_BUFFER, m_centers.size() * 4 * sizeof(GLfloat), m_centers.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-      if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+      if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
         glEnableVertexAttribArray(attr_a_specular_shininess);
         m_VBOs.bind(GL_ARRAY_BUFFER, 6);
         glBufferData(GL_ARRAY_BUFFER,
@@ -298,7 +290,7 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
     // set vertex data
     auto attr_T = shader.TAttributeLocation();
     GLint attr_a_specular_shininess = -1;
-    if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+    if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
       attr_a_specular_shininess = shader.specularShininessAttributeLocation();
     }
     auto attr_color = shader.colorAttributeLocation();
@@ -332,7 +324,7 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
     }
     glVertexAttribPointer(attr_T + 3, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+    if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
       glEnableVertexAttribArray(attr_a_specular_shininess);
       m_VBOs.bind(GL_ARRAY_BUFFER, 6);
       if (m_dataChanged) {
@@ -374,7 +366,7 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
     glDisableVertexAttribArray(attr_T + 1);
     glDisableVertexAttribArray(attr_T + 2);
     glDisableVertexAttribArray(attr_T + 3);
-    if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+    if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
       glDisableVertexAttribArray(attr_a_specular_shininess);
     }
     glDisableVertexAttribArray(attr_color);
@@ -583,6 +575,21 @@ void Z3DEllipsoidRenderer::appendDefaultColors()
       m_ellipsoidColors.emplace_back(0.f, 0.f, 0.f, 1.f);
     }
   }
+  if (m_useDynamicMaterial && m_specularAndShininess.size() < m_centers.size()) {
+    m_specularAndShininess.resize(m_centers.size(), glm::vec4(1.f, 1.f, 1.f, 10.f));
+  }
+}
+
+void Z3DEllipsoidRenderer::setUseDynamicMaterial(bool enabled)
+{
+  if (m_useDynamicMaterial == enabled) {
+    return;
+  }
+  m_useDynamicMaterial = enabled;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  invalidateOpenglRenderer();
+#endif
+  compile();
 }
 
 } // namespace nim

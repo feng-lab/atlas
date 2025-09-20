@@ -461,6 +461,23 @@ Abstraction/Reuse tasks
 - [ ] Expand Vulkan compositor to provide equivalent outputs (ready targets/readback).
 - [ ] Migrate engine to hold a `std::unique_ptr` to the facade and switch backend at runtime.
 - [ ] Audit filters for GL leakage and continue moving API-specific ownership into renderers/compositor.
+- [ ] Render-surface façade: introduce API-neutral ports/leases (`RenderSurfacePort` prototype landed) and replace `Z3DRenderPort` usage once Vulkan buffers are ready.
+- [ ] Renderer parameter audit: hoist persistent `ZParameter` state out of GL renderers so backend swaps don’t drop user settings (see checklist below).
+  - [x] Image raycaster: sampling rate, ISO value, local MIP threshold, and compositing mode now live on `Z3DImgFilter` and are injected into the renderer.
+  - [x] Volume raycaster: sampling rate, ISO value, local MIP threshold, and compositing mode are filter-owned (`Z3DVolumeFilter`) and passed into the renderer via setter hooks.
+  - [x] Background renderer: compositor holds mode/colors/orientation parameters and injects them into `Z3DBackgroundRenderer`.
+  - [x] Mesh renderer: wireframe mode/color now live on `Z3DMeshFilter`; renderer consumes filter state through new setters.
+  - [x] Sphere/Ellipsoid renderers: dynamic-material toggles moved to owning filters (`Z3DPunctaFilter`, SWC renderer setup) and are injected via setters.
+  - [x] Axis font overlay: axis filter/compositor own font/shadow/outline parameters; `Z3DFontRenderer` exposes simple setters and POD state.
+  - [x] Fixed-width line renderer: width/color configured via filter-managed state and injected through new hooks.
+  - [x] Cone/arrow and texture blend renderers: cap style/blend mode stored as plain values; renderer-side options removed.
+
+Renderer parameter ownership checklist
+
+- `Z3DImgRaycasterRenderer` / `Z3DImgSliceRenderer`: move visualization toggles (lighting, clip planes, transfer helpers) into `Z3DImgFilter` and keep renderers GPU-only.
+- `Z3DLineRenderer`: expose width/size scaling parameters at the filter layer; renderer maintains only buffers/pipelines.
+- `Z3DMeshRenderer`: relocate material/light parameters into `Z3DMeshFilter`; renderer responsible for geometry upload and draw state.
+- Background/axis renderers already source data from `Z3DGlobalParameters`; verify no renderer-owned parameters remain before cloning for Vulkan.
 
 ## API Parity Acceptance Criteria
 

@@ -3,29 +3,16 @@
 #include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
+#include "zlog.h"
+#include <QObject>
 
 namespace nim {
 
 Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_backgroundShaderGrp(rendererBase)
-  , m_firstColor("First Color", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f))
-  , m_secondColor("Second Color", glm::vec4(0.2f, 0.2f, 0.2f, 1.0f))
-  , m_gradientOrientation("Gradient Orientation")
-  , m_mode("mode")
   , m_VAO(1)
-  , m_region(0, 1, 0, 1)
 {
-  m_firstColor.setStyle("COLOR");
-  m_secondColor.setStyle("COLOR");
-  m_mode.addOptions("Uniform", "Gradient");
-  m_mode.select("Gradient");
-  m_gradientOrientation.addOptions("LeftToRight", "RightToLeft", "TopToBottom", "BottomToTop");
-  m_gradientOrientation.select("BottomToTop");
-  connect(&m_mode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBackgroundRenderer::adjustWidgets);
-  connect(&m_mode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBackgroundRenderer::compile);
-  connect(&m_gradientOrientation, &ZStringIntOptionParameter::valueChanged, this, &Z3DBackgroundRenderer::compile);
-
   QStringList allshaders;
   allshaders << "pass.vert"
              << "background_func.frag";
@@ -62,6 +49,24 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
   }
 }
 
+void Z3DBackgroundRenderer::setMode(BackgroundMode mode)
+{
+  if (m_modeValue == mode) {
+    return;
+  }
+  m_modeValue = mode;
+  compile();
+}
+
+void Z3DBackgroundRenderer::setGradientOrientation(BackgroundGradientOrientation orientation)
+{
+  if (m_orientationValue == orientation) {
+    return;
+  }
+  m_orientationValue = orientation;
+  compile();
+}
+
 void Z3DBackgroundRenderer::setRenderingRegion(double left, double right, double bottom, double top)
 {
   m_region = glm::vec4(left, right - left, bottom, top - bottom);
@@ -75,17 +80,22 @@ void Z3DBackgroundRenderer::compile()
 QString Z3DBackgroundRenderer::generateHeader()
 {
   QString headerSource;
-  if (m_mode.get() == "Uniform") {
+  if (m_modeValue == BackgroundMode::Uniform) {
     headerSource += "#define UNIFORM\n";
   } else {
-    if (m_gradientOrientation.isSelected("LeftToRight")) {
-      headerSource += "#define GRADIENT_LEFT_TO_RIGHT\n";
-    } else if (m_gradientOrientation.isSelected("RightToLeft")) {
-      headerSource += "#define GRADIENT_RIGHT_TO_LEFT\n";
-    } else if (m_gradientOrientation.isSelected("TopToBottom")) {
-      headerSource += "#define GRADIENT_TOP_TO_BOTTOM\n";
-    } else if (m_gradientOrientation.isSelected("BottomToTop")) {
-      headerSource += "#define GRADIENT_BOTTOM_TO_TOP\n";
+    switch (m_orientationValue) {
+      case BackgroundGradientOrientation::LeftToRight:
+        headerSource += "#define GRADIENT_LEFT_TO_RIGHT\n";
+        break;
+      case BackgroundGradientOrientation::RightToLeft:
+        headerSource += "#define GRADIENT_RIGHT_TO_LEFT\n";
+        break;
+      case BackgroundGradientOrientation::TopToBottom:
+        headerSource += "#define GRADIENT_TOP_TO_BOTTOM\n";
+        break;
+      case BackgroundGradientOrientation::BottomToTop:
+        headerSource += "#define GRADIENT_BOTTOM_TO_TOP\n";
+        break;
     }
   }
   return headerSource;
@@ -102,24 +112,29 @@ void Z3DBackgroundRenderer::renderUsingOpengl()
   glPushMatrix();
   glLoadIdentity();
 
-  if (m_mode.get() == "Gradient") {
-    if (m_gradientOrientation.isSelected("LeftToRight")) {
-      glRotatef(270.f, 0.0f, 0.0f, 1.0f);
-    } else if (m_gradientOrientation.isSelected("RightToLeft")) {
-      glRotatef(90.f, 0.0f, 0.0f, 1.0f);
-    } else if (m_gradientOrientation.isSelected("TopToBottom")) {
-      glRotatef(180.f, 0.0f, 0.0f, 1.0f);
-    } else if (m_gradientOrientation.isSelected("BottomToTop")) {
-      glRotatef(0.f, 0.0f, 0.0f, 1.0f);
+  if (m_modeValue == BackgroundMode::Gradient) {
+    switch (m_orientationValue) {
+      case BackgroundGradientOrientation::LeftToRight:
+        glRotatef(270.f, 0.0f, 0.0f, 1.0f);
+        break;
+      case BackgroundGradientOrientation::RightToLeft:
+        glRotatef(90.f, 0.0f, 0.0f, 1.0f);
+        break;
+      case BackgroundGradientOrientation::TopToBottom:
+        glRotatef(180.f, 0.0f, 0.0f, 1.0f);
+        break;
+      case BackgroundGradientOrientation::BottomToTop:
+        glRotatef(0.f, 0.0f, 0.0f, 1.0f);
+        break;
     }
   }
 
   glBegin(GL_QUADS);
-  glColor4fv(&m_firstColor.get()[0]);
+  glColor4fv(&m_firstColorValue[0]);
   glVertex3f(-1.0, -1.0, 1.0 - 1e-5);
   glVertex3f(1.0, -1.0, 1.0 - 1e-5);
-  if (m_mode.get() == "Gradient") {
-    glColor4fv(&m_secondColor.get()[0]);
+  if (m_modeValue == BackgroundMode::Gradient) {
+    glColor4fv(&m_secondColorValue[0]);
   }
   glVertex3f(1.0, 1.0, 1.0 - 1e-5);
   glVertex3f(-1.0, 1.0, 1.0 - 1e-5);
@@ -144,9 +159,9 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
   Z3DShaderProgram& shader = m_backgroundShaderGrp.get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
 
-  shader.setColor1Uniform(m_firstColor.get());
-  if (m_mode.get() != "Uniform") {
-    shader.setColor2Uniform(m_secondColor.get());
+  shader.setColor1Uniform(m_firstColorValue);
+  if (m_modeValue != BackgroundMode::Uniform) {
+    shader.setColor2Uniform(m_secondColorValue);
     shader.setRegionUniform(m_region);
   }
 
@@ -187,21 +202,6 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
 void Z3DBackgroundRenderer::renderPicking(Z3DEye)
 {
   // do nothing
-}
-
-void Z3DBackgroundRenderer::adjustWidgets()
-{
-  if (m_mode.get() == "Gradient") {
-    // m_firstColor.setName("First Color");
-    m_firstColor.setVisible(true);
-    m_secondColor.setVisible(true);
-    m_gradientOrientation.setVisible(true);
-  } else if (m_mode.get() == "Uniform") {
-    // m_firstColor.setName("Color");
-    m_firstColor.setVisible(true);
-    m_secondColor.setVisible(false);
-    m_gradientOrientation.setVisible(false);
-  }
 }
 
 } // namespace nim

@@ -9,8 +9,6 @@ namespace nim {
 Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_sphereShaderGrp(rendererBase)
-  , m_sphereSlicesStacks("Sphere Slices Stacks", 36, 20, 100)
-  , m_useDynamicMaterial("Calculate Material Property From Intensity", true)
   //  , m_VBOs(5)
   //  , m_pickingVBOs(4)
   , m_VAOs(1)
@@ -21,13 +19,7 @@ Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase& rendererBase)
 {
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
-  connect(&m_sphereSlicesStacks, &ZIntParameter::valueChanged, this, &Z3DSphereRenderer::invalidateOpenglRenderer);
-  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DSphereRenderer::invalidateOpenglRenderer);
 #endif
-
-  connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DSphereRenderer::compile);
-  // addParameter(m_sphereSlicesStacks);
-  // addParameter(m_useDynamicMaterial);
 
   QStringList allshaders;
   allshaders << "sphere.vert"
@@ -55,9 +47,7 @@ void Z3DSphereRenderer::setData(std::vector<glm::vec4>* pointAndRadiusInput,
     }
     quadIdx++;
   }
-  if (!specularAndShininessInput) {
-    m_useDynamicMaterial.set(false);
-  } else {
+  if (specularAndShininessInput) {
     for (auto ss : *specularAndShininessInput) {
       m_specularAndShininess.push_back(ss);
       m_specularAndShininess.push_back(ss);
@@ -132,7 +122,7 @@ void Z3DSphereRenderer::compile()
 QString Z3DSphereRenderer::generateHeader()
 {
   QString headerSource;
-  if (m_useDynamicMaterial.get()) {
+  if (m_useDynamicMaterial) {
     headerSource += "#define DYNAMIC_MATERIAL_PROPERTY\n";
   }
   return headerSource;
@@ -155,12 +145,12 @@ void Z3DSphereRenderer::renderUsingOpengl()
     float diameter = m_pointAndRadius[i].w * sizeScale() * 2;
     glScalef(diameter, diameter, diameter);
     // overwrite material property setted by z3drendererbase
-    if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+    if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
       glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, m_specularAndShininess[i].w);
       glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, glm::value_ptr(glm::vec4(m_specularAndShininess[i].xyz(), 1.f)));
     }
     glColor4fv(glm::value_ptr(glm::vec4(m_pointColors[i].rgb(), m_pointColors[i].a * opacity())));
-    gluSphere(quadric, .5, m_sphereSlicesStacks.get(), m_sphereSlicesStacks.get());
+    gluSphere(quadric, .5, m_sphereSlicesStacks, m_sphereSlicesStacks);
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
   }
@@ -228,7 +218,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
       // set vertex data
       auto attr_a_vertex_radius = shader.vertexAttributeLocation();
       GLint attr_a_specular_shininess = -1;
-      if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+      if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
         attr_a_specular_shininess = shader.specularShininessAttributeLocation();
       }
       auto attr_color = shader.colorAttributeLocation();
@@ -247,7 +237,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
         glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_pointAndRadius[start]), GL_STATIC_DRAW);
         glVertexAttribPointer(attr_a_vertex_radius, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-        if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+        if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
           glEnableVertexAttribArray(attr_a_specular_shininess);
           m_VBOs[i].bind(GL_ARRAY_BUFFER, 3);
           glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_specularAndShininess[start]), GL_STATIC_DRAW);
@@ -294,7 +284,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
     // set vertex data
     auto attr_a_vertex_radius = shader.vertexAttributeLocation();
     GLint attr_a_specular_shininess = -1;
-    if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+    if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
       attr_a_specular_shininess = shader.specularShininessAttributeLocation();
     }
     auto attr_color = shader.colorAttributeLocation();
@@ -314,7 +304,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
       }
       glVertexAttribPointer(attr_a_vertex_radius, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-      if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+      if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
         glEnableVertexAttribArray(attr_a_specular_shininess);
         m_VBOs[i].bind(GL_ARRAY_BUFFER, 3);
         if (m_dataChanged) {
@@ -347,7 +337,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
       glBindBuffer(GL_ARRAY_BUFFER, 0);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
       glDisableVertexAttribArray(attr_a_vertex_radius);
-      if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
+      if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
         glDisableVertexAttribArray(attr_a_specular_shininess);
       }
       glDisableVertexAttribArray(attr_color);
@@ -536,6 +526,23 @@ void Z3DSphereRenderer::appendDefaultColors()
       m_pointColors.emplace_back(0.f, 0.f, 0.f, 1.f);
     }
   }
+  if (m_useDynamicMaterial && m_specularAndShininess.size() < m_pointAndRadius.size()) {
+    for (size_t i = m_specularAndShininess.size(); i < m_pointAndRadius.size(); ++i) {
+      m_specularAndShininess.emplace_back(1.f, 1.f, 1.f, 10.f);
+    }
+  }
+}
+
+void Z3DSphereRenderer::setUseDynamicMaterial(bool enabled)
+{
+  if (m_useDynamicMaterial == enabled) {
+    return;
+  }
+  m_useDynamicMaterial = enabled;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  invalidateOpenglRenderer();
+#endif
+  compile();
 }
 
 } // namespace nim

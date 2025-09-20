@@ -4,6 +4,15 @@
 
 namespace nim {
 
+enum class ConeCapStyle
+{
+  FlatCaps,
+  NoCaps,
+  RoundCaps,
+  RoundBaseFlatTop,
+  FlatBaseRoundTop
+};
+
 class Z3DConeRenderer : public Z3DPrimitiveRenderer
 {
 public:
@@ -20,10 +29,11 @@ public:
 
   void setDataPickingColors(std::vector<glm::vec4>* conePickingColors = nullptr);
 
-  ZStringStringOptionParameter& coneCapStylePara()
-  {
-    return m_coneCapStyle;
-  }
+  void setConeCapStyle(ConeCapStyle style);
+
+  void setCylinderSubdivisionAroundZ(int subdivisions);
+
+  void setCylinderSubdivisionAlongZ(int subdivisions);
 
 protected:
   void compile() override;
@@ -44,9 +54,9 @@ protected:
 protected:
   Z3DShaderGroup m_coneShaderGrp;
 
-  ZStringStringOptionParameter m_coneCapStyle;
-  ZIntParameter m_cylinderSubdivisionAroundZ;
-  ZIntParameter m_cylinderSubdivisionAlongZ;
+  ConeCapStyle m_coneCapStyle = ConeCapStyle::FlatCaps;
+  int m_cylinderSubdivisionAroundZ = 36;
+  int m_cylinderSubdivisionAlongZ = 1;
 
 private:
   std::vector<glm::vec4> m_baseAndBaseRadius;
@@ -57,9 +67,9 @@ private:
   std::vector<GLfloat> m_allFlags;
   std::vector<GLuint> m_indexs;
 
-  bool m_sameColorForBaseAndTop;
+  bool m_sameColorForBaseAndTop = false;
 
-  bool m_useConeShader2;
+  bool m_useConeShader2 = true;
 
   Z3DVertexArrayObject m_VAO;
   Z3DVertexArrayObject m_pickingVAO;

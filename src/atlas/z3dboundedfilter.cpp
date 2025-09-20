@@ -108,7 +108,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
           &Z3DBoundedFilter::onSelectionBoundBoxLineWidthChanged);
   updateSelectionLineColors();
 
-  m_selectionCornerRenderer.setColorSource("CustomColor");
+  m_selectionCornerRenderer.setColorSource(MeshColorSource::CustomColor);
   m_selectionCornerRenderer.setFollowCoordTransform(false);
   m_selectionCornerRenderer.setFollowOpacity(false);
 

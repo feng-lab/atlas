@@ -8,10 +8,6 @@ namespace nim {
 
 Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_samplingRate("Sampling Rate", 2.f, 0.01f, 20.f)
-  , m_isoValue("ISO Value", 0.5f, 0.0f, 1.0f)
-  , m_localMIPThreshold("Local MIP Threshold", 0.8f, 0.01f, 1.f)
-  , m_compositingMode("Compositing")
   , m_is2DImage(false)
   , m_entryTexCoordTexture(nullptr)
   , m_entryEyeCoordTexture(nullptr)
@@ -25,26 +21,6 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase& renderer
   // m_gradientMode.select("None");
   //  todo: add gradient
   // addParameter(m_gradientMode);
-
-  // compositing modes
-  m_compositingMode.addOptions("Direct Volume Rendering",
-                               "Maximum Intensity Projection",
-                               "MIP Opaque",
-                               "Local MIP",
-                               "Local MIP Opaque",
-                               "ISO Surface",
-                               "X Ray");
-  m_compositingMode.select("MIP Opaque");
-
-  connect(&m_compositingMode,
-          &ZStringIntOptionParameter::valueChanged,
-          this,
-          &Z3DVolumeRaycasterRenderer::adjustWidgets);
-  connect(&m_compositingMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DVolumeRaycasterRenderer::compile);
-  // connect(&m_gradientMode, SIGNAL(valueChanged()), this, SLOT(compile()));
-
-  adjustWidgets();
-
   //  m_raycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster.frag",
   //                                       m_rendererBase.generateHeader() + generateHeader());
   //  m_2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_transfun.frag",
@@ -151,13 +127,6 @@ void Z3DVolumeRaycasterRenderer::setEntryExitInfo(const Z3DTexture* entryTexCoor
   m_quads.clear();
 }
 
-void Z3DVolumeRaycasterRenderer::adjustWidgets()
-{
-  m_isoValue.setVisible(m_compositingMode.isSelected("ISO Surface"));
-  m_localMIPThreshold.setVisible(m_compositingMode.isSelected("Local MIP") ||
-                                 m_compositingMode.isSelected("Local MIP Opaque"));
-}
-
 void Z3DVolumeRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& shader)
 {
   shader.setLogUniformLocationError(false);
@@ -230,33 +199,44 @@ QString Z3DVolumeRaycasterRenderer::generateHeader()
   //  if (!m_gradientMode.isSelected("None"))
   //    headerSource += "#define USE_GRADIENTS\n";
 
-  if (m_compositingMode.isSelected("Direct Volume Rendering")) {
-    headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
-    headerSource += "compositeDVR(result, color, currentRayLength, rayDepth);\n";
-  } else if (m_compositingMode.isSelected("ISO Surface")) {
-    headerSource += "#define ISO\n";
-    headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
-    headerSource += "compositeISO(result, color, currentRayLength, rayDepth, iso_value);\n";
-  } else if (m_compositingMode.isSelected("Maximum Intensity Projection")) {
-    headerSource += "#define MIP\n";
-  } else if (m_compositingMode.isSelected("Local MIP")) {
-    headerSource += "#define MIP\n";
-    headerSource += "#define LOCAL_MIP\n";
-  } else if (m_compositingMode.isSelected("X Ray")) {
-    headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
-    headerSource += "compositeXRay(result, color, currentRayLength, rayDepth);\n";
-  } else if (m_compositingMode.isSelected("MIP Opaque")) {
-    headerSource += "#define MIP\n";
-    headerSource += "#define RESULT_OPAQUE\n";
-  } else if (m_compositingMode.isSelected("Local MIP Opaque")) {
-    headerSource += "#define MIP\n";
-    headerSource += "#define LOCAL_MIP\n";
-    headerSource += "#define RESULT_OPAQUE\n";
+  const bool useMIPMerge = m_compositingModeValue == VolumeCompositingMode::MaximumIntensityProjection ||
+                           m_compositingModeValue == VolumeCompositingMode::LocalMIP ||
+                           m_compositingModeValue == VolumeCompositingMode::MIPOpaque ||
+                           m_compositingModeValue == VolumeCompositingMode::LocalMIPOpaque;
+
+  switch (m_compositingModeValue) {
+    case VolumeCompositingMode::DirectVolumeRendering:
+      headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
+      headerSource += "compositeDVR(result, color, currentRayLength, rayDepth);\n";
+      break;
+    case VolumeCompositingMode::IsoSurface:
+      headerSource += "#define ISO\n";
+      headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
+      headerSource += "compositeISO(result, color, currentRayLength, rayDepth, iso_value);\n";
+      break;
+    case VolumeCompositingMode::MaximumIntensityProjection:
+      headerSource += "#define MIP\n";
+      break;
+    case VolumeCompositingMode::LocalMIP:
+      headerSource += "#define MIP\n";
+      headerSource += "#define LOCAL_MIP\n";
+      break;
+    case VolumeCompositingMode::XRay:
+      headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
+      headerSource += "compositeXRay(result, color, currentRayLength, rayDepth);\n";
+      break;
+    case VolumeCompositingMode::MIPOpaque:
+      headerSource += "#define MIP\n";
+      headerSource += "#define RESULT_OPAQUE\n";
+      break;
+    case VolumeCompositingMode::LocalMIPOpaque:
+      headerSource += "#define MIP\n";
+      headerSource += "#define LOCAL_MIP\n";
+      headerSource += "#define RESULT_OPAQUE\n";
+      break;
   }
 
-  if (!m_quads.empty() || m_compositingMode.isSelected("Maximum Intensity Projection") ||
-      m_compositingMode.isSelected("Local MIP") || m_compositingMode.isSelected("MIP Opaque") ||
-      m_compositingMode.isSelected("Local MIP Opaque")) {
+  if (!m_quads.empty() || useMIPMerge) {
     headerSource += "#define MAX_PROJ_MERGE\n";
   }
 
@@ -368,15 +348,16 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
     m_scRaycasterShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordTexture);
     m_scRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
 
-    if (m_compositingMode.get() == "ISO Surface") {
-      m_scRaycasterShader.setUniform("iso_value", m_isoValue.get());
+    if (m_compositingModeValue == VolumeCompositingMode::IsoSurface) {
+      m_scRaycasterShader.setUniform("iso_value", m_isoValue);
     }
 
-    if (m_compositingMode.get() == "Local MIP" || m_compositingMode.get() == "Local MIP Opaque") {
-      m_scRaycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold.get());
+    if (m_compositingModeValue == VolumeCompositingMode::LocalMIP ||
+        m_compositingModeValue == VolumeCompositingMode::LocalMIPOpaque) {
+      m_scRaycasterShader.setUniform("local_MIP_threshold", m_localMIPThreshold);
     }
 
-    m_scRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
+    m_scRaycasterShader.setUniform("sampling_rate", m_samplingRateValue);
 
     if (visibleIdxs.size() == 1) {
       bindVolumeAndTransferFunc(m_scRaycasterShader, visibleIdxs[0]);

@@ -1,13 +1,37 @@
 #pragma once
 
 #include "z3dport.h"
+#include "z3drendersurfaceport.h"
 #include "z3drendertarget.h"
 #include "z3dtexture.h"
 #include <typeinfo>
 
 namespace nim {
 
-class Z3DRenderOutputPort : public Z3DOutputPortBase
+class Z3DRenderTargetLease : public Z3DRenderSurfaceLease
+{
+public:
+  explicit Z3DRenderTargetLease(Z3DRenderTarget& target)
+    : m_target(&target)
+  {}
+
+  [[nodiscard]] const Z3DRenderSurfaceDescriptor& descriptor() const override
+  {
+    m_descriptor.size = m_target->size();
+    return m_descriptor;
+  }
+
+  [[nodiscard]] Z3DRenderTarget& renderTarget() const
+  {
+    return *m_target;
+  }
+
+private:
+  Z3DRenderTarget* m_target;
+  mutable Z3DRenderSurfaceDescriptor m_descriptor;
+};
+
+class Z3DRenderOutputPort : public Z3DRenderSurfaceOutputPort
 {
 public:
   Z3DRenderOutputPort(const QString& name,
@@ -19,13 +43,14 @@ public:
 
   void bindTarget()
   {
+    setSurface(std::unique_ptr<Z3DRenderSurfaceLease>());
     m_renderTarget.bind();
-    m_resultIsValid = true;
   }
 
   void releaseTarget()
   {
     m_renderTarget.release();
+    refreshLease();
   }
 
   [[nodiscard]] GLint internalDepthFormat() const
@@ -40,11 +65,6 @@ public:
 
   // Clears the contents of an activated outport's RenderTarget,
   void clearTarget() const;
-
-  [[nodiscard]] bool hasValidData() const override
-  {
-    return m_resultIsValid;
-  }
 
   // Returns true, if the associated RenderTarget is currently bound.
   [[nodiscard]] bool isBound() const
@@ -95,8 +115,6 @@ public:
   // void setMultisample(bool multisample, int nsample = 4);
 
 private:
-  bool m_resultIsValid;
-
   GLint m_internalColorFormat;
   GLint m_internalDepthFormat;
 
@@ -104,20 +122,17 @@ private:
   int m_sample;
 
   Z3DRenderTarget m_renderTarget;
+
+  void refreshLease();
 };
 
-class Z3DRenderInputPort : public Z3DInputPortBase
+class Z3DRenderInputPort : public Z3DRenderSurfaceInputPort
 {
 public:
   Z3DRenderInputPort(const QString& name,
                      bool allowMultipleConnections,
                      Z3DFilter* filter,
                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
-
-  [[nodiscard]] bool isReady() const override
-  {
-    return numValidInputs() > 0;
-  }
 
   // go through all connected output render ports and count how many have valid rendering
   [[nodiscard]] size_t numValidInputs() const;

@@ -3,6 +3,7 @@
 #include "z3dboundedfilter.h"
 #include "z3dcameraparameter.h"
 #include "znumericparameter.h"
+#include "zoptionparameter.h"
 #include "z3dimg.h"
 #include "z3dtransformparameter.h"
 #include "zwidgetsgroup.h"
@@ -121,6 +122,11 @@ private:
 
   void channelRangeChanged();
 
+  void updateRaycasterCompositingMode();
+  void updateRaycasterSamplingRate();
+  void updateRaycasterIsoValue();
+  void updateRaycasterLocalMIPThreshold();
+
   // check success before using the returned value
   // if first hit 3d position is in volume, success will be true,
   // otherwise don't use the returned value
@@ -144,6 +150,10 @@ private:
   std::unique_ptr<Z3DImg> m_3dImg;
   ZBoolParameter m_stayOnTop;
   ZBoolParameter m_fullResolutionRendering;
+  ZStringIntOptionParameter m_raycasterCompositingMode;
+  ZFloatParameter m_raycasterSamplingRate;
+  ZFloatParameter m_raycasterIsoValue;
+  ZFloatParameter m_raycasterLocalMIPThreshold;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   size_t m_numParas;

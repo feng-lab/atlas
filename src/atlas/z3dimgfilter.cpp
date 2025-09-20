@@ -19,6 +19,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_textureCopyRenderer(m_rendererBase)
   , m_stayOnTop("Stay On Top", false)
   , m_fullResolutionRendering("Full Resolution Rendering", false)
+  , m_raycasterCompositingMode("Compositing")
+  , m_raycasterSamplingRate("Sampling Rate", 2.f, 0.01f, 20.f)
+  , m_raycasterIsoValue("ISO Value", 0.5f, 0.0f, 1.0f)
+  , m_raycasterLocalMIPThreshold("Local MIP Threshold", 0.8f, 0.01f, 1.f)
   , m_numParas(0)
   //, m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   //, m_smoothInteraction("Smooth Interaction", true)
@@ -55,6 +59,36 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 {
   m_baseBoundBoxRenderer.setEnableMultisample(false);
   m_textureCopyRenderer.setDiscardTransparent(true);
+
+  updateRaycasterSamplingRate();
+  updateRaycasterIsoValue();
+  updateRaycasterLocalMIPThreshold();
+
+  connect(&m_raycasterSamplingRate, &ZFloatParameter::valueChanged, this, &Z3DImgFilter::updateRaycasterSamplingRate);
+  connect(&m_raycasterIsoValue, &ZFloatParameter::valueChanged, this, &Z3DImgFilter::updateRaycasterIsoValue);
+  connect(&m_raycasterLocalMIPThreshold,
+          &ZFloatParameter::valueChanged,
+          this,
+          &Z3DImgFilter::updateRaycasterLocalMIPThreshold);
+
+  m_raycasterCompositingMode.clearOptions();
+  m_raycasterCompositingMode.addOptionsWithData(
+    std::make_pair(QStringLiteral("Direct Volume Rendering"),
+                   static_cast<int>(ImgCompositingMode::DirectVolumeRendering)),
+    std::make_pair(QStringLiteral("Maximum Intensity Projection"),
+                   static_cast<int>(ImgCompositingMode::MaximumIntensityProjection)),
+    std::make_pair(QStringLiteral("MIP Opaque"), static_cast<int>(ImgCompositingMode::MIPOpaque)),
+    std::make_pair(QStringLiteral("Local MIP"), static_cast<int>(ImgCompositingMode::LocalMIP)),
+    std::make_pair(QStringLiteral("Local MIP Opaque"), static_cast<int>(ImgCompositingMode::LocalMIPOpaque)),
+    std::make_pair(QStringLiteral("ISO Surface"), static_cast<int>(ImgCompositingMode::IsoSurface)),
+    std::make_pair(QStringLiteral("X Ray"), static_cast<int>(ImgCompositingMode::XRay)));
+  m_raycasterCompositingMode.select(QStringLiteral("MIP Opaque"));
+
+  updateRaycasterCompositingMode();
+  connect(&m_raycasterCompositingMode,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &Z3DImgFilter::updateRaycasterCompositingMode);
 
   addParameter(m_stayOnTop);
   addParameter(m_fullResolutionRendering);
@@ -143,10 +177,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_boundBoxLineWidth.set(1);
   m_boundBoxMode.select("Bound Box");
 
-  addParameter(m_imgRaycasterRenderer.compositingModePara());
-  addParameter(m_imgRaycasterRenderer.isoValuePara());
-  addParameter(m_imgRaycasterRenderer.localMIPThresholdPara());
-  addParameter(m_imgRaycasterRenderer.samplingRatePara());
+  addParameter(m_raycasterCompositingMode);
+  addParameter(m_raycasterIsoValue);
+  addParameter(m_raycasterLocalMIPThreshold);
+  addParameter(m_raycasterSamplingRate);
 
   m_imgRaycasterRenderer.setFastRendering(!m_fullResolutionRendering.get());
   m_imgSliceRenderer.setFastRendering(!m_fullResolutionRendering.get());
@@ -357,10 +391,10 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
       m_widgetsGroup->addChild(*para, 3);
     }
-    m_widgetsGroup->addChild(m_imgRaycasterRenderer.compositingModePara(), 4);
-    m_widgetsGroup->addChild(m_imgRaycasterRenderer.isoValuePara(), 4);
-    m_widgetsGroup->addChild(m_imgRaycasterRenderer.localMIPThresholdPara(), 4);
-    m_widgetsGroup->addChild(m_imgRaycasterRenderer.samplingRatePara(), 15);
+    m_widgetsGroup->addChild(m_raycasterCompositingMode, 4);
+    m_widgetsGroup->addChild(m_raycasterIsoValue, 4);
+    m_widgetsGroup->addChild(m_raycasterLocalMIPThreshold, 4);
+    m_widgetsGroup->addChild(m_raycasterSamplingRate, 15);
     //    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
     //      m_widgetsGroup->addChild(*para, 15);
     //    }
@@ -431,7 +465,9 @@ void Z3DImgFilter::renderTransparent(Z3DEye eye)
 
 glm::vec3 Z3DImgFilter::get3DPosition(int x, int y, int width, int height, bool& success)
 {
-  if (m_imgRaycasterRenderer.compositeMode() == "Direct Volume Rendering") {
+  const auto mode = static_cast<ImgCompositingMode>(m_raycasterCompositingMode.associatedData());
+
+  if (mode == ImgCompositingMode::DirectVolumeRendering) {
     return getMaxInten3DPositionUnderScreenPoint(x, y, width, height, success);
   } else {
     return getFirstHit3DPosition(x, y, width, height, success);
@@ -463,6 +499,35 @@ void Z3DImgFilter::exitSubregionView()
   m_yCut.set(m_yCut.range());
   m_zCut.set(m_zCut.range());
   m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBox());
+}
+
+void Z3DImgFilter::updateRaycasterSamplingRate()
+{
+  m_imgRaycasterRenderer.setSamplingRate(m_raycasterSamplingRate.get());
+}
+
+void Z3DImgFilter::updateRaycasterIsoValue()
+{
+  m_imgRaycasterRenderer.setIsoValue(m_raycasterIsoValue.get());
+}
+
+void Z3DImgFilter::updateRaycasterLocalMIPThreshold()
+{
+  m_imgRaycasterRenderer.setLocalMIPThreshold(m_raycasterLocalMIPThreshold.get());
+}
+
+void Z3DImgFilter::updateRaycasterCompositingMode()
+{
+  const auto mode = static_cast<ImgCompositingMode>(m_raycasterCompositingMode.associatedData());
+  m_imgRaycasterRenderer.setCompositingMode(mode);
+
+  const bool showIso = mode == ImgCompositingMode::IsoSurface;
+  const bool showLocal = mode == ImgCompositingMode::LocalMIP || mode == ImgCompositingMode::LocalMIPOpaque;
+  m_raycasterIsoValue.setVisible(showIso);
+  m_raycasterLocalMIPThreshold.setVisible(showLocal);
+
+  updateRaycasterIsoValue();
+  updateRaycasterLocalMIPThreshold();
 }
 
 void Z3DImgFilter::invalidate(State inv)

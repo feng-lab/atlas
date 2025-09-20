@@ -4,22 +4,11 @@
 
 namespace nim {
 
-Z3DTextureBlendRenderer::Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase, const QString& mode)
+Z3DTextureBlendRenderer::Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase, TextureBlendMode mode)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_blendMode("Blend Mode")
+  , m_blendMode(mode)
   , m_VAO(1)
 {
-  m_blendMode.addOptionsWithData(
-    std::make_pair<QString, QString>("DepthTest", "DEPTH_TEST"),
-    std::make_pair<QString, QString>("FirstOnTop", "FIRST_ON_TOP"),
-    std::make_pair<QString, QString>("SecondOnTop", "SECOND_ON_TOP"),
-    std::make_pair<QString, QString>("DepthTestBlending", "DEPTH_TEST_BLENDING"),
-    std::make_pair<QString, QString>("FirstOnTopBlending", "FIRST_ON_TOP_BLENDING"),
-    std::make_pair<QString, QString>("SecondOnTopBlending", "SECOND_ON_TOP_BLENDING"),
-    std::make_pair<QString, QString>("MIPImageDepthTestBlending", "MIP_IMAGE_DEPTH_TEST_BLENDING"));
-  m_blendMode.select(mode);
-  connect(&m_blendMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureBlendRenderer::compile);
-
   m_blendTextureShader.loadFromSourceFile("pass.vert",
                                           "compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
@@ -32,7 +21,31 @@ void Z3DTextureBlendRenderer::compile()
 
 QString Z3DTextureBlendRenderer::generateHeader()
 {
-  return QString("#define %1\n").arg(m_blendMode.associatedData());
+  QString define;
+  switch (m_blendMode) {
+    case TextureBlendMode::DepthTest:
+      define = QStringLiteral("DEPTH_TEST");
+      break;
+    case TextureBlendMode::FirstOnTop:
+      define = QStringLiteral("FIRST_ON_TOP");
+      break;
+    case TextureBlendMode::SecondOnTop:
+      define = QStringLiteral("SECOND_ON_TOP");
+      break;
+    case TextureBlendMode::DepthTestBlending:
+      define = QStringLiteral("DEPTH_TEST_BLENDING");
+      break;
+    case TextureBlendMode::FirstOnTopBlending:
+      define = QStringLiteral("FIRST_ON_TOP_BLENDING");
+      break;
+    case TextureBlendMode::SecondOnTopBlending:
+      define = QStringLiteral("SECOND_ON_TOP_BLENDING");
+      break;
+    case TextureBlendMode::MIPImageDepthTestBlending:
+      define = QStringLiteral("MIP_IMAGE_DEPTH_TEST_BLENDING");
+      break;
+  }
+  return QString("#define %1\n").arg(define);
 }
 
 void Z3DTextureBlendRenderer::render(Z3DEye eye)
@@ -54,6 +67,15 @@ void Z3DTextureBlendRenderer::render(Z3DEye eye)
   renderScreenQuad(m_VAO, m_blendTextureShader);
   glDepthFunc(GL_LESS);
   m_blendTextureShader.release();
+}
+
+void Z3DTextureBlendRenderer::setBlendMode(TextureBlendMode mode)
+{
+  if (m_blendMode == mode) {
+    return;
+  }
+  m_blendMode = mode;
+  compile();
 }
 
 } // namespace nim

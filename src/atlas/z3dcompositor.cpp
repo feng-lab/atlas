@@ -1,24 +1,27 @@
 #include "z3dcompositor.h"
 
-#include <memory>
-
 #include "z3dgl.h"
 #include "z3drendertarget.h"
 #include "z3dtexture.h"
 #include "zbenchtimer.h"
 #include "z3dscratchresourcepool.h"
+#include "zlog.h"
 
 namespace nim {
 
 Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DBoundedFilter(globalParas, parent)
-  , m_alphaBlendRenderer(m_rendererBase, "DepthTestBlending")
-  , m_firstOnTopBlendRenderer(m_rendererBase, "FirstOnTopBlending")
-  , m_firstOnTopRenderer(m_rendererBase, "FirstOnTop")
-  , m_MIPImageAlphaBlendRenderer(m_rendererBase, "MIPImageDepthTestBlending")
+  , m_alphaBlendRenderer(m_rendererBase, TextureBlendMode::DepthTestBlending)
+  , m_firstOnTopBlendRenderer(m_rendererBase, TextureBlendMode::FirstOnTopBlending)
+  , m_firstOnTopRenderer(m_rendererBase, TextureBlendMode::FirstOnTop)
+  , m_MIPImageAlphaBlendRenderer(m_rendererBase, TextureBlendMode::MIPImageDepthTestBlending)
   , m_textureCopyRenderer(m_rendererBase)
   , m_glowRenderer(m_rendererBase)
   , m_backgroundRenderer(m_rendererBase)
+  , m_backgroundMode("Background Mode")
+  , m_backgroundFirstColor("First Color", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f))
+  , m_backgroundSecondColor("Second Color", glm::vec4(0.2f, 0.2f, 0.2f, 1.0f))
+  , m_backgroundGradientOrientation("Gradient Orientation")
   //, m_renderGeometries("Render Geometries", true)
   , m_inport("Image", true, this, State::MonoViewResultInvalid)
   , m_leftEyeInport("LeftEyeImage", true, this, State::LeftEyeResultInvalid)
@@ -40,6 +43,14 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_ZAxisColor("Z Axis Color", glm::vec4(0.f, 0.f, 1.f, 1.0f))
   , m_axisRegionRatio("Axis Region Ratio", .25f, .1f, 1.f)
   , m_axisMode("Mode")
+  , m_axisFontName("Font")
+  , m_axisFontSize("Font Size", 32.f, .1f, 5000.f)
+  , m_axisFontSoftEdgeScale("Font Softedge Scale", 80.f, 0.f, 200.f)
+  , m_axisShowFontOutline("Show Font Outline", false)
+  , m_axisFontOutlineMode("Font Outline Mode")
+  , m_axisFontOutlineColor("Font Outline Color", glm::vec4(1.f))
+  , m_axisShowFontShadow("Show Font Shadow", false)
+  , m_axisFontShadowColor("Font Shadow Color", glm::vec4(0.f, 0.f, 0.f, 1.f))
   , m_screenQuadVAO(1)
   , m_region(0, 1, 0, 1)
 {
@@ -60,10 +71,41 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addPort(m_vPPort);
 
   m_textureCopyRenderer.setDiscardTransparent(true);
-  addParameter(m_backgroundRenderer.modePara());
-  addParameter(m_backgroundRenderer.firstColorPara());
-  addParameter(m_backgroundRenderer.secondColorPara());
-  addParameter(m_backgroundRenderer.gradientOrientationPara());
+  m_backgroundFirstColor.setStyle("COLOR");
+  m_backgroundSecondColor.setStyle("COLOR");
+  m_backgroundMode.clearOptions();
+  m_backgroundMode.addOptionsWithData(
+    std::make_pair(enumToQString(BackgroundMode::Uniform), static_cast<int>(BackgroundMode::Uniform)),
+    std::make_pair(enumToQString(BackgroundMode::Gradient), static_cast<int>(BackgroundMode::Gradient)));
+  m_backgroundMode.select(enumToQString(BackgroundMode::Gradient));
+  m_backgroundGradientOrientation.clearOptions();
+  m_backgroundGradientOrientation.addOptionsWithData(
+    std::make_pair(enumToQString(BackgroundGradientOrientation::LeftToRight),
+                   static_cast<int>(BackgroundGradientOrientation::LeftToRight)),
+    std::make_pair(enumToQString(BackgroundGradientOrientation::RightToLeft),
+                   static_cast<int>(BackgroundGradientOrientation::RightToLeft)),
+    std::make_pair(enumToQString(BackgroundGradientOrientation::TopToBottom),
+                   static_cast<int>(BackgroundGradientOrientation::TopToBottom)),
+    std::make_pair(enumToQString(BackgroundGradientOrientation::BottomToTop),
+                   static_cast<int>(BackgroundGradientOrientation::BottomToTop)));
+  m_backgroundGradientOrientation.select(enumToQString(BackgroundGradientOrientation::BottomToTop));
+  addParameter(m_backgroundMode);
+  addParameter(m_backgroundFirstColor);
+  addParameter(m_backgroundSecondColor);
+  addParameter(m_backgroundGradientOrientation);
+
+  updateBackgroundFirstColor();
+  updateBackgroundSecondColor();
+  updateBackgroundOrientation();
+  updateBackgroundMode();
+
+  connect(&m_backgroundMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DCompositor::updateBackgroundMode);
+  connect(&m_backgroundFirstColor, &ZVec4Parameter::valueChanged, this, &Z3DCompositor::updateBackgroundFirstColor);
+  connect(&m_backgroundSecondColor, &ZVec4Parameter::valueChanged, this, &Z3DCompositor::updateBackgroundSecondColor);
+  connect(&m_backgroundGradientOrientation,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &Z3DCompositor::updateBackgroundOrientation);
 
   // Glow renderer is compositor-owned; parameters are synced from filters per-draw
 
@@ -83,27 +125,117 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   m_ZAxisColor.setStyle("COLOR");
   m_axisMode.addOptions("Arrow", "Line");
   m_axisMode.select("Arrow");
+  m_axisFontSize.setSingleStep(0.1);
+  m_axisFontSize.setDecimal(1);
+  m_axisFontSoftEdgeScale.setSingleStep(1.0);
+  m_axisFontOutlineMode.clearOptions();
+  m_axisFontOutlineMode.addOptionsWithData(
+    std::make_pair(enumToQString(FontOutlineMode::Glow), static_cast<int>(FontOutlineMode::Glow)),
+    std::make_pair(enumToQString(FontOutlineMode::Outline), static_cast<int>(FontOutlineMode::Outline)));
+  m_axisFontOutlineMode.select(enumToQString(FontOutlineMode::Glow));
+  m_axisFontOutlineColor.setStyle("COLOR");
+  m_axisFontShadowColor.setStyle("COLOR");
   addParameter(m_showAxis);
   addParameter(m_XAxisColor);
   addParameter(m_YAxisColor);
   addParameter(m_ZAxisColor);
   addParameter(m_axisRegionRatio);
   addParameter(m_axisMode);
-  addParameter(m_fontRenderer.allFontNamesPara());
-  addParameter(m_fontRenderer.fontPara());
-  addParameter(m_fontRenderer.fontSizePara());
-  addParameter(m_fontRenderer.fontSoftEdgeScalePara());
-  addParameter(m_fontRenderer.showFontOutlinePara());
-  addParameter(m_fontRenderer.fontOutlineModePara());
-  addParameter(m_fontRenderer.fontOutlineColorPara());
-  addParameter(m_fontRenderer.showFontShadowPara());
-  addParameter(m_fontRenderer.fontShadowColorPara());
+  addParameter(m_axisFontName);
+  addParameter(m_axisFontSize);
+  addParameter(m_axisFontSoftEdgeScale);
+  addParameter(m_axisShowFontOutline);
+  addParameter(m_axisFontOutlineMode);
+  addParameter(m_axisFontOutlineColor);
+  addParameter(m_axisShowFontShadow);
+  addParameter(m_axisFontShadowColor);
+
+  if (!m_fontRenderer.fontNames().isEmpty()) {
+    int idx = 0;
+    for (const auto& name : m_fontRenderer.fontNames()) {
+      m_axisFontName.addOptionWithData(std::make_pair(name, idx++));
+    }
+    m_axisFontName.select(m_fontRenderer.selectedFontName());
+  } else {
+    m_axisFontName.setVisible(false);
+  }
+
+  auto updateAxisFontWidgets = [this]() {
+    const bool outlineVisible = m_axisShowFontOutline.get();
+    m_axisFontOutlineMode.setVisible(outlineVisible);
+    m_axisFontOutlineColor.setVisible(outlineVisible);
+    m_axisFontShadowColor.setVisible(m_axisShowFontShadow.get());
+  };
+
+  connect(&m_axisFontName, &ZStringIntOptionParameter::valueChanged, this, [this]() {
+    m_fontRenderer.setFontName(m_axisFontName.get());
+  });
+  connect(&m_axisFontSize, &ZFloatParameter::valueChanged, this, [this]() {
+    m_fontRenderer.setFontSize(m_axisFontSize.get());
+  });
+  connect(&m_axisFontSoftEdgeScale, &ZFloatParameter::valueChanged, this, [this]() {
+    m_fontRenderer.setFontSoftEdgeScale(m_axisFontSoftEdgeScale.get());
+  });
+  connect(&m_axisShowFontOutline, &ZBoolParameter::valueChanged, this, [this, updateAxisFontWidgets]() mutable {
+    m_fontRenderer.setShowFontOutline(m_axisShowFontOutline.get());
+    updateAxisFontWidgets();
+  });
+  connect(&m_axisFontOutlineMode, &ZStringIntOptionParameter::valueChanged, this, [this]() {
+    m_fontRenderer.setFontOutlineMode(static_cast<FontOutlineMode>(m_axisFontOutlineMode.associatedData()));
+  });
+  connect(&m_axisFontOutlineColor, &ZVec4Parameter::valueChanged, this, [this]() {
+    m_fontRenderer.setFontOutlineColor(m_axisFontOutlineColor.get());
+  });
+  connect(&m_axisShowFontShadow, &ZBoolParameter::valueChanged, this, [this, updateAxisFontWidgets]() mutable {
+    m_fontRenderer.setShowFontShadow(m_axisShowFontShadow.get());
+    updateAxisFontWidgets();
+  });
+  connect(&m_axisFontShadowColor, &ZVec4Parameter::valueChanged, this, [this]() {
+    m_fontRenderer.setFontShadowColor(m_axisFontShadowColor.get());
+  });
+
+  m_fontRenderer.setFontName(m_axisFontName.get());
+  m_fontRenderer.setFontSize(m_axisFontSize.get());
+  m_fontRenderer.setFontSoftEdgeScale(m_axisFontSoftEdgeScale.get());
+  m_fontRenderer.setShowFontOutline(m_axisShowFontOutline.get());
+  m_fontRenderer.setFontOutlineMode(static_cast<FontOutlineMode>(m_axisFontOutlineMode.associatedData()));
+  m_fontRenderer.setFontOutlineColor(m_axisFontOutlineColor.get());
+  m_fontRenderer.setShowFontShadow(m_axisShowFontShadow.get());
+  m_fontRenderer.setFontShadowColor(m_axisFontShadowColor.get());
+  updateAxisFontWidgets();
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   m_arrowRenderer.setUseDisplayList(false);
   m_lineRenderer.setUseDisplayList(false);
 #endif
   m_fontRenderer.setFollowCoordTransform(false);
   setupAxisCamera();
+}
+
+void Z3DCompositor::updateBackgroundMode()
+{
+  const auto mode = static_cast<BackgroundMode>(m_backgroundMode.associatedData());
+  m_backgroundRenderer.setMode(mode);
+
+  m_backgroundFirstColor.setVisible(true);
+  const bool useGradient = mode == BackgroundMode::Gradient;
+  m_backgroundSecondColor.setVisible(useGradient);
+  m_backgroundGradientOrientation.setVisible(useGradient);
+}
+
+void Z3DCompositor::updateBackgroundFirstColor()
+{
+  m_backgroundRenderer.setFirstColor(m_backgroundFirstColor.get());
+}
+
+void Z3DCompositor::updateBackgroundSecondColor()
+{
+  m_backgroundRenderer.setSecondColor(m_backgroundSecondColor.get());
+}
+
+void Z3DCompositor::updateBackgroundOrientation()
+{
+  m_backgroundRenderer.setGradientOrientation(
+    static_cast<BackgroundGradientOrientation>(m_backgroundGradientOrientation.associatedData()));
 }
 
 void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderTarget& renderTarget, Z3DEye eye)
@@ -128,17 +260,17 @@ void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderT
     glowLease1.renderTarget->release();
 
     // 2) sync glow params and render glow into temp2
-    if (auto* mode = dynamic_cast<ZStringStringOptionParameter*>(filter->parameter("Glow Mode"))) {
-      m_glowRenderer.glowModePara().select(mode->get());
+    if (auto* mode = dynamic_cast<ZStringIntOptionParameter*>(filter->parameter("Glow Mode"))) {
+      m_glowRenderer.setGlowMode(static_cast<GlowMode>(mode->associatedData()));
     }
     if (auto* radius = dynamic_cast<ZIntParameter*>(filter->parameter("Glow Blur Radius"))) {
-      m_glowRenderer.blurRadiusPara().set(radius->get());
+      m_glowRenderer.setBlurRadius(radius->get());
     }
     if (auto* scale = dynamic_cast<ZFloatParameter*>(filter->parameter("Glow Blur Scale"))) {
-      m_glowRenderer.blurScalePara().set(scale->get());
+      m_glowRenderer.setBlurScale(scale->get());
     }
     if (auto* strength = dynamic_cast<ZFloatParameter*>(filter->parameter("Glow Blur Strength"))) {
-      m_glowRenderer.blurStrengthPara().set(strength->get());
+      m_glowRenderer.setBlurStrength(strength->get());
     }
 
     auto glowLease2 = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(renderTarget.size());
@@ -180,10 +312,10 @@ std::shared_ptr<ZWidgetsGroup> Z3DCompositor::backgroundWidgetsGroup()
   if (!m_backgroundWidgetsGroup) {
     m_backgroundWidgetsGroup = std::make_shared<ZWidgetsGroup>("Background", 1);
     m_backgroundWidgetsGroup->addChild(m_showBackground, 1);
-    m_backgroundWidgetsGroup->addChild(m_backgroundRenderer.modePara(), 1);
-    m_backgroundWidgetsGroup->addChild(m_backgroundRenderer.firstColorPara(), 1);
-    m_backgroundWidgetsGroup->addChild(m_backgroundRenderer.secondColorPara(), 1);
-    m_backgroundWidgetsGroup->addChild(m_backgroundRenderer.gradientOrientationPara(), 1);
+    m_backgroundWidgetsGroup->addChild(m_backgroundMode, 1);
+    m_backgroundWidgetsGroup->addChild(m_backgroundFirstColor, 1);
+    m_backgroundWidgetsGroup->addChild(m_backgroundSecondColor, 1);
+    m_backgroundWidgetsGroup->addChild(m_backgroundGradientOrientation, 1);
     m_backgroundWidgetsGroup->setBasicAdvancedCutoff(4);
   }
   return m_backgroundWidgetsGroup;
@@ -209,15 +341,14 @@ std::shared_ptr<ZWidgetsGroup> Z3DCompositor::axisWidgetsGroup()
         m_axisWidgetsGroup->addChild(*para, 3);
       }
     }
-    m_axisWidgetsGroup->addChild(m_fontRenderer.allFontNamesPara(), 4);
-    m_axisWidgetsGroup->addChild(m_fontRenderer.fontPara(), 4);
-    m_axisWidgetsGroup->addChild(m_fontRenderer.fontSizePara(), 4);
-    m_axisWidgetsGroup->addChild(m_fontRenderer.fontSoftEdgeScalePara(), 4);
-    m_axisWidgetsGroup->addChild(m_fontRenderer.showFontOutlinePara(), 4);
-    m_axisWidgetsGroup->addChild(m_fontRenderer.fontOutlineModePara(), 4);
-    m_axisWidgetsGroup->addChild(m_fontRenderer.fontOutlineColorPara(), 4);
-    m_axisWidgetsGroup->addChild(m_fontRenderer.showFontShadowPara(), 4);
-    m_axisWidgetsGroup->addChild(m_fontRenderer.fontShadowColorPara(), 4);
+    m_axisWidgetsGroup->addChild(m_axisFontName, 4);
+    m_axisWidgetsGroup->addChild(m_axisFontSize, 4);
+    m_axisWidgetsGroup->addChild(m_axisFontSoftEdgeScale, 4);
+    m_axisWidgetsGroup->addChild(m_axisShowFontOutline, 4);
+    m_axisWidgetsGroup->addChild(m_axisFontOutlineMode, 4);
+    m_axisWidgetsGroup->addChild(m_axisFontOutlineColor, 4);
+    m_axisWidgetsGroup->addChild(m_axisShowFontShadow, 4);
+    m_axisWidgetsGroup->addChild(m_axisFontShadowColor, 4);
     m_axisWidgetsGroup->setBasicAdvancedCutoff(5);
   }
   return m_axisWidgetsGroup;
@@ -1025,17 +1156,17 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       layerRT->bind();
       layerRT->clear();
       m_rendererBase.setViewport(layerRT->size());
-      if (auto* mode = dynamic_cast<ZStringStringOptionParameter*>(gf->parameter("Glow Mode"))) {
-        m_glowRenderer.glowModePara().select(mode->get());
+      if (auto* mode = dynamic_cast<ZStringIntOptionParameter*>(gf->parameter("Glow Mode"))) {
+        m_glowRenderer.setGlowMode(static_cast<GlowMode>(mode->associatedData()));
       }
       if (auto* radius = dynamic_cast<ZIntParameter*>(gf->parameter("Glow Blur Radius"))) {
-        m_glowRenderer.blurRadiusPara().set(radius->get());
+        m_glowRenderer.setBlurRadius(radius->get());
       }
       if (auto* scale = dynamic_cast<ZFloatParameter*>(gf->parameter("Glow Blur Scale"))) {
-        m_glowRenderer.blurScalePara().set(scale->get());
+        m_glowRenderer.setBlurScale(scale->get());
       }
       if (auto* strength = dynamic_cast<ZFloatParameter*>(gf->parameter("Glow Blur Strength"))) {
-        m_glowRenderer.blurStrengthPara().set(strength->get());
+        m_glowRenderer.setBlurStrength(strength->get());
       }
       m_glowRenderer.setColorTexture(glowGeomLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
       m_glowRenderer.setDepthTexture(glowGeomLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));

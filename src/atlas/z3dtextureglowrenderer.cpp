@@ -2,26 +2,15 @@
 
 #include "z3dtexture.h"
 #include "z3dscratchresourcepool.h"
+#include <algorithm>
 
 namespace nim {
 
 Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_glowTextureShaderGrp(rendererBase)
-  , m_glowMode("Glow Mode")
-  , m_blurRadius("Glow Blur Radius", 10, 2, 10)
-  , m_blurScale("Glow Blur Scale", 1.f, 1.f, 5.f)
-  , m_blurStrength("Glow Blur Strength", .5f, 0.f, 1.f)
   , m_VAO(1)
 {
-  m_blurScale.setSingleStep(0.5);
-  m_glowMode.addOptionsWithData(std::make_pair<QString, QString>("Additive", "ADDITIVE_BLENDING"),
-                                std::make_pair<QString, QString>("Screen", "SCREEN_BLENDING"),
-                                std::make_pair<QString, QString>("Softlight", "SOFTLIGHT_BLENDING"),
-                                std::make_pair<QString, QString>("Glowmap", "GLOWMAP"));
-  m_glowMode.select("Screen");
-  connect(&m_glowMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureGlowRenderer::compile);
-
   m_blurXTextureShader.loadFromSourceFile("pass.vert",
                                           "blur.frag",
                                           m_rendererBase.generateHeader() + "#define ORIENTATION_X\n");
@@ -44,7 +33,22 @@ void Z3DTextureGlowRenderer::compile()
 
 QString Z3DTextureGlowRenderer::generateHeader()
 {
-  return QString("#define %1\n").arg(m_glowMode.associatedData());
+  QString define;
+  switch (m_glowMode) {
+    case GlowMode::Additive:
+      define = QStringLiteral("ADDITIVE_BLENDING");
+      break;
+    case GlowMode::Screen:
+      define = QStringLiteral("SCREEN_BLENDING");
+      break;
+    case GlowMode::Softlight:
+      define = QStringLiteral("SOFTLIGHT_BLENDING");
+      break;
+    case GlowMode::Glowmap:
+      define = QStringLiteral("GLOWMAP");
+      break;
+  }
+  return QString("#define %1\n").arg(define);
 }
 
 void Z3DTextureGlowRenderer::render(Z3DEye eye)
@@ -62,9 +66,9 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
   blurXLease.renderTarget->bind();
   blurXLease.renderTarget->clear();
   m_blurXTextureShader.bind();
-  m_blurXTextureShader.setUniform("blur_radius", m_blurRadius.get());
-  m_blurXTextureShader.setUniform("blur_scale", m_blurScale.get());
-  m_blurXTextureShader.setUniform("blur_strength", m_blurStrength.get());
+  m_blurXTextureShader.setUniform("blur_radius", m_blurRadius);
+  m_blurXTextureShader.setUniform("blur_scale", m_blurScale);
+  m_blurXTextureShader.setUniform("blur_strength", m_blurStrength);
   m_blurXTextureShader.setUniform("screen_dim_RCP", 1.f / glm::vec2(size));
   m_blurXTextureShader.bindTexture("color_texture", m_colorTexture);
   m_blurXTextureShader.bindTexture("depth_texture", m_depthTexture);
@@ -75,9 +79,9 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
   blurYLease.renderTarget->bind();
   blurYLease.renderTarget->clear();
   m_blurYTextureShader.bind();
-  m_blurYTextureShader.setUniform("blur_radius", m_blurRadius.get());
-  m_blurYTextureShader.setUniform("blur_scale", m_blurScale.get());
-  m_blurYTextureShader.setUniform("blur_strength", m_blurStrength.get());
+  m_blurYTextureShader.setUniform("blur_radius", m_blurRadius);
+  m_blurYTextureShader.setUniform("blur_scale", m_blurScale);
+  m_blurYTextureShader.setUniform("blur_strength", m_blurStrength);
   m_blurYTextureShader.setUniform("screen_dim_RCP", 1.f / glm::vec2(size));
   m_blurYTextureShader.bindTexture("color_texture", blurXLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
   m_blurYTextureShader.bindTexture("depth_texture", blurXLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
@@ -94,6 +98,30 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
   shader.bindTexture("glowmap_depth_texture", blurYLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
   renderScreenQuad(m_VAO, shader);
   m_glowTextureShaderGrp.release();
+}
+
+void Z3DTextureGlowRenderer::setGlowMode(GlowMode mode)
+{
+  if (m_glowMode == mode) {
+    return;
+  }
+  m_glowMode = mode;
+  compile();
+}
+
+void Z3DTextureGlowRenderer::setBlurRadius(int radius)
+{
+  m_blurRadius = std::max(0, radius);
+}
+
+void Z3DTextureGlowRenderer::setBlurScale(float scale)
+{
+  m_blurScale = std::max(0.f, scale);
+}
+
+void Z3DTextureGlowRenderer::setBlurStrength(float strength)
+{
+  m_blurStrength = strength;
 }
 
 } // namespace nim

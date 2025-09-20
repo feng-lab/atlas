@@ -12,15 +12,9 @@ public:
 
   void setData(std::vector<glm::vec3>* linesInput) override;
 
-  ZFloatParameter& lineWidthPara()
-  {
-    return m_lineWidth;
-  }
+  void setFixedLineWidth(float width);
 
-  ZVec4Parameter& lineColorPara()
-  {
-    return m_lineColor;
-  }
+  void setLineColor(const glm::vec4& color);
 
 protected:
   void setLineColors();
@@ -28,8 +22,8 @@ protected:
   float lineWidth() const override;
 
 protected:
-  ZFloatParameter m_lineWidth;
-  ZVec4Parameter m_lineColor;
+  float m_fixedLineWidth = 2.f;
+  glm::vec4 m_lineColor = glm::vec4(1.f, 1.f, 0.f, 1.f);
   std::vector<glm::vec4> m_lineColorsPrivate;
 };
 

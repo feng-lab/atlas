@@ -51,6 +51,15 @@ Compositor and Rendering
 - `Z3DNetworkEvaluator` executes the filter graph and drives progressive updates.
 - `Z3DGlobalParameters` holds camera, lights, fog, global cuts, device pixel ratio, and scratch resource pool.
 
+Vulkan Migration Snapshots
+
+- Detailed migration backlog now lives in `docs/VULKAN_MIGRATION_PLAN.md` (moved out of `src/atlas/`). Use it as the canonical task list for backend parity work.
+- Backend selection will be handled by a compositor façade (`Z3DCompositorBase` and friends). `Z3DRenderingEngine` owns only the façade and swaps concrete backends when the user toggles the runtime `RenderBackend` enum.
+- Filters must rebuild their renderer backends when the backend toggle fires; if a Vulkan renderer is not implemented yet, the filter remains disconnected rather than falling back to OpenGL. This avoids feeding GL render targets into a Vulkan compositor.
+- `Z3DRenderPort`/`Z3DRenderTarget` remain GL-specific. The plan is to split them into an API-neutral interface layer (`RenderSurfacePort` + leases) and backend implementations that wrap GL FBOs or Vulkan images. Filters will talk to the interface, and the compositor backend will provide matching surfaces.
+- Several `ZParameter` instances still live inside renderers (GL only). During migration we will audit each renderer, hoist persistent parameter state to its owning filter (or a shared parameter bundle), and keep only transient GPU resources inside renderer backends so they can be destroyed/recreated without losing user-facing state.
+- Naming convention: 3D/shared classes use the `Z3D` prefix (e.g., `Z3DImgFilter`, `Z3DRenderSurfaceOutputPort`), while Vulkan-only counterparts use the `ZVulkan` prefix (e.g., `ZVulkanCompositor`). Keep new files aligned with this scheme for clarity across backends.
+
 Invalidation & Progressive Rendering
 
 - A `Z3DFilter` tracks invalidation bits (mono/left/right). When a bit is set, the network evaluator knows that eye needs processing.

@@ -95,6 +95,7 @@ private:
   ZColorMapParameter m_colorMapMeanIntensity;
   ZColorMapParameter m_colorMapMaxIntensity;
   ZBoolParameter m_useSameSizeForAllPuncta;
+  ZBoolParameter m_useDynamicMaterial;
 
   //  Z3DSphereRenderer m_glowSphereRenderer;
   //  Z3DTextureGlowRenderer m_textureGlowRenderer;

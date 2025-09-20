@@ -9,11 +9,6 @@ namespace nim {
 Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_coneShaderGrp(rendererBase)
-  , m_coneCapStyle("Cone Cap Style")
-  , m_cylinderSubdivisionAroundZ("Cylinder Subdivisions Around Z", 36, 20, 100)
-  , m_cylinderSubdivisionAlongZ("Cylinder Subdivisions Along Z", 1, 1, 100)
-  , m_sameColorForBaseAndTop(false)
-  , m_useConeShader2(true)
   , m_VAO(1)
   , m_pickingVAO(1)
   , m_VBOs(6)
@@ -23,31 +18,6 @@ Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
 {
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
-#endif
-
-  m_coneCapStyle.addOptionsWithData(
-    std::make_pair<QString, QString>("Flat Caps", "FLAT_CAPS"),
-    // std::make_pair<QString,QString>("Round Caps", "ROUND_CAPS"),
-    std::make_pair<QString, QString>("No Caps", "NO_CAPS"),
-    // std::make_pair<QString,QString>("Round Base Flat Top", "ROUND_BASE_CAP_FLAT_TOP_CAP"),
-    std::make_pair<QString, QString>("Flat Base Round Top", "FLAT_BASE_CAP_ROUND_TOP_CAP"));
-  m_coneCapStyle.select("Flat Caps");
-
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  connect(&m_coneCapStyle,
-          &ZStringStringOptionParameter::valueChanged,
-          this,
-          &Z3DConeRenderer::invalidateOpenglRenderer);
-  connect(&m_coneCapStyle,
-          &ZStringStringOptionParameter::valueChanged,
-          this,
-          &Z3DConeRenderer::invalidateOpenglPickingRenderer);
-  connect(&m_coneCapStyle, &ZStringStringOptionParameter::valueChanged, this, &Z3DConeRenderer::compile);
-  connect(&m_cylinderSubdivisionAroundZ,
-          &ZIntParameter::valueChanged,
-          this,
-          &Z3DConeRenderer::invalidateOpenglRenderer);
-  connect(&m_cylinderSubdivisionAlongZ, &ZIntParameter::valueChanged, this, &Z3DConeRenderer::invalidateOpenglRenderer);
 #endif
 
   QStringList allshaders;
@@ -192,7 +162,23 @@ void Z3DConeRenderer::compile()
 
 QString Z3DConeRenderer::generateHeader()
 {
-  return QString("#define %1\n").arg(m_coneCapStyle.associatedData());
+  const QString define = [style = m_coneCapStyle]() {
+    switch (style) {
+      case ConeCapStyle::FlatCaps:
+        return QStringLiteral("FLAT_CAPS");
+      case ConeCapStyle::NoCaps:
+        return QStringLiteral("NO_CAPS");
+      case ConeCapStyle::RoundCaps:
+        return QStringLiteral("ROUND_CAPS");
+      case ConeCapStyle::RoundBaseFlatTop:
+        return QStringLiteral("ROUND_BASE_CAP_FLAT_TOP_CAP");
+      case ConeCapStyle::FlatBaseRoundTop:
+        return QStringLiteral("FLAT_BASE_CAP_ROUND_TOP_CAP");
+    }
+    return QStringLiteral("FLAT_CAPS");
+  }();
+
+  return QString("#define %1\n").arg(define);
 }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
@@ -229,32 +215,32 @@ void Z3DConeRenderer::renderUsingOpengl()
                 sizeScale() * m_baseAndBaseRadius[i].w,
                 sizeScale() * m_axisAndTopRadius[i].w,
                 height,
-                m_cylinderSubdivisionAroundZ.get(),
-                m_cylinderSubdivisionAlongZ.get());
+                m_cylinderSubdivisionAroundZ,
+                m_cylinderSubdivisionAlongZ);
 
-    if (m_coneCapStyle.isSelected("Round Caps") || m_coneCapStyle.isSelected("Round Base Flat Top")) {
+    if (m_coneCapStyle == ConeCapStyle::RoundCaps || m_coneCapStyle == ConeCapStyle::RoundBaseFlatTop) {
       gluSphere(quadric,
                 sizeScale() * m_baseAndBaseRadius[i].w,
-                m_cylinderSubdivisionAroundZ.get(),
-                m_cylinderSubdivisionAroundZ.get());
-    } else if (m_coneCapStyle.isSelected("Flat Caps") || m_coneCapStyle.isSelected("Flat Base Round Top")) {
+                m_cylinderSubdivisionAroundZ,
+                m_cylinderSubdivisionAroundZ);
+    } else if (m_coneCapStyle == ConeCapStyle::FlatCaps || m_coneCapStyle == ConeCapStyle::FlatBaseRoundTop) {
       gluQuadricOrientation(quadric, GLU_INSIDE);
-      gluDisk(quadric, 0.0, sizeScale() * m_baseAndBaseRadius[i].w, m_cylinderSubdivisionAroundZ.get(), 1);
+      gluDisk(quadric, 0.0, sizeScale() * m_baseAndBaseRadius[i].w, m_cylinderSubdivisionAroundZ, 1);
       gluQuadricOrientation(quadric, GLU_OUTSIDE);
     }
 
-    if (m_coneCapStyle.isSelected("Round Caps") || m_coneCapStyle.isSelected("Flat Base Round Top")) {
+    if (m_coneCapStyle == ConeCapStyle::RoundCaps || m_coneCapStyle == ConeCapStyle::FlatBaseRoundTop) {
       glTranslatef(0, 0, height);
       if (!m_sameColorForBaseAndTop) {
         glColor4fv(glm::value_ptr(glm::vec4(m_coneTopColors[i].rgb(), m_coneTopColors[i].a * opacity())));
       }
       gluSphere(quadric,
                 sizeScale() * m_axisAndTopRadius[i].w,
-                m_cylinderSubdivisionAroundZ.get(),
-                m_cylinderSubdivisionAroundZ.get());
-    } else if (m_coneCapStyle.isSelected("Flat Caps") || m_coneCapStyle.isSelected("Round Base Flat Top")) {
+                m_cylinderSubdivisionAroundZ,
+                m_cylinderSubdivisionAroundZ);
+    } else if (m_coneCapStyle == ConeCapStyle::FlatCaps || m_coneCapStyle == ConeCapStyle::RoundBaseFlatTop) {
       glTranslatef(0, 0, height);
-      gluDisk(quadric, 0.0, sizeScale() * m_axisAndTopRadius[i].w, m_cylinderSubdivisionAroundZ.get(), 1);
+      gluDisk(quadric, 0.0, sizeScale() * m_axisAndTopRadius[i].w, m_cylinderSubdivisionAroundZ, 1);
     }
 
     glMatrixMode(GL_MODELVIEW);
@@ -298,21 +284,21 @@ void Z3DConeRenderer::renderPickingUsingOpengl()
                 sizeScale() * m_baseAndBaseRadius[i].w,
                 sizeScale() * m_axisAndTopRadius[i].w,
                 height,
-                m_cylinderSubdivisionAroundZ.get(),
-                m_cylinderSubdivisionAlongZ.get());
+                m_cylinderSubdivisionAroundZ,
+                m_cylinderSubdivisionAlongZ);
 
-    if (m_coneCapStyle.isSelected("Round Caps") || m_coneCapStyle.isSelected("Round Base Flat Top")) {
+    if (m_coneCapStyle == ConeCapStyle::RoundCaps || m_coneCapStyle == ConeCapStyle::RoundBaseFlatTop) {
       gluSphere(quadric, sizeScale() * m_baseAndBaseRadius[i].w, 12, 12);
-    } else if (m_coneCapStyle.isSelected("Flat Caps") || m_coneCapStyle.isSelected("Flat Base Round Top")) {
+    } else if (m_coneCapStyle == ConeCapStyle::FlatCaps || m_coneCapStyle == ConeCapStyle::FlatBaseRoundTop) {
       gluQuadricOrientation(quadric, GLU_INSIDE);
       gluDisk(quadric, 0.0, sizeScale() * m_baseAndBaseRadius[i].w, 12, 1);
       gluQuadricOrientation(quadric, GLU_OUTSIDE);
     }
 
-    if (m_coneCapStyle.isSelected("Round Caps") || m_coneCapStyle.isSelected("Flat Base Round Top")) {
+    if (m_coneCapStyle == ConeCapStyle::RoundCaps || m_coneCapStyle == ConeCapStyle::FlatBaseRoundTop) {
       glTranslatef(0, 0, height);
       gluSphere(quadric, sizeScale() * m_axisAndTopRadius[i].w, 12, 12);
-    } else if (m_coneCapStyle.isSelected("Flat Caps") || m_coneCapStyle.isSelected("Round Base Flat Top")) {
+    } else if (m_coneCapStyle == ConeCapStyle::FlatCaps || m_coneCapStyle == ConeCapStyle::RoundBaseFlatTop) {
       glTranslatef(0, 0, height);
       gluDisk(quadric, 0.0, sizeScale() * m_axisAndTopRadius[i].w, 12, 1);
     }
@@ -671,6 +657,43 @@ void Z3DConeRenderer::appendDefaultColors()
       }
     }
   }
+}
+
+void Z3DConeRenderer::setConeCapStyle(ConeCapStyle style)
+{
+  if (m_coneCapStyle == style) {
+    return;
+  }
+  m_coneCapStyle = style;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  invalidateOpenglRenderer();
+  invalidateOpenglPickingRenderer();
+#endif
+  compile();
+}
+
+void Z3DConeRenderer::setCylinderSubdivisionAroundZ(int subdivisions)
+{
+  int clamped = std::max(1, subdivisions);
+  if (m_cylinderSubdivisionAroundZ == clamped) {
+    return;
+  }
+  m_cylinderSubdivisionAroundZ = clamped;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  invalidateOpenglRenderer();
+#endif
+}
+
+void Z3DConeRenderer::setCylinderSubdivisionAlongZ(int subdivisions)
+{
+  int clamped = std::max(1, subdivisions);
+  if (m_cylinderSubdivisionAlongZ == clamped) {
+    return;
+  }
+  m_cylinderSubdivisionAlongZ = clamped;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  invalidateOpenglRenderer();
+#endif
 }
 
 } // namespace nim

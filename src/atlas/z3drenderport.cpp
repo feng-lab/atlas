@@ -3,6 +3,7 @@
 #include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3drendertarget.h"
+#include <memory>
 
 namespace nim {
 
@@ -10,8 +11,7 @@ Z3DRenderOutputPort::Z3DRenderOutputPort(const QString& name,
                                          Z3DFilter* filter,
                                          GLint internalColorFormat,
                                          GLint internalDepthFormat)
-  : Z3DOutputPortBase(name, filter)
-  , m_resultIsValid(false)
+  : Z3DRenderSurfaceOutputPort(name, filter)
   , m_internalColorFormat(internalColorFormat)
   , m_internalDepthFormat(internalDepthFormat)
   , m_multisample(false)
@@ -21,8 +21,7 @@ Z3DRenderOutputPort::Z3DRenderOutputPort(const QString& name,
 
 void Z3DRenderOutputPort::invalidate()
 {
-  m_resultIsValid = false;
-  Z3DOutputPortBase::invalidate();
+  Z3DRenderSurfaceOutputPort::invalidate();
 }
 
 void Z3DRenderOutputPort::clearTarget() const
@@ -37,7 +36,7 @@ void Z3DRenderOutputPort::clearTarget() const
 void Z3DRenderOutputPort::resize(const glm::uvec2& newsize)
 {
   if (m_renderTarget.resize(newsize)) {
-    m_resultIsValid = false;
+    setSurface(nullptr);
     m_size = newsize;
   }
 }
@@ -65,6 +64,12 @@ bool Z3DRenderOutputPort::canConnectTo(const Z3DInputPortBase* inport) const
   }
 }
 
+void Z3DRenderOutputPort::refreshLease()
+{
+  auto lease = std::make_unique<Z3DRenderTargetLease>(m_renderTarget);
+  setSurface(std::move(lease));
+}
+
 // void Z3DRenderOutputPort::setMultisample(bool multisample, int nsample)
 //{
 //   if (!isInitialized() || (multisample == m_multisample && nsample == m_sample))
@@ -80,19 +85,12 @@ Z3DRenderInputPort::Z3DRenderInputPort(const QString& name,
                                        bool allowMultipleConnections,
                                        Z3DFilter* filter,
                                        Z3DFilter::State invalidationState)
-  : Z3DInputPortBase(name, allowMultipleConnections, filter, invalidationState)
+  : Z3DRenderSurfaceInputPort(name, allowMultipleConnections, filter, invalidationState)
 {}
 
 size_t Z3DRenderInputPort::numValidInputs() const
 {
-  size_t res = 0;
-  for (auto connectedOutputPort : m_connectedOutputPorts) {
-    const auto* p = static_cast<const Z3DRenderOutputPort*>(connectedOutputPort);
-    if (p->hasValidData()) {
-      ++res;
-    }
-  }
-  return res;
+  return Z3DRenderSurfaceInputPort::numValidInputs();
 }
 
 glm::uvec2 Z3DRenderInputPort::size(size_t idx) const
@@ -127,15 +125,9 @@ const Z3DRenderTarget* Z3DRenderInputPort::renderTarget(size_t idx) const
   if (idx >= numValidInputs()) {
     return nullptr;
   }
-  size_t res = 0;
-  for (auto connectedOutputPort : m_connectedOutputPorts) {
-    const auto* p = static_cast<const Z3DRenderOutputPort*>(connectedOutputPort);
-    if (p->hasValidData()) {
-      ++res;
-    }
-    if (idx == res - 1) {
-      return &p->renderTarget();
-    }
+  auto surface = Z3DRenderSurfaceInputPort::surface(idx);
+  if (auto lease = dynamic_cast<const Z3DRenderTargetLease*>(surface)) {
+    return &lease->renderTarget();
   }
   return nullptr;
 }
