@@ -2,9 +2,9 @@
 
 #include "z3dgl.h"
 #include "z3drendertarget.h"
-#include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace nim {
 
@@ -33,7 +33,41 @@ public:
   {
     Z3DRenderTarget* renderTarget = nullptr;
     uint32_t attachments = 0; // number of color attachments available
-    std::function<void()> releaser;
+    // TODO(nim): replace with std::move_only_function once we move to C++23.
+    struct Releaser
+    {
+      void (*call)(void*) = nullptr;
+      void* payload = nullptr;
+
+      void operator()()
+      {
+        if (call) {
+          call(payload);
+        }
+      }
+
+      void reset()
+      {
+        call = nullptr;
+        payload = nullptr;
+      }
+
+      explicit operator bool() const
+      {
+        return call != nullptr;
+      }
+
+      template<typename Slot>
+      static Releaser forSlot(Slot* slot)
+      {
+        return {[](void* ptr) {
+                  static_cast<Slot*>(ptr)->inUse = false;
+                },
+                slot};
+      }
+    };
+
+    Releaser releaser;
 
     // Move-only: explicit RAII ownership over a pooled slot
     RenderTargetLease() = default;
@@ -46,7 +80,7 @@ public:
     {
       other.renderTarget = nullptr;
       other.attachments = 0;
-      other.releaser = nullptr;
+      other.releaser.reset();
     }
     RenderTargetLease& operator=(RenderTargetLease&& other) noexcept
     {
@@ -57,7 +91,7 @@ public:
         releaser = std::move(other.releaser);
         other.renderTarget = nullptr;
         other.attachments = 0;
-        other.releaser = nullptr;
+        other.releaser.reset();
       }
       return *this;
     }
@@ -65,7 +99,7 @@ public:
     {
       if (releaser) {
         releaser();
-        releaser = nullptr;
+        releaser.reset();
       }
       renderTarget = nullptr;
       attachments = 0;

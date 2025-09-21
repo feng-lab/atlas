@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <algorithm>
+#include <utility>
 
 namespace {
 using namespace nim;
@@ -44,6 +45,32 @@ Slot* findClosestFreeSlot(std::vector<std::unique_ptr<Slot>>& slots, const glm::
   });
 }
 
+template<typename Slots, typename PerSlotFn>
+uint64_t
+accumulateCategory(const char* label, const Slots& slots, bool detailed, std::string& details, PerSlotFn&& perSlot)
+{
+  uint64_t categoryBytes = 0;
+  for (size_t idx = 0; idx < slots.size(); ++idx) {
+    const auto& slot = *slots[idx];
+    auto [bytes, line] = perSlot(slot, idx, detailed);
+    categoryBytes += bytes;
+    if (detailed && !line.empty()) {
+      details += fmt::format("[{}] {}\n", label, line);
+    }
+  }
+  return categoryBytes;
+}
+
+template<typename Slot>
+Z3DScratchResourcePool::RenderTargetLease makeLeaseFromSlot(Slot* slot, uint32_t attachments)
+{
+  Z3DScratchResourcePool::RenderTargetLease lease;
+  lease.renderTarget = slot->fbo.get();
+  lease.attachments = attachments;
+  lease.releaser = Z3DScratchResourcePool::RenderTargetLease::Releaser::forSlot(slot);
+  return lease;
+}
+
 } // anonymous namespace
 
 DEFINE_uint32(atlas_blockid_rt_max_attachments, 8, "Max color attachments for block-id FBO");
@@ -72,207 +99,247 @@ static inline uint64_t bytesPerPixelFromInternal(GLint internal)
 
 std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
 {
-  uint64_t total = 0;
-  uint64_t blockIdBytes = 0;
-  uint64_t entryExitBytes = 0;
-  uint64_t layerArrayBytes = 0;
-  uint64_t temp2DBytes = 0;
-  uint64_t raycastBytes = 0;
-  uint64_t dualDepthBytes = 0;
-  uint64_t weightedAvgBytes = 0;
-  uint64_t weightedBlendBytes = 0;
-
   std::string details;
+  const uint64_t blockIdBytes =
+    accumulateCategory("BlockID",
+                       m_blockIdRenderTargetSlots,
+                       detailed,
+                       details,
+                       [](const BlockIdRenderTargetSlot& s, size_t idx, bool wantDetail) {
+                         const glm::uvec2 sz = s.fbo->size();
+                         const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
+                         const uint64_t bpp = 16; // GL_RGBA32UI = 4 * 32-bit
+                         const uint64_t bytes = pixels * bpp * s.attachments;
+                         std::string line;
+                         if (wantDetail) {
+                           line = fmt::format("slot={} size={}x{} attachments={} inUse={} bytes={}",
+                                              idx,
+                                              sz.x,
+                                              sz.y,
+                                              s.attachments,
+                                              s.inUse ? 1 : 0,
+                                              bytes);
+                         }
+                         return std::pair{bytes, std::move(line)};
+                       });
 
-  // Block ID slots
-  for (size_t i = 0; i < m_blockIdRenderTargetSlots.size(); ++i) {
-    const auto& s = *m_blockIdRenderTargetSlots[i];
-    const glm::uvec2 sz = s.fbo->size();
-    const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
-    const uint64_t bpp = 16; // GL_RGBA32UI = 4 * 32-bit
-    const uint64_t bytes = pixels * bpp * s.attachments;
-    blockIdBytes += bytes;
-    if (detailed) {
-      details += fmt::format("[BlockID] slot={} size={}x{} attachments={} inUse={} bytes={}\n",
-                             i,
-                             sz.x,
-                             sz.y,
-                             s.attachments,
-                             s.inUse ? 1 : 0,
-                             bytes);
-    }
-  }
+  const uint64_t entryExitBytes =
+    accumulateCategory("EntryExit",
+                       m_entryExitRenderTargetSlots,
+                       detailed,
+                       details,
+                       [](const EntryExitRenderTargetSlot& s, size_t idx, bool wantDetail) {
+                         const glm::uvec2 sz = s.fbo->size();
+                         const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y * std::max<uint32_t>(1, s.layers);
+                         const uint64_t bpp = bytesPerPixelFromInternal(s.colorFormat);
+                         const uint64_t bytes = pixels * bpp;
+                         std::string line;
+                         if (wantDetail) {
+                           line = fmt::format("slot={} size={}x{} layers={} fmt={} inUse={} bytes={}",
+                                              idx,
+                                              sz.x,
+                                              sz.y,
+                                              s.layers,
+                                              glbinding::aux::Meta::getString((GLenum)s.colorFormat),
+                                              s.inUse ? 1 : 0,
+                                              bytes);
+                         }
+                         return std::pair{bytes, std::move(line)};
+                       });
 
-  // Entry/Exit slots (single color array)
-  for (size_t i = 0; i < m_entryExitRenderTargetSlots.size(); ++i) {
-    const auto& s = *m_entryExitRenderTargetSlots[i];
-    const glm::uvec2 sz = s.fbo->size();
-    const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y * std::max<uint32_t>(1, s.layers);
-    const uint64_t bpp = bytesPerPixelFromInternal(s.colorFormat);
-    const uint64_t bytes = pixels * bpp;
-    entryExitBytes += bytes;
-    if (detailed) {
-      details += fmt::format("[EntryExit] slot={} size={}x{} layers={} fmt={} inUse={} bytes={}\n",
-                             i,
-                             sz.x,
-                             sz.y,
-                             s.layers,
-                             glbinding::aux::Meta::getString((GLenum)s.colorFormat),
-                             s.inUse ? 1 : 0,
-                             bytes);
-    }
-  }
+  const uint64_t layerArrayBytes =
+    accumulateCategory("LayerArray",
+                       m_layerArrayRenderTargetSlots,
+                       detailed,
+                       details,
+                       [](const LayerArrayRenderTargetSlot& s, size_t idx, bool wantDetail) {
+                         const glm::uvec2 sz = s.fbo->size();
+                         const uint64_t layerPixels =
+                           static_cast<uint64_t>(sz.x) * sz.y * std::max<uint32_t>(1, s.layers);
+                         const uint64_t colorBpp = bytesPerPixelFromInternal(s.colorFormat);
+                         const uint64_t depthBpp = bytesPerPixelFromInternal(s.depthFormat);
+                         const uint64_t bytes = layerPixels * (colorBpp + depthBpp);
+                         std::string line;
+                         if (wantDetail) {
+                           line = fmt::format("slot={} size={}x{} layers={} colorFmt={} depthFmt={} inUse={} bytes={}",
+                                              idx,
+                                              sz.x,
+                                              sz.y,
+                                              s.layers,
+                                              glbinding::aux::Meta::getString((GLenum)s.colorFormat),
+                                              glbinding::aux::Meta::getString((GLenum)s.depthFormat),
+                                              s.inUse ? 1 : 0,
+                                              bytes);
+                         }
+                         return std::pair{bytes, std::move(line)};
+                       });
 
-  // Layer Array slots (color + depth arrays)
-  for (size_t i = 0; i < m_layerArrayRenderTargetSlots.size(); ++i) {
-    const auto& s = *m_layerArrayRenderTargetSlots[i];
-    const glm::uvec2 sz = s.fbo->size();
-    const uint64_t layerPixels = static_cast<uint64_t>(sz.x) * sz.y * std::max<uint32_t>(1, s.layers);
-    const uint64_t colorBpp = bytesPerPixelFromInternal(s.colorFormat);
-    const uint64_t depthBpp = bytesPerPixelFromInternal(s.depthFormat);
-    const uint64_t bytes = layerPixels * (colorBpp + depthBpp);
-    layerArrayBytes += bytes;
-    if (detailed) {
-      details += fmt::format("[LayerArray] slot={} size={}x{} layers={} colorFmt={} depthFmt={} inUse={} bytes={}\n",
-                             i,
-                             sz.x,
-                             sz.y,
-                             s.layers,
-                             glbinding::aux::Meta::getString((GLenum)s.colorFormat),
-                             glbinding::aux::Meta::getString((GLenum)s.depthFormat),
-                             s.inUse ? 1 : 0,
-                             bytes);
-    }
-  }
+  const uint64_t temp2DBytes =
+    accumulateCategory("Temp2D",
+                       m_temp2DRenderTargetSlots,
+                       detailed,
+                       details,
+                       [](const Temp2DRenderTargetSlot& s, size_t idx, bool wantDetail) {
+                         const glm::uvec2 sz = s.fbo->size();
+                         const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
+                         const uint64_t colorBpp = bytesPerPixelFromInternal(s.colorFormat);
+                         const uint64_t depthBpp = bytesPerPixelFromInternal(s.depthFormat);
+                         const uint64_t bytes = pixels * (colorBpp + depthBpp);
+                         std::string line;
+                         if (wantDetail) {
+                           line = fmt::format("slot={} size={}x{} colorFmt={} depthFmt={} inUse={} bytes={}",
+                                              idx,
+                                              sz.x,
+                                              sz.y,
+                                              glbinding::aux::Meta::getString((GLenum)s.colorFormat),
+                                              glbinding::aux::Meta::getString((GLenum)s.depthFormat),
+                                              s.inUse ? 1 : 0,
+                                              bytes);
+                         }
+                         return std::pair{bytes, std::move(line)};
+                       });
 
-  // Temp 2D slots (color + depth 2D)
-  for (size_t i = 0; i < m_temp2DRenderTargetSlots.size(); ++i) {
-    const auto& s = *m_temp2DRenderTargetSlots[i];
-    const glm::uvec2 sz = s.fbo->size();
-    const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
-    const uint64_t colorBpp = bytesPerPixelFromInternal(s.colorFormat);
-    const uint64_t depthBpp = bytesPerPixelFromInternal(s.depthFormat);
-    const uint64_t bytes = pixels * (colorBpp + depthBpp);
-    temp2DBytes += bytes;
-    if (detailed) {
-      details += fmt::format("[Temp2D] slot={} size={}x{} colorFmt={} depthFmt={} inUse={} bytes={}\n",
-                             i,
-                             sz.x,
-                             sz.y,
-                             glbinding::aux::Meta::getString((GLenum)s.colorFormat),
-                             glbinding::aux::Meta::getString((GLenum)s.depthFormat),
-                             s.inUse ? 1 : 0,
-                             bytes);
-    }
-  }
+  const uint64_t raycastBytes =
+    accumulateCategory("RaycastAccum",
+                       m_raycastAccumulatorSlots,
+                       detailed,
+                       details,
+                       [](const RaycastAccumulatorSlot& s, size_t idx, bool wantDetail) {
+                         const glm::uvec2 sz = s.fbo->size();
+                         const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
+                         const uint64_t primaryBpp = bytesPerPixelFromInternal(s.colorFormat);
+                         const uint64_t accumBpp = bytesPerPixelFromInternal(s.accumulatorFormat);
+                         const uint64_t bytes = pixels * (primaryBpp + accumBpp);
+                         std::string line;
+                         if (wantDetail) {
+                           line = fmt::format("slot={} size={}x{} colorFmt={} accumFmt={} inUse={} bytes={}",
+                                              idx,
+                                              sz.x,
+                                              sz.y,
+                                              glbinding::aux::Meta::getString((GLenum)s.colorFormat),
+                                              glbinding::aux::Meta::getString((GLenum)s.accumulatorFormat),
+                                              s.inUse ? 1 : 0,
+                                              bytes);
+                         }
+                         return std::pair{bytes, std::move(line)};
+                       });
 
-  // Raycast accumulator slots (dual color attachments)
-  for (size_t i = 0; i < m_raycastAccumulatorSlots.size(); ++i) {
-    const auto& s = *m_raycastAccumulatorSlots[i];
-    const glm::uvec2 sz = s.fbo->size();
-    const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
-    const uint64_t primaryBpp = bytesPerPixelFromInternal(s.colorFormat);
-    const uint64_t accumBpp = bytesPerPixelFromInternal(s.accumulatorFormat);
-    const uint64_t bytes = pixels * (primaryBpp + accumBpp);
-    raycastBytes += bytes;
-    if (detailed) {
-      details += fmt::format("[RaycastAccum] slot={} size={}x{} colorFmt={} accumFmt={} inUse={} bytes={}\n",
-                             i,
-                             sz.x,
-                             sz.y,
-                             glbinding::aux::Meta::getString((GLenum)s.colorFormat),
-                             glbinding::aux::Meta::getString((GLenum)s.accumulatorFormat),
-                             s.inUse ? 1 : 0,
-                             bytes);
-    }
-  }
-
-  // Dual-depth peeling slots (8 color attachments)
-  for (size_t i = 0; i < m_dualDepthPeelSlots.size(); ++i) {
-    const auto& s = *m_dualDepthPeelSlots[i];
-    const glm::uvec2 sz = s.fbo->size();
-    const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
-    uint64_t bytes = 0;
-    std::string attachmentFormats;
-    for (int att = 0; att < 8; ++att) {
-      if (const Z3DTexture* tex = s.fbo->attachment(GLenum(GL_COLOR_ATTACHMENT0 + att))) {
-        bytes += pixels * bytesPerPixelFromInternal(tex->internalFormat());
-        if (!attachmentFormats.empty()) {
-          attachmentFormats += ", ";
-        }
-        attachmentFormats += fmt::format("{}={}", att, glbinding::aux::Meta::getString((GLenum)tex->internalFormat()));
+  const uint64_t dualDepthBytes = accumulateCategory(
+    "DualDepthPeel",
+    m_dualDepthPeelSlots,
+    detailed,
+    details,
+    [](const DualDepthPeelSlot& s, size_t idx, bool wantDetail) {
+      const glm::uvec2 sz = s.fbo->size();
+      const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
+      uint64_t bytes = 0;
+      std::string attachmentFormats;
+      if (wantDetail) {
+        attachmentFormats.reserve(64);
       }
-    }
-    dualDepthBytes += bytes;
-    if (detailed) {
-      details += fmt::format("[DualDepthPeel] slot={} size={}x{} inUse={} bytes={} attachments=[{}]\n",
-                             i,
-                             sz.x,
-                             sz.y,
-                             s.inUse ? 1 : 0,
-                             bytes,
-                             attachmentFormats);
-    }
-  }
-
-  // Weighted-average slots (two color attachments)
-  for (size_t i = 0; i < m_weightedAverageSlots.size(); ++i) {
-    const auto& s = *m_weightedAverageSlots[i];
-    const glm::uvec2 sz = s.fbo->size();
-    const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
-    uint64_t bytes = 0;
-    std::string attachmentFormats;
-    for (int att = 0; att < 2; ++att) {
-      if (const Z3DTexture* tex = s.fbo->attachment(GLenum(GL_COLOR_ATTACHMENT0 + att))) {
-        bytes += pixels * bytesPerPixelFromInternal(tex->internalFormat());
-        if (!attachmentFormats.empty()) {
-          attachmentFormats += ", ";
+      for (int att = 0; att < 8; ++att) {
+        if (const Z3DTexture* tex = s.fbo->attachment(GLenum(GL_COLOR_ATTACHMENT0 + att))) {
+          bytes += pixels * bytesPerPixelFromInternal(tex->internalFormat());
+          if (wantDetail) {
+            if (!attachmentFormats.empty()) {
+              attachmentFormats += ", ";
+            }
+            attachmentFormats +=
+              fmt::format("{}={}", att, glbinding::aux::Meta::getString((GLenum)tex->internalFormat()));
+          }
         }
-        attachmentFormats += fmt::format("{}={}", att, glbinding::aux::Meta::getString((GLenum)tex->internalFormat()));
       }
-    }
-    weightedAvgBytes += bytes;
-    if (detailed) {
-      details += fmt::format("[WeightedAverage] slot={} size={}x{} inUse={} bytes={} attachments=[{}]\n",
-                             i,
-                             sz.x,
-                             sz.y,
-                             s.inUse ? 1 : 0,
-                             bytes,
-                             attachmentFormats);
-    }
-  }
+      std::string line;
+      if (wantDetail) {
+        line = fmt::format("slot={} size={}x{} inUse={} bytes={} attachments=[{}]",
+                           idx,
+                           sz.x,
+                           sz.y,
+                           s.inUse ? 1 : 0,
+                           bytes,
+                           attachmentFormats);
+      }
+      return std::pair{bytes, std::move(line)};
+    });
 
-  // Weighted-blended slots (two color attachments)
-  for (size_t i = 0; i < m_weightedBlendedSlots.size(); ++i) {
-    const auto& s = *m_weightedBlendedSlots[i];
-    const glm::uvec2 sz = s.fbo->size();
-    const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
-    uint64_t bytes = 0;
-    std::string attachmentFormats;
-    for (int att = 0; att < 2; ++att) {
-      if (const Z3DTexture* tex = s.fbo->attachment(GLenum(GL_COLOR_ATTACHMENT0 + att))) {
-        bytes += pixels * bytesPerPixelFromInternal(tex->internalFormat());
-        if (!attachmentFormats.empty()) {
-          attachmentFormats += ", ";
+  const uint64_t weightedAvgBytes = accumulateCategory(
+    "WeightedAverage",
+    m_weightedAverageSlots,
+    detailed,
+    details,
+    [](const WeightedAverageSlot& s, size_t idx, bool wantDetail) {
+      const glm::uvec2 sz = s.fbo->size();
+      const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
+      uint64_t bytes = 0;
+      std::string attachmentFormats;
+      if (wantDetail) {
+        attachmentFormats.reserve(32);
+      }
+      for (int att = 0; att < 2; ++att) {
+        if (const Z3DTexture* tex = s.fbo->attachment(GLenum(GL_COLOR_ATTACHMENT0 + att))) {
+          bytes += pixels * bytesPerPixelFromInternal(tex->internalFormat());
+          if (wantDetail) {
+            if (!attachmentFormats.empty()) {
+              attachmentFormats += ", ";
+            }
+            attachmentFormats +=
+              fmt::format("{}={}", att, glbinding::aux::Meta::getString((GLenum)tex->internalFormat()));
+          }
         }
-        attachmentFormats += fmt::format("{}={}", att, glbinding::aux::Meta::getString((GLenum)tex->internalFormat()));
       }
-    }
-    weightedBlendBytes += bytes;
-    if (detailed) {
-      details += fmt::format("[WeightedBlended] slot={} size={}x{} inUse={} bytes={} attachments=[{}]\n",
-                             i,
-                             sz.x,
-                             sz.y,
-                             s.inUse ? 1 : 0,
-                             bytes,
-                             attachmentFormats);
-    }
-  }
+      std::string line;
+      if (wantDetail) {
+        line = fmt::format("slot={} size={}x{} inUse={} bytes={} attachments=[{}]",
+                           idx,
+                           sz.x,
+                           sz.y,
+                           s.inUse ? 1 : 0,
+                           bytes,
+                           attachmentFormats);
+      }
+      return std::pair{bytes, std::move(line)};
+    });
 
-  total = blockIdBytes + entryExitBytes + layerArrayBytes + temp2DBytes + raycastBytes + dualDepthBytes +
-          weightedAvgBytes + weightedBlendBytes;
+  const uint64_t weightedBlendBytes = accumulateCategory(
+    "WeightedBlended",
+    m_weightedBlendedSlots,
+    detailed,
+    details,
+    [](const WeightedBlendedSlot& s, size_t idx, bool wantDetail) {
+      const glm::uvec2 sz = s.fbo->size();
+      const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
+      uint64_t bytes = 0;
+      std::string attachmentFormats;
+      if (wantDetail) {
+        attachmentFormats.reserve(32);
+      }
+      for (int att = 0; att < 2; ++att) {
+        if (const Z3DTexture* tex = s.fbo->attachment(GLenum(GL_COLOR_ATTACHMENT0 + att))) {
+          bytes += pixels * bytesPerPixelFromInternal(tex->internalFormat());
+          if (wantDetail) {
+            if (!attachmentFormats.empty()) {
+              attachmentFormats += ", ";
+            }
+            attachmentFormats +=
+              fmt::format("{}={}", att, glbinding::aux::Meta::getString((GLenum)tex->internalFormat()));
+          }
+        }
+      }
+      std::string line;
+      if (wantDetail) {
+        line = fmt::format("slot={} size={}x{} inUse={} bytes={} attachments=[{}]",
+                           idx,
+                           sz.x,
+                           sz.y,
+                           s.inUse ? 1 : 0,
+                           bytes,
+                           attachmentFormats);
+      }
+      return std::pair{bytes, std::move(line)};
+    });
+
+  const uint64_t total = blockIdBytes + entryExitBytes + layerArrayBytes + temp2DBytes + raycastBytes + dualDepthBytes +
+                         weightedAvgBytes + weightedBlendBytes;
   const double totalMiB = static_cast<double>(total) / (1024.0 * 1024.0);
   const double blockMiB = static_cast<double>(blockIdBytes) / (1024.0 * 1024.0);
   const double eeMiB = static_cast<double>(entryExitBytes) / (1024.0 * 1024.0);
@@ -322,6 +389,7 @@ Z3DScratchResourcePool::BlockIdRenderTargetSlot* Z3DScratchResourcePool::acquire
   auto* created = m_blockIdRenderTargetSlots.back().get();
   created->fbo = std::make_unique<Z3DRenderTarget>(size);
   created->attachments = 0;
+  ++m_creationCounter;
   return created;
 }
 
@@ -372,79 +440,34 @@ Z3DScratchResourcePool::acquireBlockIdRenderTarget(const glm::uvec2& viewport, i
 
   slot->inUse = true;
   slot->lastUseTick = ++m_usageTick;
-
-  RenderTargetLease lease;
-  lease.renderTarget = slot->fbo.get();
-  lease.attachments = std::min<uint32_t>(requestedAttachmentCount, slot->attachments);
-  lease.releaser = [slot]() {
-    slot->inUse = false;
-  };
-  return lease;
+  return makeLeaseFromSlot(slot, std::min<uint32_t>(requestedAttachmentCount, slot->attachments));
 }
 
 void Z3DScratchResourcePool::trim()
 {
-  auto trimCategory = [](auto& vec, size_t& kept, size_t& freed) {
-    auto it = std::remove_if(vec.begin(), vec.end(), [&](auto& uptr) {
+  auto trimCategory = [&](const char* label, auto& vec) {
+    size_t kept = 0;
+    const size_t freed = std::erase_if(vec, [&](auto& uptr) {
       auto& slot = *uptr;
       if (slot.inUse) {
         ++kept;
         return false; // keep in-use slots
       }
-      // Remove free slots; every remaining slot owns an FBO by construction.
-      ++freed;
       return true; // erase non-in-use slots
     });
-    vec.erase(it, vec.end());
+    if (kept || freed) {
+      LOG(INFO) << fmt::format("trim(): {} kept_in_use={} freed={}", label, kept, freed);
+    }
   };
 
-  size_t keptBlock = 0, freedBlock = 0;
-  trimCategory(m_blockIdRenderTargetSlots, keptBlock, freedBlock);
-  if (keptBlock || freedBlock) {
-    LOG(INFO) << fmt::format("trim(): BlockID kept_in_use={} freed={}", keptBlock, freedBlock);
-  }
-
-  size_t keptEE = 0, freedEE = 0;
-  trimCategory(m_entryExitRenderTargetSlots, keptEE, freedEE);
-  if (keptEE || freedEE) {
-    LOG(INFO) << fmt::format("trim(): EntryExit kept_in_use={} freed={}", keptEE, freedEE);
-  }
-
-  size_t keptLayer = 0, freedLayer = 0;
-  trimCategory(m_layerArrayRenderTargetSlots, keptLayer, freedLayer);
-  if (keptLayer || freedLayer) {
-    LOG(INFO) << fmt::format("trim(): LayerArray kept_in_use={} freed={}", keptLayer, freedLayer);
-  }
-
-  size_t keptTemp = 0, freedTemp = 0;
-  trimCategory(m_temp2DRenderTargetSlots, keptTemp, freedTemp);
-  if (keptTemp || freedTemp) {
-    LOG(INFO) << fmt::format("trim(): Temp2D kept_in_use={} freed={}", keptTemp, freedTemp);
-  }
-
-  size_t keptRaycast = 0, freedRaycast = 0;
-  trimCategory(m_raycastAccumulatorSlots, keptRaycast, freedRaycast);
-  if (keptRaycast || freedRaycast) {
-    LOG(INFO) << fmt::format("trim(): RaycastAccum kept_in_use={} freed={}", keptRaycast, freedRaycast);
-  }
-
-  size_t keptDDP = 0, freedDDP = 0;
-  trimCategory(m_dualDepthPeelSlots, keptDDP, freedDDP);
-  if (keptDDP || freedDDP) {
-    LOG(INFO) << fmt::format("trim(): DualDepthPeel kept_in_use={} freed={}", keptDDP, freedDDP);
-  }
-
-  size_t keptWA = 0, freedWA = 0;
-  trimCategory(m_weightedAverageSlots, keptWA, freedWA);
-  if (keptWA || freedWA) {
-    LOG(INFO) << fmt::format("trim(): WeightedAverage kept_in_use={} freed={}", keptWA, freedWA);
-  }
-
-  size_t keptWB = 0, freedWB = 0;
-  trimCategory(m_weightedBlendedSlots, keptWB, freedWB);
-  if (keptWB || freedWB) {
-    LOG(INFO) << fmt::format("trim(): WeightedBlended kept_in_use={} freed={}", keptWB, freedWB);
-  }
+  trimCategory("BlockID", m_blockIdRenderTargetSlots);
+  trimCategory("EntryExit", m_entryExitRenderTargetSlots);
+  trimCategory("LayerArray", m_layerArrayRenderTargetSlots);
+  trimCategory("Temp2D", m_temp2DRenderTargetSlots);
+  trimCategory("RaycastAccum", m_raycastAccumulatorSlots);
+  trimCategory("DualDepthPeel", m_dualDepthPeelSlots);
+  trimCategory("WeightedAverage", m_weightedAverageSlots);
+  trimCategory("WeightedBlended", m_weightedBlendedSlots);
 }
 
 Z3DScratchResourcePool::RenderTargetLease
@@ -460,19 +483,12 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size, uin
     // Existing slot path: single-pass resize; grow Z only if XY unchanged.
     const uint32_t prevLayers = slot->layers;
     const bool xyChanged = (slot->fbo->size() != size);
-    uint32_t desiredZ = layers;
-    if (!xyChanged) {
-      desiredZ = std::max<uint32_t>(slot->layers, layers);
-    }
-    bool changed = slot->fbo->resize(glm::uvec3(size.x, size.y, desiredZ));
-    slot->fbo->isFBOComplete();
+    const uint32_t desiredZ = xyChanged ? layers : std::max<uint32_t>(slot->layers, layers);
+    const bool resized = slot->fbo->resize(glm::uvec3(size.x, size.y, desiredZ));
     slot->inUse = true;
-    Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
-    slot->layers = colorTex ? static_cast<uint32_t>(colorTex->dimension().z) : layers;
-    if (slot->layers != prevLayers) {
-      changed = true;
-    }
-    if (changed) {
+    slot->layers = desiredZ;
+    if (resized || desiredZ != prevLayers) {
+      slot->fbo->isFBOComplete();
       ++m_changeCounter;
     }
   } else {
@@ -491,18 +507,11 @@ Z3DScratchResourcePool::acquireEntryExitRenderTarget(const glm::uvec2& size, uin
     }
     slot->fbo->isFBOComplete();
     slot->inUse = true;
-    Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
-    slot->layers = static_cast<uint32_t>(colorTex->dimension().z);
+    slot->layers = layers;
     slot->colorFormat = colorInternalFormat;
   }
 
-  RenderTargetLease lease;
-  lease.renderTarget = slot->fbo.get();
-  lease.attachments = 1;
-  lease.releaser = [slot]() {
-    slot->inUse = false;
-  };
-  return lease;
+  return makeLeaseFromSlot(slot, 1);
 }
 
 Z3DScratchResourcePool::RenderTargetLease
@@ -521,19 +530,12 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
     // Existing slot path: single-pass resize; grow Z only if XY unchanged.
     const uint32_t prevLayers = slot->layers;
     const bool xyChanged = (slot->fbo->size() != size);
-    uint32_t desiredZ = layers;
-    if (!xyChanged) {
-      desiredZ = std::max<uint32_t>(slot->layers, layers);
-    }
-    bool changed = slot->fbo->resize(glm::uvec3(size.x, size.y, desiredZ));
-    slot->fbo->isFBOComplete();
+    const uint32_t desiredZ = xyChanged ? layers : std::max<uint32_t>(slot->layers, layers);
+    const bool resized = slot->fbo->resize(glm::uvec3(size.x, size.y, desiredZ));
     slot->inUse = true;
-    Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
-    slot->layers = colorTex ? static_cast<uint32_t>(colorTex->dimension().z) : layers;
-    if (slot->layers != prevLayers) {
-      changed = true;
-    }
-    if (changed) {
+    slot->layers = desiredZ;
+    if (resized || desiredZ != prevLayers) {
+      slot->fbo->isFBOComplete();
       ++m_changeCounter;
     }
   } else {
@@ -562,19 +564,12 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
 
     slot->fbo->isFBOComplete();
     slot->inUse = true;
-    const Z3DTexture* colorTex = slot->fbo->attachment(GL_COLOR_ATTACHMENT0);
-    slot->layers = colorTex ? static_cast<uint32_t>(colorTex->dimension().z) : layers;
+    slot->layers = layers;
     slot->colorFormat = colorInternalFormat;
     slot->depthFormat = depthInternalFormat;
   }
 
-  RenderTargetLease lease;
-  lease.renderTarget = slot->fbo.get();
-  lease.attachments = 1;
-  lease.releaser = [slot]() {
-    slot->inUse = false;
-  };
-  return lease;
+  return makeLeaseFromSlot(slot, 1);
 }
 
 Z3DScratchResourcePool::RenderTargetLease
@@ -591,11 +586,9 @@ Z3DScratchResourcePool::acquireRaycastAccumulatorRenderTarget(const glm::uvec2& 
       slot->fbo->resize(size);
       changed = true;
     }
-    slot->fbo->isFBOComplete();
     slot->inUse = true;
-    slot->colorFormat = GLint(GL_RGBA16);
-    slot->accumulatorFormat = GLint(GL_RG32F);
     if (changed) {
+      slot->fbo->isFBOComplete();
       ++m_changeCounter;
     }
   } else {
@@ -627,13 +620,7 @@ Z3DScratchResourcePool::acquireRaycastAccumulatorRenderTarget(const glm::uvec2& 
     slot->accumulatorFormat = GLint(GL_RG32F);
   }
 
-  RenderTargetLease lease;
-  lease.renderTarget = slot->fbo.get();
-  lease.attachments = 2;
-  lease.releaser = [slot]() {
-    slot->inUse = false;
-  };
-  return lease;
+  return makeLeaseFromSlot(slot, 2);
 }
 
 Z3DScratchResourcePool::RenderTargetLease Z3DScratchResourcePool::acquireTempRenderTarget2D(const glm::uvec2& size,
@@ -653,11 +640,9 @@ Z3DScratchResourcePool::RenderTargetLease Z3DScratchResourcePool::acquireTempRen
       slot->fbo->resize(size);
       changed = true;
     }
-    slot->fbo->isFBOComplete();
     slot->inUse = true;
-    slot->colorFormat = colorInternalFormat;
-    slot->depthFormat = depthInternalFormat;
     if (changed) {
+      slot->fbo->isFBOComplete();
       ++m_changeCounter;
     }
   } else {
@@ -681,14 +666,7 @@ Z3DScratchResourcePool::RenderTargetLease Z3DScratchResourcePool::acquireTempRen
     slot->depthFormat = depthInternalFormat;
   }
 
-  RenderTargetLease lease;
-  lease.renderTarget = slot->fbo.get();
-  lease.attachments = 1;
-  lease.releaser = [slot]() {
-    slot->inUse = false;
-  };
-
-  return lease;
+  return makeLeaseFromSlot(slot, 1);
 }
 
 Z3DScratchResourcePool::RenderTargetLease
@@ -702,9 +680,9 @@ Z3DScratchResourcePool::acquireDualDepthPeelRenderTarget(const glm::uvec2& size)
       slot->fbo->resize(size);
       changed = true;
     }
-    slot->fbo->isFBOComplete();
     slot->inUse = true;
     if (changed) {
+      slot->fbo->isFBOComplete();
       ++m_changeCounter;
     }
   } else {
@@ -737,13 +715,7 @@ Z3DScratchResourcePool::acquireDualDepthPeelRenderTarget(const glm::uvec2& size)
     slot->inUse = true;
   }
 
-  RenderTargetLease lease;
-  lease.renderTarget = slot->fbo.get();
-  lease.attachments = 8;
-  lease.releaser = [slot]() {
-    slot->inUse = false;
-  };
-  return lease;
+  return makeLeaseFromSlot(slot, 8);
 }
 
 Z3DScratchResourcePool::RenderTargetLease
@@ -757,9 +729,9 @@ Z3DScratchResourcePool::acquireWeightedAverageRenderTarget(const glm::uvec2& siz
       slot->fbo->resize(size);
       changed = true;
     }
-    slot->fbo->isFBOComplete();
     slot->inUse = true;
     if (changed) {
+      slot->fbo->isFBOComplete();
       ++m_changeCounter;
     }
   } else {
@@ -788,13 +760,7 @@ Z3DScratchResourcePool::acquireWeightedAverageRenderTarget(const glm::uvec2& siz
     slot->inUse = true;
   }
 
-  RenderTargetLease lease;
-  lease.renderTarget = slot->fbo.get();
-  lease.attachments = 2;
-  lease.releaser = [slot]() {
-    slot->inUse = false;
-  };
-  return lease;
+  return makeLeaseFromSlot(slot, 2);
 }
 
 Z3DScratchResourcePool::RenderTargetLease
@@ -808,9 +774,9 @@ Z3DScratchResourcePool::acquireWeightedBlendedRenderTarget(const glm::uvec2& siz
       slot->fbo->resize(size);
       changed = true;
     }
-    slot->fbo->isFBOComplete();
     slot->inUse = true;
     if (changed) {
+      slot->fbo->isFBOComplete();
       ++m_changeCounter;
     }
   } else {
@@ -839,13 +805,7 @@ Z3DScratchResourcePool::acquireWeightedBlendedRenderTarget(const glm::uvec2& siz
     slot->inUse = true;
   }
 
-  RenderTargetLease lease;
-  lease.renderTarget = slot->fbo.get();
-  lease.attachments = 2;
-  lease.releaser = [slot]() {
-    slot->inUse = false;
-  };
-  return lease;
+  return makeLeaseFromSlot(slot, 2);
 }
 
 } // namespace nim
