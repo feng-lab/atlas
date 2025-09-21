@@ -16,6 +16,7 @@
 #include "zparameter.h"
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
+#include "z3dscratchresourcepool.h"
 
 namespace nim {
 
@@ -117,8 +118,6 @@ private:
                             const std::vector<const Z3DTexture*>& imageColorTexList,
                             const std::vector<const Z3DTexture*>& imageDepthTexList);
 
-  bool createDDPRenderTarget(const glm::uvec2& size);
-
   // Weighted Average with multiple image layers
   void renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
                            Z3DRenderTarget& renderTarget,
@@ -127,8 +126,6 @@ private:
                            const std::vector<const Z3DTexture*>& imageColorTexList,
                            const std::vector<const Z3DTexture*>& imageDepthTexList);
 
-  bool createWARenderTarget(const glm::uvec2& size);
-
   // Weighted Blended with multiple image layers
   void renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
                            Z3DRenderTarget& renderTarget,
@@ -136,8 +133,6 @@ private:
                            Z3DTexture* depthTexture,
                            const std::vector<const Z3DTexture*>& imageColorTexList,
                            const std::vector<const Z3DTexture*>& imageDepthTexList);
-
-  bool createWBRenderTarget(const glm::uvec2& size);
 
   // Build a list of non-opaque image layers (color/depth) from connected image filters
   std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> collectNonOpaqueImageLayers(Z3DEye eye) const;
@@ -163,6 +158,13 @@ private:
   void updateBackgroundFirstColor();
   void updateBackgroundSecondColor();
   void updateBackgroundOrientation();
+  void ensurePickingTarget(const glm::uvec2& size);
+  Z3DRenderTarget& ensureDDPRenderTarget(const glm::uvec2& size);
+  Z3DRenderTarget& ensureWARenderTarget(const glm::uvec2& size);
+  Z3DRenderTarget& ensureWBRenderTarget(const glm::uvec2& size);
+
+  // Internal helper: hooked transparent rendering with optional glow overlay
+  void renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderTarget& renderTarget, Z3DEye eye);
 
 private:
   Z3DTextureBlendRenderer m_alphaBlendRenderer;
@@ -195,20 +197,16 @@ private:
   Z3DRenderTarget* m_leftCurrentTarget = nullptr;
   Z3DRenderTarget* m_rightCurrentTarget = nullptr;
 
-  // Temps are now acquired from Z3DScratchResourcePool on demand
-  Z3DRenderTarget m_pickingRenderTarget;
+  Z3DScratchResourcePool::RenderTargetLease m_pickingTargetLease;
 
-  // Internal helper: hooked transparent rendering with optional glow overlay
-  void renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderTarget& renderTarget, Z3DEye eye);
-
-  std::unique_ptr<Z3DRenderTarget> m_ddpRT;
+  Z3DScratchResourcePool::RenderTargetLease m_ddpRTLease;
   Z3DShaderProgram m_ddpBlendShader;
   Z3DShaderProgram m_ddpFinalShader;
 
-  std::unique_ptr<Z3DRenderTarget> m_waRT;
+  Z3DScratchResourcePool::RenderTargetLease m_waRTLease;
   Z3DShaderProgram m_waFinalShader;
 
-  std::unique_ptr<Z3DRenderTarget> m_wbRT;
+  Z3DScratchResourcePool::RenderTargetLease m_wbRTLease;
   Z3DShaderProgram m_wbFinalShader;
 
   ZBoolParameter m_showBackground;

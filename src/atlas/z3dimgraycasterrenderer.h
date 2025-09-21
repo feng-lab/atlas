@@ -172,7 +172,9 @@ private:
 
   void render3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
 
-  // (resetProgress declared public above)
+  void ensureRaycastAccumulators(Z3DEye eye);
+  void releaseRaycastAccumulators(Z3DEye eye);
+  void releaseAllRaycastAccumulators();
 
 protected:
   //  Z3DShaderProgram m_raycasterShader;
@@ -231,12 +233,6 @@ private:
   Z3DScratchResourcePool::RenderTargetLease
     m_entryExitLease; // holds lifetime of entry/exit render target during a frame
   Z3DScratchResourcePool::RenderTargetLease m_progressiveLayerLease; // persistent across progressive rounds
-
-  // (No internal camera state tracking; filter triggers resetProgress on invalidate.)
-
-  void ensureRaycastAccumulators(Z3DEye eye);
-  void releaseRaycastAccumulators(Z3DEye eye);
-  void releaseAllRaycastAccumulators();
 };
 
 } // namespace nim

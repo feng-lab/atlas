@@ -114,6 +114,11 @@ public:
                                               GLint colorInternalFormat = GLint(GL_RGBA16),
                                               GLint depthInternalFormat = GLint(GL_DEPTH_COMPONENT24));
 
+  // Acquire compositor-specific RenderTargets.
+  RenderTargetLease acquireDualDepthPeelRenderTarget(const glm::uvec2& size);
+  RenderTargetLease acquireWeightedAverageRenderTarget(const glm::uvec2& size);
+  RenderTargetLease acquireWeightedBlendedRenderTarget(const glm::uvec2& size);
+
   // Free any cached resources to reduce memory usage.
   void trim();
 
@@ -196,6 +201,27 @@ private:
     bool inUse = false;
   };
   std::vector<std::unique_ptr<RaycastAccumulatorSlot>> m_raycastAccumulatorSlots;
+
+  struct DualDepthPeelSlot
+  {
+    std::unique_ptr<Z3DRenderTarget> fbo;
+    bool inUse = false;
+  };
+  std::vector<std::unique_ptr<DualDepthPeelSlot>> m_dualDepthPeelSlots;
+
+  struct WeightedAverageSlot
+  {
+    std::unique_ptr<Z3DRenderTarget> fbo;
+    bool inUse = false;
+  };
+  std::vector<std::unique_ptr<WeightedAverageSlot>> m_weightedAverageSlots;
+
+  struct WeightedBlendedSlot
+  {
+    std::unique_ptr<Z3DRenderTarget> fbo;
+    bool inUse = false;
+  };
+  std::vector<std::unique_ptr<WeightedBlendedSlot>> m_weightedBlendedSlots;
 };
 
 } // namespace nim
