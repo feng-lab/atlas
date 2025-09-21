@@ -62,55 +62,6 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
   m_copyTextureShader.loadFromSourceFile("pass.vert", "copy_raycaster_image.frag", headerSource);
   CHECK_GL_ERROR
 
-  // Internal targets; allocate and initialize per-eye ping-pong
-  for (int e = 0; e < 3; ++e) {
-    m_imageRenderTarget1s[e] = std::make_unique<Z3DRenderTarget>(glm::uvec2(32, 32));
-    m_imageRenderTarget2s[e] = std::make_unique<Z3DRenderTarget>(glm::uvec2(32, 32));
-    // last
-    auto* c0 = new Z3DTexture(GLint(GL_RGBA16),
-                              glm::uvec3(m_imageRenderTarget1s[e]->size().x, m_imageRenderTarget1s[e]->size().y, 1),
-                              GL_RGBA,
-                              GL_FLOAT,
-                              nullptr,
-                              GLint(GL_NEAREST),
-                              GLint(GL_NEAREST));
-    auto* d0 = new Z3DTexture(GLint(GL_RG32F),
-                              glm::uvec3(m_imageRenderTarget1s[e]->size().x, m_imageRenderTarget1s[e]->size().y, 1),
-                              GL_RG,
-                              GL_FLOAT,
-                              nullptr,
-                              GLint(GL_NEAREST),
-                              GLint(GL_NEAREST));
-    m_imageRenderTarget1s[e]->attachTextureToFBO(c0, GL_COLOR_ATTACHMENT0, true);
-    m_imageRenderTarget1s[e]->attachTextureToFBO(d0, GL_COLOR_ATTACHMENT1, true);
-    m_imageRenderTarget1s[e]->isFBOComplete();
-
-    // current
-    auto* c1 = new Z3DTexture(GLint(GL_RGBA16),
-                              glm::uvec3(m_imageRenderTarget2s[e]->size().x, m_imageRenderTarget2s[e]->size().y, 1),
-                              GL_RGBA,
-                              GL_FLOAT,
-                              nullptr,
-                              GLint(GL_NEAREST),
-                              GLint(GL_NEAREST));
-    auto* d1 = new Z3DTexture(GLint(GL_RG32F),
-                              glm::uvec3(m_imageRenderTarget2s[e]->size().x, m_imageRenderTarget2s[e]->size().y, 1),
-                              GL_RG,
-                              GL_FLOAT,
-                              nullptr,
-                              GLint(GL_NEAREST),
-                              GLint(GL_NEAREST));
-    m_imageRenderTarget2s[e]->attachTextureToFBO(c1, GL_COLOR_ATTACHMENT0, true);
-    m_imageRenderTarget2s[e]->attachTextureToFBO(d1, GL_COLOR_ATTACHMENT1, true);
-    m_imageRenderTarget2s[e]->isFBOComplete();
-  }
-  m_lastImageRenderTargets[0] = m_imageRenderTarget1s[0].get();
-  m_lastImageRenderTargets[1] = m_imageRenderTarget1s[1].get();
-  m_lastImageRenderTargets[2] = m_imageRenderTarget1s[2].get();
-  m_currentImageRenderTargets[0] = m_imageRenderTarget2s[0].get();
-  m_currentImageRenderTargets[1] = m_imageRenderTarget2s[1].get();
-  m_currentImageRenderTargets[2] = m_imageRenderTarget2s[2].get();
-
   // Render targets (layer, block-id, entry/exit) are acquired from the scratch pool on demand.
 }
 
@@ -130,6 +81,37 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
   }
   setChannelCount(m_img->numChannels());
   compile();
+}
+
+void Z3DImgRaycasterRenderer::ensureRaycastAccumulators(Z3DEye eye)
+{
+  CHECK_GT(m_outputSize.x, 0u);
+  CHECK_GT(m_outputSize.y, 0u);
+
+  auto& pool = m_rendererBase.globalParas().scratchPool();
+  auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
+    if (!lease || lease.renderTarget->size() != m_outputSize) {
+      lease.release();
+      lease = pool.acquireRaycastAccumulatorRenderTarget(m_outputSize);
+    }
+  };
+
+  ensureLease(m_lastRaycastAccum[eye]);
+  ensureLease(m_currentRaycastAccum[eye]);
+}
+
+void Z3DImgRaycasterRenderer::releaseRaycastAccumulators(Z3DEye eye)
+{
+  m_lastRaycastAccum[eye].release();
+  m_currentRaycastAccum[eye].release();
+}
+
+void Z3DImgRaycasterRenderer::releaseAllRaycastAccumulators()
+{
+  for (size_t idx = 0; idx < m_lastRaycastAccum.size(); ++idx) {
+    m_lastRaycastAccum[idx].release();
+    m_currentRaycastAccum[idx].release();
+  }
 }
 
 void Z3DImgRaycasterRenderer::setChannelCount(size_t count)
@@ -797,8 +779,6 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
   VLOG(1) << n << " " << f << " " << ze_to_screen_pixel_voxel_size << " " << pixelEyeSpaceSize << " " << ze_to_zw_a
           << " " << ze_to_zw_b;
 
-  CHECK(m_lastImageRenderTargets[eye]->size() == m_outputSize) << m_lastImageRenderTargets[eye]->size();
-
   processEventsAndMaybeCancel(cancellationToken);
 
 #if defined(__linux__)
@@ -809,6 +789,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 #endif
 
   if (progressive) {
+    ensureRaycastAccumulators(eye);
     CHECK(m_channelIdx[eye] >= 0 && m_channelIdx[eye] < static_cast<int>(visibleIdxs.size()))
       << m_channelIdx[eye] << " " << visibleIdxs.size();
     bool lastRound = render3DImageForOneRound(eye,
@@ -819,10 +800,14 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
                                               ze_to_screen_pixel_voxel_size);
     processEventsAndMaybeCancel(cancellationToken);
 
+    auto* lastTarget = m_lastRaycastAccum[eye].renderTarget;
+    CHECK(lastTarget);
+    CHECK(lastTarget->size() == m_outputSize) << lastTarget->size();
+
     if (visibleIdxs.size() == 1) {
       m_copyTextureShader.bind();
-      m_copyTextureShader.bindTexture("color_texture", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
-      m_copyTextureShader.bindTexture("depth_texture", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
+      m_copyTextureShader.bindTexture("color_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
+      m_copyTextureShader.bindTexture("depth_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
       renderScreenQuad(m_VAO, m_copyTextureShader);
       m_copyTextureShader.release();
     } else {
@@ -831,8 +816,8 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
       m_progressiveLayerLease.renderTarget->clear();
 
       m_copyTextureShader.bind();
-      m_copyTextureShader.bindTexture("color_texture", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
-      m_copyTextureShader.bindTexture("depth_texture", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
+      m_copyTextureShader.bindTexture("color_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
+      m_copyTextureShader.bindTexture("depth_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
       renderScreenQuad(m_VAO, m_copyTextureShader);
       m_copyTextureShader.release();
 
@@ -855,6 +840,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
       // final merge step below. It will be released after merging.
     }
   } else {
+    ensureRaycastAccumulators(eye);
     layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
       m_outputSize,
       static_cast<uint32_t>(visibleIdxs.size()));
@@ -865,16 +851,19 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         bool lastRound = render3DImageForOneRound(eye, c, round, ze_to_zw_a, ze_to_zw_b, ze_to_screen_pixel_voxel_size);
 #if defined(__linux__)
         if (FLAGS_atlas_debug_texture_output) {
+          auto* debugTarget = m_lastRaycastAccum[eye].renderTarget;
+          if (debugTarget) {
           auto filen =
             QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att0.tif", dummyidx, c, round));
-          m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
+            debugTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
           filen =
             QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
-          m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
+            debugTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
           if (round == 0) {
             filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
             m_entryExitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
           }
+        }
         }
 #endif
         if (lastRound) {
@@ -884,12 +873,14 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 
       processEventsAndMaybeCancel(cancellationToken);
 
+      auto* lastTarget = m_lastRaycastAccum[eye].renderTarget;
+      CHECK(lastTarget);
+      CHECK(lastTarget->size() == m_outputSize) << lastTarget->size();
+
       if (visibleIdxs.size() == 1) {
         m_copyTextureShader.bind();
-        m_copyTextureShader.bindTexture("color_texture",
-                                        m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
-        m_copyTextureShader.bindTexture("depth_texture",
-                                        m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
+        m_copyTextureShader.bindTexture("color_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
+        m_copyTextureShader.bindTexture("depth_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
         renderScreenQuad(m_VAO, m_copyTextureShader);
         m_copyTextureShader.release();
       } else {
@@ -898,10 +889,8 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         layerLease.renderTarget->clear();
 
         m_copyTextureShader.bind();
-        m_copyTextureShader.bindTexture("color_texture",
-                                        m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
-        m_copyTextureShader.bindTexture("depth_texture",
-                                        m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
+        m_copyTextureShader.bindTexture("color_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
+        m_copyTextureShader.bindTexture("depth_texture", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
         renderScreenQuad(m_VAO, m_copyTextureShader);
         m_copyTextureShader.release();
 
@@ -958,6 +947,12 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   LOG(INFO) << "channel " << c << " round " << round;
   ZBenchTimer bt(fmt::format("render 3D image channel {} round {}", c, round));
 
+  ensureRaycastAccumulators(eye);
+  auto* lastTarget = m_lastRaycastAccum[eye].renderTarget;
+  auto* currentTarget = m_currentRaycastAccum[eye].renderTarget;
+  CHECK(lastTarget);
+  CHECK(currentTarget);
+
   processEventsAndMaybeCancel(cancellationToken);
 
   m_image3DRaycasterBlockIDsShader.bind();
@@ -983,22 +978,20 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   };
 
   if (round == 0) {
-    m_lastImageRenderTargets[eye]->bind();
+    lastTarget->bind();
     glDrawBuffers(2, g_drawBuffers);
-    m_lastImageRenderTargets[eye]->clear();
-    m_lastImageRenderTargets[eye]->release();
+    lastTarget->clear();
+    lastTarget->release();
   }
 
   // Acquire multi-attachment Block ID RT via scratch pool
-  auto blockLease =
-    m_rendererBase.globalParas().scratchPool().acquireBlockIdRenderTarget(m_lastImageRenderTargets[eye]->size());
+  auto blockLease = m_rendererBase.globalParas().scratchPool().acquireBlockIdRenderTarget(lastTarget->size());
   blockLease.renderTarget->bind();
   glDrawBuffers(static_cast<GLsizei>(blockLease.attachments), g_drawBuffers);
   glClear(GL_COLOR_BUFFER_BIT);
 
   m_img->bindFullResBlockIDsShader(m_image3DRaycasterBlockIDsShader, c);
-  m_image3DRaycasterBlockIDsShader.bindTexture("last_ray_depth",
-                                               m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
+  m_image3DRaycasterBlockIDsShader.bindTexture("last_ray_depth", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
   renderScreenQuad(m_VAO, m_image3DRaycasterBlockIDsShader);
 
   blockLease.renderTarget->release();
@@ -1109,9 +1102,8 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   // entry exit points
   m_image3DRaycasterShader.bindTexture("ray_entry_exit_tex_coord", m_entryExitTexCoordAndZeTexture);
 
-  m_image3DRaycasterShader.bindTexture("last_color", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
-  m_image3DRaycasterShader.bindTexture("last_ray_depth",
-                                       m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
+  m_image3DRaycasterShader.bindTexture("last_color", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
+  m_image3DRaycasterShader.bindTexture("last_ray_depth", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
 
   if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
     m_image3DRaycasterShader.setUniform("iso_value", m_isoValue);
@@ -1124,9 +1116,9 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
   m_image3DRaycasterShader.setUniform("sampling_rate", m_samplingRateValue);
 
-  m_currentImageRenderTargets[eye]->bind();
+  currentTarget->bind();
   glDrawBuffers(2, g_drawBuffers);
-  m_currentImageRenderTargets[eye]->clear();
+  currentTarget->clear();
 
   m_img->bindFullResRenderShader(m_image3DRaycasterShader, c);
   CHECK(c < m_transferFunctions.size());
@@ -1134,14 +1126,14 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   m_image3DRaycasterShader.bindTexture("transfer_function", m_transferFunctions[c]->texture());
   renderScreenQuad(m_VAO, m_image3DRaycasterShader);
 
-  m_currentImageRenderTargets[eye]->release();
+  currentTarget->release();
 
   m_image3DRaycasterShader.release();
   // glFinish();
   bt.recordEvent("render image");
   STOP_AND_VLOG(bt)
 
-  std::swap(m_lastImageRenderTargets[eye], m_currentImageRenderTargets[eye]);
+  std::swap(m_lastRaycastAccum[eye], m_currentRaycastAccum[eye]);
 
   return lastRound;
 }

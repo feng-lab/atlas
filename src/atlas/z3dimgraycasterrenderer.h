@@ -9,6 +9,9 @@
 #include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dscratchresourcepool.h"
 
+#include <array>
+#include <vector>
+
 namespace nim {
 
 class Z3DImg;
@@ -118,12 +121,11 @@ public:
   // Ensure internal targets are sized; size is provided by filter
   void setOutputSize(const glm::uvec2& size)
   {
-    // Store output size and resize per-eye ping-pong targets
-    m_outputSize = size;
-    for (int e = 0; e < 3; ++e) {
-      m_imageRenderTarget1s[e]->resize(size);
-      m_imageRenderTarget2s[e]->resize(size);
+    if (m_outputSize == size) {
+      return;
     }
+    m_outputSize = size;
+    releaseAllRaycastAccumulators();
   }
 
   // Compute entry/exit texture for a clipped volume surface, For 3D Raycasting rendering, once called, 2d quads will be
@@ -189,9 +191,9 @@ protected:
   Z3DShaderProgram m_copyTextureShader;
 
   // Internal targets
-  // Internal targets are acquired from the scratch pool
-  Z3DRenderTarget* m_lastImageRenderTargets[3] = {nullptr, nullptr, nullptr};
-  Z3DRenderTarget* m_currentImageRenderTargets[3] = {nullptr, nullptr, nullptr};
+  // Raycast accumulators are acquired from the scratch pool on demand
+  std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_lastRaycastAccum;
+  std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_currentRaycastAccum;
 
   float m_samplingRateValue = 1.f; // Sampling rate of the raycasting, specified relative to the size of one voxel
   float m_isoValue = 0.5f; // The used isovalue, when isosurface raycasting is enabled
@@ -230,10 +232,11 @@ private:
     m_entryExitLease; // holds lifetime of entry/exit render target during a frame
   Z3DScratchResourcePool::RenderTargetLease m_progressiveLayerLease; // persistent across progressive rounds
 
-  std::unique_ptr<Z3DRenderTarget> m_imageRenderTarget1s[3];
-  std::unique_ptr<Z3DRenderTarget> m_imageRenderTarget2s[3];
-
   // (No internal camera state tracking; filter triggers resetProgress on invalidate.)
+
+  void ensureRaycastAccumulators(Z3DEye eye);
+  void releaseRaycastAccumulators(Z3DEye eye);
+  void releaseAllRaycastAccumulators();
 };
 
 } // namespace nim

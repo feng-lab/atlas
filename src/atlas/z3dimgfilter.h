@@ -127,7 +127,6 @@ private:
   void updateRaycasterSamplingRate();
   void updateRaycasterIsoValue();
   void updateRaycasterLocalMIPThreshold();
-  [[nodiscard]] static size_t eyeIndex(Z3DEye eye);
   [[nodiscard]] Z3DRenderTarget& transparentTarget(Z3DEye eye);
   [[nodiscard]] const Z3DRenderTarget& transparentTarget(Z3DEye eye) const;
   [[nodiscard]] Z3DRenderTarget& opaqueTarget(Z3DEye eye);

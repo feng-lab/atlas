@@ -77,6 +77,7 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
   uint64_t entryExitBytes = 0;
   uint64_t layerArrayBytes = 0;
   uint64_t temp2DBytes = 0;
+  uint64_t raycastBytes = 0;
 
   std::string details;
 
@@ -162,15 +163,38 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
     }
   }
 
-  total = blockIdBytes + entryExitBytes + layerArrayBytes + temp2DBytes;
+  // Raycast accumulator slots (dual color attachments)
+  for (size_t i = 0; i < m_raycastAccumulatorSlots.size(); ++i) {
+    const auto& s = *m_raycastAccumulatorSlots[i];
+    const glm::uvec2 sz = s.fbo->size();
+    const uint64_t pixels = static_cast<uint64_t>(sz.x) * sz.y;
+    const uint64_t primaryBpp = bytesPerPixelFromInternal(s.colorFormat);
+    const uint64_t accumBpp = bytesPerPixelFromInternal(s.accumulatorFormat);
+    const uint64_t bytes = pixels * (primaryBpp + accumBpp);
+    raycastBytes += bytes;
+    if (detailed) {
+      details += fmt::format("[RaycastAccum] slot={} size={}x{} colorFmt={} accumFmt={} inUse={} bytes={}\n",
+                             i,
+                             sz.x,
+                             sz.y,
+                             glbinding::aux::Meta::getString((GLenum)s.colorFormat),
+                             glbinding::aux::Meta::getString((GLenum)s.accumulatorFormat),
+                             s.inUse ? 1 : 0,
+                             bytes);
+    }
+  }
+
+  total = blockIdBytes + entryExitBytes + layerArrayBytes + temp2DBytes + raycastBytes;
   const double totalMiB = static_cast<double>(total) / (1024.0 * 1024.0);
   const double blockMiB = static_cast<double>(blockIdBytes) / (1024.0 * 1024.0);
   const double eeMiB = static_cast<double>(entryExitBytes) / (1024.0 * 1024.0);
   const double layerMiB = static_cast<double>(layerArrayBytes) / (1024.0 * 1024.0);
   const double tempMiB = static_cast<double>(temp2DBytes) / (1024.0 * 1024.0);
+  const double raycastMiB = static_cast<double>(raycastBytes) / (1024.0 * 1024.0);
   auto head =
     fmt::format("ScratchPool memory: total={} bytes ({:.2f} MiB) (BlockID={} bytes ({:.2f} MiB), "
-                "EntryExit={} bytes ({:.2f} MiB), LayerArray={} bytes ({:.2f} MiB), Temp2D={} bytes ({:.2f} MiB))",
+                "EntryExit={} bytes ({:.2f} MiB), LayerArray={} bytes ({:.2f} MiB), Temp2D={} bytes ({:.2f} MiB), "
+                "RaycastAccum={} bytes ({:.2f} MiB))",
                 total,
                 totalMiB,
                 blockIdBytes,
@@ -180,7 +204,9 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
                 layerArrayBytes,
                 layerMiB,
                 temp2DBytes,
-                tempMiB);
+                tempMiB,
+                raycastBytes,
+                raycastMiB);
 
   if (!detailed) {
     return head;
@@ -296,6 +322,12 @@ void Z3DScratchResourcePool::trim()
   trimCategory(m_temp2DRenderTargetSlots, keptTemp, freedTemp);
   if (keptTemp || freedTemp) {
     LOG(INFO) << fmt::format("trim(): Temp2D kept_in_use={} freed={}", keptTemp, freedTemp);
+  }
+
+  size_t keptRaycast = 0, freedRaycast = 0;
+  trimCategory(m_raycastAccumulatorSlots, keptRaycast, freedRaycast);
+  if (keptRaycast || freedRaycast) {
+    LOG(INFO) << fmt::format("trim(): RaycastAccum kept_in_use={} freed={}", keptRaycast, freedRaycast);
   }
 }
 
@@ -423,6 +455,65 @@ Z3DScratchResourcePool::acquireLayerArrayRenderTarget(const glm::uvec2& size,
   RenderTargetLease lease;
   lease.renderTarget = slot->fbo.get();
   lease.attachments = 1;
+  lease.releaser = [slot]() {
+    slot->inUse = false;
+  };
+  return lease;
+}
+
+Z3DScratchResourcePool::RenderTargetLease
+Z3DScratchResourcePool::acquireRaycastAccumulatorRenderTarget(const glm::uvec2& size)
+{
+  RaycastAccumulatorSlot* slot =
+    findClosestFreeSlotIf(m_raycastAccumulatorSlots, size, [](const RaycastAccumulatorSlot&) {
+      return true;
+    });
+
+  if (slot) {
+    bool changed = false;
+    if (slot->fbo->size() != size) {
+      slot->fbo->resize(size);
+      changed = true;
+    }
+    slot->fbo->isFBOComplete();
+    slot->inUse = true;
+    slot->colorFormat = GLint(GL_RGBA16);
+    slot->accumulatorFormat = GLint(GL_RG32F);
+    if (changed) {
+      ++m_changeCounter;
+    }
+  } else {
+    m_raycastAccumulatorSlots.emplace_back(std::make_unique<RaycastAccumulatorSlot>());
+    slot = m_raycastAccumulatorSlots.back().get();
+    slot->fbo = std::make_unique<Z3DRenderTarget>(size);
+    ++m_creationCounter;
+
+    auto* colorTex = new Z3DTexture(GLint(GL_RGBA16),
+                                    glm::uvec3(size.x, size.y, 1),
+                                    GL_RGBA,
+                                    GL_FLOAT,
+                                    nullptr,
+                                    GLint(GL_NEAREST),
+                                    GLint(GL_NEAREST));
+    auto* accumTex = new Z3DTexture(GLint(GL_RG32F),
+                                    glm::uvec3(size.x, size.y, 1),
+                                    GL_RG,
+                                    GL_FLOAT,
+                                    nullptr,
+                                    GLint(GL_NEAREST),
+                                    GLint(GL_NEAREST));
+
+    slot->fbo->attachTextureToFBO(colorTex, GL_COLOR_ATTACHMENT0, true);
+    slot->fbo->attachTextureToFBO(accumTex, GL_COLOR_ATTACHMENT1, true);
+    slot->fbo->isFBOComplete();
+    slot->inUse = true;
+    slot->colorFormat = GLint(GL_RGBA16);
+    slot->accumulatorFormat = GLint(GL_RG32F);
+  }
+
+  RenderTargetLease lease;
+  lease.renderTarget = slot->fbo.get();
+  lease.attachments = 2;
   lease.releaser = [slot]() {
     slot->inUse = false;
   };

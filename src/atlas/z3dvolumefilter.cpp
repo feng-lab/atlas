@@ -552,13 +552,12 @@ glm::vec3 Z3DVolumeFilter::get3DPosition(int x, int y, int width, int height, bo
 
 bool Z3DVolumeFilter::hasOpaque(Z3DEye eye) const
 {
-  return m_opaqueValid[eyeIndex(eye)];
+  return m_opaqueValid[eye];
 }
 
 void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
 {
-  const size_t idx = eyeIndex(eye);
-  if (!m_opaqueValid[idx]) {
+  if (!m_opaqueValid[eye]) {
     return;
   }
   const auto& target = opaqueTarget(eye);
@@ -569,13 +568,12 @@ void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
 
 bool Z3DVolumeFilter::hasTransparent(Z3DEye eye) const
 {
-  return m_transparentValid[eyeIndex(eye)];
+  return m_transparentValid[eye];
 }
 
 void Z3DVolumeFilter::renderTransparent(Z3DEye eye)
 {
-  const size_t idx = eyeIndex(eye);
-  if (!m_transparentValid[idx]) {
+  if (!m_transparentValid[eye]) {
     return;
   }
   const auto& target = transparentTarget(eye);
@@ -794,16 +792,15 @@ void Z3DVolumeFilter::process(Z3DEye eye)
                    m_yCut.lowerValue() > m_yCut.maximum() - 1 || m_zCut.lowerValue() > m_zCut.maximum() - 1;
 
   Z3DRenderTarget& currentTarget = transparentTarget(eye);
-  const size_t idx = eyeIndex(eye);
 
   currentTarget.bind();
   currentTarget.clear();
   m_rendererBase.setViewport(currentTarget.size());
 
-  m_transparentValid[idx] = false;
-  auto targetGuard = folly::makeGuard([&currentTarget, this, idx]() {
+  m_transparentValid[eye] = false;
+  auto targetGuard = folly::makeGuard([&currentTarget, this, eye]() {
     currentTarget.release();
-    m_transparentValid[idx] = true;
+    m_transparentValid[eye] = true;
   });
 
   glEnable(GL_BLEND);
@@ -838,7 +835,6 @@ bool Z3DVolumeFilter::hasSlices() const
 void Z3DVolumeFilter::renderSlices(Z3DEye eye)
 {
   Z3DRenderTarget& currentTarget = opaqueTarget(eye);
-  const size_t idx = eyeIndex(eye);
 
   m_layerTarget.resize(currentTarget.size());
 
@@ -846,10 +842,10 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
   currentTarget.clear();
   m_rendererBase.setViewport(currentTarget.size());
 
-  m_opaqueValid[idx] = false;
-  auto targetGuard = folly::makeGuard([&currentTarget, this, idx]() {
+  m_opaqueValid[eye] = false;
+  auto targetGuard = folly::makeGuard([&currentTarget, this, eye]() {
     currentTarget.release();
-    m_opaqueValid[idx] = true;
+    m_opaqueValid[eye] = true;
   });
 
   Z3DVolume* volume = getVolumes()[0].get();
@@ -1322,8 +1318,8 @@ glm::vec3 Z3DVolumeFilter::getFirstHit3DPosition(int x, int y, int width, int he
 {
   glm::vec3 res(-1);
   success = false;
-  const bool monoValid = m_transparentValid[eyeIndex(Mono)];
-  const bool rightValid = m_transparentValid[eyeIndex(Right)];
+  const bool monoValid = m_transparentValid[Mono];
+  const bool rightValid = m_transparentValid[Right];
   if (m_volumeRaycasterRenderer.hasVisibleRendering() && (monoValid || rightValid)) {
     glm::ivec2 pos2D = glm::ivec2(x, height - y);
     Z3DRenderTarget& target = monoValid ? transparentTarget(Mono) : transparentTarget(Right);
@@ -1348,8 +1344,8 @@ glm::vec3 Z3DVolumeFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, i
   glm::vec3 res(-1);
   glm::vec3 des(-1);
   success = false;
-  const bool monoValid = m_transparentValid[eyeIndex(Mono)];
-  const bool rightValid = m_transparentValid[eyeIndex(Right)];
+  const bool monoValid = m_transparentValid[Mono];
+  const bool rightValid = m_transparentValid[Right];
   if (m_volumeRaycasterRenderer.hasVisibleRendering() && (monoValid || rightValid)) {
     glm::ivec2 pos2D = glm::ivec2(x, height - y);
     Z3DRenderTarget& target = monoValid ? transparentTarget(Mono) : transparentTarget(Right);
@@ -1631,39 +1627,26 @@ void Z3DVolumeFilter::volumeChanged()
   }
 }
 
-size_t Z3DVolumeFilter::eyeIndex(Z3DEye eye)
-{
-  switch (eye) {
-    case Mono:
-      return 0;
-    case Left:
-      return 1;
-    case Right:
-      return 2;
-  }
-  return 0;
-}
-
 Z3DRenderTarget& Z3DVolumeFilter::transparentTarget(Z3DEye eye)
 {
-  return ensureRenderTarget(m_transparentTargets[eyeIndex(eye)]);
+  return ensureRenderTarget(m_transparentTargets[eye]);
 }
 
 const Z3DRenderTarget& Z3DVolumeFilter::transparentTarget(Z3DEye eye) const
 {
-  const auto& lease = m_transparentTargets[eyeIndex(eye)];
+  const auto& lease = m_transparentTargets[eye];
   CHECK(lease.renderTarget) << "transparent target requested before rendering";
   return *lease.renderTarget;
 }
 
 Z3DRenderTarget& Z3DVolumeFilter::opaqueTarget(Z3DEye eye)
 {
-  return ensureRenderTarget(m_opaqueTargets[eyeIndex(eye)]);
+  return ensureRenderTarget(m_opaqueTargets[eye]);
 }
 
 const Z3DRenderTarget& Z3DVolumeFilter::opaqueTarget(Z3DEye eye) const
 {
-  const auto& lease = m_opaqueTargets[eyeIndex(eye)];
+  const auto& lease = m_opaqueTargets[eye];
   CHECK(lease.renderTarget) << "opaque target requested before rendering";
   return *lease.renderTarget;
 }

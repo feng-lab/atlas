@@ -103,6 +103,11 @@ public:
                                                   GLint colorInternalFormat = GLint(GL_RGBA16),
                                                   GLint depthInternalFormat = GLint(GL_DEPTH_COMPONENT24));
 
+  // Acquire a raycast accumulator RenderTarget consisting of two RG color attachments.
+  // Attachment 0 uses GL_RGBA16, attachment 1 uses GL_RG32F. No depth attachment is provided.
+  // Intended for volume raycasting ping-pong buffers.
+  RenderTargetLease acquireRaycastAccumulatorRenderTarget(const glm::uvec2& size);
+
   // Acquire a simple 2D temp RenderTarget with a single 2D color attachment
   // (GL_TEXTURE_2D) and a 2D depth attachment. Intended for compositor passes.
   RenderTargetLease acquireTempRenderTarget2D(const glm::uvec2& size,
@@ -181,6 +186,16 @@ private:
     bool inUse = false;
   };
   std::vector<std::unique_ptr<Temp2DRenderTargetSlot>> m_temp2DRenderTargetSlots;
+
+  // Raycast accumulator slots (dual color attachments, no depth)
+  struct RaycastAccumulatorSlot
+  {
+    std::unique_ptr<Z3DRenderTarget> fbo;
+    GLint colorFormat = GLint(GL_RGBA16);
+    GLint accumulatorFormat = GLint(GL_RG32F);
+    bool inUse = false;
+  };
+  std::vector<std::unique_ptr<RaycastAccumulatorSlot>> m_raycastAccumulatorSlots;
 };
 
 } // namespace nim
