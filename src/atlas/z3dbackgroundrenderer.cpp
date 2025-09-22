@@ -4,7 +4,6 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 #include "zlog.h"
-#include <QObject>
 
 namespace nim {
 
@@ -77,28 +76,28 @@ void Z3DBackgroundRenderer::compile()
   m_backgroundShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DBackgroundRenderer::generateHeader()
+std::string Z3DBackgroundRenderer::generateHeader()
 {
-  QString headerSource;
   if (m_modeValue == BackgroundMode::Uniform) {
-    headerSource += "#define UNIFORM\n";
-  } else {
-    switch (m_orientationValue) {
-      case BackgroundGradientOrientation::LeftToRight:
-        headerSource += "#define GRADIENT_LEFT_TO_RIGHT\n";
-        break;
-      case BackgroundGradientOrientation::RightToLeft:
-        headerSource += "#define GRADIENT_RIGHT_TO_LEFT\n";
-        break;
-      case BackgroundGradientOrientation::TopToBottom:
-        headerSource += "#define GRADIENT_TOP_TO_BOTTOM\n";
-        break;
-      case BackgroundGradientOrientation::BottomToTop:
-        headerSource += "#define GRADIENT_BOTTOM_TO_TOP\n";
-        break;
-    }
+    return "#define UNIFORM\n";
   }
-  return headerSource;
+
+  std::string header;
+  switch (m_orientationValue) {
+    case BackgroundGradientOrientation::LeftToRight:
+      header = "#define GRADIENT_LEFT_TO_RIGHT\n";
+      break;
+    case BackgroundGradientOrientation::RightToLeft:
+      header = "#define GRADIENT_RIGHT_TO_LEFT\n";
+      break;
+    case BackgroundGradientOrientation::TopToBottom:
+      header = "#define GRADIENT_TOP_TO_BOTTOM\n";
+      break;
+    case BackgroundGradientOrientation::BottomToTop:
+      header = "#define GRADIENT_BOTTOM_TO_TOP\n";
+      break;
+  }
+  return header;
 }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)

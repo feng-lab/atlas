@@ -4,6 +4,7 @@
 #include "zmesh.h"
 #include "zcolormap.h"
 #include "z3dshaderprogram.h"
+#include <string>
 
 namespace nim {
 
@@ -43,7 +44,7 @@ protected:
 
   void compile() override;
 
-  QString generateHeader();
+  [[nodiscard]] std::string generateHeader();
 
   void render(Z3DEye eye) override;
 
@@ -55,8 +56,8 @@ protected:
 
   const std::vector<std::unique_ptr<Z3DVolume>>* m_vols = nullptr;
   const std::vector<std::unique_ptr<ZColorMapParameter>>* m_colormaps = nullptr;
-  std::vector<QString> m_volumeUniformNames;
-  std::vector<QString> m_colormapUniformNames;
+  std::vector<std::string> m_volumeUniformNames;
+  std::vector<std::string> m_colormapUniformNames;
 
 private:
   std::vector<ZMesh> m_quads;

@@ -899,8 +899,6 @@ double Z3DCompositor::process(Z3DEye eye)
       VLOG(1) << pool.describeMemoryUsage(true);
       s_lastCreate = curCreate;
       s_lastChange = curChange;
-    } else {
-      VLOG(1) << pool.describeMemoryUsage(false);
     }
     Q_EMIT renderingFinished();
 

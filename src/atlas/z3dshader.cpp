@@ -104,9 +104,9 @@ void Z3DShader::compileSourceCode(const char* source)
   }
 }
 
-void Z3DShader::compileSourceCode(const QString& source)
+void Z3DShader::compileSourceCode(const std::string& source)
 {
-  compileSourceCode(source.toUtf8().constData());
+  compileSourceCode(source.c_str());
 }
 
 std::string Z3DShader::sourceCode() const

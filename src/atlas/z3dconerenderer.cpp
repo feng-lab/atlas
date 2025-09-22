@@ -160,25 +160,28 @@ void Z3DConeRenderer::compile()
   m_coneShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DConeRenderer::generateHeader()
+std::string Z3DConeRenderer::generateHeader()
 {
-  const QString define = [style = m_coneCapStyle]() {
-    switch (style) {
-      case ConeCapStyle::FlatCaps:
-        return QStringLiteral("FLAT_CAPS");
-      case ConeCapStyle::NoCaps:
-        return QStringLiteral("NO_CAPS");
-      case ConeCapStyle::RoundCaps:
-        return QStringLiteral("ROUND_CAPS");
-      case ConeCapStyle::RoundBaseFlatTop:
-        return QStringLiteral("ROUND_BASE_CAP_FLAT_TOP_CAP");
-      case ConeCapStyle::FlatBaseRoundTop:
-        return QStringLiteral("FLAT_BASE_CAP_ROUND_TOP_CAP");
-    }
-    return QStringLiteral("FLAT_CAPS");
-  }();
+  const char* define = "FLAT_CAPS";
+  switch (m_coneCapStyle) {
+    case ConeCapStyle::FlatCaps:
+      define = "FLAT_CAPS";
+      break;
+    case ConeCapStyle::NoCaps:
+      define = "NO_CAPS";
+      break;
+    case ConeCapStyle::RoundCaps:
+      define = "ROUND_CAPS";
+      break;
+    case ConeCapStyle::RoundBaseFlatTop:
+      define = "ROUND_BASE_CAP_FLAT_TOP_CAP";
+      break;
+    case ConeCapStyle::FlatBaseRoundTop:
+      define = "FLAT_BASE_CAP_ROUND_TOP_CAP";
+      break;
+  }
 
-  return QString("#define %1\n").arg(define);
+  return fmt::format("#define {}\n", define);
 }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)

@@ -9,6 +9,7 @@
 #include "zcancellation.h"
 #include "zstatisticsutils.h"
 #include "z3dscratchresourcepool.h"
+#include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 
@@ -40,7 +41,7 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
   //  "volume_slice_with_transfun.frag",
   //                                                        m_rendererBase.generateHeader() + generateHeader());
 
-  QString headerSource = m_rendererBase.generateHeader() + generateHeader();
+  const std::string headerSource = m_rendererBase.generateHeader() + generateHeader();
   m_scRaycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster_single_channel.frag", headerSource);
   m_sc2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert",
                                        "image2d_with_transfun_single_channel.frag",
@@ -74,9 +75,9 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
     m_volumeDimensionNames.clear();
     m_transferFuncUniformNames.clear();
     for (size_t i = 0; i < m_img->numChannels(); ++i) {
-      m_volumeUniformNames.push_back(QString("volume_%1").arg(i + 1));
-      m_volumeDimensionNames.push_back(QString("volume_dimensions_%1").arg(i + 1));
-      m_transferFuncUniformNames.push_back(QString("transfer_function_%1").arg(i + 1));
+      m_volumeUniformNames.push_back(fmt::format("volume_{}", i + 1));
+      m_volumeDimensionNames.push_back(fmt::format("volume_dimensions_{}", i + 1));
+      m_transferFuncUniformNames.push_back(fmt::format("transfer_function_{}", i + 1));
     }
   }
   setChannelCount(m_img->numChannels());
@@ -213,7 +214,7 @@ void Z3DImgRaycasterRenderer::compile()
   //  m_2dImageShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   //  m_volumeSliceWithTransferfunShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 
-  QString headerSource = m_rendererBase.generateHeader() + generateHeader();
+  const std::string headerSource = m_rendererBase.generateHeader() + generateHeader();
   m_scRaycasterShader.setHeaderAndRebuild(headerSource);
   m_sc2dImageShader.setHeaderAndRebuild(headerSource);
   m_scVolumeSliceWithTransferfunShader.setHeaderAndRebuild(headerSource);
@@ -271,9 +272,10 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
   m_entryExitTexCoordAndZeTexture = m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0);
 }
 
-QString Z3DImgRaycasterRenderer::generateHeader()
+std::string Z3DImgRaycasterRenderer::generateHeader()
 {
-  QString headerSource;
+  std::string header;
+  header.reserve(512);
 
   size_t numVisibleChannels = 0;
   size_t numLevels = 1;
@@ -285,18 +287,14 @@ QString Z3DImgRaycasterRenderer::generateHeader()
     }
     numLevels = m_img->numLevels();
   }
-  headerSource += QString("#define LEVEL_COUNT %1\n").arg(numLevels);
+
+  fmt::format_to(std::back_inserter(header), "#define LEVEL_COUNT {}\n", numLevels);
 
   if (numVisibleChannels > 0) {
-    headerSource += QString("#define NUM_VOLUMES %1\n").arg(numVisibleChannels);
+    fmt::format_to(std::back_inserter(header), "#define NUM_VOLUMES {}\n", numVisibleChannels);
   } else {
-    headerSource += QString("#define NUM_VOLUMES 0\n");
-    headerSource += "#define DISABLE_TEXTURE_COORD_OUTPUT\n";
+    absl::StrAppend(&header, "#define NUM_VOLUMES 0\n", "#define DISABLE_TEXTURE_COORD_OUTPUT\n");
   }
-  // VLOG(1) << numVisibleChannels << " generate header";
-
-  //  if (!m_gradientMode.isSelected("None"))
-  //    headerSource += "#define USE_GRADIENTS\n";
 
   const bool useMIPMerge = m_compositingModeValue == ImgCompositingMode::MaximumIntensityProjection ||
                            m_compositingModeValue == ImgCompositingMode::LocalMIP ||
@@ -305,41 +303,40 @@ QString Z3DImgRaycasterRenderer::generateHeader()
 
   switch (m_compositingModeValue) {
     case ImgCompositingMode::DirectVolumeRendering:
-      headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
-      headerSource += "compositeDVR(result, color, currentRayLength, rayDepth);\n";
+      absl::StrAppend(&header,
+                      "#define COMPOSITING(result, color, currentRayLength, rayDepth) ",
+                      "compositeDVR(result, color, currentRayLength, rayDepth);\n");
       break;
     case ImgCompositingMode::IsoSurface:
-      headerSource += "#define ISO\n";
-      headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
-      headerSource += "compositeISO(result, color, currentRayLength, rayDepth, iso_value);\n";
+      absl::StrAppend(&header,
+                      "#define ISO\n",
+                      "#define COMPOSITING(result, color, currentRayLength, rayDepth) ",
+                      "compositeISO(result, color, currentRayLength, rayDepth, iso_value);\n");
       break;
     case ImgCompositingMode::MaximumIntensityProjection:
-      headerSource += "#define MIP\n";
+      absl::StrAppend(&header, "#define MIP\n");
       break;
     case ImgCompositingMode::LocalMIP:
-      headerSource += "#define MIP\n";
-      headerSource += "#define LOCAL_MIP\n";
+      absl::StrAppend(&header, "#define MIP\n", "#define LOCAL_MIP\n");
       break;
     case ImgCompositingMode::XRay:
-      headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
-      headerSource += "compositeXRay(result, color, currentRayLength, rayDepth);\n";
+      absl::StrAppend(&header,
+                      "#define COMPOSITING(result, color, currentRayLength, rayDepth) ",
+                      "compositeXRay(result, color, currentRayLength, rayDepth);\n");
       break;
     case ImgCompositingMode::MIPOpaque:
-      headerSource += "#define MIP\n";
-      headerSource += "#define RESULT_OPAQUE\n";
+      absl::StrAppend(&header, "#define MIP\n", "#define RESULT_OPAQUE\n");
       break;
     case ImgCompositingMode::LocalMIPOpaque:
-      headerSource += "#define MIP\n";
-      headerSource += "#define LOCAL_MIP\n";
-      headerSource += "#define RESULT_OPAQUE\n";
+      absl::StrAppend(&header, "#define MIP\n", "#define LOCAL_MIP\n", "#define RESULT_OPAQUE\n");
       break;
   }
 
   if (!m_quads.empty() || useMIPMerge) {
-    headerSource += "#define MAX_PROJ_MERGE\n";
+    absl::StrAppend(&header, "#define MAX_PROJ_MERGE\n");
   }
 
-  return headerSource;
+  return header;
 }
 
 double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
@@ -853,17 +850,17 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         if (FLAGS_atlas_debug_texture_output) {
           auto* debugTarget = m_lastRaycastAccum[eye].renderTarget;
           if (debugTarget) {
-          auto filen =
-            QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att0.tif", dummyidx, c, round));
+            auto filen =
+              QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att0.tif", dummyidx, c, round));
             debugTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
-          filen =
-            QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
+            filen =
+              QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
             debugTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
-          if (round == 0) {
-            filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
-            m_entryExitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
+            if (round == 0) {
+              filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
+              m_entryExitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
+            }
           }
-        }
         }
 #endif
         if (lastRound) {

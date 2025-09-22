@@ -2,6 +2,7 @@
 
 #include "z3dprimitiverenderer.h"
 #include <algorithm>
+#include <string>
 
 namespace nim {
 
@@ -38,7 +39,7 @@ public:
 protected:
   void compile() override;
 
-  QString generateHeader();
+  [[nodiscard]] std::string generateHeader();
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void renderUsingOpengl() override;

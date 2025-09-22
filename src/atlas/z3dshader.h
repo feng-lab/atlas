@@ -1,7 +1,7 @@
 #pragma once
 
 #include "z3dcontext.h"
-#include <QString>
+#include <string>
 
 namespace nim {
 
@@ -34,7 +34,7 @@ public:
 
   void compileSourceCode(const char* source);
 
-  void compileSourceCode(const QString& source);
+  void compileSourceCode(const std::string& source);
 
   [[nodiscard]] std::string sourceCode() const;
 

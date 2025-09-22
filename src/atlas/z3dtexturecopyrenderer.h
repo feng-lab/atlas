@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include <string>
 
 namespace nim {
 
@@ -40,7 +41,7 @@ public:
 protected:
   void compile() override;
 
-  [[nodiscard]] QString generateHeader() const;
+  [[nodiscard]] std::string generateHeader() const;
 
   void render(Z3DEye eye) override;
 

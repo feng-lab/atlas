@@ -25,9 +25,9 @@ public:
 
   void addShaderFromSourceCode(Z3DShader::Type type, const char* source);
 
-  void addShaderFromSourceCode(Z3DShader::Type type, const QString& source)
+  void addShaderFromSourceCode(Z3DShader::Type type, const std::string& source)
   {
-    addShaderFromSourceCode(type, source.toUtf8().constData());
+    addShaderFromSourceCode(type, source.c_str());
   }
 
   void removeAllShaders();
@@ -55,66 +55,57 @@ public:
   }
 
   // bind samplers
-  void bindTexture(const QString& name, const Z3DTexture* texture);
+  void bindTexture(const std::string& name, const Z3DTexture* texture);
 
-  void bindTexture(const QString& name, const Z3DTexture* texture, GLint minFilter, GLint magFilter);
+  void bindTexture(const std::string& name, const Z3DTexture* texture, GLint minFilter, GLint magFilter);
 
-  void bindTexture(const QString& name, GLenum target, GLuint textureId);
+  void bindTexture(const std::string& name, GLenum target, GLuint textureId);
 
   // load functions will load shaders and link, throw Exception if error
   // input filenames should not contain path, shader paths are managed by Z3DApplication
   void loadFromSourceFile(const QString& vertFilename,
                           const QString& geomFilename,
                           const QString& fragFilename,
-                          const QString& header,
-                          const QString& geomHeader = "");
+                          const std::string& header,
+                          const std::string& geomHeader = "");
 
   void loadFromSourceFile(const QString& vertFilename,
                           const QString& fragFilename,
-                          const QString& header,
-                          const QString& geomHeader = "");
+                          const std::string& header,
+                          const std::string& geomHeader = "");
 
-  void loadFromSourceFile(const QStringList& shaderFilenames, const QString& header, const QString& geomHeader = "");
+  void
+  loadFromSourceFile(const QStringList& shaderFilenames, const std::string& header, const std::string& geomHeader = "");
 
   // header will be prepended to all srcs
-  void loadFromSourceCode(const QStringList& vertSrcs,
-                          const QStringList& geomSrcs,
-                          const QStringList& fragSrcs,
-                          const QString& header = "",
-                          const QString& geomHeader = "");
+  void loadFromSourceCode(const std::vector<std::string>& vertSrcs,
+                          const std::vector<std::string>& geomSrcs,
+                          const std::vector<std::string>& fragSrcs,
+                          const std::string& header = "",
+                          const std::string& geomHeader = "");
 
-  void loadFromSourceCode(const QStringList& vertSrcs,
-                          const QStringList& fragSrcs,
-                          const QString& header = "",
-                          const QString& geomHeader = "");
+  void loadFromSourceCode(const std::vector<std::string>& vertSrcs,
+                          const std::vector<std::string>& fragSrcs,
+                          const std::string& header = "",
+                          const std::string& geomHeader = "");
 
-  // set new header for current readed src and rebuild
-  void setHeaderAndRebuild(const QString& header, const QString& geomHeader = "");
+  // set new header for current read src and rebuild
+  void setHeaderAndRebuild(const std::string& header, const std::string& geomHeader = "");
 
   // log error if uniform can not be found, many typos can be found this way.
   // Logging can be turn off by setLogUniformLocationError(false)
-  int uniformLocation(const QString& name) const;
+  int uniformLocation(const std::string& name) const;
 
   int uniformLocation(const char* name) const
   {
-    return uniformLocation(QString(name));
+    return uniformLocation(std::string(name));
   }
 
-  int uniformLocation(const QByteArray& name) const
-  {
-    return uniformLocation(QString(name));
-  }
-
-  int attributeLocation(const QString& name) const;
+  int attributeLocation(const std::string& name) const;
 
   int attributeLocation(const char* name) const
   {
-    return attributeLocation(QString(name));
-  }
-
-  int attributeLocation(const QByteArray& name) const
-  {
-    return attributeLocation(QString(name));
+    return attributeLocation(std::string(name));
   }
 
   void setLogUniformLocationError(bool logError)
@@ -211,62 +202,62 @@ public:
     }
   }
 
-  void setUniform(const QString& name, GLfloat value)
+  void setUniform(const std::string& name, GLfloat value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, GLint value)
+  void setUniform(const std::string& name, GLint value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, GLuint value)
+  void setUniform(const std::string& name, GLuint value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, GLfloat x, GLfloat y)
+  void setUniform(const std::string& name, GLfloat x, GLfloat y)
   {
     setUniform(uniformLocation(name), x, y);
   }
 
-  void setUniform(const QString& name, GLfloat x, GLfloat y, GLfloat z)
+  void setUniform(const std::string& name, GLfloat x, GLfloat y, GLfloat z)
   {
     setUniform(uniformLocation(name), x, y, z);
   }
 
-  void setUniform(const QString& name, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+  void setUniform(const std::string& name, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
   {
     setUniform(uniformLocation(name), x, y, z, w);
   }
 
-  void setUniform(const QString& name, GLint v1, GLint v2)
+  void setUniform(const std::string& name, GLint v1, GLint v2)
   {
     setUniform(uniformLocation(name), v1, v2);
   }
 
-  void setUniform(const QString& name, GLint v1, GLint v2, GLint v3)
+  void setUniform(const std::string& name, GLint v1, GLint v2, GLint v3)
   {
     setUniform(uniformLocation(name), v1, v2, v3);
   }
 
-  void setUniform(const QString& name, GLint v1, GLint v2, GLint v3, GLint v4)
+  void setUniform(const std::string& name, GLint v1, GLint v2, GLint v3, GLint v4)
   {
     setUniform(uniformLocation(name), v1, v2, v3, v4);
   }
 
-  void setUniform(const QString& name, GLuint v1, GLuint v2)
+  void setUniform(const std::string& name, GLuint v1, GLuint v2)
   {
     setUniform(uniformLocation(name), v1, v2);
   }
 
-  void setUniform(const QString& name, GLuint v1, GLuint v2, GLuint v3)
+  void setUniform(const std::string& name, GLuint v1, GLuint v2, GLuint v3)
   {
     setUniform(uniformLocation(name), v1, v2, v3);
   }
 
-  void setUniform(const QString& name, GLuint v1, GLuint v2, GLuint v3, GLuint v4)
+  void setUniform(const std::string& name, GLuint v1, GLuint v2, GLuint v3, GLuint v4)
   {
     setUniform(uniformLocation(name), v1, v2, v3, v4);
   }
@@ -276,10 +267,10 @@ public:
   //  void setUniformValue(GLint loc, bool v1, bool v2);
   //  void setUniformValue(GLint loc, bool v1, bool v2, bool v3);
   //  void setUniformValue(GLint loc, bool v1, bool v2, bool v3, bool v4);
-  //  void setUniformValue(const QString& name, bool value);
-  //  void setUniformValue(const QString& name, bool v1, bool v2);
-  //  void setUniformValue(const QString& name, bool v1, bool v2, bool v3);
-  //  void setUniformValue(const QString& name, bool v1, bool v2, bool v3, bool v4);
+  //  void setUniformValue(const std::string& name, bool value);
+  //  void setUniformValue(const std::string& name, bool v1, bool v2);
+  //  void setUniformValue(const std::string& name, bool v1, bool v2, bool v3);
+  //  void setUniformValue(const std::string& name, bool v1, bool v2, bool v3, bool v4);
 
   // Vectors
   void setUniform(GLint loc, const glm::vec2& value)
@@ -345,47 +336,47 @@ public:
     }
   }
 
-  void setUniform(const QString& name, const glm::vec2& value)
+  void setUniform(const std::string& name, const glm::vec2& value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, const glm::vec3& value)
+  void setUniform(const std::string& name, const glm::vec3& value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, const glm::vec4& value)
+  void setUniform(const std::string& name, const glm::vec4& value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, const glm::ivec2& value)
+  void setUniform(const std::string& name, const glm::ivec2& value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, const glm::ivec3& value)
+  void setUniform(const std::string& name, const glm::ivec3& value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, const glm::ivec4& value)
+  void setUniform(const std::string& name, const glm::ivec4& value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, const glm::uvec2& value)
+  void setUniform(const std::string& name, const glm::uvec2& value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, const glm::uvec3& value)
+  void setUniform(const std::string& name, const glm::uvec3& value)
   {
     setUniform(uniformLocation(name), value);
   }
 
-  void setUniform(const QString& name, const glm::uvec4& value)
+  void setUniform(const std::string& name, const glm::uvec4& value)
   {
     setUniform(uniformLocation(name), value);
   }
@@ -460,52 +451,52 @@ public:
     }
   }
 
-  void setUniformArray(const QString& name, const GLfloat* values, int count)
+  void setUniformArray(const std::string& name, const GLfloat* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
 
-  void setUniformArray(const QString& name, const glm::vec2* values, int count)
+  void setUniformArray(const std::string& name, const glm::vec2* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
 
-  void setUniformArray(const QString& name, const glm::vec3* values, int count)
+  void setUniformArray(const std::string& name, const glm::vec3* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
 
-  void setUniformArray(const QString& name, const glm::vec4* values, int count)
+  void setUniformArray(const std::string& name, const glm::vec4* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
 
-  void setUniformArray(const QString& name, const glm::ivec2* values, int count)
+  void setUniformArray(const std::string& name, const glm::ivec2* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
 
-  void setUniformArray(const QString& name, const glm::ivec3* values, int count)
+  void setUniformArray(const std::string& name, const glm::ivec3* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
 
-  void setUniformArray(const QString& name, const glm::ivec4* values, int count)
+  void setUniformArray(const std::string& name, const glm::ivec4* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
 
-  void setUniformArray(const QString& name, const glm::uvec2* values, int count)
+  void setUniformArray(const std::string& name, const glm::uvec2* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
 
-  void setUniformArray(const QString& name, const glm::uvec3* values, int count)
+  void setUniformArray(const std::string& name, const glm::uvec3* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
 
-  void setUniformArray(const QString& name, const glm::uvec4* values, int count)
+  void setUniformArray(const std::string& name, const glm::uvec4* values, int count)
   {
     setUniformArray(uniformLocation(name), values, count);
   }
@@ -531,17 +522,17 @@ public:
     }
   }
 
-  void setUniform(const QString& name, const glm::mat2& value, bool transpose = false)
+  void setUniform(const std::string& name, const glm::mat2& value, bool transpose = false)
   {
     setUniform(uniformLocation(name), value, transpose);
   }
 
-  void setUniform(const QString& name, const glm::mat3& value, bool transpose = false)
+  void setUniform(const std::string& name, const glm::mat3& value, bool transpose = false)
   {
     setUniform(uniformLocation(name), value, transpose);
   }
 
-  void setUniform(const QString& name, const glm::mat4& value, bool transpose = false)
+  void setUniform(const std::string& name, const glm::mat4& value, bool transpose = false)
   {
     setUniform(uniformLocation(name), value, transpose);
   }
@@ -567,17 +558,17 @@ public:
     }
   }
 
-  void setUniformArray(const QString& name, const glm::mat2* values, int count, bool transpose = false)
+  void setUniformArray(const std::string& name, const glm::mat2* values, int count, bool transpose = false)
   {
     setUniformArray(uniformLocation(name), values, count, transpose);
   }
 
-  void setUniformArray(const QString& name, const glm::mat3* values, int count, bool transpose = false)
+  void setUniformArray(const std::string& name, const glm::mat3* values, int count, bool transpose = false)
   {
     setUniformArray(uniformLocation(name), values, count, transpose);
   }
 
-  void setUniformArray(const QString& name, const glm::mat4* values, int count, bool transpose = false)
+  void setUniformArray(const std::string& name, const glm::mat4* values, int count, bool transpose = false)
   {
     setUniformArray(uniformLocation(name), values, count, transpose);
   }
@@ -990,18 +981,14 @@ protected:
 
 protected:
   bool m_logUniformLocationError = true;
-  // srcs read from file, withour header
-  QStringList m_vertSrcs;
-  QStringList m_geomSrcs;
-  QStringList m_fragSrcs;
   // shader filenames
   QStringList m_shaderFiles;
 
   Z3DTextureUnitManager m_textureUnitManager;
   std::map<GLint, std::pair<GLenum, GLint>> m_locToTextureUnit;
 
-  std::map<QString, Uniform> m_uniforms;
-  std::map<QString, Attribute> m_attributes;
+  std::map<std::string, Uniform> m_uniforms;
+  std::map<std::string, Attribute> m_attributes;
   const Uniform* m_screenDimUniform;
   const Uniform* m_screenDimRCPUniform;
   const Uniform* m_cameraPositionUniform;

@@ -102,26 +102,26 @@ void Z3DMeshRenderer::compile()
   m_meshShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DMeshRenderer::generateHeader()
+std::string Z3DMeshRenderer::generateHeader()
 {
-  QString headerSource;
+  std::string header;
   switch (m_colorSource) {
     case MeshColorSource::MeshColor:
-      headerSource += "#define USE_MESH_COLOR\n";
+      header = "#define USE_MESH_COLOR\n";
       break;
     case MeshColorSource::Mesh1DTexture:
-      headerSource += "#define USE_MESH_1DTEXTURE\n";
+      header = "#define USE_MESH_1DTEXTURE\n";
       break;
     case MeshColorSource::Mesh2DTexture:
-      headerSource += "#define USE_MESH_2DTEXTURE\n";
+      header = "#define USE_MESH_2DTEXTURE\n";
       break;
     case MeshColorSource::Mesh3DTexture:
-      headerSource += "#define USE_MESH_3DTEXTURE\n";
+      header = "#define USE_MESH_3DTEXTURE\n";
       break;
     case MeshColorSource::CustomColor:
       break;
   }
-  return headerSource;
+  return header;
 }
 
 void Z3DMeshRenderer::prepareMesh()

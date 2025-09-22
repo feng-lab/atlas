@@ -6,6 +6,7 @@
 #include "zlog.h"
 #include "zcancellation.h"
 #include "z3dscratchresourcepool.h"
+#include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 
@@ -48,8 +49,8 @@ void Z3DImgSliceRenderer::setData(Z3DImg& img, const std::vector<std::unique_ptr
     m_volumeUniformNames.resize(m_img->numChannels());
     m_colormapUniformNames.resize(m_img->numChannels());
     for (size_t i = 0; i < m_img->numChannels(); ++i) {
-      m_volumeUniformNames[i] = QString("volume_%1").arg(i + 1);
-      m_colormapUniformNames[i] = QString("colormap_%1").arg(i + 1);
+      m_volumeUniformNames[i] = fmt::format("volume_{}", i + 1);
+      m_colormapUniformNames[i] = fmt::format("colormap_{}", i + 1);
     }
   }
 }
@@ -99,27 +100,22 @@ void Z3DImgSliceRenderer::compile()
   m_image3DSliceWithColorMapShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DImgSliceRenderer::generateHeader()
+std::string Z3DImgSliceRenderer::generateHeader()
 {
-  QString headerSource;
+  std::string header;
+  header.reserve(192);
 
-  size_t numLevels = 1;
-  if (m_img) {
-    numLevels = m_img->numLevels();
-  }
-  headerSource += QString("#define LEVEL_COUNT %1\n").arg(numLevels);
+  const size_t numLevels = m_img ? m_img->numLevels() : 1;
+  fmt::format_to(std::back_inserter(header), "#define LEVEL_COUNT {}\n", numLevels);
 
   if (m_img && m_img->numChannels() > 0) {
-    headerSource += QString("#define NUM_VOLUMES %1\n").arg(m_img->numChannels());
+    fmt::format_to(std::back_inserter(header), "#define NUM_VOLUMES {}\n", m_img->numChannels());
   } else {
-    headerSource += QString("#define NUM_VOLUMES 0\n");
-    headerSource += "#define DISABLE_TEXTURE_COORD_OUTPUT\n";
+    absl::StrAppend(&header, "#define NUM_VOLUMES 0\n", "#define DISABLE_TEXTURE_COORD_OUTPUT\n");
   }
 
-  // for merge shader
-  headerSource += "#define MAX_PROJ_MERGE\n";
-
-  return headerSource;
+  absl::StrAppend(&header, "#define MAX_PROJ_MERGE\n");
+  return header;
 }
 
 double Z3DImgSliceRenderer::renderProgressively(Z3DEye eye)

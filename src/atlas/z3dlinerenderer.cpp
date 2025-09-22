@@ -252,19 +252,19 @@ void Z3DLineRenderer::compile()
   }
 }
 
-QString Z3DLineRenderer::generateHeader()
+std::string Z3DLineRenderer::generateHeader()
 {
-  QString headerSource;
+  std::string header;
   if (m_useTextureColor) {
-    headerSource += "#define USE_1DTEXTURE\n";
+    header += "#define USE_1DTEXTURE\n";
   }
   if (m_screenAligned) {
-    headerSource += "#define LINE_SCREEN_ALIGNED\n";
+    header += "#define LINE_SCREEN_ALIGNED\n";
   }
   if (m_roundCap) {
-    headerSource += "#define ROUND_CAP\n";
+    header += "#define ROUND_CAP\n";
   }
-  return headerSource;
+  return header;
 }
 
 float Z3DLineRenderer::lineWidth() const

@@ -2,7 +2,7 @@
 
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
-#include <QString>
+#include <string>
 
 namespace nim {
 
@@ -52,7 +52,7 @@ public:
 protected:
   void compile() override;
 
-  QString generateHeader();
+  [[nodiscard]] std::string generateHeader();
 
   void render(Z3DEye eye) override;
 

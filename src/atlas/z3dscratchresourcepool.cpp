@@ -99,6 +99,11 @@ static inline uint64_t bytesPerPixelFromInternal(GLint internal)
 
 std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
 {
+  auto& cache = m_descriptionCache[detailed ? 1 : 0];
+  if (cache.valid && cache.creationCounter == m_creationCounter && cache.changeCounter == m_changeCounter) {
+    return cache.text;
+  }
+
   std::string details;
   const uint64_t blockIdBytes =
     accumulateCategory("BlockID",
@@ -373,10 +378,14 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
     weightedBlendBytes,
     wbMiB);
 
-  if (!detailed) {
-    return head;
-  }
-  return fmt::format("{}\n{}", head, details);
+  std::string result = detailed ? fmt::format("{}\n{}", head, details) : head;
+
+  cache.valid = true;
+  cache.creationCounter = m_creationCounter;
+  cache.changeCounter = m_changeCounter;
+  cache.text = std::move(result);
+
+  return cache.text;
 }
 
 Z3DScratchResourcePool::BlockIdRenderTargetSlot* Z3DScratchResourcePool::acquireFreeBlockIdSlot(const glm::uvec2& size,
@@ -457,6 +466,9 @@ void Z3DScratchResourcePool::trim()
     });
     if (kept || freed) {
       LOG(INFO) << fmt::format("trim(): {} kept_in_use={} freed={}", label, kept, freed);
+    }
+    if (freed > 0) {
+      ++m_changeCounter;
     }
   };
 

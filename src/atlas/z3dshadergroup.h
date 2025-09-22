@@ -12,8 +12,8 @@ public:
   explicit Z3DShaderGroup(Z3DRendererBase& rendererBase);
 
   void init(const QStringList& shaderFiles,
-            const QString& header,
-            const QString& geomHeader = "",
+            const std::string& header,
+            const std::string& geomHeader = "",
             const QStringList& normalShaderFiles = QStringList());
 
   void addAllSupportedPostShaders();
@@ -30,7 +30,7 @@ public:
 
   Z3DShaderProgram& get();
 
-  void rebuild(const QString& header, const QString& geomHeader = "");
+  void rebuild(const std::string& header, const std::string& geomHeader = "");
 
 private:
   void buildNormalShader(Z3DShaderProgram* shader);
@@ -45,8 +45,8 @@ private:
 
 private:
   QStringList m_shaderFiles;
-  QString m_header;
-  QString m_geomHeader;
+  std::string m_header;
+  std::string m_geomHeader;
   Z3DRendererBase& m_base;
   QStringList m_normalShaderFiles;
   std::map<Z3DRendererBase::ShaderHookType, std::unique_ptr<Z3DShaderProgram>> m_shaders;

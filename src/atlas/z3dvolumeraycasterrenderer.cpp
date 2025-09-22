@@ -3,6 +3,7 @@
 #include "z3dtexture.h"
 #include "z3dvolume.h"
 #include "z3dimg.h"
+#include <absl/strings/str_cat.h>
 
 namespace nim {
 
@@ -206,9 +207,10 @@ void Z3DVolumeRaycasterRenderer::compile()
   m_mergeChannelShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DVolumeRaycasterRenderer::generateHeader()
+std::string Z3DVolumeRaycasterRenderer::generateHeader()
 {
-  QString headerSource;
+  std::string header;
+  header.reserve(384);
 
   if (hasVisibleRendering()) {
     size_t numVisibleChannels = 0;
@@ -217,14 +219,10 @@ QString Z3DVolumeRaycasterRenderer::generateHeader()
         ++numVisibleChannels;
       }
     }
-    headerSource += QString("#define NUM_VOLUMES %1\n").arg(numVisibleChannels);
+    fmt::format_to(std::back_inserter(header), "#define NUM_VOLUMES {}\n", numVisibleChannels);
   } else {
-    headerSource += QString("#define NUM_VOLUMES 0\n");
-    headerSource += "#define DISABLE_TEXTURE_COORD_OUTPUT\n";
+    absl::StrAppend(&header, "#define NUM_VOLUMES 0\n", "#define DISABLE_TEXTURE_COORD_OUTPUT\n");
   }
-
-  //  if (!m_gradientMode.isSelected("None"))
-  //    headerSource += "#define USE_GRADIENTS\n";
 
   const bool useMIPMerge = m_compositingModeValue == VolumeCompositingMode::MaximumIntensityProjection ||
                            m_compositingModeValue == VolumeCompositingMode::LocalMIP ||
@@ -233,41 +231,40 @@ QString Z3DVolumeRaycasterRenderer::generateHeader()
 
   switch (m_compositingModeValue) {
     case VolumeCompositingMode::DirectVolumeRendering:
-      headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
-      headerSource += "compositeDVR(result, color, currentRayLength, rayDepth);\n";
+      absl::StrAppend(&header,
+                      "#define COMPOSITING(result, color, currentRayLength, rayDepth) ",
+                      "compositeDVR(result, color, currentRayLength, rayDepth);\n");
       break;
     case VolumeCompositingMode::IsoSurface:
-      headerSource += "#define ISO\n";
-      headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
-      headerSource += "compositeISO(result, color, currentRayLength, rayDepth, iso_value);\n";
+      absl::StrAppend(&header,
+                      "#define ISO\n",
+                      "#define COMPOSITING(result, color, currentRayLength, rayDepth) ",
+                      "compositeISO(result, color, currentRayLength, rayDepth, iso_value);\n");
       break;
     case VolumeCompositingMode::MaximumIntensityProjection:
-      headerSource += "#define MIP\n";
+      absl::StrAppend(&header, "#define MIP\n");
       break;
     case VolumeCompositingMode::LocalMIP:
-      headerSource += "#define MIP\n";
-      headerSource += "#define LOCAL_MIP\n";
+      absl::StrAppend(&header, "#define MIP\n", "#define LOCAL_MIP\n");
       break;
     case VolumeCompositingMode::XRay:
-      headerSource += "#define COMPOSITING(result, color, currentRayLength, rayDepth) ";
-      headerSource += "compositeXRay(result, color, currentRayLength, rayDepth);\n";
+      absl::StrAppend(&header,
+                      "#define COMPOSITING(result, color, currentRayLength, rayDepth) ",
+                      "compositeXRay(result, color, currentRayLength, rayDepth);\n");
       break;
     case VolumeCompositingMode::MIPOpaque:
-      headerSource += "#define MIP\n";
-      headerSource += "#define RESULT_OPAQUE\n";
+      absl::StrAppend(&header, "#define MIP\n", "#define RESULT_OPAQUE\n");
       break;
     case VolumeCompositingMode::LocalMIPOpaque:
-      headerSource += "#define MIP\n";
-      headerSource += "#define LOCAL_MIP\n";
-      headerSource += "#define RESULT_OPAQUE\n";
+      absl::StrAppend(&header, "#define MIP\n", "#define LOCAL_MIP\n", "#define RESULT_OPAQUE\n");
       break;
   }
 
   if (!m_quads.empty() || useMIPMerge) {
-    headerSource += "#define MAX_PROJ_MERGE\n";
+    absl::StrAppend(&header, "#define MAX_PROJ_MERGE\n");
   }
 
-  return headerSource;
+  return header;
 }
 
 void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)

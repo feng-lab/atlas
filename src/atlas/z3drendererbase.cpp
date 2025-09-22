@@ -5,6 +5,7 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 #include "zlog.h"
+#include <absl/strings/str_cat.h>
 
 namespace nim {
 
@@ -182,55 +183,56 @@ void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram* shader, Z3DEye
   setGlobalShaderParameters(*shader, eye);
 }
 
-QString Z3DRendererBase::generateHeader() const
+std::string Z3DRendererBase::generateHeader() const
 {
-  QString glslVer =
-    QString("%1%2").arg(Z3DGpuInfo::instance().glslMajorVersion()).arg(Z3DGpuInfo::instance().glslMinorVersion());
-  if (glslVer.length() < 3) {
-    glslVer += "0";
+  std::string glslVer =
+    fmt::format("{}{}", Z3DGpuInfo::instance().glslMajorVersion(), Z3DGpuInfo::instance().glslMinorVersion());
+  if (glslVer.size() < 3U) {
+    glslVer.push_back('0');
   }
 
-  QString header = QString("#version %1\n").arg(glslVer);
+  std::string header;
+  header.reserve(256);
 
-  header += "#define lowp\n#define mediump\n#define highp\n";
-  // header += "#ifndef GL_FRAGMENT_PRECISION_HIGH\n#define highp mediump\n#endif\n";
-
-  header += QString("#define GLSL_VERSION %1\n").arg(glslVer);
-
-  header += QString("#define LIGHT_COUNT %1\n").arg(m_globalParas.lightCount.get());
+  fmt::format_to(std::back_inserter(header), "#version {}\n", glslVer);
+  absl::StrAppend(&header, "#define lowp\n#define mediump\n#define highp\n");
+  fmt::format_to(std::back_inserter(header), "#define GLSL_VERSION {}\n", glslVer);
+  fmt::format_to(std::back_inserter(header), "#define LIGHT_COUNT {}\n", m_globalParas.lightCount.get());
 
   if (!m_clipPlanes.empty()) {
-    header += QString("#define HAS_CLIP_PLANE\n");
+    absl::StrAppend(&header, "#define HAS_CLIP_PLANE\n");
   }
-  header += QString("#define CLIP_PLANE_COUNT %1\n").arg(m_clipPlanes.size());
+  fmt::format_to(std::back_inserter(header), "#define CLIP_PLANE_COUNT {}\n", m_clipPlanes.size());
 
   if (m_globalParas.fogMode.isSelected("Linear")) {
-    header += "#define USE_LINEAR_FOG\n";
+    absl::StrAppend(&header, "#define USE_LINEAR_FOG\n");
   } else if (m_globalParas.fogMode.isSelected("Exponential")) {
-    header += "#define USE_EXPONENTIAL_FOG\n";
+    absl::StrAppend(&header, "#define USE_EXPONENTIAL_FOG\n");
   } else if (m_globalParas.fogMode.isSelected("Squared Exponential")) {
-    header += "#define USE_SQUARED_EXPONENTIAL_FOG\n";
+    absl::StrAppend(&header, "#define USE_SQUARED_EXPONENTIAL_FOG\n");
   }
 
   return header;
 }
 
-QString Z3DRendererBase::generateGeomHeader() const
+std::string Z3DRendererBase::generateGeomHeader() const
 {
-  QString glslVer =
-    QString("%1%2").arg(Z3DGpuInfo::instance().glslMajorVersion()).arg(Z3DGpuInfo::instance().glslMinorVersion());
-  if (glslVer.length() < 3) {
-    glslVer += "0";
+  std::string glslVer =
+    fmt::format("{}{}", Z3DGpuInfo::instance().glslMajorVersion(), Z3DGpuInfo::instance().glslMinorVersion());
+  if (glslVer.size() < 3U) {
+    glslVer.push_back('0');
   }
 
-  QString header = QString("#version %1\n").arg(glslVer);
+  std::string header;
+  header.reserve(128);
 
-  header += QString("#define GLSL_VERSION %1\n").arg(glslVer);
+  fmt::format_to(std::back_inserter(header), "#version {}\n", glslVer);
+  fmt::format_to(std::back_inserter(header), "#define GLSL_VERSION {}\n", glslVer);
 
   if (!m_clipPlanes.empty()) {
-    header += QString("#define HAS_CLIP_PLANE\n");
+    absl::StrAppend(&header, "#define HAS_CLIP_PLANE\n");
   }
-  header += QString("#define CLIP_PLANE_COUNT %1\n").arg(m_clipPlanes.size());
+  fmt::format_to(std::back_inserter(header), "#define CLIP_PLANE_COUNT {}\n", m_clipPlanes.size());
 
   return header;
 }

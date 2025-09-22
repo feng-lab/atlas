@@ -7,6 +7,7 @@
 #include "z3dshaderprogram.h"
 #include "zlog.h"
 #include <QDir>
+#include <absl/strings/str_cat.h>
 #include <algorithm>
 
 namespace nim {
@@ -109,21 +110,20 @@ std::vector<glm::vec4>* Z3DFontRenderer::getColors()
   return m_colorsPt;
 }
 
-QString Z3DFontRenderer::generateHeader()
+std::string Z3DFontRenderer::generateHeader()
 {
-  // if (m_fontUseSoftEdge.get())
-  QString headerSource = "#define USE_SOFTEDGE\n";
+  std::string header = "#define USE_SOFTEDGE\n";
   if (m_showFontOutline) {
     if (m_fontOutlineMode == FontOutlineMode::Glow) {
-      headerSource += "#define SHOW_GLOW\n";
+      absl::StrAppend(&header, "#define SHOW_GLOW\n");
     } else {
-      headerSource += "#define SHOW_OUTLINE\n";
+      absl::StrAppend(&header, "#define SHOW_OUTLINE\n");
     }
   }
   if (m_showFontShadow) {
-    headerSource += "#define SHOW_SHADOW\n";
+    absl::StrAppend(&header, "#define SHOW_SHADOW\n");
   }
-  return headerSource;
+  return header;
 }
 
 void Z3DFontRenderer::render(Z3DEye eye)

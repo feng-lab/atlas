@@ -31,24 +31,27 @@ void Z3DTextureGlowRenderer::compile()
   m_glowTextureShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DTextureGlowRenderer::generateHeader()
+std::string Z3DTextureGlowRenderer::generateHeader()
 {
-  QString define;
+  const char* define = "";
   switch (m_glowMode) {
     case GlowMode::Additive:
-      define = QStringLiteral("ADDITIVE_BLENDING");
+      define = "ADDITIVE_BLENDING";
       break;
     case GlowMode::Screen:
-      define = QStringLiteral("SCREEN_BLENDING");
+      define = "SCREEN_BLENDING";
       break;
     case GlowMode::Softlight:
-      define = QStringLiteral("SOFTLIGHT_BLENDING");
+      define = "SOFTLIGHT_BLENDING";
       break;
     case GlowMode::Glowmap:
-      define = QStringLiteral("GLOWMAP");
+      define = "GLOWMAP";
       break;
   }
-  return QString("#define %1\n").arg(define);
+  if (*define == '\0') {
+    return {};
+  }
+  return fmt::format("#define {}\n", define);
 }
 
 void Z3DTextureGlowRenderer::render(Z3DEye eye)

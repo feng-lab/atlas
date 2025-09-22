@@ -2,6 +2,7 @@
 
 #include "z3dgl.h"
 #include "z3drendertarget.h"
+#include <array>
 #include <memory>
 #include <string>
 #include <utility>
@@ -256,6 +257,16 @@ private:
     bool inUse = false;
   };
   std::vector<std::unique_ptr<WeightedBlendedSlot>> m_weightedBlendedSlots;
+
+  struct DescriptionCacheEntry
+  {
+    bool valid = false;
+    uint64_t creationCounter = 0;
+    uint64_t changeCounter = 0;
+    std::string text;
+  };
+
+  mutable std::array<DescriptionCacheEntry, 2> m_descriptionCache{};
 };
 
 } // namespace nim

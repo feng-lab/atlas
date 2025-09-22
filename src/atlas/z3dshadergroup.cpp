@@ -13,8 +13,8 @@ Z3DShaderGroup::Z3DShaderGroup(Z3DRendererBase& rendererBase)
 {}
 
 void Z3DShaderGroup::init(const QStringList& shaderFiles,
-                          const QString& header,
-                          const QString& geomHeader,
+                          const std::string& header,
+                          const std::string& geomHeader,
                           const QStringList& normalShaderFiles)
 {
   m_shaderFiles = shaderFiles;
@@ -82,7 +82,7 @@ Z3DShaderProgram& Z3DShaderGroup::get()
   return *m_shaders[m_base.shaderHookType()];
 }
 
-void Z3DShaderGroup::rebuild(const QString& header, const QString& geomHeader)
+void Z3DShaderGroup::rebuild(const std::string& header, const std::string& geomHeader)
 {
   m_header = header;
   m_geomHeader = geomHeader;

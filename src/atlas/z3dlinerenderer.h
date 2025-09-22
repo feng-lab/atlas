@@ -2,6 +2,7 @@
 
 #include "z3dprimitiverenderer.h"
 #include "z3dgpuinfo.h"
+#include <string>
 
 namespace nim {
 
@@ -59,7 +60,7 @@ public:
 protected:
   void compile() override;
 
-  QString generateHeader();
+  [[nodiscard]] std::string generateHeader();
 
   [[nodiscard]] virtual float lineWidth() const;
 

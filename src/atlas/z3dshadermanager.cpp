@@ -3,8 +3,7 @@
 #include "zsysteminfo.h"
 #include "zlog.h"
 #include "z3dshader.h"
-#include <QTextStream>
-#include <QFile>
+#include "zioutils.h"
 
 namespace nim {
 
@@ -14,7 +13,7 @@ Z3DShaderManager& Z3DShaderManager::instance()
   return sm;
 }
 
-Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, const Z3DContextGroup& context)
+Z3DShader& Z3DShaderManager::shader(const QString& fn, const std::string& header, const Z3DContextGroup& context)
 {
   ShaderKey key(fn, header, context);
   auto lb = m_shaders.lower_bound(key);
@@ -32,13 +31,11 @@ Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, co
         fmt::format("Not supported file extension: {}. Use .vert, .geom or .frag as shader extension", filename));
     }
 
-    QFile file(filename);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-      throw ZException(
-        fmt::format("Can not open vertex shader file: {}.  Error String: {}", filename, file.errorString()));
-    }
-    QTextStream fileStream(&file);
-    QString src = header + fileStream.readAll();
+    auto fileSource = readFileIntoQByteArray(filename);
+    std::string src;
+    src.reserve(header.size() + fileSource.size());
+    src.append(header);
+    src.append(fileSource.constData(), fileSource.size());
 
     CHECK(context == Z3DContextGroup());
     auto shdr = std::make_unique<Z3DShader>(type);

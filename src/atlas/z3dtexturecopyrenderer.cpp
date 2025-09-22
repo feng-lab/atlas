@@ -26,15 +26,17 @@ void Z3DTextureCopyRenderer::compile()
   m_copyTextureShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DTextureCopyRenderer::generateHeader() const
+std::string Z3DTextureCopyRenderer::generateHeader() const
 {
-  QString headerSource;
-  if (m_mode == OutputColorOption::MultiplyAlpha) {
-    headerSource += "#define Multiply_Alpha\n";
-  } else if (m_mode == OutputColorOption::DivideByAlpha) {
-    headerSource += "#define Divide_By_Alpha\n";
+  switch (m_mode) {
+    case OutputColorOption::MultiplyAlpha:
+      return "#define Multiply_Alpha\n";
+    case OutputColorOption::DivideByAlpha:
+      return "#define Divide_By_Alpha\n";
+    case OutputColorOption::NoChange:
+    default:
+      return {};
   }
-  return headerSource;
 }
 
 void Z3DTextureCopyRenderer::render(Z3DEye eye)

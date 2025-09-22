@@ -4,6 +4,7 @@
 #include "z3dvolume.h"
 #include "z3dimg.h"
 #include "zlog.h"
+#include <absl/strings/str_cat.h>
 
 namespace nim {
 
@@ -35,8 +36,8 @@ void Z3DVolumeSliceRenderer::setData(const std::vector<std::unique_ptr<Z3DVolume
     m_volumeUniformNames.resize(m_vols->size());
     m_colormapUniformNames.resize(m_vols->size());
     for (size_t i = 0; i < m_vols->size(); ++i) {
-      m_volumeUniformNames[i] = QString("volume_%1").arg(i + 1);
-      m_colormapUniformNames[i] = QString("colormap_%1").arg(i + 1);
+      m_volumeUniformNames[i] = fmt::format("volume_{}", i + 1);
+      m_colormapUniformNames[i] = fmt::format("colormap_{}", i + 1);
     }
   }
 }
@@ -80,21 +81,19 @@ void Z3DVolumeSliceRenderer::compile()
   m_mergeChannelShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DVolumeSliceRenderer::generateHeader()
+std::string Z3DVolumeSliceRenderer::generateHeader()
 {
-  QString headerSource;
+  std::string header;
+  header.reserve(128);
 
   if (m_vols && !m_vols->empty()) {
-    headerSource += QString("#define NUM_VOLUMES %1\n").arg(m_vols->size());
+    fmt::format_to(std::back_inserter(header), "#define NUM_VOLUMES {}\n", m_vols->size());
   } else {
-    headerSource += QString("#define NUM_VOLUMES 0\n");
-    headerSource += "#define DISABLE_TEXTURE_COORD_OUTPUT\n";
+    absl::StrAppend(&header, "#define NUM_VOLUMES 0\n", "#define DISABLE_TEXTURE_COORD_OUTPUT\n");
   }
 
-  // for merge shader
-  headerSource += "#define MAX_PROJ_MERGE\n";
-
-  return headerSource;
+  absl::StrAppend(&header, "#define MAX_PROJ_MERGE\n");
+  return header;
 }
 
 void Z3DVolumeSliceRenderer::render(Z3DEye eye)

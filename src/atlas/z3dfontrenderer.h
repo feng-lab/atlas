@@ -4,6 +4,7 @@
 #include "z3dsdfont.h"
 #include <QString>
 #include <QStringList>
+#include <string>
 
 namespace nim {
 
@@ -54,7 +55,7 @@ public:
 
   std::vector<glm::vec4>* getColors();
 
-  QString generateHeader();
+  [[nodiscard]] std::string generateHeader();
 
   void render(Z3DEye eye) override;
 

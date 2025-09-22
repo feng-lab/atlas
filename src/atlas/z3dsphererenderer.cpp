@@ -119,13 +119,12 @@ void Z3DSphereRenderer::compile()
   m_sphereShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DSphereRenderer::generateHeader()
+std::string Z3DSphereRenderer::generateHeader()
 {
-  QString headerSource;
-  if (m_useDynamicMaterial) {
-    headerSource += "#define DYNAMIC_MATERIAL_PROPERTY\n";
+  if (!m_useDynamicMaterial) {
+    return {};
   }
-  return headerSource;
+  return "#define DYNAMIC_MATERIAL_PROPERTY\n";
 }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)

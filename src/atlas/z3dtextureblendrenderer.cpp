@@ -19,33 +19,36 @@ void Z3DTextureBlendRenderer::compile()
   m_blendTextureShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DTextureBlendRenderer::generateHeader()
+std::string Z3DTextureBlendRenderer::generateHeader()
 {
-  QString define;
+  const char* define = "";
   switch (m_blendMode) {
     case TextureBlendMode::DepthTest:
-      define = QStringLiteral("DEPTH_TEST");
+      define = "DEPTH_TEST";
       break;
     case TextureBlendMode::FirstOnTop:
-      define = QStringLiteral("FIRST_ON_TOP");
+      define = "FIRST_ON_TOP";
       break;
     case TextureBlendMode::SecondOnTop:
-      define = QStringLiteral("SECOND_ON_TOP");
+      define = "SECOND_ON_TOP";
       break;
     case TextureBlendMode::DepthTestBlending:
-      define = QStringLiteral("DEPTH_TEST_BLENDING");
+      define = "DEPTH_TEST_BLENDING";
       break;
     case TextureBlendMode::FirstOnTopBlending:
-      define = QStringLiteral("FIRST_ON_TOP_BLENDING");
+      define = "FIRST_ON_TOP_BLENDING";
       break;
     case TextureBlendMode::SecondOnTopBlending:
-      define = QStringLiteral("SECOND_ON_TOP_BLENDING");
+      define = "SECOND_ON_TOP_BLENDING";
       break;
     case TextureBlendMode::MIPImageDepthTestBlending:
-      define = QStringLiteral("MIP_IMAGE_DEPTH_TEST_BLENDING");
+      define = "MIP_IMAGE_DEPTH_TEST_BLENDING";
       break;
   }
-  return QString("#define %1\n").arg(define);
+  if (*define == '\0') {
+    return {};
+  }
+  return fmt::format("#define {}\n", define);
 }
 
 void Z3DTextureBlendRenderer::render(Z3DEye eye)

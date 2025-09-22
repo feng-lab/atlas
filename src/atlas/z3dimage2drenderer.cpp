@@ -3,6 +3,8 @@
 #include "z3dtexture.h"
 #include "z3dvolume.h"
 #include "zlog.h"
+#include <absl/strings/str_cat.h>
+#include <iterator>
 
 namespace nim {
 
@@ -43,8 +45,8 @@ void Z3DImage2DRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume
   m_volumeUniformNames.resize(m_volumes.size());
   m_colormapUniformNames.resize(m_volumes.size());
   for (size_t i = 0; i < m_volumes.size(); ++i) {
-    m_volumeUniformNames[i] = QString("volume_%1").arg(i + 1);
-    m_colormapUniformNames[i] = QString("colormap_%1").arg(i + 1);
+    m_volumeUniformNames[i] = fmt::format("volume_{}", i + 1);
+    m_colormapUniformNames[i] = fmt::format("colormap_{}", i + 1);
   }
 }
 
@@ -97,21 +99,19 @@ void Z3DImage2DRenderer::compile()
   m_mergeChannelShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DImage2DRenderer::generateHeader()
+std::string Z3DImage2DRenderer::generateHeader()
 {
-  QString headerSource;
+  std::string header;
+  header.reserve(128);
 
   if (hasVolume()) {
-    headerSource += QString("#define NUM_VOLUMES %1\n").arg(m_volumes.size());
+    fmt::format_to(std::back_inserter(header), "#define NUM_VOLUMES {}\n", m_volumes.size());
   } else {
-    headerSource += QString("#define NUM_VOLUMES 0\n");
-    headerSource += "#define DISABLE_TEXTURE_COORD_OUTPUT\n";
+    absl::StrAppend(&header, "#define NUM_VOLUMES 0\n", "#define DISABLE_TEXTURE_COORD_OUTPUT\n");
   }
 
-  // for merge shader
-  headerSource += "#define MAX_PROJ_MERGE\n";
-
-  return headerSource;
+  absl::StrAppend(&header, "#define MAX_PROJ_MERGE\n");
+  return header;
 }
 
 void Z3DImage2DRenderer::render(Z3DEye eye)

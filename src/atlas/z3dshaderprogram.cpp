@@ -4,7 +4,6 @@
 #include "zlog.h"
 #include "z3dshadermanager.h"
 #include "zexception.h"
-#include <QFile>
 
 namespace nim {
 
@@ -106,7 +105,7 @@ void Z3DShaderProgram::release() const
   glUseProgram(0);
 }
 
-void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* texture)
+void Z3DShaderProgram::bindTexture(const std::string& name, const Z3DTexture* texture)
 {
   if (!texture) {
     return;
@@ -133,7 +132,7 @@ void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* textur
   }
 }
 
-void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* texture, GLint minFilter, GLint magFilter)
+void Z3DShaderProgram::bindTexture(const std::string& name, const Z3DTexture* texture, GLint minFilter, GLint magFilter)
 {
   if (!texture) {
     return;
@@ -161,7 +160,7 @@ void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* textur
   }
 }
 
-void Z3DShaderProgram::bindTexture(const QString& name, GLenum target, GLuint textureId)
+void Z3DShaderProgram::bindTexture(const std::string& name, GLenum target, GLuint textureId)
 {
   auto loc = uniformLocation(name);
   if (loc != -1) {
@@ -187,8 +186,8 @@ void Z3DShaderProgram::bindTexture(const QString& name, GLenum target, GLuint te
 void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename,
                                           const QString& geomFilename,
                                           const QString& fragFilename,
-                                          const QString& header,
-                                          const QString& geomHeader)
+                                          const std::string& header,
+                                          const std::string& geomHeader)
 {
   removeAllShaders();
   addShader(Z3DShaderManager::instance().shader(vertFilename, header, m_context));
@@ -203,15 +202,15 @@ void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename,
 
 void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename,
                                           const QString& fragFilename,
-                                          const QString& header,
-                                          const QString& geomHeader)
+                                          const std::string& header,
+                                          const std::string& geomHeader)
 {
   loadFromSourceFile(vertFilename, "", fragFilename, header, geomHeader);
 }
 
 void Z3DShaderProgram::loadFromSourceFile(const QStringList& shaderFilenames,
-                                          const QString& header,
-                                          const QString& geomHeader)
+                                          const std::string& header,
+                                          const std::string& geomHeader)
 {
   removeAllShaders();
   for (const auto& shaderFilename : shaderFilenames) {
@@ -228,45 +227,42 @@ void Z3DShaderProgram::loadFromSourceFile(const QStringList& shaderFilenames,
   m_shaderFiles = shaderFilenames;
 }
 
-void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs,
-                                          const QStringList& geomSrcs,
-                                          const QStringList& fragSrcs,
-                                          const QString& header,
-                                          const QString& geomHeader)
+void Z3DShaderProgram::loadFromSourceCode(const std::vector<std::string>& vertSrcs,
+                                          const std::vector<std::string>& geomSrcs,
+                                          const std::vector<std::string>& fragSrcs,
+                                          const std::string& header,
+                                          const std::string& geomHeader)
 {
   removeAllShaders();
   for (const auto& i : vertSrcs) {
-    QString vertSrc = header + i;
-    addShaderFromSourceCode(Z3DShader::Type::Vertex, vertSrc);
+    addShaderFromSourceCode(Z3DShader::Type::Vertex, header + i);
   }
 
   for (const auto& i : geomSrcs) {
-    QString geomSrc = geomHeader + i;
-    addShaderFromSourceCode(Z3DShader::Type::Geometry, geomSrc);
+    addShaderFromSourceCode(Z3DShader::Type::Geometry, geomHeader + i);
   }
 
   for (const auto& i : fragSrcs) {
-    QString fragSrc = header + i;
-    addShaderFromSourceCode(Z3DShader::Type::Fragment, fragSrc);
+    addShaderFromSourceCode(Z3DShader::Type::Fragment, header + i);
   }
 
   link();
 }
 
-void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs,
-                                          const QStringList& fragSrcs,
-                                          const QString& header,
-                                          const QString& geomHeader)
+void Z3DShaderProgram::loadFromSourceCode(const std::vector<std::string>& vertSrcs,
+                                          const std::vector<std::string>& fragSrcs,
+                                          const std::string& header,
+                                          const std::string& geomHeader)
 {
-  loadFromSourceCode(vertSrcs, QStringList(), fragSrcs, header, geomHeader);
+  loadFromSourceCode(vertSrcs, {}, fragSrcs, header, geomHeader);
 }
 
-void Z3DShaderProgram::setHeaderAndRebuild(const QString& header, const QString& geomHeader)
+void Z3DShaderProgram::setHeaderAndRebuild(const std::string& header, const std::string& geomHeader)
 {
   loadFromSourceFile(m_shaderFiles, header, geomHeader);
 }
 
-int Z3DShaderProgram::uniformLocation(const QString& name) const
+int Z3DShaderProgram::uniformLocation(const std::string& name) const
 {
   auto it = m_uniforms.find(name);
   if (it != m_uniforms.end()) {
@@ -278,7 +274,7 @@ int Z3DShaderProgram::uniformLocation(const QString& name) const
   return -1;
 }
 
-int Z3DShaderProgram::attributeLocation(const QString& name) const
+int Z3DShaderProgram::attributeLocation(const std::string& name) const
 {
   auto it = m_attributes.find(name);
   if (it != m_attributes.end()) {
@@ -311,22 +307,22 @@ int Z3DShaderProgram::attributeLocation(const QString& name) const
 //   static_cast<GLint>(v4));
 // }
 
-// void Z3DShaderProgram::setUniformValue(const QString &name, bool value)
+// void Z3DShaderProgram::setUniformValue(const std::string& name, bool value)
 //{
 //   setUniformValue(name, static_cast<GLint>(value));
 // }
 
-// void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2)
+// void Z3DShaderProgram::setUniformValue(const std::string& name, bool v1, bool v2)
 //{
 //   setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2));
 // }
 
-// void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2, bool v3)
+// void Z3DShaderProgram::setUniformValue(const std::string& name, bool v1, bool v2, bool v3)
 //{
 //   setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3));
 // }
 
-// void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2, bool v3, bool v4)
+// void Z3DShaderProgram::setUniformValue(const std::string& name, bool v1, bool v2, bool v3, bool v4)
 //{
 //   setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3),
 //   static_cast<GLint>(v4));
@@ -344,14 +340,14 @@ void Z3DShaderProgram::storeUniformLocations()
     Uniform u{};
     glGetActiveUniform(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetUniformLocation(programId(), name.data());
-    QString nm(name.data());
-    if (nm.endsWith("[0]")) {
-      nm.chop(3);
+    std::string nm(name.data());
+    if (absl::EndsWith(nm, "[0]")) {
+      nm.resize(nm.size() - 3);  // chop last 3 characters
     }
     m_uniforms.insert_or_assign(nm, u);
   }
 
-  std::map<QString, Uniform>::const_iterator it;
+  std::map<std::string, Uniform>::const_iterator it;
 
   it = m_uniforms.find("screen_dim");
   m_screenDimUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
@@ -458,7 +454,7 @@ void Z3DShaderProgram::storeAttributeLocations()
     m_attributes.insert_or_assign(name.data(), u);
   }
 
-  std::map<QString, Attribute>::const_iterator it;
+  std::map<std::string, Attribute>::const_iterator it;
 
   it = m_attributes.find("attr_vertex");
   m_vertexAttribute = (it == m_attributes.end()) ? nullptr : &(it->second);

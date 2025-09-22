@@ -4,12 +4,11 @@
 #include "z3dtransferfunction.h"
 #include "zmesh.h"
 #include "z3dshaderprogram.h"
-#include "z3drendertarget.h"
 #include "z3dtexture.h"
 #include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dscratchresourcepool.h"
-
 #include <array>
+#include <string>
 #include <vector>
 
 namespace nim {
@@ -139,7 +138,7 @@ protected:
 
   void bindVolumeAndTransferFunc(Z3DShaderProgram& shader, size_t idx) const;
 
-  QString generateHeader();
+  [[nodiscard]] std::string generateHeader();
 
   void render(Z3DEye eye) override;
 
@@ -204,9 +203,9 @@ protected:
   ImgCompositingMode m_compositingModeValue = ImgCompositingMode::DirectVolumeRendering;
 
   Z3DImg* m_img = nullptr;
-  std::vector<QString> m_volumeUniformNames;
-  std::vector<QString> m_volumeDimensionNames;
-  std::vector<QString> m_transferFuncUniformNames;
+  std::vector<std::string> m_volumeUniformNames;
+  std::vector<std::string> m_volumeDimensionNames;
+  std::vector<std::string> m_transferFuncUniformNames;
   std::vector<bool> m_channelVisibilities;
   std::vector<Z3DTransferFunction*> m_transferFunctions;
 

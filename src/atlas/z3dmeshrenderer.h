@@ -3,6 +3,7 @@
 #include "z3dprimitiverenderer.h"
 #include "zmesh.h"
 #include <QString>
+#include <string>
 
 class Z3DTexture;
 
@@ -63,7 +64,7 @@ public:
 protected:
   void compile() override;
 
-  QString generateHeader();
+  [[nodiscard]] std::string generateHeader();
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void renderUsingOpengl() override;

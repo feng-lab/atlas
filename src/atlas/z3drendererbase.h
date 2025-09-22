@@ -7,6 +7,7 @@
 #include "z3dglobalparameters.h"
 #include <QObject>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace nim {
@@ -131,9 +132,9 @@ public:
 
   void setGlobalShaderParameters(Z3DShaderProgram* shader, Z3DEye eye);
 
-  QString generateHeader() const;
+  [[nodiscard]] std::string generateHeader() const;
 
-  QString generateGeomHeader() const;
+  [[nodiscard]] std::string generateGeomHeader() const;
 
   // renderer's constructor and deconstructor will take care of this
   void registerRenderer(Z3DPrimitiveRenderer* renderer);

@@ -141,13 +141,12 @@ void Z3DEllipsoidRenderer::compile()
   m_ellipsoidShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
-QString Z3DEllipsoidRenderer::generateHeader()
+std::string Z3DEllipsoidRenderer::generateHeader()
 {
-  QString headerSource;
-  if (m_useDynamicMaterial) {
-    headerSource += "#define DYNAMIC_MATERIAL_PROPERTY\n";
+  if (!m_useDynamicMaterial) {
+    return {};
   }
-  return headerSource;
+  return "#define DYNAMIC_MATERIAL_PROPERTY\n";
 }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
