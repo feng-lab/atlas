@@ -9,6 +9,12 @@ This plan guides the migration of the Z3D OpenGL renderer to a Vulkan backend, i
 - Adopt explicit, robust resource management, validation, and repeatable shader compilation to SPIR-V.
 - Maintain clean abstractions that mirror existing Z3D architecture to lower risk and churn.
 
+### Development Notes
+
+- You can use `cmake --build build/Release` to verify compositor changes still compile before pushing them further.
+- We do not use `z3dcanvaspainter`; ignore that file during the migration so no `Z3DRenderTarget` accessors need to leak out of `Z3DCompositorFilter` or `Z3DCompositorBase`.
+- Be careful with `git checkout` while iterating—running it mid-refactor can discard uncommitted progress we still rely on for diffing the legacy compositor.
+
 ## Parity And Swappable Backend
 
 To ensure the Vulkan backend is a drop‑in replacement for the OpenGL engine (files starting with `z3d*`), we will:
@@ -192,6 +198,47 @@ Render Surface Port Work (to be reimagined)
    - Expand the existing Vulkan smoke test to hash staged buffers for representative scenes (background-only, lines, mesh sample).
    - Add optional developer script comparing GL vs Vulkan readbacks for a canned network to catch regressions early.
    - Document expected warnings (OpenCV fat binaries, etc.) so CI logs stay actionable.
+
+### Z3DCompositor Refactor Plan
+
+**Goal** Move compositor responsibilities into a reusable filter/back-end split so OpenGL and Vulkan implementations can plug into the same façade without rippling through the network graph or UI.
+
+1. **Freeze Legacy Implementation As A Safety Net**
+   - Keep the existing `Z3DCompositor` sources compilable but mark them as “legacy GL reference” in file comments and documentation so no new dependencies accrete.
+   - Seal the public construction paths by moving factory ownership to the new filter; only tests should instantiate the legacy compositor directly during parity checks.
+   - Maintain compile-time coverage (build + unit tests) so we can diff behaviour during migration, but ensure runtime wiring no longer reaches these classes.
+
+2. **Elevate `Z3DCompositorFilter` To The Network-Facing Node**
+   - Derive from `Z3DBoundedFilter` and recreate the original port layout: scene inputs, camera, scratch pool, mono/stereo render targets, thumbnail and screenshot outputs.
+   - Mirror the public API of the old compositor (background/axis parameters, progressive toggles, screenshot helpers, picking entry points) so existing call sites compile unchanged.
+   - Import stateful members (progressive frame counters, invalidation flags, stereo configuration, widget groups) and rewire them to drive the backend instead of owning GL state directly.
+   - Handle JSON serialization/deserialization of compositor-related parameters inside the filter so document persistence continues to work without touching backends.
+
+3. **Codify The Backend Contract With `Z3DCompositorBase`**
+   - Introduce an abstract base exposing lifecycle (`initialize`, `shutdown`), render (`renderFrame`, `renderTransparentFilter`, `renderPicking`), resize, and readback/screenshot hooks required by the filter.
+   - Define plain-data structs for frame context (camera matrices, viewport, progressive metadata, scratch resource handles) that the filter populates once per frame and hands to any backend.
+   - Include capability queries (`supportsStereo`, `supportsOIT`, `backendName`) so UI/engine logic can adjust behaviour without RTTI or backend-specific includes.
+
+4. **Refactor `Z3DCompositorGLBackend` To Own All OpenGL Resources**
+   - Transplant FBO, texture, shader, renderer, and OIT management from the legacy compositor into the backend; ensure lifetime is scoped to the backend object.
+   - Recreate the frame graph (background, axes, glow, transparent passes, picking, screenshots) within the backend, accepting only filter-provided objects or handles.
+   - Encapsulate screenshot/picking readback buffers behind value-returning APIs so the filter does not touch GL ids.
+   - Provide explicit `reset`/`onDeviceLost` hooks to ease future backend swaps or context loss handling.
+
+5. **Wire Backend Selection And Hot Swap Logic**
+   - Extend `Z3DGlobalParameters` with a validated `RenderBackend` enum, persistence, and UI widget (already stubbed) so users can flip between OpenGL and Vulkan.
+   - Connect the filter to the global parameter change signal; when it fires, tear down the current backend, instantiate the requested one, and reinitialize using existing state (camera, viewport, scratch pool).
+   - Expose `setBackendForTesting(RenderBackend)` on the filter to let automated tests and developer utilities pin a backend without relying on global state changes.
+
+6. **Update Engine And Call Sites**
+   - Change `Z3DRenderingEngine` to own `std::unique_ptr<Z3DCompositorFilter>`, adjusting construction order and dependency injection (network evaluator, scrach pool, etc.).
+   - Audit all codepaths (views, screenshot helpers, pickers) that used to depend on `Z3DCompositor`; reinclude the filter header and call the mirrored API.
+   - Remove or rewrite helper functions that returned the legacy compositor pointer; they should now return the filter or backend-neutral abstractions.
+
+7. **Validation, Tooling, And Safety Nets**
+   - Add temporary regression tests that instantiate the filter with the GL backend, render a canned scene, and byte-compare outputs against captures from the legacy compositor.
+   - Manually test backend hot swapping (OpenGL ↔ Vulkan) during interaction-heavy workflows: progressive refinement, axis toggles, glow filters, OIT scenes, screenshot export.
+   - Document outstanding parity gaps (e.g., Vulkan backend TODOs) both in this plan and as code `TODO` markers so the Vulkan backend work can proceed without rediscovery.
 
 ### Renderer Parity Checklist
 

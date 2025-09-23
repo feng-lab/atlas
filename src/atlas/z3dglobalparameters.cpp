@@ -8,7 +8,8 @@
 namespace nim {
 
 Z3DGlobalParameters::Z3DGlobalParameters()
-  : geometriesMultisampleMode("Multisample Anti-Aliasing")
+  : renderBackend("Render Backend")
+  , geometriesMultisampleMode("Multisample Anti-Aliasing")
   , transparencyMethod("Transparency")
   , weightedBlendedDepthScale("Weighted Blended Depth Scale", 1.f, 1e-3f, 1e3f)
   , lightCount("Light Count", 5, 1, 5)
@@ -26,6 +27,13 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   , globalZCut("Global Z Cut", glm::vec2(0, 0), 0, 0)
   , devicePixelRatio("Device Pixel Ratio", 1.f, 1.f, 16.f)
 {
+  renderBackend.clearOptions();
+  renderBackend.addOptionsWithData(
+    std::make_pair(enumToQString(RenderBackend::OpenGL), static_cast<int>(RenderBackend::OpenGL)),
+    std::make_pair(enumToQString(RenderBackend::Vulkan), static_cast<int>(RenderBackend::Vulkan)));
+  renderBackend.select(enumToQString(RenderBackend::OpenGL));
+  // addParameter(renderBackend);
+
   geometriesMultisampleMode.addOptions("None", "2x2");
   geometriesMultisampleMode.select("2x2");
   addParameter(geometriesMultisampleMode);
@@ -265,6 +273,10 @@ std::shared_ptr<ZWidgetsGroup> Z3DGlobalParameters::widgetsGroup(bool includeCam
   if (!m_widgetsGrp) {
     m_widgetsGrp = std::make_shared<ZWidgetsGroup>("Global", 1);
     m_widgetsGrpNoCamera = std::make_shared<ZWidgetsGroup>("Lighting", 1);
+
+    m_widgetsGrp->addChild(renderBackend, 1);
+    m_widgetsGrpNoCamera->addChild(renderBackend, 1);
+
     for (size_t i = 0; i < m_parameters.size(); ++i) {
       if (i == m_cameraParameterIndex) {
         m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera, engine)), 1);

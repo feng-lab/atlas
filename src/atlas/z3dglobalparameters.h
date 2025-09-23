@@ -18,6 +18,12 @@ class Z3DRenderingEngine;
 
 class Z3DScratchResourcePool;
 
+enum class RenderBackend
+{
+  OpenGL = 0,
+  Vulkan
+};
+
 struct Z3DLocalColorBuffer
 {
   std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> data;
@@ -114,6 +120,7 @@ private:
   }
 
 public:
+  ZStringIntOptionParameter renderBackend;
   ZStringIntOptionParameter geometriesMultisampleMode;
   ZStringIntOptionParameter transparencyMethod;
   ZFloatParameter weightedBlendedDepthScale;

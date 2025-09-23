@@ -583,8 +583,6 @@ set(SOURCES
     zvulkanbackgroundrenderer.cpp
     zvulkanlinerenderer.h
     zvulkanlinerenderer.cpp
-    zvulkancompositor.h
-    zvulkancompositor.cpp
 )
 
 # our target
