@@ -117,6 +117,12 @@ public:
     invalidate(State::AllResultInvalid);
   }
 
+  // returns true if filter is ready to do rendering
+  // The default implementation checks, whether the filter has been initialized and
+  // all input ports and output ports are ready. This is not always necessary since not all
+  // input or output ports are needed depending on rendering context.
+  [[nodiscard]] virtual bool isReady(Z3DEye eye) const;
+
   // Debugging aid: record a short reason before calling invalidate.
   // Set by parameter-change hooks or port invalidations.
 #ifdef ATLAS_DEBUG_VERSION
@@ -151,12 +157,6 @@ protected:
   // return true if the output of current filter for certain eye is valid.
   // will be used by networkevalutor to decide whether is neccessary to call process(eye)
   [[nodiscard]] virtual bool isValid(Z3DEye eye) const;
-
-  // returns true if filter is ready to do rendering
-  // The default implementation checks, whether the filter has been initialized and
-  // all input ports and output ports are ready. This is not always necessary since not all
-  // input or output ports are needed depending on rendering context.
-  [[nodiscard]] virtual bool isReady(Z3DEye eye) const;
 
   // this is the place to do rendering related work
   // the networkevaluator will set its invalidation level to VALID after calling this
