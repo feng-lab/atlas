@@ -4,7 +4,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkanbuffer.h"
-#include "zvulkanrendererbase.h"
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
@@ -55,7 +54,7 @@ struct MaterialUBOStd140 {
 };
 } // namespace
 
-ZVulkanLineRenderer::ZVulkanLineRenderer(ZVulkanRendererBase& rendererBase)
+ZVulkanLineRenderer::ZVulkanLineRenderer(Z3DRendererBase& rendererBase)
   : ZVulkanRenderer(rendererBase)
 {
   // default state mirrors GL renderer
@@ -99,8 +98,8 @@ void ZVulkanLineRenderer::ensureThinVertexBuffer()
       thin.push_back(ThinVertex{(*m_linesPt)[i], c});
     }
   }
-  auto& device = m_rendererBase.device();
-  m_vertexBufferThin = device.createBuffer(thin.size() * sizeof(ThinVertex),
+  auto& dev = device();
+  m_vertexBufferThin = dev.createBuffer(thin.size() * sizeof(ThinVertex),
                                            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
                                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   if (!thin.empty()) m_vertexBufferThin->copyData(thin.data(), thin.size() * sizeof(ThinVertex));
@@ -148,15 +147,15 @@ void ZVulkanLineRenderer::ensureWideBuffers()
     m_dirtyCPU = false;
   }
   if (!m_vertexBufferWide || !m_indexBufferWide || m_dirtyGPU) {
-    auto& device = m_rendererBase.device();
+    auto& dev = device();
     size_t vsize = m_wideVerticesCPU.size() * sizeof(WideVertex);
     size_t isize = m_indicesCPU.size() * sizeof(uint32_t);
-    m_vertexBufferWide = device.createBuffer(std::max<size_t>(vsize, 1),
-                                            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    m_indexBufferWide = device.createBuffer(std::max<size_t>(isize, 1),
-                                           vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_vertexBufferWide = dev.createBuffer(std::max<size_t>(vsize, 1),
+                                         vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_indexBufferWide = dev.createBuffer(std::max<size_t>(isize, 1),
+                                        vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     if (vsize) m_vertexBufferWide->copyData(m_wideVerticesCPU.data(), vsize);
     if (isize) m_indexBufferWide->copyData(m_indicesCPU.data(), isize);
     m_dirtyGPU = false;
@@ -165,7 +164,7 @@ void ZVulkanLineRenderer::ensureWideBuffers()
 
 void ZVulkanLineRenderer::createDescriptorLayouts()
 {
-  auto& dev = m_rendererBase.device().context().device();
+  auto& dev = device().context().device();
   // set=0: combined image sampler for 1D texture color (always present to satisfy shader interface)
   vk::DescriptorSetLayoutBinding t0{.binding = 0,
                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
@@ -234,12 +233,12 @@ void ZVulkanLineRenderer::createPipelines()
 
   createDescriptorLayouts();
 
-  auto& device = m_rendererBase.device();
+  auto& dev = device();
   const QString baseQ = ZSystemInfo::resourcesDirPath() + "/shader/vulkan/spv/";
   const std::string base = baseQ.toStdString();
 
   // Wide pipeline (triangle list)
-  m_shaderWide = std::make_unique<ZVulkanShader>(device, base + "wideline1.vert.spv", base + "wideline.frag.spv", std::nullopt);
+  m_shaderWide = std::make_unique<ZVulkanShader>(dev, base + "wideline1.vert.spv", base + "wideline.frag.spv", std::nullopt);
   // Specialization for round cap and lighting
   uint32_t useTex = m_useTextureColor ? 1u : 0u;
   uint32_t roundCap = m_roundCap ? 1u : 0u;
@@ -262,7 +261,7 @@ void ZVulkanLineRenderer::createPipelines()
                                                                 reinterpret_cast<const uint8_t*>(&vSA) + sizeof(uint32_t)));
 
   auto viW = viWide();
-  m_pipelineWide = device.createPipeline(*m_shaderWide, viW, vk::PrimitiveTopology::eTriangleList);
+  m_pipelineWide = dev.createPipeline(*m_shaderWide, viW, vk::PrimitiveTopology::eTriangleList);
   std::vector<vk::DescriptorSetLayout> setLayoutsW = {**m_set0Texture, **m_set1Lighting, **m_set2Transforms};
   // Push constants for wideline
   vk::PushConstantRange pcW{.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
@@ -273,7 +272,7 @@ void ZVulkanLineRenderer::createPipelines()
   m_pipelineWide->create();
 
   // Wide picking pipeline (lighting disabled)
-  m_shaderWidePick = std::make_unique<ZVulkanShader>(device, base + "wideline1.vert.spv", base + "wideline.frag.spv", std::nullopt);
+  m_shaderWidePick = std::make_unique<ZVulkanShader>(dev, base + "wideline1.vert.spv", base + "wideline.frag.spv", std::nullopt);
   uint32_t lightingOff = 0u;
   std::array<uint32_t, 3> specDataPick{useTex, roundCap, lightingOff};
   m_shaderWidePick->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
@@ -285,15 +284,15 @@ void ZVulkanLineRenderer::createPipelines()
                                                std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&vSA),
                                                                     reinterpret_cast<const uint8_t*>(&vSA) + sizeof(uint32_t)));
   auto viWP = viWide();
-  m_pipelineWidePick = device.createPipeline(*m_shaderWidePick, viWP, vk::PrimitiveTopology::eTriangleList);
+  m_pipelineWidePick = dev.createPipeline(*m_shaderWidePick, viWP, vk::PrimitiveTopology::eTriangleList);
   m_pipelineWidePick->setDescriptorSetLayouts(setLayoutsW);
   m_pipelineWidePick->setPushConstantRanges({pcW});
   m_pipelineWidePick->create();
 
   // Thin line pipeline (optional fallback)
-  m_shaderThin = std::make_unique<ZVulkanShader>(device, base + "line.vert.spv", base + "line.frag.spv", std::nullopt);
+  m_shaderThin = std::make_unique<ZVulkanShader>(dev, base + "line.vert.spv", base + "line.frag.spv", std::nullopt);
   auto viT = viThin();
-  m_pipelineThin = device.createPipeline(*m_shaderThin, viT, vk::PrimitiveTopology::eLineList);
+  m_pipelineThin = dev.createPipeline(*m_shaderThin, viT, vk::PrimitiveTopology::eLineList);
   std::vector<vk::DescriptorSetLayout> setLayoutsT = {**m_set0Texture, **m_set1Lighting, **m_set2Transforms};
   m_pipelineThin->setDescriptorSetLayouts(setLayoutsT);
   m_pipelineThin->create();
@@ -302,18 +301,19 @@ void ZVulkanLineRenderer::createPipelines()
 }
 void ZVulkanLineRenderer::uploadUBOs()
 {
-  auto& device = m_rendererBase.device();
+  auto& dev = device();
   // Lighting
   if (!m_uboLighting) {
-    m_uboLighting = device.createBuffer(sizeof(LightingUBOStd140),
+    m_uboLighting = dev.createBuffer(sizeof(LightingUBOStd140),
                                         vk::BufferUsageFlagBits::eUniformBuffer,
                                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   LightingUBOStd140 lighting{};
   lighting.lighting_enabled = 0; // disable
   lighting.numLights = 0;
-  const float w = static_cast<float>(m_rendererBase.width());
-  const float h = static_cast<float>(m_rendererBase.height());
+  const auto extent = framebufferExtent();
+  const float w = static_cast<float>(extent.x);
+  const float h = static_cast<float>(extent.y);
   if (w > 0.f && h > 0.f) {
     lighting.screen_dim_RCP = glm::vec2(1.0f / w, 1.0f / h);
   }
@@ -326,21 +326,22 @@ void ZVulkanLineRenderer::uploadUBOs()
 
   // Transforms
   if (!m_uboTransforms) {
-    m_uboTransforms = device.createBuffer(sizeof(TransformsUBOStd140),
+    m_uboTransforms = dev.createBuffer(sizeof(TransformsUBOStd140),
                                           vk::BufferUsageFlagBits::eUniformBuffer,
                                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   TransformsUBOStd140 xf{};
-  auto& cam = m_rendererBase.camera();
-  xf.view_matrix = cam.viewMatrix(MonoEye);
-  xf.projection_view_matrix = cam.projectionMatrix(MonoEye) * xf.view_matrix;
+  const auto& viewState = m_rendererBase.viewState();
+  const auto& eyeState = viewState.eyes[static_cast<size_t>(MonoEye)];
+  xf.view_matrix = eyeState.viewMatrix;
+  xf.projection_view_matrix = eyeState.projectionViewMatrix;
   xf.pos_transform = m_rendererBase.coordTransform();
   xf.pos_transform_normal_matrix = glm::mat4(1.0f);
   m_uboTransforms->copyData(&xf, sizeof(xf));
 
   // Material
   if (!m_uboMaterial) {
-    m_uboMaterial = device.createBuffer(sizeof(MaterialUBOStd140),
+    m_uboMaterial = dev.createBuffer(sizeof(MaterialUBOStd140),
                                         vk::BufferUsageFlagBits::eUniformBuffer,
                                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
@@ -357,8 +358,10 @@ void ZVulkanLineRenderer::uploadUBOs()
 
 void ZVulkanLineRenderer::createDescriptorSets()
 {
-  if (!m_descPool) m_descPool = m_rendererBase.device().createDescriptorPool();
-  auto& dev = m_rendererBase.device();
+  if (!m_descPool) {
+    m_descPool = device().createDescriptorPool();
+  }
+  auto& dev = device();
 
   // Allocate sets
   auto ds1 = m_descPool->allocateDescriptorSet(**m_set1Lighting);
@@ -381,14 +384,14 @@ void ZVulkanLineRenderer::createDescriptorSets()
                                       .addressModeV = vk::SamplerAddressMode::eClampToEdge,
                                       .addressModeW = vk::SamplerAddressMode::eClampToEdge,
                                       .borderColor = vk::BorderColor::eIntOpaqueWhite};
-    m_sampler.emplace(m_rendererBase.device().context().device(), samplerInfo);
+    m_sampler.emplace(device().context().device(), samplerInfo);
   }
 
   if (!m_tex1D) {
     // Create a 1x1 2D texture as placeholder (white)
-    m_tex1D = m_rendererBase.device().createTexture(1, 1, vk::Format::eR8G8B8A8Unorm,
-                                                    vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
+    m_tex1D = device().createTexture(1, 1, vk::Format::eR8G8B8A8Unorm,
+                                       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                       vk::MemoryPropertyFlagBits::eDeviceLocal);
     uint32_t pixel = 0xffffffffu; // RGBA8 white
     m_tex1D->uploadData(&pixel, sizeof(pixel));
   }
@@ -403,32 +406,48 @@ void ZVulkanLineRenderer::compile()
   if (m_useSmoothLine) ensureWideBuffers(); else ensureThinVertexBuffer();
 }
 
-void ZVulkanLineRenderer::render(vk::raii::CommandBuffer& cmd)
+void ZVulkanLineRenderer::recordRender(Z3DEye eye, vk::raii::CommandBuffer& cmd)
 {
+  (void)eye;
+
   createPipelines();
   uploadUBOs();
   createDescriptorSets();
 
-  if (m_useSmoothLine) ensureWideBuffers(); else ensureThinVertexBuffer();
+  const auto extent = framebufferExtent();
+  if (extent.x == 0U || extent.y == 0U) {
+    return;
+  }
+
+  if (m_useSmoothLine) {
+    ensureWideBuffers();
+    if (m_wideVerticesCPU.empty()) {
+      return;
+    }
+  } else {
+    ensureThinVertexBuffer();
+    if (!m_linesPt || m_linesPt->empty()) {
+      return;
+    }
+  }
 
   auto& pipe = m_useSmoothLine ? *m_pipelineWide : *m_pipelineThin;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipe.pipeline());
 
-  // Dynamic viewport/scissor
   vk::Viewport vp{.x = 0.0f,
                   .y = 0.0f,
-                  .width = static_cast<float>(m_rendererBase.width()),
-                  .height = static_cast<float>(m_rendererBase.height()),
+                  .width = static_cast<float>(extent.x),
+                  .height = static_cast<float>(extent.y),
                   .minDepth = 0.0f,
                   .maxDepth = 1.0f};
-  vk::Rect2D scissor{{0, 0}, {m_rendererBase.width(), m_rendererBase.height()}};
+  vk::Rect2D scissor{{0, 0}, {extent.x, extent.y}};
   cmd.setViewport(0, vp);
   cmd.setScissor(0, scissor);
 
-  // Bind descriptor sets at set=1,2
-  // Bind descriptor sets at set=0,1,2 (0 optional)
   if (m_dsTexture) {
-    std::array<vk::DescriptorSet, 3> sets{m_dsTexture->descriptorSet(), m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
+    std::array<vk::DescriptorSet, 3> sets{m_dsTexture->descriptorSet(),
+                                          m_dsLighting->descriptorSet(),
+                                          m_dsTransforms->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipe.pipelineLayout(), 0, sets, {});
   } else {
     std::array<vk::DescriptorSet, 2> sets{m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
@@ -436,10 +455,7 @@ void ZVulkanLineRenderer::render(vk::raii::CommandBuffer& cmd)
   }
 
   if (m_useSmoothLine) {
-    if (m_wideVerticesCPU.empty()) return;
-    // Push constants
-    auto computeWidth = [&](float base){
-      // emulate GL's (src-0.9) * sizeScale; MSAA/devicePixelRatio elided for now
+    auto computeWidth = [&](float base) {
       return std::max(1.f, base) - 0.9f;
     };
 
@@ -448,7 +464,6 @@ void ZVulkanLineRenderer::render(vk::raii::CommandBuffer& cmd)
     cmd.bindIndexBuffer(m_indexBufferWide->buffer(), 0, vk::IndexType::eUint32);
 
     if (!m_lineWidthArray.empty()) {
-      // one draw per segment
       const uint32_t segCount = static_cast<uint32_t>(m_indicesCPU.size() / 6);
       for (uint32_t i = 0; i < segCount && i < m_lineWidthArray.size(); ++i) {
         pushWidePC(cmd, computeWidth(m_lineWidthArray[i]));
@@ -459,7 +474,6 @@ void ZVulkanLineRenderer::render(vk::raii::CommandBuffer& cmd)
       cmd.drawIndexed(static_cast<uint32_t>(m_indicesCPU.size()), 1, 0, 0, 0);
     }
   } else {
-    if (!m_linesPt || m_linesPt->empty()) return;
     vk::DeviceSize offset = 0;
     cmd.bindVertexBuffers(0, {m_vertexBufferThin->buffer()}, {offset});
     cmd.draw(static_cast<uint32_t>(m_linesPt->size()), 1, 0, 0);
@@ -470,8 +484,9 @@ void ZVulkanLineRenderer::pushWidePC(vk::raii::CommandBuffer& cmd, float lineWid
 {
   struct WideLinePC { glm::mat4 viewport_matrix; glm::mat4 viewport_matrix_inverse; float line_width; float size_scale; };
   WideLinePC pc{};
-  pc.viewport_matrix = m_rendererBase.viewportMatrix();
-  pc.viewport_matrix_inverse = m_rendererBase.viewportMatrixInverse();
+  const auto& frameState = m_rendererBase.frameState();
+  pc.viewport_matrix = frameState.viewportMatrix;
+  pc.viewport_matrix_inverse = frameState.inverseViewportMatrix;
   pc.line_width = lineWidth;
   pc.size_scale = m_rendererBase.sizeScale();
   cmd.pushConstants<WideLinePC>(m_pipelineWide->pipelineLayout(),
@@ -480,66 +495,93 @@ void ZVulkanLineRenderer::pushWidePC(vk::raii::CommandBuffer& cmd, float lineWid
                                 pc);
 }
 
-void ZVulkanLineRenderer::renderPicking(vk::raii::CommandBuffer& cmd)
+void ZVulkanLineRenderer::recordPicking(Z3DEye eye, vk::raii::CommandBuffer& cmd)
 {
-  // Same pipeline; just use picking colors if provided
-  if (!m_linesPt || m_linesPt->empty()) return;
+  (void)eye;
+
+  if (!m_linesPt || m_linesPt->empty()) {
+    return;
+  }
+
   createPipelines();
   uploadUBOs();
   createDescriptorSets();
   ensureWideBuffers();
+
+  const auto extent = framebufferExtent();
+  if (extent.x == 0U || extent.y == 0U) {
+    return;
+  }
 
   auto& pipe = *m_pipelineWidePick;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipe.pipeline());
 
   vk::Viewport vp{.x = 0.0f,
                   .y = 0.0f,
-                  .width = static_cast<float>(m_rendererBase.width()),
-                  .height = static_cast<float>(m_rendererBase.height()),
+                  .width = static_cast<float>(extent.x),
+                  .height = static_cast<float>(extent.y),
                   .minDepth = 0.0f,
                   .maxDepth = 1.0f};
-  vk::Rect2D scissor{{0, 0}, {m_rendererBase.width(), m_rendererBase.height()}};
+  vk::Rect2D scissor{{0, 0}, {extent.x, extent.y}};
   cmd.setViewport(0, vp);
   cmd.setScissor(0, scissor);
 
   if (m_dsTexture) {
-    std::array<vk::DescriptorSet, 3> sets{m_dsTexture->descriptorSet(), m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
+    std::array<vk::DescriptorSet, 3> sets{m_dsTexture->descriptorSet(),
+                                          m_dsLighting->descriptorSet(),
+                                          m_dsTransforms->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipe.pipelineLayout(), 0, sets, {});
   } else {
     std::array<vk::DescriptorSet, 2> sets{m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipe.pipelineLayout(), 1, sets, {});
   }
 
-  // Temporarily upload picking colors if available
-  std::vector<WideVertex> backup = m_wideVerticesCPU; // keep original
+  std::vector<WideVertex> backup = m_wideVerticesCPU;
+  bool patched = false;
   if (m_linePickingColorsPt && !backup.empty()) {
-    // Build a temp CPU buffer with picking colors on top of the same geometry
     std::vector<WideVertex> temp = backup;
-    size_t segCount = temp.size() / 4;
-    auto pickColorAt = [&](size_t i){ return (*m_linePickingColorsPt)[i]; };
-    auto colorAt = [&](size_t i){ return (m_lineColorsPt && i < m_lineColorsPt->size()) ? (*m_lineColorsPt)[i] : glm::vec4(0,0,0,1); };
-    // We must map per-segment endpoint colors; reconstruct from input lines
-    if (m_linesPt && m_linePickingColorsPt && (!m_isLineStrip ? (m_linePickingColorsPt->size() >= m_linesPt->size()) : (m_linePickingColorsPt->size() >= m_linesPt->size()))) {
+    const size_t segCount = temp.size() / 4;
+    const auto pickColorAt = [&](size_t i) { return (*m_linePickingColorsPt)[i]; };
+    const auto colorAt = [&](size_t i) {
+      return (m_lineColorsPt && i < m_lineColorsPt->size()) ? (*m_lineColorsPt)[i] : glm::vec4(0, 0, 0, 1);
+    };
+
+    if (m_linesPt && m_linePickingColorsPt && !m_linePickingColorsPt->empty()) {
       size_t segIdx = 0;
       if (m_isLineStrip) {
         for (size_t i = 1; i < m_linesPt->size() && segIdx < segCount; ++i, ++segIdx) {
-          glm::vec4 c0 = pickColorAt(i-1);
-          glm::vec4 c1 = pickColorAt(i);
-          for (int v = 0; v < 4; ++v) { temp[segIdx*4 + v].c0 = c0; temp[segIdx*4 + v].c1 = c1; }
+          const glm::vec4 c0 = pickColorAt(std::min(i - 1, m_linePickingColorsPt->size() - 1));
+          const glm::vec4 c1 = pickColorAt(std::min(i, m_linePickingColorsPt->size() - 1));
+          for (int v = 0; v < 4; ++v) {
+            temp[segIdx * 4 + v].c0 = c0;
+            temp[segIdx * 4 + v].c1 = c1;
+          }
         }
       } else {
         for (size_t i = 0; i + 1 < m_linesPt->size() && segIdx < segCount; i += 2, ++segIdx) {
-          glm::vec4 c0 = pickColorAt(i);
-          glm::vec4 c1 = pickColorAt(i+1);
-          for (int v = 0; v < 4; ++v) { temp[segIdx*4 + v].c0 = c0; temp[segIdx*4 + v].c1 = c1; }
+          const glm::vec4 c0 = pickColorAt(std::min(i, m_linePickingColorsPt->size() - 1));
+          const glm::vec4 c1 = pickColorAt(std::min(i + 1, m_linePickingColorsPt->size() - 1));
+          for (int v = 0; v < 4; ++v) {
+            temp[segIdx * 4 + v].c0 = c0;
+            temp[segIdx * 4 + v].c1 = c1;
+          }
         }
       }
     } else {
-      // fallback: use existing colors
-      (void)colorAt; // suppress unused
+      for (size_t segIdx = 0; segIdx < segCount; ++segIdx) {
+        const glm::vec4 fallback = colorAt(segIdx);
+        for (int v = 0; v < 4; ++v) {
+          temp[segIdx * 4 + v].c0 = fallback;
+          temp[segIdx * 4 + v].c1 = fallback;
+        }
+      }
     }
-    size_t vsize = temp.size() * sizeof(WideVertex);
-    if (vsize) m_vertexBufferWide->copyData(temp.data(), vsize);
+
+    const size_t vsize = temp.size() * sizeof(WideVertex);
+    if (vsize) {
+      m_vertexBufferWide->copyData(temp.data(), vsize);
+      patched = true;
+    }
   }
 
   vk::DeviceSize offset = 0;
@@ -548,10 +590,11 @@ void ZVulkanLineRenderer::renderPicking(vk::raii::CommandBuffer& cmd)
   pushWidePC(cmd, std::max(1.f, m_srcLineWidth) - 0.9f);
   cmd.drawIndexed(static_cast<uint32_t>(m_indicesCPU.size()), 1, 0, 0, 0);
 
-  // restore original vertex buffer data if we altered it
-  if (!backup.empty() && m_linePickingColorsPt) {
-    size_t vsize = backup.size() * sizeof(WideVertex);
-    if (vsize) m_vertexBufferWide->copyData(backup.data(), vsize);
+  if (patched) {
+    const size_t vsize = backup.size() * sizeof(WideVertex);
+    if (vsize) {
+      m_vertexBufferWide->copyData(backup.data(), vsize);
+    }
   }
 }
 

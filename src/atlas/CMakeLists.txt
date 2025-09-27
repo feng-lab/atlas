@@ -419,6 +419,7 @@ set(SOURCES
     z3darrowrenderer.h z3darrowrenderer.cpp
     z3drendererbase.h z3drendererbase.cpp
     z3drendererbackend.h z3drendererglbackend.cpp
+    z3drenderervulkanbackend.h z3drenderervulkanbackend.cpp
     z3drenderglobalstate.h z3drenderglobalstate.cpp
     z3dprimitiverenderer.h z3dprimitiverenderer.cpp
     z3dcanvaspainter.h z3dcanvaspainter.cpp
@@ -579,8 +580,6 @@ set(SOURCES
     zvulkanshaderstate.h
     zvulkanrenderer.h
     zvulkanrenderer.cpp
-    zvulkanrendererbase.h
-    zvulkanrendererbase.cpp
     zvulkanbackgroundrenderer.h
     zvulkanbackgroundrenderer.cpp
     zvulkanlinerenderer.h

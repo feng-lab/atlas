@@ -28,5 +28,6 @@ public:
 };
 
 std::unique_ptr<Z3DRendererBackend> createGLRendererBackend();
+std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend();
 
 } // namespace nim

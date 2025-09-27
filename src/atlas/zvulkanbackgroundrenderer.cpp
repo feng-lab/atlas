@@ -1,13 +1,10 @@
 #include "zvulkanbackgroundrenderer.h"
 
+#include "zsysteminfo.h"
+#include "zvulkanbuffer.h"
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
-#include "zvulkanbuffer.h"
-#include "zvulkanrendererbase.h"
-#include "zsysteminfo.h"
-#include "zvulkanswapchain.h"
-#include "zlog.h"
 
 #include <array>
 #include <fmt/format.h>
@@ -15,12 +12,20 @@
 namespace nim {
 
 namespace {
-struct Vertex { float x, y, z; };
+struct Vertex
+{
+  float x, y, z;
+};
 
 vk::PipelineVertexInputStateCreateInfo fullscreenTriVertexInput()
 {
-  static vk::VertexInputBindingDescription binding{.binding = 0, .stride = sizeof(Vertex), .inputRate = vk::VertexInputRate::eVertex};
-  static vk::VertexInputAttributeDescription attr{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 0};
+  static vk::VertexInputBindingDescription binding{.binding = 0,
+                                                    .stride = sizeof(Vertex),
+                                                    .inputRate = vk::VertexInputRate::eVertex};
+  static vk::VertexInputAttributeDescription attr{.location = 0,
+                                                   .binding = 0,
+                                                   .format = vk::Format::eR32G32B32Sfloat,
+                                                   .offset = 0};
   static vk::PipelineVertexInputStateCreateInfo vi{};
   vi.vertexBindingDescriptionCount = 1;
   vi.pVertexBindingDescriptions = &binding;
@@ -30,7 +35,8 @@ vk::PipelineVertexInputStateCreateInfo fullscreenTriVertexInput()
 }
 
 // Background push constant layout in background_func.glslinc
-struct BackgroundPC {
+struct BackgroundPC
+{
   glm::vec2 screen_dim_RCP;
   glm::vec2 _pad0;
   glm::vec4 color1;
@@ -39,7 +45,7 @@ struct BackgroundPC {
 };
 } // namespace
 
-ZVulkanBackgroundRenderer::ZVulkanBackgroundRenderer(ZVulkanRendererBase& rendererBase)
+ZVulkanBackgroundRenderer::ZVulkanBackgroundRenderer(Z3DRendererBase& rendererBase)
   : ZVulkanRenderer(rendererBase)
 {}
 
@@ -47,36 +53,42 @@ ZVulkanBackgroundRenderer::~ZVulkanBackgroundRenderer() = default;
 
 void ZVulkanBackgroundRenderer::ensureVertexBuffer()
 {
-  if (m_vertexBuffer) return;
+  if (m_vertexBuffer) {
+    return;
+  }
   // Fullscreen triangle in NDC
   constexpr std::array<Vertex, 3> tri = {{{-1.0f, -1.0f, 0.0f}, {3.0f, -1.0f, 0.0f}, {-1.0f, 3.0f, 0.0f}}};
-  auto& device = m_rendererBase.device();
-  m_vertexBuffer = device.createBuffer(sizeof(tri),
-                                       vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  auto& dev = device();
+  m_vertexBuffer = dev.createBuffer(sizeof(tri),
+                                    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                                    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexBuffer->copyData(tri.data(), sizeof(tri));
 }
 
 void ZVulkanBackgroundRenderer::compile()
 {
-  auto& device = m_rendererBase.device();
+  auto& dev = device();
 
   // Load SPIR-V from the deployed resources directory
   // ResourcesDir/shader/vulkan/spv/*
   const QString baseQ = ZSystemInfo::resourcesDirPath() + "/shader/vulkan/spv/";
   const std::string base = baseQ.toStdString();
-  m_shader = std::make_unique<ZVulkanShader>(device,
+  m_shader = std::make_unique<ZVulkanShader>(dev,
                                              base + "pass.vert.spv",
                                              base + "background.frag.spv",
                                              std::nullopt);
 
   // Specialization constants for background modes (parity with Z3DBackgroundRenderer)
   // IDs 30..34: MODE_UNIFORM, MODE_GRADIENT_L2R, MODE_GRADIENT_R2L, MODE_GRADIENT_T2B, MODE_GRADIENT_B2T
-  uint32_t s_uniform = (m_mode == Mode::Uniform) ? 1u : 0u;
-  uint32_t s_l2r = (m_mode == Mode::Gradient && m_orientation == GradientOrientation::LeftToRight) ? 1u : 0u;
-  uint32_t s_r2l = (m_mode == Mode::Gradient && m_orientation == GradientOrientation::RightToLeft) ? 1u : 0u;
-  uint32_t s_t2b = (m_mode == Mode::Gradient && m_orientation == GradientOrientation::TopToBottom) ? 1u : 0u;
-  uint32_t s_b2t = (m_mode == Mode::Gradient && m_orientation == GradientOrientation::BottomToTop) ? 1u : 0u;
+  const uint32_t s_uniform = (m_mode == Mode::Uniform) ? 1u : 0u;
+  const uint32_t s_l2r =
+    (m_mode == Mode::Gradient && m_orientation == GradientOrientation::LeftToRight) ? 1u : 0u;
+  const uint32_t s_r2l =
+    (m_mode == Mode::Gradient && m_orientation == GradientOrientation::RightToLeft) ? 1u : 0u;
+  const uint32_t s_t2b =
+    (m_mode == Mode::Gradient && m_orientation == GradientOrientation::TopToBottom) ? 1u : 0u;
+  const uint32_t s_b2t =
+    (m_mode == Mode::Gradient && m_orientation == GradientOrientation::BottomToTop) ? 1u : 0u;
 
   std::array<vk::SpecializationMapEntry, 5> entries = {
     vk::SpecializationMapEntry{.constantID = 30, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
@@ -93,7 +105,7 @@ void ZVulkanBackgroundRenderer::compile()
 
   // Vertex input for fullscreen triangle
   auto vi = fullscreenTriVertexInput();
-  m_pipeline = m_rendererBase.device().createPipeline(*m_shader, vi, vk::PrimitiveTopology::eTriangleList);
+  m_pipeline = device().createPipeline(*m_shader, vi, vk::PrimitiveTopology::eTriangleList);
 
   // Push constants range for fragment stage
   vk::PushConstantRange pcRange{.stageFlags = vk::ShaderStageFlagBits::eFragment,
@@ -107,22 +119,27 @@ void ZVulkanBackgroundRenderer::compile()
   ensureVertexBuffer();
 }
 
-void ZVulkanBackgroundRenderer::render(vk::raii::CommandBuffer& cmd)
+void ZVulkanBackgroundRenderer::recordRender(Z3DEye eye, vk::raii::CommandBuffer& cmd)
 {
-  if (!m_pipeline) compile();
+  (void)eye;
+
+  if (!m_pipeline) {
+    compile();
+  }
   ensureVertexBuffer();
 
   // Bind pipeline
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_pipeline->pipeline());
 
   // Set dynamic viewport/scissor
+  const auto extent = framebufferExtent();
   vk::Viewport vp{.x = 0.0f,
                   .y = 0.0f,
-                  .width = static_cast<float>(m_rendererBase.width()),
-                  .height = static_cast<float>(m_rendererBase.height()),
+                  .width = static_cast<float>(extent.x),
+                  .height = static_cast<float>(extent.y),
                   .minDepth = 0.0f,
                   .maxDepth = 1.0f};
-  vk::Rect2D scissor{{0, 0}, {m_rendererBase.width(), m_rendererBase.height()}};
+  vk::Rect2D scissor{{0, 0}, {extent.x, extent.y}};
   cmd.setViewport(0, vp);
   cmd.setScissor(0, scissor);
 
@@ -141,3 +158,4 @@ void ZVulkanBackgroundRenderer::render(vk::raii::CommandBuffer& cmd)
 }
 
 } // namespace nim
+

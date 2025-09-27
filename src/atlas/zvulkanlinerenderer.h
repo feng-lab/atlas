@@ -15,13 +15,16 @@ class ZVulkanDescriptorSet;
 class ZVulkanLineRenderer : public ZVulkanRenderer
 {
 public:
-  explicit ZVulkanLineRenderer(ZVulkanRendererBase& rendererBase);
+  explicit ZVulkanLineRenderer(Z3DRendererBase& rendererBase);
   ~ZVulkanLineRenderer() override;
 
   void compile() override;
-  void render(vk::raii::CommandBuffer& cmdBuffer) override;
-  void renderPicking(vk::raii::CommandBuffer& cmdBuffer) override;
 
+protected:
+  void recordRender(Z3DEye eye, vk::raii::CommandBuffer& cmdBuffer) override;
+  void recordPicking(Z3DEye eye, vk::raii::CommandBuffer& cmdBuffer) override;
+
+public:
   // Parity APIs w.r.t. Z3DLineRenderer
   void setLineStrip(bool v) { m_isLineStrip = v; m_dirtyCPU = true; }
   void setUseSmoothLine(bool v) { m_useSmoothLine = v; }

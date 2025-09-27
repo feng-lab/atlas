@@ -13,23 +13,53 @@ class ZVulkanBuffer;
 class ZVulkanBackgroundRenderer : public ZVulkanRenderer
 {
 public:
-  explicit ZVulkanBackgroundRenderer(ZVulkanRendererBase& rendererBase);
+  explicit ZVulkanBackgroundRenderer(Z3DRendererBase& rendererBase);
   ~ZVulkanBackgroundRenderer() override;
 
   void compile() override;
-  void render(vk::raii::CommandBuffer& cmdBuffer) override;
 
   // Background parameters
-  void setScreenDimRCP(float invW, float invH) { m_screenDimRCP = {invW, invH}; }
-  void setColors(const glm::vec4& c1, const glm::vec4& c2) { m_color1 = c1; m_color2 = c2; }
+  void setScreenDimRCP(float invW, float invH)
+  {
+    m_screenDimRCP = {invW, invH};
+  }
+  void setColors(const glm::vec4& c1, const glm::vec4& c2)
+  {
+    m_color1 = c1;
+    m_color2 = c2;
+  }
   // region = {x0, xScale, y0, yScale}
-  void setRegion(const glm::vec4& r) { m_region = r; }
+  void setRegion(const glm::vec4& r)
+  {
+    m_region = r;
+  }
 
   // Parity with Z3DBackgroundRenderer
-  enum class Mode { Uniform, Gradient };
-  enum class GradientOrientation { LeftToRight, RightToLeft, TopToBottom, BottomToTop };
-  void setMode(Mode m) { m_mode = m; m_pipeline.reset(); /* force recreate to apply specs */ }
-  void setGradientOrientation(GradientOrientation o) { m_orientation = o; m_pipeline.reset(); }
+  enum class Mode
+  {
+    Uniform,
+    Gradient
+  };
+  enum class GradientOrientation
+  {
+    LeftToRight,
+    RightToLeft,
+    TopToBottom,
+    BottomToTop
+  };
+  void setMode(Mode m)
+  {
+    m_mode = m;
+    m_pipeline.reset(); // force recreate to apply specs
+  }
+  void setGradientOrientation(GradientOrientation o)
+  {
+    m_orientation = o;
+    m_pipeline.reset();
+  }
+
+protected:
+  void recordRender(Z3DEye eye, vk::raii::CommandBuffer& cmdBuffer) override;
 
 private:
   void ensureVertexBuffer();
@@ -48,3 +78,4 @@ private:
 };
 
 } // namespace nim
+

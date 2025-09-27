@@ -422,14 +422,20 @@ protected:
 
   RendererParameters m_rendererParameters;
   Z3DGlobalParameters& m_globalParameters;
+
+private:
   Z3DRendererBase::ParameterState m_rendererParameterState;
   RendererFrameState m_rendererFrameState;
+
+protected:
   bool m_rendererBackendInitialized = false;
   RenderBackend m_activeBackend = RenderBackend::OpenGL;
   RenderBackend m_requestedBackend = RenderBackend::OpenGL;
   uint8_t m_boundsDirtyMask = 0;
   Z3DRendererBase m_rendererBase;
   glm::uvec4 m_currentViewport{0};
+
+  virtual void onRendererBackendChanged(RenderBackend /*backend*/) {}
 
   Z3DLineRenderer m_baseBoundBoxRenderer;
   Z3DLineRenderer m_selectionBoundBoxRenderer;

@@ -49,9 +49,6 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup(bool includeCamera, Z3DRenderingEngine& engine);
 
-  // count is lightCount
-  void populateLightingState(RendererSceneState::LightingState& lighting) const;
-
   // must call
   void setPickingTarget(Z3DRenderTarget& rt)
   {

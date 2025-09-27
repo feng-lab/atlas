@@ -1,77 +1,78 @@
 #include "zvulkanrenderer.h"
 
+#include "z3drendererbase.h"
+#include "z3drenderervulkanbackend.h"
+#include "zlog.h"
+#include "zvulkandevice.h"
+
 namespace nim {
 
-ZVulkanRenderer::ZVulkanRenderer(ZVulkanRendererBase& rendererBase)
-    : m_rendererBase(rendererBase)
+ZVulkanRenderer::ZVulkanRenderer(Z3DRendererBase& rendererBase)
+  : Z3DPrimitiveRenderer(rendererBase)
 {
-    // Register this renderer with the renderer base
-    m_rendererBase.registerRenderer(this);
+  auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(&m_rendererBase.backend());
+  CHECK(backend != nullptr) << "ZVulkanRenderer requires a Vulkan backend";
+  (void)backend;
 }
 
-ZVulkanRenderer::~ZVulkanRenderer()
+ZVulkanRenderer::~ZVulkanRenderer() = default;
+
+void ZVulkanRenderer::render(Z3DEye eye)
 {
-    // Unregister this renderer from the renderer base
-    m_rendererBase.unregisterRenderer(this);
+  const auto extent = framebufferExtent();
+  if (extent.x == 0U || extent.y == 0U) {
+    return;
+  }
+
+  auto& cmdBuffer = commandBuffer();
+  recordRender(eye, cmdBuffer);
 }
 
-glm::mat4 ZVulkanRenderer::coordTransform() const
+void ZVulkanRenderer::renderPicking(Z3DEye eye)
 {
-    if (m_followCoordTransform) {
-        // Return the coordinate transform from the renderer base
-        return m_rendererBase.coordTransform();
-    } else {
-        // Return identity matrix if not following coordinate transform
-        return glm::mat4(1.0f);
-    }
+  const auto extent = framebufferExtent();
+  if (extent.x == 0U || extent.y == 0U) {
+    return;
+  }
+
+  auto& cmdBuffer = commandBuffer();
+  recordPicking(eye, cmdBuffer);
 }
 
-float ZVulkanRenderer::opacity() const
+Z3DRendererVulkanBackend& ZVulkanRenderer::vulkanBackend()
 {
-    if (m_followOpacity) {
-        // Return the opacity from the renderer base
-        return m_rendererBase.opacity();
-    } else {
-        // Return full opacity if not following global opacity
-        return 1.0f;
-    }
+  auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(&m_rendererBase.backend());
+  CHECK(backend != nullptr) << "Vulkan backend not active for renderer";
+  return *backend;
 }
 
-float ZVulkanRenderer::sizeScale() const
+const Z3DRendererVulkanBackend& ZVulkanRenderer::vulkanBackend() const
 {
-    if (m_followSizeScale) {
-        // Return the size scale from the renderer base
-        return m_rendererBase.sizeScale();
-    } else {
-        // Return unit scale if not following global size scale
-        return 1.0f;
-    }
+  auto* backend = dynamic_cast<const Z3DRendererVulkanBackend*>(&m_rendererBase.backend());
+  CHECK(backend != nullptr) << "Vulkan backend not active for renderer";
+  return *backend;
 }
 
-ZVulkanRenderer::PushConstants ZVulkanRenderer::preparePushConstants() const
+ZVulkanDevice& ZVulkanRenderer::device()
 {
-    PushConstants constants;
-    
-    // Get the camera from the renderer base
-    auto& camera = m_rendererBase.camera();
-    
-    // Get the matrices for the mono eye (center view)
-    glm::mat4 viewMatrix = camera.viewMatrix(MonoEye);
-    glm::mat4 projMatrix = camera.projectionMatrix(MonoEye);
-    
-    // Combine into a projection-view matrix
-    constants.projectionViewMatrix = projMatrix * viewMatrix;
-    
-    // Set the model matrix with coordinate transform
-    constants.modelMatrix = coordTransform();
-    
-    // Set other parameters
-    constants.opacity = opacity();
-    constants.sizeScale = sizeScale();
-    constants.enableLighting = m_needLighting ? 1 : 0;
-    constants.padding = 0;  // Padding for alignment
-    
-    return constants;
+  return vulkanBackend().device();
 }
 
-} // namespace nim 
+const ZVulkanDevice& ZVulkanRenderer::device() const
+{
+  return vulkanBackend().device();
+}
+
+vk::raii::CommandBuffer& ZVulkanRenderer::commandBuffer()
+{
+  return vulkanBackend().commandBuffer();
+}
+
+glm::uvec2 ZVulkanRenderer::framebufferExtent() const
+{
+  const auto& viewport = m_rendererBase.frameState().viewport;
+  return glm::uvec2(viewport.z, viewport.w);
+}
+
+} // namespace nim
+

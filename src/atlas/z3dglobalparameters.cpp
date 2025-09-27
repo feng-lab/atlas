@@ -348,42 +348,5 @@ void Z3DGlobalParameters::cameraPointsTo(const ZBBox<glm::dvec3>& bound)
   camera.setCenter(cent);
 }
 
-void Z3DGlobalParameters::populateLightingState(RendererSceneState::LightingState& lighting) const
-{
-  const int configuredCount = lightCount.get();
-  const int maxCount = static_cast<int>(lightPositions.size());
-  const int clampedCount = std::clamp(configuredCount, 0, maxCount);
-
-  lighting.lightCount = clampedCount;
-
-  lighting.positions.clear();
-  lighting.ambient.clear();
-  lighting.diffuse.clear();
-  lighting.specular.clear();
-  lighting.attenuation.clear();
-  lighting.spotCutoff.clear();
-  lighting.spotExponent.clear();
-  lighting.spotDirection.clear();
-
-  lighting.positions.reserve(clampedCount);
-  lighting.ambient.reserve(clampedCount);
-  lighting.diffuse.reserve(clampedCount);
-  lighting.specular.reserve(clampedCount);
-  lighting.attenuation.reserve(clampedCount);
-  lighting.spotCutoff.reserve(clampedCount);
-  lighting.spotExponent.reserve(clampedCount);
-  lighting.spotDirection.reserve(clampedCount);
-
-  for (int i = 0; i < clampedCount; ++i) {
-    lighting.positions.push_back(lightPositions[static_cast<size_t>(i)]->get());
-    lighting.ambient.push_back(lightAmbients[static_cast<size_t>(i)]->get());
-    lighting.diffuse.push_back(lightDiffuses[static_cast<size_t>(i)]->get());
-    lighting.specular.push_back(lightSpeculars[static_cast<size_t>(i)]->get());
-    lighting.attenuation.push_back(lightAttenuations[static_cast<size_t>(i)]->get());
-    lighting.spotCutoff.push_back(lightSpotCutoff[static_cast<size_t>(i)]->get());
-    lighting.spotExponent.push_back(lightSpotExponent[static_cast<size_t>(i)]->get());
-    lighting.spotDirection.push_back(lightSpotDirection[static_cast<size_t>(i)]->get());
-  }
-}
 
 } // namespace nim

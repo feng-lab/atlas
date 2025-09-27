@@ -3,7 +3,6 @@
 #include "zvulkancontext.h"
 #include "z3dglobalparameters.h"
 #include "zvulkandevice.h"
-#include "zvulkanrendererbase.h"
 #include "zvulkanbackgroundrenderer.h"
 #include "z3dscratchresourcepool.h"
 #include "zglmutils.h"

@@ -3,6 +3,7 @@
 
 #include "z3drenderglobalstate.h"
 #include "zlog.h"
+#include <exception>
 #include <algorithm>
 #include <utility>
 #include <vector>
@@ -44,9 +45,17 @@ void Z3DBoundedFilter::refreshRendererBackend()
       backend = createGLRendererBackend();
       break;
     case RenderBackend::Vulkan:
-      LOG_FIRST_N(WARNING, 1) << "Vulkan renderer backend not wired yet; continuing with OpenGL";
-      backend = createGLRendererBackend();
-      backendUsed = RenderBackend::OpenGL;
+      try {
+        backend = createVulkanRendererBackend();
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR) << "Failed to create Vulkan renderer backend: " << e.what();
+      }
+      if (!backend) {
+        LOG(ERROR) << "Falling back to OpenGL renderer backend";
+        backend = createGLRendererBackend();
+        backendUsed = RenderBackend::OpenGL;
+      }
       break;
   }
 
@@ -54,6 +63,8 @@ void Z3DBoundedFilter::refreshRendererBackend()
   m_rendererBase.setBackend(std::move(backend));
   m_activeBackend = backendUsed;
   m_rendererBackendInitialized = true;
+
+  onRendererBackendChanged(m_activeBackend);
 
   pushRendererParametersToBase();
   resolvePendingBounds();

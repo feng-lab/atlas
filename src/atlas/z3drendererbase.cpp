@@ -5,8 +5,6 @@
 #include "z3drendererbackend.h"
 #include "z3dcamera.h"
 #include "zlog.h"
-#include <glm/gtc/matrix_inverse.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
 #include <utility>
 

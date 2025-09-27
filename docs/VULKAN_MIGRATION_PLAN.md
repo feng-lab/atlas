@@ -11,11 +11,12 @@ This plan guides the migration of the Z3D OpenGL renderer to a Vulkan backend, i
 - Historical note: legacy `z3dvolume*` classes are no longer in use; all image/volume rendering paths live under the `z3dimg*` families and should remain the focus during migration.
 - Implementation language baseline is modern C++20; all new APIs should use standard library facilities (`std::span`, `std::variant`, etc.) rather than third-party helpers when equivalents exist.
 
-### Development Notes
+### Development Notes (CRITICAL - ALWAYS FOLLOW)
+
+These instructions are mandatory for every migration change; do not deviate from them.
 
 - You can use `cmake --build build/Release` to verify compositor changes still compile before pushing them further.
-- We do not use `z3dcanvaspainter`; ignore that file during the migration so no `Z3DRenderTarget` accessors need to leak out of `Z3DCompositorFilter` or `Z3DCompositorBase`.
-- Be careful with `git checkout` while iterating—running it mid-refactor can discard uncommitted progress we still rely on for diffing the legacy compositor.
+- **Never run `git checkout`**; we might lose progress forever.
 
 ## Important Guideline (Review Before Coding)
 
@@ -36,7 +37,7 @@ To ensure the Vulkan backend is a drop‑in replacement for the OpenGL engine (f
 Implementation approach:
 
 - Renderer API invariants: For each renderer family, define a short list of methods/parameters that must remain identical (names, value ranges, behavior). Vulkan renderers will expose the same signatures where feasible, or thin adapters will translate to Vulkan‑native settings.
-- Parameter bridging: Reuse `Z3DGlobalParameters` as the single source of truth. Vulkan renderers read the same settings (camera, fog, OIT, clip planes, devicePixelRatio, etc.) from a bridge in `ZVulkanRendererBase`.
+- Parameter bridging: Reuse `Z3DGlobalParameters` as the single source of truth. Vulkan renderers consume the identical state (`camera`, fog, OIT, clip planes, `devicePixelRatio`, etc.) through `Z3DRendererBase` powered by a Vulkan backend implementation (`Z3DRendererVulkanBackend`), keeping GPU-specific code free of duplicate scene copies.
 - Feature matching: When hardware features differ (e.g., wide lines), emulate in shaders/CPU so behavior stays consistent.
 
 Data/API Abstraction Layer
@@ -473,6 +474,12 @@ Abstraction/Reuse tasks
 - [x] Add abstract compositor interface extracted from Z3D (`z3dcompositorbase.h`).
 - [x] Implement minimal Vulkan compositor to produce RGBA readbacks (background + axis lines).
 - [x] Simplify compositor façade/readback to rely on `Z3DLocalColorBuffer` snapshots (engine screenshots now API-neutral).
+- [x] Replace `ZVulkanRendererBase` with `Z3DRendererVulkanBackend` so Vulkan shares the `Z3DRendererBase` state machinery.
+  - [x] Introduce a Vulkan `Z3DRendererBackend` implementation that wraps device/swapchain setup (`beginFrame`, `endFrame`, readback helpers).
+  - [x] Update `ZVulkanRenderer` and renderer delegates to consume `RendererFrameState`, `RendererViewState`, and `RendererSceneState` from the host `Z3DRendererBase`.
+  - [x] Switch filter/backend factories (`Z3DBoundedFilter::refreshRendererBackend`, compositor bridge) to create the Vulkan backend and drop direct `ZVulkanRendererBase` construction.
+  - [x] Delete or shim the legacy `ZVulkanRendererBase` once all call sites are migrated.
+  - [x] Hoist lighting-state assembly into `Z3DRenderGlobalState` so shared renderer state builds lighting without calling back into global parameters.
 - [ ] Expand Vulkan compositor to provide equivalent outputs (ready targets/readback).
 - [ ] Migrate engine to hold a `std::unique_ptr` to the facade and switch backend at runtime.
 - [ ] Audit filters for GL leakage and continue moving API-specific ownership into renderers/compositor.
@@ -551,4 +558,7 @@ Progress Update — Renderer Backend Abstraction (Completed)
 - Filters own POD state blocks (`RendererFrameState`, `RendererViewState`, `RendererSceneState`, `ParameterState`) and feed them to their renderers/render bases. Parameter reads no longer happen inside the renderers.
 - The global state singleton is now just a cache: filters/compositors build fresh scene/view blocks from live parameters when needed, eliminating stale lighting/camera data.
 - All OIT/dual-depth compositor passes avoid leaking global camera uniforms; fullscreen shaders receive explicit screen-space uniforms.
-- Next: surface a Vulkan backend factory, move the remaining command encoding into backend implementations, and delete the legacy `ZVulkanRendererBase` scaffolding once parity lands.
+- Next focus:
+  1. Expand the Vulkan compositor to deliver parity outputs (transparency, readbacks, OIT).
+  2. Migrate engine ownership to a backend-agnostic facade that can swap OpenGL/Vulkan at runtime.
+  3. Continue auditing filters for residual GL dependencies and move backend-specific ownership into renderer delegates.

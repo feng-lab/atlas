@@ -5,7 +5,37 @@
 #include "z3dcamera.h"
 #include "zlog.h"
 
+#include <algorithm>
+
 namespace nim {
+
+RendererSceneState::LightingState buildLightingState(const Z3DGlobalParameters& params)
+{
+  RendererSceneState::LightingState lighting;
+
+  const auto configuredCount = params.lightCount.get();
+  const auto maxCount = static_cast<int>(params.lightPositions.size());
+  const auto clampedCount = std::clamp(configuredCount, 1, maxCount);
+  lighting.lightCount = clampedCount;
+
+  const auto fill = [clampedCount](auto& destination, const auto& sources) {
+    destination.resize(static_cast<size_t>(clampedCount));
+    for (int i = 0; i < clampedCount; ++i) {
+      destination[static_cast<size_t>(i)] = sources[static_cast<size_t>(i)]->get();
+    }
+  };
+
+  fill(lighting.positions, params.lightPositions);
+  fill(lighting.ambient, params.lightAmbients);
+  fill(lighting.diffuse, params.lightDiffuses);
+  fill(lighting.specular, params.lightSpeculars);
+  fill(lighting.attenuation, params.lightAttenuations);
+  fill(lighting.spotCutoff, params.lightSpotCutoff);
+  fill(lighting.spotExponent, params.lightSpotExponent);
+  fill(lighting.spotDirection, params.lightSpotDirection);
+
+  return lighting;
+}
 
 RendererSceneState buildSceneState(const Z3DGlobalParameters& params)
 {
@@ -16,7 +46,7 @@ RendererSceneState buildSceneState(const Z3DGlobalParameters& params)
   state.transparency = static_cast<TransparencyMode>(params.transparencyMethod.associatedData());
   state.multisample = static_cast<GeometryMSAAMode>(params.geometriesMultisampleMode.associatedData());
 
-  params.populateLightingState(state.lighting);
+  state.lighting = buildLightingState(params);
 
   state.fog.mode = static_cast<FogMode>(params.fogMode.associatedData());
   state.fog.topColor = params.fogTopColor.get();
@@ -34,6 +64,11 @@ RendererViewState buildViewState(const Z3DCamera& camera)
   state.nearClip = camera.nearDist();
   state.farClip = camera.farDist();
 
+  const auto eyePosition = camera.eye();
+  const auto isPerspective = camera.isPerspectiveProjection();
+  const auto frustumNearPlaneSize = camera.frustumNearPlaneSize();
+  const auto fieldOfView = camera.fieldOfView();
+
   for (int eyeValue = LeftEye; eyeValue <= RightEye; ++eyeValue) {
     auto eye = static_cast<Z3DEye>(eyeValue);
     auto& eyeState = state.eyes[static_cast<size_t>(eye)];
@@ -44,10 +79,10 @@ RendererViewState buildViewState(const Z3DCamera& camera)
     eyeState.inverseProjectionMatrix = camera.inverseProjectionMatrix(eye);
     eyeState.normalMatrix = camera.normalMatrix(eye);
     eyeState.coordTransformNormalMatrix = glm::mat3(1.f);
-    eyeState.eyePosition = camera.eye();
-    eyeState.isPerspective = camera.isPerspectiveProjection();
-    eyeState.frustumNearPlaneSize = camera.frustumNearPlaneSize();
-    eyeState.fieldOfView = camera.fieldOfView();
+    eyeState.eyePosition = eyePosition;
+    eyeState.isPerspective = isPerspective;
+    eyeState.frustumNearPlaneSize = frustumNearPlaneSize;
+    eyeState.fieldOfView = fieldOfView;
   }
 
   return state;
