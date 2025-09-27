@@ -76,6 +76,7 @@ protected:
   glm::vec3 m_ZEnd;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
+  Z3DCamera m_axisCamera;
 };
 
 } // namespace nim

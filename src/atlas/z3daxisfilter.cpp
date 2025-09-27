@@ -133,16 +133,12 @@ std::shared_ptr<ZWidgetsGroup> Z3DAxisFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_XAxisColor, 1);
     m_widgetsGroup->addChild(m_YAxisColor, 1);
     m_widgetsGroup->addChild(m_ZAxisColor, 1);
-    std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (auto para : paras) {
-      if (para->name() == "Size Scale") {
-        m_widgetsGroup->addChild(*para, 1);
-      } else if (para->name() == "Rendering Method") {
-        m_widgetsGroup->addChild(*para, 3);
-      } else if (para->name() == "Opacity") {
-        m_widgetsGroup->addChild(*para, 3);
-      }
-    }
+    auto& rendererParas = m_rendererParameters;
+    m_widgetsGroup->addChild(rendererParas.sizeScale, 1);
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+    m_widgetsGroup->addChild(rendererParas.renderMethod, 3);
+#endif
+    m_widgetsGroup->addChild(rendererParas.opacity, 3);
     m_widgetsGroup->addChild(m_fontName, 4);
     m_widgetsGroup->addChild(m_fontSize, 4);
     m_widgetsGroup->addChild(m_fontSoftEdgeScale, 4);
@@ -160,17 +156,17 @@ void Z3DAxisFilter::renderOpaque(Z3DEye eye)
 {
   prepareData(eye);
   {
-    const QSignalBlocker blocker(m_rendererBase.coordTransformPara());
-    m_rendererBase.coordTransformPara().set(glm::mat4(globalCamera().rotateMatrix(eye)));
+    const QSignalBlocker blocker(m_rendererParameters.coordTransform);
+    m_rendererParameters.coordTransform.set(glm::mat4(m_globalParameters.camera.get().rotateMatrix(eye)));
 
-    glm::uvec4 viewport = m_rendererBase.viewport();
+    const glm::uvec4& viewport = currentViewport();
     GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
     glViewport(viewport.x, viewport.y, size, size);
 
     if (m_mode.get() == "Arrow") {
-      m_rendererBase.render(eye, m_arrowRenderer, m_fontRenderer);
+      renderWithStateAndCamera(eye, m_axisCamera, m_arrowRenderer, m_fontRenderer);
     } else {
-      m_rendererBase.render(eye, m_lineRenderer, m_fontRenderer);
+      renderWithStateAndCamera(eye, m_axisCamera, m_lineRenderer, m_fontRenderer);
     }
 
     glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
@@ -180,7 +176,7 @@ void Z3DAxisFilter::renderOpaque(Z3DEye eye)
 void Z3DAxisFilter::prepareData(Z3DEye eye)
 {
   m_textPositions.clear();
-  glm::mat3 rotMatrix = globalCamera().rotateMatrix(eye);
+  glm::mat3 rotMatrix = m_globalParameters.camera.get().rotateMatrix(eye);
   m_XEnd = rotMatrix * glm::vec3(256.f, 0.f, 0.f);
   m_YEnd = rotMatrix * glm::vec3(0.f, 256.f, 0.f);
   m_ZEnd = rotMatrix * glm::vec3(0.f, 0.f, 256.f);
@@ -211,7 +207,8 @@ void Z3DAxisFilter::setupCamera()
   camera.setNearDist(distance - radius - 1);
   camera.setFarDist(distance + radius);
 
-  m_rendererBase.setCamera(camera);
+  m_axisCamera = camera;
+  invalidateViewState();
 
   m_tailPosAndTailRadius.clear();
   m_headPosAndHeadRadius.clear();

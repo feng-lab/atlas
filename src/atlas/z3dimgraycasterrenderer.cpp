@@ -9,6 +9,7 @@
 #include "zcancellation.h"
 #include "zstatisticsutils.h"
 #include "z3dscratchresourcepool.h"
+#include "z3drenderglobalstate.h"
 #include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
@@ -89,7 +90,7 @@ void Z3DImgRaycasterRenderer::ensureRaycastAccumulators(Z3DEye eye)
   CHECK_GT(m_outputSize.x, 0u);
   CHECK_GT(m_outputSize.y, 0u);
 
-  auto& pool = m_rendererBase.globalParas().scratchPool();
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
     if (!lease || lease.renderTarget->size() != m_outputSize) {
       lease.release();
@@ -237,7 +238,7 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
   m_quads.clear();
 
   // Acquire entry/exit RT from scratch pool (2-layer RGBA32F array)
-  m_entryExitLease = m_rendererBase.globalParas().scratchPool().acquireEntryExitRenderTarget(size, 2);
+  m_entryExitLease = Z3DRenderGlobalState::instance().scratchPool().acquireEntryExitRenderTarget(size, 2);
 
   glEnable(GL_CULL_FACE);
   const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
@@ -248,7 +249,7 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
   glDrawBuffers(1, g_drawBuffers);
   glClear(GL_COLOR_BUFFER_BIT);
   glCullFace(flipped ? GL_BACK : GL_FRONT);
-  m_rendererBase.setViewport(size);
+  m_rendererBase.frameState().updateViewportData(size);
   m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
   m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
   m_entryExitLease.renderTarget->release();
@@ -259,7 +260,7 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
   glDrawBuffers(1, g_drawBuffers);
   glClear(GL_COLOR_BUFFER_BIT);
   glCullFace(flipped ? GL_FRONT : GL_BACK);
-  m_rendererBase.setViewport(size);
+  m_rendererBase.frameState().updateViewportData(size);
   m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
   m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
   m_entryExitLease.renderTarget->release();
@@ -500,6 +501,8 @@ bool Z3DImgRaycasterRenderer::hasVisibleRendering() const
 
 void Z3DImgRaycasterRenderer::render2DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs)
 {
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+
   m_sc2dImageShader.bind();
   m_rendererBase.setGlobalShaderParameters(m_sc2dImageShader, eye);
 
@@ -512,9 +515,7 @@ void Z3DImgRaycasterRenderer::render2DImage(Z3DEye eye, const std::vector<size_t
     }
 
   } else {
-    layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
-      m_outputSize,
-      static_cast<uint32_t>(visibleIdxs.size()));
+    layerLease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize, static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";
     for (size_t j = 0; j < visibleIdxs.size(); ++j) {
       layerLease.renderTarget->attachSlice(j);
@@ -553,20 +554,21 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     return 0.5;
   }
 
-  auto cancellationToken = m_rendererBase.globalParas().cancellationSource
-                             ? m_rendererBase.globalParas().cancellationSource->getToken()
-                             : folly::CancellationToken();
+  const auto& sceneState = m_rendererBase.sceneState();
+  const auto& viewState = m_rendererBase.viewState();
+  const auto& eyeState = viewState.eyes[eye];
+  const auto& monoEyeState = viewState.eyes[MonoEye];
+  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  const float devicePixelRatio = sceneState.devicePixelRatio;
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
 
-  float n = m_rendererBase.camera().nearDist();
-  glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_outputSize);
-  float ze_to_screen_pixel_voxel_size =
-    -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * m_rendererBase.globalParas().devicePixelRatio.get();
+  float n = viewState.nearClip;
+  glm::vec2 pixelEyeSpaceSize = monoEyeState.frustumNearPlaneSize / glm::vec2(m_outputSize);
+  float ze_to_screen_pixel_voxel_size = -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * devicePixelRatio;
 
   Z3DScratchResourcePool::RenderTargetLease layerLease;
   if (visibleIdxs.size() > 1) {
-    layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
-      m_outputSize,
-      static_cast<uint32_t>(visibleIdxs.size()));
+    layerLease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize, static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";
   }
   size_t idx = 0;
@@ -577,7 +579,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     processEventsAndMaybeCancel(cancellationToken);
 
     // Acquire single-attachment Block ID RT for slice-of-3D pass
-    auto blockLease = m_rendererBase.globalParas().scratchPool().acquireBlockIdRenderTarget(m_outputSize, 1);
+    auto blockLease = scratchPool.acquireBlockIdRenderTarget(m_outputSize, 1);
     if (blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4 != m_blockIDs.size()) {
       m_blockIDs.resize(blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4);
       // VLOG(1) << m_blockIDs.size();
@@ -593,9 +595,8 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
 
       m_image3DSliceWithTransferfunBlockIDsShader.setUniform("ze_to_screen_pixel_voxel_size",
                                                              ze_to_screen_pixel_voxel_size);
-      m_image3DSliceWithTransferfunBlockIDsShader.setProjectionViewMatrixUniform(
-        m_rendererBase.camera().projectionViewMatrix(eye));
-      m_image3DSliceWithTransferfunBlockIDsShader.setViewMatrixUniform(m_rendererBase.camera().viewMatrix(eye));
+      m_image3DSliceWithTransferfunBlockIDsShader.setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
+      m_image3DSliceWithTransferfunBlockIDsShader.setViewMatrixUniform(eyeState.viewMatrix);
 
       // render block ids
       const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
@@ -637,9 +638,8 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     m_image3DSliceWithTransferfunShader.bind();
 
     m_image3DSliceWithTransferfunShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
-    m_image3DSliceWithTransferfunShader.setProjectionViewMatrixUniform(
-      m_rendererBase.camera().projectionViewMatrix(eye));
-    m_image3DSliceWithTransferfunShader.setViewMatrixUniform(m_rendererBase.camera().viewMatrix(eye));
+    m_image3DSliceWithTransferfunShader.setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
+    m_image3DSliceWithTransferfunShader.setViewMatrixUniform(eyeState.viewMatrix);
 
     if (visibleIdxs.size() == 1) {
       m_img->bindFullResRenderShader(m_image3DSliceWithTransferfunShader, c);
@@ -698,7 +698,7 @@ void Z3DImgRaycasterRenderer::render2DSliceOf3DImageFast(Z3DEye eye, const std::
       renderTriangleList(m_VAO, m_scVolumeSliceWithTransferfunShader, quad);
     }
   } else {
-    layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
+    layerLease = Z3DRenderGlobalState::instance().scratchPool().acquireLayerArrayRenderTarget(
       m_outputSize,
       static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";
@@ -733,6 +733,11 @@ void Z3DImgRaycasterRenderer::render2DSliceOf3DImageFast(Z3DEye eye, const std::
 double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs, bool progressive)
 {
   // VLOG(1) << "render3DImage";
+  const auto& sceneState = m_rendererBase.sceneState();
+  const auto& viewState = m_rendererBase.viewState();
+  const auto& monoEyeState = viewState.eyes[MonoEye];
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+
   Z3DScratchResourcePool::RenderTargetLease layerLease;
   if (progressive && m_channelIdx[eye] < 0) {
     // Acquire and clear the persistent layer array lease used across rounds
@@ -745,9 +750,8 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     // Initialize progressive accumulation state
     m_channelIdx[eye] = 0;
 
-    m_progressiveLayerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
-      m_outputSize,
-      static_cast<uint32_t>(visibleIdxs.size()));
+    m_progressiveLayerLease =
+      scratchPool.acquireLayerArrayRenderTarget(m_outputSize, static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";
     for (size_t idx = 0; idx < visibleIdxs.size(); ++idx) {
       m_progressiveLayerLease.renderTarget->attachSlice(idx);
@@ -760,19 +764,17 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 
   double progress = 1;
 
-  auto cancellationToken = m_rendererBase.globalParas().cancellationSource
-                             ? m_rendererBase.globalParas().cancellationSource->getToken()
-                             : folly::CancellationToken();
+  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
 
-  float n = m_rendererBase.camera().nearDist();
-  float f = m_rendererBase.camera().farDist();
-  glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_outputSize);
+  float n = viewState.nearClip;
+  float f = viewState.farClip;
+  glm::vec2 pixelEyeSpaceSize = monoEyeState.frustumNearPlaneSize / glm::vec2(m_outputSize);
   // http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
   //  zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
   float ze_to_zw_a = f * n / (f - n);
   float ze_to_zw_b = 0.5f * (f + n) / (f - n) + 0.5f;
   float ze_to_screen_pixel_voxel_size =
-    -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * m_rendererBase.globalParas().devicePixelRatio.get();
+    -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * sceneState.devicePixelRatio;
   VLOG(1) << n << " " << f << " " << ze_to_screen_pixel_voxel_size << " " << pixelEyeSpaceSize << " " << ze_to_zw_a
           << " " << ze_to_zw_b;
 
@@ -838,7 +840,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     }
   } else {
     ensureRaycastAccumulators(eye);
-    layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
+    layerLease = Z3DRenderGlobalState::instance().scratchPool().acquireLayerArrayRenderTarget(
       m_outputSize,
       static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";
@@ -937,9 +939,8 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
                                                        float ze_to_zw_b,
                                                        float ze_to_screen_pixel_voxel_size)
 {
-  auto cancellationToken = m_rendererBase.globalParas().cancellationSource
-                             ? m_rendererBase.globalParas().cancellationSource->getToken()
-                             : folly::CancellationToken();
+  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
 
   LOG(INFO) << "channel " << c << " round " << round;
   ZBenchTimer bt(fmt::format("render 3D image channel {} round {}", c, round));
@@ -982,7 +983,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   }
 
   // Acquire multi-attachment Block ID RT via scratch pool
-  auto blockLease = m_rendererBase.globalParas().scratchPool().acquireBlockIdRenderTarget(lastTarget->size());
+  auto blockLease = scratchPool.acquireBlockIdRenderTarget(lastTarget->size());
   blockLease.renderTarget->bind();
   glDrawBuffers(static_cast<GLsizei>(blockLease.attachments), g_drawBuffers);
   glClear(GL_COLOR_BUFFER_BIT);
@@ -1139,8 +1140,9 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vecto
 {
   m_scRaycasterShader.bind();
 
-  float n = m_rendererBase.camera().nearDist();
-  float f = m_rendererBase.camera().farDist();
+  const auto& viewState = m_rendererBase.viewState();
+  float n = viewState.nearClip;
+  float f = viewState.farClip;
   // http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
   //  zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
   float a = f * n / (f - n);
@@ -1169,7 +1171,7 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vecto
     renderScreenQuad(m_VAO, m_scRaycasterShader);
   } else {
     CHECK(visibleIdxs.size() > 1);
-    layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
+    layerLease = Z3DRenderGlobalState::instance().scratchPool().acquireLayerArrayRenderTarget(
       m_outputSize,
       static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";

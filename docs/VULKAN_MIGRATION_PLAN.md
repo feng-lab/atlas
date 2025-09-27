@@ -385,16 +385,28 @@ This API sketch keeps filter headers clean, mirrors today’s execution order, a
 **Renderer Base / Primitive Strategy (in progress)**
 
 - Treat `Z3DBoundedFilter` as the sole owner of global parameters; renderer bases receive precomputed POD snapshots instead of reading Qt parameters directly. This keeps filters as the bridge and makes renderer headers backend-neutral.
-- Split renderer state into explicit structs:
+- [x] Split renderer state into explicit structs:
   - `RendererFrameState` (viewport, frame index, progressive flags)
   - `RendererViewState` (camera matrices, eye-specific data)
   - `RendererSceneState` (lighting, fog, multisample policy, transparency mode)
   These structs live in the filter layer and are cached/compared there before dispatching to the backend.
-- `Z3DRendererBase` becomes a lean cache for these structs plus core transforms/material scalars; it emits change signals when the structs mutate but exposes no GL helpers.
-- Backend implementations (`Z3DRendererGLBackend`, future `ZVulkanRendererBackend`) consume the cached structs to populate their API-specific resources (uniforms, descriptors, push constants) via a shared `RendererBackendContext` interface.
+- [x] `Z3DRendererBase` becomes a lean cache for these structs plus core transforms/material scalars; it emits change signals when the structs mutate but exposes no GL helpers.
+- Introduced filter-owned `RendererParameters` with a `ParameterState` hand-off into `Z3DRendererBase`, so snapshot updates stay backend-neutral while existing GL change signals remain intact.
+- [x] Backend implementations (`Z3DRendererGLBackend`, future `ZVulkanRendererBackend`) consume the cached structs to populate their API-specific resources (uniforms, descriptors, push constants) via a shared `RendererBackendContext` interface.
 - Primitive renderers switch from direct `gl*` calls to backend-agnostic commands (`updateResources(RendererFrameState&)`, `recordOpaque(CommandList&)`, etc.). The GL backend provides a thin command list that still executes immediate GL calls, while the Vulkan backend records command buffers.
-- Clip-plane, fog, and shader-header logic move into the GL backend; Vulkan derives pipeline variants from the same state structs without relying on GLSL macro injection.
-- Adopt lightweight generation counters to avoid redundant uploads: filters bump a counter when a state struct changes, and primitive renderers only resend data when the generation increases.
+- [x] Clip-plane, fog, and shader-header logic move into the GL backend; Vulkan derives pipeline variants from the same state structs without relying on GLSL macro injection.
+- Added a default `Z3DRendererBackend` interface with a GL implementation that `Z3DRendererBase` instantiates, so filters stay API-neutral while legacy GLSL helpers live in the backend.
+- Renderer snapshots now keep device pixel ratio plus multisample/transparency enums; scratch-pool and cancellation-token access live on the shared `Z3DRenderGlobalState`, so renderers grab them on demand without bloating the per-frame state.
+- Upcoming refactor: migrate camera and viewport ownership out of `Z3DRendererBase`. Filters (or other callers like `Z3DCanvasPainter`) will own the authoritative camera, precompute per-eye view/projection data and viewport matrices when assembling `RendererViewState`/`RendererFrameState`, then hand those snapshots to the base. This requires:
+  * Auditing all `rendererBase.camera()`/`rendererBase.viewport()` users and switching them to the filter’s camera or to the snapshot values.
+  * Extending the frame/view state structs to carry any derived matrices currently produced by the base (`viewportMatrix`, normal matrices, etc.).
+  * Removing `m_camera`, `m_sharedCamera`, `m_viewport`, and the legacy helpers from `Z3DRendererBase` once all call sites consume the snapshots.
+- **Next session TODOs / status:**
+  1. [x] Sweep the remaining call sites to drop `Z3DRendererBase::globalParas()`/legacy parameter queries in favour of the new frame/view/scene state snapshots; the transitional accessor on `Z3DRendererBase` has been removed.
+  2. [x] Thread device pixel ratio through renderer snapshots and route scratch-pool/cancellation access via the shared infrastructure instead of `Z3DGlobalParameters`.
+  3. [ ] Start introducing the backend-neutral command interface for primitive renderers (`updateResources`, `recordOpaque`/`recordTransparent`) and migrate an initial renderer (e.g., `Z3DImage2DRenderer`) as the spike.
+- [x] Adopt lightweight generation counters to avoid redundant uploads: filters bump a counter when a state struct changes, and primitive renderers only resend data when the generation increases. (Tuning still needed to skip identical snapshots.)
+- [x] Extended the snapshot hand-off to canvas/raycaster utility paths so every render call now pushes frame/view/scene state; `Z3DRendererBase` no longer falls back to `Z3DGlobalParameters` when populating shader uniforms.
 
 **Refactor actions (incremental, keep GL live while migrating)**
 
@@ -406,9 +418,9 @@ This API sketch keeps filter headers clean, mirrors today’s execution order, a
    - Transition filter headers to forward declarations only, keeping backend includes in implementation files.
 
 3. **Clarify Z3DRendererBase ownership (todo)**
-   - [ ] Relocated renderer-facing UI parameters (`Coord Transform`, `Size Scale`, `Opacity`, material controls, legacy render method) from `Z3DRendererBase` into `Z3DBoundedFilter`, exposing them via `rendererParameters()` so filters own lifetime, widgets, and serialization.
-   - [ ] Trimmed `Z3DRendererBase` down to plain rendering state (matrices, floats, colors) with lightweight setters/getters and a `RenderMethod` enum; setters now emit the existing change signals and legacy invalidations without depending on `ZParameter`.
-   - [ ] Updated filters and widgets to consume the filter-owned parameters (`coordTransformPara()`, `rendererParameters()`), ensuring programmatic changes flow through the filter parameters before hitting the renderer base.
+   - [x] Relocated renderer-facing UI parameters (`Coord Transform`, `Size Scale`, `Opacity`, material controls, legacy render method) from `Z3DRendererBase` into `Z3DBoundedFilter`, exposing them via `rendererParameters()` so filters own lifetime, widgets, and serialization.
+   - [x] Trimmed `Z3DRendererBase` down to plain rendering state (matrices, floats, colors) with lightweight setters/getters and a `RenderMethod` enum; setters now emit the existing change signals and legacy invalidations without depending on `ZParameter`.
+- [x] Updated filters and widgets to consume the filter-owned parameters directly; the helper accessors on `Z3DBoundedFilter` were removed so call sites now reach into `m_rendererParameters` (and its `coordTransform`) explicitly before handing data to the renderer base.
    - [ ] Follow-up: audit any non-`Z3DBoundedFilter` renderers for lingering direct `Z3DRendererBase` parameter coupling and document additional Vulkan expectations for the new setters if they arise.
 4. **Normalize resource handles and readbacks**
    - Replace direct FBO/texture access in picking/screenshots with backend-managed readback tickets. Filters request readbacks through `Z3DCompositorBase`; each backend maps the ticket to its native transfer path (GL PBO, Vulkan staging image, etc.).
@@ -526,3 +538,17 @@ Progress Update — Image Filter GL Decoupling (Completed)
   - Raycaster and slicer manage `GL_BLEND` and `GL_DEPTH_TEST` in their render paths.
 - Bound box overlay depth/blend (temporary):
   - The image filter enables depth/blend only around `renderBoundBox()` to ensure proper depth; this can be centralized in `Z3DBoundedFilter` later.
+
+Progress Update — Renderer Scene Defaults (Completed)
+
+- `RendererSceneState` seeds the same default lighting, fog, and multisample configuration as `Z3DGlobalParameters`.
+  - Ensures freshly constructed renderers provide `LIGHT_COUNT > 0` before filters sync state, maintaining shader compatibility during refactors.
+  - Scene ambient, transparency mode, and MSAA defaults now match the UI baseline so both backends start from identical state.
+
+Progress Update — Renderer Backend Abstraction (In Progress)
+
+- `Z3DRendererBase` now talks to a pluggable `Z3DRendererBackend`; the first backend implementation (`createGLRendererBackend`) mirrors the legacy GLSL contract while keeping clip-plane handling and shader headers intact.
+- Renderers receive POD state blocks (`RendererFrameState`, `RendererViewState`, `RendererSceneState`, `ParameterState`) populated by `Z3DBoundedFilter::syncRendererState`; they no longer reach back into parameter objects on every draw.
+- `Z3DRenderGlobalState` caches camera- and scene-wide state so filters and the compositor share the same lighting/fog configuration. The compositor now explicitly refreshes the cached scene block before categorising filters to avoid stale transparency or MSAA settings.
+- Backend selection remains runtime-configurable (`RenderBackend` parameter). Vulkan delegates still fall back to the GL backend until we finish porting their command emission.
+- Next actions: surface Vulkan-specific backend in `createGLRendererBackend`, port more renderers to backend-agnostic uniforms/descriptors, and retire duplicated logic in `ZVulkanRendererBase` once the shared base covers the full contract.

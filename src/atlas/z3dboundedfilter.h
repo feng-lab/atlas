@@ -6,6 +6,19 @@
 #include "z3dmeshrenderer.h"
 #include "z3dsphererenderer.h"
 #include "z3darrowrenderer.h"
+#include "z3dglobalparameters.h"
+#include "z3drendererstates.h"
+#include "z3drenderglobalstate.h"
+#include "z3dtransformparameter.h"
+#include "znumericparameter.h"
+#include "zoptionparameter.h"
+
+#include <array>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <span>
+#include <vector>
 
 namespace nim {
 
@@ -20,6 +33,20 @@ public:
   {
     InheritState, // Do not modify GL state; caller is responsible
     OverlayAlphaDepth // Enable depth test + alpha blend locally
+  };
+
+  struct RendererParameters
+  {
+    RendererParameters();
+
+    Z3DTransformParameter coordTransform;
+    ZStringIntOptionParameter renderMethod;
+    ZFloatParameter sizeScale;
+    ZFloatParameter opacity;
+    ZBoolParameter filterNotFrontFacing;
+    ZVec4Parameter materialAmbient;
+    ZVec4Parameter materialSpecular;
+    ZFloatParameter materialShininess;
   };
 
   explicit Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* parent = nullptr);
@@ -48,37 +75,22 @@ public:
 
   virtual void setViewport(glm::uvec2 viewport)
   {
-    m_rendererBase.setViewport(viewport);
+    setViewport(glm::uvec4(0, 0, viewport.x, viewport.y));
   }
 
   virtual void setViewport(glm::uvec4 viewport)
   {
-    m_rendererBase.setViewport(viewport);
-  }
-
-  Z3DCamera& camera()
-  {
-    return m_rendererBase.camera();
-  }
-
-  Z3DCamera& globalCamera()
-  {
-    return m_rendererBase.globalCamera();
-  }
-
-  Z3DCameraParameter& globalCameraPara()
-  {
-    return m_rendererBase.globalCameraPara();
+    m_currentViewport = viewport;
   }
 
   Z3DPickingManager& pickingManager()
   {
-    return m_rendererBase.globalParas().pickingManager;
+    return m_globalParameters.pickingManager;
   }
 
   Z3DTrackballInteractionHandler& interactionHandler()
   {
-    return m_rendererBase.globalParas().interactionHandler;
+    return m_globalParameters.interactionHandler;
   }
 
   virtual void setShaderHookType(Z3DRendererBase::ShaderHookType t)
@@ -101,6 +113,13 @@ public:
     return m_rendererBase.shaderHookPara();
   }
 
+  void invalidateViewState() {}
+
+  [[nodiscard]] const glm::uvec4& currentViewport() const
+  {
+    return m_currentViewport;
+  }
+
   [[nodiscard]] const ZBBox<glm::dvec3>& axisAlignedBoundBox() const
   {
     return m_axisAlignedBoundBox;
@@ -113,12 +132,12 @@ public:
 
   [[nodiscard]] glm::mat4 coordTransform() const
   {
-    return m_rendererBase.coordTransform();
+    return m_rendererParameters.coordTransform.get();
   }
 
   [[nodiscard]] glm::mat4 inverseCoordTransform() const
   {
-    return m_rendererBase.inverseCoordTransform();
+    return glm::inverse(m_rendererParameters.coordTransform.get());
   }
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
@@ -165,54 +184,54 @@ public:
   // bound voxels in world coordinate
   [[nodiscard]] glm::vec3 worldLUF() const
   {
-    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLUF());
+    return glm::applyMatrix(coordTransform(), physicalLUF());
   }
 
   [[nodiscard]] glm::vec3 worldRDB() const
   {
-    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRDB());
+    return glm::applyMatrix(coordTransform(), physicalRDB());
   }
 
   [[nodiscard]] glm::vec3 worldLDF() const
   {
-    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLDF());
+    return glm::applyMatrix(coordTransform(), physicalLDF());
   }
 
   [[nodiscard]] glm::vec3 worldRDF() const
   {
-    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRDF());
+    return glm::applyMatrix(coordTransform(), physicalRDF());
   }
 
   [[nodiscard]] glm::vec3 worldRUF() const
   {
-    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRUF());
+    return glm::applyMatrix(coordTransform(), physicalRUF());
   }
 
   [[nodiscard]] glm::vec3 worldLUB() const
   {
-    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLUB());
+    return glm::applyMatrix(coordTransform(), physicalLUB());
   }
 
   [[nodiscard]] glm::vec3 worldLDB() const
   {
-    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLDB());
+    return glm::applyMatrix(coordTransform(), physicalLDB());
   }
 
   [[nodiscard]] glm::vec3 worldRUB() const
   {
-    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRUB());
+    return glm::applyMatrix(coordTransform(), physicalRUB());
   }
 
   [[nodiscard]] virtual bool hasOpaque(Z3DEye) const
   {
-    return m_rendererBase.opacity() == 1.f;
+    return m_rendererParameters.opacity.get() == 1.f;
   }
 
   virtual void renderOpaque(Z3DEye) {}
 
   [[nodiscard]] virtual bool hasTransparent(Z3DEye) const
   {
-    return m_rendererBase.opacity() < 1.f;
+    return m_rendererParameters.opacity.get() < 1.f;
   }
 
   virtual void renderTransparent(Z3DEye) {}
@@ -250,7 +269,19 @@ Q_SIGNALS:
 
   void objVisibleChanged(bool v);
 
+  void rendererCoordTransformChanged();
+
+  void rendererSizeScaleChanged();
+
 protected:
+  void applyRendererCoordTransform(const glm::mat4& transform);
+
+  void applyRendererSizeScale(float scale);
+
+  void refreshRendererBackend();
+
+  void pushRendererParametersToBase();
+
   void updateBoundBox();
 
   // implement this to empty function if clip planes are not needed
@@ -295,6 +326,13 @@ protected:
   virtual void expandCutRange();
 
 private:
+  enum class BoundsDirtyFlag : uint8_t
+  {
+    None = 0,
+    AxisAligned = 1u << 0,
+    Full = 1u << 1
+  };
+
   void updateAxisAlignedBoundBox();
 
   void updateNotTransformedBoundBox();
@@ -308,6 +346,15 @@ private:
   void onBoundBoxLineWidthChanged();
 
   void onSelectionBoundBoxLineWidthChanged();
+
+  void scheduleBoundsUpdate(BoundsDirtyFlag flag);
+
+  void resolvePendingBounds();
+
+  void renderWithStateAndCameraAndCoordTransformImpl(Z3DEye eye,
+                                                     const Z3DCamera& camera,
+                                                     const glm::mat4& transform,
+                                                     std::span<Z3DPrimitiveRenderer*> renderers);
 
   void invalidateHandle()
   {
@@ -325,7 +372,64 @@ private:
   void updateSelectedHandle(int handleIdx);
 
 protected:
+  template<typename... Args>
+  void renderWithState(Z3DEye eye, Args&&... args)
+  {
+    syncRendererState(eye);
+    m_rendererBase.render(eye, std::forward<Args>(args)...);
+  }
+
+  template<typename... Args>
+  void renderPickingWithState(Z3DEye eye, Args&&... args)
+  {
+    syncRendererState(eye);
+    m_rendererBase.renderPicking(eye, std::forward<Args>(args)...);
+  }
+
+  template<typename... Args>
+  void renderWithStateAndCamera(Z3DEye eye, const Z3DCamera& camera, Args&&... args)
+  {
+    syncRendererState(eye);
+    auto previousState = m_rendererBase.pushViewStateFromCamera(camera);
+    m_rendererBase.render(eye, std::forward<Args>(args)...);
+    m_rendererBase.restoreViewState(previousState);
+  }
+
+  template<typename... Args>
+  void renderPickingWithStateAndCamera(Z3DEye eye, const Z3DCamera& camera, Args&&... args)
+  {
+    syncRendererState(eye);
+    auto previousState = m_rendererBase.pushViewStateFromCamera(camera);
+    m_rendererBase.renderPicking(eye, std::forward<Args>(args)...);
+    m_rendererBase.restoreViewState(previousState);
+  }
+
+  template<typename... Args>
+  void renderWithStateAndCameraAndCoordTransform(Z3DEye eye,
+                                                 const Z3DCamera& camera,
+                                                 const glm::mat4& transform,
+                                                 Args&... args)
+  {
+    std::array<Z3DPrimitiveRenderer*, sizeof...(Args)> rendererArray{std::addressof(args)...};
+    renderWithStateAndCameraAndCoordTransformImpl(
+      eye,
+      camera,
+      transform,
+      std::span<Z3DPrimitiveRenderer*>{rendererArray.data(), rendererArray.size()});
+  }
+
+  void syncRendererState(Z3DEye eye);
+
+  RendererParameters m_rendererParameters;
+  Z3DGlobalParameters& m_globalParameters;
+  Z3DRendererBase::ParameterState m_rendererParameterState;
+  RendererFrameState m_rendererFrameState;
+  bool m_rendererBackendInitialized = false;
+  RenderBackend m_activeBackend = RenderBackend::OpenGL;
+  RenderBackend m_requestedBackend = RenderBackend::OpenGL;
+  uint8_t m_boundsDirtyMask = 0;
   Z3DRendererBase m_rendererBase;
+  glm::uvec4 m_currentViewport{0};
 
   Z3DLineRenderer m_baseBoundBoxRenderer;
   Z3DLineRenderer m_selectionBoundBoxRenderer;
@@ -384,6 +488,8 @@ private:
   bool m_transformEnabled;
 
   bool m_handleValid;
+
+  void updateFrameState();
 };
 
 } // namespace nim

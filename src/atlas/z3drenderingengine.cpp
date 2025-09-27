@@ -18,6 +18,8 @@
 #include "z3dregionannotationview.h"
 #include "zimgformat.h"
 #include "zvideoencoder.h"
+#include "z3drenderglobalstate.h"
+#include "z3dscratchresourcepool.h"
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
@@ -209,6 +211,15 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
   detachCanvas();
   VLOG(1) << "canvas detached";
   getGLFocus();
+
+  // Ensure all GPU resources release their pooled leases before we tear down the
+  // scratch pool. The leases live inside views, filters, and the compositor, so
+  // explicitly reset them while the GL context is current.
+  m_3dObjViews.clear();
+  m_compositor.reset();
+  m_networkEvaluator.reset();
+
+  Z3DRenderGlobalState::instance().resetScratchPool();
 }
 
 const ZDoc& Z3DRenderingEngine::doc() const
@@ -999,6 +1010,7 @@ void Z3DRenderingEngine::initGL()
 #endif
   }
   m_context->makeCurrent();
+  Z3DRenderGlobalState::instance().setScratchPool(std::make_unique<Z3DScratchResourcePool>());
 
   glbinding::initialize(0, [this](const char* name) {
     return m_context->getProcAddress(name);
@@ -1135,8 +1147,8 @@ void Z3DRenderingEngine::getGLFocus()
 
 void Z3DRenderingEngine::renderFast(bool stereo)
 {
-  if (m_globalParas->cancellationSource) {
-    m_globalParas->cancellationSource->requestCancellation();
+  if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
+    Z3DRenderGlobalState::instance().requestCancellation();
     LOG(INFO) << "cancel rendering, schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
     return;
@@ -1166,14 +1178,14 @@ void Z3DRenderingEngine::renderFast(bool stereo)
 void Z3DRenderingEngine::render(bool stereo)
 {
   CHECK(!m_isRendering);
-  CHECK(!m_globalParas->cancellationSource);
+  CHECK(!Z3DRenderGlobalState::instance().hasCancellationSource());
 
   VLOG(1) << "render";
   getGLFocus();
   try {
-    m_globalParas->cancellationSource = std::make_unique<folly::CancellationSource>();
+    auto& cancellationSource = Z3DRenderGlobalState::instance().ensureCancellationSource();
     while (m_progress < 1.0) {
-      m_progress = m_networkEvaluator->process(stereo, true, m_globalParas->cancellationSource->getToken());
+      m_progress = m_networkEvaluator->process(stereo, true, cancellationSource.getToken());
       Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
     }
   }
@@ -1185,7 +1197,7 @@ void Z3DRenderingEngine::render(bool stereo)
     LOG(INFO) << e.what();
   }
   Q_EMIT progressChanged(100);
-  m_globalParas->cancellationSource.reset();
+  Z3DRenderGlobalState::instance().resetCancellationSource();
 }
 
 Z3DLocalColorBuffer* Z3DRenderingEngine::monoReadyLocalBuffer() const

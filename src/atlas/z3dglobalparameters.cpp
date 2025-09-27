@@ -3,7 +3,9 @@
 #include "zwidgetsgroup.h"
 #include "z3dgpuinfo.h"
 #include "z3dcameracontrolwidget.h"
-#include "z3dscratchresourcepool.h"
+#include "z3drendererstates.h"
+#include <algorithm>
+#include <utility>
 
 namespace nim {
 
@@ -34,20 +36,21 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   renderBackend.select(enumToQString(RenderBackend::OpenGL));
   // addParameter(renderBackend);
 
-  geometriesMultisampleMode.addOptions("None", "2x2");
-  geometriesMultisampleMode.select("2x2");
+  geometriesMultisampleMode.clearOptions();
+  geometriesMultisampleMode.addOptionsWithData(
+    std::make_pair(QStringLiteral("None"), static_cast<int>(GeometryMSAAMode::None)),
+    std::make_pair(QStringLiteral("2x2"), static_cast<int>(GeometryMSAAMode::MSAA2x2)));
+  geometriesMultisampleMode.select(QStringLiteral("2x2"));
   addParameter(geometriesMultisampleMode);
 
-  transparencyMethod.addOption("Blend Delayed");
-  transparencyMethod.addOption("Blend No Depth Mask");
-  transparencyMethod.select("Blend Delayed");
-
-  transparencyMethod.addOption("Weighted Average");
-  transparencyMethod.select("Weighted Average");
-
-  transparencyMethod.addOption("Weighted Blended");
-
-  transparencyMethod.addOption("Dual Depth Peeling");
+  transparencyMethod.clearOptions();
+  transparencyMethod.addOptionsWithData(
+    std::make_pair(QStringLiteral("Blend Delayed"), static_cast<int>(TransparencyMode::BlendDelayed)),
+    std::make_pair(QStringLiteral("Blend No Depth Mask"), static_cast<int>(TransparencyMode::BlendNoDepthMask)),
+    std::make_pair(QStringLiteral("Weighted Average"), static_cast<int>(TransparencyMode::WeightedAverage)),
+    std::make_pair(QStringLiteral("Weighted Blended"), static_cast<int>(TransparencyMode::WeightedBlended)),
+    std::make_pair(QStringLiteral("Dual Depth Peeling"), static_cast<int>(TransparencyMode::DualDepthPeeling)));
+  transparencyMethod.select(QStringLiteral("Weighted Average"));
   // weightedBlendedDepthScale.setStyle("SPINBOX");
 
   //  if (Z3DGpuInfoInstance.isLinkedListSupported())
@@ -65,6 +68,32 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   addParameter(globalXCut);
   addParameter(globalYCut);
   addParameter(globalZCut);
+
+  connect(&camera, &Z3DCameraParameter::valueChanged, this, &Z3DGlobalParameters::markGlobalViewStateDirty);
+  connect(&sceneAmbient, &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&weightedBlendedDepthScale,
+          &ZFloatParameter::valueChanged,
+          this,
+          &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&devicePixelRatio, &ZFloatParameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&transparencyMethod,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&geometriesMultisampleMode,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&lightCount, &ZIntParameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&fogMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&fogTopColor, &ZVec3Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&fogBottomColor, &ZVec3Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&fogRange, &ZIntSpanParameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&fogDensity, &ZFloatParameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
+  connect(&renderBackend,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &Z3DGlobalParameters::markGlobalSceneStateDirty);
 
   // lights
   QString lightname = "Key Light";
@@ -189,44 +218,39 @@ Z3DGlobalParameters::Z3DGlobalParameters()
 
   addParameter(lightCount);
 
-  m_lightPositionArray.resize(lightPositions.size());
-  m_lightAmbientArray.resize(lightPositions.size());
-  m_lightDiffuseArray.resize(lightPositions.size());
-  m_lightSpecularArray.resize(lightPositions.size());
-  m_lightAttenuationArray.resize(lightPositions.size());
-  m_lightSpotCutoffArray.resize(lightPositions.size());
-  m_lightSpotExponentArray.resize(lightPositions.size());
-  m_lightSpotDirectionArray.resize(lightPositions.size());
-  updateLightsArray();
-
   for (size_t i = 0; i < lightPositions.size(); ++i) {
     lightAmbients[i]->setStyle("COLOR");
     lightDiffuses[i]->setStyle("COLOR");
     lightSpeculars[i]->setStyle("COLOR");
     addParameter(*lightPositions[i]);
-    connect(lightPositions[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
+    connect(lightPositions[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
     addParameter(*lightAmbients[i]);
-    connect(lightAmbients[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
+    connect(lightAmbients[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
     addParameter(*lightDiffuses[i]);
-    connect(lightDiffuses[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
+    connect(lightDiffuses[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
     addParameter(*lightSpeculars[i]);
-    connect(lightSpeculars[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
+    connect(lightSpeculars[i].get(), &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
     addParameter(*lightAttenuations[i]);
-    connect(lightAttenuations[i].get(), &ZVec3Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
+    connect(lightAttenuations[i].get(), &ZVec3Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
     addParameter(*lightSpotCutoff[i]);
-    connect(lightSpotCutoff[i].get(), &ZFloatParameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
+    connect(lightSpotCutoff[i].get(), &ZFloatParameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
     addParameter(*lightSpotExponent[i]);
-    connect(lightSpotExponent[i].get(), &ZFloatParameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
+    connect(lightSpotExponent[i].get(), &ZFloatParameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
     addParameter(*lightSpotDirection[i]);
-    connect(lightSpotDirection[i].get(), &ZVec3Parameter::valueChanged, this, &Z3DGlobalParameters::updateLightsArray);
+    connect(lightSpotDirection[i].get(), &ZVec3Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
   }
 
   sceneAmbient.setStyle("COLOR");
   addParameter(sceneAmbient);
 
   // fog
-  fogMode.addOptions("None", "Linear", "Exponential", "Squared Exponential");
-  fogMode.select("None");
+  fogMode.clearOptions();
+  fogMode.addOptionsWithData(
+    std::make_pair(QStringLiteral("None"), static_cast<int>(FogMode::None)),
+    std::make_pair(QStringLiteral("Linear"), static_cast<int>(FogMode::Linear)),
+    std::make_pair(QStringLiteral("Exponential"), static_cast<int>(FogMode::Exponential)),
+    std::make_pair(QStringLiteral("Squared Exponential"), static_cast<int>(FogMode::ExponentialSquared)));
+  fogMode.select(QStringLiteral("None"));
   addParameter(fogMode);
   fogTopColor.setStyle("COLOR");
   fogBottomColor.setStyle("COLOR");
@@ -238,12 +262,12 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   addParameter(fogRange);
   addParameter(fogDensity);
 
+  markGlobalSceneStateDirty();
+  markGlobalViewStateDirty();
+
   devicePixelRatio.setEnabled(false);
 
   pickingManager.setDevicePixelRatio(devicePixelRatio.get());
-
-  // Initialize scratch resource pool
-  m_scratchPool = std::make_unique<Z3DScratchResourcePool>();
 }
 
 void Z3DGlobalParameters::setDevicePixelRatio(float f)
@@ -293,20 +317,6 @@ std::shared_ptr<ZWidgetsGroup> Z3DGlobalParameters::widgetsGroup(bool includeCam
   return includeCamera ? m_widgetsGrp : m_widgetsGrpNoCamera;
 }
 
-void Z3DGlobalParameters::updateLightsArray()
-{
-  for (size_t i = 0; i < lightPositions.size(); ++i) {
-    m_lightPositionArray[i] = lightPositions[i]->get();
-    m_lightAmbientArray[i] = lightAmbients[i]->get();
-    m_lightDiffuseArray[i] = lightDiffuses[i]->get();
-    m_lightSpecularArray[i] = lightSpeculars[i]->get();
-    m_lightAttenuationArray[i] = lightAttenuations[i]->get();
-    m_lightSpotCutoffArray[i] = lightSpotCutoff[i]->get();
-    m_lightSpotExponentArray[i] = lightSpotExponent[i]->get();
-    m_lightSpotDirectionArray[i] = lightSpotDirection[i]->get();
-  }
-}
-
 void Z3DGlobalParameters::cameraFocusesOn(double x, double y, double z, double radius)
 {
   ZBBox<glm::dvec3> bound(glm::dvec3(x, y, z) - radius, glm::dvec3(x, y, z) + radius);
@@ -338,20 +348,41 @@ void Z3DGlobalParameters::cameraPointsTo(const ZBBox<glm::dvec3>& bound)
   camera.setCenter(cent);
 }
 
-Z3DScratchResourcePool& Z3DGlobalParameters::scratchPool()
+void Z3DGlobalParameters::populateLightingState(RendererSceneState::LightingState& lighting) const
 {
-  return *m_scratchPool;
-}
+  const int configuredCount = lightCount.get();
+  const int maxCount = static_cast<int>(lightPositions.size());
+  const int clampedCount = std::clamp(configuredCount, 0, maxCount);
 
-const Z3DScratchResourcePool& Z3DGlobalParameters::scratchPool() const
-{
-  return *m_scratchPool;
-}
+  lighting.lightCount = clampedCount;
 
-void Z3DGlobalParameters::trimScratchMemory()
-{
-  if (m_scratchPool) {
-    m_scratchPool->trim();
+  lighting.positions.clear();
+  lighting.ambient.clear();
+  lighting.diffuse.clear();
+  lighting.specular.clear();
+  lighting.attenuation.clear();
+  lighting.spotCutoff.clear();
+  lighting.spotExponent.clear();
+  lighting.spotDirection.clear();
+
+  lighting.positions.reserve(clampedCount);
+  lighting.ambient.reserve(clampedCount);
+  lighting.diffuse.reserve(clampedCount);
+  lighting.specular.reserve(clampedCount);
+  lighting.attenuation.reserve(clampedCount);
+  lighting.spotCutoff.reserve(clampedCount);
+  lighting.spotExponent.reserve(clampedCount);
+  lighting.spotDirection.reserve(clampedCount);
+
+  for (int i = 0; i < clampedCount; ++i) {
+    lighting.positions.push_back(lightPositions[static_cast<size_t>(i)]->get());
+    lighting.ambient.push_back(lightAmbients[static_cast<size_t>(i)]->get());
+    lighting.diffuse.push_back(lightDiffuses[static_cast<size_t>(i)]->get());
+    lighting.specular.push_back(lightSpeculars[static_cast<size_t>(i)]->get());
+    lighting.attenuation.push_back(lightAttenuations[static_cast<size_t>(i)]->get());
+    lighting.spotCutoff.push_back(lightSpotCutoff[static_cast<size_t>(i)]->get());
+    lighting.spotExponent.push_back(lightSpotExponent[static_cast<size_t>(i)]->get());
+    lighting.spotDirection.push_back(lightSpotDirection[static_cast<size_t>(i)]->get());
   }
 }
 

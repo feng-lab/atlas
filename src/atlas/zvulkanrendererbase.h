@@ -2,6 +2,7 @@
 
 #include "zvulkan.h"
 #include "z3dcamera.h"
+#include "z3drendererstates.h"
 #include "zglmutils.h"
 #include <memory>
 #include <set>
@@ -165,6 +166,11 @@ public:
     return m_globals;
   }
 
+  const RendererSceneState& sceneState() const
+  {
+    return m_sceneState;
+  }
+
   void syncFromGlobalParameters();
 
 protected:
@@ -201,6 +207,8 @@ private:
   // Clipping planes
   std::vector<glm::vec4> m_clipPlanes;
   bool m_clipEnabled = false;
+
+  RendererSceneState m_sceneState;
 
   Z3DGlobalParameters* m_globals = nullptr;
 };

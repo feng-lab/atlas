@@ -2,6 +2,7 @@
 
 #include "z3dglobalparameters.h"
 #include "z3dcontext.h"
+#include "z3drenderglobalstate.h"
 #include "zviewsettinginterface.h"
 #include "zbbox.h"
 #include <QDir>
@@ -210,9 +211,9 @@ public:
 
   void cancelLongRendering()
   {
-    if (m_globalParas->cancellationSource) {
+    if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
       // VLOG(1) << "request cancel";
-      m_globalParas->cancellationSource->requestCancellation();
+      Z3DRenderGlobalState::instance().requestCancellation();
     }
   }
 

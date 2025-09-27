@@ -28,22 +28,22 @@ public:
 
   [[nodiscard]] float opacity() const
   {
-    return m_rendererBase.opacity();
+    return m_rendererParameters.opacity.get();
   }
 
   void setOpacity(float v)
   {
-    m_rendererBase.setOpacity(v);
+    m_rendererParameters.opacity.set(v);
   }
 
   [[nodiscard]] float sizeScale() const
   {
-    return m_rendererBase.sizeScale();
+    return m_rendererParameters.sizeScale.get();
   }
 
   void setSizeScale(float s)
   {
-    m_rendererBase.setSizeScale(s);
+    m_rendererParameters.sizeScale.set(s);
   }
 
 protected:

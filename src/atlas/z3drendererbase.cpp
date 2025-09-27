@@ -2,239 +2,146 @@
 
 #include "z3dgl.h"
 #include "z3dprimitiverenderer.h"
-#include "z3dgpuinfo.h"
-#include "z3dshaderprogram.h"
+#include "z3drendererbackend.h"
+#include "z3dcamera.h"
 #include "zlog.h"
-#include <absl/strings/str_cat.h>
+#include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <algorithm>
+#include <utility>
 
 namespace nim {
 
-Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* parent)
-  : QObject(parent)
-  , m_globalParas(globalParas)
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  , m_displayList(0)
-  , m_pickingDisplayList(0)
-#endif
-  , m_coordTransform("Coord Transform", glm::mat4(1.f))
-  //, m_coordXScale("X Scale", 1.0f, 0.1f, 50.f)
-  //, m_coordYScale("Y Scale", 1.0f, 0.1f, 50.f)
-  //, m_coordZScale("Z Scale", 1.0f, 0.1f, 50.f)
-  , m_renderMethod("Rendering Method")
-  , m_sizeScale("Size Scale", 1.f, .001f, std::numeric_limits<float>::max())
-  , m_opacity("Opacity", 1.0f, .0f, 1.f)
-  , m_filterNotFrontFacing("Filter Not Front Facing", true)
-  , m_materialAmbient("Material Ambient", glm::vec4(0.1f, .1f, .1f, 1.f))
-  , m_materialSpecular("Material Specular", glm::vec4(1.f, 1.f, 1.f, 1.f))
-  , m_materialShininess("Material Shininess", 100.f, 1.f, 200.f)
-  , m_hasCustomCamera(false)
-  , m_viewport(0)
+Z3DRendererBase::Z3DRendererBase(ParameterState& parameterState,
+                                 RendererFrameState& frameState,
+                                 RendererViewState& viewState,
+                                 RendererSceneState& sceneState)
+  : m_parameters(parameterState)
+  , m_frameState(frameState)
+  , m_viewState(viewState)
+  , m_sceneState(sceneState)
   , m_clipEnabled(true)
   , m_shaderHookType(ShaderHookType::Normal)
 {
-  m_renderMethod.addOptions("GLSL", "Old openGL");
-  m_renderMethod.select("GLSL");
-
-  m_sizeScale.setSingleStep(0.001);
-  m_sizeScale.setDecimal(3);
-  m_sizeScale.setStyle("SPINBOX");
-
-  addParameter(m_coordTransform);
-  addParameter(m_sizeScale);
+  setBackend(createGLRendererBackend());
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  addParameter(m_renderMethod);
+  m_legacyGLState = std::make_unique<LegacyGLState>();
 #endif
-  addParameter(m_opacity);
+}
 
-  m_materialAmbient.setStyle("COLOR");
-  m_materialSpecular.setStyle("COLOR");
-  addParameter(m_materialAmbient);
-  addParameter(m_materialSpecular);
-  addParameter(m_materialShininess);
+RendererViewState Z3DRendererBase::pushViewStateFromCamera(const Z3DCamera& camera)
+{
+  const RendererViewState previous = m_viewState;
+  m_viewState = buildViewStateFromCamera(camera, m_parameters.coordTransform);
+  return previous;
+}
 
-  connect(&m_globalParas.lightCount, &ZIntParameter::valueChanged, this, &Z3DRendererBase::compile);
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  connect(&m_globalParas.lightCount, &ZIntParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
-#endif
+void Z3DRendererBase::restoreViewState(const RendererViewState& state)
+{
+  m_viewState = state;
+}
 
-  connect(&m_coordTransform,
-          &Z3DTransformParameter::valueChanged,
-          this,
-          &Z3DRendererBase::makeCoordTransformNormalMatrix);
-  connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this, &Z3DRendererBase::coordTransformChanged);
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  connect(&m_coordTransform, &Z3DTransformParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
-  connect(&m_coordTransform,
-          &Z3DTransformParameter::valueChanged,
-          this,
-          &Z3DRendererBase::invalidatePickingDisplayList);
-#endif
-  connect(&m_sizeScale, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::sizeScaleChanged);
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  connect(&m_sizeScale, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
-  connect(&m_sizeScale, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidatePickingDisplayList);
-  connect(&m_opacity, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
-  connect(&m_materialShininess, &ZFloatParameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
-  connect(&m_materialSpecular, &ZVec4Parameter::valueChanged, this, &Z3DRendererBase::invalidateDisplayList);
+RendererViewState Z3DRendererBase::buildViewStateFromCamera(const Z3DCamera& camera, const glm::mat4& coordTransform)
+{
+  RendererViewState state;
+  state.nearClip = camera.nearDist();
+  state.farClip = camera.farDist();
 
-  for (size_t i = 0; i < m_globalParas.lightPositions.size(); ++i) {
-    connect(m_globalParas.lightPositions[i].get(),
-            &ZVec4Parameter::valueChanged,
-            this,
-            &Z3DRendererBase::invalidateDisplayList);
-    connect(m_globalParas.lightAmbients[i].get(),
-            &ZVec4Parameter::valueChanged,
-            this,
-            &Z3DRendererBase::invalidateDisplayList);
-    connect(m_globalParas.lightDiffuses[i].get(),
-            &ZVec4Parameter::valueChanged,
-            this,
-            &Z3DRendererBase::invalidateDisplayList);
-    connect(m_globalParas.lightSpeculars[i].get(),
-            &ZVec4Parameter::valueChanged,
-            this,
-            &Z3DRendererBase::invalidateDisplayList);
-    connect(m_globalParas.lightAttenuations[i].get(),
-            &ZVec3Parameter::valueChanged,
-            this,
-            &Z3DRendererBase::invalidateDisplayList);
-    connect(m_globalParas.lightSpotCutoff[i].get(),
-            &ZFloatParameter::valueChanged,
-            this,
-            &Z3DRendererBase::invalidateDisplayList);
-    connect(m_globalParas.lightSpotExponent[i].get(),
-            &ZFloatParameter::valueChanged,
-            this,
-            &Z3DRendererBase::invalidateDisplayList);
-    connect(m_globalParas.lightSpotDirection[i].get(),
-            &ZVec3Parameter::valueChanged,
-            this,
-            &Z3DRendererBase::invalidateDisplayList);
+  for (int eyeValue = LeftEye; eyeValue <= RightEye; ++eyeValue) {
+    auto eye = static_cast<Z3DEye>(eyeValue);
+    auto& eyeState = state.eyes[static_cast<size_t>(eye)];
+    eyeState.viewMatrix = camera.viewMatrix(eye);
+    eyeState.projectionMatrix = camera.projectionMatrix(eye);
+    eyeState.projectionViewMatrix = camera.projectionViewMatrix(eye);
+    eyeState.inverseViewMatrix = camera.inverseViewMatrix(eye);
+    eyeState.inverseProjectionMatrix = camera.inverseProjectionMatrix(eye);
+    eyeState.normalMatrix = camera.normalMatrix(eye);
+    eyeState.eyePosition = camera.eye();
+    eyeState.isPerspective = camera.isPerspectiveProjection();
+    eyeState.frustumNearPlaneSize = camera.frustumNearPlaneSize();
+    eyeState.fieldOfView = camera.fieldOfView();
   }
+
+  for (int eyeValue = LeftEye; eyeValue <= RightEye; ++eyeValue) {
+    auto eye = static_cast<Z3DEye>(eyeValue);
+    auto& eyeState = state.eyes[static_cast<size_t>(eye)];
+    const glm::mat4 combined = eyeState.viewMatrix * coordTransform;
+    const glm::mat3 combined3(combined);
+    eyeState.coordTransformNormalMatrix = glm::transpose(glm::inverse(combined3));
+  }
+
+  return state;
+}
+
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+
+struct Z3DRendererBase::LegacyGLState
+{
+  GLuint displayList = 0;
+  GLuint pickingDisplayList = 0;
+  std::set<Z3DPrimitiveRenderer*> lastRenderingState;
+  std::set<Z3DPrimitiveRenderer*> lastPickingRenderingState;
+};
+
+Z3DRendererBase::LegacyGLState& Z3DRendererBase::legacyGL()
+{
+  DCHECK(m_legacyGLState != nullptr);
+  return *m_legacyGLState;
+}
+
+const Z3DRendererBase::LegacyGLState& Z3DRendererBase::legacyGL() const
+{
+  DCHECK(m_legacyGLState != nullptr);
+  return *m_legacyGLState;
+}
+
 #endif
 
-  // fog
-  connect(&m_globalParas.fogMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DRendererBase::compile);
+void Z3DRendererBase::setBackend(std::unique_ptr<Z3DRendererBackend> backend)
+{
+  CHECK(backend != nullptr) << "Renderer backend must not be null";
+  m_backend = std::move(backend);
+}
 
-  makeCoordTransformNormalMatrix();
-  connect(&m_globalParas.camera,
-          &Z3DCameraParameter::valueChanged,
-          this,
-          &Z3DRendererBase::makeCoordTransformNormalMatrix);
+Z3DRendererBackend& Z3DRendererBase::backend()
+{
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  return *m_backend;
+}
+
+const Z3DRendererBackend& Z3DRendererBase::backend() const
+{
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  return *m_backend;
 }
 
 void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye eye)
 {
-  shader.setScreenDimUniform(glm::vec2(m_viewport.z, m_viewport.w));
-  shader.setScreenDimRCPUniform(1.f / glm::vec2(m_viewport.z, m_viewport.w));
-  shader.setCameraPositionUniform(camera().eye());
-  shader.setViewMatrixUniform(camera().viewMatrix(eye));
-  shader.setViewMatrixInverseUniform(camera().inverseViewMatrix(eye));
-  shader.setProjectionMatrixUniform(camera().projectionMatrix(eye));
-  shader.setProjectionMatrixInverseUniform(camera().inverseProjectionMatrix(eye));
-  shader.setNormalMatrixUniform(camera().normalMatrix(eye));
-  shader.setViewportMatrixUniform(m_viewportMatrix);
-  shader.setViewportMatrixInverseUniform(m_inverseViewportMatrix);
-  shader.setProjectionViewMatrixUniform(camera().projectionViewMatrix(eye));
-
-  shader.setGammaUniform(2.f);
-
-  shader.setSizeScaleUniform(m_sizeScale.get());
-  shader.setPosTransformUniform(m_coordTransform.get());
-  shader.setPosTransformNormalMatrixUniform(m_coordTransformNormalMatrices[eye]);
-
-  shader.setLightsPositionUniform(m_globalParas.lightPositionArray(), m_globalParas.lightCount.get());
-  shader.setLightsAmbientUniform(m_globalParas.lightAmbientArray(), m_globalParas.lightCount.get());
-  shader.setLightsDiffuseUniform(m_globalParas.lightDiffuseArray(), m_globalParas.lightCount.get());
-  shader.setLightsSpecularUniform(m_globalParas.lightSpecularArray(), m_globalParas.lightCount.get());
-  shader.setLightsSpotCutoffUniform(m_globalParas.lightSpotCutoffArray(), m_globalParas.lightCount.get());
-  shader.setLightsAttenuationUniform(m_globalParas.lightAttenuationArray(), m_globalParas.lightCount.get());
-  shader.setLightsSpotExponentUniform(m_globalParas.lightSpotExponentArray(), m_globalParas.lightCount.get());
-  shader.setLightsSpotDirectionUniform(m_globalParas.lightSpotDirectionArray(), m_globalParas.lightCount.get());
-
-  shader.setMaterialSpecularUniform(m_materialSpecular.get());
-  shader.setMaterialShininessUniform(m_materialShininess.get());
-  shader.setMaterialAmbientUniform(m_materialAmbient.get());
-  shader.setOrthoUniform(camera().isPerspectiveProjection() ? 0.f : 1.f);
-  shader.setSceneAmbientUniform(m_globalParas.sceneAmbient.get());
-  shader.setAlphaUniform(m_opacity.get());
-
-  if (!m_globalParas.fogMode.isSelected("None")) {
-    shader.setFogColorTopUniform(m_globalParas.fogTopColor.get());
-    shader.setFogColorBottomUniform(m_globalParas.fogBottomColor.get());
-  }
-  // #define M_LOG2E     1.44269504088896340735992468100189214   /* log2(e)        */
-  if (m_globalParas.fogMode.isSelected("Linear")) {
-    shader.setFogEndUniform(static_cast<GLfloat>((m_globalParas.fogRange.get().y)));
-    shader.setFogScaleUniform(
-      static_cast<GLfloat>(1.f / (m_globalParas.fogRange.get().y - m_globalParas.fogRange.get().x)));
-  } else if (m_globalParas.fogMode.isSelected("Exponential")) {
-    shader.setFogDensityLog2eUniform(m_globalParas.fogDensity.get() * 1.44269504088896340735992468100189214f);
-  } else if (m_globalParas.fogMode.isSelected("Squared Exponential")) {
-    shader.setFogDensityDensityLog2eUniform(m_globalParas.fogDensity.get() * m_globalParas.fogDensity.get() *
-                                            1.44269504088896340735992468100189214f);
-  }
-
-  shader.setClipPlanesUniform(m_clipPlanes.data(), m_clipPlanes.size());
+  backend().setGlobalShaderParameters(*this, shader, eye);
 }
 
 void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram* shader, Z3DEye eye)
 {
-  setGlobalShaderParameters(*shader, eye);
+  CHECK(shader != nullptr) << "Shader pointer must not be null";
+  backend().setGlobalShaderParameters(*this, *shader, eye);
+}
+
+void Z3DRendererBase::markRenderDataDirty()
+{
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  invalidateDisplayList();
+  invalidatePickingDisplayList();
+#endif
 }
 
 std::string Z3DRendererBase::generateHeader() const
 {
-  std::string glslVer =
-    fmt::format("{}{}", Z3DGpuInfo::instance().glslMajorVersion(), Z3DGpuInfo::instance().glslMinorVersion());
-  if (glslVer.size() < 3U) {
-    glslVer.push_back('0');
-  }
-
-  std::string header;
-  header.reserve(256);
-
-  fmt::format_to(std::back_inserter(header), "#version {}\n", glslVer);
-  absl::StrAppend(&header, "#define lowp\n#define mediump\n#define highp\n");
-  fmt::format_to(std::back_inserter(header), "#define GLSL_VERSION {}\n", glslVer);
-  fmt::format_to(std::back_inserter(header), "#define LIGHT_COUNT {}\n", m_globalParas.lightCount.get());
-
-  if (!m_clipPlanes.empty()) {
-    absl::StrAppend(&header, "#define HAS_CLIP_PLANE\n");
-  }
-  fmt::format_to(std::back_inserter(header), "#define CLIP_PLANE_COUNT {}\n", m_clipPlanes.size());
-
-  if (m_globalParas.fogMode.isSelected("Linear")) {
-    absl::StrAppend(&header, "#define USE_LINEAR_FOG\n");
-  } else if (m_globalParas.fogMode.isSelected("Exponential")) {
-    absl::StrAppend(&header, "#define USE_EXPONENTIAL_FOG\n");
-  } else if (m_globalParas.fogMode.isSelected("Squared Exponential")) {
-    absl::StrAppend(&header, "#define USE_SQUARED_EXPONENTIAL_FOG\n");
-  }
-
-  return header;
+  return backend().generateHeader(*this);
 }
 
 std::string Z3DRendererBase::generateGeomHeader() const
 {
-  std::string glslVer =
-    fmt::format("{}{}", Z3DGpuInfo::instance().glslMajorVersion(), Z3DGpuInfo::instance().glslMinorVersion());
-  if (glslVer.size() < 3U) {
-    glslVer.push_back('0');
-  }
-
-  std::string header;
-  header.reserve(128);
-
-  fmt::format_to(std::back_inserter(header), "#version {}\n", glslVer);
-  fmt::format_to(std::back_inserter(header), "#define GLSL_VERSION {}\n", glslVer);
-
-  if (!m_clipPlanes.empty()) {
-    absl::StrAppend(&header, "#define HAS_CLIP_PLANE\n");
-  }
-  fmt::format_to(std::back_inserter(header), "#define CLIP_PLANE_COUNT {}\n", m_clipPlanes.size());
-
-  return header;
+  return backend().generateGeomHeader(*this);
 }
 
 void Z3DRendererBase::registerRenderer(Z3DPrimitiveRenderer* renderer)
@@ -257,28 +164,10 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
   m_clipPlanes.clear();
   m_doubleClipPlanes.clear();
   if (clipPlanes && !clipPlanes->empty()) {
-    glm::mat4 itCoordTrans = glm::inverse(glm::transpose(m_coordTransform.get()));
+    glm::mat4 itCoordTrans = glm::inverse(glm::transpose(m_parameters.coordTransform));
     for (auto& clipPlane : *clipPlanes) {
       m_clipPlanes.push_back(itCoordTrans * clipPlane);
     }
-  }
-  if (m_globalParas.globalXCut.lowerValue() != m_globalParas.globalXCut.minimum()) {
-    m_clipPlanes.emplace_back(1., 0., 0., -m_globalParas.globalXCut.lowerValue());
-  }
-  if (m_globalParas.globalXCut.upperValue() != m_globalParas.globalXCut.maximum()) {
-    m_clipPlanes.emplace_back(-1., 0., 0., m_globalParas.globalXCut.upperValue());
-  }
-  if (m_globalParas.globalYCut.lowerValue() != m_globalParas.globalYCut.minimum()) {
-    m_clipPlanes.emplace_back(0., 1., 0., -m_globalParas.globalYCut.lowerValue());
-  }
-  if (m_globalParas.globalYCut.upperValue() != m_globalParas.globalYCut.maximum()) {
-    m_clipPlanes.emplace_back(0., -1., 0., m_globalParas.globalYCut.upperValue());
-  }
-  if (m_globalParas.globalZCut.lowerValue() != m_globalParas.globalZCut.minimum()) {
-    m_clipPlanes.emplace_back(0., 0., 1., -m_globalParas.globalZCut.lowerValue());
-  }
-  if (m_globalParas.globalZCut.upperValue() != m_globalParas.globalZCut.maximum()) {
-    m_clipPlanes.emplace_back(0., 0., -1., m_globalParas.globalZCut.upperValue());
   }
   size_t nNewClipPlanes = m_clipPlanes.size();
   if (nNewClipPlanes != nOldClipPlanes) { // need to recompile shader to define or undefine HAS_CLIP_PLANE
@@ -347,35 +236,32 @@ void Z3DRendererBase::render(Z3DEye eye,
 void Z3DRendererBase::render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  if (m_renderMethod.isSelected("Old openGL")) {
+  if (m_parameters.renderMethod == RenderMethod::LegacyOpenGL) {
+    const auto& eyeState = m_viewState.eyes[static_cast<size_t>(eye)];
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
-    glLoadMatrixf(glm::value_ptr(getProjectionMatrix(eye)));
+    glLoadMatrixf(glm::value_ptr(eyeState.projectionMatrix));
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
-    glLoadMatrixf(glm::value_ptr(getViewMatrix(eye)));
+    glLoadMatrixf(glm::value_ptr(eyeState.viewMatrix));
 
-    if (!useDisplayList()) {
-      renderInstant();
-      glMatrixMode(GL_PROJECTION);
-      glPopMatrix();
-      glMatrixMode(GL_MODELVIEW);
-      glPopMatrix();
-      return;
-    }
+    if (!useDisplayList(renderers)) {
+      renderInstant(renderers);
+    } else {
+      // check if render state changed and we need to regenerate
+      // display list
+      auto& legacy = legacyGL();
+      if (legacy.displayList != 0 && legacy.lastRenderingState != m_renderers) {
+        invalidateDisplayList();
+      }
 
-    // check if render state changed and we need to regenerate
-    // display list
-    if (m_displayList != 0 && m_lastOpenglRenderingState != m_renderers) {
-      invalidateDisplayList();
-    }
+      if (legacy.displayList == 0) {
+        generateDisplayList(renderers);
+      }
 
-    if (m_displayList == 0) {
-      generateDisplayList(renderers);
-    }
-
-    if (glIsList(m_displayList)) {
-      glCallList(m_displayList);
+      if (glIsList(legacy.displayList)) {
+        glCallList(legacy.displayList);
+      }
     }
 
     glMatrixMode(GL_PROJECTION);
@@ -426,32 +312,33 @@ void Z3DRendererBase::renderPicking(Z3DEye eye,
 void Z3DRendererBase::renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  if (m_renderMethod.isSelected("Old openGL")) {
+  if (m_parameters.renderMethod == RenderMethod::LegacyOpenGL) {
+    const auto& eyeState = m_viewState.eyes[static_cast<size_t>(eye)];
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
-    glLoadMatrixf(glm::value_ptr(getProjectionMatrix(eye)));
+    glLoadMatrixf(glm::value_ptr(eyeState.projectionMatrix));
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
-    glLoadMatrixf(glm::value_ptr(getViewMatrix(eye)));
+    glLoadMatrixf(glm::value_ptr(eyeState.viewMatrix));
 
-    if (!useDisplayList()) {
-      renderPickingInstant();
-      return;
-    }
+    if (!useDisplayList(renderers)) {
+      renderPickingInstant(renderers);
+    } else {
+      // check if render state changed and we need to regenerate
+      // display list
+      auto& legacy = legacyGL();
+      if (legacy.pickingDisplayList != 0 && legacy.lastPickingRenderingState != m_renderers) {
+        invalidatePickingDisplayList();
+      }
 
-    // check if render state changed and we need to regenerate
-    // display list
-    if (m_pickingDisplayList != 0 && m_lastOpenglPickingRenderingState != m_renderers) {
-      invalidatePickingDisplayList();
-    }
+      if (legacy.pickingDisplayList == 0) {
+        generatePickingDisplayList(renderers);
+      }
 
-    if (m_pickingDisplayList == 0) {
-      generatePickingDisplayList(renderers);
-    }
-
-    // render display list
-    if (glIsList(m_pickingDisplayList)) {
-      glCallList(m_pickingDisplayList);
+      // render display list
+      if (glIsList(legacy.pickingDisplayList)) {
+        glCallList(legacy.pickingDisplayList);
+      }
     }
 
     glMatrixMode(GL_PROJECTION);
@@ -469,26 +356,30 @@ void Z3DRendererBase::renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRe
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DRendererBase::generateDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
-  if ((bool)glIsList(m_displayList)) {
-    glDeleteLists(m_displayList, 1);
+  auto& legacy = legacyGL();
+  if ((bool)glIsList(legacy.displayList)) {
+    glDeleteLists(legacy.displayList, 1);
   }
 
-  m_displayList = glGenLists(1);
-  glNewList(m_displayList, GL_COMPILE);
+  legacy.displayList = glGenLists(1);
+  glNewList(legacy.displayList, GL_COMPILE);
   renderInstant(renderers);
   glEndList();
+  legacy.lastRenderingState = m_renderers;
 }
 
 void Z3DRendererBase::generatePickingDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
-  if ((bool)glIsList(m_pickingDisplayList)) {
-    glDeleteLists(m_pickingDisplayList, 1);
+  auto& legacy = legacyGL();
+  if ((bool)glIsList(legacy.pickingDisplayList)) {
+    glDeleteLists(legacy.pickingDisplayList, 1);
   }
 
-  m_pickingDisplayList = glGenLists(1);
-  glNewList(m_pickingDisplayList, GL_COMPILE);
+  legacy.pickingDisplayList = glGenLists(1);
+  glNewList(legacy.pickingDisplayList, GL_COMPILE);
   renderPickingInstant(renderers);
   glEndList();
+  legacy.lastPickingRenderingState = m_renderers;
 }
 
 void Z3DRendererBase::renderInstant(const std::vector<Z3DPrimitiveRenderer*>& renderers)
@@ -501,77 +392,28 @@ void Z3DRendererBase::renderInstant(const std::vector<Z3DPrimitiveRenderer*>& re
     glLoadIdentity();
 
     glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-    glLightfv(GL_LIGHT0, GL_AMBIENT, glm::value_ptr(m_globalParas.lightAmbients[0]->get()));
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, glm::value_ptr(m_globalParas.lightDiffuses[0]->get()));
-    glLightfv(GL_LIGHT0, GL_SPECULAR, glm::value_ptr(m_globalParas.lightSpeculars[0]->get()));
-    glLightfv(GL_LIGHT0, GL_POSITION, glm::value_ptr(m_globalParas.lightPositions[0]->get()));
-    glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, glm::value_ptr(m_globalParas.lightSpotDirection[0]->get()));
-    glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, m_globalParas.lightSpotExponent[0]->get());
-    glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, m_globalParas.lightSpotCutoff[0]->get());
-    glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, m_globalParas.lightAttenuations[0]->get().x);
-    glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, m_globalParas.lightAttenuations[0]->get().y);
-    glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, m_globalParas.lightAttenuations[0]->get().z);
+    const auto& lighting = m_sceneState.lighting;
+    const int lightCount = std::max(0, std::min(lighting.lightCount, static_cast<int>(lighting.positions.size())));
 
-    if (m_globalParas.lightCount.get() > 1) {
-      glEnable(GL_LIGHT1);
-      glLightfv(GL_LIGHT1, GL_AMBIENT, glm::value_ptr(m_globalParas.lightAmbients[1]->get()));
-      glLightfv(GL_LIGHT1, GL_DIFFUSE, glm::value_ptr(m_globalParas.lightDiffuses[1]->get()));
-      glLightfv(GL_LIGHT1, GL_SPECULAR, glm::value_ptr(m_globalParas.lightSpeculars[1]->get()));
-      glLightfv(GL_LIGHT1, GL_POSITION, glm::value_ptr(m_globalParas.lightPositions[1]->get()));
-      glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, glm::value_ptr(m_globalParas.lightSpotDirection[1]->get()));
-      glLightf(GL_LIGHT1, GL_SPOT_EXPONENT, m_globalParas.lightSpotExponent[1]->get());
-      glLightf(GL_LIGHT1, GL_SPOT_CUTOFF, m_globalParas.lightSpotCutoff[1]->get());
-      glLightf(GL_LIGHT1, GL_CONSTANT_ATTENUATION, m_globalParas.lightAttenuations[1]->get().x);
-      glLightf(GL_LIGHT1, GL_LINEAR_ATTENUATION, m_globalParas.lightAttenuations[1]->get().y);
-      glLightf(GL_LIGHT1, GL_QUADRATIC_ATTENUATION, m_globalParas.lightAttenuations[1]->get().z);
+    for (int lightIndex = 0; lightIndex < lightCount; ++lightIndex) {
+      const GLenum lightEnum = static_cast<GLenum>(GL_LIGHT0 + lightIndex);
+      glEnable(lightEnum);
+      glLightfv(lightEnum, GL_AMBIENT, glm::value_ptr(lighting.ambient[static_cast<size_t>(lightIndex)]));
+      glLightfv(lightEnum, GL_DIFFUSE, glm::value_ptr(lighting.diffuse[static_cast<size_t>(lightIndex)]));
+      glLightfv(lightEnum, GL_SPECULAR, glm::value_ptr(lighting.specular[static_cast<size_t>(lightIndex)]));
+      glLightfv(lightEnum, GL_POSITION, glm::value_ptr(lighting.positions[static_cast<size_t>(lightIndex)]));
+      glLightfv(lightEnum, GL_SPOT_DIRECTION, glm::value_ptr(lighting.spotDirection[static_cast<size_t>(lightIndex)]));
+      glLightf(lightEnum, GL_SPOT_EXPONENT, lighting.spotExponent[static_cast<size_t>(lightIndex)]);
+      glLightf(lightEnum, GL_SPOT_CUTOFF, lighting.spotCutoff[static_cast<size_t>(lightIndex)]);
+      const glm::vec3& attenuation = lighting.attenuation[static_cast<size_t>(lightIndex)];
+      glLightf(lightEnum, GL_CONSTANT_ATTENUATION, attenuation.x);
+      glLightf(lightEnum, GL_LINEAR_ATTENUATION, attenuation.y);
+      glLightf(lightEnum, GL_QUADRATIC_ATTENUATION, attenuation.z);
     }
 
-    if (m_globalParas.lightCount.get() > 2) {
-      glEnable(GL_LIGHT2);
-      glLightfv(GL_LIGHT2, GL_AMBIENT, glm::value_ptr(m_globalParas.lightAmbients[2]->get()));
-      glLightfv(GL_LIGHT2, GL_DIFFUSE, glm::value_ptr(m_globalParas.lightDiffuses[2]->get()));
-      glLightfv(GL_LIGHT2, GL_SPECULAR, glm::value_ptr(m_globalParas.lightSpeculars[2]->get()));
-      glLightfv(GL_LIGHT2, GL_POSITION, glm::value_ptr(m_globalParas.lightPositions[2]->get()));
-      glLightfv(GL_LIGHT2, GL_SPOT_DIRECTION, glm::value_ptr(m_globalParas.lightSpotDirection[2]->get()));
-      glLightf(GL_LIGHT2, GL_SPOT_EXPONENT, m_globalParas.lightSpotExponent[2]->get());
-      glLightf(GL_LIGHT2, GL_SPOT_CUTOFF, m_globalParas.lightSpotCutoff[2]->get());
-      glLightf(GL_LIGHT2, GL_CONSTANT_ATTENUATION, m_globalParas.lightAttenuations[2]->get().x);
-      glLightf(GL_LIGHT2, GL_LINEAR_ATTENUATION, m_globalParas.lightAttenuations[2]->get().y);
-      glLightf(GL_LIGHT2, GL_QUADRATIC_ATTENUATION, m_globalParas.lightAttenuations[2]->get().z);
-    }
-
-    if (m_globalParas.lightCount.get() > 3) {
-      glEnable(GL_LIGHT3);
-      glLightfv(GL_LIGHT3, GL_AMBIENT, glm::value_ptr(m_globalParas.lightAmbients[3]->get()));
-      glLightfv(GL_LIGHT3, GL_DIFFUSE, glm::value_ptr(m_globalParas.lightDiffuses[3]->get()));
-      glLightfv(GL_LIGHT3, GL_SPECULAR, glm::value_ptr(m_globalParas.lightSpeculars[3]->get()));
-      glLightfv(GL_LIGHT3, GL_POSITION, glm::value_ptr(m_globalParas.lightPositions[3]->get()));
-      glLightfv(GL_LIGHT3, GL_SPOT_DIRECTION, glm::value_ptr(m_globalParas.lightSpotDirection[3]->get()));
-      glLightf(GL_LIGHT3, GL_SPOT_EXPONENT, m_globalParas.lightSpotExponent[3]->get());
-      glLightf(GL_LIGHT3, GL_SPOT_CUTOFF, m_globalParas.lightSpotCutoff[3]->get());
-      glLightf(GL_LIGHT3, GL_CONSTANT_ATTENUATION, m_globalParas.lightAttenuations[3]->get().x);
-      glLightf(GL_LIGHT3, GL_LINEAR_ATTENUATION, m_globalParas.lightAttenuations[3]->get().y);
-      glLightf(GL_LIGHT3, GL_QUADRATIC_ATTENUATION, m_globalParas.lightAttenuations[3]->get().z);
-    }
-
-    if (m_globalParas.lightCount.get() > 4) {
-      glEnable(GL_LIGHT4);
-      glLightfv(GL_LIGHT4, GL_AMBIENT, glm::value_ptr(m_globalParas.lightAmbients[4]->get()));
-      glLightfv(GL_LIGHT4, GL_DIFFUSE, glm::value_ptr(m_globalParas.lightDiffuses[4]->get()));
-      glLightfv(GL_LIGHT4, GL_SPECULAR, glm::value_ptr(m_globalParas.lightSpeculars[4]->get()));
-      glLightfv(GL_LIGHT4, GL_POSITION, glm::value_ptr(m_globalParas.lightPositions[4]->get()));
-      glLightfv(GL_LIGHT4, GL_SPOT_DIRECTION, glm::value_ptr(m_globalParas.lightSpotDirection[4]->get()));
-      glLightf(GL_LIGHT4, GL_SPOT_EXPONENT, m_globalParas.lightSpotExponent[4]->get());
-      glLightf(GL_LIGHT4, GL_SPOT_CUTOFF, m_globalParas.lightSpotCutoff[4]->get());
-      glLightf(GL_LIGHT4, GL_CONSTANT_ATTENUATION, m_globalParas.lightAttenuations[4]->get().x);
-      glLightf(GL_LIGHT4, GL_LINEAR_ATTENUATION, m_globalParas.lightAttenuations[4]->get().y);
-      glLightf(GL_LIGHT4, GL_QUADRATIC_ATTENUATION, m_globalParas.lightAttenuations[4]->get().z);
-    }
-
-    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, glm::value_ptr(m_materialAmbient.get()));
-    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, std::min(m_materialShininess.get(), 128.f));
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, glm::value_ptr(m_materialSpecular.get()));
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, glm::value_ptr(m_parameters.materialAmbient));
+    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, std::min(m_parameters.materialShininess, 128.f));
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, glm::value_ptr(m_parameters.materialSpecular));
     glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, 0);
     glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
     glEnable(GL_COLOR_MATERIAL);
@@ -605,20 +447,20 @@ void Z3DRendererBase::renderPickingInstant(const std::vector<Z3DPrimitiveRendere
 
 void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
-  activateClipPlanesGLSL();
-  for (auto renderer : renderers) {
+  backend().beginRender(*this);
+  for (auto* renderer : renderers) {
     renderer->render(eye);
   }
-  deactivateClipPlanesGLSL();
+  backend().endRender(*this);
 }
 
 void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
-  activateClipPlanesGLSL();
-  for (auto renderer : renderers) {
+  backend().beginRender(*this);
+  for (auto* renderer : renderers) {
     renderer->renderPicking(eye);
   }
-  deactivateClipPlanesGLSL();
+  backend().endRender(*this);
 }
 
 bool Z3DRendererBase::needLighting(const std::vector<Z3DPrimitiveRenderer*>& renderers) const
@@ -664,69 +506,23 @@ void Z3DRendererBase::deactivateClipPlanesOpenGL()
 }
 #endif
 
-void Z3DRendererBase::activateClipPlanesGLSL()
-{
-  if (!m_clipEnabled) {
-    return;
-  }
-  for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
-    glEnable(GL_CLIP_DISTANCE0 + i);
-  }
-}
-
-void Z3DRendererBase::deactivateClipPlanesGLSL()
-{
-  if (!m_clipEnabled) {
-    return;
-  }
-  for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
-    glDisable(GL_CLIP_DISTANCE0 + i);
-  }
-}
-
-void Z3DRendererBase::makeViewportMatrix()
-{
-#if 0
-  GLint viewport[4];
-  glGetIntegerv(GL_VIEWPORT, viewport);
-  float l = viewport[0];
-  float b = viewport[1];
-  float r = viewport[2] + l;
-  float t = viewport[3] + b;
-  GLfloat depthrange[2];
-  glGetFloatv(GL_DEPTH_RANGE, depthrange);
-  float n = depthrange[0];
-  float f = depthrange[1];
-#else
-  float l = m_viewport[0];
-  float b = m_viewport[1];
-  float r = m_viewport[2] + l;
-  float t = m_viewport[3] + b;
-  float n = 0;
-  float f = 1;
-#endif
-  m_viewportMatrix = glm::mat4(glm::vec4((r - l) / 2.f, 0.0f, 0.0f, 0.0f),
-                               glm::vec4(0.0f, (t - b) / 2.f, 0.0f, 0.0f),
-                               glm::vec4(0.0f, 0.0f, (f - n) / 2.f, 0.0f),
-                               glm::vec4((r + l) / 2.f, (t + b) / 2.f, (f + n) / 2.f, 1.0f));
-  m_inverseViewportMatrix = glm::inverse(m_viewportMatrix);
-}
-
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DRendererBase::invalidateDisplayList()
 {
-  if ((bool)glIsList(m_displayList)) {
-    glDeleteLists(m_displayList, 1);
+  auto& legacy = legacyGL();
+  if ((bool)glIsList(legacy.displayList)) {
+    glDeleteLists(legacy.displayList, 1);
   }
-  m_displayList = 0;
+  legacy.displayList = 0;
 }
 
 void Z3DRendererBase::invalidatePickingDisplayList()
 {
-  if ((bool)glIsList(m_pickingDisplayList)) {
-    glDeleteLists(m_pickingDisplayList, 1);
+  auto& legacy = legacyGL();
+  if ((bool)glIsList(legacy.pickingDisplayList)) {
+    glDeleteLists(legacy.pickingDisplayList, 1);
   }
-  m_pickingDisplayList = 0;
+  legacy.pickingDisplayList = 0;
 }
 #endif
 
@@ -735,16 +531,6 @@ void Z3DRendererBase::compile()
   for (auto renderer : m_renderers) {
     renderer->compile();
   }
-}
-
-void Z3DRendererBase::makeCoordTransformNormalMatrix()
-{
-  m_coordTransformNormalMatrices[LeftEye] =
-    glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(LeftEye) * m_coordTransform.get())));
-  m_coordTransformNormalMatrices[MonoEye] =
-    glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(MonoEye) * m_coordTransform.get())));
-  m_coordTransformNormalMatrices[RightEye] =
-    glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(RightEye) * m_coordTransform.get())));
 }
 
 } // namespace nim

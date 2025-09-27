@@ -145,24 +145,11 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_wireframeMode, 1);
     m_widgetsGroup->addChild(m_wireframeColor, 1);
 
-    std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (auto para : paras) {
-      if (para->name() == "Coord Transform") {
-        m_widgetsGroup->addChild(*para, 2);
-        //        QPushButton *pb = new QPushButton("Apply Transform");
-        //        connect(pb, &QPushButton::clicked, this, &Z3DMeshFilter::onApplyTransform);
-        //        m_widgetsGroup->addChild(*pb, 2);
-      }
-      // else if (para->name() == "Size Scale")
-      // m_widgetsGroup->addChild(para, 3);
-      // else if (para->name() == "Rendering Method")
-      // m_widgetsGroup->addChild(para, 4);
-      else if (para->name() == "Opacity") {
-        m_widgetsGroup->addChild(*para, 5);
-      } else if (para->name() != "Size Scale") {
-        m_widgetsGroup->addChild(*para, 7);
-      }
-    }
+    m_widgetsGroup->addChild(m_rendererParameters.coordTransform, 2);
+    m_widgetsGroup->addChild(m_rendererParameters.opacity, 5);
+    m_widgetsGroup->addChild(m_rendererParameters.materialAmbient, 7);
+    m_widgetsGroup->addChild(m_rendererParameters.materialSpecular, 7);
+    m_widgetsGroup->addChild(m_rendererParameters.materialShininess, 7);
 
     m_widgetsGroup->addChild(m_glow, 5);
     m_widgetsGroup->addChild(m_glowMode, 5);
@@ -193,12 +180,10 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroupForAnnotationFilter()
     m_widgetsGroup->addChild(m_wireframeMode, 1);
     m_widgetsGroup->addChild(m_wireframeColor, 1);
 
-    std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (auto para : paras) {
-      if (para->name().contains("Opacity") || para->name().contains("Material")) {
-        m_widgetsGroup->addChild(*para, 5);
-      }
-    }
+    m_widgetsGroup->addChild(m_rendererParameters.opacity, 5);
+    m_widgetsGroup->addChild(m_rendererParameters.materialAmbient, 5);
+    m_widgetsGroup->addChild(m_rendererParameters.materialSpecular, 5);
+    m_widgetsGroup->addChild(m_rendererParameters.materialShininess, 5);
     m_widgetsGroup->addChild(m_xCut, 5);
     m_widgetsGroup->addChild(m_yCut, 5);
     m_widgetsGroup->addChild(m_zCut, 5);
@@ -212,7 +197,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroupForAnnotationFilter()
 
 void Z3DMeshFilter::renderOpaque(Z3DEye eye)
 {
-  m_rendererBase.render(eye, m_triangleListRenderer);
+  renderWithState(eye, m_triangleListRenderer);
   renderBoundBox(eye);
 }
 
@@ -222,7 +207,7 @@ void Z3DMeshFilter::renderTransparent(Z3DEye eye)
     // Compositor owns glow composition; only render bound box here
     renderBoundBox(eye);
   } else {
-    m_rendererBase.render(eye, m_triangleListRenderer);
+    renderWithState(eye, m_triangleListRenderer);
     renderBoundBox(eye);
   }
 }
@@ -232,7 +217,7 @@ void Z3DMeshFilter::renderPicking(Z3DEye eye)
   if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
   }
-  m_rendererBase.renderPicking(eye, m_triangleListRenderer);
+  renderPickingWithState(eye, m_triangleListRenderer);
 }
 
 void Z3DMeshFilter::prepareData()
@@ -417,7 +402,7 @@ void Z3DMeshFilter::selectMesh(QMouseEvent* e, int /*w*/, int /*h*/)
 
 void Z3DMeshFilter::onApplyTransform()
 {
-  VLOG(1) << m_rendererBase.coordTransform();
+  VLOG(1) << m_rendererParameters.coordTransform.get();
 }
 
 void Z3DMeshFilter::updateMeshVisibleState()

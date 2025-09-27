@@ -2,6 +2,8 @@
 
 #include "z3dtexture.h"
 #include "z3dscratchresourcepool.h"
+#include "z3drenderglobalstate.h"
+#include "zlog.h"
 #include <algorithm>
 
 namespace nim {
@@ -62,9 +64,11 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
 
   glm::uvec2 size = m_colorTexture->dimension().xy();
 
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+
   // Acquire temporary targets from the scratch pool for blur passes
-  auto blurXLease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(size);
-  auto blurYLease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(size);
+  auto blurXLease = scratchPool.acquireTempRenderTarget2D(size);
+  auto blurYLease = scratchPool.acquireTempRenderTarget2D(size);
 
   blurXLease.renderTarget->bind();
   blurXLease.renderTarget->clear();

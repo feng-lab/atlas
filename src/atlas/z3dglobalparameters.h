@@ -3,10 +3,10 @@
 #include "zbbox.h"
 #include "znumericparameter.h"
 #include "z3dcameraparameter.h"
+#include "z3drenderglobalstate.h"
 #include "z3dpickingmanager.h"
 #include "zoptionparameter.h"
 #include "z3dinteractionhandler.h"
-#include <folly/CancellationToken.h>
 #include <vector>
 #include <mutex>
 
@@ -15,8 +15,6 @@ namespace nim {
 class ZWidgetsGroup;
 
 class Z3DRenderingEngine;
-
-class Z3DScratchResourcePool;
 
 enum class RenderBackend
 {
@@ -52,45 +50,7 @@ public:
   std::shared_ptr<ZWidgetsGroup> widgetsGroup(bool includeCamera, Z3DRenderingEngine& engine);
 
   // count is lightCount
-  [[nodiscard]] const glm::vec4* lightPositionArray() const
-  {
-    return m_lightPositionArray.data();
-  }
-
-  [[nodiscard]] const glm::vec4* lightAmbientArray() const
-  {
-    return m_lightAmbientArray.data();
-  }
-
-  [[nodiscard]] const glm::vec4* lightDiffuseArray() const
-  {
-    return m_lightDiffuseArray.data();
-  }
-
-  [[nodiscard]] const glm::vec4* lightSpecularArray() const
-  {
-    return m_lightSpecularArray.data();
-  }
-
-  [[nodiscard]] const glm::vec3* lightAttenuationArray() const
-  {
-    return m_lightAttenuationArray.data();
-  }
-
-  [[nodiscard]] const float* lightSpotCutoffArray() const
-  {
-    return m_lightSpotCutoffArray.data();
-  }
-
-  [[nodiscard]] const float* lightSpotExponentArray() const
-  {
-    return m_lightSpotExponentArray.data();
-  }
-
-  [[nodiscard]] const glm::vec3* lightSpotDirectionArray() const
-  {
-    return m_lightSpotDirectionArray.data();
-  }
+  void populateLightingState(RendererSceneState::LightingState& lighting) const;
 
   // must call
   void setPickingTarget(Z3DRenderTarget& rt)
@@ -106,13 +66,18 @@ public:
 
   void cameraPointsTo(const ZBBox<glm::dvec3>& bound);
 
-  // Scratch pool access and management
-  Z3DScratchResourcePool& scratchPool();
-  const Z3DScratchResourcePool& scratchPool() const;
-  void trimScratchMemory();
-
 private:
   void updateLightsArray();
+
+  void markGlobalSceneStateDirty()
+  {
+    Z3DRenderGlobalState::instance().markSceneStateDirty();
+  }
+
+  void markGlobalViewStateDirty()
+  {
+    Z3DRenderGlobalState::instance().markViewStateDirty();
+  }
 
   void addParameter(ZParameter& para)
   {
@@ -156,7 +121,6 @@ public:
 
   std::mutex targetSwitchMutex;
   std::atomic_bool hasNewRendering = false;
-  std::unique_ptr<folly::CancellationSource> cancellationSource;
 
 private:
   std::vector<ZParameter*> m_parameters;
@@ -164,18 +128,7 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGrp;
   std::shared_ptr<ZWidgetsGroup> m_widgetsGrpNoCamera;
 
-  std::vector<glm::vec4> m_lightPositionArray;
-  std::vector<glm::vec4> m_lightAmbientArray;
-  std::vector<glm::vec4> m_lightDiffuseArray;
-  std::vector<glm::vec4> m_lightSpecularArray;
-  std::vector<glm::vec3> m_lightAttenuationArray;
-  std::vector<float> m_lightSpotCutoffArray;
-  std::vector<float> m_lightSpotExponentArray;
-  std::vector<glm::vec3> m_lightSpotDirectionArray;
-
   size_t m_cameraParameterIndex = 0;
-
-  std::unique_ptr<Z3DScratchResourcePool> m_scratchPool;
 };
 
 } // namespace nim

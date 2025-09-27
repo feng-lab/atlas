@@ -1,6 +1,7 @@
 #include "z3dimage2drenderer.h"
 
 #include "z3dtexture.h"
+#include "z3drendertarget.h"
 #include "z3dvolume.h"
 #include "zlog.h"
 #include <absl/strings/str_cat.h>
@@ -88,7 +89,9 @@ void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx) const
 
 bool Z3DImage2DRenderer::hasVolume() const
 {
-  return std::ranges::any_of(m_volumes, [](auto vol) { return vol; });
+  return std::ranges::any_of(m_volumes, [](auto vol) {
+    return vol;
+  });
 }
 
 void Z3DImage2DRenderer::compile()

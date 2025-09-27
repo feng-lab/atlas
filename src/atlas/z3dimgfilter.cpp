@@ -4,6 +4,7 @@
 #include "zbenchtimer.h"
 #include "zeventlistenerparameter.h"
 #include "zlog.h"
+#include "z3drenderglobalstate.h"
 #include "zmesh.h"
 #include <folly/ScopeGuard.h>
 #include <QMenu>
@@ -87,12 +88,12 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   addParameter(m_stayOnTop);
   addParameter(m_fullResolutionRendering);
-  connect(&m_rendererBase, &Z3DRendererBase::coordTransformChanged, this, &Z3DImgFilter::changeCoordTransform);
-  //  connect(&m_rendererBase.globalParas().interactionHandler,
+  connect(this, &Z3DBoundedFilter::rendererCoordTransformChanged, this, &Z3DImgFilter::changeCoordTransform);
+  //  connect(&m_globalParameters.interactionHandler,
   //          &Z3DTrackballInteractionHandler::enterInteractionMode,
   //          this,
   //          &Z3DImgFilter::enterFastMode);
-  //  connect(&m_rendererBase.globalParas().interactionHandler,
+  //  connect(&m_globalParameters.interactionHandler,
   //          &Z3DTrackballInteractionHandler::exitInteractionMode,
   //          this,
   //          &Z3DImgFilter::exitFastMode);
@@ -162,11 +163,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
           &Z3DImgFilter::contextMenuEvent);
   addEventListener(m_contextMenuEvent);
 
-  // renderer internal targets are managed by the renderers themselves
-  //  for (size_t i=0; i<m_maxNumOfFullResolutionVolumeSlice; ++i) {
-  //    m_image2DRenderers.emplace_back(std::make_unique<Z3DImage2DRenderer>(m_rendererBase));
-  //    m_image2DRenderers[i]->setLayerTarget(&m_layerTarget);
-  //  }
   m_boundBoxLineWidth.set(1);
   m_boundBoxMode.select("Bound Box");
 
@@ -228,7 +224,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
         glm::dvec2(imgPack.rangeMin() + (imgPack.rangeMax() - imgPack.rangeMin()) * 0.02, imgPack.rangeMax()));
     }
 
-    m_3dImg = std::make_unique<Z3DImg>(imgPack, m_rendererBase.coordTransformPara().scale(), drs);
+    m_3dImg = std::make_unique<Z3DImg>(imgPack, m_rendererParameters.coordTransform.scale(), drs);
     connect(m_3dImg.get(), &Z3DImg::renderingError, this, &Z3DImgFilter::renderingError);
 
     updateBlockIDTarget();
@@ -279,7 +275,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     m_obliqueSlice2DistanceToOrigin.setRange(-glm::length(glm::vec3(volDim.x, volDim.y, volDim.z)),
                                              glm::length(glm::vec3(volDim.x, volDim.y, volDim.z)));
 
-    m_rendererBase.setRotationCenter(glm::vec3(volDim.x, volDim.y, volDim.z) / 2.f);
+    m_rendererParameters.coordTransform.setRotationCenter(glm::vec3(volDim.x, volDim.y, volDim.z) / 2.f);
 
     m_zSlicePosition.setRange(0, volDim.z - 1);
     m_ySlicePosition.setRange(0, volDim.y - 1);
@@ -436,7 +432,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_selectionLineColor, 17);
     m_widgetsGroup->addChild(m_manipulatorSize, 17);
     // m_widgetsGroup->addChild(m_interactionDownsample, 19);
-    m_widgetsGroup->addChild(m_rendererBase.coordTransformPara(), 1);
+    m_widgetsGroup->addChild(m_rendererParameters.coordTransform, 1);
 
     const std::vector<ZParameter*>& paras = parameters();
     for (auto para : paras) {
@@ -470,7 +466,7 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
   const auto& target = opaqueTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
-  m_rendererBase.render(eye, m_textureCopyRenderer);
+  renderWithState(eye, m_textureCopyRenderer);
 }
 
 bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
@@ -486,7 +482,7 @@ void Z3DImgFilter::renderTransparent(Z3DEye eye)
   const auto& target = transparentTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
-  m_rendererBase.render(eye, m_textureCopyRenderer);
+  renderWithState(eye, m_textureCopyRenderer);
 }
 
 glm::vec3 Z3DImgFilter::get3DPosition(int x, int y, int width, int height, bool& success)
@@ -514,7 +510,7 @@ void Z3DImgFilter::enterSubregionView(float x, float y, float z)
   m_xCut.set(glm::vec2(minCoord.x, maxCoord.x));
   m_yCut.set(glm::vec2(minCoord.y, maxCoord.y));
   m_zCut.set(glm::vec2(minCoord.z, maxCoord.z));
-  m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBoxAfterClipping());
+  m_globalParameters.cameraFocusesOn(axisAlignedBoundBoxAfterClipping());
   m_fullResolutionRendering.set(true);
 }
 
@@ -524,7 +520,7 @@ void Z3DImgFilter::exitSubregionView()
   m_xCut.set(m_xCut.range());
   m_yCut.set(m_yCut.range());
   m_zCut.set(m_zCut.range());
-  m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBox());
+  m_globalParameters.cameraFocusesOn(axisAlignedBoundBox());
 }
 
 void Z3DImgFilter::updateRaycasterSamplingRate()
@@ -568,9 +564,9 @@ void Z3DImgFilter::invalidate(State inv)
       if (isCut) {
         const auto& worldAABB = axisAlignedBoundBox();
         if (!worldAABB.empty()) {
-          auto gx = m_rendererBase.globalParas().globalXCut.get();
-          auto gy = m_rendererBase.globalParas().globalYCut.get();
-          auto gz = m_rendererBase.globalParas().globalZCut.get();
+          auto gx = m_globalParameters.globalXCut.get();
+          auto gy = m_globalParameters.globalYCut.get();
+          auto gz = m_globalParameters.globalZCut.get();
           glm::vec2 effX{std::clamp(gx[0], float(worldAABB.minCorner.x), float(worldAABB.maxCorner.x)),
                          std::clamp(gx[1], float(worldAABB.minCorner.x), float(worldAABB.maxCorner.x))};
           glm::vec2 effY{std::clamp(gy[0], float(worldAABB.minCorner.y), float(worldAABB.maxCorner.y)),
@@ -621,8 +617,8 @@ void Z3DImgFilter::invalidate(State inv)
   }
 #endif
 
-  if (m_rendererBase.globalParas().cancellationSource) {
-    m_rendererBase.globalParas().cancellationSource->requestCancellation();
+  if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
+    Z3DRenderGlobalState::instance().requestCancellation();
 #ifdef ATLAS_DEBUG_VERSION
     VLOG(1) << "requested cancellation on invalidate";
 #endif
@@ -652,7 +648,7 @@ void Z3DImgFilter::changeCoordTransform()
   VLOG(1) << "image coord changed";
   // invalidateAllFRVolumeSlices();
   if (m_3dImg) {
-    m_3dImg->setScale(m_rendererBase.coordTransformPara().scale());
+    m_3dImg->setScale(m_rendererParameters.coordTransform.scale());
   }
   m_imgRaycasterRenderer.compile();
   m_imgSliceRenderer.compile();
@@ -706,10 +702,10 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
 {
   if (isVisible() && isSelected() && m_3dImg) {
     bool success = false;
-    auto pos3D = get3DPosition(event->x() * m_rendererBase.globalParas().devicePixelRatio.get(),
-                               event->y() * m_rendererBase.globalParas().devicePixelRatio.get(),
-                               w * m_rendererBase.globalParas().devicePixelRatio.get(),
-                               h * m_rendererBase.globalParas().devicePixelRatio.get(),
+    auto pos3D = get3DPosition(event->x() * m_globalParameters.devicePixelRatio.get(),
+                               event->y() * m_globalParameters.devicePixelRatio.get(),
+                               w * m_globalParameters.devicePixelRatio.get(),
+                               h * m_globalParameters.devicePixelRatio.get(),
                                success);
 
     bool enter = success;
@@ -858,7 +854,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       }
       ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSliceDistanceToOrigin.get() * normal);
       if (!slice.empty()) {
-        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+        slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
         m_imgSliceRenderer.addSlice(slice);
       }
     }
@@ -867,7 +863,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
 
       ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgSliceRenderer.addSlice(slice);
     }
     if (m_showYSlice.get()) {
@@ -875,7 +871,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
 
       ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgSliceRenderer.addSlice(slice);
     }
     if (m_showXSlice.get()) {
@@ -883,7 +879,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
 
       ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgSliceRenderer.addSlice(slice);
     }
 
@@ -896,7 +892,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       }
       ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSlice2DistanceToOrigin.get() * normal);
       if (!slice.empty()) {
-        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+        slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
         m_imgSliceRenderer.addSlice(slice);
       }
     }
@@ -905,7 +901,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
 
       ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgSliceRenderer.addSlice(slice);
     }
     if (m_showYSlice2.get()) {
@@ -913,7 +909,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
 
       ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgSliceRenderer.addSlice(slice);
     }
     if (m_showXSlice2.get()) {
@@ -921,14 +917,14 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
 
       ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgSliceRenderer.addSlice(slice);
     }
   }
 
   currentTarget.bind();
   currentTarget.clear();
-  m_rendererBase.setViewport(currentTarget.size());
+  setViewport(currentTarget.size());
 
   m_opaqueValid[eye] = false;
 
@@ -939,7 +935,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
 
   double progress = 1.0;
   if (!m_progressiveRendering) {
-    m_rendererBase.render(eye, m_imgSliceRenderer);
+    renderWithState(eye, m_imgSliceRenderer);
   } else {
     progress = m_imgSliceRenderer.renderProgressively(eye);
   }
@@ -986,7 +982,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
                                                     glm::vec2(xCoordEnd, yCoordEnd),
                                                     glm::vec2(xTexCoordStart, yTexCoordStart),
                                                     glm::vec2(xTexCoordEnd, yTexCoordEnd));
-      m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_2DImageQuad.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgRaycasterRenderer.clearQuads();
       m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
     } else if (m_zCut.lowerValue() == m_zCut.upperValue()) { // slice of 3d image
@@ -997,7 +993,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
                                                    glm::vec2(xCoordEnd, yCoordEnd),
                                                    glm::vec2(xTexCoordStart, yTexCoordStart),
                                                    glm::vec2(xTexCoordEnd, yTexCoordEnd));
-      m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_2DImageQuad.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgRaycasterRenderer.clearQuads();
       m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
     } else if (m_yCut.lowerValue() == m_yCut.upperValue()) { // slice of 3d image
@@ -1008,7 +1004,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
                                                    glm::vec2(xCoordEnd, zCoordEnd),
                                                    glm::vec2(xTexCoordStart, zTexCoordStart),
                                                    glm::vec2(xTexCoordEnd, zTexCoordEnd));
-      m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_2DImageQuad.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgRaycasterRenderer.clearQuads();
       m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
     } else if (m_xCut.lowerValue() == m_xCut.upperValue()) { // slice of 3d image
@@ -1019,7 +1015,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
                                                    glm::vec2(yCoordEnd, zCoordEnd),
                                                    glm::vec2(yTexCoordStart, zTexCoordStart),
                                                    glm::vec2(yTexCoordEnd, zTexCoordEnd));
-      m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_2DImageQuad.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
       m_imgRaycasterRenderer.clearQuads();
       m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
     } else { // 3d volume Raycasting
@@ -1027,39 +1023,41 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
                                      glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
                                      glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
                                      glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
-      cube.transformVerticesByMatrix(m_rendererBase.coordTransform());
-      bool flipped = glm::determinant(glm::mat3(m_rendererBase.coordTransform())) < 0.0;
+      cube.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+      bool flipped = glm::determinant(glm::mat3(m_rendererParameters.coordTransform.get())) < 0.0;
 
-      m_rendererBase.setViewport(currentTarget.size());
+      setViewport(currentTarget.size());
       CHECK_GL_ERROR
 
       std::vector<glm::vec3> planeNormals;
       std::vector<glm::vec3> planeOrigins;
-      planeNormals.push_back(globalCamera().viewVector());
-      planeOrigins.push_back(globalCamera().eye() + globalCamera().viewVector() * (globalCamera().nearDist() + 0.01f));
-      if (m_rendererBase.globalParas().globalXCut.lowerValue() != m_rendererBase.globalParas().globalXCut.minimum()) {
+      planeNormals.push_back(m_globalParameters.camera.get().viewVector());
+      planeOrigins.push_back(m_globalParameters.camera.get().eye() +
+                             m_globalParameters.camera.get().viewVector() *
+                               (m_globalParameters.camera.get().nearDist() + 0.01f));
+      if (m_globalParameters.globalXCut.lowerValue() != m_globalParameters.globalXCut.minimum()) {
         planeNormals.emplace_back(1., 0., 0.);
-        planeOrigins.emplace_back(m_rendererBase.globalParas().globalXCut.lowerValue(), 0, 0);
+        planeOrigins.emplace_back(m_globalParameters.globalXCut.lowerValue(), 0, 0);
       }
-      if (m_rendererBase.globalParas().globalXCut.upperValue() != m_rendererBase.globalParas().globalXCut.maximum()) {
+      if (m_globalParameters.globalXCut.upperValue() != m_globalParameters.globalXCut.maximum()) {
         planeNormals.emplace_back(-1., 0., 0.);
-        planeOrigins.emplace_back(m_rendererBase.globalParas().globalXCut.upperValue(), 0, 0);
+        planeOrigins.emplace_back(m_globalParameters.globalXCut.upperValue(), 0, 0);
       }
-      if (m_rendererBase.globalParas().globalYCut.lowerValue() != m_rendererBase.globalParas().globalYCut.minimum()) {
+      if (m_globalParameters.globalYCut.lowerValue() != m_globalParameters.globalYCut.minimum()) {
         planeNormals.emplace_back(0., 1., 0.);
-        planeOrigins.emplace_back(0, m_rendererBase.globalParas().globalYCut.lowerValue(), 0);
+        planeOrigins.emplace_back(0, m_globalParameters.globalYCut.lowerValue(), 0);
       }
-      if (m_rendererBase.globalParas().globalYCut.upperValue() != m_rendererBase.globalParas().globalYCut.maximum()) {
+      if (m_globalParameters.globalYCut.upperValue() != m_globalParameters.globalYCut.maximum()) {
         planeNormals.emplace_back(0., -1., 0.);
-        planeOrigins.emplace_back(0, m_rendererBase.globalParas().globalYCut.upperValue(), 0);
+        planeOrigins.emplace_back(0, m_globalParameters.globalYCut.upperValue(), 0);
       }
-      if (m_rendererBase.globalParas().globalZCut.lowerValue() != m_rendererBase.globalParas().globalZCut.minimum()) {
+      if (m_globalParameters.globalZCut.lowerValue() != m_globalParameters.globalZCut.minimum()) {
         planeNormals.emplace_back(0., 0., 1.);
-        planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().globalZCut.lowerValue());
+        planeOrigins.emplace_back(0, 0, m_globalParameters.globalZCut.lowerValue());
       }
-      if (m_rendererBase.globalParas().globalZCut.upperValue() != m_rendererBase.globalParas().globalZCut.maximum()) {
+      if (m_globalParameters.globalZCut.upperValue() != m_globalParameters.globalZCut.maximum()) {
         planeNormals.emplace_back(0., 0., -1.);
-        planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().globalZCut.upperValue());
+        planeOrigins.emplace_back(0, 0, m_globalParameters.globalZCut.upperValue());
       }
       // VLOG(1) << planeNormals.size();
       ZMesh clipped = ZMesh::clipClosedSurface(cube, planeNormals, planeOrigins);
@@ -1068,23 +1066,23 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
       glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;
     std::vector<glm::vec4> planes;
     planes.emplace_back(-globalCamera().viewVector(), nearPlaneDistToOrigin);
-    if (m_rendererBase.globalParas().xCut.lowerValue() != m_rendererBase.globalParas().xCut.minimum()) {
-      planes.emplace_back(-1., 0., 0., -m_rendererBase.globalParas().xCut.lowerValue());
+    if (m_globalParameters.xCut.lowerValue() != m_globalParameters.xCut.minimum()) {
+      planes.emplace_back(-1., 0., 0., -m_globalParameters.xCut.lowerValue());
     }
-    if (m_rendererBase.globalParas().xCut.upperValue() != m_rendererBase.globalParas().xCut.maximum()) {
-      planes.emplace_back(1., 0., 0., m_rendererBase.globalParas().xCut.upperValue());
+    if (m_globalParameters.xCut.upperValue() != m_globalParameters.xCut.maximum()) {
+      planes.emplace_back(1., 0., 0., m_globalParameters.xCut.upperValue());
     }
-    if (m_rendererBase.globalParas().globalYCut.lowerValue() != m_rendererBase.globalParas().globalYCut.minimum()) {
-      planes.emplace_back(0., -1., 0., -m_rendererBase.globalParas().globalYCut.lowerValue());
+    if (m_globalParameters.globalYCut.lowerValue() != m_globalParameters.globalYCut.minimum()) {
+      planes.emplace_back(0., -1., 0., -m_globalParameters.globalYCut.lowerValue());
     }
-    if (m_rendererBase.globalParas().globalYCut.upperValue() != m_rendererBase.globalParas().globalYCut.maximum()) {
-      planes.emplace_back(0., 1., 0., m_rendererBase.globalParas().globalYCut.upperValue());
+    if (m_globalParameters.globalYCut.upperValue() != m_globalParameters.globalYCut.maximum()) {
+      planes.emplace_back(0., 1., 0., m_globalParameters.globalYCut.upperValue());
     }
-    if (m_rendererBase.globalParas().globalZCut.lowerValue() != m_rendererBase.globalParas().globalZCut.minimum()) {
-      planes.emplace_back(0., 0., -1., -m_rendererBase.globalParas().globalZCut.lowerValue());
+    if (m_globalParameters.globalZCut.lowerValue() != m_globalParameters.globalZCut.minimum()) {
+      planes.emplace_back(0., 0., -1., -m_globalParameters.globalZCut.lowerValue());
     }
-    if (m_rendererBase.globalParas().globalZCut.upperValue() != m_rendererBase.globalParas().globalZCut.maximum()) {
-      planes.emplace_back(0., 0., 1., m_rendererBase.globalParas().globalZCut.upperValue());
+    if (m_globalParameters.globalZCut.upperValue() != m_globalParameters.globalZCut.maximum()) {
+      planes.emplace_back(0., 0., 1., m_globalParameters.globalZCut.upperValue());
     }
     VLOG(1) << planes.size();
     auto clipped = ZMeshUtils::clipClosedSurface(cube, planes);
@@ -1097,7 +1095,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 
   currentTarget.bind();
   currentTarget.clear();
-  m_rendererBase.setViewport(currentTarget.size());
+  setViewport(currentTarget.size());
 
   m_transparentValid[eye] = false;
   auto targetGuard = folly::makeGuard([&currentTarget, this, eye]() {
@@ -1107,7 +1105,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 
   double progress = 1.0;
   if (!m_progressiveRendering) {
-    m_rendererBase.render(eye, m_imgRaycasterRenderer);
+    renderWithState(eye, m_imgRaycasterRenderer);
   } else {
     progress = m_imgRaycasterRenderer.renderProgressively(eye);
   }
@@ -1130,7 +1128,7 @@ void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
 
   currentTarget.bind();
   currentTarget.clear();
-  m_rendererBase.setViewport(currentTarget.size());
+  setViewport(currentTarget.size());
 
   m_transparentValid[eye] = false;
   auto targetGuard = folly::makeGuard([&currentTarget, this, eye]() {
@@ -1249,8 +1247,8 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
 
 glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderTarget& target)
 {
-  glm::mat4 projection = globalCamera().projectionMatrix(MonoEye);
-  glm::mat4 modelview = globalCamera().viewMatrix(MonoEye);
+  glm::mat4 projection = m_globalParameters.camera.get().projectionMatrix(MonoEye);
+  glm::mat4 modelview = m_globalParameters.camera.get().viewMatrix(MonoEye);
 
   glm::ivec4 viewport;
   viewport[0] = 0;
@@ -1266,8 +1264,8 @@ glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z
 
 glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, double depth, int width, int height)
 {
-  glm::mat4 projection = globalCamera().projectionMatrix(MonoEye);
-  glm::mat4 modelview = globalCamera().viewMatrix(MonoEye);
+  glm::mat4 projection = m_globalParameters.camera.get().projectionMatrix(MonoEye);
+  glm::mat4 modelview = m_globalParameters.camera.get().viewMatrix(MonoEye);
 
   glm::ivec4 viewport;
   viewport[0] = 0;
@@ -1310,7 +1308,7 @@ Z3DRenderTarget& Z3DImgFilter::ensureRenderTarget(Z3DScratchResourcePool::Render
     lease.release();
     CHECK_GT(m_outputSize.x, 0u);
     CHECK_GT(m_outputSize.y, 0u);
-    lease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(m_outputSize);
+    lease = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(m_outputSize);
   }
   return *lease.renderTarget;
 }

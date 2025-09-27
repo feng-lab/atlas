@@ -7,6 +7,7 @@
 #include "zbenchtimer.h"
 #include "zmeshutils.h"
 #include "zlog.h"
+#include "z3drenderglobalstate.h"
 #include <folly/ScopeGuard.h>
 #include <QApplication>
 #include <QMessageBox>
@@ -116,7 +117,7 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   m_zoomInViewSize.setTracking(false);
   m_zoomInViewSize.setSingleStep(32);
   addParameter(m_zoomInViewSize);
-  connect(&m_rendererBase, &Z3DRendererBase::coordTransformChanged, this, &Z3DVolumeFilter::changeCoordTransform);
+  connect(this, &Z3DBoundedFilter::rendererCoordTransformChanged, this, &Z3DVolumeFilter::changeCoordTransform);
   connect(&m_zoomInViewSize, &ZIntParameter::valueChanged, this, &Z3DVolumeFilter::changeZoomInViewSize);
 
   addParameter(m_interactionDownsample);
@@ -430,7 +431,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DVolumeFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_selectionLineColor, 17);
     m_widgetsGroup->addChild(m_manipulatorSize, 17);
     m_widgetsGroup->addChild(m_interactionDownsample, 19);
-    m_widgetsGroup->addChild(m_rendererBase.coordTransformPara(), 1);
+    m_widgetsGroup->addChild(m_rendererParameters.coordTransform, 1);
 
     const std::vector<ZParameter*>& paras = parameters();
     for (auto para : paras) {
@@ -563,7 +564,7 @@ void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
   const auto& target = opaqueTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
-  m_rendererBase.render(eye, m_textureCopyRenderer);
+  renderWithState(eye, m_textureCopyRenderer);
 }
 
 bool Z3DVolumeFilter::hasTransparent(Z3DEye eye) const
@@ -579,7 +580,7 @@ void Z3DVolumeFilter::renderTransparent(Z3DEye eye)
   const auto& target = transparentTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
-  m_rendererBase.render(eye, m_textureCopyRenderer);
+  renderWithState(eye, m_textureCopyRenderer);
 }
 
 void Z3DVolumeFilter::changeCoordTransform()
@@ -654,10 +655,11 @@ void Z3DVolumeFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
     if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
       bool success;
 #ifndef _QT4_
-      glm::vec3 pos3D = getFirstHit3DPosition(e->position().x() * m_rendererBase.globalParas().devicePixelRatio.get(),
-                                              e->position().y() * m_rendererBase.globalParas().devicePixelRatio.get(),
-                                              w * m_rendererBase.globalParas().devicePixelRatio.get(),
-                                              h * m_rendererBase.globalParas().devicePixelRatio.get(),
+      const float devicePixelRatio = m_globalParameters.devicePixelRatio.get();
+      glm::vec3 pos3D = getFirstHit3DPosition(e->position().x() * devicePixelRatio,
+                                              e->position().y() * devicePixelRatio,
+                                              w * devicePixelRatio,
+                                              h * devicePixelRatio,
                                               success);
 #else
       glm::vec3 pos3D = getFirstHit3DPosition(e->x(), e->y(), w, h, success);
@@ -795,7 +797,7 @@ void Z3DVolumeFilter::process(Z3DEye eye)
 
   currentTarget.bind();
   currentTarget.clear();
-  m_rendererBase.setViewport(currentTarget.size());
+  setViewport(currentTarget.size());
 
   m_transparentValid[eye] = false;
   auto targetGuard = folly::makeGuard([&currentTarget, this, eye]() {
@@ -808,7 +810,7 @@ void Z3DVolumeFilter::process(Z3DEye eye)
 
   if (m_volumeRaycasterRenderer.hasVisibleRendering() && !allCliped) {
     prepareDataForRaycaster(volume, eye);
-    m_rendererBase.render(eye, m_volumeRaycasterRenderer);
+    renderWithState(eye, m_volumeRaycasterRenderer);
   }
 
   renderBoundBox(eye);
@@ -840,7 +842,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
 
   currentTarget.bind();
   currentTarget.clear();
-  m_rendererBase.setViewport(currentTarget.size());
+  setViewport(currentTarget.size());
 
   m_opaqueValid[eye] = false;
   auto targetGuard = folly::makeGuard([&currentTarget, this, eye]() {
@@ -1084,7 +1086,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
       }
       renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
     }
-    m_rendererBase.render(eye, renderers);
+    renderWithState(eye, renderers);
 
   } else {
     m_volumeSliceRenderer.clearQuads();
@@ -1138,7 +1140,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
       slice.transformVerticesByMatrix(volume->physicalToWorldMatrix());
       m_volumeSliceRenderer.addQuad(slice);
     }
-    m_rendererBase.render(eye, m_volumeSliceRenderer);
+    renderWithState(eye, m_volumeSliceRenderer);
   }
 }
 
@@ -1532,7 +1534,7 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
   m_exitTarget.resize(m_outputSize);
   m_entryTarget.resize(m_outputSize);
 
-  m_rendererBase.setViewport(m_exitTarget.size());
+  setViewport(m_exitTarget.size());
   CHECK_GL_ERROR
 
   // render back texture
@@ -1543,7 +1545,7 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
   glCullFace(GL_FRONT);
 
   m_textureAndEyeCoordinateRenderer.setTriangleList(&cube);
-  m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
+  renderWithState(eye, m_textureAndEyeCoordinateRenderer);
   m_exitTarget.release();
   CHECK_GL_ERROR
 
@@ -1559,7 +1561,7 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
   planes.emplace_back(-globalCamera().viewVector(), nearPlaneDistToOrigin);
   ZMesh clipped = ZMeshUtils::clipClosedSurface(cube, planes);
   m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
-  m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
+  renderWithState(eye, m_textureAndEyeCoordinateRenderer);
   m_entryTarget.release();
   CHECK_GL_ERROR
 
@@ -1591,7 +1593,7 @@ void Z3DVolumeFilter::volumeChanged()
   m_zCut.setRange(-1, volDim.z);
   m_zCut.set(m_zCut.range());
 
-  m_rendererBase.setRotationCenter(glm::vec3(volDim.x - 1, volDim.y - 1, volDim.z - 1) / 2.f);
+  m_rendererParameters.coordTransform.setRotationCenter(glm::vec3(volDim.x - 1, volDim.y - 1, volDim.z - 1) / 2.f);
 
   m_zSlicePosition.setRange(0, volDim.z - 1);
   m_ySlicePosition.setRange(0, volDim.y - 1);
@@ -1657,7 +1659,7 @@ Z3DRenderTarget& Z3DVolumeFilter::ensureRenderTarget(Z3DScratchResourcePool::Ren
     lease.release();
     CHECK_GT(m_outputSize.x, 0u);
     CHECK_GT(m_outputSize.y, 0u);
-    lease = m_rendererBase.globalParas().scratchPool().acquireTempRenderTarget2D(m_outputSize);
+    lease = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(m_outputSize);
   }
   return *lease.renderTarget;
 }

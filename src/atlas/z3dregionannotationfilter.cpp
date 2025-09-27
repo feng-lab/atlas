@@ -50,12 +50,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_visible, 1);
     m_widgetsGroup->addChild(m_stayOnTop, 1);
 
-    std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (auto para : paras) {
-      if (para->name() == "Coord Transform") {
-        m_widgetsGroup->addChild(*para, 2);
-      }
-    }
+    m_widgetsGroup->addChild(m_rendererParameters.coordTransform, 2);
     m_widgetsGroup->addChild(m_boundBoxMode, 5);
     m_widgetsGroup->addChild(m_boundBoxLineWidth, 5);
     m_widgetsGroup->addChild(m_boundBoxLineColor, 5);
@@ -167,7 +162,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
 
   for (const auto& node : m_regionAnnotationPack->regionAnnotation().annotationTree()) {
     auto id = node.id;
-    auto flt = new Z3DMeshFilter(m_rendererBase.globalParas(), &node);
+    auto flt = new Z3DMeshFilter(m_globalParameters, &node);
     if (node.mesh) {
       std::vector<ZMesh*> meshList;
       meshList.push_back(node.mesh.get());
@@ -181,7 +176,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
     std::vector<ZParameter*> paras = flt->parameters();
     for (auto& para : paras) {
       if (para->name().contains("Coord Transform")) {
-        connect(&m_rendererBase.coordTransformPara(),
+        connect(&m_rendererParameters.coordTransform,
                 &Z3DTransformParameter::valueChanged,
                 para,
                 &ZParameter::updateFromSender);

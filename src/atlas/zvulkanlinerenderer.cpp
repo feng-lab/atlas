@@ -1,7 +1,6 @@
 #include "zvulkanlinerenderer.h"
 
 #include "zvulkandevice.h"
-#include "z3dglobalparameters.h"
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkanbuffer.h"
@@ -318,11 +317,10 @@ void ZVulkanLineRenderer::uploadUBOs()
   if (w > 0.f && h > 0.f) {
     lighting.screen_dim_RCP = glm::vec2(1.0f / w, 1.0f / h);
   }
-  if (const auto* globals = m_rendererBase.globalParameters()) {
-    if (!globals->fogMode.isSelected("None")) {
-      lighting.fog_color_top = globals->fogTopColor.get();
-      lighting.fog_color_bottom = globals->fogBottomColor.get();
-    }
+  const auto& sceneState = m_rendererBase.sceneState();
+  if (sceneState.fog.mode != FogMode::None) {
+    lighting.fog_color_top = sceneState.fog.topColor;
+    lighting.fog_color_bottom = sceneState.fog.bottomColor;
   }
   m_uboLighting->copyData(&lighting, sizeof(lighting));
 
@@ -347,11 +345,7 @@ void ZVulkanLineRenderer::uploadUBOs()
                                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   MaterialUBOStd140 mat{};
-  if (const auto* globals = m_rendererBase.globalParameters()) {
-    mat.scene_ambient = globals->sceneAmbient.get();
-  } else {
-    mat.scene_ambient = glm::vec4(1.0f);
-  }
+  mat.scene_ambient = sceneState.sceneAmbient;
   mat.material_ambient = glm::vec4(1.0f);
   mat.material_specular = glm::vec4(0.0f);
   mat.material_shininess = 32.0f;

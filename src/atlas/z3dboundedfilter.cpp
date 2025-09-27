@@ -1,17 +1,188 @@
 #include "z3dboundedfilter.h"
 #include "z3dgl.h"
 
+#include "z3drenderglobalstate.h"
 #include "zlog.h"
+#include <algorithm>
+#include <utility>
+#include <vector>
 #include <folly/ScopeGuard.h>
-
 #include <Mathematics/DistLineRay.h>
 #include <boost/math/constants/constants.hpp>
 
 namespace nim {
 
+void Z3DBoundedFilter::applyRendererCoordTransform(const glm::mat4& transform)
+{
+  m_rendererParameterState.coordTransform = transform;
+  scheduleBoundsUpdate(BoundsDirtyFlag::AxisAligned);
+  m_rendererBase.markRenderDataDirty();
+  Q_EMIT rendererCoordTransformChanged();
+}
+
+void Z3DBoundedFilter::applyRendererSizeScale(float scale)
+{
+  m_rendererParameterState.sizeScale = scale;
+  scheduleBoundsUpdate(BoundsDirtyFlag::Full);
+  m_rendererBase.markRenderDataDirty();
+  Q_EMIT rendererSizeScaleChanged();
+}
+
+void Z3DBoundedFilter::refreshRendererBackend()
+{
+  const auto selectedBackend = static_cast<RenderBackend>(m_globalParameters.renderBackend.associatedData());
+  if (m_rendererBackendInitialized && selectedBackend == m_requestedBackend && selectedBackend == m_activeBackend) {
+    return;
+  }
+
+  m_requestedBackend = selectedBackend;
+
+  std::unique_ptr<Z3DRendererBackend> backend;
+  auto backendUsed = selectedBackend;
+  switch (selectedBackend) {
+    case RenderBackend::OpenGL:
+      backend = createGLRendererBackend();
+      break;
+    case RenderBackend::Vulkan:
+      LOG_FIRST_N(WARNING, 1) << "Vulkan renderer backend not wired yet; continuing with OpenGL";
+      backend = createGLRendererBackend();
+      backendUsed = RenderBackend::OpenGL;
+      break;
+  }
+
+  CHECK(backend != nullptr) << "Failed to create renderer backend";
+  m_rendererBase.setBackend(std::move(backend));
+  m_activeBackend = backendUsed;
+  m_rendererBackendInitialized = true;
+
+  pushRendererParametersToBase();
+  resolvePendingBounds();
+  setClipPlanes();
+}
+
+void Z3DBoundedFilter::pushRendererParametersToBase()
+{
+  m_rendererParameterState.coordTransform = m_rendererParameters.coordTransform.get();
+  m_rendererParameterState.sizeScale = m_rendererParameters.sizeScale.get();
+  m_rendererParameterState.opacity = m_rendererParameters.opacity.get();
+  m_rendererParameterState.materialAmbient = m_rendererParameters.materialAmbient.get();
+  m_rendererParameterState.materialSpecular = m_rendererParameters.materialSpecular.get();
+  m_rendererParameterState.materialShininess = m_rendererParameters.materialShininess.get();
+  m_rendererParameterState.filterNotFrontFacing = m_rendererParameters.filterNotFrontFacing.get();
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  m_rendererParameterState.renderMethod = m_rendererParameters.renderMethod.isSelected("Old openGL")
+                                            ? Z3DRendererBase::RenderMethod::LegacyOpenGL
+                                            : Z3DRendererBase::RenderMethod::GLSL;
+#else
+  m_rendererParameterState.renderMethod = Z3DRendererBase::RenderMethod::GLSL;
+#endif
+  scheduleBoundsUpdate(BoundsDirtyFlag::Full);
+  m_rendererBase.markRenderDataDirty();
+}
+
+void Z3DBoundedFilter::scheduleBoundsUpdate(BoundsDirtyFlag flag)
+{
+  if (flag == BoundsDirtyFlag::None) {
+    return;
+  }
+
+  const auto mask = static_cast<uint8_t>(flag);
+  if ((mask & static_cast<uint8_t>(BoundsDirtyFlag::Full)) != 0U) {
+    m_boundsDirtyMask |= static_cast<uint8_t>(BoundsDirtyFlag::Full);
+    m_boundsDirtyMask |= static_cast<uint8_t>(BoundsDirtyFlag::AxisAligned);
+  } else {
+    m_boundsDirtyMask |= mask;
+  }
+
+  m_handleValid = false;
+}
+
+void Z3DBoundedFilter::resolvePendingBounds()
+{
+  if (m_boundsDirtyMask == 0) {
+    return;
+  }
+
+  if ((m_boundsDirtyMask & static_cast<uint8_t>(BoundsDirtyFlag::Full)) != 0U) {
+    updateBoundBox();
+  } else if ((m_boundsDirtyMask & static_cast<uint8_t>(BoundsDirtyFlag::AxisAligned)) != 0U) {
+    updateAxisAlignedBoundBox();
+  }
+
+  m_boundsDirtyMask = 0;
+}
+
+void Z3DBoundedFilter::renderWithStateAndCameraAndCoordTransformImpl(Z3DEye eye,
+                                                                     const Z3DCamera& camera,
+                                                                     const glm::mat4& transform,
+                                                                     std::span<Z3DPrimitiveRenderer*> renderers)
+{
+  if (renderers.empty()) {
+    return;
+  }
+
+  syncRendererState(eye);
+
+  const auto previousTransform = m_rendererParameterState.coordTransform;
+  auto transformGuard = folly::makeGuard([this, previousTransform]() {
+    m_rendererParameterState.coordTransform = previousTransform;
+  });
+  m_rendererParameterState.coordTransform = transform;
+
+  auto previousState = m_rendererBase.pushViewStateFromCamera(camera);
+  switch (renderers.size()) {
+    case 1:
+      m_rendererBase.render(eye, *renderers[0]);
+      break;
+    case 2:
+      m_rendererBase.render(eye, *renderers[0], *renderers[1]);
+      break;
+    case 3:
+      m_rendererBase.render(eye, *renderers[0], *renderers[1], *renderers[2]);
+      break;
+    case 4:
+      m_rendererBase.render(eye, *renderers[0], *renderers[1], *renderers[2], *renderers[3]);
+      break;
+    default: {
+      std::vector<Z3DPrimitiveRenderer*> rendererList(renderers.begin(), renderers.end());
+      m_rendererBase.render(eye, rendererList);
+      break;
+    }
+  }
+  m_rendererBase.restoreViewState(previousState);
+}
+
+Z3DBoundedFilter::RendererParameters::RendererParameters()
+  : coordTransform("Coord Transform", glm::mat4(1.f))
+  , renderMethod("Rendering Method")
+  , sizeScale("Size Scale", 1.f, .001f, std::numeric_limits<float>::max())
+  , opacity("Opacity", 1.0f, .0f, 1.f)
+  , filterNotFrontFacing("Filter Not Front Facing", true)
+  , materialAmbient("Material Ambient", glm::vec4(0.1f, .1f, .1f, 1.f))
+  , materialSpecular("Material Specular", glm::vec4(1.f, 1.f, 1.f, 1.f))
+  , materialShininess("Material Shininess", 100.f, 1.f, 200.f)
+{
+  renderMethod.addOptions("GLSL", "Old openGL");
+  renderMethod.select("GLSL");
+
+  sizeScale.setSingleStep(0.001);
+  sizeScale.setDecimal(3);
+  sizeScale.setStyle("SPINBOX");
+
+  materialAmbient.setStyle("COLOR");
+  materialSpecular.setStyle("COLOR");
+}
+
 Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* parent)
   : Z3DFilter(parent)
-  , m_rendererBase(globalPara)
+  , m_rendererParameters()
+  , m_globalParameters(globalPara)
+  , m_rendererParameterState()
+  , m_rendererFrameState()
+  , m_rendererBase(m_rendererParameterState,
+                   m_rendererFrameState,
+                   Z3DRenderGlobalState::instance().rendererState().viewState,
+                   Z3DRenderGlobalState::instance().rendererState().sceneState)
   , m_baseBoundBoxRenderer(m_rendererBase)
   , m_selectionBoundBoxRenderer(m_rendererBase)
   , m_selectionCornerRenderer(m_rendererBase)
@@ -46,12 +217,9 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_manipulatorSize.setSingleStep(10);
   connect(&m_manipulatorSize, &ZFloatParameter::valueChanged, this, &Z3DBoundedFilter::invalidateHandle);
 
-  connect(&m_rendererBase, &Z3DRendererBase::coordTransformChanged, this, &Z3DBoundedFilter::updateAxisAlignedBoundBox);
-  connect(&m_rendererBase, &Z3DRendererBase::sizeScaleChanged, this, &Z3DBoundedFilter::updateBoundBox);
-  connect(&m_rendererBase.globalCameraPara(),
-          &Z3DCameraParameter::valueChanged,
-          this,
-          &Z3DBoundedFilter::invalidateHandle);
+  connect(&m_globalParameters.camera, &Z3DCameraParameter::valueChanged, this, [this]() {
+    invalidateHandle();
+  });
 
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DBoundedFilter::objVisibleChanged);
   m_xCut.setSingleStep(1);
@@ -60,9 +228,9 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   connect(&m_xCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_yCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_zCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
-  connect(&m_rendererBase.globalXCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
-  connect(&m_rendererBase.globalYCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
-  connect(&m_rendererBase.globalZCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  connect(&m_globalParameters.globalXCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  connect(&m_globalParameters.globalYCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  connect(&m_globalParameters.globalZCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_boundBoxMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBoundedFilter::onBoundBoxModeChanged);
   m_boundBoxLineColor.setStyle("COLOR");
   // m_boundBoxLineColor.get().reset(0., 1., QColor(133,163,240,255), QColor(248,60,35,255));
@@ -82,6 +250,69 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   addParameter(m_boundBoxLineColor);
   addParameter(m_selectionLineWidth);
   addParameter(m_selectionLineColor);
+
+  addParameter(m_rendererParameters.coordTransform);
+  addParameter(m_rendererParameters.sizeScale);
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  addParameter(m_rendererParameters.renderMethod);
+#endif
+  addParameter(m_rendererParameters.opacity);
+  addParameter(m_rendererParameters.materialAmbient);
+  addParameter(m_rendererParameters.materialSpecular);
+  addParameter(m_rendererParameters.materialShininess);
+
+  connect(&m_rendererParameters.coordTransform, &Z3DTransformParameter::valueChanged, this, [this]() {
+    applyRendererCoordTransform(m_rendererParameters.coordTransform.get());
+  });
+
+  connect(&m_rendererParameters.sizeScale, &ZParameter::valueChanged, this, [this]() {
+    applyRendererSizeScale(m_rendererParameters.sizeScale.get());
+  });
+
+  connect(&m_rendererParameters.opacity, &ZParameter::valueChanged, this, [this]() {
+    m_rendererParameterState.opacity = m_rendererParameters.opacity.get();
+    m_rendererBase.markRenderDataDirty();
+  });
+
+  connect(&m_rendererParameters.materialAmbient, &ZParameter::valueChanged, this, [this]() {
+    m_rendererParameterState.materialAmbient = m_rendererParameters.materialAmbient.get();
+    m_rendererBase.markRenderDataDirty();
+  });
+
+  connect(&m_rendererParameters.materialSpecular, &ZParameter::valueChanged, this, [this]() {
+    m_rendererParameterState.materialSpecular = m_rendererParameters.materialSpecular.get();
+    m_rendererBase.markRenderDataDirty();
+  });
+
+  connect(&m_rendererParameters.materialShininess, &ZParameter::valueChanged, this, [this]() {
+    m_rendererParameterState.materialShininess = m_rendererParameters.materialShininess.get();
+    m_rendererBase.markRenderDataDirty();
+  });
+
+  connect(&m_rendererParameters.filterNotFrontFacing, &ZBoolParameter::boolChanged, this, [this](bool enabled) {
+    m_rendererParameterState.filterNotFrontFacing = enabled;
+  });
+
+  connect(&m_rendererParameters.renderMethod, &ZParameter::valueChanged, this, [this]() {
+    auto method = Z3DRendererBase::RenderMethod::GLSL;
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+    if (m_rendererParameters.renderMethod.isSelected("Old openGL")) {
+      method = Z3DRendererBase::RenderMethod::LegacyOpenGL;
+    }
+#endif
+    m_rendererParameterState.renderMethod = method;
+    m_rendererBase.markRenderDataDirty();
+  });
+
+  connect(&m_globalParameters.renderBackend, &ZParameter::valueChanged, this, [this]() {
+    refreshRendererBackend();
+  });
+
+  refreshRendererBackend();
+
+  applyRendererCoordTransform(m_rendererParameters.coordTransform.get());
+  applyRendererSizeScale(m_rendererParameters.sizeScale.get());
+  resolvePendingBounds();
 
   onBoundBoxModeChanged();
 
@@ -135,7 +366,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   addEventListener(m_handleEvent);
   m_handleEvent.setEnabled(m_isSelected);
 
-  for (auto para : m_rendererBase.globalParameters()) {
+  for (auto* para : m_globalParameters.parameters()) {
 #ifdef ATLAS_DEBUG_VERSION
     connect(para, &ZParameter::valueChanged, this, [this, para]() {
       // Record which global parameter changed to aid invalidation attribution.
@@ -162,9 +393,6 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
     connect(para, &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
 #endif
   }
-  for (auto para : m_rendererBase.parameters()) {
-    addParameter(*para);
-  }
 }
 
 void Z3DBoundedFilter::setSelected(bool v)
@@ -183,7 +411,7 @@ void Z3DBoundedFilter::renderHandle(Z3DEye eye)
       updateHandle();
     }
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    renderWithState(eye, m_handleArrowRenderer, m_handleCenterRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -192,7 +420,7 @@ void Z3DBoundedFilter::renderHandlePicking(Z3DEye eye)
 {
   if (m_isSelected) {
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.renderPicking(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    renderPickingWithState(eye, m_handleArrowRenderer, m_handleCenterRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -210,7 +438,7 @@ void Z3DBoundedFilter::renderSelectionBox(Z3DEye eye)
       m_selectionBoundBoxRenderer.setDataColors(&m_selectionLineColors);
     }
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_selectionBoundBoxRenderer, m_selectionCornerRenderer);
+    renderWithState(eye, m_selectionBoundBoxRenderer, m_selectionCornerRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -231,7 +459,7 @@ void Z3DBoundedFilter::renderEditingSelectionBox(Z3DEye eye)
       m_selectionBoundBoxRenderer.setDataColors(&m_selectionLineColors);
     }
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_selectionBoundBoxRenderer);
+    renderWithState(eye, m_selectionBoundBoxRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -241,7 +469,7 @@ void Z3DBoundedFilter::rotateX()
   if (!m_isSelected || !m_transformEnabled) {
     return;
   }
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(1, 0, 0), boost::math::float_constants::degree, m_center);
+  m_rendererParameters.coordTransform.rotate(glm::vec3(1, 0, 0), boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateY()
@@ -249,7 +477,7 @@ void Z3DBoundedFilter::rotateY()
   if (!m_isSelected || !m_transformEnabled) {
     return;
   }
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 1, 0), boost::math::float_constants::degree, m_center);
+  m_rendererParameters.coordTransform.rotate(glm::vec3(0, 1, 0), boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateZ()
@@ -257,7 +485,7 @@ void Z3DBoundedFilter::rotateZ()
   if (!m_isSelected || !m_transformEnabled) {
     return;
   }
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 0, 1), boost::math::float_constants::degree, m_center);
+  m_rendererParameters.coordTransform.rotate(glm::vec3(0, 0, 1), boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateXM()
@@ -265,7 +493,7 @@ void Z3DBoundedFilter::rotateXM()
   if (!m_isSelected || !m_transformEnabled) {
     return;
   }
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(1, 0, 0), -boost::math::float_constants::degree, m_center);
+  m_rendererParameters.coordTransform.rotate(glm::vec3(1, 0, 0), -boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateYM()
@@ -273,7 +501,7 @@ void Z3DBoundedFilter::rotateYM()
   if (!m_isSelected || !m_transformEnabled) {
     return;
   }
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 1, 0), -boost::math::float_constants::degree, m_center);
+  m_rendererParameters.coordTransform.rotate(glm::vec3(0, 1, 0), -boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateZM()
@@ -281,7 +509,7 @@ void Z3DBoundedFilter::rotateZM()
   if (!m_isSelected || !m_transformEnabled) {
     return;
   }
-  m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 0, 1), -boost::math::float_constants::degree, m_center);
+  m_rendererParameters.coordTransform.rotate(glm::vec3(0, 0, 1), -boost::math::float_constants::degree, m_center);
 }
 
 ZBBox<glm::dvec3> Z3DBoundedFilter::axisAlignedBoundBoxAfterClipping() const
@@ -289,7 +517,7 @@ ZBBox<glm::dvec3> Z3DBoundedFilter::axisAlignedBoundBoxAfterClipping() const
   ZBBox<glm::dvec3> res;
   if (auto notTransformedBBAfterCutting = notTransformedBoundBoxAfterClipping();
       !notTransformedBBAfterCutting.empty()) {
-    glm::dmat4 tfm(m_rendererBase.coordTransform());
+    glm::dmat4 tfm(m_rendererParameters.coordTransform.get());
     auto physicalLUF = notTransformedBBAfterCutting.minCorner;
     auto physicalRDB = notTransformedBBAfterCutting.maxCorner;
     res.expand(glm::applyMatrix(tfm, physicalLUF));
@@ -348,6 +576,25 @@ void Z3DBoundedFilter::setClipPlanes()
   if (m_zCut.upperValue() != m_zCut.maximum()) {
     clipPlanes.emplace_back(0., 0., -1., m_zCut.upperValue());
   }
+
+  if (m_globalParameters.globalXCut.lowerValue() != m_globalParameters.globalXCut.minimum()) {
+    clipPlanes.emplace_back(1., 0., 0., -m_globalParameters.globalXCut.lowerValue());
+  }
+  if (m_globalParameters.globalXCut.upperValue() != m_globalParameters.globalXCut.maximum()) {
+    clipPlanes.emplace_back(-1., 0., 0., m_globalParameters.globalXCut.upperValue());
+  }
+  if (m_globalParameters.globalYCut.lowerValue() != m_globalParameters.globalYCut.minimum()) {
+    clipPlanes.emplace_back(0., 1., 0., -m_globalParameters.globalYCut.lowerValue());
+  }
+  if (m_globalParameters.globalYCut.upperValue() != m_globalParameters.globalYCut.maximum()) {
+    clipPlanes.emplace_back(0., -1., 0., m_globalParameters.globalYCut.upperValue());
+  }
+  if (m_globalParameters.globalZCut.lowerValue() != m_globalParameters.globalZCut.minimum()) {
+    clipPlanes.emplace_back(0., 0., 1., -m_globalParameters.globalZCut.lowerValue());
+  }
+  if (m_globalParameters.globalZCut.upperValue() != m_globalParameters.globalZCut.maximum()) {
+    clipPlanes.emplace_back(0., 0., -1., m_globalParameters.globalZCut.upperValue());
+  }
   m_rendererBase.setClipPlanes(&clipPlanes);
 }
 
@@ -364,16 +611,18 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
     }
     updateSelectedHandle(handleIdx);
     glm::ivec4 viewport(0, 0, w, h);
-    m_startTrans = m_rendererBase.coordTransformPara().translation();
+    m_startTrans = m_rendererParameters.coordTransform.translation();
     if (handleIdx == 1) {
-      m_startDepth = camera().worldToScreen(m_center, viewport).z;
+      m_startDepth = m_globalParameters.camera.get().worldToScreen(m_center, viewport).z;
       m_startMouseWorldPos =
-        camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), m_startDepth), viewport);
+        m_globalParameters.camera.get().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), m_startDepth),
+                                                      viewport);
     } else {
       GLfloat WindowPosZ = pickingManager().depthAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
       CHECK_GL_ERROR
       m_startMouseWorldPos =
-        camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), WindowPosZ), viewport);
+        m_globalParameters.camera.get().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), WindowPosZ),
+                                                      viewport);
     }
     e->accept();
     return;
@@ -384,10 +633,10 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
       return;
     }
     if (m_selectedHandle == 1) {
-      glm::vec3 endInWorld =
-        camera().screenToWorld(glm::vec3(glm::vec2(e->position().x(), h - e->position().y()), m_startDepth),
-                               glm::ivec4(0, 0, w, h));
-      m_rendererBase.coordTransformPara().setTranslation(m_startTrans + endInWorld - m_startMouseWorldPos);
+      glm::vec3 endInWorld = m_globalParameters.camera.get().screenToWorld(
+        glm::vec3(glm::vec2(e->position().x(), h - e->position().y()), m_startDepth),
+        glm::ivec4(0, 0, w, h));
+      m_rendererParameters.coordTransform.setTranslation(m_startTrans + endInWorld - m_startMouseWorldPos);
     } else {
       glm::vec3 v1, v2;
       rayUnderScreenPoint(v1, v2, e->position().x(), e->position().y(), w, h);
@@ -399,19 +648,19 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
           gte::Vector<3, float>{m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
           gte::Vector<3, float>{1, 0, 0});
         auto result = dist(xLine, ray);
-        m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(result.parameter[0], 0, 0));
+        m_rendererParameters.coordTransform.setTranslation(m_startTrans + glm::vec3(result.parameter[0], 0, 0));
       } else if (m_selectedHandle == 3) {
         gte::Line<3, float> xLine(
           gte::Vector<3, float>{m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
           gte::Vector<3, float>{0, 1, 0});
         auto result = dist(xLine, ray);
-        m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, result.parameter[0], 0));
+        m_rendererParameters.coordTransform.setTranslation(m_startTrans + glm::vec3(0, result.parameter[0], 0));
       } else if (m_selectedHandle == 4) {
         gte::Line<3, float> xLine(
           gte::Vector<3, float>{m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
           gte::Vector<3, float>{0, 0, 1});
         auto result = dist(xLine, ray);
-        m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, 0, result.parameter[0]));
+        m_rendererParameters.coordTransform.setTranslation(m_startTrans + glm::vec3(0, 0, result.parameter[0]));
       }
     }
     m_lastMousePosition = glm::ivec2(e->position().x(), e->position().y());
@@ -440,14 +689,14 @@ void Z3DBoundedFilter::initializeCutRange()
 void Z3DBoundedFilter::initializeRotationCenter()
 {
   const ZBBox<glm::dvec3>& bound = notTransformedBoundBox();
-  m_rendererBase.setRotationCenter(glm::vec3((bound.minCorner + bound.maxCorner) / 2.0));
+  m_rendererParameters.coordTransform.setRotationCenter(glm::vec3((bound.minCorner + bound.maxCorner) / 2.0));
 }
 
 void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)
 {
   if (!m_boundBoxMode.isSelected("No Bound Box")) {
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_baseBoundBoxRenderer);
+    renderWithState(eye, m_baseBoundBoxRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -468,9 +717,34 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye, BoundBoxRenderStyle style)
       glDisable(GL_DEPTH_TEST);
     });
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_baseBoundBoxRenderer);
+    renderWithState(eye, m_baseBoundBoxRenderer);
     m_rendererBase.setClipEnabled(true);
   }
+}
+
+void Z3DBoundedFilter::syncRendererState(Z3DEye /*eye*/)
+{
+  resolvePendingBounds();
+  updateFrameState();
+
+  auto& globalState = Z3DRenderGlobalState::instance();
+  globalState.ensureSceneState(m_globalParameters);
+  globalState.ensureViewState(m_globalParameters.camera.get());
+
+  for (int eyeValue = LeftEye; eyeValue <= RightEye; ++eyeValue) {
+    auto eye = static_cast<Z3DEye>(eyeValue);
+    auto& eyeState = globalState.rendererState().viewState.eyes[eye];
+    const glm::mat4 combined = eyeState.viewMatrix * m_rendererParameters.coordTransform.get();
+    const glm::mat3 combined3 = glm::mat3(combined);
+    eyeState.coordTransformNormalMatrix = glm::transpose(glm::inverse(combined3));
+  }
+}
+
+void Z3DBoundedFilter::updateFrameState()
+{
+  m_rendererFrameState.updateViewportData(m_currentViewport);
+  m_rendererFrameState.progressiveEnabled = false;
+  m_rendererFrameState.progressiveActive = false;
 }
 
 void Z3DBoundedFilter::appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::vector<glm::vec3>& lines)
@@ -514,8 +788,8 @@ void Z3DBoundedFilter::appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::
 
 void Z3DBoundedFilter::rayUnderScreenPoint(glm::vec3& v1, glm::vec3& v2, int x, int y, int width, int height)
 {
-  const glm::mat4& projection = globalCamera().projectionMatrix(MonoEye);
-  const glm::mat4& modelview = globalCamera().viewMatrix(MonoEye);
+  const glm::mat4& projection = m_globalParameters.camera.get().projectionMatrix(MonoEye);
+  const glm::mat4& modelview = m_globalParameters.camera.get().viewMatrix(MonoEye);
 
   glm::ivec4 viewport;
   viewport[0] = 0;
@@ -530,8 +804,8 @@ void Z3DBoundedFilter::rayUnderScreenPoint(glm::vec3& v1, glm::vec3& v2, int x, 
 
 void Z3DBoundedFilter::rayUnderScreenPoint(glm::dvec3& v1, glm::dvec3& v2, int x, int y, int width, int height)
 {
-  const glm::dmat4& projection = glm::dmat4(globalCamera().projectionMatrix(MonoEye));
-  const glm::dmat4& modelview = glm::dmat4(globalCamera().viewMatrix(MonoEye));
+  const glm::dmat4& projection = glm::dmat4(m_globalParameters.camera.get().projectionMatrix(MonoEye));
+  const glm::dmat4& modelview = glm::dmat4(m_globalParameters.camera.get().viewMatrix(MonoEye));
 
   glm::ivec4 viewport;
   viewport[0] = 0;
@@ -590,7 +864,7 @@ void Z3DBoundedFilter::expandCutRange()
 
 void Z3DBoundedFilter::updateAxisAlignedBoundBox()
 {
-  if (m_rendererBase.coordTransform() == glm::mat4(1.f)) {
+  if (m_rendererParameters.coordTransform.get() == glm::mat4(1.f)) {
     m_axisAlignedBoundBox = m_notTransformedBoundBox;
   } else {
     updateAxisAlignedBoundBoxImpl();
@@ -695,8 +969,8 @@ void Z3DBoundedFilter::makeSelectionGeometries()
 void Z3DBoundedFilter::updateHandle()
 {
   if (!m_handleValid) {
-    Z3DCamera& camera = m_rendererBase.globalCamera();
-    glm::mat4 mat = m_rendererBase.viewportMatrix() * camera.projectionMatrix(MonoEye) * camera.viewMatrix(MonoEye);
+    Z3DCamera& camera = m_globalParameters.camera.get();
+    glm::mat4 mat = m_rendererFrameState.viewportMatrix * camera.projectionMatrix(MonoEye) * camera.viewMatrix(MonoEye);
     glm::vec3 rightVector(camera.viewMatrix(MonoEye)[0][0],
                           camera.viewMatrix(MonoEye)[1][0],
                           camera.viewMatrix(MonoEye)[2][0]);

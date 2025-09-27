@@ -55,14 +55,14 @@ public:
 
   bool hasOpaque(Z3DEye) const override
   {
-    return m_rendererBase.opacity() == 1.f && !m_renderingPrimitive.isSelected("Line");
+    return m_rendererParameters.opacity.get() == 1.f && !m_renderingPrimitive.isSelected("Line");
   }
 
   void renderOpaque(Z3DEye eye) override;
 
   bool hasTransparent(Z3DEye) const override
   {
-    return m_rendererBase.opacity() < 1.f || m_renderingPrimitive.isSelected("Line");
+    return m_rendererParameters.opacity.get() < 1.f || m_renderingPrimitive.isSelected("Line");
   }
 
   void renderTransparent(Z3DEye eye) override;

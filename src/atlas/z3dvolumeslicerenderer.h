@@ -12,6 +12,8 @@ class Z3DVolume;
 
 class Z3DImg;
 
+class Z3DRenderTarget;
+
 // render 2d slices of volume with colormap
 // use colormap of each volume to composite final image
 class Z3DVolumeSliceRenderer : public Z3DPrimitiveRenderer

@@ -10,6 +10,8 @@ namespace nim {
 
 class Z3DVolume;
 
+class Z3DRenderTarget;
+
 // render 2d image with colormap
 // use colormap of each volume to composite final image
 class Z3DImage2DRenderer : public Z3DPrimitiveRenderer

@@ -10,7 +10,6 @@
 #include "z3dtexturecopyrenderer.h"
 #include "z3dtextureglowrenderer.h"
 #include "z3dfontrenderer.h"
-#include "z3dinteractionhandler.h"
 #include "zwidgetsgroup.h"
 #include "z3dshaderprogram.h"
 #include "zparameter.h"
@@ -106,7 +105,7 @@ private:
                       const std::vector<Z3DBoundedFilter*>& transparentFilters,
                       Z3DRenderTarget& renderTarget,
                       Z3DEye eye,
-                      const QString& method);
+                      TransparencyMode mode);
 
   void renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& filters, Z3DRenderTarget& renderTarget, Z3DEye eye);
 
@@ -243,6 +242,8 @@ private:
   glm::vec3 m_ZEnd{};
 
   std::shared_ptr<ZWidgetsGroup> m_axisWidgetsGroup;
+
+  Z3DCamera m_axisCamera;
 
   Z3DVertexArrayObject m_screenQuadVAO;
 

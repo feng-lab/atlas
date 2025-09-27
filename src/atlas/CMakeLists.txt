@@ -418,6 +418,8 @@ set(SOURCES
     z3dbackgroundrenderer.h z3dbackgroundrenderer.cpp
     z3darrowrenderer.h z3darrowrenderer.cpp
     z3drendererbase.h z3drendererbase.cpp
+    z3drendererbackend.h z3drendererglbackend.cpp
+    z3drenderglobalstate.h z3drenderglobalstate.cpp
     z3dprimitiverenderer.h z3dprimitiverenderer.cpp
     z3dcanvaspainter.h z3dcanvaspainter.cpp
     z3dnetworkevaluator.h z3dnetworkevaluator.cpp

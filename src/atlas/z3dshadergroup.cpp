@@ -1,10 +1,9 @@
 #include "z3dshadergroup.h"
 
-#include <memory>
-
 #include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -59,15 +58,15 @@ void Z3DShaderGroup::bind()
     get().bindTexture("DepthBlenderTex", m_base.shaderHookPara().dualDepthPeelingDepthBlenderTexture);
     get().bindTexture("FrontBlenderTex", m_base.shaderHookPara().dualDepthPeelingFrontBlenderTexture);
   } else if (m_base.shaderHookType() == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
-    float n = m_base.camera().nearDist();
-    float f = m_base.camera().farDist();
+    float n = m_base.viewState().nearClip;
+    float f = m_base.viewState().farClip;
     // http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
     //  zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
     float a = f * n / (f - n);
     float b = 0.5f * (f + n) / (f - n) + 0.5f;
     get().setUniform("ze_to_zw_b", b);
     get().setUniform("ze_to_zw_a", a);
-    get().setUniform("weighted_blended_depth_scale", m_base.globalParas().weightedBlendedDepthScale.get());
+    get().setUniform("weighted_blended_depth_scale", m_base.sceneState().weightedBlendedDepthScale);
   }
 }
 

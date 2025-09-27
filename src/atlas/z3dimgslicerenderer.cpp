@@ -6,6 +6,7 @@
 #include "zlog.h"
 #include "zcancellation.h"
 #include "z3dscratchresourcepool.h"
+#include "z3drenderglobalstate.h"
 #include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
@@ -175,20 +176,21 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     return m_progress[eye];
   }
 
-  auto cancellationToken = m_rendererBase.globalParas().cancellationSource
-                             ? m_rendererBase.globalParas().cancellationSource->getToken()
-                             : folly::CancellationToken();
+  const auto& sceneState = m_rendererBase.sceneState();
+  const auto& viewState = m_rendererBase.viewState();
+  const auto& eyeState = viewState.eyes[eye];
+  const auto& monoEyeState = viewState.eyes[MonoEye];
+  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  const float devicePixelRatio = sceneState.devicePixelRatio;
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
 
-  float n = m_rendererBase.camera().nearDist();
-  glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_outputSize);
-  float ze_to_screen_pixel_voxel_size =
-    -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * m_rendererBase.globalParas().devicePixelRatio.get();
+  float n = viewState.nearClip;
+  glm::vec2 pixelEyeSpaceSize = monoEyeState.frustumNearPlaneSize / glm::vec2(m_outputSize);
+  float ze_to_screen_pixel_voxel_size = -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * devicePixelRatio;
 
   Z3DScratchResourcePool::RenderTargetLease layerLease;
   if (m_img->numChannels() > 1) {
-    layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
-      m_outputSize,
-      static_cast<uint32_t>(m_img->numChannels()));
+    layerLease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize, static_cast<uint32_t>(m_img->numChannels()));
     // VLOG(1) << "lease acquired";
   }
   for (size_t i = 0; i < m_img->numChannels(); ++i) {
@@ -198,7 +200,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     processEventsAndMaybeCancel(cancellationToken);
 
     // Acquire a scratch Block ID RT with a single color attachment
-    auto blockLease = m_rendererBase.globalParas().scratchPool().acquireBlockIdRenderTarget(m_outputSize, 1);
+    auto blockLease = scratchPool.acquireBlockIdRenderTarget(m_outputSize, 1);
 
     if (blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4 != m_blockIDs.size()) {
       m_blockIDs.resize(blockLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4);
@@ -214,9 +216,8 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
       m_image3DSliceWithColorMapBlockIDsShader.setUniform("ze_to_screen_pixel_voxel_size",
                                                           ze_to_screen_pixel_voxel_size);
-      m_image3DSliceWithColorMapBlockIDsShader.setProjectionViewMatrixUniform(
-        m_rendererBase.camera().projectionViewMatrix(eye));
-      m_image3DSliceWithColorMapBlockIDsShader.setViewMatrixUniform(m_rendererBase.camera().viewMatrix(eye));
+      m_image3DSliceWithColorMapBlockIDsShader.setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
+      m_image3DSliceWithColorMapBlockIDsShader.setViewMatrixUniform(eyeState.viewMatrix);
 
       // render block ids
       const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
@@ -258,8 +259,8 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     m_image3DSliceWithColorMapShader.bind();
 
     m_image3DSliceWithColorMapShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
-    m_image3DSliceWithColorMapShader.setProjectionViewMatrixUniform(m_rendererBase.camera().projectionViewMatrix(eye));
-    m_image3DSliceWithColorMapShader.setViewMatrixUniform(m_rendererBase.camera().viewMatrix(eye));
+    m_image3DSliceWithColorMapShader.setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
+    m_image3DSliceWithColorMapShader.setViewMatrixUniform(eyeState.viewMatrix);
 
     // macOS: if sets here, then the following rendering uses old page directory caches. no idea why
     // m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
@@ -314,6 +315,8 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
 void Z3DImgSliceRenderer::renderSliceFast(Z3DEye eye)
 {
+  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+
   m_scVolumeSliceShader.bind();
   m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceShader, eye);
 
@@ -324,9 +327,7 @@ void Z3DImgSliceRenderer::renderSliceFast(Z3DEye eye)
       renderTriangleList(m_VAO, m_scVolumeSliceShader, slice);
     }
   } else {
-    layerLease = m_rendererBase.globalParas().scratchPool().acquireLayerArrayRenderTarget(
-      m_outputSize,
-      static_cast<uint32_t>(m_img->numChannels()));
+    layerLease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize, static_cast<uint32_t>(m_img->numChannels()));
     // VLOG(1) << "lease acquired";
     for (size_t j = 0; j < m_img->numChannels(); ++j) {
       layerLease.renderTarget->attachSlice(j);

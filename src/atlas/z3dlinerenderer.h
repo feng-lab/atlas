@@ -81,13 +81,13 @@ protected:
 private:
   void updateLineWidth()
   {
-    if (m_enableMultisample && m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
+    if (m_enableMultisample && m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2) {
       m_lineWidth = (m_srcLineWidth - 0.9f) * 2.f;
     } else {
       m_lineWidth = m_srcLineWidth - 0.9f;
     }
 
-    m_lineWidth *= m_rendererBase.globalParas().devicePixelRatio.get();
+    m_lineWidth *= m_rendererBase.sceneState().devicePixelRatio;
   }
 
   Z3DShaderGroup& currentShaderGrp()

@@ -194,7 +194,8 @@ void Z3DSphereRenderer::render(Z3DEye eye)
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setShaderParameters(shader);
 
-  float fovy = glm::degrees(m_rendererBase.camera().fieldOfView());
+  const auto& eyeState = m_rendererBase.viewState().eyes[static_cast<size_t>(eye)];
+  float fovy = glm::degrees(eyeState.fieldOfView);
   float adj;
   if (fovy <= 90.f) {
     adj = 1.0027 + 0.000111 * fovy + 0.000098 * fovy * fovy;
@@ -365,7 +366,8 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setPickingShaderParameters(shader);
 
-  float fovy = glm::degrees(m_rendererBase.camera().fieldOfView());
+  const auto& eyeState = m_rendererBase.viewState().eyes[static_cast<size_t>(eye)];
+  float fovy = glm::degrees(eyeState.fieldOfView);
   float adj;
   if (fovy <= 90.f) {
     adj = 1.0027 + 0.000111 * fovy + 0.000098 * fovy * fovy;

@@ -23,7 +23,7 @@ void Z3DLineWithFixedWidthColorRenderer::setData(std::vector<glm::vec3>* linesIn
 float Z3DLineWithFixedWidthColorRenderer::lineWidth() const
 {
   float width = m_fixedLineWidth;
-  if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
+  if (m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2) {
     width *= 2.f;
   }
   return width;

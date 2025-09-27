@@ -196,20 +196,16 @@ std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
     }
     m_widgetsGroup->addChild(m_swcColorParameters.colorMapBranchType, 1);
 
-    const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
-    for (auto para : paras) {
-      if (para->name() == "Coord Transform") {
-        m_widgetsGroup->addChild(*para, 5);
-      } else if (para->name() == "Size Scale") {
-        m_widgetsGroup->addChild(*para, 2);
-      } else if (para->name() == "Rendering Method") {
-        m_widgetsGroup->addChild(*para, 4);
-      } else if (para->name() == "Opacity") {
-        m_widgetsGroup->addChild(*para, 3);
-      } else {
-        m_widgetsGroup->addChild(*para, 7);
-      }
-    }
+    auto& rendererParas = m_rendererParameters;
+    m_widgetsGroup->addChild(rendererParas.coordTransform, 5);
+    m_widgetsGroup->addChild(rendererParas.sizeScale, 2);
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+    m_widgetsGroup->addChild(rendererParas.renderMethod, 4);
+#endif
+    m_widgetsGroup->addChild(rendererParas.opacity, 3);
+    m_widgetsGroup->addChild(rendererParas.materialAmbient, 7);
+    m_widgetsGroup->addChild(rendererParas.materialSpecular, 7);
+    m_widgetsGroup->addChild(rendererParas.materialShininess, 7);
     m_widgetsGroup->addChild(m_xCut, 5);
     m_widgetsGroup->addChild(m_yCut, 5);
     m_widgetsGroup->addChild(m_zCut, 5);
@@ -227,13 +223,13 @@ std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
 void Z3DSwcFilter::renderOpaque(Z3DEye eye)
 {
   if (m_renderingPrimitive.isSelected("Normal")) {
-    m_rendererBase.render(eye, m_sphereRendererForCone, m_coneRenderer);
+    renderWithState(eye, m_sphereRendererForCone, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Cylinder")) {
-    m_rendererBase.render(eye, m_coneRenderer);
+    renderWithState(eye, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Line")) {
-    m_rendererBase.render(eye, m_lineRenderer);
+    renderWithState(eye, m_lineRenderer);
   } else /* (m_renderingPrimitive.get() == "Sphere") */ {
-    m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
+    renderWithState(eye, m_lineRenderer, m_sphereRenderer);
   }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
@@ -242,13 +238,13 @@ void Z3DSwcFilter::renderOpaque(Z3DEye eye)
 void Z3DSwcFilter::renderTransparent(Z3DEye eye)
 {
   if (m_renderingPrimitive.isSelected("Normal")) {
-    m_rendererBase.render(eye, m_sphereRendererForCone, m_coneRenderer);
+    renderWithState(eye, m_sphereRendererForCone, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Cylinder")) {
-    m_rendererBase.render(eye, m_coneRenderer);
+    renderWithState(eye, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Line")) {
-    m_rendererBase.render(eye, m_lineRenderer);
+    renderWithState(eye, m_lineRenderer);
   } else /* (m_renderingPrimitive.get() == "Sphere") */ {
-    m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
+    renderWithState(eye, m_lineRenderer, m_sphereRenderer);
   }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
@@ -261,13 +257,13 @@ void Z3DSwcFilter::renderPicking(Z3DEye eye)
   }
 
   if (m_renderingPrimitive.isSelected("Normal")) {
-    m_rendererBase.renderPicking(eye, m_coneRenderer, m_sphereRendererForCone);
+    renderPickingWithState(eye, m_coneRenderer, m_sphereRendererForCone);
   } else if (m_renderingPrimitive.isSelected("Cylinder")) {
-    m_rendererBase.renderPicking(eye, m_coneRenderer);
+    renderPickingWithState(eye, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Line")) {
-    m_rendererBase.renderPicking(eye, m_lineRenderer);
+    renderPickingWithState(eye, m_lineRenderer);
   } else /* (m_renderingPrimitive.get() == "Sphere") */ {
-    m_rendererBase.renderPicking(eye, m_lineRenderer, m_sphereRenderer);
+    renderPickingWithState(eye, m_lineRenderer, m_sphereRenderer);
   }
 }
 
@@ -284,8 +280,8 @@ void Z3DSwcFilter::addSelectionBox(const std::pair<ZSwc::ConstSwcTreeNode, ZSwc:
   //                 n2->node.z * getCoordTransform().z);
   glm::vec3 bPos = glm::applyMatrix(coordTransform(), glm::vec3(n1->x, n1->y, n1->z));
   glm::vec3 tPos = glm::applyMatrix(coordTransform(), glm::vec3(n2->x, n2->y, n2->z));
-  float bRadius = std::max(.5, n1->radius) * m_rendererBase.sizeScale();
-  float tRadius = std::max(.5, n2->radius) * m_rendererBase.sizeScale();
+  float bRadius = std::max(.5, n1->radius) * m_rendererParameters.sizeScale.get();
+  float tRadius = std::max(.5, n2->radius) * m_rendererParameters.sizeScale.get();
   glm::vec3 axis = tPos - bPos;
   if (glm::length(axis) < std::numeric_limits<float>::epsilon() * 1e2) {
     LOG(WARNING) << "node and parent node too close";
@@ -334,7 +330,7 @@ void Z3DSwcFilter::addSelectionBox(const std::pair<ZSwc::ConstSwcTreeNode, ZSwc:
 
 void Z3DSwcFilter::addSelectionBox(const ZSwc::ConstSwcTreeNode& tn, std::vector<glm::vec3>& lines)
 {
-  float radius = std::max(.5, tn->radius) * m_rendererBase.sizeScale();
+  float radius = std::max(.5, tn->radius) * m_rendererParameters.sizeScale.get();
   glm::vec3 cent = glm::applyMatrix(coordTransform(), glm::vec3(tn->x, tn->y, tn->z));
   float xmin = cent.x - radius;
   float xmax = cent.x + radius;

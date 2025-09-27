@@ -1,6 +1,7 @@
 #include "z3dvolumeslicerenderer.h"
 
 #include "z3dtexture.h"
+#include "z3drendertarget.h"
 #include "z3dvolume.h"
 #include "z3dimg.h"
 #include "zlog.h"

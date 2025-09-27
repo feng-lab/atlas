@@ -269,7 +269,8 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
   m_fontColors.clear();
   m_fontPickingColors.clear();
   m_indexs.clear();
-  glm::mat4 viewMatrix = m_rendererBase.camera().viewMatrix(eye);
+  const auto& eyeState = m_rendererBase.viewState().eyes[static_cast<size_t>(eye)];
+  glm::mat4 viewMatrix = eyeState.viewMatrix;
   glm::vec3 rightVector(viewMatrix[0][0], viewMatrix[0][1], viewMatrix[0][2]);
   glm::vec3 upVector(viewMatrix[1][0], viewMatrix[1][1], viewMatrix[1][2]);
   m_selectedFontIndex = std::clamp(m_selectedFontIndex, 0, static_cast<int>(m_allFonts.size()) - 1);

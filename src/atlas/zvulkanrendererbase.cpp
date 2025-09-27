@@ -6,6 +6,8 @@
 #include "zvulkanswapchain.h"
 #include "zlog.h"
 
+#include <algorithm>
+
 namespace nim {
 
 ZVulkanRendererBase::ZVulkanRendererBase(ZVulkanDevice& device, uint32_t width, uint32_t height)
@@ -184,6 +186,26 @@ void ZVulkanRendererBase::syncFromGlobalParameters()
 
   setClipPlanes(derivedClipPlanes);
   enableClipping(!derivedClipPlanes.empty());
+
+  RendererSceneState sceneState;
+  sceneState.sceneAmbient = m_globals->sceneAmbient.get();
+  sceneState.weightedBlendedDepthScale = m_globals->weightedBlendedDepthScale.get();
+  sceneState.devicePixelRatio = m_globals->devicePixelRatio.get();
+  sceneState.transparency =
+    static_cast<TransparencyMode>(m_globals->transparencyMethod.associatedData());
+  sceneState.multisample =
+    static_cast<GeometryMSAAMode>(m_globals->geometriesMultisampleMode.associatedData());
+
+  m_globals->populateLightingState(sceneState.lighting);
+
+  sceneState.fog.mode = static_cast<FogMode>(m_globals->fogMode.associatedData());
+  sceneState.fog.topColor = m_globals->fogTopColor.get();
+  sceneState.fog.bottomColor = m_globals->fogBottomColor.get();
+  const glm::ivec2 fogRange = m_globals->fogRange.get();
+  sceneState.fog.range = glm::vec2(fogRange);
+  sceneState.fog.density = m_globals->fogDensity.get();
+
+  m_sceneState = std::move(sceneState);
 
   updatePushConstants();
 }

@@ -213,20 +213,16 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_useSameSizeForAllPuncta, 1);
     m_widgetsGroup->addChild(m_useDynamicMaterial, 7);
 
-    const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
-    for (auto para : paras) {
-      if (para->name() == "Coord Transform") {
-        m_widgetsGroup->addChild(*para, 5);
-      } else if (para->name() == "Size Scale") {
-        m_widgetsGroup->addChild(*para, 2);
-      } else if (para->name() == "Rendering Method") {
-        m_widgetsGroup->addChild(*para, 4);
-      } else if (para->name() == "Opacity") {
-        m_widgetsGroup->addChild(*para, 3);
-      } else {
-        m_widgetsGroup->addChild(*para, 7);
-      }
-    }
+    auto& rendererParas = m_rendererParameters;
+    m_widgetsGroup->addChild(rendererParas.coordTransform, 5);
+    m_widgetsGroup->addChild(rendererParas.sizeScale, 2);
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+    m_widgetsGroup->addChild(rendererParas.renderMethod, 4);
+#endif
+    m_widgetsGroup->addChild(rendererParas.opacity, 3);
+    m_widgetsGroup->addChild(rendererParas.materialAmbient, 7);
+    m_widgetsGroup->addChild(rendererParas.materialSpecular, 7);
+    m_widgetsGroup->addChild(rendererParas.materialShininess, 7);
 
     //    m_widgetsGroup->addChild(&m_randomGlow, 5);
     //    m_widgetsGroup->addChild(&m_glowPercentage, 5);
@@ -259,7 +255,7 @@ void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
   //    m_rendererBase.render(eye, m_textureCopyRenderer);
   //    renderBoundBox(eye);
   //  }
-  m_rendererBase.render(eye, m_sphereRenderer);
+  renderWithState(eye, m_sphereRenderer);
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
 }
@@ -276,7 +272,7 @@ void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
   //    m_rendererBase.render(eye, m_textureCopyRenderer);
   //    renderBoundBox(eye);
   //  }
-  m_rendererBase.render(eye, m_sphereRenderer);
+  renderWithState(eye, m_sphereRenderer);
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
 }
@@ -286,7 +282,7 @@ void Z3DPunctaFilter::renderPicking(Z3DEye eye)
   if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
   }
-  m_rendererBase.renderPicking(eye, m_sphereRenderer);
+  renderPickingWithState(eye, m_sphereRenderer);
 }
 
 void Z3DPunctaFilter::registerPickingObjects()
@@ -355,9 +351,9 @@ void Z3DPunctaFilter::prepareData()
 
 void Z3DPunctaFilter::punctumBound(const ZPunctum& p, ZBBox<glm::dvec3>& result) const
 {
-  double radius = p.radius() * m_rendererBase.sizeScale();
+  double radius = p.radius() * m_rendererParameters.sizeScale.get();
   if (m_useSameSizeForAllPuncta.get()) {
-    radius = 2.0 * m_rendererBase.sizeScale();
+    radius = 2.0 * m_rendererParameters.sizeScale.get();
   }
   glm::dvec3 cent = glm::dvec3(glm::applyMatrix(coordTransform(), glm::vec3(p.x(), p.y(), p.z())));
   result.setMinCorner(cent - radius);
@@ -386,9 +382,9 @@ void Z3DPunctaFilter::updateData()
 
 void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum& p, ZBBox<glm::dvec3>& result) const
 {
-  double radius = p.radius() * m_rendererBase.sizeScale();
+  double radius = p.radius() * m_rendererParameters.sizeScale.get();
   if (m_useSameSizeForAllPuncta.get()) {
-    radius = 2.0 * m_rendererBase.sizeScale();
+    radius = 2.0 * m_rendererParameters.sizeScale.get();
   }
   glm::dvec3 cent(p.x(), p.y(), p.z());
   result.setMinCorner(cent - radius);

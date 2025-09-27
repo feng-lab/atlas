@@ -3,6 +3,7 @@
 #include "z3dtexture.h"
 #include "z3dvolume.h"
 #include "z3dimg.h"
+#include "zlog.h"
 #include <absl/strings/str_cat.h>
 
 namespace nim {
@@ -357,8 +358,9 @@ void Z3DVolumeRaycasterRenderer::render(Z3DEye eye)
 
     m_rendererBase.setGlobalShaderParameters(m_scRaycasterShader, eye);
 
-    float n = m_rendererBase.camera().nearDist();
-    float f = m_rendererBase.camera().farDist();
+    const auto& viewState = m_rendererBase.viewState();
+    float n = viewState.nearClip;
+    float f = viewState.farClip;
     // http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
     //  zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
     float a = f * n / (f - n);

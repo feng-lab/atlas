@@ -97,6 +97,7 @@ void Z3DShader::compileSourceCode(const char* source)
       if (!sourceCodeBuffer.empty()) {
         fmt::format_to(std::back_inserter(log), "\n*** source code ***\n{}\n***", source);
       }
+      LOG(ERROR) << log;
       throw ZException(log);
     }
   } else {
