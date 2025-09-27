@@ -545,10 +545,10 @@ Progress Update — Renderer Scene Defaults (Completed)
   - Ensures freshly constructed renderers provide `LIGHT_COUNT > 0` before filters sync state, maintaining shader compatibility during refactors.
   - Scene ambient, transparency mode, and MSAA defaults now match the UI baseline so both backends start from identical state.
 
-Progress Update — Renderer Backend Abstraction (In Progress)
+Progress Update — Renderer Backend Abstraction (Completed)
 
-- `Z3DRendererBase` now talks to a pluggable `Z3DRendererBackend`; the first backend implementation (`createGLRendererBackend`) mirrors the legacy GLSL contract while keeping clip-plane handling and shader headers intact.
-- Renderers receive POD state blocks (`RendererFrameState`, `RendererViewState`, `RendererSceneState`, `ParameterState`) populated by `Z3DBoundedFilter::syncRendererState`; they no longer reach back into parameter objects on every draw.
-- `Z3DRenderGlobalState` caches camera- and scene-wide state so filters and the compositor share the same lighting/fog configuration. The compositor now explicitly refreshes the cached scene block before categorising filters to avoid stale transparency or MSAA settings.
-- Backend selection remains runtime-configurable (`RenderBackend` parameter). Vulkan delegates still fall back to the GL backend until we finish porting their command emission.
-- Next actions: surface Vulkan-specific backend in `createGLRendererBackend`, port more renderers to backend-agnostic uniforms/descriptors, and retire duplicated logic in `ZVulkanRendererBase` once the shared base covers the full contract.
+- `Z3DRendererBase` now talks to pluggable backends; the GLSL implementation lives behind `createGLRendererBackend()` and remains responsible for API-specific glue (clip planes, shader headers, global uniforms).
+- Filters own POD state blocks (`RendererFrameState`, `RendererViewState`, `RendererSceneState`, `ParameterState`) and feed them to their renderers/render bases. Parameter reads no longer happen inside the renderers.
+- The global state singleton is now just a cache: filters/compositors build fresh scene/view blocks from live parameters when needed, eliminating stale lighting/camera data.
+- All OIT/dual-depth compositor passes avoid leaking global camera uniforms; fullscreen shaders receive explicit screen-space uniforms.
+- Next: surface a Vulkan backend factory, move the remaining command encoding into backend implementations, and delete the legacy `ZVulkanRendererBase` scaffolding once parity lands.
