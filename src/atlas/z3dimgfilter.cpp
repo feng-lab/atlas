@@ -466,7 +466,7 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
   const auto& target = opaqueTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
-  renderWithState(eye, m_textureCopyRenderer);
+  m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
 bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
@@ -482,7 +482,7 @@ void Z3DImgFilter::renderTransparent(Z3DEye eye)
   const auto& target = transparentTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
-  renderWithState(eye, m_textureCopyRenderer);
+  m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
 glm::vec3 Z3DImgFilter::get3DPosition(int x, int y, int width, int height, bool& success)
@@ -771,6 +771,8 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
 
 double Z3DImgFilter::process(Z3DEye eye)
 {
+  syncRendererState();
+
   // Apply any deferred progressive reset at a safe point
   if (m_resetProgressPending) {
     m_imgRaycasterRenderer.resetProgress(MonoEye);
@@ -935,7 +937,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
 
   double progress = 1.0;
   if (!m_progressiveRendering) {
-    renderWithState(eye, m_imgSliceRenderer);
+    m_rendererBase.render(eye, m_imgSliceRenderer);
   } else {
     progress = m_imgSliceRenderer.renderProgressively(eye);
   }
@@ -1089,7 +1091,6 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 #endif
 
       // prepare entry/exit in renderer
-      syncRendererState(eye);
       m_imgRaycasterRenderer.prepareEntryExit(clipped, flipped, eye, currentTarget.size());
     }
   }
@@ -1106,7 +1107,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 
   double progress = 1.0;
   if (!m_progressiveRendering) {
-    renderWithState(eye, m_imgRaycasterRenderer);
+    m_rendererBase.render(eye, m_imgRaycasterRenderer);
   } else {
     progress = m_imgRaycasterRenderer.renderProgressively(eye);
   }

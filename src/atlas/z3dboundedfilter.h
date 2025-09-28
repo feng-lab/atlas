@@ -14,6 +14,7 @@
 #include "zoptionparameter.h"
 
 #include <array>
+#include <folly/ScopeGuard.h>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -40,10 +41,8 @@ public:
     RendererParameters();
 
     Z3DTransformParameter coordTransform;
-    ZStringIntOptionParameter renderMethod;
     ZFloatParameter sizeScale;
     ZFloatParameter opacity;
-    ZBoolParameter filterNotFrontFacing;
     ZVec4Parameter materialAmbient;
     ZVec4Parameter materialSpecular;
     ZFloatParameter materialShininess;
@@ -334,11 +333,6 @@ private:
 
   void onSelectionBoundBoxLineWidthChanged();
 
-  void renderWithStateAndCameraAndCoordTransformImpl(Z3DEye eye,
-                                                     const Z3DCamera& camera,
-                                                     const glm::mat4& transform,
-                                                     std::span<Z3DPrimitiveRenderer*> renderers);
-
   void invalidateHandle()
   {
     m_handleValid = false;
@@ -356,35 +350,13 @@ private:
 
 protected:
   template<typename... Args>
-  void renderWithState(Z3DEye eye, Args&&... args)
-  {
-    syncRendererState(eye);
-    m_rendererBase.render(eye, std::forward<Args>(args)...);
-  }
-
-  template<typename... Args>
-  void renderPickingWithState(Z3DEye eye, Args&&... args)
-  {
-    syncRendererState(eye);
-    m_rendererBase.renderPicking(eye, std::forward<Args>(args)...);
-  }
-
-  template<typename... Args>
   void renderWithStateAndCamera(Z3DEye eye, const Z3DCamera& camera, Args&&... args)
   {
-    syncRendererState(eye);
     auto previousState = m_rendererBase.pushViewStateFromCamera(camera);
+    auto stateGuard = folly::makeGuard([this, previousState]() {
+      m_rendererBase.restoreViewState(previousState);
+    });
     m_rendererBase.render(eye, std::forward<Args>(args)...);
-    m_rendererBase.restoreViewState(previousState);
-  }
-
-  template<typename... Args>
-  void renderPickingWithStateAndCamera(Z3DEye eye, const Z3DCamera& camera, Args&&... args)
-  {
-    syncRendererState(eye);
-    auto previousState = m_rendererBase.pushViewStateFromCamera(camera);
-    m_rendererBase.renderPicking(eye, std::forward<Args>(args)...);
-    m_rendererBase.restoreViewState(previousState);
   }
 
   template<typename... Args>
@@ -393,21 +365,31 @@ protected:
                                                  const glm::mat4& transform,
                                                  Args&... args)
   {
+    static_assert(sizeof...(Args) > 0, "renderWithStateAndCameraAndCoordTransform requires at least one renderer");
+
     std::array<Z3DPrimitiveRenderer*, sizeof...(Args)> rendererArray{std::addressof(args)...};
-    renderWithStateAndCameraAndCoordTransformImpl(
-      eye,
-      camera,
-      transform,
-      std::span<Z3DPrimitiveRenderer*>{rendererArray.data(), rendererArray.size()});
+    std::span<Z3DPrimitiveRenderer*> rendererSpan(rendererArray.data(), rendererArray.size());
+    const auto previousTransform = m_rendererParameterState.coordTransform;
+    auto transformGuard = folly::makeGuard([this, previousTransform]() {
+      m_rendererParameterState.coordTransform = previousTransform;
+    });
+    m_rendererParameterState.coordTransform = transform;
+
+    auto previousState = m_rendererBase.pushViewStateFromCamera(camera);
+    auto stateGuard = folly::makeGuard([this, previousState]() {
+      m_rendererBase.restoreViewState(previousState);
+    });
+
+    m_rendererBase.render(eye, rendererSpan);
   }
 
-  void syncRendererState(Z3DEye eye);
+  void syncRendererState();
 
   RendererParameters m_rendererParameters;
   Z3DGlobalParameters& m_globalParameters;
 
 private:
-  Z3DRendererBase::ParameterState m_rendererParameterState;
+  RendererParameterState m_rendererParameterState;
   RendererFrameState m_rendererFrameState;
 
 protected:
@@ -475,8 +457,6 @@ private:
   bool m_transformEnabled;
 
   bool m_handleValid;
-
-  void updateFrameState();
 };
 
 } // namespace nim

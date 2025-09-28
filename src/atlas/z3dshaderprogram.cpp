@@ -409,8 +409,6 @@ void Z3DShaderProgram::storeUniformLocations()
   m_sceneAmbientUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
   it = m_uniforms.find("alpha");
   m_alphaUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
-  it = m_uniforms.find("fog_mode");
-  m_fogModeUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
   it = m_uniforms.find("fog_color_top");
   m_fogColorTopUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
   it = m_uniforms.find("fog_color_bottom");

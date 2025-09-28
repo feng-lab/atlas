@@ -95,6 +95,8 @@ QString Z3DMeshFilter::regionName() const
 
 double Z3DMeshFilter::process(Z3DEye)
 {
+  syncRendererState();
+
   if (m_dataIsInvalid) {
     prepareData();
   }
@@ -197,7 +199,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroupForAnnotationFilter()
 
 void Z3DMeshFilter::renderOpaque(Z3DEye eye)
 {
-  renderWithState(eye, m_triangleListRenderer);
+  m_rendererBase.render(eye, m_triangleListRenderer);
   renderBoundBox(eye);
 }
 
@@ -207,7 +209,7 @@ void Z3DMeshFilter::renderTransparent(Z3DEye eye)
     // Compositor owns glow composition; only render bound box here
     renderBoundBox(eye);
   } else {
-    renderWithState(eye, m_triangleListRenderer);
+    m_rendererBase.render(eye, m_triangleListRenderer);
     renderBoundBox(eye);
   }
 }
@@ -217,7 +219,7 @@ void Z3DMeshFilter::renderPicking(Z3DEye eye)
   if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
   }
-  renderPickingWithState(eye, m_triangleListRenderer);
+  m_rendererBase.renderPicking(eye, m_triangleListRenderer);
 }
 
 void Z3DMeshFilter::prepareData()

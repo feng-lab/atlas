@@ -66,8 +66,6 @@ void Z3DCanvasPainter::renderEye(Z3DEye eye, Z3DRenderTarget& target)
 void Z3DCanvasPainter::syncRendererState(const glm::uvec2& size)
 {
   m_frameState.updateViewportData(glm::uvec4(0, 0, size.x, size.y));
-  m_frameState.progressiveEnabled = false;
-  m_frameState.progressiveActive = false;
 
   m_viewState.nearClip = 0.f;
   m_viewState.farClip = 1.f;

@@ -77,6 +77,8 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
 
 double Z3DAnimationFilter::process(Z3DEye)
 {
+  syncRendererState();
+
   if (m_dataIsInvalid) {
     prepareData();
   }
@@ -138,18 +140,18 @@ std::shared_ptr<ZWidgetsGroup> Z3DAnimationFilter::widgetsGroup()
 void Z3DAnimationFilter::renderOpaque(Z3DEye eye)
 {
   if (m_showCameraDirection.get()) {
-    renderWithState(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
+    m_rendererBase.render(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
   } else {
-    renderWithState(eye, m_lineRenderer, m_triangleListRenderer);
+    m_rendererBase.render(eye, m_lineRenderer, m_triangleListRenderer);
   }
 }
 
 void Z3DAnimationFilter::renderTransparent(Z3DEye eye)
 {
   if (m_showCameraDirection.get()) {
-    renderWithState(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
+    m_rendererBase.render(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
   } else {
-    renderWithState(eye, m_lineRenderer, m_triangleListRenderer);
+    m_rendererBase.render(eye, m_lineRenderer, m_triangleListRenderer);
   }
 }
 

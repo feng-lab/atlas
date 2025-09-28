@@ -15,17 +15,12 @@ namespace nim {
 
 Z3DBoundedFilter::RendererParameters::RendererParameters()
   : coordTransform("Coord Transform", glm::mat4(1.f))
-  , renderMethod("Rendering Method")
   , sizeScale("Size Scale", 1.f, .001f, std::numeric_limits<float>::max())
   , opacity("Opacity", 1.0f, .0f, 1.f)
-  , filterNotFrontFacing("Filter Not Front Facing", true)
   , materialAmbient("Material Ambient", glm::vec4(0.1f, .1f, .1f, 1.f))
   , materialSpecular("Material Specular", glm::vec4(1.f, 1.f, 1.f, 1.f))
   , materialShininess("Material Shininess", 100.f, 1.f, 200.f)
 {
-  renderMethod.addOptions("GLSL", "Old openGL");
-  renderMethod.select("GLSL");
-
   sizeScale.setSingleStep(0.001);
   sizeScale.setDecimal(3);
   sizeScale.setStyle("SPINBOX");
@@ -112,60 +107,41 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   addParameter(m_selectionLineWidth);
   addParameter(m_selectionLineColor);
 
+  connect(&m_globalParameters.fogMode, &Z3DCameraParameter::valueChanged, this, [this]() {
+    syncRendererState();
+    m_rendererBase.compile();
+  });
+
   connect(&m_rendererParameters.coordTransform, &Z3DTransformParameter::valueChanged, this, [this]() {
     m_rendererParameterState.coordTransform = m_rendererParameters.coordTransform.get();
-    m_rendererBase.markRenderDataDirty();
     updateAxisAlignedBoundBox();
     Q_EMIT rendererCoordTransformChanged();
   });
 
   connect(&m_rendererParameters.sizeScale, &ZParameter::valueChanged, this, [this]() {
     m_rendererParameterState.sizeScale = m_rendererParameters.sizeScale.get();
-    m_rendererBase.markRenderDataDirty();
     updateBoundBox();
     Q_EMIT rendererSizeScaleChanged();
   });
 
   connect(&m_rendererParameters.opacity, &ZParameter::valueChanged, this, [this]() {
     m_rendererParameterState.opacity = m_rendererParameters.opacity.get();
-    m_rendererBase.markRenderDataDirty();
   });
 
   connect(&m_rendererParameters.materialAmbient, &ZParameter::valueChanged, this, [this]() {
     m_rendererParameterState.materialAmbient = m_rendererParameters.materialAmbient.get();
-    m_rendererBase.markRenderDataDirty();
   });
 
   connect(&m_rendererParameters.materialSpecular, &ZParameter::valueChanged, this, [this]() {
     m_rendererParameterState.materialSpecular = m_rendererParameters.materialSpecular.get();
-    m_rendererBase.markRenderDataDirty();
   });
 
   connect(&m_rendererParameters.materialShininess, &ZParameter::valueChanged, this, [this]() {
     m_rendererParameterState.materialShininess = m_rendererParameters.materialShininess.get();
-    m_rendererBase.markRenderDataDirty();
-  });
-
-  connect(&m_rendererParameters.filterNotFrontFacing, &ZBoolParameter::boolChanged, this, [this](bool enabled) {
-    m_rendererParameterState.filterNotFrontFacing = enabled;
-  });
-
-  connect(&m_rendererParameters.renderMethod, &ZParameter::valueChanged, this, [this]() {
-    auto method = Z3DRendererBase::RenderMethod::GLSL;
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-    if (m_rendererParameters.renderMethod.isSelected("Old openGL")) {
-      method = Z3DRendererBase::RenderMethod::LegacyOpenGL;
-    }
-#endif
-    m_rendererParameterState.renderMethod = method;
-    m_rendererBase.markRenderDataDirty();
   });
 
   addParameter(m_rendererParameters.coordTransform);
   addParameter(m_rendererParameters.sizeScale);
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  addParameter(m_rendererParameters.renderMethod);
-#endif
   addParameter(m_rendererParameters.opacity);
   addParameter(m_rendererParameters.materialAmbient);
   addParameter(m_rendererParameters.materialSpecular);
@@ -274,7 +250,7 @@ void Z3DBoundedFilter::renderHandle(Z3DEye eye)
       updateHandle();
     }
     m_rendererBase.setClipEnabled(false);
-    renderWithState(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    m_rendererBase.render(eye, m_handleArrowRenderer, m_handleCenterRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -283,7 +259,7 @@ void Z3DBoundedFilter::renderHandlePicking(Z3DEye eye)
 {
   if (m_isSelected) {
     m_rendererBase.setClipEnabled(false);
-    renderPickingWithState(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    m_rendererBase.renderPicking(eye, m_handleArrowRenderer, m_handleCenterRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -301,7 +277,7 @@ void Z3DBoundedFilter::renderSelectionBox(Z3DEye eye)
       m_selectionBoundBoxRenderer.setDataColors(&m_selectionLineColors);
     }
     m_rendererBase.setClipEnabled(false);
-    renderWithState(eye, m_selectionBoundBoxRenderer, m_selectionCornerRenderer);
+    m_rendererBase.render(eye, m_selectionBoundBoxRenderer, m_selectionCornerRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -322,7 +298,7 @@ void Z3DBoundedFilter::renderEditingSelectionBox(Z3DEye eye)
       m_selectionBoundBoxRenderer.setDataColors(&m_selectionLineColors);
     }
     m_rendererBase.setClipEnabled(false);
-    renderWithState(eye, m_selectionBoundBoxRenderer);
+    m_rendererBase.render(eye, m_selectionBoundBoxRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -559,7 +535,7 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)
 {
   if (!m_boundBoxMode.isSelected("No Bound Box")) {
     m_rendererBase.setClipEnabled(false);
-    renderWithState(eye, m_baseBoundBoxRenderer);
+    m_rendererBase.render(eye, m_baseBoundBoxRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -580,7 +556,7 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye, BoundBoxRenderStyle style)
       glDisable(GL_DEPTH_TEST);
     });
     m_rendererBase.setClipEnabled(false);
-    renderWithState(eye, m_baseBoundBoxRenderer);
+    m_rendererBase.render(eye, m_baseBoundBoxRenderer);
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -634,69 +610,13 @@ void Z3DBoundedFilter::pushRendererParametersToBase()
   m_rendererParameterState.materialAmbient = m_rendererParameters.materialAmbient.get();
   m_rendererParameterState.materialSpecular = m_rendererParameters.materialSpecular.get();
   m_rendererParameterState.materialShininess = m_rendererParameters.materialShininess.get();
-  m_rendererParameterState.filterNotFrontFacing = m_rendererParameters.filterNotFrontFacing.get();
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  m_rendererParameterState.renderMethod = m_rendererParameters.renderMethod.isSelected("Old openGL")
-                                            ? Z3DRendererBase::RenderMethod::LegacyOpenGL
-                                            : Z3DRendererBase::RenderMethod::GLSL;
-#else
-  m_rendererParameterState.renderMethod = Z3DRendererBase::RenderMethod::GLSL;
-#endif
-  m_rendererBase.markRenderDataDirty();
 }
 
-void Z3DBoundedFilter::renderWithStateAndCameraAndCoordTransformImpl(Z3DEye eye,
-                                                                     const Z3DCamera& camera,
-                                                                     const glm::mat4& transform,
-                                                                     std::span<Z3DPrimitiveRenderer*> renderers)
+void Z3DBoundedFilter::syncRendererState()
 {
-  if (renderers.empty()) {
-    return;
-  }
-
-  const auto previousTransform = m_rendererParameterState.coordTransform;
-  auto transformGuard = folly::makeGuard([this, previousTransform]() {
-    m_rendererParameterState.coordTransform = previousTransform;
-  });
-  m_rendererParameterState.coordTransform = transform;
-  syncRendererState(eye);
-
-  auto previousState = m_rendererBase.pushViewStateFromCamera(camera);
-  switch (renderers.size()) {
-    case 1:
-      m_rendererBase.render(eye, *renderers[0]);
-      break;
-    case 2:
-      m_rendererBase.render(eye, *renderers[0], *renderers[1]);
-      break;
-    case 3:
-      m_rendererBase.render(eye, *renderers[0], *renderers[1], *renderers[2]);
-      break;
-    case 4:
-      m_rendererBase.render(eye, *renderers[0], *renderers[1], *renderers[2], *renderers[3]);
-      break;
-    default: {
-      std::vector<Z3DPrimitiveRenderer*> rendererList(renderers.begin(), renderers.end());
-      m_rendererBase.render(eye, rendererList);
-      break;
-    }
-  }
-  m_rendererBase.restoreViewState(previousState);
-}
-
-void Z3DBoundedFilter::syncRendererState(Z3DEye /*eye*/)
-{
-  updateFrameState();
-
   auto& globalState = Z3DRenderGlobalState::instance();
   globalState.ensureSceneState(m_globalParameters);
   globalState.ensureViewState(m_globalParameters.camera.get());
-}
-
-void Z3DBoundedFilter::updateFrameState()
-{
-  m_rendererFrameState.progressiveEnabled = false;
-  m_rendererFrameState.progressiveActive = false;
 }
 
 void Z3DBoundedFilter::appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::vector<glm::vec3>& lines)

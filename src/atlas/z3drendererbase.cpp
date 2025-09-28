@@ -10,7 +10,7 @@
 
 namespace nim {
 
-Z3DRendererBase::Z3DRendererBase(ParameterState& parameterState,
+Z3DRendererBase::Z3DRendererBase(RendererParameterState& parameterState,
                                  RendererFrameState& frameState,
                                  RendererViewState& viewState,
                                  RendererSceneState& sceneState)
@@ -20,6 +20,7 @@ Z3DRendererBase::Z3DRendererBase(ParameterState& parameterState,
   , m_sceneState(sceneState)
   , m_clipEnabled(true)
   , m_shaderHookType(ShaderHookType::Normal)
+  , m_renderMethod(RenderMethod::GLSL)
 {
   setBackend(createGLRendererBackend());
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
@@ -116,14 +117,6 @@ void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram* shader, Z3DEye
   backend().setGlobalShaderParameters(*this, *shader, eye);
 }
 
-void Z3DRendererBase::markRenderDataDirty()
-{
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  invalidateDisplayList();
-  invalidatePickingDisplayList();
-#endif
-}
-
 std::string Z3DRendererBase::generateHeader() const
 {
   return backend().generateHeader(*this);
@@ -172,61 +165,14 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
 #endif
 }
 
-void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer* renderer)
+void Z3DRendererBase::render(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
-  CHECK(m_renderers.contains(renderer));
-  std::vector<Z3DPrimitiveRenderer*> renderers;
-  renderers.push_back(renderer);
-  render(eye, renderers);
-}
+  for (auto* renderer : renderers) {
+    CHECK(m_renderers.contains(renderer));
+  }
 
-void Z3DRendererBase::render(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2)
-{
-  CHECK(m_renderers.contains(renderer1));
-  CHECK(m_renderers.contains(renderer2));
-  std::vector<Z3DPrimitiveRenderer*> renderers;
-  renderers.push_back(renderer1);
-  renderers.push_back(renderer2);
-  render(eye, renderers);
-}
-
-void Z3DRendererBase::render(Z3DEye eye,
-                             Z3DPrimitiveRenderer* renderer1,
-                             Z3DPrimitiveRenderer* renderer2,
-                             Z3DPrimitiveRenderer* renderer3)
-{
-  CHECK(m_renderers.contains(renderer1));
-  CHECK(m_renderers.contains(renderer2));
-  CHECK(m_renderers.contains(renderer3));
-  std::vector<Z3DPrimitiveRenderer*> renderers;
-  renderers.push_back(renderer1);
-  renderers.push_back(renderer2);
-  renderers.push_back(renderer3);
-  render(eye, renderers);
-}
-
-void Z3DRendererBase::render(Z3DEye eye,
-                             Z3DPrimitiveRenderer* renderer1,
-                             Z3DPrimitiveRenderer* renderer2,
-                             Z3DPrimitiveRenderer* renderer3,
-                             Z3DPrimitiveRenderer* renderer4)
-{
-  CHECK(m_renderers.contains(renderer1));
-  CHECK(m_renderers.contains(renderer2));
-  CHECK(m_renderers.contains(renderer3));
-  CHECK(m_renderers.contains(renderer4));
-  std::vector<Z3DPrimitiveRenderer*> renderers;
-  renderers.push_back(renderer1);
-  renderers.push_back(renderer2);
-  renderers.push_back(renderer3);
-  renderers.push_back(renderer4);
-  render(eye, renderers);
-}
-
-void Z3DRendererBase::render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
-{
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  if (m_parameters.renderMethod == RenderMethod::LegacyOpenGL) {
+  if (m_renderMethod == RenderMethod::LegacyOpenGL) {
     const auto& eyeState = m_viewState.eyes[static_cast<size_t>(eye)];
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
@@ -238,8 +184,7 @@ void Z3DRendererBase::render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*
     if (!useDisplayList(renderers)) {
       renderInstant(renderers);
     } else {
-      // check if render state changed and we need to regenerate
-      // display list
+      // check if render state changed and we need to regenerate display list
       auto& legacy = legacyGL();
       if (legacy.displayList != 0 && legacy.lastRenderingState != m_renderers) {
         invalidateDisplayList();
@@ -266,43 +211,14 @@ void Z3DRendererBase::render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*
 #endif
 }
 
-void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer* renderer)
+void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
-  CHECK(m_renderers.contains(renderer));
-  std::vector<Z3DPrimitiveRenderer*> renderers;
-  renderers.push_back(renderer);
-  renderPicking(eye, renderers);
-}
+  for (auto* renderer : renderers) {
+    CHECK(m_renderers.contains(renderer));
+  }
 
-void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2)
-{
-  CHECK(m_renderers.contains(renderer1));
-  CHECK(m_renderers.contains(renderer2));
-  std::vector<Z3DPrimitiveRenderer*> renderers;
-  renderers.push_back(renderer1);
-  renderers.push_back(renderer2);
-  renderPicking(eye, renderers);
-}
-
-void Z3DRendererBase::renderPicking(Z3DEye eye,
-                                    Z3DPrimitiveRenderer* renderer1,
-                                    Z3DPrimitiveRenderer* renderer2,
-                                    Z3DPrimitiveRenderer* renderer3)
-{
-  CHECK(m_renderers.contains(renderer1));
-  CHECK(m_renderers.contains(renderer2));
-  CHECK(m_renderers.contains(renderer3));
-  std::vector<Z3DPrimitiveRenderer*> renderers;
-  renderers.push_back(renderer1);
-  renderers.push_back(renderer2);
-  renderers.push_back(renderer3);
-  renderPicking(eye, renderers);
-}
-
-void Z3DRendererBase::renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
-{
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  if (m_parameters.renderMethod == RenderMethod::LegacyOpenGL) {
+  if (m_renderMethod == RenderMethod::LegacyOpenGL) {
     const auto& eyeState = m_viewState.eyes[static_cast<size_t>(eye)];
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
@@ -314,8 +230,7 @@ void Z3DRendererBase::renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRe
     if (!useDisplayList(renderers)) {
       renderPickingInstant(renderers);
     } else {
-      // check if render state changed and we need to regenerate
-      // display list
+      // check if render state changed and we need to regenerate display list
       auto& legacy = legacyGL();
       if (legacy.pickingDisplayList != 0 && legacy.lastPickingRenderingState != m_renderers) {
         invalidatePickingDisplayList();
@@ -344,7 +259,7 @@ void Z3DRendererBase::renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRe
 }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-void Z3DRendererBase::generateDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers)
+void Z3DRendererBase::generateDisplayList(Z3DRendererBase::RendererSpan renderers)
 {
   auto& legacy = legacyGL();
   if ((bool)glIsList(legacy.displayList)) {
@@ -358,7 +273,7 @@ void Z3DRendererBase::generateDisplayList(const std::vector<Z3DPrimitiveRenderer
   legacy.lastRenderingState = m_renderers;
 }
 
-void Z3DRendererBase::generatePickingDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers)
+void Z3DRendererBase::generatePickingDisplayList(Z3DRendererBase::RendererSpan renderers)
 {
   auto& legacy = legacyGL();
   if ((bool)glIsList(legacy.pickingDisplayList)) {
@@ -372,7 +287,7 @@ void Z3DRendererBase::generatePickingDisplayList(const std::vector<Z3DPrimitiveR
   legacy.lastPickingRenderingState = m_renderers;
 }
 
-void Z3DRendererBase::renderInstant(const std::vector<Z3DPrimitiveRenderer*>& renderers)
+void Z3DRendererBase::renderInstant(Z3DRendererBase::RendererSpan renderers)
 {
   glPushAttrib(GL_ALL_ATTRIB_BITS);
 
@@ -413,21 +328,21 @@ void Z3DRendererBase::renderInstant(const std::vector<Z3DPrimitiveRenderer*>& re
   }
 
   activateClipPlanesOpenGL();
-  for (size_t i = 0; i < renderers.size(); ++i) {
-    renderers[i]->renderUsingOpengl();
+  for (auto* renderer : renderers) {
+    renderer->renderUsingOpengl();
   }
   deactivateClipPlanesOpenGL();
 
   glPopAttrib();
 }
 
-void Z3DRendererBase::renderPickingInstant(const std::vector<Z3DPrimitiveRenderer*>& renderers)
+void Z3DRendererBase::renderPickingInstant(Z3DRendererBase::RendererSpan renderers)
 {
   glPushAttrib(GL_ALL_ATTRIB_BITS);
 
   activateClipPlanesOpenGL();
-  for (size_t i = 0; i < renderers.size(); ++i) {
-    renderers[i]->renderPickingUsingOpengl();
+  for (auto* renderer : renderers) {
+    renderer->renderPickingUsingOpengl();
   }
   deactivateClipPlanesOpenGL();
 
@@ -435,7 +350,7 @@ void Z3DRendererBase::renderPickingInstant(const std::vector<Z3DPrimitiveRendere
 }
 #endif
 
-void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
+void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
   backend().beginRender(*this);
   for (auto* renderer : renderers) {
@@ -444,7 +359,7 @@ void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitive
   backend().endRender(*this);
 }
 
-void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
+void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
   backend().beginRender(*this);
   for (auto* renderer : renderers) {
@@ -453,21 +368,21 @@ void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPr
   backend().endRender(*this);
 }
 
-bool Z3DRendererBase::needLighting(const std::vector<Z3DPrimitiveRenderer*>& renderers) const
+bool Z3DRendererBase::needLighting(Z3DRendererBase::RendererSpan renderers) const
 {
   bool needLighting = false;
-  for (auto renderer : renderers) {
+  for (auto* renderer : renderers) {
     needLighting = needLighting || renderer->needLighting();
   }
   return needLighting;
 }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-bool Z3DRendererBase::useDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers) const
+bool Z3DRendererBase::useDisplayList(Z3DRendererBase::RendererSpan renderers) const
 {
   bool useDisplayList = false;
-  for (size_t i = 0; i < renderers.size(); ++i) {
-    useDisplayList = useDisplayList || renderers[i]->useDisplayList();
+  for (auto* renderer : renderers) {
+    useDisplayList = useDisplayList || renderer->useDisplayList();
   }
   return useDisplayList;
 }

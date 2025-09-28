@@ -47,8 +47,9 @@ public:
   }
 
 protected:
-  double process(Z3DEye /*eye*/) override
+  double process(Z3DEye) override
   {
+    syncRendererState();
     return 1.0;
   }
 

@@ -10,8 +10,6 @@ namespace nim {
 struct RendererFrameState
 {
   glm::uvec4 viewport{0};
-  bool progressiveEnabled = false;
-  bool progressiveActive = false;
   glm::mat4 viewportMatrix{1.f};
   glm::mat4 inverseViewportMatrix{1.f};
 
@@ -42,6 +40,16 @@ struct RendererFrameState
   {
     return updateViewportData(glm::uvec4(0, 0, size.x, size.y));
   }
+};
+
+struct RendererParameterState
+{
+  glm::mat4 coordTransform{glm::mat4(1.f)};
+  float sizeScale{1.f};
+  float opacity{1.f};
+  glm::vec4 materialAmbient{glm::vec4(0.1f, 0.1f, 0.1f, 1.f)};
+  glm::vec4 materialSpecular{glm::vec4(1.f, 1.f, 1.f, 1.f)};
+  float materialShininess{100.f};
 };
 
 struct RendererViewState

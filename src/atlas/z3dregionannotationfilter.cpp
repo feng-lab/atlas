@@ -20,6 +20,8 @@ Z3DRegionAnnotationFilter::Z3DRegionAnnotationFilter(Z3DGlobalParameters& global
 
 double Z3DRegionAnnotationFilter::process(Z3DEye eye)
 {
+  syncRendererState();
+
   initializeCutRange();
   initializeRotationCenter();
   for (const auto& idFilter : m_idToMeshFilters) {

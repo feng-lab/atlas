@@ -135,9 +135,6 @@ std::shared_ptr<ZWidgetsGroup> Z3DAxisFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_ZAxisColor, 1);
     auto& rendererParas = m_rendererParameters;
     m_widgetsGroup->addChild(rendererParas.sizeScale, 1);
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-    m_widgetsGroup->addChild(rendererParas.renderMethod, 3);
-#endif
     m_widgetsGroup->addChild(rendererParas.opacity, 3);
     m_widgetsGroup->addChild(m_fontName, 4);
     m_widgetsGroup->addChild(m_fontSize, 4);

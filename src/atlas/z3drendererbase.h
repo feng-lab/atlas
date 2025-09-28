@@ -4,9 +4,13 @@
 #include "z3drendererstates.h"
 #include "zglmutils.h"
 #include <array>
+#include <concepts>
 #include <memory>
 #include <set>
+#include <span>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace nim {
@@ -18,6 +22,30 @@ class Z3DTexture;
 class Z3DShaderProgram;
 
 class Z3DCamera;
+
+namespace detail {
+
+template<typename T>
+using Decayed = std::remove_cvref_t<T>;
+
+template<typename T>
+using Pointee = std::remove_cv_t<std::remove_pointer_t<Decayed<T>>>;
+
+template<typename T>
+concept RendererArgument = std::derived_from<Decayed<T>, Z3DPrimitiveRenderer> ||
+                           (std::is_pointer_v<Decayed<T>> && std::derived_from<Pointee<T>, Z3DPrimitiveRenderer>);
+
+inline Z3DPrimitiveRenderer* toRendererPointer(Z3DPrimitiveRenderer* renderer)
+{
+  return renderer;
+}
+
+inline Z3DPrimitiveRenderer* toRendererPointer(Z3DPrimitiveRenderer& renderer)
+{
+  return &renderer;
+}
+
+} // namespace detail
 
 // contains basic properties such as lighting, method, size for rendering.
 // A renderBase usually contains multiple primitive renderers. Some of those are
@@ -55,25 +83,7 @@ public:
 
   void unregisterRenderer(Z3DPrimitiveRenderer* renderer);
 
-  enum class RenderMethod
-  {
-    GLSL,
-    LegacyOpenGL
-  };
-
-  struct ParameterState
-  {
-    glm::mat4 coordTransform{glm::mat4(1.f)};
-    float sizeScale{1.f};
-    float opacity{1.f};
-    glm::vec4 materialAmbient{glm::vec4(0.1f, 0.1f, 0.1f, 1.f)};
-    glm::vec4 materialSpecular{glm::vec4(1.f, 1.f, 1.f, 1.f)};
-    float materialShininess{100.f};
-    bool filterNotFrontFacing{true};
-    RenderMethod renderMethod{RenderMethod::GLSL};
-  };
-
-  Z3DRendererBase(ParameterState& parameterState,
+  Z3DRendererBase(RendererParameterState& parameterState,
                   RendererFrameState& frameState,
                   RendererViewState& viewState,
                   RendererSceneState& sceneState);
@@ -94,14 +104,20 @@ public:
     return m_parameters.sizeScale;
   }
 
-  void markRenderDataDirty();
+  void markRenderDataDirty()
+  {
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+    invalidateDisplayList();
+    invalidatePickingDisplayList();
+#endif
+  }
 
-  ParameterState& parameterState()
+  RendererParameterState& parameterState()
   {
     return m_parameters;
   }
 
-  const ParameterState& parameterState() const
+  const RendererParameterState& parameterState() const
   {
     return m_parameters;
   }
@@ -143,74 +159,29 @@ public:
     m_clipEnabled = v;
   }
 
-  void render(Z3DEye eye, Z3DPrimitiveRenderer& renderer)
+  using RendererSpan = std::span<Z3DPrimitiveRenderer*>;
+
+  template<detail::RendererArgument... Renderers>
+  void render(Z3DEye eye, Renderers&&... renderers)
   {
-    render(eye, &renderer);
+    static_assert(sizeof...(Renderers) > 0, "render requires at least one renderer");
+    std::array<Z3DPrimitiveRenderer*, sizeof...(Renderers)> rendererPtrs{
+      detail::toRendererPointer(std::forward<Renderers>(renderers))...};
+    render(eye, RendererSpan(rendererPtrs.data(), rendererPtrs.size()));
   }
 
-  void render(Z3DEye eye, Z3DPrimitiveRenderer& renderer1, Z3DPrimitiveRenderer& renderer2)
+  void render(Z3DEye eye, RendererSpan renderers);
+
+  template<detail::RendererArgument... Renderers>
+  void renderPicking(Z3DEye eye, Renderers&&... renderers)
   {
-    render(eye, &renderer1, &renderer2);
+    static_assert(sizeof...(Renderers) > 0, "renderPicking requires at least one renderer");
+    std::array<Z3DPrimitiveRenderer*, sizeof...(Renderers)> rendererPtrs{
+      detail::toRendererPointer(std::forward<Renderers>(renderers))...};
+    renderPicking(eye, RendererSpan(rendererPtrs.data(), rendererPtrs.size()));
   }
 
-  void
-  render(Z3DEye eye, Z3DPrimitiveRenderer& renderer1, Z3DPrimitiveRenderer& renderer2, Z3DPrimitiveRenderer& renderer3)
-  {
-    render(eye, &renderer1, &renderer2, &renderer3);
-  }
-
-  void render(Z3DEye eye,
-              Z3DPrimitiveRenderer& renderer1,
-              Z3DPrimitiveRenderer& renderer2,
-              Z3DPrimitiveRenderer& renderer3,
-              Z3DPrimitiveRenderer& renderer4)
-  {
-    render(eye, &renderer1, &renderer2, &renderer3, &renderer4);
-  }
-
-  void render(Z3DEye eye, Z3DPrimitiveRenderer* renderer);
-
-  void render(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2);
-
-  void
-  render(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2, Z3DPrimitiveRenderer* renderer3);
-
-  void render(Z3DEye eye,
-              Z3DPrimitiveRenderer* renderer1,
-              Z3DPrimitiveRenderer* renderer2,
-              Z3DPrimitiveRenderer* renderer3,
-              Z3DPrimitiveRenderer* renderer4);
-
-  void render(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers);
-
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer& renderer)
-  {
-    renderPicking(eye, &renderer);
-  }
-
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer& renderer1, Z3DPrimitiveRenderer& renderer2)
-  {
-    renderPicking(eye, &renderer1, &renderer2);
-  }
-
-  void renderPicking(Z3DEye eye,
-                     Z3DPrimitiveRenderer& renderer1,
-                     Z3DPrimitiveRenderer& renderer2,
-                     Z3DPrimitiveRenderer& renderer3)
-  {
-    renderPicking(eye, &renderer1, &renderer2, &renderer3);
-  }
-
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer* renderer);
-
-  void renderPicking(Z3DEye eye, Z3DPrimitiveRenderer* renderer1, Z3DPrimitiveRenderer* renderer2);
-
-  void renderPicking(Z3DEye eye,
-                     Z3DPrimitiveRenderer* renderer1,
-                     Z3DPrimitiveRenderer* renderer2,
-                     Z3DPrimitiveRenderer* renderer3);
-
-  void renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers);
+  void renderPicking(Z3DEye eye, RendererSpan renderers);
 
   void setShaderHookType(ShaderHookType t)
   {
@@ -253,31 +224,37 @@ public:
 
   const Z3DRendererBackend& backend() const;
 
-protected:
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  void generateDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers);
-  void generatePickingDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers);
+  void compile();
 
-  void renderInstant(const std::vector<Z3DPrimitiveRenderer*>& renderers);
-  void renderPickingInstant(const std::vector<Z3DPrimitiveRenderer*>& renderers);
+protected:
+  enum class RenderMethod
+  {
+    GLSL,
+    LegacyOpenGL
+  };
+
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  void generateDisplayList(RendererSpan renderers);
+  void generatePickingDisplayList(RendererSpan renderers);
+
+  void renderInstant(RendererSpan renderers);
+  void renderPickingInstant(RendererSpan renderers);
 #endif
 
-  void renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers);
+  void renderUsingGLSL(Z3DEye eye, RendererSpan renderers);
 
-  void renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers);
+  void renderPickingUsingGLSL(Z3DEye eye, RendererSpan renderers);
 
-  bool needLighting(const std::vector<Z3DPrimitiveRenderer*>& renderers) const;
+  bool needLighting(RendererSpan renderers) const;
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  bool useDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers) const;
+  bool useDisplayList(RendererSpan renderers) const;
 #endif
 
   bool hasClipPlanes()
   {
     return !m_clipPlanes.empty();
   }
-
-  void compile();
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void activateClipPlanesOpenGL();
@@ -291,7 +268,7 @@ private:
 #endif
 
 protected:
-  ParameterState& m_parameters;
+  RendererParameterState& m_parameters;
   RendererFrameState& m_frameState;
   RendererViewState& m_viewState;
   RendererSceneState& m_sceneState;
@@ -308,6 +285,7 @@ protected:
 private:
   std::set<Z3DPrimitiveRenderer*>::iterator m_renderersIt;
   std::unique_ptr<Z3DRendererBackend> m_backend;
+  RenderMethod m_renderMethod;
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   struct LegacyGLState;

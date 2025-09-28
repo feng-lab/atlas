@@ -28,7 +28,7 @@ public:
   void paint(bool stereo);
 
 private:
-  Z3DRendererBase::ParameterState m_parameterState{};
+  RendererParameterState m_parameterState{};
   RendererFrameState m_frameState{};
   RendererViewState m_viewState{};
   RendererSceneState m_sceneState{};

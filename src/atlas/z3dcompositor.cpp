@@ -264,9 +264,6 @@ std::shared_ptr<ZWidgetsGroup> Z3DCompositor::axisWidgetsGroup()
     m_axisWidgetsGroup->addChild(m_ZAxisColor, 1);
     auto& rendererParas = m_rendererParameters;
     m_axisWidgetsGroup->addChild(rendererParas.sizeScale, 1);
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-    m_axisWidgetsGroup->addChild(rendererParas.renderMethod, 3);
-#endif
     m_axisWidgetsGroup->addChild(rendererParas.opacity, 3);
     m_axisWidgetsGroup->addChild(m_axisFontName, 4);
     m_axisWidgetsGroup->addChild(m_axisFontSize, 4);
@@ -334,6 +331,8 @@ void Z3DCompositor::setProgressiveRenderingMode(bool v)
 
 double Z3DCompositor::process(Z3DEye eye)
 {
+  syncRendererState();
+
   std::vector<Z3DGeometryFilter*> filters = m_gPPort.connectedFilters();
   std::vector<Z3DImgFilter*> vFilters = m_vPPort.connectedFilters();
   // VLOG(1) << filters.size() << " " << vFilters.size();
@@ -430,14 +429,14 @@ double Z3DCompositor::process(Z3DEye eye)
         setViewport(currentOutRenderTarget.size());
 
         if (m_showBackground.get()) {
-          renderWithState(eye, m_backgroundRenderer);
+          m_rendererBase.render(eye, m_backgroundRenderer);
           glEnable(GL_BLEND);
           glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
         glDepthFunc(GL_ALWAYS);
         m_textureCopyRenderer.setColorTexture(temp1Lease.renderTarget->colorTexture());
         m_textureCopyRenderer.setDepthTexture(temp1Lease.renderTarget->depthTexture());
-        renderWithState(eye, m_textureCopyRenderer);
+        m_rendererBase.render(eye, m_textureCopyRenderer);
         glDepthFunc(GL_LESS);
         if (m_showAxis.get()) {
           if (!m_showBackground.get()) {
@@ -473,7 +472,7 @@ double Z3DCompositor::process(Z3DEye eye)
         setViewport(currentOutRenderTarget.size());
 
         if (m_showBackground.get()) {
-          renderWithState(eye, m_backgroundRenderer);
+          m_rendererBase.render(eye, m_backgroundRenderer);
           glEnable(GL_BLEND);
           glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
@@ -481,7 +480,7 @@ double Z3DCompositor::process(Z3DEye eye)
         m_firstOnTopBlendRenderer.setDepthTexture1(temp2Lease.renderTarget->depthTexture());
         m_firstOnTopBlendRenderer.setColorTexture2(temp1Lease.renderTarget->colorTexture());
         m_firstOnTopBlendRenderer.setDepthTexture2(temp1Lease.renderTarget->depthTexture());
-        renderWithState(eye, m_firstOnTopBlendRenderer);
+        m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
         if (m_showAxis.get()) {
           if (!m_showBackground.get()) {
             glEnable(GL_BLEND);
@@ -510,14 +509,14 @@ double Z3DCompositor::process(Z3DEye eye)
         setViewport(currentOutRenderTarget.size());
 
         if (m_showBackground.get()) {
-          renderWithState(eye, m_backgroundRenderer);
+          m_rendererBase.render(eye, m_backgroundRenderer);
           glEnable(GL_BLEND);
           glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
         glDepthFunc(GL_ALWAYS);
         m_textureCopyRenderer.setColorTexture(colorTex);
         m_textureCopyRenderer.setDepthTexture(depthTex);
-        renderWithState(eye, m_textureCopyRenderer);
+        m_rendererBase.render(eye, m_textureCopyRenderer);
         glDepthFunc(GL_LESS);
         if (m_showAxis.get()) {
           if (!m_showBackground.get()) {
@@ -556,7 +555,7 @@ double Z3DCompositor::process(Z3DEye eye)
         setViewport(currentOutRenderTarget.size());
 
         if (m_showBackground.get()) {
-          renderWithState(eye, m_backgroundRenderer);
+          m_rendererBase.render(eye, m_backgroundRenderer);
           glEnable(GL_BLEND);
           glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
@@ -566,13 +565,13 @@ double Z3DCompositor::process(Z3DEye eye)
           m_alphaBlendRenderer.setDepthTexture1(tempGeoLease.renderTarget->depthTexture());
           m_alphaBlendRenderer.setColorTexture2(colorTex);
           m_alphaBlendRenderer.setDepthTexture2(depthTex);
-          renderWithState(eye, m_alphaBlendRenderer);
+          m_rendererBase.render(eye, m_alphaBlendRenderer);
         } else {
           m_firstOnTopBlendRenderer.setColorTexture1(tempGeoLease.renderTarget->colorTexture());
           m_firstOnTopBlendRenderer.setDepthTexture1(tempGeoLease.renderTarget->depthTexture());
           m_firstOnTopBlendRenderer.setColorTexture2(colorTex);
           m_firstOnTopBlendRenderer.setDepthTexture2(depthTex);
-          renderWithState(eye, m_firstOnTopBlendRenderer);
+          m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
         }
 
         if (m_showAxis.get()) {
@@ -613,7 +612,7 @@ double Z3DCompositor::process(Z3DEye eye)
         m_alphaBlendRenderer.setDepthTexture1(temp1LeaseA.renderTarget->depthTexture());
         m_alphaBlendRenderer.setColorTexture2(colorTex);
         m_alphaBlendRenderer.setDepthTexture2(depthTex);
-        renderWithState(eye, m_alphaBlendRenderer);
+        m_rendererBase.render(eye, m_alphaBlendRenderer);
         temp2LeaseA.renderTarget->release();
 
         // render on top geometries into tempport
@@ -625,7 +624,7 @@ double Z3DCompositor::process(Z3DEye eye)
         setViewport(currentOutRenderTarget.size());
 
         if (m_showBackground.get()) {
-          renderWithState(eye, m_backgroundRenderer);
+          m_rendererBase.render(eye, m_backgroundRenderer);
           glEnable(GL_BLEND);
           glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
@@ -633,7 +632,7 @@ double Z3DCompositor::process(Z3DEye eye)
         m_firstOnTopBlendRenderer.setDepthTexture1(temp1LeaseA.renderTarget->depthTexture());
         m_firstOnTopBlendRenderer.setColorTexture2(temp2LeaseA.renderTarget->colorTexture());
         m_firstOnTopBlendRenderer.setDepthTexture2(temp2LeaseA.renderTarget->depthTexture());
-        renderWithState(eye, m_firstOnTopBlendRenderer);
+        m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
 
         if (m_showAxis.get()) {
           if (!m_showBackground.get()) {
@@ -678,14 +677,14 @@ double Z3DCompositor::process(Z3DEye eye)
       setViewport(currentOutRenderTarget.size());
 
       if (m_showBackground.get()) {
-        renderWithState(eye, m_backgroundRenderer);
+        m_rendererBase.render(eye, m_backgroundRenderer);
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
       }
       glDepthFunc(GL_ALWAYS);
       m_textureCopyRenderer.setColorTexture(temp1Lease.renderTarget->colorTexture());
       m_textureCopyRenderer.setDepthTexture(temp1Lease.renderTarget->depthTexture());
-      renderWithState(eye, m_textureCopyRenderer);
+      m_rendererBase.render(eye, m_textureCopyRenderer);
       glDepthFunc(GL_LESS);
       if (m_showAxis.get()) {
         if (!m_showBackground.get()) {
@@ -721,7 +720,7 @@ double Z3DCompositor::process(Z3DEye eye)
       setViewport(currentOutRenderTarget.size());
 
       if (m_showBackground.get()) {
-        renderWithState(eye, m_backgroundRenderer);
+        m_rendererBase.render(eye, m_backgroundRenderer);
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
       }
@@ -729,7 +728,7 @@ double Z3DCompositor::process(Z3DEye eye)
       m_firstOnTopBlendRenderer.setDepthTexture1(temp2Lease2.renderTarget->depthTexture());
       m_firstOnTopBlendRenderer.setColorTexture2(temp1Lease2.renderTarget->colorTexture());
       m_firstOnTopBlendRenderer.setDepthTexture2(temp1Lease2.renderTarget->depthTexture());
-      renderWithState(eye, m_firstOnTopBlendRenderer);
+      m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
       if (m_showAxis.get()) {
         if (!m_showBackground.get()) {
           glEnable(GL_BLEND);
@@ -769,7 +768,7 @@ double Z3DCompositor::process(Z3DEye eye)
     m_firstOnTopBlendRenderer.setDepthTexture1(handleLease.renderTarget->depthTexture());
     m_firstOnTopBlendRenderer.setColorTexture2(currentOutRenderTarget.colorTexture());
     m_firstOnTopBlendRenderer.setDepthTexture2(currentOutRenderTarget.depthTexture());
-    renderWithState(eye, m_firstOnTopBlendRenderer);
+    m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     for (auto& selectedFilter : selectedFilters) {
@@ -847,7 +846,7 @@ double Z3DCompositor::process(Z3DEye eye)
     m_firstOnTopRenderer.setDepthTexture1(leaseHandles.renderTarget->depthTexture());
     m_firstOnTopRenderer.setColorTexture2(leaseGeoms.renderTarget->colorTexture());
     m_firstOnTopRenderer.setDepthTexture2(leaseGeoms.renderTarget->depthTexture());
-    renderWithState(eye, m_firstOnTopRenderer);
+    m_rendererBase.render(eye, m_firstOnTopRenderer);
     pickingManager().releaseTarget();
   }
 
@@ -1004,7 +1003,7 @@ void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderT
     setViewport(glowLease2.renderTarget->size());
     m_glowRenderer.setColorTexture(glowLease1.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
     m_glowRenderer.setDepthTexture(glowLease1.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
-    renderWithState(eye, m_glowRenderer);
+    m_rendererBase.render(eye, m_glowRenderer);
     glowLease2.renderTarget->release();
 
     // Restore previous depth state
@@ -1016,7 +1015,7 @@ void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderT
     setViewport(renderTarget.size());
     m_textureCopyRenderer.setColorTexture(glowLease2.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
     m_textureCopyRenderer.setDepthTexture(glowLease2.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
-    renderWithState(eye, m_textureCopyRenderer);
+    m_rendererBase.render(eye, m_textureCopyRenderer);
   } else {
     // default path
     filter->setViewport(renderTarget.size());
@@ -1152,7 +1151,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       }
       m_glowRenderer.setColorTexture(glowGeomLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
       m_glowRenderer.setDepthTexture(glowGeomLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
-      renderWithState(eye, m_glowRenderer);
+      m_rendererBase.render(eye, m_glowRenderer);
       layerRT->release();
 
       // Restore depth state
@@ -1220,7 +1219,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
     m_alphaBlendRenderer.setDepthTexture1(leaseOpaque.renderTarget->depthTexture());
     m_alphaBlendRenderer.setColorTexture2(leaseTrans.renderTarget->colorTexture());
     m_alphaBlendRenderer.setDepthTexture2(leaseTrans.renderTarget->depthTexture());
-    renderWithState(eye, m_alphaBlendRenderer);
+    m_rendererBase.render(eye, m_alphaBlendRenderer);
 
     renderTarget.release();
   }
@@ -1317,7 +1316,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
     for (size_t i = 0; i < n; ++i) {
       m_textureCopyRenderer.setColorTexture(imageColorTexList[i]);
       m_textureCopyRenderer.setDepthTexture(imageDepthTexList[i]);
-      renderWithState(eye, m_textureCopyRenderer);
+      m_rendererBase.render(eye, m_textureCopyRenderer);
     }
   }
 
@@ -1366,7 +1365,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
       for (size_t i = 0; i < n; ++i) {
         m_textureCopyRenderer.setColorTexture(imageColorTexList[i]);
         m_textureCopyRenderer.setDepthTexture(imageDepthTexList[i]);
-        renderWithState(eye, m_textureCopyRenderer);
+        m_rendererBase.render(eye, m_textureCopyRenderer);
       }
     }
 
@@ -1493,7 +1492,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
     for (size_t i = 0; i < n; ++i) {
       m_textureCopyRenderer.setColorTexture(imageColorTexList[i]);
       m_textureCopyRenderer.setDepthTexture(imageDepthTexList[i]);
-      renderWithState(eye, m_textureCopyRenderer);
+      m_rendererBase.render(eye, m_textureCopyRenderer);
     }
   }
 
@@ -1583,7 +1582,7 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
     for (size_t i = 0; i < n; ++i) {
       m_textureCopyRenderer.setColorTexture(imageColorTexList[i]);
       m_textureCopyRenderer.setDepthTexture(imageDepthTexList[i]);
-      renderWithState(eye, m_textureCopyRenderer);
+      m_rendererBase.render(eye, m_textureCopyRenderer);
     }
   }
 
@@ -1838,7 +1837,7 @@ bool Z3DCompositor::mergeImageLayers(const std::vector<std::pair<const Z3DTextur
   m_MIPImageAlphaBlendRenderer.setDepthTexture1(layers[0].second);
   m_MIPImageAlphaBlendRenderer.setColorTexture2(layers[1].first);
   m_MIPImageAlphaBlendRenderer.setDepthTexture2(layers[1].second);
-  renderWithState(eye, m_MIPImageAlphaBlendRenderer);
+  m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
   imgLease1.renderTarget->release();
   auto* resRT = imgLease1.renderTarget;
   auto* nextResRT = imgLease2.renderTarget;
@@ -1850,7 +1849,7 @@ bool Z3DCompositor::mergeImageLayers(const std::vector<std::pair<const Z3DTextur
     m_MIPImageAlphaBlendRenderer.setDepthTexture1(resRT->depthTexture());
     m_MIPImageAlphaBlendRenderer.setColorTexture2(layers[i].first);
     m_MIPImageAlphaBlendRenderer.setDepthTexture2(layers[i].second);
-    renderWithState(eye, m_MIPImageAlphaBlendRenderer);
+    m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
     nextResRT->release();
     std::swap(resRT, nextResRT);
   }

@@ -564,7 +564,7 @@ void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
   const auto& target = opaqueTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
-  renderWithState(eye, m_textureCopyRenderer);
+  m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
 bool Z3DVolumeFilter::hasTransparent(Z3DEye eye) const
@@ -580,7 +580,7 @@ void Z3DVolumeFilter::renderTransparent(Z3DEye eye)
   const auto& target = transparentTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
-  renderWithState(eye, m_textureCopyRenderer);
+  m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
 void Z3DVolumeFilter::changeCoordTransform()
@@ -782,6 +782,8 @@ void Z3DVolumeFilter::invalidate(State inv)
 
 void Z3DVolumeFilter::process(Z3DEye eye)
 {
+  syncRendererState();
+
   glEnable(GL_DEPTH_TEST);
 
   Z3DVolume* volume = getVolumes()[0].get();
@@ -810,7 +812,7 @@ void Z3DVolumeFilter::process(Z3DEye eye)
 
   if (m_volumeRaycasterRenderer.hasVisibleRendering() && !allCliped) {
     prepareDataForRaycaster(volume, eye);
-    renderWithState(eye, m_volumeRaycasterRenderer);
+    m_rendererBase.render(eye, m_volumeRaycasterRenderer);
   }
 
   renderBoundBox(eye);
@@ -1086,7 +1088,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
       }
       renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
     }
-    renderWithState(eye, renderers);
+    m_rendererBase.render(eye, Z3DRendererBase::RendererSpan(renderers));
 
   } else {
     m_volumeSliceRenderer.clearQuads();
@@ -1140,7 +1142,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
       slice.transformVerticesByMatrix(volume->physicalToWorldMatrix());
       m_volumeSliceRenderer.addQuad(slice);
     }
-    renderWithState(eye, m_volumeSliceRenderer);
+    m_rendererBase.render(eye, m_volumeSliceRenderer);
   }
 }
 
@@ -1545,7 +1547,7 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
   glCullFace(GL_FRONT);
 
   m_textureAndEyeCoordinateRenderer.setTriangleList(&cube);
-  renderWithState(eye, m_textureAndEyeCoordinateRenderer);
+  m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
   m_exitTarget.release();
   CHECK_GL_ERROR
 
@@ -1561,7 +1563,7 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
   planes.emplace_back(-globalCamera().viewVector(), nearPlaneDistToOrigin);
   ZMesh clipped = ZMeshUtils::clipClosedSurface(cube, planes);
   m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
-  renderWithState(eye, m_textureAndEyeCoordinateRenderer);
+  m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
   m_entryTarget.release();
   CHECK_GL_ERROR
 

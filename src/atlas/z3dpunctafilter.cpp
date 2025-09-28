@@ -106,8 +106,10 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   adjustWidgets();
 }
 
-double Z3DPunctaFilter::process(Z3DEye /*eye*/)
+double Z3DPunctaFilter::process(Z3DEye)
 {
+  syncRendererState();
+
   if (m_dataIsInvalid) {
     prepareData();
   }
@@ -216,9 +218,6 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
     auto& rendererParas = m_rendererParameters;
     m_widgetsGroup->addChild(rendererParas.coordTransform, 5);
     m_widgetsGroup->addChild(rendererParas.sizeScale, 2);
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-    m_widgetsGroup->addChild(rendererParas.renderMethod, 4);
-#endif
     m_widgetsGroup->addChild(rendererParas.opacity, 3);
     m_widgetsGroup->addChild(rendererParas.materialAmbient, 7);
     m_widgetsGroup->addChild(rendererParas.materialSpecular, 7);
@@ -255,7 +254,7 @@ void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
   //    m_rendererBase.render(eye, m_textureCopyRenderer);
   //    renderBoundBox(eye);
   //  }
-  renderWithState(eye, m_sphereRenderer);
+  m_rendererBase.render(eye, m_sphereRenderer);
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
 }
@@ -272,7 +271,7 @@ void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
   //    m_rendererBase.render(eye, m_textureCopyRenderer);
   //    renderBoundBox(eye);
   //  }
-  renderWithState(eye, m_sphereRenderer);
+  m_rendererBase.render(eye, m_sphereRenderer);
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
 }
@@ -282,7 +281,7 @@ void Z3DPunctaFilter::renderPicking(Z3DEye eye)
   if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
   }
-  renderPickingWithState(eye, m_sphereRenderer);
+  m_rendererBase.renderPicking(eye, m_sphereRenderer);
 }
 
 void Z3DPunctaFilter::registerPickingObjects()

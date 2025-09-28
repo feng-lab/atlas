@@ -690,13 +690,6 @@ public:
     }
   }
 
-  void setFogModeUniform(int value)
-  {
-    if (m_fogModeUniform) {
-      setUniform(m_fogModeUniform->location, value);
-    }
-  }
-
   void setLightsPositionUniform(const glm::vec4* value, int count)
   {
     if (m_lightsPositionUniform) {
@@ -1046,7 +1039,6 @@ protected:
   const Uniform* m_fogDensityDensityLog2eUniform;
   const Uniform* m_clipPlanesUniform;
   const Uniform* m_lightingEnabledUniform;
-  const Uniform* m_fogModeUniform = nullptr;
   const Uniform* m_color1Uniform;
   const Uniform* m_color2Uniform;
   const Uniform* m_lineWidthUniform;

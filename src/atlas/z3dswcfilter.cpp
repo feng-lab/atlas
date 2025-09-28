@@ -97,6 +97,8 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
 double Z3DSwcFilter::process(Z3DEye)
 {
+  syncRendererState();
+
   if (m_dataIsInvalid) {
     prepareData();
   }
@@ -199,9 +201,6 @@ std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
     auto& rendererParas = m_rendererParameters;
     m_widgetsGroup->addChild(rendererParas.coordTransform, 5);
     m_widgetsGroup->addChild(rendererParas.sizeScale, 2);
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-    m_widgetsGroup->addChild(rendererParas.renderMethod, 4);
-#endif
     m_widgetsGroup->addChild(rendererParas.opacity, 3);
     m_widgetsGroup->addChild(rendererParas.materialAmbient, 7);
     m_widgetsGroup->addChild(rendererParas.materialSpecular, 7);
@@ -223,13 +222,13 @@ std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
 void Z3DSwcFilter::renderOpaque(Z3DEye eye)
 {
   if (m_renderingPrimitive.isSelected("Normal")) {
-    renderWithState(eye, m_sphereRendererForCone, m_coneRenderer);
+    m_rendererBase.render(eye, m_sphereRendererForCone, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Cylinder")) {
-    renderWithState(eye, m_coneRenderer);
+    m_rendererBase.render(eye, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Line")) {
-    renderWithState(eye, m_lineRenderer);
+    m_rendererBase.render(eye, m_lineRenderer);
   } else /* (m_renderingPrimitive.get() == "Sphere") */ {
-    renderWithState(eye, m_lineRenderer, m_sphereRenderer);
+    m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
   }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
@@ -238,13 +237,13 @@ void Z3DSwcFilter::renderOpaque(Z3DEye eye)
 void Z3DSwcFilter::renderTransparent(Z3DEye eye)
 {
   if (m_renderingPrimitive.isSelected("Normal")) {
-    renderWithState(eye, m_sphereRendererForCone, m_coneRenderer);
+    m_rendererBase.render(eye, m_sphereRendererForCone, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Cylinder")) {
-    renderWithState(eye, m_coneRenderer);
+    m_rendererBase.render(eye, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Line")) {
-    renderWithState(eye, m_lineRenderer);
+    m_rendererBase.render(eye, m_lineRenderer);
   } else /* (m_renderingPrimitive.get() == "Sphere") */ {
-    renderWithState(eye, m_lineRenderer, m_sphereRenderer);
+    m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
   }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
@@ -257,13 +256,13 @@ void Z3DSwcFilter::renderPicking(Z3DEye eye)
   }
 
   if (m_renderingPrimitive.isSelected("Normal")) {
-    renderPickingWithState(eye, m_coneRenderer, m_sphereRendererForCone);
+    m_rendererBase.renderPicking(eye, m_coneRenderer, m_sphereRendererForCone);
   } else if (m_renderingPrimitive.isSelected("Cylinder")) {
-    renderPickingWithState(eye, m_coneRenderer);
+    m_rendererBase.renderPicking(eye, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Line")) {
-    renderPickingWithState(eye, m_lineRenderer);
+    m_rendererBase.renderPicking(eye, m_lineRenderer);
   } else /* (m_renderingPrimitive.get() == "Sphere") */ {
-    renderPickingWithState(eye, m_lineRenderer, m_sphereRenderer);
+    m_rendererBase.renderPicking(eye, m_lineRenderer, m_sphereRenderer);
   }
 }
 

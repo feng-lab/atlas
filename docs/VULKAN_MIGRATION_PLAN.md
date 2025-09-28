@@ -47,6 +47,7 @@ Renderer Base Façade (Revised)
 - `Z3DRendererBase` acts as the single façade. It holds a `std::unique_ptr<Z3DRendererBackend>` and orchestrates the primitive drivers that issue API calls. Swapping backends means asking the renderer base to tear down its current driver, create a new one for the requested backend, and replay cached CPU state.
 - Backend drivers expose narrowly scoped hooks (`createPipelines`, `uploadBuffers`, `issueDraw`, `blit`, `readback`) that both OpenGL and Vulkan can implement efficiently. We keep the naming convention: OpenGL sources stay prefixed `z3d`, Vulkan counterparts `zvulkan`.
 - Filters call the same renderer methods as today (`renderOpaque`, `renderTransparent`, `setData`, `setSliceState`, …). Prior to issuing work they call `renderer.ensureBackend(activeBackend)`, letting the renderer base perform backend switches without introducing extra per-filter glue objects.
+- Keep per-renderer CPU state in the shared structs under `z3drendererstates.h`. If a value is not consumed by both backends, store it privately inside `Z3DRendererBase` (e.g., the legacy OpenGL render method toggle) instead of exposing another parameter knob. Trim old fields when they are unused so Vulkan inherits a minimal, well-defined contract.
 
 **Render Target & Scratch Pool Abstraction**
 
