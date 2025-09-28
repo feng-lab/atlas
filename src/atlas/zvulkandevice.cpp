@@ -31,6 +31,11 @@ ZVulkanDevice::createBuffer(size_t size, vk::BufferUsageFlags usage, vk::MemoryP
   return std::make_unique<ZVulkanBuffer>(*this, size, usage, properties);
 }
 
+std::unique_ptr<ZVulkanTexture> ZVulkanDevice::createTexture(const ZVulkanTexture::CreateInfo& createInfo)
+{
+  return std::make_unique<ZVulkanTexture>(*this, createInfo);
+}
+
 std::unique_ptr<ZVulkanTexture> ZVulkanDevice::createTexture(uint32_t width, uint32_t height, vk::Format format)
 {
   return std::make_unique<ZVulkanTexture>(*this, width, height, format);

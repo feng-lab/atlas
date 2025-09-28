@@ -32,7 +32,7 @@ struct LightingUBOStd140 {
     glm::vec4 attenuation_spare; // attenuation.xyz + pad
     glm::vec4 spotCutoffExponent_pad; // cutoff, exponent, pad
     glm::vec4 spotDirection_pad; // direction.xyz + pad
-  } lights[16];
+  } lights[5];
 };
 
 struct TransformsUBOStd140 {

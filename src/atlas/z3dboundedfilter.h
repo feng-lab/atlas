@@ -75,12 +75,12 @@ public:
 
   virtual void setViewport(glm::uvec2 viewport)
   {
-    setViewport(glm::uvec4(0, 0, viewport.x, viewport.y));
+    m_rendererFrameState.updateViewportData(viewport);
   }
 
   virtual void setViewport(glm::uvec4 viewport)
   {
-    m_currentViewport = viewport;
+    m_rendererFrameState.updateViewportData(viewport);
   }
 
   Z3DPickingManager& pickingManager()
@@ -113,11 +113,9 @@ public:
     return m_rendererBase.shaderHookPara();
   }
 
-  void invalidateViewState() {}
-
   [[nodiscard]] const glm::uvec4& currentViewport() const
   {
-    return m_currentViewport;
+    return m_rendererFrameState.viewport;
   }
 
   [[nodiscard]] const ZBBox<glm::dvec3>& axisAlignedBoundBox() const
@@ -274,10 +272,6 @@ Q_SIGNALS:
   void rendererSizeScaleChanged();
 
 protected:
-  void applyRendererCoordTransform(const glm::mat4& transform);
-
-  void applyRendererSizeScale(float scale);
-
   void refreshRendererBackend();
 
   void pushRendererParametersToBase();
@@ -326,13 +320,6 @@ protected:
   virtual void expandCutRange();
 
 private:
-  enum class BoundsDirtyFlag : uint8_t
-  {
-    None = 0,
-    AxisAligned = 1u << 0,
-    Full = 1u << 1
-  };
-
   void updateAxisAlignedBoundBox();
 
   void updateNotTransformedBoundBox();
@@ -346,10 +333,6 @@ private:
   void onBoundBoxLineWidthChanged();
 
   void onSelectionBoundBoxLineWidthChanged();
-
-  void scheduleBoundsUpdate(BoundsDirtyFlag flag);
-
-  void resolvePendingBounds();
 
   void renderWithStateAndCameraAndCoordTransformImpl(Z3DEye eye,
                                                      const Z3DCamera& camera,
@@ -431,9 +414,7 @@ protected:
   bool m_rendererBackendInitialized = false;
   RenderBackend m_activeBackend = RenderBackend::OpenGL;
   RenderBackend m_requestedBackend = RenderBackend::OpenGL;
-  uint8_t m_boundsDirtyMask = 0;
   Z3DRendererBase m_rendererBase;
-  glm::uvec4 m_currentViewport{0};
 
   virtual void onRendererBackendChanged(RenderBackend /*backend*/) {}
 

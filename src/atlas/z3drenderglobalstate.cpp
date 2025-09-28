@@ -15,7 +15,8 @@ RendererSceneState::LightingState buildLightingState(const Z3DGlobalParameters& 
 
   const auto configuredCount = params.lightCount.get();
   const auto maxCount = static_cast<int>(params.lightPositions.size());
-  const auto clampedCount = std::clamp(configuredCount, 1, maxCount);
+  constexpr int kMaxLights = 5;
+  const auto clampedCount = std::clamp(configuredCount, 1, std::min(maxCount, kMaxLights));
   lighting.lightCount = clampedCount;
 
   const auto fill = [clampedCount](auto& destination, const auto& sources) {
@@ -78,7 +79,6 @@ RendererViewState buildViewState(const Z3DCamera& camera)
     eyeState.inverseViewMatrix = camera.inverseViewMatrix(eye);
     eyeState.inverseProjectionMatrix = camera.inverseProjectionMatrix(eye);
     eyeState.normalMatrix = camera.normalMatrix(eye);
-    eyeState.coordTransformNormalMatrix = glm::mat3(1.f);
     eyeState.eyePosition = eyePosition;
     eyeState.isPerspective = isPerspective;
     eyeState.frustumNearPlaneSize = frustumNearPlaneSize;

@@ -6,6 +6,14 @@ layout(set = 2, binding = 0) uniform Transforms {
   mat3 pos_transform_normal_matrix;
 } xf;
 
+mat3 compute_view_normal_matrix()
+{
+  // Match the GLSL path: normals are transformed by the inverse-transpose of the
+  // view matrix so lighting happens in eye space. The view matrix is affine, so
+  // we only keep the upper-left 3x3 block before inverting.
+  return transpose(inverse(mat3(xf.view_matrix)));
+}
+
 layout(set = 2, binding = 1) uniform MaterialUBO {
   vec4 scene_ambient;
   vec4 material_ambient;
@@ -16,4 +24,3 @@ layout(set = 2, binding = 1) uniform MaterialUBO {
   float _pad0;
   vec4  custom_color;
 } matu;
-

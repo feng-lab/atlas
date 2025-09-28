@@ -678,6 +678,25 @@ public:
     }
   }
 
+  [[nodiscard]] bool hasPosTransformNormalMatrixUniform() const
+  {
+    return m_posTransformNormalMatrixUniform != nullptr;
+  }
+
+  void setLightCountUniform(int value)
+  {
+    if (m_lightCountUniform) {
+      setUniform(m_lightCountUniform->location, value);
+    }
+  }
+
+  void setFogModeUniform(int value)
+  {
+    if (m_fogModeUniform) {
+      setUniform(m_fogModeUniform->location, value);
+    }
+  }
+
   void setLightsPositionUniform(const glm::vec4* value, int count)
   {
     if (m_lightsPositionUniform) {
@@ -1004,6 +1023,7 @@ protected:
   const Uniform* m_sizeScaleUniform;
   const Uniform* m_posTransformUniform;
   const Uniform* m_posTransformNormalMatrixUniform;
+  const Uniform* m_lightCountUniform = nullptr;
   const Uniform* m_lightsPositionUniform;
   const Uniform* m_lightsAmbientUniform;
   const Uniform* m_lightsDiffuseUniform;
@@ -1026,6 +1046,7 @@ protected:
   const Uniform* m_fogDensityDensityLog2eUniform;
   const Uniform* m_clipPlanesUniform;
   const Uniform* m_lightingEnabledUniform;
+  const Uniform* m_fogModeUniform = nullptr;
   const Uniform* m_color1Uniform;
   const Uniform* m_color2Uniform;
   const Uniform* m_lineWidthUniform;

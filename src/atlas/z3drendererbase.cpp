@@ -30,7 +30,7 @@ Z3DRendererBase::Z3DRendererBase(ParameterState& parameterState,
 RendererViewState Z3DRendererBase::pushViewStateFromCamera(const Z3DCamera& camera)
 {
   const RendererViewState previous = m_viewState;
-  m_viewState = buildViewStateFromCamera(camera, m_parameters.coordTransform);
+  m_viewState = buildViewStateFromCamera(camera);
   return previous;
 }
 
@@ -39,7 +39,7 @@ void Z3DRendererBase::restoreViewState(const RendererViewState& state)
   m_viewState = state;
 }
 
-RendererViewState Z3DRendererBase::buildViewStateFromCamera(const Z3DCamera& camera, const glm::mat4& coordTransform)
+RendererViewState Z3DRendererBase::buildViewStateFromCamera(const Z3DCamera& camera)
 {
   RendererViewState state;
   state.nearClip = camera.nearDist();
@@ -58,14 +58,6 @@ RendererViewState Z3DRendererBase::buildViewStateFromCamera(const Z3DCamera& cam
     eyeState.isPerspective = camera.isPerspectiveProjection();
     eyeState.frustumNearPlaneSize = camera.frustumNearPlaneSize();
     eyeState.fieldOfView = camera.fieldOfView();
-  }
-
-  for (int eyeValue = LeftEye; eyeValue <= RightEye; ++eyeValue) {
-    auto eye = static_cast<Z3DEye>(eyeValue);
-    auto& eyeState = state.eyes[static_cast<size_t>(eye)];
-    const glm::mat4 combined = eyeState.viewMatrix * coordTransform;
-    const glm::mat3 combined3(combined);
-    eyeState.coordTransformNormalMatrix = glm::transpose(glm::inverse(combined3));
   }
 
   return state;

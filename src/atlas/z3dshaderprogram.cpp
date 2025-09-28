@@ -379,6 +379,8 @@ void Z3DShaderProgram::storeUniformLocations()
   m_posTransformUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
   it = m_uniforms.find("pos_transform_normal_matrix");
   m_posTransformNormalMatrixUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("light_count");
+  m_lightCountUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
   it = m_uniforms.find("lights_position");
   m_lightsPositionUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
   it = m_uniforms.find("lights_ambient");
@@ -407,6 +409,8 @@ void Z3DShaderProgram::storeUniformLocations()
   m_sceneAmbientUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
   it = m_uniforms.find("alpha");
   m_alphaUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
+  it = m_uniforms.find("fog_mode");
+  m_fogModeUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
   it = m_uniforms.find("fog_color_top");
   m_fogColorTopUniform = (it == m_uniforms.end()) ? nullptr : &(it->second);
   it = m_uniforms.find("fog_color_bottom");

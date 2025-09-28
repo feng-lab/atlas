@@ -40,248 +40,84 @@ Implementation approach:
 - Parameter bridging: Reuse `Z3DGlobalParameters` as the single source of truth. Vulkan renderers consume the identical state (`camera`, fog, OIT, clip planes, `devicePixelRatio`, etc.) through `Z3DRendererBase` powered by a Vulkan backend implementation (`Z3DRendererVulkanBackend`), keeping GPU-specific code free of duplicate scene copies.
 - Feature matching: When hardware features differ (e.g., wide lines), emulate in shaders/CPU so behavior stays consistent.
 
-Data/API Abstraction Layer
 
-- Preserve renderer method names across backends (e.g., `setData`, `setDataColors`, `setLineWidth`, etc.) so filters/compositor can keep calling the same functions.
-- Extract an interface from `Z3DCompositor` so that Vulkan compositor can implement the same surface used by the engine. Introduce `src/atlas/z3dcompositorbase.h` (abstract) as the target interface.
-- Run a feasibility check for each abstraction decision (resource ownership, frame contexts, synchronization) to confirm it maps cleanly to both OpenGL and Vulkan without hidden performance cliffs.
+Renderer Base Façade (Revised)
 
-## GL Dependency Classification (Current Engine)
+- Filters continue to own their renderer members (e.g., `Z3DImgFilter::m_imgRaycasterRenderer`). Those renderers become API-neutral shells that store CPU-side state and interact with a backend driver; filters never touch GL types or Vulkan handles directly.
+- `Z3DRendererBase` acts as the single façade. It holds a `std::unique_ptr<Z3DRendererBackend>` and orchestrates the primitive drivers that issue API calls. Swapping backends means asking the renderer base to tear down its current driver, create a new one for the requested backend, and replay cached CPU state.
+- Backend drivers expose narrowly scoped hooks (`createPipelines`, `uploadBuffers`, `issueDraw`, `blit`, `readback`) that both OpenGL and Vulkan can implement efficiently. We keep the naming convention: OpenGL sources stay prefixed `z3d`, Vulkan counterparts `zvulkan`.
+- Filters call the same renderer methods as today (`renderOpaque`, `renderTransparent`, `setData`, `setSliceState`, …). Prior to issuing work they call `renderer.ensureBackend(activeBackend)`, letting the renderer base perform backend switches without introducing extra per-filter glue objects.
 
-- API‑independent core (keep as is):
-  - Engine scaffolding (minus GL readback): `z3drenderingengine.*`
-  - Scene/camera/parameters/UI: `z3dscene.*`, `z3dcamera.*`, `z3dglobalparameters.*`, `z*parameter.*`, widget groups
-  - Graph: `z3dport.*` (ports), `z3dnetworkevaluator.*`
-  - Views/docs: `z3d*view.*`, `z*doc.*`
-- OpenGL‑specific (keep GL here; add Vulkan counterparts):
-  - GL context/helpers: `z3dgl.*`, `z3dcontext.*`
-  - Shaders: `z3dshaderprogram.*`, `z3dshadergroup.*`, `z3dshadermanager.*`
-  - Buffers/VAO: `z3dvertexarrayobject.*`, `z3dvertexbufferobject.*`
-  - Textures/FBO: `z3dtexture.*`, `z3drendertarget.*`, `z3drenderport.*`
-  - Renderers: `z3d*renderer.*` (background, line, mesh, image/volume paths inside `z3dimg*`)
-  - Compositor: `z3dcompositor.*`
-- Mixed areas still being cleaned: residual GL includes in a few filters and any helper utilities that still assume OpenGL-only state.
+**Render Target & Scratch Pool Abstraction**
 
-Recent cleanups worth carrying forward:
+- Refactor `Z3DRenderTarget` into an API-neutral interface that exposes only cross-backend operations (size query, resize, clear, attachment access by index/role, readback helpers). The existing GL implementation moves to `Z3DRenderTargetGL`; the Vulkan path introduces `ZVulkanRenderTarget` with matching behaviour.
+- Attachment access switches from raw GL enums to small descriptors (`enum class AttachmentRole { Color0, Color1, Depth, Feedback }`). Helpers on the interface expose typed accessors (`colorAttachment(size_t index)`, `depthAttachment()`) returning opaque `RenderAttachmentView` handles that drivers understand.
+- `Z3DScratchResourcePool` keeps the existing `RenderTargetLease` API but stores `std::unique_ptr<Z3DRenderTarget>` in its slots. A new `Z3DScratchResourcePoolBackend` interface creates/resizes targets per backend and maps semantic requests (opaque/transparent/picking). Backends attach their own GPU resources without leaking handles back to filters.
+- Temporary 2D surfaces expose a neutral selector (`TempRenderTargetKind`) so callers can request the default render target or the picking-friendly variant without passing GL enums; each backend maps those kinds to its preferred formats.
+- On backend switch, the engine calls `scratchPool.setBackend(createScratchBackend(targetBackend))`. The pool releases outstanding slots, adopts the new backend, and lazily recreates render targets on the next acquisition.
 
-- `z3dport.h` no longer includes `z3dfilter.h`; it forward-declares the filter class and keeps GL headers in source files.
-- `z3dfilter` base removed its GL helper dependency so headers stay backend-neutral.
-- `Z3DMeshFilter` already delegates all GL work to renderers/compositor; use it as the pattern for the remaining filters.
+**FilterRenderContext & Utilities**
 
-Essentials for the ongoing effort:
+- `FilterRenderContext` accompanies each draw call. Instead of exposing raw attachment handles, it now carries the active `RenderTargetLease` plus backend utilities (`RenderUtilities`) for common operations (clear, blit, readback, unproject).
+- `RenderUtilities` is implemented by the active backend and provides the small set of stateful actions filters/compositor need (depth unprojection, fullscreen blits, resolve helpers, readbacks). OpenGL implementations wrap existing helper renderers; Vulkan implementations record commands or schedule transfers.
 
-- Continue sweeping headers in API-neutral layers, replacing GL includes with forward declarations and moving includes into `.cpp`.
-- Confine new backend-specific code to delegates, renderers, and the compositor; filters should only manage CPU state and call delegate helpers.
-- Maintain a slim `Z3DCompositorBase` interface so both backends share the same engine integration pathway.
+**Renderer/Filter Interaction**
 
-## Detailed Migration Backlog (mirrors OpenGL pipeline)
+1. **Initialization** – filters construct their renderer members exactly as today. `Z3DRendererBase` lazily instantiates a GL backend driver so existing behaviour is preserved.
+2. **Per-frame** – the compositor builds a `FilterRenderContext` for each draw pass. Filters forward it to their renderers, then call the usual render entry points. The renderer base hands the context to its backend driver, which binds/uses the leased render target, uploads dirty resources, and records draw calls.
+3. **Backend Switch** – `Z3DRenderingEngine` broadcasts `switchBackend(RenderBackend)`. Each renderer base releases its current driver, creates the requested backend driver, and replays cached CPU state (vertex/index data, shader defines, texture metadata). Filters do not special-case the switch.
+4. **CPU Data Updates** – when filter data changes, existing invalidation paths call renderer setters. The renderer base marks its cached state dirty; the active backend driver performs the necessary buffer/image updates on the next frame.
+5. **Readback/Picking** – filters request readback through `RenderUtilities` (`readColor`, `readDepth`, `unprojectDepth`). GL uses PBOs; Vulkan stages buffers. The caller sees identical semantics.
 
-1. **Cross-API Rendering Abstraction Design**
-   - Document the API-neutral command/data interfaces (frame context structs, renderer entry points, resource handles) that filters and the compositor rely on.
-   - Evaluate each interface proposal against both OpenGL’s stateful model and Vulkan’s explicit render pass/synchronization requirements to guarantee feasibility and avoid future performance cliffs.
-   - Produce an adaptation checklist for the existing OpenGL path (shims, ownership moves, lifetime rules) so we can converge GL onto the façade before advancing Vulkan work.
+**Compositor Integration**
 
-2. **Compositor Filter Shell**
-   - Introduce `Z3DCompositorFilter` derived from `Z3DBoundedFilter` that owns invalidation, progressive flags, widget plumbing, JSON I/O, and render requests.
-   - The shell holds `std::unique_ptr<Z3DCompositorBase>` and delegates to either `Z3DCompositorGLBackend` or `ZVulkanCompositor` depending on runtime config.
-   - Adjust `Z3DRenderingEngine` to construct the shell, keep its pointer instead of the GL compositor, and expose accessor helpers that forward to the active backend.
+- The compositor still acquires temporary targets from `Z3DScratchResourcePool`, but leases now wrap API-neutral `Z3DRenderTarget` objects. The compositor never binds FBOs directly; it asks backend utilities to begin or resolve passes using the lease.
+- Blend/OIT paths become high-level intents (`beginTransparencyPass(mode, lease)`, `resolveTransparency(lease, dst)`) that backend drivers translate to GL state changes or Vulkan subpasses.
+- Glow, axis, texture copy, and blend helpers already go through `Z3DRendererBase`; once their GL calls move into backend drivers they automatically obey the façade.
+- Picking/screenshot readback routes through `RenderUtilities`, removing compositor-owned PBO management.
 
-3. **Filter/Compositor Decoupling (No DTO layer)**
-   - Continue moving GL resource ownership out of filters into renderers/compositor while keeping filter data structures unchanged.
-   - Audit filters to ensure headers stay backend-agnostic and only expose existing parameter/state surfaces.
+### Vulkan Prototype Roadmap
 
-**Filter/Renderer Refactor Blueprint**
-- **Filter structure (API-neutral):**
-  - Data ownership stays in the filter (`std::vector` geometry, image bricks, parameter state). Filters continue to expose the CPU data they already manage (vectors, parameter structs, cached configs) directly to their delegates—no extra abstraction layer is introduced.
-  - Each filter owns a small `RenderState` struct (material flags, shader toggles, invalidation counters) that is serialisable and independent of backend.
-  - Filters no longer include GL renderer headers. Instead they reference abstract delegate interfaces, resolved at runtime through the `FilterBackendBridge`.
-- **Renderer delegates (per backend):**
-  - Define `Z3DFilterDelegate` in `src/atlas/z3dfilterdelegate.h` with pass-oriented methods (`beginFrame`, `renderOpaque`, `renderTransparent`, `renderDepthPrepass`, `endFrame`, `shutdown`). Filter-specific data upload methods stay on the derived delegate types so they can consume the existing CPU data each filter already manages.
-  - Provide concrete implementations adhering to the naming convention `Z3D…` for OpenGL artefacts and `ZVulkan…` for Vulkan artefacts. Every filter type gains a matching pair (e.g., `Z3DMeshFilterDelegate`, `ZVulkanMeshFilterDelegate`; `Z3DImgFilterDelegate`, `ZVulkanImgFilterDelegate`; file names `z3dmeshfilterdelegate.*`, `zvulkanmeshfilterdelegate.*`). All delegate sources remain in `src/atlas/`; the prefix signals the backend while the delegate encapsulates VAO/VBO creation, descriptor management, and draw commands.
-  - Delegates keep long-lived GPU objects (VBOs, pipelines) and refresh allocations only when the incoming CPU data changes size/layout or when a backend switch occurs.
-- **Filter execution flow after refactor:**
-  1. During `onBackendSwitch`, the filter calls `bridge.createDelegate(filterKind(), filterId(), bootstrapCtx)` to obtain a backend-specific delegate. The filter immediately pushes its existing CPU data through the delegate’s update methods so the GPU resources are rebuilt under the new backend.
-  2. On `filter->render(eye)`, the filter forwards the current frame context and eye directly to its delegate’s render method. The filter does not issue GL calls; it just updates CPU-side state and invalidation flags.
-  3. If filter data mutates (new vertices, parameter changes), the filter calls the delegate’s update method with the same CPU data it already owns. Delegates refresh GPU buffers incrementally and rebuild only when necessary.
-  4. When the filter disconnects, it calls `delegate->shutdown()` and the bridge releases backend resources via `releaseBackendResources(filterId)`.
-- **Compositor interaction:**
-  - `Z3DCompositorFilter` continues to orchestrate passes but keeps relying on the existing helper predicates: `filter->isReady(eye)`, `filter->hasOpaque(eye)`, and `filter->hasTransparent(eye)`. These flags, together with the legacy stay-on-top/transparency metadata, already encode the pass ordering the compositor needs, so no additional `prepareRenderPlan()` layer is introduced.
-  - Progressive rendering: filters maintain their CPU-side progressive counters; delegates expose `supportsProgressive()` so the compositor can decide whether to reuse previous frames or request incremental uploads.
-  - Detailed call path:
-    1. **Frame kickoff:** engine calls `Z3DCompositorFilter::process(eye)`. The filter gathers connected filters from its ports and builds a `FrameContext` (camera, viewport, frame index, progressive state) for the current eye.
-    2. **Pass bucketing:** using existing predicates (`isReady`, `hasOpaque`, `hasTransparent`, `isStayOnTop`), the compositor partitions filters into opaque/transparent/on-top buckets exactly as the current OpenGL code does.
-    3. **Backend scheduling:** for each bucket the active `Z3DCompositorBase` allocates or reuses render targets, then for every filter in draw order performs:
-       - `auto* delegate = filter.delegateHandle();`
-       - `bridge.connectDelegate(*delegate)` to expose backend utilities for the pass (bind in-flight command buffer/FBO, hand out scratch resources, descriptor allocators, progressive state).
-       - `delegate->beginFrame(frameCtx)` (using the context assembled in step 1).
-       - `delegate->renderOpaque(attachments)` or `delegate->renderTransparent(attachments)` based on the bucket.
-    4. **Pass execution:** the delegate binds buffers, descriptors, and issues draw commands on the backend. Filters stay unaware of FBO/descriptor details.
-    5. **Cleanup:** after each delegate call the backend invokes `bridge.disconnectDelegate(*delegate)` to release per-frame bindings, and once all passes finish it publishes composed render targets back to the compositor filter for readback/signaling.
-- **Migration approach:**
-  - Start with geometry filters (`Z3DMeshFilter`, `Z3DLineFilter`), converting them to the delegate model while keeping the GL delegate wired to existing renderer code. Once stable, build Vulkan delegates that reuse the same update methods and CPU data.
-  - After geometry filters, port image filters; ensure render target creation moves entirely into delegates so filters only describe required attachments (formats, dimensions) and the compositor backend provides the concrete target handles.
-  - Add unit tests validating that CPU data changes trigger delegate updates and that backend toggles recreate delegates without losing filter state.
+- **Stage 0 – Foundation**
+  - Stand up a `VkDeviceContext` helper (logical device, queues, allocator hooks) isolated from the shipping renderer.
+  - Add a small utilities header for command buffer submission (`ImmediateSubmission`, transient fences) so the prototypes can upload resources without touching the GL path.
 
-### API Sketch — Filter Delegates & Bridge
+- **Stage 1 – Texture Primitives**
+  - Implement `ZVulkanTexture` that encapsulates a `VkImage`, `VkImageView`, and sampler creation.
+  - Provide helper methods for cube/array/3D images, including staged uploads of subregions (mirroring `Z3DTexture::setSubImage`).
+  - Expose descriptor info (`VkDescriptorImageInfo`) so later prototypes can bind textures without re-querying state.
 
-**Header layout (all names follow the `Z3D…` / `ZVulkan…` convention and live directly under `src/atlas/`):**
+- **Stage 2 – Render Target Wrapper**
+  - Design `ZVulkanRenderTarget` around dynamic rendering: store color/depth images, view, and render-area metadata.
+  - Support attachment clear/load policies analogous to the GL path and expose a `beginRendering/endRendering` pair that records commands on an injected command buffer.
+  - Handle multisample resolve images internally so parity features (progressive targets, accumulation buffers) are available.
 
-- `src/atlas/z3dfilterdelegate.h`
-  - Declares the API-neutral base classes shared across backends.
-- `src/atlas/z3dfilterbackendbridge.h`
-  - Declares the bridge interface used by filters/compositor to talk to the active backend.
-- Backend-specific source files share the same directory, relying on prefix alone for clarity (e.g., `z3dmeshfilterdelegate.cpp`, `zvulkanmeshfilterdelegate.cpp`).
+- **Stage 3 – Scratch Pool Prototype**
+  - Create `ZVulkanScratchResourcePool` that mirrors the GL lease API but tracks per-frame image lifetime, layout transitions, and queue ownership.
+  - Start with a single `Temp2D` surface role, then extend to entry/exit, layer arrays, and picking surfaces.
+  - Integrate a lightweight cache eviction policy based on frame counters so long-lived Vulkan images are recycled safely.
 
-**Core enums & aliases:**
+- **Stage 4 – Prototype Render Flow**
+  - Build a self-contained sample that records a command buffer: acquire render target from the Vulkan pool, bind a pipeline, draw a fullscreen triangle, and read back via staging buffer.
+  - Validate synchronization (pipeline barriers, queue submissions) with the validation layers before attempting integration with the main renderer.
 
-```cpp
-enum class RenderBackend { OpenGL, Vulkan };
+### Vulkan Prototype Rendering Pipeline Sketch
 
-enum class FilterKind {
-  Mesh,
-  Line,
-  Img,
-  Puncta,
-  // extend as new filter families appear
-};
+1. **Frame Bootstrap**
+   - Acquire a command buffer + frame fence from the prototype device context.
+   - Transition scratch-pool images to the required layouts (color attachment, sampled, transfer) via helper utilities.
+2. **Render Pass Encoding**
+   - Call `ZVulkanRenderTarget::beginRendering` to emit `vkCmdBeginRendering` with the leased attachments.
+   - Bind descriptor sets populated from `ZVulkanTexture` instances, record draw calls through the prototype pipeline state.
+   - End rendering, transition the render target to a sampled or transfer src layout as needed.
+3. **Readback / Presentation**
+   - If CPU readback is required, issue `vkCmdCopyImageToBuffer` into a scratch staging buffer, submit, and map once the fence signals.
+   - Otherwise, transition images to the appropriate layout for subsequent passes (e.g., sampled in a composition step).
+4. **Cleanup**
+   - Return leases to the scratch pool; pool defers destruction until it is safe (tracked via submitted fence values).
+   - Reset the command buffer for the next frame.
 
-using FilterId = QUuid; // filters already have UUIDs; reuse for backend bookkeeping
-
-struct FrameContext {
-  const Z3DCamera* camera;
-  glm::uvec2 viewport;
-  uint64_t frameIndex;
-  bool progressiveEnabled;
-  Z3DEye eye;
-};
-
-struct PassAttachments {
-  AttachmentHandle color; // opaque handle provided by compositor backend
-  AttachmentHandle depth;
-  AttachmentHandle accum; // optional OIT accumulation
-  AttachmentHandle reveal; // optional OIT revealage
-};
-```
-
-`AttachmentHandle` remains an opaque backend-defined token (GL texture id + target pair, or Vulkan image/view). Delegates obtain binding helpers for it through the bridge.
-
-**API-neutral delegate interfaces (`z3dfilterdelegate.h`):**
-
-```cpp
-class Z3DFilterDelegate
-{
-public:
-  virtual ~Z3DFilterDelegate() = default;
-
-  virtual void beginFrame(const FrameContext& ctx) = 0;
-  virtual void renderOpaque(const PassAttachments& attachments) = 0;
-  virtual void renderTransparent(const PassAttachments& attachments) = 0;
-  virtual void renderDepthPrepass(const PassAttachments& attachments) = 0;
-  virtual void endFrame() = 0;
-
-  virtual bool supportsProgressive() const { return false; }
-  virtual void shutdown() = 0;
-};
-```
-
-Filter-specific delegates inherit from `Z3DFilterDelegate` and add the strongly typed upload hooks they require. Example:
-
-```cpp
-struct Z3DMeshCpuData;
-struct Z3DMeshRenderState;
-
-class Z3DMeshFilterDelegate : public Z3DFilterDelegate
-{
-public:
-  virtual void updateMeshData(const Z3DMeshCpuData& data) = 0;
-  virtual void updateRenderState(const Z3DMeshRenderState& state) = 0;
-};
-
-class Z3DImgFilterDelegate : public Z3DFilterDelegate
-{
-public:
-  virtual void updateImageConfig(const Z3DImgConfig& config) = 0;
-  virtual void updateSliceState(const Z3DImgSliceState& slice) = 0;
-};
-```
-
-Backends derive concrete implementations (`Z3DMeshFilterDelegate`, `ZVulkanMeshFilterDelegate`, etc.) that plug into the existing renderer logic without inventing new intermediate containers. Each delegate reuses the filter’s existing CPU data structures.
-
-**Bridge responsibilities (`z3dfilterbackendbridge.h`):**
-
-```cpp
-class Z3DFilterBackendBridge
-{
-public:
-  virtual ~Z3DFilterBackendBridge() = default;
-
-  // Called during backend switch / filter creation.
-  virtual std::unique_ptr<Z3DFilterDelegate> createDelegate(FilterKind kind,
-                                                            FilterId id,
-                                                            const FrameContext& bootstrapCtx) = 0;
-
-  virtual void connectDelegate(Z3DFilterDelegate& delegate,
-                               const FrameContext& ctx,
-                               const PassAttachments& attachments) = 0;
-  virtual void disconnectDelegate(Z3DFilterDelegate& delegate) = 0;
-
-  virtual ReadbackTicket requestReadback(FilterId id,
-                                         const ReadbackDescriptor& desc) = 0;
-  virtual void releaseBackendResources(FilterId id) = 0;
-};
-```
-
-- `ReadbackDescriptor` represents a semantic readback request (picking, screenshot, histogram). Backends map it to the appropriate pipeline stage.
-- Geometry/texture uploads are triggered directly by filters via their typed delegate methods (`updateMeshData`, `updateImageConfig`, etc.), keeping ownership with the filter classes that already manage those CPU structures.
-
-**Filter base additions (`z3dboundedfilter.*` planned changes):**
-
-```cpp
-class Z3DBoundedFilter : public Z3DFilter
-{
-public:
-  void setDelegate(std::unique_ptr<Z3DFilterDelegate> delegate);
-  Z3DFilterDelegate* delegateHandle() const { return m_delegate.get(); }
-
-protected:
-  virtual FilterKind filterKind() const = 0;
-
-private:
-  std::unique_ptr<Z3DFilterDelegate> m_delegate;
-};
-```
-
-- Derived filters reuse their existing invalidation paths (`invalidateGeometry`, `invalidateImageConfig`, etc.) to call the appropriate delegate update methods with the CPU data they already own.
-- `filterKind()` lets the backend registry choose the correct concrete delegate during backend switch.
-
-**Backend factory responsibilities:**
-
-- Each backend exposes a factory function, e.g.,
-
-```cpp
-std::unique_ptr<Z3DFilterDelegate> createZ3DDelegate(FilterKind kind,
-                                                     FilterId id,
-                                                     const FrameContext& ctx,
-                                                     Z3DFilterBackendBridge& bridge);
-
-std::unique_ptr<Z3DFilterDelegate> createZVulkanDelegate(FilterKind kind,
-                                                         FilterId id,
-                                                         const FrameContext& ctx,
-                                                         Z3DFilterBackendBridge& bridge);
-```
-
-These register immutable upload helpers, share renderer caches, and ensure we follow the naming rules (`Z3D…`/`ZVulkan…`). The bridge owns whichever factory matches the active backend.
-
-**Rendering sequence summary:**
-
-1. Backend switch: compositor asks bridge to create delegates for each filter using `filter.filterKind()`.
-2. Frame rendering: compositor buckets filters via `hasOpaque/hasTransparent`, obtains `delegateHandle()`, calls `bridge.connectDelegate(*delegate)` passing `FrameContext` + attachments.
-3. Delegate renders the requested pass (opaque/transparent/etc.).
-4. Backend calls `bridge.disconnectDelegate(*delegate)` and moves to the next filter.
-5. When a filter disconnects from the graph, compositor calls `delegate->shutdown()` and `bridge.releaseBackendResources(filterId)`.
-
-This API sketch keeps filter headers clean, mirrors today’s execution order, and makes it straightforward to add the Vulkan implementations without rewriting filter logic.
-
+This roadmap keeps the prototypes isolated—none of these steps touch the live GL renderer—yet exercises the full set of capabilities (`Z3DTexture`, `Z3DRenderTarget`, scratch leasing) so the eventual integration can swap in the Vulkan implementations when we are ready.
 4. **Render Target Parity**
    - Implement `ZVulkanRenderTarget` (mono/left/right) with color/depth attachments, resolve images, and CPU staging buffers analogous to GL `Z3DRenderTarget`.
    - Mirror progressive ping-pong management (`m_monoCurrentTarget`, etc.) inside the Vulkan compositor while exposing ready local buffers for engine readback (render targets remain backend-private).
@@ -335,18 +171,6 @@ This API sketch keeps filter headers clean, mirrors today’s execution order, a
    - Mirror the public API of the old compositor (background/axis parameters, progressive toggles, screenshot helpers, picking entry points) so existing call sites compile unchanged.
    - Import stateful members (progressive frame counters, invalidation flags, stereo configuration, widget groups) and rewire them to drive the backend instead of owning GL state directly.
    - Handle JSON serialization/deserialization of compositor-related parameters inside the filter so document persistence continues to work without touching backends.
-
-**Filter Backend Handshake (all upstream filters)**
-- Interface definition lives in `src/atlas/z3dfilterbackendbridge.h` (new). It declares pure virtual hooks every backend supplies:
-  - `std::unique_ptr<Z3DFilterDelegate> createDelegate(FilterKind, FilterId, const FrameContext&)` — factory used during backend switch or filter insertion.
-  - `void releaseBackendResources(FilterId)` — invoked when a filter is removed or before a backend swap so the backend can destroy buffers, framebuffers, pipelines, or cached descriptors tied to that filter.
-  - `ReadbackTicket requestReadback(const ReadbackDescriptor&)` — queue a CPU readback (screenshots, picking, histograms). Implementations enqueue either a GL PBO read or a Vulkan transfer/fence and return an opaque ticket the filter can poll.
-- `Z3DCompositorBase` owns the concrete bridge; the compositor backend stores a delegate pointer for each connected filter and, before rendering, invokes `bridge.connectDelegate(*delegate)` (see detailed call path below) so the delegate sees the correct in-flight command context.
-- Every bounded filter implements `onBackendSwitch(RenderBackend newBackend, FilterBackendBridge& bridge)`. The renderer pipeline calls this in two spots:
-  1. **Backend toggle:** within the engine’s runtime switch flow (see above step 2), the compositor filter iterates all connected filters. For each filter it first calls `filter->beginBackendSwitch()`, then `onBackendSwitch(newBackend, bridge)`, followed by `filter->finishBackendSwitch(success)`. During the hook the filter drops backend-owned caches and asks the bridge to create a new delegate; the filter immediately feeds its existing CPU data into the delegate so GPU resources are recreated under the new backend.
-  2. **Filter insertion/removal:** when a filter connects/disconnects to the compositor port, `Z3DCompositorFilter` invokes `onBackendSwitch(currentBackend, bridge)` so the new filter instantly materializes backend resources via its delegate, and calls `releaseBackendResources` when it departs.
-- `requestReadback` is used by filters that need CPU-visible output (picking buffers, thumbnails, screenshot export). For example, the compositor filter’s picking path can ask the bridge for a readback ticket after rendering the ID target; volume/image filters typically skip this helper because their results stay in backend-owned render targets consumed by the compositor.
-- If any bridge operation throws or returns an error code, the filter reports it via `FilterBackendBridge::reportError`. The engine interprets that as a failed switch, reverts to the prior backend, and surfaces the problem to the user.
 
 3. **Codify The Backend Contract With `Z3DCompositorBase`**
    - Introduce an abstract base exposing lifecycle (`initialize`, `shutdown`), render (`renderFrame`, `renderTransparentFilter`, `renderPicking`), resize, and readback/screenshot hooks required by the filter.
@@ -415,8 +239,8 @@ This API sketch keeps filter headers clean, mirrors today’s execution order, a
    - Move the GL renderers, shaders, and render-target ownership out of `Z3DCompositor` into a backend that implements `Z3DCompositorBase`. Keep `Z3DCompositor::process` focused on gathering filters, building the `FrameContext`, and delegating passes through the bridge.
 
 2. **Split filter responsibilities**
-   - Replace GL renderer members on `Z3DBoundedFilter` with backend-agnostic delegate handles. Filters keep CPU data/state and forward them via strongly typed delegate update methods.
-   - Transition filter headers to forward declarations only, keeping backend includes in implementation files.
+   - Keep renderer members on `Z3DBoundedFilter`, but ensure they own only backend-neutral state and talk to `Z3DRendererBase` drivers for API-specific work. Filters stay responsible for CPU data/parameters and avoid direct GL/Vulkan calls.
+   - Transition filter headers to forward declarations only, keeping backend includes in implementation files so the public surface stays neutral.
 
 3. **Clarify Z3DRendererBase ownership (todo)**
    - [x] Relocated renderer-facing UI parameters (`Coord Transform`, `Size Scale`, `Opacity`, material controls, legacy render method) from `Z3DRendererBase` into `Z3DBoundedFilter`, exposing them via `rendererParameters()` so filters own lifetime, widgets, and serialization.
@@ -430,7 +254,7 @@ This API sketch keeps filter headers clean, mirrors today’s execution order, a
   - Keep the compositor backend responsible for named passes (`renderOpaqueGeometry`, `renderVolumetricImages`, `resolveGlow`, `composeOnTop`) so filters remain API-neutral coordinators.
 
 6. **Testing hooks**
-   - Expand lightweight unit/integration tests that exercise the delegate bridge with mock filters to validate bucketing, invalidation, and progressive behaviour.
+   - Expand lightweight unit/integration tests that exercise renderer-base drivers with mock filters to validate bucketing, invalidation, and progressive behaviour.
    - Capture GL outputs before/after major refactors to guarantee parity while we reshape the pipeline.
 
 ### Renderer Parity Focus
@@ -442,9 +266,9 @@ This API sketch keeps filter headers clean, mirrors today’s execution order, a
 
 ### Backend Switch Execution
 
-- Backend toggles are driven by `Z3DGlobalParameters::renderBackend`; `Z3DRenderingEngine` listens, pauses work, and asks the compositor bridge to swap delegates/backends.
-- Filters implement `onBackendSwitch` to drop backend-specific caches, request a new delegate, and immediately push their existing CPU data so GPU resources are recreated under the new backend.
-- Bridge failures surface via `reportError`, prompting an automatic rollback to the previous backend with a user-visible error.
+- Backend toggles are driven by `Z3DGlobalParameters::renderBackend`; `Z3DRenderingEngine` listens, pauses work, and asks the compositor/backend managers to swap renderer drivers.
+- Filters implement `onBackendSwitch` to drop backend-specific caches, ensure their renderer bases recreate GPU resources, and immediately push their CPU data to the new driver.
+- Backend swap failures surface via error callbacks, prompting an automatic rollback to the previous backend with a user-visible error.
 
 
 ## Detailed Task Breakdown (Checklist)
@@ -458,7 +282,7 @@ This API sketch keeps filter headers clean, mirrors today’s execution order, a
 - [x] Fullscreen triangle pipeline for background gradient base.
 - [x] Fix line renderer pipeline layout and descriptor binding (always include set=0 combined image sampler).
 - [x] Convert 1D LUT usage to 2D Wx1 to improve portability.
-- [ ] Background renderer parity: finalize specialization constants for Uniform/Gradient orientations; ensure delegate wires `mode`/`orientation`/`region` consistently.
+- [ ] Background renderer parity: finalize specialization constants for Uniform/Gradient orientations; ensure the renderer backend wires `mode`/`orientation`/`region` consistently.
 - [ ] Finalize `ZVulkanLineRenderer` (buffers, pipelines, draw calls, picking path).
 - [ ] Line renderer parity: match smooth wide lines, caps, strip batching, per-segment widths, 1D texture colours, picking IDs.
 - [ ] Implement per-frame UBO/push-constant plumbing for camera matrices, fog, lights.
@@ -476,7 +300,7 @@ Abstraction/Reuse tasks
 - [x] Simplify compositor façade/readback to rely on `Z3DLocalColorBuffer` snapshots (engine screenshots now API-neutral).
 - [x] Replace `ZVulkanRendererBase` with `Z3DRendererVulkanBackend` so Vulkan shares the `Z3DRendererBase` state machinery.
   - [x] Introduce a Vulkan `Z3DRendererBackend` implementation that wraps device/swapchain setup (`beginFrame`, `endFrame`, readback helpers).
-  - [x] Update `ZVulkanRenderer` and renderer delegates to consume `RendererFrameState`, `RendererViewState`, and `RendererSceneState` from the host `Z3DRendererBase`.
+- [x] Update `ZVulkanRenderer` and renderer backend drivers to consume `RendererFrameState`, `RendererViewState`, and `RendererSceneState` from the host `Z3DRendererBase`.
   - [x] Switch filter/backend factories (`Z3DBoundedFilter::refreshRendererBackend`, compositor bridge) to create the Vulkan backend and drop direct `ZVulkanRendererBase` construction.
   - [x] Delete or shim the legacy `ZVulkanRendererBase` once all call sites are migrated.
   - [x] Hoist lighting-state assembly into `Z3DRenderGlobalState` so shared renderer state builds lighting without calling back into global parameters.
@@ -487,7 +311,7 @@ Abstraction/Reuse tasks
 - [ ] Update scratch render-target handling so both backends share common helpers via the bridge (no new abstraction layer beyond existing scratch pool).
 - [ ] Renderer parameter audit: hoist persistent `ZParameter` state out of GL renderers so backend swaps don’t drop user settings (see checklist below).
   - [x] Image raycaster: sampling rate, ISO value, local MIP threshold, and compositing mode now live on `Z3DImgFilter` and are injected into the renderer.
-  - [x] Volume raycaster: sampling rate, ISO value, local MIP threshold, and compositing mode now live on `Z3DImgFilter` and are injected into the renderer via delegate hooks.
+- [x] Volume raycaster: sampling rate, ISO value, local MIP threshold, and compositing mode now live on `Z3DImgFilter` and are injected into the renderer through backend driver hooks.
   - [x] Background renderer: compositor holds mode/colors/orientation parameters and injects them into `Z3DBackgroundRenderer`.
   - [x] Mesh renderer: wireframe mode/color now live on `Z3DMeshFilter`; renderer consumes filter state through new setters.
   - [x] Sphere/Ellipsoid renderers: dynamic-material toggles moved to owning filters (`Z3DPunctaFilter`, SWC renderer setup) and are injected via setters.
@@ -554,11 +378,11 @@ Progress Update — Renderer Scene Defaults (Completed)
 
 Progress Update — Renderer Backend Abstraction (Completed)
 
-- `Z3DRendererBase` now talks to pluggable backends; the GLSL implementation lives behind `createGLRendererBackend()` and remains responsible for API-specific glue (clip planes, shader headers, global uniforms).
+  - `Z3DRendererBase` now talks to pluggable backends; the GLSL implementation lives behind `createGLRendererBackend()` and remains responsible for API-specific glue (clip planes, shader headers, global uniforms).
 - Filters own POD state blocks (`RendererFrameState`, `RendererViewState`, `RendererSceneState`, `ParameterState`) and feed them to their renderers/render bases. Parameter reads no longer happen inside the renderers.
 - The global state singleton is now just a cache: filters/compositors build fresh scene/view blocks from live parameters when needed, eliminating stale lighting/camera data.
 - All OIT/dual-depth compositor passes avoid leaking global camera uniforms; fullscreen shaders receive explicit screen-space uniforms.
 - Next focus:
   1. Expand the Vulkan compositor to deliver parity outputs (transparency, readbacks, OIT).
   2. Migrate engine ownership to a backend-agnostic facade that can swap OpenGL/Vulkan at runtime.
-  3. Continue auditing filters for residual GL dependencies and move backend-specific ownership into renderer delegates.
+  3. Continue auditing filters for residual GL dependencies and move backend-specific ownership into renderer backend drivers.

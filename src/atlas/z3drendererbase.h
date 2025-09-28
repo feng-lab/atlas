@@ -3,6 +3,7 @@
 #include "z3drendererbackend.h"
 #include "z3drendererstates.h"
 #include "zglmutils.h"
+#include <array>
 #include <memory>
 #include <set>
 #include <string>
@@ -81,7 +82,7 @@ public:
 
   void restoreViewState(const RendererViewState& state);
 
-  static RendererViewState buildViewStateFromCamera(const Z3DCamera& camera, const glm::mat4& coordTransform);
+  static RendererViewState buildViewStateFromCamera(const Z3DCamera& camera);
 
   const glm::mat4& coordTransform() const
   {
@@ -276,6 +277,8 @@ protected:
     return !m_clipPlanes.empty();
   }
 
+  void compile();
+
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void activateClipPlanesOpenGL();
   void deactivateClipPlanesOpenGL();
@@ -286,8 +289,6 @@ private:
   void invalidateDisplayList();
   void invalidatePickingDisplayList();
 #endif
-
-  void compile();
 
 protected:
   ParameterState& m_parameters;

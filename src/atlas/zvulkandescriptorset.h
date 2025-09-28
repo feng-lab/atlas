@@ -15,6 +15,7 @@ public:
   ~ZVulkanDescriptorSet();
 
   void updateUniformBuffer(uint32_t binding, ZVulkanBuffer& buffer);
+  void updateTexture(uint32_t binding, ZVulkanTexture& texture);
   void updateTexture(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler);
 
   vk::DescriptorSet descriptorSet() const

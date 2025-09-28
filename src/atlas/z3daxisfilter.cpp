@@ -208,7 +208,6 @@ void Z3DAxisFilter::setupCamera()
   camera.setFarDist(distance + radius);
 
   m_axisCamera = camera;
-  invalidateViewState();
 
   m_tailPosAndTailRadius.clear();
   m_headPosAndHeadRadius.clear();

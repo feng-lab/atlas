@@ -78,12 +78,13 @@ void Z3DCanvasPainter::syncRendererState(const glm::uvec2& size)
     eyeState.inverseViewMatrix = glm::mat4(1.f);
     eyeState.inverseProjectionMatrix = glm::mat4(1.f);
     eyeState.normalMatrix = glm::mat3(1.f);
-    eyeState.coordTransformNormalMatrix = glm::mat3(1.f);
     eyeState.eyePosition = glm::vec3(0.f);
     eyeState.frustumNearPlaneSize = glm::vec2(0.f);
     eyeState.fieldOfView = 0.f;
     eyeState.isPerspective = false;
   }
+
+  m_parameterState.coordTransform = glm::mat4(1.f);
 
   m_sceneState.sceneAmbient = glm::vec4(0.f);
   m_sceneState.weightedBlendedDepthScale = 1.f;

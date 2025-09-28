@@ -4,7 +4,7 @@ layout(constant_id = 21) const bool USE_EXPONENTIAL_FOG = false;
 layout(constant_id = 22) const bool USE_SQUARED_EXPONENTIAL_FOG = false;
 
 // Fixed upper bound for lights; actual count provided via uLighting.numLights
-const int MAX_LIGHTS = 16;
+const int MAX_LIGHTS = 5;
 
 // Define light struct at global scope (cannot nest a struct inside a UBO)
 struct LightSource {

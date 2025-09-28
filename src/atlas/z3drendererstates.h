@@ -54,7 +54,6 @@ struct RendererViewState
     glm::mat4 inverseViewMatrix{1.f};
     glm::mat4 inverseProjectionMatrix{1.f};
     glm::mat3 normalMatrix{1.f};
-    glm::mat3 coordTransformNormalMatrix{1.f};
     glm::vec3 eyePosition{0.f};
     glm::vec2 frustumNearPlaneSize{0.f};
     float fieldOfView = 0.f;

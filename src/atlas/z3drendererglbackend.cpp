@@ -40,20 +40,28 @@ public:
     const auto& params = renderer.parameterState();
     shader.setSizeScaleUniform(params.sizeScale);
     shader.setPosTransformUniform(params.coordTransform);
-    shader.setPosTransformNormalMatrixUniform(eyeState.coordTransformNormalMatrix);
+    if (shader.hasPosTransformNormalMatrixUniform()) {
+      const glm::mat4 combined = eyeState.viewMatrix * params.coordTransform;
+      const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(combined)));
+      shader.setPosTransformNormalMatrixUniform(normalMatrix);
+    }
 
     const auto& scene = renderer.sceneState();
+    constexpr int kMaxLights = 5;
     const auto& lighting = scene.lighting;
-    const int clampedLightCount =
-      std::max(0, std::min(lighting.lightCount, static_cast<int>(lighting.positions.size())));
-    shader.setLightsPositionUniform(lighting.positions.data(), clampedLightCount);
-    shader.setLightsAmbientUniform(lighting.ambient.data(), clampedLightCount);
-    shader.setLightsDiffuseUniform(lighting.diffuse.data(), clampedLightCount);
-    shader.setLightsSpecularUniform(lighting.specular.data(), clampedLightCount);
-    shader.setLightsSpotCutoffUniform(lighting.spotCutoff.data(), clampedLightCount);
-    shader.setLightsAttenuationUniform(lighting.attenuation.data(), clampedLightCount);
-    shader.setLightsSpotExponentUniform(lighting.spotExponent.data(), clampedLightCount);
-    shader.setLightsSpotDirectionUniform(lighting.spotDirection.data(), clampedLightCount);
+    int requestedLightCount = std::max(0, std::min(lighting.lightCount, static_cast<int>(lighting.positions.size())));
+    const int clampedLightCount = std::min(requestedLightCount, kMaxLights);
+    if (clampedLightCount > 0) {
+      shader.setLightsPositionUniform(lighting.positions.data(), clampedLightCount);
+      shader.setLightsAmbientUniform(lighting.ambient.data(), clampedLightCount);
+      shader.setLightsDiffuseUniform(lighting.diffuse.data(), clampedLightCount);
+      shader.setLightsSpecularUniform(lighting.specular.data(), clampedLightCount);
+      shader.setLightsSpotCutoffUniform(lighting.spotCutoff.data(), clampedLightCount);
+      shader.setLightsAttenuationUniform(lighting.attenuation.data(), clampedLightCount);
+      shader.setLightsSpotExponentUniform(lighting.spotExponent.data(), clampedLightCount);
+      shader.setLightsSpotDirectionUniform(lighting.spotDirection.data(), clampedLightCount);
+    }
+    shader.setLightCountUniform(clampedLightCount);
 
     shader.setMaterialSpecularUniform(params.materialSpecular);
     shader.setMaterialShininessUniform(params.materialShininess);
@@ -63,21 +71,22 @@ public:
 
     constexpr float kLog2e = 1.44269504088896340735992468100189214f;
 
+    shader.setFogModeUniform(static_cast<int>(scene.fog.mode));
+    shader.setFogColorTopUniform(scene.fog.topColor);
+    shader.setFogColorBottomUniform(scene.fog.bottomColor);
+    shader.setFogEndUniform(0.f);
+    shader.setFogScaleUniform(0.f);
+    shader.setFogDensityLog2eUniform(0.f);
+    shader.setFogDensityDensityLog2eUniform(0.f);
     switch (scene.fog.mode) {
       case FogMode::Linear:
-        shader.setFogColorTopUniform(scene.fog.topColor);
-        shader.setFogColorBottomUniform(scene.fog.bottomColor);
         shader.setFogEndUniform(static_cast<GLfloat>(scene.fog.range.y));
-        shader.setFogScaleUniform(static_cast<GLfloat>(1.f / (scene.fog.range.y - scene.fog.range.x)));
+        shader.setFogScaleUniform(static_cast<GLfloat>(1.f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f)));
         break;
       case FogMode::Exponential:
-        shader.setFogColorTopUniform(scene.fog.topColor);
-        shader.setFogColorBottomUniform(scene.fog.bottomColor);
         shader.setFogDensityLog2eUniform(scene.fog.density * kLog2e);
         break;
       case FogMode::ExponentialSquared:
-        shader.setFogColorTopUniform(scene.fog.topColor);
-        shader.setFogColorBottomUniform(scene.fog.bottomColor);
         shader.setFogDensityDensityLog2eUniform(scene.fog.density * scene.fog.density * kLog2e);
         break;
       case FogMode::None:
@@ -101,31 +110,10 @@ public:
     fmt::format_to(std::back_inserter(header), "#version {}\n", glslVer);
     absl::StrAppend(&header, "#define lowp\n#define mediump\n#define highp\n");
     fmt::format_to(std::back_inserter(header), "#define GLSL_VERSION {}\n", glslVer);
-    const int lightCount = renderer.sceneState().lighting.lightCount;
-    fmt::format_to(std::back_inserter(header), "#define LIGHT_COUNT {}\n", lightCount);
-
     if (!renderer.clipPlanes().empty()) {
       absl::StrAppend(&header, "#define HAS_CLIP_PLANE\n");
     }
     fmt::format_to(std::back_inserter(header), "#define CLIP_PLANE_COUNT {}\n", renderer.clipPlanes().size());
-
-    auto appendFogMacro = [&](FogMode mode) {
-      switch (mode) {
-        case FogMode::Linear:
-          absl::StrAppend(&header, "#define USE_LINEAR_FOG\n");
-          break;
-        case FogMode::Exponential:
-          absl::StrAppend(&header, "#define USE_EXPONENTIAL_FOG\n");
-          break;
-        case FogMode::ExponentialSquared:
-          absl::StrAppend(&header, "#define USE_SQUARED_EXPONENTIAL_FOG\n");
-          break;
-        case FogMode::None:
-          break;
-      }
-    };
-
-    appendFogMacro(renderer.sceneState().fog.mode);
 
     return header;
   }

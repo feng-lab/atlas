@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zvulkan.h"
+#include "zvulkantexture.h"
 #include <memory>
 #include <optional>
 #include <string>
@@ -30,6 +31,7 @@ public:
   std::unique_ptr<ZVulkanBuffer>
   createBuffer(size_t size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
 
+  std::unique_ptr<ZVulkanTexture> createTexture(const ZVulkanTexture::CreateInfo& createInfo);
   std::unique_ptr<ZVulkanTexture> createTexture(uint32_t width, uint32_t height, vk::Format format);
   std::unique_ptr<ZVulkanTexture> createTexture(uint32_t width,
                                                 uint32_t height,

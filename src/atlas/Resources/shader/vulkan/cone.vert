@@ -41,15 +41,16 @@ void main()
   inv_sqr_height = 1.0 / inv_sqr_height;
 
   vec3 h = normalize(scaledAxis);
-  v_axis = normalize(xf.pos_transform_normal_matrix * h);
+  mat3 view_normal_matrix = compute_view_normal_matrix();
+  v_axis = normalize(view_normal_matrix * h);
 
   vec3 u = cross(h, vec3(1.0, 0.0, 0.0));
   if (dot(u, u) < 0.001) u = cross(h, vec3(0.0, 1.0, 0.0));
   u = normalize(u);
   vec3 v = normalize(cross(u, h));
 
-  v_U = normalize(xf.pos_transform_normal_matrix * u);
-  v_V = normalize(xf.pos_transform_normal_matrix * v);
+  v_U = normalize(view_normal_matrix * u);
+  v_V = normalize(view_normal_matrix * v);
 
   // Compute bounding box vertex
   vec4 vertex = vec4(scaledOrigin, 1.0);

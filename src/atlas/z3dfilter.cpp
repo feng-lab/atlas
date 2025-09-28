@@ -110,6 +110,7 @@ void Z3DFilter::write(json::object& json) const
 
 void Z3DFilter::setValid(Z3DEye eye)
 {
+  // VLOG(1) << className() << " setValid(" << eye << ")";
   if (eye == MonoEye) {
     unsetFlag(m_state, State::MonoViewResultInvalid);
   } else if (eye == LeftEye) {

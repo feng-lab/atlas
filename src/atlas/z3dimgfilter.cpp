@@ -1089,6 +1089,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 #endif
 
       // prepare entry/exit in renderer
+      syncRendererState(eye);
       m_imgRaycasterRenderer.prepareEntryExit(clipped, flipped, eye, currentTarget.size());
     }
   }

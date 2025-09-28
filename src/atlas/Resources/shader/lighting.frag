@@ -1,21 +1,22 @@
 uniform bool lighting_enabled;
 
-#if defined(USE_LINEAR_FOG) || defined(USE_EXPONENTIAL_FOG) || defined(USE_SQUARED_EXPONENTIAL_FOG)
 uniform vec3 fog_color_top;
 uniform vec3 fog_color_bottom;
-#endif
-#if defined(USE_LINEAR_FOG)
 uniform float fog_end;
 uniform float fog_scale;
-#endif
-#if defined(USE_EXPONENTIAL_FOG)
 uniform float fog_density_log2e;
-#endif
-#if defined(USE_SQUARED_EXPONENTIAL_FOG)
 uniform float fog_density_density_log2e;
-#endif
 
 uniform vec2 screen_dim_RCP;
+
+const int MAX_LIGHT_COUNT = 5;
+uniform int light_count;
+
+const int FOG_MODE_NONE = 0;
+const int FOG_MODE_LINEAR = 1;
+const int FOG_MODE_EXPONENTIAL = 2;
+const int FOG_MODE_EXPONENTIAL_SQUARED = 3;
+uniform int fog_mode;
 
 struct LightSource
 {
@@ -27,7 +28,7 @@ struct LightSource
   float spotCutoff, spotExponent;
   vec3 spotDirection;
 };
-uniform LightSource lights[LIGHT_COUNT];
+uniform LightSource lights[MAX_LIGHT_COUNT];
 
 vec4 computeColorFromLight(const in vec3 normalDirection, const in LightSource light, const in vec3 position,
                            const in float materialShininess, const in vec4 materialAmbient, const in vec4 materialSpecular,
@@ -76,33 +77,29 @@ vec4 apply_lighting_and_fog(const in vec4 sceneAmbient,
                             const in float materialShininess, const in vec4 materialAmbient, const in vec4 materialSpecular,
                             const in vec3 normalDirection, const in vec3 position, const in vec4 color, const in float alpha)
 {
-  if (lighting_enabled && LIGHT_COUNT > 0) {
+  if (lighting_enabled && light_count > 0) {
     vec4 finalColor = sceneAmbient * materialAmbient;
 
-    for (int index = 0; index < LIGHT_COUNT; index++) {
+    for (int index = 0; index < light_count; index++) {
       finalColor += computeColorFromLight(normalDirection, lights[index], position,
                                           materialShininess, materialAmbient, materialSpecular, color);
     }
 
-#if defined(USE_LINEAR_FOG)
-    float fog = clamp((fog_end + position.z) * fog_scale, 0.0, 1.0);
-    vec3 fogColor = mix(fog_color_bottom, fog_color_top, gl_FragCoord.y * screen_dim_RCP.y);
-    finalColor.rgb = mix(fogColor, finalColor.rgb, fog);
-#endif
-#if defined(USE_EXPONENTIAL_FOG)
-    float fog = clamp(exp2(position.z * fog_density_log2e), 0.0, 1.0);
-    vec3 fogColor = mix(fog_color_bottom, fog_color_top, gl_FragCoord.y * screen_dim_RCP.y);
-    finalColor.rgb = mix(fogColor, finalColor.rgb, fog);
-#endif
-#if defined(USE_SQUARED_EXPONENTIAL_FOG)
-    float fog = clamp(exp2(-position.z * position.z * fog_density_density_log2e), 0.0, 1.0);
-    vec3 fogColor = mix(fog_color_bottom, fog_color_top, gl_FragCoord.y * screen_dim_RCP.y);
-    finalColor.rgb = mix(fogColor, finalColor.rgb, fog);
-#endif
+    if (fog_mode != FOG_MODE_NONE) {
+      vec3 fogColor = mix(fog_color_bottom, fog_color_top, gl_FragCoord.y * screen_dim_RCP.y);
+      float fogFactor = 1.0;
+      if (fog_mode == FOG_MODE_LINEAR) {
+        fogFactor = clamp((fog_end + position.z) * fog_scale, 0.0, 1.0);
+      } else if (fog_mode == FOG_MODE_EXPONENTIAL) {
+        fogFactor = clamp(exp2(position.z * fog_density_log2e), 0.0, 1.0);
+      } else if (fog_mode == FOG_MODE_EXPONENTIAL_SQUARED) {
+        fogFactor = clamp(exp2(-position.z * position.z * fog_density_density_log2e), 0.0, 1.0);
+      }
+      finalColor.rgb = mix(fogColor, finalColor.rgb, fogFactor);
+    }
 
     return vec4(finalColor.rgb * color.a * alpha, color.a * alpha);
   } else {
     return color;
   }
 }
-
