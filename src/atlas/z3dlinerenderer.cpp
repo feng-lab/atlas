@@ -33,7 +33,7 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   , m_VAOs(1)
   , m_pickingVAOs(1)
   , m_oneBatchNumber(4e6)
-  , m_useGeomLineShader(true)
+  , m_useGeomLineShader(false)
 {
   updateLineWidth();
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)

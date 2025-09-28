@@ -70,9 +70,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_manipulatorSize.setSingleStep(10);
   connect(&m_manipulatorSize, &ZFloatParameter::valueChanged, this, &Z3DBoundedFilter::invalidateHandle);
 
-  connect(&m_globalParameters.camera, &Z3DCameraParameter::valueChanged, this, [this]() {
-    invalidateHandle();
-  });
+  connect(&m_globalParameters.camera, &Z3DCameraParameter::valueChanged, this, &Z3DBoundedFilter::invalidateHandle);
 
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DBoundedFilter::objVisibleChanged);
   m_xCut.setSingleStep(1);
