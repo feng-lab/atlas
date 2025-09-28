@@ -27,10 +27,12 @@ ZParameter* Z3DFilter::parameter(const QString& name) const
 
 void Z3DFilter::invalidate(State inv)
 {
+  // VLOG(1) << className() << " 1";
   CHECK(inv != State::Valid);
   if (isFlagSet(m_state, inv)) {
     return;
   }
+  // VLOG(1) << className() << " 2";
 
   setFlag(m_state, inv);
 
@@ -190,7 +192,7 @@ void Z3DFilter::addParameter(ZParameter& para, State inv)
   m_parameters.push_back(&para);
   m_parameterNames.insert(para.name());
   if (inv != State::Valid) {
-#ifdef ATLAS_DEBUG_VERSION
+#ifdef NO // ATLAS_DEBUG_VERSION
     // Capture and tag parameter changes (debug-only) before invalidation.
     connect(&para, &ZParameter::valueChanged, this, [this, &para]() {
       try {
@@ -259,7 +261,7 @@ void Z3DFilter::updateSize()
     port->setExpectedSize(maxOutportSize);
   }
   // Provide a reason so downstream logs can attribute this invalidation.
-#ifdef ATLAS_DEBUG_VERSION
+#ifdef NO // ATLAS_DEBUG_VERSION
   debugSetInvalidateReason("updateSize");
 #endif
   invalidate(State::AllResultInvalid);

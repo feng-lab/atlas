@@ -125,7 +125,7 @@ public:
 
   // Debugging aid: record a short reason before calling invalidate.
   // Set by parameter-change hooks or port invalidations.
-#ifdef ATLAS_DEBUG_VERSION
+#ifdef NO // ATLAS_DEBUG_VERSION
   void debugSetInvalidateReason(const QString& reason)
   {
     m_lastInvalidateReason = reason;

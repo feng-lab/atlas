@@ -204,6 +204,10 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
 #endif
   m_fontRenderer.setFollowCoordTransform(false);
   setupAxisCamera();
+
+  for (auto* para : m_globalParameters.parameters()) {
+    connect(para, &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
+  }
 }
 
 void Z3DCompositor::updateBackgroundMode()
@@ -314,6 +318,7 @@ glm::uvec2 Z3DCompositor::outputSize() const
 
 void Z3DCompositor::invalidate(State inv)
 {
+  // VLOG(1) << "1";
   CHECK(inv != State::Valid);
   if (isFlagSet(m_state, inv)) {
     return;

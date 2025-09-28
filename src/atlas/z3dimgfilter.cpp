@@ -182,6 +182,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   CHECK_GL_ERROR
 
   m_numParas = m_parameters.size();
+
+  for (auto* para : m_globalParameters.parameters()) {
+    connect(para, &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
+  }
 }
 
 void Z3DImgFilter::setData(const ZImgPack& imgPack)
@@ -390,7 +394,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     Q_EMIT renderingError(QString("import 3d img error: %1").arg(e.what()));
   }
 
-#ifdef ATLAS_DEBUG_VERSION
+#ifdef NO // ATLAS_DEBUG_VERSION
   // Reset cached global cuts since our bounds may have changed with new data
   m_cachedGlobalCutsInitialized = false;
   debugSetInvalidateReason("setData");

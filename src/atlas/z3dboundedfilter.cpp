@@ -31,10 +31,7 @@ Z3DBoundedFilter::RendererParameters::RendererParameters()
 
 Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* parent)
   : Z3DFilter(parent)
-  , m_rendererParameters()
   , m_globalParameters(globalPara)
-  , m_rendererParameterState()
-  , m_rendererFrameState()
   , m_rendererBase(m_rendererParameterState,
                    m_rendererFrameState,
                    Z3DRenderGlobalState::instance().rendererState().viewState,
@@ -204,34 +201,6 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   connect(&m_handleEvent, &ZEventListenerParameter::mouseEventTriggered, this, &Z3DBoundedFilter::handleEvent);
   addEventListener(m_handleEvent);
   m_handleEvent.setEnabled(m_isSelected);
-
-  for (auto* para : m_globalParameters.parameters()) {
-#ifdef ATLAS_DEBUG_VERSION
-    connect(para, &ZParameter::valueChanged, this, [this, para]() {
-      // Record which global parameter changed to aid invalidation attribution.
-      QString valueStr;
-      try {
-        if (auto* cam = dynamic_cast<Z3DCameraParameter*>(para)) {
-          // Augment camera JSON with near/far to make subtle changes visible.
-          auto jv = cam->jsonValue();
-          auto obj = jv.as_object();
-          obj["Near Distance Float"] = json::value_from(cam->get().nearDist());
-          obj["Far Distance Float"] = json::value_from(cam->get().farDist());
-          valueStr = nim::jsonToFormattedQString(obj);
-        } else {
-          valueStr = nim::jsonToFormattedQString(para->jsonValue());
-        }
-      }
-      catch (...) {
-        valueStr = QStringLiteral("<unavailable>");
-      }
-      debugSetInvalidateReason(QString("global '%1' changed to %2").arg(para->name(), valueStr));
-      invalidateResult();
-    });
-#else
-    connect(para, &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
-#endif
-  }
 }
 
 void Z3DBoundedFilter::setSelected(bool v)

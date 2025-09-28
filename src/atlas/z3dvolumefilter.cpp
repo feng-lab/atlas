@@ -207,6 +207,10 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   CHECK_GL_ERROR
 
   m_numParas = m_parameters.size();
+
+  for (auto* para : m_globalParameters.parameters()) {
+    connect(para, &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
+  }
 }
 
 void Z3DVolumeFilter::setData(const ZImgPack& img)

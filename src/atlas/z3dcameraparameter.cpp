@@ -4,6 +4,7 @@
 #include "zlog.h"
 #include <QWidget>
 #include <QGroupBox>
+#include <QSignalBlocker>
 
 namespace nim {
 
@@ -254,17 +255,20 @@ void Z3DCameraParameter::beforeChange(Z3DCamera& value)
 
 void Z3DCameraParameter::updateWidget(Z3DCamera& value)
 {
+  // Prevent sub-parameter updates from recursively emitting valueChanged.
+  QSignalBlocker blockProjection(&m_projectionType);
+  QSignalBlocker blockEye(&m_eye);
+  QSignalBlocker blockCenter(&m_center);
+  QSignalBlocker blockUp(&m_upVector);
+  QSignalBlocker blockEyeSep(&m_eyeSeparationAngle);
+  QSignalBlocker blockFov(&m_fieldOfView);
+  QSignalBlocker blockNear(&m_nearDist);
+  QSignalBlocker blockFar(&m_farDist);
+
   m_eye.set(value.eye());
-  // VLOG(1) << value.eye() << " " << m_eye.get();
   m_center.set(value.center());
-  // VLOG(1) << value.center() << " " << m_center.get();
   m_upVector.set(value.upVector());
-  // VLOG(1) << value.upVector() << " " << m_upVector.get();
-  if (value.isPerspectiveProjection()) {
-    m_projectionType.select("Perspective");
-  } else {
-    m_projectionType.select("Orthographic");
-  }
+  m_projectionType.select(value.isPerspectiveProjection() ? "Perspective" : "Orthographic");
   m_eyeSeparationAngle.set(glm::degrees(value.eyeSeparationAngle()));
   m_fieldOfView.set(glm::degrees(value.fieldOfView()));
   m_nearDist.set(value.nearDist());

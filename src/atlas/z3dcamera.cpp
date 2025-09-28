@@ -173,8 +173,14 @@ void Z3DCamera::resetCameraNearFarPlane(const ZBBox<glm::dvec3>& bound)
     range[0] = nearClippingPlaneTolerance * range[1];
   }
 
-  m_nearDist = range[0];
-  m_farDist = range[1];
+  constexpr double kNearFarEpsilon = 1e-6;
+  if (std::abs(range[0] - static_cast<double>(m_nearDist)) <= kNearFarEpsilon &&
+      std::abs(range[1] - static_cast<double>(m_farDist)) <= kNearFarEpsilon) {
+    return;
+  }
+
+  m_nearDist = static_cast<float>(range[0]);
+  m_farDist = static_cast<float>(range[1]);
   updateFrustum();
 }
 

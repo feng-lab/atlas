@@ -28,7 +28,7 @@ Z3DInputPortBase::~Z3DInputPortBase()
 void Z3DInputPortBase::invalidate()
 {
   // Tag downstream filter with the specific inport cause and state.
-#ifdef ATLAS_DEBUG_VERSION
+#ifdef NO // ATLAS_DEBUG_VERSION
   if (m_filter) {
     m_filter->debugSetInvalidateReason(
       QString("inport '%1' invalidated (state=%2)").arg(m_name, nim::enumToQString(m_invalidationState)));
@@ -103,7 +103,7 @@ void Z3DOutputPortBase::invalidate()
 {
   for (size_t i = 0; i < m_connectedInputPorts.size(); ++i) {
     // Attach a reason to the downstream filter for debugging attribution.
-#ifdef ATLAS_DEBUG_VERSION
+#ifdef NO  // ATLAS_DEBUG_VERSION
     if (auto* f = m_connectedInputPorts[i]->filter()) {
       f->debugSetInvalidateReason(
         QString("upstream outport '%1' of '%2' invalidated").arg(m_name, m_filter->className()));
