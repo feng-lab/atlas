@@ -173,6 +173,12 @@ int numDigits(int32_t x)
 
 namespace nim {
 
+void Z3DRenderingEngine::ScratchPoolDeleter::operator()(Z3DScratchResourcePool* pool) const
+{
+  Z3DRenderGlobalState::instance().resetScratchPool();
+  delete pool;
+}
+
 Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
   : QObject(parent)
   , m_doc(doc)
@@ -212,14 +218,7 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
   VLOG(1) << "canvas detached";
   getGLFocus();
 
-  // Ensure all GPU resources release their pooled leases before we tear down the
-  // scratch pool. The leases live inside views, filters, and the compositor, so
-  // explicitly reset them while the GL context is current.
-  m_3dObjViews.clear();
-  m_compositor.reset();
-  m_networkEvaluator.reset();
-
-  Z3DRenderGlobalState::instance().resetScratchPool();
+  // Members release their GPU resources as they go out of scope.
 }
 
 const ZDoc& Z3DRenderingEngine::doc() const
@@ -1010,7 +1009,8 @@ void Z3DRenderingEngine::initGL()
 #endif
   }
   m_context->makeCurrent();
-  Z3DRenderGlobalState::instance().setScratchPool(std::make_unique<Z3DScratchResourcePool>());
+  m_scratchPool.reset(new Z3DScratchResourcePool());
+  Z3DRenderGlobalState::instance().setScratchPool(m_scratchPool.get());
 
   glbinding::initialize(0, [this](const char* name) {
     return m_context->getProcAddress(name);

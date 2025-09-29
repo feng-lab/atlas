@@ -116,17 +116,17 @@ void Z3DRenderGlobalState::trimScratchPool()
 
 bool Z3DRenderGlobalState::hasScratchPool() const
 {
-  return static_cast<bool>(m_scratchPool);
+  return m_scratchPool != nullptr;
 }
 
-void Z3DRenderGlobalState::setScratchPool(std::unique_ptr<Z3DScratchResourcePool> pool)
+void Z3DRenderGlobalState::setScratchPool(Z3DScratchResourcePool* pool)
 {
-  m_scratchPool = std::move(pool);
+  m_scratchPool = pool;
 }
 
 void Z3DRenderGlobalState::resetScratchPool()
 {
-  m_scratchPool.reset();
+  m_scratchPool = nullptr;
 }
 
 bool Z3DRenderGlobalState::hasCancellationSource() const

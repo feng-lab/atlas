@@ -20,7 +20,7 @@ public:
   void trimScratchPool();
 
   bool hasScratchPool() const;
-  void setScratchPool(std::unique_ptr<Z3DScratchResourcePool> pool);
+  void setScratchPool(Z3DScratchResourcePool* pool);
   void resetScratchPool();
 
   bool hasCancellationSource() const;
@@ -59,7 +59,7 @@ private:
   Z3DScratchResourcePool& accessScratchPool() const;
 
   std::unique_ptr<folly::CancellationSource> m_cancellationSource;
-  std::unique_ptr<Z3DScratchResourcePool> m_scratchPool;
+  Z3DScratchResourcePool* m_scratchPool = nullptr;
   RendererSharedState m_rendererState;
 };
 

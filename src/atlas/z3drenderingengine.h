@@ -32,6 +32,8 @@ class Z3DCanvasEventListener;
 
 class ZAnimation;
 
+class Z3DScratchResourcePool;
+
 // Vulkan compositor forward decl removed (classification phase)
 
 class Z3DRenderingEngine
@@ -337,6 +339,11 @@ private:
   void resetOutputSizeToMatchCanvasSize();
 
 private:
+  struct ScratchPoolDeleter
+  {
+    void operator()(Z3DScratchResourcePool* pool) const;
+  };
+
   // Track widget groups we've already connected to avoid duplicate connects. Must outlive compositor.
   std::unordered_set<const ZWidgetsGroup*> m_observedWGs;
 
@@ -347,12 +354,12 @@ private:
   std::unique_ptr<Z3DContext> m_context;
   ZDoc& m_doc;
 
-  std::vector<std::unique_ptr<Z3DObjView>> m_3dObjViews;
-
   QPointer<Z3DCanvas> m_canvas;
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
-  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
+  std::unique_ptr<Z3DScratchResourcePool, ScratchPoolDeleter> m_scratchPool;
   std::unique_ptr<Z3DCompositor> m_compositor;
+  std::vector<std::unique_ptr<Z3DObjView>> m_3dObjViews;
+  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
   // Vulkan compositor bridge deferred
 
   ZBBox<glm::dvec3> m_boundBox;
