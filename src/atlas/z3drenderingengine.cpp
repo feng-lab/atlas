@@ -1442,8 +1442,8 @@ void Z3DRenderingEngine::handleRenderBackendChanged()
   m_scratchPool->reset();
   m_scratchPool->setDefaultBackend(backend);
 
-  m_globalParas->camera.setCoordinateSystem(backend == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan
-                                                                             : Z3DCoordinateSystem::OpenGL);
+  m_globalParas->camera.get().setCoordinateSystem(backend == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan
+                                                                                   : Z3DCoordinateSystem::OpenGL);
 }
 
 // Backend switch removed for now; to be reintroduced post-classification
