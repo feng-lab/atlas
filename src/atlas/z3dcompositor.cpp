@@ -1638,8 +1638,8 @@ void Z3DCompositor::ensurePickingTarget(const glm::uvec2& size)
     m_pickingTargetLease.release();
     m_pickingTargetLease =
       Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(size,
-                                                                               GLint(GL_RGBA8),
-                                                                               GLint(GL_DEPTH_COMPONENT24));
+                                                                               ScratchFormat::RGBA8,
+                                                                               ScratchFormat::Depth24);
   }
 
   CHECK(m_pickingTargetLease.renderTarget != nullptr);

@@ -17,6 +17,7 @@ These instructions are mandatory for every migration change; do not deviate from
 
 - You can use `cmake --build build/Release` to verify compositor changes still compile before pushing them further.
 - **Never run `git checkout`**; we might lose progress forever.
+- Do not mirror OpenGL one-to-one in Vulkan. Treat the abstraction layer as the primary product and adjust both backends to fit the façade rather than forcing Vulkan to emulate GL state.
 
 ## Important Guideline (Review Before Coding)
 
@@ -45,9 +46,18 @@ Renderer Base Façade (Revised)
 
 - Filters continue to own their renderer members (e.g., `Z3DImgFilter::m_imgRaycasterRenderer`). Those renderers become API-neutral shells that store CPU-side state and interact with a backend driver; filters never touch GL types or Vulkan handles directly.
 - `Z3DRendererBase` acts as the single façade. It holds a `std::unique_ptr<Z3DRendererBackend>` and orchestrates the primitive drivers that issue API calls. Swapping backends means asking the renderer base to tear down its current driver, create a new one for the requested backend, and replay cached CPU state.
-- Backend drivers expose narrowly scoped hooks (`createPipelines`, `uploadBuffers`, `issueDraw`, `blit`, `readback`) that both OpenGL and Vulkan can implement efficiently. We keep the naming convention: OpenGL sources stay prefixed `z3d`, Vulkan counterparts `zvulkan`.
+- Backend drivers expose narrowly scoped hooks built around *backend command streams* (`beginPass`, `bindPipeline`, `bindResources`, `draw`, `blit`, `readback`). OpenGL implementations translate commands to state-machine calls; Vulkan implementations record the same intent into command buffers, descriptor sets, and explicit barriers.
 - Filters call the same renderer methods as today (`renderOpaque`, `renderTransparent`, `setData`, `setSliceState`, …). Prior to issuing work they call `renderer.ensureBackend(activeBackend)`, letting the renderer base perform backend switches without introducing extra per-filter glue objects.
 - Keep per-renderer CPU state in the shared structs under `z3drendererstates.h`. If a value is not consumed by both backends, store it privately inside `Z3DRendererBase` (e.g., the legacy OpenGL render method toggle) instead of exposing another parameter knob. Trim old fields when they are unused so Vulkan inherits a minimal, well-defined contract.
+- When a façade change lands, implement the GL and Vulkan backends together. Designing with both implementations in hand validates the abstraction level and prevents GL-centric leaks from reappearing.
+
+Abstraction Level Principles
+
+- Prefer *intent-based* commands over direct resource binding. A renderer describes what pass to execute, which pipelines to use, and which resources participate; each backend decides the optimal sequence of API calls.
+- Resource pooling operates on plain descriptors describing extent, layer count, formats, and usage (e.g., `ScratchImageRequest`). Backends allocate or reuse API objects behind those descriptors and expose them back through lightweight leases without surfacing raw GL or Vulkan handles to filters.
+- Pipelines are defined once per renderer through backend-neutral descriptions (shaders, vertex layout, fixed-function state). GL backends consume GLSL sources; Vulkan backends load SPIR-V modules and create pipeline layouts. The descriptor-level contract must be expressive enough for Vulkan to optimise without emulating GL.
+- Command submission is driven by a backend-provided context (e.g., `BackendCommandList`). Renderers emit a sequence of commands against the context instead of calling GL directly. GL wraps the existing state changes; Vulkan records to `vk::CommandBuffer`.
+- Both backends may evolve to meet performance requirements. GL paths can change internal structures to match the façade; Vulkan is free to leverage dynamic rendering, descriptor indexing, or secondary command buffers so long as the façade contract is honoured.
 
 **Render Target & Scratch Pool Abstraction**
 
@@ -198,6 +208,35 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
    - Add temporary regression tests that instantiate the filter with the GL backend, render a canned scene, and byte-compare outputs against captures from the legacy compositor.
    - Manually test backend hot swapping (OpenGL ↔ Vulkan) during interaction-heavy workflows: progressive refinement, axis toggles, glow filters, OIT scenes, screenshot export.
    - Document outstanding parity gaps (e.g., Vulkan backend TODOs) both in this plan and as code `TODO` markers so the Vulkan backend work can proceed without rediscovery.
+
+### Detailed Coding Plan (Façade-First Backend Evolution)
+
+1. **Resource Descriptor Layer**
+   - Define API-neutral structs for scratch resources (`ScratchImageRequest`, `ScratchImageLease`) and renderer pipelines (`PipelineDescription`, `ResourceBindings`).
+   - Replace direct `Z3DRenderTarget` exposure in `Z3DScratchResourcePool` with descriptor-driven leases while keeping the GL implementation functional.
+   - Implement matching Vulkan allocation paths (`ZVulkanScratchResourcePool`) that honour the same descriptors and manage image/view/memory lifetimes internally.
+
+2. **Backend Command Context**
+   - Extend `Z3DRendererBackend` with a command recording interface (`BackendCommandList`) supporting pass begin/end, pipeline binding, resource binding, draw/dispatch, blit, and readback.
+   - Update the GL backend to translate commands to existing state-machine operations and to maintain caching for programs, VAOs, and FBOs under the new abstraction.
+   - Build the Vulkan backend side-by-side, recording identical commands into primary command buffers, handling descriptor set allocation/update, and inserting explicit layout transitions.
+
+3. **Renderer Migration**
+   - Incrementally port renderers (lines → meshes → volumes → compositor) so they emit commands against the backend context instead of invoking GL directly. Each step must preserve behavior under GL and produce first pixels via Vulkan before moving on.
+   - While migrating, collapse or replace GL-only helpers (e.g., direct `glBindFramebuffer`) with façade calls, ensuring no API-specific handles leak back to filters.
+
+4. **Scratch Pool and Pass Wiring**
+   - Rebuild scratch-pool consumers (filters, compositor) around the descriptor leases, ensuring per-pass data (extent, layers, usage) flows through the façade. GL keeps using FBOs under the hood; Vulkan tracks images and render areas.
+   - Introduce explicit pass descriptors for compositor and image renderers so both backends know which attachments participate and which load/store ops to apply.
+   - Let the rendering engine own backend switching: when `RenderBackend` changes it resets the scratch pool and sets the new default backend before filters reacquire resources.
+
+5. **Validation & Tooling**
+   - Add dual-backend smoke tests that exercise the new command path and compare GL vs Vulkan readbacks where feasible.
+   - Instrument command submission to capture diagnostics (e.g., command list dumps) for debugging abstraction violations.
+
+6. **Documentation & Handoff**
+   - Update developer documentation alongside code to reflect façade usage patterns, backend command semantics, and resource descriptor expectations.
+   - Track outstanding Vulkan-specific TODOs explicitly when parity features are deferred during migration.
 
 ### OpenGL Pipeline Refactor Plan
 

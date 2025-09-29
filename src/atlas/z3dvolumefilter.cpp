@@ -7,6 +7,7 @@
 #include "zbenchtimer.h"
 #include "zmeshutils.h"
 #include "zlog.h"
+#include "z3drendertarget.h"
 #include "z3drenderglobalstate.h"
 #include <folly/ScopeGuard.h>
 #include <QApplication>

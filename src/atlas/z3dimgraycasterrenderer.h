@@ -138,6 +138,9 @@ public:
     m_round[eye] = 0;
   }
 
+  // Release any scratch-pool backed targets retained across frames.
+  void releaseScratchResources();
+
 protected:
   void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader) const;
 

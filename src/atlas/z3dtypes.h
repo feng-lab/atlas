@@ -31,4 +31,10 @@ enum class Z3DCoordinateSystem
   Vulkan   // Y-down, depth range [0, 1]
 };
 
+enum class RenderBackend
+{
+  OpenGL = 0,
+  Vulkan
+};
+
 } // namespace nim 

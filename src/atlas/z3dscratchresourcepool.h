@@ -1,13 +1,90 @@
 #pragma once
 
-#include "z3dgl.h"
-#include "z3drendertarget.h"
+#include "z3dtypes.h"
+#include "zglmutils.h"
+#include "zlog.h"
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace nim {
+
+class ZVulkanScratchImage;
+class ZVulkanDevice;
+class ZVulkanContext;
+class Z3DRenderTarget;
+
+enum class ScratchImageUsage
+{
+  BlockId,
+  EntryExit,
+  LayerArray,
+  RaycastAccumulator,
+  Temp2D,
+  DualDepthPeel,
+  WeightedAverage,
+  WeightedBlended
+};
+
+inline constexpr size_t kScratchUsageCount = 8;
+static_assert(static_cast<size_t>(ScratchImageUsage::WeightedBlended) + 1 == kScratchUsageCount,
+              "Scratch usage enum count must match Vulkan slot array size");
+
+enum class ScratchImageDimension
+{
+  Tex2D,
+  Tex2DArray
+};
+
+enum class ScratchAttachmentKind
+{
+  Color,
+  Depth
+};
+
+enum class ScratchFormat
+{
+  RGBA8,
+  RGBA32UI,
+  RGBA32F,
+  RGBA16,
+  RGBA16F,
+  RG32F,
+  R32F,
+  R16F,
+  Depth24
+};
+
+struct ScratchAttachmentDesc
+{
+  ScratchAttachmentKind kind = ScratchAttachmentKind::Color;
+  uint32_t index = 0;
+  ScratchFormat format = ScratchFormat::RGBA32F;
+};
+
+inline bool operator==(const ScratchAttachmentDesc& lhs, const ScratchAttachmentDesc& rhs)
+{
+  return lhs.kind == rhs.kind && lhs.index == rhs.index && lhs.format == rhs.format;
+}
+
+inline bool operator!=(const ScratchAttachmentDesc& lhs, const ScratchAttachmentDesc& rhs)
+{
+  return !(lhs == rhs);
+}
+
+struct ScratchImageDescriptor
+{
+  ScratchImageUsage usage = ScratchImageUsage::Temp2D;
+  ScratchImageDimension dimension = ScratchImageDimension::Tex2D;
+  glm::uvec2 size{};
+  uint32_t layers = 1;
+  std::vector<ScratchAttachmentDesc> attachments;
+};
 
 // Scratch resource pool focused on sharing heavy RenderTargets
 //
@@ -32,7 +109,10 @@ public:
   // RAII lease for a render target
   struct RenderTargetLease
   {
+    ScratchImageDescriptor descriptor;
+    RenderBackend backend;
     Z3DRenderTarget* renderTarget = nullptr;
+    ZVulkanScratchImage* vulkanImage = nullptr;
     uint32_t attachments = 0; // number of color attachments available
     // TODO(nim): replace with std::move_only_function once we move to C++23.
     struct Releaser
@@ -71,15 +151,22 @@ public:
     Releaser releaser;
 
     // Move-only: explicit RAII ownership over a pooled slot
-    RenderTargetLease() = default;
+    RenderTargetLease()
+      : backend(RenderBackend::OpenGL)
+    {}
     RenderTargetLease(const RenderTargetLease&) = delete;
     RenderTargetLease& operator=(const RenderTargetLease&) = delete;
     RenderTargetLease(RenderTargetLease&& other) noexcept
-      : renderTarget(other.renderTarget)
+      : descriptor(std::move(other.descriptor))
+      , backend(other.backend)
+      , renderTarget(other.renderTarget)
+      , vulkanImage(other.vulkanImage)
       , attachments(other.attachments)
       , releaser(std::move(other.releaser))
     {
+      other.backend = RenderBackend::OpenGL;
       other.renderTarget = nullptr;
+      other.vulkanImage = nullptr;
       other.attachments = 0;
       other.releaser.reset();
     }
@@ -87,10 +174,15 @@ public:
     {
       if (this != &other) {
         release();
+        descriptor = std::move(other.descriptor);
+        backend = other.backend;
         renderTarget = other.renderTarget;
+        vulkanImage = other.vulkanImage;
         attachments = other.attachments;
         releaser = std::move(other.releaser);
+        other.backend = RenderBackend::OpenGL;
         other.renderTarget = nullptr;
+        other.vulkanImage = nullptr;
         other.attachments = 0;
         other.releaser.reset();
       }
@@ -102,7 +194,10 @@ public:
         releaser();
         releaser.reset();
       }
+      descriptor = ScratchImageDescriptor{};
+      backend = RenderBackend::OpenGL;
       renderTarget = nullptr;
+      vulkanImage = nullptr;
       attachments = 0;
     }
     ~RenderTargetLease()
@@ -112,7 +207,29 @@ public:
     }
     explicit operator bool() const
     {
+      return renderTarget != nullptr || vulkanImage != nullptr;
+    }
+
+    [[nodiscard]] bool hasGLRenderTarget() const
+    {
       return renderTarget != nullptr;
+    }
+
+    [[nodiscard]] Z3DRenderTarget& glRenderTarget() const
+    {
+      CHECK(renderTarget != nullptr) << "GL render target not available for this lease";
+      return *renderTarget;
+    }
+
+    [[nodiscard]] bool hasVulkanImage() const
+    {
+      return vulkanImage != nullptr;
+    }
+
+    [[nodiscard]] ZVulkanScratchImage& vulkanScratchImage() const
+    {
+      CHECK(vulkanImage != nullptr) << "Vulkan scratch image not available for this lease";
+      return *vulkanImage;
     }
   };
 
@@ -121,41 +238,61 @@ public:
   // capacity >= requested; lease.attachments equals min(requested, capacity).
   // If requestedAttachments < 0, pool uses the configured default. If scale <= 0, pool
   // uses the configured default. Slots only grow (size/capacity) and never shrink until trim().
-  RenderTargetLease
-  acquireBlockIdRenderTarget(const glm::uvec2& viewport, int requestedAttachments = -1, double scale = -1.0);
+  RenderTargetLease acquireBlockIdRenderTarget(const glm::uvec2& viewport,
+                                               int requestedAttachments = -1,
+                                               double scale = -1.0,
+                                               std::optional<RenderBackend> backend = std::nullopt);
 
   // Acquire an entry/exit RenderTarget with a single 2D array color attachment of 'layers' depth
   // (default 2), with specified internal color format (default GL_RGBA32F). Filters set
   // to NEAREST. No depth attachment.
   RenderTargetLease acquireEntryExitRenderTarget(const glm::uvec2& size,
                                                  uint32_t layers = 2,
-                                                 GLint colorInternalFormat = GLint(GL_RGBA32F));
+                                                 ScratchFormat colorFormat = ScratchFormat::RGBA32F,
+                                                 std::optional<RenderBackend> backend = std::nullopt);
 
   // Acquire a layer array RenderTarget with a color 2D array attachment (colorInternalFormat)
   // and a depth 2D array attachment (depthInternalFormat). Array depth equals 'layers'.
   RenderTargetLease acquireLayerArrayRenderTarget(const glm::uvec2& size,
                                                   uint32_t layers,
-                                                  GLint colorInternalFormat = GLint(GL_RGBA16),
-                                                  GLint depthInternalFormat = GLint(GL_DEPTH_COMPONENT24));
+                                                  ScratchFormat colorFormat = ScratchFormat::RGBA16,
+                                                  ScratchFormat depthFormat = ScratchFormat::Depth24,
+                                                  std::optional<RenderBackend> backend = std::nullopt);
 
   // Acquire a raycast accumulator RenderTarget consisting of two RG color attachments.
   // Attachment 0 uses GL_RGBA16, attachment 1 uses GL_RG32F. No depth attachment is provided.
   // Intended for volume raycasting ping-pong buffers.
-  RenderTargetLease acquireRaycastAccumulatorRenderTarget(const glm::uvec2& size);
+  RenderTargetLease acquireRaycastAccumulatorRenderTarget(const glm::uvec2& size,
+                                                          std::optional<RenderBackend> backend = std::nullopt);
 
   // Acquire a simple 2D temp RenderTarget with a single 2D color attachment
   // (GL_TEXTURE_2D) and a 2D depth attachment. Intended for compositor passes.
   RenderTargetLease acquireTempRenderTarget2D(const glm::uvec2& size,
-                                              GLint colorInternalFormat = GLint(GL_RGBA16),
-                                              GLint depthInternalFormat = GLint(GL_DEPTH_COMPONENT24));
+                                              ScratchFormat colorFormat = ScratchFormat::RGBA16,
+                                              ScratchFormat depthFormat = ScratchFormat::Depth24,
+                                              std::optional<RenderBackend> backend = std::nullopt);
 
   // Acquire compositor-specific RenderTargets.
-  RenderTargetLease acquireDualDepthPeelRenderTarget(const glm::uvec2& size);
-  RenderTargetLease acquireWeightedAverageRenderTarget(const glm::uvec2& size);
-  RenderTargetLease acquireWeightedBlendedRenderTarget(const glm::uvec2& size);
+  RenderTargetLease acquireDualDepthPeelRenderTarget(const glm::uvec2& size,
+                                                     std::optional<RenderBackend> backend = std::nullopt);
+  RenderTargetLease acquireWeightedAverageRenderTarget(const glm::uvec2& size,
+                                                       std::optional<RenderBackend> backend = std::nullopt);
+  RenderTargetLease acquireWeightedBlendedRenderTarget(const glm::uvec2& size,
+                                                       std::optional<RenderBackend> backend = std::nullopt);
+
+  void setDefaultBackend(RenderBackend backend)
+  {
+    m_defaultBackend = backend;
+  }
+
+  RenderBackend defaultBackend() const
+  {
+    return m_defaultBackend;
+  }
 
   // Free any cached resources to reduce memory usage.
   void trim();
+  void reset();
 
   // Current config values (from flags).
   uint32_t blockIdMaxAttachments() const;
@@ -183,10 +320,11 @@ private:
     uint32_t attachments = 0;
     bool inUse = false;
     uint64_t lastUseTick = 0;
+    ScratchImageDescriptor descriptor;
   };
 
   BlockIdRenderTargetSlot* acquireFreeBlockIdSlot(const glm::uvec2& size, uint32_t requiredAttachments);
-  void growSlotIfNeeded(BlockIdRenderTargetSlot& slot, const glm::uvec2& exactSize, uint32_t requiredAttachments);
+  void growSlotIfNeeded(BlockIdRenderTargetSlot& slot, const ScratchImageDescriptor& descriptor);
 
 private:
   // Keep a small number of slots to allow limited concurrency and avoid thrash.
@@ -201,8 +339,10 @@ private:
   {
     std::unique_ptr<Z3DRenderTarget> fbo;
     uint32_t layers = 0;
-    GLint colorFormat = GLint(GL_RGBA32F);
+    ScratchFormat colorFormat = ScratchFormat::RGBA32F;
     bool inUse = false;
+    uint64_t lastUseTick = 0;
+    ScratchImageDescriptor descriptor;
   };
   std::vector<std::unique_ptr<EntryExitRenderTargetSlot>> m_entryExitRenderTargetSlots;
 
@@ -211,9 +351,11 @@ private:
   {
     std::unique_ptr<Z3DRenderTarget> fbo;
     uint32_t layers = 0;
-    GLint colorFormat = GLint(GL_RGBA16);
-    GLint depthFormat = GLint(GL_DEPTH_COMPONENT24);
+    ScratchFormat colorFormat = ScratchFormat::RGBA16;
+    ScratchFormat depthFormat = ScratchFormat::Depth24;
     bool inUse = false;
+    uint64_t lastUseTick = 0;
+    ScratchImageDescriptor descriptor;
   };
   std::vector<std::unique_ptr<LayerArrayRenderTargetSlot>> m_layerArrayRenderTargetSlots;
 
@@ -221,9 +363,11 @@ private:
   struct Temp2DRenderTargetSlot
   {
     std::unique_ptr<Z3DRenderTarget> fbo;
-    GLint colorFormat = GLint(GL_RGBA16);
-    GLint depthFormat = GLint(GL_DEPTH_COMPONENT24);
+    ScratchFormat colorFormat = ScratchFormat::RGBA16;
+    ScratchFormat depthFormat = ScratchFormat::Depth24;
     bool inUse = false;
+    uint64_t lastUseTick = 0;
+    ScratchImageDescriptor descriptor;
   };
   std::vector<std::unique_ptr<Temp2DRenderTargetSlot>> m_temp2DRenderTargetSlots;
 
@@ -231,9 +375,11 @@ private:
   struct RaycastAccumulatorSlot
   {
     std::unique_ptr<Z3DRenderTarget> fbo;
-    GLint colorFormat = GLint(GL_RGBA16);
-    GLint accumulatorFormat = GLint(GL_RG32F);
+    ScratchFormat colorFormat = ScratchFormat::RGBA16;
+    ScratchFormat accumulatorFormat = ScratchFormat::RG32F;
     bool inUse = false;
+    uint64_t lastUseTick = 0;
+    ScratchImageDescriptor descriptor;
   };
   std::vector<std::unique_ptr<RaycastAccumulatorSlot>> m_raycastAccumulatorSlots;
 
@@ -241,6 +387,8 @@ private:
   {
     std::unique_ptr<Z3DRenderTarget> fbo;
     bool inUse = false;
+    uint64_t lastUseTick = 0;
+    ScratchImageDescriptor descriptor;
   };
   std::vector<std::unique_ptr<DualDepthPeelSlot>> m_dualDepthPeelSlots;
 
@@ -248,6 +396,8 @@ private:
   {
     std::unique_ptr<Z3DRenderTarget> fbo;
     bool inUse = false;
+    uint64_t lastUseTick = 0;
+    ScratchImageDescriptor descriptor;
   };
   std::vector<std::unique_ptr<WeightedAverageSlot>> m_weightedAverageSlots;
 
@@ -255,6 +405,8 @@ private:
   {
     std::unique_ptr<Z3DRenderTarget> fbo;
     bool inUse = false;
+    uint64_t lastUseTick = 0;
+    ScratchImageDescriptor descriptor;
   };
   std::vector<std::unique_ptr<WeightedBlendedSlot>> m_weightedBlendedSlots;
 
@@ -267,6 +419,41 @@ private:
   };
 
   mutable std::array<DescriptionCacheEntry, 2> m_descriptionCache{};
+
+  struct VulkanScratchSlot
+  {
+    std::unique_ptr<ZVulkanScratchImage> image;
+    ScratchImageDescriptor descriptor;
+    bool inUse = false;
+    uint64_t lastUseTick = 0;
+  };
+
+  struct VulkanEnvironment
+  {
+    std::unique_ptr<ZVulkanContext> context;
+    std::unique_ptr<ZVulkanDevice> device;
+  };
+
+  VulkanEnvironment& ensureVulkanEnvironment();
+  std::vector<std::unique_ptr<VulkanScratchSlot>>& vulkanSlotsForUsage(ScratchImageUsage usage);
+  RenderTargetLease acquireVulkanScratchImage(const ScratchImageDescriptor& descriptor);
+
+  std::unique_ptr<VulkanEnvironment> m_vulkanEnvironment;
+  std::array<std::vector<std::unique_ptr<VulkanScratchSlot>>, kScratchUsageCount> m_vulkanSlots;
+  RenderBackend m_defaultBackend = RenderBackend::OpenGL;
+
+  static constexpr uint32_t kTrimAcquireInterval = 512;
+  static constexpr uint64_t kTrimAgeTicks = 1024;
+
+  void maybeTrimAfterAcquire();
+  size_t performTrim(uint64_t ageThreshold, bool logSummary);
+
+  template<typename Slot>
+  void markSlotAcquired(Slot& slot)
+  {
+    slot.inUse = true;
+    slot.lastUseTick = ++m_usageTick;
+  }
 };
 
 } // namespace nim

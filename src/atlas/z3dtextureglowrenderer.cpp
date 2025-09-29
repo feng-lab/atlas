@@ -1,6 +1,7 @@
 #include "z3dtextureglowrenderer.h"
 
 #include "z3dtexture.h"
+#include "z3drendertarget.h"
 #include "z3dscratchresourcepool.h"
 #include "z3drenderglobalstate.h"
 #include "zlog.h"

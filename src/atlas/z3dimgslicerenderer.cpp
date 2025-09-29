@@ -1,6 +1,7 @@
 #include "z3dimgslicerenderer.h"
 
 #include "z3dtexture.h"
+#include "z3drendertarget.h"
 #include "z3dimg.h"
 #include "zbenchtimer.h"
 #include "zlog.h"

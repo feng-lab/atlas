@@ -746,6 +746,12 @@ void Z3DRenderingEngine::init()
   getGLFocus();
 
   m_globalParas = std::make_unique<Z3DGlobalParameters>();
+  if (m_scratchPool) {
+    m_scratchPool->setDefaultBackend(static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData()));
+  }
+  connect(&m_globalParas->renderBackend, &ZParameter::valueChanged, this, [this]() {
+    handleRenderBackendChanged();
+  });
 
   // filters
   m_compositor = std::make_unique<Z3DCompositor>(*m_globalParas);
@@ -1425,6 +1431,19 @@ void Z3DRenderingEngine::resetOutputSizeToMatchCanvasSize()
   if (m_canvas) {
     setOutputSize(m_canvas->physicalSize());
   }
+}
+
+void Z3DRenderingEngine::handleRenderBackendChanged()
+{
+  if (!m_scratchPool) {
+    return;
+  }
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  m_scratchPool->reset();
+  m_scratchPool->setDefaultBackend(backend);
+
+  m_globalParas->camera.setCoordinateSystem(backend == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan
+                                                                             : Z3DCoordinateSystem::OpenGL);
 }
 
 // Backend switch removed for now; to be reintroduced post-classification

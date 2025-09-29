@@ -188,7 +188,7 @@ Invalidation and Progressive Reset Policy
 Scratch Resource Pool (`Z3DScratchResourcePool`)
 
 - Purpose: reuse heavy render targets (block-id FBOs with multiple integer attachments, entry/exit 2D arrays, layer arrays, temp 2D FBOs) across passes and filters.
-- Leases: move-only RAII (`RenderTargetLease`) that marks a slot in-use until released or destroyed.
+- Leases: move-only RAII (`RenderTargetLease`) that marks a slot in-use until released or destroyed; each lease records the producing `ScratchImageDescriptor` plus the backend (`RenderBackend`) so renderers can branch between `glRenderTarget()` and `vulkanScratchImage()` as the façade evolves.
 - Growth: slots grow to match requested size/attachments; they don’t shrink until `trim()`.
 - Debugging/memory: `describeMemoryUsage(detailed)` returns a breakdown; counters `creationCounter()` and `changeCounter()` help detect churn.
 - Best practices:

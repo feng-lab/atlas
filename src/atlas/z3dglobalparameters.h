@@ -5,6 +5,7 @@
 #include "z3dcameraparameter.h"
 #include "z3drenderglobalstate.h"
 #include "z3dpickingmanager.h"
+#include "z3dtypes.h"
 #include "zoptionparameter.h"
 #include "z3dinteractionhandler.h"
 #include <vector>
@@ -15,12 +16,6 @@ namespace nim {
 class ZWidgetsGroup;
 
 class Z3DRenderingEngine;
-
-enum class RenderBackend
-{
-  OpenGL = 0,
-  Vulkan
-};
 
 struct Z3DLocalColorBuffer
 {

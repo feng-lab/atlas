@@ -562,7 +562,6 @@ void Z3DBoundedFilter::refreshRendererBackend()
   m_rendererBase.setBackend(std::move(backend));
   m_activeBackend = backendUsed;
   m_rendererBackendInitialized = true;
-
   onRendererBackendChanged(m_activeBackend);
 
   pushRendererParametersToBase();

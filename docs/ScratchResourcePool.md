@@ -28,6 +28,7 @@ Design
 - Ownership:
   - `Z3DScratchResourcePool` manages lifetime of cached `Z3DRenderTarget` instances and their attached textures.
   - Callers acquire an `RTLease` (RAII) which marks a resource in-use; release returns it to the pool.
+  - Requests are expressed through `ScratchImageDescriptor` (usage, extent, layers, attachment list). Both OpenGL and Vulkan backends satisfy the same descriptor and wrap their native resources behind the lease.
 
 - Block ID RT policy:
   - FBO with N color attachments (`GL_RGBA32UI`, NEAREST).
@@ -36,15 +37,17 @@ Design
   - Pool manages a dynamic number of slots to match demand; each free slot can be resized to the exact requested size on acquire (may grow or shrink). Attachment capacity grows as needed; shrink of attachments happens only on `trim()` (to avoid churn).
 
 - API (current):
-  - `RenderTargetLease acquireBlockIdRenderTarget(glm::uvec2 viewport, int requestedAttachments=-1, double scale=-1.0)`
+  - `RenderTargetLease acquireBlockIdRenderTarget(glm::uvec2 viewport, int requestedAttachments=-1, double scale=-1.0, RenderBackend backend=RenderBackend::OpenGL)`
     - Integer color attachments (`GL_RGBA32UI`, NEAREST). Size = `ceil(viewport * scale)`.
-  - `RenderTargetLease acquireEntryExitRenderTarget(glm::uvec2 size, uint32_t layers=2, GLint colorInternalFormat=GL_RGBA32F)`
+  - `RenderTargetLease acquireEntryExitRenderTarget(glm::uvec2 size, uint32_t layers=2, ScratchFormat colorFormat=ScratchFormat::RGBA32F, RenderBackend backend=RenderBackend::OpenGL)`
     - One 2D array color attachment with `layers` depth. No depth attachment, NEAREST filtering.
-  - `RenderTargetLease acquireLayerArrayRenderTarget(glm::uvec2 size, uint32_t layers, GLint colorInternalFormat=GL_RGBA16, GLint depthInternalFormat=GL_DEPTH_COMPONENT24)`
+  - `RenderTargetLease acquireLayerArrayRenderTarget(glm::uvec2 size, uint32_t layers, ScratchFormat colorFormat=ScratchFormat::RGBA16, ScratchFormat depthFormat=ScratchFormat::Depth24, RenderBackend backend=RenderBackend::OpenGL)`
     - One 2D array color attachment and one 2D array depth attachment; array depth equals `layers`.
-  - `RenderTargetLease acquireTempRenderTarget2D(glm::uvec2 size, GLint colorInternalFormat=GL_RGBA16, GLint depthInternalFormat=GL_DEPTH_COMPONENT24)`
+  - `RenderTargetLease acquireTempRenderTarget2D(glm::uvec2 size, ScratchFormat colorFormat=ScratchFormat::RGBA16, ScratchFormat depthFormat=ScratchFormat::Depth24, RenderBackend backend=RenderBackend::OpenGL)`
     - One 2D color and one 2D depth attachment (non-array). Intended for compositor/raster temp passes.
-  - `void trim()` — destroys cached RTs/textures to reclaim memory.
+  - `void setDefaultBackend(RenderBackend backend)` / `RenderBackend defaultBackend() const` — configure the backend the pool will use when callers omit the optional backend argument.
+  - `void reset()` — drop all cached slots (GL + Vulkan) and invalidate description caches; used when the rendering engine switches GPU backend.
+- `void trim()` — destroys cached RTs/textures to reclaim memory.
   - `uint32_t blockIdMaxAttachments() const` / `double blockIdScale() const` — current defaults.
 
 - Safety:
@@ -58,9 +61,11 @@ Configuration
   - `--atlas_blockid_rt_max_attachments`: Max color attachments on Block ID RT (default 8).
   - `--atlas_blockid_rt_scale`: Size scale relative to viewport (default 1.0).
   - Entry/exit precision: no change (remains RGBA32F). A future flag `--atlas_entry_exit_half_float` can be added if desired.
+- Auto-trim:
+  - Every 512 successful acquires the pool scans for idle slots and frees those that have not been reused in the last 2048 acquires. Manual `trim()` still clears all free slots immediately.
 
 - UI integration:
-  - Global: expose a button/action to call `Z3DGlobalParameters::trimScratchMemory()`.
+  - No direct UI hook yet; leverage the automatic tick-based trim policy once implemented.
 
 Migration Details
 
@@ -98,7 +103,7 @@ File Touchpoints
 - New:
   - `src/atlas/z3dscratchresourcepool.h/.cpp`
 - Modified:
-  - `src/atlas/z3dglobalparameters.h/.cpp` — holds pool and exposes `scratchPool()` and `trimScratchMemory()`.
+  - `src/atlas/z3dglobalparameters.h/.cpp` — holds pool and exposes `scratchPool()`.
   - `src/atlas/z3dimgslicerenderer.h/.cpp` — removed unused Block ID attachments; now uses pool in Block ID pass.
   - `src/atlas/z3dimgraycasterrenderer.h/.cpp` — uses pool for Block ID passes; removed direct resize of per-renderer Block ID RT.
 
@@ -151,7 +156,7 @@ Usage Examples
 - Entry/Exit (ray entry/exit as RGBA32F array with 2 layers):
 
   ```cpp
-  auto lease = global.scratchPool().acquireEntryExitRenderTarget(size, /*layers*/2, GL_RGBA32F);
+  auto lease = global.scratchPool().acquireEntryExitRenderTarget(size, /*layers*/2, ScratchFormat::RGBA32F);
   lease.renderTarget->attachSlice(0); // front-facing
   lease.renderTarget->bind();
   // render front faces
@@ -183,7 +188,7 @@ Usage Examples
 - 2D Temp (compositor blend/copy passes):
 
   ```cpp
-  auto lease = global.scratchPool().acquireTempRenderTarget2D(size, GL_RGBA16, GL_DEPTH_COMPONENT24);
+  auto lease = global.scratchPool().acquireTempRenderTarget2D(size, ScratchFormat::RGBA16, ScratchFormat::Depth24);
   lease.renderTarget->bind();
   lease.renderTarget->clear();
   // run a full-screen pass
@@ -194,7 +199,7 @@ Usage Examples
 
 Notes
 
-- Leases are move-only RAII: copying is disabled; moving transfers ownership. Releasing is automatic in the destructor but can be done explicitly via `lease.release()`.
+- Leases are move-only RAII: copying is disabled; moving transfers ownership. Each lease carries the `ScratchImageDescriptor` that produced it and the backend in use, so GL callers can grab `lease.glRenderTarget()` while the Vulkan path uses `lease.vulkanScratchImage()`. Releasing is automatic in the destructor but can be done explicitly via `lease.release()`.
 - `Z3DRenderTarget::attachment(GLenum)` returns `nullptr` if the attachment is not present on the FBO (safe to probe).
 
 Next Steps (Compositor)

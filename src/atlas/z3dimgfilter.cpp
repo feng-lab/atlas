@@ -4,6 +4,7 @@
 #include "zbenchtimer.h"
 #include "zeventlistenerparameter.h"
 #include "zlog.h"
+#include "z3drendertarget.h"
 #include "z3drenderglobalstate.h"
 #include "zmesh.h"
 #include <folly/ScopeGuard.h>
@@ -108,6 +109,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   // port exposing this filter to the compositor network
   addPort(m_vPPort);
   markTargetsInvalid();
+  connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DImgFilter::onVisibilityChanged);
 
   m_obliqueSliceNormal.setNameForEachValue({"x", "y", "z"});
   m_obliqueSlice2Normal.setNameForEachValue({"x", "y", "z"});
@@ -540,6 +542,19 @@ void Z3DImgFilter::updateRaycasterIsoValue()
 void Z3DImgFilter::updateRaycasterLocalMIPThreshold()
 {
   m_imgRaycasterRenderer.setLocalMIPThreshold(m_raycasterLocalMIPThreshold.get());
+}
+
+void Z3DImgFilter::onVisibilityChanged(bool visible)
+{
+  if (visible) {
+    return;
+  }
+
+  m_imgRaycasterRenderer.releaseScratchResources();
+  for (Z3DEye eye : {MonoEye, LeftEye, RightEye}) {
+    m_imgSliceRenderer.resetProgress(eye);
+  }
+  releaseAllRenderTargets();
 }
 
 void Z3DImgFilter::updateRaycasterCompositingMode()

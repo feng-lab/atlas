@@ -12,7 +12,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - High-performance 2D/3D visualization built in modern C++20 with Qt, OpenGL, and emerging Vulkan support.
 - Preserve progressive rendering, deterministic invalidation, and RAII-managed GPU resources.
 - Respect SOLID/KISS/YAGNI, but never at the expense of correctness or portability.
-- Follow Atlas naming conventions (`Z3D*` for shared 3D code, `ZVulkan*` for Vulkan-only). Keep files feature-scoped.
+- Follow Atlas naming conventions (`Z3D*` for shared/OpenGL 3D code, `ZVulkan*` for Vulkan-only). Do not introduce alternate prefixes such as `ZGL*`; keep files feature-scoped.
 - Security/privacy: no unexpected telemetry, no leaking user data in logs.
 
 ## Non-Negotiable Rules
@@ -31,6 +31,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - Complex changes should land with multi-line commit messages (subject + explanatory body) that call out rationale, risk, and validation.
 
 ## Build & Tooling Cheatsheet
+- **Always read and keep this section handy during a session; it contains the canonical build/test commands.**
 - First-time setup: follow `readme.md` for platform prerequisites (Qt, Intel oneAPI, Vulkan SDK, etc.) before running repo scripts.
 - After external dependencies are in place, run `python3 util/build_ext_libs.py all` to stage bundled libraries.
 - Configure with CMake presets or run `cmake -S . -B build/Release -DCMAKE_BUILD_TYPE=Release` (adjust preset as needed).
@@ -55,9 +56,11 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 ## Coding Standards
 - C++20 (`set(CMAKE_CXX_STANDARD 20)`); enable warnings and treat new warnings seriously.
 - Prefer RAII, smart pointers, and move semantics. Keep GPU handle lifetime explicit.
+- Add brief comments when control flow, state transitions, or variable roles are non-obvious so future readers understand intent quickly.
 - One type per file; match filenames to classes (e.g., `z3dscratchresourcepool.cpp`/`.h`).
 - Thread-safe design: avoid global state mutations without synchronization; keep renderer state local to the rendering thread.
 - Structured logging through `ZLog`; avoid `std::cout`/`printf` in production paths.
+- When you need GLM math utilities, include `zglmutils.h`; do not include `<glm/...>` headers directly.
 - Maintain consistent naming: `CamelCase` types, `camelCase` locals, `_member` private fields where applicable.
 - Remove dead code, unused includes, and stale feature flags. Do not leave TODOs without linked issues.
 
@@ -69,7 +72,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 ## Debugging & Performance
 - Use `--v=1` (or higher) for stage timing logs; wrap hotspots with `ZBenchTimer`.
 - Diagnose GL state issues with `--atlas_debug_opengl` (expensive) or `--atlas_log_glbinding_context_switch` (for context audits).
-- For GPU memory pressure, inspect scratch-pool logs and consider calling `Z3DGlobalParameters::trimScratchMemory()` (UI action or scripting).
+- For GPU memory pressure, inspect scratch-pool logs and review recent trim activity.
 - Keep `m_outputSize` and viewport sizes in sync across collaborating renderers to avoid redundant reallocations.
 
 ## Documentation & Handoff

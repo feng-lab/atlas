@@ -338,6 +338,8 @@ private:
 
   void resetOutputSizeToMatchCanvasSize();
 
+  void handleRenderBackendChanged();
+
 private:
   struct ScratchPoolDeleter
   {

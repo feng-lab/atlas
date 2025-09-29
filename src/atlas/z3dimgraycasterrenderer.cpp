@@ -1,6 +1,7 @@
 #include "z3dimgraycasterrenderer.h"
 
 #include "z3dtexture.h"
+#include "z3drendertarget.h"
 #include "z3dimg.h"
 #include "zbenchtimer.h"
 #include "zimgcache.h"
@@ -120,6 +121,22 @@ void Z3DImgRaycasterRenderer::setChannelCount(size_t count)
 {
   m_channelVisibilities.assign(count, false);
   m_transferFunctions.assign(count, nullptr);
+}
+
+void Z3DImgRaycasterRenderer::releaseScratchResources()
+{
+  m_entryExitTexCoordAndZeTexture = nullptr;
+  if (m_entryExitLease) {
+    m_entryExitLease.release();
+  }
+  if (m_progressiveLayerLease) {
+    m_progressiveLayerLease.release();
+  }
+
+  releaseAllRaycastAccumulators();
+  for (Z3DEye eye : {MonoEye, LeftEye, RightEye}) {
+    resetProgress(eye);
+  }
 }
 
 void Z3DImgRaycasterRenderer::setChannelVisibility(size_t index, bool visible)
