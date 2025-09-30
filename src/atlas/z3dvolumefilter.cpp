@@ -594,10 +594,10 @@ void Z3DVolumeFilter::changeCoordTransform()
     return;
   }
   for (size_t i = 0; i < m_volumes.size(); ++i) {
-    m_volumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
+    m_volumes[i]->setPhysicalToWorldMatrix(m_rendererBase.parameterState().coordTransform);
   }
   for (size_t i = 0; i < m_zoomInVolumes.size(); ++i) {
-    m_zoomInVolumes[i]->setPhysicalToWorldMatrix(m_rendererBase.coordTransform());
+    m_zoomInVolumes[i]->setPhysicalToWorldMatrix(m_rendererBase.parameterState().coordTransform);
   }
   invalidateAllFRVolumeSlices();
 }
@@ -1256,7 +1256,7 @@ void Z3DVolumeFilter::readVolumes()
     Z3DVolume* vh = new Z3DVolume(img,
                                   glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale),
                                   glm::vec3(.0),
-                                  m_rendererBase.coordTransform());
+                                  m_rendererBase.parameterState().coordTransform);
 
     m_volumes.emplace_back(vh);
   } else {
@@ -1265,7 +1265,7 @@ void Z3DVolumeFilter::readVolumes()
       Z3DVolume* vh = new Z3DVolume(cImg,
                                     glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale),
                                     glm::vec3(.0),
-                                    m_rendererBase.coordTransform());
+                                    m_rendererBase.parameterState().coordTransform);
 
       m_volumes.emplace_back(vh);
     } // for each cannel

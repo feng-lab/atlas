@@ -64,8 +64,6 @@ public:
     return attachment(GL_DEPTH_ATTACHMENT);
   }
 
-  static const Z3DRenderTarget* currentBoundRenderTarget();
-
   // Get the color at position pos. This method will bind the RenderTarget!
   glm::vec4 floatColorAtPos(const glm::ivec2& pos);
 

@@ -2,6 +2,7 @@
 
 #include "z3dtypes.h"
 #include "zglmutils.h"
+#include "z3dgl.h"
 
 #include <cstddef>
 #include <cstdint>

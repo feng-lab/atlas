@@ -42,17 +42,17 @@ public:
 
   Z3DRenderTarget* monoReadyTarget() const
   {
-    return m_monoReadyTarget;
+    return m_monoReadyTarget->renderTarget;
   }
 
   Z3DRenderTarget* leftReadyTarget() const
   {
-    return m_leftReadyTarget;
+    return m_leftReadyTarget->renderTarget;
   }
 
   Z3DRenderTarget* rightReadyTarget() const
   {
-    return m_rightReadyTarget;
+    return m_rightReadyTarget->renderTarget;
   }
 
   Z3DLocalColorBuffer* monoReadyLocalBuffer() const
@@ -88,30 +88,32 @@ private:
   // little helper function
   void renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                         const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                        Z3DRenderTarget& renderTarget,
+                        Z3DScratchResourcePool::RenderTargetLease& targetLease,
                         Z3DEye eye);
 
   void renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                               Z3DRenderTarget& renderTarget,
+                               Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                Z3DEye eye);
 
   void renderGeomsBlendNoDepthMask(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                    const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                                   Z3DRenderTarget& renderTarget,
+                                   Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                    Z3DEye eye);
 
   void renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                       const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                      Z3DRenderTarget& renderTarget,
+                      Z3DScratchResourcePool::RenderTargetLease& targetLease,
                       Z3DEye eye,
                       TransparencyMode mode);
 
-  void renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& filters, Z3DRenderTarget& renderTarget, Z3DEye eye);
+  void renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& filters,
+                           Z3DScratchResourcePool::RenderTargetLease& targetLease,
+                           Z3DEye eye);
 
   // DDP with multiple image layers
   void renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& filters,
-                            Z3DRenderTarget& renderTarget,
+                            Z3DScratchResourcePool::RenderTargetLease& targetLease,
                             Z3DEye eye,
                             Z3DTexture* depthTexture,
                             const std::vector<const Z3DTexture*>& imageColorTexList,
@@ -119,7 +121,7 @@ private:
 
   // Weighted Average with multiple image layers
   void renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
-                           Z3DRenderTarget& renderTarget,
+                           Z3DScratchResourcePool::RenderTargetLease& targetLease,
                            Z3DEye eye,
                            Z3DTexture* depthTexture,
                            const std::vector<const Z3DTexture*>& imageColorTexList,
@@ -127,7 +129,7 @@ private:
 
   // Weighted Blended with multiple image layers
   void renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
-                           Z3DRenderTarget& renderTarget,
+                           Z3DScratchResourcePool::RenderTargetLease& targetLease,
                            Z3DEye eye,
                            Z3DTexture* depthTexture,
                            const std::vector<const Z3DTexture*>& imageColorTexList,
@@ -139,7 +141,7 @@ private:
   // Merge a list of image layers into a single pair using the same blending as renderImages
   bool mergeImageLayers(const std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>>& layers,
                         Z3DEye eye,
-                        Z3DRenderTarget& renderTarget,
+                        Z3DScratchResourcePool::RenderTargetLease& targetLease,
                         const Z3DTexture*& colorTex,
                         const Z3DTexture*& depthTex);
 
@@ -158,12 +160,13 @@ private:
   void updateBackgroundSecondColor();
   void updateBackgroundOrientation();
   void ensurePickingTarget(const glm::uvec2& size);
-  Z3DRenderTarget& ensureDDPRenderTarget(const glm::uvec2& size);
-  Z3DRenderTarget& ensureWARenderTarget(const glm::uvec2& size);
-  Z3DRenderTarget& ensureWBRenderTarget(const glm::uvec2& size);
+  Z3DScratchResourcePool::RenderTargetLease& ensureDDPRenderTarget(const glm::uvec2& size);
+  Z3DScratchResourcePool::RenderTargetLease& ensureWARenderTarget(const glm::uvec2& size);
+  Z3DScratchResourcePool::RenderTargetLease& ensureWBRenderTarget(const glm::uvec2& size);
 
   // Internal helper: hooked transparent rendering with optional glow overlay
-  void renderTransparentFilter(Z3DBoundedFilter* filter, Z3DRenderTarget& renderTarget, Z3DEye eye);
+  void
+  renderTransparentFilter(Z3DBoundedFilter* filter, Z3DScratchResourcePool::RenderTargetLease& targetLease, Z3DEye eye);
 
 private:
   Z3DTextureBlendRenderer m_alphaBlendRenderer;
@@ -183,18 +186,18 @@ private:
   Z3DFilterInputPort<Z3DGeometryFilter> m_gPPort;
   Z3DFilterInputPort<Z3DImgFilter> m_vPPort;
 
-  Z3DRenderTarget m_outRenderTarget1;
-  Z3DRenderTarget m_leftEyeOutRenderTarget1;
+  Z3DScratchResourcePool::RenderTargetLease m_outRenderTarget1;
+  Z3DScratchResourcePool::RenderTargetLease m_leftEyeOutRenderTarget1;
 
-  Z3DRenderTarget m_outRenderTarget2;
-  Z3DRenderTarget m_leftEyeOutRenderTarget2;
+  Z3DScratchResourcePool::RenderTargetLease m_outRenderTarget2;
+  Z3DScratchResourcePool::RenderTargetLease m_leftEyeOutRenderTarget2;
 
-  Z3DRenderTarget* m_monoReadyTarget = nullptr;
-  Z3DRenderTarget* m_leftReadyTarget = nullptr;
-  Z3DRenderTarget* m_rightReadyTarget = nullptr;
-  Z3DRenderTarget* m_monoCurrentTarget = nullptr;
-  Z3DRenderTarget* m_leftCurrentTarget = nullptr;
-  Z3DRenderTarget* m_rightCurrentTarget = nullptr;
+  Z3DScratchResourcePool::RenderTargetLease* m_monoReadyTarget = nullptr;
+  Z3DScratchResourcePool::RenderTargetLease* m_leftReadyTarget = nullptr;
+  Z3DScratchResourcePool::RenderTargetLease* m_rightReadyTarget = nullptr;
+  Z3DScratchResourcePool::RenderTargetLease* m_monoCurrentTarget = nullptr;
+  Z3DScratchResourcePool::RenderTargetLease* m_leftCurrentTarget = nullptr;
+  Z3DScratchResourcePool::RenderTargetLease* m_rightCurrentTarget = nullptr;
 
   Z3DScratchResourcePool::RenderTargetLease m_pickingTargetLease;
 

@@ -399,6 +399,10 @@ Z3DScratchResourcePool::RenderTargetLease makeLeaseFromSlot(Slot* slot, uint32_t
 
 } // anonymous namespace
 
+namespace nim {
+
+} // namespace nim
+
 DEFINE_uint32(atlas_blockid_rt_max_attachments, 8, "Max color attachments for block-id FBO");
 DEFINE_double(atlas_blockid_rt_scale, 1.0, "Scale factor for block-id FBO size (relative to viewport)");
 
@@ -457,6 +461,22 @@ private:
   std::vector<std::unique_ptr<ZVulkanTexture>> m_colorAttachments;
   std::unique_ptr<ZVulkanTexture> m_depthAttachment;
 };
+
+ZVulkanTexture* Z3DScratchResourcePool::RenderTargetLease::colorAttachment(uint32_t index) const
+{
+  if (!vulkanImage) {
+    return nullptr;
+  }
+  return vulkanImage->colorAttachment(index);
+}
+
+ZVulkanTexture* Z3DScratchResourcePool::RenderTargetLease::depthAttachmentTexture() const
+{
+  if (!vulkanImage) {
+    return nullptr;
+  }
+  return vulkanImage->depthAttachment();
+}
 
 Z3DScratchResourcePool::Z3DScratchResourcePool() = default;
 

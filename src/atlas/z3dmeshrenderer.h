@@ -62,6 +62,9 @@ public:
     m_wireframeColorValue = color;
   }
 
+  // Command list integration helper used by backend implementations.
+  void executeBatchGL(const RenderBatch& batch);
+
 protected:
   void compile() override;
 
@@ -75,8 +78,6 @@ protected:
   void render(Z3DEye eye) override;
 
   void renderPicking(Z3DEye eye) override;
-
-  void executeBatchGL(const RenderBatch& batch);
 
 private:
   void prepareMesh();

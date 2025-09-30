@@ -14,10 +14,12 @@
 #include "zlog.h"
 #include <absl/strings/str_cat.h>
 #include <algorithm>
+#include <vector>
+#include <glm/gtc/type_ptr.hpp>
 
 namespace nim {
 
-namespace {
+namespace detail {
 
 class Z3DRendererGLBackend final : public Z3DRendererBackend
 {
@@ -192,6 +194,7 @@ public:
     }
 
     for (const auto& batch : state.batches) {
+      ScopedFramebufferBind framebufferScope(batch.pass);
       applyPassState(batch.pass);
       if (const auto* line = std::get_if<LinePayload>(&batch.geometry)) {
         if (line->renderer != nullptr) {
@@ -199,24 +202,14 @@ public:
         }
         continue;
       }
+
       if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
         if (mesh->renderer != nullptr) {
           mesh->renderer->executeBatchGL(batch);
         }
         continue;
       }
-      if (const auto* ellipsoid = std::get_if<EllipsoidPayload>(&batch.geometry)) {
-        if (ellipsoid->renderer != nullptr) {
-          ellipsoid->renderer->executeBatchGL(batch);
-        }
-        continue;
-      }
-      if (const auto* cone = std::get_if<ConePayload>(&batch.geometry)) {
-        if (cone->renderer != nullptr) {
-          cone->renderer->executeBatchGL(batch);
-        }
-        continue;
-      }
+
     }
   }
 
@@ -226,38 +219,167 @@ public:
   }
 
   RendererFrameState::ActiveSurface
-  describeSurfaceFromRenderTarget(const Z3DRenderTarget& target) override
+  describeSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease) override
   {
     RendererFrameState::ActiveSurface surface;
+    if (!lease || lease.backend != RenderBackend::OpenGL || !lease.hasGLRenderTarget()) {
+      return surface;
+    }
+
+    auto& target = lease.glRenderTarget();
     const auto attachments = target.attachments();
-    for (const auto& [attachmentEnum, texture] : attachments) {
-      if (!texture) {
-        continue;
-      }
+    const GLuint colorBase = static_cast<GLuint>(GL_COLOR_ATTACHMENT0);
+    const GLuint colorMax = colorBase + 31u;
+    const GLuint depthAttachment = static_cast<GLuint>(GL_DEPTH_ATTACHMENT);
+    const GLuint depthStencilAttachment = static_cast<GLuint>(GL_DEPTH_STENCIL_ATTACHMENT);
+
+    for (const auto& [attachmentEnum, /*texture*/ _] : attachments) {
+      const GLuint attachmentValue = static_cast<GLuint>(attachmentEnum);
       AttachmentDesc desc;
       desc.handle.backend = AttachmentBackend::OpenGL;
-      desc.handle.id = reinterpret_cast<uint64_t>(texture);
-      if (attachmentEnum >= GL_COLOR_ATTACHMENT0 && attachmentEnum <= GL_COLOR_ATTACHMENT31) {
-        desc.handle.index = static_cast<uint32_t>(attachmentEnum - GL_COLOR_ATTACHMENT0);
+      desc.handle.id = reinterpret_cast<uint64_t>(&target);
+      desc.handle.index = attachmentValue;
+
+      if (attachmentValue >= colorBase && attachmentValue <= colorMax) {
         surface.colorAttachments.push_back(desc);
-      } else if (attachmentEnum == GL_DEPTH_ATTACHMENT || attachmentEnum == GL_DEPTH_STENCIL_ATTACHMENT) {
-        desc.handle.index = 0u;
+      } else if (attachmentValue == depthAttachment || attachmentValue == depthStencilAttachment) {
         surface.depthAttachment = desc;
       }
     }
+
     return surface;
   }
 
-  RendererFrameState::ActiveSurface
-  describeSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease) override
-  {
-    if (lease.hasGLRenderTarget()) {
-      return describeSurfaceFromRenderTarget(lease.glRenderTarget());
-    }
-    return RendererFrameState::ActiveSurface{};
-  }
-
 private:
+  class ScopedFramebufferBind
+  {
+  public:
+    explicit ScopedFramebufferBind(const BackendPassDesc& pass)
+      : m_target(resolveTarget(pass))
+    {
+      if (m_target) {
+        m_target->bind();
+        configureDrawBuffers(pass.colorAttachments);
+        applyLoadOps(pass);
+      } else {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        applyLoadOps(pass);
+      }
+    }
+
+    ScopedFramebufferBind(const ScopedFramebufferBind&) = delete;
+    ScopedFramebufferBind& operator=(const ScopedFramebufferBind&) = delete;
+
+    ~ScopedFramebufferBind()
+    {
+      if (m_target) {
+        m_target->release();
+      }
+    }
+
+  private:
+    static Z3DRenderTarget* resolveTarget(const BackendPassDesc& pass)
+    {
+      for (const auto& attachment : pass.colorAttachments) {
+        if (attachment.handle.backend == AttachmentBackend::OpenGL && attachment.handle.id != 0) {
+          return reinterpret_cast<Z3DRenderTarget*>(attachment.handle.id);
+        }
+      }
+
+      if (pass.depthAttachment && pass.depthAttachment->handle.backend == AttachmentBackend::OpenGL &&
+          pass.depthAttachment->handle.id != 0) {
+        return reinterpret_cast<Z3DRenderTarget*>(pass.depthAttachment->handle.id);
+      }
+
+      return nullptr;
+    }
+
+    static void configureDrawBuffers(const std::vector<AttachmentDesc>& colorAttachments)
+    {
+      if (colorAttachments.empty()) {
+        GLenum none = GL_NONE;
+        glDrawBuffers(1, &none);
+        return;
+      }
+
+      std::vector<GLenum> buffers;
+      buffers.reserve(colorAttachments.size());
+      for (const auto& attachment : colorAttachments) {
+        buffers.push_back(static_cast<GLenum>(attachment.handle.index));
+      }
+
+      glDrawBuffers(static_cast<GLsizei>(buffers.size()), buffers.data());
+    }
+
+    static void applyLoadOps(const BackendPassDesc& pass)
+    {
+      std::vector<GLenum> invalidateAttachments;
+      invalidateAttachments.reserve(pass.colorAttachments.size() + (pass.depthAttachment ? 1 : 0));
+
+      auto handleColorAttachment = [&](const AttachmentDesc& attachment) {
+        const GLenum attachmentEnum = static_cast<GLenum>(attachment.handle.index);
+        switch (attachment.loadOp) {
+          case LoadOp::Clear: {
+            const GLint drawBufferIndex = static_cast<GLint>(static_cast<int>(attachmentEnum) -
+                                                             static_cast<int>(GL_COLOR_ATTACHMENT0));
+            const glm::vec4& color = attachment.clearValue.color;
+            const GLfloat clearColor[4] = {
+              color.r,
+              color.g,
+              color.b,
+              color.a
+            };
+            glClearBufferfv(GL_COLOR, drawBufferIndex, clearColor);
+            break;
+          }
+          case LoadOp::DontCare:
+            invalidateAttachments.push_back(attachmentEnum);
+            break;
+          case LoadOp::Load:
+          default:
+            break;
+        }
+      };
+
+      for (const auto& attachment : pass.colorAttachments) {
+        handleColorAttachment(attachment);
+      }
+
+      if (pass.depthAttachment) {
+        const auto& depth = *pass.depthAttachment;
+        const GLenum attachmentEnum = static_cast<GLenum>(depth.handle.index);
+        switch (depth.loadOp) {
+          case LoadOp::Clear: {
+            const GLfloat depthValue = depth.clearValue.depth;
+            const GLint stencilValue = static_cast<GLint>(depth.clearValue.stencil);
+            if (attachmentEnum == GL_DEPTH_STENCIL_ATTACHMENT) {
+              glClearBufferfi(GL_DEPTH_STENCIL, 0, depthValue, stencilValue);
+            } else if (attachmentEnum == GL_DEPTH_ATTACHMENT) {
+              glClearBufferfv(GL_DEPTH, 0, &depthValue);
+            } else if (attachmentEnum == GL_STENCIL_ATTACHMENT) {
+              glClearBufferiv(GL_STENCIL, 0, &stencilValue);
+            }
+            break;
+          }
+          case LoadOp::DontCare:
+            invalidateAttachments.push_back(attachmentEnum);
+            break;
+          case LoadOp::Load:
+          default:
+            break;
+        }
+      }
+
+      if (!invalidateAttachments.empty()) {
+        glInvalidateFramebuffer(GL_FRAMEBUFFER,
+                                static_cast<GLsizei>(invalidateAttachments.size()),
+                                invalidateAttachments.data());
+      }
+    }
+
+    Z3DRenderTarget* m_target = nullptr;
+  };
+
   static void applyPassState(const BackendPassDesc& pass)
   {
     const auto& vp = pass.viewport;
@@ -278,11 +400,11 @@ private:
   }
 };
 
-} // namespace
+} // namespace detail
 
 std::unique_ptr<Z3DRendererBackend> createGLRendererBackend()
 {
-  return std::make_unique<Z3DRendererGLBackend>();
+  return std::make_unique<detail::Z3DRendererGLBackend>();
 }
 
 } // namespace nim

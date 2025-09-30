@@ -372,6 +372,25 @@ Abstraction/Reuse tasks
   - [x] Fixed-width line renderer: width/color configured via filter-managed state and injected through new hooks.
   - [x] Cone/arrow and texture blend renderers: cap style/blend mode stored as plain values; renderer-side options removed.
 
+### 2025 Q1 Compositor Backend Roadmap
+
+Now that the compositor uses leases exclusively, we still need to migrate the remaining OpenGL-only routines into backend executors. Planned sequence:
+
+1. **Geometry Pass Extraction**
+   - Define a `CompositorPass` descriptor (surface lease, load/store, depth/blend flags, opaque/transparent filter lists) and refactor `renderGeometries`/`renderTransparentFilter` to emit it instead of performing GL work in place.
+   - Implement a GL helper inside `Z3DRendererGLBackend` that consumes the pass descriptor (binding the FBO, issuing clears, setting blend equations, executing batches). Prototype the matching Vulkan executor using dynamic rendering.
+
+2. **Fullscreen/Image Operations**
+   - Extend the descriptor for fullscreen quad stages (shader id, sampled textures, uniforms) and migrate glow, texture copy, handle overlay, and image-layer merge paths into backend-specific helpers.
+   - Ensure each pass sets explicit load/store behavior before execution; leases remain ownership/size objects only.
+
+3. **Backend Parity & Validation**
+   - Port WA/WB/dual-depth-peeling finalization to the Vulkan executor and ensure picking/screenshot flows share the same pass machinery.
+   - Remove the last GL state calls from `z3dcompositor.cpp` and gate any remaining API-specific paths behind backend capabilities.
+   - Add regression coverage (geometry-only, geometry+volume, glow, WA/WB/DDP, handle overlays, picking) on both backends before exposing the runtime toggle.
+
+Complete the phases sequentially—do not start Vulkan work until the GL backend is executing compositor passes entirely through the new façade.
+
 Renderer parameter ownership checklist
 
 - `Z3DImgRaycasterRenderer` / `Z3DImgSliceRenderer`: move visualization toggles (lighting, clip planes, transfer helpers) into `Z3DImgFilter` and keep renderers GPU-only.

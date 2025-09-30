@@ -15,6 +15,7 @@
 namespace nim {
 
 class ZVulkanScratchImage;
+class ZVulkanTexture;
 class ZVulkanDevice;
 class ZVulkanContext;
 class Z3DRenderTarget;
@@ -231,6 +232,11 @@ public:
       CHECK(vulkanImage != nullptr) << "Vulkan scratch image not available for this lease";
       return *vulkanImage;
     }
+
+    [[nodiscard]] ZVulkanTexture* colorAttachment(uint32_t index) const;
+
+    [[nodiscard]] ZVulkanTexture* depthAttachmentTexture() const;
+
   };
 
   // Acquire a Block ID FBO sized to viewport*scale with the requested number

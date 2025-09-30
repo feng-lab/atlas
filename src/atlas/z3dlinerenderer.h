@@ -40,6 +40,10 @@ public:
   void setDataPickingColors(std::vector<glm::vec4> linePickingColorsInput);
   void clearPickingColors();
 
+  // Command list integration helpers used by backend implementations.
+  void executeBatchGL(const RenderBatch& batch);
+  void buildWideLineGeometry(std::vector<LineWideVertex>& outVertices, std::vector<uint32_t>& outIndices) const;
+
   // default true since glLineWidth only support 1 pixel width line from now on
   void setUseSmoothLine(bool v)
   {
@@ -81,8 +85,6 @@ protected:
   void render(Z3DEye eye) override;
 
   void renderPicking(Z3DEye eye) override;
-
-  void executeBatchGL(const RenderBatch& batch);
 
   // void enableLineSmooth();
   // void disableLineSmooth();
@@ -164,8 +166,6 @@ private:
 
   [[nodiscard]] LinePayload buildLinePayload(bool picking) const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
-
-  void buildWideLineGeometry(std::vector<LineWideVertex>& outVertices, std::vector<uint32_t>& outIndices) const;
 
   void refreshSmoothLinePayloads();
   void ensureLineColorStorage();

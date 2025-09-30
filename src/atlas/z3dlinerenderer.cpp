@@ -15,8 +15,10 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   , m_lineShaderGrp(rendererBase)
   , m_smoothLineShaderGrp(rendererBase)
   , m_smoothLineShaderGrp1(rendererBase)
+  , m_hasExplicitColors(false)
   , m_useSmoothLine(true)
   , m_srcLineWidth(1)
+  , m_lineWidth(1.f)
   , m_enableMultisample(true)
   , m_texture(nullptr)
   , m_VAO(1)
@@ -33,7 +35,6 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   , m_pickingVAOs(1)
   , m_oneBatchNumber(4e6)
   , m_useGeomLineShader(false)
-  , m_hasExplicitColors(false)
 {
   updateLineWidth();
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
@@ -204,10 +205,10 @@ float Z3DLineRenderer::lineWidth() const
 {
   if (m_followSizeScale) {
     if (m_useSmoothLine) {
-      return std::max(1.f, m_lineWidth * m_rendererBase.sizeScale());
+      return std::max(1.f, m_lineWidth * m_rendererBase.parameterState().sizeScale);
     } else {
       return std::min(Z3DGpuInfo::instance().maxAliasedLineWidth(),
-                      std::max(m_rendererBase.sizeScale() * m_lineWidth, Z3DGpuInfo::instance().minAliasedLineWidth()));
+                      std::max(m_rendererBase.parameterState().sizeScale * m_lineWidth, Z3DGpuInfo::instance().minAliasedLineWidth()));
     }
   } else {
     if (m_useSmoothLine) {

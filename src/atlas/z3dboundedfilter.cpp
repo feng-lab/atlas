@@ -1,7 +1,5 @@
 #include "z3dboundedfilter.h"
 #include "z3dgl.h"
-
-#include "z3drendertarget.h"
 #include "z3drenderglobalstate.h"
 #include "zlog.h"
 #include <exception>
@@ -13,31 +11,6 @@
 #include <boost/math/constants/constants.hpp>
 
 namespace nim {
-
-void Z3DBoundedFilter::setActiveSurfaceFromRenderTarget(const Z3DRenderTarget& target)
-{
-  auto surface = m_rendererBase.describeSurface(target);
-  if (surface.colorAttachments.empty() && !surface.depthAttachment) {
-    m_rendererBase.clearPendingActiveSurface();
-  } else {
-    m_rendererBase.setActiveSurfaceForNextPass(std::move(surface));
-  }
-}
-
-void Z3DBoundedFilter::setActiveSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease)
-{
-  if (!lease) {
-    m_rendererBase.clearPendingActiveSurface();
-    return;
-  }
-
-  auto surface = m_rendererBase.describeSurface(lease);
-  if (surface.colorAttachments.empty() && !surface.depthAttachment) {
-    m_rendererBase.clearPendingActiveSurface();
-  } else {
-    m_rendererBase.setActiveSurfaceForNextPass(std::move(surface));
-  }
-}
 
 Z3DBoundedFilter::RendererParameters::RendererParameters()
   : coordTransform("Coord Transform", glm::mat4(1.f))
@@ -262,12 +235,12 @@ void Z3DBoundedFilter::renderSelectionBox(Z3DEye eye)
   if (m_isSelected) {
     m_selectionLines.resize(24);
     addSelectionLines();
-    m_selectionBoundBoxRenderer.setData(&m_selectionLines);
+    m_selectionBoundBoxRenderer.setData(std::span<const glm::vec3>(m_selectionLines));
     if (m_selectionLineColors.size() < m_selectionLines.size()) {
       for (size_t i = m_selectionLineColors.size(); i < m_selectionLines.size(); ++i) {
         m_selectionLineColors.push_back(m_selectionLineColor.get());
       }
-      m_selectionBoundBoxRenderer.setDataColors(&m_selectionLineColors);
+      m_selectionBoundBoxRenderer.setDataColors(std::span<const glm::vec4>(m_selectionLineColors));
     }
     m_rendererBase.setClipEnabled(false);
     m_rendererBase.render(eye, m_selectionBoundBoxRenderer, m_selectionCornerRenderer);
@@ -283,12 +256,12 @@ void Z3DBoundedFilter::renderEditingSelectionBox(Z3DEye eye)
     if (m_editingSelectionLines.empty()) {
       return;
     }
-    m_selectionBoundBoxRenderer.setData(&m_editingSelectionLines);
+    m_selectionBoundBoxRenderer.setData(std::span<const glm::vec3>(m_editingSelectionLines));
     if (m_selectionLineColors.size() < m_editingSelectionLines.size()) {
       for (size_t i = m_selectionLineColors.size(); i < m_editingSelectionLines.size(); ++i) {
         m_selectionLineColors.push_back(m_selectionLineColor.get());
       }
-      m_selectionBoundBoxRenderer.setDataColors(&m_selectionLineColors);
+      m_selectionBoundBoxRenderer.setDataColors(std::span<const glm::vec4>(m_selectionLineColors));
     }
     m_rendererBase.setClipEnabled(false);
     m_rendererBase.render(eye, m_selectionBoundBoxRenderer);
@@ -378,7 +351,7 @@ void Z3DBoundedFilter::updateBoundBox()
   m_normalBoundBoxLines.clear();
   appendBoundboxLines(m_notTransformedBoundBox, m_normalBoundBoxLines);
   if (m_boundBoxMode.isSelected("Bound Box")) {
-    m_baseBoundBoxRenderer.setData(&m_normalBoundBoxLines);
+    m_baseBoundBoxRenderer.setData(std::span<const glm::vec3>(m_normalBoundBoxLines));
   }
   updateAxisAlignedBoundBox();
 }
@@ -736,7 +709,7 @@ void Z3DBoundedFilter::updateAxisAlignedBoundBox()
   m_axisAlignedBoundBoxLines.clear();
   appendBoundboxLines(m_axisAlignedBoundBox, m_axisAlignedBoundBoxLines);
   if (m_boundBoxMode.isSelected("Axis Aligned Bound Box")) {
-    m_baseBoundBoxRenderer.setData(&m_axisAlignedBoundBoxLines);
+    m_baseBoundBoxRenderer.setData(std::span<const glm::vec3>(m_axisAlignedBoundBoxLines));
   }
 
   m_center = glm::vec3((m_axisAlignedBoundBox.minCorner + m_axisAlignedBoundBox.maxCorner) / 2.0);
@@ -756,10 +729,10 @@ void Z3DBoundedFilter::updateNotTransformedBoundBox()
 void Z3DBoundedFilter::onBoundBoxModeChanged()
 {
   if (m_boundBoxMode.isSelected("Axis Aligned Bound Box")) {
-    m_baseBoundBoxRenderer.setData(&m_axisAlignedBoundBoxLines);
+    m_baseBoundBoxRenderer.setData(std::span<const glm::vec3>(m_axisAlignedBoundBoxLines));
     m_baseBoundBoxRenderer.setFollowCoordTransform(false);
   } else if (m_boundBoxMode.isSelected("Bound Box")) {
-    m_baseBoundBoxRenderer.setData(&m_normalBoundBoxLines);
+    m_baseBoundBoxRenderer.setData(std::span<const glm::vec3>(m_normalBoundBoxLines));
     m_baseBoundBoxRenderer.setFollowCoordTransform(true);
   }
   m_boundBoxLineWidth.setVisible(!m_boundBoxMode.isSelected("No Bound Box"));
@@ -770,7 +743,7 @@ void Z3DBoundedFilter::updateBoundBoxLineColors()
 {
   m_boundBoxLineColors.clear();
   m_boundBoxLineColors.resize(24, m_boundBoxLineColor.get());
-  m_baseBoundBoxRenderer.setDataColors(&m_boundBoxLineColors);
+  m_baseBoundBoxRenderer.setDataColors(std::span<const glm::vec4>(m_boundBoxLineColors));
   // m_baseBoundBoxRenderer->setTexture(m_boundBoxLineColor.get().getTexture());
 }
 
@@ -778,7 +751,7 @@ void Z3DBoundedFilter::updateSelectionLineColors()
 {
   m_selectionLineColors.clear();
   m_selectionLineColors.resize(24, m_selectionLineColor.get());
-  m_selectionBoundBoxRenderer.setDataColors(&m_selectionLineColors);
+  m_selectionBoundBoxRenderer.setDataColors(std::span<const glm::vec4>(m_selectionLineColors));
   m_selectionCornerRenderer.setDataColors(&m_selectionLineColors);
 }
 

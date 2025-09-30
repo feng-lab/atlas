@@ -25,7 +25,6 @@ class Z3DShaderProgram;
 
 class Z3DCamera;
 
-class Z3DRenderTarget;
 class Z3DScratchResourcePool;
 
 namespace detail {
@@ -112,25 +111,21 @@ public:
 
   void setActiveSurfaceForNextPass(const RendererFrameState::ActiveSurface& surface);
   void setActiveSurfaceForNextPass(RendererFrameState::ActiveSurface&& surface);
+  void setActiveSurfaceForNextPass(const Z3DScratchResourcePool::RenderTargetLease& lease);
+  void setPendingColorAttachmentsLoadStore(LoadOp loadOp,
+                                           StoreOp storeOp,
+                                           const ClearValue& clearValue = {});
+  void setPendingDepthAttachmentLoadStore(LoadOp loadOp,
+                                          StoreOp storeOp,
+                                          const ClearValue& clearValue = {});
   void clearPendingActiveSurface();
 
-  RendererFrameState::ActiveSurface describeSurface(const Z3DRenderTarget& target);
   RendererFrameState::ActiveSurface
   describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
   [[nodiscard]] bool supportsCommandLists() const;
 
   static RendererViewState buildViewStateFromCamera(const Z3DCamera& camera);
-
-  const glm::mat4& coordTransform() const
-  {
-    return m_parameters.coordTransform;
-  }
-
-  float sizeScale() const
-  {
-    return m_parameters.sizeScale;
-  }
 
   void markRenderDataDirty()
   {

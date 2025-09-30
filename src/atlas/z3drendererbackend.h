@@ -13,7 +13,6 @@ namespace nim {
 class Z3DRendererBase;
 class Z3DPrimitiveRenderer;
 class Z3DShaderProgram;
-class Z3DRenderTarget;
 class Z3DScratchResourcePool;
 
 class Z3DRendererBackend
@@ -41,8 +40,6 @@ public:
   {
     return false;
   }
-
-  virtual RendererFrameState::ActiveSurface describeSurfaceFromRenderTarget(const Z3DRenderTarget& target) = 0;
 
   virtual RendererFrameState::ActiveSurface
   describeSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease) = 0;

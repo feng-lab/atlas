@@ -66,10 +66,18 @@ public:
   [[nodiscard]] glm::mat4 coordTransform() const
   {
     if (m_followCoordTransform) {
-      return m_rendererBase.coordTransform();
+      return m_rendererBase.parameterState().coordTransform;
     } else {
       return glm::mat4(1.f);
     }
+  }
+
+  [[nodiscard]] float sizeScale() const
+  {
+    if (m_followSizeScale) {
+      return m_rendererBase.parameterState().sizeScale;
+    }
+    return 1.f;
   }
 
   // commonly used render functions

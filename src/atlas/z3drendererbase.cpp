@@ -3,6 +3,7 @@
 #include "z3dgl.h"
 #include "z3dprimitiverenderer.h"
 #include "z3drendererbackend.h"
+#include "z3dscratchresourcepool.h"
 #include "z3dcamera.h"
 #include "zlog.h"
 #include <algorithm>
@@ -77,14 +78,66 @@ void Z3DRendererBase::setActiveSurfaceForNextPass(RendererFrameState::ActiveSurf
   m_pendingActiveSurface = std::move(surface);
 }
 
+void Z3DRendererBase::setActiveSurfaceForNextPass(const Z3DScratchResourcePool::RenderTargetLease& lease)
+{
+  if (!lease) {
+    clearPendingActiveSurface();
+    return;
+  }
+
+  auto surface = describeSurface(lease);
+  if (surface.colorAttachments.empty() && !surface.depthAttachment) {
+    clearPendingActiveSurface();
+  } else {
+    setActiveSurfaceForNextPass(std::move(surface));
+  }
+}
+
+namespace {
+
+RendererFrameState::ActiveSurface* surfaceForMutation(std::optional<RendererFrameState::ActiveSurface>& pending,
+                                                      RendererFrameState& frameState)
+{
+  if (pending) {
+    return &*pending;
+  }
+  if (!frameState.activeSurface.empty()) {
+    return &frameState.activeSurface;
+  }
+  return nullptr;
+}
+
+} // namespace
+
+void Z3DRendererBase::setPendingColorAttachmentsLoadStore(LoadOp loadOp,
+                                                          StoreOp storeOp,
+                                                          const ClearValue& clearValue)
+{
+  if (auto* surface = surfaceForMutation(m_pendingActiveSurface, m_frameState)) {
+    for (auto& attachment : surface->colorAttachments) {
+      attachment.loadOp = loadOp;
+      attachment.storeOp = storeOp;
+      attachment.clearValue = clearValue;
+    }
+  }
+}
+
+void Z3DRendererBase::setPendingDepthAttachmentLoadStore(LoadOp loadOp,
+                                                         StoreOp storeOp,
+                                                         const ClearValue& clearValue)
+{
+  if (auto* surface = surfaceForMutation(m_pendingActiveSurface, m_frameState)) {
+    if (surface->depthAttachment) {
+      surface->depthAttachment->loadOp = loadOp;
+      surface->depthAttachment->storeOp = storeOp;
+      surface->depthAttachment->clearValue = clearValue;
+    }
+  }
+}
+
 void Z3DRendererBase::clearPendingActiveSurface()
 {
   m_pendingActiveSurface.reset();
-}
-
-RendererFrameState::ActiveSurface Z3DRendererBase::describeSurface(const Z3DRenderTarget& target)
-{
-  return backend().describeSurfaceFromRenderTarget(target);
 }
 
 RendererFrameState::ActiveSurface
