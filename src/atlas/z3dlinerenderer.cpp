@@ -6,6 +6,8 @@
 #include "z3dtexture.h"
 #include "zlog.h"
 
+#include <utility>
+
 namespace nim {
 
 Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
@@ -13,9 +15,6 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   , m_lineShaderGrp(rendererBase)
   , m_smoothLineShaderGrp(rendererBase)
   , m_smoothLineShaderGrp1(rendererBase)
-  , m_linesPt(nullptr)
-  , m_lineColorsPt(nullptr)
-  , m_linePickingColorsPt(nullptr)
   , m_useSmoothLine(true)
   , m_srcLineWidth(1)
   , m_enableMultisample(true)
@@ -34,6 +33,7 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   , m_pickingVAOs(1)
   , m_oneBatchNumber(4e6)
   , m_useGeomLineShader(false)
+  , m_hasExplicitColors(false)
 {
   updateLineWidth();
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
@@ -67,67 +67,19 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   }
 }
 
-void Z3DLineRenderer::setData(std::vector<glm::vec3>* linesInput)
+void Z3DLineRenderer::setData(std::span<const glm::vec3> lines)
 {
-  m_linesPt = linesInput;
+  std::vector<glm::vec3> copy(lines.begin(), lines.end());
+  setData(std::move(copy));
+}
 
-  if (!m_useGeomLineShader) {
-    m_smoothLineP0s.clear();
-    m_smoothLineP1s.clear();
-    m_indexs.clear();
-    if (linesInput) {
-      GLuint indices[6] = {0, 1, 2, 2, 1, 3};
-      GLuint quadIdx = 0;
-      if (m_isLineStrip) {
-        for (size_t i = 1; i < linesInput->size(); ++i) {
-          m_smoothLineP0s.push_back((*linesInput)[i - 1]);
-          m_smoothLineP0s.push_back((*linesInput)[i - 1]);
-          m_smoothLineP0s.push_back((*linesInput)[i - 1]);
-          m_smoothLineP0s.push_back((*linesInput)[i - 1]);
-          m_smoothLineP1s.push_back((*linesInput)[i]);
-          m_smoothLineP1s.push_back((*linesInput)[i]);
-          m_smoothLineP1s.push_back((*linesInput)[i]);
-          m_smoothLineP1s.push_back((*linesInput)[i]);
-          for (auto indice : indices) {
-            m_indexs.push_back(indice + 4 * quadIdx);
-          }
-          quadIdx++;
-        }
-      } else {
-        for (size_t i = 0; i + 1 < linesInput->size(); i += 2) {
-          m_smoothLineP0s.push_back((*linesInput)[i]);
-          m_smoothLineP0s.push_back((*linesInput)[i]);
-          m_smoothLineP0s.push_back((*linesInput)[i]);
-          m_smoothLineP0s.push_back((*linesInput)[i]);
-          m_smoothLineP1s.push_back((*linesInput)[i + 1]);
-          m_smoothLineP1s.push_back((*linesInput)[i + 1]);
-          m_smoothLineP1s.push_back((*linesInput)[i + 1]);
-          m_smoothLineP1s.push_back((*linesInput)[i + 1]);
-          for (auto indice : indices) {
-            m_indexs.push_back(indice + 4 * quadIdx);
-          }
-          quadIdx++;
-        }
-      }
-      size_t rightUpSize = m_allFlags.size();
-      float cornerFlags[4] = {0 << 4 | 0, // (-1, -1) left down
-                              2 << 4 | 0, // (1, -1) right down
-                              0 << 4 | 2, // (-1, 1) left up
-                              2 << 4 | 2}; // (1, 1) right up
+void Z3DLineRenderer::setData(std::vector<glm::vec3> lines)
+{
+  m_linePositions = std::move(lines);
 
-      if (rightUpSize > m_smoothLineP0s.size()) {
-        m_allFlags.resize(m_smoothLineP0s.size());
-      } else if (rightUpSize < m_smoothLineP0s.size()) {
-        m_allFlags.resize(m_smoothLineP0s.size());
-        for (size_t i = rightUpSize; i < m_allFlags.size(); i += 4) {
-          m_allFlags[i] = cornerFlags[0];
-          m_allFlags[i + 1] = cornerFlags[1];
-          m_allFlags[i + 2] = cornerFlags[2];
-          m_allFlags[i + 3] = cornerFlags[3];
-        }
-      }
-    }
-  }
+  ensureLineColorStorage();
+  syncPickingColorCount();
+  refreshSmoothLinePayloads();
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
@@ -137,43 +89,25 @@ void Z3DLineRenderer::setData(std::vector<glm::vec3>* linesInput)
   m_pickingDataChanged = true;
 }
 
-void Z3DLineRenderer::setDataColors(std::vector<glm::vec4>* lineColorsInput)
+void Z3DLineRenderer::setDataColors(std::span<const glm::vec4> lineColorsInput)
+{
+  std::vector<glm::vec4> copy(lineColorsInput.begin(), lineColorsInput.end());
+  setDataColors(std::move(copy));
+}
+
+void Z3DLineRenderer::setDataColors(std::vector<glm::vec4> lineColorsInput)
 {
   if (m_useTextureColor) {
     m_useTextureColor = false;
     compile();
   }
-  m_lineColorsPt = lineColorsInput;
 
-  if (!m_useGeomLineShader) {
-    m_smoothLineP0Colors.clear();
-    m_smoothLineP1Colors.clear();
-    if (lineColorsInput) {
-      if (m_isLineStrip) {
-        for (size_t i = 1; i < lineColorsInput->size(); ++i) {
-          m_smoothLineP0Colors.push_back((*lineColorsInput)[i - 1]);
-          m_smoothLineP0Colors.push_back((*lineColorsInput)[i - 1]);
-          m_smoothLineP0Colors.push_back((*lineColorsInput)[i - 1]);
-          m_smoothLineP0Colors.push_back((*lineColorsInput)[i - 1]);
-          m_smoothLineP1Colors.push_back((*lineColorsInput)[i]);
-          m_smoothLineP1Colors.push_back((*lineColorsInput)[i]);
-          m_smoothLineP1Colors.push_back((*lineColorsInput)[i]);
-          m_smoothLineP1Colors.push_back((*lineColorsInput)[i]);
-        }
-      } else {
-        for (size_t i = 0; i + 1 < lineColorsInput->size(); i += 2) {
-          m_smoothLineP0Colors.push_back((*lineColorsInput)[i]);
-          m_smoothLineP0Colors.push_back((*lineColorsInput)[i]);
-          m_smoothLineP0Colors.push_back((*lineColorsInput)[i]);
-          m_smoothLineP0Colors.push_back((*lineColorsInput)[i]);
-          m_smoothLineP1Colors.push_back((*lineColorsInput)[i + 1]);
-          m_smoothLineP1Colors.push_back((*lineColorsInput)[i + 1]);
-          m_smoothLineP1Colors.push_back((*lineColorsInput)[i + 1]);
-          m_smoothLineP1Colors.push_back((*lineColorsInput)[i + 1]);
-        }
-      }
-    }
-  }
+  m_lineColors = std::move(lineColorsInput);
+  m_hasExplicitColors = !m_lineColors.empty();
+
+  ensureLineColorStorage();
+  refreshSmoothLinePayloads();
+
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
 #endif
@@ -193,30 +127,29 @@ void Z3DLineRenderer::setTexture(Z3DTexture* tex)
   }
 }
 
-void Z3DLineRenderer::setDataPickingColors(std::vector<glm::vec4>* linePickingColorsInput)
+void Z3DLineRenderer::setDataPickingColors(std::span<const glm::vec4> linePickingColorsInput)
 {
-  m_linePickingColorsPt = linePickingColorsInput;
+  std::vector<glm::vec4> copy(linePickingColorsInput.begin(), linePickingColorsInput.end());
+  setDataPickingColors(std::move(copy));
+}
 
-  if (!m_useGeomLineShader) {
-    m_smoothLinePickingColors.clear();
-    if (linePickingColorsInput) {
-      if (m_isLineStrip) {
-        for (size_t i = 1; i < linePickingColorsInput->size(); ++i) {
-          m_smoothLinePickingColors.push_back((*linePickingColorsInput)[i - 1]);
-          m_smoothLinePickingColors.push_back((*linePickingColorsInput)[i - 1]);
-          m_smoothLinePickingColors.push_back((*linePickingColorsInput)[i - 1]);
-          m_smoothLinePickingColors.push_back((*linePickingColorsInput)[i - 1]);
-        }
-      } else {
-        for (size_t i = 0; i + 1 < linePickingColorsInput->size(); i += 2) {
-          m_smoothLinePickingColors.push_back((*linePickingColorsInput)[i]);
-          m_smoothLinePickingColors.push_back((*linePickingColorsInput)[i]);
-          m_smoothLinePickingColors.push_back((*linePickingColorsInput)[i]);
-          m_smoothLinePickingColors.push_back((*linePickingColorsInput)[i]);
-        }
-      }
-    }
-  }
+void Z3DLineRenderer::setDataPickingColors(std::vector<glm::vec4> linePickingColorsInput)
+{
+  m_linePickingColors = std::move(linePickingColorsInput);
+  syncPickingColorCount();
+  refreshSmoothLinePayloads();
+
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  invalidateOpenglPickingRenderer();
+#endif
+  m_pickingDataChanged = true;
+}
+
+void Z3DLineRenderer::clearPickingColors()
+{
+  m_linePickingColors.clear();
+  refreshSmoothLinePayloads();
+
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglPickingRenderer();
 #endif
@@ -286,37 +219,246 @@ float Z3DLineRenderer::lineWidth() const
   }
 }
 
-std::vector<glm::vec4>* Z3DLineRenderer::lineColors()
+void Z3DLineRenderer::ensureLineColorStorage()
 {
-  if (!m_lineColorsPt) {
-    m_lineColors.assign(m_linesPt->size(), glm::vec4(0.f, 0.f, 0.f, 1.f));
-    return &m_lineColors;
-  } else if (m_lineColorsPt->size() < m_linesPt->size()) {
-    m_lineColors.clear();
-    for (const auto& color : *m_lineColorsPt) {
-      m_lineColors.push_back(color);
+  if (m_hasExplicitColors) {
+    if (m_lineColors.size() > m_linePositions.size()) {
+      m_lineColors.resize(m_linePositions.size());
+    } else if (m_lineColors.size() < m_linePositions.size()) {
+      m_lineColors.resize(m_linePositions.size(), glm::vec4(0.f, 0.f, 0.f, 1.f));
     }
-    for (size_t i = m_lineColorsPt->size(); i < m_linesPt->size(); ++i) {
-      m_lineColors.emplace_back(0.f, 0.f, 0.f, 1.f);
-    }
-    return &m_lineColors;
+  } else if (m_lineColors.size() != m_linePositions.size()) {
+    m_lineColors.assign(m_linePositions.size(), glm::vec4(0.f, 0.f, 0.f, 1.f));
+  }
+}
+
+void Z3DLineRenderer::syncPickingColorCount()
+{
+  if (m_linePickingColors.empty()) {
+    return;
   }
 
-  return m_lineColorsPt;
+  if (m_linePickingColors.size() > m_linePositions.size()) {
+    m_linePickingColors.resize(m_linePositions.size());
+  } else if (m_linePickingColors.size() < m_linePositions.size()) {
+    m_linePickingColors.resize(m_linePositions.size(), glm::vec4(0.f));
+  }
+}
+
+void Z3DLineRenderer::refreshSmoothLinePayloads()
+{
+  if (m_useGeomLineShader) {
+    return;
+  }
+
+  m_smoothLineP0s.clear();
+  m_smoothLineP1s.clear();
+  m_smoothLineP0Colors.clear();
+  m_smoothLineP1Colors.clear();
+  m_smoothLinePickingColors.clear();
+  m_indexs.clear();
+
+  const size_t vertexCount = m_linePositions.size();
+  if (vertexCount < 2) {
+    m_allFlags.clear();
+    return;
+  }
+
+  ensureLineColorStorage();
+  syncPickingColorCount();
+
+  constexpr GLuint quadIndices[6] = {0, 1, 2, 2, 1, 3};
+  constexpr float cornerFlags[4] = {0 << 4 | 0, 2 << 4 | 0, 0 << 4 | 2, 2 << 4 | 2};
+
+  const bool emitColors = m_hasExplicitColors;
+  const bool emitPicking = !m_linePickingColors.empty();
+
+  GLuint quadIdx = 0;
+  auto pushSegment = [&](size_t idx0, size_t idx1) {
+    const glm::vec3& p0 = m_linePositions[idx0];
+    const glm::vec3& p1 = m_linePositions[idx1];
+
+    m_smoothLineP0s.push_back(p0);
+    m_smoothLineP0s.push_back(p0);
+    m_smoothLineP0s.push_back(p0);
+    m_smoothLineP0s.push_back(p0);
+
+    m_smoothLineP1s.push_back(p1);
+    m_smoothLineP1s.push_back(p1);
+    m_smoothLineP1s.push_back(p1);
+    m_smoothLineP1s.push_back(p1);
+
+    for (GLuint idx : quadIndices) {
+      m_indexs.push_back(idx + quadIdx * 4);
+    }
+    ++quadIdx;
+
+    if (emitColors) {
+      const glm::vec4& c0 = m_lineColors[idx0];
+      const glm::vec4& c1 = m_lineColors[idx1];
+      m_smoothLineP0Colors.push_back(c0);
+      m_smoothLineP0Colors.push_back(c0);
+      m_smoothLineP0Colors.push_back(c0);
+      m_smoothLineP0Colors.push_back(c0);
+
+      m_smoothLineP1Colors.push_back(c1);
+      m_smoothLineP1Colors.push_back(c1);
+      m_smoothLineP1Colors.push_back(c1);
+      m_smoothLineP1Colors.push_back(c1);
+    }
+
+    if (emitPicking) {
+      const glm::vec4& pick0 = m_linePickingColors[idx0];
+      m_smoothLinePickingColors.push_back(pick0);
+      m_smoothLinePickingColors.push_back(pick0);
+      m_smoothLinePickingColors.push_back(pick0);
+      m_smoothLinePickingColors.push_back(pick0);
+    }
+  };
+
+  if (m_isLineStrip) {
+    for (size_t i = 1; i < vertexCount; ++i) {
+      pushSegment(i - 1, i);
+    }
+  } else {
+    for (size_t i = 0; i + 1 < vertexCount; i += 2) {
+      pushSegment(i, i + 1);
+    }
+  }
+
+  const size_t targetSize = m_smoothLineP0s.size();
+  const size_t previousSize = m_allFlags.size();
+  m_allFlags.resize(targetSize);
+  for (size_t i = previousSize; i < targetSize; i += 4) {
+    m_allFlags[i] = cornerFlags[0];
+    if (i + 1 < targetSize) {
+      m_allFlags[i + 1] = cornerFlags[1];
+    }
+    if (i + 2 < targetSize) {
+      m_allFlags[i + 2] = cornerFlags[2];
+    }
+    if (i + 3 < targetSize) {
+      m_allFlags[i + 3] = cornerFlags[3];
+    }
+  }
+}
+
+std::vector<glm::vec4>& Z3DLineRenderer::lineColors()
+{
+  ensureLineColorStorage();
+  return m_lineColors;
+}
+
+void Z3DLineRenderer::buildWideLineGeometry(std::vector<LineWideVertex>& outVertices,
+                                            std::vector<uint32_t>& outIndices) const
+{
+  outVertices.clear();
+  outIndices.clear();
+
+  if (!m_useSmoothLine) {
+    return;
+  }
+
+  const size_t vertexCount = m_smoothLineP0s.size();
+  if (vertexCount == 0) {
+    return;
+  }
+
+  const bool hasP0Colors = !m_smoothLineP0Colors.empty();
+  const bool hasP1Colors = !m_smoothLineP1Colors.empty();
+  const glm::vec4 defaultColor(0.f, 0.f, 0.f, 1.f);
+
+  outVertices.reserve(vertexCount);
+  for (size_t i = 0; i < vertexCount; ++i) {
+    LineWideVertex vertex{};
+    vertex.p0 = m_smoothLineP0s[i];
+    vertex.p1 = m_smoothLineP1s[i];
+    vertex.c0 = hasP0Colors ? m_smoothLineP0Colors[i] : defaultColor;
+    vertex.c1 = hasP1Colors ? m_smoothLineP1Colors[i] : vertex.c0;
+    vertex.flags = (i < m_allFlags.size()) ? m_allFlags[i] : 0.f;
+    outVertices.push_back(vertex);
+  }
+
+  outIndices.assign(m_indexs.begin(), m_indexs.end());
+}
+
+LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
+{
+  LinePayload payload;
+
+  payload.renderer = const_cast<Z3DLineRenderer*>(this);
+
+  payload.positions = spanOrEmpty(m_linePositions);
+
+  if (!m_linePositions.empty()) {
+    auto& colors = const_cast<Z3DLineRenderer*>(this)->lineColors();
+    payload.colors = spanOrEmpty(colors);
+  }
+
+  payload.pickingColors = spanOrEmpty(m_linePickingColors);
+  payload.perSegmentWidths = spanOrEmpty(m_lineWidthArray);
+
+  payload.smoothP0Positions = spanOrEmpty(m_smoothLineP0s);
+  payload.smoothP1Positions = spanOrEmpty(m_smoothLineP1s);
+  payload.smoothP0Colors = spanOrEmpty(m_smoothLineP0Colors);
+  payload.smoothP1Colors = spanOrEmpty(m_smoothLineP1Colors);
+  payload.smoothPickingColors = spanOrEmpty(m_smoothLinePickingColors);
+  payload.smoothFlags = spanFromGLfloats(m_allFlags);
+  payload.smoothIndices = spanFromGLuints(m_indexs);
+
+  payload.texture = m_texture;
+  payload.useSmoothLine = m_useSmoothLine;
+  payload.useTextureColor = m_useTextureColor;
+  payload.screenAligned = m_screenAligned;
+  payload.roundCap = m_roundCap;
+  payload.isLineStrip = m_isLineStrip;
+  payload.enableMultisample = m_enableMultisample;
+  payload.srcLineWidth = m_srcLineWidth;
+  payload.resolvedLineWidth = m_lineWidth;
+  payload.pickingPass = picking;
+
+  return payload;
+}
+
+RenderBatch Z3DLineRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
+{
+  RenderBatch batch;
+
+  batch.eye = eye;
+
+  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+  batch.pass.viewport.minDepth = 0.f;
+  batch.pass.viewport.maxDepth = 1.f;
+
+  const auto& surface = m_rendererBase.frameState().activeSurface;
+  batch.pass.colorAttachments = surface.colorAttachments;
+  batch.pass.depthAttachment = surface.depthAttachment;
+
+  batch.draw.topology = m_isLineStrip ? PrimitiveTopology::LineStrip : PrimitiveTopology::LineList;
+
+  auto payload = buildLinePayload(picking);
+  batch.draw.vertexCount = static_cast<uint32_t>(payload.positions.size());
+  batch.draw.indexCount = static_cast<uint32_t>(payload.smoothIndices.size());
+  batch.geometry = std::move(payload);
+
+  return batch;
 }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DLineRenderer::renderUsingOpengl()
 {
-  if (!m_linesPt || m_linesPt->empty()) {
+  if (m_linePositions.empty()) {
     return;
   }
 
-  std::vector<glm::vec4>* colors = lineColors();
+  auto& colors = lineColors();
 
-  if ((*colors)[0].a != opacity()) {
-    for (size_t i = 0; i < colors->size(); ++i) {
-      (*colors)[i].a = opacity();
+  if (!colors.empty() && colors[0].a != opacity()) {
+    for (auto& color : colors) {
+      color.a = opacity();
     }
   }
 
@@ -333,16 +475,16 @@ void Z3DLineRenderer::renderUsingOpengl()
 
   glEnableClientState(GL_VERTEX_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
-  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, m_linePositions.size() * 3 * sizeof(GLfloat), m_linePositions.data(), GL_STATIC_DRAW);
   glVertexPointer(3, GL_FLOAT, 0, 0);
 
   glEnableClientState(GL_COLOR_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
-  glBufferData(GL_ARRAY_BUFFER, colors->size() * 4 * sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, colors.size() * 4 * sizeof(GLfloat), colors.data(), GL_STATIC_DRAW);
   glColorPointer(4, GL_FLOAT, 0, 0);
 
-  glDrawArrays(GL_LINES, 0, m_linesPt->size());
-  glDrawArrays(GL_POINTS, 0, m_linesPt->size());
+  glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_linePositions.size()));
+  glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_linePositions.size()));
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glDeleteBuffers(2, bufObjects);
@@ -358,11 +500,11 @@ void Z3DLineRenderer::renderUsingOpengl()
 
 void Z3DLineRenderer::renderPickingUsingOpengl()
 {
-  if (!m_linesPt || m_linesPt->empty()) {
+  if (m_linePositions.empty()) {
     return;
   }
 
-  if (!m_linePickingColorsPt || m_linePickingColorsPt->empty() || m_linePickingColorsPt->size() != m_linesPt->size()) {
+  if (m_linePickingColors.empty() || m_linePickingColors.size() != m_linePositions.size()) {
     return;
   }
 
@@ -379,19 +521,19 @@ void Z3DLineRenderer::renderPickingUsingOpengl()
 
   glEnableClientState(GL_VERTEX_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
-  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, m_linePositions.size() * 3 * sizeof(GLfloat), m_linePositions.data(), GL_STATIC_DRAW);
   glVertexPointer(3, GL_FLOAT, 0, 0);
 
   glEnableClientState(GL_COLOR_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
   glBufferData(GL_ARRAY_BUFFER,
-               m_linePickingColorsPt->size() * 4 * sizeof(GLfloat),
-               m_linePickingColorsPt->data(),
+               m_linePickingColors.size() * 4 * sizeof(GLfloat),
+               m_linePickingColors.data(),
                GL_STATIC_DRAW);
   glColorPointer(4, GL_FLOAT, 0, 0);
 
-  glDrawArrays(GL_LINES, 0, m_linesPt->size());
-  glDrawArrays(GL_POINTS, 0, m_linesPt->size());
+  glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_linePositions.size()));
+  glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_linePositions.size()));
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glDeleteBuffers(2, bufObjects);
@@ -408,7 +550,29 @@ void Z3DLineRenderer::renderPickingUsingOpengl()
 
 void Z3DLineRenderer::render(Z3DEye eye)
 {
-  if (!m_linesPt || m_linesPt->empty()) {
+  if (m_linePositions.empty()) {
+    return;
+  }
+
+  RenderBatch batch = buildRenderBatch(eye, /*picking=*/false);
+  if (auto* payload = std::get_if<LinePayload>(&batch.geometry)) {
+    if (payload->positions.empty()) {
+      return;
+    }
+  }
+
+  m_rendererBase.appendBatch(std::move(batch));
+
+  if (m_rendererBase.supportsCommandLists()) {
+    return;
+  }
+
+  renderImmediate(eye);
+}
+
+void Z3DLineRenderer::renderImmediate(Z3DEye eye)
+{
+  if (m_linePositions.empty()) {
     return;
   }
 
@@ -419,7 +583,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
     return;
   }
 
-  const std::vector<glm::vec4>* colors = lineColors();
+  auto& colors = lineColors();
 
   if (!m_useSmoothLine) {
     glLineWidth(lineWidth());
@@ -442,14 +606,14 @@ void Z3DLineRenderer::render(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-      glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_linePositions.size() * 3 * sizeof(GLfloat), m_linePositions.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       if (!m_useTextureColor) {
         auto attr_color = shader.colorAttributeLocation();
         glEnableVertexAttribArray(attr_color);
         m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-        glBufferData(GL_ARRAY_BUFFER, colors->size() * 4 * sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, colors.size() * 4 * sizeof(GLfloat), colors.data(), GL_STATIC_DRAW);
         glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
       }
 
@@ -473,15 +637,15 @@ void Z3DLineRenderer::render(Z3DEye eye)
       }
     } else {
       if (m_isLineStrip) {
-        glDrawArrays(GL_LINE_STRIP, 0, m_linesPt->size());
+        glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(m_linePositions.size()));
       } else {
-        glDrawArrays(GL_LINES, 0, m_linesPt->size());
+        glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_linePositions.size()));
       }
     }
 
 #ifndef _FLYEM_
     if (!m_useSmoothLine) {
-      glDrawArrays(GL_POINTS, 0, m_linesPt->size());
+      glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_linePositions.size()));
     }
 #endif
     m_VAO.release();
@@ -491,7 +655,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, m_linePositions.size() * 3 * sizeof(GLfloat), m_linePositions.data(), GL_STATIC_DRAW);
     }
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
@@ -501,7 +665,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
       glEnableVertexAttribArray(attr_color);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
       if (m_dataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, colors->size() * 4 * sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, colors.size() * 4 * sizeof(GLfloat), colors.data(), GL_STATIC_DRAW);
       }
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
     }
@@ -519,15 +683,15 @@ void Z3DLineRenderer::render(Z3DEye eye)
       }
     } else {
       if (m_isLineStrip) {
-        glDrawArrays(GL_LINE_STRIP, 0, m_linesPt->size());
+        glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(m_linePositions.size()));
       } else {
-        glDrawArrays(GL_LINES, 0, m_linesPt->size());
+        glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_linePositions.size()));
       }
     }
 
 #ifndef _FLYEM_
     if (!m_useSmoothLine) {
-      glDrawArrays(GL_POINTS, 0, m_linesPt->size());
+      glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(m_linePositions.size()));
     }
 #endif
 
@@ -546,13 +710,31 @@ void Z3DLineRenderer::render(Z3DEye eye)
   currentShaderGrp().release();
 }
 
+void Z3DLineRenderer::executeBatchGL(const RenderBatch& batch)
+{
+  renderImmediate(batch.eye);
+}
+
 void Z3DLineRenderer::renderPicking(Z3DEye eye)
 {
-  if (!m_linesPt || m_linesPt->empty()) {
+  if (m_linePositions.empty()) {
     return;
   }
 
-  if (!m_linePickingColorsPt || m_linePickingColorsPt->empty() || m_linePickingColorsPt->size() != m_linesPt->size()) {
+  if (m_linePickingColors.empty() || m_linePickingColors.size() != m_linePositions.size()) {
+    return;
+  }
+
+  RenderBatch batch = buildRenderBatch(eye, /*picking=*/true);
+  if (auto* payload = std::get_if<LinePayload>(&batch.geometry)) {
+    if (payload->positions.empty()) {
+      return;
+    }
+  }
+
+  m_rendererBase.appendBatch(std::move(batch));
+
+  if (m_rendererBase.supportsCommandLists()) {
     return;
   }
 
@@ -581,7 +763,7 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
       glEnableVertexAttribArray(attr_vertex);
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ARRAY_BUFFER, 0);
-        glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_linePositions.size() * 3 * sizeof(GLfloat), m_linePositions.data(), GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 0);
       }
@@ -590,8 +772,8 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
       glEnableVertexAttribArray(attr_color);
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
       glBufferData(GL_ARRAY_BUFFER,
-                   m_linePickingColorsPt->size() * 4 * sizeof(GLfloat),
-                   m_linePickingColorsPt->data(),
+                   m_linePickingColors.size() * 4 * sizeof(GLfloat),
+                   m_linePickingColors.data(),
                    GL_STATIC_DRAW);
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
@@ -603,9 +785,9 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
 
     m_pickingVAO.bind();
     if (m_isLineStrip) {
-      glDrawArrays(GL_LINE_STRIP, 0, m_linesPt->size());
+      glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(m_linePositions.size()));
     } else {
-      glDrawArrays(GL_LINES, 0, m_linesPt->size());
+      glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_linePositions.size()));
     }
     m_pickingVAO.release();
 
@@ -617,7 +799,7 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 0);
       if (m_pickingDataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, m_linePositions.size() * 3 * sizeof(GLfloat), m_linePositions.data(), GL_STATIC_DRAW);
       }
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
@@ -628,16 +810,16 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
     m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
     if (m_pickingDataChanged) {
       glBufferData(GL_ARRAY_BUFFER,
-                   m_linePickingColorsPt->size() * 4 * sizeof(GLfloat),
-                   m_linePickingColorsPt->data(),
+                   m_linePickingColors.size() * 4 * sizeof(GLfloat),
+                   m_linePickingColors.data(),
                    GL_STATIC_DRAW);
     }
     glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     if (m_isLineStrip) {
-      glDrawArrays(GL_LINE_STRIP, 0, m_linesPt->size());
+      glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(m_linePositions.size()));
     } else {
-      glDrawArrays(GL_LINES, 0, m_linesPt->size());
+      glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(m_linePositions.size()));
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);

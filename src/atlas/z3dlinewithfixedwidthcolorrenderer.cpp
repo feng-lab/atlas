@@ -1,6 +1,7 @@
 #include "z3dlinewithfixedwidthcolorrenderer.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace nim {
 
@@ -14,9 +15,15 @@ Z3DLineWithFixedWidthColorRenderer::Z3DLineWithFixedWidthColorRenderer(Z3DRender
   Z3DLineWithFixedWidthColorRenderer::setFixedLineWidth(m_fixedLineWidth);
 }
 
-void Z3DLineWithFixedWidthColorRenderer::setData(std::vector<glm::vec3>* linesInput)
+void Z3DLineWithFixedWidthColorRenderer::setData(std::span<const glm::vec3> lines)
 {
-  Z3DLineRenderer::setData(linesInput);
+  Z3DLineRenderer::setData(lines);
+  setLineColors();
+}
+
+void Z3DLineWithFixedWidthColorRenderer::setData(std::vector<glm::vec3> lines)
+{
+  Z3DLineRenderer::setData(std::move(lines));
   setLineColors();
 }
 
@@ -32,13 +39,11 @@ float Z3DLineWithFixedWidthColorRenderer::lineWidth() const
 void Z3DLineWithFixedWidthColorRenderer::setLineColors()
 {
   m_lineColorsPrivate.clear();
-  if (!m_linesPt) {
+  if (m_linePositions.empty()) {
     return;
   }
-  for (size_t i = 0; i < m_linesPt->size(); ++i) {
-    m_lineColorsPrivate.push_back(m_lineColor);
-  }
-  setDataColors(&m_lineColorsPrivate);
+  m_lineColorsPrivate.resize(m_linePositions.size(), m_lineColor);
+  setDataColors(std::move(m_lineColorsPrivate));
 }
 
 void Z3DLineWithFixedWidthColorRenderer::setFixedLineWidth(float width)

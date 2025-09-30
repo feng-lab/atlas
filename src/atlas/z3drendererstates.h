@@ -1,8 +1,10 @@
 #pragma once
 
 #include "zglmutils.h"
+#include "z3drendercommands.h"
 
 #include <array>
+#include <optional>
 #include <vector>
 
 namespace nim {
@@ -12,6 +14,23 @@ struct RendererFrameState
   glm::uvec4 viewport{0};
   glm::mat4 viewportMatrix{1.f};
   glm::mat4 inverseViewportMatrix{1.f};
+
+  struct ActiveSurface
+  {
+    std::vector<AttachmentDesc> colorAttachments;
+    std::optional<AttachmentDesc> depthAttachment;
+
+    void clear()
+    {
+      colorAttachments.clear();
+      depthAttachment.reset();
+    }
+
+    [[nodiscard]] bool empty() const
+    {
+      return colorAttachments.empty() && !depthAttachment.has_value();
+    }
+  } activeSurface;
 
   bool updateViewportData(const glm::uvec4& rect)
   {
@@ -39,6 +58,16 @@ struct RendererFrameState
   bool updateViewportData(const glm::uvec2& size)
   {
     return updateViewportData(glm::uvec4(0, 0, size.x, size.y));
+  }
+
+  void setActiveSurface(const ActiveSurface& surface)
+  {
+    activeSurface = surface;
+  }
+
+  void resetActiveSurface()
+  {
+    activeSurface.clear();
   }
 };
 

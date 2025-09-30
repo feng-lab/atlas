@@ -252,8 +252,8 @@ void Z3DAxisFilter::setupCamera()
   m_tailPosAndTailRadius.emplace_back(origin, tailRadius);
   m_headPosAndHeadRadius.emplace_back(m_ZEnd * glm::vec3(0.88), headRadius);
 
-  m_lineRenderer.setData(&m_lines);
-  m_lineRenderer.setDataColors(&m_lineColors);
+  m_lineRenderer.setData(std::move(m_lines));
+  m_lineRenderer.setDataColors(std::move(m_lineColors));
   m_arrowRenderer.setArrowData(&m_tailPosAndTailRadius, &m_headPosAndHeadRadius, .1f);
   m_arrowRenderer.setArrowColors(&m_textColors);
   m_fontRenderer.setData(&m_textPositions, texts);

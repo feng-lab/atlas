@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3drendererbackend.h"
+#include "z3drendercommands.h"
 #include "z3drendererstates.h"
 #include "zglmutils.h"
 #include <array>
@@ -9,6 +10,7 @@
 #include <set>
 #include <span>
 #include <string>
+#include <optional>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -22,6 +24,9 @@ class Z3DTexture;
 class Z3DShaderProgram;
 
 class Z3DCamera;
+
+class Z3DRenderTarget;
+class Z3DScratchResourcePool;
 
 namespace detail {
 
@@ -91,6 +96,29 @@ public:
   [[nodiscard]] RendererViewState pushViewStateFromCamera(const Z3DCamera& camera);
 
   void restoreViewState(const RendererViewState& state);
+
+  // ---------------------------------------------------------------------------
+  // Command façade helpers (no-op until renderers adopt them)
+  // ---------------------------------------------------------------------------
+  void resetCPUState();
+
+  void appendBatch(RenderBatch batch);
+
+  [[nodiscard]] const RendererCPUState& cpuState() const;
+
+  [[nodiscard]] RendererCPUState& cpuState();
+
+  void submitBatches();
+
+  void setActiveSurfaceForNextPass(const RendererFrameState::ActiveSurface& surface);
+  void setActiveSurfaceForNextPass(RendererFrameState::ActiveSurface&& surface);
+  void clearPendingActiveSurface();
+
+  RendererFrameState::ActiveSurface describeSurface(const Z3DRenderTarget& target);
+  RendererFrameState::ActiveSurface
+  describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
+
+  [[nodiscard]] bool supportsCommandLists() const;
 
   static RendererViewState buildViewStateFromCamera(const Z3DCamera& camera);
 
@@ -272,8 +300,12 @@ protected:
   RendererFrameState& m_frameState;
   RendererViewState& m_viewState;
   RendererSceneState& m_sceneState;
+
+  std::optional<RendererFrameState::ActiveSurface> m_pendingActiveSurface;
   // renderers
   std::set<Z3DPrimitiveRenderer*> m_renderers;
+
+  RendererCPUState m_cpuState;
 
   std::vector<glm::vec4> m_clipPlanes;
   std::vector<glm::dvec4> m_doubleClipPlanes;

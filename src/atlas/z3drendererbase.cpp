@@ -40,6 +40,64 @@ void Z3DRendererBase::restoreViewState(const RendererViewState& state)
   m_viewState = state;
 }
 
+void Z3DRendererBase::resetCPUState()
+{
+  m_cpuState.batches.clear();
+  m_frameState.resetActiveSurface();
+}
+
+void Z3DRendererBase::appendBatch(RenderBatch batch)
+{
+  m_cpuState.batches.push_back(std::move(batch));
+}
+
+const RendererCPUState& Z3DRendererBase::cpuState() const
+{
+  return m_cpuState;
+}
+
+RendererCPUState& Z3DRendererBase::cpuState()
+{
+  return m_cpuState;
+}
+
+void Z3DRendererBase::submitBatches()
+{
+  backend().processBatches(*this, m_cpuState);
+  m_cpuState.batches.clear();
+}
+
+void Z3DRendererBase::setActiveSurfaceForNextPass(const RendererFrameState::ActiveSurface& surface)
+{
+  m_pendingActiveSurface = surface;
+}
+
+void Z3DRendererBase::setActiveSurfaceForNextPass(RendererFrameState::ActiveSurface&& surface)
+{
+  m_pendingActiveSurface = std::move(surface);
+}
+
+void Z3DRendererBase::clearPendingActiveSurface()
+{
+  m_pendingActiveSurface.reset();
+}
+
+RendererFrameState::ActiveSurface Z3DRendererBase::describeSurface(const Z3DRenderTarget& target)
+{
+  return backend().describeSurfaceFromRenderTarget(target);
+}
+
+RendererFrameState::ActiveSurface
+Z3DRendererBase::describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease)
+{
+  return backend().describeSurfaceFromLease(lease);
+}
+
+bool Z3DRendererBase::supportsCommandLists() const
+{
+  return backend().supportsCommandLists();
+}
+
 RendererViewState Z3DRendererBase::buildViewStateFromCamera(const Z3DCamera& camera)
 {
   RendererViewState state;
@@ -167,6 +225,11 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
 
 void Z3DRendererBase::render(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
+  resetCPUState();
+  if (m_pendingActiveSurface) {
+    m_frameState.setActiveSurface(*m_pendingActiveSurface);
+    m_pendingActiveSurface.reset();
+  }
   for (auto* renderer : renderers) {
     CHECK(m_renderers.contains(renderer));
   }
@@ -213,6 +276,11 @@ void Z3DRendererBase::render(Z3DEye eye, Z3DRendererBase::RendererSpan renderers
 
 void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
+  resetCPUState();
+  if (m_pendingActiveSurface) {
+    m_frameState.setActiveSurface(*m_pendingActiveSurface);
+    m_pendingActiveSurface.reset();
+  }
   for (auto* renderer : renderers) {
     CHECK(m_renderers.contains(renderer));
   }
@@ -356,6 +424,7 @@ void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan 
   for (auto* renderer : renderers) {
     renderer->render(eye);
   }
+  submitBatches();
   backend().endRender(*this);
 }
 
@@ -365,6 +434,7 @@ void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, Z3DRendererBase::Render
   for (auto* renderer : renderers) {
     renderer->renderPicking(eye);
   }
+  submitBatches();
   backend().endRender(*this);
 }
 

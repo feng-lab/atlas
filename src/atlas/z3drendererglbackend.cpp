@@ -4,6 +4,12 @@
 #include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3drendererbase.h"
+#include "z3drendertarget.h"
+#include "z3dscratchresourcepool.h"
+#include "z3dlinerenderer.h"
+#include "z3dmeshrenderer.h"
+#include "z3dellipsoidrenderer.h"
+#include "z3dconerenderer.h"
 #include "z3dshaderprogram.h"
 #include "zlog.h"
 #include <absl/strings/str_cat.h>
@@ -176,6 +182,98 @@ public:
     const auto& clipPlanes = renderer.clipPlanes();
     for (size_t i = 0; i < clipPlanes.size(); ++i) {
       glDisable(GL_CLIP_DISTANCE0 + i);
+    }
+  }
+
+  void processBatches(Z3DRendererBase& /*renderer*/, const RendererCPUState& state) override
+  {
+    if (state.batches.empty()) {
+      return;
+    }
+
+    for (const auto& batch : state.batches) {
+      applyPassState(batch.pass);
+      if (const auto* line = std::get_if<LinePayload>(&batch.geometry)) {
+        if (line->renderer != nullptr) {
+          line->renderer->executeBatchGL(batch);
+        }
+        continue;
+      }
+      if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
+        if (mesh->renderer != nullptr) {
+          mesh->renderer->executeBatchGL(batch);
+        }
+        continue;
+      }
+      if (const auto* ellipsoid = std::get_if<EllipsoidPayload>(&batch.geometry)) {
+        if (ellipsoid->renderer != nullptr) {
+          ellipsoid->renderer->executeBatchGL(batch);
+        }
+        continue;
+      }
+      if (const auto* cone = std::get_if<ConePayload>(&batch.geometry)) {
+        if (cone->renderer != nullptr) {
+          cone->renderer->executeBatchGL(batch);
+        }
+        continue;
+      }
+    }
+  }
+
+  [[nodiscard]] bool supportsCommandLists() const override
+  {
+    return true;
+  }
+
+  RendererFrameState::ActiveSurface
+  describeSurfaceFromRenderTarget(const Z3DRenderTarget& target) override
+  {
+    RendererFrameState::ActiveSurface surface;
+    const auto attachments = target.attachments();
+    for (const auto& [attachmentEnum, texture] : attachments) {
+      if (!texture) {
+        continue;
+      }
+      AttachmentDesc desc;
+      desc.handle.backend = AttachmentBackend::OpenGL;
+      desc.handle.id = reinterpret_cast<uint64_t>(texture);
+      if (attachmentEnum >= GL_COLOR_ATTACHMENT0 && attachmentEnum <= GL_COLOR_ATTACHMENT31) {
+        desc.handle.index = static_cast<uint32_t>(attachmentEnum - GL_COLOR_ATTACHMENT0);
+        surface.colorAttachments.push_back(desc);
+      } else if (attachmentEnum == GL_DEPTH_ATTACHMENT || attachmentEnum == GL_DEPTH_STENCIL_ATTACHMENT) {
+        desc.handle.index = 0u;
+        surface.depthAttachment = desc;
+      }
+    }
+    return surface;
+  }
+
+  RendererFrameState::ActiveSurface
+  describeSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease) override
+  {
+    if (lease.hasGLRenderTarget()) {
+      return describeSurfaceFromRenderTarget(lease.glRenderTarget());
+    }
+    return RendererFrameState::ActiveSurface{};
+  }
+
+private:
+  static void applyPassState(const BackendPassDesc& pass)
+  {
+    const auto& vp = pass.viewport;
+    glViewport(static_cast<GLint>(vp.origin.x),
+               static_cast<GLint>(vp.origin.y),
+               static_cast<GLsizei>(vp.extent.x),
+               static_cast<GLsizei>(vp.extent.y));
+
+    if (pass.enableScissor) {
+      glEnable(GL_SCISSOR_TEST);
+      glScissor(static_cast<GLint>(pass.scissorRect.x),
+                static_cast<GLint>(pass.scissorRect.y),
+                static_cast<GLsizei>(pass.scissorRect.z),
+                static_cast<GLsizei>(pass.scissorRect.w));
+    } else {
+      glDisable(GL_SCISSOR_TEST);
     }
   }
 };

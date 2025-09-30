@@ -8,8 +8,15 @@
 #include "zimgformat.h"
 #include <memory>
 #include <algorithm>
+#include <vector>
 
 namespace nim {
+
+namespace {
+
+thread_local std::vector<const Z3DRenderTarget*> g_boundRenderTargetStack;
+
+} // namespace
 
 Z3DRenderTarget::Z3DRenderTarget(GLint internalColorFormat,
                                  GLint internalDepthFormat,
@@ -31,6 +38,18 @@ Z3DRenderTarget::Z3DRenderTarget(glm::uvec2 size)
   : m_size(size)
 {
   generateId();
+}
+
+std::vector<std::pair<GLenum, Z3DTexture*>> Z3DRenderTarget::attachments() const
+{
+  std::vector<std::pair<GLenum, Z3DTexture*>> result;
+  result.reserve(m_attachments.size());
+  for (const auto& entry : m_attachments) {
+    if (entry.second != nullptr) {
+      result.emplace_back(entry.first, entry.second);
+    }
+  }
+  return result;
 }
 
 Z3DRenderTarget::~Z3DRenderTarget()
@@ -114,6 +133,7 @@ void Z3DRenderTarget::bind()
   }
   // else
   // glBindFramebuffer(GL_FRAMEBUFFER, m_multisampleFBOID);
+  g_boundRenderTargetStack.push_back(this);
 }
 
 void Z3DRenderTarget::release() const
@@ -133,6 +153,16 @@ void Z3DRenderTarget::release() const
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_previousDrawFBOID);
   glViewport(m_previousViewport.x, m_previousViewport.y, m_previousViewport.z, m_previousViewport.w);
   // glGetError(); // there should be no error according to openGL doc, but some drivers report error, ignore
+  if (!g_boundRenderTargetStack.empty()) {
+    if (g_boundRenderTargetStack.back() == this) {
+      g_boundRenderTargetStack.pop_back();
+    } else {
+      auto it = std::find(g_boundRenderTargetStack.begin(), g_boundRenderTargetStack.end(), this);
+      if (it != g_boundRenderTargetStack.end()) {
+        g_boundRenderTargetStack.erase(it);
+      }
+    }
+  }
 }
 
 bool Z3DRenderTarget::isBound() const
@@ -150,6 +180,14 @@ void Z3DRenderTarget::clear() const
   } else {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   }
+}
+
+const Z3DRenderTarget* Z3DRenderTarget::currentBoundRenderTarget()
+{
+  if (g_boundRenderTargetStack.empty()) {
+    return nullptr;
+  }
+  return g_boundRenderTargetStack.back();
 }
 
 GLuint Z3DRenderTarget::handle() const

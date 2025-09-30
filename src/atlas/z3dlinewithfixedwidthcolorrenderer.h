@@ -2,6 +2,8 @@
 
 #include "z3dlinerenderer.h"
 
+#include <span>
+
 namespace nim {
 
 class Z3DLineWithFixedWidthColorRenderer : public Z3DLineRenderer
@@ -10,7 +12,10 @@ public:
   // default use display list but not lighting in opengl mode
   explicit Z3DLineWithFixedWidthColorRenderer(Z3DRendererBase& base);
 
-  void setData(std::vector<glm::vec3>* linesInput) override;
+  using Z3DLineRenderer::setData;
+
+  void setData(std::span<const glm::vec3> lines);
+  void setData(std::vector<glm::vec3> lines);
 
   void setFixedLineWidth(float width);
 

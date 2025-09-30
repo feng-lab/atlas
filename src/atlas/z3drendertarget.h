@@ -3,6 +3,7 @@
 #include "z3dgl.h"
 #include <map>
 #include <set>
+#include <vector>
 
 namespace nim {
 
@@ -51,6 +52,8 @@ public:
     return m_attachments.at(attachment);
   }
 
+  [[nodiscard]] std::vector<std::pair<GLenum, Z3DTexture*>> attachments() const;
+
   Z3DTexture* colorTexture()
   {
     return attachment(GL_COLOR_ATTACHMENT0);
@@ -60,6 +63,8 @@ public:
   {
     return attachment(GL_DEPTH_ATTACHMENT);
   }
+
+  static const Z3DRenderTarget* currentBoundRenderTarget();
 
   // Get the color at position pos. This method will bind the RenderTarget!
   glm::vec4 floatColorAtPos(const glm::ivec2& pos);

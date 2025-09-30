@@ -137,7 +137,7 @@ void Z3DSwcFilter::registerPickingObjects()
 
     m_coneRenderer.setDataPickingColors(&m_swcPickingColors);
     m_sphereRendererForCone.setDataPickingColors(&m_sphereForConePickingColors);
-    m_lineRenderer.setDataPickingColors(&m_linePickingColors);
+    m_lineRenderer.setDataPickingColors(std::move(m_linePickingColors));
     m_sphereRenderer.setDataPickingColors(&m_pointPickingColors);
   }
 
@@ -417,7 +417,7 @@ void Z3DSwcFilter::prepareData()
   initializeRotationCenter();
 
   m_coneRenderer.setData(&m_baseAndBaseRadius, &m_axisAndTopRadius);
-  m_lineRenderer.setData(&m_lines);
+  m_lineRenderer.setData(std::move(m_lines));
   m_sphereRenderer.setData(&m_pointAndRadius);
   m_sphereRendererForCone.setData(&m_pointAndRadius);
   prepareColor();
@@ -599,7 +599,7 @@ void Z3DSwcFilter::prepareColor()
 #endif
 
   m_coneRenderer.setDataColors(&m_swcColors1, &m_swcColors2);
-  m_lineRenderer.setDataColors(&m_lineColors);
+  m_lineRenderer.setDataColors(std::move(m_lineColors));
   m_sphereRenderer.setDataColors(&m_pointColors);
   m_sphereRendererForCone.setDataColors(&m_pointColors);
 }

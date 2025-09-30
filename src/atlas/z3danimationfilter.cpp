@@ -173,7 +173,7 @@ void Z3DAnimationFilter::prepareData()
 
   deregisterPickingObjects();
 
-  m_lineRenderer.setData(&m_lines);
+  m_lineRenderer.setData(m_lines);
   m_arrowRenderer.setArrowData(&m_tailPosAndTailRadius, &m_headPosAndHeadRadius, .2);
   m_triangleListRenderer.setData(&m_trianglesWrapper);
 
@@ -262,7 +262,7 @@ void Z3DAnimationFilter::prepareColor()
     m_triangles.setColors(colors);
   }
 
-  m_lineRenderer.setDataColors(&m_lineColors);
+  m_lineRenderer.setDataColors(std::move(m_lineColors));
   m_arrowRenderer.setArrowColors(&m_arrowColors);
 }
 

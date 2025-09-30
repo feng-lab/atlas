@@ -1,6 +1,7 @@
 #include "zflyemtodolistfilter.h"
 
 #include <limits>
+#include <utility>
 #include <QMouseEvent>
 #include <QApplication>
 
@@ -502,7 +503,7 @@ void ZFlyEmTodoListFilter::prepareData()
   initializeCutRange();
   initializeRotationCenter();
 
-  m_lineRenderer.setData(&m_lines);
+  m_lineRenderer.setData(std::move(m_lines));
   m_lineRenderer.setLineWidth(3.0);
   m_lineRenderer.setLineWidth(edgeWidth);
   m_sphereRenderer.setData(&m_pointAndRadius);
@@ -576,7 +577,7 @@ void ZFlyEmTodoListFilter::prepareColor()
     m_lineColors.push_back(endColor);
   }
 
-  m_lineRenderer.setDataColors(&m_lineColors);
+  m_lineRenderer.setDataColors(std::move(m_lineColors));
   m_sphereRenderer.setDataColors(&m_pointColors);
 }
 
@@ -669,4 +670,3 @@ void ZFlyEmTodoListFilter::selectObject(QMouseEvent *e, int, int /*h*/)
 
 
 }
-

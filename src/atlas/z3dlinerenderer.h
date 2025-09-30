@@ -2,7 +2,10 @@
 
 #include "z3dprimitiverenderer.h"
 #include "z3dgpuinfo.h"
+#include "z3drendercommands.h"
+#include <span>
 #include <string>
+#include <vector>
 
 namespace nim {
 
@@ -18,7 +21,8 @@ public:
     m_isLineStrip = v;
   }
 
-  virtual void setData(std::vector<glm::vec3>* linesInput);
+  void setData(std::span<const glm::vec3> lines);
+  void setData(std::vector<glm::vec3> lines);
 
   void setLineWidth(const std::vector<float>& lineWidthArray)
   {
@@ -26,12 +30,15 @@ public:
   }
 
   // use vertice color
-  void setDataColors(std::vector<glm::vec4>* lineColorsInput);
+  void setDataColors(std::span<const glm::vec4> lineColorsInput);
+  void setDataColors(std::vector<glm::vec4> lineColorsInput);
 
   // use 1d texture color
   void setTexture(Z3DTexture* tex);
 
-  void setDataPickingColors(std::vector<glm::vec4>* linePickingColorsInput = nullptr);
+  void setDataPickingColors(std::span<const glm::vec4> linePickingColorsInput);
+  void setDataPickingColors(std::vector<glm::vec4> linePickingColorsInput);
+  void clearPickingColors();
 
   // default true since glLineWidth only support 1 pixel width line from now on
   void setUseSmoothLine(bool v)
@@ -64,7 +71,7 @@ protected:
 
   [[nodiscard]] virtual float lineWidth() const;
 
-  virtual std::vector<glm::vec4>* lineColors();
+  std::vector<glm::vec4>& lineColors();
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void renderUsingOpengl() override;
@@ -75,10 +82,14 @@ protected:
 
   void renderPicking(Z3DEye eye) override;
 
+  void executeBatchGL(const RenderBatch& batch);
+
   // void enableLineSmooth();
   // void disableLineSmooth();
 
 private:
+  void renderImmediate(Z3DEye eye);
+
   void updateLineWidth()
   {
     if (m_enableMultisample && m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2) {
@@ -106,9 +117,10 @@ protected:
   Z3DShaderGroup m_smoothLineShaderGrp;
   Z3DShaderGroup m_smoothLineShaderGrp1;
 
-  std::vector<glm::vec3>* m_linesPt;
-  std::vector<glm::vec4>* m_lineColorsPt;
-  std::vector<glm::vec4>* m_linePickingColorsPt;
+  std::vector<glm::vec3> m_linePositions;
+  std::vector<glm::vec4> m_lineColors;
+  std::vector<glm::vec4> m_linePickingColors;
+  bool m_hasExplicitColors;
 
   bool m_useSmoothLine;
   float m_srcLineWidth;
@@ -119,8 +131,6 @@ protected:
   Z3DTexture* m_texture;
 
 private:
-  std::vector<glm::vec4> m_lineColors;
-
   Z3DVertexArrayObject m_VAO;
   Z3DVertexArrayObject m_pickingVAO;
   Z3DVertexBufferObject m_VBOs;
@@ -151,6 +161,15 @@ private:
   std::vector<Z3DVertexBufferObject> m_batchPickingVBOs;
   size_t m_oneBatchNumber;
   bool m_useGeomLineShader;
+
+  [[nodiscard]] LinePayload buildLinePayload(bool picking) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
+
+  void buildWideLineGeometry(std::vector<LineWideVertex>& outVertices, std::vector<uint32_t>& outIndices) const;
+
+  void refreshSmoothLinePayloads();
+  void ensureLineColorStorage();
+  void syncPickingColorCount();
 };
 
 } // namespace nim

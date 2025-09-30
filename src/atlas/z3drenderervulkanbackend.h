@@ -6,13 +6,13 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace nim {
 
 class ZVulkanContext;
 class ZVulkanDevice;
 class ZVulkanSwapChain;
-
 class Z3DRendererVulkanBackend final : public Z3DRendererBackend
 {
 public:
@@ -28,6 +28,15 @@ public:
   void beginRender(Z3DRendererBase& renderer) override;
 
   void endRender(Z3DRendererBase& renderer) override;
+
+  void processBatches(Z3DRendererBase& renderer, const RendererCPUState& state) override;
+
+  [[nodiscard]] bool supportsCommandLists() const override;
+
+  RendererFrameState::ActiveSurface describeSurfaceFromRenderTarget(const Z3DRenderTarget& target) override;
+
+  RendererFrameState::ActiveSurface
+  describeSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease) override;
 
   ZVulkanDevice& device();
 
@@ -47,18 +56,23 @@ public:
   }
 
 private:
+  struct LinePipelineContext;
+
   void ensureDevice();
 
   void ensureSwapChain(uint32_t width, uint32_t height);
+
+  RendererFrameState::ActiveSurface describeSurfaceFromSwapChain();
 
   std::unique_ptr<ZVulkanContext> m_context;
   std::unique_ptr<ZVulkanDevice> m_device;
   std::unique_ptr<ZVulkanSwapChain> m_swapChain;
   std::optional<vk::raii::CommandBuffer> m_activeCommandBuffer;
   glm::uvec2 m_swapChainExtent{0, 0};
+
+  std::unique_ptr<LinePipelineContext> m_lineContext;
 };
 
 std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend();
 
 } // namespace nim
-
