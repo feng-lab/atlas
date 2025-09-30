@@ -210,7 +210,34 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
   if (m_centers.empty()) {
     return;
   }
+
+  if (m_rendererBase.supportsCommandLists()) {
+    appendDefaultColors();
+    RenderBatch batch = buildRenderBatch(eye);
+    if (batch.draw.vertexCount == 0u) {
+      return;
+    }
+    m_rendererBase.appendBatch(std::move(batch));
+    return;
+  }
+
+  renderImmediate(eye, true);
+}
+
+void Z3DEllipsoidRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
+{
+  if (m_centers.empty()) {
+    return;
+  }
   appendDefaultColors();
+
+  RenderBatch batch = buildRenderBatch(eye);
+  if (batch.draw.vertexCount == 0u) {
+    return;
+  }
+  if (appendBatch) {
+    m_rendererBase.appendBatch(std::move(batch));
+  }
 
   m_ellipsoidShaderGrp.bind();
   Z3DShaderProgram& shader = m_ellipsoidShaderGrp.get();
@@ -375,6 +402,11 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
   }
 
   m_ellipsoidShaderGrp.release();
+}
+
+void Z3DEllipsoidRenderer::executeBatchGL(const RenderBatch& batch)
+{
+  renderImmediate(batch.eye, false);
 }
 
 void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
@@ -577,6 +609,49 @@ void Z3DEllipsoidRenderer::appendDefaultColors()
   if (m_useDynamicMaterial && m_specularAndShininess.size() < m_centers.size()) {
     m_specularAndShininess.resize(m_centers.size(), glm::vec4(1.f, 1.f, 1.f, 10.f));
   }
+}
+
+EllipsoidPayload Z3DEllipsoidRenderer::buildEllipsoidPayload() const
+{
+  EllipsoidPayload payload;
+
+  payload.renderer = const_cast<Z3DEllipsoidRenderer*>(this);
+  payload.centers = spanOrEmpty(m_centers);
+  payload.axis1 = spanOrEmpty(m_axis1);
+  payload.axis2 = spanOrEmpty(m_axis2);
+  payload.axis3 = spanOrEmpty(m_axis3);
+  payload.specularAndShininess = spanOrEmpty(m_specularAndShininess);
+  payload.colors = spanOrEmpty(m_ellipsoidColors);
+  payload.pickingColors = spanOrEmpty(m_ellipsoidPickingColors);
+  payload.flags = spanFromGLfloats(m_allFlags);
+  payload.indices = spanFromGLuints(m_indexs);
+  payload.useDynamicMaterial = m_useDynamicMaterial;
+  return payload;
+}
+
+RenderBatch Z3DEllipsoidRenderer::buildRenderBatch(Z3DEye eye) const
+{
+  RenderBatch batch;
+
+  batch.eye = eye;
+
+  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+  batch.pass.viewport.minDepth = 0.f;
+  batch.pass.viewport.maxDepth = 1.f;
+
+  const auto& surface = m_rendererBase.frameState().activeSurface;
+  batch.pass.colorAttachments = surface.colorAttachments;
+  batch.pass.depthAttachment = surface.depthAttachment;
+
+  batch.draw.topology = PrimitiveTopology::TriangleList;
+  batch.draw.vertexCount = static_cast<uint32_t>(m_axis1.size());
+  batch.draw.indexCount = static_cast<uint32_t>(m_indexs.size());
+
+  batch.geometry = buildEllipsoidPayload();
+  return batch;
 }
 
 void Z3DEllipsoidRenderer::setUseDynamicMaterial(bool enabled)

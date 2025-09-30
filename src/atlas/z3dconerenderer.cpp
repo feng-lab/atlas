@@ -318,7 +318,34 @@ void Z3DConeRenderer::render(Z3DEye eye)
   if (m_baseAndBaseRadius.empty()) {
     return;
   }
+
+  if (m_rendererBase.supportsCommandLists()) {
+    appendDefaultColors();
+    RenderBatch batch = buildRenderBatch(eye);
+    if (batch.draw.vertexCount == 0u) {
+      return;
+    }
+    m_rendererBase.appendBatch(std::move(batch));
+    return;
+  }
+
+  renderImmediate(eye, true);
+}
+
+void Z3DConeRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
+{
+  if (m_baseAndBaseRadius.empty()) {
+    return;
+  }
   appendDefaultColors();
+
+  RenderBatch batch = buildRenderBatch(eye);
+  if (batch.draw.vertexCount == 0u) {
+    return;
+  }
+  if (appendBatch) {
+    m_rendererBase.appendBatch(std::move(batch));
+  }
 
   m_coneShaderGrp.bind();
   Z3DShaderProgram& shader = m_coneShaderGrp.get();
@@ -471,6 +498,11 @@ void Z3DConeRenderer::render(Z3DEye eye)
   }
 
   m_coneShaderGrp.release();
+}
+
+void Z3DConeRenderer::executeBatchGL(const RenderBatch& batch)
+{
+  renderImmediate(batch.eye, false);
 }
 
 void Z3DConeRenderer::renderPicking(Z3DEye eye)
@@ -660,6 +692,68 @@ void Z3DConeRenderer::appendDefaultColors()
       }
     }
   }
+}
+
+ConePayload Z3DConeRenderer::buildConePayload() const
+{
+  ConePayload payload;
+
+  payload.renderer = const_cast<Z3DConeRenderer*>(this);
+  payload.baseAndRadius = spanOrEmpty(m_baseAndBaseRadius);
+  payload.axisAndTopRadius = spanOrEmpty(m_axisAndTopRadius);
+  payload.baseColors = spanOrEmpty(m_coneBaseColors);
+  payload.topColors = spanOrEmpty(m_coneTopColors);
+  payload.pickingColors = spanOrEmpty(m_conePickingColors);
+  payload.flags = spanFromGLfloats(m_allFlags);
+  payload.indices = spanFromGLuints(m_indexs);
+
+  switch (m_coneCapStyle) {
+    case ConeCapStyle::FlatCaps:
+      payload.capStyle = ConePayload::CapStyle::FlatCaps;
+      break;
+    case ConeCapStyle::NoCaps:
+      payload.capStyle = ConePayload::CapStyle::NoCaps;
+      break;
+    case ConeCapStyle::RoundCaps:
+      payload.capStyle = ConePayload::CapStyle::RoundCaps;
+      break;
+    case ConeCapStyle::RoundBaseFlatTop:
+      payload.capStyle = ConePayload::CapStyle::RoundBaseFlatTop;
+      break;
+    case ConeCapStyle::FlatBaseRoundTop:
+      payload.capStyle = ConePayload::CapStyle::FlatBaseRoundTop;
+      break;
+  }
+
+  payload.subdivisionAround = m_cylinderSubdivisionAroundZ;
+  payload.subdivisionAlong = m_cylinderSubdivisionAlongZ;
+  payload.sameColorForBaseAndTop = m_sameColorForBaseAndTop;
+  payload.useConeShader2 = m_useConeShader2;
+  return payload;
+}
+
+RenderBatch Z3DConeRenderer::buildRenderBatch(Z3DEye eye) const
+{
+  RenderBatch batch;
+
+  batch.eye = eye;
+
+  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+  batch.pass.viewport.minDepth = 0.f;
+  batch.pass.viewport.maxDepth = 1.f;
+
+  const auto& surface = m_rendererBase.frameState().activeSurface;
+  batch.pass.colorAttachments = surface.colorAttachments;
+  batch.pass.depthAttachment = surface.depthAttachment;
+
+  batch.draw.topology = PrimitiveTopology::TriangleList;
+  batch.draw.vertexCount = static_cast<uint32_t>(m_baseAndBaseRadius.size());
+  batch.draw.indexCount = static_cast<uint32_t>(m_indexs.size());
+  batch.geometry = buildConePayload();
+  return batch;
 }
 
 void Z3DConeRenderer::setConeCapStyle(ConeCapStyle style)

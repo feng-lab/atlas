@@ -26,6 +26,7 @@ These instructions are mandatory for every migration change; do not deviate from
 > - Stress-test every proposed interface and data contract against OpenGL’s state machine model and Vulkan’s explicit synchronization/descriptor requirements to ensure the design is feasible for both backends.
 > - Confirm or adapt the current OpenGL implementation (via shims or refactors) to the new façade so we retain a working reference renderer while we build the Vulkan backend under the same contracts.
 > - Treat the abstraction as the primary product: once it holds up for both APIs, implementing Vulkan becomes a mechanical backend task instead of a redesign.
+> - **Status update (2025-01)**: `z3drendercommands.h` hosts the façade data model (`RendererCPUState`, `RenderBatch`, payload variants) and `Z3DRendererBase` now buffers batches emitted by the line/mesh/ellipsoid/cone renderers. The legacy GL paths still execute; batches are staged for upcoming GL/Vulkan translation work.
 
 ## Parity And Swappable Backend
 
@@ -57,6 +58,7 @@ Abstraction Level Principles
 - Resource pooling operates on plain descriptors describing extent, layer count, formats, and usage (e.g., `ScratchImageRequest`). Backends allocate or reuse API objects behind those descriptors and expose them back through lightweight leases without surfacing raw GL or Vulkan handles to filters.
 - Pipelines are defined once per renderer through backend-neutral descriptions (shaders, vertex layout, fixed-function state). GL backends consume GLSL sources; Vulkan backends load SPIR-V modules and create pipeline layouts. The descriptor-level contract must be expressive enough for Vulkan to optimise without emulating GL.
 - Command submission is driven by a backend-provided context (e.g., `BackendCommandList`). Renderers emit a sequence of commands against the context instead of calling GL directly. GL wraps the existing state changes; Vulkan records to `vk::CommandBuffer`.
+- **In progress**: Renderers currently populate geometry payloads and pass extents only. Pipeline descriptions, resource bindings, and attachment handles still need to be wired before backends can replay the façade.
 - Both backends may evolve to meet performance requirements. GL paths can change internal structures to match the façade; Vulkan is free to leverage dynamic rendering, descriptor indexing, or secondary command buffers so long as the façade contract is honoured.
 
 **Render Target & Scratch Pool Abstraction**
@@ -222,7 +224,9 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
    - Build the Vulkan backend side-by-side, recording identical commands into primary command buffers, handling descriptor set allocation/update, and inserting explicit layout transitions.
 
 3. **Renderer Migration**
-   - Incrementally port renderers (lines → meshes → volumes → compositor) so they emit commands against the backend context instead of invoking GL directly. Each step must preserve behavior under GL and produce first pixels via Vulkan before moving on.
+- Incrementally port renderers (lines → meshes → volumes → compositor) so they emit commands against the backend context instead of invoking GL directly. Each step must preserve behavior under GL and produce first pixels via Vulkan before moving on.
+- **Done (initial scaffolding)**: line, mesh, ellipsoid, and cone renderers now append `RenderBatch` records alongside their existing GL implementations.
+- **Next**: extend remaining renderers (volumes, compositor passes, background) and populate pipeline/resource descriptors so backends can execute batches.
    - While migrating, collapse or replace GL-only helpers (e.g., direct `glBindFramebuffer`) with façade calls, ensuring no API-specific handles leak back to filters.
 
 4. **Scratch Pool and Pass Wiring**
@@ -236,7 +240,16 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
 
 6. **Documentation & Handoff**
    - Update developer documentation alongside code to reflect façade usage patterns, backend command semantics, and resource descriptor expectations.
-   - Track outstanding Vulkan-specific TODOs explicitly when parity features are deferred during migration.
+- Track outstanding Vulkan-specific TODOs explicitly when parity features are deferred during migration.
+- **Active follow-up tasks**
+  - Surface scratch attachments in `RendererFrameState` / compositor so batches include the target handles both backends need.
+  - [x] Implement GL backend processing of recorded batches, verifying parity before enabling Vulkan consumption. (GL path now replays line/mesh/ellipsoid/cone batches via the façade; Vulkan submission remains TODO.)
+  - [ ] Refactor `Z3DLineRenderer` so it owns contiguous payload buffers (positions, colors, widths) and expose helper functions (`buildWideLineVertices`, etc.) that both GL and Vulkan backends can call.
+  - [ ] Teach the Vulkan backend’s line execution path to reuse those helpers, remove `ZVulkanLineRenderer`, and emit draws directly from `RenderBatch::geometry`.
+  - [ ] Extend the same façade-driven execution to mesh/ellipsoid/cone batches (shared helpers for CPU prep, backend-specific buffer upload + pipeline binding).
+  - [ ] Build a façade-to-Vulkan shader/pipeline map: translate `PipelineStateDesc` + `ShaderHandle` into cached `ZVulkanPipeline` objects, plus descriptor bindings for `ResourceBinding` entries.
+  - [ ] Replace persistent compositor FBO usage with backend-neutral surface wrappers or copy-out logic so final frame buffers can move onto leases.
+  - Translate the façade batches in the Vulkan backend once GL parity is confirmed.
 
 ### OpenGL Pipeline Refactor Plan
 

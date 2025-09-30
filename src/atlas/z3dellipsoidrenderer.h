@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include "z3drendercommands.h"
 #include <algorithm>
 #include <string>
 
@@ -50,7 +51,14 @@ protected:
 
   void renderPicking(Z3DEye eye) override;
 
+  void executeBatchGL(const RenderBatch& batch);
+
   void appendDefaultColors();
+
+  [[nodiscard]] EllipsoidPayload buildEllipsoidPayload() const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
+
+  void renderImmediate(Z3DEye eye, bool appendBatch);
 
 protected:
   Z3DShaderGroup m_ellipsoidShaderGrp;

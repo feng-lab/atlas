@@ -22,6 +22,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - Cross threads via `QMetaObject::invokeMethod` (queued connections). Never mutate engine QObjects from the UI thread.
 - When adding or altering Vulkan code, first validate the API-neutral façade per `docs/VULKAN_MIGRATION_PLAN.md`. Do not bypass the façade or duplicate OpenGL state.
 - Update documentation (especially `docs/DEVELOPER_GUIDE.md` and migration docs) in the same change when behavior, architecture, or workflows move.
+- **Never commit unless you have successfully compiled/tested the change or the user explicitly confirms it is safe to skip.** If the user instructs you to commit, freeze the work: make no additional edits or follow-up commits unless the user asks for more changes.
 
 ## Workflow Expectations
 - Coordinate work through GitHub Issues (label P0/P1/P2). Document plan, progress, and hand-off notes in the issue thread.

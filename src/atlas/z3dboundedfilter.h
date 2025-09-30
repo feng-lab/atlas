@@ -8,6 +8,7 @@
 #include "z3darrowrenderer.h"
 #include "z3dglobalparameters.h"
 #include "z3drendererstates.h"
+#include "z3drendertarget.h"
 #include "z3drenderglobalstate.h"
 #include "z3dtransformparameter.h"
 #include "znumericparameter.h"
@@ -75,12 +76,25 @@ public:
   virtual void setViewport(glm::uvec2 viewport)
   {
     m_rendererFrameState.updateViewportData(viewport);
+    if (const auto* activeTarget = Z3DRenderTarget::currentBoundRenderTarget()) {
+      setActiveSurfaceFromRenderTarget(*activeTarget);
+    } else {
+      m_rendererBase.clearPendingActiveSurface();
+    }
   }
 
   virtual void setViewport(glm::uvec4 viewport)
   {
     m_rendererFrameState.updateViewportData(viewport);
+    if (const auto* activeTarget = Z3DRenderTarget::currentBoundRenderTarget()) {
+      setActiveSurfaceFromRenderTarget(*activeTarget);
+    } else {
+      m_rendererBase.clearPendingActiveSurface();
+    }
   }
+
+  void setActiveSurfaceFromRenderTarget(const Z3DRenderTarget& target);
+  void setActiveSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
   Z3DPickingManager& pickingManager()
   {

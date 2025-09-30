@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include "z3drendercommands.h"
 #include "zmesh.h"
 #include <QString>
 #include <string>
@@ -75,12 +76,19 @@ protected:
 
   void renderPicking(Z3DEye eye) override;
 
+  void executeBatchGL(const RenderBatch& batch);
+
 private:
   void prepareMesh();
 
   void prepareMeshColor();
 
   void prepareMeshPickingColor();
+
+  void renderImmediate(Z3DEye eye, bool appendBatch);
+
+  [[nodiscard]] MeshPayload buildMeshPayload() const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
 
 protected:
   Z3DShaderGroup m_meshShaderGrp;

@@ -206,6 +206,93 @@ void Z3DMeshRenderer::prepareMeshPickingColor()
   }
 }
 
+MeshPayload Z3DMeshRenderer::buildMeshPayload() const
+{
+  MeshPayload payload;
+
+  payload.renderer = const_cast<Z3DMeshRenderer*>(this);
+
+  payload.meshes = spanOrEmpty(m_meshPt);
+  payload.meshColors = spanOrEmpty(m_meshColorsPt);
+  payload.meshPickingColors = spanOrEmpty(m_meshPickingColorsPt);
+  payload.texture = m_texture;
+  payload.meshNeedsSplit = m_meshNeedSplit;
+  payload.meshColorReady = m_meshColorReady;
+  payload.meshPickingColorReady = m_meshPickingColorReady;
+
+  switch (m_colorSource) {
+    case MeshColorSource::MeshColor:
+      payload.colorSource = MeshPayload::ColorSource::MeshColor;
+      break;
+    case MeshColorSource::Mesh1DTexture:
+      payload.colorSource = MeshPayload::ColorSource::Mesh1DTexture;
+      break;
+    case MeshColorSource::Mesh2DTexture:
+      payload.colorSource = MeshPayload::ColorSource::Mesh2DTexture;
+      break;
+    case MeshColorSource::Mesh3DTexture:
+      payload.colorSource = MeshPayload::ColorSource::Mesh3DTexture;
+      break;
+    case MeshColorSource::CustomColor:
+      payload.colorSource = MeshPayload::ColorSource::CustomColor;
+      break;
+  }
+
+  switch (m_wireframeModeValue) {
+    case WireframeMode::NoWireframe:
+      payload.wireframeMode = MeshPayload::WireframeMode::NoWireframe;
+      break;
+    case WireframeMode::WithWireframe:
+      payload.wireframeMode = MeshPayload::WireframeMode::WithWireframe;
+      break;
+    case WireframeMode::OnlyWireframe:
+      payload.wireframeMode = MeshPayload::WireframeMode::OnlyWireframe;
+      break;
+  }
+
+  payload.wireframeColor = m_wireframeColorValue;
+
+  return payload;
+}
+
+RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye) const
+{
+  RenderBatch batch;
+
+  batch.eye = eye;
+
+  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+  batch.pass.viewport.minDepth = 0.f;
+  batch.pass.viewport.maxDepth = 1.f;
+
+  const auto& surface = m_rendererBase.frameState().activeSurface;
+  batch.pass.colorAttachments = surface.colorAttachments;
+  batch.pass.depthAttachment = surface.depthAttachment;
+
+  batch.draw.topology = PrimitiveTopology::TriangleList;
+
+  uint32_t vertexCount = 0u;
+  uint32_t indexCount = 0u;
+  if (m_meshPt) {
+    for (const auto* mesh : *m_meshPt) {
+      if (!mesh) {
+        continue;
+      }
+      vertexCount += static_cast<uint32_t>(mesh->numVertices());
+      indexCount += static_cast<uint32_t>(mesh->indices().size());
+    }
+  }
+  batch.draw.vertexCount = vertexCount;
+  batch.draw.indexCount = indexCount;
+
+  batch.geometry = buildMeshPayload();
+
+  return batch;
+}
+
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DMeshRenderer::renderUsingOpengl()
 {
@@ -417,6 +504,24 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     return;
   }
 
+  if (m_rendererBase.supportsCommandLists()) {
+    RenderBatch batch = buildRenderBatch(eye);
+    if (batch.draw.vertexCount == 0u) {
+      return;
+    }
+    m_rendererBase.appendBatch(std::move(batch));
+    return;
+  }
+
+  renderImmediate(eye, true);
+}
+
+void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
+{
+  if (!m_meshPt || m_meshPt->empty()) {
+    return;
+  }
+
   if (m_colorSource == MeshColorSource::CustomColor && !m_meshColorReady) {
     prepareMeshColor();
   }
@@ -446,6 +551,14 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     if (mesh->numNormals() != mesh->numVertices()) {
       mesh->generateNormals();
     }
+  }
+
+  RenderBatch batch = buildRenderBatch(eye);
+  if (batch.draw.vertexCount == 0u) {
+    return;
+  }
+  if (appendBatch) {
+    m_rendererBase.appendBatch(std::move(batch));
   }
 
   const bool drawSurface = m_wireframeModeValue != WireframeMode::OnlyWireframe;
@@ -771,6 +884,11 @@ void Z3DMeshRenderer::render(Z3DEye eye)
   }
 
   m_meshShaderGrp.release();
+}
+
+void Z3DMeshRenderer::executeBatchGL(const RenderBatch& batch)
+{
+  renderImmediate(batch.eye, false);
 }
 
 void Z3DMeshRenderer::renderPicking(Z3DEye eye)

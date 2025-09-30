@@ -1,6 +1,7 @@
 #include "z3dboundedfilter.h"
 #include "z3dgl.h"
 
+#include "z3drendertarget.h"
 #include "z3drenderglobalstate.h"
 #include "zlog.h"
 #include <exception>
@@ -12,6 +13,31 @@
 #include <boost/math/constants/constants.hpp>
 
 namespace nim {
+
+void Z3DBoundedFilter::setActiveSurfaceFromRenderTarget(const Z3DRenderTarget& target)
+{
+  auto surface = m_rendererBase.describeSurface(target);
+  if (surface.colorAttachments.empty() && !surface.depthAttachment) {
+    m_rendererBase.clearPendingActiveSurface();
+  } else {
+    m_rendererBase.setActiveSurfaceForNextPass(std::move(surface));
+  }
+}
+
+void Z3DBoundedFilter::setActiveSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease)
+{
+  if (!lease) {
+    m_rendererBase.clearPendingActiveSurface();
+    return;
+  }
+
+  auto surface = m_rendererBase.describeSurface(lease);
+  if (surface.colorAttachments.empty() && !surface.depthAttachment) {
+    m_rendererBase.clearPendingActiveSurface();
+  } else {
+    m_rendererBase.setActiveSurfaceForNextPass(std::move(surface));
+  }
+}
 
 Z3DBoundedFilter::RendererParameters::RendererParameters()
   : coordTransform("Coord Transform", glm::mat4(1.f))
@@ -919,5 +945,4 @@ void Z3DBoundedFilter::updateSelectedHandle(int handleIdx)
   invalidateResult();
   m_selectedHandle = handleIdx;
 }
-
 } // namespace nim
