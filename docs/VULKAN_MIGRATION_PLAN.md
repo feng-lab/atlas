@@ -27,6 +27,8 @@ These instructions are mandatory for every migration change; do not deviate from
 > - Confirm or adapt the current OpenGL implementation (via shims or refactors) to the new façade so we retain a working reference renderer while we build the Vulkan backend under the same contracts.
 > - Treat the abstraction as the primary product: once it holds up for both APIs, implementing Vulkan becomes a mechanical backend task instead of a redesign.
 > - **Status update (2025-01)**: `z3drendercommands.h` hosts the façade data model (`RendererCPUState`, `RenderBatch`, payload variants) and `Z3DRendererBase` now buffers batches emitted by the line/mesh/ellipsoid/cone renderers. The legacy GL paths still execute; batches are staged for upcoming GL/Vulkan translation work.
+> - **Status update (2025-02)**: `ZVulkanMeshPipelineContext` handles mesh batches via the façade. Mesh payload spans are consumed directly—no extra CPU staging vectors—and per-frame Vulkan buffers are populated from those spans. Pipeline variants are cached by color source, topology, and wireframe mode so we avoid shader churn when filters flip options. Texture sampling currently supports RGBA8 surfaces and is uploaded on-demand from the GL texture when first referenced.
+> - **Status update (2025-03)**: `ZVulkanEllipsoidPipelineContext` consumes ellipsoid batches from `Z3DEllipsoidRenderer`. Façade spans feed transient Vulkan buffers without extra staging, specialization constants gate dynamic-material attributes, and the shared transforms/material UBO now carries projection matrices plus size/ortho scalars so GL and Vulkan agree on footprint.
 
 ## Parity And Swappable Backend
 
@@ -34,21 +36,23 @@ To ensure the Vulkan backend is a drop‑in replacement for the OpenGL engine (f
 
 - Preserve public APIs and parameter semantics of the OpenGL renderers when adding Vulkan counterparts.
 - Provide adapter classes or matching method names on Vulkan renderers so existing UI, frontend, and configuration code do not change.
-- Introduce a backend switch in `Z3DRenderingEngine` that selects OpenGL or Vulkan at runtime, without altering higher‑level code.
+- Expose a backend switch through `Z3DRenderingEngine`, but have the compositor orchestrate the actual swap so filters stay insulated from engine internals.
 
 Implementation approach:
 
 - Renderer API invariants: For each renderer family, define a short list of methods/parameters that must remain identical (names, value ranges, behavior). Vulkan renderers will expose the same signatures where feasible, or thin adapters will translate to Vulkan‑native settings.
 - Parameter bridging: Reuse `Z3DGlobalParameters` as the single source of truth. Vulkan renderers consume the identical state (`camera`, fog, OIT, clip planes, `devicePixelRatio`, etc.) through `Z3DRendererBase` powered by a Vulkan backend implementation (`Z3DRendererVulkanBackend`), keeping GPU-specific code free of duplicate scene copies.
 - Feature matching: When hardware features differ (e.g., wide lines), emulate in shaders/CPU so behavior stays consistent.
+- Mesh parity guardrails: `Z3DMeshRenderer` is the single owner of split meshes and custom color buffers; backend code should never clone vertex data outside the `prepareMesh*` helpers. When adding new mesh features, extend those helpers instead of introducing duplicate CPU storage.
 
 
 Renderer Base Façade (Revised)
 
 - Filters continue to own their renderer members (e.g., `Z3DImgFilter::m_imgRaycasterRenderer`). Those renderers become API-neutral shells that store CPU-side state and interact with a backend driver; filters never touch GL types or Vulkan handles directly.
 - `Z3DRendererBase` acts as the single façade. It holds a `std::unique_ptr<Z3DRendererBackend>` and orchestrates the primitive drivers that issue API calls. Swapping backends means asking the renderer base to tear down its current driver, create a new one for the requested backend, and replay cached CPU state.
+- Persistent scratch leases move under `Z3DRendererBase`. Renderers request leases through the base, which records them and can release every outstanding lease when a backend swap begins, ensuring no GL/Vulkan objects survive the transition.
 - Backend drivers expose narrowly scoped hooks built around *backend command streams* (`beginPass`, `bindPipeline`, `bindResources`, `draw`, `blit`, `readback`). OpenGL implementations translate commands to state-machine calls; Vulkan implementations record the same intent into command buffers, descriptor sets, and explicit barriers.
-- Filters call the same renderer methods as today (`renderOpaque`, `renderTransparent`, `setData`, `setSliceState`, …). Prior to issuing work they call `renderer.ensureBackend(activeBackend)`, letting the renderer base perform backend switches without introducing extra per-filter glue objects.
+- Filters keep calling the same renderer methods (`renderOpaque`, `renderTransparent`, `setData`, `setSliceState`, …). Backend changes are initiated by the compositor and handled inside `Z3DRendererBase`, so filters never need to poke backend-specific toggles.
 - Keep per-renderer CPU state in the shared structs under `z3drendererstates.h`. If a value is not consumed by both backends, store it privately inside `Z3DRendererBase` (e.g., the legacy OpenGL render method toggle) instead of exposing another parameter knob. Trim old fields when they are unused so Vulkan inherits a minimal, well-defined contract.
 - When a façade change lands, implement the GL and Vulkan backends together. Designing with both implementations in hand validates the abstraction level and prevents GL-centric leaks from reappearing.
 
@@ -67,7 +71,7 @@ Abstraction Level Principles
 - Attachment access switches from raw GL enums to small descriptors (`enum class AttachmentRole { Color0, Color1, Depth, Feedback }`). Helpers on the interface expose typed accessors (`colorAttachment(size_t index)`, `depthAttachment()`) returning opaque `RenderAttachmentView` handles that drivers understand.
 - `Z3DScratchResourcePool` keeps the existing `RenderTargetLease` API but stores `std::unique_ptr<Z3DRenderTarget>` in its slots. A new `Z3DScratchResourcePoolBackend` interface creates/resizes targets per backend and maps semantic requests (opaque/transparent/picking). Backends attach their own GPU resources without leaking handles back to filters.
 - Temporary 2D surfaces expose a neutral selector (`TempRenderTargetKind`) so callers can request the default render target or the picking-friendly variant without passing GL enums; each backend maps those kinds to its preferred formats.
-- On backend switch, the engine calls `scratchPool.setBackend(createScratchBackend(targetBackend))`. The pool releases outstanding slots, adopts the new backend, and lazily recreates render targets on the next acquisition.
+- On backend switch, the compositor (after releasing leases through each renderer base) calls `scratchPool.setBackend(createScratchBackend(targetBackend))`. The pool drops outstanding slots, adopts the new backend, and lazily recreates render targets on the next acquisition.
 
 **FilterRenderContext & Utilities**
 
@@ -157,13 +161,13 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
 
 9. **Backend Selection & Persistence**
    - Add `RenderBackend` enum to settings, serialize the chosen backend with docs/views, and surface in preferences/UI.
-   - Provide runtime switch that tears down and recreates the compositor shell while preserving filter/back-end state where possible.
-   - Runtime toggle flow (handled by `Z3DRenderingEngine`):
+  - Provide runtime switch that tears down backend-specific resources while keeping filter state intact and letting renderers repopulate lazily.
+  - Runtime toggle flow (initiated by `Z3DRenderingEngine`, executed inside the compositor):
      1. `Z3DGlobalParameters::renderBackend` emits `valueChanged` when the user flips the UI switch.
-     2. The engine pauses in-flight renders (`Z3DNetworkEvaluator::cancelPending`, compositor filter `abortProgressive()`), captures the active frame context (viewport, progressive counters, scratch leases), and signals the current backend to quiesce via `Z3DCompositorBase::beginBackendSwitch()`.
-     3. The engine instantiates the requested backend through a central factory (`createCompositorBackend(RenderBackend)`), injects shared services (scratch pool, renderer cache, picking manager), reapplies persisted state (camera, invalidation flags, mono/stereo mode), and reconnects filter/back-end signal wiring.
-     4. If backend creation fails, the engine rolls back to the previous backend and surfaces the error; otherwise it calls `Z3DCompositorBase::endBackendSwitch()` and issues an immediate `requestRender()` so the new backend produces the next frame.
-     5. Backend selection is cached in documents/preferences so reopening a project restores the same backend without reconfiguration.
+     2. The engine pauses in-flight renders (`Z3DNetworkEvaluator::cancelPending`, compositor `abortProgressive()`), then calls `Z3DCompositor::switchBackend(targetBackend)`.
+     3. The compositor enumerates the connected geometry and volume filters via `m_gPPort`/`m_vPPort`, asking each filter’s `rendererBase()` to begin a backend switch. `Z3DRendererBase` releases all tracked leases and drops any backend-owned objects.
+     4. Once the release phase completes, each renderer base instantiates the requested backend implementation, marks primitive renderers/shaders dirty, and leaves resource creation to the next frame’s lazy compilation path.
+     5. The compositor resumes the network evaluator, requests a fresh frame, and the new backend rebuilds leases/shaders on demand. Backend selection remains cached in documents/preferences so reopening a project restores the same backend without reconfiguration.
 
 10. **Validation, Tooling, and CI Hooks**
    - Expand the existing Vulkan smoke test to hash staged buffers for representative scenes (background-only, lines, mesh sample).
@@ -232,7 +236,7 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
 4. **Scratch Pool and Pass Wiring**
    - Rebuild scratch-pool consumers (filters, compositor) around the descriptor leases, ensuring per-pass data (extent, layers, usage) flows through the façade. GL keeps using FBOs under the hood; Vulkan tracks images and render areas.
    - Introduce explicit pass descriptors for compositor and image renderers so both backends know which attachments participate and which load/store ops to apply.
-   - Let the rendering engine own backend switching: when `RenderBackend` changes it resets the scratch pool and sets the new default backend before filters reacquire resources.
+  - Route backend switching through the compositor: the engine triggers the swap, the compositor walks connected filters to tell their `Z3DRendererBase` to drop leases, swap backend drivers, and rebuild resources lazily on the next render.
 
 5. **Validation & Tooling**
    - Add dual-backend smoke tests that exercise the new command path and compare GL vs Vulkan readbacks where feasible.
@@ -244,8 +248,8 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
 - **Active follow-up tasks**
   - Surface scratch attachments in `RendererFrameState` / compositor so batches include the target handles both backends need.
   - [x] Implement GL backend processing of recorded batches, verifying parity before enabling Vulkan consumption. (GL path now replays line/mesh/ellipsoid/cone batches via the façade; Vulkan submission remains TODO.)
-  - [ ] Refactor `Z3DLineRenderer` so it owns contiguous payload buffers (positions, colors, widths) and expose helper functions (`buildWideLineVertices`, etc.) that both GL and Vulkan backends can call.
-  - [ ] Teach the Vulkan backend’s line execution path to reuse those helpers, remove `ZVulkanLineRenderer`, and emit draws directly from `RenderBatch::geometry`.
+  - [x] Refactor `Z3DLineRenderer` so it owns contiguous payload buffers (positions, colors, widths) and expose helper functions (`buildWideLineVertices`, etc.) that both GL and Vulkan backends can call.
+  - [x] Teach the Vulkan backend’s line execution path to reuse those helpers, remove `ZVulkanLineRenderer`, and emit draws directly from `RenderBatch::geometry`.
   - [ ] Extend the same façade-driven execution to mesh/ellipsoid/cone batches (shared helpers for CPU prep, backend-specific buffer upload + pipeline binding).
   - [ ] Build a façade-to-Vulkan shader/pipeline map: translate `PipelineStateDesc` + `ShaderHandle` into cached `ZVulkanPipeline` objects, plus descriptor bindings for `ResourceBinding` entries.
   - [ ] Replace persistent compositor FBO usage with backend-neutral surface wrappers or copy-out logic so final frame buffers can move onto leases.
@@ -377,15 +381,17 @@ Abstraction/Reuse tasks
 Now that the compositor uses leases exclusively, we still need to migrate the remaining OpenGL-only routines into backend executors. Planned sequence:
 
 1. **Geometry Pass Extraction**
-   - Define a `CompositorPass` descriptor (surface lease, load/store, depth/blend flags, opaque/transparent filter lists) and refactor `renderGeometries`/`renderTransparentFilter` to emit it instead of performing GL work in place.
-   - Implement a GL helper inside `Z3DRendererGLBackend` that consumes the pass descriptor (binding the FBO, issuing clears, setting blend equations, executing batches). Prototype the matching Vulkan executor using dynamic rendering.
+   - [ ] Define a `CompositorPass` descriptor (surface lease, load/store, depth/blend flags, opaque/transparent filter lists) that mirrors Vulkan dynamic-rendering attachments yet stays API-neutral (surface handles + optional GL/Vulkan hints).
+   - [ ] Refactor `renderGeometries`/`renderTransparentFilter` to emit the descriptor instead of performing GL work in place, preserving existing transparency modes (blend, delayed blend, WA/WB, dual-depth peeling).
+   - [ ] Implement backend executors: GL consumes the descriptor by binding the lease FBO, issuing clears, blending, glow, and OIT resolves; Vulkan maps attachment handles to dynamic `vk::RenderingAttachmentInfo` and issues equivalent draws.
+   - The descriptor schema should expose: target lease metadata, per-attachment load/store policy, MSAA mode, ordered opaque/transparent filter lists (with glow flags), and optional pre-baked image layers (color/depth attachment pairs with backend handles). This keeps compositor logic declarative while letting each backend stage the API-specific commands.
 
 2. **Fullscreen/Image Operations**
    - Extend the descriptor for fullscreen quad stages (shader id, sampled textures, uniforms) and migrate glow, texture copy, handle overlay, and image-layer merge paths into backend-specific helpers.
    - Ensure each pass sets explicit load/store behavior before execution; leases remain ownership/size objects only.
 
 3. **Backend Parity & Validation**
-   - Port WA/WB/dual-depth-peeling finalization to the Vulkan executor and ensure picking/screenshot flows share the same pass machinery.
+   - Port WA/WB/dual-depth-peeling finalization to the Vulkan executor and ensure picking/screenshot flows share the same pass machinery (GL implementation now lives in the backend; Vulkan needs full draw support).
    - Remove the last GL state calls from `z3dcompositor.cpp` and gate any remaining API-specific paths behind backend capabilities.
    - Add regression coverage (geometry-only, geometry+volume, glow, WA/WB/DDP, handle overlays, picking) on both backends before exposing the runtime toggle.
 

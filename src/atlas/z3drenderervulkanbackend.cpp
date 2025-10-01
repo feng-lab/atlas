@@ -2,6 +2,7 @@
 
 #include "z3drendererbase.h"
 #include "z3drendercommands.h"
+#include "z3dcompositorpass.h"
 #include "z3dshaderprogram.h"
 #include "zlog.h"
 #include "zvulkandevice.h"
@@ -291,6 +292,13 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
     cmd.endRendering();
   }
+}
+
+void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, const Z3DCompositorPass& pass)
+{
+  (void)renderer;
+  (void)pass;
+  LOG_FIRST_N(WARNING, 5) << "Vulkan compositor pass execution is not implemented yet.";
 }
 
 bool Z3DRendererVulkanBackend::supportsCommandLists() const

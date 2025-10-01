@@ -4,6 +4,9 @@ layout(set = 2, binding = 0) uniform Transforms {
   mat4 view_matrix;
   mat4 pos_transform;
   mat3 pos_transform_normal_matrix;
+  mat4 projection_matrix;
+  mat4 inverse_projection_matrix;
+  vec4 parameters; // x=sizeScale, y=ortho flag
 } xf;
 
 mat3 compute_view_normal_matrix()

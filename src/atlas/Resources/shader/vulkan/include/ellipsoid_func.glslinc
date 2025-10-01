@@ -1,20 +1,18 @@
 #include "lighting.glslinc"
 
-// Per-fragment push constants
-layout(push_constant) uniform EllipsoidPC {
-  mat4 projection_matrix; // for depth
-  float ortho;
-  vec3 _pad;
-} epcf;
-
 layout(location = 0) in vec4 v_color;
 layout(location = 1) in mat4 v_MT_inverse;
 layout(location = 5) in vec3 v_point;
+layout(location = 6) in vec4 v_material_specular;
+layout(location = 7) in float v_material_shininess;
+
+layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
-  vec3 rayOrigin    = mix(vec3(0.0, 0.0, 0.0), v_point, epcf.ortho);
-  vec3 rayDirection = mix(normalize(v_point), vec3(0.0, 0.0, -1.0), epcf.ortho);
+  float ortho = xf.parameters.y;
+  vec3 rayOrigin    = mix(vec3(0.0, 0.0, 0.0), v_point, ortho);
+  vec3 rayDirection = mix(normalize(v_point), vec3(0.0, 0.0, -1.0), ortho);
 
   vec4 xfpp = v_MT_inverse * vec4(rayOrigin, 1.0);
   vec4 c3   = v_MT_inverse * vec4(rayDirection, 0.0);
@@ -31,7 +29,7 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
 
   vec3 ipoint = dist * rayDirection + rayOrigin;
 
-  vec2 clipZW = ipoint.z * epcf.projection_matrix[2].zw + epcf.projection_matrix[3].zw;
+  vec2 clipZW = ipoint.z * xf.projection_matrix[2].zw + xf.projection_matrix[3].zw;
   float depth = 0.5 + 0.5 * clipZW.x / clipZW.y;
   if (depth <= 0.0 || depth >= 1.0) discard;
   fragDepth = depth;
@@ -39,6 +37,13 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   vec4 normal4 = transpose(v_MT_inverse) * (xfpp + dist * c3);
   vec3 normalDirection = normalize(normal4.xyz);
 
-  fragColor = apply_lighting_and_fog(matu.scene_ambient, matu.material_shininess, matu.material_ambient, matu.material_specular,
+  float shininess = matu.material_shininess;
+  vec4 specular = matu.material_specular;
+  if (USE_DYNAMIC_MATERIAL) {
+    shininess = v_material_shininess;
+    specular = v_material_specular;
+  }
+
+  fragColor = apply_lighting_and_fog(matu.scene_ambient, shininess, matu.material_ambient, specular,
                                      normalDirection, ipoint, v_color, matu.alpha);
 }

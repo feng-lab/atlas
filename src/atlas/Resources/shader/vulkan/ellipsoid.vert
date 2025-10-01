@@ -5,20 +5,18 @@
 layout(location = 0) in mat4 attr_T; // variance matrix (T)
 layout(location = 4) in vec4 attr_color;
 layout(location = 5) in float attr_flags;
+layout(location = 6) in vec4 attr_specular_shininess;
 
 // Varyings
 layout(location = 0) out vec4 v_color;
 layout(location = 1) out mat4 v_MT_inverse;
 layout(location = 5) out vec3 v_point;
+layout(location = 6) out vec4 v_material_specular;
+layout(location = 7) out float v_material_shininess;
 
 #include "include/matrices_material.glslinc"
 
-// Push constants
-layout(push_constant) uniform EllipsoidPCV {
-  mat4 projection_matrix_inverse;
-  float size_scale;
-  vec3 _pad;
-} epcv;
+layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
 #if 1
 mat4 inverse_glsl(const in mat4 m)
@@ -69,9 +67,9 @@ void main()
 {
   // Scale and transform T
   mat4 T;
-  T[0] = attr_T[0] * epcv.size_scale;
-  T[1] = attr_T[1] * epcv.size_scale;
-  T[2] = attr_T[2] * epcv.size_scale;
+  T[0] = attr_T[0] * xf.parameters.x;
+  T[1] = attr_T[1] * xf.parameters.x;
+  T[2] = attr_T[2] * xf.parameters.x;
   T[3] = xf.pos_transform * attr_T[3];
 
   // Determine bounding quad in clip space
@@ -87,10 +85,16 @@ void main()
 
   v_MT_inverse = inverse_glsl(xf.view_matrix * T);
   v_color = attr_color;
+  if (USE_DYNAMIC_MATERIAL) {
+    v_material_specular = vec4(attr_specular_shininess.xyz, 1.0);
+    v_material_shininess = attr_specular_shininess.w;
+  } else {
+    v_material_specular = vec4(0.0);
+    v_material_shininess = 0.0;
+  }
 
   vec4 vertex_clipspace = vec4(x, y, 0.0, 1.0);
-  vec4 eyeSpacePos = epcv.projection_matrix_inverse * vertex_clipspace;
+  vec4 eyeSpacePos = xf.inverse_projection_matrix * vertex_clipspace;
   v_point = eyeSpacePos.xyz / eyeSpacePos.w;
   gl_Position = vertex_clipspace;
 }
-

@@ -5,6 +5,8 @@
 #include "z3drendererbackend.h"
 #include "z3dscratchresourcepool.h"
 #include "z3dcamera.h"
+#include "z3drenderglobalstate.h"
+#include "z3dcompositorpass.h"
 #include "zlog.h"
 #include <algorithm>
 #include <utility>
@@ -66,6 +68,122 @@ void Z3DRendererBase::submitBatches()
 {
   backend().processBatches(*this, m_cpuState);
   m_cpuState.batches.clear();
+}
+
+Z3DRendererBase::~Z3DRendererBase()
+{
+  releasePersistentLeases();
+}
+
+void Z3DRendererBase::releasePersistentLeases()
+{
+  for (auto* lease : m_persistentLeases) {
+    if (lease != nullptr) {
+      lease->release();
+    }
+  }
+}
+
+void Z3DRendererBase::registerPersistentLease(Z3DScratchResourcePool::RenderTargetLease& lease)
+{
+  auto* ptr = &lease;
+  if (std::find(m_persistentLeases.begin(), m_persistentLeases.end(), ptr) == m_persistentLeases.end()) {
+    m_persistentLeases.push_back(ptr);
+  }
+}
+
+Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentTempRenderTarget2D(
+  Z3DScratchResourcePool::RenderTargetLease& lease,
+  const glm::uvec2& size,
+  ScratchFormat colorFormat,
+  ScratchFormat depthFormat)
+{
+  registerPersistentLease(lease);
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  lease = pool.acquireTempRenderTarget2D(size, colorFormat, depthFormat);
+  return lease;
+}
+
+Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentDualDepthPeelRenderTarget(
+  Z3DScratchResourcePool::RenderTargetLease& lease,
+  const glm::uvec2& size)
+{
+  registerPersistentLease(lease);
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  lease = pool.acquireDualDepthPeelRenderTarget(size);
+  return lease;
+}
+
+Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentWeightedAverageRenderTarget(
+  Z3DScratchResourcePool::RenderTargetLease& lease,
+  const glm::uvec2& size)
+{
+  registerPersistentLease(lease);
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  lease = pool.acquireWeightedAverageRenderTarget(size);
+  return lease;
+}
+
+Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentWeightedBlendedRenderTarget(
+  Z3DScratchResourcePool::RenderTargetLease& lease,
+  const glm::uvec2& size)
+{
+  registerPersistentLease(lease);
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  lease = pool.acquireWeightedBlendedRenderTarget(size);
+  return lease;
+}
+
+Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentRaycastAccumulatorRenderTarget(
+  Z3DScratchResourcePool::RenderTargetLease& lease,
+  const glm::uvec2& size)
+{
+  registerPersistentLease(lease);
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  lease = pool.acquireRaycastAccumulatorRenderTarget(size);
+  return lease;
+}
+
+Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentLayerArrayRenderTarget(
+  Z3DScratchResourcePool::RenderTargetLease& lease,
+  const glm::uvec2& size,
+  uint32_t layers,
+  ScratchFormat colorFormat,
+  ScratchFormat depthFormat)
+{
+  registerPersistentLease(lease);
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  lease = pool.acquireLayerArrayRenderTarget(size, layers, colorFormat, depthFormat);
+  return lease;
+}
+
+Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentEntryExitRenderTarget(
+  Z3DScratchResourcePool::RenderTargetLease& lease,
+  const glm::uvec2& size,
+  uint32_t layers,
+  ScratchFormat colorFormat)
+{
+  registerPersistentLease(lease);
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  lease = pool.acquireEntryExitRenderTarget(size, layers, colorFormat);
+  return lease;
+}
+
+Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentBlockIdRenderTarget(
+  Z3DScratchResourcePool::RenderTargetLease& lease,
+  const glm::uvec2& viewport,
+  int requestedAttachments,
+  double scale)
+{
+  registerPersistentLease(lease);
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  lease = pool.acquireBlockIdRenderTarget(viewport, requestedAttachments, scale);
+  return lease;
+}
+
+void Z3DRendererBase::executeCompositorPass(const Z3DCompositorPass& pass)
+{
+  backend().processCompositorPass(*this, pass);
 }
 
 void Z3DRendererBase::setActiveSurfaceForNextPass(const RendererFrameState::ActiveSurface& surface)

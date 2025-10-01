@@ -29,6 +29,13 @@ public:
 
   void setDescriptorSetLayouts(const std::vector<vk::DescriptorSetLayout>& layouts);
   void setPushConstantRanges(const std::vector<vk::PushConstantRange>& pushConstantRanges);
+  void setPolygonMode(vk::PolygonMode mode);
+  void setCullMode(vk::CullModeFlags mode);
+  void setFrontFace(vk::FrontFace frontFace);
+  void setDepthBias(bool enable, float constantFactor, float slopeFactor);
+  void setLineWidth(float width);
+  void setDepthWriteEnable(bool enable);
+  void setColorBlendAttachment(const vk::PipelineColorBlendAttachmentState& attachment);
   void create();
 
 private:
@@ -39,6 +46,25 @@ private:
 
   std::vector<vk::DescriptorSetLayout> m_descriptorSetLayouts;
   std::vector<vk::PushConstantRange> m_pushConstantRanges;
+
+  vk::PolygonMode m_polygonMode = vk::PolygonMode::eFill;
+  vk::CullModeFlags m_cullMode = vk::CullModeFlagBits::eBack;
+  vk::FrontFace m_frontFace = vk::FrontFace::eCounterClockwise;
+  bool m_depthBiasEnable = false;
+  float m_depthBiasConstant = 0.0f;
+  float m_depthBiasSlope = 0.0f;
+  float m_lineWidth = 1.0f;
+  bool m_depthWriteEnable = true;
+  vk::PipelineColorBlendAttachmentState m_colorBlendAttachment{
+    .blendEnable = VK_TRUE,
+    .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+    .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+    .colorBlendOp = vk::BlendOp::eAdd,
+    .srcAlphaBlendFactor = vk::BlendFactor::eOne,
+    .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+    .alphaBlendOp = vk::BlendOp::eAdd,
+    .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
 
   std::optional<vk::raii::PipelineLayout> m_pipelineLayout;
   std::optional<vk::raii::Pipeline> m_pipeline;

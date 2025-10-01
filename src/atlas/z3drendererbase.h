@@ -27,6 +27,10 @@ class Z3DCamera;
 
 class Z3DScratchResourcePool;
 
+enum class ScratchFormat;
+
+struct Z3DCompositorPass;
+
 namespace detail {
 
 template<typename T>
@@ -108,6 +112,53 @@ public:
   [[nodiscard]] RendererCPUState& cpuState();
 
   void submitBatches();
+
+  virtual ~Z3DRendererBase();
+
+  void releasePersistentLeases();
+
+  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentTempRenderTarget2D(
+    Z3DScratchResourcePool::RenderTargetLease& lease,
+    const glm::uvec2& size,
+    ScratchFormat colorFormat = ScratchFormat::RGBA16,
+    ScratchFormat depthFormat = ScratchFormat::Depth24);
+
+  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentDualDepthPeelRenderTarget(
+    Z3DScratchResourcePool::RenderTargetLease& lease,
+    const glm::uvec2& size);
+
+  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentWeightedAverageRenderTarget(
+    Z3DScratchResourcePool::RenderTargetLease& lease,
+    const glm::uvec2& size);
+
+  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentWeightedBlendedRenderTarget(
+    Z3DScratchResourcePool::RenderTargetLease& lease,
+    const glm::uvec2& size);
+
+  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentRaycastAccumulatorRenderTarget(
+    Z3DScratchResourcePool::RenderTargetLease& lease,
+    const glm::uvec2& size);
+
+  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentLayerArrayRenderTarget(
+    Z3DScratchResourcePool::RenderTargetLease& lease,
+    const glm::uvec2& size,
+    uint32_t layers,
+    ScratchFormat colorFormat = ScratchFormat::RGBA16,
+    ScratchFormat depthFormat = ScratchFormat::Depth24);
+
+  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentEntryExitRenderTarget(
+    Z3DScratchResourcePool::RenderTargetLease& lease,
+    const glm::uvec2& size,
+    uint32_t layers = 2,
+    ScratchFormat colorFormat = ScratchFormat::RGBA32F);
+
+  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentBlockIdRenderTarget(
+    Z3DScratchResourcePool::RenderTargetLease& lease,
+    const glm::uvec2& viewport,
+    int requestedAttachments = -1,
+    double scale = -1.0);
+
+  void executeCompositorPass(const Z3DCompositorPass& pass);
 
   void setActiveSurfaceForNextPass(const RendererFrameState::ActiveSurface& surface);
   void setActiveSurfaceForNextPass(RendererFrameState::ActiveSurface&& surface);
@@ -290,6 +341,8 @@ private:
   void invalidatePickingDisplayList();
 #endif
 
+  void registerPersistentLease(Z3DScratchResourcePool::RenderTargetLease& lease);
+
 protected:
   RendererParameterState& m_parameters;
   RendererFrameState& m_frameState;
@@ -313,6 +366,8 @@ private:
   std::set<Z3DPrimitiveRenderer*>::iterator m_renderersIt;
   std::unique_ptr<Z3DRendererBackend> m_backend;
   RenderMethod m_renderMethod;
+
+  std::vector<Z3DScratchResourcePool::RenderTargetLease*> m_persistentLeases;
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   struct LegacyGLState;

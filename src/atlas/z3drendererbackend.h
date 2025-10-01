@@ -4,6 +4,7 @@
 #include "z3drendercommands.h"
 #include "z3drendererstates.h"
 #include "z3dscratchresourcepool.h"
+#include "z3dcompositorpass.h"
 
 #include <memory>
 #include <string>
@@ -34,6 +35,9 @@ public:
   // backends that support the command list façade can override this to
   // translate and execute the batches. Legacy backends can ignore it.
   virtual void processBatches(Z3DRendererBase& /*renderer*/, const RendererCPUState& /*state*/)
+  {}
+
+  virtual void processCompositorPass(Z3DRendererBase& /*renderer*/, const Z3DCompositorPass& /*pass*/)
   {}
 
   [[nodiscard]] virtual bool supportsCommandLists() const

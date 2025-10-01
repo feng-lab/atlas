@@ -32,6 +32,8 @@ public:
 
   void processBatches(Z3DRendererBase& renderer, const RendererCPUState& state) override;
 
+  void processCompositorPass(Z3DRendererBase& renderer, const Z3DCompositorPass& pass) override;
+
   [[nodiscard]] bool supportsCommandLists() const override;
 
   RendererFrameState::ActiveSurface

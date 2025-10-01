@@ -12,6 +12,7 @@
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
+#include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
 #include "z3dlinerenderer.h"
 
@@ -24,38 +25,6 @@
 
 namespace nim {
 namespace {
-
-struct LightingUBOStd140 {
-  alignas(4) int lighting_enabled = 0;
-  alignas(4) int numLights = 0;
-  alignas(8) glm::vec2 _pad0{0.0f};
-  alignas(16) glm::vec3 fog_color_top{0.0f};
-  alignas(4) float fog_end = 0.0f;
-  alignas(16) glm::vec3 fog_color_bottom{0.0f};
-  alignas(4) float fog_scale = 0.0f;
-  alignas(8) float fog_density_log2e = 0.0f;
-  alignas(8) float fog_density_density_log2e = 0.0f;
-  alignas(8) glm::vec2 screen_dim_RCP{0.0f};
-  alignas(8) glm::vec2 _pad1{0.0f};
-};
-
-struct TransformsUBOStd140 {
-  glm::mat4 projection_view_matrix{1.0f};
-  glm::mat4 view_matrix{1.0f};
-  glm::mat4 pos_transform{1.0f};
-  glm::mat4 pos_transform_normal_matrix{1.0f};
-};
-
-struct MaterialUBOStd140 {
-  glm::vec4 scene_ambient{0.0f};
-  glm::vec4 material_ambient{1.0f};
-  glm::vec4 material_specular{0.0f};
-  float material_shininess = 32.0f;
-  float alpha = 1.0f;
-  int use_custom_color = 0;
-  float _pad0 = 0.0f;
-  glm::vec4 custom_color{1.0f};
-};
 
 vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
 {
@@ -110,6 +79,11 @@ vk::PipelineVertexInputStateCreateInfo makeThinVertexInput()
 float resolveWideLineWidth(float srcWidth)
 {
   return std::max(1.f, srcWidth) - 0.9f;
+}
+
+std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
+{
+  return {glm::vec4(matrix[0], 0.0f), glm::vec4(matrix[1], 0.0f), glm::vec4(matrix[2], 0.0f)};
 }
 
 } // namespace
@@ -270,20 +244,24 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer, const Ren
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   transforms.view_matrix = eyeState.viewMatrix;
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
-  const glm::mat4& coordTransform = renderer.parameterState().coordTransform;
+  const auto& params = renderer.parameterState();
+  const glm::mat4& coordTransform = params.coordTransform;
   transforms.pos_transform = coordTransform;
 
   // Line shaders do not consume the normal matrix; keep it as identity to
   // avoid redundant inverse/transpose work.
-  transforms.pos_transform_normal_matrix = glm::mat4(1.0f);
+  transforms.pos_transform_normal_matrix = encodeMat3ToStd140(glm::mat3(1.0f));
+  transforms.projection_matrix = eyeState.projectionMatrix;
+  transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
+  transforms.parameters = glm::vec4(params.sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
   m_uboTransforms->copyData(&transforms, sizeof(transforms));
 
   MaterialUBOStd140 material{};
   material.scene_ambient = sceneState.sceneAmbient;
-  material.material_ambient = renderer.parameterState().materialAmbient;
-  material.material_specular = renderer.parameterState().materialSpecular;
-  material.material_shininess = renderer.parameterState().materialShininess;
-  material.alpha = renderer.parameterState().opacity;
+  material.material_ambient = params.materialAmbient;
+  material.material_specular = params.materialSpecular;
+  material.material_shininess = params.materialShininess;
+  material.alpha = params.opacity;
   m_uboMaterial->copyData(&material, sizeof(material));
 }
 

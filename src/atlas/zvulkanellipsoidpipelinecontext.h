@@ -1,0 +1,109 @@
+#pragma once
+
+#include "z3drendercommands.h"
+#include "z3drendererstates.h"
+#include "zvulkan.h"
+
+#include <map>
+#include <memory>
+#include <optional>
+#include <tuple>
+#include <vector>
+
+namespace nim {
+
+class Z3DRendererBase;
+class Z3DRendererVulkanBackend;
+class ZVulkanShader;
+class ZVulkanPipeline;
+class ZVulkanDescriptorPool;
+class ZVulkanDescriptorSet;
+class ZVulkanBuffer;
+
+class ZVulkanEllipsoidPipelineContext
+{
+public:
+  explicit ZVulkanEllipsoidPipelineContext(Z3DRendererVulkanBackend& backend);
+  ~ZVulkanEllipsoidPipelineContext();
+
+  void resetFrame();
+
+  void record(Z3DRendererBase& renderer,
+              const RenderBatch& batch,
+              const EllipsoidPayload& payload,
+              const vk::Viewport& viewport,
+              const vk::Rect2D& scissor,
+              vk::raii::CommandBuffer& cmd);
+
+private:
+  struct EllipsoidVertex
+  {
+    glm::vec4 axis1{0.0f};
+    glm::vec4 axis2{0.0f};
+    glm::vec4 axis3{0.0f};
+    glm::vec4 center{0.0f};
+    glm::vec4 color{0.0f};
+    float flags = 0.0f;
+    float pad0 = 0.0f;
+    float pad1 = 0.0f;
+    float pad2 = 0.0f;
+    glm::vec4 specularShininess{0.0f};
+  };
+
+  struct PipelineKey
+  {
+    bool dynamicMaterial = false;
+    FogMode fogMode = FogMode::None;
+
+    auto tie() const
+    {
+      return std::tuple(dynamicMaterial, static_cast<int>(fogMode));
+    }
+
+    bool operator<(const PipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+
+  struct PipelineInstance
+  {
+    std::unique_ptr<ZVulkanShader> shader;
+    std::unique_ptr<ZVulkanPipeline> pipeline;
+  };
+
+  Z3DRendererVulkanBackend& m_backend;
+
+  std::map<PipelineKey, PipelineInstance> m_pipelineCache;
+
+  std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder;
+  std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
+  std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
+  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
+  std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
+  std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
+
+  std::unique_ptr<ZVulkanBuffer> m_uboLighting;
+  std::unique_ptr<ZVulkanBuffer> m_uboTransforms;
+  std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
+
+  std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
+  std::unique_ptr<ZVulkanBuffer> m_indexBuffer;
+  size_t m_vertexCapacity = 0;
+  size_t m_indexCapacity = 0;
+  size_t m_vertexCount = 0;
+  size_t m_indexCount = 0;
+
+  void ensureDescriptorLayouts();
+  void ensureDescriptorSets();
+  void updateLightingUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const EllipsoidPayload& payload);
+  void updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const EllipsoidPayload& payload);
+  PipelineInstance& ensurePipeline(const PipelineKey& key);
+  vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
+
+  void ensureVertexCapacity(size_t vertexCount);
+  void ensureIndexCapacity(size_t indexCount);
+  void uploadGeometry(const EllipsoidPayload& payload);
+};
+
+} // namespace nim

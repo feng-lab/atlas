@@ -78,6 +78,30 @@ LayoutState layoutStateFor(vk::ImageLayout layout)
 // ----- CreateInfo helpers ---------------------------------------------------------------------
 
 ZVulkanTexture::CreateInfo
+ZVulkanTexture::CreateInfo::make1D(uint32_t width,
+                                   vk::Format format,
+                                   vk::ImageUsageFlags usage,
+                                   vk::MemoryPropertyFlags memoryProperties,
+                                   uint32_t mipLevels,
+                                   bool createSampler,
+                                   vk::ImageLayout descriptorLayout)
+{
+  CreateInfo info;
+  info.imageType = vk::ImageType::e1D;
+  info.viewType = vk::ImageViewType::e1D;
+  info.extent = vk::Extent3D{width, 1u, 1u};
+  info.format = format;
+  info.mipLevels = std::max(1u, mipLevels);
+  info.arrayLayers = 1u;
+  info.usage = usage;
+  info.memoryProperties = memoryProperties;
+  info.aspectMask = defaultAspectMask(format);
+  info.createDefaultSampler = createSampler;
+  info.descriptorLayout = descriptorLayout;
+  return info;
+}
+
+ZVulkanTexture::CreateInfo
 ZVulkanTexture::CreateInfo::make2D(uint32_t width,
                                    uint32_t height,
                                    vk::Format format,

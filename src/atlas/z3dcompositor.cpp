@@ -9,6 +9,7 @@
 #include "z3dscratchresourcepool.h"
 #include "zlog.h"
 #include <algorithm>
+#include <unordered_set>
 
 namespace nim {
 
@@ -92,13 +93,7 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_screenQuadVAO(1)
   , m_region(0, 1, 0, 1)
 {
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
-  const glm::uvec2 initialOutputSize(32u, 32u);
-
-  m_outRenderTarget1 = scratchPool.acquireTempRenderTarget2D(initialOutputSize);
-  m_outRenderTarget2 = scratchPool.acquireTempRenderTarget2D(initialOutputSize);
-  m_leftEyeOutRenderTarget1 = scratchPool.acquireTempRenderTarget2D(initialOutputSize);
-  m_leftEyeOutRenderTarget2 = scratchPool.acquireTempRenderTarget2D(initialOutputSize);
+  ensureOutputTargets(m_outputSize);
 
   m_monoCurrentTarget = &m_outRenderTarget1;
   m_monoReadyTarget = &m_outRenderTarget2;
@@ -350,20 +345,15 @@ void Z3DCompositor::setRenderingRegion(double left, double right, double bottom,
 
 void Z3DCompositor::setOutputSize(const glm::uvec2& size)
 {
-  if (size == m_monoCurrentTarget->renderTarget->size()) {
+  if (size == m_outputSize) {
     return;
   }
 
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
-  auto reacquire = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
-    lease.release();
-    lease = scratchPool.acquireTempRenderTarget2D(size);
-  };
+  CHECK_GT(size.x, 0u);
+  CHECK_GT(size.y, 0u);
 
-  reacquire(m_outRenderTarget1);
-  reacquire(m_outRenderTarget2);
-  reacquire(m_leftEyeOutRenderTarget1);
-  reacquire(m_leftEyeOutRenderTarget2);
+  m_outputSize = size;
+  ensureOutputTargets(m_outputSize);
 
   if (size != m_vPPort.expectedSize()) {
     m_vPPort.setExpectedSize(size);
@@ -374,7 +364,7 @@ void Z3DCompositor::setOutputSize(const glm::uvec2& size)
 
 glm::uvec2 Z3DCompositor::outputSize() const
 {
-  return m_outRenderTarget1.renderTarget->size();
+  return m_outputSize;
 }
 
 void Z3DCompositor::invalidate(State inv)
@@ -1014,10 +1004,118 @@ void Z3DCompositor::updateSize()
   invalidate(State::AllResultInvalid);
 }
 
+void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
+{
+  auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
+    if (!lease.renderTarget || lease.renderTarget->size() != size) {
+      lease.release();
+      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, size);
+    }
+  };
+
+  ensureLease(m_outRenderTarget1);
+  ensureLease(m_outRenderTarget2);
+  ensureLease(m_leftEyeOutRenderTarget1);
+  ensureLease(m_leftEyeOutRenderTarget2);
+}
+
+void Z3DCompositor::switchBackend(RenderBackend backendRequest)
+{
+  Z3DBoundedFilter::switchRendererBackend(backendRequest);
+
+  std::unordered_set<Z3DBoundedFilter*> seen;
+  auto registerFilter = [&](Z3DBoundedFilter* filter) {
+    if (filter && seen.insert(filter).second) {
+      filter->switchRendererBackend(backendRequest);
+    }
+  };
+
+  for (auto* filter : m_gPPort.connectedFilters()) {
+    registerFilter(filter);
+  }
+  for (auto* filter : m_vPPort.connectedFilters()) {
+    registerFilter(filter);
+  }
+
+  ensureOutputTargets(m_outputSize);
+}
+
+bool Z3DCompositor::tryRenderGeometriesPass(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
+                                            const std::vector<Z3DBoundedFilter*>& transparentFilters,
+                                            Z3DScratchResourcePool::RenderTargetLease& targetLease,
+                                            Z3DEye eye)
+{
+  const auto transparencyMode = static_cast<TransparencyMode>(m_globalParameters.transparencyMethod.associatedData());
+  if (transparencyMode != TransparencyMode::BlendNoDepthMask && transparencyMode != TransparencyMode::BlendDelayed) {
+    return false;
+  }
+
+  for (auto* filter : transparentFilters) {
+    if (!filter) {
+      continue;
+    }
+    if (auto* glowParam = filter->parameter("Glow")) {
+      if (auto* glowBool = dynamic_cast<ZBoolParameter*>(glowParam); glowBool && glowBool->get()) {
+        return false;
+      }
+    }
+  }
+
+  const auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
+  if (!nonOpaqueLayers.empty()) {
+    return false;
+  }
+
+  Z3DCompositorPass pass;
+  pass.targetLease = &targetLease;
+  pass.surface = m_rendererBase.describeSurface(targetLease);
+  if (pass.surface.colorAttachments.empty() && !pass.surface.depthAttachment) {
+    return false;
+  }
+
+  pass.eye = eye;
+  pass.transparency = transparencyMode;
+  pass.msaaMode =
+    static_cast<GeometryMSAAMode>(m_globalParameters.geometriesMultisampleMode.associatedData());
+
+  pass.clearColor = true;
+  pass.clearDepth = true;
+  pass.clearStencil = false;
+  pass.clearValue.color = glm::vec4(0.f);
+  pass.clearValue.depth = 1.f;
+  pass.clearValue.stencil = 0u;
+
+  pass.opaqueFilters.assign(opaqueFilters.begin(), opaqueFilters.end());
+  pass.transparentFilters.reserve(transparentFilters.size());
+  for (auto* filter : transparentFilters) {
+    Z3DCompositorTransparentBatch batch;
+    batch.filter = filter;
+    batch.glowEnabled = false;
+    pass.transparentFilters.push_back(batch);
+  }
+
+  pass.imageLayers.clear();
+
+  m_rendererBase.executeCompositorPass(pass);
+  return true;
+}
+
 void Z3DCompositor::renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                      const std::vector<Z3DBoundedFilter*>& transparentFilters,
                                      Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                      Z3DEye eye)
+{
+  if (tryRenderGeometriesPass(opaqueFilters, transparentFilters, targetLease, eye)) {
+    return;
+  }
+
+  renderGeometriesLegacy(opaqueFilters, transparentFilters, targetLease, eye);
+}
+
+void Z3DCompositor::renderGeometriesLegacy(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
+                                           const std::vector<Z3DBoundedFilter*>& transparentFilters,
+                                           Z3DScratchResourcePool::RenderTargetLease& targetLease,
+                                           Z3DEye eye)
 {
   const auto transparencyMode = static_cast<TransparencyMode>(m_globalParameters.transparencyMethod.associatedData());
   if (transparencyMode == TransparencyMode::BlendNoDepthMask) {
@@ -1750,10 +1848,10 @@ void Z3DCompositor::ensurePickingTarget(const glm::uvec2& size)
   }
   if (!m_pickingTargetLease.renderTarget || m_pickingTargetLease.renderTarget->size() != size) {
     m_pickingTargetLease.release();
-    m_pickingTargetLease =
-      Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(size,
-                                                                               ScratchFormat::RGBA8,
-                                                                               ScratchFormat::Depth24);
+    m_rendererBase.acquirePersistentTempRenderTarget2D(m_pickingTargetLease,
+                                                       size,
+                                                       ScratchFormat::RGBA8,
+                                                       ScratchFormat::Depth24);
   }
 
   CHECK(m_pickingTargetLease.renderTarget != nullptr);
@@ -1766,7 +1864,7 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DCompositor::ensureDDPRenderTarget(
   CHECK_GT(size.y, 0u);
   if (!m_ddpRTLease.renderTarget || m_ddpRTLease.renderTarget->size() != size) {
     m_ddpRTLease.release();
-    m_ddpRTLease = Z3DRenderGlobalState::instance().scratchPool().acquireDualDepthPeelRenderTarget(size);
+    m_rendererBase.acquirePersistentDualDepthPeelRenderTarget(m_ddpRTLease, size);
   }
   CHECK(m_ddpRTLease.renderTarget != nullptr);
   return m_ddpRTLease;
@@ -1778,7 +1876,7 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DCompositor::ensureWARenderTarget(c
   CHECK_GT(size.y, 0u);
   if (!m_waRTLease.renderTarget || m_waRTLease.renderTarget->size() != size) {
     m_waRTLease.release();
-    m_waRTLease = Z3DRenderGlobalState::instance().scratchPool().acquireWeightedAverageRenderTarget(size);
+    m_rendererBase.acquirePersistentWeightedAverageRenderTarget(m_waRTLease, size);
   }
   CHECK(m_waRTLease.renderTarget != nullptr);
   return m_waRTLease;
@@ -1790,7 +1888,7 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DCompositor::ensureWBRenderTarget(c
   CHECK_GT(size.y, 0u);
   if (!m_wbRTLease.renderTarget || m_wbRTLease.renderTarget->size() != size) {
     m_wbRTLease.release();
-    m_wbRTLease = Z3DRenderGlobalState::instance().scratchPool().acquireWeightedBlendedRenderTarget(size);
+    m_rendererBase.acquirePersistentWeightedBlendedRenderTarget(m_wbRTLease, size);
   }
   CHECK(m_wbRTLease.renderTarget != nullptr);
   return m_wbRTLease;

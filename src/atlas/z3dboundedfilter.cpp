@@ -1,14 +1,14 @@
 #include "z3dboundedfilter.h"
 #include "z3dgl.h"
 #include "z3drenderglobalstate.h"
+#include "zexception.h"
 #include "zlog.h"
-#include <exception>
 #include <algorithm>
-#include <utility>
-#include <vector>
 #include <folly/ScopeGuard.h>
 #include <Mathematics/DistLineRay.h>
 #include <boost/math/constants/constants.hpp>
+#include <utility>
+#include <vector>
 
 namespace nim {
 
@@ -140,12 +140,6 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   addParameter(m_rendererParameters.materialAmbient);
   addParameter(m_rendererParameters.materialSpecular);
   addParameter(m_rendererParameters.materialShininess);
-
-  connect(&m_globalParameters.renderBackend, &ZParameter::valueChanged, this, [this]() {
-    refreshRendererBackend();
-  });
-
-  refreshRendererBackend();
 
   onBoundBoxModeChanged();
 
@@ -527,18 +521,10 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye, BoundBoxRenderStyle style)
   }
 }
 
-void Z3DBoundedFilter::refreshRendererBackend()
+void Z3DBoundedFilter::switchRendererBackend(RenderBackend backendRequest)
 {
-  const auto selectedBackend = static_cast<RenderBackend>(m_globalParameters.renderBackend.associatedData());
-  if (m_rendererBackendInitialized && selectedBackend == m_requestedBackend && selectedBackend == m_activeBackend) {
-    return;
-  }
-
-  m_requestedBackend = selectedBackend;
-
   std::unique_ptr<Z3DRendererBackend> backend;
-  auto backendUsed = selectedBackend;
-  switch (selectedBackend) {
+  switch (backendRequest) {
     case RenderBackend::OpenGL:
       backend = createGLRendererBackend();
       break;
@@ -546,25 +532,20 @@ void Z3DBoundedFilter::refreshRendererBackend()
       try {
         backend = createVulkanRendererBackend();
       }
+      catch (const ZException&) {
+        throw;
+      }
       catch (const std::exception& e) {
-        LOG(ERROR) << "Failed to create Vulkan renderer backend: " << e.what();
+        throw ZException(fmt::format("Failed to create Vulkan renderer backend: {}", e.what()));
       }
       if (!backend) {
-        LOG(ERROR) << "Falling back to OpenGL renderer backend";
-        backend = createGLRendererBackend();
-        backendUsed = RenderBackend::OpenGL;
+        throw ZException("Failed to create Vulkan renderer backend");
       }
       break;
   }
 
-  CHECK(backend != nullptr) << "Failed to create renderer backend";
+  m_rendererBase.releasePersistentLeases();
   m_rendererBase.setBackend(std::move(backend));
-  m_activeBackend = backendUsed;
-  m_rendererBackendInitialized = true;
-  onRendererBackendChanged(m_activeBackend);
-
-  pushRendererParametersToBase();
-  setClipPlanes();
 }
 
 void Z3DBoundedFilter::pushRendererParametersToBase()

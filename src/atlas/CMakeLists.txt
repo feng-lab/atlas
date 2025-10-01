@@ -576,6 +576,7 @@ set(SOURCES
     zvulkanshader.cpp
     zvulkanpipeline.h
     zvulkanpipeline.cpp
+    zvulkanuniforms.h
     z3dtypes.h
     zvulkanshaderstate.h
     zvulkanrenderer.h
@@ -584,6 +585,10 @@ set(SOURCES
     zvulkanbackgroundrenderer.cpp
     zvulkanlinepipelinecontext.h
     zvulkanlinepipelinecontext.cpp
+    zvulkanmeshpipelinecontext.h
+    zvulkanmeshpipelinecontext.cpp
+    zvulkanellipsoidpipelinecontext.h
+    zvulkanellipsoidpipelinecontext.cpp
 )
 
 # our target

@@ -251,6 +251,8 @@ public:
 
   void renderEditingSelectionBox(Z3DEye eye);
 
+  void switchRendererBackend(RenderBackend backend);
+
   void rotateX() override;
 
   void rotateY() override;
@@ -281,8 +283,6 @@ Q_SIGNALS:
   void rendererSizeScaleChanged();
 
 protected:
-  void refreshRendererBackend();
-
   void pushRendererParametersToBase();
 
   void updateBoundBox();
@@ -403,12 +403,7 @@ private:
   RendererFrameState m_rendererFrameState;
 
 protected:
-  bool m_rendererBackendInitialized = false;
-  RenderBackend m_activeBackend = RenderBackend::OpenGL;
-  RenderBackend m_requestedBackend = RenderBackend::OpenGL;
   Z3DRendererBase m_rendererBase;
-
-  virtual void onRendererBackendChanged(RenderBackend /*backend*/) {}
 
   Z3DLineRenderer m_baseBoundBoxRenderer;
   Z3DLineRenderer m_selectionBoundBoxRenderer;

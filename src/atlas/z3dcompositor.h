@@ -16,6 +16,7 @@
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
 #include "z3dscratchresourcepool.h"
+#include "z3dcompositorpass.h"
 
 namespace nim {
 
@@ -74,6 +75,8 @@ public:
 
   void setProgressiveRenderingMode(bool v) override;
 
+  void switchBackend(RenderBackend backend);
+
 Q_SIGNALS:
   void sceneParaUpdated();
 
@@ -90,6 +93,18 @@ private:
                         const std::vector<Z3DBoundedFilter*>& transparentFilters,
                         Z3DScratchResourcePool::RenderTargetLease& targetLease,
                         Z3DEye eye);
+
+  void ensureOutputTargets(const glm::uvec2& size);
+
+  bool tryRenderGeometriesPass(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
+                               const std::vector<Z3DBoundedFilter*>& transparentFilters,
+                               Z3DScratchResourcePool::RenderTargetLease& targetLease,
+                               Z3DEye eye);
+
+  void renderGeometriesLegacy(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
+                              const std::vector<Z3DBoundedFilter*>& transparentFilters,
+                              Z3DScratchResourcePool::RenderTargetLease& targetLease,
+                              Z3DEye eye);
 
   void renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                const std::vector<Z3DBoundedFilter*>& transparentFilters,
@@ -249,6 +264,8 @@ private:
   Z3DCamera m_axisCamera;
 
   Z3DVertexArrayObject m_screenQuadVAO;
+
+  glm::uvec2 m_outputSize{32u, 32u};
 
   glm::vec4 m_region;
 

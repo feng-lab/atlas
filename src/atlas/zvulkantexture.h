@@ -33,6 +33,18 @@ public:
     bool createDefaultSampler = true;
     std::optional<vk::SamplerCreateInfo> samplerInfo = std::nullopt;
 
+    static CreateInfo make1D(uint32_t width,
+                             vk::Format format,
+                             vk::ImageUsageFlags usage =
+                               vk::ImageUsageFlagBits::eSampled |
+                               vk::ImageUsageFlagBits::eTransferDst,
+                             vk::MemoryPropertyFlags memoryProperties =
+                               vk::MemoryPropertyFlagBits::eDeviceLocal,
+                             uint32_t mipLevels = 1u,
+                             bool createSampler = true,
+                             vk::ImageLayout descriptorLayout =
+                               vk::ImageLayout::eShaderReadOnlyOptimal);
+
     static CreateInfo make2D(uint32_t width,
                              uint32_t height,
                              vk::Format format,

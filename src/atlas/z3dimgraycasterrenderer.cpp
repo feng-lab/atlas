@@ -91,11 +91,10 @@ void Z3DImgRaycasterRenderer::ensureRaycastAccumulators(Z3DEye eye)
   CHECK_GT(m_outputSize.x, 0u);
   CHECK_GT(m_outputSize.y, 0u);
 
-  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
     if (!lease || lease.renderTarget->size() != m_outputSize) {
       lease.release();
-      lease = pool.acquireRaycastAccumulatorRenderTarget(m_outputSize);
+      m_rendererBase.acquirePersistentRaycastAccumulatorRenderTarget(lease, m_outputSize);
     }
   };
 
@@ -255,7 +254,7 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
   m_quads.clear();
 
   // Acquire entry/exit RT from scratch pool (2-layer RGBA32F array)
-  m_entryExitLease = Z3DRenderGlobalState::instance().scratchPool().acquireEntryExitRenderTarget(size, 2);
+  m_rendererBase.acquirePersistentEntryExitRenderTarget(m_entryExitLease, size, 2);
 
   glEnable(GL_CULL_FACE);
   const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
@@ -753,7 +752,6 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
   const auto& sceneState = m_rendererBase.sceneState();
   const auto& viewState = m_rendererBase.viewState();
   const auto& monoEyeState = viewState.eyes[MonoEye];
-  auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
 
   Z3DScratchResourcePool::RenderTargetLease layerLease;
   if (progressive && m_channelIdx[eye] < 0) {
@@ -767,8 +765,9 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     // Initialize progressive accumulation state
     m_channelIdx[eye] = 0;
 
-    m_progressiveLayerLease =
-      scratchPool.acquireLayerArrayRenderTarget(m_outputSize, static_cast<uint32_t>(visibleIdxs.size()));
+    m_rendererBase.acquirePersistentLayerArrayRenderTarget(m_progressiveLayerLease,
+                                                           m_outputSize,
+                                                           static_cast<uint32_t>(visibleIdxs.size()));
     // VLOG(1) << "lease acquired";
     for (size_t idx = 0; idx < visibleIdxs.size(); ++idx) {
       m_progressiveLayerLease.renderTarget->attachSlice(idx);

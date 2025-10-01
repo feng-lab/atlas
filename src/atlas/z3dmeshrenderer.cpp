@@ -49,6 +49,9 @@ void Z3DMeshRenderer::setData(std::vector<ZMesh*>* meshInput)
   m_origMeshPt = meshInput;
   m_meshPt = meshInput;
   prepareMesh();
+  // Invalidate cached color/picking spans; they will be rebuilt on demand.
+  m_meshColorsPt = nullptr;
+  m_meshPickingColorsPt = nullptr;
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
@@ -61,6 +64,7 @@ void Z3DMeshRenderer::setData(std::vector<ZMesh*>* meshInput)
 void Z3DMeshRenderer::setDataColors(std::vector<glm::vec4>* meshColorsInput)
 {
   m_origMeshColorsPt = meshColorsInput;
+  m_meshColorsPt = nullptr;
   m_meshColorReady = false;
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
@@ -80,6 +84,7 @@ void Z3DMeshRenderer::setTexture(Z3DTexture* tex)
 void Z3DMeshRenderer::setDataPickingColors(std::vector<glm::vec4>* meshPickingColorsInput)
 {
   m_origMeshPickingColorsPt = meshPickingColorsInput;
+  m_meshPickingColorsPt = nullptr;
   m_meshPickingColorReady = false;
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglPickingRenderer();
@@ -168,6 +173,10 @@ void Z3DMeshRenderer::prepareMesh()
     m_meshPt = &m_splitMeshesWrapper;
     LOG(INFO) << "Number of meshes after spliting " << m_meshPt->size();
   }
+
+  // Color and picking spans are rebuilt lazily to align with any split outcome.
+  m_meshColorsPt = nullptr;
+  m_meshPickingColorsPt = nullptr;
 }
 
 void Z3DMeshRenderer::prepareMeshColor()
@@ -213,8 +222,12 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
   payload.renderer = const_cast<Z3DMeshRenderer*>(this);
 
   payload.meshes = spanOrEmpty(m_meshPt);
-  payload.meshColors = spanOrEmpty(m_meshColorsPt);
-  payload.meshPickingColors = spanOrEmpty(m_meshPickingColorsPt);
+  if (m_meshColorReady) {
+    payload.meshColors = spanOrEmpty(m_meshColorsPt);
+  }
+  if (m_meshPickingColorReady) {
+    payload.meshPickingColors = spanOrEmpty(m_meshPickingColorsPt);
+  }
   payload.texture = m_texture;
   payload.meshNeedsSplit = m_meshNeedSplit;
   payload.meshColorReady = m_meshColorReady;

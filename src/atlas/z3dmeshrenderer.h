@@ -80,14 +80,21 @@ protected:
   void renderPicking(Z3DEye eye) override;
 
 private:
+  // Rebuilds the mesh pointer list, splitting oversized meshes while keeping
+  // payload spans referencing renderer-owned storage.
   void prepareMesh();
 
+  // Material/picking color helpers populate the lazily-evaluated span pointers
+  // used by MeshPayload. They never allocate unless splitting requires it.
   void prepareMeshColor();
 
   void prepareMeshPickingColor();
 
   void renderImmediate(Z3DEye eye, bool appendBatch);
 
+  // MeshPayload is a zero-copy view of the renderer's CPU-side buffers. Callers
+  // must ensure the corresponding prepare* helpers ran before dereferencing the
+  // spans they expose.
   [[nodiscard]] MeshPayload buildMeshPayload() const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
 

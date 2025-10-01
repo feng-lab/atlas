@@ -1329,7 +1329,7 @@ Z3DRenderTarget& Z3DImgFilter::ensureRenderTarget(Z3DScratchResourcePool::Render
     lease.release();
     CHECK_GT(m_outputSize.x, 0u);
     CHECK_GT(m_outputSize.y, 0u);
-    lease = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(m_outputSize);
+    m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize);
   }
   return *lease.renderTarget;
 }

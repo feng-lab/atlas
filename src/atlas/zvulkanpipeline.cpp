@@ -38,6 +38,43 @@ void ZVulkanPipeline::setPushConstantRanges(const std::vector<vk::PushConstantRa
   m_pushConstantRanges = pushConstantRanges;
 }
 
+void ZVulkanPipeline::setPolygonMode(vk::PolygonMode mode)
+{
+  m_polygonMode = mode;
+}
+
+void ZVulkanPipeline::setCullMode(vk::CullModeFlags mode)
+{
+  m_cullMode = mode;
+}
+
+void ZVulkanPipeline::setFrontFace(vk::FrontFace frontFace)
+{
+  m_frontFace = frontFace;
+}
+
+void ZVulkanPipeline::setDepthBias(bool enable, float constantFactor, float slopeFactor)
+{
+  m_depthBiasEnable = enable;
+  m_depthBiasConstant = constantFactor;
+  m_depthBiasSlope = slopeFactor;
+}
+
+void ZVulkanPipeline::setLineWidth(float width)
+{
+  m_lineWidth = width;
+}
+
+void ZVulkanPipeline::setDepthWriteEnable(bool enable)
+{
+  m_depthWriteEnable = enable;
+}
+
+void ZVulkanPipeline::setColorBlendAttachment(const vk::PipelineColorBlendAttachmentState& attachment)
+{
+  m_colorBlendAttachment = attachment;
+}
+
 void ZVulkanPipeline::create()
 {
   vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
@@ -56,14 +93,14 @@ void ZVulkanPipeline::create()
 
   vk::PipelineRasterizationStateCreateInfo rasterizer{.depthClampEnable = VK_FALSE,
                                                       .rasterizerDiscardEnable = VK_FALSE,
-                                                      .polygonMode = vk::PolygonMode::eFill,
-                                                      .cullMode = vk::CullModeFlagBits::eBack,
-                                                      .frontFace = vk::FrontFace::eCounterClockwise,
-                                                      .depthBiasEnable = VK_FALSE,
-                                                      .depthBiasConstantFactor = 0.0f,
+                                                      .polygonMode = m_polygonMode,
+                                                      .cullMode = m_cullMode,
+                                                      .frontFace = m_frontFace,
+                                                      .depthBiasEnable = static_cast<vk::Bool32>(m_depthBiasEnable),
+                                                      .depthBiasConstantFactor = m_depthBiasConstant,
                                                       .depthBiasClamp = 0.0f,
-                                                      .depthBiasSlopeFactor = 0.0f,
-                                                      .lineWidth = 1.0f};
+                                                      .depthBiasSlopeFactor = m_depthBiasSlope,
+                                                      .lineWidth = m_lineWidth};
 
   vk::PipelineMultisampleStateCreateInfo multisampling{.rasterizationSamples = vk::SampleCountFlagBits::e1,
                                                        .sampleShadingEnable = VK_FALSE,
@@ -73,7 +110,7 @@ void ZVulkanPipeline::create()
                                                        .alphaToOneEnable = VK_FALSE};
 
   vk::PipelineDepthStencilStateCreateInfo depthStencil{.depthTestEnable = VK_TRUE,
-                                                       .depthWriteEnable = VK_TRUE,
+                                                       .depthWriteEnable = static_cast<vk::Bool32>(m_depthWriteEnable),
                                                        .depthCompareOp = vk::CompareOp::eLess,
                                                        .depthBoundsTestEnable = VK_FALSE,
                                                        .stencilTestEnable = VK_FALSE,
@@ -82,22 +119,11 @@ void ZVulkanPipeline::create()
                                                        .minDepthBounds = 0.0f,
                                                        .maxDepthBounds = 1.0f};
 
-  vk::PipelineColorBlendAttachmentState colorBlendAttachment{
-    .blendEnable = VK_TRUE,
-    .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
-    .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
-    .colorBlendOp = vk::BlendOp::eAdd,
-    .srcAlphaBlendFactor = vk::BlendFactor::eOne,
-    .dstAlphaBlendFactor = vk::BlendFactor::eZero,
-    .alphaBlendOp = vk::BlendOp::eAdd,
-    .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB |
-                      vk::ColorComponentFlagBits::eA};
-
   vk::PipelineColorBlendStateCreateInfo colorBlending{
     .logicOpEnable = VK_FALSE,
     .logicOp = vk::LogicOp::eCopy,
     .attachmentCount = 1,
-    .pAttachments = &colorBlendAttachment,
+    .pAttachments = &m_colorBlendAttachment,
     .blendConstants = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}
   };
 

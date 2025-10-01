@@ -11,13 +11,53 @@
 #include "z3dellipsoidrenderer.h"
 #include "z3dconerenderer.h"
 #include "z3dshaderprogram.h"
+#include "z3dboundedfilter.h"
 #include "zlog.h"
 #include <absl/strings/str_cat.h>
 #include <algorithm>
 #include <vector>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/glm.hpp>
 
 namespace nim {
+
+namespace {
+
+void prepareFilterForLease(Z3DBoundedFilter& filter, Z3DScratchResourcePool::RenderTargetLease& lease)
+{
+  if (lease.renderTarget != nullptr) {
+    filter.setViewport(lease.renderTarget->size());
+  } else {
+    filter.setViewport(lease.descriptor.size);
+  }
+  filter.rendererBase().setActiveSurfaceForNextPass(lease);
+}
+
+void requestSurfaceClear(Z3DRendererBase& renderer,
+                         bool clearColor,
+                         const glm::vec4& color,
+                         bool clearDepth,
+                         float depth,
+                         uint32_t stencil = 0u)
+{
+  if (!renderer.supportsCommandLists()) {
+    return;
+  }
+
+  ClearValue clearValue{};
+  clearValue.color = color;
+  clearValue.depth = depth;
+  clearValue.stencil = stencil;
+
+  if (clearColor) {
+    renderer.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clearValue);
+  }
+  if (clearDepth) {
+    renderer.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clearValue);
+  }
+}
+
+} // namespace
 
 namespace detail {
 
@@ -213,6 +253,8 @@ public:
     }
   }
 
+  void processCompositorPass(Z3DRendererBase& renderer, const Z3DCompositorPass& pass) override;
+
   [[nodiscard]] bool supportsCommandLists() const override
   {
     return true;
@@ -401,6 +443,89 @@ private:
 };
 
 } // namespace detail
+
+void detail::Z3DRendererGLBackend::processCompositorPass(Z3DRendererBase& renderer,
+                                                         const Z3DCompositorPass& pass)
+{
+  if (pass.kind != Z3DCompositorPass::Kind::Geometry) {
+    LOG_FIRST_N(WARNING, 5) << "GL backend received unsupported compositor pass kind.";
+    return;
+  }
+
+  if (pass.transparency != TransparencyMode::BlendDelayed &&
+      pass.transparency != TransparencyMode::BlendNoDepthMask) {
+    LOG_FIRST_N(WARNING, 5) << "GL compositor pass requested unsupported transparency path.";
+    return;
+  }
+
+  if (pass.targetLease == nullptr || pass.targetLease->renderTarget == nullptr) {
+    LOG_FIRST_N(WARNING, 5) << "GL compositor pass missing render target lease.";
+    return;
+  }
+
+  if (!pass.imageLayers.empty()) {
+    LOG_FIRST_N(WARNING, 5) << "GL compositor pass still relies on legacy image-layer blending; falling back not implemented.";
+    return;
+  }
+
+  auto& lease = *pass.targetLease;
+  auto* glTarget = lease.renderTarget;
+  glTarget->bind();
+
+  GLbitfield clearMask = 0;
+  if (pass.clearColor) {
+    clearMask |= static_cast<GLbitfield>(GL_COLOR_BUFFER_BIT);
+  }
+  if (pass.clearDepth) {
+    clearMask |= static_cast<GLbitfield>(GL_DEPTH_BUFFER_BIT);
+  }
+  if (pass.clearStencil) {
+    clearMask |= static_cast<GLbitfield>(GL_STENCIL_BUFFER_BIT);
+  }
+  if (clearMask != 0u) {
+    glClear(static_cast<gl::ClearBufferMask>(clearMask));
+  }
+
+  requestSurfaceClear(renderer,
+                      pass.clearColor,
+                      pass.clearValue.color,
+                      pass.clearDepth,
+                      pass.clearValue.depth,
+                      pass.clearValue.stencil);
+
+  for (auto* filter : pass.opaqueFilters) {
+    if (!filter) {
+      continue;
+    }
+    prepareFilterForLease(*filter, lease);
+    filter->renderOpaque(pass.eye);
+  }
+
+  if (!pass.transparentFilters.empty()) {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    const bool disableDepthWrites = (pass.transparency == TransparencyMode::BlendNoDepthMask);
+    if (disableDepthWrites) {
+      glDepthMask(GL_FALSE);
+    }
+
+    for (const auto& batch : pass.transparentFilters) {
+      if (!batch.filter) {
+        continue;
+      }
+      prepareFilterForLease(*batch.filter, lease);
+      batch.filter->renderTransparent(pass.eye);
+    }
+
+    if (disableDepthWrites) {
+      glDepthMask(GL_TRUE);
+    }
+    glBlendFunc(GL_ONE, GL_ZERO);
+    glDisable(GL_BLEND);
+  }
+
+  glTarget->release();
+}
 
 std::unique_ptr<Z3DRendererBackend> createGLRendererBackend()
 {
