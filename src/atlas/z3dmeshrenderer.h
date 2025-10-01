@@ -4,6 +4,7 @@
 #include "z3drendercommands.h"
 #include "zmesh.h"
 #include <QString>
+#include <memory>
 #include <string>
 
 class Z3DTexture;
@@ -99,7 +100,11 @@ private:
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
 
 protected:
-  Z3DShaderGroup m_meshShaderGrp;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderGroup> m_meshShaderGrp;
 
   std::vector<ZMesh*>* m_meshPt;
   std::vector<glm::vec4>* m_meshColorsPt;
@@ -125,10 +130,10 @@ private:
   bool m_dataChanged;
   bool m_pickingDataChanged;
   // one VAO for each mesh
-  Z3DVertexArrayObject m_VAOs;
-  Z3DVertexArrayObject m_pickingVAOs;
-  std::vector<Z3DVertexBufferObject> m_VBOs;
-  std::vector<Z3DVertexBufferObject> m_pickingVBOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_pickingVAOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_VBOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_pickingVBOs;
 
   WireframeMode m_wireframeModeValue = WireframeMode::NoWireframe;
   glm::vec4 m_wireframeColorValue{1.f};

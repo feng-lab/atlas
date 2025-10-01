@@ -2,6 +2,7 @@
 
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -62,10 +63,14 @@ protected:
   const Z3DTexture* m_colorTexture2 = nullptr;
   const Z3DTexture* m_depthTexture2 = nullptr;
 
-  Z3DShaderProgram m_blendTextureShader;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderProgram> m_blendTextureShader;
 
   TextureBlendMode m_blendMode;
-  Z3DVertexArrayObject m_VAO;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
 };
 
 } // namespace nim

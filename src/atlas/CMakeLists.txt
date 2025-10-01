@@ -579,10 +579,6 @@ set(SOURCES
     zvulkanuniforms.h
     z3dtypes.h
     zvulkanshaderstate.h
-    zvulkanrenderer.h
-    zvulkanrenderer.cpp
-    zvulkanbackgroundrenderer.h
-    zvulkanbackgroundrenderer.cpp
     zvulkanlinepipelinecontext.h
     zvulkanlinepipelinecontext.cpp
     zvulkanmeshpipelinecontext.h

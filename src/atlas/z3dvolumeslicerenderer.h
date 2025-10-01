@@ -4,6 +4,7 @@
 #include "zmesh.h"
 #include "zcolormap.h"
 #include "z3dshaderprogram.h"
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -52,9 +53,13 @@ protected:
 
 protected:
   // Z3DShaderProgram m_volumeSliceShader;
-  Z3DShaderProgram m_scVolumeSliceShader;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderProgram> m_scVolumeSliceShader;
   Z3DRenderTarget* m_layerTarget = nullptr;
-  Z3DShaderProgram m_mergeChannelShader;
+  std::unique_ptr<Z3DShaderProgram> m_mergeChannelShader;
 
   const std::vector<std::unique_ptr<Z3DVolume>>* m_vols = nullptr;
   const std::vector<std::unique_ptr<ZColorMapParameter>>* m_colormaps = nullptr;
@@ -63,7 +68,7 @@ protected:
 
 private:
   std::vector<ZMesh> m_quads;
-  Z3DVertexArrayObject m_VAO;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
 };
 
 } // namespace nim

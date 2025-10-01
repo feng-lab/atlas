@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -49,11 +50,15 @@ protected:
   const Z3DTexture* m_colorTexture = nullptr;
   const Z3DTexture* m_depthTexture = nullptr;
 
-  Z3DShaderGroup m_copyTextureShaderGrp;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderGroup> m_copyTextureShaderGrp;
   bool m_discardTransparent = true;
 
   OutputColorOption m_mode;
-  Z3DVertexArrayObject m_VAO;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
 };
 
 } // namespace nim

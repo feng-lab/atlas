@@ -3,6 +3,7 @@
 #include "z3dprimitiverenderer.h"
 #include "z3drendercommands.h"
 #include <algorithm>
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -61,7 +62,11 @@ protected:
   void renderImmediate(Z3DEye eye, bool appendBatch);
 
 protected:
-  Z3DShaderGroup m_ellipsoidShaderGrp;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderGroup> m_ellipsoidShaderGrp;
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   int m_sphereSlicesStacks = 36;
@@ -81,10 +86,10 @@ private:
   std::vector<GLfloat> m_allFlags;
   std::vector<GLuint> m_indexs;
 
-  Z3DVertexArrayObject m_VAO;
-  Z3DVertexArrayObject m_pickingVAO;
-  Z3DVertexBufferObject m_VBOs;
-  Z3DVertexBufferObject m_pickingVBOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
+  std::unique_ptr<Z3DVertexArrayObject> m_pickingVAO;
+  std::unique_ptr<Z3DVertexBufferObject> m_VBOs;
+  std::unique_ptr<Z3DVertexBufferObject> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
 };

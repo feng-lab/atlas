@@ -14,7 +14,18 @@ Z3DPrimitiveRenderer::Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase)
 
 Z3DPrimitiveRenderer::~Z3DPrimitiveRenderer()
 {
+  destroyResources();
   m_rendererBase.unregisterRenderer(this);
+}
+
+void Z3DPrimitiveRenderer::buildBackendResources(RenderBackend backend)
+{
+  createResources(backend);
+}
+
+void Z3DPrimitiveRenderer::releaseBackendResources()
+{
+  destroyResources();
 }
 
 void Z3DPrimitiveRenderer::renderScreenQuad(const Z3DVertexArrayObject& vao, const Z3DShaderProgram& shader)

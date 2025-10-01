@@ -7,6 +7,7 @@
 #include "z3dcamera.h"
 #include "z3drenderglobalstate.h"
 #include "z3dcompositorpass.h"
+#include "zexception.h"
 #include "zlog.h"
 #include <algorithm>
 #include <utility>
@@ -25,7 +26,7 @@ Z3DRendererBase::Z3DRendererBase(RendererParameterState& parameterState,
   , m_shaderHookType(ShaderHookType::Normal)
   , m_renderMethod(RenderMethod::GLSL)
 {
-  setBackend(createGLRendererBackend());
+  setBackend(RenderBackend::OpenGL);
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   m_legacyGLState = std::make_unique<LegacyGLState>();
 #endif
@@ -66,7 +67,8 @@ RendererCPUState& Z3DRendererBase::cpuState()
 
 void Z3DRendererBase::submitBatches()
 {
-  backend().processBatches(*this, m_cpuState);
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  m_backend->processBatches(*this, m_cpuState);
   m_cpuState.batches.clear();
 }
 
@@ -183,7 +185,8 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentBlo
 
 void Z3DRendererBase::executeCompositorPass(const Z3DCompositorPass& pass)
 {
-  backend().processCompositorPass(*this, pass);
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  m_backend->processCompositorPass(*this, pass);
 }
 
 void Z3DRendererBase::setActiveSurfaceForNextPass(const RendererFrameState::ActiveSurface& surface)
@@ -261,12 +264,13 @@ void Z3DRendererBase::clearPendingActiveSurface()
 RendererFrameState::ActiveSurface
 Z3DRendererBase::describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease)
 {
-  return backend().describeSurfaceFromLease(lease);
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  return m_backend->describeSurfaceFromLease(lease);
 }
 
 bool Z3DRendererBase::supportsCommandLists() const
 {
-  return backend().supportsCommandLists();
+  return m_backend != nullptr && m_backend->supportsCommandLists();
 }
 
 RendererViewState Z3DRendererBase::buildViewStateFromCamera(const Z3DCamera& camera)
@@ -317,43 +321,64 @@ const Z3DRendererBase::LegacyGLState& Z3DRendererBase::legacyGL() const
 
 #endif
 
-void Z3DRendererBase::setBackend(std::unique_ptr<Z3DRendererBackend> backend)
+void Z3DRendererBase::setBackend(RenderBackend backendType)
 {
-  CHECK(backend != nullptr) << "Renderer backend must not be null";
-  m_backend = std::move(backend);
-}
+  if (m_backend && m_activeBackend == backendType) {
+    return;
+  }
 
-Z3DRendererBackend& Z3DRendererBase::backend()
-{
-  CHECK(m_backend != nullptr) << "Renderer backend not set";
-  return *m_backend;
-}
+  std::unique_ptr<Z3DRendererBackend> newBackend;
+  switch (backendType) {
+    case RenderBackend::OpenGL:
+      newBackend = createGLRendererBackend();
+      break;
+    case RenderBackend::Vulkan:
+      try {
+        newBackend = createVulkanRendererBackend();
+      }
+      catch (const ZException&) {
+        throw;
+      }
+      catch (const std::exception& e) {
+        throw ZException(fmt::format("Failed to create Vulkan renderer backend: {}", e.what()));
+      }
+      if (!newBackend) {
+        throw ZException("Failed to create Vulkan renderer backend");
+      }
+      break;
+  }
 
-const Z3DRendererBackend& Z3DRendererBase::backend() const
-{
-  CHECK(m_backend != nullptr) << "Renderer backend not set";
-  return *m_backend;
+  releaseBackendResources();
+  releasePersistentLeases();
+
+  m_backend = std::move(newBackend);
+  m_activeBackend = backendType;
+  buildBackendResources(backendType);
 }
 
 void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye eye)
 {
-  backend().setGlobalShaderParameters(*this, shader, eye);
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  m_backend->setGlobalShaderParameters(*this, shader, eye);
 }
 
 void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram* shader, Z3DEye eye)
 {
   CHECK(shader != nullptr) << "Shader pointer must not be null";
-  backend().setGlobalShaderParameters(*this, *shader, eye);
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  m_backend->setGlobalShaderParameters(*this, *shader, eye);
 }
 
 std::string Z3DRendererBase::generateHeader() const
 {
-  return backend().generateHeader(*this);
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  return m_backend->generateHeader(*this);
 }
 
 std::string Z3DRendererBase::generateGeomHeader() const
 {
-  return backend().generateGeomHeader(*this);
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  return m_backend->generateGeomHeader(*this);
 }
 
 void Z3DRendererBase::registerRenderer(Z3DPrimitiveRenderer* renderer)
@@ -368,6 +393,20 @@ void Z3DRendererBase::unregisterRenderer(Z3DPrimitiveRenderer* renderer)
   CHECK(renderer && m_renderers.contains(renderer));
 
   m_renderers.erase(renderer);
+}
+
+void Z3DRendererBase::releaseBackendResources()
+{
+  for (auto* renderer : m_renderers) {
+    renderer->releaseBackendResources();
+  }
+}
+
+void Z3DRendererBase::buildBackendResources(RenderBackend backend)
+{
+  for (auto* renderer : m_renderers) {
+    renderer->buildBackendResources(backend);
+  }
 }
 
 void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
@@ -591,22 +630,24 @@ void Z3DRendererBase::renderPickingInstant(Z3DRendererBase::RendererSpan rendere
 
 void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
-  backend().beginRender(*this);
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  m_backend->beginRender(*this);
   for (auto* renderer : renderers) {
     renderer->render(eye);
   }
   submitBatches();
-  backend().endRender(*this);
+  m_backend->endRender(*this);
 }
 
 void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
-  backend().beginRender(*this);
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  m_backend->beginRender(*this);
   for (auto* renderer : renderers) {
     renderer->renderPicking(eye);
   }
   submitBatches();
-  backend().endRender(*this);
+  m_backend->endRender(*this);
 }
 
 bool Z3DRendererBase::needLighting(Z3DRendererBase::RendererSpan renderers) const

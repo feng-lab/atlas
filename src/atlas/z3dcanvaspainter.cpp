@@ -18,7 +18,7 @@ Z3DCanvasPainter::Z3DCanvasPainter(Z3DCanvas& canvas)
   , m_textureCopyRenderer(m_rendererBase, Z3DTextureCopyRenderer::OutputColorOption::DivideByAlpha)
   , m_canvas(canvas)
 {
-  m_rendererBase.setBackend(createGLRendererBackend());
+  m_rendererBase.setBackend(RenderBackend::OpenGL);
 }
 
 void Z3DCanvasPainter::paint(bool stereo)

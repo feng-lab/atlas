@@ -2,6 +2,7 @@
 
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
+#include <memory>
 
 class ZMesh;
 
@@ -29,10 +30,14 @@ protected:
 protected:
   const ZMesh* m_mesh;
 
-  Z3DShaderProgram m_renderTextureCoordinateShader;
+  void createResources(RenderBackend backend) override;
 
-  Z3DVertexBufferObject m_VBOs;
-  Z3DVertexArrayObject m_VAO;
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderProgram> m_renderTextureCoordinateShader;
+
+  std::unique_ptr<Z3DVertexBufferObject> m_VBOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
   bool m_dataChanged;
 };
 

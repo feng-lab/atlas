@@ -24,6 +24,7 @@
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
 #include <QCoreApplication>
+#include <QMetaObject>
 #include <memory>
 #include "zvulkan.h"
 // Vulkan compositor removed for now (classification phase)
@@ -990,6 +991,21 @@ void Z3DRenderingEngine::onCanvasResized(size_t w, size_t h)
 
 void Z3DRenderingEngine::initGL()
 {
+  if (!m_scratchPool) {
+    m_scratchPool.reset(new Z3DScratchResourcePool());
+    Z3DRenderGlobalState::instance().setScratchPool(m_scratchPool.get());
+  }
+
+  ensureGLContext();
+}
+
+void Z3DRenderingEngine::ensureGLContext()
+{
+  if (m_context) {
+    m_context->makeCurrent();
+    return;
+  }
+
   if (m_canvas) {
 #if defined(ATLAS_USE_OPENGLWIDGET)
     m_context = std::make_unique<Z3DContext>(*m_offscreenSurface, m_canvas->context());
@@ -1014,15 +1030,16 @@ void Z3DRenderingEngine::initGL()
     m_context = std::make_unique<Z3DContext>(*m_offscreenSurface);
 #endif
   }
+
   m_context->makeCurrent();
-  m_scratchPool.reset(new Z3DScratchResourcePool());
-  Z3DRenderGlobalState::instance().setScratchPool(m_scratchPool.get());
 
   glbinding::initialize(0, [this](const char* name) {
     return m_context->getProcAddress(name);
   });
   glbinding::useContext(0);
+
   Z3DGpuInfo::instance().logGpuInfo();
+
   if (FLAGS_atlas_debug_opengl) {
     glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
                                        glbinding::CallbackMask::ParametersAndReturnValue |
@@ -1052,13 +1069,17 @@ void Z3DRenderingEngine::initGL()
   } else {
     glbinding::setCallbackMask(glbinding::CallbackMask::Unresolved);
   }
+
   glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction& call) {
     LOG(ERROR) << "OpenGL function " << call.name() << " can not be resolved.";
   });
-  if (FLAGS_atlas_log_glbinding_context_switch) {
+
+  static bool contextSwitchCallbackRegistered = false;
+  if (FLAGS_atlas_log_glbinding_context_switch && !contextSwitchCallbackRegistered) {
     glbinding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
       LOG(INFO) << "Switching to OpenGL context " << handle;
     });
+    contextSwitchCallbackRegistered = true;
   }
 
   if (!Z3DGpuInfo::instance().isSupported()) {
@@ -1147,8 +1168,8 @@ bool Z3DRenderingEngine::event(QEvent* e)
 
 void Z3DRenderingEngine::getGLFocus()
 {
+  CHECK(m_context != nullptr) << "OpenGL context is not initialized";
   m_context->makeCurrent();
-  // glbinding::useContext(0);
 }
 
 void Z3DRenderingEngine::renderFast(bool stereo)
@@ -1435,17 +1456,70 @@ void Z3DRenderingEngine::resetOutputSizeToMatchCanvasSize()
 
 void Z3DRenderingEngine::handleRenderBackendChanged()
 {
-  if (!m_scratchPool) {
-    return;
-  }
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  const char* targetLabel = backend == RenderBackend::OpenGL ? "OpenGL" : "Vulkan";
+  VLOG(1) << fmt::format("Render backend change requested: {}", targetLabel);
+
+  if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
+    Z3DRenderGlobalState::instance().requestCancellation();
+    VLOG(1) << "Active render detected; queuing backend switch after cancellation.";
+
+    if (!m_backendSwitchScheduled) {
+      m_backendSwitchScheduled = true;
+      QMetaObject::invokeMethod(
+        this,
+        [this]() {
+          applyBackendSwitch();
+        },
+        Qt::QueuedConnection);
+    }
+  } else {
+    applyBackendSwitch();
+  }
+}
+
+void Z3DRenderingEngine::applyBackendSwitch()
+{
+  auto resetScheduleGuard = folly::makeGuard([this]() {
+    m_backendSwitchScheduled = false;
+  });
+
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  std::scoped_lock lock(targetSwitchMutex());
+  const RenderBackend previousBackend = m_scratchPool->defaultBackend();
+  const char* previousLabel = previousBackend == RenderBackend::OpenGL ? "OpenGL" : "Vulkan";
+  const char* targetLabel = backend == RenderBackend::OpenGL ? "OpenGL" : "Vulkan";
+  VLOG(1) << fmt::format("Switching rendering backend from {} to {}", previousLabel, targetLabel);
+
+  if (backend == RenderBackend::OpenGL) {
+    ensureGLContext();
+    if (!m_context) {
+      const auto errorMsg = QStringLiteral("Failed to create OpenGL context for backend switch");
+      LOG(ERROR) << errorMsg.toStdString();
+      reportRenderingError(errorMsg);
+      m_scratchPool->setDefaultBackend(previousBackend);
+      return;
+    }
+  } else if (m_context) {
+    getGLFocus();
+  }
+
   m_scratchPool->reset();
   m_scratchPool->setDefaultBackend(backend);
 
+  m_compositor->switchBackend(backend);
+
+  if (backend == RenderBackend::Vulkan) {
+    m_context.reset();
+  }
+
   m_globalParas->camera.get().setCoordinateSystem(backend == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan
                                                                                    : Z3DCoordinateSystem::OpenGL);
-}
 
-// Backend switch removed for now; to be reintroduced post-classification
+  m_progress = 0.0;
+  m_isRendering = false;
+
+  QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+}
 
 } // namespace nim

@@ -13,7 +13,6 @@ namespace nim {
 
 Z3DMeshRenderer::Z3DMeshRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_meshShaderGrp(rendererBase)
   , m_meshPt(nullptr)
   , m_meshColorsPt(nullptr)
   , m_meshPickingColorsPt(nullptr)
@@ -31,17 +30,7 @@ Z3DMeshRenderer::Z3DMeshRenderer(Z3DRendererBase& rendererBase)
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
 #endif
-
-  QStringList allshaders;
-  allshaders << "mesh.vert"
-             << "mesh_func.frag"
-             << "lighting2.frag";
-  QStringList normalShaders;
-  normalShaders << "mesh.vert"
-                << "mesh.frag"
-                << "lighting2.frag";
-  m_meshShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
-  m_meshShaderGrp.addAllSupportedPostShaders();
+  createResources(m_rendererBase.activeBackend());
 }
 
 void Z3DMeshRenderer::setData(std::vector<ZMesh*>* meshInput)
@@ -104,7 +93,7 @@ void Z3DMeshRenderer::setColorSource(MeshColorSource source)
 void Z3DMeshRenderer::compile()
 {
   m_dataChanged = true;
-  m_meshShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_meshShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
 std::string Z3DMeshRenderer::generateHeader()
@@ -577,8 +566,8 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
   const bool drawSurface = m_wireframeModeValue != WireframeMode::OnlyWireframe;
   const bool drawWireframe = m_wireframeModeValue != WireframeMode::NoWireframe;
 
-  m_meshShaderGrp.bind();
-  Z3DShaderProgram& shader = m_meshShaderGrp.get();
+  m_meshShaderGrp->bind();
+  Z3DShaderProgram& shader = m_meshShaderGrp->get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setShaderParameters(shader);
 
@@ -596,15 +585,19 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
 
   if (m_useVAO) {
     if (m_dataChanged) {
-      m_VAOs.resize(m_meshPt->size());
+      m_VAOs->resize(m_meshPt->size());
 
       m_VBOs.resize(m_meshPt->size());
-      for (size_t ivbo = 0; ivbo < m_VBOs.size(); ++ivbo) {
-        m_VBOs[ivbo].resize(4);
+      for (auto& vbo : m_VBOs) {
+        if (!vbo) {
+          vbo = std::make_unique<Z3DVertexBufferObject>(4);
+        } else {
+          vbo->resize(4);
+        }
       }
 
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
-        m_VAOs.bind(i);
+        m_VAOs->bind(i);
 
         const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
         const std::vector<float>& textureCoordinates1D = (*m_meshPt)[i]->textureCoordinates1D();
@@ -616,19 +609,19 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
 
         size_t bufIdx = 0;
         glEnableVertexAttribArray(attr_vertex);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
         glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
         if (attr_normal != -1) {
           glEnableVertexAttribArray(attr_normal);
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER, normals.size() * 3 * sizeof(GLfloat), normals.data(), GL_STATIC_DRAW);
           glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
         if (!triangleIndexes.empty()) {
-          m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
+          m_VBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                        triangleIndexes.size() * sizeof(GLuint),
                        triangleIndexes.data(),
@@ -638,7 +631,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
         if (m_colorSource == MeshColorSource::Mesh1DTexture && attr_1dTexCoord0 != -1 &&
             !textureCoordinates1D.empty()) {
           glEnableVertexAttribArray(attr_1dTexCoord0);
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER,
                        textureCoordinates1D.size() * 1 * sizeof(GLfloat),
                        textureCoordinates1D.data(),
@@ -649,7 +642,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
         if (m_colorSource == MeshColorSource::Mesh2DTexture && attr_2dTexCoord0 != -1 &&
             !textureCoordinates2D.empty()) {
           glEnableVertexAttribArray(attr_2dTexCoord0);
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER,
                        textureCoordinates2D.size() * 2 * sizeof(GLfloat),
                        textureCoordinates2D.data(),
@@ -660,7 +653,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
         if (m_colorSource == MeshColorSource::Mesh3DTexture && attr_3dTexCoord0 != -1 &&
             !textureCoordinates3D.empty()) {
           glEnableVertexAttribArray(attr_3dTexCoord0);
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER,
                        textureCoordinates3D.size() * 3 * sizeof(GLfloat),
                        textureCoordinates3D.data(),
@@ -670,14 +663,14 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
 
         if (m_colorSource == MeshColorSource::MeshColor && attr_color != -1 && colors.size() >= vertices.size()) {
           glEnableVertexAttribArray(attr_color);
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER, colors.size() * 4 * sizeof(GLfloat), colors.data(), GL_STATIC_DRAW);
           glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        m_VAOs.release();
+        m_VAOs->release();
       }
 
       m_dataChanged = false;
@@ -699,13 +692,13 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
         auto type = toGLType((*m_meshPt)[i]->type());
         const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
         const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
-        m_VAOs.bind(i);
+        m_VAOs->bind(i);
         if (triangleIndexes.empty()) {
           glDrawArrays(type, 0, vertices.size());
         } else {
           glDrawElements(type, triangleIndexes.size(), GL_UNSIGNED_INT, 0);
         }
-        m_VAOs.release();
+        m_VAOs->release();
       }
     }
 
@@ -723,13 +716,13 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
         auto type = toGLType((*m_meshPt)[i]->type());
         const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
         const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
-        m_VAOs.bind(i);
+        m_VAOs->bind(i);
         if (triangleIndexes.empty()) {
           glDrawArrays(type, 0, vertices.size());
         } else {
           glDrawElements(type, triangleIndexes.size(), GL_UNSIGNED_INT, 0);
         }
-        m_VAOs.release();
+        m_VAOs->release();
       }
       // restore default polygon mode
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -746,8 +739,12 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
     //    }
     if (m_dataChanged) {
       m_VBOs.resize(m_meshPt->size());
-      for (size_t ivbo = 0; ivbo < m_VBOs.size(); ++ivbo) {
-        m_VBOs[ivbo].resize(4);
+      for (auto& vbo : m_VBOs) {
+        if (!vbo) {
+          vbo = std::make_unique<Z3DVertexBufferObject>(4);
+        } else {
+          vbo->resize(4);
+        }
       }
     }
 
@@ -774,7 +771,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
 
       size_t bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);
-      m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+      m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
       if (m_dataChanged) {
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
       }
@@ -782,7 +779,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
 
       if (attr_normal != -1) {
         glEnableVertexAttribArray(attr_normal);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER, normals.size() * 3 * sizeof(GLfloat), normals.data(), GL_STATIC_DRAW);
         }
@@ -790,7 +787,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
       }
 
       if (!triangleIndexes.empty()) {
-        m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
+        m_VBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
           glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                        triangleIndexes.size() * sizeof(GLuint),
@@ -801,7 +798,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
 
       if (m_colorSource == MeshColorSource::Mesh1DTexture && attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
         glEnableVertexAttribArray(attr_1dTexCoord0);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER,
                        textureCoordinates1D.size() * 1 * sizeof(GLfloat),
@@ -813,7 +810,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
 
       if (m_colorSource == MeshColorSource::Mesh2DTexture && attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
         glEnableVertexAttribArray(attr_2dTexCoord0);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER,
                        textureCoordinates2D.size() * 2 * sizeof(GLfloat),
@@ -825,7 +822,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
 
       if (m_colorSource == MeshColorSource::Mesh3DTexture && attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
         glEnableVertexAttribArray(attr_3dTexCoord0);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER,
                        textureCoordinates3D.size() * 3 * sizeof(GLfloat),
@@ -837,7 +834,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
 
       if (m_colorSource == MeshColorSource::MeshColor && attr_color != -1 && colors.size() >= vertices.size()) {
         glEnableVertexAttribArray(attr_color);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER, colors.size() * 4 * sizeof(GLfloat), colors.data(), GL_STATIC_DRAW);
         }
@@ -896,7 +893,7 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
     m_dataChanged = false;
   }
 
-  m_meshShaderGrp.release();
+  m_meshShaderGrp->release();
 }
 
 void Z3DMeshRenderer::executeBatchGL(const RenderBatch& batch)
@@ -918,8 +915,8 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     return;
   }
 
-  m_meshShaderGrp.bind();
-  Z3DShaderProgram& shader = m_meshShaderGrp.get();
+  m_meshShaderGrp->bind();
+  Z3DShaderProgram& shader = m_meshShaderGrp->get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setPickingShaderParameters(shader);
   shader.setUseCustomColorUniform(true);
@@ -929,15 +926,19 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
 
   if (m_useVAO) {
     if (m_pickingDataChanged) {
-      m_pickingVAOs.resize(m_meshPt->size());
+      m_pickingVAOs->resize(m_meshPt->size());
 
       m_pickingVBOs.resize(m_meshPt->size());
-      for (size_t ivbo = 0; ivbo < m_pickingVBOs.size(); ++ivbo) {
-        m_pickingVBOs[ivbo].resize(3);
+      for (auto& pickingVBO : m_pickingVBOs) {
+        if (!pickingVBO) {
+          pickingVBO = std::make_unique<Z3DVertexBufferObject>(3);
+        } else {
+          pickingVBO->resize(3);
+        }
       }
 
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
-        m_pickingVAOs.bind(i);
+        m_pickingVAOs->bind(i);
 
         const auto& vertices = (*m_meshPt)[i]->vertices();
         const auto& normals = (*m_meshPt)[i]->normals();
@@ -946,39 +947,39 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
         size_t bufIdx = 0;
         glEnableVertexAttribArray(attr_vertex);
         if (m_dataChanged) {
-          m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+          m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
         } else {
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         }
         glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
         if (attr_normal != -1) {
           glEnableVertexAttribArray(attr_normal);
           if (m_dataChanged) {
-            m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+            m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
             glBufferData(GL_ARRAY_BUFFER, normals.size() * 3 * sizeof(GLfloat), normals.data(), GL_STATIC_DRAW);
           } else {
-            m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+            m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           }
           glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, 0, 0);
         }
 
         if (!triangleIndexes.empty()) {
           if (m_dataChanged) {
-            m_pickingVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
+            m_pickingVBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                          triangleIndexes.size() * sizeof(GLuint),
                          triangleIndexes.data(),
                          GL_STATIC_DRAW);
           } else {
-            m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
+            m_VBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
           }
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        m_pickingVAOs.release();
+        m_pickingVAOs->release();
       }
 
       m_pickingDataChanged = false;
@@ -1000,13 +1001,13 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       const auto& vertices = (*m_meshPt)[i]->vertices();
       const auto& triangleIndexes = (*m_meshPt)[i]->indices();
 
-      m_pickingVAOs.bind(i);
+      m_pickingVAOs->bind(i);
       if (triangleIndexes.empty()) {
         glDrawArrays(type, 0, vertices.size());
       } else {
         glDrawElements(type, triangleIndexes.size(), GL_UNSIGNED_INT, 0);
       }
-      m_pickingVAOs.release();
+      m_pickingVAOs->release();
     }
 
     if (m_wireframeModeValue == WireframeMode::OnlyWireframe) {
@@ -1021,8 +1022,12 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     // }
     if (m_pickingDataChanged) {
       m_pickingVBOs.resize(m_meshPt->size());
-      for (size_t ivbo = 0; ivbo < m_pickingVBOs.size(); ++ivbo) {
-        m_pickingVBOs[ivbo].resize(3);
+      for (auto& pickingVBO : m_pickingVBOs) {
+        if (!pickingVBO) {
+          pickingVBO = std::make_unique<Z3DVertexBufferObject>(3);
+        } else {
+          pickingVBO->resize(3);
+        }
       }
     }
 
@@ -1046,31 +1051,31 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       size_t bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);
       if (m_dataChanged) {
-        m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+        m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         if (m_pickingDataChanged) {
           glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
         }
       } else {
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
       }
       glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
       if (attr_normal != -1) {
         glEnableVertexAttribArray(attr_normal);
         if (m_dataChanged) {
-          m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+          m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
           if (m_pickingDataChanged) {
             glBufferData(GL_ARRAY_BUFFER, normals.size() * 3 * sizeof(GLfloat), normals.data(), GL_STATIC_DRAW);
           }
         } else {
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, bufIdx++);
         }
         glVertexAttribPointer(attr_normal, 3, GL_FLOAT, GL_FALSE, 0, 0);
       }
 
       if (!triangleIndexes.empty()) {
         if (m_dataChanged) {
-          m_pickingVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
+          m_pickingVBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
           if (m_pickingDataChanged) {
             glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                          triangleIndexes.size() * sizeof(GLuint),
@@ -1078,7 +1083,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
                          GL_STATIC_DRAW);
           }
         } else {
-          m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
+          m_VBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
         }
         glDrawElements(type, triangleIndexes.size(), GL_UNSIGNED_INT, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -1103,7 +1108,44 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     m_pickingDataChanged = false;
   }
 
-  m_meshShaderGrp.release();
+  m_meshShaderGrp->release();
+}
+
+void Z3DMeshRenderer::createResources(RenderBackend backend)
+{
+  if (backend != RenderBackend::OpenGL) {
+    return;
+  }
+  m_meshShaderGrp = std::make_unique<Z3DShaderGroup>(m_rendererBase);
+
+  QStringList allshaders;
+  allshaders << "mesh.vert"
+             << "mesh_func.frag"
+             << "lighting2.frag";
+  QStringList normalShaders;
+  normalShaders << "mesh.vert"
+                << "mesh.frag"
+                << "lighting2.frag";
+  const std::string header = m_rendererBase.generateHeader() + generateHeader();
+  m_meshShaderGrp->init(allshaders, header, "", normalShaders);
+  m_meshShaderGrp->addAllSupportedPostShaders();
+
+  m_VAOs = std::make_unique<Z3DVertexArrayObject>(1);
+  m_pickingVAOs = std::make_unique<Z3DVertexArrayObject>(1);
+  m_VBOs.clear();
+  m_pickingVBOs.clear();
+
+  m_dataChanged = true;
+  m_pickingDataChanged = true;
+}
+
+void Z3DMeshRenderer::destroyResources()
+{
+  m_meshShaderGrp.reset();
+  m_VAOs.reset();
+  m_pickingVAOs.reset();
+  m_VBOs.clear();
+  m_pickingVBOs.clear();
 }
 
 } // namespace nim

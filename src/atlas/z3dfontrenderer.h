@@ -4,6 +4,7 @@
 #include "z3dsdfont.h"
 #include <QString>
 #include <QStringList>
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -64,7 +65,11 @@ public:
   void prepareFontShaderData(Z3DEye eye);
 
 protected:
-  Z3DShaderGroup m_fontShaderGrp;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderGroup> m_fontShaderGrp;
 
   QStringList m_fontNames;
   QString m_selectedFontName;
@@ -90,9 +95,9 @@ protected:
   std::vector<glm::vec2> m_fontTextureCoords;
   std::vector<GLuint> m_indexs;
 
-  Z3DVertexArrayObject m_VAO;
-  Z3DVertexBufferObject m_VBOs;
-  Z3DVertexBufferObject m_pickingVBOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
+  std::unique_ptr<Z3DVertexBufferObject> m_VBOs;
+  std::unique_ptr<Z3DVertexBufferObject> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
 };

@@ -2,6 +2,7 @@
 
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -48,16 +49,20 @@ protected:
   const Z3DTexture* m_colorTexture = nullptr;
   const Z3DTexture* m_depthTexture = nullptr;
 
-  Z3DShaderProgram m_blurXTextureShader;
-  Z3DShaderProgram m_blurYTextureShader;
-  Z3DShaderGroup m_glowTextureShaderGrp;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderProgram> m_blurXTextureShader;
+  std::unique_ptr<Z3DShaderProgram> m_blurYTextureShader;
+  std::unique_ptr<Z3DShaderGroup> m_glowTextureShaderGrp;
 
   GlowMode m_glowMode = GlowMode::Screen;
   int m_blurRadius = 10;
   float m_blurScale = 1.f;
   float m_blurStrength = 0.5f;
 
-  Z3DVertexArrayObject m_VAO;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
 };
 
 } // namespace nim

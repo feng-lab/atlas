@@ -14,24 +14,22 @@ namespace nim {
 
 Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_fontShaderGrp(rendererBase)
   , m_positionsPt(nullptr)
   , m_colorsPt(nullptr)
   , m_pickingColorsPt(nullptr)
-  , m_VAO(1)
-  , m_VBOs(4)
-  , m_pickingVBOs(4)
   , m_dataChanged(false)
   , m_pickingDataChanged(false)
 {
+  createResources(m_rendererBase.activeBackend());
+
   QStringList allshaders;
   allshaders << "almag.vert"
              << "almag_func.frag";
   QStringList normalShaders;
   normalShaders << "almag.vert"
                 << "almag.frag";
-  m_fontShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
-  m_fontShaderGrp.addAllSupportedPostShaders();
+  m_fontShaderGrp->init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
+  m_fontShaderGrp->addAllSupportedPostShaders();
 
   // search for available fonts
   QDir fontDir(ZSystemInfo::instance().fontPath());
@@ -88,7 +86,7 @@ void Z3DFontRenderer::setDataPickingColors(std::vector<glm::vec4>* pickingColors
 
 void Z3DFontRenderer::compile()
 {
-  m_fontShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_fontShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
 std::vector<glm::vec4>* Z3DFontRenderer::getColors()
@@ -149,8 +147,8 @@ void Z3DFontRenderer::render(Z3DEye eye)
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   }
 
-  m_fontShaderGrp.bind();
-  Z3DShaderProgram& shader = m_fontShaderGrp.get();
+  m_fontShaderGrp->bind();
+  Z3DShaderProgram& shader = m_fontShaderGrp->get();
 
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   shader.bindTexture("tex", font->texture());
@@ -164,14 +162,14 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
   if (m_useVAO) {
     if (m_dataChanged) {
-      m_VAO.bind();
+      m_VAO->bind();
       // set vertex data
       auto attr_vertex = shader.vertexAttributeLocation();
       auto attr_2dTexCoord0 = shader.tex2dCoord0AttributeLocation();
       auto attr_color = shader.colorAttributeLocation();
 
       glEnableVertexAttribArray(attr_vertex);
-      m_VBOs.bind(GL_ARRAY_BUFFER, 0);
+      m_VBOs->bind(GL_ARRAY_BUFFER, 0);
       glBufferData(GL_ARRAY_BUFFER,
                    m_fontPositions.size() * 3 * sizeof(GLfloat),
                    m_fontPositions.data(),
@@ -179,7 +177,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
       glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_2dTexCoord0);
-      m_VBOs.bind(GL_ARRAY_BUFFER, 1);
+      m_VBOs->bind(GL_ARRAY_BUFFER, 1);
       glBufferData(GL_ARRAY_BUFFER,
                    m_fontTextureCoords.size() * 2 * sizeof(GLfloat),
                    m_fontTextureCoords.data(),
@@ -187,22 +185,22 @@ void Z3DFontRenderer::render(Z3DEye eye)
       glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_color);
-      m_VBOs.bind(GL_ARRAY_BUFFER, 2);
+      m_VBOs->bind(GL_ARRAY_BUFFER, 2);
       glBufferData(GL_ARRAY_BUFFER, m_fontColors.size() * 4 * sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-      m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 3);
+      m_VBOs->bind(GL_ELEMENT_ARRAY_BUFFER, 3);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
       glBindBuffer(GL_ARRAY_BUFFER, 0);
-      m_VAO.release();
+      m_VAO->release();
 
       m_dataChanged = false;
     }
 
-    m_VAO.bind();
+    m_VAO->bind();
     glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
-    m_VAO.release();
+    m_VAO->release();
 
   } else {
     // set vertex data
@@ -211,12 +209,12 @@ void Z3DFontRenderer::render(Z3DEye eye)
     auto attr_color = shader.colorAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
-    m_VBOs.bind(GL_ARRAY_BUFFER, 0);
+    m_VBOs->bind(GL_ARRAY_BUFFER, 0);
     glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size() * 3 * sizeof(GLfloat), m_fontPositions.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_2dTexCoord0);
-    m_VBOs.bind(GL_ARRAY_BUFFER, 1);
+    m_VBOs->bind(GL_ARRAY_BUFFER, 1);
     glBufferData(GL_ARRAY_BUFFER,
                  m_fontTextureCoords.size() * 2 * sizeof(GLfloat),
                  m_fontTextureCoords.data(),
@@ -224,11 +222,11 @@ void Z3DFontRenderer::render(Z3DEye eye)
     glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_color);
-    m_VBOs.bind(GL_ARRAY_BUFFER, 2);
+    m_VBOs->bind(GL_ARRAY_BUFFER, 2);
     glBufferData(GL_ARRAY_BUFFER, m_fontColors.size() * 4 * sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 3);
+    m_VBOs->bind(GL_ELEMENT_ARRAY_BUFFER, 3);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
     glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
@@ -240,7 +238,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
     glDisableVertexAttribArray(attr_color);
   }
 
-  m_fontShaderGrp.release();
+  m_fontShaderGrp->release();
 
   if (m_rendererBase.shaderHookType() == Z3DRendererBase::ShaderHookType::Normal) {
     glDisable(GL_BLEND);
@@ -321,6 +319,28 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
       loc += rightVector * charInfo.xadvance * scale;
     }
   }
+}
+
+void Z3DFontRenderer::createResources(RenderBackend backend)
+{
+  if (backend != RenderBackend::OpenGL) {
+    return;
+  }
+  m_fontShaderGrp = std::make_unique<Z3DShaderGroup>(m_rendererBase);
+  m_VAO = std::make_unique<Z3DVertexArrayObject>(1);
+  m_VBOs = std::make_unique<Z3DVertexBufferObject>(4);
+  m_pickingVBOs = std::make_unique<Z3DVertexBufferObject>(4);
+
+  m_dataChanged = true;
+  m_pickingDataChanged = true;
+}
+
+void Z3DFontRenderer::destroyResources()
+{
+  m_fontShaderGrp.reset();
+  m_VAO.reset();
+  m_VBOs.reset();
+  m_pickingVBOs.reset();
 }
 
 void Z3DFontRenderer::setFontName(const QString& fontName)

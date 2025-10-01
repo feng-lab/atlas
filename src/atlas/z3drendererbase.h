@@ -91,6 +91,10 @@ public:
 
   void unregisterRenderer(Z3DPrimitiveRenderer* renderer);
 
+  void releaseBackendResources();
+
+  void buildBackendResources(RenderBackend backend);
+
   Z3DRendererBase(RendererParameterState& parameterState,
                   RendererFrameState& frameState,
                   RendererViewState& viewState,
@@ -292,11 +296,12 @@ public:
     return m_clipEnabled;
   }
 
-  void setBackend(std::unique_ptr<Z3DRendererBackend> backend);
+  void setBackend(RenderBackend backendType);
 
-  Z3DRendererBackend& backend();
-
-  const Z3DRendererBackend& backend() const;
+  RenderBackend activeBackend() const
+  {
+    return m_activeBackend;
+  }
 
   void compile();
 
@@ -365,6 +370,7 @@ protected:
 private:
   std::set<Z3DPrimitiveRenderer*>::iterator m_renderersIt;
   std::unique_ptr<Z3DRendererBackend> m_backend;
+  RenderBackend m_activeBackend = RenderBackend::OpenGL;
   RenderMethod m_renderMethod;
 
   std::vector<Z3DScratchResourcePool::RenderTargetLease*> m_persistentLeases;

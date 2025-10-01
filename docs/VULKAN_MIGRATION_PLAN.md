@@ -357,9 +357,9 @@ Abstraction/Reuse tasks
 - [x] Simplify compositor façade/readback to rely on `Z3DLocalColorBuffer` snapshots (engine screenshots now API-neutral).
 - [x] Replace `ZVulkanRendererBase` with `Z3DRendererVulkanBackend` so Vulkan shares the `Z3DRendererBase` state machinery.
   - [x] Introduce a Vulkan `Z3DRendererBackend` implementation that wraps device/swapchain setup (`beginFrame`, `endFrame`, readback helpers).
-- [x] Update `ZVulkanRenderer` and renderer backend drivers to consume `RendererFrameState`, `RendererViewState`, and `RendererSceneState` from the host `Z3DRendererBase`.
-  - [x] Switch filter/backend factories (`Z3DBoundedFilter::refreshRendererBackend`, compositor bridge) to create the Vulkan backend and drop direct `ZVulkanRendererBase` construction.
-  - [x] Delete or shim the legacy `ZVulkanRendererBase` once all call sites are migrated.
+- [x] Update renderer backend drivers to consume `RendererFrameState`, `RendererViewState`, and `RendererSceneState` from the host `Z3DRendererBase`.
+  - [x] Switch filter/backend factories (`Z3DBoundedFilter::refreshRendererBackend`, compositor bridge) to create the Vulkan backend via `Z3DRendererBase::setBackend(RenderBackend)` so callers never construct backend objects directly.
+  - [x] Remove the legacy `ZVulkanRenderer` / `ZVulkanBackgroundRenderer` shims once all call sites are migrated (they are now deleted).
   - [x] Hoist lighting-state assembly into `Z3DRenderGlobalState` so shared renderer state builds lighting without calling back into global parameters.
 - [ ] Expand Vulkan compositor to provide equivalent outputs (ready targets/readback).
 - [ ] Migrate engine to hold a `std::unique_ptr` to the facade and switch backend at runtime.

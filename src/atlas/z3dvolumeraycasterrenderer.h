@@ -5,6 +5,7 @@
 #include "zmesh.h"
 #include "z3dshaderprogram.h"
 #include "z3drendertarget.h"
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -126,11 +127,15 @@ protected:
   //  Z3DShaderProgram m_volumeSliceWithTransferfunShader;
 
   // single channel version
-  Z3DShaderProgram m_scRaycasterShader;
-  Z3DShaderProgram m_sc2dImageShader;
-  Z3DShaderProgram m_scVolumeSliceWithTransferfunShader;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderProgram> m_scRaycasterShader;
+  std::unique_ptr<Z3DShaderProgram> m_sc2dImageShader;
+  std::unique_ptr<Z3DShaderProgram> m_scVolumeSliceWithTransferfunShader;
   Z3DRenderTarget* m_layerTarget = nullptr;
-  Z3DShaderProgram m_mergeChannelShader;
+  std::unique_ptr<Z3DShaderProgram> m_mergeChannelShader;
   float m_samplingRateValue = 1.f; // Sampling rate of the raycasting, specified relative to the size of one voxel
   float m_isoValue = 0.5f; // The used isovalue, when isosurface raycasting is enabled
   float m_localMIPThreshold = 0.8f;
@@ -154,7 +159,7 @@ private:
   const Z3DTexture* m_exitTexCoordTexture;
   const Z3DTexture* m_exitEyeCoordTexture;
 
-  ZVertexArrayObject m_VAO;
+  std::unique_ptr<ZVertexArrayObject> m_VAO;
 };
 
 } // namespace nim

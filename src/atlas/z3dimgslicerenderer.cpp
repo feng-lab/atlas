@@ -16,26 +16,8 @@ namespace nim {
 
 Z3DImgSliceRenderer::Z3DImgSliceRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_VAO(1)
 {
-  //  m_volumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_colormap.frag",
-  //                                         m_rendererBase.generateHeader() + generateHeader());
-
-  m_scVolumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert",
-                                           "volume_slice_with_colormap_single_channel.frag",
-                                           m_rendererBase.generateHeader() + generateHeader());
-  m_mergeChannelShader.loadFromSourceFile("pass.vert",
-                                          "image2d_array_compositor.frag",
-                                          m_rendererBase.generateHeader() + generateHeader());
-
-  m_image3DSliceWithColorMapBlockIDsShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
-                                                              "image3d_slice_with_transfun_blockID.frag",
-                                                              m_rendererBase.generateHeader() + generateHeader());
-  m_image3DSliceWithColorMapShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
-                                                      "image3d_slice_with_colormap.frag",
-                                                      m_rendererBase.generateHeader() + generateHeader());
-  CHECK_GL_ERROR
-
+  createResources(m_rendererBase.activeBackend());
   // Render targets (layer and block-id) are acquired from the scratch pool on demand.
 }
 
@@ -95,11 +77,11 @@ void Z3DImgSliceRenderer::compile()
 {
   // m_volumeSliceShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 
-  m_scVolumeSliceShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
-  m_mergeChannelShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_scVolumeSliceShader->setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_mergeChannelShader->setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 
-  m_image3DSliceWithColorMapBlockIDsShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
-  m_image3DSliceWithColorMapShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_image3DSliceWithColorMapBlockIDsShader->setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_image3DSliceWithColorMapShader->setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
 std::string Z3DImgSliceRenderer::generateHeader()
@@ -210,27 +192,27 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     std::vector<uint32_t> missingBlockIDs;
     tbb::concurrent_unordered_set<uint32_t> ccSet;
     { // scope for block id shader
-      m_image3DSliceWithColorMapBlockIDsShader.bind();
+      m_image3DSliceWithColorMapBlockIDsShader->bind();
       auto guard = folly::makeGuard([=, this]() {
-        m_image3DSliceWithColorMapBlockIDsShader.release();
+        m_image3DSliceWithColorMapBlockIDsShader->release();
       });
 
-      m_image3DSliceWithColorMapBlockIDsShader.setUniform("ze_to_screen_pixel_voxel_size",
+      m_image3DSliceWithColorMapBlockIDsShader->setUniform("ze_to_screen_pixel_voxel_size",
                                                           ze_to_screen_pixel_voxel_size);
-      m_image3DSliceWithColorMapBlockIDsShader.setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
-      m_image3DSliceWithColorMapBlockIDsShader.setViewMatrixUniform(eyeState.viewMatrix);
+      m_image3DSliceWithColorMapBlockIDsShader->setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
+      m_image3DSliceWithColorMapBlockIDsShader->setViewMatrixUniform(eyeState.viewMatrix);
 
       // render block ids
       const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
 
-      m_img->bindFullResBlockIDsShader(m_image3DSliceWithColorMapBlockIDsShader, i);
+      m_img->bindFullResBlockIDsShader(*m_image3DSliceWithColorMapBlockIDsShader, i);
 
       for (auto& slice : m_slices) {
         blockLease.renderTarget->bind();
         glDrawBuffers(1, g_drawBuffers);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        renderTriangleList(m_VAO, m_image3DSliceWithColorMapBlockIDsShader, slice);
+        renderTriangleList(*m_VAO, *m_image3DSliceWithColorMapBlockIDsShader, slice);
 
         blockLease.renderTarget->release();
 
@@ -257,20 +239,20 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, i, cancellationToken, bt);
 
     // render channels one by one
-    m_image3DSliceWithColorMapShader.bind();
+    m_image3DSliceWithColorMapShader->bind();
 
-    m_image3DSliceWithColorMapShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
-    m_image3DSliceWithColorMapShader.setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
-    m_image3DSliceWithColorMapShader.setViewMatrixUniform(eyeState.viewMatrix);
+    m_image3DSliceWithColorMapShader->setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
+    m_image3DSliceWithColorMapShader->setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
+    m_image3DSliceWithColorMapShader->setViewMatrixUniform(eyeState.viewMatrix);
 
     // macOS: if sets here, then the following rendering uses old page directory caches. no idea why
-    // m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
+    // m_img->bindFullResRenderShader(*m_image3DSliceWithColorMapShader);
 
     if (m_img->numChannels() == 1) {
-      m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader, 0);
-      m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[0]->get().texture1D());
+      m_img->bindFullResRenderShader(*m_image3DSliceWithColorMapShader, 0);
+      m_image3DSliceWithColorMapShader->bindTexture("colormap", (*m_colormaps)[0]->get().texture1D());
       for (auto& slice : m_slices) {
-        renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, slice);
+        renderTriangleList(*m_VAO, *m_image3DSliceWithColorMapShader, slice);
       }
     } else {
       layerLease.renderTarget->attachSlice(i);
@@ -282,10 +264,10 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       layerLease.renderTarget->bind();
       layerLease.renderTarget->clear();
 
-      m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader, i);
-      m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[i]->get().texture1D());
+      m_img->bindFullResRenderShader(*m_image3DSliceWithColorMapShader, i);
+      m_image3DSliceWithColorMapShader->bindTexture("colormap", (*m_colormaps)[i]->get().texture1D());
       for (auto& slice : m_slices) {
-        renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, slice);
+        renderTriangleList(*m_VAO, *m_image3DSliceWithColorMapShader, slice);
       }
 
       layerLease.renderTarget->release();
@@ -295,17 +277,17 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       // }
     }
 
-    m_image3DSliceWithColorMapShader.release();
+    m_image3DSliceWithColorMapShader->release();
     // glFinish();
     bt.recordEvent("render image3d slice");
   }
 
   if (m_img->numChannels() > 1) {
-    m_mergeChannelShader.bind();
-    m_mergeChannelShader.bindTexture("color_texture", layerLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
-    m_mergeChannelShader.bindTexture("depth_texture", layerLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
-    renderScreenQuad(m_VAO, m_mergeChannelShader);
-    m_mergeChannelShader.release();
+    m_mergeChannelShader->bind();
+    m_mergeChannelShader->bindTexture("color_texture", layerLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+    m_mergeChannelShader->bindTexture("depth_texture", layerLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
+    renderScreenQuad(*m_VAO, *m_mergeChannelShader);
+    m_mergeChannelShader->release();
   }
 
   CHECK_GL_ERROR
@@ -318,14 +300,14 @@ void Z3DImgSliceRenderer::renderSliceFast(Z3DEye eye)
 {
   auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
 
-  m_scVolumeSliceShader.bind();
-  m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceShader, eye);
+  m_scVolumeSliceShader->bind();
+  m_rendererBase.setGlobalShaderParameters(*m_scVolumeSliceShader, eye);
 
   Z3DScratchResourcePool::RenderTargetLease layerLease;
   if (m_img->numChannels() == 1) {
-    bindVolume(m_scVolumeSliceShader, 0);
+    bindVolume(*m_scVolumeSliceShader, 0);
     for (auto& slice : m_slices) {
-      renderTriangleList(m_VAO, m_scVolumeSliceShader, slice);
+      renderTriangleList(*m_VAO, *m_scVolumeSliceShader, slice);
     }
   } else {
     layerLease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize, static_cast<uint32_t>(m_img->numChannels()));
@@ -335,26 +317,65 @@ void Z3DImgSliceRenderer::renderSliceFast(Z3DEye eye)
       layerLease.renderTarget->bind();
       layerLease.renderTarget->clear();
 
-      bindVolume(m_scVolumeSliceShader, j);
+      bindVolume(*m_scVolumeSliceShader, j);
       for (auto& slice : m_slices) {
-        renderTriangleList(m_VAO, m_scVolumeSliceShader, slice);
+        renderTriangleList(*m_VAO, *m_scVolumeSliceShader, slice);
       }
 
       layerLease.renderTarget->release();
     }
   }
 
-  m_scVolumeSliceShader.release();
+  m_scVolumeSliceShader->release();
 
   if (m_img->numChannels() > 1) {
-    m_mergeChannelShader.bind();
-    m_mergeChannelShader.bindTexture("color_texture", layerLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
-    m_mergeChannelShader.bindTexture("depth_texture", layerLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
-    renderScreenQuad(m_VAO, m_mergeChannelShader);
-    m_mergeChannelShader.release();
+    m_mergeChannelShader->bind();
+    m_mergeChannelShader->bindTexture("color_texture", layerLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+    m_mergeChannelShader->bindTexture("depth_texture", layerLease.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
+    renderScreenQuad(*m_VAO, *m_mergeChannelShader);
+    m_mergeChannelShader->release();
   }
 
   CHECK_GL_ERROR
+}
+
+void Z3DImgSliceRenderer::createResources(RenderBackend backend)
+{
+  if (backend != RenderBackend::OpenGL) {
+    return;
+  }
+  m_scVolumeSliceShader = std::make_unique<Z3DShaderProgram>();
+  m_mergeChannelShader = std::make_unique<Z3DShaderProgram>();
+  m_image3DSliceWithColorMapBlockIDsShader = std::make_unique<Z3DShaderProgram>();
+  m_image3DSliceWithColorMapShader = std::make_unique<Z3DShaderProgram>();
+
+  const std::string header = m_rendererBase.generateHeader() + generateHeader();
+  m_scVolumeSliceShader->loadFromSourceFile("transform_with_3dtexture.vert",
+                                            "volume_slice_with_colormap_single_channel.frag",
+                                            header);
+  m_mergeChannelShader->loadFromSourceFile("pass.vert",
+                                           "image2d_array_compositor.frag",
+                                           header);
+  m_image3DSliceWithColorMapBlockIDsShader->loadFromSourceFile(
+    "transform_with_3dtexture_and_eye_coordinate.vert",
+    "image3d_slice_with_transfun_blockID.frag",
+    header);
+  m_image3DSliceWithColorMapShader->loadFromSourceFile(
+    "transform_with_3dtexture_and_eye_coordinate.vert",
+    "image3d_slice_with_colormap.frag",
+    header);
+  CHECK_GL_ERROR;
+
+  m_VAO = std::make_unique<Z3DVertexArrayObject>(1);
+}
+
+void Z3DImgSliceRenderer::destroyResources()
+{
+  m_scVolumeSliceShader.reset();
+  m_mergeChannelShader.reset();
+  m_image3DSliceWithColorMapBlockIDsShader.reset();
+  m_image3DSliceWithColorMapShader.reset();
+  m_VAO.reset();
 }
 
 } // namespace nim

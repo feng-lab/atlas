@@ -303,6 +303,7 @@ private:
   void onCanvasResized(size_t w, size_t h);
 
   void initGL();
+  void ensureGLContext();
   // Vulkan init deferred
 
   void rotateX();
@@ -339,6 +340,7 @@ private:
   void resetOutputSizeToMatchCanvasSize();
 
   void handleRenderBackendChanged();
+  void applyBackendSwitch();
 
 private:
   struct ScratchPoolDeleter
@@ -378,6 +380,7 @@ private:
   double m_progress = 0;
 
   // Backend switch deferred
+  bool m_backendSwitchScheduled = false;
 
   // Pending per-object View3D json waiting for objViewReady
   std::unordered_map<size_t, json::object> m_pendingObjViewJson;

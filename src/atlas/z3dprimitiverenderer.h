@@ -16,6 +16,10 @@ public:
 
   virtual ~Z3DPrimitiveRenderer();
 
+  virtual void buildBackendResources(RenderBackend backend);
+
+  virtual void releaseBackendResources();
+
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   // for opengl mode only, if set, display list will be build in opengl mode.
   // for large amount of objects, display list can render faster but it is expensive to build.
@@ -111,6 +115,10 @@ protected:
   virtual void renderPicking(Z3DEye) {}
 
 protected:
+  virtual void createResources(RenderBackend /*backend*/) {}
+
+  virtual void destroyResources() {}
+
   Z3DRendererBase& m_rendererBase;
   bool m_needLighting = true;
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)

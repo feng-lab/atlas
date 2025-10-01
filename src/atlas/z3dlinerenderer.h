@@ -3,6 +3,7 @@
 #include "z3dprimitiverenderer.h"
 #include "z3dgpuinfo.h"
 #include "z3drendercommands.h"
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
@@ -106,18 +107,22 @@ private:
   Z3DShaderGroup& currentShaderGrp()
   {
     if (m_useGeomLineShader && m_useSmoothLine) {
-      return m_smoothLineShaderGrp;
+      return *m_smoothLineShaderGrp;
     } else if (m_useSmoothLine) {
-      return m_smoothLineShaderGrp1;
+      return *m_smoothLineShaderGrp1;
     } else {
-      return m_lineShaderGrp;
+      return *m_lineShaderGrp;
     }
   }
 
 protected:
-  Z3DShaderGroup m_lineShaderGrp;
-  Z3DShaderGroup m_smoothLineShaderGrp;
-  Z3DShaderGroup m_smoothLineShaderGrp1;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderGroup> m_lineShaderGrp;
+  std::unique_ptr<Z3DShaderGroup> m_smoothLineShaderGrp;
+  std::unique_ptr<Z3DShaderGroup> m_smoothLineShaderGrp1;
 
   std::vector<glm::vec3> m_linePositions;
   std::vector<glm::vec4> m_lineColors;
@@ -133,10 +138,10 @@ protected:
   Z3DTexture* m_texture;
 
 private:
-  Z3DVertexArrayObject m_VAO;
-  Z3DVertexArrayObject m_pickingVAO;
-  Z3DVertexBufferObject m_VBOs;
-  Z3DVertexBufferObject m_pickingVBOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
+  std::unique_ptr<Z3DVertexArrayObject> m_pickingVAO;
+  std::unique_ptr<Z3DVertexBufferObject> m_VBOs;
+  std::unique_ptr<Z3DVertexBufferObject> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
   bool m_isLineStrip;
@@ -157,10 +162,10 @@ private:
   std::vector<GLfloat> m_allFlags;
   std::vector<GLuint> m_indexs;
 
-  Z3DVertexArrayObject m_VAOs;
-  Z3DVertexArrayObject m_pickingVAOs;
-  std::vector<Z3DVertexBufferObject> m_batchVBOs;
-  std::vector<Z3DVertexBufferObject> m_batchPickingVBOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_pickingVAOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_batchVBOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_batchPickingVBOs;
   size_t m_oneBatchNumber;
   bool m_useGeomLineShader;
 

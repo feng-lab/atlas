@@ -4,6 +4,7 @@
 #include "z3dshaderprogram.h"
 #include "zcolormap.h"
 #include "zmesh.h"
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -85,11 +86,15 @@ private:
 
 protected:
   // Z3DShaderProgram m_volumeSliceShader;
-  Z3DShaderProgram m_scVolumeSliceShader;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderProgram> m_scVolumeSliceShader;
   // Internal targets are obtained from the scratch pool
-  Z3DShaderProgram m_mergeChannelShader;
-  Z3DShaderProgram m_image3DSliceWithColorMapBlockIDsShader;
-  Z3DShaderProgram m_image3DSliceWithColorMapShader;
+  std::unique_ptr<Z3DShaderProgram> m_mergeChannelShader;
+  std::unique_ptr<Z3DShaderProgram> m_image3DSliceWithColorMapBlockIDsShader;
+  std::unique_ptr<Z3DShaderProgram> m_image3DSliceWithColorMapShader;
 
   Z3DImg* m_img = nullptr;
   const std::vector<std::unique_ptr<ZColorMapParameter>>* m_colormaps = nullptr;
@@ -98,7 +103,7 @@ protected:
 
 private:
   std::vector<ZMesh> m_slices;
-  Z3DVertexArrayObject m_VAO;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
   bool m_fastRendering = true;

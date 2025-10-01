@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -54,7 +55,11 @@ public:
   void renderPicking(Z3DEye) override;
 
 protected:
-  Z3DShaderGroup m_backgroundShaderGrp;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderGroup> m_backgroundShaderGrp;
 
   glm::vec4 m_region{0.f, 1.f, 0.f, 1.f};
 
@@ -63,8 +68,8 @@ protected:
   glm::vec4 m_firstColorValue{1.f, 1.f, 1.f, 1.f};
   glm::vec4 m_secondColorValue{0.2f, 0.2f, 0.2f, 1.f};
 
-  Z3DVertexArrayObject m_VAO;
-  Z3DVertexBufferObject m_VBO;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
+  std::unique_ptr<Z3DVertexBufferObject> m_VBO;
 };
 
 } // namespace nim

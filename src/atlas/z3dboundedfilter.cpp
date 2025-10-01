@@ -523,29 +523,7 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye, BoundBoxRenderStyle style)
 
 void Z3DBoundedFilter::switchRendererBackend(RenderBackend backendRequest)
 {
-  std::unique_ptr<Z3DRendererBackend> backend;
-  switch (backendRequest) {
-    case RenderBackend::OpenGL:
-      backend = createGLRendererBackend();
-      break;
-    case RenderBackend::Vulkan:
-      try {
-        backend = createVulkanRendererBackend();
-      }
-      catch (const ZException&) {
-        throw;
-      }
-      catch (const std::exception& e) {
-        throw ZException(fmt::format("Failed to create Vulkan renderer backend: {}", e.what()));
-      }
-      if (!backend) {
-        throw ZException("Failed to create Vulkan renderer backend");
-      }
-      break;
-  }
-
-  m_rendererBase.releasePersistentLeases();
-  m_rendererBase.setBackend(std::move(backend));
+  m_rendererBase.setBackend(backendRequest);
 }
 
 void Z3DBoundedFilter::pushRendererParametersToBase()

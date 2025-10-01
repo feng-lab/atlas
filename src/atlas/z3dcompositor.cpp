@@ -1038,6 +1038,7 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
   }
 
   ensureOutputTargets(m_outputSize);
+  invalidate(State::AllResultInvalid);
 }
 
 bool Z3DCompositor::tryRenderGeometriesPass(const std::vector<Z3DBoundedFilter*>& opaqueFilters,

@@ -7,23 +7,14 @@ namespace nim {
 
 Z3DTextureCopyRenderer::Z3DTextureCopyRenderer(Z3DRendererBase& rendererBase, OutputColorOption mode)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_copyTextureShaderGrp(rendererBase)
   , m_mode(mode)
-  , m_VAO(1)
 {
-  QStringList allshaders;
-  allshaders << "pass.vert"
-             << "copyimage_func.frag";
-  QStringList normalShaders;
-  normalShaders << "pass.vert"
-                << "copyimage.frag";
-  m_copyTextureShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
-  m_copyTextureShaderGrp.addAllSupportedPostShaders();
+  createResources(m_rendererBase.activeBackend());
 }
 
 void Z3DTextureCopyRenderer::compile()
 {
-  m_copyTextureShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_copyTextureShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
 std::string Z3DTextureCopyRenderer::generateHeader() const
@@ -45,8 +36,8 @@ void Z3DTextureCopyRenderer::render(Z3DEye eye)
     return;
   }
 
-  m_copyTextureShaderGrp.bind();
-  Z3DShaderProgram& shader = m_copyTextureShaderGrp.get();
+  m_copyTextureShaderGrp->bind();
+  Z3DShaderProgram& shader = m_copyTextureShaderGrp->get();
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   shader.setUniform("discard_transparent", m_discardTransparent);
 
@@ -54,8 +45,32 @@ void Z3DTextureCopyRenderer::render(Z3DEye eye)
   shader.bindTexture("color_texture", m_colorTexture);
   shader.bindTexture("depth_texture", m_depthTexture);
 
-  renderScreenQuad(m_VAO, shader);
-  m_copyTextureShaderGrp.release();
+  renderScreenQuad(*m_VAO, shader);
+  m_copyTextureShaderGrp->release();
+}
+
+void Z3DTextureCopyRenderer::createResources(RenderBackend backend)
+{
+  if (backend != RenderBackend::OpenGL) {
+    return;
+  }
+  m_copyTextureShaderGrp = std::make_unique<Z3DShaderGroup>(m_rendererBase);
+  QStringList allshaders;
+  allshaders << "pass.vert"
+             << "copyimage_func.frag";
+  QStringList normalShaders;
+  normalShaders << "pass.vert"
+                << "copyimage.frag";
+  m_copyTextureShaderGrp->init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
+  m_copyTextureShaderGrp->addAllSupportedPostShaders();
+
+  m_VAO = std::make_unique<Z3DVertexArrayObject>(1);
+}
+
+void Z3DTextureCopyRenderer::destroyResources()
+{
+  m_copyTextureShaderGrp.reset();
+  m_VAO.reset();
 }
 
 } // namespace nim

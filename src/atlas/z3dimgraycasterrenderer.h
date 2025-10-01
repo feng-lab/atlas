@@ -8,6 +8,7 @@
 #include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dscratchresourcepool.h"
 #include <array>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -181,15 +182,19 @@ protected:
   //  Z3DShaderProgram m_volumeSliceWithTransferfunShader;
 
   // single channel version
-  Z3DShaderProgram m_scRaycasterShader;
-  Z3DShaderProgram m_sc2dImageShader;
-  Z3DShaderProgram m_scVolumeSliceWithTransferfunShader;
-  Z3DShaderProgram m_image3DSliceWithTransferfunBlockIDsShader;
-  Z3DShaderProgram m_image3DSliceWithTransferfunShader;
-  Z3DShaderProgram m_image3DRaycasterBlockIDsShader;
-  Z3DShaderProgram m_image3DRaycasterShader;
-  Z3DShaderProgram m_mergeChannelShader;
-  Z3DShaderProgram m_copyTextureShader;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderProgram> m_scRaycasterShader;
+  std::unique_ptr<Z3DShaderProgram> m_sc2dImageShader;
+  std::unique_ptr<Z3DShaderProgram> m_scVolumeSliceWithTransferfunShader;
+  std::unique_ptr<Z3DShaderProgram> m_image3DSliceWithTransferfunBlockIDsShader;
+  std::unique_ptr<Z3DShaderProgram> m_image3DSliceWithTransferfunShader;
+  std::unique_ptr<Z3DShaderProgram> m_image3DRaycasterBlockIDsShader;
+  std::unique_ptr<Z3DShaderProgram> m_image3DRaycasterShader;
+  std::unique_ptr<Z3DShaderProgram> m_mergeChannelShader;
+  std::unique_ptr<Z3DShaderProgram> m_copyTextureShader;
 
   // Internal targets
   // Raycast accumulators are acquired from the scratch pool on demand
@@ -213,7 +218,7 @@ private:
   std::vector<ZMesh> m_quads;
   const Z3DTexture* m_entryExitTexCoordAndZeTexture = nullptr;
 
-  Z3DVertexArrayObject m_VAO;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
   bool m_fastRendering = true;

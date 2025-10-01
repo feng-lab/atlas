@@ -2,6 +2,7 @@
 
 #include "z3dprimitiverenderer.h"
 #include <algorithm>
+#include <memory>
 #include <string>
 
 namespace nim {
@@ -50,7 +51,11 @@ protected:
   void appendDefaultColors();
 
 protected:
-  Z3DShaderGroup m_sphereShaderGrp;
+  void createResources(RenderBackend backend) override;
+
+  void destroyResources() override;
+
+  std::unique_ptr<Z3DShaderGroup> m_sphereShaderGrp;
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   int m_sphereSlicesStacks = 36;
@@ -68,10 +73,10 @@ private:
 
   // std::vector<GLuint> m_VBOs;
   // std::vector<GLuint> m_pickingVBOs;
-  Z3DVertexArrayObject m_VAOs;
-  Z3DVertexArrayObject m_pickingVAOs;
-  std::vector<Z3DVertexBufferObject> m_VBOs;
-  std::vector<Z3DVertexBufferObject> m_pickingVBOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_VAOs;
+  std::unique_ptr<Z3DVertexArrayObject> m_pickingVAOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_VBOs;
+  std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
   size_t m_oneBatchNumber;

@@ -7,16 +7,13 @@ namespace nim {
 Z3DTextureBlendRenderer::Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase, TextureBlendMode mode)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_blendMode(mode)
-  , m_VAO(1)
 {
-  m_blendTextureShader.loadFromSourceFile("pass.vert",
-                                          "compositor.frag",
-                                          m_rendererBase.generateHeader() + generateHeader());
+  createResources(m_rendererBase.activeBackend());
 }
 
 void Z3DTextureBlendRenderer::compile()
 {
-  m_blendTextureShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_blendTextureShader->setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
 std::string Z3DTextureBlendRenderer::generateHeader()
@@ -57,19 +54,19 @@ void Z3DTextureBlendRenderer::render(Z3DEye eye)
     return;
   }
 
-  m_blendTextureShader.bind();
-  m_rendererBase.setGlobalShaderParameters(m_blendTextureShader, eye);
+  m_blendTextureShader->bind();
+  m_rendererBase.setGlobalShaderParameters(*m_blendTextureShader, eye);
 
-  m_blendTextureShader.bindTexture("color_texture_0", m_colorTexture1);
-  m_blendTextureShader.bindTexture("depth_texture_0", m_depthTexture1);
+  m_blendTextureShader->bindTexture("color_texture_0", m_colorTexture1);
+  m_blendTextureShader->bindTexture("depth_texture_0", m_depthTexture1);
 
-  m_blendTextureShader.bindTexture("color_texture_1", m_colorTexture2);
-  m_blendTextureShader.bindTexture("depth_texture_1", m_depthTexture2);
+  m_blendTextureShader->bindTexture("color_texture_1", m_colorTexture2);
+  m_blendTextureShader->bindTexture("depth_texture_1", m_depthTexture2);
 
   glDepthFunc(GL_ALWAYS);
-  renderScreenQuad(m_VAO, m_blendTextureShader);
+  renderScreenQuad(*m_VAO, *m_blendTextureShader);
   glDepthFunc(GL_LESS);
-  m_blendTextureShader.release();
+  m_blendTextureShader->release();
 }
 
 void Z3DTextureBlendRenderer::setBlendMode(TextureBlendMode mode)
@@ -79,6 +76,25 @@ void Z3DTextureBlendRenderer::setBlendMode(TextureBlendMode mode)
   }
   m_blendMode = mode;
   compile();
+}
+
+void Z3DTextureBlendRenderer::createResources(RenderBackend backend)
+{
+  if (backend != RenderBackend::OpenGL) {
+    return;
+  }
+  m_blendTextureShader = std::make_unique<Z3DShaderProgram>();
+  m_blendTextureShader->loadFromSourceFile("pass.vert",
+                                           "compositor.frag",
+                                           m_rendererBase.generateHeader() + generateHeader());
+
+  m_VAO = std::make_unique<Z3DVertexArrayObject>(1);
+}
+
+void Z3DTextureBlendRenderer::destroyResources()
+{
+  m_blendTextureShader.reset();
+  m_VAO.reset();
 }
 
 } // namespace nim

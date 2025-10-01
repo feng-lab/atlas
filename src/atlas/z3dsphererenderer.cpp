@@ -8,11 +8,6 @@ namespace nim {
 
 Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_sphereShaderGrp(rendererBase)
-  //  , m_VBOs(5)
-  //  , m_pickingVBOs(4)
-  , m_VAOs(1)
-  , m_pickingVAOs(1)
   , m_dataChanged(false)
   , m_pickingDataChanged(false)
   , m_oneBatchNumber(4e6)
@@ -20,13 +15,7 @@ Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase& rendererBase)
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
 #endif
-
-  QStringList allshaders;
-  allshaders << "sphere.vert"
-             << "sphere_func.frag"
-             << "lighting2.frag";
-  m_sphereShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
-  m_sphereShaderGrp.addAllSupportedPostShaders();
+  createResources(m_rendererBase.activeBackend());
 }
 
 void Z3DSphereRenderer::setData(std::vector<glm::vec4>* pointAndRadiusInput,
@@ -116,7 +105,7 @@ void Z3DSphereRenderer::setDataPickingColors(std::vector<glm::vec4>* pointPickin
 void Z3DSphereRenderer::compile()
 {
   m_dataChanged = true;
-  m_sphereShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
+  m_sphereShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
 std::string Z3DSphereRenderer::generateHeader()
@@ -188,8 +177,8 @@ void Z3DSphereRenderer::render(Z3DEye eye)
   }
   appendDefaultColors();
 
-  m_sphereShaderGrp.bind();
-  Z3DShaderProgram& shader = m_sphereShaderGrp.get();
+  m_sphereShaderGrp->bind();
+  Z3DShaderProgram& shader = m_sphereShaderGrp->get();
 
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setShaderParameters(shader);
@@ -208,11 +197,15 @@ void Z3DSphereRenderer::render(Z3DEye eye)
 
   if (m_useVAO) {
     if (m_dataChanged) {
-      m_VAOs.resize(numBatch);
+      m_VAOs->resize(numBatch);
 
       m_VBOs.resize(numBatch);
       for (auto& VBO : m_VBOs) {
-        VBO.resize(5);
+        if (!VBO) {
+          VBO = std::make_unique<Z3DVertexBufferObject>(5);
+        } else {
+          VBO->resize(5);
+        }
       }
 
       // set vertex data
@@ -225,7 +218,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
       auto attr_flags = shader.flagsAttributeLocation();
 
       for (size_t i = 0; i < numBatch; ++i) {
-        m_VAOs.bind(i);
+        m_VAOs->bind(i);
         size_t size = m_oneBatchNumber;
         if (i == numBatch - 1) {
           size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
@@ -233,32 +226,32 @@ void Z3DSphereRenderer::render(Z3DEye eye)
         size_t start = m_oneBatchNumber * i;
 
         glEnableVertexAttribArray(attr_a_vertex_radius);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, 0);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, 0);
         glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_pointAndRadius[start]), GL_STATIC_DRAW);
         glVertexAttribPointer(attr_a_vertex_radius, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
         if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
           glEnableVertexAttribArray(attr_a_specular_shininess);
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, 3);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, 3);
           glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_specularAndShininess[start]), GL_STATIC_DRAW);
           glVertexAttribPointer(attr_a_specular_shininess, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
         }
 
         glEnableVertexAttribArray(attr_color);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, 1);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, 1);
         glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_pointColors[start]), GL_STATIC_DRAW);
         glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
         glEnableVertexAttribArray(attr_flags);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, 2);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, 2);
         glBufferData(GL_ARRAY_BUFFER, size * sizeof(GLfloat), &(m_allFlags[start]), GL_STATIC_DRAW);
         glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-        m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
+        m_VBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, 4);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, size * 6 / 4 * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-        m_VAOs.release();
+        m_VAOs->release();
       }
 
       m_dataChanged = false;
@@ -269,16 +262,20 @@ void Z3DSphereRenderer::render(Z3DEye eye)
       if (i == numBatch - 1) {
         size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
       }
-      m_VAOs.bind(i);
+      m_VAOs->bind(i);
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
-      m_VAOs.release();
+      m_VAOs->release();
     }
 
   } else {
     if (m_dataChanged) {
       m_VBOs.resize(numBatch);
       for (auto& VBO : m_VBOs) {
-        VBO.resize(5);
+        if (!VBO) {
+          VBO = std::make_unique<Z3DVertexBufferObject>(5);
+        } else {
+          VBO->resize(5);
+        }
       }
     }
     // set vertex data
@@ -298,7 +295,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
       size_t start = m_oneBatchNumber * i;
 
       glEnableVertexAttribArray(attr_a_vertex_radius);
-      m_VBOs[i].bind(GL_ARRAY_BUFFER, 0);
+      m_VBOs[i]->bind(GL_ARRAY_BUFFER, 0);
       if (m_dataChanged) {
         glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_pointAndRadius[start]), GL_STATIC_DRAW);
       }
@@ -306,7 +303,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
 
       if (m_useDynamicMaterial && !m_specularAndShininess.empty()) {
         glEnableVertexAttribArray(attr_a_specular_shininess);
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, 3);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, 3);
         if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_specularAndShininess[start]), GL_STATIC_DRAW);
         }
@@ -314,20 +311,20 @@ void Z3DSphereRenderer::render(Z3DEye eye)
       }
 
       glEnableVertexAttribArray(attr_color);
-      m_VBOs[i].bind(GL_ARRAY_BUFFER, 1);
+      m_VBOs[i]->bind(GL_ARRAY_BUFFER, 1);
       if (m_dataChanged) {
         glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_pointColors[start]), GL_STATIC_DRAW);
       }
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_flags);
-      m_VBOs[i].bind(GL_ARRAY_BUFFER, 2);
+      m_VBOs[i]->bind(GL_ARRAY_BUFFER, 2);
       if (m_dataChanged) {
         glBufferData(GL_ARRAY_BUFFER, size * sizeof(GLfloat), &(m_allFlags[start]), GL_STATIC_DRAW);
       }
       glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-      m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
+      m_VBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, 4);
       if (m_dataChanged) {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, size * 6 / 4 * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
       }
@@ -347,7 +344,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
     m_dataChanged = false;
   }
 
-  m_sphereShaderGrp.release();
+  m_sphereShaderGrp->release();
 }
 
 void Z3DSphereRenderer::renderPicking(Z3DEye eye)
@@ -360,8 +357,8 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
     return;
   }
 
-  m_sphereShaderGrp.bind();
-  Z3DShaderProgram& shader = m_sphereShaderGrp.get();
+  m_sphereShaderGrp->bind();
+  Z3DShaderProgram& shader = m_sphereShaderGrp->get();
 
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setPickingShaderParameters(shader);
@@ -380,11 +377,15 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
 
   if (m_useVAO) {
     if (m_pickingDataChanged) {
-      m_pickingVAOs.resize(numBatch);
+      m_pickingVAOs->resize(numBatch);
 
       m_pickingVBOs.resize(numBatch);
       for (auto& pickingVBO : m_pickingVBOs) {
-        pickingVBO.resize(4);
+        if (!pickingVBO) {
+          pickingVBO = std::make_unique<Z3DVertexBufferObject>(4);
+        } else {
+          pickingVBO->resize(4);
+        }
       }
 
       // set vertex data
@@ -393,7 +394,7 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
       auto attr_flags = shader.flagsAttributeLocation();
 
       for (size_t i = 0; i < numBatch; ++i) {
-        m_pickingVAOs.bind(i);
+        m_pickingVAOs->bind(i);
         size_t size = m_oneBatchNumber;
         if (i == numBatch - 1) {
           size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
@@ -402,37 +403,37 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
 
         glEnableVertexAttribArray(attr_a_vertex_radius);
         if (m_dataChanged) {
-          m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, 0);
+          m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, 0);
           glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_pointAndRadius[start]), GL_STATIC_DRAW);
         } else {
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, 0);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, 0);
         }
         glVertexAttribPointer(attr_a_vertex_radius, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
         glEnableVertexAttribArray(attr_color);
-        m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, 1);
+        m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, 1);
         glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_pointPickingColors[start]), GL_STATIC_DRAW);
         glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
         glEnableVertexAttribArray(attr_flags);
         if (m_dataChanged) {
-          m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, 2);
+          m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, 2);
           glBufferData(GL_ARRAY_BUFFER, size * sizeof(GLfloat), &(m_allFlags[start]), GL_STATIC_DRAW);
         } else {
-          m_VBOs[i].bind(GL_ARRAY_BUFFER, 2);
+          m_VBOs[i]->bind(GL_ARRAY_BUFFER, 2);
         }
         glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
         if (m_dataChanged) {
-          m_pickingVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 3);
+          m_pickingVBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, 3);
           glBufferData(GL_ELEMENT_ARRAY_BUFFER, size * 6 / 4 * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
         } else {
-          m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
+          m_VBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, 4);
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        m_pickingVAOs.release();
+        m_pickingVAOs->release();
       }
 
       m_pickingDataChanged = false;
@@ -443,16 +444,20 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
       if (i == numBatch - 1) {
         size = m_pointAndRadius.size() - (numBatch - 1) * m_oneBatchNumber;
       }
-      m_pickingVAOs.bind(i);
+      m_pickingVAOs->bind(i);
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
-      m_pickingVAOs.release();
+      m_pickingVAOs->release();
     }
 
   } else {
     if (m_pickingDataChanged) {
       m_pickingVBOs.resize(numBatch);
       for (auto& pickingVBO : m_pickingVBOs) {
-        pickingVBO.resize(4);
+        if (!pickingVBO) {
+          pickingVBO = std::make_unique<Z3DVertexBufferObject>(4);
+        } else {
+          pickingVBO->resize(4);
+        }
       }
     }
     // set vertex data
@@ -469,17 +474,17 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_a_vertex_radius);
       if (m_dataChanged) {
-        m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, 0);
+        m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, 0);
         if (m_pickingDataChanged) {
           glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_pointAndRadius[start]), GL_STATIC_DRAW);
         }
       } else {
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, 0);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, 0);
       }
       glVertexAttribPointer(attr_a_vertex_radius, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_color);
-      m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, 1);
+      m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, 1);
       if (m_pickingDataChanged) {
         glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_pointPickingColors[start]), GL_STATIC_DRAW);
       }
@@ -487,22 +492,22 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_flags);
       if (m_dataChanged) {
-        m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, 2);
+        m_pickingVBOs[i]->bind(GL_ARRAY_BUFFER, 2);
         if (m_pickingDataChanged) {
           glBufferData(GL_ARRAY_BUFFER, size * sizeof(GLfloat), &(m_allFlags[start]), GL_STATIC_DRAW);
         }
       } else {
-        m_VBOs[i].bind(GL_ARRAY_BUFFER, 2);
+        m_VBOs[i]->bind(GL_ARRAY_BUFFER, 2);
       }
       glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       if (m_dataChanged) {
-        m_pickingVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 3);
+        m_pickingVBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, 3);
         if (m_pickingDataChanged) {
           glBufferData(GL_ELEMENT_ARRAY_BUFFER, size * 6 / 4 * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
         }
       } else {
-        m_VBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
+        m_VBOs[i]->bind(GL_ELEMENT_ARRAY_BUFFER, 4);
       }
 
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
@@ -517,7 +522,7 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
     m_pickingDataChanged = false;
   }
 
-  m_sphereShaderGrp.release();
+  m_sphereShaderGrp->release();
 }
 
 void Z3DSphereRenderer::appendDefaultColors()
@@ -532,6 +537,37 @@ void Z3DSphereRenderer::appendDefaultColors()
       m_specularAndShininess.emplace_back(1.f, 1.f, 1.f, 10.f);
     }
   }
+}
+
+void Z3DSphereRenderer::createResources(RenderBackend backend)
+{
+  if (backend != RenderBackend::OpenGL) {
+    return;
+  }
+  m_sphereShaderGrp = std::make_unique<Z3DShaderGroup>(m_rendererBase);
+  QStringList allshaders;
+  allshaders << "sphere.vert"
+             << "sphere_func.frag"
+             << "lighting2.frag";
+  m_sphereShaderGrp->init(allshaders, m_rendererBase.generateHeader() + generateHeader());
+  m_sphereShaderGrp->addAllSupportedPostShaders();
+
+  m_VAOs = std::make_unique<Z3DVertexArrayObject>(1);
+  m_pickingVAOs = std::make_unique<Z3DVertexArrayObject>(1);
+  m_VBOs.clear();
+  m_pickingVBOs.clear();
+
+  m_dataChanged = true;
+  m_pickingDataChanged = true;
+}
+
+void Z3DSphereRenderer::destroyResources()
+{
+  m_sphereShaderGrp.reset();
+  m_VAOs.reset();
+  m_pickingVAOs.reset();
+  m_VBOs.clear();
+  m_pickingVBOs.clear();
 }
 
 void Z3DSphereRenderer::setUseDynamicMaterial(bool enabled)
