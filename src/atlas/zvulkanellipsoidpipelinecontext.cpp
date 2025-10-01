@@ -14,6 +14,7 @@
 #include "zvulkanbuffer.h"
 #include "zsysteminfo.h"
 #include "zlog.h"
+#include "zvulkanrenderconversions.h"
 
 #include <algorithm>
 #include <array>
@@ -64,11 +65,15 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   updateTransformUBO(renderer, batch, payload);
   ensureDescriptorSets();
 
+  const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
+
   PipelineKey key;
   key.dynamicMaterial = payload.useDynamicMaterial;
   key.fogMode = renderer.sceneState().fog.mode;
+  key.colorFormats = formats.colorFormats;
+  key.depthFormat = formats.depthFormat;
 
-  PipelineInstance& pipeline = ensurePipeline(key);
+  PipelineInstance& pipeline = ensurePipeline(key, formats);
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
@@ -269,7 +274,8 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
 }
 
 ZVulkanEllipsoidPipelineContext::PipelineInstance&
-ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key)
+ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key,
+                                                const vulkan::AttachmentFormats& formats)
 {
   auto it = m_pipelineCache.find(key);
   if (it != m_pipelineCache.end()) {
@@ -314,6 +320,7 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key)
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
   std::vector<vk::DescriptorSetLayout> layouts{**m_setPlaceholder, **m_setLighting, **m_setTransforms};
+  instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);

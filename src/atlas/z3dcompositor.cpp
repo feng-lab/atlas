@@ -13,45 +13,6 @@
 
 namespace nim {
 
-namespace {
-
-inline void prepareFilterForLease(Z3DBoundedFilter& filter, Z3DScratchResourcePool::RenderTargetLease& lease)
-{
-  if (lease.renderTarget) {
-    filter.setViewport(lease.renderTarget->size());
-  } else {
-    filter.setViewport(lease.descriptor.size);
-  }
-  filter.rendererBase().setActiveSurfaceForNextPass(lease);
-}
-
-inline void requestSurfaceClearIfSupported(Z3DBoundedFilter& filter,
-                                           bool clearColor,
-                                           const glm::vec4& color,
-                                           bool clearDepth,
-                                           float depth,
-                                           uint32_t stencil = 0u)
-{
-  auto& renderer = filter.rendererBase();
-  if (!renderer.supportsCommandLists()) {
-    return;
-  }
-
-  ClearValue clearValue{};
-  clearValue.color = color;
-  clearValue.depth = depth;
-  clearValue.stencil = stencil;
-
-  if (clearColor) {
-    renderer.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clearValue);
-  }
-  if (clearDepth) {
-    renderer.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clearValue);
-  }
-}
-
-} // namespace
-
 Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DBoundedFilter(globalParas, parent)
   , m_alphaBlendRenderer(m_rendererBase, TextureBlendMode::DepthTestBlending)
@@ -485,11 +446,8 @@ double Z3DCompositor::process(Z3DEye eye)
 
         // copy to outport
         currentOutRenderTarget.bind();
-        if (!m_rendererBase.supportsCommandLists()) {
-          currentOutRenderTarget.clear();
-        }
-        prepareFilterForLease(*this, *currentOutLease);
-        requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
+        currentOutRenderTarget.clear();
+        setViewport(currentOutRenderTarget.size());
 
         if (m_showBackground.get()) {
           m_rendererBase.render(eye, m_backgroundRenderer);
@@ -531,11 +489,8 @@ double Z3DCompositor::process(Z3DEye eye)
 
         // blend to output
         currentOutRenderTarget.bind();
-        if (!m_rendererBase.supportsCommandLists()) {
-          currentOutRenderTarget.clear();
-        }
-        prepareFilterForLease(*this, *currentOutLease);
-        requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
+        currentOutRenderTarget.clear();
+        setViewport(currentOutRenderTarget.size());
 
         if (m_showBackground.get()) {
           m_rendererBase.render(eye, m_backgroundRenderer);
@@ -571,11 +526,8 @@ double Z3DCompositor::process(Z3DEye eye)
         mergeImageLayers(nonOpaqueLayers, eye, *currentOutLease, colorTex, depthTex);
 
         currentOutRenderTarget.bind();
-        if (!m_rendererBase.supportsCommandLists()) {
-          currentOutRenderTarget.clear();
-        }
+        currentOutRenderTarget.clear();
         setViewport(currentOutRenderTarget.size());
-        requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
 
         if (m_showBackground.get()) {
           m_rendererBase.render(eye, m_backgroundRenderer);
@@ -620,11 +572,8 @@ double Z3DCompositor::process(Z3DEye eye)
 
         // blend tempPort with volume
         currentOutRenderTarget.bind();
-        if (!m_rendererBase.supportsCommandLists()) {
-          currentOutRenderTarget.clear();
-        }
+        currentOutRenderTarget.clear();
         setViewport(currentOutRenderTarget.size());
-        requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
 
         if (m_showBackground.get()) {
           m_rendererBase.render(eye, m_backgroundRenderer);
@@ -679,7 +628,7 @@ double Z3DCompositor::process(Z3DEye eye)
 
         // blend inport and tempport into tempport2
         temp2LeaseA.renderTarget->bind();
-        prepareFilterForLease(*this, temp2LeaseA);
+        setViewport(temp2LeaseA.renderTarget->size());
         m_alphaBlendRenderer.setColorTexture1(temp1LeaseA.renderTarget->colorTexture());
         m_alphaBlendRenderer.setDepthTexture1(temp1LeaseA.renderTarget->depthTexture());
         m_alphaBlendRenderer.setColorTexture2(colorTex);
@@ -692,11 +641,8 @@ double Z3DCompositor::process(Z3DEye eye)
 
         // blend temport and temport2 into outport
         currentOutRenderTarget.bind();
-        if (!m_rendererBase.supportsCommandLists()) {
-          currentOutRenderTarget.clear();
-        }
-        prepareFilterForLease(*this, *currentOutLease);
-        requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
+        currentOutRenderTarget.clear();
+        setViewport(currentOutRenderTarget.size());
 
         if (m_showBackground.get()) {
           m_rendererBase.render(eye, m_backgroundRenderer);
@@ -748,11 +694,8 @@ double Z3DCompositor::process(Z3DEye eye)
 
       // copy to outport
       currentOutRenderTarget.bind();
-      if (!m_rendererBase.supportsCommandLists()) {
-        currentOutRenderTarget.clear();
-      }
+      currentOutRenderTarget.clear();
       setViewport(currentOutRenderTarget.size());
-      requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
 
       if (m_showBackground.get()) {
         m_rendererBase.render(eye, m_backgroundRenderer);
@@ -794,11 +737,8 @@ double Z3DCompositor::process(Z3DEye eye)
 
       // blend to output
       currentOutRenderTarget.bind();
-      if (!m_rendererBase.supportsCommandLists()) {
-        currentOutRenderTarget.clear();
-      }
+      currentOutRenderTarget.clear();
       setViewport(currentOutRenderTarget.size());
-      requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
 
       if (m_showBackground.get()) {
         m_rendererBase.render(eye, m_backgroundRenderer);
@@ -838,17 +778,14 @@ double Z3DCompositor::process(Z3DEye eye)
     handleLease.renderTarget->bind();
     handleLease.renderTarget->clear();
     for (auto& showHandleFilter : showHandleFilters) {
-      prepareFilterForLease(*showHandleFilter, handleLease);
+      showHandleFilter->setViewport(handleLease.renderTarget->size());
       showHandleFilter->renderHandle(eye);
     }
     handleLease.renderTarget->release();
     CHECK_GL_ERROR
     finalOutRenderTarget.bind();
-    if (!m_rendererBase.supportsCommandLists()) {
-      finalOutRenderTarget.clear();
-    }
-    prepareFilterForLease(*this, *finalOutLease);
-    requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
+    finalOutRenderTarget.clear();
+    setViewport(finalOutRenderTarget.size());
     m_firstOnTopBlendRenderer.setColorTexture1(handleLease.renderTarget->colorTexture());
     m_firstOnTopBlendRenderer.setDepthTexture1(handleLease.renderTarget->depthTexture());
     m_firstOnTopBlendRenderer.setColorTexture2(currentOutRenderTarget.colorTexture());
@@ -857,7 +794,7 @@ double Z3DCompositor::process(Z3DEye eye)
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     for (auto& selectedFilter : selectedFilters) {
-      prepareFilterForLease(*selectedFilter, *finalOutLease);
+      selectedFilter->setViewport(finalOutRenderTarget.size());
       selectedFilter->renderSelectionBox(eye);
     }
     glBlendFunc(GL_ONE, GL_ZERO);
@@ -1151,7 +1088,7 @@ void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter,
     auto glowLease1 = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize);
     glowLease1.renderTarget->bind();
     glowLease1.renderTarget->clear();
-    prepareFilterForLease(*filter, glowLease1);
+    filter->setViewport(glowLease1.renderTarget->size());
     filter->renderOpaque(eye);
     glowLease1.renderTarget->release();
 
@@ -1172,7 +1109,7 @@ void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter,
     auto glowLease2 = Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(targetSize);
     glowLease2.renderTarget->bind();
     glowLease2.renderTarget->clear();
-    prepareFilterForLease(*this, glowLease2);
+    setViewport(glowLease2.renderTarget->size());
     m_glowRenderer.setColorTexture(glowLease1.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
     m_glowRenderer.setDepthTexture(glowLease1.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
     m_rendererBase.render(eye, m_glowRenderer);
@@ -1184,13 +1121,13 @@ void Z3DCompositor::renderTransparentFilter(Z3DBoundedFilter* filter,
     }
 
     // 3) copy glow result directly into renderTarget (skip alpha blend)
-    prepareFilterForLease(*this, targetLease);
+    setViewport(targetLease.renderTarget->size());
     m_textureCopyRenderer.setColorTexture(glowLease2.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
     m_textureCopyRenderer.setDepthTexture(glowLease2.renderTarget->attachment(GL_DEPTH_ATTACHMENT));
     m_rendererBase.render(eye, m_textureCopyRenderer);
   } else {
     // default path
-    prepareFilterForLease(*filter, targetLease);
+    filter->setViewport(targetLease.renderTarget->size());
     filter->renderTransparent(eye);
   }
 }
@@ -1205,10 +1142,9 @@ void Z3DCompositor::renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*>
 
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
 
   for (auto filter : opaqueFilters) {
-    prepareFilterForLease(*filter, targetLease);
+    filter->setViewport(glTarget->size());
     filter->renderOpaque(eye);
   }
 
@@ -1233,10 +1169,9 @@ void Z3DCompositor::renderGeomsBlendNoDepthMask(const std::vector<Z3DBoundedFilt
 
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
 
   for (auto filter : opaqueFilters) {
-    prepareFilterForLease(*filter, targetLease);
+    filter->setViewport(glTarget->size());
     filter->renderOpaque(eye);
   }
 
@@ -1308,7 +1243,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       // VLOG(1) << "lease acquired";
       glowGeomLease.renderTarget->bind();
       glowGeomLease.renderTarget->clear();
-      prepareFilterForLease(*gf, glowGeomLease);
+      gf->setViewport(glowGeomLease.renderTarget->size());
       gf->renderOpaque(eye);
       glowGeomLease.renderTarget->release();
 
@@ -1319,7 +1254,7 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
       auto* layerRT = glowLayerLeases.back().renderTarget;
       layerRT->bind();
       layerRT->clear();
-      prepareFilterForLease(*this, glowLayerLeases.back());
+      setViewport(layerRT->size());
       if (auto* glowModeParam = dynamic_cast<ZStringIntOptionParameter*>(gf->parameter("Glow Mode"))) {
         m_glowRenderer.setGlowMode(static_cast<GlowMode>(glowModeParam->associatedData()));
       }
@@ -1396,11 +1331,8 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
 
     // blend temport3 and temport4 into outport
     glTarget->bind();
-    if (!m_rendererBase.supportsCommandLists()) {
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-    prepareFilterForLease(*this, targetLease);
-    requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    setViewport(glTarget->size());
     m_alphaBlendRenderer.setColorTexture1(leaseOpaque.renderTarget->colorTexture());
     m_alphaBlendRenderer.setDepthTexture1(leaseOpaque.renderTarget->depthTexture());
     m_alphaBlendRenderer.setColorTexture2(leaseTrans.renderTarget->colorTexture());
@@ -1421,7 +1353,7 @@ void Z3DCompositor::renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& fi
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   for (auto filter : filters) {
-    prepareFilterForLease(*filter, targetLease);
+    filter->setViewport(glTarget->size());
     filter->renderOpaque(eye);
   }
   glTarget->release();
@@ -1499,12 +1431,12 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   glBlendEquation(GL_MAX);
 
   for (auto filter : filters) {
-    prepareFilterForLease(*filter, ddpLease);
+    filter->setViewport(ddpRT.size());
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
     filter->renderTransparent(eye);
   }
   if (!imageColorTexList.empty()) {
-    prepareFilterForLease(*this, ddpLease);
+    setViewport(ddpRT.size());
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
     size_t n = std::min(imageColorTexList.size(), imageDepthTexList.size());
     for (size_t i = 0; i < n; ++i) {
@@ -1546,14 +1478,14 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
     glBlendEquation(GL_MAX);
 
     for (auto filter : filters) {
-      prepareFilterForLease(*filter, ddpLease);
+      filter->setViewport(ddpRT.size());
       filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
       filter->setShaderHookParaDDPDepthBlenderTexture(g_dualDepthTexId[prevId]);
       filter->setShaderHookParaDDPFrontBlenderTexture(g_dualFrontBlenderTexId[prevId]);
       filter->renderTransparent(eye);
     }
     if (!imageColorTexList.empty()) {
-      prepareFilterForLease(*this, ddpLease);
+      setViewport(ddpRT.size());
       m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
       size_t n = std::min(imageColorTexList.size(), imageDepthTexList.size());
       for (size_t i = 0; i < n; ++i) {
@@ -1622,11 +1554,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   // ---------------------------------------------------------------------
 
   glTarget->bind();
-  if (!m_rendererBase.supportsCommandLists()) {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  }
-  prepareFilterForLease(*this, targetLease);
-  requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   m_ddpFinalShader.bind();
   m_ddpFinalShader.bindTexture("DepthTex", g_depthTex);
   m_ddpFinalShader.bindTexture("FrontBlenderTex", g_dualFrontBlenderTexId[currId]);
@@ -1679,18 +1607,17 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   glDrawBuffers(2, g_drawBuffers);
   glClearColor(0, 0, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT);
-  requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), depthTexture != nullptr, 1.f);
 
   glBlendFunc(GL_ONE, GL_ONE);
   glEnable(GL_BLEND);
 
   for (auto filter : filters) {
-    prepareFilterForLease(*filter, waLease);
+    filter->setViewport(waRT.size());
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
     filter->renderTransparent(eye);
   }
   if (!imageColorTexList.empty()) {
-    prepareFilterForLease(*this, waLease);
+    setViewport(waRT.size());
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
     size_t n = std::min(imageColorTexList.size(), imageDepthTexList.size());
     for (size_t i = 0; i < n; ++i) {
@@ -1720,11 +1647,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   }
 
   glTarget->bind();
-  if (!m_rendererBase.supportsCommandLists()) {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  }
-  prepareFilterForLease(*this, targetLease);
-  requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   m_waFinalShader.bind();
   m_waFinalShader.bindTexture("ColorTex0", g_accumulationTexId[0]);
   m_waFinalShader.bindTexture("ColorTex1", g_accumulationTexId[1]);
@@ -1785,12 +1708,12 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   glBlendFunci(1, GL_ZERO, GL_ONE_MINUS_SRC_COLOR);
 
   for (auto filter : filters) {
-    prepareFilterForLease(*filter, wbLease);
+    filter->setViewport(wbRT.size());
     filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
     filter->renderTransparent(eye);
   }
   if (!imageColorTexList.empty()) {
-    prepareFilterForLease(*this, wbLease);
+    setViewport(wbRT.size());
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
     size_t n = std::min(imageColorTexList.size(), imageDepthTexList.size());
     for (size_t i = 0; i < n; ++i) {
@@ -1821,11 +1744,7 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   }
 
   glTarget->bind();
-  if (!m_rendererBase.supportsCommandLists()) {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  }
-  prepareFilterForLease(*this, targetLease);
-  requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   m_wbFinalShader.bind();
   m_wbFinalShader.bindTexture("ColorTex0", g_accumulationTexId[0]);
   m_wbFinalShader.bindTexture("ColorTex1", g_accumulationTexId[1]);
@@ -2054,8 +1973,7 @@ bool Z3DCompositor::mergeImageLayers(const std::vector<std::pair<const Z3DTextur
   // Blend first two layers into imgLease1
   imgLease1.renderTarget->bind();
   imgLease1.renderTarget->clear();
-  requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
-  prepareFilterForLease(*this, imgLease1);
+  setViewport(imgLease1.renderTarget->size());
   m_MIPImageAlphaBlendRenderer.setColorTexture1(layers[0].first);
   m_MIPImageAlphaBlendRenderer.setDepthTexture1(layers[0].second);
   m_MIPImageAlphaBlendRenderer.setColorTexture2(layers[1].first);
@@ -2069,8 +1987,7 @@ bool Z3DCompositor::mergeImageLayers(const std::vector<std::pair<const Z3DTextur
   for (size_t i = 2; i < layers.size(); ++i) {
     nextRT->bind();
     nextRT->clear();
-    requestSurfaceClearIfSupported(*this, true, glm::vec4(0.f), true, 1.f);
-    prepareFilterForLease(*this, *nextLease);
+    setViewport(nextRT->size());
     m_MIPImageAlphaBlendRenderer.setColorTexture1(resRT->colorTexture());
     m_MIPImageAlphaBlendRenderer.setDepthTexture1(resRT->depthTexture());
     m_MIPImageAlphaBlendRenderer.setColorTexture2(layers[i].first);

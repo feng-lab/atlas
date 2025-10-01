@@ -12,6 +12,9 @@
 #include "z3dscratchresourcepool.h"
 #include "zsysteminfo.h"
 #include "zvulkanlinepipelinecontext.h"
+#include "zvulkanmeshpipelinecontext.h"
+#include "zvulkanellipsoidpipelinecontext.h"
+#include "zvulkanrenderconversions.h"
 
 #include <algorithm>
 #include <array>
@@ -22,6 +25,8 @@ namespace nim {
 
 Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
   : m_lineContext(std::make_unique<ZVulkanLinePipelineContext>(*this))
+  , m_meshContext(std::make_unique<ZVulkanMeshPipelineContext>(*this))
+  , m_ellipsoidContext(std::make_unique<ZVulkanEllipsoidPipelineContext>(*this))
 {}
 
 Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend() = default;
@@ -52,6 +57,12 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 {
   if (m_lineContext) {
     m_lineContext->resetFrame();
+  }
+  if (m_meshContext) {
+    m_meshContext->resetFrame();
+  }
+  if (m_ellipsoidContext) {
+    m_ellipsoidContext->resetFrame();
   }
   ensureDevice();
 
@@ -86,28 +97,6 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 }
 
 namespace {
-
-vk::Viewport toVkViewport(const ViewportDesc& viewport)
-{
-  return vk::Viewport(viewport.origin.x,
-                      viewport.origin.y,
-                      std::max(0.0f, viewport.extent.x),
-                      std::max(0.0f, viewport.extent.y),
-                      viewport.minDepth,
-                      viewport.maxDepth);
-}
-
-vk::Rect2D toVkScissor(const BackendPassDesc& pass)
-{
-  if (pass.enableScissor) {
-    return vk::Rect2D({static_cast<int32_t>(pass.scissorRect.x), static_cast<int32_t>(pass.scissorRect.y)},
-                      {static_cast<uint32_t>(std::max(0.0f, pass.scissorRect.z)),
-                       static_cast<uint32_t>(std::max(0.0f, pass.scissorRect.w))});
-  }
-  return vk::Rect2D({static_cast<int32_t>(pass.viewport.origin.x), static_cast<int32_t>(pass.viewport.origin.y)},
-                    {static_cast<uint32_t>(std::max(0.0f, pass.viewport.extent.x)),
-                     static_cast<uint32_t>(std::max(0.0f, pass.viewport.extent.y))});
-}
 
 std::string_view describeGeometry(const GeometryPayload& geometry)
 {
@@ -173,28 +162,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     std::vector<vk::RenderingAttachmentInfo> colorAttachments;
     colorAttachments.reserve(batch.pass.colorAttachments.size());
 
-    auto convertLoadOp = [](LoadOp op) {
-      switch (op) {
-        case LoadOp::Clear:
-          return vk::AttachmentLoadOp::eClear;
-        case LoadOp::Load:
-          return vk::AttachmentLoadOp::eLoad;
-        case LoadOp::DontCare:
-        default:
-          return vk::AttachmentLoadOp::eDontCare;
-      }
-    };
-
-    auto convertStoreOp = [](StoreOp op) {
-      switch (op) {
-        case StoreOp::Store:
-          return vk::AttachmentStoreOp::eStore;
-        case StoreOp::DontCare:
-        default:
-          return vk::AttachmentStoreOp::eDontCare;
-      }
-    };
-
     auto makeColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
       if (attachment.handle.backend != AttachmentBackend::Vulkan || attachment.handle.id == 0) {
         return std::nullopt;
@@ -210,8 +177,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       vk::RenderingAttachmentInfo info;
       info.imageView = texture->imageView();
       info.imageLayout = desiredLayout;
-      info.loadOp = convertLoadOp(attachment.loadOp);
-      info.storeOp = convertStoreOp(attachment.storeOp);
+      info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+      info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
       vk::ClearValue clear{};
       clear.color = vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
                                                              attachment.clearValue.color.g,
@@ -236,8 +203,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       vk::RenderingAttachmentInfo info;
       info.imageView = texture->imageView();
       info.imageLayout = desiredLayout;
-      info.loadOp = convertLoadOp(attachment.loadOp);
-      info.storeOp = convertStoreOp(attachment.storeOp);
+      info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+      info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
       vk::ClearValue clear{};
       clear.depthStencil = vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
       info.clearValue = clear;
@@ -260,8 +227,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       continue;
     }
 
-    const auto vkViewport = toVkViewport(batch.pass.viewport);
-    const auto vkScissor = toVkScissor(batch.pass);
+    const auto vkViewport = vulkan::toVkViewport(batch.pass.viewport);
+    const auto vkScissor = vulkan::toVkScissor(batch.pass);
 
     vk::RenderingInfo renderingInfo;
     renderingInfo.renderArea = vkScissor;
@@ -280,6 +247,30 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
         m_lineContext->record(renderer, batch, *line, vkViewport, vkScissor, cmd);
         handled = true;
+      }
+    }
+
+    if (!handled) {
+      if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
+        if (mesh->renderer) {
+          if (!m_meshContext) {
+            m_meshContext = std::make_unique<ZVulkanMeshPipelineContext>(*this);
+          }
+          m_meshContext->record(renderer, batch, *mesh, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
+      if (const auto* ellipsoid = std::get_if<EllipsoidPayload>(&batch.geometry)) {
+        if (ellipsoid->renderer) {
+          if (!m_ellipsoidContext) {
+            m_ellipsoidContext = std::make_unique<ZVulkanEllipsoidPipelineContext>(*this);
+          }
+          m_ellipsoidContext->record(renderer, batch, *ellipsoid, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
       }
     }
 

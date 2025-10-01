@@ -14,6 +14,8 @@ class ZVulkanContext;
 class ZVulkanDevice;
 class ZVulkanSwapChain;
 class ZVulkanLinePipelineContext;
+class ZVulkanMeshPipelineContext;
+class ZVulkanEllipsoidPipelineContext;
 class Z3DRendererVulkanBackend final : public Z3DRendererBackend
 {
 public:
@@ -70,6 +72,8 @@ private:
   glm::uvec2 m_swapChainExtent{0, 0};
 
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
+  std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
+  std::unique_ptr<ZVulkanEllipsoidPipelineContext> m_ellipsoidContext;
 };
 
 std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend();

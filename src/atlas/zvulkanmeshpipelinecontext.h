@@ -15,6 +15,10 @@ namespace nim {
 
 enum class FogMode;
 
+namespace vulkan {
+struct AttachmentFormats;
+}
+
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
@@ -47,10 +51,17 @@ private:
     ZMesh::Type meshType;
     bool wireframe = false;
     FogMode fogMode = FogMode::None;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(static_cast<int>(colorSource), static_cast<int>(meshType), wireframe, static_cast<int>(fogMode));
+      return std::tuple(static_cast<int>(colorSource),
+                        static_cast<int>(meshType),
+                        wireframe,
+                        static_cast<int>(fogMode),
+                        colorFormats,
+                        depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const
@@ -126,7 +137,7 @@ private:
                          bool useFallbackColor,
                          const glm::vec4& fallbackColor);
   void bindDescriptorSets(vk::raii::CommandBuffer& cmd, const PipelineInstance& pipeline) const;
-  PipelineInstance& ensurePipeline(const PipelineKey& key);
+  PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
   void ensureVertexCapacity(size_t vertexCount);

@@ -52,6 +52,26 @@ void Z3DRendererBase::resetCPUState()
 
 void Z3DRendererBase::appendBatch(RenderBatch batch)
 {
+  const glm::uvec4 viewportRect = m_frameState.viewport;
+
+  if (batch.pass.extent == glm::uvec2(0u) && viewportRect.z > 0u && viewportRect.w > 0u) {
+    batch.pass.extent = glm::uvec2(viewportRect.z, viewportRect.w);
+  }
+
+  if (batch.pass.viewport.extent == glm::vec2(0.0f) && viewportRect.z > 0u && viewportRect.w > 0u) {
+    batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewportRect.x), static_cast<float>(viewportRect.y));
+    batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewportRect.z), static_cast<float>(viewportRect.w));
+    batch.pass.viewport.minDepth = 0.0f;
+    batch.pass.viewport.maxDepth = 1.0f;
+  }
+
+  const bool hasColorAttachments = !batch.pass.colorAttachments.empty();
+  const bool hasDepthAttachment = batch.pass.depthAttachment.has_value();
+  if (!hasColorAttachments && !hasDepthAttachment && !m_frameState.activeSurface.empty()) {
+    batch.pass.colorAttachments = m_frameState.activeSurface.colorAttachments;
+    batch.pass.depthAttachment = m_frameState.activeSurface.depthAttachment;
+  }
+
   m_cpuState.batches.push_back(std::move(batch));
 }
 

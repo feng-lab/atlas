@@ -64,7 +64,6 @@ public:
   }
 
   // Command list integration helper used by backend implementations.
-  void executeBatchGL(const RenderBatch& batch);
 
 protected:
   void compile() override;
@@ -90,8 +89,6 @@ private:
   void prepareMeshColor();
 
   void prepareMeshPickingColor();
-
-  void renderImmediate(Z3DEye eye, bool appendBatch);
 
   // MeshPayload is a zero-copy view of the renderer's CPU-side buffers. Callers
   // must ensure the corresponding prepare* helpers ran before dereferencing the

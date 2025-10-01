@@ -75,6 +75,13 @@ void ZVulkanPipeline::setColorBlendAttachment(const vk::PipelineColorBlendAttach
   m_colorBlendAttachment = attachment;
 }
 
+void ZVulkanPipeline::setAttachmentFormats(std::vector<vk::Format> colorFormats,
+                                           std::optional<vk::Format> depthFormat)
+{
+  m_colorAttachmentFormats = std::move(colorFormats);
+  m_depthAttachmentFormat = std::move(depthFormat);
+}
+
 void ZVulkanPipeline::create()
 {
   vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
@@ -119,11 +126,14 @@ void ZVulkanPipeline::create()
                                                        .minDepthBounds = 0.0f,
                                                        .maxDepthBounds = 1.0f};
 
+  const uint32_t blendAttachmentCount = m_colorAttachmentFormats.empty() ? 0u : 1u;
+  const vk::PipelineColorBlendAttachmentState* blendAttachmentPtr =
+    blendAttachmentCount == 0u ? nullptr : &m_colorBlendAttachment;
   vk::PipelineColorBlendStateCreateInfo colorBlending{
     .logicOpEnable = VK_FALSE,
     .logicOp = vk::LogicOp::eCopy,
-    .attachmentCount = 1,
-    .pAttachments = &m_colorBlendAttachment,
+    .attachmentCount = blendAttachmentCount,
+    .pAttachments = blendAttachmentPtr,
     .blendConstants = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}
   };
 
@@ -133,13 +143,12 @@ void ZVulkanPipeline::create()
 
   const auto& shaderStages = m_shader.shaderStages();
 
-  vk::Format colorFormat = vk::Format::eR8G8B8A8Unorm;
-  vk::Format depthFormat = vk::Format::eD32Sfloat;
-
+  const vk::Format* colorFormatsPtr = m_colorAttachmentFormats.empty() ? nullptr : m_colorAttachmentFormats.data();
   vk::PipelineRenderingCreateInfo renderingCreateInfo{};
-  renderingCreateInfo.colorAttachmentCount = 1;
-  renderingCreateInfo.pColorAttachmentFormats = &colorFormat;
-  renderingCreateInfo.depthAttachmentFormat = depthFormat;
+  renderingCreateInfo.colorAttachmentCount = static_cast<uint32_t>(m_colorAttachmentFormats.size());
+  renderingCreateInfo.pColorAttachmentFormats = colorFormatsPtr;
+  renderingCreateInfo.depthAttachmentFormat =
+    m_depthAttachmentFormat.has_value() ? *m_depthAttachmentFormat : vk::Format::eUndefined;
 
   vk::GraphicsPipelineCreateInfo pipelineInfo{.pNext = &renderingCreateInfo,
                                               .stageCount = static_cast<uint32_t>(shaderStages.size()),

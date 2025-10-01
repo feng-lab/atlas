@@ -263,17 +263,6 @@ RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye) const
 
   batch.eye = eye;
 
-  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
-  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-  batch.pass.viewport.minDepth = 0.f;
-  batch.pass.viewport.maxDepth = 1.f;
-
-  const auto& surface = m_rendererBase.frameState().activeSurface;
-  batch.pass.colorAttachments = surface.colorAttachments;
-  batch.pass.depthAttachment = surface.depthAttachment;
-
   batch.draw.topology = PrimitiveTopology::TriangleList;
 
   uint32_t vertexCount = 0u;
@@ -506,24 +495,6 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     return;
   }
 
-  if (m_rendererBase.supportsCommandLists()) {
-    RenderBatch batch = buildRenderBatch(eye);
-    if (batch.draw.vertexCount == 0u) {
-      return;
-    }
-    m_rendererBase.appendBatch(std::move(batch));
-    return;
-  }
-
-  renderImmediate(eye, true);
-}
-
-void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
-{
-  if (!m_meshPt || m_meshPt->empty()) {
-    return;
-  }
-
   if (m_colorSource == MeshColorSource::CustomColor && !m_meshColorReady) {
     prepareMeshColor();
   }
@@ -553,14 +524,6 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
     if (mesh->numNormals() != mesh->numVertices()) {
       mesh->generateNormals();
     }
-  }
-
-  RenderBatch batch = buildRenderBatch(eye);
-  if (batch.draw.vertexCount == 0u) {
-    return;
-  }
-  if (appendBatch) {
-    m_rendererBase.appendBatch(std::move(batch));
   }
 
   const bool drawSurface = m_wireframeModeValue != WireframeMode::OnlyWireframe;
@@ -894,11 +857,6 @@ void Z3DMeshRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
   }
 
   m_meshShaderGrp->release();
-}
-
-void Z3DMeshRenderer::executeBatchGL(const RenderBatch& batch)
-{
-  renderImmediate(batch.eye, false);
 }
 
 void Z3DMeshRenderer::renderPicking(Z3DEye eye)

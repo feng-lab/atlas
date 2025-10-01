@@ -11,6 +11,10 @@
 
 namespace nim {
 
+namespace vulkan {
+struct AttachmentFormats;
+}
+
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
@@ -50,10 +54,19 @@ private:
     bool screenAligned = false;
     bool useTextureColor = false;
     bool lineStrip = false;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tie(useSmooth, picking, roundCap, screenAligned, useTextureColor, lineStrip);
+      return std::tie(useSmooth,
+                      picking,
+                      roundCap,
+                      screenAligned,
+                      useTextureColor,
+                      lineStrip,
+                      colorFormats,
+                      depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const
@@ -102,7 +115,9 @@ private:
   void ensurePlaceholderTexture();
   void ensureDescriptorSets(Z3DRendererBase& renderer);
   void updateUBOs(Z3DRendererBase& renderer, const RenderBatch& batch);
-  PipelineInstance& ensurePipeline(const PipelineKey& key, const LinePayload& payload);
+  PipelineInstance& ensurePipeline(const PipelineKey& key,
+                                   const LinePayload& payload,
+                                   const vulkan::AttachmentFormats& formats);
   void bindDescriptorSets(vk::raii::CommandBuffer& cmd, const PipelineInstance& pipeline) const;
   void uploadWideGeometry(const LinePayload& payload, bool pickingPass);
   void uploadThinGeometry(const LinePayload& payload, bool pickingPass);

@@ -457,17 +457,6 @@ RenderBatch Z3DLineRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 
   batch.eye = eye;
 
-  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
-  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-  batch.pass.viewport.minDepth = 0.f;
-  batch.pass.viewport.maxDepth = 1.f;
-
-  const auto& surface = m_rendererBase.frameState().activeSurface;
-  batch.pass.colorAttachments = surface.colorAttachments;
-  batch.pass.depthAttachment = surface.depthAttachment;
-
   batch.draw.topology = m_isLineStrip ? PrimitiveTopology::LineStrip : PrimitiveTopology::LineList;
 
   auto payload = buildLinePayload(picking);
@@ -580,28 +569,6 @@ void Z3DLineRenderer::renderPickingUsingOpengl()
 #endif
 
 void Z3DLineRenderer::render(Z3DEye eye)
-{
-  if (m_linePositions.empty()) {
-    return;
-  }
-
-  RenderBatch batch = buildRenderBatch(eye, /*picking=*/false);
-  if (auto* payload = std::get_if<LinePayload>(&batch.geometry)) {
-    if (payload->positions.empty()) {
-      return;
-    }
-  }
-
-  m_rendererBase.appendBatch(std::move(batch));
-
-  if (m_rendererBase.supportsCommandLists()) {
-    return;
-  }
-
-  renderImmediate(eye);
-}
-
-void Z3DLineRenderer::renderImmediate(Z3DEye eye)
 {
   if (m_linePositions.empty()) {
     return;
@@ -741,11 +708,6 @@ void Z3DLineRenderer::renderImmediate(Z3DEye eye)
   currentShaderGrp().release();
 }
 
-void Z3DLineRenderer::executeBatchGL(const RenderBatch& batch)
-{
-  renderImmediate(batch.eye);
-}
-
 void Z3DLineRenderer::renderPicking(Z3DEye eye)
 {
   if (m_linePositions.empty()) {
@@ -753,19 +715,6 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
   }
 
   if (m_linePickingColors.empty() || m_linePickingColors.size() != m_linePositions.size()) {
-    return;
-  }
-
-  RenderBatch batch = buildRenderBatch(eye, /*picking=*/true);
-  if (auto* payload = std::get_if<LinePayload>(&batch.geometry)) {
-    if (payload->positions.empty()) {
-      return;
-    }
-  }
-
-  m_rendererBase.appendBatch(std::move(batch));
-
-  if (m_rendererBase.supportsCommandLists()) {
     return;
   }
 

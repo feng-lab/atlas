@@ -15,6 +15,7 @@
 #include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
 #include "z3dlinerenderer.h"
+#include "zvulkanrenderconversions.h"
 
 #include <algorithm>
 #include <array>
@@ -266,7 +267,9 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer, const Ren
 }
 
 ZVulkanLinePipelineContext::PipelineInstance&
-ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key, const LinePayload& payload)
+ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
+                                           const LinePayload& payload,
+                                           const vulkan::AttachmentFormats& formats)
 {
   (void)payload;
   auto it = m_pipelineCache.find(key);
@@ -310,6 +313,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key, const LinePay
     auto vi = makeWideVertexInput();
     instance.pipeline = device.createPipeline(*instance.shader, vi, vk::PrimitiveTopology::eTriangleList);
     std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, **m_setLighting, **m_setTransforms};
+    instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
     instance.pipeline->setDescriptorSetLayouts(setLayouts);
 
     vk::PushConstantRange pushRange{.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
@@ -327,6 +331,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key, const LinePay
     const vk::PrimitiveTopology topology = key.lineStrip ? vk::PrimitiveTopology::eLineStrip : vk::PrimitiveTopology::eLineList;
     instance.pipeline = device.createPipeline(*instance.shader, vi, topology);
     std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, **m_setLighting, **m_setTransforms};
+    instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
     instance.pipeline->setDescriptorSetLayouts(setLayouts);
     instance.pipeline->create();
   }
@@ -479,7 +484,11 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   key.useTextureColor = false; // TODO: integrate line textures for Vulkan backend
   key.lineStrip = payload.isLineStrip;
 
-  auto& pipeline = ensurePipeline(key, payload);
+  const auto formats = vulkan::extractAttachmentFormats(batch);
+  key.colorFormats = formats.colorFormats;
+  key.depthFormat = formats.depthFormat;
+
+  auto& pipeline = ensurePipeline(key, payload, formats);
 
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
   bindDescriptorSets(cmd, pipeline);

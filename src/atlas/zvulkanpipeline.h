@@ -36,6 +36,8 @@ public:
   void setLineWidth(float width);
   void setDepthWriteEnable(bool enable);
   void setColorBlendAttachment(const vk::PipelineColorBlendAttachmentState& attachment);
+  void setAttachmentFormats(std::vector<vk::Format> colorFormats,
+                            std::optional<vk::Format> depthFormat);
   void create();
 
 private:
@@ -65,6 +67,9 @@ private:
     .alphaBlendOp = vk::BlendOp::eAdd,
     .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                       vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
+
+  std::vector<vk::Format> m_colorAttachmentFormats{vk::Format::eR8G8B8A8Unorm};
+  std::optional<vk::Format> m_depthAttachmentFormat = vk::Format::eD32Sfloat;
 
   std::optional<vk::raii::PipelineLayout> m_pipelineLayout;
   std::optional<vk::raii::Pipeline> m_pipeline;

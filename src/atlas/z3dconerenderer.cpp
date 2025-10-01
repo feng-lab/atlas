@@ -302,33 +302,7 @@ void Z3DConeRenderer::render(Z3DEye eye)
     return;
   }
 
-  if (m_rendererBase.supportsCommandLists()) {
-    appendDefaultColors();
-    RenderBatch batch = buildRenderBatch(eye);
-    if (batch.draw.vertexCount == 0u) {
-      return;
-    }
-    m_rendererBase.appendBatch(std::move(batch));
-    return;
-  }
-
-  renderImmediate(eye, true);
-}
-
-void Z3DConeRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
-{
-  if (m_baseAndBaseRadius.empty()) {
-    return;
-  }
   appendDefaultColors();
-
-  RenderBatch batch = buildRenderBatch(eye);
-  if (batch.draw.vertexCount == 0u) {
-    return;
-  }
-  if (appendBatch) {
-    m_rendererBase.appendBatch(std::move(batch));
-  }
 
   m_coneShaderGrp->bind();
   Z3DShaderProgram& shader = m_coneShaderGrp->get();
@@ -481,11 +455,6 @@ void Z3DConeRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
   }
 
   m_coneShaderGrp->release();
-}
-
-void Z3DConeRenderer::executeBatchGL(const RenderBatch& batch)
-{
-  renderImmediate(batch.eye, false);
 }
 
 void Z3DConeRenderer::renderPicking(Z3DEye eye)

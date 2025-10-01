@@ -20,6 +20,7 @@
 #include "z3dmeshrenderer.h"
 #include "zlog.h"
 #include "zexception.h"
+#include "zvulkanrenderconversions.h"
 
 #include <algorithm>
 #include <array>
@@ -168,6 +169,8 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
   const FogMode fogMode = renderer.sceneState().fog.mode;
 
+  const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
+
   PipelineInstance* currentPipeline = nullptr;
   if (drawSurface) {
     for (const auto& draw : m_draws) {
@@ -181,7 +184,10 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       key.wireframe = false;
       key.fogMode = fogMode;
 
-      PipelineInstance& pipeline = ensurePipeline(key);
+      key.colorFormats = formats.colorFormats;
+      key.depthFormat = formats.depthFormat;
+
+      PipelineInstance& pipeline = ensurePipeline(key, formats);
       if (&pipeline != currentPipeline) {
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
         bindDescriptorSets(cmd, pipeline);
@@ -215,7 +221,10 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       key.wireframe = true;
       key.fogMode = fogMode;
 
-      PipelineInstance& pipeline = ensurePipeline(key);
+      key.colorFormats = formats.colorFormats;
+      key.depthFormat = formats.depthFormat;
+
+      PipelineInstance& pipeline = ensurePipeline(key, formats);
       if (&pipeline != currentPipeline) {
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
         bindDescriptorSets(cmd, pipeline);
@@ -522,7 +531,8 @@ void ZVulkanMeshPipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd
 }
 
 ZVulkanMeshPipelineContext::PipelineInstance&
-ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key)
+ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key,
+                                           const vulkan::AttachmentFormats& formats)
 {
   auto it = m_pipelineCache.find(key);
   if (it != m_pipelineCache.end()) {
@@ -577,6 +587,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key)
   auto vertexInput = makeMeshVertexInput();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, toVkTopology(key.meshType));
   std::vector<vk::DescriptorSetLayout> layouts{**m_setTextures, **m_setLighting, **m_setTransforms};
+  instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
 

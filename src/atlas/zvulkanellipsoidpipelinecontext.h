@@ -12,6 +12,10 @@
 
 namespace nim {
 
+namespace vulkan {
+struct AttachmentFormats;
+}
+
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
@@ -54,10 +58,15 @@ private:
   {
     bool dynamicMaterial = false;
     FogMode fogMode = FogMode::None;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(dynamicMaterial, static_cast<int>(fogMode));
+      return std::tuple(dynamicMaterial,
+                        static_cast<int>(fogMode),
+                        colorFormats,
+                        depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const
@@ -98,7 +107,7 @@ private:
   void ensureDescriptorSets();
   void updateLightingUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const EllipsoidPayload& payload);
   void updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const EllipsoidPayload& payload);
-  PipelineInstance& ensurePipeline(const PipelineKey& key);
+  PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
   void ensureVertexCapacity(size_t vertexCount);

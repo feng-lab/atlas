@@ -41,8 +41,6 @@ public:
   void setDataPickingColors(std::vector<glm::vec4> linePickingColorsInput);
   void clearPickingColors();
 
-  // Command list integration helpers used by backend implementations.
-  void executeBatchGL(const RenderBatch& batch);
   void buildWideLineGeometry(std::vector<LineWideVertex>& outVertices, std::vector<uint32_t>& outIndices) const;
 
   // default true since glLineWidth only support 1 pixel width line from now on
@@ -91,8 +89,6 @@ protected:
   // void disableLineSmooth();
 
 private:
-  void renderImmediate(Z3DEye eye);
-
   void updateLineWidth()
   {
     if (m_enableMultisample && m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2) {

@@ -199,33 +199,7 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
     return;
   }
 
-  if (m_rendererBase.supportsCommandLists()) {
-    appendDefaultColors();
-    RenderBatch batch = buildRenderBatch(eye);
-    if (batch.draw.vertexCount == 0u) {
-      return;
-    }
-    m_rendererBase.appendBatch(std::move(batch));
-    return;
-  }
-
-  renderImmediate(eye, true);
-}
-
-void Z3DEllipsoidRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
-{
-  if (m_centers.empty()) {
-    return;
-  }
   appendDefaultColors();
-
-  RenderBatch batch = buildRenderBatch(eye);
-  if (batch.draw.vertexCount == 0u) {
-    return;
-  }
-  if (appendBatch) {
-    m_rendererBase.appendBatch(std::move(batch));
-  }
 
   m_ellipsoidShaderGrp->bind();
   Z3DShaderProgram& shader = m_ellipsoidShaderGrp->get();
@@ -390,11 +364,6 @@ void Z3DEllipsoidRenderer::renderImmediate(Z3DEye eye, bool appendBatch)
   }
 
   m_ellipsoidShaderGrp->release();
-}
-
-void Z3DEllipsoidRenderer::executeBatchGL(const RenderBatch& batch)
-{
-  renderImmediate(batch.eye, false);
 }
 
 void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)

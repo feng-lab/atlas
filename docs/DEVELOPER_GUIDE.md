@@ -53,13 +53,13 @@ Compositor and Rendering
 
 Vulkan Migration Snapshots
 
-- Detailed migration backlog now lives in `docs/VULKAN_MIGRATION_PLAN.md` (moved out of `src/atlas/`). Use it as the canonical task list for backend parity work.
-- Backend selection is driven by the façade (`Z3DCompositorBase` and friends). `Z3DRenderingEngine` owns only the façade and swaps concrete backends when the user toggles the runtime `RenderBackend` enum. `Z3DRendererBase::setBackend(RenderBackend)` now encapsulates the full switch (backend construction, resource teardown, and renderer rebuild), so filters only pass the enum.
-- Filters must call `setBackend()` when the backend toggle fires; if a Vulkan renderer is not implemented yet, the filter remains disconnected rather than falling back to OpenGL. This avoids feeding GL render targets into a Vulkan compositor.
-- Render-surface façade work is paused. The pipeline now keeps per-eye `Z3DRenderTarget` leases on each filter and hands textures to consumers through helper accessors (see `docs/RENDER_SURFACE_PORTS.md` for historical context and future directions).
-- Several `ZParameter` instances still live inside renderers (GL only). During migration we will audit each renderer, hoist persistent parameter state to its owning filter (or a shared parameter bundle), and keep only transient GPU resources inside renderer backends so they can be destroyed/recreated without losing user-facing state.
-- Naming convention: 3D/shared classes use the `Z3D` prefix (e.g., `Z3DImgFilter`, `Z3DRenderSurfaceOutputPort`), while Vulkan-only counterparts use the `ZVulkan` prefix (e.g., `ZVulkanCompositor`). Keep new files aligned with this scheme for clarity across backends.
-- Renderer subclasses implement `createResources(RenderBackend backend)` and must guard against unsupported APIs (current GL implementations simply return when `backend != RenderBackend::OpenGL`). This keeps Vulkan transitions from instantiating GL shaders/VAOs during a backend flip.
+- Detailed migration backlog now lives in `docs/VULKAN_MIGRATION_PLAN.md`. Treat it as the canonical task list for Vulkan parity and update it whenever plans change.
+- Backend selection remains a session-level switch. GL stays the default renderer while the Vulkan translation layer comes online; runtime hot-swapping will be revisited once the translators cover the major primitives.
+- Filters continue to own their GL renderers. When we add Vulkan support, expose lightweight translation helpers instead of pushing façade-only abstractions into the filters.
+- Render-surface façade work is paused. Per-eye `Z3DRenderTarget` leases stay with each filter, and consumers pull textures via existing helper accessors (see `docs/RENDER_SURFACE_PORTS.md` for historical notes).
+- Several `ZParameter` instances still live inside renderers (GL only). As Vulkan coverage expands, audit each renderer, move persistent parameter state to its owning filter (or a shared bundle), and keep only transient GPU resources inside the renderer so backend resets don’t drop user-facing state.
+- Naming convention: 3D/shared classes use the `Z3D` prefix (e.g., `Z3DImgFilter`, `Z3DRenderSurfaceOutputPort`), while Vulkan-specific helpers use the `ZVulkan` prefix (e.g., `ZVulkanLinePipelineContext`). Keep new files aligned with this scheme for clarity across backends.
+- Renderer subclasses still implement `createResources(RenderBackend backend)` and must guard against unsupported APIs (current GL implementations simply return when `backend != RenderBackend::OpenGL`). This keeps future backend transitions from instantiating GL shaders/VAOs during staging.
 
 Invalidation & Progressive Rendering
 
