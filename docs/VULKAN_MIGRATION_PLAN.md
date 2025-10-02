@@ -18,6 +18,7 @@ These instructions are mandatory for every migration change; do not deviate from
 - You can use `cmake --build build/Release` to verify compositor changes still compile before pushing them further.
 - **Never run `git checkout`**; we might lose progress forever.
 - Build Vulkan features by translating the existing GL renderer data. Avoid rewriting the GL draw paths; instead, expose the geometry/state they already use and feed that into Vulkan.
+- Dynamic rendering stays the foundation for command recording. Renderers provide backend-neutral batches (via the `enqueueRenderBatches` hook) so the Vulkan backend can cache/create pipelines and issue draws without pre-declared render passes.
 
 ## Important Guideline (Review Before Coding)
 
@@ -146,6 +147,11 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
 - **Validation**
   - Capture GL reference frames before switching a renderer to Vulkan and log intentional gaps here so parity debt stays visible.
   - Add CPU-side unit hooks for the translator helpers to catch regressions without needing GL contexts.
+- **Implemented translators**
+  - Lines, meshes, spheres, background quads, ellipsoids, and cones now publish Vulkan-ready batches. `ZVulkanSpherePipelineContext` mirrors the GL box-correction path and disables lighting during picking; `ZVulkanBackgroundPipelineContext` drives the pass shader via specialization constants and push constants; `ZVulkanConePipelineContext` covers all cap styles and reuses picking colours by toggling lighting/material state.
+  - Texture copy (colour + depth) now feeds Vulkan via `ZVulkanTextureCopyPipelineContext`, reusing the fullscreen quad geometry, the discard/divide/multiply specialization constants, and staging GL textures through a CPU readback/upload bridge until native Vulkan-backed attachments are available.
+  - Texture blend (dual colour/depth compositing) routes through `ZVulkanTextureBlendPipelineContext`, mapping the GL blend/priority modes onto a single specialization constant (`COMPOSE_MODE`) and uploading both layers’ textures via the same CPU bridge while we lack Vulkan-native render targets.
+  - Texture glow (blur + compositing) executes the two-pass separable blur and final glow combine in `ZVulkanTextureGlowPipelineContext`, translating blur parameters into push constants and reusing CPU-uploaded textures alongside internally managed Vulkan scratch images for the intermediate glow map.
 
 ### Renderer Parity Focus
 
@@ -154,3 +160,33 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
 - Meshes: validate material/light UBOs, wireframe overlays, and transparency parity.
 - Volumes & slices: once translators exist, compare raycaster/slicer outputs, transfer-function blending, and progressive accumulation against GL captures.
 - Post effects (axis, glow, screenshot readback): port after primitive renderers are reliable; document any temporary fallbacks.
+- **Upcoming Vulkan Compositor Port Plan**
+  1. **Inventory Existing GL Flow**
+     - Map each compositor phase that touches texture-copy/blend/glow (inputs, outputs, scratch usage, parameter propagation).
+     - Document shader parameters and ordering so Vulkan paths stay behaviourally identical.
+
+  2. **Extend Scratch Pool for Vulkan Surfaces**
+     - Teach `Z3DScratchResourcePool` helpers (e.g. `acquireTempRenderTarget2D`) to populate Vulkan attachment handles when the default backend is Vulkan.
+     - Ensure leases describe both GL and Vulkan resources; add TODOs where GL-only code remains.
+
+  3. **Add Vulkan Render Entry Points**
+     - In `Z3DRendererBase`, provide a helper that accepts Vulkan attachments and dispatches Vulkan batches without touching GL.
+     - Keep the existing GL path unchanged.
+
+  4. **Upgrade Renderers**
+     - For each compositor primitive, expose `renderVulkan(...)` plus payload/batch builders that accept `AttachmentHandle`s.
+     - Leave GL `render(...)` logic untouched so both paths can coexist.
+
+  5. **Integrate in the Compositor**
+     - For each compositor pass that currently binds a `Z3DRenderTarget`, add a Vulkan branch: acquire a Vulkan lease, set the active surface, call the renderer’s Vulkan entry point, and reuse Vulkan intermediates across multi-pass flows.
+     - Guard with backend checks to avoid disturbing the GL path.
+
+  6. **Pipeline Adjustments**
+     - Verify all Vulkan pipeline contexts consume attachment handles exclusively, with no CPU upload fallback.
+     - Audit layout transitions and descriptor usage for the new Vulkan intermediates.
+
+  7. **Documentation & TODOs**
+     - Capture remaining gaps in this plan/the issue tracker (e.g., GL fallback removal) so later work is well-scoped.
+
+  8. **Remove CPU Bridges**
+     - After the compositor emits Vulkan attachments end-to-end, delete the CPU texture upload scaffolding and confirm both Vulkan and GL builds succeed.

@@ -94,6 +94,82 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
   m_glowTextureShaderGrp->release();
 }
 
+TextureGlowPayload Z3DTextureGlowRenderer::buildTextureGlowPayload() const
+{
+  return buildTextureGlowPayload(AttachmentHandle{}, AttachmentHandle{});
+}
+
+TextureGlowPayload Z3DTextureGlowRenderer::buildTextureGlowPayload(AttachmentHandle colorHandle,
+                                                                   AttachmentHandle depthHandle) const
+{
+  TextureGlowPayload payload;
+  payload.renderer = const_cast<Z3DTextureGlowRenderer*>(this);
+  payload.colorTexture = m_colorTexture;
+  payload.depthTexture = m_depthTexture;
+  payload.mode = m_glowMode;
+  payload.blurRadius = m_blurRadius;
+  payload.blurScale = m_blurScale;
+  payload.blurStrength = m_blurStrength;
+  payload.colorAttachmentHandle = colorHandle;
+  payload.depthAttachmentHandle = depthHandle;
+  return payload;
+}
+
+RenderBatch Z3DTextureGlowRenderer::buildRenderBatch(Z3DEye eye) const
+{
+  return buildRenderBatch(eye, AttachmentHandle{}, AttachmentHandle{});
+}
+
+RenderBatch Z3DTextureGlowRenderer::buildRenderBatch(Z3DEye eye,
+                                                     AttachmentHandle colorHandle,
+                                                     AttachmentHandle depthHandle) const
+{
+  RenderBatch batch;
+
+  batch.eye = eye;
+
+  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+  batch.pass.viewport.minDepth = 0.0f;
+  batch.pass.viewport.maxDepth = 1.0f;
+
+  const auto& surface = m_rendererBase.frameState().activeSurface;
+  batch.pass.colorAttachments = surface.colorAttachments;
+  batch.pass.depthAttachment = surface.depthAttachment;
+
+  batch.draw.topology = PrimitiveTopology::TriangleStrip;
+  batch.draw.vertexCount = 4;
+  batch.draw.indexCount = 0;
+
+  batch.geometry = buildTextureGlowPayload(colorHandle, depthHandle);
+
+  return batch;
+}
+
+void Z3DTextureGlowRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan || picking) {
+    return;
+  }
+
+  if (!m_colorTexture || !m_depthTexture) {
+    return;
+  }
+
+  auto batch = buildRenderBatch(eye);
+  m_rendererBase.appendBatch(std::move(batch));
+}
+
+void Z3DTextureGlowRenderer::renderVulkan(Z3DEye eye,
+                                          AttachmentHandle colorHandle,
+                                          AttachmentHandle depthHandle)
+{
+  auto batch = buildRenderBatch(eye, colorHandle, depthHandle);
+  m_rendererBase.appendBatch(std::move(batch));
+}
+
 void Z3DTextureGlowRenderer::setGlowMode(GlowMode mode)
 {
   if (m_glowMode == mode) {

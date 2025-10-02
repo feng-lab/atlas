@@ -15,16 +15,6 @@
 namespace nim {
 
 class Z3DImg;
-enum class ImgCompositingMode
-{
-  DirectVolumeRendering,
-  MaximumIntensityProjection,
-  MIPOpaque,
-  LocalMIP,
-  LocalMIPOpaque,
-  IsoSurface,
-  XRay
-};
 
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions

@@ -6,6 +6,7 @@
 #include "zglmutils.h"
 #include <array>
 #include <concepts>
+#include <functional>
 #include <memory>
 #include <set>
 #include <span>
@@ -177,6 +178,23 @@ public:
 
   RendererFrameState::ActiveSurface
   describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
+
+  struct VulkanSurfaceBindings
+  {
+    RendererFrameState::ActiveSurface surface;
+    std::vector<AttachmentHandle> colorHandles;
+    std::optional<AttachmentHandle> depthHandle;
+
+    [[nodiscard]] bool valid() const
+    {
+      return !colorHandles.empty() || depthHandle.has_value();
+    }
+  };
+
+  VulkanSurfaceBindings
+  prepareVulkanSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
+
+  void executeVulkanBatches(const std::function<void()>& recordBatches);
 
   [[nodiscard]] bool supportsCommandLists() const;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include "z3drendercommands.h"
 #include <memory>
 #include <string>
 
@@ -45,6 +46,17 @@ protected:
   [[nodiscard]] std::string generateHeader() const;
 
   void render(Z3DEye eye) override;
+
+  [[nodiscard]] TextureCopyPayload buildTextureCopyPayload() const;
+  [[nodiscard]] TextureCopyPayload buildTextureCopyPayload(AttachmentHandle colorHandle,
+                                                           AttachmentHandle depthHandle) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye,
+                                             AttachmentHandle colorHandle,
+                                             AttachmentHandle depthHandle) const;
+
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
+  void renderVulkan(Z3DEye eye, AttachmentHandle colorHandle, AttachmentHandle depthHandle);
 
 protected:
   const Z3DTexture* m_colorTexture = nullptr;

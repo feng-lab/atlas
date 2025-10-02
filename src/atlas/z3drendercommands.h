@@ -3,9 +3,11 @@
 #include "z3dtypes.h"
 #include "zglmutils.h"
 #include "z3dgl.h"
+#include "z3dscratchresourcepool.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
 #include <variant>
@@ -17,8 +19,61 @@ class Z3DTexture;
 class ZMesh;
 class Z3DLineRenderer;
 class Z3DMeshRenderer;
+class Z3DSphereRenderer;
 class Z3DEllipsoidRenderer;
 class Z3DConeRenderer;
+class Z3DBackgroundRenderer;
+class Z3DTextureCopyRenderer;
+class Z3DTextureBlendRenderer;
+class Z3DTextureGlowRenderer;
+class Z3DImg;
+class Z3DImgSliceRenderer;
+class Z3DImgRaycasterRenderer;
+class ZColorMapParameter;
+
+enum class BackgroundMode
+{
+  Uniform,
+  Gradient
+};
+
+enum class BackgroundGradientOrientation
+{
+  LeftToRight,
+  RightToLeft,
+  TopToBottom,
+  BottomToTop
+};
+
+enum class TextureBlendMode
+{
+  DepthTest,
+  FirstOnTop,
+  SecondOnTop,
+  DepthTestBlending,
+  FirstOnTopBlending,
+  SecondOnTopBlending,
+  MIPImageDepthTestBlending
+};
+
+enum class GlowMode
+{
+  Additive,
+  Screen,
+  Softlight,
+  Glowmap
+};
+
+enum class ImgCompositingMode
+{
+  DirectVolumeRendering,
+  MaximumIntensityProjection,
+  MIPOpaque,
+  LocalMIP,
+  LocalMIPOpaque,
+  IsoSurface,
+  XRay
+};
 
 //------------------------------------------------------------------------------
 // Backend handles
@@ -344,6 +399,102 @@ struct MeshPayload
   bool meshNeedsSplit = false;
   bool meshColorReady = false;
   bool meshPickingColorReady = false;
+  bool pickingPass = false;
+};
+
+struct SpherePayload
+{
+  Z3DSphereRenderer* renderer = nullptr;
+  std::span<const glm::vec4> pointsAndRadius;
+  std::span<const glm::vec4> colors;
+  std::span<const glm::vec4> pickingColors;
+  std::span<const glm::vec4> specularAndShininess;
+  std::span<const float> flags;
+  std::span<const uint32_t> indices;
+
+  bool useDynamicMaterial = true;
+  bool pickingPass = false;
+};
+
+struct BackgroundPayload
+{
+  Z3DBackgroundRenderer* renderer = nullptr;
+  glm::vec4 color1{1.0f};
+  glm::vec4 color2{0.0f};
+  glm::vec4 region{0.0f, 1.0f, 0.0f, 1.0f};
+  BackgroundMode mode = BackgroundMode::Gradient;
+  BackgroundGradientOrientation orientation = BackgroundGradientOrientation::BottomToTop;
+};
+
+struct TextureCopyPayload
+{
+  enum class OutputMode
+  {
+    NoChange,
+    DivideByAlpha,
+    MultiplyAlpha
+  };
+
+  Z3DTextureCopyRenderer* renderer = nullptr;
+  const Z3DTexture* colorTexture = nullptr; // TODO: populate Vulkan handles and remove GL pointers
+  const Z3DTexture* depthTexture = nullptr;
+  bool discardTransparent = true;
+  OutputMode mode = OutputMode::NoChange;
+  AttachmentHandle colorAttachmentHandle;
+  AttachmentHandle depthAttachmentHandle;
+};
+
+struct TextureBlendPayload
+{
+  Z3DTextureBlendRenderer* renderer = nullptr;
+  const Z3DTexture* colorTexture0 = nullptr; // TODO: populate Vulkan handles and remove GL pointers
+  const Z3DTexture* depthTexture0 = nullptr;
+  const Z3DTexture* colorTexture1 = nullptr;
+  const Z3DTexture* depthTexture1 = nullptr;
+  TextureBlendMode mode = TextureBlendMode::DepthTestBlending;
+  AttachmentHandle colorAttachmentHandle0;
+  AttachmentHandle depthAttachmentHandle0;
+  AttachmentHandle colorAttachmentHandle1;
+  AttachmentHandle depthAttachmentHandle1;
+};
+
+struct TextureGlowPayload
+{
+  Z3DTextureGlowRenderer* renderer = nullptr;
+  const Z3DTexture* colorTexture = nullptr; // TODO: populate Vulkan handles and remove GL pointers
+  const Z3DTexture* depthTexture = nullptr;
+  GlowMode mode = GlowMode::Screen;
+  int blurRadius = 0;
+  float blurScale = 1.0f;
+  float blurStrength = 0.5f;
+  AttachmentHandle colorAttachmentHandle;
+  AttachmentHandle depthAttachmentHandle;
+};
+
+struct ImgSlicePayload
+{
+  Z3DImgSliceRenderer* renderer = nullptr;
+  Z3DImg* image = nullptr;
+  const std::vector<std::unique_ptr<ZColorMapParameter>>* colormaps = nullptr;
+  std::span<const ZMesh> slices;
+  glm::uvec2 outputSize{0u, 0u};
+  bool fastPathOnly = true;
+  bool maxProjectionMerge = true;
+  std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> layerLease;
+};
+
+struct ImgRaycasterPayload
+{
+  Z3DImgRaycasterRenderer* renderer = nullptr;
+  Z3DImg* image = nullptr;
+  std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> entryExitLease;
+  std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> channelLayerLease;
+  glm::uvec2 outputSize{0u, 0u};
+  float samplingRate = 1.0f;
+  float isoValue = 0.5f;
+  float localMIPThreshold = 0.8f;
+  ImgCompositingMode compositingMode = ImgCompositingMode::DirectVolumeRendering;
+  bool fastPathOnly = true;
 };
 
 struct EllipsoidPayload
@@ -360,6 +511,7 @@ struct EllipsoidPayload
   std::span<const uint32_t> indices;
 
   bool useDynamicMaterial = true;
+  bool pickingPass = false;
 };
 
 struct ConePayload
@@ -386,9 +538,21 @@ struct ConePayload
   int subdivisionAlong = 1;
   bool sameColorForBaseAndTop = false;
   bool useConeShader2 = true;
+  bool pickingPass = false;
 };
 
-using GeometryPayload = std::variant<std::monostate, LinePayload, MeshPayload, EllipsoidPayload, ConePayload>;
+using GeometryPayload = std::variant<std::monostate,
+                                     LinePayload,
+                                     MeshPayload,
+                                     SpherePayload,
+                                     BackgroundPayload,
+                                     ImgSlicePayload,
+                                     ImgRaycasterPayload,
+                                     TextureCopyPayload,
+                                     TextureBlendPayload,
+                                     TextureGlowPayload,
+                                     EllipsoidPayload,
+                                     ConePayload>;
 
 struct RenderBatch
 {

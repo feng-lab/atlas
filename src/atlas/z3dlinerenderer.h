@@ -85,6 +85,8 @@ protected:
 
   void renderPicking(Z3DEye eye) override;
 
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
+
   // void enableLineSmooth();
   // void disableLineSmooth();
 

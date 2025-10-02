@@ -1,24 +1,11 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include "z3drendercommands.h"
 #include <memory>
 #include <string>
 
 namespace nim {
-
-enum class BackgroundMode
-{
-  Uniform,
-  Gradient
-};
-
-enum class BackgroundGradientOrientation
-{
-  LeftToRight,
-  RightToLeft,
-  TopToBottom,
-  BottomToTop
-};
 
 class Z3DBackgroundRenderer : public Z3DPrimitiveRenderer
 {
@@ -53,6 +40,11 @@ public:
   void render(Z3DEye eye) override;
 
   void renderPicking(Z3DEye) override;
+
+  [[nodiscard]] BackgroundPayload buildBackgroundPayload() const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
+
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 
 protected:
   void createResources(RenderBackend backend) override;

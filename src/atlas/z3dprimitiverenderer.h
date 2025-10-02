@@ -114,6 +114,9 @@ protected:
 
   virtual void renderPicking(Z3DEye) {}
 
+  virtual void enqueueRenderBatches(Z3DEye /*eye*/, RenderBackend /*backend*/, bool /*picking*/)
+  {}
+
 protected:
   virtual void createResources(RenderBackend /*backend*/) {}
 

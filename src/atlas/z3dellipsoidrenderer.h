@@ -52,11 +52,13 @@ protected:
 
   void renderPicking(Z3DEye eye) override;
 
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
+
 
   void appendDefaultColors();
 
   [[nodiscard]] EllipsoidPayload buildEllipsoidPayload() const;
-  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
 
 protected:
   void createResources(RenderBackend backend) override;

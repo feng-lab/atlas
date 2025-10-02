@@ -227,6 +227,9 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createIn
   allocateMemory();
   createImageView();
   createSampler();
+  if (m_arrayLayers > 1u) {
+    m_layerImageViews.resize(m_arrayLayers);
+  }
   LOG(INFO) << "ZVulkanTexture created: " << m_extent.width << "x" << m_extent.height << "x" << m_extent.depth
             << " layers=" << m_arrayLayers;
 }
@@ -357,6 +360,33 @@ void ZVulkanTexture::setDescriptorLayout(vk::ImageLayout layout)
 vk::Sampler ZVulkanTexture::sampler() const
 {
   return m_sampler ? **m_sampler : vk::Sampler{};
+}
+
+vk::ImageView ZVulkanTexture::layerImageView(uint32_t layer) const
+{
+  if (m_arrayLayers <= 1u) {
+    return m_imageView ? **m_imageView : vk::ImageView{};
+  }
+  if (!m_image || !m_imageView || layer >= m_arrayLayers) {
+    return vk::ImageView{};
+  }
+  if (m_layerImageViews.empty()) {
+    m_layerImageViews.resize(m_arrayLayers);
+  }
+  if (!m_layerImageViews[layer].has_value()) {
+    vk::ImageViewCreateInfo viewInfo{};
+    viewInfo.image = **m_image;
+    viewInfo.viewType = vk::ImageViewType::e2D;
+    viewInfo.format = m_format;
+    viewInfo.components = vk::ComponentMapping{};
+    viewInfo.subresourceRange.aspectMask = m_aspectMask;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = m_mipLevels;
+    viewInfo.subresourceRange.baseArrayLayer = layer;
+    viewInfo.subresourceRange.layerCount = 1;
+    m_layerImageViews[layer].emplace(m_device.context().device(), viewInfo);
+  }
+  return **m_layerImageViews[layer];
 }
 
 // ----- Private helpers ------------------------------------------------------------------------

@@ -49,6 +49,94 @@ void Z3DTextureCopyRenderer::render(Z3DEye eye)
   m_copyTextureShaderGrp->release();
 }
 
+TextureCopyPayload Z3DTextureCopyRenderer::buildTextureCopyPayload() const
+{
+  return buildTextureCopyPayload(AttachmentHandle{}, AttachmentHandle{});
+}
+
+TextureCopyPayload
+Z3DTextureCopyRenderer::buildTextureCopyPayload(AttachmentHandle colorHandle, AttachmentHandle depthHandle) const
+{
+  TextureCopyPayload payload;
+  payload.renderer = const_cast<Z3DTextureCopyRenderer*>(this);
+  payload.colorTexture = m_colorTexture;
+  payload.depthTexture = m_depthTexture;
+  payload.discardTransparent = m_discardTransparent;
+  payload.colorAttachmentHandle = colorHandle;
+  payload.depthAttachmentHandle = depthHandle;
+
+  switch (m_mode) {
+    case OutputColorOption::DivideByAlpha:
+      payload.mode = TextureCopyPayload::OutputMode::DivideByAlpha;
+      break;
+    case OutputColorOption::MultiplyAlpha:
+      payload.mode = TextureCopyPayload::OutputMode::MultiplyAlpha;
+      break;
+    case OutputColorOption::NoChange:
+    default:
+      payload.mode = TextureCopyPayload::OutputMode::NoChange;
+      break;
+  }
+
+  return payload;
+}
+
+RenderBatch Z3DTextureCopyRenderer::buildRenderBatch(Z3DEye eye) const
+{
+  return buildRenderBatch(eye, AttachmentHandle{}, AttachmentHandle{});
+}
+
+RenderBatch
+Z3DTextureCopyRenderer::buildRenderBatch(Z3DEye eye,
+                                         AttachmentHandle colorHandle,
+                                         AttachmentHandle depthHandle) const
+{
+  RenderBatch batch;
+
+  batch.eye = eye;
+
+  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+  batch.pass.viewport.minDepth = 0.0f;
+  batch.pass.viewport.maxDepth = 1.0f;
+
+  const auto& surface = m_rendererBase.frameState().activeSurface;
+  batch.pass.colorAttachments = surface.colorAttachments;
+  batch.pass.depthAttachment = surface.depthAttachment;
+
+  batch.draw.topology = PrimitiveTopology::TriangleStrip;
+  batch.draw.vertexCount = 4;
+  batch.draw.indexCount = 0;
+
+  batch.geometry = buildTextureCopyPayload(colorHandle, depthHandle);
+
+  return batch;
+}
+
+void Z3DTextureCopyRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan || picking) {
+    return;
+  }
+
+  if (!m_colorTexture || !m_depthTexture) {
+    return;
+  }
+
+  auto batch = buildRenderBatch(eye);
+  m_rendererBase.appendBatch(std::move(batch));
+}
+
+void Z3DTextureCopyRenderer::renderVulkan(Z3DEye eye,
+                                          AttachmentHandle colorHandle,
+                                          AttachmentHandle depthHandle)
+{
+  auto batch = buildRenderBatch(eye, colorHandle, depthHandle);
+  m_rendererBase.appendBatch(std::move(batch));
+}
+
 void Z3DTextureCopyRenderer::createResources(RenderBackend backend)
 {
   if (backend != RenderBackend::OpenGL) {

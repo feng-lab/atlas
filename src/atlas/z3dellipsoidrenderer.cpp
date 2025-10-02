@@ -4,6 +4,8 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
+#include <utility>
+
 namespace nim {
 
 Z3DEllipsoidRenderer::Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase)
@@ -556,6 +558,26 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
   m_ellipsoidShaderGrp->release();
 }
 
+void Z3DEllipsoidRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan) {
+    return;
+  }
+
+  if (m_centers.empty()) {
+    return;
+  }
+
+  if (picking && (m_ellipsoidPickingColors.size() < m_centers.size())) {
+    return;
+  }
+
+  appendDefaultColors();
+
+  auto batch = buildRenderBatch(eye, picking);
+  m_rendererBase.appendBatch(std::move(batch));
+}
+
 void Z3DEllipsoidRenderer::appendDefaultColors()
 {
   if (m_ellipsoidColors.size() < m_centers.size()) {
@@ -586,7 +608,7 @@ EllipsoidPayload Z3DEllipsoidRenderer::buildEllipsoidPayload() const
   return payload;
 }
 
-RenderBatch Z3DEllipsoidRenderer::buildRenderBatch(Z3DEye eye) const
+RenderBatch Z3DEllipsoidRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 {
   RenderBatch batch;
 
@@ -607,7 +629,9 @@ RenderBatch Z3DEllipsoidRenderer::buildRenderBatch(Z3DEye eye) const
   batch.draw.vertexCount = static_cast<uint32_t>(m_axis1.size());
   batch.draw.indexCount = static_cast<uint32_t>(m_indexs.size());
 
-  batch.geometry = buildEllipsoidPayload();
+  auto payload = buildEllipsoidPayload();
+  payload.pickingPass = picking;
+  batch.geometry = std::move(payload);
   return batch;
 }
 

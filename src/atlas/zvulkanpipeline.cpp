@@ -70,6 +70,16 @@ void ZVulkanPipeline::setDepthWriteEnable(bool enable)
   m_depthWriteEnable = enable;
 }
 
+void ZVulkanPipeline::setDepthTestEnable(bool enable)
+{
+  m_depthTestEnable = enable;
+}
+
+void ZVulkanPipeline::setDepthCompareOp(vk::CompareOp compareOp)
+{
+  m_depthCompareOp = compareOp;
+}
+
 void ZVulkanPipeline::setColorBlendAttachment(const vk::PipelineColorBlendAttachmentState& attachment)
 {
   m_colorBlendAttachment = attachment;
@@ -116,9 +126,9 @@ void ZVulkanPipeline::create()
                                                        .alphaToCoverageEnable = VK_FALSE,
                                                        .alphaToOneEnable = VK_FALSE};
 
-  vk::PipelineDepthStencilStateCreateInfo depthStencil{.depthTestEnable = VK_TRUE,
+  vk::PipelineDepthStencilStateCreateInfo depthStencil{.depthTestEnable = static_cast<vk::Bool32>(m_depthTestEnable),
                                                        .depthWriteEnable = static_cast<vk::Bool32>(m_depthWriteEnable),
-                                                       .depthCompareOp = vk::CompareOp::eLess,
+                                                       .depthCompareOp = m_depthCompareOp,
                                                        .depthBoundsTestEnable = VK_FALSE,
                                                        .stencilTestEnable = VK_FALSE,
                                                        .front = {},

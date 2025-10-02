@@ -9,6 +9,8 @@
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
 
+#include <utility>
+
 namespace nim {
 
 Z3DMeshRenderer::Z3DMeshRenderer(Z3DRendererBase& rendererBase)
@@ -257,7 +259,7 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
   return payload;
 }
 
-RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye) const
+RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 {
   RenderBatch batch;
 
@@ -279,7 +281,9 @@ RenderBatch Z3DMeshRenderer::buildRenderBatch(Z3DEye eye) const
   batch.draw.vertexCount = vertexCount;
   batch.draw.indexCount = indexCount;
 
-  batch.geometry = buildMeshPayload();
+  auto payload = buildMeshPayload();
+  payload.pickingPass = picking;
+  batch.geometry = std::move(payload);
 
   return batch;
 }
@@ -289,6 +293,15 @@ void Z3DMeshRenderer::renderUsingOpengl()
 {
   if (!m_meshPt || m_meshPt->empty()) {
     return;
+  }
+
+  if (picking) {
+    if (!m_meshPickingColorReady) {
+      prepareMeshPickingColor();
+    }
+    if (!m_meshPickingColorsPt || m_meshPickingColorsPt->empty() || m_meshPickingColorsPt->size() != m_meshPt->size()) {
+      return;
+    }
   }
 
   if (m_colorSource == MeshColorSource::CustomColor && !m_meshColorReady) {
@@ -1067,6 +1080,58 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
   }
 
   m_meshShaderGrp->release();
+}
+
+void Z3DMeshRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan) {
+    return;
+  }
+
+  if (!m_meshPt || m_meshPt->empty()) {
+    return;
+  }
+
+  if (picking) {
+    if (!m_meshPickingColorReady) {
+      prepareMeshPickingColor();
+    }
+    if (!m_meshPickingColorsPt || m_meshPickingColorsPt->empty() || m_meshPickingColorsPt->size() != m_meshPt->size()) {
+      return;
+    }
+  }
+
+  if (m_colorSource == MeshColorSource::CustomColor && !m_meshColorReady) {
+    prepareMeshColor();
+  }
+
+  for (auto mesh : *m_meshPt) {
+    if (m_colorSource == MeshColorSource::Mesh1DTexture &&
+        (mesh->num1DTextureCoordinates() < mesh->numVertices() || !m_texture ||
+         m_texture->textureTarget() != GL_TEXTURE_1D)) {
+      return;
+    }
+    if (m_colorSource == MeshColorSource::Mesh2DTexture &&
+        (mesh->num2DTextureCoordinates() < mesh->numVertices() || !m_texture ||
+         m_texture->textureTarget() != GL_TEXTURE_2D)) {
+      return;
+    }
+    if (m_colorSource == MeshColorSource::Mesh3DTexture &&
+        (mesh->num3DTextureCoordinates() < mesh->numVertices() || !m_texture ||
+         m_texture->textureTarget() != GL_TEXTURE_3D)) {
+      return;
+    }
+    if (m_colorSource == MeshColorSource::CustomColor &&
+        (!m_meshColorsPt || m_meshColorsPt->size() < m_meshPt->size())) {
+      return;
+    }
+    if (mesh->numNormals() != mesh->numVertices()) {
+      mesh->generateNormals();
+    }
+  }
+
+  auto batch = buildRenderBatch(eye, picking);
+  m_rendererBase.appendBatch(std::move(batch));
 }
 
 void Z3DMeshRenderer::createResources(RenderBackend backend)

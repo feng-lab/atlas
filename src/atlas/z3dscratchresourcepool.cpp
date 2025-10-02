@@ -1409,4 +1409,19 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
   return lease;
 }
 
+ZVulkanDevice* Z3DScratchResourcePool::vulkanDevice()
+{
+  if (!m_vulkanEnvironment) {
+    return nullptr;
+  }
+  return m_vulkanEnvironment->device.get();
+}
+
+ZVulkanDevice& Z3DScratchResourcePool::ensureVulkanDevice()
+{
+  auto& env = ensureVulkanEnvironment();
+  CHECK(env.device != nullptr) << "Failed to initialize Vulkan device";
+  return *env.device;
+}
+
 } // namespace nim

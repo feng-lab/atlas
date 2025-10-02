@@ -815,6 +815,28 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
   currentShaderGrp().release();
 }
 
+void Z3DLineRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan) {
+    return;
+  }
+
+  if (m_linePositions.empty()) {
+    return;
+  }
+
+  if (picking) {
+    if (m_linePickingColors.empty() || m_linePickingColors.size() != m_linePositions.size()) {
+      return;
+    }
+  }
+
+  updateLineWidth();
+
+  auto batch = buildRenderBatch(eye, picking);
+  m_rendererBase.appendBatch(std::move(batch));
+}
+
 void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 {
   updateLineWidth();

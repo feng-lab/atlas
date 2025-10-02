@@ -4,6 +4,8 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 
+#include <utility>
+
 namespace nim {
 
 Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase& rendererBase)
@@ -523,6 +525,74 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
   }
 
   m_sphereShaderGrp->release();
+}
+
+SpherePayload Z3DSphereRenderer::buildSpherePayload() const
+{
+  SpherePayload payload;
+
+  payload.renderer = const_cast<Z3DSphereRenderer*>(this);
+  payload.pointsAndRadius = spanOrEmpty(m_pointAndRadius);
+  payload.colors = spanOrEmpty(m_pointColors);
+  payload.pickingColors = spanOrEmpty(m_pointPickingColors);
+  payload.specularAndShininess = spanOrEmpty(m_specularAndShininess);
+  payload.flags = spanFromGLfloats(m_allFlags);
+  payload.indices = spanFromGLuints(m_indexs);
+  payload.useDynamicMaterial = m_useDynamicMaterial;
+  return payload;
+}
+
+RenderBatch Z3DSphereRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
+{
+  RenderBatch batch;
+
+  batch.eye = eye;
+
+  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+  batch.pass.viewport.minDepth = 0.f;
+  batch.pass.viewport.maxDepth = 1.f;
+
+  const auto& surface = m_rendererBase.frameState().activeSurface;
+  batch.pass.colorAttachments = surface.colorAttachments;
+  batch.pass.depthAttachment = surface.depthAttachment;
+
+  batch.draw.topology = PrimitiveTopology::TriangleList;
+
+  auto payload = buildSpherePayload();
+  payload.pickingPass = picking;
+  if (picking) {
+    payload.useDynamicMaterial = false;
+  }
+
+  batch.draw.vertexCount = static_cast<uint32_t>(payload.pointsAndRadius.size());
+  batch.draw.indexCount = static_cast<uint32_t>(payload.indices.size());
+  batch.geometry = std::move(payload);
+  return batch;
+}
+
+void Z3DSphereRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan) {
+    return;
+  }
+
+  if (m_pointAndRadius.empty()) {
+    return;
+  }
+
+  if (picking) {
+    if (m_pointPickingColors.empty() || m_pointPickingColors.size() != m_pointAndRadius.size()) {
+      return;
+    }
+  }
+
+  appendDefaultColors();
+
+  auto batch = buildRenderBatch(eye, picking);
+  m_rendererBase.appendBatch(std::move(batch));
 }
 
 void Z3DSphereRenderer::appendDefaultColors()

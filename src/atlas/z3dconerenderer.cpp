@@ -646,6 +646,26 @@ void Z3DConeRenderer::appendDefaultColors()
   }
 }
 
+void Z3DConeRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan) {
+    return;
+  }
+
+  if (m_baseAndBaseRadius.empty()) {
+    return;
+  }
+
+  if (picking && (m_conePickingColors.size() < m_baseAndBaseRadius.size())) {
+    return;
+  }
+
+  appendDefaultColors();
+
+  auto batch = buildRenderBatch(eye, picking);
+  m_rendererBase.appendBatch(std::move(batch));
+}
+
 ConePayload Z3DConeRenderer::buildConePayload() const
 {
   ConePayload payload;
@@ -684,7 +704,7 @@ ConePayload Z3DConeRenderer::buildConePayload() const
   return payload;
 }
 
-RenderBatch Z3DConeRenderer::buildRenderBatch(Z3DEye eye) const
+RenderBatch Z3DConeRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 {
   RenderBatch batch;
 
@@ -704,7 +724,9 @@ RenderBatch Z3DConeRenderer::buildRenderBatch(Z3DEye eye) const
   batch.draw.topology = PrimitiveTopology::TriangleList;
   batch.draw.vertexCount = static_cast<uint32_t>(m_baseAndBaseRadius.size());
   batch.draw.indexCount = static_cast<uint32_t>(m_indexs.size());
-  batch.geometry = buildConePayload();
+  auto payload = buildConePayload();
+  payload.pickingPass = picking;
+  batch.geometry = std::move(payload);
   return batch;
 }
 

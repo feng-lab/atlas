@@ -584,6 +584,20 @@ set(SOURCES
     zvulkanmeshpipelinecontext.cpp
     zvulkanellipsoidpipelinecontext.h
     zvulkanellipsoidpipelinecontext.cpp
+    zvulkanspherepipelinecontext.h
+    zvulkanspherepipelinecontext.cpp
+    zvulkanbackgroundpipelinecontext.h
+    zvulkanbackgroundpipelinecontext.cpp
+    zvulkantexturecopypipelinecontext.h
+    zvulkantexturecopypipelinecontext.cpp
+    zvulkantextureblendpipelinecontext.h
+    zvulkantextureblendpipelinecontext.cpp
+    zvulkantextureglowpipelinecontext.h
+    zvulkantextureglowpipelinecontext.cpp
+    zvulkanimgslicepipelinecontext.h
+    zvulkanimgslicepipelinecontext.cpp
+    zvulkanconepipelinecontext.h
+    zvulkanconepipelinecontext.cpp
 )
 
 # our target

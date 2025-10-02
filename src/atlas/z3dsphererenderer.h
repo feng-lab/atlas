@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include "z3drendercommands.h"
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -49,6 +50,11 @@ protected:
   void renderPicking(Z3DEye eye) override;
 
   void appendDefaultColors();
+
+  [[nodiscard]] SpherePayload buildSpherePayload() const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
+
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 
 protected:
   void createResources(RenderBackend backend) override;

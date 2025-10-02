@@ -16,6 +16,13 @@ class ZVulkanSwapChain;
 class ZVulkanLinePipelineContext;
 class ZVulkanMeshPipelineContext;
 class ZVulkanEllipsoidPipelineContext;
+class ZVulkanConePipelineContext;
+class ZVulkanSpherePipelineContext;
+class ZVulkanBackgroundPipelineContext;
+class ZVulkanTextureCopyPipelineContext;
+class ZVulkanTextureBlendPipelineContext;
+class ZVulkanTextureGlowPipelineContext;
+class ZVulkanImgSlicePipelineContext;
 class Z3DRendererVulkanBackend final : public Z3DRendererBackend
 {
 public:
@@ -74,6 +81,14 @@ private:
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
   std::unique_ptr<ZVulkanEllipsoidPipelineContext> m_ellipsoidContext;
+  std::unique_ptr<ZVulkanSpherePipelineContext> m_sphereContext;
+  std::unique_ptr<ZVulkanConePipelineContext> m_coneContext;
+  std::unique_ptr<ZVulkanBackgroundPipelineContext> m_backgroundContext;
+  std::unique_ptr<ZVulkanTextureCopyPipelineContext> m_textureCopyContext;
+  std::unique_ptr<ZVulkanTextureBlendPipelineContext> m_textureBlendContext;
+  std::unique_ptr<ZVulkanTextureGlowPipelineContext> m_textureGlowContext;
+  std::unique_ptr<ZVulkanImgSlicePipelineContext> m_imgSliceContext;
+  
 };
 
 std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend();

@@ -3,6 +3,7 @@
 #include "zvulkan.h"
 #include <memory>
 #include <optional>
+#include <vector>
 #include <cstddef>
 
 // Stage 1 prototype helper focused on self-contained texture management.
@@ -167,6 +168,7 @@ public:
     return m_currentLayout;
   }
   vk::Sampler sampler() const;
+  vk::ImageView layerImageView(uint32_t layer) const;
   uint32_t mipLevels() const
   {
     return m_mipLevels;
@@ -202,6 +204,7 @@ private:
   std::optional<vk::raii::DeviceMemory> m_imageMemory;
   std::optional<vk::raii::ImageView> m_imageView;
   std::optional<vk::raii::Sampler> m_sampler;
+  mutable std::vector<std::optional<vk::raii::ImageView>> m_layerImageViews;
   vk::ImageLayout m_currentLayout = vk::ImageLayout::eUndefined;
 };
 

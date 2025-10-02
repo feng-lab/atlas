@@ -304,6 +304,9 @@ public:
   uint32_t blockIdMaxAttachments() const;
   double blockIdScale() const;
 
+  ZVulkanDevice* vulkanDevice();
+  ZVulkanDevice& ensureVulkanDevice();
+
   // Describe current memory usage for logging/diagnostics.
   // detailed=false: single-line total; detailed=true: breakdown per slot/category.
   [[nodiscard]] std::string describeMemoryUsage(bool detailed = false) const;

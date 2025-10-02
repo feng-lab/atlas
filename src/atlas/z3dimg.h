@@ -10,6 +10,9 @@
 #include <folly/CancellationToken.h>
 #include <QObject>
 #include <set>
+#include <functional>
+#include <optional>
+#include <span>
 
 #if defined(ATLAS_SANITIZE_ADDRESS)
 #define ATLAS_CHECK_CACHE
@@ -21,6 +24,7 @@ namespace nim {
 class Z3DShaderProgram;
 
 class ZBenchTimer;
+class ZVulkanImageBlockUploader;
 
 // Z3DVolume coordinates:
 // 1. Voxel Coordinate:    [0, dim.x-1] x [0, dim.y-1] x [0, dim.z-1]
@@ -31,6 +35,8 @@ class ZBenchTimer;
 class Z3DImg : public QObject
 {
   Q_OBJECT
+
+  friend class ZVulkanImageBlockUploader;
 
 public:
   // Z3DVolume will take ownership of the img
@@ -83,6 +89,10 @@ public:
   {
     return m_volumes;
   }
+
+  const ZImg& channelVolumeImage(size_t c) const;
+
+  uint64_t volumeGeneration(size_t c) const;
 
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
   [[nodiscard]] QString samplerType() const;
@@ -153,6 +163,18 @@ public:
   {
     return m_channelImageCacheManagers[c]->size();
   }
+
+  [[nodiscard]] glm::uvec3 pageDirectorySize() const
+  {
+    return m_pageDirectorySize;
+  }
+
+  [[nodiscard]] glm::uvec3 pageTableCacheSize() const
+  {
+    return m_pageTableCacheSize;
+  }
+
+  [[nodiscard]] glm::uvec3 imageCacheSize() const;
 
   void bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const;
 
@@ -225,6 +247,8 @@ protected:
                                   const folly::CancellationToken& cancellationToken,
                                   ZBenchTimer& bt);
 
+  void setVulkanImageBlockUploader(ZVulkanImageBlockUploader* uploader);
+
   void checkPageSystemError(size_t c, bool strict = true);
 
   void resetCacheSystem(size_t c);
@@ -255,6 +279,7 @@ protected:
   std::vector<std::unique_ptr<Z3DBlockCache<glm::uvec4>>> m_channelPageTableCacheManagers;
   std::vector<std::unique_ptr<Z3DTexture>> m_channelImageCacheTextures;
   std::vector<std::unique_ptr<Z3DBlockCache<glm::uvec4>>> m_channelImageCacheManagers;
+  std::vector<uint64_t> m_volumeGenerations;
 
   size_t m_numLevels = 1;
   std::vector<glm::uvec3> m_pageDirectoryBases;
@@ -302,6 +327,8 @@ private:
   size_t m_maxMemoryForPageTableCache;
   size_t m_maxMemoryForImageCache;
   bool m_hasSufficientPageTableCacheSpace = false;
+
+  ZVulkanImageBlockUploader* m_vulkanImageBlockUploader = nullptr;
 };
 
 } // namespace nim

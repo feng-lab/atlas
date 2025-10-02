@@ -150,10 +150,14 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  updateLightingUBO(renderer, batch, payload);
+  const bool pickingPass = payload.pickingPass;
+
+  updateLightingUBO(renderer, batch, payload, pickingPass);
   updateTransformUBO(renderer, batch);
   ensureDescriptorSets();
-  bindTextureIfNeeded(payload);
+  if (!pickingPass) {
+    bindTextureIfNeeded(payload);
+  }
 
   vk::DeviceSize vertexOffset = 0;
   cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {vertexOffset});
@@ -198,7 +202,8 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
                         payload,
                         draw.payloadMeshIndex,
                         draw.useFallbackColor,
-                        draw.fallbackColor);
+                        draw.fallbackColor,
+                        pickingPass);
 
       if (draw.indexed && draw.indexCount > 0 && m_indexBuffer) {
         cmd.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
@@ -231,11 +236,13 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
         currentPipeline = &pipeline;
       }
 
+      const glm::vec4 wireColor = pickingPass ? draw.fallbackColor : payload.wireframeColor;
       updateMaterialUBO(renderer,
                         payload,
                         draw.payloadMeshIndex,
                         true,
-                        payload.wireframeColor);
+                        wireColor,
+                        pickingPass);
 
       if (draw.indexed && draw.indexCount > 0 && m_indexBuffer) {
         cmd.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
@@ -378,7 +385,8 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
 
 void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
                                                    const RenderBatch& batch,
-                                                   const MeshPayload& payload)
+                                                   const MeshPayload& payload,
+                                                   bool pickingPass)
 {
   auto& device = m_backend.device();
 
@@ -402,7 +410,8 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   availableLights = std::min(availableLights, static_cast<size_t>(scene.lighting.lightCount));
 
   lighting.numLights = static_cast<int>(std::min(availableLights, lighting.lights.size()));
-  lighting.lighting_enabled = lighting.numLights > 0 && payload.renderer && payload.renderer->needLighting() ? 1 : 0;
+  const bool enableLighting = !pickingPass && lighting.numLights > 0 && payload.renderer && payload.renderer->needLighting();
+  lighting.lighting_enabled = enableLighting ? 1 : 0;
 
   const glm::vec2 extent = batch.pass.viewport.extent;
   if (extent.x > 0.0f && extent.y > 0.0f) {
@@ -483,10 +492,11 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer, c
 }
 
 void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
-                                                    const MeshPayload& payload,
-                                                    size_t meshIndex,
-                                                    bool useFallbackColor,
-                                                    const glm::vec4& fallbackColor)
+                                                   const MeshPayload& payload,
+                                                   size_t meshIndex,
+                                                   bool useFallbackColor,
+                                                   const glm::vec4& fallbackColor,
+                                                   bool pickingPass)
 {
   if (!m_uboMaterial) {
     return;
@@ -504,7 +514,17 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
   bool useCustomColor = false;
   glm::vec4 colorValue = fallbackColor;
 
-  if (useFallbackColor) {
+  if (pickingPass) {
+    useCustomColor = true;
+    if (meshIndex < payload.meshPickingColors.size()) {
+      colorValue = payload.meshPickingColors[meshIndex];
+    } else {
+      colorValue = glm::vec4(0.0f);
+    }
+    material.alpha = 1.0f;
+    material.material_specular = glm::vec4(0.0f);
+    material.material_shininess = 0.0f;
+  } else if (useFallbackColor) {
     useCustomColor = true;
   } else if (payload.colorSource == MeshPayload::ColorSource::CustomColor &&
              meshIndex < payload.meshColors.size()) {
@@ -658,7 +678,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
       continue;
     }
 
-    if (!validateTexturePrerequisites(payload, *mesh)) {
+    if (!payload.pickingPass && !validateTexturePrerequisites(payload, *mesh)) {
       LOG_FIRST_N(WARNING, 5) << "Vulkan mesh backend skipping batch: texture prerequisites not met.";
       m_draws.clear();
       return;
@@ -754,8 +774,17 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
       indexCursor += indices.size();
     }
 
-    draw.useFallbackColor = fallbackColorNeeded;
-    draw.fallbackColor = fallbackColorNeeded ? kFallbackMeshColor : glm::vec4(1.0f);
+    if (payload.pickingPass) {
+      draw.useFallbackColor = true;
+      if (meshIdx < payload.meshPickingColors.size()) {
+        draw.fallbackColor = payload.meshPickingColors[meshIdx];
+      } else {
+        draw.fallbackColor = glm::vec4(0.0f);
+      }
+    } else {
+      draw.useFallbackColor = fallbackColorNeeded;
+      draw.fallbackColor = fallbackColorNeeded ? kFallbackMeshColor : glm::vec4(1.0f);
+    }
 
     m_draws.push_back(draw);
   }

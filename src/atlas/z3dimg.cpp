@@ -3,6 +3,7 @@
 #include "z3dshaderprogram.h"
 #include "z3dgpuinfo.h"
 #include "z3dtexture.h"
+#include "zvulkanimageblockuploader.h"
 #include "zkmeans.h"
 #include "zbenchtimer.h"
 #include "zcancellation.h"
@@ -61,6 +62,7 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
   m_volumeSpacing = glm::vec3(1.f / m_widthScale, 1.f / m_heightScale, 1.f / m_depthScale);
 
   m_nChannels = m_imgPack.imgInfo().numChannels;
+  m_volumeGenerations.assign(m_nChannels, 0);
 
 #if 0
   // shader limit is 20 channels
@@ -142,6 +144,29 @@ QString Z3DImg::samplerType() const
   }
 
   return "sampler2D";
+}
+
+const ZImg& Z3DImg::channelVolumeImage(size_t c) const
+{
+  CHECK_LT(c, m_volumes.size());
+  CHECK(m_volumes[c] != nullptr);
+  return m_volumes[c]->image();
+}
+
+uint64_t Z3DImg::volumeGeneration(size_t c) const
+{
+  if (c < m_volumeGenerations.size()) {
+    return m_volumeGenerations[c];
+  }
+  return 0;
+}
+
+glm::uvec3 Z3DImg::imageCacheSize() const
+{
+  const glm::uvec3 blockExtent = m_imageBlockSize + m_imageBlockSizePad;
+  return glm::uvec3(m_imageCacheNumBlocks.x * blockExtent.x,
+                    m_imageCacheNumBlocks.y * blockExtent.y,
+                    m_imageCacheNumBlocks.z * blockExtent.z);
 }
 
 std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeXSliceVolume(size_t x)
@@ -751,6 +776,10 @@ void Z3DImg::readVolumes()
 {
   m_volumes.clear();
 
+  if (m_volumeGenerations.size() != m_nChannels) {
+    m_volumeGenerations.assign(m_nChannels, 0);
+  }
+
   ZImg img = m_imgPack.resizedImg(m_volumeDimension.x, m_volumeDimension.y, m_volumeDimension.z, 0);
 
   if (m_nChannels == 1) {
@@ -763,6 +792,7 @@ void Z3DImg::readVolumes()
     auto vh = std::make_unique<Z3DVolume>(img, m_volumeSpacing, glm::vec3(.0));
 
     m_volumes.emplace_back(std::move(vh));
+    ++m_volumeGenerations[0];
   } else {
     for (size_t i = 0; i < m_nChannels; ++i) {
       ZImg cImg = img.crop(ZImgRegion(0, -1, 0, -1, 0, -1, i, i + 1));
@@ -774,6 +804,7 @@ void Z3DImg::readVolumes()
       auto vh = std::make_unique<Z3DVolume>(cImg, m_volumeSpacing, glm::vec3(.0));
 
       m_volumes.emplace_back(std::move(vh));
+      ++m_volumeGenerations[i];
     } // for each cannel
   }
 
@@ -995,6 +1026,10 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                         const folly::CancellationToken& cancellationToken,
                                         ZBenchTimer& bt)
 {
+  if (m_vulkanImageBlockUploader != nullptr) {
+    return m_vulkanImageBlockUploader->readAndUploadImageBlocks(*this, c, pendingTasks, cancellationToken, bt);
+  }
+
   size_t emptyBlockCount = 0;
 
   processEventsAndMaybeCancel(cancellationToken);
@@ -1218,6 +1253,11 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   }
 
   return emptyBlockCount;
+}
+
+void Z3DImg::setVulkanImageBlockUploader(ZVulkanImageBlockUploader* uploader)
+{
+  m_vulkanImageBlockUploader = uploader;
 }
 
 void Z3DImg::checkPageSystemError(size_t c, bool strict)

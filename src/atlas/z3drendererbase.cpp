@@ -288,6 +288,53 @@ Z3DRendererBase::describeSurface(const Z3DScratchResourcePool::RenderTargetLease
   return m_backend->describeSurfaceFromLease(lease);
 }
 
+Z3DRendererBase::VulkanSurfaceBindings
+Z3DRendererBase::prepareVulkanSurface(const Z3DScratchResourcePool::RenderTargetLease& lease)
+{
+  VulkanSurfaceBindings bindings;
+
+  if (!lease || lease.backend != RenderBackend::Vulkan) {
+    return bindings;
+  }
+
+  bindings.surface = describeSurface(lease);
+  if (bindings.surface.colorAttachments.empty() && !bindings.surface.depthAttachment.has_value()) {
+    return bindings;
+  }
+
+  bindings.colorHandles.reserve(bindings.surface.colorAttachments.size());
+  for (const auto& attachment : bindings.surface.colorAttachments) {
+    bindings.colorHandles.push_back(attachment.handle);
+  }
+
+  if (bindings.surface.depthAttachment.has_value()) {
+    bindings.depthHandle = bindings.surface.depthAttachment->handle;
+  }
+
+  return bindings;
+}
+
+void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBatches)
+{
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  CHECK(m_activeBackend == RenderBackend::Vulkan)
+    << "executeVulkanBatches called with non-Vulkan backend";
+
+  resetCPUState();
+
+  if (m_pendingActiveSurface.has_value()) {
+    m_frameState.setActiveSurface(*m_pendingActiveSurface);
+    m_pendingActiveSurface.reset();
+  }
+
+  m_backend->beginRender(*this);
+  if (recordBatches) {
+    recordBatches();
+  }
+  submitBatches();
+  m_backend->endRender(*this);
+}
+
 bool Z3DRendererBase::supportsCommandLists() const
 {
   return m_backend != nullptr && m_backend->supportsCommandLists();
@@ -652,8 +699,14 @@ void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan 
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
   m_backend->beginRender(*this);
-  for (auto* renderer : renderers) {
-    renderer->render(eye);
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    for (auto* renderer : renderers) {
+      renderer->enqueueRenderBatches(eye, m_activeBackend, false);
+    }
+  } else {
+    for (auto* renderer : renderers) {
+      renderer->render(eye);
+    }
   }
   submitBatches();
   m_backend->endRender(*this);
@@ -663,8 +716,14 @@ void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, Z3DRendererBase::Render
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
   m_backend->beginRender(*this);
-  for (auto* renderer : renderers) {
-    renderer->renderPicking(eye);
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    for (auto* renderer : renderers) {
+      renderer->enqueueRenderBatches(eye, m_activeBackend, true);
+    }
+  } else {
+    for (auto* renderer : renderers) {
+      renderer->renderPicking(eye);
+    }
   }
   submitBatches();
   m_backend->endRender(*this);

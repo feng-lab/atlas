@@ -35,6 +35,8 @@ public:
   void setDepthBias(bool enable, float constantFactor, float slopeFactor);
   void setLineWidth(float width);
   void setDepthWriteEnable(bool enable);
+  void setDepthTestEnable(bool enable);
+  void setDepthCompareOp(vk::CompareOp compareOp);
   void setColorBlendAttachment(const vk::PipelineColorBlendAttachmentState& attachment);
   void setAttachmentFormats(std::vector<vk::Format> colorFormats,
                             std::optional<vk::Format> depthFormat);
@@ -57,6 +59,8 @@ private:
   float m_depthBiasSlope = 0.0f;
   float m_lineWidth = 1.0f;
   bool m_depthWriteEnable = true;
+  bool m_depthTestEnable = true;
+  vk::CompareOp m_depthCompareOp = vk::CompareOp::eLess;
   vk::PipelineColorBlendAttachmentState m_colorBlendAttachment{
     .blendEnable = VK_TRUE,
     .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,

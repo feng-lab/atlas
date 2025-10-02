@@ -1,19 +1,12 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include "z3drendercommands.h"
 #include "z3dshaderprogram.h"
 #include <memory>
 #include <string>
 
 namespace nim {
-
-enum class GlowMode
-{
-  Additive,
-  Screen,
-  Softlight,
-  Glowmap
-};
 
 class Z3DTextureGlowRenderer : public Z3DPrimitiveRenderer
 {
@@ -44,6 +37,17 @@ protected:
   [[nodiscard]] std::string generateHeader();
 
   void render(Z3DEye eye) override;
+
+  [[nodiscard]] TextureGlowPayload buildTextureGlowPayload() const;
+  [[nodiscard]] TextureGlowPayload buildTextureGlowPayload(AttachmentHandle colorHandle,
+                                                           AttachmentHandle depthHandle) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye,
+                                             AttachmentHandle colorHandle,
+                                             AttachmentHandle depthHandle) const;
+
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
+  void renderVulkan(Z3DEye eye, AttachmentHandle colorHandle, AttachmentHandle depthHandle);
 
 protected:
   const Z3DTexture* m_colorTexture = nullptr;

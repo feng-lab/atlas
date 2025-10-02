@@ -3,11 +3,13 @@
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
 #include "z3dimg.h"
+#include "z3drendercommands.h"
 #include "zbenchtimer.h"
 #include "zlog.h"
 #include "zcancellation.h"
 #include "z3dscratchresourcepool.h"
 #include "z3drenderglobalstate.h"
+#include <memory>
 #include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
@@ -37,6 +39,50 @@ void Z3DImgSliceRenderer::setData(Z3DImg& img, const std::vector<std::unique_ptr
       m_colormapUniformNames[i] = fmt::format("colormap_{}", i + 1);
     }
   }
+}
+
+void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan || picking) {
+    return;
+  }
+
+  if (!m_img || m_slices.empty()) {
+    return;
+  }
+
+  if (!m_fastRendering && m_img->isVolumeDownsampled()) {
+    LOG_FIRST_N(WARNING, 5) << "Vulkan img slice renderer currently supports the fast rendering path only.";
+    return;
+  }
+
+  ImgSlicePayload payload;
+  payload.renderer = this;
+  payload.image = m_img;
+  payload.colormaps = m_colormaps;
+  payload.slices = std::span<const ZMesh>(m_slices.data(), m_slices.size());
+  payload.outputSize = m_outputSize;
+  payload.fastPathOnly = m_fastRendering;
+  payload.maxProjectionMerge = true;
+
+  const uint32_t channelCount = static_cast<uint32_t>(m_img->numChannels());
+  if (channelCount > 1u) {
+    auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
+    auto lease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize,
+                                                          channelCount,
+                                                          ScratchFormat::RGBA16,
+                                                          ScratchFormat::Depth24,
+                                                          std::optional<RenderBackend>(RenderBackend::Vulkan));
+    auto leaseHolder = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
+    *leaseHolder = std::move(lease);
+    payload.layerLease = std::move(leaseHolder);
+  }
+
+  RenderBatch batch;
+  batch.eye = eye;
+  batch.geometry = std::move(payload);
+
+  m_rendererBase.appendBatch(std::move(batch));
 }
 
 void Z3DImgSliceRenderer::addSlice(const ZMesh& slice)

@@ -14,6 +14,13 @@
 #include "zvulkanlinepipelinecontext.h"
 #include "zvulkanmeshpipelinecontext.h"
 #include "zvulkanellipsoidpipelinecontext.h"
+#include "zvulkanspherepipelinecontext.h"
+#include "zvulkanbackgroundpipelinecontext.h"
+#include "zvulkanconepipelinecontext.h"
+#include "zvulkantexturecopypipelinecontext.h"
+#include "zvulkantextureblendpipelinecontext.h"
+#include "zvulkantextureglowpipelinecontext.h"
+#include "zvulkanimgslicepipelinecontext.h"
 #include "zvulkanrenderconversions.h"
 
 #include <algorithm>
@@ -27,6 +34,13 @@ Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
   : m_lineContext(std::make_unique<ZVulkanLinePipelineContext>(*this))
   , m_meshContext(std::make_unique<ZVulkanMeshPipelineContext>(*this))
   , m_ellipsoidContext(std::make_unique<ZVulkanEllipsoidPipelineContext>(*this))
+  , m_sphereContext(std::make_unique<ZVulkanSpherePipelineContext>(*this))
+  , m_coneContext(std::make_unique<ZVulkanConePipelineContext>(*this))
+  , m_backgroundContext(std::make_unique<ZVulkanBackgroundPipelineContext>(*this))
+  , m_textureCopyContext(std::make_unique<ZVulkanTextureCopyPipelineContext>(*this))
+  , m_textureBlendContext(std::make_unique<ZVulkanTextureBlendPipelineContext>(*this))
+  , m_textureGlowContext(std::make_unique<ZVulkanTextureGlowPipelineContext>(*this))
+  , m_imgSliceContext(std::make_unique<ZVulkanImgSlicePipelineContext>(*this))
 {}
 
 Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend() = default;
@@ -63,6 +77,27 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
   if (m_ellipsoidContext) {
     m_ellipsoidContext->resetFrame();
+  }
+  if (m_sphereContext) {
+    m_sphereContext->resetFrame();
+  }
+  if (m_coneContext) {
+    m_coneContext->resetFrame();
+  }
+  if (m_backgroundContext) {
+    m_backgroundContext->resetFrame();
+  }
+  if (m_textureCopyContext) {
+    m_textureCopyContext->resetFrame();
+  }
+  if (m_textureBlendContext) {
+    m_textureBlendContext->resetFrame();
+  }
+  if (m_textureGlowContext) {
+    m_textureGlowContext->resetFrame();
+  }
+  if (m_imgSliceContext) {
+    m_imgSliceContext->resetFrame();
   }
   ensureDevice();
 
@@ -108,6 +143,21 @@ std::string_view describeGeometry(const GeometryPayload& geometry)
   }
   if (std::holds_alternative<MeshPayload>(geometry)) {
     return "mesh";
+  }
+  if (std::holds_alternative<SpherePayload>(geometry)) {
+    return "sphere";
+  }
+  if (std::holds_alternative<BackgroundPayload>(geometry)) {
+    return "background";
+  }
+  if (std::holds_alternative<TextureCopyPayload>(geometry)) {
+    return "texture_copy";
+  }
+  if (std::holds_alternative<TextureBlendPayload>(geometry)) {
+    return "texture_blend";
+  }
+  if (std::holds_alternative<TextureGlowPayload>(geometry)) {
+    return "texture_glow";
   }
   if (std::holds_alternative<EllipsoidPayload>(geometry)) {
     return "ellipsoid";
@@ -263,6 +313,78 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     }
 
     if (!handled) {
+      if (const auto* sphere = std::get_if<SpherePayload>(&batch.geometry)) {
+        if (sphere->renderer) {
+          if (!m_sphereContext) {
+            m_sphereContext = std::make_unique<ZVulkanSpherePipelineContext>(*this);
+          }
+          m_sphereContext->record(renderer, batch, *sphere, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
+      if (const auto* background = std::get_if<BackgroundPayload>(&batch.geometry)) {
+        if (background->renderer) {
+          if (!m_backgroundContext) {
+            m_backgroundContext = std::make_unique<ZVulkanBackgroundPipelineContext>(*this);
+          }
+          m_backgroundContext->record(renderer, batch, *background, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
+      if (const auto* slice = std::get_if<ImgSlicePayload>(&batch.geometry)) {
+        if (slice->renderer) {
+          if (!m_imgSliceContext) {
+            m_imgSliceContext = std::make_unique<ZVulkanImgSlicePipelineContext>(*this);
+          }
+          m_imgSliceContext->record(renderer, batch, *slice, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
+      if (const auto* textureCopy = std::get_if<TextureCopyPayload>(&batch.geometry)) {
+        if (textureCopy->renderer) {
+          if (!m_textureCopyContext) {
+            m_textureCopyContext = std::make_unique<ZVulkanTextureCopyPipelineContext>(*this);
+          }
+          m_textureCopyContext->record(renderer, batch, *textureCopy, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
+      if (const auto* textureBlend = std::get_if<TextureBlendPayload>(&batch.geometry)) {
+        if (textureBlend->renderer) {
+          if (!m_textureBlendContext) {
+            m_textureBlendContext = std::make_unique<ZVulkanTextureBlendPipelineContext>(*this);
+          }
+          m_textureBlendContext->record(renderer, batch, *textureBlend, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
+      if (const auto* textureGlow = std::get_if<TextureGlowPayload>(&batch.geometry)) {
+        if (textureGlow->renderer) {
+          if (!m_textureGlowContext) {
+            m_textureGlowContext = std::make_unique<ZVulkanTextureGlowPipelineContext>(*this);
+          }
+          m_textureGlowContext->record(renderer, batch, *textureGlow, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
       if (const auto* ellipsoid = std::get_if<EllipsoidPayload>(&batch.geometry)) {
         if (ellipsoid->renderer) {
           if (!m_ellipsoidContext) {
@@ -271,6 +393,26 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
           m_ellipsoidContext->record(renderer, batch, *ellipsoid, vkViewport, vkScissor, cmd);
           handled = true;
         }
+      }
+    }
+
+    if (!handled) {
+      if (const auto* cone = std::get_if<ConePayload>(&batch.geometry)) {
+        if (cone->renderer) {
+          if (!m_coneContext) {
+            m_coneContext = std::make_unique<ZVulkanConePipelineContext>(*this);
+          }
+          m_coneContext->record(renderer, batch, *cone, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
+      if (const auto* raycaster = std::get_if<ImgRaycasterPayload>(&batch.geometry)) {
+        (void)raycaster;
+        LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster pipeline is not implemented yet.";
+        handled = true;
       }
     }
 

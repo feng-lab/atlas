@@ -56,7 +56,9 @@ protected:
   void appendDefaultColors();
 
   [[nodiscard]] ConePayload buildConePayload() const;
-  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
+
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 
 protected:
   void createResources(RenderBackend backend) override;

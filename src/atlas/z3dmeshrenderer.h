@@ -79,6 +79,8 @@ protected:
 
   void renderPicking(Z3DEye eye) override;
 
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
+
 private:
   // Rebuilds the mesh pointer list, splitting oversized meshes while keeping
   // payload spans referencing renderer-owned storage.
@@ -94,7 +96,7 @@ private:
   // must ensure the corresponding prepare* helpers ran before dereferencing the
   // spans they expose.
   [[nodiscard]] MeshPayload buildMeshPayload() const;
-  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;
 
 protected:
   void createResources(RenderBackend backend) override;

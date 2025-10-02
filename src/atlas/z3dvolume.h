@@ -173,6 +173,11 @@ public:
 
   Z3DTexture* texture() const;
 
+  const ZImg& image() const
+  {
+    return m_img;
+  }
+
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
 
   glm::vec3 cubeSize() const

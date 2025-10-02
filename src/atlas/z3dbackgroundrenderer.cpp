@@ -5,6 +5,8 @@
 #include "z3dshaderprogram.h"
 #include "zlog.h"
 
+#include <utility>
+
 namespace nim {
 
 Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
@@ -161,6 +163,53 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
   }
 
   m_backgroundShaderGrp->release();
+}
+
+BackgroundPayload Z3DBackgroundRenderer::buildBackgroundPayload() const
+{
+  BackgroundPayload payload;
+  payload.renderer = const_cast<Z3DBackgroundRenderer*>(this);
+  payload.color1 = m_firstColorValue;
+  payload.color2 = m_secondColorValue;
+  payload.region = m_region;
+  payload.mode = m_modeValue;
+  payload.orientation = m_orientationValue;
+  return payload;
+}
+
+RenderBatch Z3DBackgroundRenderer::buildRenderBatch(Z3DEye eye) const
+{
+  RenderBatch batch;
+
+  batch.eye = eye;
+
+  const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+  batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+  batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+  batch.pass.viewport.minDepth = 0.0f;
+  batch.pass.viewport.maxDepth = 1.0f;
+
+  const auto& surface = m_rendererBase.frameState().activeSurface;
+  batch.pass.colorAttachments = surface.colorAttachments;
+  batch.pass.depthAttachment = surface.depthAttachment;
+
+  batch.draw.topology = PrimitiveTopology::TriangleStrip;
+  batch.draw.vertexCount = 4;
+  batch.draw.indexCount = 0;
+
+  batch.geometry = buildBackgroundPayload();
+  return batch;
+}
+
+void Z3DBackgroundRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan || picking) {
+    return;
+  }
+
+  auto batch = buildRenderBatch(eye);
+  m_rendererBase.appendBatch(std::move(batch));
 }
 
 void Z3DBackgroundRenderer::createResources(RenderBackend backend)

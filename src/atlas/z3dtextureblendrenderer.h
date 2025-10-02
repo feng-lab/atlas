@@ -1,22 +1,12 @@
 #pragma once
 
 #include "z3dprimitiverenderer.h"
+#include "z3drendercommands.h"
 #include "z3dshaderprogram.h"
 #include <memory>
 #include <string>
 
 namespace nim {
-
-enum class TextureBlendMode
-{
-  DepthTest,
-  FirstOnTop,
-  SecondOnTop,
-  DepthTestBlending,
-  FirstOnTopBlending,
-  SecondOnTopBlending,
-  MIPImageDepthTestBlending
-};
 
 class Z3DTextureBlendRenderer : public Z3DPrimitiveRenderer
 {
@@ -56,6 +46,25 @@ protected:
   [[nodiscard]] std::string generateHeader();
 
   void render(Z3DEye eye) override;
+
+  [[nodiscard]] TextureBlendPayload buildTextureBlendPayload(AttachmentHandle colorHandle0,
+                                                            AttachmentHandle depthHandle0,
+                                                            AttachmentHandle colorHandle1,
+                                                            AttachmentHandle depthHandle1) const;
+  [[nodiscard]] TextureBlendPayload buildTextureBlendPayload() const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
+  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye,
+                                             AttachmentHandle colorHandle0,
+                                             AttachmentHandle depthHandle0,
+                                             AttachmentHandle colorHandle1,
+                                             AttachmentHandle depthHandle1) const;
+
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
+  void renderVulkan(Z3DEye eye,
+                    AttachmentHandle colorHandle0,
+                    AttachmentHandle depthHandle0,
+                    AttachmentHandle colorHandle1,
+                    AttachmentHandle depthHandle1);
 
 protected:
   const Z3DTexture* m_colorTexture1 = nullptr;

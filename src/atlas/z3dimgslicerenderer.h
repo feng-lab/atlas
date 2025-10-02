@@ -58,6 +58,28 @@ public:
     m_outputSize = size;
   }
 
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
+
+  [[nodiscard]] const std::vector<ZMesh>& slices() const
+  {
+    return m_slices;
+  }
+
+  [[nodiscard]] Z3DImg* image() const
+  {
+    return m_img;
+  }
+
+  [[nodiscard]] const std::vector<std::unique_ptr<ZColorMapParameter>>* colormaps() const
+  {
+    return m_colormaps;
+  }
+
+  [[nodiscard]] glm::uvec2 outputSize() const
+  {
+    return m_outputSize;
+  }
+
   double renderProgressively(Z3DEye eye);
 
   bool renderingStarted(Z3DEye eye)
