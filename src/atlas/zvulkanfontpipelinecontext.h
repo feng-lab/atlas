@@ -1,0 +1,119 @@
+#pragma once
+
+#include "z3drendercommands.h"
+#include "zvulkan.h"
+
+#include <map>
+#include <memory>
+#include <optional>
+#include <tuple>
+#include <vector>
+
+namespace nim {
+
+class Z3DRendererBase;
+class Z3DRendererVulkanBackend;
+class Z3DTexture;
+class ZVulkanShader;
+class ZVulkanPipeline;
+class ZVulkanDescriptorPool;
+class ZVulkanDescriptorSet;
+class ZVulkanTexture;
+class ZVulkanBuffer;
+
+namespace vulkan {
+struct AttachmentFormats;
+}
+
+class ZVulkanFontPipelineContext
+{
+public:
+  explicit ZVulkanFontPipelineContext(Z3DRendererVulkanBackend& backend);
+  ~ZVulkanFontPipelineContext();
+
+  void resetFrame();
+
+  void record(Z3DRendererBase& renderer,
+              const RenderBatch& batch,
+              const FontPayload& payload,
+              const vk::Viewport& viewport,
+              const vk::Rect2D& scissor,
+              vk::raii::CommandBuffer& cmd);
+
+private:
+  struct FontVertex
+  {
+    glm::vec3 position{0.0f};
+    glm::vec2 texcoord{0.0f};
+    glm::vec4 color{1.0f};
+  };
+
+  struct PipelineKey
+  {
+    bool picking = false;
+    bool showOutline = false;
+    bool showShadow = false;
+    int outlineMode = 0;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
+
+    auto tie() const
+    {
+      return std::tuple(picking, showOutline, showShadow, outlineMode, colorFormats, depthFormat);
+    }
+
+    bool operator<(const PipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+
+  struct PipelineInstance
+  {
+    std::unique_ptr<ZVulkanShader> shader;
+    std::unique_ptr<ZVulkanPipeline> pipeline;
+  };
+
+  struct FontPushConstants
+  {
+    glm::mat4 mvp{1.0f};
+    glm::vec4 outlineColor{1.0f};
+    glm::vec4 shadowColor{0.0f, 0.0f, 0.0f, 1.0f};
+    float softedgeScale = 80.0f;
+    glm::vec3 _pad{0.0f};
+    uint32_t flags = 0u; // bit0=picking, bit1=outline, bit2=shadow, bits8..=outlineMode
+  };
+
+  Z3DRendererVulkanBackend& m_backend;
+
+  std::map<PipelineKey, PipelineInstance> m_pipelineCache;
+
+  std::optional<vk::raii::DescriptorSetLayout> m_setTexture;
+  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
+  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
+
+  std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
+  std::unique_ptr<ZVulkanBuffer> m_indexBuffer;
+  size_t m_vertexCapacity = 0;
+  size_t m_indexCapacity = 0;
+  size_t m_vertexCount = 0;
+  size_t m_indexCount = 0;
+
+  // Bridge GL textures to Vulkan
+  std::map<const Z3DTexture*, std::unique_ptr<ZVulkanTexture>> m_textureCache;
+
+  void ensureDescriptorLayout();
+  void ensureDescriptorSet();
+  vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
+
+  void ensureVertexCapacity(size_t vertexCount);
+  void ensureIndexCapacity(size_t indexCount);
+  void uploadGeometry(const FontPayload& payload);
+
+  ZVulkanTexture* ensureTextureUpload(const Z3DTexture& source);
+
+  PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
+};
+
+} // namespace nim
+
