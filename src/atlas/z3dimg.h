@@ -36,8 +36,6 @@ class Z3DImg : public QObject
 {
   Q_OBJECT
 
-  friend class ZVulkanImageBlockUploader;
-
 public:
   // Z3DVolume will take ownership of the img
   Z3DImg(const ZImgPack& imgPack,
@@ -176,6 +174,97 @@ public:
 
   [[nodiscard]] glm::uvec3 imageCacheSize() const;
 
+  [[nodiscard]] glm::uvec3 imageBlockSize() const
+  {
+    return m_imageBlockSize;
+  }
+
+  [[nodiscard]] glm::uvec3 imageBlockPadding() const
+  {
+    return m_imageBlockSizePad;
+  }
+
+  [[nodiscard]] glm::uvec3 imageBlockExtent() const
+  {
+    return m_imageBlockSize + m_imageBlockSizePad;
+  }
+
+  [[nodiscard]] size_t imageBlockByteSize() const;
+
+  [[nodiscard]] const glm::uvec4& emptyPageTableEntry() const
+  {
+    return m_emptyPageTableEntry;
+  }
+
+  [[nodiscard]] const std::vector<glm::uvec3>& pageDirectoryBases() const
+  {
+    return m_pageDirectoryBases;
+  }
+
+  [[nodiscard]] const glm::uvec3& pageTableBlockSize() const
+  {
+    return m_pageTableBlockSize;
+  }
+
+  [[nodiscard]] const std::vector<glm::uvec3>& imageDimensionsLevels() const
+  {
+    return m_imageDimensions;
+  }
+
+  [[nodiscard]] const std::vector<float>& voxelWorldSizesLevels() const
+  {
+    return m_voxelWorldSizes;
+  }
+
+  [[nodiscard]] const std::vector<glm::uvec3>& posToBlockIDsLevels() const
+  {
+    return m_posToBlockIDs;
+  }
+
+  [[nodiscard]] glm::vec3 imageAddressToNormalizedTextureCoord(size_t channel) const
+  {
+    const auto dimension = m_channelImageCacheTextures[channel]->dimension();
+    return 1.f / glm::vec3(dimension);
+  }
+
+  [[nodiscard]] std::span<const glm::uvec4> pageDirectoryView(size_t c) const
+  {
+    return std::span<const glm::uvec4>(m_channelPageDirectories[c].data(), m_channelPageDirectories[c].size());
+  }
+
+  [[nodiscard]] std::span<const glm::uvec4> pageTableCacheView(size_t c) const
+  {
+    return std::span<const glm::uvec4>(m_channelPageTableCaches[c].data(), m_channelPageTableCaches[c].size());
+  }
+
+  void attachVulkanImageBlockUploader(ZVulkanImageBlockUploader* uploader)
+  {
+    setVulkanImageBlockUploader(uploader);
+  }
+
+  void mapImageBlockToCache(size_t channel,
+                            const glm::uvec4& pageTableEntryKey,
+                            glm::uvec4& pageTableEntryRef)
+  {
+    insertImageBlockToCache(channel, pageTableEntryKey, pageTableEntryRef);
+  }
+
+  template<typename QueueType>
+  folly::coro::Task<void>
+  readImageBlockToQueueAsync(size_t c,
+                             const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                             size_t taskIdx,
+                             const ZImgInfo& resInfo,
+                             QueueType& queue) const;
+
+  template<typename QueueType>
+  folly::coro::Task<void>
+  readImageBlocksToQueueAsync(size_t c,
+                              const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                              const ZImgInfo& resInfo,
+                              QueueType& queue,
+                              ZBenchTimer& bt) const;
+
   void bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const;
 
   void bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const;
@@ -224,22 +313,6 @@ protected:
                                const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                const ZImgInfo& resInfo,
                                uint8_t* buffer) const;
-
-  template<typename QueueType>
-  folly::coro::Task<void>
-  readImageBlockToQueueAsync(size_t c,
-                             const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
-                             size_t taskIdx,
-                             const ZImgInfo& resInfo,
-                             QueueType& queue) const;
-
-  template<typename QueueType>
-  folly::coro::Task<void>
-  readImageBlocksToQueueAsync(size_t c,
-                              const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
-                              const ZImgInfo& resInfo,
-                              QueueType& queue,
-                              ZBenchTimer& bt) const;
 
   // return number of empty (all zero) image blocks
   size_t readAndUploadImageBlocks(size_t c,

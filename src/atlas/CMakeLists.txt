@@ -596,6 +596,9 @@ set(SOURCES
     zvulkantextureglowpipelinecontext.cpp
     zvulkanimgslicepipelinecontext.h
     zvulkanimgslicepipelinecontext.cpp
+    zvulkanimageblockuploader.cpp
+    zvulkanpagedimageblockuploader.h
+    zvulkanpagedimageblockuploader.cpp
     zvulkanconepipelinecontext.h
     zvulkanconepipelinecontext.cpp
 )

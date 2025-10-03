@@ -24,6 +24,7 @@ class ZMesh;
 class ZImg;
 class Z3DImg;
 class ZColorMapParameter;
+class ZVulkanImageBlockUploader;
 
 namespace vulkan {
 struct AttachmentFormats;
@@ -54,12 +55,13 @@ private:
   struct SlicePipelineKey
   {
     bool validInput = true;
+    uint32_t levelCount = 1;
     std::vector<vk::Format> colorFormats;
     std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(validInput, colorFormats, depthFormat);
+      return std::tuple(validInput, levelCount, colorFormats, depthFormat);
     }
 
     bool operator<(const SlicePipelineKey& rhs) const
@@ -87,6 +89,22 @@ private:
     }
   };
 
+  struct BlockIdPipelineKey
+  {
+    uint32_t levelCount = 1;
+    vk::Format colorFormat = vk::Format::eR32G32B32A32Uint;
+
+    auto tie() const
+    {
+      return std::tuple(levelCount, colorFormat);
+    }
+
+    bool operator<(const BlockIdPipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+
   struct PipelineInstance
   {
     std::unique_ptr<ZVulkanShader> shader;
@@ -98,17 +116,27 @@ private:
     uint64_t volumeGeneration = 0;
     std::unique_ptr<ZVulkanTexture> volumeTexture;
     std::unique_ptr<ZVulkanTexture> colormapTexture;
+    std::unique_ptr<ZVulkanDescriptorSet> fastTextureDescriptor;
+    std::unique_ptr<ZVulkanDescriptorSet> pagedTextureDescriptor;
+    std::unique_ptr<ZVulkanDescriptorSet> pageDescriptor;
+    std::unique_ptr<ZVulkanBuffer> pageDataBuffer;
+    size_t pageDataCapacity = 0;
+    uint32_t levelCount = 0;
   };
 
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<SlicePipelineKey, PipelineInstance> m_slicePipelines;
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
+  std::map<BlockIdPipelineKey, PipelineInstance> m_blockIdPipelines;
 
-  std::optional<vk::raii::DescriptorSetLayout> m_sliceSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_fastSliceSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_pagedSliceSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_slicePageSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_emptySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_mergeSetLayout;
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
-  std::unique_ptr<ZVulkanDescriptorSet> m_sliceDescriptor;
+  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor;
   std::unique_ptr<ZVulkanDescriptorSet> m_mergeDescriptor;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
@@ -119,9 +147,11 @@ private:
   size_t m_quadVertexCapacity = 0;
   size_t m_quadVertexCount = 0;
   std::vector<ChannelResources> m_channelResources;
+  std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
 
   void ensureDescriptorLayouts();
   void ensureDescriptorPool();
+  void ensureEmptyDescriptor();
   vk::PipelineVertexInputStateCreateInfo makeSliceVertexInputState() const;
   vk::PipelineVertexInputStateCreateInfo makeQuadVertexInputState() const;
   void ensureSliceVertexCapacity(size_t vertexCount);
@@ -136,10 +166,27 @@ private:
                                         ChannelResources& resources);
   void transitionToSampled(vk::raii::CommandBuffer& cmd, ZVulkanTexture& texture, vk::ImageLayout desiredLayout);
 
+  void updateFastDescriptors(ChannelResources& resources,
+                             ZVulkanTexture& volume,
+                             ZVulkanTexture& colormap);
+  bool updatePagedDescriptors(ChannelResources& resources,
+                              ZVulkanTexture& pageDirectory,
+                              ZVulkanTexture& pageTable,
+                              ZVulkanTexture& imageCache,
+                              ZVulkanTexture& volume,
+                              ZVulkanTexture& colormap,
+                              const Z3DImg& image,
+                              size_t channel,
+                              float zeToScreenPixelVoxelSize);
+
   PipelineInstance& ensureSlicePipeline(const SlicePipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
+  PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
 
-  void bindSliceDescriptor(ZVulkanTexture& volume, ZVulkanTexture& colormap);
+  void bindPagedDescriptors(ChannelResources& resources,
+                            vk::PipelineLayout layout,
+                            vk::raii::CommandBuffer& cmd,
+                            bool usePaging);
   void bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray);
 };
 

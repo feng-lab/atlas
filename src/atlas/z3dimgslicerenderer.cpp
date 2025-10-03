@@ -51,11 +51,6 @@ void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend
     return;
   }
 
-  if (!m_fastRendering && m_img->isVolumeDownsampled()) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan img slice renderer currently supports the fast rendering path only.";
-    return;
-  }
-
   ImgSlicePayload payload;
   payload.renderer = this;
   payload.image = m_img;

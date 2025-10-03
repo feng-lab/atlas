@@ -169,6 +169,13 @@ glm::uvec3 Z3DImg::imageCacheSize() const
                     m_imageCacheNumBlocks.z * blockExtent.z);
 }
 
+size_t Z3DImg::imageBlockByteSize() const
+{
+  const glm::uvec3 extent = imageBlockExtent();
+  const ZImgInfo info(extent.x, extent.y, extent.z, 1);
+  return info.byteNumber();
+}
+
 std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeXSliceVolume(size_t x)
 {
   std::vector<std::unique_ptr<Z3DVolume>> res;
@@ -739,12 +746,16 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   size_t readEmptyBlockCount = 0;
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
-    auto uploadGuard = folly::makeGuard([=, this, &bt]() {
-      checkPageSystemError(c, false);
+  auto uploadGuard = folly::makeGuard([=, this, &bt]() {
+    checkPageSystemError(c, false);
+    if (m_vulkanImageBlockUploader) {
+      m_vulkanImageBlockUploader->uploadPageCaches(*this, c, bt);
+    } else {
       m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
       m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
       bt.recordEvent("upload page table");
-    });
+    }
+  });
 
     // read image
     if (!pendingTasks.empty()) {
@@ -1258,6 +1269,9 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 void Z3DImg::setVulkanImageBlockUploader(ZVulkanImageBlockUploader* uploader)
 {
   m_vulkanImageBlockUploader = uploader;
+  if (m_vulkanImageBlockUploader) {
+    m_vulkanImageBlockUploader->ensureImageResources(*this);
+  }
 }
 
 void Z3DImg::checkPageSystemError(size_t c, bool strict)
@@ -1361,3 +1375,19 @@ void Z3DImg::resetCacheSystem(size_t c)
 }
 
 } // namespace nim
+
+template folly::coro::Task<void>
+nim::Z3DImg::readImageBlockToQueueAsync<folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>>, true>>(
+  size_t,
+  const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>&,
+  size_t,
+  const nim::ZImgInfo&,
+  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>>, true>&) const;
+
+template folly::coro::Task<void>
+nim::Z3DImg::readImageBlocksToQueueAsync<folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>>, true>>(
+  size_t,
+  const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>&,
+  const nim::ZImgInfo&,
+  folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<nim::ZImg>>, true>&,
+  nim::ZBenchTimer&) const;
