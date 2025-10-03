@@ -592,12 +592,20 @@ set(SOURCES
     zvulkantexturecopypipelinecontext.cpp
     zvulkantextureblendpipelinecontext.h
     zvulkantextureblendpipelinecontext.cpp
+    zvulkantexturedualpeelpipelinecontext.h
+    zvulkantexturedualpeelpipelinecontext.cpp
+    zvulkantextureweightedaveragepipelinecontext.h
+    zvulkantextureweightedaveragepipelinecontext.cpp
+    zvulkantextureweightedblendedpipelinecontext.h
+    zvulkantextureweightedblendedpipelinecontext.cpp
     zvulkantextureglowpipelinecontext.h
     zvulkantextureglowpipelinecontext.cpp
     zvulkanimgslicepipelinecontext.h
     zvulkanimgslicepipelinecontext.cpp
     zvulkanimgraycasterpipelinecontext.h
     zvulkanimgraycasterpipelinecontext.cpp
+    zvulkanfontpipelinecontext.h
+    zvulkanfontpipelinecontext.cpp
     zvulkanimageblockuploader.cpp
     zvulkanpagedimageblockuploader.h
     zvulkanpagedimageblockuploader.cpp

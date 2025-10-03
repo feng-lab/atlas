@@ -25,11 +25,19 @@ public:
   void setColorTexture(const Z3DTexture* colorTex)
   {
     m_colorTexture = colorTex;
+    m_colorAttachmentHandle = {};
   }
 
   void setDepthTexture(const Z3DTexture* depthTex)
   {
     m_depthTexture = depthTex;
+    m_depthAttachmentHandle = {};
+  }
+
+  void setSourceAttachments(AttachmentHandle colorHandle, AttachmentHandle depthHandle)
+  {
+    m_colorAttachmentHandle = colorHandle;
+    m_depthAttachmentHandle = depthHandle;
   }
 
   // if true, color with zero alpha value should be discarded, which might save many depth texture lookup. default is
@@ -48,12 +56,7 @@ protected:
   void render(Z3DEye eye) override;
 
   [[nodiscard]] TextureCopyPayload buildTextureCopyPayload() const;
-  [[nodiscard]] TextureCopyPayload buildTextureCopyPayload(AttachmentHandle colorHandle,
-                                                           AttachmentHandle depthHandle) const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
-  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye,
-                                             AttachmentHandle colorHandle,
-                                             AttachmentHandle depthHandle) const;
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
   void renderVulkan(Z3DEye eye, AttachmentHandle colorHandle, AttachmentHandle depthHandle);
@@ -61,6 +64,8 @@ protected:
 protected:
   const Z3DTexture* m_colorTexture = nullptr;
   const Z3DTexture* m_depthTexture = nullptr;
+  AttachmentHandle m_colorAttachmentHandle;
+  AttachmentHandle m_depthAttachmentHandle;
 
   void createResources(RenderBackend backend) override;
 

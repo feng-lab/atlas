@@ -150,11 +150,29 @@ private:
                            const std::vector<const Z3DTexture*>& imageColorTexList,
                            const std::vector<const Z3DTexture*>& imageDepthTexList);
 
+  void renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilter*>& filters,
+                                  Z3DScratchResourcePool::RenderTargetLease& targetLease,
+                                  Z3DEye eye,
+                                  AttachmentHandle depthAttachmentHandle,
+                                  const std::vector<Z3DCompositorImageLayer>& imageLayers);
+
+  void renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter*>& filters,
+                                 Z3DScratchResourcePool::RenderTargetLease& targetLease,
+                                 Z3DEye eye,
+                                 AttachmentHandle depthAttachmentHandle,
+                                 const std::vector<Z3DCompositorImageLayer>& imageLayers);
+
+  void renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter*>& filters,
+                                 Z3DScratchResourcePool::RenderTargetLease& targetLease,
+                                 Z3DEye eye,
+                                 AttachmentHandle depthAttachmentHandle,
+                                 const std::vector<Z3DCompositorImageLayer>& imageLayers);
+
   // Build a list of non-opaque image layers (color/depth) from connected image filters
-  std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>> collectNonOpaqueImageLayers(Z3DEye eye) const;
+  std::vector<Z3DCompositorImageLayer> collectNonOpaqueImageLayers(Z3DEye eye);
 
   // Merge a list of image layers into a single pair using the same blending as renderImages
-  bool mergeImageLayers(const std::vector<std::pair<const Z3DTexture*, const Z3DTexture*>>& layers,
+  bool mergeImageLayers(const std::vector<Z3DCompositorImageLayer>& layers,
                         Z3DEye eye,
                         Z3DScratchResourcePool::RenderTargetLease& targetLease,
                         const Z3DTexture*& colorTex,
@@ -182,6 +200,9 @@ private:
   // Internal helper: hooked transparent rendering with optional glow overlay
   void
   renderTransparentFilter(Z3DBoundedFilter* filter, Z3DScratchResourcePool::RenderTargetLease& targetLease, Z3DEye eye);
+
+  double processGL(Z3DEye eye);
+  double processVulkan(Z3DEye eye);
 
 private:
   Z3DTextureBlendRenderer m_alphaBlendRenderer;

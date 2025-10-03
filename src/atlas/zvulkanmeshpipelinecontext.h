@@ -2,6 +2,7 @@
 
 #include "z3drendercommands.h"
 #include "z3drendererstates.h"
+#include "z3drendererbase.h"
 #include "zvulkan.h"
 #include "zglmutils.h"
 
@@ -51,6 +52,7 @@ private:
     ZMesh::Type meshType;
     bool wireframe = false;
     FogMode fogMode = FogMode::None;
+    Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
     std::vector<vk::Format> colorFormats;
     std::optional<vk::Format> depthFormat;
 
@@ -60,6 +62,7 @@ private:
                         static_cast<int>(meshType),
                         wireframe,
                         static_cast<int>(fogMode),
+                        static_cast<int>(shaderHookType),
                         colorFormats,
                         depthFormat);
     }

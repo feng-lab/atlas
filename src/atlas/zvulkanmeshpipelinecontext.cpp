@@ -159,6 +159,24 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
     bindTextureIfNeeded(payload);
   }
 
+  const auto shaderHook = renderer.shaderHookType();
+  if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_dsTextures) {
+    const auto& hookPara = renderer.shaderHookPara();
+    if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
+      if (auto* depthTexture = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingDepthBlenderHandle.id)) {
+        m_dsTextures->updateTexture(3, *depthTexture);
+      }
+    }
+    if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
+      if (auto* frontTexture = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingFrontBlenderHandle.id)) {
+        m_dsTextures->updateTexture(4, *frontTexture);
+      }
+    }
+  } else if (m_dsTextures && m_placeholder2D) {
+    m_dsTextures->updateTexture(3, *m_placeholder2D);
+    m_dsTextures->updateTexture(4, *m_placeholder2D);
+  }
+
   vk::DeviceSize vertexOffset = 0;
   cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {vertexOffset});
   if (m_indexCount > 0 && m_indexBuffer) {
@@ -187,6 +205,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       key.meshType = draw.mesh->type();
       key.wireframe = false;
       key.fogMode = fogMode;
+      key.shaderHookType = shaderHook;
 
       key.colorFormats = formats.colorFormats;
       key.depthFormat = formats.depthFormat;
@@ -195,6 +214,19 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       if (&pipeline != currentPipeline) {
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
         bindDescriptorSets(cmd, pipeline);
+
+        if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
+          const float n = renderer.viewState().nearClip;
+          const float f = renderer.viewState().farClip;
+          const float a = (f * n) / std::max(f - n, 1e-6f);
+          const float b = 0.5f * (f + n) / std::max(f - n, 1e-6f) + 0.5f;
+          const float depthScale = renderer.sceneState().weightedBlendedDepthScale;
+          glm::vec4 pushConstants(a, b, depthScale, 0.0f);
+          cmd.pushConstants<glm::vec4>(pipeline.pipeline->pipelineLayout(),
+                                       vk::ShaderStageFlagBits::eFragment,
+                                       0,
+                                       pushConstants);
+        }
         currentPipeline = &pipeline;
       }
 
@@ -225,6 +257,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       key.meshType = draw.mesh->type();
       key.wireframe = true;
       key.fogMode = fogMode;
+      key.shaderHookType = shaderHook;
 
       key.colorFormats = formats.colorFormats;
       key.depthFormat = formats.depthFormat;
@@ -263,7 +296,7 @@ void ZVulkanMeshPipelineContext::ensureDescriptorLayouts()
   auto& vkDevice = device.context().device();
 
   if (!m_setTextures) {
-    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, 5> bindings{
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
@@ -273,6 +306,14 @@ void ZVulkanMeshPipelineContext::ensureDescriptorLayouts()
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eFragment},
       vk::DescriptorSetLayoutBinding{.binding = 2,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 3,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 4,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eFragment}};
@@ -372,6 +413,8 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
     m_dsTextures->updateTexture(0, *m_placeholder1D);
     m_dsTextures->updateTexture(1, *m_placeholder2D);
     m_dsTextures->updateTexture(2, *m_placeholder3D);
+    m_dsTextures->updateTexture(3, *m_placeholder2D);
+    m_dsTextures->updateTexture(4, *m_placeholder2D);
   }
 
   if (m_dsLighting && m_uboLighting) {
@@ -565,9 +608,28 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key,
   ensureDescriptorLayouts();
 
   PipelineInstance instance;
+
+  auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> std::string {
+    switch (hook) {
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
+        return "dual_peeling_init_mesh.frag.spv";
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
+        return "dual_peeling_peel_mesh.frag.spv";
+      case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
+        return "wavg_init_mesh.frag.spv";
+      case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
+        return "wblended_init_mesh.frag.spv";
+      case Z3DRendererBase::ShaderHookType::Normal:
+      default:
+        return "mesh.frag.spv";
+    }
+  };
+
+  const auto fragmentShader = selectFragmentShader(key.shaderHookType);
+
   instance.shader = std::make_unique<ZVulkanShader>(device,
                                                     shaderBase + "mesh.vert.spv",
-                                                    shaderBase + "mesh.frag.spv",
+                                                    shaderBase + fragmentShader,
                                                     std::nullopt);
 
   const uint32_t useMeshColor = key.colorSource == MeshPayload::ColorSource::MeshColor ? 1u : 0u;
@@ -610,6 +672,89 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key,
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
+
+  auto makeDefaultBlendAttachment = []() {
+    vk::PipelineColorBlendAttachmentState state{};
+    state.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    state.blendEnable = VK_FALSE;
+    return state;
+  };
+
+  std::vector<vk::PipelineColorBlendAttachmentState> blendAttachments;
+  blendAttachments.reserve(formats.colorFormats.size());
+
+  switch (key.shaderHookType) {
+    case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
+      for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
+        auto state = makeDefaultBlendAttachment();
+        state.blendEnable = VK_TRUE;
+        state.srcColorBlendFactor = vk::BlendFactor::eOne;
+        state.dstColorBlendFactor = vk::BlendFactor::eOne;
+        state.colorBlendOp = vk::BlendOp::eAdd;
+        state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+        state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+        state.alphaBlendOp = vk::BlendOp::eAdd;
+        blendAttachments.push_back(state);
+      }
+      instance.pipeline->setDepthTestEnable(false);
+      instance.pipeline->setDepthWriteEnable(false);
+      break;
+    }
+    case Z3DRendererBase::ShaderHookType::WeightedBlendedInit: {
+      for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
+        auto state = makeDefaultBlendAttachment();
+        state.blendEnable = VK_TRUE;
+        if (i == 0) {
+          state.srcColorBlendFactor = vk::BlendFactor::eOne;
+          state.dstColorBlendFactor = vk::BlendFactor::eOne;
+          state.colorBlendOp = vk::BlendOp::eAdd;
+          state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          state.alphaBlendOp = vk::BlendOp::eAdd;
+        } else {
+          state.srcColorBlendFactor = vk::BlendFactor::eZero;
+          state.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcColor;
+          state.colorBlendOp = vk::BlendOp::eAdd;
+          state.srcAlphaBlendFactor = vk::BlendFactor::eZero;
+          state.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcColor;
+          state.alphaBlendOp = vk::BlendOp::eAdd;
+        }
+        blendAttachments.push_back(state);
+      }
+      instance.pipeline->setDepthTestEnable(true);
+      instance.pipeline->setDepthWriteEnable(false);
+
+      vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
+                                  .offset = 0,
+                                  .size = sizeof(glm::vec4)};
+      instance.pipeline->setPushConstantRanges({range});
+      break;
+    }
+    case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
+    case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel: {
+      for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
+        auto state = makeDefaultBlendAttachment();
+        state.blendEnable = VK_TRUE;
+        state.srcColorBlendFactor = vk::BlendFactor::eOne;
+        state.dstColorBlendFactor = vk::BlendFactor::eOne;
+        state.colorBlendOp = vk::BlendOp::eAdd;
+        state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+        state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+        state.alphaBlendOp = vk::BlendOp::eAdd;
+        blendAttachments.push_back(state);
+      }
+      instance.pipeline->setDepthWriteEnable(false);
+      break;
+    }
+    case Z3DRendererBase::ShaderHookType::Normal:
+    default:
+      break;
+  }
+
+  if (!blendAttachments.empty()) {
+    instance.pipeline->setColorBlendAttachments(blendAttachments);
+  }
 
   if (key.wireframe) {
     instance.pipeline->setPolygonMode(vk::PolygonMode::eLine);

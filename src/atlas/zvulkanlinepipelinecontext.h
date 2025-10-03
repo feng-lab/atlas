@@ -1,6 +1,7 @@
 #pragma once
 
 #include "z3drendercommands.h"
+#include "z3drendererbase.h"
 #include "zvulkan.h"
 
 #include <memory>
@@ -54,19 +55,21 @@ private:
     bool screenAligned = false;
     bool useTextureColor = false;
     bool lineStrip = false;
+    Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
     std::vector<vk::Format> colorFormats;
     std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tie(useSmooth,
-                      picking,
-                      roundCap,
-                      screenAligned,
-                      useTextureColor,
-                      lineStrip,
-                      colorFormats,
-                      depthFormat);
+      return std::tuple(useSmooth,
+                        picking,
+                        roundCap,
+                        screenAligned,
+                        useTextureColor,
+                        lineStrip,
+                        static_cast<int>(shaderHookType),
+                        colorFormats,
+                        depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const

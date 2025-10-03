@@ -64,6 +64,8 @@ public:
 
   void prepareFontShaderData(Z3DEye eye);
 
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
+
 protected:
   void createResources(RenderBackend backend) override;
 

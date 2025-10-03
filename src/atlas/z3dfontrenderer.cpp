@@ -6,6 +6,7 @@
 #include "z3dsdfont.h"
 #include "z3dshaderprogram.h"
 #include "zlog.h"
+#include "z3drendercommands.h"
 #include <QDir>
 #include <absl/strings/str_cat.h>
 #include <algorithm>
@@ -258,6 +259,75 @@ void Z3DFontRenderer::renderPicking(Z3DEye)
   if (!m_positionsPt || m_positionsPt->empty() || m_positionsPt->size() != static_cast<size_t>(m_texts.size())) {
     return;
   }
+}
+
+void Z3DFontRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan) {
+    return;
+  }
+
+  if (m_allFonts.empty()) {
+    return;
+  }
+
+  if (!m_positionsPt || m_positionsPt->empty() || m_positionsPt->size() != static_cast<size_t>(m_texts.size())) {
+    return;
+  }
+
+  if (picking) {
+    if (!m_pickingColorsPt || m_pickingColorsPt->empty() || m_pickingColorsPt->size() != m_positionsPt->size()) {
+      return;
+    }
+  }
+
+  // Build CPU-side quads and attributes
+  prepareFontShaderData(eye);
+
+  m_selectedFontIndex = std::clamp(m_selectedFontIndex, 0, static_cast<int>(m_allFonts.size()) - 1);
+  Z3DSDFont* font = m_allFonts[m_selectedFontIndex].get();
+  if (!font) {
+    return;
+  }
+
+  FontPayload payload;
+  payload.renderer = this;
+  payload.positions = spanOrEmpty(m_fontPositions);
+  payload.texcoords = spanOrEmpty(m_fontTextureCoords);
+  payload.colors = spanOrEmpty(m_fontColors);
+  payload.pickingColors = spanOrEmpty(m_fontPickingColors);
+  payload.indices = spanFromGLuints(m_indexs);
+  payload.atlasTexture = font->texture();
+  payload.softedgeScale = m_fontSoftEdgeScale;
+  payload.showOutline = m_showFontOutline;
+  payload.showShadow = m_showFontShadow;
+  payload.outlineMode = (m_fontOutlineMode == FontOutlineMode::Glow) ? 0 : 1;
+  payload.outlineColor = m_fontOutlineColor;
+  payload.shadowColor = m_fontShadowColor;
+  payload.pickingPass = picking;
+
+  if (payload.positions.empty() || payload.texcoords.empty() || payload.indices.empty()) {
+    return;
+  }
+
+  if (picking) {
+    if (payload.pickingColors.empty()) {
+      return;
+    }
+  } else {
+    if (payload.colors.empty()) {
+      return;
+    }
+  }
+
+  RenderBatch batch;
+  batch.eye = eye;
+  batch.draw.topology = PrimitiveTopology::TriangleList;
+  batch.draw.vertexCount = static_cast<uint32_t>(payload.positions.size());
+  batch.draw.indexCount = static_cast<uint32_t>(payload.indices.size());
+  batch.geometry = std::move(payload);
+
+  m_rendererBase.appendBatch(std::move(batch));
 }
 
 void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)

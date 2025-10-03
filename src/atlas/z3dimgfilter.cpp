@@ -469,6 +469,27 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
   if (!m_opaqueValid[eye]) {
     return;
   }
+
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    const auto& lease = m_opaqueTargets[eye];
+    if (!lease || !lease.hasVulkanImage()) {
+      return;
+    }
+    AttachmentHandle colorHandle;
+    colorHandle.backend = AttachmentBackend::Vulkan;
+    colorHandle.index = 0;
+    colorHandle.id = reinterpret_cast<uint64_t>(lease.colorAttachment(0));
+
+    AttachmentHandle depthHandle;
+    depthHandle.backend = AttachmentBackend::Vulkan;
+    depthHandle.index = 0;
+    depthHandle.id = reinterpret_cast<uint64_t>(lease.depthAttachmentTexture());
+
+    m_textureCopyRenderer.setSourceAttachments(colorHandle, depthHandle);
+    m_rendererBase.render(eye, m_textureCopyRenderer);
+    return;
+  }
+
   const auto& target = opaqueTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
@@ -485,6 +506,27 @@ void Z3DImgFilter::renderTransparent(Z3DEye eye)
   if (!m_transparentValid[eye]) {
     return;
   }
+
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    const auto& lease = m_transparentTargets[eye];
+    if (!lease || !lease.hasVulkanImage()) {
+      return;
+    }
+    AttachmentHandle colorHandle;
+    colorHandle.backend = AttachmentBackend::Vulkan;
+    colorHandle.index = 0;
+    colorHandle.id = reinterpret_cast<uint64_t>(lease.colorAttachment(0));
+
+    AttachmentHandle depthHandle;
+    depthHandle.backend = AttachmentBackend::Vulkan;
+    depthHandle.index = 0;
+    depthHandle.id = reinterpret_cast<uint64_t>(lease.depthAttachmentTexture());
+
+    m_textureCopyRenderer.setSourceAttachments(colorHandle, depthHandle);
+    m_rendererBase.render(eye, m_textureCopyRenderer);
+    return;
+  }
+
   const auto& target = transparentTarget(eye);
   m_textureCopyRenderer.setColorTexture(target.attachment(GL_COLOR_ATTACHMENT0));
   m_textureCopyRenderer.setDepthTexture(target.attachment(GL_DEPTH_ATTACHMENT));
@@ -853,6 +895,116 @@ bool Z3DImgFilter::hasSlices() const
 
 double Z3DImgFilter::renderSlices(Z3DEye eye)
 {
+  // Vulkan path: render slices into this filter's own per-eye opaque lease
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    const bool progressiveStep = m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye);
+    if (!progressiveStep) {
+      m_imgSliceRenderer.setOutputSize(m_outputSize);
+
+      glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
+      glm::vec3 coordLuf = m_3dImg->physicalLUF();
+      glm::vec3 coordRdb = m_3dImg->physicalRDB();
+
+      m_imgSliceRenderer.clearSlices();
+
+      ZMesh cube = ZMesh::createCube(coordLuf, coordRdb, glm::vec3(0, 0, 0), glm::vec3(1, 1, 1));
+      if (m_showObliqueSlice.get()) {
+        glm::vec3 normal = m_obliqueSliceNormal.get();
+        if (glm::length(normal) == 0) {
+          normal = glm::vec3(1, 1, 0);
+        } else {
+          normal = glm::normalize(normal);
+        }
+        ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSliceDistanceToOrigin.get() * normal);
+        if (!slice.empty()) {
+          slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+          m_imgSliceRenderer.addSlice(slice);
+        }
+      }
+      if (m_showZSlice.get()) {
+        float zTexCoord = (m_zSlicePosition.get() + .5f) / volDim.z;
+        float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
+        ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
+        slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgSliceRenderer.addSlice(slice);
+      }
+      if (m_showYSlice.get()) {
+        float yTexCoord = (m_ySlicePosition.get() + .5f) / volDim.y;
+        float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
+        ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
+        slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgSliceRenderer.addSlice(slice);
+      }
+      if (m_showXSlice.get()) {
+        float xTexCoord = (m_xSlicePosition.get() + .5f) / volDim.x;
+        float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
+        ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
+        slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgSliceRenderer.addSlice(slice);
+      }
+      if (m_showObliqueSlice2.get()) {
+        glm::vec3 normal = m_obliqueSlice2Normal.get();
+        if (glm::length(normal) == 0) {
+          normal = glm::vec3(1, 1, 0);
+        } else {
+          normal = glm::normalize(normal);
+        }
+        ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSlice2DistanceToOrigin.get() * normal);
+        if (!slice.empty()) {
+          slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+          m_imgSliceRenderer.addSlice(slice);
+        }
+      }
+      if (m_showZSlice2.get()) {
+        float zTexCoord = (m_zSlice2Position.get() + .5f) / volDim.z;
+        float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
+        ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
+        slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgSliceRenderer.addSlice(slice);
+      }
+      if (m_showYSlice2.get()) {
+        float yTexCoord = (m_ySlice2Position.get() + .5f) / volDim.y;
+        float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
+        ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
+        slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgSliceRenderer.addSlice(slice);
+      }
+      if (m_showXSlice2.get()) {
+        float xTexCoord = (m_xSlice2Position.get() + .5f) / volDim.x;
+        float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
+        ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
+        slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgSliceRenderer.addSlice(slice);
+      }
+    }
+
+    // Ensure/prepare opaque Vulkan lease and clear
+    auto& lease = m_opaqueTargets[eye];
+    if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
+      lease.release();
+      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth24);
+    }
+
+    auto surface = m_rendererBase.describeSurface(lease);
+    for (auto& att : surface.colorAttachments) {
+      att.loadOp = LoadOp::Clear;
+      att.storeOp = StoreOp::Store;
+      att.clearValue.color = glm::vec4(0.f);
+    }
+    if (surface.depthAttachment) {
+      surface.depthAttachment->loadOp = LoadOp::Clear;
+      surface.depthAttachment->storeOp = StoreOp::Store;
+      surface.depthAttachment->clearValue.depth = 1.0f;
+      surface.depthAttachment->clearValue.stencil = 0u;
+    }
+    auto prevSurface = m_rendererBase.frameState().activeSurface;
+    m_rendererBase.frameState().setActiveSurface(surface);
+    m_rendererBase.render(eye, m_imgSliceRenderer);
+    m_rendererBase.frameState().setActiveSurface(prevSurface);
+    m_opaqueValid[eye] = true;
+    return 1.0;
+  }
+
   Z3DRenderTarget& currentTarget = opaqueTarget(eye);
 
   const bool progressiveStep = m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye);
@@ -974,6 +1126,142 @@ bool Z3DImgFilter::hasImage() const
 
 double Z3DImgFilter::renderImage(Z3DEye eye)
 {
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    if (!(m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye))) {
+      m_imgRaycasterRenderer.setOutputSize(m_outputSize);
+
+      glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
+      glm::vec3 coordLuf = m_3dImg->physicalLUF();
+      glm::vec3 coordRdb = m_3dImg->physicalRDB();
+
+      float xTexCoordStart = m_xCut.lowerValue() / volDim.x;
+      float xTexCoordEnd = m_xCut.upperValue() / volDim.x;
+      float xCoordStart = glm::mix(coordLuf.x, coordRdb.x, xTexCoordStart);
+      float xCoordEnd = glm::mix(coordLuf.x, coordRdb.x, xTexCoordEnd);
+      float yTexCoordStart = m_yCut.lowerValue() / volDim.y;
+      float yTexCoordEnd = m_yCut.upperValue() / volDim.y;
+      float yCoordStart = glm::mix(coordLuf.y, coordRdb.y, yTexCoordStart);
+      float yCoordEnd = glm::mix(coordLuf.y, coordRdb.y, yTexCoordEnd);
+      float zTexCoordStart = m_zCut.lowerValue() / volDim.z;
+      float zTexCoordEnd = m_zCut.upperValue() / volDim.z;
+      float zCoordStart = glm::mix(coordLuf.z, coordRdb.z, zTexCoordStart);
+      float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
+
+      if (m_3dImg->is2DData()) {
+        ZMesh m_2DImageQuad = ZMesh::createImageSlice(0,
+                                                      glm::vec2(xCoordStart, yCoordStart),
+                                                      glm::vec2(xCoordEnd, yCoordEnd),
+                                                      glm::vec2(xTexCoordStart, yTexCoordStart),
+                                                      glm::vec2(xTexCoordEnd, yTexCoordEnd));
+        m_2DImageQuad.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgRaycasterRenderer.clearQuads();
+        m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
+      } else if (m_zCut.lowerValue() == m_zCut.upperValue()) {
+        ZMesh m_2DImageQuad = ZMesh::createCubeSlice(zCoordStart,
+                                                     zTexCoordStart,
+                                                     2,
+                                                     glm::vec2(xCoordStart, yCoordStart),
+                                                     glm::vec2(xCoordEnd, yCoordEnd),
+                                                     glm::vec2(xTexCoordStart, yTexCoordStart),
+                                                     glm::vec2(xTexCoordEnd, yTexCoordEnd));
+        m_2DImageQuad.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgRaycasterRenderer.clearQuads();
+        m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
+      } else if (m_yCut.lowerValue() == m_yCut.upperValue()) {
+        ZMesh m_2DImageQuad = ZMesh::createCubeSlice(yCoordStart,
+                                                     yTexCoordStart,
+                                                     1,
+                                                     glm::vec2(xCoordStart, zCoordStart),
+                                                     glm::vec2(xCoordEnd, zCoordEnd),
+                                                     glm::vec2(xTexCoordStart, zTexCoordStart),
+                                                     glm::vec2(xTexCoordEnd, zTexCoordEnd));
+        m_2DImageQuad.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgRaycasterRenderer.clearQuads();
+        m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
+      } else if (m_xCut.lowerValue() == m_xCut.upperValue()) {
+        ZMesh m_2DImageQuad = ZMesh::createCubeSlice(xCoordStart,
+                                                     xTexCoordStart,
+                                                     0,
+                                                     glm::vec2(yCoordStart, zCoordStart),
+                                                     glm::vec2(yCoordEnd, zCoordEnd),
+                                                     glm::vec2(yTexCoordStart, zTexCoordStart),
+                                                     glm::vec2(yTexCoordEnd, zTexCoordEnd));
+        m_2DImageQuad.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        m_imgRaycasterRenderer.clearQuads();
+        m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
+      } else { // 3d volume Raycasting
+        ZMesh cube = ZMesh::createCube(glm::vec3(xCoordStart, yCoordStart, zCoordStart),
+                                       glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
+                                       glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
+                                       glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
+        cube.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
+        bool flipped = glm::determinant(glm::mat3(m_rendererParameters.coordTransform.get())) < 0.0;
+
+        std::vector<glm::vec3> planeNormals;
+        std::vector<glm::vec3> planeOrigins;
+        planeNormals.push_back(m_globalParameters.camera.get().viewVector());
+        planeOrigins.push_back(m_globalParameters.camera.get().eye() +
+                               m_globalParameters.camera.get().viewVector() *
+                                 (m_globalParameters.camera.get().nearDist() + 0.01f));
+        if (m_globalParameters.globalXCut.lowerValue() != m_globalParameters.globalXCut.minimum()) {
+          planeNormals.emplace_back(1., 0., 0.);
+          planeOrigins.emplace_back(m_globalParameters.globalXCut.lowerValue(), 0, 0);
+        }
+        if (m_globalParameters.globalXCut.upperValue() != m_globalParameters.globalXCut.maximum()) {
+          planeNormals.emplace_back(-1., 0., 0.);
+          planeOrigins.emplace_back(m_globalParameters.globalXCut.upperValue(), 0, 0);
+        }
+        if (m_globalParameters.globalYCut.lowerValue() != m_globalParameters.globalYCut.minimum()) {
+          planeNormals.emplace_back(0., 1., 0.);
+          planeOrigins.emplace_back(0, m_globalParameters.globalYCut.lowerValue(), 0);
+        }
+        if (m_globalParameters.globalYCut.upperValue() != m_globalParameters.globalYCut.maximum()) {
+          planeNormals.emplace_back(0., -1., 0.);
+          planeOrigins.emplace_back(0, m_globalParameters.globalYCut.upperValue(), 0);
+        }
+        if (m_globalParameters.globalZCut.lowerValue() != m_globalParameters.globalZCut.minimum()) {
+          planeNormals.emplace_back(0., 0., 1.);
+          planeOrigins.emplace_back(0, 0, m_globalParameters.globalZCut.lowerValue());
+        }
+        if (m_globalParameters.globalZCut.upperValue() != m_globalParameters.globalZCut.maximum()) {
+          planeNormals.emplace_back(0., 0., -1.);
+          planeOrigins.emplace_back(0, 0, m_globalParameters.globalZCut.upperValue());
+        }
+        ZMesh clipped = ZMesh::clipClosedSurface(cube, planeNormals, planeOrigins);
+        m_imgRaycasterRenderer.prepareEntryExit(clipped, flipped, eye, m_outputSize);
+      }
+    }
+
+    // Render into this filter's own per-eye transparent lease (Vulkan)
+    auto& lease = m_transparentTargets[eye];
+    if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
+      lease.release();
+      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth24);
+    }
+
+    // Clear target, set active surface, and record batches for the raycaster
+    m_rendererBase.setCollectOnly(true);
+    m_rendererBase.setActiveSurfaceForNextPass(lease);
+    ClearValue clear{};
+    clear.color = glm::vec4(0.0f);
+    clear.depth = 1.0f;
+    clear.stencil = 0u;
+    m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+    m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+    m_rendererBase.executeVulkanBatches([&]() {
+      m_rendererBase.render(eye, m_imgRaycasterRenderer);
+    });
+    // Draw bound box using the same active surface; no clears
+    m_rendererBase.setActiveSurfaceForNextPass(lease);
+    m_rendererBase.executeVulkanBatches([&]() {
+      renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
+    });
+    m_rendererBase.setCollectOnly(false);
+
+    m_transparentValid[eye] = true;
+    return 1.0;
+  }
+
   Z3DRenderTarget& currentTarget = transparentTarget(eye);
 
   // VLOG(1) << m_progressiveRendering << " " << m_imgRaycasterRenderer.renderingStarted(eye);

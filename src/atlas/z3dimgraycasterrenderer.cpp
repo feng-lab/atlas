@@ -3,6 +3,7 @@
 #include "z3dtexture.h"
 #include "z3drendertarget.h"
 #include "z3dimg.h"
+#include "zmesh.h"
 #include "zbenchtimer.h"
 #include "zimgcache.h"
 #include "zimgregioncache.h"
@@ -15,6 +16,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 #include <algorithm>
+#include <array>
 #include <optional>
 
 DEFINE_uint32(atlas_volume_rendering_maximum_round,
@@ -64,16 +66,6 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     return;
   }
 
-  if (!m_quads.empty()) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster 2D path not implemented yet.";
-    return;
-  }
-
-  if (!m_entryExitMeshValid || m_entryExitSize.x == 0u || m_entryExitSize.y == 0u) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster requires entry/exit geometry. Call prepareEntryExit before rendering.";
-    return;
-  }
-
   std::vector<size_t> visibleChannels;
   visibleChannels.reserve(m_img->numChannels());
   for (size_t i = 0; i < m_img->numChannels(); ++i) {
@@ -83,11 +75,6 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   }
 
   if (visibleChannels.empty()) {
-    return;
-  }
-
-  if (visibleChannels.size() > 1) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster currently supports single-channel fast path only.";
     return;
   }
 
@@ -105,7 +92,11 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   payload.localMIPThreshold = m_localMIPThreshold;
   payload.compositingMode = m_compositingModeValue;
   payload.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
-  payload.entryExitSize = m_entryExitSize;
+  glm::uvec2 entrySize = m_entryExitSize;
+  if (entrySize.x == 0u || entrySize.y == 0u) {
+    entrySize = m_outputSize;
+  }
+  payload.entryExitSize = entrySize;
   payload.visibleChannels = visibleChannels;
   payload.activeChannel = visibleChannels.empty() ? std::numeric_limits<size_t>::max() : visibleChannels.front();
   payload.activeChannelIndex = 0u;
@@ -127,21 +118,107 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   payload.roundsCompleted = static_cast<uint32_t>(std::max(0, m_round[eye]));
   payload.roundsRemaining = FLAGS_atlas_volume_rendering_maximum_round;
 
-  const auto& positions = m_entryExitMesh.vertices();
-  const auto& texCoords = m_entryExitMesh.textureCoordinates3D();
-  const auto& indices = m_entryExitMesh.indices();
+  auto populateFromEntryExitMesh = [&]() {
+    const auto& positions = m_entryExitMesh.vertices();
+    const auto& texCoords = m_entryExitMesh.textureCoordinates3D();
+    const auto& indices = m_entryExitMesh.indices();
 
-  payload.entryPositions.assign(positions.begin(), positions.end());
-  payload.entryTexCoords.assign(texCoords.begin(), texCoords.end());
-  payload.entryHasIndices = m_entryExitMesh.hasIndices();
-  if (payload.entryHasIndices) {
-    payload.entryIndices.assign(indices.begin(), indices.end());
+    payload.entryPositions.assign(positions.begin(), positions.end());
+    payload.entryTexCoords.assign(texCoords.begin(), texCoords.end());
+    payload.entryHasIndices = m_entryExitMesh.hasIndices();
+    if (payload.entryHasIndices) {
+      payload.entryIndices.assign(indices.begin(), indices.end());
+    }
+    payload.entryPrimitive = static_cast<uint32_t>(m_entryExitMesh.type());
+    payload.entryFlipped = m_entryExitMeshFlipped;
+  };
+
+  auto populateFromQuads = [&]() {
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> texCoords;
+    positions.reserve(m_quads.size() * 6);
+    texCoords.reserve(m_quads.size() * 6);
+
+    auto appendVertex = [&](const glm::vec3& pos, const glm::vec3& tex) {
+      positions.push_back(pos);
+      texCoords.push_back(tex);
+    };
+
+    for (const auto& quad : m_quads) {
+      const auto& verts = quad.vertices();
+      if (verts.empty()) {
+        continue;
+      }
+      const auto& tex3d = quad.textureCoordinates3D();
+      const auto& tex2d = quad.textureCoordinates2D();
+      const bool has3d = tex3d.size() == verts.size();
+      const bool has2d = tex2d.size() == verts.size();
+
+      auto texAt = [&](size_t idx) {
+        if (has3d) {
+          return tex3d[idx];
+        }
+        if (has2d) {
+          const auto& uv = tex2d[idx];
+          return glm::vec3(uv.x, uv.y, 0.0f);
+        }
+        return glm::vec3(0.0f);
+      };
+
+      if (quad.hasIndices()) {
+        const auto& quadIndices = quad.indices();
+        if (quadIndices.size() >= 3) {
+          for (size_t idx = 0; idx + 2 < quadIndices.size(); idx += 3) {
+            const uint32_t i0 = quadIndices[idx];
+            const uint32_t i1 = quadIndices[idx + 1];
+            const uint32_t i2 = quadIndices[idx + 2];
+            if (i0 < verts.size() && i1 < verts.size() && i2 < verts.size()) {
+              appendVertex(verts[i0], texAt(i0));
+              appendVertex(verts[i1], texAt(i1));
+              appendVertex(verts[i2], texAt(i2));
+            }
+          }
+        }
+        continue;
+      }
+
+      if (verts.size() == 4) {
+        static constexpr std::array<uint32_t, 6> kQuadTris{0, 1, 2, 0, 2, 3};
+        for (auto idx : kQuadTris) {
+          if (idx < verts.size()) {
+            appendVertex(verts[idx], texAt(idx));
+          }
+        }
+        continue;
+      }
+
+      for (size_t idx = 0; idx < verts.size(); ++idx) {
+        appendVertex(verts[idx], texAt(idx));
+      }
+    }
+
+    if (!positions.empty()) {
+      payload.entryHasIndices = false;
+      payload.entryPrimitive = static_cast<uint32_t>(ZMesh::Type::TRIANGLES);
+      payload.entryPositions = std::move(positions);
+      payload.entryTexCoords = std::move(texCoords);
+      payload.entryFlipped = false;
+    }
+  };
+
+  if (m_entryExitMeshValid && m_quads.empty() && !m_entryExitMesh.vertices().empty()) {
+    populateFromEntryExitMesh();
+  } else if (!m_quads.empty()) {
+    populateFromQuads();
   }
-  payload.entryPrimitive = static_cast<uint32_t>(m_entryExitMesh.type());
-  payload.entryFlipped = m_entryExitMeshFlipped;
+
+  if (payload.entryPositions.empty()) {
+    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster is missing entry geometry for the current draw.";
+    return;
+  }
 
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  auto entryLease = pool.acquireEntryExitRenderTarget(m_entryExitSize,
+  auto entryLease = pool.acquireEntryExitRenderTarget(entrySize,
                                                       2u,
                                                       ScratchFormat::RGBA32F,
                                                       std::optional<RenderBackend>(RenderBackend::Vulkan));

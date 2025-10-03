@@ -51,19 +51,13 @@ void Z3DTextureCopyRenderer::render(Z3DEye eye)
 
 TextureCopyPayload Z3DTextureCopyRenderer::buildTextureCopyPayload() const
 {
-  return buildTextureCopyPayload(AttachmentHandle{}, AttachmentHandle{});
-}
-
-TextureCopyPayload
-Z3DTextureCopyRenderer::buildTextureCopyPayload(AttachmentHandle colorHandle, AttachmentHandle depthHandle) const
-{
   TextureCopyPayload payload;
   payload.renderer = const_cast<Z3DTextureCopyRenderer*>(this);
   payload.colorTexture = m_colorTexture;
   payload.depthTexture = m_depthTexture;
   payload.discardTransparent = m_discardTransparent;
-  payload.colorAttachmentHandle = colorHandle;
-  payload.depthAttachmentHandle = depthHandle;
+  payload.colorAttachmentHandle = m_colorAttachmentHandle;
+  payload.depthAttachmentHandle = m_depthAttachmentHandle;
 
   switch (m_mode) {
     case OutputColorOption::DivideByAlpha:
@@ -82,14 +76,6 @@ Z3DTextureCopyRenderer::buildTextureCopyPayload(AttachmentHandle colorHandle, At
 }
 
 RenderBatch Z3DTextureCopyRenderer::buildRenderBatch(Z3DEye eye) const
-{
-  return buildRenderBatch(eye, AttachmentHandle{}, AttachmentHandle{});
-}
-
-RenderBatch
-Z3DTextureCopyRenderer::buildRenderBatch(Z3DEye eye,
-                                         AttachmentHandle colorHandle,
-                                         AttachmentHandle depthHandle) const
 {
   RenderBatch batch;
 
@@ -110,7 +96,7 @@ Z3DTextureCopyRenderer::buildRenderBatch(Z3DEye eye,
   batch.draw.vertexCount = 4;
   batch.draw.indexCount = 0;
 
-  batch.geometry = buildTextureCopyPayload(colorHandle, depthHandle);
+  batch.geometry = buildTextureCopyPayload();
 
   return batch;
 }
@@ -121,7 +107,8 @@ void Z3DTextureCopyRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend back
     return;
   }
 
-  if (!m_colorTexture || !m_depthTexture) {
+  if (!m_colorAttachmentHandle.valid() || !m_depthAttachmentHandle.valid()) {
+    LOG_FIRST_N(WARNING, 5) << "Texture copy renderer missing Vulkan attachment handles.";
     return;
   }
 
@@ -133,7 +120,8 @@ void Z3DTextureCopyRenderer::renderVulkan(Z3DEye eye,
                                           AttachmentHandle colorHandle,
                                           AttachmentHandle depthHandle)
 {
-  auto batch = buildRenderBatch(eye, colorHandle, depthHandle);
+  setSourceAttachments(colorHandle, depthHandle);
+  auto batch = buildRenderBatch(eye);
   m_rendererBase.appendBatch(std::move(batch));
 }
 

@@ -2,6 +2,7 @@
 
 #include "z3drendercommands.h"
 #include "z3drendererstates.h"
+#include "z3drendererbase.h"
 #include "zvulkan.h"
 
 #include <map>
@@ -56,12 +57,17 @@ private:
   {
     bool dynamicMaterial = true;
     int capsMode = 1;
+    Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
     std::vector<vk::Format> colorFormats;
     std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(dynamicMaterial, capsMode, colorFormats, depthFormat);
+      return std::tuple(dynamicMaterial,
+                        capsMode,
+                        static_cast<int>(shaderHookType),
+                        colorFormats,
+                        depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const
@@ -84,8 +90,12 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
   std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
+  std::unique_ptr<ZVulkanDescriptorSet> m_dsPlaceholder;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
+
+  std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
+  std::optional<vk::raii::Sampler> m_sampler;
 
   std::unique_ptr<ZVulkanBuffer> m_uboLighting;
   std::unique_ptr<ZVulkanBuffer> m_uboTransforms;
@@ -100,6 +110,7 @@ private:
 
   void ensureDescriptorLayouts();
   void ensureDescriptorSets();
+  void ensurePlaceholderTexture();
   void updateLightingUBO(Z3DRendererBase& renderer,
                          const RenderBatch& batch,
                          const ConePayload& payload,
@@ -117,4 +128,3 @@ private:
 };
 
 } // namespace nim
-

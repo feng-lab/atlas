@@ -3,6 +3,7 @@
 #include "z3drendererbase.h"
 #include "z3drendercommands.h"
 #include "z3dcompositorpass.h"
+#include "z3dboundedfilter.h"
 #include "z3dshaderprogram.h"
 #include "zlog.h"
 #include "zvulkandevice.h"
@@ -19,9 +20,13 @@
 #include "zvulkanconepipelinecontext.h"
 #include "zvulkantexturecopypipelinecontext.h"
 #include "zvulkantextureblendpipelinecontext.h"
+#include "zvulkantexturedualpeelpipelinecontext.h"
+#include "zvulkantextureweightedaveragepipelinecontext.h"
+#include "zvulkantextureweightedblendedpipelinecontext.h"
 #include "zvulkantextureglowpipelinecontext.h"
 #include "zvulkanimgslicepipelinecontext.h"
 #include "zvulkanimgraycasterpipelinecontext.h"
+#include "zvulkanfontpipelinecontext.h"
 #include "zvulkanrenderconversions.h"
 
 #include <algorithm>
@@ -94,11 +99,23 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   if (m_textureBlendContext) {
     m_textureBlendContext->resetFrame();
   }
+  if (m_textureDualPeelContext) {
+    m_textureDualPeelContext->resetFrame();
+  }
+  if (m_textureWeightedAverageContext) {
+    m_textureWeightedAverageContext->resetFrame();
+  }
+  if (m_textureWeightedBlendedContext) {
+    m_textureWeightedBlendedContext->resetFrame();
+  }
   if (m_textureGlowContext) {
     m_textureGlowContext->resetFrame();
   }
   if (m_imgSliceContext) {
     m_imgSliceContext->resetFrame();
+  }
+  if (m_fontContext) {
+    m_fontContext->resetFrame();
   }
   ensureDevice();
 
@@ -126,7 +143,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 {
   (void)renderer;
-  if (m_swapChain && m_activeCommandBuffer) {
+  if (m_swapChain && m_activeCommandBuffer && !m_suppressSwapchainPresent) {
     m_swapChain->endFrame(*m_activeCommandBuffer);
   }
   m_activeCommandBuffer.reset();
@@ -160,11 +177,23 @@ std::string_view describeGeometry(const GeometryPayload& geometry)
   if (std::holds_alternative<TextureGlowPayload>(geometry)) {
     return "texture_glow";
   }
+  if (std::holds_alternative<TextureDualPeelPayload>(geometry)) {
+    return "texture_dual_peel";
+  }
+  if (std::holds_alternative<TextureWeightedAveragePayload>(geometry)) {
+    return "texture_weighted_average";
+  }
+  if (std::holds_alternative<TextureWeightedBlendedPayload>(geometry)) {
+    return "texture_weighted_blended";
+  }
   if (std::holds_alternative<EllipsoidPayload>(geometry)) {
     return "ellipsoid";
   }
   if (std::holds_alternative<ConePayload>(geometry)) {
     return "cone";
+  }
+  if (std::holds_alternative<FontPayload>(geometry)) {
+    return "font";
   }
   return "unknown";
 }
@@ -350,6 +379,18 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     }
 
     if (!handled) {
+      if (const auto* font = std::get_if<FontPayload>(&batch.geometry)) {
+        if (font->renderer) {
+          if (!m_fontContext) {
+            m_fontContext = std::make_unique<ZVulkanFontPipelineContext>(*this);
+          }
+          m_fontContext->record(renderer, batch, *font, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
+      }
+    }
+
+    if (!handled) {
       if (const auto* textureCopy = std::get_if<TextureCopyPayload>(&batch.geometry)) {
         if (textureCopy->renderer) {
           if (!m_textureCopyContext) {
@@ -382,6 +423,38 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
           m_textureGlowContext->record(renderer, batch, *textureGlow, vkViewport, vkScissor, cmd);
           handled = true;
         }
+      }
+    }
+
+    if (!handled) {
+      if (const auto* dualPeel = std::get_if<TextureDualPeelPayload>(&batch.geometry)) {
+        if (!m_textureDualPeelContext) {
+          m_textureDualPeelContext = std::make_unique<ZVulkanTextureDualPeelPipelineContext>(*this);
+        }
+        m_textureDualPeelContext->record(renderer, batch, *dualPeel, vkViewport, vkScissor, cmd);
+        handled = true;
+      }
+    }
+
+    if (!handled) {
+      if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
+        if (!m_textureWeightedAverageContext) {
+          m_textureWeightedAverageContext =
+            std::make_unique<ZVulkanTextureWeightedAveragePipelineContext>(*this);
+        }
+        m_textureWeightedAverageContext->record(renderer, batch, *weightedAverage, vkViewport, vkScissor, cmd);
+        handled = true;
+      }
+    }
+
+    if (!handled) {
+      if (const auto* weightedBlended = std::get_if<TextureWeightedBlendedPayload>(&batch.geometry)) {
+        if (!m_textureWeightedBlendedContext) {
+          m_textureWeightedBlendedContext =
+            std::make_unique<ZVulkanTextureWeightedBlendedPipelineContext>(*this);
+        }
+        m_textureWeightedBlendedContext->record(renderer, batch, *weightedBlended, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
 
@@ -434,9 +507,34 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
 void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, const Z3DCompositorPass& pass)
 {
-  (void)renderer;
-  (void)pass;
-  LOG_FIRST_N(WARNING, 5) << "Vulkan compositor pass execution is not implemented yet.";
+  // Collect-only recording of batches, then execute as a single begin/end.
+  renderer.setCollectOnly(true);
+  renderer.setActiveSurfaceForNextPass(pass.surface);
+  // Honor clear policy on this pass
+  const LoadOp colorLoad = pass.clearColor ? LoadOp::Clear : LoadOp::Load;
+  const LoadOp depthLoad = pass.clearDepth ? LoadOp::Clear : LoadOp::Load;
+  renderer.setPendingColorAttachmentsLoadStore(colorLoad, StoreOp::Store, pass.clearValue);
+  renderer.setPendingDepthAttachmentLoadStore(depthLoad, StoreOp::Store, pass.clearValue);
+  const bool prevSuppress = m_suppressSwapchainPresent;
+  m_suppressSwapchainPresent = true;
+
+  renderer.executeVulkanBatches([&]() {
+    // Opaque first
+    for (auto* filter : pass.opaqueFilters) {
+      if (filter) {
+        filter->renderOpaque(pass.eye);
+      }
+    }
+    // Then transparent
+    for (const auto& tb : pass.transparentFilters) {
+      if (tb.filter) {
+        tb.filter->renderTransparent(pass.eye);
+      }
+    }
+  });
+
+  m_suppressSwapchainPresent = prevSuppress;
+  renderer.setCollectOnly(false);
 }
 
 bool Z3DRendererVulkanBackend::supportsCommandLists() const

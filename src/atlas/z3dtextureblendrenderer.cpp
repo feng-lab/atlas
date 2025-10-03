@@ -1,6 +1,7 @@
 #include "z3dtextureblendrenderer.h"
 
 #include "z3dtexture.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -71,17 +72,6 @@ void Z3DTextureBlendRenderer::render(Z3DEye eye)
 
 TextureBlendPayload Z3DTextureBlendRenderer::buildTextureBlendPayload() const
 {
-  return buildTextureBlendPayload(AttachmentHandle{},
-                                  AttachmentHandle{},
-                                  AttachmentHandle{},
-                                  AttachmentHandle{});
-}
-
-TextureBlendPayload Z3DTextureBlendRenderer::buildTextureBlendPayload(AttachmentHandle colorHandle0,
-                                                                      AttachmentHandle depthHandle0,
-                                                                      AttachmentHandle colorHandle1,
-                                                                      AttachmentHandle depthHandle1) const
-{
   TextureBlendPayload payload;
   payload.renderer = const_cast<Z3DTextureBlendRenderer*>(this);
   payload.colorTexture0 = m_colorTexture1;
@@ -89,27 +79,14 @@ TextureBlendPayload Z3DTextureBlendRenderer::buildTextureBlendPayload(Attachment
   payload.colorTexture1 = m_colorTexture2;
   payload.depthTexture1 = m_depthTexture2;
   payload.mode = m_blendMode;
-  payload.colorAttachmentHandle0 = colorHandle0;
-  payload.depthAttachmentHandle0 = depthHandle0;
-  payload.colorAttachmentHandle1 = colorHandle1;
-  payload.depthAttachmentHandle1 = depthHandle1;
+  payload.colorAttachmentHandle0 = m_colorAttachmentHandle0;
+  payload.depthAttachmentHandle0 = m_depthAttachmentHandle0;
+  payload.colorAttachmentHandle1 = m_colorAttachmentHandle1;
+  payload.depthAttachmentHandle1 = m_depthAttachmentHandle1;
   return payload;
 }
 
 RenderBatch Z3DTextureBlendRenderer::buildRenderBatch(Z3DEye eye) const
-{
-  return buildRenderBatch(eye,
-                          AttachmentHandle{},
-                          AttachmentHandle{},
-                          AttachmentHandle{},
-                          AttachmentHandle{});
-}
-
-RenderBatch Z3DTextureBlendRenderer::buildRenderBatch(Z3DEye eye,
-                                                      AttachmentHandle colorHandle0,
-                                                      AttachmentHandle depthHandle0,
-                                                      AttachmentHandle colorHandle1,
-                                                      AttachmentHandle depthHandle1) const
 {
   RenderBatch batch;
 
@@ -130,7 +107,7 @@ RenderBatch Z3DTextureBlendRenderer::buildRenderBatch(Z3DEye eye,
   batch.draw.vertexCount = 4;
   batch.draw.indexCount = 0;
 
-  batch.geometry = buildTextureBlendPayload(colorHandle0, depthHandle0, colorHandle1, depthHandle1);
+  batch.geometry = buildTextureBlendPayload();
 
   return batch;
 }
@@ -141,7 +118,9 @@ void Z3DTextureBlendRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     return;
   }
 
-  if (!m_colorTexture1 || !m_depthTexture1 || !m_colorTexture2 || !m_depthTexture2) {
+  if (!m_colorAttachmentHandle0.valid() || !m_depthAttachmentHandle0.valid() ||
+      !m_colorAttachmentHandle1.valid() || !m_depthAttachmentHandle1.valid()) {
+    LOG_FIRST_N(WARNING, 5) << "Texture blend renderer missing Vulkan attachment handles.";
     return;
   }
 
@@ -155,7 +134,9 @@ void Z3DTextureBlendRenderer::renderVulkan(Z3DEye eye,
                                            AttachmentHandle colorHandle1,
                                            AttachmentHandle depthHandle1)
 {
-  auto batch = buildRenderBatch(eye, colorHandle0, depthHandle0, colorHandle1, depthHandle1);
+  setSourceAttachments0(colorHandle0, depthHandle0);
+  setSourceAttachments1(colorHandle1, depthHandle1);
+  auto batch = buildRenderBatch(eye);
   m_rendererBase.appendBatch(std::move(batch));
 }
 

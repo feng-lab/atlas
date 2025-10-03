@@ -96,12 +96,6 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
 
 TextureGlowPayload Z3DTextureGlowRenderer::buildTextureGlowPayload() const
 {
-  return buildTextureGlowPayload(AttachmentHandle{}, AttachmentHandle{});
-}
-
-TextureGlowPayload Z3DTextureGlowRenderer::buildTextureGlowPayload(AttachmentHandle colorHandle,
-                                                                   AttachmentHandle depthHandle) const
-{
   TextureGlowPayload payload;
   payload.renderer = const_cast<Z3DTextureGlowRenderer*>(this);
   payload.colorTexture = m_colorTexture;
@@ -110,19 +104,12 @@ TextureGlowPayload Z3DTextureGlowRenderer::buildTextureGlowPayload(AttachmentHan
   payload.blurRadius = m_blurRadius;
   payload.blurScale = m_blurScale;
   payload.blurStrength = m_blurStrength;
-  payload.colorAttachmentHandle = colorHandle;
-  payload.depthAttachmentHandle = depthHandle;
+  payload.colorAttachmentHandle = m_colorAttachmentHandle;
+  payload.depthAttachmentHandle = m_depthAttachmentHandle;
   return payload;
 }
 
 RenderBatch Z3DTextureGlowRenderer::buildRenderBatch(Z3DEye eye) const
-{
-  return buildRenderBatch(eye, AttachmentHandle{}, AttachmentHandle{});
-}
-
-RenderBatch Z3DTextureGlowRenderer::buildRenderBatch(Z3DEye eye,
-                                                     AttachmentHandle colorHandle,
-                                                     AttachmentHandle depthHandle) const
 {
   RenderBatch batch;
 
@@ -143,7 +130,7 @@ RenderBatch Z3DTextureGlowRenderer::buildRenderBatch(Z3DEye eye,
   batch.draw.vertexCount = 4;
   batch.draw.indexCount = 0;
 
-  batch.geometry = buildTextureGlowPayload(colorHandle, depthHandle);
+  batch.geometry = buildTextureGlowPayload();
 
   return batch;
 }
@@ -154,7 +141,8 @@ void Z3DTextureGlowRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend back
     return;
   }
 
-  if (!m_colorTexture || !m_depthTexture) {
+  if (!m_colorAttachmentHandle.valid() || !m_depthAttachmentHandle.valid()) {
+    LOG_FIRST_N(WARNING, 5) << "Texture glow renderer missing Vulkan attachment handles.";
     return;
   }
 
@@ -166,7 +154,8 @@ void Z3DTextureGlowRenderer::renderVulkan(Z3DEye eye,
                                           AttachmentHandle colorHandle,
                                           AttachmentHandle depthHandle)
 {
-  auto batch = buildRenderBatch(eye, colorHandle, depthHandle);
+  setSourceAttachments(colorHandle, depthHandle);
+  auto batch = buildRenderBatch(eye);
   m_rendererBase.appendBatch(std::move(batch));
 }
 

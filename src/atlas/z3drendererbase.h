@@ -76,6 +76,8 @@ public:
   {
     const Z3DTexture* dualDepthPeelingDepthBlenderTexture = nullptr;
     const Z3DTexture* dualDepthPeelingFrontBlenderTexture = nullptr;
+    AttachmentHandle dualDepthPeelingDepthBlenderHandle;
+    AttachmentHandle dualDepthPeelingFrontBlenderHandle;
   };
 
   // need valid camera and viewport
@@ -279,6 +281,11 @@ public:
 
   void renderPicking(Z3DEye eye, RendererSpan renderers);
 
+  void setCollectOnly(bool v)
+  {
+    m_collectOnly = v;
+  }
+
   void setShaderHookType(ShaderHookType t)
   {
     m_shaderHookType = t;
@@ -297,11 +304,29 @@ public:
   void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
   {
     m_shaderHookPara.dualDepthPeelingDepthBlenderTexture = t;
+    m_shaderHookPara.dualDepthPeelingDepthBlenderHandle = {};
+  }
+
+  void setShaderHookParaDDPDepthBlenderAttachment(AttachmentHandle handle)
+  {
+    m_shaderHookPara.dualDepthPeelingDepthBlenderHandle = handle;
+    if (!handle.valid()) {
+      m_shaderHookPara.dualDepthPeelingDepthBlenderTexture = nullptr;
+    }
   }
 
   void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
   {
     m_shaderHookPara.dualDepthPeelingFrontBlenderTexture = t;
+    m_shaderHookPara.dualDepthPeelingFrontBlenderHandle = {};
+  }
+
+  void setShaderHookParaDDPFrontBlenderAttachment(AttachmentHandle handle)
+  {
+    m_shaderHookPara.dualDepthPeelingFrontBlenderHandle = handle;
+    if (!handle.valid()) {
+      m_shaderHookPara.dualDepthPeelingFrontBlenderTexture = nullptr;
+    }
   }
 
   const std::vector<glm::vec4>& clipPlanes() const
@@ -373,6 +398,7 @@ protected:
   RendererSceneState& m_sceneState;
 
   std::optional<RendererFrameState::ActiveSurface> m_pendingActiveSurface;
+  bool m_collectOnly = false;
   // renderers
   std::set<Z3DPrimitiveRenderer*> m_renderers;
 

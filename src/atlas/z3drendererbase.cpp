@@ -132,7 +132,11 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentDua
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  lease = pool.acquireDualDepthPeelRenderTarget(size);
+  std::optional<RenderBackend> backend;
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    backend = RenderBackend::Vulkan;
+  }
+  lease = pool.acquireDualDepthPeelRenderTarget(size, backend);
   return lease;
 }
 
@@ -142,7 +146,11 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentWei
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  lease = pool.acquireWeightedAverageRenderTarget(size);
+  std::optional<RenderBackend> backend;
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    backend = RenderBackend::Vulkan;
+  }
+  lease = pool.acquireWeightedAverageRenderTarget(size, backend);
   return lease;
 }
 
@@ -152,7 +160,11 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentWei
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  lease = pool.acquireWeightedBlendedRenderTarget(size);
+  std::optional<RenderBackend> backend;
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    backend = RenderBackend::Vulkan;
+  }
+  lease = pool.acquireWeightedBlendedRenderTarget(size, backend);
   return lease;
 }
 
@@ -702,6 +714,12 @@ void Z3DRendererBase::renderPickingInstant(Z3DRendererBase::RendererSpan rendere
 void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
+  if (m_activeBackend == RenderBackend::Vulkan && m_collectOnly) {
+    for (auto* renderer : renderers) {
+      renderer->enqueueRenderBatches(eye, m_activeBackend, false);
+    }
+    return;
+  }
   m_backend->beginRender(*this);
   if (m_activeBackend == RenderBackend::Vulkan) {
     for (auto* renderer : renderers) {
@@ -719,6 +737,12 @@ void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan 
 void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
+  if (m_activeBackend == RenderBackend::Vulkan && m_collectOnly) {
+    for (auto* renderer : renderers) {
+      renderer->enqueueRenderBatches(eye, m_activeBackend, true);
+    }
+    return;
+  }
   m_backend->beginRender(*this);
   if (m_activeBackend == RenderBackend::Vulkan) {
     for (auto* renderer : renderers) {

@@ -110,11 +110,21 @@ void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
   auto& vkDevice = device.context().device();
 
   if (!m_setTexture) {
-    vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
+    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 2,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                                 .pBindings = bindings.data()};
     m_setTexture.emplace(vkDevice, createInfo);
   }
 
@@ -199,8 +209,10 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
   }
 
   ensurePlaceholderTexture();
-  if (m_placeholderTexture) {
+  if (m_placeholderTexture && m_dsTexture) {
     m_dsTexture->updateTexture(0, *m_placeholderTexture, **m_sampler);
+    m_dsTexture->updateTexture(1, *m_placeholderTexture, **m_sampler);
+    m_dsTexture->updateTexture(2, *m_placeholderTexture, **m_sampler);
   }
 }
 
@@ -282,10 +294,35 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
 
   PipelineInstance instance;
 
+  auto makeBlendAttachments = [](size_t count, vk::PipelineColorBlendAttachmentState templateState) {
+    std::vector<vk::PipelineColorBlendAttachmentState> attachments(count, templateState);
+    return attachments;
+  };
+
   if (key.useSmooth) {
+    std::string fragmentShader = "wideline.frag.spv";
+    switch (key.shaderHookType) {
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
+        fragmentShader = "dual_peeling_init_wideline.frag.spv";
+        break;
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
+        fragmentShader = "dual_peeling_peel_wideline.frag.spv";
+        break;
+      case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
+        fragmentShader = "wavg_init_wideline.frag.spv";
+        break;
+      case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
+        fragmentShader = "wblended_init_wideline.frag.spv";
+        break;
+      case Z3DRendererBase::ShaderHookType::Normal:
+      default:
+        fragmentShader = "wideline.frag.spv";
+        break;
+    }
+
     instance.shader = std::make_unique<ZVulkanShader>(device,
                                                      shaderBase + "wideline1.vert.spv",
-                                                     shaderBase + "wideline.frag.spv",
+                                                     shaderBase + fragmentShader,
                                                      std::nullopt);
 
     const uint32_t useTex = key.useTextureColor ? 1u : 0u;
@@ -316,15 +353,99 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
     instance.pipeline->setDescriptorSetLayouts(setLayouts);
 
+    vk::PipelineColorBlendAttachmentState baseBlend{};
+    baseBlend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                               vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    baseBlend.blendEnable = VK_FALSE;
+
+    switch (key.shaderHookType) {
+      case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
+        auto attachments = makeBlendAttachments(formats.colorFormats.size(), baseBlend);
+        for (auto& attachment : attachments) {
+          attachment.blendEnable = VK_TRUE;
+          attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.colorBlendOp = vk::BlendOp::eAdd;
+          attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.alphaBlendOp = vk::BlendOp::eAdd;
+        }
+        instance.pipeline->setColorBlendAttachments(std::move(attachments));
+        instance.pipeline->setDepthTestEnable(false);
+        instance.pipeline->setDepthWriteEnable(false);
+        break;
+      }
+      case Z3DRendererBase::ShaderHookType::WeightedBlendedInit: {
+        auto attachments = makeBlendAttachments(formats.colorFormats.size(), baseBlend);
+        for (size_t i = 0; i < attachments.size(); ++i) {
+          auto& attachment = attachments[i];
+          attachment.blendEnable = VK_TRUE;
+          if (i == 0) {
+            attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+            attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+            attachment.colorBlendOp = vk::BlendOp::eAdd;
+            attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+            attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+            attachment.alphaBlendOp = vk::BlendOp::eAdd;
+          } else {
+            attachment.srcColorBlendFactor = vk::BlendFactor::eZero;
+            attachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcColor;
+            attachment.colorBlendOp = vk::BlendOp::eAdd;
+            attachment.srcAlphaBlendFactor = vk::BlendFactor::eZero;
+            attachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcColor;
+            attachment.alphaBlendOp = vk::BlendOp::eAdd;
+          }
+        }
+        instance.pipeline->setColorBlendAttachments(std::move(attachments));
+        instance.pipeline->setDepthTestEnable(true);
+        instance.pipeline->setDepthWriteEnable(false);
+        break;
+      }
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel: {
+        auto attachments = makeBlendAttachments(formats.colorFormats.size(), baseBlend);
+        for (auto& attachment : attachments) {
+          attachment.blendEnable = VK_TRUE;
+          attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.colorBlendOp = vk::BlendOp::eAdd;
+          attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.alphaBlendOp = vk::BlendOp::eAdd;
+        }
+        instance.pipeline->setColorBlendAttachments(std::move(attachments));
+        instance.pipeline->setDepthWriteEnable(false);
+        break;
+      }
+      default:
+        break;
+    }
+
+    constexpr uint32_t wideLinePCSize = static_cast<uint32_t>(sizeof(glm::mat4) * 2 + sizeof(float) * 6);
     vk::PushConstantRange pushRange{.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                                     .offset = 0,
-                                    .size = static_cast<uint32_t>(sizeof(glm::mat4) * 2 + sizeof(float) * 2)};
+                                    .size = wideLinePCSize};
     instance.pipeline->setPushConstantRanges({pushRange});
     instance.pipeline->create();
   } else {
+    std::string fragmentShader = "line.frag.spv";
+    switch (key.shaderHookType) {
+      case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
+      case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
+      case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
+        // Thin-line specialisations are not available; fall back to normal shader.
+        fragmentShader = "line.frag.spv";
+        break;
+      case Z3DRendererBase::ShaderHookType::Normal:
+      default:
+        fragmentShader = "line.frag.spv";
+        break;
+    }
+
     instance.shader = std::make_unique<ZVulkanShader>(device,
                                                      shaderBase + "line.vert.spv",
-                                                     shaderBase + "line.frag.spv",
+                                                     shaderBase + fragmentShader,
                                                      std::nullopt);
 
     auto vi = makeThinVertexInput();
@@ -476,6 +597,24 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   updateUBOs(renderer, batch);
   ensureDescriptorSets(renderer);
 
+  const auto shaderHook = renderer.shaderHookType();
+  if (m_dsTexture && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    const auto& hookPara = renderer.shaderHookPara();
+    if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
+      if (auto* tex = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingDepthBlenderHandle.id)) {
+        m_dsTexture->updateTexture(1, *tex, **m_sampler);
+      }
+    }
+    if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
+      if (auto* tex = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingFrontBlenderHandle.id)) {
+        m_dsTexture->updateTexture(2, *tex, **m_sampler);
+      }
+    }
+  } else if (m_dsTexture && m_placeholderTexture) {
+    m_dsTexture->updateTexture(1, *m_placeholderTexture, **m_sampler);
+    m_dsTexture->updateTexture(2, *m_placeholderTexture, **m_sampler);
+  }
+
   PipelineKey key;
   key.useSmooth = payload.useSmoothLine;
   key.picking = pickingPass;
@@ -483,6 +622,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   key.screenAligned = payload.screenAligned;
   key.useTextureColor = false; // TODO: integrate line textures for Vulkan backend
   key.lineStrip = payload.isLineStrip;
+  key.shaderHookType = shaderHook;
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
   key.colorFormats = formats.colorFormats;
@@ -512,6 +652,10 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       glm::mat4 viewport_matrix_inverse{1.0f};
       float line_width = 1.0f;
       float size_scale = 1.0f;
+      float weighted_a = 0.0f;
+      float weighted_b = 0.0f;
+      float weighted_depth_scale = 0.0f;
+      float _pad = 0.0f;
     } pc;
 
     const auto& frameState = renderer.frameState();
@@ -525,10 +669,23 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       const uint32_t drawSegments = std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size()));
       for (uint32_t i = 0; i < drawSegments; ++i) {
         pc.line_width = resolveWideLineWidth(widths[i]);
-        cmd.pushConstants<WideLinePC>(pipeline.pipeline->pipelineLayout(),
-                                      vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                                      0,
-                                      pc);
+    if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
+      const float n = renderer.viewState().nearClip;
+      const float f = renderer.viewState().farClip;
+      const float denom = std::max(f - n, 1e-6f);
+      pc.weighted_a = (f * n) / denom;
+      pc.weighted_b = 0.5f * (f + n) / denom + 0.5f;
+      pc.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
+    } else {
+      pc.weighted_a = 0.0f;
+      pc.weighted_b = 0.0f;
+      pc.weighted_depth_scale = 0.0f;
+    }
+
+    cmd.pushConstants<WideLinePC>(pipeline.pipeline->pipelineLayout(),
+                                  vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+                                  0,
+                                  pc);
         cmd.drawIndexed(6, 1, i * 6, i * 4, 0);
       }
     } else {

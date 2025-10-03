@@ -9,6 +9,9 @@ This plan guides the migration of the Z3D OpenGL renderer to a Vulkan backend, i
 - Adopt explicit, robust resource management, validation, and repeatable shader compilation to SPIR-V.
 - Maintain clean abstractions that mirror existing Z3D architecture to lower risk and churn.
 - Historical note: legacy `z3dvolume*` classes are no longer in use; all image/volume rendering paths live under the `z3dimg*` families and should remain the focus during migration.
+- **2025-05 update:** the `z3dvolume*` renderer stack is now scheduled for removal. Delete the remaining `Z3DVolumeSliceRenderer`, `Z3DImage2DRenderer`, and `Z3DVolumeRaycasterRenderer` implementations after the current Vulkan parity tasks land; migrate any lingering call sites to the `z3dimg*` renderers before cutting the code.
+- **2025-05 update:** Z3DCompositor keeps the original OpenGL rendering path intact. A dedicated Vulkan compositor implementation is being scaffolded (`processVulkan`) and will be wired up in subsequent steps using the existing scratch-pool lease APIs.
+  - Status: Vulkan compositor now gathers per-filter image layers from each Z3DImgFilter’s Vulkan scratch leases and blends them with `ZVulkanTextureBlendPipelineContext` (MIP/DepthTestBlending parity). Filters render their final per-eye outputs into their own Vulkan leases; the compositor no longer renders image batches directly to the compositor surface.
 - Implementation language baseline is modern C++20; all new APIs should use standard library facilities (`std::span`, `std::variant`, etc.) rather than third-party helpers when equivalents exist.
 
 ### Development Notes (CRITICAL - ALWAYS FOLLOW)
@@ -192,3 +195,53 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
 
   8. **Remove CPU Bridges**
      - After the compositor emits Vulkan attachments end-to-end, delete the CPU texture upload scaffolding and confirm both Vulkan and GL builds succeed.
+
+## Vulkan Compositor Parity Tasks — Progress (2025-10-03)
+
+Status legend: [Done], [In‑Progress], [Todo], [Blocked]
+
+- Per‑filter image leases in Vulkan [Done]
+  - Z3DImgFilter Vulkan path writes to per‑eye leases:
+    - Slices → `m_opaqueTargets[eye]` (RGBA16 + Depth24) with clear on first use.
+    - DVR/2D → `m_transparentTargets[eye]` with clear on first use; bound box overlays recorded on same active surface.
+  - File refs: src/atlas/z3dimgfilter.cpp:920, 1194
+
+- Image filter copy to active surface (Vulkan) [Done]
+  - `renderOpaque`/`renderTransparent` set AttachmentHandles and call `m_rendererBase.render(...)` so compositor passes can invoke them like GL.
+  - File refs: src/atlas/z3dimgfilter.cpp:1132, 1163
+
+- Compositor: geometry vs. image pass parity [Done]
+  - No image‑transparent layers → single compositor pass draws geometry + image‑opaque.
+  - With image‑transparent layers → geometry in a pass, then image layers blended.
+  - File ref: src/atlas/z3dcompositor.cpp:1015
+
+- Vulkan image layer blending parity (non‑OIT) [Done]
+  - Collect per‑filter AttachmentHandles (color+depth) and blend using TextureBlend renderer (DepthTest/MIP modes) with Vulkan attachments.
+  - Multi‑layer merge via pairwise passes into pooled Vulkan temps, then blend over output.
+  - File ref: src/atlas/z3dcompositor.cpp:1188
+
+- OIT parity for geometry/images [In-Progress]
+  - Dual depth peeling / weighted average / weighted blended now active for cones, ellipsoids, lines, meshes, spheres on Vulkan.
+  - Compositor Vulkan path drives OIT passes using scratch leases + `AttachmentHandle`s (geometry arenas + image layers) and blends opaque/transparent results onto the output lease.
+  - Vulkan execution now lives in dedicated helpers (`renderTransparent*Vulkan`) so GL paths stay untouched for reference, with compositor entry points dispatching per-backend.
+  - TODO: extend volume-integrated OIT and tighten validation coverage.
+
+- Axis overlay (Vulkan) [In-Progress]
+  - Axis camera/renderer now execute on Vulkan backend after transparency resolves via `setActiveSurfaceForNextPass(*outLease)` without clearing.
+  - TODO: replicate GL scissor-style corner viewport logic if further refinement needed.
+
+- MSAA / 2x2 supersample parity [Todo]
+  - Map `GeometryMSAAMode` to Vulkan sample counts; provide 2x2 supersample temp path when enabled.
+
+- Picking path (Vulkan) [Todo]
+  - Ensure picking target uses Vulkan lease; add Vulkan picking batches for primitive contexts; save buffer to image.
+
+- Screenshot/readback (Vulkan) [Todo]
+  - Readback from Vulkan output attachments for screenshots (mono/stereo, tiled).
+
+- CPU bridges removal [Todo]
+  - Confirm no GL texture bridges remain in compositor‑side Vulkan paths; remove any temporary CPU upload code once full attachment flow is in place.
+
+- Validation [In‑Progress]
+  - Build succeeds on macOS; run interactive checks for background, geometry, DVR/slices, layer blending parity, and on‑top ordering.
+  - Added hard `CHECK`s ensuring compositor leases and image-layer handles are Vulkan-backed when the Vulkan renderer is active to fail fast on backend mismatches.

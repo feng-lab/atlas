@@ -21,9 +21,13 @@ class ZVulkanSpherePipelineContext;
 class ZVulkanBackgroundPipelineContext;
 class ZVulkanTextureCopyPipelineContext;
 class ZVulkanTextureBlendPipelineContext;
+class ZVulkanTextureDualPeelPipelineContext;
+class ZVulkanTextureWeightedAveragePipelineContext;
+class ZVulkanTextureWeightedBlendedPipelineContext;
 class ZVulkanTextureGlowPipelineContext;
 class ZVulkanImgSlicePipelineContext;
 class ZVulkanImgRaycasterPipelineContext;
+class ZVulkanFontPipelineContext;
 class Z3DRendererVulkanBackend final : public Z3DRendererBackend
 {
 public:
@@ -87,9 +91,15 @@ private:
   std::unique_ptr<ZVulkanBackgroundPipelineContext> m_backgroundContext;
   std::unique_ptr<ZVulkanTextureCopyPipelineContext> m_textureCopyContext;
   std::unique_ptr<ZVulkanTextureBlendPipelineContext> m_textureBlendContext;
+  std::unique_ptr<ZVulkanTextureDualPeelPipelineContext> m_textureDualPeelContext;
+  std::unique_ptr<ZVulkanTextureWeightedAveragePipelineContext> m_textureWeightedAverageContext;
+  std::unique_ptr<ZVulkanTextureWeightedBlendedPipelineContext> m_textureWeightedBlendedContext;
   std::unique_ptr<ZVulkanTextureGlowPipelineContext> m_textureGlowContext;
   std::unique_ptr<ZVulkanImgSlicePipelineContext> m_imgSliceContext;
   std::unique_ptr<ZVulkanImgRaycasterPipelineContext> m_imgRaycasterContext;
+  std::unique_ptr<ZVulkanFontPipelineContext> m_fontContext;
+
+  bool m_suppressSwapchainPresent = false;
   
 };
 

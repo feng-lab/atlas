@@ -117,6 +117,16 @@ public:
     m_rendererBase.setShaderHookParaDDPFrontBlenderTexture(t);
   }
 
+  virtual void setShaderHookParaDDPDepthBlenderAttachment(AttachmentHandle handle)
+  {
+    m_rendererBase.setShaderHookParaDDPDepthBlenderAttachment(handle);
+  }
+
+  virtual void setShaderHookParaDDPFrontBlenderAttachment(AttachmentHandle handle)
+  {
+    m_rendererBase.setShaderHookParaDDPFrontBlenderAttachment(handle);
+  }
+
   Z3DRendererBase::ShaderHookParameter& shaderHookPara()
   {
     return m_rendererBase.shaderHookPara();

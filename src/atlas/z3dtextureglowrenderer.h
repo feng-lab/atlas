@@ -16,11 +16,19 @@ public:
   void setColorTexture(const Z3DTexture* colorTex)
   {
     m_colorTexture = colorTex;
+    m_colorAttachmentHandle = {};
   }
 
   void setDepthTexture(const Z3DTexture* depthTex)
   {
     m_depthTexture = depthTex;
+    m_depthAttachmentHandle = {};
+  }
+
+  void setSourceAttachments(AttachmentHandle colorHandle, AttachmentHandle depthHandle)
+  {
+    m_colorAttachmentHandle = colorHandle;
+    m_depthAttachmentHandle = depthHandle;
   }
 
   void setGlowMode(GlowMode mode);
@@ -30,6 +38,12 @@ public:
   void setBlurScale(float scale);
 
   void setBlurStrength(float strength);
+
+  // Query current glow parameters (used by compositor when enqueuing batches directly)
+  GlowMode glowMode() const { return m_glowMode; }
+  int blurRadius() const { return m_blurRadius; }
+  float blurScale() const { return m_blurScale; }
+  float blurStrength() const { return m_blurStrength; }
 
 protected:
   void compile() override;
@@ -52,6 +66,8 @@ protected:
 protected:
   const Z3DTexture* m_colorTexture = nullptr;
   const Z3DTexture* m_depthTexture = nullptr;
+  AttachmentHandle m_colorAttachmentHandle;
+  AttachmentHandle m_depthAttachmentHandle;
 
   void createResources(RenderBackend backend) override;
 

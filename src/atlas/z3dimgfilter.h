@@ -130,6 +130,15 @@ private:
   void onVisibilityChanged(bool visible);
   [[nodiscard]] Z3DRenderTarget& transparentTarget(Z3DEye eye);
   [[nodiscard]] const Z3DRenderTarget& transparentTarget(Z3DEye eye) const;
+  [[nodiscard]] const Z3DScratchResourcePool::RenderTargetLease& transparentLease(Z3DEye eye) const
+  {
+    return m_transparentTargets[eye];
+  }
+
+  [[nodiscard]] const Z3DScratchResourcePool::RenderTargetLease& opaqueLease(Z3DEye eye) const
+  {
+    return m_opaqueTargets[eye];
+  }
   [[nodiscard]] Z3DRenderTarget& opaqueTarget(Z3DEye eye);
   [[nodiscard]] const Z3DRenderTarget& opaqueTarget(Z3DEye eye) const;
   [[nodiscard]] Z3DRenderTarget& ensureRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease);
