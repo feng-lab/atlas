@@ -19,6 +19,12 @@ class ZVulkanPipeline;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 class Z3DTransferFunction;
+class ZVulkanImageBlockUploader;
+
+namespace vulkan
+{
+struct AttachmentFormats;
+}
 
 class ZVulkanImgRaycasterPipelineContext
 {
@@ -50,12 +56,91 @@ private:
     std::unique_ptr<ZVulkanDescriptorSet> fastDescriptor;
     std::unique_ptr<ZVulkanDescriptorSet> rayParamDescriptor;
     std::unique_ptr<ZVulkanBuffer> rayParamBuffer;
+    std::unique_ptr<ZVulkanDescriptorSet> pagedDescriptor;
+    std::unique_ptr<ZVulkanDescriptorSet> pageDescriptor;
+    std::unique_ptr<ZVulkanBuffer> pageDataBuffer;
+    size_t pageDataCapacity = 0;
+    uint32_t levelCount = 0;
+    std::unique_ptr<ZVulkanDescriptorSet> blockIdDescriptor;
+    std::vector<uint32_t> blockIdScratch;
   };
 
   struct PipelineInstance
   {
     std::unique_ptr<ZVulkanShader> shader;
     std::unique_ptr<ZVulkanPipeline> pipeline;
+  };
+
+  struct BlockIdPipelineKey
+  {
+    uint32_t levelCount = 1u;
+    uint32_t attachmentCount = 1u;
+    vk::Format colorFormat = vk::Format::eR32G32B32A32Uint;
+
+    auto tie() const
+    {
+      return std::tuple(levelCount, attachmentCount, colorFormat);
+    }
+
+    bool operator<(const BlockIdPipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+
+  struct ProgressivePipelineKey
+  {
+    vk::Format colorFormat = vk::Format::eR16G16B16A16Sfloat;
+    vk::Format accumulatorFormat = vk::Format::eR32G32Sfloat;
+    ImgCompositingMode mode = ImgCompositingMode::DirectVolumeRendering;
+    bool localMip = false;
+    bool resultOpaque = false;
+    uint32_t levelCount = 1u;
+
+    auto tie() const
+    {
+      return std::tuple(colorFormat, accumulatorFormat, mode, localMip, resultOpaque, levelCount);
+    }
+
+    bool operator<(const ProgressivePipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+
+  struct CopyPipelineKey
+  {
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
+
+    auto tie() const
+    {
+      return std::tuple(colorFormats, depthFormat);
+    }
+
+    bool operator<(const CopyPipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
+  };
+
+  struct MergePipelineKey
+  {
+    int numVolumes = 1;
+    bool maxProjectionMerge = false;
+    bool resultOpaque = false;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
+
+    auto tie() const
+    {
+      return std::tuple(numVolumes, maxProjectionMerge, resultOpaque, colorFormats, depthFormat);
+    }
+
+    bool operator<(const MergePipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
   };
 
   Z3DRendererVulkanBackend& m_backend;
@@ -73,13 +158,32 @@ private:
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::optional<vk::raii::DescriptorSetLayout> m_entrySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_fastSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_progressiveSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_pageSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_copySetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_mergeSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_emptySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_rayParamSetLayout;
 
   PipelineInstance m_entryFrontPipeline;
   PipelineInstance m_entryBackPipeline;
   PipelineInstance m_fastPipeline;
+  std::map<BlockIdPipelineKey, PipelineInstance> m_blockIdPipelines;
+  std::map<ProgressivePipelineKey, PipelineInstance> m_progressivePipelines;
+  std::map<CopyPipelineKey, PipelineInstance> m_copyPipelines;
+  std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
+
+  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor;
+  std::unique_ptr<ZVulkanDescriptorSet> m_copyDescriptor;
+  std::unique_ptr<ZVulkanDescriptorSet> m_mergeDescriptor;
 
   std::vector<ChannelResources> m_channelResources;
+  std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
+  std::unique_ptr<ZVulkanTexture> m_progressiveLayerColor;
+  std::unique_ptr<ZVulkanTexture> m_progressiveLayerDepth;
+  glm::uvec2 m_progressiveLayerSize{0u, 0u};
+  uint32_t m_progressiveLayerCount = 0u;
+  uint32_t m_progressiveGeneration = 0u;
 
   void ensureDescriptorPool();
   void ensureEntryVertexCapacity(size_t vertexCount, size_t indexCount);
@@ -88,6 +192,14 @@ private:
   void ensureDescriptorLayouts();
   void ensureEntryPipelines();
   void ensureFastPipeline(ImgCompositingMode mode, bool resultOpaque);
+  void ensureEmptyDescriptor();
+  PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
+  PipelineInstance& ensureProgressivePipeline(const ProgressivePipelineKey& key,
+                                              const vulkan::AttachmentFormats& formats);
+  PipelineInstance& ensureCopyPipeline(const CopyPipelineKey& key,
+                                       const vulkan::AttachmentFormats& formats);
+  PipelineInstance& ensureMergePipeline(const MergePipelineKey& key,
+                                        const vulkan::AttachmentFormats& formats);
   void uploadEntryGeometry(const ImgRaycasterPayload& payload);
 
   ChannelResources& ensureChannelResources(size_t channelIndex);
@@ -100,6 +212,26 @@ private:
                                     float zeToZW_a,
                                     float zeToZW_b,
                                     const glm::vec3& volumeDimensions);
+
+  bool updatePageDescriptors(ChannelResources& resources,
+                             const ImgRaycasterPayload& payload,
+                             ZVulkanTexture& entryExit,
+                             ZVulkanTexture& lastDepth,
+                             ZVulkanTexture& lastColor,
+                             ZVulkanTexture& volume,
+                             ZVulkanTexture& transfer,
+                             const Z3DImg& image,
+                             size_t channelIndex,
+                             float zeToScreenPixelVoxelSize);
+
+  void bindProgressiveDescriptors(ChannelResources& resources,
+                                  vk::PipelineLayout layout,
+                                  vk::raii::CommandBuffer& cmd);
+  void bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray);
+  void ensureProgressiveLayerTargets(const glm::uvec2& size,
+                                     uint32_t layerCount,
+                                     uint32_t generation,
+                                     vk::raii::CommandBuffer& cmd);
 
   ZVulkanTexture& ensureVolumeTexture(ChannelResources& resources,
                                       const ZImg& image,
@@ -118,6 +250,13 @@ private:
                       const vk::Viewport& viewport,
                       const vk::Rect2D& scissor,
                       vk::raii::CommandBuffer& cmd);
+
+  void renderProgressivePath(Z3DRendererBase& renderer,
+                             const RenderBatch& batch,
+                             const ImgRaycasterPayload& payload,
+                             const vk::Viewport& viewport,
+                             const vk::Rect2D& scissor,
+                             vk::raii::CommandBuffer& cmd);
 };
 
 } // namespace nim

@@ -252,6 +252,11 @@ float Z3DLineRenderer::lineWidth() const
 
 void Z3DLineRenderer::ensureLineColorStorage()
 {
+  if (m_linePositions.empty()) {
+    // Geometry has not been provided yet; keep explicit colors intact until we know the vertex count.
+    return;
+  }
+
   if (m_hasExplicitColors) {
     if (m_lineColors.size() > m_linePositions.size()) {
       m_lineColors.resize(m_linePositions.size());
@@ -266,6 +271,11 @@ void Z3DLineRenderer::ensureLineColorStorage()
 void Z3DLineRenderer::syncPickingColorCount()
 {
   if (m_linePickingColors.empty()) {
+    return;
+  }
+
+  if (m_linePositions.empty()) {
+    // Delay adjustment until geometry is available so we preserve explicit picking colors.
     return;
   }
 

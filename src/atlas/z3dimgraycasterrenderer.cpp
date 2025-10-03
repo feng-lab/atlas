@@ -14,6 +14,8 @@
 #include <absl/strings/str_cat.h>
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
+#include <algorithm>
+#include <optional>
 
 DEFINE_uint32(atlas_volume_rendering_maximum_round,
               100,
@@ -105,6 +107,25 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   payload.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
   payload.entryExitSize = m_entryExitSize;
   payload.visibleChannels = visibleChannels;
+  payload.activeChannel = visibleChannels.empty() ? std::numeric_limits<size_t>::max() : visibleChannels.front();
+  payload.activeChannelIndex = 0u;
+  payload.progressiveGeneration = m_progressiveGeneration[eye];
+  if (!payload.fastPathOnly) {
+    if (m_channelIdx[eye] < 0) {
+      m_channelIdx[eye] = 0;
+      m_round[eye] = 0;
+    }
+    if (!visibleChannels.empty()) {
+      const int clampedIndex = std::clamp(m_channelIdx[eye], 0, static_cast<int>(visibleChannels.size() - 1));
+      payload.activeChannelIndex = static_cast<uint32_t>(clampedIndex);
+      payload.activeChannel = visibleChannels[static_cast<size_t>(clampedIndex)];
+    }
+  } else {
+    m_channelIdx[eye] = -1;
+    m_round[eye] = 0;
+  }
+  payload.roundsCompleted = static_cast<uint32_t>(std::max(0, m_round[eye]));
+  payload.roundsRemaining = FLAGS_atlas_volume_rendering_maximum_round;
 
   const auto& positions = m_entryExitMesh.vertices();
   const auto& texCoords = m_entryExitMesh.textureCoordinates3D();
@@ -127,7 +148,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   payload.entryExitLease =
     std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(entryLease));
 
-  if (visibleChannels.size() > 1) {
+  if (visibleChannels.size() > 1 && payload.fastPathOnly) {
     auto layerLease = pool.acquireLayerArrayRenderTarget(m_outputSize,
                                                          static_cast<uint32_t>(visibleChannels.size()),
                                                          ScratchFormat::RGBA16,
@@ -135,6 +156,33 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
                                                          std::optional<RenderBackend>(RenderBackend::Vulkan));
     payload.channelLayerLease =
       std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(layerLease));
+  }
+
+  if (!payload.fastPathOnly) {
+    ensureRaycastAccumulators(eye);
+
+    auto shareLease = [](Z3DScratchResourcePool::RenderTargetLease& lease) {
+      return std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>(&lease, [](auto*) {});
+    };
+
+    if (m_lastRaycastAccum[eye]) {
+      payload.lastAccumLease = shareLease(m_lastRaycastAccum[eye]);
+    }
+    if (m_currentRaycastAccum[eye]) {
+      payload.currentAccumLease = shareLease(m_currentRaycastAccum[eye]);
+    }
+
+    auto blockLease = pool.acquireBlockIdRenderTarget(m_outputSize,
+                                                      -1,
+                                                      -1.0,
+                                                      std::optional<RenderBackend>(RenderBackend::Vulkan));
+    payload.blockIdAttachmentCount = blockLease.attachments;
+    payload.blockIdLease =
+      std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(blockLease));
+  }
+
+  if (!m_blockIDs.empty()) {
+    payload.blockIdReadback = m_blockIDs;
   }
 
   RenderBatch batch;
@@ -149,15 +197,51 @@ void Z3DImgRaycasterRenderer::ensureRaycastAccumulators(Z3DEye eye)
   CHECK_GT(m_outputSize.x, 0u);
   CHECK_GT(m_outputSize.y, 0u);
 
-  auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
-    if (!lease || lease.renderTarget->size() != m_outputSize) {
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+    auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
+      const bool sizeMismatch = lease.descriptor.size != m_outputSize;
+      if (!lease.hasVulkanImage() || sizeMismatch) {
+        lease.release();
+        lease = pool.acquireRaycastAccumulatorRenderTarget(m_outputSize,
+                                                           std::optional<RenderBackend>(RenderBackend::Vulkan));
+      }
+    };
+    ensureLease(m_lastRaycastAccum[eye]);
+    ensureLease(m_currentRaycastAccum[eye]);
+    return;
+  }
+
+  auto ensureGlLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
+    if (!lease || !lease.hasGLRenderTarget() || lease.renderTarget->size() != m_outputSize) {
       lease.release();
       m_rendererBase.acquirePersistentRaycastAccumulatorRenderTarget(lease, m_outputSize);
     }
   };
 
-  ensureLease(m_lastRaycastAccum[eye]);
-  ensureLease(m_currentRaycastAccum[eye]);
+  ensureGlLease(m_lastRaycastAccum[eye]);
+  ensureGlLease(m_currentRaycastAccum[eye]);
+}
+
+void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye,
+                                                       bool lastRound,
+                                                       size_t channelCount)
+{
+  std::swap(m_lastRaycastAccum[eye], m_currentRaycastAccum[eye]);
+
+  if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
+    return;
+  }
+
+  if (lastRound) {
+    m_channelIdx[eye] = -1;
+    m_round[eye] = 0;
+  } else {
+    if (m_channelIdx[eye] < 0 && channelCount > 0) {
+      m_channelIdx[eye] = 0;
+    }
+    ++m_round[eye];
+  }
 }
 
 void Z3DImgRaycasterRenderer::releaseRaycastAccumulators(Z3DEye eye)
@@ -833,19 +917,24 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
       m_progressiveLayerLease.release();
     }
     // Show an initial fast result immediately
-    render3DImageFast(eye, visibleIdxs);
+    if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
+      render3DImageFast(eye, visibleIdxs);
+    }
     // Initialize progressive accumulation state
     m_channelIdx[eye] = 0;
+    ++m_progressiveGeneration[eye];
 
     m_rendererBase.acquirePersistentLayerArrayRenderTarget(m_progressiveLayerLease,
                                                            m_outputSize,
                                                            static_cast<uint32_t>(visibleIdxs.size()));
-    // VLOG(1) << "lease acquired";
-    for (size_t idx = 0; idx < visibleIdxs.size(); ++idx) {
-      m_progressiveLayerLease.renderTarget->attachSlice(idx);
-      m_progressiveLayerLease.renderTarget->bind();
-      m_progressiveLayerLease.renderTarget->clear();
-      m_progressiveLayerLease.renderTarget->release();
+    if (m_rendererBase.activeBackend() != RenderBackend::Vulkan) {
+      // Clear GL-backed slices
+      for (size_t idx = 0; idx < visibleIdxs.size(); ++idx) {
+        m_progressiveLayerLease.renderTarget->attachSlice(idx);
+        m_progressiveLayerLease.renderTarget->bind();
+        m_progressiveLayerLease.renderTarget->clear();
+        m_progressiveLayerLease.renderTarget->release();
+      }
     }
     return 0.5;
   }
@@ -884,7 +973,8 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
                                               m_round[eye],
                                               ze_to_zw_a,
                                               ze_to_zw_b,
-                                              ze_to_screen_pixel_voxel_size);
+                                              ze_to_screen_pixel_voxel_size,
+                                              visibleIdxs.size());
     processEventsAndMaybeCancel(cancellationToken);
 
     auto* lastTarget = m_lastRaycastAccum[eye].renderTarget;
@@ -935,7 +1025,13 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     for (size_t channelIdx = 0; channelIdx < visibleIdxs.size(); ++channelIdx) {
       auto c = visibleIdxs[channelIdx];
       for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
-        bool lastRound = render3DImageForOneRound(eye, c, round, ze_to_zw_a, ze_to_zw_b, ze_to_screen_pixel_voxel_size);
+        bool lastRound = render3DImageForOneRound(eye,
+                                                  c,
+                                                  round,
+                                                  ze_to_zw_a,
+                                                  ze_to_zw_b,
+                                                  ze_to_screen_pixel_voxel_size,
+                                                  visibleIdxs.size());
 #if defined(__linux__)
         if (FLAGS_atlas_debug_texture_output) {
           auto* debugTarget = m_lastRaycastAccum[eye].renderTarget;
@@ -1025,7 +1121,8 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
                                                        uint32_t round,
                                                        float ze_to_zw_a,
                                                        float ze_to_zw_b,
-                                                       float ze_to_screen_pixel_voxel_size)
+                                                       float ze_to_screen_pixel_voxel_size,
+                                                       size_t totalChannels)
 {
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
   auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
@@ -1219,7 +1316,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   bt.recordEvent("render image");
   STOP_AND_VLOG(bt)
 
-  std::swap(m_lastRaycastAccum[eye], m_currentRaycastAccum[eye]);
+  finalizeProgressiveRound(eye, lastRound, totalChannels);
 
   return lastRound;
 }

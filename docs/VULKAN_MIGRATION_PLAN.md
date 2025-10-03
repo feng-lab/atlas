@@ -153,7 +153,7 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
   - Texture blend (dual colour/depth compositing) routes through `ZVulkanTextureBlendPipelineContext`, mapping the GL blend/priority modes onto a single specialization constant (`COMPOSE_MODE`) and uploading both layers’ textures via the same CPU bridge while we lack Vulkan-native render targets.
 - Texture glow (blur + compositing) executes the two-pass separable blur and final glow combine in `ZVulkanTextureGlowPipelineContext`, translating blur parameters into push constants and reusing CPU-uploaded textures alongside internally managed Vulkan scratch images for the intermediate glow map.
 - Volume slices now render through `ZVulkanImgSlicePipelineContext`, matching the GL block-ID paging flow, per-channel layer array merge, and fast-path descriptors via the shared upload helpers.
-- Volume raycaster fast-path (single-channel, non-paged) renders through `ZVulkanImgRaycasterPipelineContext`, producing entry/exit layers and sampling transfer functions; progressive paging rounds remain to be ported.
+- Volume raycaster fast-path renders through `ZVulkanImgRaycasterPipelineContext`, producing entry/exit layers and sampling transfer functions. The Vulkan path now mirrors the GL multi-channel merge, shading each channel into a layer array and resolving it via `image2d_array_compositor`; progressive paging rounds reuse the same layer aggregation so multi-channel progressive parity is available alongside the existing block-ID staging.
 
 ### Renderer Parity Focus
 

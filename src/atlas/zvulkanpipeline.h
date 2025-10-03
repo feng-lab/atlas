@@ -38,6 +38,7 @@ public:
   void setDepthTestEnable(bool enable);
   void setDepthCompareOp(vk::CompareOp compareOp);
   void setColorBlendAttachment(const vk::PipelineColorBlendAttachmentState& attachment);
+  void setColorBlendAttachments(std::vector<vk::PipelineColorBlendAttachmentState> attachments);
   void setAttachmentFormats(std::vector<vk::Format> colorFormats,
                             std::optional<vk::Format> depthFormat);
   void create();
@@ -61,16 +62,18 @@ private:
   bool m_depthWriteEnable = true;
   bool m_depthTestEnable = true;
   vk::CompareOp m_depthCompareOp = vk::CompareOp::eLess;
-  vk::PipelineColorBlendAttachmentState m_colorBlendAttachment{
-    .blendEnable = VK_TRUE,
-    .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
-    .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
-    .colorBlendOp = vk::BlendOp::eAdd,
-    .srcAlphaBlendFactor = vk::BlendFactor::eOne,
-    .dstAlphaBlendFactor = vk::BlendFactor::eZero,
-    .alphaBlendOp = vk::BlendOp::eAdd,
-    .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-                      vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
+  std::vector<vk::PipelineColorBlendAttachmentState> m_colorBlendAttachments{
+    vk::PipelineColorBlendAttachmentState{.blendEnable = VK_TRUE,
+                                          .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+                                          .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+                                          .colorBlendOp = vk::BlendOp::eAdd,
+                                          .srcAlphaBlendFactor = vk::BlendFactor::eOne,
+                                          .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+                                          .alphaBlendOp = vk::BlendOp::eAdd,
+                                          .colorWriteMask = vk::ColorComponentFlagBits::eR |
+                                                            vk::ColorComponentFlagBits::eG |
+                                                            vk::ColorComponentFlagBits::eB |
+                                                            vk::ColorComponentFlagBits::eA}};
 
   std::vector<vk::Format> m_colorAttachmentFormats{vk::Format::eR8G8B8A8Unorm};
   std::optional<vk::Format> m_depthAttachmentFormat = vk::Format::eD32Sfloat;

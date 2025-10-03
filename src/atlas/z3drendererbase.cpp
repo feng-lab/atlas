@@ -175,7 +175,11 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentLay
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  lease = pool.acquireLayerArrayRenderTarget(size, layers, colorFormat, depthFormat);
+  std::optional<RenderBackend> backend;
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    backend = RenderBackend::Vulkan;
+  }
+  lease = pool.acquireLayerArrayRenderTarget(size, layers, colorFormat, depthFormat, backend);
   return lease;
 }
 

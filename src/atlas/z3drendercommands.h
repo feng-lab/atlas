@@ -12,6 +12,7 @@
 #include <span>
 #include <variant>
 #include <vector>
+#include <limits>
 
 namespace nim {
 
@@ -488,6 +489,9 @@ struct ImgRaycasterPayload
   Z3DImgRaycasterRenderer* renderer = nullptr;
   Z3DImg* image = nullptr;
   std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> entryExitLease;
+  std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> blockIdLease;
+  std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lastAccumLease;
+  std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> currentAccumLease;
   std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> channelLayerLease;
   glm::uvec2 outputSize{0u, 0u};
   float samplingRate = 1.0f;
@@ -503,6 +507,13 @@ struct ImgRaycasterPayload
   bool entryHasIndices = false;
   bool entryFlipped = false;
   std::vector<size_t> visibleChannels;
+  std::vector<uint32_t> blockIdReadback;
+  uint32_t blockIdAttachmentCount = 0u;
+  uint32_t roundsCompleted = 0u;
+  uint32_t roundsRemaining = 0u;
+  size_t activeChannel = std::numeric_limits<size_t>::max();
+  uint32_t activeChannelIndex = 0u;
+  uint32_t progressiveGeneration = 0u;
 };
 
 struct EllipsoidPayload

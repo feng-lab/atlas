@@ -156,6 +156,10 @@ public:
     m_round[eye] = 0;
   }
 
+  // Notify renderer that a progressive round has completed so internal
+  // accumulators can be swapped and bookkeeping updated.
+  void finalizeProgressiveRound(Z3DEye eye, bool lastRound, size_t channelCount);
+
   // Release any scratch-pool backed targets retained across frames.
   void releaseScratchResources();
 
@@ -185,7 +189,8 @@ private:
                                 uint32_t round,
                                 float ze_to_zw_a,
                                 float ze_to_zw_b,
-                                float ze_to_screen_pixel_voxel_size);
+                                float ze_to_screen_pixel_voxel_size,
+                                size_t totalChannels);
 
   void render3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
 
@@ -247,6 +252,7 @@ private:
 
   int m_channelIdx[3] = {-1, -1, -1};
   int m_round[3] = {0, 0, 0};
+  std::array<uint32_t, 3> m_progressiveGeneration{};
 
   // Output size provided via ensureInternalTargets()
   glm::uvec2 m_outputSize{32, 32};

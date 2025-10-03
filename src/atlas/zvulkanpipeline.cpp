@@ -82,7 +82,17 @@ void ZVulkanPipeline::setDepthCompareOp(vk::CompareOp compareOp)
 
 void ZVulkanPipeline::setColorBlendAttachment(const vk::PipelineColorBlendAttachmentState& attachment)
 {
-  m_colorBlendAttachment = attachment;
+  m_colorBlendAttachments.clear();
+  m_colorBlendAttachments.push_back(attachment);
+}
+
+void ZVulkanPipeline::setColorBlendAttachments(std::vector<vk::PipelineColorBlendAttachmentState> attachments)
+{
+  if (attachments.empty()) {
+    m_colorBlendAttachments.clear();
+    return;
+  }
+  m_colorBlendAttachments = std::move(attachments);
 }
 
 void ZVulkanPipeline::setAttachmentFormats(std::vector<vk::Format> colorFormats,
@@ -136,9 +146,12 @@ void ZVulkanPipeline::create()
                                                        .minDepthBounds = 0.0f,
                                                        .maxDepthBounds = 1.0f};
 
-  const uint32_t blendAttachmentCount = m_colorAttachmentFormats.empty() ? 0u : 1u;
+  if (m_colorAttachmentFormats.size() > m_colorBlendAttachments.size() && !m_colorBlendAttachments.empty()) {
+    m_colorBlendAttachments.resize(m_colorAttachmentFormats.size(), m_colorBlendAttachments.back());
+  }
+  const uint32_t blendAttachmentCount = static_cast<uint32_t>(m_colorBlendAttachments.size());
   const vk::PipelineColorBlendAttachmentState* blendAttachmentPtr =
-    blendAttachmentCount == 0u ? nullptr : &m_colorBlendAttachment;
+    blendAttachmentCount == 0u ? nullptr : m_colorBlendAttachments.data();
   vk::PipelineColorBlendStateCreateInfo colorBlending{
     .logicOpEnable = VK_FALSE,
     .logicOp = vk::LogicOp::eCopy,
