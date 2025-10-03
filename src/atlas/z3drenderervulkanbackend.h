@@ -23,6 +23,7 @@ class ZVulkanTextureCopyPipelineContext;
 class ZVulkanTextureBlendPipelineContext;
 class ZVulkanTextureGlowPipelineContext;
 class ZVulkanImgSlicePipelineContext;
+class ZVulkanImgRaycasterPipelineContext;
 class Z3DRendererVulkanBackend final : public Z3DRendererBackend
 {
 public:
@@ -88,6 +89,7 @@ private:
   std::unique_ptr<ZVulkanTextureBlendPipelineContext> m_textureBlendContext;
   std::unique_ptr<ZVulkanTextureGlowPipelineContext> m_textureGlowContext;
   std::unique_ptr<ZVulkanImgSlicePipelineContext> m_imgSliceContext;
+  std::unique_ptr<ZVulkanImgRaycasterPipelineContext> m_imgRaycasterContext;
   
 };
 

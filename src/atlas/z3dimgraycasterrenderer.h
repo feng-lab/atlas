@@ -64,6 +64,8 @@ public:
 
   double renderProgressively(Z3DEye eye);
 
+  void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
+
   bool renderingStarted(Z3DEye eye)
   {
     return m_channelIdx[eye] > -1;
@@ -106,6 +108,31 @@ public:
   [[nodiscard]] const std::vector<bool>& channelVisibilities() const
   {
     return m_channelVisibilities;
+  }
+
+  [[nodiscard]] const std::vector<Z3DTransferFunction*>& transferFunctions() const
+  {
+    return m_transferFunctions;
+  }
+
+  [[nodiscard]] const ZMesh& entryExitMesh() const
+  {
+    return m_entryExitMesh;
+  }
+
+  [[nodiscard]] bool entryExitMeshValid() const
+  {
+    return m_entryExitMeshValid;
+  }
+
+  [[nodiscard]] bool entryExitMeshFlipped() const
+  {
+    return m_entryExitMeshFlipped;
+  }
+
+  [[nodiscard]] glm::uvec2 entryExitSize() const
+  {
+    return m_entryExitSize;
   }
 
   // Ensure internal targets are sized; size is provided by filter
@@ -207,6 +234,10 @@ protected:
 private:
   std::vector<ZMesh> m_quads;
   const Z3DTexture* m_entryExitTexCoordAndZeTexture = nullptr;
+  ZMesh m_entryExitMesh;
+  bool m_entryExitMeshValid = false;
+  bool m_entryExitMeshFlipped = false;
+  glm::uvec2 m_entryExitSize{0u, 0u};
 
   std::unique_ptr<Z3DVertexArrayObject> m_VAO;
 

@@ -495,6 +495,14 @@ struct ImgRaycasterPayload
   float localMIPThreshold = 0.8f;
   ImgCompositingMode compositingMode = ImgCompositingMode::DirectVolumeRendering;
   bool fastPathOnly = true;
+  glm::uvec2 entryExitSize{0u, 0u};
+  std::vector<glm::vec3> entryPositions;
+  std::vector<glm::vec3> entryTexCoords;
+  std::vector<uint32_t> entryIndices;
+  uint32_t entryPrimitive = 0u;
+  bool entryHasIndices = false;
+  bool entryFlipped = false;
+  std::vector<size_t> visibleChannels;
 };
 
 struct EllipsoidPayload

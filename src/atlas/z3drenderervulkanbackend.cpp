@@ -21,6 +21,7 @@
 #include "zvulkantextureblendpipelinecontext.h"
 #include "zvulkantextureglowpipelinecontext.h"
 #include "zvulkanimgslicepipelinecontext.h"
+#include "zvulkanimgraycasterpipelinecontext.h"
 #include "zvulkanrenderconversions.h"
 
 #include <algorithm>
@@ -410,9 +411,13 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
     if (!handled) {
       if (const auto* raycaster = std::get_if<ImgRaycasterPayload>(&batch.geometry)) {
-        (void)raycaster;
-        LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster pipeline is not implemented yet.";
-        handled = true;
+        if (raycaster->renderer && raycaster->image) {
+          if (!m_imgRaycasterContext) {
+            m_imgRaycasterContext = std::make_unique<ZVulkanImgRaycasterPipelineContext>(*this);
+          }
+          m_imgRaycasterContext->record(renderer, batch, *raycaster, vkViewport, vkScissor, cmd);
+          handled = true;
+        }
       }
     }
 

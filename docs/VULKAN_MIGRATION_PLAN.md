@@ -153,13 +153,14 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
   - Texture blend (dual colour/depth compositing) routes through `ZVulkanTextureBlendPipelineContext`, mapping the GL blend/priority modes onto a single specialization constant (`COMPOSE_MODE`) and uploading both layers’ textures via the same CPU bridge while we lack Vulkan-native render targets.
 - Texture glow (blur + compositing) executes the two-pass separable blur and final glow combine in `ZVulkanTextureGlowPipelineContext`, translating blur parameters into push constants and reusing CPU-uploaded textures alongside internally managed Vulkan scratch images for the intermediate glow map.
 - Volume slices now render through `ZVulkanImgSlicePipelineContext`, matching the GL block-ID paging flow, per-channel layer array merge, and fast-path descriptors via the shared upload helpers.
+- Volume raycaster fast-path (single-channel, non-paged) renders through `ZVulkanImgRaycasterPipelineContext`, producing entry/exit layers and sampling transfer functions; progressive paging rounds remain to be ported.
 
 ### Renderer Parity Focus
 
 - Backgrounds: verify gradient/uniform output and orientation flags match GL when the Vulkan backend consumes the shared helpers.
 - Lines: cover smooth/wide, per-segment widths, textured lines, and picking IDs. Track open items (round caps, MSAA, dashed paths) here.
 - Meshes: validate material/light UBOs, wireframe overlays, and transparency parity.
-- Volumes & slices: slice renderer parity now verifies against GL captures (fast + paged); raycaster remains in progress for full parity (progressive accumulation/blending still tracked).
+- Volumes & slices: slice renderer parity now verifies against GL captures (fast + paged); raycaster fast-path parity is available for single-channel DVR/MIP, with progressive accumulation and paged updates still tracked.
 - Post effects (axis, glow, screenshot readback): port after primitive renderers are reliable; document any temporary fallbacks.
 - **Upcoming Vulkan Compositor Port Plan**
   1. **Inventory Existing GL Flow**

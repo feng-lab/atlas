@@ -52,6 +52,98 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
   compile();
 }
 
+void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
+{
+  if (backend != RenderBackend::Vulkan || picking) {
+    return;
+  }
+
+  if (!m_img || !hasVisibleRendering()) {
+    return;
+  }
+
+  if (!m_quads.empty()) {
+    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster 2D path not implemented yet.";
+    return;
+  }
+
+  if (!m_entryExitMeshValid || m_entryExitSize.x == 0u || m_entryExitSize.y == 0u) {
+    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster requires entry/exit geometry. Call prepareEntryExit before rendering.";
+    return;
+  }
+
+  std::vector<size_t> visibleChannels;
+  visibleChannels.reserve(m_img->numChannels());
+  for (size_t i = 0; i < m_img->numChannels(); ++i) {
+    if (i < m_channelVisibilities.size() && m_channelVisibilities[i]) {
+      visibleChannels.push_back(i);
+    }
+  }
+
+  if (visibleChannels.empty()) {
+    return;
+  }
+
+  if (visibleChannels.size() > 1) {
+    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster currently supports single-channel fast path only.";
+    return;
+  }
+
+  if (m_outputSize.x == 0u || m_outputSize.y == 0u) {
+    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster output size is zero.";
+    return;
+  }
+
+  ImgRaycasterPayload payload;
+  payload.renderer = this;
+  payload.image = m_img;
+  payload.outputSize = m_outputSize;
+  payload.samplingRate = m_samplingRateValue;
+  payload.isoValue = m_isoValue;
+  payload.localMIPThreshold = m_localMIPThreshold;
+  payload.compositingMode = m_compositingModeValue;
+  payload.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
+  payload.entryExitSize = m_entryExitSize;
+  payload.visibleChannels = visibleChannels;
+
+  const auto& positions = m_entryExitMesh.vertices();
+  const auto& texCoords = m_entryExitMesh.textureCoordinates3D();
+  const auto& indices = m_entryExitMesh.indices();
+
+  payload.entryPositions.assign(positions.begin(), positions.end());
+  payload.entryTexCoords.assign(texCoords.begin(), texCoords.end());
+  payload.entryHasIndices = m_entryExitMesh.hasIndices();
+  if (payload.entryHasIndices) {
+    payload.entryIndices.assign(indices.begin(), indices.end());
+  }
+  payload.entryPrimitive = static_cast<uint32_t>(m_entryExitMesh.type());
+  payload.entryFlipped = m_entryExitMeshFlipped;
+
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  auto entryLease = pool.acquireEntryExitRenderTarget(m_entryExitSize,
+                                                      2u,
+                                                      ScratchFormat::RGBA32F,
+                                                      std::optional<RenderBackend>(RenderBackend::Vulkan));
+  payload.entryExitLease =
+    std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(entryLease));
+
+  if (visibleChannels.size() > 1) {
+    auto layerLease = pool.acquireLayerArrayRenderTarget(m_outputSize,
+                                                         static_cast<uint32_t>(visibleChannels.size()),
+                                                         ScratchFormat::RGBA16,
+                                                         ScratchFormat::Depth24,
+                                                         std::optional<RenderBackend>(RenderBackend::Vulkan));
+    payload.channelLayerLease =
+      std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(layerLease));
+  }
+
+  RenderBatch batch;
+  batch.eye = eye;
+  batch.geometry = std::move(payload);
+
+  m_rendererBase.appendBatch(std::move(batch));
+}
+
 void Z3DImgRaycasterRenderer::ensureRaycastAccumulators(Z3DEye eye)
 {
   CHECK_GT(m_outputSize.x, 0u);
@@ -102,6 +194,10 @@ void Z3DImgRaycasterRenderer::releaseScratchResources()
   for (Z3DEye eye : {MonoEye, LeftEye, RightEye}) {
     resetProgress(eye);
   }
+
+  m_entryExitMeshValid = false;
+  m_entryExitMeshFlipped = false;
+  m_entryExitSize = glm::uvec2(0u);
 }
 
 void Z3DImgRaycasterRenderer::setChannelVisibility(size_t index, bool visible)
@@ -212,6 +308,16 @@ void Z3DImgRaycasterRenderer::compile()
 void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flipped, Z3DEye eye, const glm::uvec2& size)
 {
   // VLOG(1) << "prepareEntryExit";
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_entryExitMesh = clipped;
+    m_entryExitMeshValid = true;
+    m_entryExitMeshFlipped = flipped;
+    m_entryExitSize = size;
+    m_entryExitTexCoordAndZeTexture = nullptr;
+    m_quads.clear();
+    return;
+  }
+
   // Release any previous entry/exit lease before acquiring a new one to
   // avoid growing the scratch pool unnecessarily.
   if (m_entryExitLease) {
