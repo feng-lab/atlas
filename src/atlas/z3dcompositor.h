@@ -245,14 +245,14 @@ private:
   Z3DScratchResourcePool::RenderTargetLease m_pickingTargetLease;
 
   Z3DScratchResourcePool::RenderTargetLease m_ddpRTLease;
-  Z3DShaderProgram m_ddpBlendShader;
-  Z3DShaderProgram m_ddpFinalShader;
+  std::unique_ptr<Z3DShaderProgram> m_ddpBlendShader;
+  std::unique_ptr<Z3DShaderProgram> m_ddpFinalShader;
 
   Z3DScratchResourcePool::RenderTargetLease m_waRTLease;
-  Z3DShaderProgram m_waFinalShader;
+  std::unique_ptr<Z3DShaderProgram> m_waFinalShader;
 
   Z3DScratchResourcePool::RenderTargetLease m_wbRTLease;
-  Z3DShaderProgram m_wbFinalShader;
+  std::unique_ptr<Z3DShaderProgram> m_wbFinalShader;
 
   ZBoolParameter m_showBackground;
   std::shared_ptr<ZWidgetsGroup> m_backgroundWidgetsGroup;

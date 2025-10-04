@@ -22,14 +22,14 @@
 #include "z3dscratchresourcepool.h"
 #include "zvulkancontext.h"
 #include "zvulkandevice.h"
+#include "zvulkan.h"
+#include "z3dshadermanager.h"
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
 #include <QCoreApplication>
 #include <QMetaObject>
 #include <memory>
-#include "zvulkan.h"
-// Vulkan compositor removed for now (classification phase)
 
 DEFINE_bool(atlas_debug_opengl,
             false,
@@ -221,7 +221,18 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
   VLOG(1) << "canvas detached";
   getGLFocus();
 
-  // Members release their GPU resources as they go out of scope.
+  // Proactively release any cached GL shaders while GL context is current,
+  // to avoid deleting them later when no GL context is available.
+  Z3DShaderManager::instance().clear();
+
+  // Safe cleanup for Vulkan: ensure GPU idle and release scratch resources
+  try {
+    if (m_vkDevice) {
+      m_vkDevice->context().device().waitIdle();
+    }
+  } catch (const std::exception& e) {
+    LOG(WARNING) << "Vulkan waitIdle during engine shutdown failed: " << e.what();
+  }
 }
 
 const ZDoc& Z3DRenderingEngine::doc() const
@@ -1479,10 +1490,6 @@ void Z3DRenderingEngine::resetOutputSizeToMatchCanvasSize()
 
 void Z3DRenderingEngine::handleRenderBackendChanged()
 {
-  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-  const char* targetLabel = backend == RenderBackend::OpenGL ? "OpenGL" : "Vulkan";
-  VLOG(1) << fmt::format("Render backend change requested: {}", targetLabel);
-
   if (Z3DRenderGlobalState::instance().hasCancellationSource()) {
     Z3DRenderGlobalState::instance().requestCancellation();
     VLOG(1) << "Active render detected; queuing backend switch after cancellation.";
@@ -1509,31 +1516,22 @@ void Z3DRenderingEngine::applyBackendSwitch()
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
   std::scoped_lock lock(targetSwitchMutex());
-  const RenderBackend previousBackend = m_scratchPool->defaultBackend();
-  const char* previousLabel = previousBackend == RenderBackend::OpenGL ? "OpenGL" : "Vulkan";
-  const char* targetLabel = backend == RenderBackend::OpenGL ? "OpenGL" : "Vulkan";
-  VLOG(1) << fmt::format("Switching rendering backend from {} to {}", previousLabel, targetLabel);
+  VLOG(1) << fmt::format("Switching rendering backend to {}", enumToString(backend));
 
   if (backend == RenderBackend::OpenGL) {
-    ensureGLContext();
-    if (!m_context) {
-      const auto errorMsg = QStringLiteral("Failed to create OpenGL context for backend switch");
-      LOG(ERROR) << errorMsg.toStdString();
-      reportRenderingError(errorMsg);
-      m_scratchPool->setDefaultBackend(previousBackend);
-      return;
-    }
-  } else if (m_context) {
-    // Make GL current to safely tear down any GL resources in release paths
-    getGLFocus();
-  }
-
-  // If switching away from Vulkan, ensure the GPU is idle before destroying scratch resources
-  if (previousBackend == RenderBackend::Vulkan && m_vkDevice) {
+    // If switching away from Vulkan, ensure the GPU is idle before destroying scratch resources
     try {
       m_vkDevice->context().device().waitIdle();
     } catch (const std::exception& e) {
       LOG(WARNING) << "Vulkan waitIdle before pool reset failed: " << e.what();
+    }
+
+    ensureGLContext();
+    if (!m_context) {
+      const auto errorMsg = QStringLiteral("Failed to create OpenGL context for backend switch");
+      LOG(ERROR) << errorMsg;
+      reportRenderingError(errorMsg);
+      return;
     }
   }
 
@@ -1542,14 +1540,16 @@ void Z3DRenderingEngine::applyBackendSwitch()
 
   // Prepare Vulkan device if targeting Vulkan; inject into scratch pool before any Vulkan allocations
   if (backend == RenderBackend::Vulkan) {
+    // Make GL current to safely tear down any GL resources in release paths
+    getGLFocus();
+
     if (!m_vkContext) {
       try {
         m_vkContext = std::make_unique<ZVulkanContext>();
       } catch (const std::exception& e) {
-        const auto errorMsg = QString::fromStdString(fmt::format("Failed to create Vulkan context: {}", e.what()));
-        LOG(ERROR) << errorMsg.toStdString();
+        const auto errorMsg = fmt::format("Failed to create Vulkan context: {}", e.what());
+        LOG(ERROR) << errorMsg;
         reportRenderingError(errorMsg);
-        m_scratchPool->setDefaultBackend(previousBackend);
         return;
       }
     }
@@ -1557,14 +1557,12 @@ void Z3DRenderingEngine::applyBackendSwitch()
       try {
         m_vkDevice = m_vkContext->createDevice();
       } catch (const std::exception& e) {
-        const auto errorMsg = QString::fromStdString(fmt::format("Failed to create Vulkan device: {}", e.what()));
-        LOG(ERROR) << errorMsg.toStdString();
+        const auto errorMsg = fmt::format("Failed to create Vulkan device: {}", e.what());
+        LOG(ERROR) << errorMsg;
         reportRenderingError(errorMsg);
-        m_scratchPool->setDefaultBackend(previousBackend);
         return;
       }
     }
-    Z3DRenderGlobalState::instance().setScratchPool(m_scratchPool.get());
     m_scratchPool->setVulkanDevice(m_vkDevice.get());
   }
 
@@ -1575,6 +1573,12 @@ void Z3DRenderingEngine::applyBackendSwitch()
   m_compositor->switchBackend(backend);
 
   if (backend == RenderBackend::Vulkan) {
+    // Drop any cached GL shaders tied to the current GL context before
+    // destroying it. This ensures their glDeleteShader calls happen with
+    // a valid context and prevents late deletions against a different or
+    // nonexistent context.
+    Z3DShaderManager::instance().clear();
+
     // Drop GL context after transition to Vulkan to avoid accidental usage
     m_context.reset();
   }

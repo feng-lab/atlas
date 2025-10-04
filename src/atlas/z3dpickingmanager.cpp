@@ -15,6 +15,12 @@ void Z3DPickingManager::setRenderTarget(Z3DRenderTarget& rt)
 {
   CHECK(rt.attachment(GL_COLOR_ATTACHMENT0)->internalFormat() == GL_RGBA8);
   m_renderTarget = &rt;
+  // Switching to a GL picking target should invalidate any Vulkan pointers.
+  // Otherwise, callers like objectAtWidgetPos()/depthAtWidgetPos would keep
+  // using stale Vulkan textures after a backend switch (Vulkan -> OpenGL).
+  m_vkColor = nullptr;
+  m_vkDepth = nullptr;
+  m_vkSize = glm::uvec2(0u, 0u);
 }
 
 glm::col4 Z3DPickingManager::registerObject(const void* obj)

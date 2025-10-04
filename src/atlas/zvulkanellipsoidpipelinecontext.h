@@ -91,10 +91,12 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder;
   std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
   std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
+  std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsPlaceholder;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
+  std::unique_ptr<ZVulkanDescriptorSet> m_dsOIT;
 
   std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
   std::optional<vk::raii::Sampler> m_sampler;
@@ -102,6 +104,7 @@ private:
   std::unique_ptr<ZVulkanBuffer> m_uboLighting;
   std::unique_ptr<ZVulkanBuffer> m_uboTransforms;
   std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
+  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   std::unique_ptr<ZVulkanBuffer> m_indexBuffer;
@@ -112,6 +115,9 @@ private:
 
   void ensureDescriptorLayouts();
   void ensureDescriptorSets();
+  void ensureOITResources();
+  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,
+                          const glm::vec2& screenDimRcp);
   void ensurePlaceholderTexture();
   void updateLightingUBO(Z3DRendererBase& renderer,
                          const RenderBatch& batch,

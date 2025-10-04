@@ -11,7 +11,6 @@ class ZVulkanDescriptorPool
 {
 public:
   explicit ZVulkanDescriptorPool(ZVulkanDevice& device);
-  ~ZVulkanDescriptorPool();
 
   vk::DescriptorPool pool() const
   {

@@ -54,6 +54,11 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
 {
   const glm::uvec4 viewportRect = m_frameState.viewport;
 
+  LOG(INFO) << "appendBatch initial colors=" << batch.pass.colorAttachments.size()
+            << " depth=" << batch.pass.depthAttachment.has_value()
+            << " activeSurfaceColors=" << m_frameState.activeSurface.colorAttachments.size()
+            << " activeSurfaceHasDepth=" << m_frameState.activeSurface.depthAttachment.has_value();
+
   if (batch.pass.extent == glm::uvec2(0u) && viewportRect.z > 0u && viewportRect.w > 0u) {
     batch.pass.extent = glm::uvec2(viewportRect.z, viewportRect.w);
   }
@@ -71,6 +76,11 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
     batch.pass.colorAttachments = m_frameState.activeSurface.colorAttachments;
     batch.pass.depthAttachment = m_frameState.activeSurface.depthAttachment;
   }
+
+  LOG(INFO) << "appendBatch final colors=" << batch.pass.colorAttachments.size()
+            << " depth=" << batch.pass.depthAttachment.has_value()
+            << " (active colors " << m_frameState.activeSurface.colorAttachments.size()
+            << " depth " << m_frameState.activeSurface.depthAttachment.has_value() << ")";
 
   m_cpuState.batches.push_back(std::move(batch));
 }
@@ -343,6 +353,9 @@ void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBa
     m_pendingActiveSurface.reset();
   }
 
+  LOG(INFO) << "executeVulkanBatches activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
+            << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
+
   m_backend->beginRender(*this);
   if (recordBatches) {
     recordBatches();
@@ -521,7 +534,10 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
 
 void Z3DRendererBase::render(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
-  resetCPUState();
+  const bool collectingCommandLists = m_activeBackend == RenderBackend::Vulkan && m_collectOnly;
+  if (!collectingCommandLists) {
+    resetCPUState();
+  }
   if (m_pendingActiveSurface) {
     m_frameState.setActiveSurface(*m_pendingActiveSurface);
     m_pendingActiveSurface.reset();
@@ -572,7 +588,10 @@ void Z3DRendererBase::render(Z3DEye eye, Z3DRendererBase::RendererSpan renderers
 
 void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
-  resetCPUState();
+  const bool collectingCommandLists = m_activeBackend == RenderBackend::Vulkan && m_collectOnly;
+  if (!collectingCommandLists) {
+    resetCPUState();
+  }
   if (m_pendingActiveSurface) {
     m_frameState.setActiveSurface(*m_pendingActiveSurface);
     m_pendingActiveSurface.reset();

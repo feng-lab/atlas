@@ -28,6 +28,7 @@
 #include "zvulkanfontpipelinecontext.h"
 #include "zvulkanrenderconversions.h"
 #include "z3drenderglobalstate.h"
+#include "z3dscratchresourcepool.h"
 
 #include <algorithm>
 #include <array>
@@ -62,6 +63,12 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
       LOG(WARNING) << "Vulkan waitIdle (shared) failed: " << e.what();
     }
   }
+
+   // Release scratch resources proactively so device teardown is clean
+   if (Z3DRenderGlobalState::instance().hasScratchPool()) {
+     auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+     pool.reset();
+   }
 }
 
 void Z3DRendererVulkanBackend::setGlobalShaderParameters(Z3DRendererBase& renderer,
@@ -135,6 +142,12 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   const auto& viewport = renderer.frameState().viewport;
   const uint32_t width = viewport.z;
   const uint32_t height = viewport.w;
+  const auto& surf = renderer.frameState().activeSurface;
+  VLOG(1) << fmt::format("VK beginRender: viewport={}x{}, colors={}, depth={}",
+                         width,
+                         height,
+                         surf.colorAttachments.size(),
+                         surf.depthAttachment.has_value());
 
   if (width == 0U || height == 0U) {
     m_activeCommandBuffer.reset();
@@ -215,7 +228,105 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
   auto& cmd = *m_activeCommandBuffer;
 
+  size_t batchIndex = 0;
   for (const auto& batch : state.batches) {
+    const auto geom = describeGeometry(batch.geometry);
+    VLOG(1) << fmt::format("VK batch[{}]: geom={}, colors={}, depth={} viewport=({},{} {}x{})",
+                           batchIndex++,
+                           geom,
+                           batch.pass.colorAttachments.size(),
+                           batch.pass.depthAttachment.has_value(),
+                           static_cast<int>(batch.pass.viewport.origin.x),
+                           static_cast<int>(batch.pass.viewport.origin.y),
+                           static_cast<int>(batch.pass.viewport.extent.x),
+                           static_cast<int>(batch.pass.viewport.extent.y));
+    // Ensure any sampled inputs referenced by this batch are transitioned to shader-read
+    auto classifyReadLayout = [](vk::Format format) {
+      struct
+      {
+        vk::ImageLayout layout;
+        vk::ImageAspectFlags aspect;
+      } result;
+
+      switch (format) {
+        case vk::Format::eD16Unorm:
+        case vk::Format::eX8D24UnormPack32:
+        case vk::Format::eD32Sfloat:
+          result.layout = vk::ImageLayout::eDepthReadOnlyOptimal;
+          result.aspect = vk::ImageAspectFlagBits::eDepth;
+          break;
+        case vk::Format::eD16UnormS8Uint:
+        case vk::Format::eD24UnormS8Uint:
+        case vk::Format::eD32SfloatS8Uint:
+          result.layout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+          result.aspect = vk::ImageAspectFlagBits::eDepth;
+          break;
+        case vk::Format::eS8Uint:
+          result.layout = vk::ImageLayout::eStencilReadOnlyOptimal;
+          result.aspect = vk::ImageAspectFlagBits::eStencil;
+          break;
+        default:
+          result.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+          result.aspect = vk::ImageAspectFlags{};
+          break;
+      }
+      return result;
+    };
+
+    auto ensureSampledReadable = [&](const AttachmentHandle& handle) {
+      if (handle.backend != AttachmentBackend::Vulkan || !handle.valid()) return;
+      auto* texture = reinterpret_cast<ZVulkanTexture*>(handle.id);
+      if (!texture) return;
+      const auto samplingState = classifyReadLayout(texture->format());
+      // Transition before dynamic rendering begins
+      vk::ImageAspectFlags transitionAspect = samplingState.aspect;
+      if (transitionAspect == vk::ImageAspectFlagBits::eDepth &&
+          (texture->format() == vk::Format::eD16UnormS8Uint || texture->format() == vk::Format::eD24UnormS8Uint ||
+           texture->format() == vk::Format::eD32SfloatS8Uint)) {
+        transitionAspect = texture->info().aspectMask;
+      }
+      texture->transitionLayout(cmd, texture->layout(), samplingState.layout, transitionAspect);
+      texture->setDescriptorLayout(samplingState.layout);
+    };
+
+    if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
+      ensureSampledReadable(weightedAverage->accumulationAttachment);
+      ensureSampledReadable(weightedAverage->momentsAttachment);
+    } else if (const auto* dualPeel = std::get_if<TextureDualPeelPayload>(&batch.geometry)) {
+      if (dualPeel->stage == TextureDualPeelPayload::Stage::Blend) {
+        ensureSampledReadable(dualPeel->tempAttachment);
+      } else {
+        ensureSampledReadable(dualPeel->depthAttachment);
+        ensureSampledReadable(dualPeel->frontAttachment);
+        ensureSampledReadable(dualPeel->backAttachment);
+      }
+    } else if (const auto* blend = std::get_if<TextureBlendPayload>(&batch.geometry)) {
+      ensureSampledReadable(blend->colorAttachmentHandle0);
+      ensureSampledReadable(blend->depthAttachmentHandle0);
+      ensureSampledReadable(blend->colorAttachmentHandle1);
+      ensureSampledReadable(blend->depthAttachmentHandle1);
+    } else if (const auto* weightedBlended = std::get_if<TextureWeightedBlendedPayload>(&batch.geometry)) {
+      ensureSampledReadable(weightedBlended->accumulationAttachment);
+      ensureSampledReadable(weightedBlended->transmittanceAttachment);
+    } else if (const auto* textureCopy = std::get_if<TextureCopyPayload>(&batch.geometry)) {
+      ensureSampledReadable(textureCopy->colorAttachmentHandle);
+      ensureSampledReadable(textureCopy->depthAttachmentHandle);
+    } else if (const auto* textureGlow = std::get_if<TextureGlowPayload>(&batch.geometry)) {
+      ensureSampledReadable(textureGlow->colorAttachmentHandle);
+      ensureSampledReadable(textureGlow->depthAttachmentHandle);
+    } else if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
+      (void)mesh;
+      // When peeling, mesh shaders sample depth/front blender from hook params
+      if (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+        const auto& hookPara = renderer.shaderHookPara();
+        if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
+          ensureSampledReadable(hookPara.dualDepthPeelingDepthBlenderHandle);
+        }
+        if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
+          ensureSampledReadable(hookPara.dualDepthPeelingFrontBlenderHandle);
+        }
+      }
+    }
     std::vector<vk::RenderingAttachmentInfo> colorAttachments;
     colorAttachments.reserve(batch.pass.colorAttachments.size());
 
@@ -284,6 +395,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     }
 
     if (colorAttachments.empty() && !depthAttachmentInfo) {
+      VLOG(1) << "VK: skipping batch with no attachments";
       LOG_FIRST_N(WARNING, 5) << "Vulkan backend skipping batch with no Vulkan-compatible attachments.";
       continue;
     }
@@ -490,6 +602,8 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
 {
   // Collect-only recording of batches, then execute as a single begin/end.
   renderer.setCollectOnly(true);
+  LOG(INFO) << "processCompositorPass surface colors=" << pass.surface.colorAttachments.size()
+            << " depth=" << pass.surface.depthAttachment.has_value();
   renderer.setActiveSurfaceForNextPass(pass.surface);
   // Honor clear policy on this pass
   const LoadOp colorLoad = pass.clearColor ? LoadOp::Clear : LoadOp::Load;
@@ -497,18 +611,35 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   renderer.setPendingColorAttachmentsLoadStore(colorLoad, StoreOp::Store, pass.clearValue);
   renderer.setPendingDepthAttachmentLoadStore(depthLoad, StoreOp::Store, pass.clearValue);
 
+  auto recordFilterBatches = [&](Z3DBoundedFilter* filter, auto&& renderFn) {
+    if (!filter) {
+      return;
+    }
+    auto& source = filter->rendererBase();
+    const bool prevCollectOnly = source.collectOnly();
+    const glm::uvec4 previousViewport = source.frameState().viewport;
+    source.setCollectOnly(true);
+    source.frameState().updateViewportData(renderer.frameState().viewport);
+    const auto surfaceCopy = renderer.frameState().activeSurface;
+    source.setActiveSurfaceForNextPass(surfaceCopy);
+    renderFn();
+    auto& batches = source.cpuState().batches;
+    for (auto& batch : batches) {
+      renderer.appendBatch(std::move(batch));
+    }
+    source.resetCPUState();
+    source.setCollectOnly(prevCollectOnly);
+    source.frameState().updateViewportData(previousViewport);
+  };
+
   renderer.executeVulkanBatches([&]() {
     // Opaque first
     for (auto* filter : pass.opaqueFilters) {
-      if (filter) {
-        filter->renderOpaque(pass.eye);
-      }
+      recordFilterBatches(filter, [&]() { filter->renderOpaque(pass.eye); });
     }
     // Then transparent
     for (const auto& tb : pass.transparentFilters) {
-      if (tb.filter) {
-        tb.filter->renderTransparent(pass.eye);
-      }
+      recordFilterBatches(tb.filter, [&]() { tb.filter->renderTransparent(pass.eye); });
     }
   });
 

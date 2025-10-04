@@ -19,6 +19,14 @@ public:
   // return reference because it is always valid
   Z3DShader& shader(const QString& fn, const std::string& header, const Z3DContextGroup& context);
 
+  // Release all cached shaders. Must be called while a valid GL context is
+  // current, before destroying or switching GL contexts, to ensure shader
+  // deletion happens against the correct context.
+  void clear()
+  {
+    m_shaders.clear();
+  }
+
 private:
   struct ShaderKey
   {

@@ -852,9 +852,9 @@ void ZVulkanImgRaycasterPipelineContext::ensureProgressiveLayerTargets(const glm
                                depthRange);
     m_progressiveLayerDepth->transitionLayout(cmd,
                                               vk::ImageLayout::eTransferDstOptimal,
-                                              vk::ImageLayout::eShaderReadOnlyOptimal,
+                                              vk::ImageLayout::eDepthReadOnlyOptimal,
                                               vk::ImageAspectFlagBits::eDepth);
-    m_progressiveLayerDepth->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+    m_progressiveLayerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
   }
 
   m_progressiveGeneration = generation;
@@ -1510,8 +1510,9 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     if (layerDepth) {
       layerDepth->transitionLayout(cmd,
                                    vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                                   vk::ImageLayout::eShaderReadOnlyOptimal);
-      layerDepth->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+                                   vk::ImageLayout::eDepthReadOnlyOptimal,
+                                   vk::ImageAspectFlagBits::eDepth);
+      layerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
     }
   }
 
@@ -1641,10 +1642,13 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   // Ensure previous-round data is ready for sampling.
   entryTexture->transitionLayout(cmd, entryTexture->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   lastColor->transitionLayout(cmd, lastColor->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
-  lastDepth->transitionLayout(cmd, lastDepth->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
+  lastDepth->transitionLayout(cmd,
+                              lastDepth->layout(),
+                              vk::ImageLayout::eDepthReadOnlyOptimal,
+                              vk::ImageAspectFlagBits::eDepth);
   entryTexture->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
   lastColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-  lastDepth->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+  lastDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
 
   updateChannelFastDescriptors(resources,
                                payload,
@@ -1883,9 +1887,9 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
   layerDepth->transitionLayout(cmd,
                                vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                               vk::ImageLayout::eShaderReadOnlyOptimal,
+                               vk::ImageLayout::eDepthReadOnlyOptimal,
                                vk::ImageAspectFlagBits::eDepth);
-  layerDepth->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+  layerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
 
   auto buildColorAttachment = [&](const AttachmentDesc& attachment)
     -> std::optional<vk::RenderingAttachmentInfo> {

@@ -5,6 +5,7 @@
 #include "zexception.h"
 #include "zlog.h"
 
+#include <unordered_map>
 #include <algorithm>
 #include <cstring>
 
@@ -221,6 +222,7 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createIn
   , m_aspectMask(createInfo.aspectMask == vk::ImageAspectFlags{} ? defaultAspectMask(createInfo.format)
                                                                   : createInfo.aspectMask)
   , m_descriptorLayout(createInfo.descriptorLayout)
+  , m_descriptorAspectMask(m_aspectMask)
   , m_currentLayout(createInfo.initialLayout)
 {
   createImage();
@@ -229,6 +231,8 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createIn
   createSampler();
   if (m_arrayLayers > 1u) {
     m_layerImageViews.resize(m_arrayLayers);
+    m_layerDepthViews.resize(m_arrayLayers);
+    m_layerStencilViews.resize(m_arrayLayers);
   }
   LOG(INFO) << "ZVulkanTexture created: " << m_extent.width << "x" << m_extent.height << "x" << m_extent.depth
             << " layers=" << m_arrayLayers;
@@ -247,11 +251,7 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device,
   : ZVulkanTexture(device, CreateInfo::make2D(width, height, format, usage, memoryProperties))
 {}
 
-ZVulkanTexture::~ZVulkanTexture()
-{
-  LOG(INFO) << "Destroying ZVulkanTexture";
-}
-
+ZVulkanTexture::~ZVulkanTexture() = default;
 // ----- Public API -----------------------------------------------------------------------------
 
 void ZVulkanTexture::uploadData(const void* data, size_t size)
@@ -299,7 +299,10 @@ void ZVulkanTexture::downloadData(void* data, size_t size)
                                     m_createInfo.imageType == vk::ImageType::e3D ? m_extent.depth : 1u};
 
   cmdBuffer.copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
-  transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, originalLayout, m_aspectMask);
+  // Do not transition back to an undefined layout; use GENERAL if the prior layout was undefined.
+  const vk::ImageLayout restoreLayout =
+    (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
+  transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, m_aspectMask);
   m_device.endSingleTimeCommands(cmdBuffer);
 
   void* mapped = stagingBuffer->map(0, size);
@@ -339,7 +342,9 @@ void ZVulkanTexture::downloadSubImage(void* data,
   region.imageExtent = extent;
 
   cmdBuffer.copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
-  transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, originalLayout, aspect);
+  const vk::ImageLayout restoreLayout =
+    (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
+  transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, aspect);
   m_device.endSingleTimeCommands(cmdBuffer);
 
   void* mapped = stagingBuffer->map(0, size);
@@ -381,13 +386,25 @@ void ZVulkanTexture::transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
 
 vk::DescriptorImageInfo ZVulkanTexture::descriptorInfo() const
 {
+  return descriptorInfo(m_descriptorLayout, m_descriptorAspectMask);
+}
+
+vk::DescriptorImageInfo ZVulkanTexture::descriptorInfo(vk::ImageLayout layoutOverride,
+                                                       vk::ImageAspectFlags aspectOverride) const
+{
   if (!m_imageView) {
     throw ZException("Descriptor info requested before image view creation");
   }
 
+  const vk::ImageAspectFlags resolvedAspect =
+    (aspectOverride == vk::ImageAspectFlags{}) ? m_descriptorAspectMask : aspectOverride;
+
   vk::DescriptorImageInfo info{};
-  info.imageView = *m_imageView;
-  info.imageLayout = m_descriptorLayout;
+  info.imageView = imageViewForAspect(resolvedAspect);
+  info.imageLayout = layoutOverride;
+  if (info.imageLayout == vk::ImageLayout::eUndefined) {
+    info.imageLayout = m_descriptorLayout;
+  }
   info.sampler = m_sampler ? **m_sampler : vk::Sampler{};
   return info;
 }
@@ -395,6 +412,28 @@ vk::DescriptorImageInfo ZVulkanTexture::descriptorInfo() const
 void ZVulkanTexture::setDescriptorLayout(vk::ImageLayout layout)
 {
   m_descriptorLayout = layout;
+
+  switch (layout) {
+    case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
+    case vk::ImageLayout::eDepthReadOnlyOptimal:
+      setDescriptorAspect(vk::ImageAspectFlagBits::eDepth);
+      break;
+    case vk::ImageLayout::eStencilReadOnlyOptimal:
+      setDescriptorAspect(vk::ImageAspectFlagBits::eStencil);
+      break;
+    default:
+      setDescriptorAspect(vk::ImageAspectFlags{});
+      break;
+  }
+}
+
+void ZVulkanTexture::setDescriptorAspect(vk::ImageAspectFlags aspect)
+{
+  if (aspect == vk::ImageAspectFlags{} || (aspect & m_aspectMask) != aspect) {
+    m_descriptorAspectMask = m_aspectMask;
+  } else {
+    m_descriptorAspectMask = aspect;
+  }
 }
 
 vk::Sampler ZVulkanTexture::sampler() const
@@ -402,31 +441,113 @@ vk::Sampler ZVulkanTexture::sampler() const
   return m_sampler ? **m_sampler : vk::Sampler{};
 }
 
-vk::ImageView ZVulkanTexture::layerImageView(uint32_t layer) const
+vk::ImageView ZVulkanTexture::layerImageView(uint32_t layer, vk::ImageAspectFlags aspect) const
 {
   if (m_arrayLayers <= 1u) {
-    return m_imageView ? **m_imageView : vk::ImageView{};
+    return imageViewForAspect(aspect);
   }
   if (!m_image || !m_imageView || layer >= m_arrayLayers) {
     return vk::ImageView{};
   }
-  if (m_layerImageViews.empty()) {
-    m_layerImageViews.resize(m_arrayLayers);
-  }
-  if (!m_layerImageViews[layer].has_value()) {
+
+  const vk::ImageAspectFlags resolvedAspect =
+    (aspect == vk::ImageAspectFlags{}) ? m_descriptorAspectMask : aspect;
+
+  auto ensureCacheSized = [&](auto& cache) {
+    if (cache.empty()) {
+      cache.resize(m_arrayLayers);
+    }
+  };
+
+  auto& cache = [&]() -> std::vector<std::optional<vk::raii::ImageView>>& {
+    if (resolvedAspect == vk::ImageAspectFlagBits::eDepth) {
+      ensureCacheSized(m_layerDepthViews);
+      return m_layerDepthViews;
+    }
+    if (resolvedAspect == vk::ImageAspectFlagBits::eStencil) {
+      ensureCacheSized(m_layerStencilViews);
+      return m_layerStencilViews;
+    }
+    ensureCacheSized(m_layerImageViews);
+    return m_layerImageViews;
+  }();
+
+  if (!cache[layer].has_value()) {
     vk::ImageViewCreateInfo viewInfo{};
     viewInfo.image = **m_image;
     viewInfo.viewType = vk::ImageViewType::e2D;
     viewInfo.format = m_format;
     viewInfo.components = vk::ComponentMapping{};
-    viewInfo.subresourceRange.aspectMask = m_aspectMask;
+    vk::ImageAspectFlags subresourceAspect =
+      (resolvedAspect == vk::ImageAspectFlags{}) ? m_descriptorAspectMask : resolvedAspect;
+    if (subresourceAspect == vk::ImageAspectFlags{}) {
+      subresourceAspect = m_aspectMask;
+    }
+    viewInfo.subresourceRange.aspectMask = subresourceAspect;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = m_mipLevels;
     viewInfo.subresourceRange.baseArrayLayer = layer;
     viewInfo.subresourceRange.layerCount = 1;
-    m_layerImageViews[layer].emplace(m_device.context().device(), viewInfo);
+    cache[layer].emplace(m_device.context().device(), viewInfo);
   }
-  return **m_layerImageViews[layer];
+  return **cache[layer];
+}
+
+vk::ImageView ZVulkanTexture::imageViewForAspect(vk::ImageAspectFlags aspect) const
+{
+  if (!m_imageView) {
+    return vk::ImageView{};
+  }
+
+  vk::ImageAspectFlags resolvedAspect = (aspect == vk::ImageAspectFlags{}) ? m_descriptorAspectMask : aspect;
+  if (resolvedAspect == vk::ImageAspectFlags{}) {
+    resolvedAspect = m_aspectMask;
+  }
+
+  if (resolvedAspect == m_aspectMask) {
+    return **m_imageView;
+  }
+
+  if ((resolvedAspect & m_aspectMask) != resolvedAspect) {
+    // Requested aspect not compatible; fall back to default view.
+    return **m_imageView;
+  }
+
+  auto buildView = [&](vk::ImageAspectFlags aspectMask) {
+    vk::ImageViewCreateInfo viewInfo{};
+    viewInfo.image = **m_image;
+    viewInfo.viewType = m_createInfo.viewType;
+    viewInfo.format = m_format;
+    viewInfo.components = vk::ComponentMapping{};
+    viewInfo.subresourceRange.aspectMask = aspectMask;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = m_mipLevels;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = m_arrayLayers;
+    return vk::raii::ImageView(m_device.context().device(), viewInfo);
+  };
+
+  if (resolvedAspect == vk::ImageAspectFlagBits::eDepth) {
+    if (!m_depthAspectView.has_value()) {
+      m_depthAspectView.emplace(buildView(resolvedAspect));
+    }
+    return **m_depthAspectView;
+  }
+
+  if (resolvedAspect == vk::ImageAspectFlagBits::eStencil) {
+    if (!m_stencilAspectView.has_value()) {
+      m_stencilAspectView.emplace(buildView(resolvedAspect));
+    }
+    return **m_stencilAspectView;
+  }
+
+  // Fallback: rebuild view for requested aspect on the fly.
+  const uint32_t aspectKey = static_cast<uint32_t>(resolvedAspect);
+  auto iter = m_genericAspectViews.find(aspectKey);
+  if (iter == m_genericAspectViews.end()) {
+    iter = m_genericAspectViews.emplace(aspectKey, buildView(resolvedAspect)).first;
+  }
+  return *iter->second;
 }
 
 // ----- Private helpers ------------------------------------------------------------------------

@@ -22,11 +22,6 @@ ZVulkanBuffer::ZVulkanBuffer(ZVulkanDevice& device,
   LOG(INFO) << "ZVulkanBuffer created: " << size << " bytes";
 }
 
-ZVulkanBuffer::~ZVulkanBuffer()
-{
-  LOG(INFO) << "Destroying ZVulkanBuffer";
-}
-
 void ZVulkanBuffer::createBuffer()
 {
   vk::BufferCreateInfo bufferInfo{.size = m_size, .usage = m_usage, .sharingMode = vk::SharingMode::eExclusive};

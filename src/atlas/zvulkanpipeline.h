@@ -16,7 +16,6 @@ public:
                   ZVulkanShader& shader,
                   const vk::PipelineVertexInputStateCreateInfo& vertexInputInfo,
                   const vk::PrimitiveTopology& topology = vk::PrimitiveTopology::eTriangleList);
-  ~ZVulkanPipeline();
 
   vk::Pipeline pipeline() const
   {

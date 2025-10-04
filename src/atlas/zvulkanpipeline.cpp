@@ -19,14 +19,7 @@ ZVulkanPipeline::ZVulkanPipeline(ZVulkanDevice& device,
   , m_shader(shader)
   , m_vertexInputInfo(vertexInputInfo)
   , m_topology(topology)
-{
-  LOG(INFO) << "ZVulkanPipeline created";
-}
-
-ZVulkanPipeline::~ZVulkanPipeline()
-{
-  LOG(INFO) << "Destroying ZVulkanPipeline";
-}
+{}
 
 void ZVulkanPipeline::setDescriptorSetLayouts(const std::vector<vk::DescriptorSetLayout>& layouts)
 {
@@ -95,8 +88,7 @@ void ZVulkanPipeline::setColorBlendAttachments(std::vector<vk::PipelineColorBlen
   m_colorBlendAttachments = std::move(attachments);
 }
 
-void ZVulkanPipeline::setAttachmentFormats(std::vector<vk::Format> colorFormats,
-                                           std::optional<vk::Format> depthFormat)
+void ZVulkanPipeline::setAttachmentFormats(std::vector<vk::Format> colorFormats, std::optional<vk::Format> depthFormat)
 {
   m_colorAttachmentFormats = std::move(colorFormats);
   m_depthAttachmentFormat = std::move(depthFormat);

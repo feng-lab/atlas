@@ -23,15 +23,6 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
 {
   createResources(m_rendererBase.activeBackend());
 
-  QStringList allshaders;
-  allshaders << "almag.vert"
-             << "almag_func.frag";
-  QStringList normalShaders;
-  normalShaders << "almag.vert"
-                << "almag.frag";
-  m_fontShaderGrp->init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
-  m_fontShaderGrp->addAllSupportedPostShaders();
-
   // search for available fonts
   QDir fontDir(ZSystemInfo::instance().fontPath());
   QStringList filters;
@@ -406,6 +397,15 @@ void Z3DFontRenderer::createResources(RenderBackend backend)
   m_VAO = std::make_unique<Z3DVertexArrayObject>(1);
   m_VBOs = std::make_unique<Z3DVertexBufferObject>(4);
   m_pickingVBOs = std::make_unique<Z3DVertexBufferObject>(4);
+
+  QStringList allshaders;
+  allshaders << "almag.vert"
+             << "almag_func.frag";
+  QStringList normalShaders;
+  normalShaders << "almag.vert"
+                << "almag.frag";
+  m_fontShaderGrp->init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
+  m_fontShaderGrp->addAllSupportedPostShaders();
 
   m_dataChanged = true;
   m_pickingDataChanged = true;

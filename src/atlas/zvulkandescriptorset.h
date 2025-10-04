@@ -12,7 +12,6 @@ class ZVulkanDescriptorSet
 {
 public:
   ZVulkanDescriptorSet(ZVulkanDevice& device, vk::raii::DescriptorSet&& descriptorSet);
-  ~ZVulkanDescriptorSet();
 
   void updateUniformBuffer(uint32_t binding, ZVulkanBuffer& buffer);
   void updateTexture(uint32_t binding, ZVulkanTexture& texture);

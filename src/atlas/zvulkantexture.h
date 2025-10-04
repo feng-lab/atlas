@@ -3,6 +3,7 @@
 #include "zvulkan.h"
 #include <memory>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 #include <cstddef>
 
@@ -138,7 +139,18 @@ public:
                         vk::ImageAspectFlags aspectMask = {});
 
   vk::DescriptorImageInfo descriptorInfo() const;
+  vk::DescriptorImageInfo descriptorInfo(vk::ImageLayout layoutOverride,
+                                         vk::ImageAspectFlags aspectOverride) const;
   void setDescriptorLayout(vk::ImageLayout layout);
+  void setDescriptorAspect(vk::ImageAspectFlags aspect);
+  vk::ImageLayout descriptorLayout() const
+  {
+    return m_descriptorLayout;
+  }
+  vk::ImageAspectFlags descriptorAspect() const
+  {
+    return m_descriptorAspectMask;
+  }
 
   uint32_t width() const
   {
@@ -173,7 +185,7 @@ public:
     return m_currentLayout;
   }
   vk::Sampler sampler() const;
-  vk::ImageView layerImageView(uint32_t layer) const;
+  vk::ImageView layerImageView(uint32_t layer, vk::ImageAspectFlags aspect = {}) const;
   uint32_t mipLevels() const
   {
     return m_mipLevels;
@@ -197,6 +209,7 @@ private:
   void createSampler();
   vk::Extent3D mipExtent(uint32_t mipLevel) const;
   void uploadInternal(const void* data, size_t size, const UploadRegion& region);
+  vk::ImageView imageViewForAspect(vk::ImageAspectFlags aspect) const;
 
   ZVulkanDevice& m_device;
   CreateInfo m_createInfo;
@@ -208,11 +221,17 @@ private:
   vk::MemoryPropertyFlags m_memoryProperties;
   vk::ImageAspectFlags m_aspectMask;
   vk::ImageLayout m_descriptorLayout;
+  vk::ImageAspectFlags m_descriptorAspectMask;
   std::optional<vk::raii::Image> m_image;
   std::optional<vk::raii::DeviceMemory> m_imageMemory;
   std::optional<vk::raii::ImageView> m_imageView;
   std::optional<vk::raii::Sampler> m_sampler;
+  mutable std::optional<vk::raii::ImageView> m_depthAspectView;
+  mutable std::optional<vk::raii::ImageView> m_stencilAspectView;
   mutable std::vector<std::optional<vk::raii::ImageView>> m_layerImageViews;
+  mutable std::vector<std::optional<vk::raii::ImageView>> m_layerDepthViews;
+  mutable std::vector<std::optional<vk::raii::ImageView>> m_layerStencilViews;
+  mutable std::unordered_map<uint32_t, vk::raii::ImageView> m_genericAspectViews;
   vk::ImageLayout m_currentLayout = vk::ImageLayout::eUndefined;
 };
 

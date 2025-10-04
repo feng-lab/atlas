@@ -360,8 +360,14 @@ private:
   // Set true during destruction to ignore late events and postings
   std::atomic_bool m_shuttingDown = false;
 
+  // gl surface/context
   std::unique_ptr<QOffscreenSurface> m_offscreenSurface;
   std::unique_ptr<Z3DContext> m_context;
+
+  // Vulkan context/device owned at engine level (mirrors GL ownership)
+  std::unique_ptr<ZVulkanContext> m_vkContext;
+  std::unique_ptr<ZVulkanDevice> m_vkDevice;
+
   ZDoc& m_doc;
 
   QPointer<Z3DCanvas> m_canvas;
@@ -394,9 +400,7 @@ private:
 
   // (m_observedWGs and m_shuttingDown declared above to ensure lifetime beyond compositor)
 
-  // Vulkan context/device owned at engine level (mirrors GL ownership)
-  std::unique_ptr<ZVulkanContext> m_vkContext;
-  std::unique_ptr<ZVulkanDevice> m_vkDevice;
+
 };
 
 } // namespace nim

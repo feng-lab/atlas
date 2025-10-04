@@ -189,13 +189,17 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
 
   // Glow renderer is compositor-owned; parameters are synced from filters per-draw
 
-  m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
+  m_waFinalShader = std::make_unique<Z3DShaderProgram>();
+  m_waFinalShader->loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
 
-  m_wbFinalShader.loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
+  m_wbFinalShader = std::make_unique<Z3DShaderProgram>();
+  m_wbFinalShader->loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
 
-  m_ddpBlendShader.loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
+  m_ddpBlendShader = std::make_unique<Z3DShaderProgram>();
+  m_ddpBlendShader->loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
 
-  m_ddpFinalShader.loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
+  m_ddpFinalShader = std::make_unique<Z3DShaderProgram>();
+  m_ddpFinalShader->loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
 
   ensurePickingTarget(glm::uvec2(32u, 32u));
   addInteractionHandler(globalParas.interactionHandler);
@@ -1347,6 +1351,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       Z3DCompositorPass pass;
       pass.targetLease = sceneOutLease;
       pass.surface = m_rendererBase.describeSurface(*sceneOutLease);
+      LOG(INFO) << "renderGeometries pass surface colors=" << pass.surface.colorAttachments.size()
+                << " depth=" << pass.surface.depthAttachment.has_value();
       pass.eye = eye;
       pass.transparency = transparencyMode;
       pass.msaaMode = m_rendererBase.sceneState().multisample;
@@ -1842,9 +1848,32 @@ void Z3DCompositor::updateSize()
 void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
 {
   auto ensureLease = [&](Z3DScratchResourcePool::RenderTargetLease& lease) {
-    if (!lease.renderTarget || lease.renderTarget->size() != size) {
+    const RenderBackend activeBackend = m_rendererBase.activeBackend();
+    const bool hasVulkanImage = lease.vulkanImage != nullptr;
+    const bool hasGLTarget = lease.renderTarget != nullptr;
+
+    bool sizeMismatch = false;
+    if (activeBackend == RenderBackend::Vulkan && hasVulkanImage) {
+      const auto& descriptorSize = lease.descriptor.size;
+      sizeMismatch = descriptorSize.x != size.x || descriptorSize.y != size.y;
+    } else if (activeBackend == RenderBackend::OpenGL && hasGLTarget) {
+      sizeMismatch = lease.renderTarget->size() != size;
+    }
+
+    const bool backendMismatch = lease.backend != activeBackend;
+    const bool missingResource =
+      (activeBackend == RenderBackend::Vulkan && !hasVulkanImage) ||
+      (activeBackend == RenderBackend::OpenGL && !hasGLTarget);
+
+    if (missingResource || backendMismatch || sizeMismatch) {
       lease.release();
       m_rendererBase.acquirePersistentTempRenderTarget2D(lease, size);
+      LOG(INFO) << fmt::format("ensureOutputTargets reacquired {}x{} backend={} hasVulkanImage={} hasGLTarget={}",
+                               size.x,
+                               size.y,
+                               lease.backend == RenderBackend::Vulkan ? "Vulkan" : "OpenGL",
+                               lease.vulkanImage != nullptr,
+                               lease.renderTarget != nullptr);
     }
   };
 
@@ -1857,6 +1886,38 @@ void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
 void Z3DCompositor::switchBackend(RenderBackend backendRequest)
 {
   Z3DBoundedFilter::switchRendererBackend(backendRequest);
+
+  // If switching away from OpenGL, proactively dispose compositor-owned GL
+  // shader programs while a valid GL context is current to avoid deleting
+  // them later against a different or missing context.
+  if (backendRequest == RenderBackend::Vulkan) {
+    m_ddpBlendShader.reset();
+    m_ddpFinalShader.reset();
+    m_waFinalShader.reset();
+    m_wbFinalShader.reset();
+  }
+
+  // Extra safety: if switching to OpenGL, clear any lingering Vulkan
+  // picking attachments so picking paths won’t accidentally try to read
+  // from stale Vulkan textures.
+  if (backendRequest == RenderBackend::OpenGL) {
+    m_globalParameters.setPickingTargetVulkan(nullptr, nullptr, glm::uvec2(0u, 0u));
+    // Optionally reacquire a GL picking target immediately.
+    ensurePickingTarget(m_outputSize);
+
+    // Rebuild compositor-owned GL shader programs in the new context.
+    m_ddpBlendShader = std::make_unique<Z3DShaderProgram>();
+    m_ddpBlendShader->loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
+
+    m_ddpFinalShader = std::make_unique<Z3DShaderProgram>();
+    m_ddpFinalShader->loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
+
+    m_waFinalShader = std::make_unique<Z3DShaderProgram>();
+    m_waFinalShader->loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
+
+    m_wbFinalShader = std::make_unique<Z3DShaderProgram>();
+    m_wbFinalShader->loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
+  }
 
   std::unordered_set<Z3DBoundedFilter*> seen;
   auto registerFilter = [&](Z3DBoundedFilter* filter) {
@@ -2406,15 +2467,15 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
       glBeginQuery(GL_SAMPLES_PASSED, queryId);
     }
 
-    m_ddpBlendShader.bind();
-    m_ddpBlendShader.bindTexture("TempTex", g_dualBackTempTexId[currId]);
+    m_ddpBlendShader->bind();
+    m_ddpBlendShader->bindTexture("TempTex", g_dualBackTempTexId[currId]);
     const glm::uvec2 ddpBlendSize = ddpRT.size();
     const glm::vec2 ddpBlendScreenDimRcp(ddpBlendSize.x > 0u ? 1.f / static_cast<float>(ddpBlendSize.x) : 0.f,
                                          ddpBlendSize.y > 0u ? 1.f / static_cast<float>(ddpBlendSize.y) : 0.f);
-    m_ddpBlendShader.setScreenDimRCPUniform(ddpBlendScreenDimRcp);
+    m_ddpBlendShader->setScreenDimRCPUniform(ddpBlendScreenDimRcp);
 
-    Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, m_ddpBlendShader);
-    m_ddpBlendShader.release();
+    Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_ddpBlendShader);
+    m_ddpBlendShader->release();
 
     if (g_useOQ) {
       glEndQuery(GL_SAMPLES_PASSED);
@@ -2454,18 +2515,18 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
 
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  m_ddpFinalShader.bind();
-  m_ddpFinalShader.bindTexture("DepthTex", g_depthTex);
-  m_ddpFinalShader.bindTexture("FrontBlenderTex", g_dualFrontBlenderTexId[currId]);
-  m_ddpFinalShader.bindTexture("BackBlenderTex", g_dualBackBlenderTexId);
+  m_ddpFinalShader->bind();
+  m_ddpFinalShader->bindTexture("DepthTex", g_depthTex);
+  m_ddpFinalShader->bindTexture("FrontBlenderTex", g_dualFrontBlenderTexId[currId]);
+  m_ddpFinalShader->bindTexture("BackBlenderTex", g_dualBackBlenderTexId);
 
   const glm::uvec2 ddpSize = ddpRT.size();
   const glm::vec2 ddpScreenDimRcp(ddpSize.x > 0u ? 1.f / static_cast<float>(ddpSize.x) : 0.f,
                                   ddpSize.y > 0u ? 1.f / static_cast<float>(ddpSize.y) : 0.f);
-  m_ddpFinalShader.setScreenDimRCPUniform(ddpScreenDimRcp);
+  m_ddpFinalShader->setScreenDimRCPUniform(ddpScreenDimRcp);
 
-  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, m_ddpFinalShader);
-  m_ddpFinalShader.release();
+  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_ddpFinalShader);
+  m_ddpFinalShader->release();
   glTarget->release();
 
   glEnable(GL_DEPTH_TEST);
@@ -2547,17 +2608,17 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
 
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  m_waFinalShader.bind();
-  m_waFinalShader.bindTexture("ColorTex0", g_accumulationTexId[0]);
-  m_waFinalShader.bindTexture("ColorTex1", g_accumulationTexId[1]);
+  m_waFinalShader->bind();
+  m_waFinalShader->bindTexture("ColorTex0", g_accumulationTexId[0]);
+  m_waFinalShader->bindTexture("ColorTex1", g_accumulationTexId[1]);
 
   const glm::uvec2 waSize = waRT.size();
   const glm::vec2 waScreenDimRcp(waSize.x > 0u ? 1.f / static_cast<float>(waSize.x) : 0.f,
                                  waSize.y > 0u ? 1.f / static_cast<float>(waSize.y) : 0.f);
-  m_waFinalShader.setScreenDimRCPUniform(waScreenDimRcp);
+  m_waFinalShader->setScreenDimRCPUniform(waScreenDimRcp);
 
-  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, m_waFinalShader);
-  m_waFinalShader.release();
+  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_waFinalShader);
+  m_waFinalShader->release();
   glTarget->release();
 
   glEnable(GL_DEPTH_TEST);
@@ -2644,17 +2705,17 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
 
   glTarget->bind();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  m_wbFinalShader.bind();
-  m_wbFinalShader.bindTexture("ColorTex0", g_accumulationTexId[0]);
-  m_wbFinalShader.bindTexture("ColorTex1", g_accumulationTexId[1]);
+  m_wbFinalShader->bind();
+  m_wbFinalShader->bindTexture("ColorTex0", g_accumulationTexId[0]);
+  m_wbFinalShader->bindTexture("ColorTex1", g_accumulationTexId[1]);
 
   const glm::uvec2 wbSize = wbRT.size();
   const glm::vec2 wbScreenDimRcp(wbSize.x > 0u ? 1.f / static_cast<float>(wbSize.x) : 0.f,
                                  wbSize.y > 0u ? 1.f / static_cast<float>(wbSize.y) : 0.f);
-  m_wbFinalShader.setScreenDimRCPUniform(wbScreenDimRcp);
+  m_wbFinalShader->setScreenDimRCPUniform(wbScreenDimRcp);
 
-  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, m_wbFinalShader);
-  m_wbFinalShader.release();
+  Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_wbFinalShader);
+  m_wbFinalShader->release();
   glTarget->release();
 
   glEnable(GL_DEPTH_TEST);

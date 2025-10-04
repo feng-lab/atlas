@@ -13,14 +13,7 @@ namespace nim {
 ZVulkanDescriptorSet::ZVulkanDescriptorSet(ZVulkanDevice& device, vk::raii::DescriptorSet&& descriptorSet)
   : m_device(device)
   , m_descriptorSet(std::move(descriptorSet))
-{
-  LOG(INFO) << "ZVulkanDescriptorSet created";
-}
-
-ZVulkanDescriptorSet::~ZVulkanDescriptorSet()
-{
-  LOG(INFO) << "Destroying ZVulkanDescriptorSet";
-}
+{}
 
 void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& buffer)
 {

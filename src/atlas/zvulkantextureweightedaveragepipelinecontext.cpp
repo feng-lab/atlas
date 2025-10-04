@@ -12,6 +12,7 @@
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbuffer.h"
+#include "zvulkanuniforms.h"
 #include "zlog.h"
 
 #include <array>
@@ -110,6 +111,17 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
     constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
   }
 
+  // Ensure and update OIT params UBO (set = 3)
+  ensureDescriptorLayout();
+  ensureDescriptorPool();
+  ensureOITResources();
+  updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
+  if (m_descriptorSetOIT && m_uboOIT) {
+    m_descriptorSetOIT->updateUniformBuffer(0, *m_uboOIT);
+    std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 3, sets3, {});
+  }
+
   cmd.pushConstants<WeightedAveragePushConstants>(instance.pipeline->pipelineLayout(),
                                                   vk::ShaderStageFlagBits::eFragment,
                                                   0,
@@ -120,26 +132,38 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
 
 void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorLayout()
 {
-  if (m_setLayout) {
-    return;
-  }
-
   auto& device = m_backend.device();
   auto& vkDevice = device.context().device();
 
-  std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-    vk::DescriptorSetLayoutBinding{.binding = 0,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment},
-    vk::DescriptorSetLayoutBinding{.binding = 1,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+  if (!m_setLayout) {
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
 
-  vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                               .pBindings = bindings.data()};
-  m_setLayout.emplace(vkDevice, createInfo);
+    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                                 .pBindings = bindings.data()};
+    m_setLayout.emplace(vkDevice, createInfo);
+  }
+
+  if (!m_setPlaceholder) {
+    vk::DescriptorSetLayoutCreateInfo emptyInfo{.bindingCount = 0, .pBindings = nullptr};
+    m_setPlaceholder.emplace(vkDevice, emptyInfo);
+  }
+
+  if (!m_setOIT) {
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
+    m_setOIT.emplace(vkDevice, info);
+  }
 }
 
 void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorPool()
@@ -158,6 +182,55 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorSet()
     auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_setLayout);
     m_descriptorSet = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
   }
+
+  if (!m_descriptorSetOIT && m_setOIT) {
+    auto oitSet = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
+    m_descriptorSetOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(oitSet));
+  }
+}
+
+void ZVulkanTextureWeightedAveragePipelineContext::ensureOITResources()
+{
+  if (!m_uboOIT) {
+    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
+                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_descriptorSetOIT && m_setOIT) {
+    auto ds = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
+    m_descriptorSetOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(ds));
+  }
+}
+
+void ZVulkanTextureWeightedAveragePipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
+                                                                     const RenderBatch&,
+                                                                     const glm::vec2& fallbackScreenDimRcp)
+{
+  if (!m_uboOIT) {
+    return;
+  }
+  OITParamsUBOStd140 oit{};
+
+  glm::vec2 rcp = fallbackScreenDimRcp;
+  if (!(rcp.x > 0.0f && rcp.y > 0.0f)) {
+    const auto& viewportState = renderer.frameState().viewport;
+    const float w = static_cast<float>(viewportState.z);
+    const float h = static_cast<float>(viewportState.w);
+    if (w > 0.0f && h > 0.0f) {
+      rcp = glm::vec2(1.0f / w, 1.0f / h);
+    }
+  }
+  oit.screen_dim_RCP = rcp;
+
+  const float n = renderer.viewState().nearClip;
+  const float f = renderer.viewState().farClip;
+  const float denom = std::max(f - n, 1e-6f);
+  oit.ze_to_zw_a = (f * n) / denom;
+  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
+  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
+
+  m_uboOIT->copyData(&oit, sizeof(oit));
 }
 
 vk::PipelineVertexInputStateCreateInfo
@@ -235,7 +308,9 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  instance.pipeline->setDescriptorSetLayouts({**m_setLayout});
+  // Sets: 0 = images, 1/2 = placeholders, 3 = OIT params
+  std::vector<vk::DescriptorSetLayout> layouts{**m_setLayout, **m_setPlaceholder, **m_setPlaceholder, **m_setOIT};
+  instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
@@ -260,4 +335,3 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
 }
 
 } // namespace nim
-

@@ -73,8 +73,12 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // for set 1/2 alignment
+  std::optional<vk::raii::DescriptorSetLayout> m_setOIT;         // set = 3
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
+  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT; // set = 3
+  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
@@ -83,6 +87,9 @@ private:
   void ensureDescriptorLayout();
   void ensureDescriptorPool();
   void ensureDescriptorSet();
+  void ensureOITResources();
+  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,
+                          const glm::vec2& fallbackScreenDimRcp);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
   void ensureVertexCapacity(size_t vertexCount);
   void uploadGeometry();
@@ -91,4 +98,3 @@ private:
 };
 
 } // namespace nim
-

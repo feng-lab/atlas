@@ -384,7 +384,7 @@ void ZVulkanContext::pickPhysicalDevice()
     auto features2 = physicalDevice.getFeatures2<vk::PhysicalDeviceFeatures2,
                                                  vk::PhysicalDeviceVulkan12Features,
                                                  vk::PhysicalDeviceVulkan13Features>();
-    const vk::PhysicalDeviceFeatures& physicalDeviceFeatures = features2.get<vk::PhysicalDeviceFeatures2>().features;
+    // const vk::PhysicalDeviceFeatures& physicalDeviceFeatures = features2.get<vk::PhysicalDeviceFeatures2>().features;
     const vk::PhysicalDeviceVulkan12Features& physicalDeviceVulkan12Features =
       features2.get<vk::PhysicalDeviceVulkan12Features>();
     const vk::PhysicalDeviceVulkan13Features& physicalDeviceVulkan13Features =
@@ -547,7 +547,7 @@ void ZVulkanContext::createLogicalDevice()
                                    vk::PhysicalDeviceVulkan13Features>();
   auto& physicalDeviceFeatures = features2.get<vk::PhysicalDeviceFeatures2>().features;
   auto& physicalDeviceVulkan12Features = features2.get<vk::PhysicalDeviceVulkan12Features>();
-  auto& physicalDeviceVulkan13Features = features2.get<vk::PhysicalDeviceVulkan13Features>();
+  // auto& physicalDeviceVulkan13Features = features2.get<vk::PhysicalDeviceVulkan13Features>();
 
   // Setup enabled features
   vk::
@@ -575,10 +575,15 @@ void ZVulkanContext::createLogicalDevice()
     // Enable Vulkan 1.3 features
     enabledPhysicalDeviceVulkan13Features.dynamicRendering = true;
     enabledPhysicalDeviceVulkan13Features.synchronization2 = true;
+    // Enable useful 1.2 features via the 1.2 struct in the chain when supported
+    enabledPhysicalDeviceVulkan12Features.separateDepthStencilLayouts =
+      physicalDeviceVulkan12Features.separateDepthStencilLayouts;
   } else {
     // For Vulkan 1.2, use extensions
     enabledPhysicalDeviceVulkan12Features.descriptorIndexing = true;
     enabledPhysicalDeviceVulkan12Features.bufferDeviceAddress = true;
+    enabledPhysicalDeviceVulkan12Features.separateDepthStencilLayouts =
+      physicalDeviceVulkan12Features.separateDepthStencilLayouts;
     enabledFeatures2.unlink<vk::PhysicalDeviceVulkan13Features>();
 
     auto deviceExtensionProperties = m_physicalDevices[0].enumerateDeviceExtensionProperties();

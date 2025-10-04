@@ -150,6 +150,19 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
   updateLightingUBO(renderer, batch, payload, pickingPass);
   updateTransformUBO(renderer, batch);
+  // Ensure OIT params UBO for shaders including include/oit_params.glslinc
+  ensureOITResources();
+  {
+    glm::vec2 extent = batch.pass.viewport.extent;
+    if (extent.x <= 0.0f || extent.y <= 0.0f) {
+      const auto& viewportState = renderer.frameState().viewport;
+      extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
+    }
+    glm::vec2 screenRcp = (extent.x > 0.0f && extent.y > 0.0f)
+                            ? glm::vec2(1.0f / extent.x, 1.0f / extent.y)
+                            : glm::vec2(0.0f);
+    updateOITParamsUBO(renderer, batch, screenRcp);
+  }
   ensureDescriptorSets();
   if (!pickingPass && m_dsTextures) {
     // Bind Vulkan-native texture if provided; otherwise placeholders remain bound.
@@ -302,10 +315,6 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
 void ZVulkanMeshPipelineContext::ensureDescriptorLayouts()
 {
-  if (m_setTextures && m_setLighting && m_setTransforms) {
-    return;
-  }
-
   auto& device = m_backend.device();
   auto& vkDevice = device.context().device();
 
@@ -358,6 +367,15 @@ void ZVulkanMeshPipelineContext::ensureDescriptorLayouts()
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setTransforms.emplace(vkDevice, createInfo);
+  }
+
+  if (!m_setOIT) {
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
+    m_setOIT.emplace(vkDevice, createInfo);
   }
 }
 
@@ -423,6 +441,11 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
     m_dsTransforms = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsTransforms));
   }
 
+  if (!m_dsOIT && m_setOIT) {
+    auto dsOit = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
+    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsOit));
+  }
+
   if (m_placeholder1D && m_placeholder2D && m_placeholder3D && m_dsTextures) {
     m_dsTextures->updateTexture(0, *m_placeholder1D);
     m_dsTextures->updateTexture(1, *m_placeholder2D);
@@ -438,6 +461,46 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
     m_dsTransforms->updateUniformBuffer(0, *m_uboTransforms);
     m_dsTransforms->updateUniformBuffer(1, *m_uboMaterial);
   }
+  if (m_dsOIT && m_uboOIT) {
+    m_dsOIT->updateUniformBuffer(0, *m_uboOIT);
+  }
+}
+
+void ZVulkanMeshPipelineContext::ensureOITResources()
+{
+  ensureDescriptorLayouts();
+  if (!m_descriptorPool) {
+    m_descriptorPool = m_backend.device().createDescriptorPool();
+  }
+  if (!m_uboOIT) {
+    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
+                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_dsOIT && m_setOIT) {
+    auto ds = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
+    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(ds));
+  }
+}
+
+void ZVulkanMeshPipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
+                                                    const RenderBatch& batch,
+                                                    const glm::vec2& fallbackScreenDimRcp)
+{
+  (void)batch;
+  if (!m_uboOIT) {
+    return;
+  }
+  OITParamsUBOStd140 oit{};
+  oit.screen_dim_RCP = fallbackScreenDimRcp;
+  const float n = renderer.viewState().nearClip;
+  const float f = renderer.viewState().farClip;
+  const float denom = std::max(f - n, 1e-6f);
+  oit.ze_to_zw_a = (f * n) / denom;
+  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
+  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
+  m_uboOIT->copyData(&oit, sizeof(oit));
 }
 
 void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
@@ -605,6 +668,10 @@ void ZVulkanMeshPipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd
                                         m_dsLighting->descriptorSet(),
                                         m_dsTransforms->descriptorSet()};
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
+  if (m_dsOIT) {
+    std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 3, sets3, {});
+  }
 }
 
 ZVulkanMeshPipelineContext::PipelineInstance&
@@ -682,7 +749,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key,
 
   auto vertexInput = makeMeshVertexInput();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, toVkTopology(key.meshType));
-  std::vector<vk::DescriptorSetLayout> layouts{**m_setTextures, **m_setLighting, **m_setTransforms};
+  std::vector<vk::DescriptorSetLayout> layouts{**m_setTextures, **m_setLighting, **m_setTransforms, **m_setOIT};
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);

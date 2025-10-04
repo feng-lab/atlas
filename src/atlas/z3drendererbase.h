@@ -286,6 +286,11 @@ public:
     m_collectOnly = v;
   }
 
+  [[nodiscard]] bool collectOnly() const
+  {
+    return m_collectOnly;
+  }
+
   void setShaderHookType(ShaderHookType t)
   {
     m_shaderHookType = t;

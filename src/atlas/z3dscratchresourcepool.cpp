@@ -239,13 +239,23 @@ vk::Format vkFormatFor(ScratchFormat format)
   return vk::Format::eR8G8B8A8Unorm;
 }
 
-vk::ImageAspectFlags vkAspectMaskFor(ScratchAttachmentKind kind)
+vk::ImageAspectFlags vkAspectMaskFor(ScratchAttachmentKind kind, vk::Format format)
 {
   switch (kind) {
     case ScratchAttachmentKind::Color:
       return vk::ImageAspectFlagBits::eColor;
-    case ScratchAttachmentKind::Depth:
-      return vk::ImageAspectFlagBits::eDepth;
+    case ScratchAttachmentKind::Depth: {
+      // Depth attachments that use a combined depth-stencil format must include both
+      // aspects in barriers and views unless separateDepthStencilLayouts is enabled.
+      switch (format) {
+        case vk::Format::eD16UnormS8Uint:
+        case vk::Format::eD24UnormS8Uint:
+        case vk::Format::eD32SfloatS8Uint:
+          return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+        default:
+          return vk::ImageAspectFlagBits::eDepth;
+      }
+    }
   }
   CHECK(false) << "Unhandled ScratchAttachmentKind";
   return vk::ImageAspectFlagBits::eColor;
@@ -270,7 +280,7 @@ ZVulkanTexture::CreateInfo makeVulkanTextureInfo(const ScratchImageDescriptor& d
 {
   const auto format = vkFormatFor(attachment.format);
   const auto usage = vkUsageFor(attachment);
-  const auto aspect = vkAspectMaskFor(attachment.kind);
+  const auto aspect = vkAspectMaskFor(attachment.kind, format);
   constexpr auto memory = vk::MemoryPropertyFlagBits::eDeviceLocal;
   constexpr bool createSampler = true;
   const auto descriptorLayout = vk::ImageLayout::eShaderReadOnlyOptimal;

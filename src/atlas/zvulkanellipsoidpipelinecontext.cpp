@@ -120,6 +120,10 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
                                           m_dsTransforms->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
   }
+  if (m_dsOIT) {
+    std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 3, sets3, {});
+  }
 
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
@@ -148,10 +152,6 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
 
 void ZVulkanEllipsoidPipelineContext::ensureDescriptorLayouts()
 {
-  if (m_setPlaceholder && m_setLighting && m_setTransforms) {
-    return;
-  }
-
   auto& device = m_backend.device();
   auto& vkDevice = device.context().device();
 
@@ -193,6 +193,15 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorLayouts()
                                                  .pBindings = bindings.data()};
     m_setTransforms.emplace(vkDevice, createInfo);
   }
+
+  if (!m_setOIT) {
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
+    m_setOIT.emplace(vkDevice, createInfo);
+  }
 }
 
 void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
@@ -216,6 +225,10 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
     auto dsTransforms = m_descriptorPool->allocateDescriptorSet(**m_setTransforms);
     m_dsTransforms = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsTransforms));
   }
+  if (!m_dsOIT && m_setOIT) {
+    auto dsOit = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
+    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsOit));
+  }
 
   ensurePlaceholderTexture();
   if (m_dsPlaceholder && m_placeholderTexture) {
@@ -231,6 +244,46 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
     m_dsTransforms->updateUniformBuffer(0, *m_uboTransforms);
     m_dsTransforms->updateUniformBuffer(1, *m_uboMaterial);
   }
+  if (m_dsOIT && m_uboOIT) {
+    m_dsOIT->updateUniformBuffer(0, *m_uboOIT);
+  }
+}
+
+void ZVulkanEllipsoidPipelineContext::ensureOITResources()
+{
+  ensureDescriptorLayouts();
+  if (!m_descriptorPool) {
+    m_descriptorPool = m_backend.device().createDescriptorPool();
+  }
+  if (!m_uboOIT) {
+    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
+                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_dsOIT && m_setOIT) {
+    auto ds = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
+    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(ds));
+  }
+}
+
+void ZVulkanEllipsoidPipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
+                                                         const RenderBatch& batch,
+                                                         const glm::vec2& screenDimRcp)
+{
+  (void)batch;
+  if (!m_uboOIT) {
+    return;
+  }
+  OITParamsUBOStd140 oit{};
+  oit.screen_dim_RCP = screenDimRcp;
+  const float n = renderer.viewState().nearClip;
+  const float f = renderer.viewState().farClip;
+  const float denom = std::max(f - n, 1e-6f);
+  oit.ze_to_zw_a = (f * n) / denom;
+  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
+  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
+  m_uboOIT->copyData(&oit, sizeof(oit));
 }
 
 void ZVulkanEllipsoidPipelineContext::ensurePlaceholderTexture()
@@ -444,7 +497,7 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key,
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
-  std::vector<vk::DescriptorSetLayout> layouts{**m_setPlaceholder, **m_setLighting, **m_setTransforms};
+  std::vector<vk::DescriptorSetLayout> layouts{**m_setPlaceholder, **m_setLighting, **m_setTransforms, **m_setOIT};
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);

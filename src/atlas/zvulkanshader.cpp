@@ -41,11 +41,6 @@ ZVulkanShader::ZVulkanShader(ZVulkanDevice& device,
   loadFromSPIRVFiles(vertexSpvPath, fragmentSpvPath, geometrySpvPath);
 }
 
-ZVulkanShader::~ZVulkanShader()
-{
-  LOG(INFO) << "Destroying ZVulkanShader";
-}
-
 vk::raii::ShaderModule ZVulkanShader::createShaderModule(const std::vector<uint32_t>& spirv) const
 {
   vk::ShaderModuleCreateInfo createInfo{.codeSize = spirv.size() * sizeof(uint32_t), .pCode = spirv.data()};

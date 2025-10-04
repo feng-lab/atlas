@@ -92,6 +92,18 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
 
   updateLightingUBO(renderer, batch, payload, pickingPass);
   updateTransformUBO(renderer, batch, payload, pickingPass);
+  // OIT params UBO for shaders including oit_params.glslinc
+  ensureOITResources();
+  {
+    glm::vec2 extent = batch.pass.viewport.extent;
+    if (extent.x <= 0.0f || extent.y <= 0.0f) {
+      const auto& viewportState = renderer.frameState().viewport;
+      extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
+    }
+    glm::vec2 screenRcp = (extent.x > 0.0f && extent.y > 0.0f) ? glm::vec2(1.0f / extent.x, 1.0f / extent.y)
+                                                              : glm::vec2(0.0f);
+    updateOITParamsUBO(renderer, batch, screenRcp);
+  }
   ensureDescriptorSets();
 
   if (m_dsPlaceholder) {
@@ -138,6 +150,10 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
                                           m_dsTransforms->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
   }
+  if (m_dsOIT) {
+    std::array<vk::DescriptorSet, 1> ds3{m_dsOIT->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 3, ds3, {});
+  }
 
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
@@ -169,10 +185,6 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
 
 void ZVulkanConePipelineContext::ensureDescriptorLayouts()
 {
-  if (m_setPlaceholder && m_setLighting && m_setTransforms) {
-    return;
-  }
-
   auto& device = m_backend.device();
   auto& vkDevice = device.context().device();
 
@@ -214,6 +226,15 @@ void ZVulkanConePipelineContext::ensureDescriptorLayouts()
                                                  .pBindings = bindings.data()};
     m_setTransforms.emplace(vkDevice, createInfo);
   }
+
+  if (!m_setOIT) {
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
+    m_setOIT.emplace(vkDevice, createInfo);
+  }
 }
 
 void ZVulkanConePipelineContext::ensureDescriptorSets()
@@ -238,6 +259,10 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
     auto dsTransforms = m_descriptorPool->allocateDescriptorSet(**m_setTransforms);
     m_dsTransforms = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsTransforms));
   }
+  if (!m_dsOIT && m_setOIT) {
+    auto dsOit = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
+    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsOit));
+  }
 
   ensurePlaceholderTexture();
   if (m_dsPlaceholder && m_placeholderTexture) {
@@ -253,6 +278,46 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
     m_dsTransforms->updateUniformBuffer(0, *m_uboTransforms);
     m_dsTransforms->updateUniformBuffer(1, *m_uboMaterial);
   }
+  if (m_dsOIT && m_uboOIT) {
+    m_dsOIT->updateUniformBuffer(0, *m_uboOIT);
+  }
+}
+
+void ZVulkanConePipelineContext::ensureOITResources()
+{
+  ensureDescriptorLayouts();
+  if (!m_descriptorPool) {
+    m_descriptorPool = m_backend.device().createDescriptorPool();
+  }
+  if (!m_uboOIT) {
+    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
+                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_dsOIT && m_setOIT) {
+    auto ds = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
+    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(ds));
+  }
+}
+
+void ZVulkanConePipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
+                                                    const RenderBatch& batch,
+                                                    const glm::vec2& screenDimRcp)
+{
+  (void)batch;
+  if (!m_uboOIT) {
+    return;
+  }
+  OITParamsUBOStd140 oit{};
+  oit.screen_dim_RCP = screenDimRcp;
+  const float n = renderer.viewState().nearClip;
+  const float f = renderer.viewState().farClip;
+  const float denom = std::max(f - n, 1e-6f);
+  oit.ze_to_zw_a = (f * n) / denom;
+  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
+  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
+  m_uboOIT->copyData(&oit, sizeof(oit));
 }
 
 void ZVulkanConePipelineContext::ensurePlaceholderTexture()
@@ -440,7 +505,7 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
-  std::vector<vk::DescriptorSetLayout> layouts{**m_setPlaceholder, **m_setLighting, **m_setTransforms};
+  std::vector<vk::DescriptorSetLayout> layouts{**m_setPlaceholder, **m_setLighting, **m_setTransforms, **m_setOIT};
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);

@@ -17,7 +17,6 @@ public:
                 const std::string& vertexSpvPath,
                 const std::string& fragmentSpvPath,
                 const std::optional<std::string>& geometrySpvPath = std::nullopt);
-  ~ZVulkanShader();
 
   void addStageFromSPIRVFile(const std::string& spvPath, vk::ShaderStageFlagBits stage);
   void addStageFromSPIRV(const std::vector<uint32_t>& spirv, vk::ShaderStageFlagBits stage);

@@ -11,7 +11,6 @@ class ZVulkanBuffer
 {
 public:
   ZVulkanBuffer(ZVulkanDevice& device, size_t size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
-  ~ZVulkanBuffer();
 
   vk::Buffer buffer() const
   {

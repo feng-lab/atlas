@@ -64,4 +64,13 @@ struct MaterialUBOStd140
   glm::vec4 custom_color{1.0f};
 };
 
+// Common OIT parameters UBO, mirrored from Resources/shader/vulkan/include/oit_params.glslinc
+struct OITParamsUBOStd140
+{
+  alignas(8) glm::vec2 screen_dim_RCP{0.0f};
+  alignas(4) float ze_to_zw_a = 0.0f;
+  alignas(4) float ze_to_zw_b = 0.0f;
+  alignas(4) float weighted_blended_depth_scale = 1.0f;
+};
+
 } // namespace nim
