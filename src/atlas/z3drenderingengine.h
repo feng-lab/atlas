@@ -211,6 +211,10 @@ public:
     m_globalParas->hasNewRendering = false;
   }
 
+  // Debug helpers to directly save compositor outputs (bypass local buffer)
+  void saveCurrentFrameColor(const QString& filename, Z3DEye eye = MonoEye);
+  void saveCurrentFrameDepth(const QString& filename, Z3DEye eye = MonoEye);
+
   void cancelLongRendering()
   {
     if (Z3DRenderGlobalState::instance().hasCancellationSource()) {

@@ -220,6 +220,7 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
     payload.meshPickingColors = spanOrEmpty(m_meshPickingColorsPt);
   }
   payload.texture = m_texture;
+  payload.textureHandle = m_textureHandle;
   payload.meshNeedsSplit = m_meshNeedSplit;
   payload.meshColorReady = m_meshColorReady;
   payload.meshPickingColorReady = m_meshPickingColorReady;

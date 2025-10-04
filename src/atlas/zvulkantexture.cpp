@@ -307,6 +307,46 @@ void ZVulkanTexture::downloadData(void* data, size_t size)
   stagingBuffer->unmap();
 }
 
+void ZVulkanTexture::downloadSubImage(void* data,
+                                      size_t size,
+                                      vk::Offset3D offset,
+                                      vk::Extent3D extent,
+                                      vk::ImageAspectFlags aspectMask)
+{
+  if (!data || size == 0) {
+    throw ZException("Invalid download buffer (subimage)");
+  }
+
+  auto stagingBuffer =
+    m_device.createBuffer(size,
+                          vk::BufferUsageFlagBits::eTransferDst,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+  auto originalLayout = m_currentLayout;
+  auto cmdBuffer = m_device.beginSingleTimeCommands();
+  const auto aspect = (aspectMask == vk::ImageAspectFlags{}) ? m_aspectMask : aspectMask;
+  transitionLayout(cmdBuffer, originalLayout, vk::ImageLayout::eTransferSrcOptimal, aspect);
+
+  vk::BufferImageCopy region{};
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+  region.imageSubresource.aspectMask = aspect;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.baseArrayLayer = 0;
+  region.imageSubresource.layerCount = 1;
+  region.imageOffset = offset;
+  region.imageExtent = extent;
+
+  cmdBuffer.copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
+  transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, originalLayout, aspect);
+  m_device.endSingleTimeCommands(cmdBuffer);
+
+  void* mapped = stagingBuffer->map(0, size);
+  std::memcpy(data, mapped, size);
+  stagingBuffer->unmap();
+}
+
 void ZVulkanTexture::transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
                                       vk::ImageLayout oldLayout,
                                       vk::ImageLayout newLayout,

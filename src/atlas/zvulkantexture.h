@@ -127,6 +127,11 @@ public:
   void uploadData(const void* data, size_t size, vk::ImageLayout finalLayout);
   void uploadSubImage(const void* data, size_t size, const UploadRegion& region);
   void downloadData(void* data, size_t size);
+  void downloadSubImage(void* data,
+                        size_t size,
+                        vk::Offset3D offset,
+                        vk::Extent3D extent,
+                        vk::ImageAspectFlags aspectMask = {});
   void transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
                         vk::ImageLayout oldLayout,
                         vk::ImageLayout newLayout,

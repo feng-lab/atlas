@@ -1447,6 +1447,24 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
   }
 }
 
+void Z3DRenderingEngine::saveCurrentFrameColor(const QString& filename, Z3DEye eye)
+{
+  if (!m_compositor) {
+    LOG(WARNING) << "Compositor not initialized";
+    return;
+  }
+  m_compositor->saveOutputColorToImage(filename, eye);
+}
+
+void Z3DRenderingEngine::saveCurrentFrameDepth(const QString& filename, Z3DEye eye)
+{
+  if (!m_compositor) {
+    LOG(WARNING) << "Compositor not initialized";
+    return;
+  }
+  m_compositor->saveOutputDepthToImage(filename, eye);
+}
+
 void Z3DRenderingEngine::resetOutputSizeToMatchCanvasSize()
 {
   if (m_canvas) {

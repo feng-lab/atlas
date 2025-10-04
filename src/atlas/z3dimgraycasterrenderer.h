@@ -163,6 +163,14 @@ public:
   // Release any scratch-pool backed targets retained across frames.
   void releaseScratchResources();
 
+  void releaseBackendResources() override
+  {
+    // Clear GL cache; textures will be deleted with unique_ptr
+    m_transferCache.textures.clear();
+    m_transferCache.meta.clear();
+    Z3DPrimitiveRenderer::releaseBackendResources();
+  }
+
 protected:
   void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader) const;
 
@@ -258,6 +266,15 @@ private:
   glm::uvec2 m_outputSize{32, 32};
 
   // Owned GL resources (moved from filter)
+  // GL LUT cache for transfer functions
+  struct TransferGLCache
+  {
+    std::unordered_map<const Z3DTransferFunction*, std::unique_ptr<Z3DTexture>> textures;
+    std::unordered_map<const Z3DTransferFunction*, std::pair<uint64_t, uint32_t>> meta; // generation, width
+  };
+  mutable TransferGLCache m_transferCache;
+
+  Z3DTexture* transferTextureGL(const Z3DTransferFunction& tf) const;
   // Layer textures
   // No per-renderer textures; entry/exit obtained from scratch pool
   Z3DTextureAndEyeCoordinateRenderer m_textureAndEyeCoordinateRenderer;

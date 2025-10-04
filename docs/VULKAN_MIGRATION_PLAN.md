@@ -8,8 +8,6 @@ This plan guides the migration of the Z3D OpenGL renderer to a Vulkan backend, i
 - Keep OpenGL running during migration; enable selecting backend for A/B comparison.
 - Adopt explicit, robust resource management, validation, and repeatable shader compilation to SPIR-V.
 - Maintain clean abstractions that mirror existing Z3D architecture to lower risk and churn.
-- Historical note: legacy `z3dvolume*` classes are no longer in use; all image/volume rendering paths live under the `z3dimg*` families and should remain the focus during migration.
-- **2025-05 update:** the `z3dvolume*` renderer stack is now scheduled for removal. Delete the remaining `Z3DVolumeSliceRenderer`, `Z3DImage2DRenderer`, and `Z3DVolumeRaycasterRenderer` implementations after the current Vulkan parity tasks land; migrate any lingering call sites to the `z3dimg*` renderers before cutting the code.
 - **2025-05 update:** Z3DCompositor keeps the original OpenGL rendering path intact. A dedicated Vulkan compositor implementation is being scaffolded (`processVulkan`) and will be wired up in subsequent steps using the existing scratch-pool lease APIs.
   - Status: Vulkan compositor now gathers per-filter image layers from each Z3DImgFilter’s Vulkan scratch leases and blends them with `ZVulkanTextureBlendPipelineContext` (MIP/DepthTestBlending parity). Filters render their final per-eye outputs into their own Vulkan leases; the compositor no longer renders image batches directly to the compositor surface.
 - Implementation language baseline is modern C++20; all new APIs should use standard library facilities (`std::span`, `std::variant`, etc.) rather than third-party helpers when equivalents exist.
@@ -152,9 +150,9 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
   - Add CPU-side unit hooks for the translator helpers to catch regressions without needing GL contexts.
 - **Implemented translators**
   - Lines, meshes, spheres, background quads, ellipsoids, and cones now publish Vulkan-ready batches. `ZVulkanSpherePipelineContext` mirrors the GL box-correction path and disables lighting during picking; `ZVulkanBackgroundPipelineContext` drives the pass shader via specialization constants and push constants; `ZVulkanConePipelineContext` covers all cap styles and reuses picking colours by toggling lighting/material state.
-  - Texture copy (colour + depth) now feeds Vulkan via `ZVulkanTextureCopyPipelineContext`, reusing the fullscreen quad geometry, the discard/divide/multiply specialization constants, and staging GL textures through a CPU readback/upload bridge until native Vulkan-backed attachments are available.
-  - Texture blend (dual colour/depth compositing) routes through `ZVulkanTextureBlendPipelineContext`, mapping the GL blend/priority modes onto a single specialization constant (`COMPOSE_MODE`) and uploading both layers’ textures via the same CPU bridge while we lack Vulkan-native render targets.
-- Texture glow (blur + compositing) executes the two-pass separable blur and final glow combine in `ZVulkanTextureGlowPipelineContext`, translating blur parameters into push constants and reusing CPU-uploaded textures alongside internally managed Vulkan scratch images for the intermediate glow map.
+  - Texture copy (colour + depth) now feeds Vulkan via `ZVulkanTextureCopyPipelineContext`, reusing the fullscreen quad geometry and discard/divide/multiply specialization constants. Inputs are Vulkan `AttachmentHandle`s from scratch-pool leases; no CPU GL↔Vulkan texture bridge is used.
+  - Texture blend (dual colour/depth compositing) routes through `ZVulkanTextureBlendPipelineContext`, mapping the GL blend/priority modes onto a single specialization constant (`COMPOSE_MODE`). Inputs are Vulkan `AttachmentHandle`s; no CPU upload bridge is used.
+- Texture glow (blur + compositing) executes the two-pass separable blur and final glow combine in `ZVulkanTextureGlowPipelineContext`, translating blur parameters into push constants and using Vulkan attachments end-to-end (temporary blur images are Vulkan scratch textures). No CPU upload bridge is used.
 - Volume slices now render through `ZVulkanImgSlicePipelineContext`, matching the GL block-ID paging flow, per-channel layer array merge, and fast-path descriptors via the shared upload helpers.
 - Volume raycaster fast-path renders through `ZVulkanImgRaycasterPipelineContext`, producing entry/exit layers and sampling transfer functions. The Vulkan path now mirrors the GL multi-channel merge, shading each channel into a layer array and resolving it via `image2d_array_compositor`; progressive paging rounds reuse the same layer aggregation so multi-channel progressive parity is available alongside the existing block-ID staging.
 
@@ -246,8 +244,80 @@ Status legend: [Done], [In‑Progress], [Todo], [Blocked]
 - Screenshot/readback (Vulkan) [Todo]
   - Readback from Vulkan output attachments for screenshots (mono/stereo, tiled).
 
-- CPU bridges removal [Todo]
-  - Confirm no GL texture bridges remain in compositor‑side Vulkan paths; remove any temporary CPU upload code once full attachment flow is in place.
+## 2025-10-04 Update
+
+- Final-frame handoff parity [Done]
+  - Vulkan compositor now downloads the final color attachment to the same CPU local buffer format as the GL path (BGRA8), swaps ready/current buffers, sets `hasNewRendering`, and emits `renderingFinished`. UI continues to render from local buffers unchanged.
+  - File refs: src/atlas/z3dcompositor.cpp (end of `processVulkan`)
+
+- Vulkan screenshots/readback [Done]
+  - Added helpers to save output color/depth directly from the compositor for both backends. Engine wrappers provided for convenience.
+  - Color: converts to planar RGBA with ZImg and flips Y to match GL.
+  - Depth: handles D32Sfloat (normalized) and D24UnormS8.
+  - File refs: src/atlas/z3dcompositor.cpp (saveOutputColorToImage/saveOutputDepthToImage),
+               src/atlas/z3drenderingengine.cpp (saveCurrentFrameColor/saveCurrentFrameDepth)
+
+- Backend switch ergonomics [Done]
+  - Centralized backend switch path: `Z3DRenderingEngine::applyBackendSwitch` resets the scratch pool, sets default backend, then calls `Z3DCompositor::switchBackend` which propagates to connected filters. `Z3DImgFilter::switchRendererBackend` releases GL resources on Vulkan switch and rebuilds them on GL. This notifies renderers/data owners to release backend-specific resources.
+  - Minimal prewarm on switch: `Z3DCompositor::ensureOutputTargets` acquires persistent temp render targets via the scratch pool after the backend change, which pre-creates Vulkan attachments for the compositor outputs to reduce first-frame latency.
+  - File refs: src/atlas/z3drenderingengine.cpp:1499, src/atlas/z3dcompositor.cpp:1866, src/atlas/z3dcompositor.cpp:1851, src/atlas/z3dimgfilter.h:75
+
+- CPU bridges removal (compositor paths) [Done]
+  - Compositor-side Vulkan paths (texture copy/blend/glow) now consume Vulkan `AttachmentHandle`s and never stage GL textures through CPU. Verified in pipeline contexts:
+    - Texture copy: src/atlas/zvulkantexturecopypipelinecontext.cpp:41
+    - Texture blend: src/atlas/zvulkantextureblendpipelinecontext.cpp:62
+    - Glow: src/atlas/zvulkantextureglowpipelinecontext.cpp:56
+  - Note: CPU uploads may still appear in non-compositor translators (e.g., mesh texture uploads) and are tracked separately.
+
+- Z3DImg GL resource release on backend switch [Done]
+  - Added `Z3DImg::releaseGLResources()` and wired `Z3DImgFilter::switchRendererBackend` to free GL textures (channel and paging) when switching to Vulkan to reduce VRAM usage and avoid stale resources.
+  - Channel textures now lazily re-create on GL demand, avoiding hard coupling.
+  - File refs: src/atlas/z3dimg.cpp/.h, src/atlas/z3dimgfilter.h
+
+- API cleanup [Done]
+  - Removed `channelVolumeImage` and standardized on `channelImageShared`; call sites dereference shared pointers.
+  - File refs: src/atlas/z3dimg.h/.cpp, src/atlas/zvulkanimgraycasterpipelinecontext.cpp, src/atlas/zvulkanimgslicepipelinecontext.cpp
+
+- CPU-only LUTs [Done]
+  - ZColorMap/Z3DTransferFunction no longer own GL textures. They produce CPU RGBA8 LUTs (`buildLUTBGRA8`) and expose `generation()` for cache invalidation.
+  - GL renderers maintain per-renderer 1D LUT caches; Vulkan pipeline contexts build/upload 1D images on demand using a shared helper.
+  - File refs: src/atlas/zcolormap.h/.cpp, src/atlas/z3dtransferfunction.h/.cpp, src/atlas/z3dimgslicerenderer.cpp, src/atlas/z3dimgraycasterrenderer.cpp, src/atlas/zvulkanlututils.h, src/atlas/zvulkanimgslicepipelinecontext.cpp, src/atlas/zvulkanimgraycasterpipelinecontext.cpp
+
+## Potential Optimizations (Backlog)
+
+- Readback/presentation
+  - Asynchronous staging for final-frame and picking readbacks (reuse staging buffers, fence/pool management) to avoid CPU stalls.
+  - Optional “UI readback toggle” to skip local-buffer downloads when not needed; read straight from Vulkan for screenshots.
+  - Direct compositor screenshot path (mono/stereo SxS assembly) from attachments (already exposed via helpers; could batch/avoid intermediate copies).
+
+- Picking
+  - Batched subimage reads for hover/drag (coalesce requests, small ring buffer of mapped staging memory).
+  - Debounce/throttle interactive reads on high-frequency pointer updates.
+  - Persistent mapped staging for single-pixel downloads to reduce map/unmap churn.
+
+- OIT/passes
+  - Reduce layout transitions and attachment clears by merging passes where legal (dynamic rendering subpass emulation).
+  - Heuristic to bypass OIT when geometry topology guarantees ordering (thin lines, •small depth complexity).
+  - Specialize WA/WB pipelines by attachment format to simplify pipelines and improve cache hits.
+
+- Volume raycaster
+  - Empty-space skipping and AABB clipping per channel; conservative per-channel ROIs from paging metadata.
+  - Adaptive sampling (eye-space pixel size driven) and early ray termination (energy threshold).
+  - Pipeline key reduction by pushing more into UBOs to increase cache reuse.
+
+- Resource/pooling
+  - Dedicated transient attachment pools per format/size for compositor intermediates to avoid redundant (re)creation.
+  - Bindless/persistent descriptors where feasible; descriptor set recycling per frame.
+  - Separate device-local vs. host-visible staging pools with lifetime buckets (frame, multi-frame, long-lived).
+
+- MSAA/supersample
+  - Optional true MSAA path (samples>1) to evaluate quality/perf vs. current 2× supersample downsample.
+  - Jittered supersample for enhanced edge AA during still renders.
+
+- Profiling/debug
+  - GPU timestamp queries around major passes; UI overlay with pass timings and VRAM usage (scratch pool counters).
+  - Shader specialization constants for toggling debug modes without rebuilding pipelines.
+
 
 - Validation [In‑Progress]
   - Build succeeds on macOS; run interactive checks for background, geometry, DVR/slices, layer blending parity, and on‑top ordering.

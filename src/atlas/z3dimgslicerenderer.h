@@ -6,6 +6,7 @@
 #include "zmesh.h"
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace nim {
 
@@ -135,6 +136,25 @@ private:
 
   // Output size provided via ensureInternalTargets()
   glm::uvec2 m_outputSize{32, 32};
+
+  // GL LUT cache for colormaps when using the OpenGL backend
+  struct ColormapGLCache
+  {
+    std::unordered_map<const ZColorMap*, std::unique_ptr<Z3DTexture>> textures;
+    std::unordered_map<const ZColorMap*, std::pair<uint64_t, uint32_t>> meta; // generation, width
+  };
+  mutable ColormapGLCache m_colormapCache;
+
+  Z3DTexture* colormapTextureGL(const ZColorMap& cm, uint32_t width = 256) const;
+
+public:
+  void releaseBackendResources() override
+  {
+    // Clear GL cache; textures will be deleted with unique_ptr
+    m_colormapCache.textures.clear();
+    m_colormapCache.meta.clear();
+    Z3DPrimitiveRenderer::releaseBackendResources();
+  }
 };
 
 } // namespace nim

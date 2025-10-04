@@ -41,6 +41,14 @@ public:
   // ZMesh
   void setTexture(Z3DTexture* tex);
 
+  // Optional: provide a backend-native sampled image handle for Vulkan.
+  // When set, Vulkan path binds this handle instead of bridging from GL.
+  void setTextureHandle(const SampledImageHandle& handle)
+  {
+    // Caller manages the lifecycle of the underlying backend resource.
+    m_textureHandle = handle;
+  }
+
   void setDataPickingColors(std::vector<glm::vec4>* meshPickingColorsInput = nullptr);
 
   // One of "MeshColor", "Mesh1DTexture", "Mesh2DTexture", "Mesh3DTexture", "CustomColor"
@@ -113,6 +121,7 @@ protected:
   std::vector<glm::vec4>* m_origMeshPickingColorsPt;
 
   Z3DTexture* m_texture;
+  SampledImageHandle m_textureHandle{};
 
 private:
   std::vector<ZMesh> m_splitMeshes;

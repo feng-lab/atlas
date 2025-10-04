@@ -127,7 +127,8 @@ private:
 
   std::vector<MeshDraw> m_draws;
 
-  std::map<const Z3DTexture*, std::unique_ptr<ZVulkanTexture>> m_textureCache;
+  // No GL texture bridging: Vulkan mesh pipeline uses placeholders or
+  // backend-native textures only.
 
   void ensureDescriptorLayouts();
   void ensurePlaceholderTextures();
@@ -151,8 +152,10 @@ private:
   void ensureIndexCapacity(size_t indexCount);
   void uploadGeometry(const MeshPayload& payload);
 
-  std::optional<TextureBinding> bindTextureIfNeeded(const MeshPayload& payload);
-  ZVulkanTexture* ensureTextureUpload(const Z3DTexture& source);
+  std::optional<TextureBinding> bindTextureIfNeeded(const MeshPayload& /*payload*/)
+  {
+    return std::nullopt;
+  }
 };
 
 } // namespace nim

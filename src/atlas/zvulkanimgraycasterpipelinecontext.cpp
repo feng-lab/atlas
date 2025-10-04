@@ -15,6 +15,7 @@
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
 #include "zvulkanbuffer.h"
+#include "zvulkanlututils.h"
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkanrenderconversions.h"
@@ -912,24 +913,11 @@ ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureTransferTexture(Channe
                                                                           const Z3DTransferFunction& transferFunction)
 {
   auto& device = m_backend.device();
-  const uint32_t width = static_cast<uint32_t>(transferFunction.textureDimensions().x);
-  if (!resources.transferTexture || resources.transferTexture->extent().width != width) {
-    auto info = ZVulkanTexture::CreateInfo::make1D(width,
-                                                   vk::Format::eR8G8B8A8Unorm,
-                                                   vk::ImageUsageFlagBits::eSampled |
-                                                     vk::ImageUsageFlagBits::eTransferDst,
-                                                   vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                   1u,
-                                                   true,
-                                                   vk::ImageLayout::eShaderReadOnlyOptimal);
-    resources.transferTexture = device.createTexture(info);
-  }
-
-  std::vector<glm::col4> texels(width);
-  for (uint32_t x = 0; x < width; ++x) {
-    texels[x] = transferFunction.mappedColorBGRA(static_cast<double>(x) / std::max<uint32_t>(1u, width - 1u));
-  }
-  resources.transferTexture->uploadData(texels.data(), texels.size() * sizeof(glm::col4));
+  const uint32_t width = static_cast<uint32_t>(transferFunction.dimensions().x);
+  std::vector<uint8_t> texels;
+  transferFunction.buildLUTBGRA8(texels, width);
+  vulkan::ensure1DLUTTexture(device, resources.transferTexture, width);
+  vulkan::uploadLUT(*resources.transferTexture, texels.data(), texels.size());
   return *resources.transferTexture;
 }
 
@@ -1342,7 +1330,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     }
 
     ChannelResources& resources = ensureChannelResources(channelIndex);
-    const ZImg& channelImage = payload.image->channelVolumeImage(channelIndex);
+    const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
     ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex);
     ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
 
@@ -1424,7 +1412,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     }
 
     ChannelResources& resources = ensureChannelResources(channelIndex);
-    const ZImg& channelImage = payload.image->channelVolumeImage(channelIndex);
+    const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
     ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex);
     ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
 
@@ -1604,7 +1592,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   ChannelResources& resources = ensureChannelResources(channelIndex);
 
-  const ZImg& channelImage = payload.image->channelVolumeImage(channelIndex);
+  const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
   ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex);
   const auto& transferList = payload.renderer->transferFunctions();
   if (channelIndex >= transferList.size() || transferList[channelIndex] == nullptr) {

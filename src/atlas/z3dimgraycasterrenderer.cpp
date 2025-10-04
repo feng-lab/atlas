@@ -421,8 +421,10 @@ void Z3DImgRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& shad
     shader.bindTexture(m_volumeUniformNames[idx], texture);
     shader.setUniform(m_volumeDimensionNames[idx], glm::vec3(m_img->channelDimensions(i)));
 
-    // transfer functions
-    shader.bindTexture(m_transferFuncUniformNames[idx++], m_transferFunctions[i]->texture());
+    // transfer functions (GL LUT cache)
+    if (auto* tex = transferTextureGL(*m_transferFunctions[i])) {
+      shader.bindTexture(m_transferFuncUniformNames[idx++], tex);
+    }
 
     CHECK_GL_ERROR
   }
@@ -439,10 +441,12 @@ void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader
   shader.bindTexture(m_volumeUniformNames[0], texture);
   shader.setUniform(m_volumeDimensionNames[0], glm::vec3(m_img->channelDimensions(idx)));
 
-  // transfer functions
+  // transfer functions (GL LUT cache)
   CHECK(idx < m_transferFunctions.size());
   CHECK(m_transferFunctions[idx] != nullptr);
-  shader.bindTexture(m_transferFuncUniformNames[0], m_transferFunctions[idx]->texture());
+  if (auto* tex = transferTextureGL(*m_transferFunctions[idx])) {
+    shader.bindTexture(m_transferFuncUniformNames[0], tex);
+  }
 
   // m_transferFunctions[idx]->texture()->saveAsColorImage("/Users/feng/Downloads/abcd_tf.tif");
   // if (auto* tex = m_img->channelTexture(idx)) {
@@ -900,7 +904,9 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
       m_img->bindFullResRenderShader(*m_image3DSliceWithTransferfunShader, c);
       CHECK(c < m_transferFunctions.size());
       CHECK(m_transferFunctions[c] != nullptr);
-      m_image3DSliceWithTransferfunShader->bindTexture("transfer_function", m_transferFunctions[c]->texture());
+      if (auto* tex = transferTextureGL(*m_transferFunctions[c])) {
+        m_image3DSliceWithTransferfunShader->bindTexture("transfer_function", tex);
+      }
       for (auto& quad : m_quads) {
         renderTriangleList(*m_VAO, *m_image3DSliceWithTransferfunShader, quad);
       }
@@ -912,7 +918,9 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
       m_img->bindFullResRenderShader(*m_image3DSliceWithTransferfunShader, c);
       CHECK(c < m_transferFunctions.size());
       CHECK(m_transferFunctions[c] != nullptr);
-      m_image3DSliceWithTransferfunShader->bindTexture("transfer_function", m_transferFunctions[c]->texture());
+      if (auto* tex = transferTextureGL(*m_transferFunctions[c])) {
+        m_image3DSliceWithTransferfunShader->bindTexture("transfer_function", tex);
+      }
       for (auto& quad : m_quads) {
         renderTriangleList(*m_VAO, *m_image3DSliceWithTransferfunShader, quad);
       }
@@ -1389,7 +1397,9 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   m_img->bindFullResRenderShader(*m_image3DRaycasterShader, c);
   CHECK(c < m_transferFunctions.size());
   CHECK(m_transferFunctions[c] != nullptr);
-  m_image3DRaycasterShader->bindTexture("transfer_function", m_transferFunctions[c]->texture());
+  if (auto* tex = transferTextureGL(*m_transferFunctions[c])) {
+    m_image3DRaycasterShader->bindTexture("transfer_function", tex);
+  }
   renderScreenQuad(*m_VAO, *m_image3DRaycasterShader);
 
   currentTarget->release();
@@ -1402,6 +1412,29 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   finalizeProgressiveRound(eye, lastRound, totalChannels);
 
   return lastRound;
+}
+
+Z3DTexture* Z3DImgRaycasterRenderer::transferTextureGL(const Z3DTransferFunction& tf) const
+{
+  const uint64_t gen = tf.generation();
+  const uint32_t width = static_cast<uint32_t>(tf.dimensions().x);
+  auto itMeta = m_transferCache.meta.find(&tf);
+  auto itTex = m_transferCache.textures.find(&tf);
+  const bool needCreate = itMeta == m_transferCache.meta.end() ||
+                          itTex == m_transferCache.textures.end() ||
+                          itMeta->second.first != gen || itMeta->second.second != width;
+  if (needCreate) {
+    std::vector<uint8_t> lut;
+    tf.buildLUTBGRA8(lut, width);
+    if (lut.empty()) {
+      return nullptr;
+    }
+    auto tex = std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
+    tex->updateImage(lut.data());
+    m_transferCache.textures[&tf] = std::move(tex);
+    m_transferCache.meta[&tf] = std::make_pair(gen, width);
+  }
+  return m_transferCache.textures[&tf].get();
 }
 
 void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vector<size_t>& visibleIdxs)

@@ -92,6 +92,7 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
 
   m_nChannels = m_imgPack.imgInfo().numChannels;
   m_volumeGenerations.assign(m_nChannels, 0);
+  m_PBO.reset();
 
 #if 0
   // shader limit is 20 channels
@@ -184,13 +185,6 @@ std::string Z3DImg::samplerType() const
   return "sampler2D";
 }
 
-const ZImg& Z3DImg::channelVolumeImage(size_t c) const
-{
-  CHECK_LT(c, m_channelResources.size());
-  CHECK(m_channelResources[c].image != nullptr);
-  return *m_channelResources[c].image;
-}
-
 std::shared_ptr<const ZImg> Z3DImg::channelImageShared(size_t c) const
 {
   CHECK_LT(c, m_channelResources.size());
@@ -201,6 +195,11 @@ std::shared_ptr<const ZImg> Z3DImg::channelImageShared(size_t c) const
 Z3DTexture* Z3DImg::channelTexture(size_t c) const
 {
   CHECK_LT(c, m_channelResources.size());
+  if (!m_channelResources[c].texture && m_channelResources[c].image) {
+    // Lazily create GL texture for this channel if needed
+    const_cast<Z3DImg*>(this)->m_channelResources[c].texture =
+      createChannelTexture(*m_channelResources[c].image);
+  }
   return m_channelResources[c].texture.get();
 }
 
@@ -859,6 +858,24 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
   }
 }
 
+void Z3DImg::releaseGLResources()
+{
+  // Release per-channel GL textures
+  for (auto& ch : m_channelResources) {
+    ch.texture.reset();
+  }
+  // Release paging-related GL textures (if any)
+  for (auto& tex : m_channelPageDirectoryTextures) {
+    tex.reset();
+  }
+  for (auto& tex : m_channelPageTableCacheTextures) {
+    tex.reset();
+  }
+  for (auto& tex : m_channelImageCacheTextures) {
+    tex.reset();
+  }
+}
+
 void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef)
 {
   // auto hasher = boost::hash<glm::uvec4>();
@@ -1059,7 +1076,10 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   uint8_t* pboPtr = nullptr;
   std::vector<uint8_t> pboLocalBuffer;
   if (pendingTasks.size() >= FLAGS_atlas_number_of_blocks_to_use_PBO_threashold) {
-    m_PBO.bind(GL_PIXEL_UNPACK_BUFFER);
+    if (!m_PBO) {
+      m_PBO = std::make_unique<Z3DVertexBufferObject>();
+    }
+    m_PBO->bind(GL_PIXEL_UNPACK_BUFFER);
     glBufferData(GL_PIXEL_UNPACK_BUFFER, blockSizeInByte * pendingTasks.size(), nullptr, GL_STREAM_DRAW);
     pboPtr = (uint8_t*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
     if (!pboPtr) {
@@ -1069,7 +1089,9 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     }
   }
   auto pboGuard = folly::makeGuard([=, this]() {
-    m_PBO.release(GL_PIXEL_UNPACK_BUFFER);
+    if (m_PBO) {
+      m_PBO->release(GL_PIXEL_UNPACK_BUFFER);
+    }
   });
 
   if (!pboPtr) {
@@ -1369,6 +1391,84 @@ void Z3DImg::resetCacheSystem(size_t c)
 
   std::ranges::fill(m_channelPageTableCaches[c], glm::uvec4(0));
   m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
+}
+
+void Z3DImg::rebuildGLPagingResources()
+{
+  // Recreate GL paging textures for all channels and reset CPU arrays to zero-filled state.
+  // Page sizes and block counts are assumed already computed (constructor/setScale path).
+
+  auto imageBlockTotal = m_imageBlockSize + m_imageBlockSizePad;
+  const glm::uvec3 imageCacheSize = m_imageCacheNumBlocks * imageBlockTotal;
+
+  // Ensure vectors are sized correctly
+  if (m_channelPageDirectories.size() != m_nChannels) {
+    m_channelPageDirectories.resize(m_nChannels);
+  }
+  if (m_channelPageTableCaches.size() != m_nChannels) {
+    m_channelPageTableCaches.resize(m_nChannels);
+  }
+  if (m_channelPageDirectoryTextures.size() != m_nChannels) {
+    m_channelPageDirectoryTextures.resize(m_nChannels);
+  }
+  if (m_channelPageTableCacheTextures.size() != m_nChannels) {
+    m_channelPageTableCacheTextures.resize(m_nChannels);
+  }
+  if (m_channelImageCacheTextures.size() != m_nChannels) {
+    m_channelImageCacheTextures.resize(m_nChannels);
+  }
+  if (m_channelPageTableCacheManagers.size() != m_nChannels) {
+    m_channelPageTableCacheManagers.resize(m_nChannels);
+  }
+  if (m_channelImageCacheManagers.size() != m_nChannels) {
+    m_channelImageCacheManagers.resize(m_nChannels);
+  }
+
+  for (size_t c = 0; c < m_nChannels; ++c) {
+    // Reset CPU arrays
+    m_channelPageDirectories[c].resize(size_t(m_pageDirectorySize.x) * m_pageDirectorySize.y * m_pageDirectorySize.z);
+    std::ranges::fill(m_channelPageDirectories[c], glm::uvec4(0));
+
+    m_channelPageTableCaches[c].resize(size_t(m_pageTableCacheSize.x) * m_pageTableCacheSize.y * m_pageTableCacheSize.z);
+    std::ranges::fill(m_channelPageTableCaches[c], glm::uvec4(0));
+
+    // Reset cache managers
+    m_channelPageTableCacheManagers[c] = std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize,
+                                                                                    m_pageTableCacheNumBlocks,
+                                                                                    m_invalidKey);
+    m_channelImageCacheManagers[c] = std::make_unique<Z3DBlockCache<glm::uvec4>>(imageBlockTotal,
+                                                                                 m_imageCacheNumBlocks,
+                                                                                 m_invalidKey);
+
+    // Recreate GL textures
+    m_channelPageDirectoryTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
+                                                                     GLint(GL_RGBA32UI),
+                                                                     m_pageDirectorySize,
+                                                                     GL_RGBA_INTEGER,
+                                                                     GL_UNSIGNED_INT,
+                                                                     m_channelPageDirectories[c].data(),
+                                                                     GLint(GL_NEAREST),
+                                                                     GLint(GL_NEAREST));
+
+    m_channelPageTableCacheTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
+                                                                      GLint(GL_RGBA32UI),
+                                                                      m_pageTableCacheSize,
+                                                                      GL_RGBA_INTEGER,
+                                                                      GL_UNSIGNED_INT,
+                                                                      m_channelPageTableCaches[c].data(),
+                                                                      GLint(GL_NEAREST),
+                                                                      GLint(GL_NEAREST));
+
+    m_channelImageCacheTextures[c] = std::make_unique<Z3DTexture>(GLint(GL_R8),
+                                                                  imageCacheSize,
+                                                                  GL_RED,
+                                                                  GL_UNSIGNED_BYTE,
+                                                                  nullptr,
+                                                                  GLint(GL_LINEAR),
+                                                                  GLint(GL_LINEAR),
+                                                                  GLint(GL_CLAMP_TO_BORDER));
+    m_channelImageCacheTextures[c]->clearImage();
+  }
 }
 
 } // namespace nim

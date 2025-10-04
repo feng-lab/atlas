@@ -35,6 +35,12 @@ public:
 
   void savePickingBufferToImage(const QString& filename);
 
+  // Debug helpers: save the current output attachments directly to disk.
+  // For Vulkan, downloads from the current ready lease attachments.
+  // For OpenGL, uses the GL texture save helpers.
+  void saveOutputColorToImage(const QString& filename, Z3DEye eye = MonoEye);
+  void saveOutputDepthToImage(const QString& filename, Z3DEye eye = MonoEye);
+
   void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
 
   void setOutputSize(const glm::uvec2& size);

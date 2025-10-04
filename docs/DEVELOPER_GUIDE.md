@@ -16,6 +16,16 @@ Architecture Overview
 - Rendering engine (`Z3DRenderingEngine`) — owns the offscreen GL context, global parameters, compositor, network evaluator, and per-object 3D views.
 - Parameter system (`ZParameter` + subclasses) — typed, QObject-based, with signals/slots and JSON (de)serialization.
 
+Lookup Tables (LUTs)
+
+- Colormaps (`ZColorMap`) and transfer functions (`Z3DTransferFunction`) are CPU-only. They expose:
+  - `buildLUTBGRA8(width)` to generate an RGBA8 LUT in CPU memory.
+  - `generation()` that increments on change for cache invalidation.
+- Renderers/pipeline contexts create and cache backend LUT textures:
+  - OpenGL: per-renderer 1D RGBA8 textures for colormaps/transfer functions.
+  - Vulkan: pipeline contexts create 1D `ZVulkanTexture`s via a small helper; LUTs are uploaded as RGBA8 and bound through descriptor sets.
+- On backend switch, `Z3DRendererBase::releaseBackendResources()` clears renderer caches; `Z3DImgFilter::switchRendererBackend` releases GL volume resources when switching to Vulkan.
+
 Threading Model
 
 - UI thread: widgets (`Z3DCanvas`, main window), menu actions, docks, drag-and-drop.

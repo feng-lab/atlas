@@ -72,6 +72,19 @@ Q_SIGNALS:
   void showImgContextMenu(QPoint globalPos, float x, float y, float z, bool enter, bool exit);
 
 protected:
+  void switchRendererBackend(RenderBackend backend) override
+  {
+    Z3DBoundedFilter::switchRendererBackend(backend);
+    if (!m_3dImg) {
+      return;
+    }
+    if (backend == RenderBackend::Vulkan) {
+      m_3dImg->releaseGLResources();
+    } else {
+      // Prepare GL paging resources proactively to avoid first-use hazards
+      m_3dImg->rebuildGLPagingResources();
+    }
+  }
   void updateSize() override;
 
   void changeCoordTransform();

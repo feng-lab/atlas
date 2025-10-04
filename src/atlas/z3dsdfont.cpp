@@ -1,9 +1,9 @@
 #include "z3dsdfont.h"
 
 #include "zlog.h"
+#include "zglobal.h"
 #include <QFile>
 #include <QTextStream>
-#include <memory>
 #include <utility>
 
 namespace nim {
@@ -29,17 +29,6 @@ Z3DSDFont::CharInfo Z3DSDFont::charInfo(int id) const
     }
   }
   return space;
-}
-
-Z3DTexture* Z3DSDFont::texture()
-{
-  if (m_isEmpty) {
-    return nullptr;
-  }
-  if (!m_texture) {
-    createTexture();
-  }
-  return m_texture.get();
 }
 
 void Z3DSDFont::loadImage()
@@ -184,21 +173,6 @@ void Z3DSDFont::parseFontFile()
     m_isEmpty = true;
     return;
   }
-}
-
-void Z3DSDFont::createTexture()
-{
-  if (m_isEmpty || m_texture) {
-    return;
-  }
-  m_texture = std::make_unique<Z3DTexture>(GLint(GL_RGBA8),
-                                           glm::uvec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
-                                           GL_BGRA,
-                                           GL_UNSIGNED_INT_8_8_8_8_REV,
-                                           m_GLFormattedImage.bits(),
-                                           GLint(GL_LINEAR),
-                                           GLint(GL_LINEAR),
-                                           GLint(GL_REPEAT));
 }
 
 } // namespace nim

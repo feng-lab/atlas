@@ -1,9 +1,6 @@
 #include "z3dtransferfunction.h"
 
-#include "z3dgpuinfo.h"
-#include "z3dshaderprogram.h"
 #include "z3dtransferfunctionwidgetwitheditorwindow.h"
-#include "z3dtexture.h"
 #include "zimg.h"
 #include "zlog.h"
 #include <QLabel>
@@ -46,15 +43,11 @@ Z3DTransferFunction::Z3DTransferFunction(double min,
                                          QObject* parent)
   : ZColorMap(min, max, minColor, maxColor, parent)
   , m_dimensions(width, 1, 1)
-  , m_textureFormat(GL_BGRA)
-  , m_textureDataType(GL_UNSIGNED_INT_8_8_8_8_REV)
 {}
 
 Z3DTransferFunction::Z3DTransferFunction(const Z3DTransferFunction& tf)
   : ZColorMap(tf)
   , m_dimensions(tf.m_dimensions)
-  , m_textureFormat(tf.m_textureFormat)
-  , m_textureDataType(tf.m_textureDataType)
 {}
 
 Z3DTransferFunction::Z3DTransferFunction(Z3DTransferFunction&& tf) noexcept
@@ -66,8 +59,6 @@ void Z3DTransferFunction::swap(Z3DTransferFunction& other) noexcept
 {
   ZColorMap::swap(other);
   std::swap(m_dimensions, other.m_dimensions);
-  std::swap(m_textureFormat, other.m_textureFormat);
-  std::swap(m_textureDataType, other.m_textureDataType);
 }
 
 bool Z3DTransferFunction::operator==(const Z3DTransferFunction& tf) const
@@ -78,12 +69,6 @@ bool Z3DTransferFunction::operator==(const Z3DTransferFunction& tf) const
   if (m_dimensions != tf.m_dimensions) {
     return false;
   }
-  if (m_textureDataType != tf.m_textureDataType) {
-    return false;
-  }
-  if (m_textureFormat != tf.m_textureFormat) {
-    return false;
-  }
 
   return true;
 }
@@ -92,15 +77,6 @@ void Z3DTransferFunction::resetToDefault()
 {
   reset(0., 1., glm::col4(0, 0, 0, 0), glm::col4(255, 255, 255, 255));
   Q_EMIT changed();
-}
-
-Z3DTexture* Z3DTransferFunction::texture() const
-{
-  if (m_textureIsInvalid) {
-    updateTexture();
-  }
-
-  return m_texture.get();
 }
 
 QString Z3DTransferFunction::samplerType() const
@@ -127,47 +103,13 @@ void Z3DTransferFunction::resize(uint32_t width)
 
 void Z3DTransferFunction::fitDimensions(uint32_t& width, uint32_t& height, uint32_t& depth) const
 {
-  uint32_t maxTexSize;
-  if (depth == 1) {
-    maxTexSize = Z3DGpuInfo::instance().maxTextureSize();
-  } else {
-    maxTexSize = Z3DGpuInfo::instance().max3DTextureSize();
-  }
-
-  if (maxTexSize < width) {
-    width = maxTexSize;
-  }
-
-  if (maxTexSize < height) {
-    height = maxTexSize;
-  }
-
-  if (maxTexSize < depth) {
-    depth = maxTexSize;
-  }
+  // CPU-only TF: keep dimensions as requested; clamp to sensible minimums.
+  width = std::max<uint32_t>(1, width);
+  height = std::max<uint32_t>(1, height);
+  depth = std::max<uint32_t>(1, depth);
 }
 
-void Z3DTransferFunction::updateTexture() const
-{
-  if (!m_texture || (m_texture->dimension() != glm::uvec3(m_dimensions))) {
-    createTexture();
-  }
-  CHECK(m_texture);
-
-  std::vector<glm::col4> tfData(m_dimensions.x);
-  for (size_t x = 0; x < tfData.size(); ++x) {
-    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1.));
-  }
-  m_texture->updateImage(tfData.data());
-
-  m_textureIsInvalid = false;
-}
-
-void Z3DTransferFunction::createTexture() const
-{
-  m_texture =
-    std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType);
-}
+// GL texture APIs removed: renderers build backend textures from CPU LUTs.
 
 bool Z3DTransferFunction::isValidDomainMin(double min) const
 {
@@ -208,7 +150,7 @@ void Z3DTransferFunctionParameter::setImage(std::shared_ptr<const ZImg> image)
   if (m_image) {
     m_bitsStored = bitsStoredForImage(*m_image);
     const size_t desiredWidth = histogramTextureWidthForBits(m_bitsStored);
-    if (desiredWidth != m_value.textureDimensions().x) {
+    if (desiredWidth != m_value.dimensions().x) {
       m_value.resize(static_cast<uint32_t>(desiredWidth));
     }
   } else {

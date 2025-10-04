@@ -98,8 +98,10 @@ void Z3DImgSliceRenderer::bindVolumes(Z3DShaderProgram& shader) const
     CHECK(texture != nullptr) << "Missing OpenGL texture for channel " << i;
     shader.bindTexture(m_volumeUniformNames[idx], texture, GLint(GL_NEAREST), GLint(GL_NEAREST));
 
-    // colormap
-    shader.bindTexture(m_colormapUniformNames[idx++], (*m_colormaps)[i]->get().texture1D());
+    // colormap (GL LUT cache)
+    if (auto* tex = colormapTextureGL((*m_colormaps)[i]->get())) {
+      shader.bindTexture(m_colormapUniformNames[idx++], tex);
+    }
 
     CHECK_GL_ERROR
   }
@@ -112,10 +114,34 @@ void Z3DImgSliceRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx) const
   CHECK(texture != nullptr) << "Missing OpenGL texture for channel " << idx;
   shader.bindTexture(m_volumeUniformNames[0], texture, GLint(GL_NEAREST), GLint(GL_NEAREST));
 
-  // colormap
-  shader.bindTexture(m_colormapUniformNames[0], (*m_colormaps)[idx]->get().texture1D());
+  // colormap (GL LUT cache)
+  if (auto* tex = colormapTextureGL((*m_colormaps)[idx]->get())) {
+    shader.bindTexture(m_colormapUniformNames[0], tex);
+  }
 
   CHECK_GL_ERROR
+}
+
+Z3DTexture* Z3DImgSliceRenderer::colormapTextureGL(const ZColorMap& cm, uint32_t width) const
+{
+  const uint64_t gen = cm.generation();
+  auto itMeta = m_colormapCache.meta.find(&cm);
+  auto itTex = m_colormapCache.textures.find(&cm);
+  const bool needCreate = itMeta == m_colormapCache.meta.end() ||
+                          itTex == m_colormapCache.textures.end() ||
+                          itMeta->second.first != gen || itMeta->second.second != width;
+  if (needCreate) {
+    std::vector<uint8_t> lut;
+    cm.buildLUTBGRA8(lut, width);
+    if (lut.empty()) {
+      return nullptr;
+    }
+    auto tex = std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
+    tex->updateImage(lut.data());
+    m_colormapCache.textures[&cm] = std::move(tex);
+    m_colormapCache.meta[&cm] = std::make_pair(gen, width);
+  }
+  return m_colormapCache.textures[&cm].get();
 }
 
 void Z3DImgSliceRenderer::compile()
@@ -295,7 +321,9 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
     if (m_img->numChannels() == 1) {
       m_img->bindFullResRenderShader(*m_image3DSliceWithColorMapShader, 0);
-      m_image3DSliceWithColorMapShader->bindTexture("colormap", (*m_colormaps)[0]->get().texture1D());
+      if (auto* tex = colormapTextureGL((*m_colormaps)[0]->get())) {
+        m_image3DSliceWithColorMapShader->bindTexture("colormap", tex);
+      }
       for (auto& slice : m_slices) {
         renderTriangleList(*m_VAO, *m_image3DSliceWithColorMapShader, slice);
       }
@@ -310,7 +338,9 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
       layerLease.renderTarget->clear();
 
       m_img->bindFullResRenderShader(*m_image3DSliceWithColorMapShader, i);
-      m_image3DSliceWithColorMapShader->bindTexture("colormap", (*m_colormaps)[i]->get().texture1D());
+      if (auto* tex = colormapTextureGL((*m_colormaps)[i]->get())) {
+        m_image3DSliceWithColorMapShader->bindTexture("colormap", tex);
+      }
       for (auto& slice : m_slices) {
         renderTriangleList(*m_VAO, *m_image3DSliceWithColorMapShader, slice);
       }

@@ -8,12 +8,12 @@
 #include <optional>
 #include <tuple>
 #include <vector>
+#include <unordered_map>
 
 namespace nim {
 
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
-class Z3DTexture;
 class ZVulkanShader;
 class ZVulkanPipeline;
 class ZVulkanDescriptorPool;
@@ -99,8 +99,8 @@ private:
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
 
-  // Bridge GL textures to Vulkan
-  std::map<const Z3DTexture*, std::unique_ptr<ZVulkanTexture>> m_textureCache;
+  // Cache CPU-provided atlases keyed by pixel pointer
+  std::unordered_map<const void*, std::unique_ptr<ZVulkanTexture>> m_atlasCache;
 
   void ensureDescriptorLayout();
   void ensureDescriptorSet();
@@ -110,10 +110,9 @@ private:
   void ensureIndexCapacity(size_t indexCount);
   void uploadGeometry(const FontPayload& payload);
 
-  ZVulkanTexture* ensureTextureUpload(const Z3DTexture& source);
+  ZVulkanTexture* ensureAtlasFromPayload(const FontPayload& payload);
 
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
 };
 
 } // namespace nim
-

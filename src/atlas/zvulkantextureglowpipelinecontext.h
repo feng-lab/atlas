@@ -13,7 +13,6 @@ namespace nim {
 
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
-class Z3DTexture;
 class ZVulkanShader;
 class ZVulkanPipeline;
 class ZVulkanDescriptorPool;

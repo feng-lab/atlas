@@ -99,6 +99,19 @@ struct AttachmentHandle
   }
 };
 
+// Neutral handle for sampled images (textures) passed in payloads.
+// For Vulkan, `id` is a reinterpret_cast<uint64_t>(ZVulkanTexture*).
+struct SampledImageHandle
+{
+  uint64_t id = 0;
+  AttachmentBackend backend = AttachmentBackend::Unknown;
+
+  [[nodiscard]] bool valid() const
+  {
+    return id != 0;
+  }
+};
+
 struct BufferHandle
 {
   uint64_t id = 0;
@@ -397,6 +410,7 @@ struct MeshPayload
   glm::vec4 wireframeColor{1.0f};
 
   Z3DTexture* texture = nullptr;
+  SampledImageHandle textureHandle; // Vulkan-native sampled image (optional)
 
   bool meshNeedsSplit = false;
   bool meshColorReady = false;
@@ -603,6 +617,11 @@ struct FontPayload
 
   // Glyph atlas as an OpenGL texture (bridged to Vulkan via CPU upload when needed)
   const Z3DTexture* atlasTexture = nullptr;
+  // Vulkan: either provide a native handle or CPU pixels (BGRA8) + dimensions.
+  SampledImageHandle atlasHandle;
+  const uint8_t* atlasPixels = nullptr;
+  uint32_t atlasWidth = 0;
+  uint32_t atlasHeight = 0;
 
   // SDF text parameters
   float softedgeScale = 80.0f;

@@ -13,6 +13,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
 #include "zvulkanbuffer.h"
+#include "zvulkanlututils.h"
 #include "zvulkanrenderconversions.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanpagedimageblockuploader.h"
@@ -306,7 +307,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   std::vector<ChannelInputs> channels(channelCount);
 
   for (size_t idx = 0; idx < channelCount; ++idx) {
-    const ZImg& img = payload.image->channelVolumeImage(idx);
+    const ZImg& img = *payload.image->channelImageShared(idx);
     const uint64_t generation = payload.image->volumeGeneration(idx);
     auto& resources = m_channelResources[idx];
     ChannelInputs channel{};
@@ -882,31 +883,15 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureColormapTexture(size_t cha
   (void)channel;
   constexpr uint32_t kColormapWidth = 256u;
   auto& device = m_backend.device();
-
-  if (!resources.colormapTexture || resources.colormapTexture->extent().width != kColormapWidth) {
-    auto info = ZVulkanTexture::CreateInfo::make1D(kColormapWidth,
-                                                   vk::Format::eR8G8B8A8Unorm,
-                                                   vk::ImageUsageFlagBits::eSampled |
-                                                     vk::ImageUsageFlagBits::eTransferDst,
-                                                   vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                   1u,
-                                                   true,
-                                                   vk::ImageLayout::eShaderReadOnlyOptimal);
-    resources.colormapTexture = device.createTexture(info);
-  }
-
-  std::vector<uint8_t> texels(static_cast<size_t>(kColormapWidth) * 4u);
   const ZColorMap* colorMap = parameter ? &parameter->get() : nullptr;
-  for (uint32_t x = 0; x < kColormapWidth; ++x) {
-    const double fraction = kColormapWidth > 1 ? static_cast<double>(x) / static_cast<double>(kColormapWidth - 1) : 0.0;
-    glm::col4 color = colorMap ? colorMap->mappedColor(fraction) : glm::col4(255, 255, 255, 255);
-    texels[x * 4 + 0] = color.r;
-    texels[x * 4 + 1] = color.g;
-    texels[x * 4 + 2] = color.b;
-    texels[x * 4 + 3] = color.a;
+  std::vector<uint8_t> texels;
+  if (colorMap) {
+    colorMap->buildLUTBGRA8(texels, kColormapWidth);
+  } else {
+    texels.assign(static_cast<size_t>(kColormapWidth) * 4u, 0xFF);
   }
-
-  resources.colormapTexture->uploadData(texels.data(), texels.size());
+  vulkan::ensure1DLUTTexture(device, resources.colormapTexture, kColormapWidth);
+  vulkan::uploadLUT(*resources.colormapTexture, texels.data(), texels.size());
   return *resources.colormapTexture;
 }
 

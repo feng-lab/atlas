@@ -1,6 +1,5 @@
 #pragma once
 
-#include "z3dtexture.h"
 #include "zglmutils.h"
 #include "zglobal.h"
 #include "zparameter.h"
@@ -200,6 +199,17 @@ public:
 
   bool operator==(const ZColorMap& cm) const;
 
+  // CPU LUT helpers (backend-neutral)
+  // Returns a monotonically increasing generation that bumps whenever the
+  // colormap changes. Backends can cache GPU textures keyed by this value.
+  [[nodiscard]] uint64_t generation() const
+  {
+    return m_generation;
+  }
+
+  // Build a BGRA8 look-up table of the given width in CPU memory.
+  void buildLUTBGRA8(std::vector<uint8_t>& out, uint32_t width) const;
+
   double domainMin() const;
 
   double domainMax() const;
@@ -369,20 +379,14 @@ public:
     return m_keys.empty();
   }
 
-  Z3DTexture* texture1D() const;
-
-  void create1DTexture(size_t width = 256) const;
-
 Q_SIGNALS:
   void changed();
 
 protected:
   void invalidateTexture()
   {
-    m_textureIsInvalid = true;
+    ++m_generation;
   }
-
-  void update1DTexture() const;
 
   void clearKeys()
   {
@@ -392,8 +396,7 @@ protected:
   virtual bool equalTo(const ZColorMap& cm) const;
 
 protected:
-  mutable std::unique_ptr<Z3DTexture> m_texture;
-  mutable bool m_textureIsInvalid = true;
+  mutable uint64_t m_generation = 0;
 
   friend class ZColorMapParameter;
 

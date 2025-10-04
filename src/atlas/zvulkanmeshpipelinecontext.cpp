@@ -15,7 +15,6 @@
 #include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
 #include "zmesh.h"
-#include "z3dtexture.h"
 #include "z3dprimitiverenderer.h"
 #include "z3dmeshrenderer.h"
 #include "zlog.h"
@@ -100,14 +99,11 @@ bool validateTexturePrerequisites(const MeshPayload& payload, const ZMesh& mesh)
   const size_t vertexCount = mesh.numVertices();
   switch (payload.colorSource) {
     case MeshPayload::ColorSource::Mesh1DTexture:
-      return vertexCount > 0 && mesh.num1DTextureCoordinates() >= vertexCount && payload.texture != nullptr &&
-             payload.texture->textureTarget() == GL_TEXTURE_1D;
+      return vertexCount > 0 && mesh.num1DTextureCoordinates() >= vertexCount;
     case MeshPayload::ColorSource::Mesh2DTexture:
-      return vertexCount > 0 && mesh.num2DTextureCoordinates() >= vertexCount && payload.texture != nullptr &&
-             payload.texture->textureTarget() == GL_TEXTURE_2D;
+      return vertexCount > 0 && mesh.num2DTextureCoordinates() >= vertexCount;
     case MeshPayload::ColorSource::Mesh3DTexture:
-      return vertexCount > 0 && mesh.num3DTextureCoordinates() >= vertexCount && payload.texture != nullptr &&
-             payload.texture->textureTarget() == GL_TEXTURE_3D;
+      return vertexCount > 0 && mesh.num3DTextureCoordinates() >= vertexCount;
     default:
       return true;
   }
@@ -155,8 +151,26 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   updateLightingUBO(renderer, batch, payload, pickingPass);
   updateTransformUBO(renderer, batch);
   ensureDescriptorSets();
-  if (!pickingPass) {
-    bindTextureIfNeeded(payload);
+  if (!pickingPass && m_dsTextures) {
+    // Bind Vulkan-native texture if provided; otherwise placeholders remain bound.
+    if (payload.textureHandle.valid() && payload.textureHandle.backend == AttachmentBackend::Vulkan) {
+      auto* vkTex = reinterpret_cast<ZVulkanTexture*>(payload.textureHandle.id);
+      if (vkTex) {
+        switch (payload.colorSource) {
+          case MeshPayload::ColorSource::Mesh1DTexture:
+            m_dsTextures->updateTexture(0, *vkTex);
+            break;
+          case MeshPayload::ColorSource::Mesh2DTexture:
+            m_dsTextures->updateTexture(1, *vkTex);
+            break;
+          case MeshPayload::ColorSource::Mesh3DTexture:
+            m_dsTextures->updateTexture(2, *vkTex);
+            break;
+          default:
+            break;
+        }
+      }
+    }
   }
 
   const auto shaderHook = renderer.shaderHookType();
@@ -943,102 +957,8 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
   m_indexCount = totalIndices;
 }
 
-std::optional<ZVulkanMeshPipelineContext::TextureBinding>
-ZVulkanMeshPipelineContext::bindTextureIfNeeded(const MeshPayload& payload)
-{
-  if (!m_dsTextures || !payload.texture) {
-    return std::nullopt;
-  }
-
-  ZVulkanTexture* vkTexture = ensureTextureUpload(*payload.texture);
-  if (!vkTexture) {
-    return std::nullopt;
-  }
-
-  switch (payload.colorSource) {
-    case MeshPayload::ColorSource::Mesh1DTexture:
-      m_dsTextures->updateTexture(0, *vkTexture);
-      return TextureBinding{vkTexture, 0};
-    case MeshPayload::ColorSource::Mesh2DTexture:
-      m_dsTextures->updateTexture(1, *vkTexture);
-      return TextureBinding{vkTexture, 1};
-    case MeshPayload::ColorSource::Mesh3DTexture:
-      m_dsTextures->updateTexture(2, *vkTexture);
-      return TextureBinding{vkTexture, 2};
-    default:
-      return std::nullopt;
-  }
-}
-
-ZVulkanTexture* ZVulkanMeshPipelineContext::ensureTextureUpload(const Z3DTexture& source)
-{
-  const auto it = m_textureCache.find(&source);
-  if (it != m_textureCache.end()) {
-    return it->second.get();
-  }
-
-  std::optional<vk::Format> format;
-  if (source.dataFormat() == GL_RGBA && source.dataType() == GL_UNSIGNED_BYTE) {
-    format = vk::Format::eR8G8B8A8Unorm;
-  }
-
-  if (!format) {
-    LOG_FIRST_N(WARNING, 5) << "Skipping unsupported mesh texture format for Vulkan backend.";
-    return nullptr;
-  }
-
-  const size_t byteSize = source.textureSizeOnGPU();
-  if (byteSize == 0) {
-    return nullptr;
-  }
-
-  std::vector<uint8_t> pixels(byteSize);
-  source.downloadTextureToBuffer(source.dataFormat(), source.dataType(), pixels.data());
-
-  auto& device = m_backend.device();
-  std::unique_ptr<ZVulkanTexture> vkTexture;
-
-  switch (source.textureTarget()) {
-    case GL_TEXTURE_1D: {
-      auto info = ZVulkanTexture::CreateInfo::make1D(static_cast<uint32_t>(source.width()),
-                                                     *format,
-                                                     vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                     vk::MemoryPropertyFlagBits::eDeviceLocal);
-      vkTexture = device.createTexture(info);
-      break;
-    }
-    case GL_TEXTURE_2D: {
-      auto info = ZVulkanTexture::CreateInfo::make2D(static_cast<uint32_t>(source.width()),
-                                                     static_cast<uint32_t>(source.height()),
-                                                     *format,
-                                                     vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                     vk::MemoryPropertyFlagBits::eDeviceLocal);
-      vkTexture = device.createTexture(info);
-      break;
-    }
-    case GL_TEXTURE_3D: {
-      auto info = ZVulkanTexture::CreateInfo::make3D(static_cast<uint32_t>(source.width()),
-                                                     static_cast<uint32_t>(source.height()),
-                                                     static_cast<uint32_t>(source.depth()),
-                                                     *format,
-                                                     vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                     vk::MemoryPropertyFlagBits::eDeviceLocal);
-      vkTexture = device.createTexture(info);
-      break;
-    }
-    default:
-      LOG_FIRST_N(WARNING, 3) << "Unsupported texture target for Vulkan mesh pipeline.";
-      return nullptr;
-  }
-
-  if (!vkTexture) {
-    return nullptr;
-  }
-
-  vkTexture->uploadData(pixels.data(), pixels.size());
-
-  auto [inserted, _] = m_textureCache.emplace(&source, std::move(vkTexture));
-  return inserted->second.get();
-}
+// No GL texture bridging in Vulkan mesh pipeline. Texture binding, if any,
+// should be provided via backend-native resources. Placeholders are already
+// bound in ensureDescriptorSets().
 
 } // namespace nim

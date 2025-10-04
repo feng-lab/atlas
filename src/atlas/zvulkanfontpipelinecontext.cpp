@@ -59,7 +59,7 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   // Ensure texture descriptor
   ensureDescriptorLayout();
   ensureDescriptorSet();
-  ZVulkanTexture* atlas = payload.atlasTexture ? ensureTextureUpload(*payload.atlasTexture) : nullptr;
+  ZVulkanTexture* atlas = ensureAtlasFromPayload(payload);
   if (!m_descriptorSet || !atlas) {
     return;
   }
@@ -241,48 +241,66 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
   m_indexCount = idxCount;
 }
 
-ZVulkanTexture* ZVulkanFontPipelineContext::ensureTextureUpload(const Z3DTexture& source)
+ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPayload& payload)
 {
-  const auto it = m_textureCache.find(&source);
-  if (it != m_textureCache.end()) {
+  // Priority: native Vulkan handle → CPU pixels → fallback
+  if (payload.atlasHandle.valid() && payload.atlasHandle.backend == AttachmentBackend::Vulkan) {
+    return reinterpret_cast<ZVulkanTexture*>(payload.atlasHandle.id);
+  }
+
+  if (payload.atlasPixels && payload.atlasWidth > 0 && payload.atlasHeight > 0) {
+    auto it = m_atlasCache.find(payload.atlasPixels);
+    if (it != m_atlasCache.end()) {
+      auto* tex = it->second.get();
+      const auto& ext = tex->extent();
+      if (ext.width == payload.atlasWidth && ext.height == payload.atlasHeight) {
+        return tex;
+      }
+      // size changed, recreate
+      m_atlasCache.erase(it);
+    }
+
+    auto& device = m_backend.device();
+    auto info = ZVulkanTexture::CreateInfo::make2D(payload.atlasWidth,
+                                                   payload.atlasHeight,
+                                                   vk::Format::eB8G8R8A8Unorm,
+                                                   vk::ImageUsageFlagBits::eSampled |
+                                                     vk::ImageUsageFlagBits::eTransferDst,
+                                                   vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                                   1u,
+                                                   true,
+                                                   vk::ImageLayout::eShaderReadOnlyOptimal);
+    auto tex = device.createTexture(info);
+    if (!tex) {
+      return nullptr;
+    }
+    const size_t byteSize = static_cast<size_t>(payload.atlasWidth) * payload.atlasHeight * 4u;
+    tex->uploadData(payload.atlasPixels, byteSize);
+    auto [inserted, _] = m_atlasCache.emplace(payload.atlasPixels, std::move(tex));
+    return inserted->second.get();
+  }
+
+  // Fallback: tiny white
+  auto it = m_atlasCache.find(nullptr);
+  if (it != m_atlasCache.end()) {
     return it->second.get();
   }
-
-  std::optional<vk::Format> format;
-  if (source.dataFormat() == GL_BGRA && source.dataType() == GL_UNSIGNED_INT_8_8_8_8_REV) {
-    // SDF atlas built as BGRA8
-    format = vk::Format::eB8G8R8A8Unorm;
-  } else if (source.dataFormat() == GL_RGBA && source.dataType() == GL_UNSIGNED_BYTE) {
-    format = vk::Format::eR8G8B8A8Unorm;
-  }
-
-  if (!format) {
-    LOG_FIRST_N(WARNING, 5) << "Skipping unsupported font atlas texture format for Vulkan backend.";
-    return nullptr;
-  }
-
-  const size_t byteSize = source.textureSizeOnGPU();
-  if (byteSize == 0) {
-    return nullptr;
-  }
-
-  std::vector<uint8_t> pixels(byteSize);
-  source.downloadTextureToBuffer(source.dataFormat(), source.dataType(), pixels.data());
-
   auto& device = m_backend.device();
-  std::unique_ptr<ZVulkanTexture> vkTexture;
-  auto info = ZVulkanTexture::CreateInfo::make2D(static_cast<uint32_t>(source.width()),
-                                                 static_cast<uint32_t>(source.height()),
-                                                 *format,
+  auto info = ZVulkanTexture::CreateInfo::make2D(1,
+                                                 1,
+                                                 vk::Format::eR8G8B8A8Unorm,
                                                  vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                 vk::MemoryPropertyFlagBits::eDeviceLocal);
-  vkTexture = device.createTexture(info);
-  if (!vkTexture) {
+                                                 vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                                 1u,
+                                                 true,
+                                                 vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto tex = device.createTexture(info);
+  if (!tex) {
     return nullptr;
   }
-  vkTexture->uploadData(pixels.data(), pixels.size());
-
-  auto [inserted, _] = m_textureCache.emplace(&source, std::move(vkTexture));
+  const uint32_t white = 0xffffffffu;
+  tex->uploadData(&white, sizeof(white));
+  auto [inserted, _] = m_atlasCache.emplace(nullptr, std::move(tex));
   return inserted->second.get();
 }
 

@@ -16,6 +16,76 @@
 #include <cmath>
 #include <unordered_set>
 
+namespace {
+using namespace nim;
+
+inline uint8_t to_u8_from_unorm16(uint16_t v)
+{
+  return static_cast<uint8_t>((static_cast<uint32_t>(v) + 127u) / 257u);
+}
+
+void downloadVulkanTextureToLocalColorBuffer(ZVulkanTexture& tex, Z3DLocalColorBuffer& localColorBuffer)
+{
+  const uint32_t w = tex.width();
+  const uint32_t h = tex.height();
+  const size_t pixels = static_cast<size_t>(w) * h;
+  const size_t desiredSize = pixels * 4u;
+  if (localColorBuffer.data.size() < desiredSize) {
+    localColorBuffer.data.resize(desiredSize);
+  }
+
+  if (tex.format() == vk::Format::eR8G8B8A8Unorm) {
+    std::vector<uint8_t> rgba;
+    rgba.resize(desiredSize);
+    tex.downloadData(rgba.data(), rgba.size());
+    for (size_t i = 0; i < pixels; ++i) {
+      const uint8_t r = rgba[4 * i + 0];
+      const uint8_t g = rgba[4 * i + 1];
+      const uint8_t b = rgba[4 * i + 2];
+      const uint8_t a = rgba[4 * i + 3];
+      auto* out = &localColorBuffer.data[4 * i];
+      out[0] = b;
+      out[1] = g;
+      out[2] = r;
+      out[3] = a;
+    }
+  } else if (tex.format() == vk::Format::eR16G16B16A16Unorm) {
+    std::vector<uint16_t> data16;
+    data16.resize(pixels * 4u);
+    tex.downloadData(data16.data(), data16.size() * sizeof(uint16_t));
+    for (size_t i = 0, j = 0; i < pixels; ++i, j += 4) {
+      const uint8_t r8 = to_u8_from_unorm16(data16[j + 0]);
+      const uint8_t g8 = to_u8_from_unorm16(data16[j + 1]);
+      const uint8_t b8 = to_u8_from_unorm16(data16[j + 2]);
+      const uint8_t a8 = to_u8_from_unorm16(data16[j + 3]);
+      auto* out = &localColorBuffer.data[4 * i];
+      out[0] = b8;
+      out[1] = g8;
+      out[2] = r8;
+      out[3] = a8;
+    }
+  } else {
+    std::vector<uint8_t> rgba;
+    rgba.resize(desiredSize);
+    tex.downloadData(rgba.data(), rgba.size());
+    for (size_t i = 0; i < pixels; ++i) {
+      const uint8_t r = rgba[4 * i + 0];
+      const uint8_t g = rgba[4 * i + 1];
+      const uint8_t b = rgba[4 * i + 2];
+      const uint8_t a = rgba[4 * i + 3];
+      auto* out = &localColorBuffer.data[4 * i];
+      out[0] = b;
+      out[1] = g;
+      out[2] = r;
+      out[3] = a;
+    }
+  }
+
+  localColorBuffer.width = w;
+  localColorBuffer.height = h;
+}
+} // namespace
+
 namespace nim {
 
 Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
@@ -338,6 +408,112 @@ void Z3DCompositor::savePickingBufferToImage(const QString& filename)
 
   const Z3DTexture* tex = pickingManager().renderTarget().attachment(GL_COLOR_ATTACHMENT0);
   tex->saveAsColorImage(filename);
+}
+
+void Z3DCompositor::saveOutputColorToImage(const QString& filename, Z3DEye eye)
+{
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    const Z3DScratchResourcePool::RenderTargetLease* ready =
+      (eye == MonoEye)   ? m_monoReadyTarget
+      : (eye == LeftEye) ? m_leftReadyTarget
+                         : m_rightReadyTarget;
+    if (!ready || !*ready || ready->backend != RenderBackend::Vulkan) {
+      LOG(WARNING) << "Vulkan output save requested but ready lease is not Vulkan-backed.";
+      return;
+    }
+    ZVulkanTexture* vtex = ready->colorAttachment(0);
+    if (!vtex) {
+      LOG(WARNING) << "Vulkan output color attachment not available.";
+      return;
+    }
+    Z3DLocalColorBuffer temp{};
+    downloadVulkanTextureToLocalColorBuffer(*vtex, temp);
+    // Convert to planar RGBA and save
+    ZImg bufImg;
+    bufImg.wrapData(temp.data.data(), ZImgInfo(temp.width, temp.height, 1, 4));
+    ZImg out(bufImg.info());
+    ZImgFormat::CXYZtoXYZC(bufImg, out, true);
+    out.infoRef().lastChannelIsAlphaChannel = true;
+    out.flip(Dimension::Y);
+    try {
+      out.save(filename);
+    }
+    catch (const ZException& e) {
+      LOG(ERROR) << "Failed to save Vulkan output color image: " << e.what();
+    }
+    return;
+  }
+
+  // GL fallback
+  const Z3DScratchResourcePool::RenderTargetLease* ready =
+    (eye == MonoEye)   ? m_monoReadyTarget
+    : (eye == LeftEye) ? m_leftReadyTarget
+                       : m_rightReadyTarget;
+  if (!ready || !ready->renderTarget) {
+    LOG(WARNING) << "GL output save requested but ready render target missing.";
+    return;
+  }
+  const Z3DTexture* tex = ready->renderTarget->attachment(GL_COLOR_ATTACHMENT0);
+  tex->saveAsColorImage(filename);
+}
+
+void Z3DCompositor::saveOutputDepthToImage(const QString& filename, Z3DEye eye)
+{
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    const Z3DScratchResourcePool::RenderTargetLease* ready =
+      (eye == MonoEye)   ? m_monoReadyTarget
+      : (eye == LeftEye) ? m_leftReadyTarget
+                         : m_rightReadyTarget;
+    if (!ready || !*ready || ready->backend != RenderBackend::Vulkan) {
+      LOG(WARNING) << "Vulkan depth save requested but ready lease is not Vulkan-backed.";
+      return;
+    }
+    ZVulkanTexture* dtex = ready->depthAttachmentTexture();
+    if (!dtex) {
+      LOG(WARNING) << "Vulkan output depth attachment not available.";
+      return;
+    }
+    const uint32_t w = dtex->width();
+    const uint32_t h = dtex->height();
+    const size_t pixels = static_cast<size_t>(w) * h;
+
+    // Convert to uint32_t image for saving (matches GL's saveAsDepthImage pattern)
+    std::vector<uint32_t> depth;
+    depth.resize(pixels);
+    if (dtex->format() == vk::Format::eD32Sfloat) {
+      std::vector<float> f;
+      f.resize(pixels);
+      dtex->downloadData(f.data(), f.size() * sizeof(float));
+      for (size_t i = 0; i < pixels; ++i) {
+        float v = std::clamp(f[i], 0.0f, 1.0f);
+        depth[i] = static_cast<uint32_t>(v * 4294967295.0f + 0.5f);
+      }
+    } else {
+      // Assume D24UnormS8: just download packed 32-bit and keep 24-bit depth in low bits.
+      dtex->downloadData(depth.data(), depth.size() * sizeof(uint32_t));
+    }
+    ZImg img;
+    img.wrapData(depth.data(), w, h, 1);
+    img.flip(Dimension::Y);
+    try {
+      img.save(filename);
+    }
+    catch (const ZException& e) {
+      LOG(ERROR) << "Failed to save Vulkan output depth image: " << e.what();
+    }
+    return;
+  }
+
+  // GL fallback
+  const Z3DScratchResourcePool::RenderTargetLease* ready =
+    (eye == MonoEye)   ? m_monoReadyTarget
+    : (eye == LeftEye) ? m_leftReadyTarget
+                       : m_rightReadyTarget;
+  if (!ready || !ready->renderTarget) {
+    LOG(WARNING) << "GL depth save requested but ready render target missing.";
+    return;
+  }
+  ready->renderTarget->saveAsDepthImage(filename);
 }
 
 void Z3DCompositor::setRenderingRegion(double left, double right, double bottom, double top)
@@ -1215,7 +1391,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       }
 
       // 1) render filter geometry to temp lease
-      auto& pool = Z3DRenderGlobalState::instance().scratchPool();
       auto glowGeomLease = pool.acquireTempRenderTarget2D(targetSize,
                                                           ScratchFormat::RGBA16,
                                                           ScratchFormat::Depth24,
@@ -1309,7 +1484,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
     if (!layers.empty()) {
       const glm::uvec2 tgtSize = outLease->descriptor.size;
-      auto& pool = Z3DRenderGlobalState::instance().scratchPool();
 
       m_rendererBase.setCollectOnly(true);
 
@@ -1617,6 +1791,49 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_rendererBase.render(eye, m_textureCopyRenderer);
     });
     m_rendererBase.setCollectOnly(false);
+  }
+
+  // Finalize frame: download final color to local buffer and signal like GL path
+  {
+    ZVulkanTexture* finalColor = outLease->colorAttachment(0);
+    if (finalColor) {
+      auto* local = (eye == MonoEye)   ? m_monoCurrentLocalBuffer
+                    : (eye == LeftEye) ? m_leftCurrentLocalBuffer
+                                       : m_rightCurrentLocalBuffer;
+      downloadVulkanTextureToLocalColorBuffer(*finalColor, *local);
+    }
+
+    if (eye == MonoEye) {
+      {
+        const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+        std::swap(m_monoReadyLocalBuffer, m_monoCurrentLocalBuffer);
+        std::swap(m_monoReadyTarget, m_monoCurrentTarget);
+      }
+      m_globalParameters.hasNewRendering = true;
+      // Log scratch pool memory usage as in GL path
+      static uint64_t s_lastCreate = 0;
+      static uint64_t s_lastChange = 0;
+      const uint64_t curCreate = pool.creationCounter();
+      const uint64_t curChange = pool.changeCounter();
+      if (curCreate != s_lastCreate || curChange != s_lastChange) {
+        VLOG(1) << pool.describeMemoryUsage(true);
+        s_lastCreate = curCreate;
+        s_lastChange = curChange;
+      }
+      Q_EMIT renderingFinished();
+    } else if (eye == LeftEye) {
+      const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+      std::swap(m_leftReadyLocalBuffer, m_leftCurrentLocalBuffer);
+      std::swap(m_leftReadyTarget, m_leftCurrentTarget);
+    } else {
+      {
+        const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+        std::swap(m_rightReadyLocalBuffer, m_rightCurrentLocalBuffer);
+        std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+      }
+      m_globalParameters.hasNewRendering = true;
+      Q_EMIT renderingFinished();
+    }
   }
 
   return 1.0;

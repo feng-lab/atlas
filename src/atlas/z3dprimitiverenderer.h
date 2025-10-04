@@ -16,6 +16,13 @@ public:
 
   virtual ~Z3DPrimitiveRenderer();
 
+  // Backend lifecycle (public entry points)
+  // - buildBackendResources: called by Z3DRendererBase when a backend becomes active
+  //   (e.g., app start or backend switch). Default forwards to createResources().
+  // - releaseBackendResources: called by Z3DRendererBase before tearing down/switching
+  //   backends. Default forwards to destroyResources(). Renderers with extra per-backend
+  //   caches (e.g., GL LUTs) should override releaseBackendResources(), clear caches, then
+  //   call Z3DPrimitiveRenderer::releaseBackendResources() to also run destroyResources().
   virtual void buildBackendResources(RenderBackend backend);
 
   virtual void releaseBackendResources();
@@ -118,6 +125,9 @@ protected:
   {}
 
 protected:
+  // Allocation hooks for per-backend GPU resources. These are the primary extension
+  // points most renderers override. Z3DPrimitiveRenderer calls them from the public
+  // build/release methods above, and the destructor calls destroyResources().
   virtual void createResources(RenderBackend /*backend*/) {}
 
   virtual void destroyResources() {}

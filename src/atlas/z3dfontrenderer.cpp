@@ -152,7 +152,9 @@ void Z3DFontRenderer::render(Z3DEye eye)
   Z3DShaderProgram& shader = m_fontShaderGrp->get();
 
   m_rendererBase.setGlobalShaderParameters(shader, eye);
-  shader.bindTexture("tex", font->texture());
+  if (auto* tex = fontAtlasTextureGL(*font)) {
+    shader.bindTexture("tex", tex);
+  }
   shader.setUniform("softedge_scale", m_fontSoftEdgeScale);
   if (m_showFontOutline) {
     shader.setUniform("outline_color", m_fontOutlineColor);
@@ -297,7 +299,11 @@ void Z3DFontRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   payload.colors = spanOrEmpty(m_fontColors);
   payload.pickingColors = spanOrEmpty(m_fontPickingColors);
   payload.indices = spanFromGLuints(m_indexs);
-  payload.atlasTexture = font->texture();
+  // Avoid GL bridging for Vulkan: provide CPU atlas
+  payload.atlasTexture = nullptr;
+  payload.atlasPixels = font->atlasPixelsBGRA8();
+  payload.atlasWidth = font->atlasWidth();
+  payload.atlasHeight = font->atlasHeight();
   payload.softedgeScale = m_fontSoftEdgeScale;
   payload.showOutline = m_showFontOutline;
   payload.showShadow = m_showFontShadow;
@@ -411,6 +417,37 @@ void Z3DFontRenderer::destroyResources()
   m_VAO.reset();
   m_VBOs.reset();
   m_pickingVBOs.reset();
+}
+
+Z3DTexture* Z3DFontRenderer::fontAtlasTextureGL(const Z3DSDFont& font) const
+{
+  const auto* key = &font;
+  const uint32_t w = font.atlasWidth();
+  const uint32_t h = font.atlasHeight();
+  auto itMeta = m_fontCache.meta.find(key);
+  auto itTex = m_fontCache.textures.find(key);
+  const bool needCreate = itMeta == m_fontCache.meta.end() ||
+                          itTex == m_fontCache.textures.end() ||
+                          itMeta->second.first != w || itMeta->second.second != h;
+  if (needCreate) {
+    const uint8_t* pixels = font.atlasPixelsBGRA8();
+    if (!pixels || w == 0u || h == 0u) {
+      return nullptr;
+    }
+    auto tex = std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(w, h, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
+    tex->updateImage(pixels);
+    m_fontCache.textures[key] = std::move(tex);
+    m_fontCache.meta[key] = std::make_pair(w, h);
+  }
+  return m_fontCache.textures[key].get();
+}
+
+void Z3DFontRenderer::releaseBackendResources()
+{
+  // Clear GL cache; textures will be deleted with unique_ptr
+  m_fontCache.textures.clear();
+  m_fontCache.meta.clear();
+  Z3DPrimitiveRenderer::releaseBackendResources();
 }
 
 void Z3DFontRenderer::setFontName(const QString& fontName)

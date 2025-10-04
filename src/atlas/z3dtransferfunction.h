@@ -1,6 +1,5 @@
 #pragma once
 
-#include "z3dgl.h"
 #include "zcolormap.h"
 #include "zparameter.h"
 #include <QObject>
@@ -10,8 +9,6 @@
 namespace nim {
 
 class ZImg;
-
-class Z3DTexture;
 
 // only support 1d transfer function now
 class Z3DTransferFunction : public ZColorMap
@@ -44,13 +41,10 @@ public:
 
   QString samplerType() const;
 
-  glm::uvec3 textureDimensions() const
+  glm::uvec3 dimensions() const
   {
     return m_dimensions;
   }
-
-  // Returns the texture of the transfer function.
-  Z3DTexture* texture() const;
 
   void resize(uint32_t width);
 
@@ -59,19 +53,12 @@ public:
 
   bool isValidDomainMax(double max) const override;
 
-protected:
-  void updateTexture() const;
-
-  void createTexture() const;
-
 private:
   // Adapts the given width and height of transfer function to graphics board capabilities.
   void fitDimensions(uint32_t& width, uint32_t& height, uint32_t& depth) const;
 
 protected:
   glm::uvec3 m_dimensions;
-  GLenum m_textureFormat;
-  GLenum m_textureDataType;
 };
 
 class Z3DTransferFunctionParameter : public ZSingleValueParameter<Z3DTransferFunction>

@@ -5,6 +5,7 @@
 #include <QString>
 #include <QStringList>
 #include <memory>
+#include <unordered_map>
 #include <string>
 
 namespace nim {
@@ -66,6 +67,8 @@ public:
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 
+  void releaseBackendResources() override;
+
 protected:
   void createResources(RenderBackend backend) override;
 
@@ -102,6 +105,16 @@ protected:
   std::unique_ptr<Z3DVertexBufferObject> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
+
+  // GL font atlas cache (OpenGL backend only)
+  struct FontGLCache
+  {
+    std::unordered_map<const Z3DSDFont*, std::unique_ptr<Z3DTexture>> textures;
+    std::unordered_map<const Z3DSDFont*, std::pair<uint32_t, uint32_t>> meta; // width, height
+  };
+  mutable FontGLCache m_fontCache;
+
+  Z3DTexture* fontAtlasTextureGL(const Z3DSDFont& font) const;
 };
 
 } // namespace nim

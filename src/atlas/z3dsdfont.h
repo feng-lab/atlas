@@ -1,7 +1,9 @@
 #pragma once
 
-#include "z3dtexture.h"
 #include <QImage>
+#include <QString>
+#include <cstdint>
+#include <vector>
 
 namespace nim {
 
@@ -76,14 +78,26 @@ public:
 
   [[nodiscard]] CharInfo charInfo(int id) const;
 
-  Z3DTexture* texture();
+  // CPU atlas accessors (BGRA8 in QImage memory layout)
+  [[nodiscard]] const uint8_t* atlasPixelsBGRA8() const
+  {
+    return reinterpret_cast<const uint8_t*>(m_GLFormattedImage.bits());
+  }
+
+  [[nodiscard]] uint32_t atlasWidth() const
+  {
+    return static_cast<uint32_t>(m_GLFormattedImage.width());
+  }
+
+  [[nodiscard]] uint32_t atlasHeight() const
+  {
+    return static_cast<uint32_t>(m_GLFormattedImage.height());
+  }
 
 protected:
   void loadImage();
 
   void parseFontFile();
-
-  void createTexture();
 
 private:
   QString m_imageFileName;
@@ -94,8 +108,6 @@ private:
   bool m_isEmpty; // if load image or txt failed, the font is empty
   std::vector<CharInfo> m_charInfos;
   int m_maxFontHeight;
-
-  std::unique_ptr<Z3DTexture> m_texture;
 };
 
 } // namespace nim

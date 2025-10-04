@@ -1,7 +1,6 @@
 #include "zcolormap.h"
 
-#include "z3dtexture.h"
-#include "z3dgpuinfo.h"
+#include "zglmutils.h"
 #include "zlog.h"
 #include "zcolormapwidgetwitheditorwindow.h"
 #include <QWidget>
@@ -249,6 +248,24 @@ ZColorMap::ZColorMap(const ZColorMap& cm)
   connect(this, &ZColorMap::changed, this, &ZColorMap::invalidateTexture);
 }
 
+void ZColorMap::buildLUTBGRA8(std::vector<uint8_t>& out, uint32_t width) const
+{
+  if (width == 0u) {
+    out.clear();
+    return;
+  }
+  out.resize(static_cast<size_t>(width) * 4u);
+  for (uint32_t x = 0; x < width; ++x) {
+    const double t = width > 1 ? static_cast<double>(x) / static_cast<double>(width - 1u) : 0.0;
+    const glm::col4 c = mappedColorBGRA(t);
+    const size_t idx = static_cast<size_t>(x) * 4u;
+    out[idx + 0] = static_cast<uint8_t>(c.r);
+    out[idx + 1] = static_cast<uint8_t>(c.g);
+    out[idx + 2] = static_cast<uint8_t>(c.b);
+    out[idx + 3] = static_cast<uint8_t>(c.a);
+  }
+}
+
 ZColorMap::ZColorMap(ZColorMap&& other) noexcept
 {
   swap(other);
@@ -260,8 +277,7 @@ void ZColorMap::swap(ZColorMap& other) noexcept
   std::swap(m_hasDataRange, other.m_hasDataRange);
   std::swap(m_dataMin, other.m_dataMin);
   std::swap(m_dataMax, other.m_dataMax);
-  m_texture.swap(other.m_texture);
-  std::swap(m_textureIsInvalid, other.m_textureIsInvalid);
+  std::swap(m_generation, other.m_generation);
 }
 
 void ZColorMap::reset(double min, double max, const glm::col4& minColor, const glm::col4& maxColor)
@@ -828,7 +844,9 @@ bool ZColorMap::removeDuplicatedKeys()
 bool ZColorMap::removeSelectedKeys()
 {
   size_t sizeBefore = m_keys.size();
-  std::erase_if(m_keys, [](const auto& key) { return key.second; });
+  std::erase_if(m_keys, [](const auto& key) {
+    return key.second;
+  });
   if (m_keys.size() != sizeBefore) {
     Q_EMIT changed();
   }
@@ -851,44 +869,6 @@ void ZColorMap::removeKey(size_t index)
 {
   m_keys.erase(m_keys.begin() + index);
   Q_EMIT changed();
-}
-
-Z3DTexture* ZColorMap::texture1D() const
-{
-  if (!m_texture) {
-    create1DTexture(256);
-  }
-  CHECK(m_texture);
-  if (m_textureIsInvalid) {
-    update1DTexture();
-  }
-
-  return m_texture.get();
-}
-
-void ZColorMap::create1DTexture(size_t width) const
-{
-  size_t maxTexSize = Z3DGpuInfo::instance().maxTextureSize();
-  if (maxTexSize < width) {
-    width = maxTexSize;
-  }
-  m_texture =
-    std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
-}
-
-void ZColorMap::update1DTexture() const
-{
-  if (!m_texture) {
-    return;
-  }
-
-  std::vector<glm::col4> tfData(m_texture->dimension().x);
-  for (size_t x = 0; x < tfData.size(); ++x) {
-    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1.));
-  }
-  m_texture->updateImage(tfData.data());
-
-  m_textureIsInvalid = false;
 }
 
 ZColorMapParameter::ZColorMapParameter(const QString& name, QObject* parent)

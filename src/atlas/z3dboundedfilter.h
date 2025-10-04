@@ -261,7 +261,7 @@ public:
 
   void renderEditingSelectionBox(Z3DEye eye);
 
-  void switchRendererBackend(RenderBackend backend);
+  virtual void switchRendererBackend(RenderBackend backend);
 
   void rotateX() override;
 

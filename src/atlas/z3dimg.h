@@ -81,11 +81,17 @@ public:
     return m_isVolumeDownsampled;
   }
 
-  const ZImg& channelVolumeImage(size_t c) const;
-
   [[nodiscard]] std::shared_ptr<const ZImg> channelImageShared(size_t c) const;
 
   [[nodiscard]] Z3DTexture* channelTexture(size_t c) const;
+
+  // Release GL textures owned by this image (channel and paging textures) to free memory
+  // when switching to Vulkan backend. Textures will be recreated lazily when needed.
+  void releaseGLResources();
+
+  // Explicitly (re)create GL paging textures (page directory, page table cache, image cache)
+  // and reset CPU paging arrays to a consistent empty state. Call when switching back to GL.
+  void rebuildGLPagingResources();
 
   [[nodiscard]] glm::uvec3 channelDimensions(size_t c) const;
 
@@ -373,7 +379,7 @@ private:
   size_t m_nChannels = 0;
   bool m_isVolumeDownsampled;
 
-  Z3DVertexBufferObject m_PBO;
+  std::unique_ptr<Z3DVertexBufferObject> m_PBO;
 
   std::vector<glm::dvec2> m_channelDisplayRanges;
 
