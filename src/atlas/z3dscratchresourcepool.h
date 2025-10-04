@@ -17,7 +17,6 @@ namespace nim {
 class ZVulkanScratchImage;
 class ZVulkanTexture;
 class ZVulkanDevice;
-class ZVulkanContext;
 class Z3DRenderTarget;
 
 enum class ScratchImageUsage
@@ -307,6 +306,13 @@ public:
   ZVulkanDevice* vulkanDevice();
   ZVulkanDevice& ensureVulkanDevice();
 
+  // Inject a shared Vulkan device owned by the rendering engine. When set, the
+  // pool will use this device and will not create its own context/device.
+  void setVulkanDevice(ZVulkanDevice* device)
+  {
+    m_externalVkDevice = device;
+  }
+
   // Describe current memory usage for logging/diagnostics.
   // detailed=false: single-line total; detailed=true: breakdown per slot/category.
   [[nodiscard]] std::string describeMemoryUsage(bool detailed = false) const;
@@ -439,7 +445,6 @@ private:
 
   struct VulkanEnvironment
   {
-    std::unique_ptr<ZVulkanContext> context;
     std::unique_ptr<ZVulkanDevice> device;
   };
 
@@ -450,6 +455,7 @@ private:
   std::unique_ptr<VulkanEnvironment> m_vulkanEnvironment;
   std::array<std::vector<std::unique_ptr<VulkanScratchSlot>>, kScratchUsageCount> m_vulkanSlots;
   RenderBackend m_defaultBackend = RenderBackend::OpenGL;
+  ZVulkanDevice* m_externalVkDevice = nullptr; // non-owning
 
   static constexpr uint32_t kTrimAcquireInterval = 512;
   static constexpr uint64_t kTrimAgeTicks = 1024;

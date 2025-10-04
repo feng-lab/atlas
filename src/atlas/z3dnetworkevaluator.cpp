@@ -20,7 +20,10 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* par
   , m_compositor(compositor)
 {
 #if defined(CHECKOPENGLSTATE) || defined(ATLAS_SANITIZE_ADDRESS)
-  m_filterWrappers.emplace_back(std::make_unique<Z3DCheckOpenGLStateFilterWrapper>());
+  // Only add GL state checker when using the OpenGL backend.
+  if (m_compositor.rendererBase().activeBackend() == RenderBackend::OpenGL) {
+    m_filterWrappers.emplace_back(std::make_unique<Z3DCheckOpenGLStateFilterWrapper>());
+  }
 #endif
   if (VLOG_IS_ON(1)) {
     m_filterWrappers.emplace_back(std::make_unique<Z3DProfileFilterWrapper>());
@@ -57,11 +60,18 @@ Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly
 
   maybeCancel(cancellationToken);
 
+  const bool glMode = (m_compositor.rendererBase().activeBackend() == RenderBackend::OpenGL);
+
   // notify filter wrappers
   for (auto& filterWrapper : m_filterWrappers) {
+    if (!glMode && dynamic_cast<Z3DCheckOpenGLStateFilterWrapper*>(filterWrapper.get()) != nullptr) {
+      continue;
+    }
     filterWrapper->beforeNetworkProcess();
   }
-  CHECK_GL_ERROR
+  if (glMode) {
+    CHECK_GL_ERROR
+  }
 
   double currentProgress = 0.0;
   double totalProgress = 0.0;
@@ -78,9 +88,14 @@ Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly
     if (!currentFilter->isValid(eye) && currentFilter->isReady(eye)) {
       // notify filter wrappers
       for (auto& filterWrapper : m_filterWrappers) {
+        if (!glMode && dynamic_cast<Z3DCheckOpenGLStateFilterWrapper*>(filterWrapper.get()) != nullptr) {
+          continue;
+        }
         filterWrapper->beforeFilterProcess(currentFilter);
       }
-      CHECK_GL_ERROR
+      if (glMode) {
+        CHECK_GL_ERROR
+      }
 
       {
         double progress = currentFilter->process(eye);
@@ -96,22 +111,34 @@ Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly
         }
         currentProgress += progress;
         totalProgress += 1.0;
-        CHECK_GL_ERROR
+        if (glMode) {
+          CHECK_GL_ERROR
+        }
       }
 
       // notify filter wrappers
       for (const auto& filterWrapper : m_filterWrappers) {
+        if (!glMode && dynamic_cast<const Z3DCheckOpenGLStateFilterWrapper*>(filterWrapper.get()) != nullptr) {
+          continue;
+        }
         filterWrapper->afterFilterProcess(currentFilter);
       }
-      CHECK_GL_ERROR
+      if (glMode) {
+        CHECK_GL_ERROR
+      }
     }
 
     if (stereo && !currentFilter->isValid(RightEye) && currentFilter->isReady(RightEye)) {
       // notify filter wrappers
       for (const auto& filterWrapper : m_filterWrappers) {
+        if (!glMode && dynamic_cast<const Z3DCheckOpenGLStateFilterWrapper*>(filterWrapper.get()) != nullptr) {
+          continue;
+        }
         filterWrapper->beforeFilterProcess(currentFilter);
       }
-      CHECK_GL_ERROR
+      if (glMode) {
+        CHECK_GL_ERROR
+      }
 
       {
         double progress = currentFilter->process(RightEye);
@@ -127,14 +154,21 @@ Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly
         }
         currentProgress += progress;
         totalProgress += 1.0;
-        CHECK_GL_ERROR
+        if (glMode) {
+          CHECK_GL_ERROR
+        }
       }
 
       // notify filter wrappers
       for (const auto& filterWrapper : m_filterWrappers) {
+        if (!glMode && dynamic_cast<const Z3DCheckOpenGLStateFilterWrapper*>(filterWrapper.get()) != nullptr) {
+          continue;
+        }
         filterWrapper->afterFilterProcess(currentFilter);
       }
-      CHECK_GL_ERROR
+      if (glMode) {
+        CHECK_GL_ERROR
+      }
     }
   }
 

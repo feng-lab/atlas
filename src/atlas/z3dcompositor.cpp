@@ -413,10 +413,9 @@ void Z3DCompositor::savePickingBufferToImage(const QString& filename)
 void Z3DCompositor::saveOutputColorToImage(const QString& filename, Z3DEye eye)
 {
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
-    const Z3DScratchResourcePool::RenderTargetLease* ready =
-      (eye == MonoEye)   ? m_monoReadyTarget
-      : (eye == LeftEye) ? m_leftReadyTarget
-                         : m_rightReadyTarget;
+    const Z3DScratchResourcePool::RenderTargetLease* ready = (eye == MonoEye)   ? m_monoReadyTarget
+                                                             : (eye == LeftEye) ? m_leftReadyTarget
+                                                                                : m_rightReadyTarget;
     if (!ready || !*ready || ready->backend != RenderBackend::Vulkan) {
       LOG(WARNING) << "Vulkan output save requested but ready lease is not Vulkan-backed.";
       return;
@@ -445,10 +444,9 @@ void Z3DCompositor::saveOutputColorToImage(const QString& filename, Z3DEye eye)
   }
 
   // GL fallback
-  const Z3DScratchResourcePool::RenderTargetLease* ready =
-    (eye == MonoEye)   ? m_monoReadyTarget
-    : (eye == LeftEye) ? m_leftReadyTarget
-                       : m_rightReadyTarget;
+  const Z3DScratchResourcePool::RenderTargetLease* ready = (eye == MonoEye)   ? m_monoReadyTarget
+                                                           : (eye == LeftEye) ? m_leftReadyTarget
+                                                                              : m_rightReadyTarget;
   if (!ready || !ready->renderTarget) {
     LOG(WARNING) << "GL output save requested but ready render target missing.";
     return;
@@ -460,10 +458,9 @@ void Z3DCompositor::saveOutputColorToImage(const QString& filename, Z3DEye eye)
 void Z3DCompositor::saveOutputDepthToImage(const QString& filename, Z3DEye eye)
 {
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
-    const Z3DScratchResourcePool::RenderTargetLease* ready =
-      (eye == MonoEye)   ? m_monoReadyTarget
-      : (eye == LeftEye) ? m_leftReadyTarget
-                         : m_rightReadyTarget;
+    const Z3DScratchResourcePool::RenderTargetLease* ready = (eye == MonoEye)   ? m_monoReadyTarget
+                                                             : (eye == LeftEye) ? m_leftReadyTarget
+                                                                                : m_rightReadyTarget;
     if (!ready || !*ready || ready->backend != RenderBackend::Vulkan) {
       LOG(WARNING) << "Vulkan depth save requested but ready lease is not Vulkan-backed.";
       return;
@@ -505,10 +502,9 @@ void Z3DCompositor::saveOutputDepthToImage(const QString& filename, Z3DEye eye)
   }
 
   // GL fallback
-  const Z3DScratchResourcePool::RenderTargetLease* ready =
-    (eye == MonoEye)   ? m_monoReadyTarget
-    : (eye == LeftEye) ? m_leftReadyTarget
-                       : m_rightReadyTarget;
+  const Z3DScratchResourcePool::RenderTargetLease* ready = (eye == MonoEye)   ? m_monoReadyTarget
+                                                           : (eye == LeftEye) ? m_leftReadyTarget
+                                                                              : m_rightReadyTarget;
   if (!ready || !ready->renderTarget) {
     LOG(WARNING) << "GL depth save requested but ready render target missing.";
     return;
@@ -586,10 +582,8 @@ double Z3DCompositor::processGL(Z3DEye eye)
   std::vector<Z3DBoundedFilter*> selectedFilters;
   std::vector<Z3DBoundedFilter*> showHandleFilters;
 
-  const auto transparencyMode = static_cast<TransparencyMode>(m_globalParameters.transparencyMethod.associatedData());
-  const bool multisample2x2 =
-    static_cast<GeometryMSAAMode>(m_globalParameters.geometriesMultisampleMode.associatedData()) ==
-    GeometryMSAAMode::MSAA2x2;
+  const auto transparencyMode = m_rendererBase.sceneState().transparency;
+  const bool multisample2x2 = (m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2);
   for (auto vFilter : vFilters) {
     if (vFilter->isReady(eye) && vFilter->hasOpaque(eye)) {
       normalOpaqueFilters.push_back(vFilter);
@@ -1220,9 +1214,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   }
 
   // Supersample 2x2 parity (render to 2x scene lease, then downsample)
-  const bool supersample2x2 =
-    static_cast<GeometryMSAAMode>(m_globalParameters.geometriesMultisampleMode.associatedData()) ==
-    GeometryMSAAMode::MSAA2x2;
+  const bool supersample2x2 = (m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2);
 
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   Z3DScratchResourcePool::RenderTargetLease sceneLease;
@@ -1252,7 +1244,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   }
 
   // Decide OIT usage and collect non-opaque image layers (volumes/slices) once
-  const auto transparencyMode = static_cast<TransparencyMode>(m_globalParameters.transparencyMethod.associatedData());
+  const auto transparencyMode = m_rendererBase.sceneState().transparency;
   const bool useOIT = transparencyMode == TransparencyMode::DualDepthPeeling ||
                       transparencyMode == TransparencyMode::WeightedAverage ||
                       transparencyMode == TransparencyMode::WeightedBlended;
@@ -1290,8 +1282,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         opaquePass.surface = m_rendererBase.describeSurface(leaseOpaque);
         opaquePass.eye = eye;
         opaquePass.transparency = TransparencyMode::BlendDelayed;
-        opaquePass.msaaMode =
-          static_cast<GeometryMSAAMode>(m_globalParameters.geometriesMultisampleMode.associatedData());
+        opaquePass.msaaMode = m_rendererBase.sceneState().multisample;
         opaquePass.clearColor = true;
         opaquePass.clearDepth = true;
         opaquePass.clearStencil = false;
@@ -1358,7 +1349,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       pass.surface = m_rendererBase.describeSurface(*sceneOutLease);
       pass.eye = eye;
       pass.transparency = transparencyMode;
-      pass.msaaMode = static_cast<GeometryMSAAMode>(m_globalParameters.geometriesMultisampleMode.associatedData());
+      pass.msaaMode = m_rendererBase.sceneState().multisample;
       pass.clearColor = false;
       pass.clearDepth = false;
       pass.clearStencil = false;
@@ -1586,8 +1577,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     pass.targetLease = sceneOutLease;
     pass.surface = m_rendererBase.describeSurface(*sceneOutLease);
     pass.eye = eye;
-    pass.transparency = static_cast<TransparencyMode>(m_globalParameters.transparencyMethod.associatedData());
-    pass.msaaMode = static_cast<GeometryMSAAMode>(m_globalParameters.geometriesMultisampleMode.associatedData());
+    pass.transparency = m_rendererBase.sceneState().transparency;
+    pass.msaaMode = m_rendererBase.sceneState().multisample;
     pass.clearColor = false;
     pass.clearDepth = false;
     pass.clearStencil = false;
@@ -1890,7 +1881,7 @@ bool Z3DCompositor::tryRenderGeometriesPass(const std::vector<Z3DBoundedFilter*>
                                             Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                             Z3DEye eye)
 {
-  const auto transparencyMode = static_cast<TransparencyMode>(m_globalParameters.transparencyMethod.associatedData());
+  const auto transparencyMode = m_rendererBase.sceneState().transparency;
   if (transparencyMode != TransparencyMode::BlendNoDepthMask && transparencyMode != TransparencyMode::BlendDelayed) {
     return false;
   }
@@ -1920,7 +1911,7 @@ bool Z3DCompositor::tryRenderGeometriesPass(const std::vector<Z3DBoundedFilter*>
 
   pass.eye = eye;
   pass.transparency = transparencyMode;
-  pass.msaaMode = static_cast<GeometryMSAAMode>(m_globalParameters.geometriesMultisampleMode.associatedData());
+  pass.msaaMode = m_rendererBase.sceneState().multisample;
 
   pass.clearColor = true;
   pass.clearDepth = true;
@@ -1961,7 +1952,7 @@ void Z3DCompositor::renderGeometriesLegacy(const std::vector<Z3DBoundedFilter*>&
                                            Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                            Z3DEye eye)
 {
-  const auto transparencyMode = static_cast<TransparencyMode>(m_globalParameters.transparencyMethod.associatedData());
+  const auto transparencyMode = m_rendererBase.sceneState().transparency;
   if (transparencyMode == TransparencyMode::BlendNoDepthMask) {
     renderGeomsBlendNoDepthMask(opaqueFilters, transparentFilters, targetLease, eye);
   } else if (transparencyMode == TransparencyMode::BlendDelayed) {

@@ -4,7 +4,6 @@
 #include "z3drendertarget.h"
 #include "z3dtexture.h"
 #include "zlog.h"
-#include "zvulkancontext.h"
 #include "zvulkandevice.h"
 #include "zvulkantexture.h"
 #include <cmath>
@@ -1331,17 +1330,9 @@ Z3DScratchResourcePool::VulkanEnvironment& Z3DScratchResourcePool::ensureVulkanE
 {
   if (!m_vulkanEnvironment) {
     auto env = std::make_unique<VulkanEnvironment>();
-    try {
-      env->context = std::make_unique<ZVulkanContext>();
-      env->device = env->context->createDevice();
-    }
-    catch (const std::exception& e) {
-      LOG(ERROR) << "Failed to initialize Vulkan scratch environment: " << e.what();
-      throw;
-    }
+    // No device/context created here anymore; device must be injected via setVulkanDevice()
     m_vulkanEnvironment = std::move(env);
   }
-  CHECK(m_vulkanEnvironment->device != nullptr) << "Vulkan device not available for scratch pool";
   return *m_vulkanEnvironment;
 }
 
@@ -1356,7 +1347,8 @@ Z3DScratchResourcePool::vulkanSlotsForUsage(ScratchImageUsage usage)
 Z3DScratchResourcePool::RenderTargetLease
 Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& descriptor)
 {
-  auto& env = ensureVulkanEnvironment();
+  // Ensure a device is available (external or internal)
+  ZVulkanDevice& dev = ensureVulkanDevice();
   auto& slots = vulkanSlotsForUsage(descriptor.usage);
 
   VulkanScratchSlot* slot = nullptr;
@@ -1382,7 +1374,7 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
 
   if (!slot) {
     auto newSlot = std::make_unique<VulkanScratchSlot>();
-    newSlot->image = std::make_unique<ZVulkanScratchImage>(*env.device, descriptor);
+    newSlot->image = std::make_unique<ZVulkanScratchImage>(dev, descriptor);
     newSlot->descriptor = descriptor;
     markSlotAcquired(*newSlot);
     auto lease = RenderTargetLease{};
@@ -1411,17 +1403,13 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
 
 ZVulkanDevice* Z3DScratchResourcePool::vulkanDevice()
 {
-  if (!m_vulkanEnvironment) {
-    return nullptr;
-  }
-  return m_vulkanEnvironment->device.get();
+  return m_externalVkDevice;
 }
 
 ZVulkanDevice& Z3DScratchResourcePool::ensureVulkanDevice()
 {
-  auto& env = ensureVulkanEnvironment();
-  CHECK(env.device != nullptr) << "Failed to initialize Vulkan device";
-  return *env.device;
+  CHECK(m_externalVkDevice != nullptr) << "External Vulkan device must be injected before Vulkan scratch allocation";
+  return *m_externalVkDevice;
 }
 
 } // namespace nim

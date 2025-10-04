@@ -10,9 +10,7 @@
 
 namespace nim {
 
-class ZVulkanContext;
 class ZVulkanDevice;
-class ZVulkanSwapChain;
 class ZVulkanLinePipelineContext;
 class ZVulkanMeshPipelineContext;
 class ZVulkanEllipsoidPipelineContext;
@@ -53,35 +51,21 @@ public:
   RendererFrameState::ActiveSurface
   describeSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease) override;
 
+  void preBackendSwitch() override;
+
   ZVulkanDevice& device();
 
   const ZVulkanDevice& device() const;
-
-  ZVulkanSwapChain& swapChain();
-
-  const ZVulkanSwapChain& swapChain() const;
 
   vk::raii::CommandBuffer& commandBuffer();
 
   const vk::raii::CommandBuffer& commandBuffer() const;
 
-  glm::uvec2 surfaceExtent() const
-  {
-    return m_swapChainExtent;
-  }
-
 private:
   void ensureDevice();
 
-  void ensureSwapChain(uint32_t width, uint32_t height);
-
-  RendererFrameState::ActiveSurface describeSurfaceFromSwapChain();
-
-  std::unique_ptr<ZVulkanContext> m_context;
-  std::unique_ptr<ZVulkanDevice> m_device;
-  std::unique_ptr<ZVulkanSwapChain> m_swapChain;
+  ZVulkanDevice* m_sharedDevice = nullptr; // non-owning; provided by engine/scratch-pool
   std::optional<vk::raii::CommandBuffer> m_activeCommandBuffer;
-  glm::uvec2 m_swapChainExtent{0, 0};
 
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
@@ -99,7 +83,6 @@ private:
   std::unique_ptr<ZVulkanImgRaycasterPipelineContext> m_imgRaycasterContext;
   std::unique_ptr<ZVulkanFontPipelineContext> m_fontContext;
 
-  bool m_suppressSwapchainPresent = false;
   
 };
 

@@ -431,6 +431,9 @@ void Z3DRendererBase::setBackend(RenderBackend backendType)
       break;
   }
 
+  if (m_backend) {
+    m_backend->preBackendSwitch();
+  }
   releaseBackendResources();
   releasePersistentLeases();
 

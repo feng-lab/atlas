@@ -564,8 +564,6 @@ set(SOURCES
     zvulkandescriptorpool.cpp
     zvulkandescriptorset.h
     zvulkandescriptorset.cpp
-    zvulkanswapchain.h
-    zvulkanswapchain.cpp
     zvulkan.cpp
     zvulkanshader.h
     zvulkanshader.cpp

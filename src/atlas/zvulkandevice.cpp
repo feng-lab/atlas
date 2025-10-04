@@ -5,7 +5,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
-#include "zvulkanswapchain.h"
 #include "zvulkancontext.h"
 #include "zexception.h"
 #include "zlog.h"
@@ -95,9 +94,5 @@ std::unique_ptr<ZVulkanDescriptorSet> ZVulkanDevice::createDescriptorSet(ZVulkan
   return std::make_unique<ZVulkanDescriptorSet>(*this, std::move(descriptorSet));
 }
 
-std::unique_ptr<ZVulkanSwapChain> ZVulkanDevice::createSwapChain(uint32_t width, uint32_t height)
-{
-  return std::make_unique<ZVulkanSwapChain>(*this, width, height);
-}
 
 } // namespace nim

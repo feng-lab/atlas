@@ -47,6 +47,11 @@ public:
 
   virtual RendererFrameState::ActiveSurface
   describeSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease) = 0;
+
+  // Called before switching away from the current backend. Allows implementations
+  // (e.g., Vulkan) to idle the device and drop swapchains to ensure safe teardown
+  // of resources referenced by in-flight work.
+  virtual void preBackendSwitch() {}
 };
 
 std::unique_ptr<Z3DRendererBackend> createGLRendererBackend();

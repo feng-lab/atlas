@@ -8,7 +8,6 @@
 #include "zlog.h"
 #include "zvulkandevice.h"
 #include "zvulkancontext.h"
-#include "zvulkanswapchain.h"
 #include "zvulkantexture.h"
 #include "z3dscratchresourcepool.h"
 #include "zsysteminfo.h"
@@ -28,6 +27,7 @@
 #include "zvulkanimgraycasterpipelinecontext.h"
 #include "zvulkanfontpipelinecontext.h"
 #include "zvulkanrenderconversions.h"
+#include "z3drenderglobalstate.h"
 
 #include <algorithm>
 #include <array>
@@ -50,6 +50,19 @@ Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
 {}
 
 Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend() = default;
+
+void Z3DRendererVulkanBackend::preBackendSwitch()
+{
+  // Drop any active frame and ensure GPU is idle before teardown/reset
+  m_activeCommandBuffer.reset();
+  if (m_sharedDevice) {
+    try {
+      m_sharedDevice->context().device().waitIdle();
+    } catch (const std::exception& e) {
+      LOG(WARNING) << "Vulkan waitIdle (shared) failed: " << e.what();
+    }
+  }
+}
 
 void Z3DRendererVulkanBackend::setGlobalShaderParameters(Z3DRendererBase& renderer,
                                                          Z3DShaderProgram& shader,
@@ -128,25 +141,18 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     return;
   }
 
-  ensureSwapChain(width, height);
-  if (!m_swapChain) {
-    LOG(ERROR) << "Vulkan backend failed to create swap chain";
-    m_activeCommandBuffer.reset();
-    return;
-  }
-
-  m_activeCommandBuffer = m_swapChain->beginFrame();
-
-  renderer.setActiveSurfaceForNextPass(describeSurfaceFromSwapChain());
+  // Headless mode: record into a one-shot command buffer. Render targets are provided
+  // by the compositor via scratch-pool leases; no swapchain is used.
+  m_activeCommandBuffer = device().beginSingleTimeCommands();
 }
 
 void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 {
   (void)renderer;
-  if (m_swapChain && m_activeCommandBuffer && !m_suppressSwapchainPresent) {
-    m_swapChain->endFrame(*m_activeCommandBuffer);
+  if (m_activeCommandBuffer) {
+    device().endSingleTimeCommands(*m_activeCommandBuffer);
+    m_activeCommandBuffer.reset();
   }
-  m_activeCommandBuffer.reset();
 }
 
 namespace {
@@ -200,35 +206,6 @@ std::string_view describeGeometry(const GeometryPayload& geometry)
 
 } // namespace
 
-RendererFrameState::ActiveSurface Z3DRendererVulkanBackend::describeSurfaceFromSwapChain()
-{
-  RendererFrameState::ActiveSurface surface;
-
-  if (!m_swapChain) {
-    return surface;
-  }
-
-  AttachmentDesc colorAttachment;
-  colorAttachment.handle.backend = AttachmentBackend::Vulkan;
-  colorAttachment.handle.index = 0;
-  colorAttachment.handle.id = reinterpret_cast<uint64_t>(&m_swapChain->colorAttachment());
-  colorAttachment.loadOp = LoadOp::Clear;
-  colorAttachment.storeOp = StoreOp::Store;
-  colorAttachment.clearValue.color = glm::vec4(0.f, 0.f, 0.f, 1.f);
-  surface.colorAttachments.push_back(colorAttachment);
-
-  AttachmentDesc depthAttachment;
-  depthAttachment.handle.backend = AttachmentBackend::Vulkan;
-  depthAttachment.handle.index = 0;
-  depthAttachment.handle.id = reinterpret_cast<uint64_t>(&m_swapChain->depthAttachment());
-  depthAttachment.loadOp = LoadOp::Clear;
-  depthAttachment.storeOp = StoreOp::Store;
-  depthAttachment.clearValue.depth = 1.0f;
-  depthAttachment.clearValue.stencil = 0;
-  surface.depthAttachment = depthAttachment;
-
-  return surface;
-}
 
 void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const RendererCPUState& state)
 {
@@ -250,6 +227,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (!texture) {
         return std::nullopt;
       }
+      // Enforce same logical device for backend and attachments
+      CHECK(&texture->ownerDevice() == &device()) << "Vulkan device mismatch for color attachment";
 
       const auto desiredLayout = vk::ImageLayout::eColorAttachmentOptimal;
       texture->transitionLayout(cmd, texture->layout(), desiredLayout);
@@ -276,6 +255,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (!texture) {
         return std::nullopt;
       }
+      // Enforce same logical device for backend and attachments
+      CHECK(&texture->ownerDevice() == &device()) << "Vulkan device mismatch for depth attachment";
 
       const auto desiredLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
       texture->transitionLayout(cmd, texture->layout(), desiredLayout);
@@ -515,8 +496,6 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   const LoadOp depthLoad = pass.clearDepth ? LoadOp::Clear : LoadOp::Load;
   renderer.setPendingColorAttachmentsLoadStore(colorLoad, StoreOp::Store, pass.clearValue);
   renderer.setPendingDepthAttachmentLoadStore(depthLoad, StoreOp::Store, pass.clearValue);
-  const bool prevSuppress = m_suppressSwapchainPresent;
-  m_suppressSwapchainPresent = true;
 
   renderer.executeVulkanBatches([&]() {
     // Opaque first
@@ -533,7 +512,6 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
     }
   });
 
-  m_suppressSwapchainPresent = prevSuppress;
   renderer.setCollectOnly(false);
 }
 
@@ -582,27 +560,16 @@ Z3DRendererVulkanBackend::describeSurfaceFromLease(const Z3DScratchResourcePool:
 ZVulkanDevice& Z3DRendererVulkanBackend::device()
 {
   ensureDevice();
-  CHECK(m_device != nullptr);
-  return *m_device;
+  CHECK(m_sharedDevice != nullptr);
+  return *m_sharedDevice;
 }
 
 const ZVulkanDevice& Z3DRendererVulkanBackend::device() const
 {
-  CHECK(m_device != nullptr);
-  return *m_device;
+  CHECK(m_sharedDevice != nullptr);
+  return *m_sharedDevice;
 }
 
-ZVulkanSwapChain& Z3DRendererVulkanBackend::swapChain()
-{
-  CHECK(m_swapChain != nullptr);
-  return *m_swapChain;
-}
-
-const ZVulkanSwapChain& Z3DRendererVulkanBackend::swapChain() const
-{
-  CHECK(m_swapChain != nullptr);
-  return *m_swapChain;
-}
 
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()
 {
@@ -618,36 +585,15 @@ const vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer() const
 
 void Z3DRendererVulkanBackend::ensureDevice()
 {
-  if (!m_context) {
-    m_context = std::make_unique<ZVulkanContext>();
+  if (m_sharedDevice) {
+    return;
   }
-  if (!m_device && m_context) {
-    m_device = m_context->createDevice();
-  }
+  auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+  auto* dev = pool.vulkanDevice();
+  CHECK(dev != nullptr) << "Shared Vulkan device not injected into scratch pool";
+  m_sharedDevice = dev;
 }
 
-void Z3DRendererVulkanBackend::ensureSwapChain(uint32_t width, uint32_t height)
-{
-  if (width == 0U || height == 0U) {
-    return;
-  }
-
-  ensureDevice();
-  if (!m_device) {
-    return;
-  }
-
-  if (!m_swapChain) {
-    m_swapChain = m_device->createSwapChain(width, height);
-    m_swapChainExtent = glm::uvec2(width, height);
-    return;
-  }
-
-  if (m_swapChainExtent.x != width || m_swapChainExtent.y != height) {
-    m_swapChain->resize(width, height);
-    m_swapChainExtent = glm::uvec2(width, height);
-  }
-}
 
 std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend()
 {

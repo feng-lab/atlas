@@ -33,6 +33,8 @@ class Z3DCanvasEventListener;
 class ZAnimation;
 
 class Z3DScratchResourcePool;
+class ZVulkanContext;
+class ZVulkanDevice;
 
 // Vulkan compositor forward decl removed (classification phase)
 
@@ -391,6 +393,10 @@ private:
   int m_sceneApplyOutstanding = 0;
 
   // (m_observedWGs and m_shuttingDown declared above to ensure lifetime beyond compositor)
+
+  // Vulkan context/device owned at engine level (mirrors GL ownership)
+  std::unique_ptr<ZVulkanContext> m_vkContext;
+  std::unique_ptr<ZVulkanDevice> m_vkDevice;
 };
 
 } // namespace nim

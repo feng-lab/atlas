@@ -187,6 +187,9 @@ public:
     return m_createInfo;
   }
 
+  // Access owning device for validation/assertions
+  ZVulkanDevice& ownerDevice() const { return m_device; }
+
 private:
   void createImage();
   void allocateMemory();

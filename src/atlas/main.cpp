@@ -12,7 +12,6 @@
 #include "zrunexport3danimation.h"
 #include "zrunneutucommand.h"
 #include "zwindowsheader.h"
-#include "zvulkan.h"
 
 #include <QSurfaceFormat>
 #include <QDir>
@@ -194,8 +193,6 @@ int main(int argc, char* argv[])
                        ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
                        ZSystemInfo::jarsDirPath(),
                        true);
-
-    initVulkan();
 
     // ZServiceManager sm;
 

@@ -275,6 +275,19 @@ void Z3DGlobalParameters::setDevicePixelRatio(float f)
   if (f != devicePixelRatio.get()) {
     devicePixelRatio.set(f);
     pickingManager.setDevicePixelRatio(f);
+    // Auto-tune geometry multisample mode based on display DPI.
+    // - On high-DPI (Retina) screens (DPR >= 2), disable 2x2 supersample to avoid redundant cost.
+    // - On standard-DPI screens (DPR < 2), prefer 2x2 supersample for crisper edges when enabled.
+    const auto current = static_cast<GeometryMSAAMode>(geometriesMultisampleMode.associatedData());
+    if (f >= 2.0f) {
+      if (current != GeometryMSAAMode::None) {
+        geometriesMultisampleMode.select(QStringLiteral("None"));
+      }
+    } else { // f < 2.0f
+      if (current == GeometryMSAAMode::None) {
+        geometriesMultisampleMode.select(QStringLiteral("2x2"));
+      }
+    }
   }
 }
 

@@ -20,6 +20,8 @@
 #include "zvideoencoder.h"
 #include "z3drenderglobalstate.h"
 #include "z3dscratchresourcepool.h"
+#include "zvulkancontext.h"
+#include "zvulkandevice.h"
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
@@ -1168,7 +1170,10 @@ bool Z3DRenderingEngine::event(QEvent* e)
 
 void Z3DRenderingEngine::getGLFocus()
 {
-  CHECK(m_context != nullptr) << "OpenGL context is not initialized";
+  // In Vulkan/headless paths there may be no GL context; treat as no-op.
+  if (!m_context) {
+    return;
+  }
   m_context->makeCurrent();
 }
 
@@ -1519,15 +1524,58 @@ void Z3DRenderingEngine::applyBackendSwitch()
       return;
     }
   } else if (m_context) {
+    // Make GL current to safely tear down any GL resources in release paths
     getGLFocus();
   }
 
+  // If switching away from Vulkan, ensure the GPU is idle before destroying scratch resources
+  if (previousBackend == RenderBackend::Vulkan && m_vkDevice) {
+    try {
+      m_vkDevice->context().device().waitIdle();
+    } catch (const std::exception& e) {
+      LOG(WARNING) << "Vulkan waitIdle before pool reset failed: " << e.what();
+    }
+  }
+
+  // Clear old scratch resources first; new backend allocations happen after this point
   m_scratchPool->reset();
+
+  // Prepare Vulkan device if targeting Vulkan; inject into scratch pool before any Vulkan allocations
+  if (backend == RenderBackend::Vulkan) {
+    if (!m_vkContext) {
+      try {
+        m_vkContext = std::make_unique<ZVulkanContext>();
+      } catch (const std::exception& e) {
+        const auto errorMsg = QString::fromStdString(fmt::format("Failed to create Vulkan context: {}", e.what()));
+        LOG(ERROR) << errorMsg.toStdString();
+        reportRenderingError(errorMsg);
+        m_scratchPool->setDefaultBackend(previousBackend);
+        return;
+      }
+    }
+    if (!m_vkDevice) {
+      try {
+        m_vkDevice = m_vkContext->createDevice();
+      } catch (const std::exception& e) {
+        const auto errorMsg = QString::fromStdString(fmt::format("Failed to create Vulkan device: {}", e.what()));
+        LOG(ERROR) << errorMsg.toStdString();
+        reportRenderingError(errorMsg);
+        m_scratchPool->setDefaultBackend(previousBackend);
+        return;
+      }
+    }
+    Z3DRenderGlobalState::instance().setScratchPool(m_scratchPool.get());
+    m_scratchPool->setVulkanDevice(m_vkDevice.get());
+  }
+
+  // Set the pool default backend so subsequent allocations use the new API
   m_scratchPool->setDefaultBackend(backend);
 
+  // Switch renderer backends for compositor + connected filters (this will idle Vulkan via preBackendSwitch)
   m_compositor->switchBackend(backend);
 
   if (backend == RenderBackend::Vulkan) {
+    // Drop GL context after transition to Vulkan to avoid accidental usage
     m_context.reset();
   }
 

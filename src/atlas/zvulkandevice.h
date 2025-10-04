@@ -15,7 +15,6 @@ class ZVulkanShader;
 class ZVulkanPipeline;
 class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
-class ZVulkanSwapChain;
 
 class ZVulkanDevice
 {
@@ -50,7 +49,6 @@ public:
   std::unique_ptr<ZVulkanDescriptorSet> createDescriptorSet(ZVulkanDescriptorPool& pool,
                                                             vk::DescriptorSetLayout layout);
 
-  std::unique_ptr<ZVulkanSwapChain> createSwapChain(uint32_t width, uint32_t height);
 
   vk::raii::CommandBuffer beginSingleTimeCommands();
   void endSingleTimeCommands(vk::raii::CommandBuffer& cmdBuffer);
