@@ -242,8 +242,15 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
   instance.pipeline->setDepthTestEnable(false);
   instance.pipeline->setDepthWriteEnable(false);
 
+  // Blend weighted-blended result over background using premultiplied alpha.
   vk::PipelineColorBlendAttachmentState blendAttachment{};
-  blendAttachment.blendEnable = VK_FALSE;
+  blendAttachment.blendEnable = VK_TRUE;
+  blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+  blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  blendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+  blendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
   blendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   instance.pipeline->setColorBlendAttachment(blendAttachment);
@@ -259,4 +266,3 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
 }
 
 } // namespace nim
-

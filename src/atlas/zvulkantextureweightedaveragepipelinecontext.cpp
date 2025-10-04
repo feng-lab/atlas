@@ -318,8 +318,16 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
   instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
   instance.pipeline->setDepthWriteEnable(true);
 
+  // Blend weighted-average result over the existing background using
+  // premultiplied alpha semantics (GL: ONE, ONE_MINUS_SRC_ALPHA).
   vk::PipelineColorBlendAttachmentState blendAttachment{};
-  blendAttachment.blendEnable = VK_FALSE;
+  blendAttachment.blendEnable = VK_TRUE;
+  blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+  blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  blendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+  blendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
   blendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   instance.pipeline->setColorBlendAttachment(blendAttachment);

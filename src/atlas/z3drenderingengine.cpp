@@ -1586,6 +1586,10 @@ void Z3DRenderingEngine::applyBackendSwitch()
   m_globalParas->camera.get().setCoordinateSystem(backend == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan
                                                                                    : Z3DCoordinateSystem::OpenGL);
 
+  // After switching clip space conventions, recompute near/far to avoid
+  // accidental clipping differences between backends.
+  resetCameraClippingRange();
+
   m_progress = 0.0;
   m_isRendering = false;
 

@@ -618,18 +618,37 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
     auto& source = filter->rendererBase();
     const bool prevCollectOnly = source.collectOnly();
     const glm::uvec4 previousViewport = source.frameState().viewport;
+    const auto previousSurface = source.frameState().activeSurface;
+    const auto surfaceCopy = renderer.frameState().activeSurface;
     source.setCollectOnly(true);
     source.frameState().updateViewportData(renderer.frameState().viewport);
-    const auto surfaceCopy = renderer.frameState().activeSurface;
-    source.setActiveSurfaceForNextPass(surfaceCopy);
+    source.frameState().setActiveSurface(surfaceCopy);
+    source.clearPendingActiveSurface();
     renderFn();
     auto& batches = source.cpuState().batches;
     for (auto& batch : batches) {
+      if (batch.pass.colorAttachments.empty() && !surfaceCopy.colorAttachments.empty()) {
+        batch.pass.colorAttachments = surfaceCopy.colorAttachments;
+      }
+      if (!batch.pass.depthAttachment.has_value() && surfaceCopy.depthAttachment.has_value()) {
+        batch.pass.depthAttachment = surfaceCopy.depthAttachment;
+      }
+      if (batch.pass.viewport.extent == glm::vec2(0.0f) && renderer.frameState().viewport.z > 0u &&
+          renderer.frameState().viewport.w > 0u) {
+        batch.pass.viewport.origin = glm::vec2(static_cast<float>(renderer.frameState().viewport.x),
+                                               static_cast<float>(renderer.frameState().viewport.y));
+        batch.pass.viewport.extent =
+          glm::vec2(static_cast<float>(renderer.frameState().viewport.z),
+                    static_cast<float>(renderer.frameState().viewport.w));
+        batch.pass.viewport.minDepth = 0.0f;
+        batch.pass.viewport.maxDepth = 1.0f;
+      }
       renderer.appendBatch(std::move(batch));
     }
     source.resetCPUState();
     source.setCollectOnly(prevCollectOnly);
     source.frameState().updateViewportData(previousViewport);
+    source.frameState().setActiveSurface(previousSurface);
   };
 
   renderer.executeVulkanBatches([&]() {

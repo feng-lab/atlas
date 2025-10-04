@@ -274,8 +274,16 @@ ZVulkanTextureBlendPipelineContext::ensurePipeline(const PipelineKey& key, const
   instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
   instance.pipeline->setDepthWriteEnable(true);
 
+  // Final compositor pass needs premultiplied alpha blending over the
+  // already-rendered background, matching the GL path.
   vk::PipelineColorBlendAttachmentState blendAttachment{};
-  blendAttachment.blendEnable = VK_FALSE;
+  blendAttachment.blendEnable = VK_TRUE;
+  blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+  blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  blendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+  blendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
   blendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   instance.pipeline->setColorBlendAttachment(blendAttachment);

@@ -32,6 +32,7 @@
 #include <glm/gtx/hash.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/matrix_transform_2d.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <tuple>
 #include <utility>
 #include <type_traits>

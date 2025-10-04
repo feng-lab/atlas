@@ -395,18 +395,13 @@ void Z3DCamera::makeViewMatrices()
 void Z3DCamera::makeProjectionMatrices()
 {
   if (m_projectionType == ProjectionType::Orthographic) {
-    glm::mat4 pmat = glm::ortho(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
-    
-    // For Vulkan, adjust the depth range from [0,1] instead of [-1,1]
+    glm::mat4 pmat;
     if (m_coordinateSystem == Z3DCoordinateSystem::Vulkan) {
-      // Adjust for Vulkan's coordinate system (Y is inverted and depth range is [0,1])
-      pmat[1][1] *= -1;  // Flip Y axis
-      
-      // Transform Z from [-1,1] to [0,1]
-      pmat[2][2] = pmat[2][2] * 0.5f;
-      pmat[3][2] = pmat[3][2] + 0.5f * pmat[2][3];
+      // Vulkan-style depth in [0,1]
+      pmat = glm::orthoRH_ZO(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
+    } else {
+      pmat = glm::ortho(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
     }
-    
     m_projectionMatrices[LeftEye] = pmat;
     m_projectionMatrices[MonoEye] = pmat;
     m_projectionMatrices[RightEye] = pmat;
@@ -417,19 +412,10 @@ void Z3DCamera::makeProjectionMatrices()
   } else {
     // Create perspective projection matrices
     auto createFrustum = [this](float left, float right, float bottom, float top, float near, float far) -> glm::mat4 {
-      glm::mat4 mat = glm::frustum(left, right, bottom, top, near, far);
-      
-      // For Vulkan, adjust the Y axis and depth range
       if (m_coordinateSystem == Z3DCoordinateSystem::Vulkan) {
-        // Flip Y axis
-        mat[1][1] *= -1;
-        
-        // Transform Z from [-1,1] to [0,1]
-        mat[2][2] = mat[2][2] * 0.5f;
-        mat[3][2] = mat[3][2] + 0.5f * mat[2][3];
+        return glm::frustumRH_ZO(left, right, bottom, top, near, far);
       }
-      
-      return mat;
+      return glm::frustum(left, right, bottom, top, near, far);
     };
     
     // VLOG(1) << fmt::format("{}, {}, {}, {}", m_left, m_right, m_bottom, m_top);

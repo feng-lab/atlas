@@ -1239,10 +1239,50 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     clear.color = glm::vec4(0.0f);
     clear.depth = 1.0f;
     clear.stencil = 0u;
+    // Clear then draw background into the scene lease
     m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
     m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
     m_rendererBase.executeVulkanBatches([&]() {
       m_rendererBase.render(eye, m_backgroundRenderer);
+    });
+    m_rendererBase.setCollectOnly(false);
+  } else {
+    // Ensure transparent output when background is disabled. We clear the
+    // scene lease by drawing a uniform transparent quad using the background
+    // pipeline (mode=Uniform, color=0). This preserves the GL behavior where
+    // background off yields alpha=0 for screenshots.
+    m_rendererBase.setCollectOnly(true);
+    m_rendererBase.setActiveSurfaceForNextPass(*sceneOutLease);
+    ClearValue clear{};
+    clear.color = glm::vec4(0.0f);
+    clear.depth = 1.0f;
+    clear.stencil = 0u;
+    m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+    m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+    m_rendererBase.executeVulkanBatches([&]() {
+      BackgroundPayload payload;
+      payload.renderer = &m_backgroundRenderer;
+      payload.color1 = glm::vec4(0.0f);
+      payload.color2 = glm::vec4(0.0f);
+      payload.region = glm::vec4(0.f, 1.f, 0.f, 1.f);
+      payload.mode = BackgroundMode::Uniform;
+      payload.orientation = BackgroundGradientOrientation::BottomToTop;
+
+      RenderBatch batch;
+      batch.eye = eye;
+      const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+      batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+      batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+      batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+      batch.pass.viewport.minDepth = 0.0f;
+      batch.pass.viewport.maxDepth = 1.0f;
+      batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
+      batch.pass.depthAttachment = m_rendererBase.frameState().activeSurface.depthAttachment;
+      batch.draw.topology = PrimitiveTopology::TriangleStrip;
+      batch.draw.vertexCount = 4;
+      batch.draw.indexCount = 0;
+      batch.geometry = payload;
+      m_rendererBase.appendBatch(std::move(batch));
     });
     m_rendererBase.setCollectOnly(false);
   }
@@ -1330,13 +1370,19 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_alphaBlendRenderer.setSourceAttachments1(color1, depth1);
 
       ClearValue clear{};
+      // Keep alpha=0 when no background, so screenshots can preserve
+      // transparency like the OpenGL path.
       clear.color = glm::vec4(0.0f);
       clear.depth = 1.0f;
       clear.stencil = 0u;
 
       m_rendererBase.setCollectOnly(true);
       m_rendererBase.setActiveSurfaceForNextPass(*sceneOutLease);
-      m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+      // Preserve the previously rendered background when composing OIT result
+      // (GL draws background first and then overlays; mimic by loading color).
+      m_rendererBase.setPendingColorAttachmentsLoadStore(m_showBackground.get() ? LoadOp::Load : LoadOp::Clear,
+                                                         StoreOp::Store,
+                                                         clear);
       m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
       m_rendererBase.executeVulkanBatches([&]() {
         m_rendererBase.render(eye, m_alphaBlendRenderer);
@@ -1626,7 +1672,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
     m_rendererBase.setCollectOnly(true);
     m_rendererBase.setActiveSurfaceForNextPass(*sceneOutLease);
+    // Load color, clear depth inside the axis viewport so axes are always on top.
+    ClearValue clearAxis{};
+    clearAxis.depth = 1.0f;
     m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Load, StoreOp::Store);
+    m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clearAxis);
     m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Load, StoreOp::Store);
     m_rendererBase.executeVulkanBatches([&]() {
       if (m_axisMode.get() == "Arrow") {
@@ -1902,8 +1952,6 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
   // from stale Vulkan textures.
   if (backendRequest == RenderBackend::OpenGL) {
     m_globalParameters.setPickingTargetVulkan(nullptr, nullptr, glm::uvec2(0u, 0u));
-    // Optionally reacquire a GL picking target immediately.
-    ensurePickingTarget(m_outputSize);
 
     // Rebuild compositor-owned GL shader programs in the new context.
     m_ddpBlendShader = std::make_unique<Z3DShaderProgram>();
@@ -3007,7 +3055,8 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
   for (auto& attachment : outSurface.colorAttachments) {
-    attachment.loadOp = LoadOp::Clear;
+    // If a background was drawn earlier into the same surface, keep it.
+    attachment.loadOp = m_showBackground.get() ? LoadOp::Load : LoadOp::Clear;
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
@@ -3132,7 +3181,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
   for (auto& attachment : outSurface.colorAttachments) {
-    attachment.loadOp = LoadOp::Clear;
+    attachment.loadOp = m_showBackground.get() ? LoadOp::Load : LoadOp::Clear;
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
@@ -3260,7 +3309,7 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
   for (auto& attachment : outSurface.colorAttachments) {
-    attachment.loadOp = LoadOp::Clear;
+    attachment.loadOp = m_showBackground.get() ? LoadOp::Load : LoadOp::Clear;
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
