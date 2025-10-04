@@ -105,14 +105,13 @@ std::unique_ptr<ZVulkanTexture> createImageCacheTexture(ZVulkanDevice& device, g
 
 ZVulkanPagedImageBlockUploader::ZVulkanPagedImageBlockUploader(ZVulkanDevice& device)
   : m_device(device)
+  , m_aliveFlag(std::make_shared<bool>(true))
 {}
 
 ZVulkanPagedImageBlockUploader::~ZVulkanPagedImageBlockUploader()
 {
+  *m_aliveFlag = false;
   std::scoped_lock lock(m_mutex);
-  for (auto& [_, imageResources] : m_resources) {
-    QObject::disconnect(imageResources.destructionHook);
-  }
   m_resources.clear();
 }
 
@@ -315,11 +314,23 @@ ZVulkanPagedImageBlockUploader::ensureImageResourcesLocked(Z3DImg& image)
     resources.channels.resize(image.numChannels());
     auto [inserted, _] = m_resources.emplace(&image, std::move(resources));
     it = inserted;
-    it->second.destructionHook = QObject::connect(&image, &QObject::destroyed, [this, key = &image]() {
-      std::scoped_lock guard(m_mutex);
-      m_resources.erase(key);
+  }
+
+  if (!it->second.destructionRegistered) {
+    std::weak_ptr<bool> alive = m_aliveFlag;
+    ZVulkanPagedImageBlockUploader* self = this;
+    image.addDestructionCallback([alive, self, key = &image]() {
+      auto alivePtr = alive.lock();
+      if (!alivePtr || !*alivePtr) {
+        return;
+      }
+      std::scoped_lock guard(self->m_mutex);
+      self->m_resources.erase(key);
     });
-  } else if (it->second.channels.size() != image.numChannels()) {
+    it->second.destructionRegistered = true;
+  }
+
+  if (it->second.channels.size() != image.numChannels()) {
     it->second.channels.resize(image.numChannels());
   }
   return it->second;

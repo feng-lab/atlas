@@ -212,29 +212,36 @@ Status legend: [Done], [In‑Progress], [Todo], [Blocked]
 
 - Compositor: geometry vs. image pass parity [Done]
   - No image‑transparent layers → single compositor pass draws geometry + image‑opaque.
-  - With image‑transparent layers → geometry in a pass, then image layers blended.
-  - File ref: src/atlas/z3dcompositor.cpp:1015
+  - With image‑transparent layers and OIT disabled → geometry in a pass, then image layers blended.
+  - With image‑transparent layers and OIT enabled → image layers participate directly in Vulkan OIT helpers (DDP/WA/WB) alongside geometry; no post‑blend step.
+  - File refs: src/atlas/z3dcompositor.cpp:1000, src/atlas/z3dcompositor.cpp:1120
 
 - Vulkan image layer blending parity (non‑OIT) [Done]
-  - Collect per‑filter AttachmentHandles (color+depth) and blend using TextureBlend renderer (DepthTest/MIP modes) with Vulkan attachments.
-  - Multi‑layer merge via pairwise passes into pooled Vulkan temps, then blend over output.
-  - File ref: src/atlas/z3dcompositor.cpp:1188
+  - Collect per‑filter AttachmentHandles (color+depth) and blend using TextureBlend renderer (DepthTest/MIP modes) with Vulkan attachments when OIT is disabled.
+  - Multi‑layer merge via pairwise passes into pooled Vulkan temps, then blend over output; gated so it skips when OIT already consumed the layers.
+  - File ref: src/atlas/z3dcompositor.cpp:1370
 
-- OIT parity for geometry/images [In-Progress]
-  - Dual depth peeling / weighted average / weighted blended now active for cones, ellipsoids, lines, meshes, spheres on Vulkan.
-  - Compositor Vulkan path drives OIT passes using scratch leases + `AttachmentHandle`s (geometry arenas + image layers) and blends opaque/transparent results onto the output lease.
-  - Vulkan execution now lives in dedicated helpers (`renderTransparent*Vulkan`) so GL paths stay untouched for reference, with compositor entry points dispatching per-backend.
-  - TODO: extend volume-integrated OIT and tighten validation coverage.
+- OIT parity for geometry/images [Done]
+  - Dual depth peeling / weighted average / weighted blended now active for cones, ellipsoids, lines, meshes, spheres, and volume image layers on Vulkan.
+  - `processVulkan` always reuses collected non‑opaque image leases when OIT is enabled so volume outputs participate in the same Vulkan OIT helpers before opaque/transparent compositing. The compositor skips the legacy post‑blend path in this case.
+  - Vulkan execution stays isolated in the `renderTransparent*Vulkan` helpers, keeping the GL path untouched for reference.
+  - File refs: src/atlas/z3dcompositor.cpp:1000, src/atlas/z3dcompositor.cpp:1120
 
-- Axis overlay (Vulkan) [In-Progress]
-  - Axis camera/renderer now execute on Vulkan backend after transparency resolves via `setActiveSurfaceForNextPass(*outLease)` without clearing.
-  - TODO: replicate GL scissor-style corner viewport logic if further refinement needed.
+- Axis overlay (Vulkan) [Done]
+  - Axis renderer now mirrors the GL corner viewport + scissor handling and disables depth testing so the overlay matches GL layering.
+  - File ref: src/atlas/z3dcompositor.cpp:1424
 
-- MSAA / 2x2 supersample parity [Todo]
-  - Map `GeometryMSAAMode` to Vulkan sample counts; provide 2x2 supersample temp path when enabled.
+- MSAA / 2x2 supersample parity [Done]
+  - Implemented 2x2 supersample parity in the Vulkan compositor by rendering the scene to a 2x viewport‐sized scratch lease and downsampling into the compositor output via `Z3DTextureCopyRenderer`.
+  - Applies to background, opaque/transparent geometry, OIT paths (DDP/WA/WB), image‑layer blending, glow overlays, and axis overlay.
+  - Vulkan sample count remains 1; parity uses supersampled intermediate attachments, matching the GL flow.
+  - File refs: src/atlas/z3dcompositor.cpp:1006, src/atlas/z3dcompositor.cpp:1429
 
-- Picking path (Vulkan) [Todo]
-  - Ensure picking target uses Vulkan lease; add Vulkan picking batches for primitive contexts; save buffer to image.
+- Picking path (Vulkan) [In‑Progress → MVP]
+  - Added Vulkan picking target acquisition via persistent RGBA8+Depth24 leases and recorded picking batches for geometry and handle overlays, with first‑on‑top composition to a dedicated picking target.
+  - Implemented `savePickingBufferToImage` for Vulkan by downloading the picking attachment and saving via QImage.
+  - Next: wire interactive queries to read back individual pixels for widget interactions (current change focuses on recording + save).
+  - File refs: src/atlas/z3dcompositor.cpp:1468, src/atlas/z3dcompositor.cpp:257
 
 - Screenshot/readback (Vulkan) [Todo]
   - Readback from Vulkan output attachments for screenshots (mono/stereo, tiled).

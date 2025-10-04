@@ -4,11 +4,12 @@
 #include "zcolormap.h"
 #include "zparameter.h"
 #include <QObject>
+#include <memory>
 #include <vector>
 
 namespace nim {
 
-class Z3DVolume;
+class ZImg;
 
 class Z3DTexture;
 
@@ -88,11 +89,16 @@ public:
                                int width,
                                QObject* parent = nullptr);
 
-  void setVolume(Z3DVolume* volume);
+  void setImage(std::shared_ptr<const ZImg> image);
 
-  [[nodiscard]] Z3DVolume* volume() const
+  [[nodiscard]] std::shared_ptr<const ZImg> image() const
   {
-    return m_volume;
+    return m_image;
+  }
+
+  [[nodiscard]] int bitsStored() const
+  {
+    return m_bitsStored;
   }
 
   void setMinMaxIntensity(double minInten, double maxInten)
@@ -130,7 +136,8 @@ protected:
   QWidget* actualCreateWidget(QWidget* parent) override;
 
 protected:
-  Z3DVolume* m_volume;
+  std::shared_ptr<const ZImg> m_image;
+  int m_bitsStored = 0;
   double m_minIntensity = std::numeric_limits<double>::lowest();
   double m_maxIntensity = std::numeric_limits<double>::lowest();
 };

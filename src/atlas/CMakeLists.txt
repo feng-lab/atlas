@@ -400,7 +400,6 @@ set(SOURCES
     z3dgeometryfilter.h z3dgeometryfilter.cpp
     z3daxisfilter.h z3daxisfilter.cpp
     z3dboundedfilter.h z3dboundedfilter.cpp
-    z3dvolumeslicerenderer.h z3dvolumeslicerenderer.cpp
     z3dmeshrenderer.h z3dmeshrenderer.cpp
     z3dtexturecopyrenderer.h z3dtexturecopyrenderer.cpp
     z3dtexturecoordinaterenderer.h z3dtexturecoordinaterenderer.cpp
@@ -408,7 +407,6 @@ set(SOURCES
     z3dsphererenderer.h z3dsphererenderer.cpp
     z3dlinewithfixedwidthcolorrenderer.h z3dlinewithfixedwidthcolorrenderer.cpp
     z3dlinerenderer.h z3dlinerenderer.cpp
-    z3dimage2drenderer.h z3dimage2drenderer.cpp
     z3dfontrenderer.h z3dfontrenderer.cpp
     z3dellipsoidrenderer.h z3dellipsoidrenderer.cpp
     z3dconerenderer.h z3dconerenderer.cpp

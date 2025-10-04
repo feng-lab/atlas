@@ -9,8 +9,6 @@
 
 namespace nim {
 
-class Z3DVolume;
-
 class Z3DImg;
 
 // render 2d slices of volume with colormap

@@ -10,6 +10,7 @@
 #include <folly/ScopeGuard.h>
 #include <QMenu>
 #include <memory>
+#include <utility>
 
 namespace nim {
 
@@ -231,8 +232,6 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     }
 
     m_3dImg = std::make_unique<Z3DImg>(imgPack, m_rendererParameters.coordTransform.scale(), drs);
-    connect(m_3dImg.get(), &Z3DImg::renderingError, this, &Z3DImgFilter::renderingError);
-
     updateBlockIDTarget();
 
     // Layer target channel depth managed inside renderers now
@@ -853,6 +852,8 @@ double Z3DImgFilter::process(Z3DEye eye)
       }
       m_3dImg->setChannelDisplayRanges(channelDisplayRanges);
       for (size_t i = 0; i < m_transferFuncParas.size() && i < m_3dImg->numChannels(); ++i) {
+        auto channelImage = m_3dImg->channelImageShared(i);
+        m_transferFuncParas[i]->setImage(std::move(channelImage));
         m_transferFuncParas[i]->setMinMaxIntensity(m_3dImg->displayRange(i).x, m_3dImg->displayRange(i).y);
       }
     }

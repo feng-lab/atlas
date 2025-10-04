@@ -4,15 +4,15 @@
 #include "zimgpack.h"
 #include "z3dblockcache.h"
 #include "z3dtexture.h"
-#include "z3dvolume.h"
 #include "z3dvertexbufferobject.h"
 #include "zbbox.h"
 #include <folly/CancellationToken.h>
-#include <QObject>
 #include <set>
 #include <functional>
 #include <optional>
 #include <span>
+#include <string>
+#include <memory>
 
 #if defined(ATLAS_SANITIZE_ADDRESS)
 #define ATLAS_CHECK_CACHE
@@ -26,22 +26,20 @@ class Z3DShaderProgram;
 class ZBenchTimer;
 class ZVulkanImageBlockUploader;
 
-// Z3DVolume coordinates:
+// coordinates:
 // 1. Voxel Coordinate:    [0, dim.x-1] x [0, dim.y-1] x [0, dim.z-1]
 //                     in which (0,0,0) is LeftUpFront Corner (LUF)
 //                         and dim-1 is RightDownBack Corner (RDB)
 // 2. Texture Coordinate:  [0.0, 1.0] x [0.0, 1.0] x [0.0, 1.0]
 // might throw exception
-class Z3DImg : public QObject
+class Z3DImg
 {
-  Q_OBJECT
-
 public:
-  // Z3DVolume will take ownership of the img
+  // Z3DImg builds per-channel textures and caches for rendering
   Z3DImg(const ZImgPack& imgPack,
          const glm::vec3& scale,
-         const std::vector<glm::dvec2>& displayRanges,
-         QObject* parent = nullptr);
+         const std::vector<glm::dvec2>& displayRanges);
+  ~Z3DImg();
 
   [[nodiscard]] const ZImgPack& imgPack() const
   {
@@ -83,17 +81,20 @@ public:
     return m_isVolumeDownsampled;
   }
 
-  [[nodiscard]] const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const
-  {
-    return m_volumes;
-  }
-
   const ZImg& channelVolumeImage(size_t c) const;
+
+  [[nodiscard]] std::shared_ptr<const ZImg> channelImageShared(size_t c) const;
+
+  [[nodiscard]] Z3DTexture* channelTexture(size_t c) const;
+
+  [[nodiscard]] glm::uvec3 channelDimensions(size_t c) const;
 
   uint64_t volumeGeneration(size_t c) const;
 
+  void addDestructionCallback(std::function<void()> callback);
+
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
-  [[nodiscard]] QString samplerType() const;
+  [[nodiscard]] std::string samplerType() const;
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   [[nodiscard]] glm::vec3 physicalLUF() const
@@ -136,12 +137,6 @@ public:
   {
     return {physicalRDB().x, physicalLUF().y, physicalRDB().z};
   }
-
-  std::vector<std::unique_ptr<Z3DVolume>> makeXSliceVolume(size_t x);
-
-  std::vector<std::unique_ptr<Z3DVolume>> makeYSliceVolume(size_t y);
-
-  std::vector<std::unique_ptr<Z3DVolume>> makeZSliceVolume(size_t z);
 
   [[nodiscard]] ZBBox<glm::dvec3> physicalBoundBox() const
   {
@@ -274,9 +269,6 @@ public:
                                           const folly::CancellationToken& cancellationToken,
                                           ZBenchTimer& bt);
 
-Q_SIGNALS:
-  void renderingError(const QString& error) const;
-
 protected:
   void readVolumes();
 
@@ -370,7 +362,14 @@ protected:
 private:
   // std::unique_ptr<Z3DImgHistogramThread> m_histogramThread;
   const ZImgPack& m_imgPack;
-  std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
+  struct ChannelResources
+  {
+    std::shared_ptr<const ZImg> image;
+    std::unique_ptr<Z3DTexture> texture;
+    glm::uvec3 dimensions{0u, 0u, 0u};
+  };
+
+  std::vector<ChannelResources> m_channelResources;
   size_t m_nChannels = 0;
   bool m_isVolumeDownsampled;
 
@@ -386,6 +385,8 @@ private:
   double m_depthScale = 1.0;
   glm::uvec3 m_volumeDimension;
   glm::vec3 m_volumeSpacing;
+
+  std::vector<std::function<void()>> m_destructionCallbacks;
 
 #ifdef ATLAS_CHECK_CACHE
   boost::unordered_flat_set<glm::uvec3> m_usedPageTableEntry;

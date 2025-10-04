@@ -162,7 +162,6 @@ private:
 private:
   Z3DImgRaycasterRenderer m_imgRaycasterRenderer;
   Z3DImgSliceRenderer m_imgSliceRenderer;
-  // std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
   std::unique_ptr<Z3DImg> m_3dImg;
@@ -190,11 +189,6 @@ private:
   std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
   std::vector<std::unique_ptr<Z3DTransferFunctionParameter>> m_transferFuncParas;
 
-  // static const size_t m_maxNumOfFullResolutionVolumeSlice;
-  //  each channel is represented by a Z3DVolume
-  // std::vector<std::vector<std::unique_ptr<Z3DVolume>>> m_FRVolumeSlices;
-  // std::vector<bool> m_FRVolumeSlicesValidState;
-  // ZBoolParameter m_useFRVolumeSlice;
   ZBoolParameter m_showXSlice;
   ZIntParameter m_xSlicePosition;
   ZBoolParameter m_showYSlice;

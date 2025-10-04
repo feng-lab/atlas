@@ -2,10 +2,9 @@
 
 #include "zvulkanimageblockuploader.h"
 
-#include <QMetaObject>
-#include <QObject>
 #include "zglmutils.h"
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -50,7 +49,7 @@ private:
 
   struct ImageResources
   {
-    QMetaObject::Connection destructionHook;
+    bool destructionRegistered = false;
     std::vector<ChannelResources> channels;
   };
 
@@ -63,6 +62,7 @@ private:
   ZVulkanDevice& m_device;
   mutable std::mutex m_mutex;
   std::unordered_map<const Z3DImg*, ImageResources> m_resources;
+  std::shared_ptr<bool> m_aliveFlag;
 };
 
 } // namespace nim

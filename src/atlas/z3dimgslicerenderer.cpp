@@ -94,7 +94,9 @@ void Z3DImgSliceRenderer::bindVolumes(Z3DShaderProgram& shader) const
   size_t idx = 0;
   for (size_t i = 0; i < m_img->numChannels(); ++i) {
     // volumes
-    shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes()[i]->texture(), GLint(GL_NEAREST), GLint(GL_NEAREST));
+    auto* texture = m_img->channelTexture(i);
+    CHECK(texture != nullptr) << "Missing OpenGL texture for channel " << i;
+    shader.bindTexture(m_volumeUniformNames[idx], texture, GLint(GL_NEAREST), GLint(GL_NEAREST));
 
     // colormap
     shader.bindTexture(m_colormapUniformNames[idx++], (*m_colormaps)[i]->get().texture1D());
@@ -106,7 +108,9 @@ void Z3DImgSliceRenderer::bindVolumes(Z3DShaderProgram& shader) const
 void Z3DImgSliceRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx) const
 {
   // volumes
-  shader.bindTexture(m_volumeUniformNames[0], m_img->volumes()[idx]->texture(), GLint(GL_NEAREST), GLint(GL_NEAREST));
+  auto* texture = m_img->channelTexture(idx);
+  CHECK(texture != nullptr) << "Missing OpenGL texture for channel " << idx;
+  shader.bindTexture(m_volumeUniformNames[0], texture, GLint(GL_NEAREST), GLint(GL_NEAREST));
 
   // colormap
   shader.bindTexture(m_colormapUniformNames[0], (*m_colormaps)[idx]->get().texture1D());

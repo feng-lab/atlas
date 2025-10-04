@@ -193,6 +193,7 @@ private:
   void updateBackgroundSecondColor();
   void updateBackgroundOrientation();
   void ensurePickingTarget(const glm::uvec2& size);
+  void ensurePickingTargetVulkan(const glm::uvec2& size);
   Z3DScratchResourcePool::RenderTargetLease& ensureDDPRenderTarget(const glm::uvec2& size);
   Z3DScratchResourcePool::RenderTargetLease& ensureWARenderTarget(const glm::uvec2& size);
   Z3DScratchResourcePool::RenderTargetLease& ensureWBRenderTarget(const glm::uvec2& size);

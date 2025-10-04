@@ -416,8 +416,10 @@ void Z3DImgRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& shad
     CHECK(m_transferFunctions[i] != nullptr);
 
     // volumes
-    shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes()[i]->texture());
-    shader.setUniform(m_volumeDimensionNames[idx], glm::vec3(m_img->volumes()[i]->dimensions()));
+    auto* texture = m_img->channelTexture(i);
+    CHECK(texture != nullptr) << "Missing OpenGL texture for channel " << i;
+    shader.bindTexture(m_volumeUniformNames[idx], texture);
+    shader.setUniform(m_volumeDimensionNames[idx], glm::vec3(m_img->channelDimensions(i)));
 
     // transfer functions
     shader.bindTexture(m_transferFuncUniformNames[idx++], m_transferFunctions[i]->texture());
@@ -432,8 +434,10 @@ void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader
 {
   shader.setLogUniformLocationError(false);
 
-  shader.bindTexture(m_volumeUniformNames[0], m_img->volumes()[idx]->texture());
-  shader.setUniform(m_volumeDimensionNames[0], glm::vec3(m_img->volumes()[idx]->dimensions()));
+  auto* texture = m_img->channelTexture(idx);
+  CHECK(texture != nullptr) << "Missing OpenGL texture for channel " << idx;
+  shader.bindTexture(m_volumeUniformNames[0], texture);
+  shader.setUniform(m_volumeDimensionNames[0], glm::vec3(m_img->channelDimensions(idx)));
 
   // transfer functions
   CHECK(idx < m_transferFunctions.size());
@@ -441,7 +445,9 @@ void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader
   shader.bindTexture(m_transferFuncUniformNames[0], m_transferFunctions[idx]->texture());
 
   // m_transferFunctions[idx]->texture()->saveAsColorImage("/Users/feng/Downloads/abcd_tf.tif");
-  // m_img->volumes()[idx]->texture()->saveAsColorImage("/Users/feng/Downloads/abcd_v.tif");
+  // if (auto* tex = m_img->channelTexture(idx)) {
+  //   tex->saveAsColorImage("/Users/feng/Downloads/abcd_v.tif");
+  // }
 
   CHECK_GL_ERROR
 

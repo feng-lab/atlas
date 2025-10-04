@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <chrono>
 #include <memory>
+#include <utility>
 
 DEFINE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds,
               5,
@@ -36,12 +37,40 @@ DECLARE_double(atlas_image_cache_memory_proportion);
 DECLARE_double(atlas_image_region_cache_memory_proportion);
 
 namespace nim {
+
+namespace {
+
+std::unique_ptr<Z3DTexture> createChannelTexture(const ZImg& image)
+{
+  glm::uvec3 dimensions(image.width(), image.height(), image.depth());
+
+  GLenum format = GL_RED;
+  GLint internalFormat = GLint(GL_R8);
+  GLenum dataType = GL_UNSIGNED_BYTE;
+
+  if (image.isType<uint8_t>()) {
+    internalFormat = GLint(GL_R8);
+    dataType = GL_UNSIGNED_BYTE;
+  } else if (image.isType<uint16_t>()) {
+    internalFormat = GLint(GL_R16);
+    dataType = GL_UNSIGNED_SHORT;
+  } else if (image.isType<float>()) {
+    internalFormat = GLint(GL_R32F);
+    dataType = GL_FLOAT;
+  } else {
+    LOG(ERROR) << "Unsupported volume voxel format for channel texture.";
+    return nullptr;
+  }
+
+  return std::make_unique<Z3DTexture>(internalFormat, dimensions, format, dataType, image.channelData(0));
+}
+
+} // namespace
+
 Z3DImg::Z3DImg(const ZImgPack& imgPack,
                const glm::vec3& scale,
-               const std::vector<glm::dvec2>& displayRanges,
-               QObject* parent)
-  : QObject(parent)
-  , m_imgPack(imgPack)
+               const std::vector<glm::dvec2>& displayRanges)
+  : m_imgPack(imgPack)
   , m_channelDisplayRanges(displayRanges)
 {
   for (const auto& dr : m_channelDisplayRanges) {
@@ -137,7 +166,16 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
   }
 }
 
-QString Z3DImg::samplerType() const
+Z3DImg::~Z3DImg()
+{
+  for (auto& callback : m_destructionCallbacks) {
+    if (callback) {
+      callback();
+    }
+  }
+}
+
+std::string Z3DImg::samplerType() const
 {
   if (is3DData()) {
     return "sampler3D";
@@ -148,9 +186,28 @@ QString Z3DImg::samplerType() const
 
 const ZImg& Z3DImg::channelVolumeImage(size_t c) const
 {
-  CHECK_LT(c, m_volumes.size());
-  CHECK(m_volumes[c] != nullptr);
-  return m_volumes[c]->image();
+  CHECK_LT(c, m_channelResources.size());
+  CHECK(m_channelResources[c].image != nullptr);
+  return *m_channelResources[c].image;
+}
+
+std::shared_ptr<const ZImg> Z3DImg::channelImageShared(size_t c) const
+{
+  CHECK_LT(c, m_channelResources.size());
+  CHECK(m_channelResources[c].image != nullptr);
+  return m_channelResources[c].image;
+}
+
+Z3DTexture* Z3DImg::channelTexture(size_t c) const
+{
+  CHECK_LT(c, m_channelResources.size());
+  return m_channelResources[c].texture.get();
+}
+
+glm::uvec3 Z3DImg::channelDimensions(size_t c) const
+{
+  CHECK_LT(c, m_channelResources.size());
+  return m_channelResources[c].dimensions;
 }
 
 uint64_t Z3DImg::volumeGeneration(size_t c) const
@@ -159,6 +216,11 @@ uint64_t Z3DImg::volumeGeneration(size_t c) const
     return m_volumeGenerations[c];
   }
   return 0;
+}
+
+void Z3DImg::addDestructionCallback(std::function<void()> callback)
+{
+  m_destructionCallbacks.emplace_back(std::move(callback));
 }
 
 glm::uvec3 Z3DImg::imageCacheSize() const
@@ -174,80 +236,6 @@ size_t Z3DImg::imageBlockByteSize() const
   const glm::uvec3 extent = imageBlockExtent();
   const ZImgInfo info(extent.x, extent.y, extent.z, 1);
   return info.byteNumber();
-}
-
-std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeXSliceVolume(size_t x)
-{
-  std::vector<std::unique_ptr<Z3DVolume>> res;
-  size_t maxTextureSize = Z3DGpuInfo::instance().maxTextureSize();
-  for (size_t c = 0; c < m_nChannels; ++c) {
-    ZImg croped = m_imgPack.crop(ZImgRegion(x, x + 1, 0, -1, 0, -1, c, c + 1, 0, 1));
-    croped.infoRef().width = m_imgPack.imgInfo().height;
-    croped.infoRef().height = m_imgPack.imgInfo().depth;
-    croped.infoRef().depth = 1;
-    if (croped.width() > maxTextureSize || croped.height() > maxTextureSize) {
-      croped = croped.resize(std::min(maxTextureSize, croped.width()), std::min(maxTextureSize, croped.height()), 1);
-    }
-    if (!croped.isType<uint8_t>()) {
-      croped = croped.convertTo<uint8_t>(m_channelDisplayRanges[c].x, m_channelDisplayRanges[c].y);
-    } else {
-      croped.normalize(m_channelDisplayRanges[c].x, m_channelDisplayRanges[c].y);
-    }
-    auto vh = std::make_unique<Z3DVolume>(croped);
-    vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
-                              m_imgPack.imgInfo().channelColors[c].g / 255.,
-                              m_imgPack.imgInfo().channelColors[c].b / 255.));
-    res.emplace_back(std::move(vh));
-  }
-  return res;
-}
-
-std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeYSliceVolume(size_t y)
-{
-  std::vector<std::unique_ptr<Z3DVolume>> res;
-  size_t maxTextureSize = Z3DGpuInfo::instance().maxTextureSize();
-  for (size_t c = 0; c < m_nChannels; ++c) {
-    ZImg croped = m_imgPack.crop(ZImgRegion(0, -1, y, y + 1, 0, -1, c, c + 1, 0, 1));
-    croped.infoRef().height = m_imgPack.imgInfo().depth;
-    croped.infoRef().depth = 1;
-    if (croped.width() > maxTextureSize || croped.height() > maxTextureSize) {
-      croped = croped.resize(std::min(maxTextureSize, croped.width()), std::min(maxTextureSize, croped.height()), 1);
-    }
-    if (!croped.isType<uint8_t>()) {
-      croped = croped.convertTo<uint8_t>(m_channelDisplayRanges[c].x, m_channelDisplayRanges[c].y);
-    } else {
-      croped.normalize(m_channelDisplayRanges[c].x, m_channelDisplayRanges[c].y);
-    }
-    auto vh = std::make_unique<Z3DVolume>(croped);
-    vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
-                              m_imgPack.imgInfo().channelColors[c].g / 255.,
-                              m_imgPack.imgInfo().channelColors[c].b / 255.));
-    res.emplace_back(std::move(vh));
-  }
-  return res;
-}
-
-std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeZSliceVolume(size_t z)
-{
-  std::vector<std::unique_ptr<Z3DVolume>> res;
-  size_t maxTextureSize = Z3DGpuInfo::instance().maxTextureSize();
-  for (size_t c = 0; c < m_nChannels; ++c) {
-    ZImg croped = m_imgPack.crop(ZImgRegion(0, -1, 0, -1, z, z + 1, c, c + 1, 0, 1));
-    if (croped.width() > maxTextureSize || croped.height() > maxTextureSize) {
-      croped = croped.resize(std::min(maxTextureSize, croped.width()), std::min(maxTextureSize, croped.height()), 1);
-    }
-    if (!croped.isType<uint8_t>()) {
-      croped = croped.convertTo<uint8_t>(m_channelDisplayRanges[c].x, m_channelDisplayRanges[c].y);
-    } else {
-      croped.normalize(m_channelDisplayRanges[c].x, m_channelDisplayRanges[c].y);
-    }
-    auto vh = std::make_unique<Z3DVolume>(croped);
-    vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
-                              m_imgPack.imgInfo().channelColors[c].g / 255.,
-                              m_imgPack.imgInfo().channelColors[c].b / 255.));
-    res.emplace_back(std::move(vh));
-  }
-  return res;
 }
 
 void Z3DImg::setScale(const glm::vec3& scale)
@@ -554,7 +542,10 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
   shader.bindTexture("page_directory", m_channelPageDirectoryTextures[c].get());
   shader.bindTexture("page_table_cache", m_channelPageTableCacheTextures[c].get());
   shader.bindTexture("image_cache", m_channelImageCacheTextures[c].get());
-  shader.bindTexture("volume", m_volumes[c]->texture());
+
+  Z3DTexture* texture = channelTexture(c);
+  CHECK(texture != nullptr) << "Missing channel texture for channel " << c;
+  shader.bindTexture("volume", texture);
 }
 
 bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
@@ -785,7 +776,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
 void Z3DImg::readVolumes()
 {
-  m_volumes.clear();
+  m_channelResources.clear();
+  m_channelResources.resize(m_nChannels);
 
   if (m_volumeGenerations.size() != m_nChannels) {
     m_volumeGenerations.assign(m_nChannels, 0);
@@ -800,9 +792,14 @@ void Z3DImg::readVolumes()
       img.normalize(m_channelDisplayRanges[0].x, m_channelDisplayRanges[0].y);
     }
 
-    auto vh = std::make_unique<Z3DVolume>(img, m_volumeSpacing, glm::vec3(.0));
-
-    m_volumes.emplace_back(std::move(vh));
+    auto mutableImage = std::make_shared<ZImg>(std::move(img));
+    auto& channel = m_channelResources[0];
+    channel.image = std::shared_ptr<const ZImg>(mutableImage);
+    channel.dimensions = glm::uvec3(static_cast<uint32_t>(channel.image->width()),
+                                    static_cast<uint32_t>(channel.image->height()),
+                                    static_cast<uint32_t>(channel.image->depth()));
+    channel.texture = createChannelTexture(*channel.image);
+    CHECK(channel.texture != nullptr) << "Failed to create channel texture.";
     ++m_volumeGenerations[0];
   } else {
     for (size_t i = 0; i < m_nChannels; ++i) {
@@ -812,17 +809,17 @@ void Z3DImg::readVolumes()
       } else if (cImg.validBitCount() != 0 && cImg.validBitCount() != 8 && cImg.validBitCount() != 16) {
         cImg.normalize(m_channelDisplayRanges[i].x, m_channelDisplayRanges[i].y);
       }
-      auto vh = std::make_unique<Z3DVolume>(cImg, m_volumeSpacing, glm::vec3(.0));
 
-      m_volumes.emplace_back(std::move(vh));
+      auto mutableImage = std::make_shared<ZImg>(std::move(cImg));
+      auto& channel = m_channelResources[i];
+      channel.image = std::shared_ptr<const ZImg>(mutableImage);
+      channel.dimensions = glm::uvec3(static_cast<uint32_t>(channel.image->width()),
+                                      static_cast<uint32_t>(channel.image->height()),
+                                      static_cast<uint32_t>(channel.image->depth()));
+      channel.texture = createChannelTexture(*channel.image);
+      CHECK(channel.texture != nullptr) << "Failed to create channel texture.";
       ++m_volumeGenerations[i];
-    } // for each cannel
-  }
-
-  for (size_t i = 0; i < m_nChannels; ++i) {
-    m_volumes[i]->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[i].r / 255.,
-                                        m_imgPack.imgInfo().channelColors[i].g / 255.,
-                                        m_imgPack.imgInfo().channelColors[i].b / 255.));
+    }
   }
 }
 

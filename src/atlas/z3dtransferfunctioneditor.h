@@ -4,6 +4,8 @@
 #include "zoptionparameter.h"
 #include <QWidget>
 #include <QMenu>
+#include <memory>
+#include <vector>
 
 class QAction;
 
@@ -25,11 +27,13 @@ namespace nim {
 
 class ZClickableTransferFunctionLabel;
 
-class Z3DVolume;
-
 class Z3DTransferFunctionParameter;
 
 class Z3DTransferFunction;
+
+class ZImg;
+
+class ZImgHistogramThread;
 
 class Z3DTransferFunctionWidget : public QWidget
 {
@@ -71,7 +75,11 @@ public:
 
   void setHistogramVisible(bool v);
 
-  void volumeChanged(Z3DVolume* volume);
+  void setHistogramData(std::vector<size_t> bins, size_t maxCount);
+
+  void clearHistogram();
+
+  void setHistogramPending(bool pending);
 
 protected:
   void deleteKey();
@@ -141,7 +149,9 @@ protected:
   bool m_showHistogram;
   QString m_histogramNormalizeMethod;
 
-  Z3DVolume* m_volume;
+  std::vector<size_t> m_histogramBins;
+  size_t m_histogramMaxCount = 0;
+  bool m_histogramPending = false;
 };
 
 class Z3DTransferFunctionEditor : public QWidget
@@ -150,6 +160,8 @@ class Z3DTransferFunctionEditor : public QWidget
 
 public:
   explicit Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent = nullptr);
+
+  ~Z3DTransferFunctionEditor() override;
 
   void createWidgets();
 
@@ -160,7 +172,11 @@ protected:
 
   void updateFromTransferFunction();
 
-  void volumeChanged();
+  void imageChanged();
+
+  void histogramComputationFinished();
+
+  void stopHistogramThread();
 
   void domainMinSpinBoxChanged(double min);
 
@@ -174,8 +190,7 @@ protected:
 
 protected:
   Z3DTransferFunctionParameter* m_transferFunction;
-
-  Z3DVolume* m_volume;
+  std::shared_ptr<const ZImg> m_image;
 
   Z3DTransferFunctionWidget* m_transferFunctionWidget;
   ZClickableTransferFunctionLabel* m_transferFunctionTexture;
@@ -192,6 +207,12 @@ protected:
   QLabel* m_dataMaxNameLabel;
   QPushButton* m_fitDomainToDataButton;
   QCheckBox* m_rescaleKeys;
+
+  double m_dataMinValue = 0.0;
+  double m_dataMaxValue = 0.0;
+  bool m_hasDataMinMax = false;
+
+  std::unique_ptr<ZImgHistogramThread> m_histogramThread;
 };
 
 } // namespace nim

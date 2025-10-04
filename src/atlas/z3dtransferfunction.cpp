@@ -3,13 +3,40 @@
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
 #include "z3dtransferfunctionwidgetwitheditorwindow.h"
-#include "z3dvolume.h"
 #include "z3dtexture.h"
+#include "zimg.h"
 #include "zlog.h"
 #include <QLabel>
+#include <algorithm>
 #include <memory>
 
 namespace nim {
+
+namespace {
+
+int bitsStoredForImage(const ZImg& image)
+{
+  const auto& info = image.info();
+  const auto bitsFromFormat = static_cast<int>(info.bytesPerVoxel * 8);
+  if (info.voxelFormat == VoxelFormat::Float) {
+    return bitsFromFormat;
+  }
+  if (info.validBitCount != 0) {
+    return static_cast<int>(info.validBitCount);
+  }
+  return bitsFromFormat;
+}
+
+size_t histogramTextureWidthForBits(int bits)
+{
+  if (bits <= 0) {
+    return 256;
+  }
+  const int clampedBits = std::clamp(bits, 1, 16);
+  return static_cast<size_t>(1) << clampedBits;
+}
+
+} // namespace
 
 Z3DTransferFunction::Z3DTransferFunction(double min,
                                          double max,
@@ -154,7 +181,6 @@ bool Z3DTransferFunction::isValidDomainMax(double max) const
 
 Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<Z3DTransferFunction>(name, parent)
-  , m_volume(nullptr)
 {
   connect(&m_value, &Z3DTransferFunction::changed, this, &Z3DTransferFunctionParameter::valueChanged);
 }
@@ -167,28 +193,29 @@ Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString& name,
                                                            int width,
                                                            QObject* parent)
   : ZSingleValueParameter<Z3DTransferFunction>(name, parent)
-  , m_volume(nullptr)
 {
   m_value = Z3DTransferFunction(min, max, minColor, maxColor, width);
   connect(&m_value, &Z3DTransferFunction::changed, this, &Z3DTransferFunctionParameter::valueChanged);
 }
 
-void Z3DTransferFunctionParameter::setVolume(Z3DVolume* volume)
+void Z3DTransferFunctionParameter::setImage(std::shared_ptr<const ZImg> image)
 {
-  if (m_volume != volume) {
-    m_volume = volume;
-    if (m_volume) {
-      // Resize texture of tf according to bitdepth of volume
-      int bits = m_volume->bitsStored();
-      if (bits > 16) {
-        bits = 16; // handle float data as if it was 16 bit to prevent overflow
-      }
-
-      int max = 1 << bits;
-      m_value.resize(max);
-    }
-    Q_EMIT valueChanged();
+  if (m_image == image) {
+    return;
   }
+
+  m_image = std::move(image);
+  if (m_image) {
+    m_bitsStored = bitsStoredForImage(*m_image);
+    const size_t desiredWidth = histogramTextureWidthForBits(m_bitsStored);
+    if (desiredWidth != m_value.textureDimensions().x) {
+      m_value.resize(static_cast<uint32_t>(desiredWidth));
+    }
+  } else {
+    m_bitsStored = 0;
+  }
+
+  Q_EMIT valueChanged();
 }
 
 QWidget* Z3DTransferFunctionParameter::actualCreateWidget(QWidget* parent)
@@ -200,6 +227,8 @@ void Z3DTransferFunctionParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const auto* src = static_cast<const Z3DTransferFunctionParameter*>(&rhs);
+  m_image = src->image();
+  m_bitsStored = src->bitsStored();
   if (m_value != src->get()) {
     m_value = src->get();
     m_value.invalidateTexture();

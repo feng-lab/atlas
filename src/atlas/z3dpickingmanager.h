@@ -9,6 +9,8 @@
 
 namespace nim {
 
+class ZVulkanTexture; // forward declare
+
 class Z3DPickingManager
 {
 public:
@@ -20,6 +22,14 @@ public:
   void setDevicePixelRatio(double dpr)
   {
     m_devicePixelRatio = dpr;
+  }
+
+  // Vulkan: set color/depth attachments for picking readback
+  void setVulkanTargets(ZVulkanTexture* color, ZVulkanTexture* depth, const glm::uvec2& size)
+  {
+    m_vkColor = color;
+    m_vkDepth = depth;
+    m_vkSize = size;
   }
 
   glm::col4 registerObject(const void* obj);
@@ -89,6 +99,11 @@ private:
   Z3DRenderTarget* m_renderTarget = nullptr;
   glm::col4 m_currentColor{0, 0, 0, 128};
   double m_devicePixelRatio = 1.;
+
+  // Vulkan attachments for picking (optional)
+  ZVulkanTexture* m_vkColor = nullptr;
+  ZVulkanTexture* m_vkDepth = nullptr;
+  glm::uvec2 m_vkSize{0u, 0u};
 };
 
 } // namespace nim

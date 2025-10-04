@@ -3,6 +3,7 @@
 #include "z3dgl.h"
 #include "z3dtexture.h"
 #include "zlog.h"
+#include "zvulkantexture.h"
 #include <functional>
 #include <memory>
 #include <vector>
@@ -76,6 +77,31 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
   pos[0] = pos[0] * m_devicePixelRatio;
   pos[1] = pos[1] * m_devicePixelRatio;
 
+  // Vulkan path
+  if (m_vkColor) {
+    const int w = static_cast<int>(m_vkSize.x);
+    const int h = static_cast<int>(m_vkSize.y);
+    if (w <= 0 || h <= 0) {
+      return nullptr;
+    }
+    // Clamp inside bounds
+    pos.x = std::clamp(pos.x, 0, w - 1);
+    pos.y = std::clamp(pos.y, 0, h - 1);
+    const int yFlip = h - 1 - pos.y;
+    const size_t idx = (static_cast<size_t>(yFlip) * w + pos.x) * 4ull;
+    std::vector<uint8_t> raw;
+    raw.resize(static_cast<size_t>(w) * h * 4u);
+    try {
+      m_vkColor->downloadData(raw.data(), raw.size());
+    }
+    catch (const std::exception& e) {
+      LOG_FIRST_N(WARNING, 3) << "Vulkan picking color download failed: " << e.what();
+      return nullptr;
+    }
+    glm::col4 c{raw[idx + 0], raw[idx + 1], raw[idx + 2], raw[idx + 3]};
+    return objectOfColor(c);
+  }
+
   auto texSize = glm::ivec3(m_renderTarget->attachment(GL_COLOR_ATTACHMENT0)->dimension());
   pos[1] = texSize[1] - pos[1];
   return objectOfColor(m_renderTarget->colorAtPos(pos));
@@ -86,6 +112,47 @@ GLfloat Z3DPickingManager::depthAtWidgetPos(glm::ivec2 pos)
   assert(m_devicePixelRatio >= 1);
   pos[0] = pos[0] * m_devicePixelRatio;
   pos[1] = pos[1] * m_devicePixelRatio;
+
+  // Vulkan path
+  if (m_vkDepth) {
+    const int w = static_cast<int>(m_vkSize.x);
+    const int h = static_cast<int>(m_vkSize.y);
+    if (w <= 0 || h <= 0) {
+      return 1.0f;
+    }
+    // Clamp inside bounds
+    pos.x = std::clamp(pos.x, 0, w - 1);
+    pos.y = std::clamp(pos.y, 0, h - 1);
+    const int yFlip = h - 1 - pos.y;
+    const size_t index = static_cast<size_t>(yFlip) * w + pos.x;
+
+    const auto fmt = m_vkDepth->format();
+    if (fmt == vk::Format::eD32Sfloat) {
+      std::vector<float> buf;
+      buf.resize(static_cast<size_t>(w) * h);
+      try {
+        m_vkDepth->downloadData(buf.data(), buf.size() * sizeof(float));
+      }
+      catch (const std::exception& e) {
+        LOG_FIRST_N(WARNING, 3) << "Vulkan picking depth download failed: " << e.what();
+        return 1.0f;
+      }
+      return buf[index];
+    }
+    // Default: D24UnormS8 (depth as 24-bit UNORM in low bits)
+    std::vector<uint32_t> buf;
+    buf.resize(static_cast<size_t>(w) * h);
+    try {
+      m_vkDepth->downloadData(buf.data(), buf.size() * sizeof(uint32_t));
+    }
+    catch (const std::exception& e) {
+      LOG_FIRST_N(WARNING, 3) << "Vulkan picking depth download failed: " << e.what();
+      return 1.0f;
+    }
+    uint32_t packed = buf[index];
+    float depth = static_cast<float>(packed & 0x00FFFFFFu) / static_cast<float>(0x00FFFFFFu);
+    return depth;
+  }
 
   auto texSize = glm::ivec2(m_renderTarget->size());
   pos[1] = texSize[1] - pos[1];

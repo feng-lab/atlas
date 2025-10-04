@@ -2,7 +2,7 @@
 
 #include "z3dtransferfunction.h"
 #include "zclickablelabel.h"
-#include "z3dvolume.h"
+#include "zimg.h"
 #include "zlog.h"
 #include <QMouseEvent>
 #include <QPainter>
@@ -16,11 +16,94 @@
 #include <QCheckBox>
 #include <QMessageBox>
 #include <QApplication>
+#include <QThread>
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <utility>
 
 namespace nim {
+
+class ZImgHistogramThread : public QThread
+{
+public:
+  ZImgHistogramThread(std::shared_ptr<const ZImg> image, int bitsStored, QObject* parent = nullptr)
+    : QThread(parent)
+    , m_image(std::move(image))
+    , m_bitsStored(bitsStored)
+  {}
+
+  [[nodiscard]] const std::vector<size_t>& histogram() const
+  {
+    return m_histogram;
+  }
+
+  [[nodiscard]] size_t maxCount() const
+  {
+    return m_maxCount;
+  }
+
+  [[nodiscard]] double minValue() const
+  {
+    return m_minValue;
+  }
+
+  [[nodiscard]] double maxValue() const
+  {
+    return m_maxValue;
+  }
+
+protected:
+  void run() override
+  {
+    if (!m_image) {
+      return;
+    }
+
+    double minRaw = 0.0;
+    double maxRaw = 0.0;
+    m_image->computeMinMax(minRaw, maxRaw);
+    m_minValue = minRaw;
+    m_maxValue = maxRaw;
+
+    const size_t binCount = histogramBinCount();
+    m_histogram = m_image->histogram(binCount);
+    if (!m_histogram.empty()) {
+      m_maxCount = *std::max_element(m_histogram.begin(), m_histogram.end());
+    } else {
+      m_maxCount = 0;
+    }
+  }
+
+private:
+  size_t histogramBinCount() const
+  {
+    if (m_bitsStored <= 0) {
+      return 256;
+    }
+    const int clamped = std::clamp(m_bitsStored, 1, 16);
+    return static_cast<size_t>(1) << clamped;
+  }
+
+  std::shared_ptr<const ZImg> m_image;
+  int m_bitsStored;
+  std::vector<size_t> m_histogram;
+  size_t m_maxCount = 0;
+  double m_minValue = 0.0;
+  double m_maxValue = 0.0;
+};
+
+double normalizeIntensity(double value, int bits)
+{
+  if (bits > 0 && bits <= 16) {
+    const double denominator = static_cast<double>((1u << bits) - 1u);
+    if (denominator > 0.0) {
+      return value / denominator;
+    }
+  }
+  return value;
+}
 
 Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParameter* tf,
                                                      bool showHistogram,
@@ -36,7 +119,6 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
   , m_yAxisText(std::move(yAxisText))
   , m_showHistogram(showHistogram)
   , m_histogramNormalizeMethod(std::move(histogramNormalizeMethod))
-  , m_volume(tf->volume())
 {
   m_padding = 36;
   m_keyCircleRadius = 5;
@@ -66,9 +148,6 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
   m_keyContextMenu.addAction(m_deleteKeyAction);
   connect(m_deleteKeyAction, &QAction::triggered, this, &Z3DTransferFunctionWidget::deleteKey);
 
-  if (m_volume) {
-    connect(m_volume, &Z3DVolume::histogramFinished, this, qOverload<>(&Z3DTransferFunctionWidget::update));
-  }
   connect(m_transferFunction,
           &Z3DTransferFunctionParameter::valueChanged,
           this,
@@ -118,7 +197,7 @@ void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
   if (m_showHistogram) {
     if (!m_histogramCache || m_histogramCache->rect() != rect()) {
       m_histogramCache.reset();
-      if (m_volume && m_volume->hasHistogram()) {
+      if (!m_histogramBins.empty() && m_histogramMaxCount > 0) {
         m_histogramCache = std::make_unique<QPixmap>(rect().size());
         m_histogramCache->fill(Qt::transparent);
 
@@ -128,34 +207,38 @@ void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
         cachePaint.setBrush(QColor(0, 40, 160, 120));
         cachePaint.setRenderHint(QPainter::Antialiasing, true);
 
-        size_t histogramWidth = m_volume->histogramBinCount();
-        double barWidth = 1.0 / (histogramWidth - 1.0);
+        const size_t histogramWidth = m_histogramBins.size();
+        if (histogramWidth > 1) {
+          const double barWidth = 1.0 / (histogramWidth - 1.0);
 
-        for (size_t x = 0; x < histogramWidth; ++x) {
-          double sxpos = x / (histogramWidth - 1.0);
-          double expos = sxpos + 0.5 * barWidth;
-          sxpos = sxpos - 0.5 * barWidth;
-          if (x == 0) {
-            sxpos += 0.5 * barWidth;
+          for (size_t x = 0; x < histogramWidth; ++x) {
+            double sxpos = x / (histogramWidth - 1.0);
+            double expos = sxpos + 0.5 * barWidth;
+            sxpos -= 0.5 * barWidth;
+            if (x == 0) {
+              sxpos += 0.5 * barWidth;
+            }
+            if (x == histogramWidth - 1) {
+              expos -= 0.5 * barWidth;
+            }
+
+            double value = 0.0;
+            if (m_histogramMaxCount > 0) {
+              if (m_histogramNormalizeMethod == "Log") {
+                value = std::log(static_cast<double>(m_histogramBins[x]) + 1.0) /
+                        std::log(static_cast<double>(m_histogramMaxCount) + 1.0);
+              } else {
+                value = static_cast<double>(m_histogramBins[x]) /
+                        static_cast<double>(m_histogramMaxCount);
+              }
+            }
+            value = std::clamp(value, 0.0, 1.0);
+            glm::dvec2 p1 =
+              relativeToPixelCoordinates(glm::dvec2(sxpos, value * (m_yRange[1] - m_yRange[0]) + m_yRange[0]));
+            glm::dvec2 p2 = relativeToPixelCoordinates(glm::dvec2(expos, m_yRange[0]));
+            cachePaint.drawRect(QRectF(QPointF(p1.x, p1.y), QPointF(p2.x, p2.y)));
           }
-          if (x == histogramWidth - 1) {
-            expos -= 0.5 * barWidth;
-          }
-          double value;
-          if (m_histogramNormalizeMethod == "Log") {
-            value = m_volume->logNormalizedHistogramValue(x);
-          } else {
-            value = m_volume->normalizedHistogramValue(x);
-          }
-          glm::dvec2 p1 =
-            relativeToPixelCoordinates(glm::dvec2(sxpos, value * (m_yRange[1] - m_yRange[0]) + m_yRange[0]));
-          glm::dvec2 p2 = relativeToPixelCoordinates(glm::dvec2(expos, m_yRange[0]));
-          QPointF topLeft(p1.x, p1.y);
-          QPointF bottomRight(p2.x, p2.y);
-          cachePaint.drawRect(QRectF(topLeft, bottomRight));
         }
-      } else if (m_volume) {
-        m_volume->asyncGenerateHistogram();
       }
     }
 
@@ -760,12 +843,36 @@ void Z3DTransferFunctionWidget::showKeyInfo(QPoint pos, const glm::dvec2& values
                      QString("Intensity: %1 \nOpacity: %2").arg(keyIntensityToRealIntensity(values.x)).arg(values.y));
 }
 
-void Z3DTransferFunctionWidget::volumeChanged(Z3DVolume* volume)
+void Z3DTransferFunctionWidget::setHistogramData(std::vector<size_t> bins, size_t maxCount)
 {
+  m_histogramBins = std::move(bins);
+  m_histogramMaxCount = maxCount;
+  m_histogramPending = false;
   m_histogramCache.reset();
+  update();
+}
 
-  m_volume = volume;
-  connect(m_volume, &Z3DVolume::histogramFinished, this, qOverload<>(&Z3DTransferFunctionWidget::update));
+void Z3DTransferFunctionWidget::clearHistogram()
+{
+  m_histogramBins.clear();
+  m_histogramMaxCount = 0;
+  m_histogramPending = false;
+  m_histogramCache.reset();
+  update();
+}
+
+void Z3DTransferFunctionWidget::setHistogramPending(bool pending)
+{
+  if (m_histogramPending == pending) {
+    return;
+  }
+  m_histogramPending = pending;
+  if (pending) {
+    m_histogramBins.clear();
+    m_histogramMaxCount = 0;
+    m_histogramCache.reset();
+  }
+  update();
 }
 
 void Z3DTransferFunctionWidget::setTransFunc(Z3DTransferFunctionParameter* tf)
@@ -797,11 +904,11 @@ double Z3DTransferFunctionWidget::realIntensityToKeyIntensity(double realInten) 
 Z3DTransferFunctionEditor::Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent)
   : QWidget(parent)
   , m_transferFunction(para)
-  , m_volume(nullptr)
   , m_transferFunctionWidget(nullptr)
   , m_transferFunctionTexture(nullptr)
   , m_showHistogram("Show Histogram: ", true)
   , m_histogramNormalizeMethod("Histogram Normalize Method: ")
+
 {
   setWindowFlag(Qt::Window, true);
   m_histogramNormalizeMethod.addOptions("Linear", "Log");
@@ -809,6 +916,11 @@ Z3DTransferFunctionEditor::Z3DTransferFunctionEditor(Z3DTransferFunctionParamete
   createWidgets();
   updateFromTransferFunction();
   createConnections();
+}
+
+Z3DTransferFunctionEditor::~Z3DTransferFunctionEditor()
+{
+  stopHistogramThread();
 }
 
 QLayout* Z3DTransferFunctionEditor::createMappingLayout()
@@ -946,11 +1058,11 @@ void Z3DTransferFunctionEditor::updateFromTransferFunction()
 {
   CHECK(m_transferFunction);
 
-  // check whether the volume associated with the TransFuncProperty has changed
-  Z3DVolume* newVolume = m_transferFunction->volume();
-  if (newVolume != m_volume) {
-    m_volume = newVolume;
-    volumeChanged();
+  // check whether the image associated with the TransFuncProperty has changed
+  auto newImage = m_transferFunction->image();
+  if (newImage != m_image) {
+    m_image = std::move(newImage);
+    imageChanged();
   }
 
   // update treshold widgets from tf
@@ -960,10 +1072,10 @@ void Z3DTransferFunctionEditor::updateFromTransferFunction()
 
 void Z3DTransferFunctionEditor::fitDomainToData()
 {
-  if (m_volume) {
-    m_transferFunction->get().setDomain(
-      glm::dvec2(m_volume->floatMinValue(), std::max(m_volume->floatMaxValue(), m_volume->floatMinValue() + 0.001)),
-      m_rescaleKeys->isChecked());
+  if (m_hasDataMinMax && m_dataMaxValue > m_dataMinValue) {
+    m_transferFunction->get().setDomain(glm::dvec2(m_dataMinValue,
+                                                   std::max(m_dataMaxValue, m_dataMinValue + 0.001)),
+                                        m_rescaleKeys->isChecked());
   }
 }
 
@@ -994,15 +1106,70 @@ void Z3DTransferFunctionEditor::domainMaxSpinBoxChanged(double max)
   }
 }
 
-void Z3DTransferFunctionEditor::volumeChanged()
+void Z3DTransferFunctionEditor::stopHistogramThread()
 {
-  if (m_volume) {
-    m_dataMinValueLabel->setText(QString::number(m_volume->floatMinValue()));
-    m_dataMaxValueLabel->setText(QString::number(m_volume->floatMaxValue()));
-
-    // propagate new volume to transfuncMappingCanvas
-    m_transferFunctionWidget->volumeChanged(m_volume);
+  if (m_histogramThread) {
+    if (m_histogramThread->isRunning()) {
+      m_histogramThread->requestInterruption();
+      m_histogramThread->wait();
+    }
+    m_histogramThread.reset();
   }
+}
+
+void Z3DTransferFunctionEditor::imageChanged()
+{
+  stopHistogramThread();
+
+  if (!m_image) {
+    m_dataMinValueLabel->setText("-");
+    m_dataMaxValueLabel->setText("-");
+    m_transferFunctionWidget->clearHistogram();
+    m_hasDataMinMax = false;
+    return;
+  }
+
+  const int bits = m_transferFunction->bitsStored();
+  double minRaw = 0.0;
+  double maxRaw = 0.0;
+  m_image->computeMinMax(minRaw, maxRaw);
+  m_dataMinValue = normalizeIntensity(minRaw, bits);
+  m_dataMaxValue = normalizeIntensity(maxRaw, bits);
+  m_hasDataMinMax = std::isfinite(m_dataMinValue) && std::isfinite(m_dataMaxValue);
+
+  if (m_hasDataMinMax) {
+    m_dataMinValueLabel->setText(QString::number(m_dataMinValue));
+    m_dataMaxValueLabel->setText(QString::number(m_dataMaxValue));
+  } else {
+    m_dataMinValueLabel->setText("-");
+    m_dataMaxValueLabel->setText("-");
+  }
+
+  m_transferFunctionWidget->setHistogramPending(true);
+
+  m_histogramThread = std::make_unique<ZImgHistogramThread>(m_image, bits, this);
+  connect(m_histogramThread.get(), &QThread::finished, this, &Z3DTransferFunctionEditor::histogramComputationFinished);
+  m_histogramThread->start();
+}
+
+void Z3DTransferFunctionEditor::histogramComputationFinished()
+{
+  if (!m_histogramThread) {
+    return;
+  }
+
+  const auto& binsRef = m_histogramThread->histogram();
+  std::vector<size_t> bins(binsRef.begin(), binsRef.end());
+  const size_t maxCount = m_histogramThread->maxCount();
+
+  stopHistogramThread();
+
+  if (bins.empty() || maxCount == 0) {
+    m_transferFunctionWidget->clearHistogram();
+    return;
+  }
+
+  m_transferFunctionWidget->setHistogramData(std::move(bins), maxCount);
 }
 
 } // namespace nim
