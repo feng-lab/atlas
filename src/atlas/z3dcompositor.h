@@ -190,6 +190,12 @@ private:
 
   void setupAxisCamera();
 
+  void renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderTargetLease& sceneOutLease);
+
+  [[nodiscard]] glm::uvec4 axisViewportFor(const glm::uvec4& baseViewport) const;
+
+  void ensureAxisCameraBackend(RenderBackend backend);
+
   void setClipPlanes() override {}
 
   static void downloadTextureToLocalColorBuffer(const Z3DTexture& tex, Z3DLocalColorBuffer& localColorBuffer);

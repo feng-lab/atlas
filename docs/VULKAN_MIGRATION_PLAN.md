@@ -56,7 +56,8 @@ Renderer Base Status
 
 - The compositor still acquires temporary targets from `Z3DScratchResourcePool`, but leases now wrap API-neutral `Z3DRenderTarget` objects. The compositor never binds FBOs directly; it asks backend utilities to begin or resolve passes using the lease.
 - Blend/OIT paths become high-level intents (`beginTransparencyPass(mode, lease)`, `resolveTransparency(lease, dst)`) that backend drivers translate to GL state changes or Vulkan subpasses.
-- Glow, axis, texture copy, and blend helpers currently remain GL-only. Once the primitive translators are stable, document the data they need so Vulkan equivalents can be implemented without disturbing the GL path.
+- Glow, texture copy, and blend helpers currently remain GL-only. Once the primitive translators are stable, document the data they need so Vulkan equivalents can be implemented without disturbing the GL path.
+- The axis overlay now renders through the Vulkan compositor; future work can optimize the dedicated Vulkan path without affecting the GL implementation.
 - Picking/screenshot readback routes through `RenderUtilities`, removing compositor-owned PBO management.
 
 ### Vulkan Prototype Roadmap

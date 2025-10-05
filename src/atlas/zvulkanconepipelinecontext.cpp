@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cmath>
 #include <vector>
 
 namespace nim {
@@ -699,7 +700,16 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
     } else {
       vertex.colorTop = vertex.colorBase;
     }
-    vertex.flags = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
+    float flagsValue = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
+    if (payload.useConeShader2) {
+      float right = std::floor(flagsValue / 16.0f);
+      float up = flagsValue - right * 16.0f;
+      right = std::clamp(right, 0.0f, 1.0f);
+      up = std::clamp(up, 0.0f, 1.0f);
+      float forward = up;
+      flagsValue = right * 256.0f + up * 16.0f + forward;
+    }
+    vertex.flags = flagsValue;
   }
   m_vertexBuffer->unmap();
 

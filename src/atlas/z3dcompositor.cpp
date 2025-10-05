@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <unordered_set>
 
 namespace {
@@ -1655,41 +1656,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   }
 
   if (m_showAxis.get()) {
-    prepareAxisData(eye);
-    const glm::mat4 axisTransform = glm::mat4(m_globalParameters.camera.get().rotateMatrix(eye));
-    glm::uvec4 axisViewport = viewport();
-    if (m_region[0] <= 0.f && m_region[2] <= 0.f) {
-      const double startX = axisViewport.x + static_cast<double>(axisViewport.z) / m_region[1] * m_region[0];
-      const double startY = axisViewport.y + static_cast<double>(axisViewport.w) / m_region[3] * m_region[2];
-      const uint32_t axisSize = static_cast<uint32_t>(
-        std::max(1.0f, std::min<float>(axisViewport.z, axisViewport.w) * m_axisRegionRatio.get()));
-      const int axisX = static_cast<int>(axisViewport.x) - static_cast<int>(std::floor(startX));
-      const int axisY = static_cast<int>(axisViewport.y) - static_cast<int>(std::floor(startY));
-      axisViewport = glm::uvec4(static_cast<uint32_t>(std::max(axisX, 0)),
-                                static_cast<uint32_t>(std::max(axisY, 0)),
-                                axisSize,
-                                axisSize);
-    }
-
-    const glm::uvec4 prevViewport = m_rendererBase.frameState().viewport;
-    m_rendererBase.frameState().updateViewportData(axisViewport);
-
-    m_rendererBase.setCollectOnly(true);
-    m_rendererBase.setActiveSurfaceForNextPass(*sceneOutLease);
-    // Load color, clear depth inside the axis viewport so axes are always on top.
-    ClearValue clearAxis{};
-    clearAxis.depth = 1.0f;
-    m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Load, StoreOp::Store);
-    m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clearAxis);
-    m_rendererBase.executeVulkanBatches([&]() {
-      if (m_axisMode.get() == "Arrow") {
-        renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_arrowRenderer, m_fontRenderer);
-      } else {
-        renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_lineRenderer, m_fontRenderer);
-      }
-    });
-    m_rendererBase.setCollectOnly(false);
-    m_rendererBase.frameState().updateViewportData(prevViewport);
+    renderAxisVulkan(eye, *sceneOutLease);
   }
 
   // Vulkan picking (render to RGBA8+Depth24 Vulkan scratch image)
@@ -3353,6 +3320,89 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
   });
   m_rendererBase.setCollectOnly(false);
   resetHooks();
+}
+
+glm::uvec4 Z3DCompositor::axisViewportFor(const glm::uvec4& baseViewport) const
+{
+  if (m_region[0] > 0.f || m_region[2] > 0.f) {
+    return glm::uvec4(0u);
+  }
+
+  if (std::abs(m_region[1]) < std::numeric_limits<float>::epsilon() ||
+      std::abs(m_region[3]) < std::numeric_limits<float>::epsilon()) {
+    return glm::uvec4(0u);
+  }
+
+  const double startX = baseViewport.x + static_cast<double>(baseViewport.z) / m_region[1] * m_region[0];
+  const double startY = baseViewport.y + static_cast<double>(baseViewport.w) / m_region[3] * m_region[2];
+  const uint32_t axisSize = static_cast<uint32_t>(
+    std::max(1.0f, std::min<float>(baseViewport.z, baseViewport.w) * m_axisRegionRatio.get()));
+  const int axisX = static_cast<int>(baseViewport.x) - static_cast<int>(std::floor(startX));
+  const int axisY = static_cast<int>(baseViewport.y) - static_cast<int>(std::floor(startY));
+
+  return glm::uvec4(static_cast<uint32_t>(std::max(axisX, 0)),
+                    static_cast<uint32_t>(std::max(axisY, 0)),
+                    axisSize,
+                    axisSize);
+}
+
+void Z3DCompositor::ensureAxisCameraBackend(RenderBackend backend)
+{
+  const auto expected = backend == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan : Z3DCoordinateSystem::OpenGL;
+  if (m_axisCamera.getCoordinateSystem() != expected) {
+    setupAxisCamera();
+  }
+}
+
+void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderTargetLease& sceneOutLease)
+{
+  if (!sceneOutLease || sceneOutLease.backend != RenderBackend::Vulkan) {
+    return;
+  }
+
+  ensureAxisCameraBackend(RenderBackend::Vulkan);
+  prepareAxisData(eye);
+
+  const glm::mat4 axisTransform = glm::mat4(m_globalParameters.camera.get().rotateMatrix(eye));
+  const glm::uvec4 baseViewport = viewport();
+  const glm::uvec4 axisViewport = axisViewportFor(baseViewport);
+  if (axisViewport.z == 0u || axisViewport.w == 0u) {
+    return;
+  }
+
+  const glm::uvec4 prevViewport = m_rendererBase.frameState().viewport;
+  const auto prevSurface = m_rendererBase.frameState().activeSurface;
+  const auto prevHook = m_rendererBase.shaderHookType();
+  const bool hookWasNormal = prevHook == Z3DRendererBase::ShaderHookType::Normal;
+
+  m_rendererBase.frameState().updateViewportData(axisViewport);
+  if (!hookWasNormal) {
+    m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
+  }
+
+  const bool prevCollectOnly = m_rendererBase.collectOnly();
+  m_rendererBase.setCollectOnly(true);
+  m_rendererBase.setActiveSurfaceForNextPass(sceneOutLease);
+
+  ClearValue clearAxis{};
+  clearAxis.depth = 1.0f;
+  m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Load, StoreOp::Store);
+  m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clearAxis);
+
+  m_rendererBase.executeVulkanBatches([&]() {
+    if (m_axisMode.get() == "Arrow") {
+      renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_arrowRenderer, m_fontRenderer);
+    } else {
+      renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_lineRenderer, m_fontRenderer);
+    }
+  });
+
+  m_rendererBase.setCollectOnly(prevCollectOnly);
+  m_rendererBase.frameState().updateViewportData(prevViewport);
+  m_rendererBase.frameState().setActiveSurface(prevSurface);
+  if (!hookWasNormal) {
+    m_rendererBase.setShaderHookType(prevHook);
+  }
 }
 
 void Z3DCompositor::renderAxis(Z3DEye eye)
