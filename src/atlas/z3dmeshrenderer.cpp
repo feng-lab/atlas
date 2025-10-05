@@ -89,7 +89,9 @@ void Z3DMeshRenderer::setColorSource(MeshColorSource source)
     return;
   }
   m_colorSource = source;
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DMeshRenderer::compile()

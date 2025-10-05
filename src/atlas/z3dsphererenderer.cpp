@@ -649,7 +649,9 @@ void Z3DSphereRenderer::setUseDynamicMaterial(bool enabled)
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
 #endif
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 } // namespace nim

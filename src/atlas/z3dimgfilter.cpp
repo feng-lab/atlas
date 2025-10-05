@@ -710,8 +710,10 @@ void Z3DImgFilter::changeCoordTransform()
   if (m_3dImg) {
     m_3dImg->setScale(m_rendererParameters.coordTransform.scale());
   }
-  m_imgRaycasterRenderer.compile();
-  m_imgSliceRenderer.compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    m_imgRaycasterRenderer.compile();
+    m_imgSliceRenderer.compile();
+  }
 
 #ifdef ATLAS_DEBUG_VERSION
   // World AABB changed; invalidate cached effective cuts

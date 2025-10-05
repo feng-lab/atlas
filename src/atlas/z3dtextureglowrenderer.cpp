@@ -165,7 +165,9 @@ void Z3DTextureGlowRenderer::setGlowMode(GlowMode mode)
     return;
   }
   m_glowMode = mode;
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DTextureGlowRenderer::setBlurRadius(int radius)

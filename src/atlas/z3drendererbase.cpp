@@ -529,7 +529,9 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
   }
   size_t nNewClipPlanes = m_clipPlanes.size();
   if (nNewClipPlanes != nOldClipPlanes) { // need to recompile shader to define or undefine HAS_CLIP_PLANE
-    compile();
+    if (m_activeBackend == RenderBackend::OpenGL) {
+      compile();
+    }
   }
   for (auto& m_clipPlane : m_clipPlanes) {
     m_doubleClipPlanes.emplace_back(m_clipPlane);
@@ -852,6 +854,9 @@ void Z3DRendererBase::invalidatePickingDisplayList()
 
 void Z3DRendererBase::compile()
 {
+  if (m_activeBackend != RenderBackend::OpenGL) {
+    return;
+  }
   for (auto renderer : m_renderers) {
     renderer->compile();
   }

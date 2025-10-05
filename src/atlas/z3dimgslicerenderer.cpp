@@ -31,7 +31,9 @@ void Z3DImgSliceRenderer::setData(Z3DImg& img, const std::vector<std::unique_ptr
   m_colormaps = &colormaps;
 
   if (m_img->numChannels() != m_volumeUniformNames.size()) {
-    compile();
+    if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+      compile();
+    }
     m_volumeUniformNames.resize(m_img->numChannels());
     m_colormapUniformNames.resize(m_img->numChannels());
     for (size_t i = 0; i < m_img->numChannels(); ++i) {

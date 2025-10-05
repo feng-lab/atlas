@@ -130,7 +130,9 @@ void Z3DLineRenderer::setDataColors(std::vector<glm::vec4> lineColorsInput)
 {
   if (m_useTextureColor) {
     m_useTextureColor = false;
-    compile();
+    if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+      compile();
+    }
   }
 
   m_lineColors = std::move(lineColorsInput);
@@ -150,7 +152,9 @@ void Z3DLineRenderer::setTexture(Z3DTexture* tex)
   if (m_useSmoothLine) {
     if (!m_useTextureColor) {
       m_useTextureColor = true;
-      compile();
+      if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+        compile();
+      }
       m_dataChanged = true;
     }
     m_texture = tex;
@@ -193,7 +197,9 @@ void Z3DLineRenderer::setRoundCap(bool v)
   if (m_roundCap) {
     m_screenAligned = false;
   }
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DLineRenderer::setScreenAlign(bool v)
@@ -202,7 +208,9 @@ void Z3DLineRenderer::setScreenAlign(bool v)
   if (m_screenAligned) {
     m_roundCap = false;
   }
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DLineRenderer::compile()

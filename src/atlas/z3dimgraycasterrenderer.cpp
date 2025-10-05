@@ -53,7 +53,9 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
     }
   }
   setChannelCount(m_img->numChannels());
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
@@ -368,7 +370,9 @@ void Z3DImgRaycasterRenderer::setChannelVisibility(size_t index, bool visible)
     return;
   }
   m_channelVisibilities[index] = visible;
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DImgRaycasterRenderer::setChannelVisibilities(const std::vector<bool>& visibilities)
@@ -378,7 +382,9 @@ void Z3DImgRaycasterRenderer::setChannelVisibilities(const std::vector<bool>& vi
     return;
   }
   m_channelVisibilities = visibilities;
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DImgRaycasterRenderer::setTransferFunction(size_t index, Z3DTransferFunction* transferFunction)

@@ -92,7 +92,9 @@ public:
       return;
     }
     m_compositingModeValue = mode;
-    compile();
+    if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+      compile();
+    }
   }
 
   void setChannelCount(size_t count);

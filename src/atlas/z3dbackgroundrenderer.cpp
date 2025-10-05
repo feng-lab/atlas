@@ -21,7 +21,9 @@ void Z3DBackgroundRenderer::setMode(BackgroundMode mode)
     return;
   }
   m_modeValue = mode;
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DBackgroundRenderer::setGradientOrientation(BackgroundGradientOrientation orientation)
@@ -30,7 +32,9 @@ void Z3DBackgroundRenderer::setGradientOrientation(BackgroundGradientOrientation
     return;
   }
   m_orientationValue = orientation;
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DBackgroundRenderer::setRenderingRegion(double left, double right, double bottom, double top)

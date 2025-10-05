@@ -146,7 +146,9 @@ void Z3DTextureBlendRenderer::setBlendMode(TextureBlendMode mode)
     return;
   }
   m_blendMode = mode;
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DTextureBlendRenderer::createResources(RenderBackend backend)

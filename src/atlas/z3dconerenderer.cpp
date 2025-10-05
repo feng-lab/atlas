@@ -777,7 +777,9 @@ void Z3DConeRenderer::setConeCapStyle(ConeCapStyle style)
   invalidateOpenglRenderer();
   invalidateOpenglPickingRenderer();
 #endif
-  compile();
+  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
+    compile();
+  }
 }
 
 void Z3DConeRenderer::setCylinderSubdivisionAroundZ(int subdivisions)
