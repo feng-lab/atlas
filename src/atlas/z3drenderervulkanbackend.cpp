@@ -61,6 +61,9 @@ Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend() = default;
 
 void Z3DRendererVulkanBackend::preBackendSwitch()
 {
+  // Drop shared placeholders; they'll be recreated lazily on next use.
+  m_defaultPlaceholder2D.reset();
+  m_defaultSampler.reset();
   // Finish any in-flight frame before we start tearing resources down.
   if (m_frameRecording && m_activeFrameHandle && m_activeFrameHandle->valid()) {
     try {
@@ -809,6 +812,47 @@ const ZVulkanDevice& Z3DRendererVulkanBackend::device() const
 {
   CHECK(m_sharedDevice != nullptr);
   return *m_sharedDevice;
+}
+
+void Z3DRendererVulkanBackend::ensureDefaultPlaceholders()
+{
+  ensureDevice();
+  if (!m_sharedDevice) {
+    return;
+  }
+  if (!m_defaultPlaceholder2D) {
+    // 1x1 RGBA8 white texture for placeholder sampling
+    m_defaultPlaceholder2D = m_sharedDevice->createTexture(1,
+                                                           1,
+                                                           vk::Format::eR8G8B8A8Unorm,
+                                                           vk::ImageUsageFlagBits::eSampled |
+                                                             vk::ImageUsageFlagBits::eTransferDst,
+                                                           vk::MemoryPropertyFlagBits::eDeviceLocal);
+    uint32_t pixel = 0xffffffffu;
+    m_defaultPlaceholder2D->uploadData(&pixel, sizeof(pixel));
+  }
+  if (!m_defaultSampler) {
+    vk::SamplerCreateInfo samplerInfo{.magFilter = vk::Filter::eLinear,
+                                      .minFilter = vk::Filter::eLinear,
+                                      .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+                                      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+                                      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+                                      .borderColor = vk::BorderColor::eFloatOpaqueWhite};
+    m_defaultSampler.emplace(m_sharedDevice->context().device(), samplerInfo);
+  }
+}
+
+ZVulkanTexture& Z3DRendererVulkanBackend::defaultPlaceholderTexture2D()
+{
+  ensureDefaultPlaceholders();
+  return *m_defaultPlaceholder2D;
+}
+
+vk::Sampler Z3DRendererVulkanBackend::defaultSampler()
+{
+  ensureDefaultPlaceholders();
+  return **m_defaultSampler;
 }
 
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()

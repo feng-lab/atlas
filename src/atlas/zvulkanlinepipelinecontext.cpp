@@ -178,31 +178,7 @@ void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
   }
 }
 
-void ZVulkanLinePipelineContext::ensurePlaceholderTexture()
-{
-  auto& device = m_backend.device();
-
-  if (!m_placeholderTexture) {
-    m_placeholderTexture = device.createTexture(1,
-                                                1,
-                                                vk::Format::eR8G8B8A8Unorm,
-                                                vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                vk::MemoryPropertyFlagBits::eDeviceLocal);
-    uint32_t pixel = 0xffffffffu;
-    m_placeholderTexture->uploadData(&pixel, sizeof(pixel));
-  }
-
-  if (!m_sampler) {
-    vk::SamplerCreateInfo samplerInfo{.magFilter = vk::Filter::eLinear,
-                                      .minFilter = vk::Filter::eLinear,
-                                      .mipmapMode = vk::SamplerMipmapMode::eNearest,
-                                      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-                                      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-                                      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-                                      .borderColor = vk::BorderColor::eIntOpaqueWhite};
-    m_sampler.emplace(device.context().device(), samplerInfo);
-  }
-}
+void ZVulkanLinePipelineContext::ensurePlaceholderTexture() {}
 
 void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
 {
@@ -234,10 +210,12 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
   }
 
   ensurePlaceholderTexture();
-  if (m_placeholderTexture && m_dsTexture) {
-    m_dsTexture->updateTexture(0, *m_placeholderTexture, **m_sampler);
-    m_dsTexture->updateTexture(1, *m_placeholderTexture, **m_sampler);
-    m_dsTexture->updateTexture(2, *m_placeholderTexture, **m_sampler);
+  if (m_dsTexture) {
+    auto& tex = m_backend.defaultPlaceholderTexture2D();
+    auto sampler = m_backend.defaultSampler();
+    m_dsTexture->updateTexture(0, tex, sampler);
+    m_dsTexture->updateTexture(1, tex, sampler);
+    m_dsTexture->updateTexture(2, tex, sampler);
   }
 }
 
@@ -647,9 +625,11 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
                                                  "line dual-depth-peeling front blender");
       m_dsTexture->updateTexture(2, frontTex, **m_sampler);
     }
-  } else if (m_dsTexture && m_placeholderTexture) {
-    m_dsTexture->updateTexture(1, *m_placeholderTexture, **m_sampler);
-    m_dsTexture->updateTexture(2, *m_placeholderTexture, **m_sampler);
+  } else if (m_dsTexture) {
+    auto& tex = m_backend.defaultPlaceholderTexture2D();
+    auto sampler = m_backend.defaultSampler();
+    m_dsTexture->updateTexture(1, tex, sampler);
+    m_dsTexture->updateTexture(2, tex, sampler);
   }
 
   PipelineKey key;

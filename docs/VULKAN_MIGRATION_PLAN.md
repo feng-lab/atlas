@@ -333,10 +333,42 @@ This roadmap replaces the ad-hoc backlog with a staged plan targeting predictabl
   - Introduce frame indices into `Z3DScratchResourcePool` leases; recycle temp render targets when their submit fence signals.
   - Create descriptor arena per frame; contexts pull descriptor sets from a resettable pool.
   - Centralise immutable sampler cache under `Z3DRendererVulkanBackend`.
+  - Reuse shared geometry buffers for common full-screen quads (background, texture copy/blend/glow) to avoid per-context tiny VBOs.
 - **Validation:**
   - Stress test with rapid OIT + volume toggles to ensure no leak and no reuse-before-signal.
   - Add logging guard that asserts descriptor pool resets exactly once per frame in debug builds.
 - **Docs:** Update developer guide with new lifecycle expectations for leases/descriptor usage.
+
+Prioritisation and Plan (Next Focus)
+- Prioritised Stage: Stage 2 – Per-Frame Resource Recycling. This yields the highest architectural payoff now by reducing per-frame allocations, descriptor churn, and VRAM pressure.
+- Implementation Plan (targeted, incremental):
+  1) Backend descriptor arena
+     - Add a resettable per-frame descriptor pool arena to `Z3DRendererVulkanBackend` and thread a lightweight handle to pipeline contexts.
+     - Update contexts (line, mesh, sphere, ellipsoid, cone, background, texture copy/blend/glow, image slice/raycast) to allocate descriptor sets from the per-frame arena.
+  2) Lease fence integration
+     - Extend `Z3DScratchResourcePool` leases with the frame key/fence; trigger recycle after frame completion via `ZVulkanFrameExecutor::waitForCompletion`.
+  3) Shared fullscreen quad VBO
+     - Provide a backend-shared static quad vertex buffer and index buffer; switch background/texture* pipeline contexts to use it.
+  4) Sampler/placeholder consolidation
+     - Maintain a small set of default samplers (linear clamp, nearest clamp) under the backend and ensure all contexts use them.
+  5) Instrumentation and guards
+     - Add VLOG(1) counters for per-frame descriptor sets allocated and pooled; add debug-only CHECK that arena reset happens exactly once per frame.
+
+Acceptance Criteria
+- No per-context creation of tiny placeholder textures/samplers or fullscreen quad VBOs during steady-state rendering.
+- Descriptor set allocation count stabilises across frames; per-frame reset occurs once in `endRender`.
+- No resource reuse before signal; no leaks when rapidly toggling OIT modes or switching backend.
+- Docs updated (this file + `docs/DEVELOPER_GUIDE.md`) to reflect the new lifecycle and APIs.
+
+Risks and Mitigations
+- Descriptor pool exhaustion: size the arena conservatively and add fallback slow-path (local pool) with a debug log.
+- Cross-thread safety: ensure all allocations occur on the rendering thread; pass handles by value or immutable reference only.
+
+Status Tracking
+- Small win already applied: centralized placeholder sampling resources (shared 1x1 RGBA8 texture + linear clamp sampler) under the backend, reused by common contexts.
+
+Small wins already applied:
+- Centralized placeholder sampling resources: a shared 1x1 RGBA8 texture and linear clamp sampler now live under `Z3DRendererVulkanBackend` and are reused by common pipeline contexts (line, cone, sphere, ellipsoid). This avoids repeatedly creating tiny textures/samplers per context and reduces CPU overhead and VRAM churn.
 
 ### Stage 3 – Compositor Pass Graph Simplification (owner: compositor team, 2 sprints)
 
@@ -345,6 +377,7 @@ This roadmap replaces the ad-hoc backlog with a staged plan targeting predictabl
   - Build an explicit pass graph (opaque, transparency, glow, overlays, picking) and dispatch through `executeCompositorPass` to avoid repeated collect/submit cycles.
   - Cache OIT attachment descriptors between frames; minimize redundant clears.
   - Ensure supersample downsample reuses persistent pipelines.
+  - Tighten attachment clear/load policies using pass history to avoid redundant clears.
 - **Validation:** Automated tests for transparent + glow scenes; compare against Stage 0 baselines.
 - **Docs:** Document pass graph ordering and any behavioural differences; extend USER_GUIDE if controls change.
 
@@ -352,10 +385,17 @@ This roadmap replaces the ad-hoc backlog with a staged plan targeting predictabl
 
 - **Prereqs:** Stage 3 merged; persistent command context available.
 - **Scope:**
-  - Introduce ring-buffered staging textures for screenshots/picking with persistent mapping.
-  - Add UI flag to defer readbacks when not needed; fallback to synchronous path for headless captures.
-  - Batch hover-pick requests when pointer moves faster than frame cadence.
-- **Validation:** Manual interactive test + automated picking regression harness.
+  - Ring-buffered staging buffers (preferred) or linear images for readback: allocate N host-visible, HOST_COHERENT (and HOST_CACHED when available) buffers sized for the target format (e.g., RGBA8) and persistently map them.
+  - Record readback in-frame: at the end of the per-frame command buffer, transition color attachment to TRANSFER_SRC, issue vkCmdCopyImageToBuffer into the current ring buffer, then transition back as needed. Use the frame fence (or a per-frame fence token) to know when the buffer is ready.
+  - One-frame latency handoff: UI/CPU consumption reads the previous frame’s buffer after fence signal; provide a knob `--atlas_vk_readback_lag_frames=N` (default 1) for tuning.
+  - Optional timeline semaphore path: when available and stable on the platform, replace/augment fence waits with a per-frame timeline semaphore counter for finer-grained readiness tracking. Fallback remains fence-based.
+  - Row pitch control: set `bufferRowLength` to the image width (no padding) and copy RGBA8 when possible to reduce CPU swizzling; otherwise, perform a single swizzle step on CPU outside the render thread.
+  - Picking batching: accumulate hover-pick requests within the same frame and service them off the most recent ready buffer rather than blocking on the GPU.
+  - Defer/skip readbacks: add UI/environment toggles to disable readbacks when the output is not visible; keep a synchronous fallback for headless capture tools.
+- **Validation:** Manual interactive test + automated picking regression harness. Verify:
+  - No render-thread stalls; readback happens after fence signal on a worker thread.
+  - Stable one-frame latency (configurable); ring buffers rotate without reuse-before-signal.
+  - Data correctness (checksums on a few frames) and consistent pitches.
 - **Docs:** Update USER_GUIDE with new screenshot/picking options; document environment toggles.
 
 ### Stage 5 – Deferred Enhancements (owner: shared, backlog)
@@ -370,3 +410,8 @@ This roadmap replaces the ad-hoc backlog with a staged plan targeting predictabl
 - Stage 2 recycling soak test (TBD).
 - Stage 3 pass graph regression suite (TBD).
 - Stage 4 asynchronous readback regression (TBD).
+### Offscreen Rendering Policy (No Swapchain/WSI)
+
+- Atlas renders offscreen only and does not use a swapchain/presentation. All frame outputs are produced into internal attachments, then read back for CPU-side display.
+- Stage 1 semaphore policy: do not wait on acquire semaphores and do not signal release semaphores by default. These synchronization points are reserved for potential future WSI/external hand-offs. For offscreen submission, the frame fence is the single synchronization primitive used to determine completion.
+- Readback policy: prefer enqueueing GPU copies to host-visible staging buffers inside the frame command buffer and consuming results after the frame fence signals. Avoid synchronous immediate submissions that block the render thread.

@@ -117,21 +117,24 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
         auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
                                                    m_backend.device(),
                                                    "sphere dual-depth-peeling depth blender");
-        m_dsPlaceholder->updateTexture(0, depthTex, **m_sampler);
-      } else if (m_placeholderTexture) {
-        m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, **m_sampler);
+        m_dsPlaceholder->updateTexture(0, depthTex, m_backend.defaultSampler());
+      } else {
+        auto& tex = m_backend.defaultPlaceholderTexture2D();
+        m_dsPlaceholder->updateTexture(0, tex, m_backend.defaultSampler());
       }
       if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
         auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
                                                    m_backend.device(),
                                                    "sphere dual-depth-peeling front blender");
-        m_dsPlaceholder->updateTexture(1, frontTex, **m_sampler);
-      } else if (m_placeholderTexture) {
-        m_dsPlaceholder->updateTexture(1, *m_placeholderTexture, **m_sampler);
+        m_dsPlaceholder->updateTexture(1, frontTex, m_backend.defaultSampler());
+      } else {
+        auto& tex = m_backend.defaultPlaceholderTexture2D();
+        m_dsPlaceholder->updateTexture(1, tex, m_backend.defaultSampler());
       }
-    } else if (m_placeholderTexture) {
-      m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, **m_sampler);
-      m_dsPlaceholder->updateTexture(1, *m_placeholderTexture, **m_sampler);
+    } else {
+      auto& tex = m_backend.defaultPlaceholderTexture2D();
+      m_dsPlaceholder->updateTexture(0, tex, m_backend.defaultSampler());
+      m_dsPlaceholder->updateTexture(1, tex, m_backend.defaultSampler());
     }
   }
 
@@ -283,10 +286,10 @@ void ZVulkanSpherePipelineContext::ensureDescriptorSets()
   }
 
   ensurePlaceholderTexture();
-  if (m_dsPlaceholder && m_placeholderTexture) {
-    const auto sampler = **m_sampler;
-    m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, sampler);
-    m_dsPlaceholder->updateTexture(1, *m_placeholderTexture, sampler);
+  if (m_dsPlaceholder) {
+    auto& tex = m_backend.defaultPlaceholderTexture2D();
+    m_dsPlaceholder->updateTexture(0, tex, m_backend.defaultSampler());
+    m_dsPlaceholder->updateTexture(1, tex, m_backend.defaultSampler());
   }
 
   ensurePlaceholderTexture();

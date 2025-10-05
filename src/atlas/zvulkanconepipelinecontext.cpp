@@ -128,17 +128,18 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
         auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
                                                    m_backend.device(),
                                                    "cone dual-depth-peeling depth blender");
-        m_dsPlaceholder->updateTexture(0, depthTex, **m_sampler);
+        m_dsPlaceholder->updateTexture(0, depthTex, m_backend.defaultSampler());
       }
       if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
         auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
                                                    m_backend.device(),
                                                    "cone dual-depth-peeling front blender");
-        m_dsPlaceholder->updateTexture(1, frontTex, **m_sampler);
+        m_dsPlaceholder->updateTexture(1, frontTex, m_backend.defaultSampler());
       }
-    } else if (m_placeholderTexture) {
-      m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, **m_sampler);
-      m_dsPlaceholder->updateTexture(1, *m_placeholderTexture, **m_sampler);
+    } else {
+      auto& tex = m_backend.defaultPlaceholderTexture2D();
+      m_dsPlaceholder->updateTexture(0, tex, m_backend.defaultSampler());
+      m_dsPlaceholder->updateTexture(1, tex, m_backend.defaultSampler());
     }
   }
 
@@ -285,10 +286,10 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
   }
 
   ensurePlaceholderTexture();
-  if (m_dsPlaceholder && m_placeholderTexture) {
-    const auto sampler = **m_sampler;
-    m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, sampler);
-    m_dsPlaceholder->updateTexture(1, *m_placeholderTexture, sampler);
+  if (m_dsPlaceholder) {
+    auto& tex = m_backend.defaultPlaceholderTexture2D();
+    m_dsPlaceholder->updateTexture(0, tex, m_backend.defaultSampler());
+    m_dsPlaceholder->updateTexture(1, tex, m_backend.defaultSampler());
   }
 
   if (m_dsLighting && m_uboLighting) {
@@ -340,35 +341,7 @@ void ZVulkanConePipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
   m_uboOIT->copyData(&oit, sizeof(oit));
 }
 
-void ZVulkanConePipelineContext::ensurePlaceholderTexture()
-{
-  auto& device = m_backend.device();
-  if (!m_placeholderTexture) {
-    m_placeholderTexture = device.createTexture(1,
-                                                1,
-                                                vk::Format::eR8G8B8A8Unorm,
-                                                vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                vk::MemoryPropertyFlagBits::eDeviceLocal);
-    uint32_t pixel = 0xffffffffu;
-    m_placeholderTexture->uploadData(&pixel, sizeof(pixel));
-  }
-  if (!m_sampler) {
-    vk::SamplerCreateInfo info{.magFilter = vk::Filter::eLinear,
-                               .minFilter = vk::Filter::eLinear,
-                               .mipmapMode = vk::SamplerMipmapMode::eNearest,
-                               .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-                               .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-                               .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-                               .borderColor = vk::BorderColor::eIntOpaqueWhite};
-    m_sampler.emplace(device.context().device(), info);
-  }
-
-  if (m_dsPlaceholder && m_placeholderTexture) {
-    const auto sampler = **m_sampler;
-    m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, sampler);
-    m_dsPlaceholder->updateTexture(1, *m_placeholderTexture, sampler);
-  }
-}
+void ZVulkanConePipelineContext::ensurePlaceholderTexture() {}
 
 void ZVulkanConePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
                                                    const RenderBatch& batch,

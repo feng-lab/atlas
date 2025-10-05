@@ -64,6 +64,11 @@ public:
   RendererFrameState::ActiveSurface
   describeSurfaceFromLease(const Z3DScratchResourcePool::RenderTargetLease& lease) override;
 
+  // Shared fallback resources used across pipeline contexts to avoid redundant
+  // tiny texture/sampler creation.
+  ZVulkanTexture& defaultPlaceholderTexture2D();
+  vk::Sampler defaultSampler();
+
   void preBackendSwitch() override;
 
   ZVulkanDevice& device();
@@ -78,6 +83,7 @@ private:
   friend class Z3DRendererBase;
   void ensureDevice();
   void resetFrameResources();
+  void ensureDefaultPlaceholders();
   struct FrameResources;
   FrameResources& ensureFrameResourcesForKey(void* key);
   struct GpuScopeRecord
@@ -131,6 +137,10 @@ private:
   std::unique_ptr<ZVulkanImgSlicePipelineContext> m_imgSliceContext;
   std::unique_ptr<ZVulkanImgRaycasterPipelineContext> m_imgRaycasterContext;
   std::unique_ptr<ZVulkanFontPipelineContext> m_fontContext;
+
+  // Shared fallback resources
+  std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;
+  std::optional<vk::raii::Sampler> m_defaultSampler;
 
   
 };
