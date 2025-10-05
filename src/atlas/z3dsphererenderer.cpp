@@ -106,6 +106,10 @@ void Z3DSphereRenderer::setDataPickingColors(std::vector<glm::vec4>* pointPickin
 
 void Z3DSphereRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_sphereShaderGrp != nullptr);
   m_dataChanged = true;
   m_sphereShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
@@ -649,9 +653,7 @@ void Z3DSphereRenderer::setUseDynamicMaterial(bool enabled)
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
 #endif
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 } // namespace nim

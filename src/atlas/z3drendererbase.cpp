@@ -529,9 +529,7 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
   }
   size_t nNewClipPlanes = m_clipPlanes.size();
   if (nNewClipPlanes != nOldClipPlanes) { // need to recompile shader to define or undefine HAS_CLIP_PLANE
-    if (m_activeBackend == RenderBackend::OpenGL) {
-      compile();
-    }
+    compile();
   }
   for (auto& m_clipPlane : m_clipPlanes) {
     m_doubleClipPlanes.emplace_back(m_clipPlane);

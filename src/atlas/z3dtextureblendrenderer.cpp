@@ -14,6 +14,10 @@ Z3DTextureBlendRenderer::Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase, 
 
 void Z3DTextureBlendRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_blendTextureShader != nullptr);
   m_blendTextureShader->setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
@@ -146,9 +150,7 @@ void Z3DTextureBlendRenderer::setBlendMode(TextureBlendMode mode)
     return;
   }
   m_blendMode = mode;
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DTextureBlendRenderer::createResources(RenderBackend backend)

@@ -31,9 +31,7 @@ void Z3DImgSliceRenderer::setData(Z3DImg& img, const std::vector<std::unique_ptr
   m_colormaps = &colormaps;
 
   if (m_img->numChannels() != m_volumeUniformNames.size()) {
-    if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-      compile();
-    }
+    compile();
     m_volumeUniformNames.resize(m_img->numChannels());
     m_colormapUniformNames.resize(m_img->numChannels());
     for (size_t i = 0; i < m_img->numChannels(); ++i) {
@@ -148,6 +146,13 @@ Z3DTexture* Z3DImgSliceRenderer::colormapTextureGL(const ZColorMap& cm, uint32_t
 
 void Z3DImgSliceRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_scVolumeSliceShader != nullptr);
+  DCHECK(m_mergeChannelShader != nullptr);
+  DCHECK(m_image3DSliceWithColorMapBlockIDsShader != nullptr);
+  DCHECK(m_image3DSliceWithColorMapShader != nullptr);
   // m_volumeSliceShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 
   m_scVolumeSliceShader->setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());

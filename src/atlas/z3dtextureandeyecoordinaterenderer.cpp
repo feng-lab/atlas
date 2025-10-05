@@ -2,6 +2,7 @@
 
 #include "z3dgl.h"
 #include "zmesh.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -15,6 +16,10 @@ Z3DTextureAndEyeCoordinateRenderer::Z3DTextureAndEyeCoordinateRenderer(Z3DRender
 
 void Z3DTextureAndEyeCoordinateRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_renderTextureAndEyeCoordinateShader != nullptr);
   m_renderTextureAndEyeCoordinateShader->setHeaderAndRebuild(m_rendererBase.generateHeader());
 }
 

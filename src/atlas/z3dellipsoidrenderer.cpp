@@ -127,6 +127,10 @@ void Z3DEllipsoidRenderer::setDataPickingColors(std::vector<glm::vec4>* ellipsoi
 
 void Z3DEllipsoidRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_ellipsoidShaderGrp != nullptr);
   m_dataChanged = true;
   m_ellipsoidShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
@@ -676,9 +680,7 @@ void Z3DEllipsoidRenderer::setUseDynamicMaterial(bool enabled)
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   invalidateOpenglRenderer();
 #endif
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 } // namespace nim

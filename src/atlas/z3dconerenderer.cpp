@@ -140,6 +140,10 @@ void Z3DConeRenderer::setDataPickingColors(std::vector<glm::vec4>* conePickingCo
 
 void Z3DConeRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_coneShaderGrp != nullptr);
   m_coneShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
@@ -777,9 +781,7 @@ void Z3DConeRenderer::setConeCapStyle(ConeCapStyle style)
   invalidateOpenglRenderer();
   invalidateOpenglPickingRenderer();
 #endif
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DConeRenderer::setCylinderSubdivisionAroundZ(int subdivisions)

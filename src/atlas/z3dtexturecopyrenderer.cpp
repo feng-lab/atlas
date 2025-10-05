@@ -2,6 +2,7 @@
 
 #include "z3dshaderprogram.h"
 #include "z3dtexture.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -14,6 +15,10 @@ Z3DTextureCopyRenderer::Z3DTextureCopyRenderer(Z3DRendererBase& rendererBase, Ou
 
 void Z3DTextureCopyRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_copyTextureShaderGrp != nullptr);
   m_copyTextureShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 

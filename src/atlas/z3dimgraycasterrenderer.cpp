@@ -53,9 +53,7 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
     }
   }
   setChannelCount(m_img->numChannels());
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking)
@@ -370,9 +368,7 @@ void Z3DImgRaycasterRenderer::setChannelVisibility(size_t index, bool visible)
     return;
   }
   m_channelVisibilities[index] = visible;
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DImgRaycasterRenderer::setChannelVisibilities(const std::vector<bool>& visibilities)
@@ -382,9 +378,7 @@ void Z3DImgRaycasterRenderer::setChannelVisibilities(const std::vector<bool>& vi
     return;
   }
   m_channelVisibilities = visibilities;
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DImgRaycasterRenderer::setTransferFunction(size_t index, Z3DTransferFunction* transferFunction)
@@ -466,6 +460,18 @@ void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader
 
 void Z3DImgRaycasterRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_scRaycasterShader != nullptr);
+  DCHECK(m_sc2dImageShader != nullptr);
+  DCHECK(m_scVolumeSliceWithTransferfunShader != nullptr);
+  DCHECK(m_image3DSliceWithTransferfunBlockIDsShader != nullptr);
+  DCHECK(m_image3DSliceWithTransferfunShader != nullptr);
+  DCHECK(m_image3DRaycasterBlockIDsShader != nullptr);
+  DCHECK(m_image3DRaycasterShader != nullptr);
+  DCHECK(m_mergeChannelShader != nullptr);
+  DCHECK(m_copyTextureShader != nullptr);
   //  m_raycasterShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   //  m_2dImageShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   //  m_volumeSliceWithTransferfunShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());

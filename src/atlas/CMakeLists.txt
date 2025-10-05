@@ -426,7 +426,6 @@ set(SOURCES
     z3dglobalparameters.h z3dglobalparameters.cpp
     z3dscratchresourcepool.h z3dscratchresourcepool.cpp
     z3dshaderprogram.h z3dshaderprogram.cpp
-    z3dvolume.h z3dvolume.cpp
     z3dtransferfunction.h z3dtransferfunction.cpp
     z3dtransferfunctioneditor.h z3dtransferfunctioneditor.cpp
     z3dtransferfunctionwidgetwitheditorwindow.h z3dtransferfunctionwidgetwitheditorwindow.cpp

@@ -2,6 +2,7 @@
 
 #include "z3dgl.h"
 #include "zmesh.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -15,6 +16,10 @@ Z3DTextureCoordinateRenderer::Z3DTextureCoordinateRenderer(Z3DRendererBase& rend
 
 void Z3DTextureCoordinateRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_renderTextureCoordinateShader != nullptr);
   m_renderTextureCoordinateShader->setHeaderAndRebuild(m_rendererBase.generateHeader());
 }
 

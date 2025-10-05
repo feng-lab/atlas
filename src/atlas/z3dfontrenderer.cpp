@@ -78,6 +78,10 @@ void Z3DFontRenderer::setDataPickingColors(std::vector<glm::vec4>* pickingColors
 
 void Z3DFontRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_fontShaderGrp != nullptr);
   m_fontShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
@@ -496,9 +500,7 @@ void Z3DFontRenderer::setShowFontOutline(bool show)
   }
   m_showFontOutline = show;
   m_dataChanged = true;
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DFontRenderer::setFontOutlineMode(FontOutlineMode mode)
@@ -507,9 +509,7 @@ void Z3DFontRenderer::setFontOutlineMode(FontOutlineMode mode)
     return;
   }
   m_fontOutlineMode = mode;
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DFontRenderer::setFontOutlineColor(const glm::vec4& color)
@@ -527,9 +527,7 @@ void Z3DFontRenderer::setShowFontShadow(bool show)
   }
   m_showFontShadow = show;
   m_dataChanged = true;
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DFontRenderer::setFontShadowColor(const glm::vec4& color)

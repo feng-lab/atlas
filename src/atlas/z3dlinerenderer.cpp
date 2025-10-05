@@ -130,9 +130,7 @@ void Z3DLineRenderer::setDataColors(std::vector<glm::vec4> lineColorsInput)
 {
   if (m_useTextureColor) {
     m_useTextureColor = false;
-    if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-      compile();
-    }
+    compile();
   }
 
   m_lineColors = std::move(lineColorsInput);
@@ -152,9 +150,7 @@ void Z3DLineRenderer::setTexture(Z3DTexture* tex)
   if (m_useSmoothLine) {
     if (!m_useTextureColor) {
       m_useTextureColor = true;
-      if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-        compile();
-      }
+      compile();
       m_dataChanged = true;
     }
     m_texture = tex;
@@ -197,9 +193,7 @@ void Z3DLineRenderer::setRoundCap(bool v)
   if (m_roundCap) {
     m_screenAligned = false;
   }
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DLineRenderer::setScreenAlign(bool v)
@@ -208,18 +202,22 @@ void Z3DLineRenderer::setScreenAlign(bool v)
   if (m_screenAligned) {
     m_roundCap = false;
   }
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DLineRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_lineShaderGrp != nullptr);
   m_lineShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
   if (m_useGeomLineShader) {
+    DCHECK(m_smoothLineShaderGrp != nullptr);
     m_smoothLineShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader(),
                                   m_rendererBase.generateGeomHeader() + generateHeader());
   } else {
+    DCHECK(m_smoothLineShaderGrp1 != nullptr);
     m_smoothLineShaderGrp1->rebuild(m_rendererBase.generateHeader() + generateHeader());
   }
 }

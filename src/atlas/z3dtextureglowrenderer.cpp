@@ -17,6 +17,10 @@ Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase)
 
 void Z3DTextureGlowRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_glowTextureShaderGrp != nullptr);
   m_glowTextureShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
 
@@ -165,9 +169,7 @@ void Z3DTextureGlowRenderer::setGlowMode(GlowMode mode)
     return;
   }
   m_glowMode = mode;
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DTextureGlowRenderer::setBlurRadius(int radius)

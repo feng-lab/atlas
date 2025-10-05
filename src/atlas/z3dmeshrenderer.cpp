@@ -89,13 +89,15 @@ void Z3DMeshRenderer::setColorSource(MeshColorSource source)
     return;
   }
   m_colorSource = source;
-  if (m_rendererBase.activeBackend() == RenderBackend::OpenGL) {
-    compile();
-  }
+  compile();
 }
 
 void Z3DMeshRenderer::compile()
 {
+  if (m_rendererBase.activeBackend() != RenderBackend::OpenGL) {
+    return;
+  }
+  DCHECK(m_meshShaderGrp != nullptr);
   m_dataChanged = true;
   m_meshShaderGrp->rebuild(m_rendererBase.generateHeader() + generateHeader());
 }
