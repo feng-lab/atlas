@@ -26,6 +26,14 @@ class ZVulkanTextureGlowPipelineContext;
 class ZVulkanImgSlicePipelineContext;
 class ZVulkanImgRaycasterPipelineContext;
 class ZVulkanFontPipelineContext;
+// Vulkan renderer backend borrows the shared ZVulkanDevice injected through the scratch pool.
+// Lifetime notes:
+//  * Z3DRenderingEngine owns the Vulkan context/device and calls setVulkanDevice() on the pool
+//    prior to rendering. The backend simply caches the latest pointer and never destroys it.
+//  * Scratch pool leases own all VkImage-backed render targets; pipeline contexts must treat
+//    ZVulkanTexture* obtained through AttachmentHandle as transient and valid only for the lease.
+//  * Each frame uses a single one-shot command buffer acquired via beginSingleTimeCommands().
+//    preBackendSwitch() guarantees the buffer is ended and submitted before switching APIs.
 class Z3DRendererVulkanBackend final : public Z3DRendererBackend
 {
 public:

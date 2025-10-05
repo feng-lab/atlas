@@ -1535,9 +1535,6 @@ void Z3DRenderingEngine::applyBackendSwitch()
     }
   }
 
-  // Clear old scratch resources first; new backend allocations happen after this point
-  m_scratchPool->reset();
-
   // Prepare Vulkan device if targeting Vulkan; inject into scratch pool before any Vulkan allocations
   if (backend == RenderBackend::Vulkan) {
     // Make GL current to safely tear down any GL resources in release paths
@@ -1563,14 +1560,18 @@ void Z3DRenderingEngine::applyBackendSwitch()
         return;
       }
     }
+    // The scratch pool outlives the backend(s) and simply stores a borrowed pointer. All
+    // command buffers and attachments retrieved through the Vulkan backend assume the active
+    // device matches this pointer, so refresh it immediately after (re-)creating the device.
     m_scratchPool->setVulkanDevice(m_vkDevice.get());
   }
 
-  // Set the pool default backend so subsequent allocations use the new API
-  m_scratchPool->setDefaultBackend(backend);
-
   // Switch renderer backends for compositor + connected filters (this will idle Vulkan via preBackendSwitch)
   m_compositor->switchBackend(backend);
+
+  // Set the pool default backend so subsequent allocations use the new API
+  m_scratchPool->reset();
+  m_scratchPool->setDefaultBackend(backend);
 
   if (backend == RenderBackend::Vulkan) {
     // Drop any cached GL shaders tied to the current GL context before

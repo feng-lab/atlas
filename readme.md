@@ -17,7 +17,7 @@
 conda env remove -n pt12 -y
 conda create -n pt12 -y python=3.12
 conda activate pt12
-conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build conda-verify ninja
+conda install qt numpy python conda-build ninja
 ```
 
 ### macOS:

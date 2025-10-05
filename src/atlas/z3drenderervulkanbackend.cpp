@@ -54,8 +54,22 @@ Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend() = default;
 
 void Z3DRendererVulkanBackend::preBackendSwitch()
 {
+  // Finish any in-flight frame before we start tearing resources down. Dropping a recording
+  // command buffer without ending it leads to validation errors (and occasional driver crashes).
+  if (m_activeCommandBuffer) {
+    try {
+      if (m_sharedDevice) {
+        m_sharedDevice->endSingleTimeCommands(*m_activeCommandBuffer);
+      } else {
+        m_activeCommandBuffer->end();
+      }
+    } catch (const std::exception& e) {
+      LOG(WARNING) << "Vulkan command buffer flush during backend switch failed: " << e.what();
+    }
+    m_activeCommandBuffer.reset();
+  }
+
   // Drop any active frame and ensure GPU is idle before teardown/reset
-  m_activeCommandBuffer.reset();
   if (m_sharedDevice) {
     try {
       m_sharedDevice->context().device().waitIdle();
@@ -745,13 +759,12 @@ const vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer() const
 
 void Z3DRendererVulkanBackend::ensureDevice()
 {
-  if (m_sharedDevice) {
-    return;
-  }
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   auto* dev = pool.vulkanDevice();
   CHECK(dev != nullptr) << "Shared Vulkan device not injected into scratch pool";
-  m_sharedDevice = dev;
+  if (m_sharedDevice != dev) {
+    m_sharedDevice = dev;
+  }
 }
 
 std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend()

@@ -96,20 +96,21 @@ ZVulkanTexture& ZVulkanSwapChain::depthAttachment()
   return *m_depthAttachment;
 }
 
-vk::raii::CommandBuffer ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearColor,
-                                                     vk::ClearDepthStencilValue clearDepthStencil)
+vk::raii::CommandBuffer& ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearColor,
+                                                      vk::ClearDepthStencilValue clearDepthStencil)
 {
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
-  (*m_commandBuffers)[m_currentBuffer].begin(beginInfo);
+  auto& cmdBuffer = (*m_commandBuffers)[m_currentBuffer];
+  cmdBuffer.begin(beginInfo);
 
   // Ensure attachments are in the correct layouts for rendering
   {
-    auto& cmd = (*m_commandBuffers)[m_currentBuffer];
     if (m_colorAttachment->layout() != vk::ImageLayout::eColorAttachmentOptimal) {
-      m_colorAttachment->transitionLayout(cmd, m_colorAttachment->layout(), vk::ImageLayout::eColorAttachmentOptimal);
+      m_colorAttachment->transitionLayout(cmdBuffer, m_colorAttachment->layout(),
+                                          vk::ImageLayout::eColorAttachmentOptimal);
     }
     if (m_depthAttachment->layout() != vk::ImageLayout::eDepthStencilAttachmentOptimal) {
-      m_depthAttachment->transitionLayout(cmd, m_depthAttachment->layout(),
+      m_depthAttachment->transitionLayout(cmdBuffer, m_depthAttachment->layout(),
                                           vk::ImageLayout::eDepthStencilAttachmentOptimal);
     }
   }
@@ -144,9 +145,8 @@ vk::raii::CommandBuffer ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearCo
   renderingInfo.pColorAttachments = colorAttachments.data();
   renderingInfo.pDepthAttachment = &depthAttachment;
 
-  (*m_commandBuffers)[m_currentBuffer].beginRendering(renderingInfo);
-  auto& cmdBuffer = (*m_commandBuffers)[m_currentBuffer];
-  return std::move(cmdBuffer);
+  cmdBuffer.beginRendering(renderingInfo);
+  return cmdBuffer;
 }
 
 void ZVulkanSwapChain::endFrame(vk::raii::CommandBuffer& commandBuffer)

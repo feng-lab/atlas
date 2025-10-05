@@ -629,6 +629,8 @@ double Z3DCompositor::processGL(Z3DEye eye)
   size_t numNormalFilters = normalOpaqueFilters.size() + normalTransparentFilters.size();
   size_t numOnTopFilters = onTopOpaqueFilters.size() + onTopTransparentFilters.size();
 
+  ensureOutputTargets(m_outputSize);
+
   // If we need to overlay handles, render the scene into a pooled temp first
   Z3DScratchResourcePool::RenderTargetLease overlayLease;
   Z3DScratchResourcePool::RenderTargetLease* currentOutLease = nullptr;
@@ -1952,7 +1954,6 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
 
   setupAxisCamera();
 
-  ensureOutputTargets(m_outputSize);
   invalidate(State::AllResultInvalid);
 }
 
@@ -3370,6 +3371,12 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderT
     return;
   }
 
+  auto axisSurface = m_rendererBase.describeSurface(sceneOutLease);
+  if (axisSurface.colorAttachments.empty() && !axisSurface.depthAttachment.has_value()) {
+    LOG_FIRST_N(WARNING, 5) << "Vulkan axis overlay skipped: compositor output lease has no Vulkan attachments.";
+    return;
+  }
+
   const glm::uvec4 prevViewport = m_rendererBase.frameState().viewport;
   const auto prevSurface = m_rendererBase.frameState().activeSurface;
   const auto prevHook = m_rendererBase.shaderHookType();
@@ -3382,7 +3389,7 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderT
 
   const bool prevCollectOnly = m_rendererBase.collectOnly();
   m_rendererBase.setCollectOnly(true);
-  m_rendererBase.setActiveSurfaceForNextPass(sceneOutLease);
+  m_rendererBase.setActiveSurfaceForNextPass(std::move(axisSurface));
 
   ClearValue clearAxis{};
   clearAxis.depth = 1.0f;
