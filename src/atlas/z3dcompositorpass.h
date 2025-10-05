@@ -48,7 +48,7 @@ struct Z3DCompositorPass
   std::vector<Z3DBoundedFilter*> opaqueFilters;
   std::vector<Z3DCompositorTransparentBatch> transparentFilters;
   std::vector<Z3DCompositorImageLayer> imageLayers;
+  const char* debugLabel = nullptr;
 };
 
 } // namespace nim
-

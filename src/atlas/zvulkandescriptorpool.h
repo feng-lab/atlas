@@ -17,6 +17,7 @@ public:
     return *m_descriptorPool;
   }
   vk::raii::DescriptorSet allocateDescriptorSet(vk::DescriptorSetLayout layout);
+  void reset();
 
 private:
   ZVulkanDevice& m_device;

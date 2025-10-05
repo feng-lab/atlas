@@ -35,6 +35,15 @@ ZVulkanTextureWeightedBlendedPipelineContext::~ZVulkanTextureWeightedBlendedPipe
 void ZVulkanTextureWeightedBlendedPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanTextureWeightedBlendedPipelineContext::resetDescriptors()
+{
+  m_descriptorSet.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& renderer,
@@ -64,14 +73,15 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     return;
   }
 
-  auto* accumulationTexture = reinterpret_cast<ZVulkanTexture*>(payload.accumulationAttachment.id);
-  auto* transmittanceTexture = reinterpret_cast<ZVulkanTexture*>(payload.transmittanceAttachment.id);
-  if (!accumulationTexture || !transmittanceTexture) {
-    return;
-  }
+  auto& accumulationTexture = vulkan::textureFromHandle(payload.accumulationAttachment,
+                                                        m_backend.device(),
+                                                        "texture-weighted-blended accumulation attachment");
+  auto& transmittanceTexture = vulkan::textureFromHandle(payload.transmittanceAttachment,
+                                                         m_backend.device(),
+                                                         "texture-weighted-blended transmittance attachment");
 
-  m_descriptorSet->updateTexture(0, *accumulationTexture);
-  m_descriptorSet->updateTexture(1, *transmittanceTexture);
+  m_descriptorSet->updateTexture(0, accumulationTexture);
+  m_descriptorSet->updateTexture(1, transmittanceTexture);
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 

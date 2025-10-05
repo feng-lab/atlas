@@ -284,42 +284,75 @@ Status legend: [Done], [In‑Progress], [Todo], [Blocked]
   - GL renderers maintain per-renderer 1D LUT caches; Vulkan pipeline contexts build/upload 1D images on demand using a shared helper.
   - File refs: src/atlas/zcolormap.h/.cpp, src/atlas/z3dtransferfunction.h/.cpp, src/atlas/z3dimgslicerenderer.cpp, src/atlas/z3dimgraycasterrenderer.cpp, src/atlas/zvulkanlututils.h, src/atlas/zvulkanimgslicepipelinecontext.cpp, src/atlas/zvulkanimgraycasterpipelinecontext.cpp
 
-## Potential Optimizations (Backlog)
+## Vulkan Dynamic Rendering Optimization Roadmap (2025 Q4)
 
-- Readback/presentation
-  - Asynchronous staging for final-frame and picking readbacks (reuse staging buffers, fence/pool management) to avoid CPU stalls.
-  - Optional “UI readback toggle” to skip local-buffer downloads when not needed; read straight from Vulkan for screenshots.
-  - Direct compositor screenshot path (mono/stereo SxS assembly) from attachments (already exposed via helpers; could batch/avoid intermediate copies).
+This roadmap replaces the ad-hoc backlog with a staged plan targeting predictable frame pacing and lower CPU/GPU overhead while keeping parity with the OpenGL path. Each stage calls out prerequisites, scope, validation, and doc/reporting impact. Stages must land sequentially; later stages assume earlier infrastructure is in place.
 
-- Picking
-  - Batched subimage reads for hover/drag (coalesce requests, small ring buffer of mapped staging memory).
-  - Debounce/throttle interactive reads on high-frequency pointer updates.
-  - Persistent mapped staging for single-pixel downloads to reduce map/unmap churn.
+### Stage 0 – Instrument & Baseline (owner: Vulkan backend team, 1 sprint)
 
-- OIT/passes
-  - Reduce layout transitions and attachment clears by merging passes where legal (dynamic rendering subpass emulation).
-  - Heuristic to bypass OIT when geometry topology guarantees ordering (thin lines, •small depth complexity).
-  - Specialize WA/WB pipelines by attachment format to simplify pipelines and improve cache hits.
+- **Prereqs:** Current Vulkan compositor builds on macOS/Linux; scratch pool stats logging available (already in place).
+- **Scope:**
+  - Wire GPU timestamp queries around compositor phases (background, opaque, transparency, glow, picking, readback).
+  - Add per-frame CPU timers for command recording/submit in `Z3DRendererVulkanBackend`.
+  - Capture reference traces (mono + stereo scenes) and archive in issue tracker for comparison after each stage.
+- **Validation:** Manual run on representative scenes; store timing CSV + captured screenshots. No behavioural change expected.
+- **Docs:** Update this plan with measured baselines and flag any hotspots uncovered.
+- **Status (2025-10):** Vulkan backend now logs per-batch CPU timings together with GPU timestamp scopes for background, geometry (opaque/transparency), glow overlays, picking paths, supersample downsample, and final readback (`VLOG(1)` output). `collectFrameTimings` now pulls timestamp data via the device dispatcher so macOS x86_64 builds link cleanly (see `src/atlas/z3drenderervulkanbackend.cpp:895`). Use these traces as the baseline for Stage 0 comparisons; next action is to capture and archive the reference timing CSV/screenshots called out in the validation bullet.
 
-- Volume raycaster
-  - Empty-space skipping and AABB clipping per channel; conservative per-channel ROIs from paging metadata.
-  - Adaptive sampling (eye-space pixel size driven) and early ray termination (energy threshold).
-  - Pipeline key reduction by pushing more into UBOs to increase cache reuse.
+### Stage 1 – Frame-Level Command Submission (owner: backend/runtime, 2 sprints)
 
-- Resource/pooling
-  - Dedicated transient attachment pools per format/size for compositor intermediates to avoid redundant (re)creation.
-  - Bindless/persistent descriptors where feasible; descriptor set recycling per frame.
-  - Separate device-local vs. host-visible staging pools with lifetime buckets (frame, multi-frame, long-lived).
+- **Prereqs:** Stage 0 timings; agreement on max frames in flight (target: 2).
+- **Scope:**
+  - Replace per-pass single-time command buffers with a per-frame command context (command buffer + fence + semaphore pool).
+  - Submit once per frame; wait on fences instead of device-wide `waitIdle`.
+  - Move `ZVulkanDevice::beginSingleTimeCommands` usage to new `FrameExecutor`; retire legacy helper after migration.
+- **Validation:**
+  - Unit test: ensure fence wait path handles device-loss exceptions.
+  - Manual: verify no deadlocks when rapidly toggling backend; confirm frame pacing improves in profiler.
+- **Docs:** Record fence configuration, failure-handling policy, and any new developer tooling (e.g., `--atlas_vk_max_frames_in_flight`).
+- **Status (2025-10-06):** Vulkan frames now stay inside a single command buffer per eye: `Z3DRendererBase::beginVulkanFrame`/`recordVulkanBatches` gate command recording so the compositor only submits once at `endVulkanFrame` (`src/atlas/z3drendererbase.cpp#L354`, `src/atlas/z3dcompositor.cpp#L1237`, `src/atlas/z3dcompositor.cpp#L1821`). `ZVulkanFrameExecutor` continues to cover resource uploads and feed the shared frame context (`src/atlas/zvulkanframeexecutor.cpp:100`), keeping Stage 1 scope items (per-frame context + fence waits) in place. **Next:** plumb the executor's acquire/release semaphores through the compositor/presentation path and add a fence-failure regression test before closing out Stage 1.
 
-- MSAA/supersample
-  - Optional true MSAA path (samples>1) to evaluate quality/perf vs. current 2× supersample downsample.
-  - Jittered supersample for enhanced edge AA during still renders.
+### Stage 2 – Per-Frame Resource Recycling (owner: scratch pool/backend, 2–3 sprints)
 
-- Profiling/debug
-  - GPU timestamp queries around major passes; UI overlay with pass timings and VRAM usage (scratch pool counters).
-  - Shader specialization constants for toggling debug modes without rebuilding pipelines.
+- **Prereqs:** Stage 1 merged.
+- **Scope:**
+  - Introduce frame indices into `Z3DScratchResourcePool` leases; recycle temp render targets when their submit fence signals.
+  - Create descriptor arena per frame; contexts pull descriptor sets from a resettable pool.
+  - Centralise immutable sampler cache under `Z3DRendererVulkanBackend`.
+- **Validation:**
+  - Stress test with rapid OIT + volume toggles to ensure no leak and no reuse-before-signal.
+  - Add logging guard that asserts descriptor pool resets exactly once per frame in debug builds.
+- **Docs:** Update developer guide with new lifecycle expectations for leases/descriptor usage.
 
+### Stage 3 – Compositor Pass Graph Simplification (owner: compositor team, 2 sprints)
 
-- Validation [In‑Progress]
-  - Build succeeds on macOS; run interactive checks for background, geometry, DVR/slices, layer blending parity, and on‑top ordering.
-  - Added hard `CHECK`s ensuring compositor leases and image-layer handles are Vulkan-backed when the Vulkan renderer is active to fail fast on backend mismatches.
+- **Prereqs:** Stage 2 resource recycling.
+- **Scope:**
+  - Build an explicit pass graph (opaque, transparency, glow, overlays, picking) and dispatch through `executeCompositorPass` to avoid repeated collect/submit cycles.
+  - Cache OIT attachment descriptors between frames; minimize redundant clears.
+  - Ensure supersample downsample reuses persistent pipelines.
+- **Validation:** Automated tests for transparent + glow scenes; compare against Stage 0 baselines.
+- **Docs:** Document pass graph ordering and any behavioural differences; extend USER_GUIDE if controls change.
+
+### Stage 4 – Async Readback & Picking Optimisation (owner: runtime/UI, 1–2 sprints)
+
+- **Prereqs:** Stage 3 merged; persistent command context available.
+- **Scope:**
+  - Introduce ring-buffered staging textures for screenshots/picking with persistent mapping.
+  - Add UI flag to defer readbacks when not needed; fallback to synchronous path for headless captures.
+  - Batch hover-pick requests when pointer moves faster than frame cadence.
+- **Validation:** Manual interactive test + automated picking regression harness.
+- **Docs:** Update USER_GUIDE with new screenshot/picking options; document environment toggles.
+
+### Stage 5 – Deferred Enhancements (owner: shared, backlog)
+
+- MSAA/MSRR parity explorations, adaptive volume sampling, shader specialization toggles remain backlog items after Stage 4.
+- Re-evaluate once timing goals met; keep tracking in this doc.
+
+## Validation Tracker
+
+- Stage 0 baselines (TBD) – capture after instrumentation lands.
+- Stage 1 fence/submit validation (TBD).
+- Stage 2 recycling soak test (TBD).
+- Stage 3 pass graph regression suite (TBD).
+- Stage 4 asynchronous readback regression (TBD).

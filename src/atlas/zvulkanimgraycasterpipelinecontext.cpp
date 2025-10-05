@@ -208,7 +208,24 @@ ZVulkanImgRaycasterPipelineContext::~ZVulkanImgRaycasterPipelineContext() = defa
 
 void ZVulkanImgRaycasterPipelineContext::resetFrame()
 {
-  // Channel resources persist per renderer instance; nothing to clear per frame yet.
+  resetDescriptors();
+}
+
+void ZVulkanImgRaycasterPipelineContext::resetDescriptors()
+{
+  for (auto& channel : m_channelResources) {
+    channel.fastDescriptor.reset();
+    channel.rayParamDescriptor.reset();
+    channel.pagedDescriptor.reset();
+    channel.pageDescriptor.reset();
+    channel.blockIdDescriptor.reset();
+  }
+  m_emptyDescriptor.reset();
+  m_copyDescriptor.reset();
+  m_mergeDescriptor.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
@@ -1237,18 +1254,14 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
   }
 
   auto buildColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-    if (attachment.handle.id == 0) {
+    if (!attachment.handle.valid()) {
       return std::nullopt;
     }
-    CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
-      << "GL color attachment encountered in Vulkan img raycaster fast path";
-    auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
-    if (!texture) {
-      return std::nullopt;
-    }
-    texture->transitionLayout(cmd, texture->layout(), vk::ImageLayout::eColorAttachmentOptimal);
+    auto& texture =
+      vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster fast pass color attachment");
+    texture.transitionLayout(cmd, texture.layout(), vk::ImageLayout::eColorAttachmentOptimal);
     vk::RenderingAttachmentInfo info{};
-    info.imageView = texture->imageView();
+    info.imageView = texture.imageView();
     info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
@@ -1260,18 +1273,14 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
   };
 
   auto buildDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-    if (attachment.handle.id == 0) {
+    if (!attachment.handle.valid()) {
       return std::nullopt;
     }
-    CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
-      << "GL depth attachment encountered in Vulkan img raycaster fast path";
-    auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
-    if (!texture) {
-      return std::nullopt;
-    }
-    texture->transitionLayout(cmd, texture->layout(), vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    auto& texture =
+      vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster fast pass depth attachment");
+    texture.transitionLayout(cmd, texture.layout(), vk::ImageLayout::eDepthStencilAttachmentOptimal);
     vk::RenderingAttachmentInfo info{};
-    info.imageView = texture->imageView();
+    info.imageView = texture.imageView();
     info.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
@@ -1858,18 +1867,14 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
 
   auto buildColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-    if (attachment.handle.id == 0) {
+    if (!attachment.handle.valid()) {
       return std::nullopt;
     }
-    CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
-      << "GL color attachment encountered in Vulkan img raycaster blend path";
-    auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
-    if (!texture) {
-      return std::nullopt;
-    }
-    texture->transitionLayout(cmd, texture->layout(), vk::ImageLayout::eColorAttachmentOptimal);
+    auto& texture =
+      vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster blend pass color attachment");
+    texture.transitionLayout(cmd, texture.layout(), vk::ImageLayout::eColorAttachmentOptimal);
     vk::RenderingAttachmentInfo info{};
-    info.imageView = texture->imageView();
+    info.imageView = texture.imageView();
     info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
@@ -1881,18 +1886,14 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   };
 
   auto buildDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-    if (attachment.handle.id == 0) {
+    if (!attachment.handle.valid()) {
       return std::nullopt;
     }
-    CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
-      << "GL depth attachment encountered in Vulkan img raycaster blend path";
-    auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
-    if (!texture) {
-      return std::nullopt;
-    }
-    texture->transitionLayout(cmd, texture->layout(), vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    auto& texture =
+      vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster blend pass depth attachment");
+    texture.transitionLayout(cmd, texture.layout(), vk::ImageLayout::eDepthStencilAttachmentOptimal);
     vk::RenderingAttachmentInfo info{};
-    info.imageView = texture->imageView();
+    info.imageView = texture.imageView();
     info.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);

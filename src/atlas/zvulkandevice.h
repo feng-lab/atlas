@@ -3,7 +3,6 @@
 #include "zvulkan.h"
 #include "zvulkantexture.h"
 #include <memory>
-#include <optional>
 #include <string>
 
 namespace nim {
@@ -15,6 +14,7 @@ class ZVulkanShader;
 class ZVulkanPipeline;
 class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
+class ZVulkanFrameExecutor;
 
 class ZVulkanDevice
 {
@@ -49,12 +49,12 @@ public:
   std::unique_ptr<ZVulkanDescriptorSet> createDescriptorSet(ZVulkanDescriptorPool& pool,
                                                             vk::DescriptorSetLayout layout);
 
-
-  vk::raii::CommandBuffer beginSingleTimeCommands();
-  void endSingleTimeCommands(vk::raii::CommandBuffer& cmdBuffer);
+  ZVulkanFrameExecutor& frameExecutor();
+  const ZVulkanFrameExecutor& frameExecutor() const;
 
 private:
   ZVulkanContext& m_context;
+  std::unique_ptr<ZVulkanFrameExecutor> m_frameExecutor;
 };
 
 } // namespace nim

@@ -1,13 +1,42 @@
 #include "zvulkanbuffer.h"
 #include "zvulkandevice.h"
 #include "zvulkancontext.h"
+#include "zvulkanframeexecutor.h"
 #include "zexception.h"
 #include "zlog.h"
 
-#include <fmt/format.h>
 #include <cstring>
 
 namespace nim {
+
+ZVulkanBuffer::ScopedMap::ScopedMap(ZVulkanBuffer& buffer, vk::DeviceSize offset, vk::DeviceSize size)
+  : m_buffer(&buffer)
+  , m_data(buffer.map(offset, size))
+{}
+
+ZVulkanBuffer::ScopedMap::ScopedMap(ScopedMap&& other) noexcept
+  : m_buffer(std::exchange(other.m_buffer, nullptr))
+  , m_data(std::exchange(other.m_data, nullptr))
+{}
+
+ZVulkanBuffer::ScopedMap& ZVulkanBuffer::ScopedMap::operator=(ScopedMap&& other) noexcept
+{
+  if (this != &other) {
+    if (m_buffer) {
+      m_buffer->unmap();
+    }
+    m_buffer = std::exchange(other.m_buffer, nullptr);
+    m_data = std::exchange(other.m_data, nullptr);
+  }
+  return *this;
+}
+
+ZVulkanBuffer::ScopedMap::~ScopedMap()
+{
+  if (m_buffer) {
+    m_buffer->unmap();
+  }
+}
 
 ZVulkanBuffer::ZVulkanBuffer(ZVulkanDevice& device,
                              size_t size,
@@ -64,10 +93,12 @@ void ZVulkanBuffer::copyData(const void* data, size_t size)
                             vk::BufferUsageFlagBits::eTransferSrc,
                             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     stagingBuffer->copyData(data, size);
-    auto cmdBuffer = m_device.beginSingleTimeCommands();
-    const vk::BufferCopy copyRegion{.srcOffset = 0, .dstOffset = 0, .size = size};
-    cmdBuffer.copyBuffer(stagingBuffer->buffer(), *m_buffer, copyRegion);
-    m_device.endSingleTimeCommands(cmdBuffer);
+    m_device.frameExecutor().executeImmediate(
+      [&](vk::raii::CommandBuffer& cmdBuffer) {
+        const vk::BufferCopy copyRegion{.srcOffset = 0, .dstOffset = 0, .size = size};
+        cmdBuffer.copyBuffer(stagingBuffer->buffer(), *m_buffer, copyRegion);
+      },
+      "buffer_copy");
   } else {
     void* mappedMemory = m_bufferMemory->mapMemory(0, size);
     std::memcpy(mappedMemory, data, size);

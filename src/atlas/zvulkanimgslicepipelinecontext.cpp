@@ -167,6 +167,21 @@ void ZVulkanImgSlicePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_quadVertexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanImgSlicePipelineContext::resetDescriptors()
+{
+  for (auto& channel : m_channelResources) {
+    channel.fastTextureDescriptor.reset();
+    channel.pagedTextureDescriptor.reset();
+    channel.pageDescriptor.reset();
+  }
+  m_emptyDescriptor.reset();
+  m_mergeDescriptor.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
@@ -203,20 +218,15 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
   auto buildColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-    if (attachment.handle.id == 0) {
+    if (!attachment.handle.valid()) {
       return std::nullopt;
     }
-    CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
-      << "GL color attachment encountered in Vulkan image-slice pipeline";
-    auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
-    if (!texture) {
-      return std::nullopt;
-    }
+    auto& texture = vulkan::textureFromHandle(attachment.handle, m_backend.device(), "image-slice color attachment");
 
     vk::RenderingAttachmentInfo info;
     const auto desiredLayout = vk::ImageLayout::eColorAttachmentOptimal;
-    texture->transitionLayout(cmd, texture->layout(), desiredLayout);
-    info.imageView = texture->imageView();
+    texture.transitionLayout(cmd, texture.layout(), desiredLayout);
+    info.imageView = texture.imageView();
     info.imageLayout = desiredLayout;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
@@ -230,20 +240,15 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   };
 
   auto buildDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-    if (attachment.handle.id == 0) {
+    if (!attachment.handle.valid()) {
       return std::nullopt;
     }
-    CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
-      << "GL depth attachment encountered in Vulkan image-slice pipeline";
-    auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
-    if (!texture) {
-      return std::nullopt;
-    }
+    auto& texture = vulkan::textureFromHandle(attachment.handle, m_backend.device(), "image-slice depth attachment");
 
     vk::RenderingAttachmentInfo info;
     const auto desiredLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-    texture->transitionLayout(cmd, texture->layout(), desiredLayout);
-    info.imageView = texture->imageView();
+    texture.transitionLayout(cmd, texture.layout(), desiredLayout);
+    info.imageView = texture.imageView();
     info.imageLayout = desiredLayout;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);

@@ -89,6 +89,7 @@ private:
   size_t m_vertexCount = 0;
 
   void ensureDescriptorLayouts();
+  void resetDescriptors();
   void ensureDescriptorSets();
   void updateLightingUBO(Z3DRendererBase& renderer,
                          const RenderBatch& batch,
@@ -104,4 +105,3 @@ private:
 };
 
 } // namespace nim
-

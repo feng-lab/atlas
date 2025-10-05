@@ -186,6 +186,7 @@ private:
   uint32_t m_progressiveGeneration = 0u;
 
   void ensureDescriptorPool();
+  void resetDescriptors();
   void ensureEntryVertexCapacity(size_t vertexCount, size_t indexCount);
   void ensureQuadVertexBuffer();
 

@@ -36,6 +36,16 @@ ZVulkanTextureWeightedAveragePipelineContext::~ZVulkanTextureWeightedAveragePipe
 void ZVulkanTextureWeightedAveragePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanTextureWeightedAveragePipelineContext::resetDescriptors()
+{
+  m_descriptorSet.reset();
+  m_descriptorSetOIT.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& renderer,
@@ -64,14 +74,15 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
     return;
   }
 
-  auto* accumulationTexture = reinterpret_cast<ZVulkanTexture*>(payload.accumulationAttachment.id);
-  auto* momentsTexture = reinterpret_cast<ZVulkanTexture*>(payload.momentsAttachment.id);
-  if (!accumulationTexture || !momentsTexture) {
-    return;
-  }
+  auto& accumulationTexture = vulkan::textureFromHandle(payload.accumulationAttachment,
+                                                        m_backend.device(),
+                                                        "texture-weighted-average accumulation attachment");
+  auto& momentsTexture = vulkan::textureFromHandle(payload.momentsAttachment,
+                                                   m_backend.device(),
+                                                   "texture-weighted-average moments attachment");
 
-  m_descriptorSet->updateTexture(0, *accumulationTexture);
-  m_descriptorSet->updateTexture(1, *momentsTexture);
+  m_descriptorSet->updateTexture(0, accumulationTexture);
+  m_descriptorSet->updateTexture(1, momentsTexture);
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 

@@ -33,7 +33,10 @@ vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
                                                    .stride = static_cast<uint32_t>(sizeof(LineWideVertex)),
                                                    .inputRate = vk::VertexInputRate::eVertex};
   static std::array<vk::VertexInputAttributeDescription, 5> attrs{
-    vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0},
     vk::VertexInputAttributeDescription{.location = 1,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
@@ -49,7 +52,8 @@ vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
     vk::VertexInputAttributeDescription{.location = 4,
                                         .binding = 0,
                                         .format = vk::Format::eR32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(LineWideVertex, flags))}};
+                                        .offset = static_cast<uint32_t>(offsetof(LineWideVertex, flags))}
+  };
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
   info.pVertexBindingDescriptions = &binding;
@@ -64,11 +68,15 @@ vk::PipelineVertexInputStateCreateInfo makeThinVertexInput()
                                                    .stride = static_cast<uint32_t>(sizeof(VulkanThinLineVertex)),
                                                    .inputRate = vk::VertexInputRate::eVertex};
   static std::array<vk::VertexInputAttributeDescription, 2> attrs{
-    vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0},
     vk::VertexInputAttributeDescription{.location = 1,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(VulkanThinLineVertex, color))}};
+                                        .offset = static_cast<uint32_t>(offsetof(VulkanThinLineVertex, color))}
+  };
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
   info.pVertexBindingDescriptions = &binding;
@@ -97,7 +105,20 @@ ZVulkanLinePipelineContext::~ZVulkanLinePipelineContext() = default;
 
 void ZVulkanLinePipelineContext::resetFrame()
 {
-  // Currently no per-frame state to reset.
+  m_wideVertices.clear();
+  m_wideIndices.clear();
+  m_thinVertices.clear();
+  resetDescriptors();
+}
+
+void ZVulkanLinePipelineContext::resetDescriptors()
+{
+  m_dsTexture.reset();
+  m_dsLighting.reset();
+  m_dsTransforms.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
@@ -122,7 +143,8 @@ void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 2,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setTexture.emplace(vkDevice, createInfo);
@@ -142,11 +164,14 @@ void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setTransforms.emplace(vkDevice, createInfo);
@@ -221,19 +246,22 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer, const Ren
   auto& device = m_backend.device();
 
   if (!m_uboLighting) {
-    m_uboLighting = device.createBuffer(sizeof(LightingUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboLighting =
+      device.createBuffer(sizeof(LightingUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_uboTransforms) {
-    m_uboTransforms = device.createBuffer(sizeof(TransformsUBOStd140),
-                                          vk::BufferUsageFlagBits::eUniformBuffer,
-                                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboTransforms =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_uboMaterial) {
-    m_uboMaterial = device.createBuffer(sizeof(MaterialUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboMaterial =
+      device.createBuffer(sizeof(MaterialUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   LightingUBOStd140 lighting{};
@@ -321,31 +349,35 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     }
 
     instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                     shaderBase + "wideline1.vert.spv",
-                                                     shaderBase + fragmentShader,
-                                                     std::nullopt);
+                                                      shaderBase + "wideline1.vert.spv",
+                                                      shaderBase + fragmentShader,
+                                                      std::nullopt);
 
     const uint32_t useTex = key.useTextureColor ? 1u : 0u;
     const uint32_t roundCap = key.roundCap ? 1u : 0u;
     const uint32_t lighting = 0u;
 
     std::array<vk::SpecializationMapEntry, 3> specEntries{
-      vk::SpecializationMapEntry{.constantID = 98, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-      vk::SpecializationMapEntry{.constantID = 99, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-      vk::SpecializationMapEntry{.constantID = 100, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)}};
+      vk::SpecializationMapEntry{.constantID = 98,  .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 99,  .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+      vk::SpecializationMapEntry{.constantID = 100, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+    };
     std::array<uint32_t, 3> specData{useTex, roundCap, lighting};
-    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
-                                                std::vector<vk::SpecializationMapEntry>(specEntries.begin(), specEntries.end()),
-                                                std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
-                                                                     reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
+    instance.shader->setSpecializationConstants(
+      vk::ShaderStageFlagBits::eFragment,
+      std::vector<vk::SpecializationMapEntry>(specEntries.begin(), specEntries.end()),
+      std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
+                           reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
 
     std::array<vk::SpecializationMapEntry, 1> vertexEntry{
-      vk::SpecializationMapEntry{.constantID = 101, .offset = 0, .size = sizeof(uint32_t)}};
+      vk::SpecializationMapEntry{.constantID = 101, .offset = 0, .size = sizeof(uint32_t)}
+    };
     const uint32_t screenAligned = key.screenAligned ? 1u : 0u;
-    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eVertex,
-                                                std::vector<vk::SpecializationMapEntry>(vertexEntry.begin(), vertexEntry.end()),
-                                                std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&screenAligned),
-                                                                     reinterpret_cast<const uint8_t*>(&screenAligned) + sizeof(uint32_t)));
+    instance.shader->setSpecializationConstants(
+      vk::ShaderStageFlagBits::eVertex,
+      std::vector<vk::SpecializationMapEntry>(vertexEntry.begin(), vertexEntry.end()),
+      std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&screenAligned),
+                           reinterpret_cast<const uint8_t*>(&screenAligned) + sizeof(uint32_t)));
 
     auto vi = makeWideVertexInput();
     instance.pipeline = device.createPipeline(*instance.shader, vi, vk::PrimitiveTopology::eTriangleList);
@@ -443,13 +475,12 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
         break;
     }
 
-    instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                     shaderBase + "line.vert.spv",
-                                                     shaderBase + fragmentShader,
-                                                     std::nullopt);
+    instance.shader =
+      std::make_unique<ZVulkanShader>(device, shaderBase + "line.vert.spv", shaderBase + fragmentShader, std::nullopt);
 
     auto vi = makeThinVertexInput();
-    const vk::PrimitiveTopology topology = key.lineStrip ? vk::PrimitiveTopology::eLineStrip : vk::PrimitiveTopology::eLineList;
+    const vk::PrimitiveTopology topology =
+      key.lineStrip ? vk::PrimitiveTopology::eLineStrip : vk::PrimitiveTopology::eLineList;
     instance.pipeline = device.createPipeline(*instance.shader, vi, topology);
     std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, **m_setLighting, **m_setTransforms};
     instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
@@ -461,7 +492,8 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
   return insertIt->second;
 }
 
-void ZVulkanLinePipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd, const PipelineInstance& pipeline) const
+void ZVulkanLinePipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd,
+                                                    const PipelineInstance& pipeline) const
 {
   if (!m_dsLighting || !m_dsTransforms || !m_dsTexture) {
     return;
@@ -509,9 +541,10 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
   const size_t vertexBytes = m_wideVertices.size() * sizeof(LineWideVertex);
   if (!m_wideVertexBuffer || vertexBytes > m_wideVertexCapacity) {
     const size_t allocSize = std::max<size_t>(vertexBytes, sizeof(LineWideVertex));
-    m_wideVertexBuffer = device.createBuffer(allocSize,
-                                             vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                                             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_wideVertexBuffer =
+      device.createBuffer(allocSize,
+                          vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     m_wideVertexCapacity = allocSize;
   }
   if (vertexBytes > 0) {
@@ -521,9 +554,10 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
   const size_t indexBytes = m_wideIndices.size() * sizeof(uint32_t);
   if (!m_wideIndexBuffer || indexBytes > m_wideIndexCapacity) {
     const size_t allocSize = std::max<size_t>(indexBytes, sizeof(uint32_t));
-    m_wideIndexBuffer = device.createBuffer(allocSize,
-                                            vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                                            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_wideIndexBuffer =
+      device.createBuffer(allocSize,
+                          vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     m_wideIndexCapacity = allocSize;
   }
   if (indexBytes > 0) {
@@ -572,9 +606,10 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
   auto& device = m_backend.device();
   if (!m_thinVertexBuffer || vertexBytes > m_thinVertexCapacity) {
     const size_t allocSize = std::max<size_t>(vertexBytes, sizeof(VulkanThinLineVertex));
-    m_thinVertexBuffer = device.createBuffer(allocSize,
-                                             vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                                             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_thinVertexBuffer =
+      device.createBuffer(allocSize,
+                          vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     m_thinVertexCapacity = allocSize;
   }
 
@@ -601,14 +636,16 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   if (m_dsTexture && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
     const auto& hookPara = renderer.shaderHookPara();
     if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-      if (auto* tex = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingDepthBlenderHandle.id)) {
-        m_dsTexture->updateTexture(1, *tex, **m_sampler);
-      }
+      auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                                 m_backend.device(),
+                                                 "line dual-depth-peeling depth blender");
+      m_dsTexture->updateTexture(1, depthTex, **m_sampler);
     }
     if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-      if (auto* tex = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingFrontBlenderHandle.id)) {
-        m_dsTexture->updateTexture(2, *tex, **m_sampler);
-      }
+      auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                                 m_backend.device(),
+                                                 "line dual-depth-peeling front blender");
+      m_dsTexture->updateTexture(2, frontTex, **m_sampler);
     }
   } else if (m_dsTexture && m_placeholderTexture) {
     m_dsTexture->updateTexture(1, *m_placeholderTexture, **m_sampler);
@@ -661,7 +698,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     const auto& frameState = renderer.frameState();
     pc.viewport_matrix = frameState.viewportMatrix;
     pc.viewport_matrix_inverse = frameState.inverseViewportMatrix;
-  pc.size_scale = renderer.parameterState().sizeScale;
+    pc.size_scale = renderer.parameterState().sizeScale;
 
     const auto widths = payload.perSegmentWidths;
     if (!widths.empty()) {
@@ -669,23 +706,23 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       const uint32_t drawSegments = std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size()));
       for (uint32_t i = 0; i < drawSegments; ++i) {
         pc.line_width = resolveWideLineWidth(widths[i]);
-    if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
-      const float n = renderer.viewState().nearClip;
-      const float f = renderer.viewState().farClip;
-      const float denom = std::max(f - n, 1e-6f);
-      pc.weighted_a = (f * n) / denom;
-      pc.weighted_b = 0.5f * (f + n) / denom + 0.5f;
-      pc.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-    } else {
-      pc.weighted_a = 0.0f;
-      pc.weighted_b = 0.0f;
-      pc.weighted_depth_scale = 0.0f;
-    }
+        if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
+          const float n = renderer.viewState().nearClip;
+          const float f = renderer.viewState().farClip;
+          const float denom = std::max(f - n, 1e-6f);
+          pc.weighted_a = (f * n) / denom;
+          pc.weighted_b = 0.5f * (f + n) / denom + 0.5f;
+          pc.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
+        } else {
+          pc.weighted_a = 0.0f;
+          pc.weighted_b = 0.0f;
+          pc.weighted_depth_scale = 0.0f;
+        }
 
-    cmd.pushConstants<WideLinePC>(pipeline.pipeline->pipelineLayout(),
-                                  vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                                  0,
-                                  pc);
+        cmd.pushConstants<WideLinePC>(pipeline.pipeline->pipelineLayout(),
+                                      vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+                                      0,
+                                      pc);
         cmd.drawIndexed(6, 1, i * 6, i * 4, 0);
       }
     } else {

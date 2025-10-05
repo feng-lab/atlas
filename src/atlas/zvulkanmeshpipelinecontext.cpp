@@ -55,23 +55,24 @@ vk::PipelineVertexInputStateCreateInfo makeMeshVertexInput()
     vk::VertexInputAttributeDescription{.location = 1,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, normal))},
+                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, normal))  },
     vk::VertexInputAttributeDescription{.location = 2,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, color))},
+                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, color))   },
     vk::VertexInputAttributeDescription{.location = 3,
                                         .binding = 0,
                                         .format = vk::Format::eR32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, tex1d))},
+                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, tex1d))   },
     vk::VertexInputAttributeDescription{.location = 4,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, tex2d))},
+                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, tex2d))   },
     vk::VertexInputAttributeDescription{.location = 5,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, tex3d))}};
+                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, tex3d))   }
+  };
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
   info.pVertexBindingDescriptions = &binding;
@@ -128,6 +129,18 @@ void ZVulkanMeshPipelineContext::resetFrame()
   m_vertexCount = 0;
   m_indexCount = 0;
   m_draws.clear();
+  resetDescriptors();
+}
+
+void ZVulkanMeshPipelineContext::resetDescriptors()
+{
+  m_dsTextures.reset();
+  m_dsLighting.reset();
+  m_dsTransforms.reset();
+  m_dsOIT.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
@@ -158,30 +171,28 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       const auto& viewportState = renderer.frameState().viewport;
       extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
     }
-    glm::vec2 screenRcp = (extent.x > 0.0f && extent.y > 0.0f)
-                            ? glm::vec2(1.0f / extent.x, 1.0f / extent.y)
-                            : glm::vec2(0.0f);
+    glm::vec2 screenRcp =
+      (extent.x > 0.0f && extent.y > 0.0f) ? glm::vec2(1.0f / extent.x, 1.0f / extent.y) : glm::vec2(0.0f);
     updateOITParamsUBO(renderer, batch, screenRcp);
   }
   ensureDescriptorSets();
   if (!pickingPass && m_dsTextures) {
     // Bind Vulkan-native texture if provided; otherwise placeholders remain bound.
     if (payload.textureHandle.valid() && payload.textureHandle.backend == AttachmentBackend::Vulkan) {
-      auto* vkTex = reinterpret_cast<ZVulkanTexture*>(payload.textureHandle.id);
-      if (vkTex) {
-        switch (payload.colorSource) {
-          case MeshPayload::ColorSource::Mesh1DTexture:
-            m_dsTextures->updateTexture(0, *vkTex);
-            break;
-          case MeshPayload::ColorSource::Mesh2DTexture:
-            m_dsTextures->updateTexture(1, *vkTex);
-            break;
-          case MeshPayload::ColorSource::Mesh3DTexture:
-            m_dsTextures->updateTexture(2, *vkTex);
-            break;
-          default:
-            break;
-        }
+      auto& sampledTexture =
+        vulkan::textureFromHandle(payload.textureHandle, m_backend.device(), "mesh payload sampled texture");
+      switch (payload.colorSource) {
+        case MeshPayload::ColorSource::Mesh1DTexture:
+          m_dsTextures->updateTexture(0, sampledTexture);
+          break;
+        case MeshPayload::ColorSource::Mesh2DTexture:
+          m_dsTextures->updateTexture(1, sampledTexture);
+          break;
+        case MeshPayload::ColorSource::Mesh3DTexture:
+          m_dsTextures->updateTexture(2, sampledTexture);
+          break;
+        default:
+          break;
       }
     }
   }
@@ -190,14 +201,16 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_dsTextures) {
     const auto& hookPara = renderer.shaderHookPara();
     if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-      if (auto* depthTexture = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingDepthBlenderHandle.id)) {
-        m_dsTextures->updateTexture(3, *depthTexture);
-      }
+      auto& depthTexture = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                                     m_backend.device(),
+                                                     "mesh dual-depth-peeling depth blender");
+      m_dsTextures->updateTexture(3, depthTexture);
     }
     if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-      if (auto* frontTexture = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingFrontBlenderHandle.id)) {
-        m_dsTextures->updateTexture(4, *frontTexture);
-      }
+      auto& frontTexture = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                                     m_backend.device(),
+                                                     "mesh dual-depth-peeling front blender");
+      m_dsTextures->updateTexture(4, frontTexture);
     }
   } else if (m_dsTextures && m_placeholder2D) {
     m_dsTextures->updateTexture(3, *m_placeholder2D);
@@ -297,12 +310,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       }
 
       const glm::vec4 wireColor = pickingPass ? draw.fallbackColor : payload.wireframeColor;
-      updateMaterialUBO(renderer,
-                        payload,
-                        draw.payloadMeshIndex,
-                        true,
-                        wireColor,
-                        pickingPass);
+      updateMaterialUBO(renderer, payload, draw.payloadMeshIndex, true, wireColor, pickingPass);
 
       if (draw.indexed && draw.indexCount > 0 && m_indexBuffer) {
         cmd.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
@@ -339,7 +347,8 @@ void ZVulkanMeshPipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 4,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setTextures.emplace(vkDevice, createInfo);
@@ -359,11 +368,14 @@ void ZVulkanMeshPipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setTransforms.emplace(vkDevice, createInfo);
@@ -384,33 +396,36 @@ void ZVulkanMeshPipelineContext::ensurePlaceholderTextures()
   auto& device = m_backend.device();
 
   if (!m_placeholder1D) {
-    auto info = ZVulkanTexture::CreateInfo::make1D(1,
-                                                   vk::Format::eR8G8B8A8Unorm,
-                                                   vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                   vk::MemoryPropertyFlagBits::eDeviceLocal);
+    auto info =
+      ZVulkanTexture::CreateInfo::make1D(1,
+                                         vk::Format::eR8G8B8A8Unorm,
+                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
     m_placeholder1D = device.createTexture(info);
     const uint32_t pixel = 0xffffffffu;
     m_placeholder1D->uploadData(&pixel, sizeof(pixel));
   }
 
   if (!m_placeholder2D) {
-    auto info = ZVulkanTexture::CreateInfo::make2D(1,
-                                                   1,
-                                                   vk::Format::eR8G8B8A8Unorm,
-                                                   vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                   vk::MemoryPropertyFlagBits::eDeviceLocal);
+    auto info =
+      ZVulkanTexture::CreateInfo::make2D(1,
+                                         1,
+                                         vk::Format::eR8G8B8A8Unorm,
+                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
     m_placeholder2D = device.createTexture(info);
     const uint32_t pixel = 0xffffffffu;
     m_placeholder2D->uploadData(&pixel, sizeof(pixel));
   }
 
   if (!m_placeholder3D) {
-    auto info = ZVulkanTexture::CreateInfo::make3D(1,
-                                                   1,
-                                                   1,
-                                                   vk::Format::eR8G8B8A8Unorm,
-                                                   vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                   vk::MemoryPropertyFlagBits::eDeviceLocal);
+    auto info =
+      ZVulkanTexture::CreateInfo::make3D(1,
+                                         1,
+                                         1,
+                                         vk::Format::eR8G8B8A8Unorm,
+                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
     m_placeholder3D = device.createTexture(info);
     const uint32_t pixel = 0xffffffffu;
     m_placeholder3D->uploadData(&pixel, sizeof(pixel));
@@ -511,9 +526,10 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   auto& device = m_backend.device();
 
   if (!m_uboLighting) {
-    m_uboLighting = device.createBuffer(sizeof(LightingUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboLighting =
+      device.createBuffer(sizeof(LightingUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   LightingUBOStd140 lighting{};
@@ -530,7 +546,8 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   availableLights = std::min(availableLights, static_cast<size_t>(scene.lighting.lightCount));
 
   lighting.numLights = static_cast<int>(std::min(availableLights, lighting.lights.size()));
-  const bool enableLighting = !pickingPass && lighting.numLights > 0 && payload.renderer && payload.renderer->needLighting();
+  const bool enableLighting =
+    !pickingPass && lighting.numLights > 0 && payload.renderer && payload.renderer->needLighting();
   lighting.lighting_enabled = enableLighting ? 1 : 0;
 
   const glm::vec2 extent = batch.pass.viewport.extent;
@@ -546,9 +563,8 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   lighting.fog_color_top = scene.fog.topColor;
   lighting.fog_color_bottom = scene.fog.bottomColor;
   lighting.fog_end = scene.fog.range.y;
-  lighting.fog_scale = scene.fog.range.y > scene.fog.range.x ?
-                         1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) :
-                         0.0f;
+  lighting.fog_scale =
+    scene.fog.range.y > scene.fog.range.x ? 1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) : 0.0f;
   constexpr float kLog2e = 1.44269504088896340735992468100189214f;
   lighting.fog_density_log2e = scene.fog.density * kLog2e;
   lighting.fog_density_density_log2e = scene.fog.density * scene.fog.density * kLog2e;
@@ -573,14 +589,16 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer, c
   auto& device = m_backend.device();
 
   if (!m_uboTransforms) {
-    m_uboTransforms = device.createBuffer(sizeof(TransformsUBOStd140),
-                                          vk::BufferUsageFlagBits::eUniformBuffer,
-                                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboTransforms =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_uboMaterial) {
-    m_uboMaterial = device.createBuffer(sizeof(MaterialUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboMaterial =
+      device.createBuffer(sizeof(MaterialUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   TransformsUBOStd140 transforms{};
@@ -646,8 +664,7 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
     material.material_shininess = 0.0f;
   } else if (useFallbackColor) {
     useCustomColor = true;
-  } else if (payload.colorSource == MeshPayload::ColorSource::CustomColor &&
-             meshIndex < payload.meshColors.size()) {
+  } else if (payload.colorSource == MeshPayload::ColorSource::CustomColor && meshIndex < payload.meshColors.size()) {
     useCustomColor = true;
     colorValue = payload.meshColors[meshIndex];
   }
@@ -658,7 +675,8 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
   m_uboMaterial->copyData(&material, sizeof(material));
 }
 
-void ZVulkanMeshPipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd, const PipelineInstance& pipeline) const
+void ZVulkanMeshPipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd,
+                                                    const PipelineInstance& pipeline) const
 {
   if (!m_dsTextures || !m_dsLighting || !m_dsTransforms) {
     return;
@@ -675,8 +693,7 @@ void ZVulkanMeshPipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd
 }
 
 ZVulkanMeshPipelineContext::PipelineInstance&
-ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key,
-                                           const vulkan::AttachmentFormats& formats)
+ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats)
 {
   auto it = m_pipelineCache.find(key);
   if (it != m_pipelineCache.end()) {
@@ -708,10 +725,8 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key,
 
   const auto fragmentShader = selectFragmentShader(key.shaderHookType);
 
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "mesh.vert.spv",
-                                                    shaderBase + fragmentShader,
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device, shaderBase + "mesh.vert.spv", shaderBase + fragmentShader, std::nullopt);
 
   const uint32_t useMeshColor = key.colorSource == MeshPayload::ColorSource::MeshColor ? 1u : 0u;
   const uint32_t use1D = key.colorSource == MeshPayload::ColorSource::Mesh1DTexture ? 1u : 0u;
@@ -722,7 +737,8 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key,
     vk::SpecializationMapEntry{.constantID = 40, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 41, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 42, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 43, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)}};
+    vk::SpecializationMapEntry{.constantID = 43, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+  };
   std::array<uint32_t, 4> vertexData{useMeshColor, use1D, use2D, use3D};
   const uint8_t* vertexPtr = reinterpret_cast<const uint8_t*>(vertexData.data());
   std::vector<uint8_t> vertexBytes(vertexPtr, vertexPtr + sizeof(vertexData));
@@ -740,7 +756,8 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key,
     vk::SpecializationMapEntry{.constantID = 43, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 20, .offset = 4 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 21, .offset = 5 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 22, .offset = 6 * sizeof(uint32_t), .size = sizeof(uint32_t)}};
+    vk::SpecializationMapEntry{.constantID = 22, .offset = 6 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+  };
   std::array<uint32_t, 7> fragmentData{useMeshColor, use1D, use2D, use3D, useLinearFog, useExpFog, useExp2Fog};
   const uint8_t* fragmentPtr = reinterpret_cast<const uint8_t*>(fragmentData.data());
   std::vector<uint8_t> fragmentBytes(fragmentPtr, fragmentPtr + sizeof(fragmentData));
@@ -858,9 +875,10 @@ void ZVulkanMeshPipelineContext::ensureVertexCapacity(size_t vertexCount)
 
   size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
   auto& device = m_backend.device();
-  m_vertexBuffer = device.createBuffer(newCapacity,
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
 }
 
@@ -873,9 +891,10 @@ void ZVulkanMeshPipelineContext::ensureIndexCapacity(size_t indexCount)
 
   size_t newCapacity = std::max(requiredBytes, m_indexCapacity == 0 ? requiredBytes : m_indexCapacity * 2);
   auto& device = m_backend.device();
-  m_indexBuffer = device.createBuffer(newCapacity,
-                                      vk::BufferUsageFlagBits::eIndexBuffer,
-                                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_indexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eIndexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_indexCapacity = newCapacity;
 }
 
@@ -933,10 +952,20 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
     ensureIndexCapacity(totalIndices);
   }
 
-  auto* vertexPtr = reinterpret_cast<MeshVertex*>(m_vertexBuffer->map(0, totalVertices * sizeof(MeshVertex)));
+  auto vertexMapping = m_vertexBuffer->mapRange(0, totalVertices * sizeof(MeshVertex));
+  auto* vertexPtr = vertexMapping.as<MeshVertex>();
+  if (!vertexPtr) {
+    throw ZException("Failed to map mesh vertex buffer");
+  }
+
+  ZVulkanBuffer::ScopedMap indexMapping;
   uint32_t* indexPtr = nullptr;
   if (totalIndices > 0 && m_indexBuffer) {
-    indexPtr = reinterpret_cast<uint32_t*>(m_indexBuffer->map(0, totalIndices * sizeof(uint32_t)));
+    indexMapping = m_indexBuffer->mapRange(0, totalIndices * sizeof(uint32_t));
+    indexPtr = indexMapping.as<uint32_t>();
+    if (!indexPtr) {
+      throw ZException("Failed to map mesh index buffer");
+    }
   }
 
   size_t vertexCursor = 0;
@@ -961,10 +990,9 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
     const auto& tex2D = mesh->textureCoordinates2D();
     const auto& tex3D = mesh->textureCoordinates3D();
 
-    const bool hasVertexColors = payload.colorSource == MeshPayload::ColorSource::MeshColor &&
-                                 colors.size() >= mesh->numVertices();
-    const bool fallbackColorNeeded =
-      payload.colorSource == MeshPayload::ColorSource::MeshColor && !hasVertexColors;
+    const bool hasVertexColors =
+      payload.colorSource == MeshPayload::ColorSource::MeshColor && colors.size() >= mesh->numVertices();
+    const bool fallbackColorNeeded = payload.colorSource == MeshPayload::ColorSource::MeshColor && !hasVertexColors;
 
     for (size_t v = 0; v < mesh->numVertices(); ++v) {
       MeshVertex& dst = vertexPtr[vertexCursor + v];
@@ -1015,10 +1043,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
     m_draws.push_back(draw);
   }
 
-  m_vertexBuffer->unmap();
-  if (indexPtr && m_indexBuffer) {
-    m_indexBuffer->unmap();
-  }
+  // ScopedMap unmaps automatically on destruction.
 
   m_vertexCount = totalVertices;
   m_indexCount = totalIndices;

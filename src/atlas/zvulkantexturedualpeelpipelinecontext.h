@@ -96,6 +96,7 @@ private:
 
   void ensureDescriptorLayouts();
   void ensureDescriptorPool();
+  void resetDescriptors();
   ZVulkanDescriptorSet* ensureDescriptor(Stage stage);
   void ensureOITResources();
   void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,

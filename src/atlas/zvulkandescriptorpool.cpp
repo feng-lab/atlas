@@ -28,4 +28,11 @@ vk::raii::DescriptorSet ZVulkanDescriptorPool::allocateDescriptorSet(vk::Descrip
   return std::move(descriptorSets.front());
 }
 
+void ZVulkanDescriptorPool::reset()
+{
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
+}
+
 } // namespace nim

@@ -124,6 +124,7 @@ private:
   void bindDescriptorSets(vk::raii::CommandBuffer& cmd, const PipelineInstance& pipeline) const;
   void uploadWideGeometry(const LinePayload& payload, bool pickingPass);
   void uploadThinGeometry(const LinePayload& payload, bool pickingPass);
+  void resetDescriptors();
 };
 
 } // namespace nim

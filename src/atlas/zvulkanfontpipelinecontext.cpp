@@ -30,6 +30,15 @@ void ZVulkanFontPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanFontPipelineContext::resetDescriptors()
+{
+  m_descriptorSet.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
@@ -129,7 +138,8 @@ void ZVulkanFontPipelineContext::ensureDescriptorLayout()
     vk::DescriptorSetLayoutBinding{.binding = 0,
                                    .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                    .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                   .stageFlags = vk::ShaderStageFlagBits::eFragment}
+  };
 
   vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                .pBindings = bindings.data()};
@@ -168,7 +178,8 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanFontPipelineContext::makeVertexInp
     vk::VertexInputAttributeDescription{.location = 2,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(FontVertex, color))}};
+                                        .offset = static_cast<uint32_t>(offsetof(FontVertex, color))   }
+  };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
@@ -186,9 +197,10 @@ void ZVulkanFontPipelineContext::ensureVertexCapacity(size_t vertexCount)
   }
   size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
   auto& device = m_backend.device();
-  m_vertexBuffer = device.createBuffer(newCapacity,
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
 }
 
@@ -200,9 +212,10 @@ void ZVulkanFontPipelineContext::ensureIndexCapacity(size_t indexCount)
   }
   size_t newCapacity = std::max(requiredBytes, m_indexCapacity == 0 ? requiredBytes : m_indexCapacity * 2);
   auto& device = m_backend.device();
-  m_indexBuffer = device.createBuffer(newCapacity,
-                                      vk::BufferUsageFlagBits::eIndexBuffer,
-                                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_indexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eIndexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_indexCapacity = newCapacity;
 }
 
@@ -245,7 +258,8 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
 {
   // Priority: native Vulkan handle → CPU pixels → fallback
   if (payload.atlasHandle.valid() && payload.atlasHandle.backend == AttachmentBackend::Vulkan) {
-    return reinterpret_cast<ZVulkanTexture*>(payload.atlasHandle.id);
+    auto& texture = vulkan::textureFromHandle(payload.atlasHandle, m_backend.device(), "font atlas sampled image");
+    return &texture;
   }
 
   if (payload.atlasPixels && payload.atlasWidth > 0 && payload.atlasHeight > 0) {
@@ -261,15 +275,15 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
     }
 
     auto& device = m_backend.device();
-    auto info = ZVulkanTexture::CreateInfo::make2D(payload.atlasWidth,
-                                                   payload.atlasHeight,
-                                                   vk::Format::eB8G8R8A8Unorm,
-                                                   vk::ImageUsageFlagBits::eSampled |
-                                                     vk::ImageUsageFlagBits::eTransferDst,
-                                                   vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                   1u,
-                                                   true,
-                                                   vk::ImageLayout::eShaderReadOnlyOptimal);
+    auto info =
+      ZVulkanTexture::CreateInfo::make2D(payload.atlasWidth,
+                                         payload.atlasHeight,
+                                         vk::Format::eB8G8R8A8Unorm,
+                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                         1u,
+                                         true,
+                                         vk::ImageLayout::eShaderReadOnlyOptimal);
     auto tex = device.createTexture(info);
     if (!tex) {
       return nullptr;
@@ -286,14 +300,15 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
     return it->second.get();
   }
   auto& device = m_backend.device();
-  auto info = ZVulkanTexture::CreateInfo::make2D(1,
-                                                 1,
-                                                 vk::Format::eR8G8B8A8Unorm,
-                                                 vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                 vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                 1u,
-                                                 true,
-                                                 vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto info =
+    ZVulkanTexture::CreateInfo::make2D(1,
+                                       1,
+                                       vk::Format::eR8G8B8A8Unorm,
+                                       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                       vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                       1u,
+                                       true,
+                                       vk::ImageLayout::eShaderReadOnlyOptimal);
   auto tex = device.createTexture(info);
   if (!tex) {
     return nullptr;
@@ -318,10 +333,8 @@ ZVulkanFontPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "almag.vert.spv",
-                                                    shaderBase + "almag.frag.spv",
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device, shaderBase + "almag.vert.spv", shaderBase + "almag.frag.spv", std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);

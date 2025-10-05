@@ -29,7 +29,7 @@ void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& 
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  LOG(INFO) << "Updated uniform buffer descriptor at binding " << binding;
+  VLOG(2) << "Updated uniform buffer descriptor at binding " << binding;
 }
 
 void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& texture)
@@ -50,7 +50,7 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  LOG(INFO) << "Updated texture descriptor (sampler-owned) at binding " << binding;
+  VLOG(2) << "Updated texture descriptor (sampler-owned) at binding " << binding;
 }
 
 void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler)
@@ -68,7 +68,7 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  LOG(INFO) << "Updated texture descriptor at binding " << binding;
+  VLOG(2) << "Updated texture descriptor at binding " << binding;
 }
 
 } // namespace nim

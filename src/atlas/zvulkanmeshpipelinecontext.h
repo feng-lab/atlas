@@ -162,6 +162,7 @@ private:
   {
     return std::nullopt;
   }
+  void resetDescriptors();
 };
 
 } // namespace nim

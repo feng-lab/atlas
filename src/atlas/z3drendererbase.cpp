@@ -3,6 +3,7 @@
 #include "z3dgl.h"
 #include "z3dprimitiverenderer.h"
 #include "z3drendererbackend.h"
+#include "z3drenderervulkanbackend.h"
 #include "z3dscratchresourcepool.h"
 #include "z3dcamera.h"
 #include "z3drenderglobalstate.h"
@@ -10,6 +11,7 @@
 #include "zexception.h"
 #include "zlog.h"
 #include <algorithm>
+#include <optional>
 #include <utility>
 
 namespace nim {
@@ -349,10 +351,39 @@ Z3DRendererBase::prepareVulkanSurface(const Z3DScratchResourcePool::RenderTarget
   return bindings;
 }
 
-void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBatches)
+void Z3DRendererBase::beginVulkanFrame()
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
-  CHECK(m_activeBackend == RenderBackend::Vulkan) << "executeVulkanBatches called with non-Vulkan backend";
+  CHECK(m_activeBackend == RenderBackend::Vulkan) << "beginVulkanFrame requires a Vulkan backend";
+
+  if (m_vulkanFrameActive) {
+    return;
+  }
+
+  m_backend->beginRender(*this);
+  m_vulkanFrameActive = true;
+}
+
+void Z3DRendererBase::endVulkanFrame()
+{
+  if (!m_vulkanFrameActive) {
+    return;
+  }
+
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  m_backend->endRender(*this);
+  m_vulkanFrameActive = false;
+}
+
+void Z3DRendererBase::recordVulkanBatches(const std::function<void()>& recordBatches, std::string_view label)
+{
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  CHECK(m_activeBackend == RenderBackend::Vulkan) << "recordVulkanBatches called with non-Vulkan backend";
+
+  const bool startedFrame = !m_vulkanFrameActive;
+  if (startedFrame) {
+    beginVulkanFrame();
+  }
 
   resetCPUState();
 
@@ -361,15 +392,30 @@ void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBa
     m_pendingActiveSurface.reset();
   }
 
-  LOG(INFO) << "executeVulkanBatches activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
+  LOG(INFO) << "recordVulkanBatches activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
             << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
 
-  m_backend->beginRender(*this);
+  std::optional<size_t> gpuScope;
+  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_backend.get());
+  if (vkBackend != nullptr && !label.empty()) {
+    gpuScope = vkBackend->beginGpuScope(label);
+  }
   if (recordBatches) {
     recordBatches();
   }
   submitBatches();
-  m_backend->endRender(*this);
+  if (vkBackend != nullptr && gpuScope.has_value()) {
+    vkBackend->endGpuScope(*gpuScope);
+  }
+
+  if (startedFrame) {
+    endVulkanFrame();
+  }
+}
+
+void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label)
+{
+  recordVulkanBatches(recordBatches, label);
 }
 
 bool Z3DRendererBase::supportsCommandLists() const

@@ -87,6 +87,7 @@ private:
   void ensureDescriptorLayout();
   void ensureDescriptorPool();
   void ensureDescriptorSet();
+  void resetDescriptors();
   void ensureOITResources();
   void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,
                           const glm::vec2& fallbackScreenDimRcp);

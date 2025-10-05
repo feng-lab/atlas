@@ -114,6 +114,7 @@ private:
   size_t m_indexCount = 0;
 
   void ensureDescriptorLayouts();
+  void resetDescriptors();
   void ensureDescriptorSets();
   void ensureOITResources();
   void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,

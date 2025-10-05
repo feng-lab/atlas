@@ -131,6 +131,7 @@ private:
 
   void ensureDescriptorLayouts();
   void ensureDescriptorPool();
+  void resetDescriptors();
 
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 

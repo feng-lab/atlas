@@ -83,6 +83,7 @@ private:
   void ensureDescriptorLayout();
   void ensureDescriptorPool();
   void ensureDescriptorSet();
+  void resetDescriptors();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
   void ensureVertexCapacity(size_t vertexCount);
   void uploadGeometry();
@@ -91,4 +92,3 @@ private:
 };
 
 } // namespace nim
-

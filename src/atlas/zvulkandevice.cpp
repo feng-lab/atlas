@@ -6,10 +6,12 @@
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
+#include "zvulkanframeexecutor.h"
 #include "zexception.h"
 #include "zlog.h"
 
 #include <fmt/format.h>
+#include <utility>
 
 namespace nim {
 
@@ -63,23 +65,17 @@ ZVulkanDevice::createPipeline(ZVulkanShader& shader,
   return std::make_unique<ZVulkanPipeline>(*this, shader, vertexInputInfo, topology);
 }
 
-vk::raii::CommandBuffer ZVulkanDevice::beginSingleTimeCommands()
+ZVulkanFrameExecutor& ZVulkanDevice::frameExecutor()
 {
-  const vk::CommandBufferAllocateInfo allocInfo{.commandPool = m_context.commandPool(),
-                                                .level = vk::CommandBufferLevel::ePrimary,
-                                                .commandBufferCount = 1};
-  vk::raii::CommandBuffers commandBuffers(m_context.device(), allocInfo);
-  const vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
-  commandBuffers[0].begin(beginInfo);
-  return std::move(commandBuffers[0]);
+  if (!m_frameExecutor) {
+    m_frameExecutor = std::make_unique<ZVulkanFrameExecutor>(*this);
+  }
+  return *m_frameExecutor;
 }
 
-void ZVulkanDevice::endSingleTimeCommands(vk::raii::CommandBuffer& commandBuffer)
+const ZVulkanFrameExecutor& ZVulkanDevice::frameExecutor() const
 {
-  commandBuffer.end();
-  vk::SubmitInfo submitInfo{.commandBufferCount = 1, .pCommandBuffers = &(*commandBuffer)};
-  m_context.graphicsQueue().submit(submitInfo, nullptr);
-  m_context.graphicsQueue().waitIdle();
+  return const_cast<ZVulkanDevice*>(this)->frameExecutor();
 }
 
 std::unique_ptr<ZVulkanDescriptorPool> ZVulkanDevice::createDescriptorPool()

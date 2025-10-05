@@ -555,6 +555,8 @@ set(SOURCES
     zvulkancontext.cpp
     zvulkandevice.h
     zvulkandevice.cpp
+    zvulkanframeexecutor.h
+    zvulkanframeexecutor.cpp
     zvulkanbuffer.h
     zvulkanbuffer.cpp
     zvulkantexture.h

@@ -13,6 +13,7 @@
 #include "zvulkanrenderconversions.h"
 #include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
+#include "zexception.h"
 
 #include <algorithm>
 #include <array>
@@ -47,6 +48,16 @@ ZVulkanBackgroundPipelineContext::~ZVulkanBackgroundPipelineContext() = default;
 void ZVulkanBackgroundPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanBackgroundPipelineContext::resetDescriptors()
+{
+  m_dsLighting.reset();
+  m_dsTransforms.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
@@ -141,11 +152,14 @@ void ZVulkanBackgroundPipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setTransforms.emplace(vkDevice, createInfo);
@@ -187,9 +201,10 @@ void ZVulkanBackgroundPipelineContext::updateLightingUBO(Z3DRendererBase& render
   (void)payload;
   auto& device = m_backend.device();
   if (!m_uboLighting) {
-    m_uboLighting = device.createBuffer(sizeof(LightingUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboLighting =
+      device.createBuffer(sizeof(LightingUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   LightingUBOStd140 lighting{};
@@ -210,9 +225,8 @@ void ZVulkanBackgroundPipelineContext::updateLightingUBO(Z3DRendererBase& render
   lighting.fog_color_top = scene.fog.topColor;
   lighting.fog_color_bottom = scene.fog.bottomColor;
   lighting.fog_end = scene.fog.range.y;
-  lighting.fog_scale = scene.fog.range.y > scene.fog.range.x ?
-                         1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) :
-                         0.0f;
+  lighting.fog_scale =
+    scene.fog.range.y > scene.fog.range.x ? 1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) : 0.0f;
   constexpr float kLog2e = 1.44269504088896340735992468100189214f;
   lighting.fog_density_log2e = scene.fog.density * kLog2e;
   lighting.fog_density_density_log2e = scene.fog.density * scene.fog.density * kLog2e;
@@ -227,14 +241,16 @@ void ZVulkanBackgroundPipelineContext::updateTransformUBO(Z3DRendererBase& rende
   (void)payload;
   auto& device = m_backend.device();
   if (!m_uboTransforms) {
-    m_uboTransforms = device.createBuffer(sizeof(TransformsUBOStd140),
-                                          vk::BufferUsageFlagBits::eUniformBuffer,
-                                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboTransforms =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_uboMaterial) {
-    m_uboMaterial = device.createBuffer(sizeof(MaterialUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboMaterial =
+      device.createBuffer(sizeof(MaterialUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
@@ -297,13 +313,18 @@ ZVulkanBackgroundPipelineContext::ensurePipeline(const PipelineKey& key, const v
     vk::SpecializationMapEntry{.constantID = 31, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 32, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 33, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 34, .offset = 4 * sizeof(uint32_t), .size = sizeof(uint32_t)}};
+    vk::SpecializationMapEntry{.constantID = 34, .offset = 4 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+  };
 
   const bool isUniform = key.mode == BackgroundMode::Uniform;
-  const bool gradientL2R = key.mode == BackgroundMode::Gradient && key.orientation == BackgroundGradientOrientation::LeftToRight;
-  const bool gradientR2L = key.mode == BackgroundMode::Gradient && key.orientation == BackgroundGradientOrientation::RightToLeft;
-  const bool gradientT2B = key.mode == BackgroundMode::Gradient && key.orientation == BackgroundGradientOrientation::TopToBottom;
-  const bool gradientB2T = key.mode == BackgroundMode::Gradient && key.orientation == BackgroundGradientOrientation::BottomToTop;
+  const bool gradientL2R =
+    key.mode == BackgroundMode::Gradient && key.orientation == BackgroundGradientOrientation::LeftToRight;
+  const bool gradientR2L =
+    key.mode == BackgroundMode::Gradient && key.orientation == BackgroundGradientOrientation::RightToLeft;
+  const bool gradientT2B =
+    key.mode == BackgroundMode::Gradient && key.orientation == BackgroundGradientOrientation::TopToBottom;
+  const bool gradientB2T =
+    key.mode == BackgroundMode::Gradient && key.orientation == BackgroundGradientOrientation::BottomToTop;
 
   std::array<uint32_t, 5> specData{static_cast<uint32_t>(isUniform),
                                    static_cast<uint32_t>(gradientL2R),
@@ -311,10 +332,11 @@ ZVulkanBackgroundPipelineContext::ensurePipeline(const PipelineKey& key, const v
                                    static_cast<uint32_t>(gradientT2B),
                                    static_cast<uint32_t>(gradientB2T)};
 
-  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
-                                              std::vector<vk::SpecializationMapEntry>(entries.begin(), entries.end()),
-                                              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
-                                                                   reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
+  instance.shader->setSpecializationConstants(
+    vk::ShaderStageFlagBits::eFragment,
+    std::vector<vk::SpecializationMapEntry>(entries.begin(), entries.end()),
+    std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
+                         reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
 
   vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
                               .offset = 0,
@@ -335,7 +357,8 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanBackgroundPipelineContext::makeVer
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = 0}};
+                                        .offset = 0}
+  };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
@@ -354,9 +377,10 @@ void ZVulkanBackgroundPipelineContext::ensureVertexCapacity(size_t vertexCount)
 
   size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
   auto& device = m_backend.device();
-  m_vertexBuffer = device.createBuffer(newCapacity,
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
 }
 
@@ -370,11 +394,14 @@ void ZVulkanBackgroundPipelineContext::uploadGeometry()
                                            glm::vec3(1.0f, 1.0f, 1.0f - 1e-5f),
                                            glm::vec3(1.0f, -1.0f, 1.0f - 1e-5f)};
 
-  auto* vertices = reinterpret_cast<BackgroundVertex*>(m_vertexBuffer->map(0, m_vertexCount * sizeof(BackgroundVertex)));
+  auto mapping = m_vertexBuffer->mapRange(0, m_vertexCount * sizeof(BackgroundVertex));
+  auto* vertices = mapping.as<BackgroundVertex>();
+  if (!vertices) {
+    throw ZException("Failed to map background vertex buffer");
+  }
   for (size_t i = 0; i < m_vertexCount; ++i) {
     vertices[i].position = kVertices[i];
   }
-  m_vertexBuffer->unmap();
 }
 
 } // namespace nim

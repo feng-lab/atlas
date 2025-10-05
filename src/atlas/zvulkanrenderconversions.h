@@ -4,7 +4,13 @@
 #include "zvulkan.h"
 
 #include <optional>
+#include <string_view>
 #include <vector>
+
+namespace nim {
+class ZVulkanDevice;
+class ZVulkanTexture;
+} // namespace nim
 
 namespace nim::vulkan {
 
@@ -34,5 +40,13 @@ vk::PolygonMode toVkPolygonMode(FillMode mode);
 
 vk::PipelineColorBlendAttachmentState toVkBlendAttachment(const BlendState& blend);
 
-} // namespace nim::vulkan
+// Converts renderer attachment handles back into Vulkan textures, enforcing that they
+// originate from the active device. The usageDescription is surfaced in exception messages
+// to aid debugging when stale handles are encountered during backend switches.
+[[nodiscard]] ZVulkanTexture&
+textureFromHandle(const AttachmentHandle& handle, ZVulkanDevice& device, std::string_view usageDescription);
 
+[[nodiscard]] ZVulkanTexture&
+textureFromHandle(const SampledImageHandle& handle, ZVulkanDevice& device, std::string_view usageDescription);
+
+} // namespace nim::vulkan

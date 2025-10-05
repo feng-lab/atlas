@@ -15,6 +15,7 @@
 #include "zsysteminfo.h"
 #include "zlog.h"
 #include "zvulkanrenderconversions.h"
+#include "zexception.h"
 
 #include <algorithm>
 #include <array>
@@ -51,6 +52,18 @@ void ZVulkanEllipsoidPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanEllipsoidPipelineContext::resetDescriptors()
+{
+  m_dsPlaceholder.reset();
+  m_dsLighting.reset();
+  m_dsTransforms.reset();
+  m_dsOIT.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
@@ -81,14 +94,20 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
     const auto& hookPara = renderer.shaderHookPara();
     if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
       if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-        if (auto* tex = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingDepthBlenderHandle.id)) {
-          m_dsPlaceholder->updateTexture(0, *tex, **m_sampler);
-        }
+        auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                                   m_backend.device(),
+                                                   "ellipsoid dual-depth-peeling depth blender");
+        m_dsPlaceholder->updateTexture(0, depthTex, **m_sampler);
+      } else if (m_placeholderTexture) {
+        m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, **m_sampler);
       }
       if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-        if (auto* tex = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingFrontBlenderHandle.id)) {
-          m_dsPlaceholder->updateTexture(1, *tex, **m_sampler);
-        }
+        auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                                   m_backend.device(),
+                                                   "ellipsoid dual-depth-peeling front blender");
+        m_dsPlaceholder->updateTexture(1, frontTex, **m_sampler);
+      } else if (m_placeholderTexture) {
+        m_dsPlaceholder->updateTexture(1, *m_placeholderTexture, **m_sampler);
       }
     } else if (m_placeholderTexture) {
       m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, **m_sampler);
@@ -164,7 +183,8 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setPlaceholder.emplace(vkDevice, createInfo);
@@ -184,11 +204,14 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setTransforms.emplace(vkDevice, createInfo);
@@ -291,10 +314,10 @@ void ZVulkanEllipsoidPipelineContext::ensurePlaceholderTexture()
   auto& device = m_backend.device();
   if (!m_placeholderTexture) {
     m_placeholderTexture = device.createTexture(1,
-                                               1,
-                                               vk::Format::eR8G8B8A8Unorm,
-                                               vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                               vk::MemoryPropertyFlagBits::eDeviceLocal);
+                                                1,
+                                                vk::Format::eR8G8B8A8Unorm,
+                                                vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                                vk::MemoryPropertyFlagBits::eDeviceLocal);
     uint32_t pixel = 0xffffffffu;
     m_placeholderTexture->uploadData(&pixel, sizeof(pixel));
   }
@@ -323,9 +346,10 @@ void ZVulkanEllipsoidPipelineContext::updateLightingUBO(Z3DRendererBase& rendere
 {
   auto& device = m_backend.device();
   if (!m_uboLighting) {
-    m_uboLighting = device.createBuffer(sizeof(LightingUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboLighting =
+      device.createBuffer(sizeof(LightingUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   LightingUBOStd140 lighting{};
@@ -357,9 +381,8 @@ void ZVulkanEllipsoidPipelineContext::updateLightingUBO(Z3DRendererBase& rendere
   lighting.fog_color_top = scene.fog.topColor;
   lighting.fog_color_bottom = scene.fog.bottomColor;
   lighting.fog_end = scene.fog.range.y;
-  lighting.fog_scale = scene.fog.range.y > scene.fog.range.x ?
-                         1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) :
-                         0.0f;
+  lighting.fog_scale =
+    scene.fog.range.y > scene.fog.range.x ? 1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) : 0.0f;
   constexpr float kLog2e = 1.44269504088896340735992468100189214f;
   lighting.fog_density_log2e = scene.fog.density * kLog2e;
   lighting.fog_density_density_log2e = scene.fog.density * scene.fog.density * kLog2e;
@@ -387,14 +410,16 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
   (void)payload;
   auto& device = m_backend.device();
   if (!m_uboTransforms) {
-    m_uboTransforms = device.createBuffer(sizeof(TransformsUBOStd140),
-                                          vk::BufferUsageFlagBits::eUniformBuffer,
-                                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboTransforms =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_uboMaterial) {
-    m_uboMaterial = device.createBuffer(sizeof(MaterialUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboMaterial =
+      device.createBuffer(sizeof(MaterialUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   TransformsUBOStd140 transforms{};
@@ -408,10 +433,8 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  transforms.parameters = glm::vec4(renderer.parameterState().sizeScale,
-                                    eyeState.isPerspective ? 0.0f : 1.0f,
-                                    0.0f,
-                                    0.0f);
+  transforms.parameters =
+    glm::vec4(renderer.parameterState().sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
   m_uboTransforms->copyData(&transforms, sizeof(transforms));
 
@@ -435,8 +458,7 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
 }
 
 ZVulkanEllipsoidPipelineContext::PipelineInstance&
-ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key,
-                                                const vulkan::AttachmentFormats& formats)
+ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats)
 {
   auto it = m_pipelineCache.find(key);
   if (it != m_pipelineCache.end()) {
@@ -473,12 +495,14 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key,
 
   const uint32_t useDynamic = key.dynamicMaterial ? 1u : 0u;
   std::array<vk::SpecializationMapEntry, 1> vertEntries{
-    vk::SpecializationMapEntry{.constantID = 60, .offset = 0, .size = sizeof(uint32_t)}};
+    vk::SpecializationMapEntry{.constantID = 60, .offset = 0, .size = sizeof(uint32_t)}
+  };
   std::array<uint32_t, 1> vertData{useDynamic};
-  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eVertex,
-                                              std::vector<vk::SpecializationMapEntry>(vertEntries.begin(), vertEntries.end()),
-                                              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(vertData.data()),
-                                                                   reinterpret_cast<const uint8_t*>(vertData.data()) + sizeof(vertData)));
+  instance.shader->setSpecializationConstants(
+    vk::ShaderStageFlagBits::eVertex,
+    std::vector<vk::SpecializationMapEntry>(vertEntries.begin(), vertEntries.end()),
+    std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(vertData.data()),
+                         reinterpret_cast<const uint8_t*>(vertData.data()) + sizeof(vertData)));
 
   const uint32_t useLinearFog = key.fogMode == FogMode::Linear ? 1u : 0u;
   const uint32_t useExpFog = key.fogMode == FogMode::Exponential ? 1u : 0u;
@@ -488,12 +512,14 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key,
     vk::SpecializationMapEntry{.constantID = 60, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 20, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 21, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 22, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)}};
+    vk::SpecializationMapEntry{.constantID = 22, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+  };
   std::array<uint32_t, 4> fragData{useDynamic, useLinearFog, useExpFog, useExp2Fog};
-  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
-                                              std::vector<vk::SpecializationMapEntry>(fragEntries.begin(), fragEntries.end()),
-                                              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(fragData.data()),
-                                                                   reinterpret_cast<const uint8_t*>(fragData.data()) + sizeof(fragData)));
+  instance.shader->setSpecializationConstants(
+    vk::ShaderStageFlagBits::eFragment,
+    std::vector<vk::SpecializationMapEntry>(fragEntries.begin(), fragEntries.end()),
+    std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(fragData.data()),
+                         reinterpret_cast<const uint8_t*>(fragData.data()) + sizeof(fragData)));
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
@@ -592,9 +618,10 @@ void ZVulkanEllipsoidPipelineContext::ensureVertexCapacity(size_t vertexCount)
 
   size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
   auto& device = m_backend.device();
-  m_vertexBuffer = device.createBuffer(newCapacity,
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
 }
 
@@ -607,9 +634,10 @@ void ZVulkanEllipsoidPipelineContext::ensureIndexCapacity(size_t indexCount)
 
   size_t newCapacity = std::max(requiredBytes, m_indexCapacity == 0 ? requiredBytes : m_indexCapacity * 2);
   auto& device = m_backend.device();
-  m_indexBuffer = device.createBuffer(newCapacity,
-                                      vk::BufferUsageFlagBits::eIndexBuffer,
-                                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_indexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eIndexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_indexCapacity = newCapacity;
 }
 
@@ -636,10 +664,15 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
   }
 
   if (payload.useDynamicMaterial && payload.specularAndShininess.size() < m_vertexCount) {
-    LOG_FIRST_N(WARNING, 3) << "Vulkan ellipsoid backend: dynamic material buffer is incomplete; missing values default to zero.";
+    LOG_FIRST_N(WARNING, 3)
+      << "Vulkan ellipsoid backend: dynamic material buffer is incomplete; missing values default to zero.";
   }
 
-  auto* vertices = reinterpret_cast<EllipsoidVertex*>(m_vertexBuffer->map(0, m_vertexCount * sizeof(EllipsoidVertex)));
+  auto mapping = m_vertexBuffer->mapRange(0, m_vertexCount * sizeof(EllipsoidVertex));
+  auto* vertices = mapping.as<EllipsoidVertex>();
+  if (!vertices) {
+    throw ZException("Failed to map ellipsoid vertex buffer");
+  }
   const bool pickingPass = payload.pickingPass;
 
   for (size_t i = 0; i < m_vertexCount; ++i) {
@@ -666,7 +699,6 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
       vertex.specularShininess = glm::vec4(0.0f);
     }
   }
-  m_vertexBuffer->unmap();
 
   if (m_indexCount > 0 && m_indexBuffer) {
     m_indexBuffer->copyData(payload.indices.data(), m_indexCount * sizeof(uint32_t));
@@ -682,31 +714,32 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanEllipsoidPipelineContext::makeVert
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, axis1))},
+                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, axis1))            },
     vk::VertexInputAttributeDescription{.location = 1,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, axis2))},
+                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, axis2))            },
     vk::VertexInputAttributeDescription{.location = 2,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, axis3))},
+                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, axis3))            },
     vk::VertexInputAttributeDescription{.location = 3,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, center))},
+                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, center))           },
     vk::VertexInputAttributeDescription{.location = 4,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, color))},
+                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, color))            },
     vk::VertexInputAttributeDescription{.location = 5,
                                         .binding = 0,
                                         .format = vk::Format::eR32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, flags))},
+                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, flags))            },
     vk::VertexInputAttributeDescription{.location = 6,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, specularShininess))}};
+                                        .offset = static_cast<uint32_t>(offsetof(EllipsoidVertex, specularShininess))}
+  };
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
   info.pVertexBindingDescriptions = &binding;

@@ -51,6 +51,16 @@ ZVulkanTextureGlowPipelineContext::~ZVulkanTextureGlowPipelineContext() = defaul
 void ZVulkanTextureGlowPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanTextureGlowPipelineContext::resetDescriptors()
+{
+  m_blurDescriptor.reset();
+  m_glowDescriptor.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
@@ -64,18 +74,17 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  CHECK(payload.colorAttachmentHandle.backend == AttachmentBackend::Vulkan)
-    << "GL colorAttachmentHandle in Vulkan path";
-  CHECK(payload.depthAttachmentHandle.backend == AttachmentBackend::Vulkan)
-    << "GL depthAttachmentHandle in Vulkan path";
-
-  auto* colorTexture = reinterpret_cast<ZVulkanTexture*>(payload.colorAttachmentHandle.id);
-  auto* depthTexture = reinterpret_cast<ZVulkanTexture*>(payload.depthAttachmentHandle.id);
-  if (!colorTexture || !depthTexture) {
+  if (!payload.colorAttachmentHandle.valid() || !payload.depthAttachmentHandle.valid()) {
+    LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan glow pass due to missing attachments";
     return;
   }
 
-  glm::uvec2 size(colorTexture->width(), colorTexture->height());
+  auto& colorTexture =
+    vulkan::textureFromHandle(payload.colorAttachmentHandle, m_backend.device(), "texture-glow color attachment");
+  auto& depthTexture =
+    vulkan::textureFromHandle(payload.depthAttachmentHandle, m_backend.device(), "texture-glow depth attachment");
+
+  glm::uvec2 size(colorTexture.width(), colorTexture.height());
   if (size.x == 0u || size.y == 0u) {
     return;
   }
@@ -89,7 +98,7 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
   ensureDescriptorLayouts();
   ensureDescriptorPool();
 
-  const vk::Format colorFormat = colorTexture->format();
+  const vk::Format colorFormat = colorTexture.format();
   ensureIntermediateTextures(size, colorFormat);
   if (!m_blurIntermediate0.color.texture || !m_blurIntermediate0.depth.texture || !m_blurIntermediate1.color.texture ||
       !m_blurIntermediate1.depth.texture) {
@@ -102,20 +111,16 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     depth.reset();
 
     auto makeColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (attachment.handle.id == 0) {
+      if (!attachment.handle.valid()) {
         return std::nullopt;
       }
-      CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
-        << "GL color attachment encountered in Vulkan glow pipeline";
-      auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
-      if (!texture) {
-        return std::nullopt;
-      }
+      auto& texture =
+        vulkan::textureFromHandle(attachment.handle, m_backend.device(), "texture-glow intermediate color attachment");
       const auto desiredLayout = vk::ImageLayout::eColorAttachmentOptimal;
-      texture->transitionLayout(cmd, texture->layout(), desiredLayout);
+      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
 
       vk::RenderingAttachmentInfo info;
-      info.imageView = texture->imageView();
+      info.imageView = texture.imageView();
       info.imageLayout = desiredLayout;
       info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
       info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
@@ -129,20 +134,16 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     };
 
     auto makeDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (attachment.handle.id == 0) {
+      if (!attachment.handle.valid()) {
         return std::nullopt;
       }
-      CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
-        << "GL depth attachment encountered in Vulkan glow pipeline";
-      auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
-      if (!texture) {
-        return std::nullopt;
-      }
+      auto& texture =
+        vulkan::textureFromHandle(attachment.handle, m_backend.device(), "texture-glow intermediate depth attachment");
       const auto desiredLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-      texture->transitionLayout(cmd, texture->layout(), desiredLayout);
+      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
 
       vk::RenderingAttachmentInfo info;
-      info.imageView = texture->imageView();
+      info.imageView = texture.imageView();
       info.imageLayout = desiredLayout;
       info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
       info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
@@ -170,8 +171,8 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
 
   runBlurPass(renderer,
               cmd,
-              *colorTexture,
-              *depthTexture,
+              colorTexture,
+              depthTexture,
               m_blurIntermediate0,
               true,
               size,
@@ -218,8 +219,8 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     m_glowDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
   }
 
-  m_glowDescriptor->updateTexture(0, *colorTexture);
-  m_glowDescriptor->updateTexture(1, *depthTexture);
+  m_glowDescriptor->updateTexture(0, colorTexture);
+  m_glowDescriptor->updateTexture(1, depthTexture);
   m_glowDescriptor->updateTexture(2, *m_blurIntermediate1.color.texture);
   m_glowDescriptor->updateTexture(3, *m_blurIntermediate1.depth.texture);
 

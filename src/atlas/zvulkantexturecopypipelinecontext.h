@@ -89,6 +89,7 @@ private:
   size_t m_vertexCount = 0;
 
   void ensureDescriptorLayout();
+  void resetDescriptors();
   void ensureDescriptorSet();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 

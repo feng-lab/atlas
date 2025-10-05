@@ -36,6 +36,15 @@ ZVulkanTextureCopyPipelineContext::~ZVulkanTextureCopyPipelineContext() = defaul
 void ZVulkanTextureCopyPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanTextureCopyPipelineContext::resetDescriptors()
+{
+  m_descriptorSet.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
@@ -49,16 +58,15 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  CHECK(payload.colorAttachmentHandle.backend == AttachmentBackend::Vulkan)
-    << "GL colorAttachmentHandle in Vulkan path";
-  CHECK(payload.depthAttachmentHandle.backend == AttachmentBackend::Vulkan)
-    << "GL depthAttachmentHandle in Vulkan path";
-
-  auto* colorTexture = reinterpret_cast<ZVulkanTexture*>(payload.colorAttachmentHandle.id);
-  auto* depthTexture = reinterpret_cast<ZVulkanTexture*>(payload.depthAttachmentHandle.id);
-  if (!colorTexture || !depthTexture) {
+  if (!payload.colorAttachmentHandle.valid() || !payload.depthAttachmentHandle.valid()) {
+    LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan texture copy pass due to missing attachments";
     return;
   }
+
+  auto& colorTexture =
+    vulkan::textureFromHandle(payload.colorAttachmentHandle, m_backend.device(), "texture-copy color attachment");
+  auto& depthTexture =
+    vulkan::textureFromHandle(payload.depthAttachmentHandle, m_backend.device(), "texture-copy depth attachment");
 
   uploadGeometry();
   if (!m_vertexBuffer || m_vertexCount == 0) {
@@ -71,8 +79,8 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  m_descriptorSet->updateTexture(0, *colorTexture);
-  m_descriptorSet->updateTexture(1, *depthTexture);
+  m_descriptorSet->updateTexture(0, colorTexture);
+  m_descriptorSet->updateTexture(1, depthTexture);
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 

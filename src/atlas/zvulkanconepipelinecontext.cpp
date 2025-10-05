@@ -13,6 +13,7 @@
 #include "zvulkanrenderconversions.h"
 #include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
+#include "zexception.h"
 #include "zlog.h"
 #include "z3dconerenderer.h"
 
@@ -70,6 +71,18 @@ void ZVulkanConePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanConePipelineContext::resetDescriptors()
+{
+  m_dsPlaceholder.reset();
+  m_dsLighting.reset();
+  m_dsTransforms.reset();
+  m_dsOIT.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
@@ -101,8 +114,8 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
       const auto& viewportState = renderer.frameState().viewport;
       extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
     }
-    glm::vec2 screenRcp = (extent.x > 0.0f && extent.y > 0.0f) ? glm::vec2(1.0f / extent.x, 1.0f / extent.y)
-                                                              : glm::vec2(0.0f);
+    glm::vec2 screenRcp =
+      (extent.x > 0.0f && extent.y > 0.0f) ? glm::vec2(1.0f / extent.x, 1.0f / extent.y) : glm::vec2(0.0f);
     updateOITParamsUBO(renderer, batch, screenRcp);
   }
   ensureDescriptorSets();
@@ -112,14 +125,16 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
     const auto& hookPara = renderer.shaderHookPara();
     if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
       if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-        if (auto* tex = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingDepthBlenderHandle.id)) {
-          m_dsPlaceholder->updateTexture(0, *tex, **m_sampler);
-        }
+        auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                                   m_backend.device(),
+                                                   "cone dual-depth-peeling depth blender");
+        m_dsPlaceholder->updateTexture(0, depthTex, **m_sampler);
       }
       if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-        if (auto* tex = reinterpret_cast<ZVulkanTexture*>(hookPara.dualDepthPeelingFrontBlenderHandle.id)) {
-          m_dsPlaceholder->updateTexture(1, *tex, **m_sampler);
-        }
+        auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                                   m_backend.device(),
+                                                   "cone dual-depth-peeling front blender");
+        m_dsPlaceholder->updateTexture(1, frontTex, **m_sampler);
       }
     } else if (m_placeholderTexture) {
       m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, **m_sampler);
@@ -198,7 +213,8 @@ void ZVulkanConePipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setPlaceholder.emplace(vkDevice, createInfo);
@@ -218,11 +234,14 @@ void ZVulkanConePipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eUniformBuffer,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setTransforms.emplace(vkDevice, createInfo);
@@ -326,10 +345,10 @@ void ZVulkanConePipelineContext::ensurePlaceholderTexture()
   auto& device = m_backend.device();
   if (!m_placeholderTexture) {
     m_placeholderTexture = device.createTexture(1,
-                                               1,
-                                               vk::Format::eR8G8B8A8Unorm,
-                                               vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                               vk::MemoryPropertyFlagBits::eDeviceLocal);
+                                                1,
+                                                vk::Format::eR8G8B8A8Unorm,
+                                                vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                                vk::MemoryPropertyFlagBits::eDeviceLocal);
     uint32_t pixel = 0xffffffffu;
     m_placeholderTexture->uploadData(&pixel, sizeof(pixel));
   }
@@ -358,9 +377,10 @@ void ZVulkanConePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
 {
   auto& device = m_backend.device();
   if (!m_uboLighting) {
-    m_uboLighting = device.createBuffer(sizeof(LightingUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboLighting =
+      device.createBuffer(sizeof(LightingUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   LightingUBOStd140 lighting{};
@@ -392,9 +412,8 @@ void ZVulkanConePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   lighting.fog_color_top = scene.fog.topColor;
   lighting.fog_color_bottom = scene.fog.bottomColor;
   lighting.fog_end = scene.fog.range.y;
-  lighting.fog_scale = scene.fog.range.y > scene.fog.range.x ?
-                         1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) :
-                         0.0f;
+  lighting.fog_scale =
+    scene.fog.range.y > scene.fog.range.x ? 1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) : 0.0f;
   constexpr float kLog2e = 1.44269504088896340735992468100189214f;
   lighting.fog_density_log2e = scene.fog.density * kLog2e;
   lighting.fog_density_density_log2e = scene.fog.density * scene.fog.density * kLog2e;
@@ -422,14 +441,16 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   (void)payload;
   auto& device = m_backend.device();
   if (!m_uboTransforms) {
-    m_uboTransforms = device.createBuffer(sizeof(TransformsUBOStd140),
-                                          vk::BufferUsageFlagBits::eUniformBuffer,
-                                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboTransforms =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_uboMaterial) {
-    m_uboMaterial = device.createBuffer(sizeof(MaterialUBOStd140),
-                                        vk::BufferUsageFlagBits::eUniformBuffer,
-                                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_uboMaterial =
+      device.createBuffer(sizeof(MaterialUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
@@ -497,12 +518,14 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
                                                     std::nullopt);
 
   std::array<vk::SpecializationMapEntry, 1> specEntries{
-    vk::SpecializationMapEntry{.constantID = 90, .offset = 0, .size = sizeof(int)}};
+    vk::SpecializationMapEntry{.constantID = 90, .offset = 0, .size = sizeof(int)}
+  };
   std::array<int, 1> specData{key.capsMode};
-  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
-                                              std::vector<vk::SpecializationMapEntry>(specEntries.begin(), specEntries.end()),
-                                              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
-                                                                   reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
+  instance.shader->setSpecializationConstants(
+    vk::ShaderStageFlagBits::eFragment,
+    std::vector<vk::SpecializationMapEntry>(specEntries.begin(), specEntries.end()),
+    std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
+                         reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
@@ -601,15 +624,15 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanConePipelineContext::makeVertexInp
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, origin))},
+                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, origin))   },
     vk::VertexInputAttributeDescription{.location = 1,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, axis))},
+                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, axis))     },
     vk::VertexInputAttributeDescription{.location = 2,
                                         .binding = 0,
                                         .format = vk::Format::eR32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, flags))},
+                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, flags))    },
     vk::VertexInputAttributeDescription{.location = 3,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
@@ -617,7 +640,8 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanConePipelineContext::makeVertexInp
     vk::VertexInputAttributeDescription{.location = 4,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, colorTop))}};
+                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, colorTop)) }
+  };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
@@ -636,9 +660,10 @@ void ZVulkanConePipelineContext::ensureVertexCapacity(size_t vertexCount)
 
   size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
   auto& device = m_backend.device();
-  m_vertexBuffer = device.createBuffer(newCapacity,
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
 }
 
@@ -651,9 +676,10 @@ void ZVulkanConePipelineContext::ensureIndexCapacity(size_t indexCount)
 
   size_t newCapacity = std::max(requiredBytes, m_indexCapacity == 0 ? requiredBytes : m_indexCapacity * 2);
   auto& device = m_backend.device();
-  m_indexBuffer = device.createBuffer(newCapacity,
-                                      vk::BufferUsageFlagBits::eIndexBuffer,
-                                      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_indexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eIndexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_indexCapacity = newCapacity;
 }
 
@@ -678,7 +704,11 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
     ensureIndexCapacity(m_indexCount);
   }
 
-  auto* vertices = reinterpret_cast<ConeVertex*>(m_vertexBuffer->map(0, m_vertexCount * sizeof(ConeVertex)));
+  auto mapping = m_vertexBuffer->mapRange(0, m_vertexCount * sizeof(ConeVertex));
+  auto* vertices = mapping.as<ConeVertex>();
+  if (!vertices) {
+    throw ZException("Failed to map cone vertex buffer");
+  }
   for (size_t i = 0; i < m_vertexCount; ++i) {
     auto& vertex = vertices[i];
     vertex.origin = payload.baseAndRadius[i];
@@ -711,7 +741,6 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
     }
     vertex.flags = flagsValue;
   }
-  m_vertexBuffer->unmap();
 
   if (m_indexCount > 0 && m_indexBuffer) {
     m_indexBuffer->copyData(payload.indices.data(), m_indexCount * sizeof(uint32_t));

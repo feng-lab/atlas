@@ -152,6 +152,7 @@ private:
   void ensureDescriptorLayouts();
   void ensureDescriptorPool();
   void ensureEmptyDescriptor();
+  void resetDescriptors();
   vk::PipelineVertexInputStateCreateInfo makeSliceVertexInputState() const;
   vk::PipelineVertexInputStateCreateInfo makeQuadVertexInputState() const;
   void ensureSliceVertexCapacity(size_t vertexCount);

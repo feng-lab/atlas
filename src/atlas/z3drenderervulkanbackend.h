@@ -3,14 +3,17 @@
 #include "z3drendererbackend.h"
 #include "zglmutils.h"
 #include "zvulkan.h"
+#include "zvulkandevice.h"
 
+#include <chrono>
 #include <memory>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace nim {
 
-class ZVulkanDevice;
 class ZVulkanLinePipelineContext;
 class ZVulkanMeshPipelineContext;
 class ZVulkanEllipsoidPipelineContext;
@@ -32,8 +35,8 @@ class ZVulkanFontPipelineContext;
 //    prior to rendering. The backend simply caches the latest pointer and never destroys it.
 //  * Scratch pool leases own all VkImage-backed render targets; pipeline contexts must treat
 //    ZVulkanTexture* obtained through AttachmentHandle as transient and valid only for the lease.
-//  * Each frame uses a single one-shot command buffer acquired via beginSingleTimeCommands().
-//    preBackendSwitch() guarantees the buffer is ended and submitted before switching APIs.
+//  * Frames rotate through a small pool of command buffers guarded by fences. Each frame is
+//    submitted once; backend waits on the frame fence before reusing resources.
 class Z3DRendererVulkanBackend final : public Z3DRendererBackend
 {
 public:
@@ -70,10 +73,48 @@ public:
   const vk::raii::CommandBuffer& commandBuffer() const;
 
 private:
+  friend class Z3DRendererBase;
   void ensureDevice();
+  void ensureFrameResources();
+  void resetFrameResources();
+  struct GpuScopeRecord
+  {
+    std::string label;
+    uint32_t startQuery = 0;
+    uint32_t endQuery = 0;
+  };
+  struct CpuScopeRecord
+  {
+    std::string label;
+    double milliseconds = 0.0;
+  };
+  struct FrameResources
+  {
+    vk::raii::CommandBuffer commandBuffer{nullptr};
+    vk::raii::Fence fence{nullptr};
+    bool inFlight = false;
+    vk::raii::QueryPool queryPool{nullptr};
+    std::vector<GpuScopeRecord> gpuScopes;
+    std::vector<CpuScopeRecord> cpuScopes;
+    uint32_t nextQuery = 0;
+    std::chrono::steady_clock::time_point cpuStart;
+    std::chrono::steady_clock::time_point cpuEnd;
+  };
+
+  FrameResources& acquireFrame();
+  void collectFrameTimings(FrameResources& frame);
+  std::optional<size_t> beginGpuScope(std::string_view label);
+  void endGpuScope(size_t token);
+  void recordCpuScope(std::string_view label, double milliseconds);
 
   ZVulkanDevice* m_sharedDevice = nullptr; // non-owning; provided by engine/scratch-pool
-  std::optional<vk::raii::CommandBuffer> m_activeCommandBuffer;
+  ZVulkanDevice* m_frameDevice = nullptr;    // tracked to rebuild frame resources on device changes
+  std::vector<FrameResources> m_frames;
+  size_t m_frameCursor = 0;
+  FrameResources* m_activeFrame = nullptr;
+  bool m_frameRecording = false;
+  uint32_t m_maxFramesInFlight = 2;
+  float m_timestampPeriod = 1.0f;
 
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;

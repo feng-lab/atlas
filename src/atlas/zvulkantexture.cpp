@@ -2,6 +2,7 @@
 #include "zvulkandevice.h"
 #include "zvulkanbuffer.h"
 #include "zvulkancontext.h"
+#include "zvulkanframeexecutor.h"
 #include "zexception.h"
 #include "zlog.h"
 
@@ -283,27 +284,30 @@ void ZVulkanTexture::downloadData(void* data, size_t size)
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
   auto originalLayout = m_currentLayout;
-  auto cmdBuffer = m_device.beginSingleTimeCommands();
-  transitionLayout(cmdBuffer, originalLayout, vk::ImageLayout::eTransferSrcOptimal, m_aspectMask);
+  m_device.frameExecutor().executeImmediate(
+    [&](vk::raii::CommandBuffer& cmdBuffer) {
+      transitionLayout(cmdBuffer, originalLayout, vk::ImageLayout::eTransferSrcOptimal, m_aspectMask);
 
-  vk::BufferImageCopy region{};
-  region.bufferOffset = 0;
-  region.bufferRowLength = 0;
-  region.bufferImageHeight = 0;
-  region.imageSubresource.aspectMask = m_aspectMask;
-  region.imageSubresource.mipLevel = 0;
-  region.imageSubresource.baseArrayLayer = 0;
-  region.imageSubresource.layerCount = m_createInfo.imageType == vk::ImageType::e3D ? 1u : m_arrayLayers;
-  region.imageOffset = vk::Offset3D{0, 0, 0};
-  region.imageExtent = vk::Extent3D{m_extent.width, m_extent.height,
-                                    m_createInfo.imageType == vk::ImageType::e3D ? m_extent.depth : 1u};
+      vk::BufferImageCopy region{};
+      region.bufferOffset = 0;
+      region.bufferRowLength = 0;
+      region.bufferImageHeight = 0;
+      region.imageSubresource.aspectMask = m_aspectMask;
+      region.imageSubresource.mipLevel = 0;
+      region.imageSubresource.baseArrayLayer = 0;
+      region.imageSubresource.layerCount = m_createInfo.imageType == vk::ImageType::e3D ? 1u : m_arrayLayers;
+      region.imageOffset = vk::Offset3D{0, 0, 0};
+      region.imageExtent = vk::Extent3D{m_extent.width,
+                                        m_extent.height,
+                                        m_createInfo.imageType == vk::ImageType::e3D ? m_extent.depth : 1u};
 
-  cmdBuffer.copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
-  // Do not transition back to an undefined layout; use GENERAL if the prior layout was undefined.
-  const vk::ImageLayout restoreLayout =
-    (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
-  transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, m_aspectMask);
-  m_device.endSingleTimeCommands(cmdBuffer);
+      cmdBuffer.copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
+      // Do not transition back to an undefined layout; use GENERAL if the prior layout was undefined.
+      const vk::ImageLayout restoreLayout =
+        (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
+      transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, m_aspectMask);
+    },
+    "texture_download");
 
   void* mapped = stagingBuffer->map(0, size);
   std::memcpy(data, mapped, size);
@@ -326,26 +330,28 @@ void ZVulkanTexture::downloadSubImage(void* data,
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
   auto originalLayout = m_currentLayout;
-  auto cmdBuffer = m_device.beginSingleTimeCommands();
   const auto aspect = (aspectMask == vk::ImageAspectFlags{}) ? m_aspectMask : aspectMask;
-  transitionLayout(cmdBuffer, originalLayout, vk::ImageLayout::eTransferSrcOptimal, aspect);
+  m_device.frameExecutor().executeImmediate(
+    [&](vk::raii::CommandBuffer& cmdBuffer) {
+      transitionLayout(cmdBuffer, originalLayout, vk::ImageLayout::eTransferSrcOptimal, aspect);
 
-  vk::BufferImageCopy region{};
-  region.bufferOffset = 0;
-  region.bufferRowLength = 0;
-  region.bufferImageHeight = 0;
-  region.imageSubresource.aspectMask = aspect;
-  region.imageSubresource.mipLevel = 0;
-  region.imageSubresource.baseArrayLayer = 0;
-  region.imageSubresource.layerCount = 1;
-  region.imageOffset = offset;
-  region.imageExtent = extent;
+      vk::BufferImageCopy region{};
+      region.bufferOffset = 0;
+      region.bufferRowLength = 0;
+      region.bufferImageHeight = 0;
+      region.imageSubresource.aspectMask = aspect;
+      region.imageSubresource.mipLevel = 0;
+      region.imageSubresource.baseArrayLayer = 0;
+      region.imageSubresource.layerCount = 1;
+      region.imageOffset = offset;
+      region.imageExtent = extent;
 
-  cmdBuffer.copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
-  const vk::ImageLayout restoreLayout =
-    (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
-  transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, aspect);
-  m_device.endSingleTimeCommands(cmdBuffer);
+      cmdBuffer.copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
+      const vk::ImageLayout restoreLayout =
+        (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
+      transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, aspect);
+    },
+    "texture_download_subimage");
 
   void* mapped = stagingBuffer->map(0, size);
   std::memcpy(data, mapped, size);
@@ -704,25 +710,31 @@ void ZVulkanTexture::uploadInternal(const void* data, size_t size, const UploadR
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   stagingBuffer->copyData(data, size);
 
-  auto cmdBuffer = m_device.beginSingleTimeCommands();
-  transitionLayout(cmdBuffer, m_currentLayout, vk::ImageLayout::eTransferDstOptimal, m_aspectMask);
-
-  vk::BufferImageCopy copyRegion{};
-  copyRegion.bufferOffset = 0;
-  copyRegion.bufferRowLength = region.bufferRowLength;
-  copyRegion.bufferImageHeight = region.bufferImageHeight;
-  copyRegion.imageSubresource.aspectMask = m_aspectMask;
-  copyRegion.imageSubresource.mipLevel = region.mipLevel;
-  copyRegion.imageSubresource.baseArrayLayer = m_createInfo.imageType == vk::ImageType::e3D ? 0u : region.baseArrayLayer;
-  copyRegion.imageSubresource.layerCount = m_createInfo.imageType == vk::ImageType::e3D ? 1u : region.layerCount;
-  copyRegion.imageOffset = region.offset;
-  copyRegion.imageExtent = region.extent;
-
-  cmdBuffer.copyBufferToImage(stagingBuffer->buffer(), *m_image, vk::ImageLayout::eTransferDstOptimal, copyRegion);
-
   const vk::ImageLayout finalLayout = region.finalLayout;
-  transitionLayout(cmdBuffer, vk::ImageLayout::eTransferDstOptimal, finalLayout, m_aspectMask);
-  m_device.endSingleTimeCommands(cmdBuffer);
+  m_device.frameExecutor().executeImmediate(
+    [&](vk::raii::CommandBuffer& cmdBuffer) {
+      transitionLayout(cmdBuffer, m_currentLayout, vk::ImageLayout::eTransferDstOptimal, m_aspectMask);
+
+      vk::BufferImageCopy copyRegion{};
+      copyRegion.bufferOffset = 0;
+      copyRegion.bufferRowLength = region.bufferRowLength;
+      copyRegion.bufferImageHeight = region.bufferImageHeight;
+      copyRegion.imageSubresource.aspectMask = m_aspectMask;
+      copyRegion.imageSubresource.mipLevel = region.mipLevel;
+      copyRegion.imageSubresource.baseArrayLayer =
+        m_createInfo.imageType == vk::ImageType::e3D ? 0u : region.baseArrayLayer;
+      copyRegion.imageSubresource.layerCount = m_createInfo.imageType == vk::ImageType::e3D ? 1u : region.layerCount;
+      copyRegion.imageOffset = region.offset;
+      copyRegion.imageExtent = region.extent;
+
+      cmdBuffer.copyBufferToImage(stagingBuffer->buffer(),
+                                  *m_image,
+                                  vk::ImageLayout::eTransferDstOptimal,
+                                  copyRegion);
+
+      transitionLayout(cmdBuffer, vk::ImageLayout::eTransferDstOptimal, finalLayout, m_aspectMask);
+    },
+    "texture_upload");
 
   if (finalLayout != vk::ImageLayout::eUndefined && finalLayout != vk::ImageLayout::eTransferDstOptimal) {
     m_descriptorLayout = finalLayout;

@@ -1,8 +1,11 @@
 #include "zvulkanrenderconversions.h"
 
+#include "zexception.h"
+#include "zvulkandevice.h"
 #include "zvulkantexture.h"
 
 #include <algorithm>
+#include <fmt/format.h>
 
 namespace nim::vulkan {
 namespace {
@@ -40,6 +43,40 @@ vk::BlendOp toVkBlendOp(BlendOp op)
 }
 
 } // namespace
+
+ZVulkanTexture&
+textureFromHandle(const AttachmentHandle& handle, ZVulkanDevice& device, std::string_view usageDescription)
+{
+  if (!handle.valid() || handle.backend != AttachmentBackend::Vulkan) {
+    throw ZException(fmt::format("{} requires a Vulkan attachment handle", usageDescription));
+  }
+
+  auto* texture = reinterpret_cast<ZVulkanTexture*>(handle.id);
+  if (!texture) {
+    throw ZException(fmt::format("{} provided a null Vulkan texture handle", usageDescription));
+  }
+  if (&texture->ownerDevice() != &device) {
+    throw ZException(fmt::format("{} references a texture from a different Vulkan device", usageDescription));
+  }
+  return *texture;
+}
+
+ZVulkanTexture&
+textureFromHandle(const SampledImageHandle& handle, ZVulkanDevice& device, std::string_view usageDescription)
+{
+  if (!handle.valid() || handle.backend != AttachmentBackend::Vulkan) {
+    throw ZException(fmt::format("{} requires a Vulkan sampled image handle", usageDescription));
+  }
+
+  auto* texture = reinterpret_cast<ZVulkanTexture*>(handle.id);
+  if (!texture) {
+    throw ZException(fmt::format("{} provided a null Vulkan texture handle", usageDescription));
+  }
+  if (&texture->ownerDevice() != &device) {
+    throw ZException(fmt::format("{} references a texture from a different Vulkan device", usageDescription));
+  }
+  return *texture;
+}
 
 vk::Viewport toVkViewport(const ViewportDesc& viewport)
 {

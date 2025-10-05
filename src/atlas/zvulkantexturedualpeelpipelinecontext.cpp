@@ -35,6 +35,17 @@ ZVulkanTextureDualPeelPipelineContext::~ZVulkanTextureDualPeelPipelineContext() 
 void ZVulkanTextureDualPeelPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanTextureDualPeelPipelineContext::resetDescriptors()
+{
+  m_blendDescriptor.reset();
+  m_finalDescriptor.reset();
+  m_descriptorOIT.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
@@ -57,16 +68,9 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
     if (!payload.tempAttachment.valid()) {
       return;
     }
-  } else {
-    CHECK(payload.frontAttachment.backend == AttachmentBackend::Vulkan)
-      << "GL frontAttachment in Vulkan dual-peel final path";
-    CHECK(payload.backAttachment.backend == AttachmentBackend::Vulkan)
-      << "GL backAttachment in Vulkan dual-peel final path";
-    CHECK(payload.depthAttachment.backend == AttachmentBackend::Vulkan)
-      << "GL depthAttachment in Vulkan dual-peel final path";
-    if (!payload.frontAttachment.valid() || !payload.backAttachment.valid() || !payload.depthAttachment.valid()) {
-      return;
-    }
+  } else if (!payload.frontAttachment.valid() || !payload.backAttachment.valid() || !payload.depthAttachment.valid()) {
+    LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan dual-peel final stage due to missing attachments";
+    return;
   }
 
   ensureDescriptorLayouts();
@@ -77,21 +81,23 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   }
 
   if (stage == Stage::Blend) {
-    auto* tempTexture = reinterpret_cast<ZVulkanTexture*>(payload.tempAttachment.id);
-    if (!tempTexture) {
+    if (!payload.tempAttachment.valid()) {
+      LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan dual-peel blend stage because temp attachment is missing";
       return;
     }
-    descriptor->updateTexture(0, *tempTexture);
+    auto& tempTexture =
+      vulkan::textureFromHandle(payload.tempAttachment, m_backend.device(), "dual-peel blend attachment");
+    descriptor->updateTexture(0, tempTexture);
   } else {
-    auto* frontTexture = reinterpret_cast<ZVulkanTexture*>(payload.frontAttachment.id);
-    auto* backTexture = reinterpret_cast<ZVulkanTexture*>(payload.backAttachment.id);
-    auto* depthTexture = reinterpret_cast<ZVulkanTexture*>(payload.depthAttachment.id);
-    if (!frontTexture || !backTexture || !depthTexture) {
-      return;
-    }
-    descriptor->updateTexture(0, *depthTexture);
-    descriptor->updateTexture(1, *frontTexture);
-    descriptor->updateTexture(2, *backTexture);
+    auto& depthTexture =
+      vulkan::textureFromHandle(payload.depthAttachment, m_backend.device(), "dual-peel depth attachment");
+    auto& frontTexture =
+      vulkan::textureFromHandle(payload.frontAttachment, m_backend.device(), "dual-peel front attachment");
+    auto& backTexture =
+      vulkan::textureFromHandle(payload.backAttachment, m_backend.device(), "dual-peel back attachment");
+    descriptor->updateTexture(0, depthTexture);
+    descriptor->updateTexture(1, frontTexture);
+    descriptor->updateTexture(2, backTexture);
   }
 
   const auto formats = vulkan::extractAttachmentFormats(batch);

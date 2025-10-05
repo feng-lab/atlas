@@ -103,6 +103,7 @@ private:
   std::unordered_map<const void*, std::unique_ptr<ZVulkanTexture>> m_atlasCache;
 
   void ensureDescriptorLayout();
+  void resetDescriptors();
   void ensureDescriptorSet();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 

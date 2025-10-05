@@ -11,6 +11,7 @@
 #include <set>
 #include <span>
 #include <string>
+#include <string_view>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -196,7 +197,14 @@ public:
   VulkanSurfaceBindings
   prepareVulkanSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
-  void executeVulkanBatches(const std::function<void()>& recordBatches);
+  void executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label = {});
+  void beginVulkanFrame();
+  void endVulkanFrame();
+  [[nodiscard]] bool isVulkanFrameActive() const
+  {
+    return m_vulkanFrameActive;
+  }
+  void recordVulkanBatches(const std::function<void()>& recordBatches, std::string_view label = {});
 
   [[nodiscard]] bool supportsCommandLists() const;
 
@@ -421,6 +429,7 @@ private:
   std::unique_ptr<Z3DRendererBackend> m_backend;
   RenderBackend m_activeBackend = RenderBackend::OpenGL;
   RenderMethod m_renderMethod;
+  bool m_vulkanFrameActive = false;
 
   std::vector<Z3DScratchResourcePool::RenderTargetLease*> m_persistentLeases;
 

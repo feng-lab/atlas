@@ -178,32 +178,35 @@ void ZVulkanSwapChain::copyToMemory(void* data, size_t size)
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
   // One-shot copy via device helper (waits idle)
-  {
-    auto cmd = m_device.beginSingleTimeCommands();
-    // Ensure source image layout
-    if (m_colorAttachment->layout() != vk::ImageLayout::eTransferSrcOptimal) {
-      m_colorAttachment->transitionLayout(cmd, m_colorAttachment->layout(), vk::ImageLayout::eTransferSrcOptimal);
-    }
+  m_device.frameExecutor().executeImmediate(
+    [&](vk::raii::CommandBuffer& cmd) {
+      if (m_colorAttachment->layout() != vk::ImageLayout::eTransferSrcOptimal) {
+        m_colorAttachment->transitionLayout(cmd,
+                                            m_colorAttachment->layout(),
+                                            vk::ImageLayout::eTransferSrcOptimal);
+      }
 
-    vk::BufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = vk::Offset3D{0, 0, 0};
-    region.imageExtent = vk::Extent3D{m_width, m_height, 1};
+      vk::BufferImageCopy region{};
+      region.bufferOffset = 0;
+      region.bufferRowLength = 0;
+      region.bufferImageHeight = 0;
+      region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+      region.imageSubresource.mipLevel = 0;
+      region.imageSubresource.baseArrayLayer = 0;
+      region.imageSubresource.layerCount = 1;
+      region.imageOffset = vk::Offset3D{0, 0, 0};
+      region.imageExtent = vk::Extent3D{m_width, m_height, 1};
 
-    cmd.copyImageToBuffer(m_colorAttachment->image(), vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
+      cmd.copyImageToBuffer(m_colorAttachment->image(),
+                            vk::ImageLayout::eTransferSrcOptimal,
+                            stagingBuffer->buffer(),
+                            region);
 
-    // Restore color attachment layout
-    m_colorAttachment->transitionLayout(cmd, vk::ImageLayout::eTransferSrcOptimal,
-                                        vk::ImageLayout::eColorAttachmentOptimal);
-
-    m_device.endSingleTimeCommands(cmd);
-  }
+      m_colorAttachment->transitionLayout(cmd,
+                                          vk::ImageLayout::eTransferSrcOptimal,
+                                          vk::ImageLayout::eColorAttachmentOptimal);
+    },
+    "swapchain_copy_to_memory");
 
   void* mapped = stagingBuffer->map(0, size);
   std::memcpy(data, mapped, size);

@@ -57,6 +57,15 @@ ZVulkanTextureBlendPipelineContext::~ZVulkanTextureBlendPipelineContext() = defa
 void ZVulkanTextureBlendPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
+  resetDescriptors();
+}
+
+void ZVulkanTextureBlendPipelineContext::resetDescriptors()
+{
+  m_descriptorSet.reset();
+  if (m_descriptorPool) {
+    m_descriptorPool->reset();
+  }
 }
 
 void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
@@ -70,23 +79,20 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  CHECK(payload.colorAttachmentHandle0.backend == AttachmentBackend::Vulkan)
-    << "GL colorAttachmentHandle0 in Vulkan path";
-  CHECK(payload.depthAttachmentHandle0.backend == AttachmentBackend::Vulkan)
-    << "GL depthAttachmentHandle0 in Vulkan path";
-  CHECK(payload.colorAttachmentHandle1.backend == AttachmentBackend::Vulkan)
-    << "GL colorAttachmentHandle1 in Vulkan path";
-  CHECK(payload.depthAttachmentHandle1.backend == AttachmentBackend::Vulkan)
-    << "GL depthAttachmentHandle1 in Vulkan path";
-
-  auto* color0 = reinterpret_cast<ZVulkanTexture*>(payload.colorAttachmentHandle0.id);
-  auto* depth0 = reinterpret_cast<ZVulkanTexture*>(payload.depthAttachmentHandle0.id);
-  auto* color1 = reinterpret_cast<ZVulkanTexture*>(payload.colorAttachmentHandle1.id);
-  auto* depth1 = reinterpret_cast<ZVulkanTexture*>(payload.depthAttachmentHandle1.id);
-
-  if (!color0 || !depth0 || !color1 || !depth1) {
+  if (!payload.colorAttachmentHandle0.valid() || !payload.depthAttachmentHandle0.valid() ||
+      !payload.colorAttachmentHandle1.valid() || !payload.depthAttachmentHandle1.valid()) {
+    LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan texture blend pass due to missing attachments";
     return;
   }
+
+  auto& color0 =
+    vulkan::textureFromHandle(payload.colorAttachmentHandle0, m_backend.device(), "texture-blend color attachment 0");
+  auto& depth0 =
+    vulkan::textureFromHandle(payload.depthAttachmentHandle0, m_backend.device(), "texture-blend depth attachment 0");
+  auto& color1 =
+    vulkan::textureFromHandle(payload.colorAttachmentHandle1, m_backend.device(), "texture-blend color attachment 1");
+  auto& depth1 =
+    vulkan::textureFromHandle(payload.depthAttachmentHandle1, m_backend.device(), "texture-blend depth attachment 1");
 
   uploadGeometry();
   if (!m_vertexBuffer || m_vertexCount == 0) {
@@ -99,10 +105,10 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  m_descriptorSet->updateTexture(0, *color0);
-  m_descriptorSet->updateTexture(1, *depth0);
-  m_descriptorSet->updateTexture(2, *color1);
-  m_descriptorSet->updateTexture(3, *depth1);
+  m_descriptorSet->updateTexture(0, color0);
+  m_descriptorSet->updateTexture(1, depth0);
+  m_descriptorSet->updateTexture(2, color1);
+  m_descriptorSet->updateTexture(3, depth1);
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
