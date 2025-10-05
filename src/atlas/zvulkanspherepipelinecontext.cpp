@@ -262,28 +262,10 @@ void ZVulkanSpherePipelineContext::ensureDescriptorSets()
 {
   ensureDescriptorLayouts();
 
-  auto& device = m_backend.device();
-  if (!m_descriptorPool) {
-    m_descriptorPool = device.createDescriptorPool();
-  }
-
-  if (!m_dsPlaceholder) {
-    auto dsPlaceholder = m_descriptorPool->allocateDescriptorSet(**m_setPlaceholder);
-    m_dsPlaceholder = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsPlaceholder));
-  }
-  if (!m_dsLighting) {
-    auto dsLighting = m_descriptorPool->allocateDescriptorSet(**m_setLighting);
-    m_dsLighting = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsLighting));
-  }
-
-  if (!m_dsTransforms) {
-    auto dsTransforms = m_descriptorPool->allocateDescriptorSet(**m_setTransforms);
-    m_dsTransforms = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsTransforms));
-  }
-  if (!m_dsOIT && m_setOIT) {
-    auto dsOit = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
-    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsOit));
-  }
+  if (!m_dsPlaceholder) m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(**m_setPlaceholder);
+  if (!m_dsLighting) m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+  if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+  if (!m_dsOIT && m_setOIT) m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
 
   ensurePlaceholderTexture();
   if (m_dsPlaceholder) {
@@ -309,9 +291,6 @@ void ZVulkanSpherePipelineContext::ensureDescriptorSets()
 void ZVulkanSpherePipelineContext::ensureOITResources()
 {
   ensureDescriptorLayouts();
-  if (!m_descriptorPool) {
-    m_descriptorPool = m_backend.device().createDescriptorPool();
-  }
   if (!m_uboOIT) {
     m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
                                                vk::BufferUsageFlagBits::eUniformBuffer,
@@ -319,8 +298,7 @@ void ZVulkanSpherePipelineContext::ensureOITResources()
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_dsOIT && m_setOIT) {
-    auto ds = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
-    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(ds));
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
   }
 }
 
@@ -343,35 +321,7 @@ void ZVulkanSpherePipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
   m_uboOIT->copyData(&oit, sizeof(oit));
 }
 
-void ZVulkanSpherePipelineContext::ensurePlaceholderTexture()
-{
-  auto& device = m_backend.device();
-  if (!m_placeholderTexture) {
-    m_placeholderTexture = device.createTexture(1,
-                                                1,
-                                                vk::Format::eR8G8B8A8Unorm,
-                                                vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                                vk::MemoryPropertyFlagBits::eDeviceLocal);
-    uint32_t pixel = 0xffffffffu;
-    m_placeholderTexture->uploadData(&pixel, sizeof(pixel));
-  }
-  if (!m_sampler) {
-    vk::SamplerCreateInfo info{.magFilter = vk::Filter::eLinear,
-                               .minFilter = vk::Filter::eLinear,
-                               .mipmapMode = vk::SamplerMipmapMode::eNearest,
-                               .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-                               .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-                               .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-                               .borderColor = vk::BorderColor::eIntOpaqueWhite};
-    m_sampler.emplace(device.context().device(), info);
-  }
-
-  if (m_dsPlaceholder && m_placeholderTexture) {
-    const auto sampler = **m_sampler;
-    m_dsPlaceholder->updateTexture(0, *m_placeholderTexture, sampler);
-    m_dsPlaceholder->updateTexture(1, *m_placeholderTexture, sampler);
-  }
-}
+void ZVulkanSpherePipelineContext::ensurePlaceholderTexture() {}
 
 void ZVulkanSpherePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
                                                      const RenderBatch& batch,

@@ -7,7 +7,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
@@ -43,9 +42,6 @@ void ZVulkanTextureDualPeelPipelineContext::resetDescriptors()
   m_blendDescriptor.reset();
   m_finalDescriptor.reset();
   m_descriptorOIT.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
 }
 
 void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
@@ -55,10 +51,8 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
                                                    const vk::Rect2D& scissor,
                                                    vk::raii::CommandBuffer& cmd)
 {
-  uploadGeometry();
-  if (!m_vertexBuffer || m_vertexCount == 0) {
-    return;
-  }
+  // Shared fullscreen quad
+  m_vertexCount = 4;
 
   Stage stage = (payload.stage == TextureDualPeelPayload::Stage::Final) ? Stage::Final : Stage::Blend;
 
@@ -74,7 +68,6 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   }
 
   ensureDescriptorLayouts();
-  ensureDescriptorPool();
   auto* descriptor = ensureDescriptor(stage);
   if (!descriptor) {
     return;
@@ -111,7 +104,8 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
+  auto& quad = m_backend.fullscreenQuadVertexBuffer();
+  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
 
   if (descriptor) {
     std::array<vk::DescriptorSet, 1> sets{descriptor->descriptorSet()};
@@ -207,27 +201,22 @@ void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorLayouts()
 
 void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorPool()
 {
-  if (!m_descriptorPool) {
-    m_descriptorPool = m_backend.device().createDescriptorPool();
-  }
+  // No-op: descriptor sets are allocated from the backend per-frame arena.
 }
 
 ZVulkanDescriptorSet* ZVulkanTextureDualPeelPipelineContext::ensureDescriptor(Stage stage)
 {
   ensureDescriptorLayouts();
-  ensureDescriptorPool();
 
   if (stage == Stage::Blend) {
     if (!m_blendDescriptor) {
-      auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_blendSetLayout);
-      m_blendDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+      m_blendDescriptor = m_backend.allocateFrameDescriptorSet(**m_blendSetLayout);
     }
     return m_blendDescriptor.get();
   }
 
   if (!m_finalDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_finalSetLayout);
-    m_finalDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    m_finalDescriptor = m_backend.allocateFrameDescriptorSet(**m_finalSetLayout);
   }
   return m_finalDescriptor.get();
 }
@@ -235,10 +224,8 @@ ZVulkanDescriptorSet* ZVulkanTextureDualPeelPipelineContext::ensureDescriptor(St
 void ZVulkanTextureDualPeelPipelineContext::ensureOITResources()
 {
   ensureDescriptorLayouts();
-  ensureDescriptorPool();
   if (!m_descriptorOIT && m_setOIT) {
-    auto ds = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
-    m_descriptorOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(ds));
+    m_descriptorOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
   }
   if (!m_uboOIT) {
     m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),

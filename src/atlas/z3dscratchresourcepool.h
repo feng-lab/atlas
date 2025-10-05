@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -145,6 +146,26 @@ public:
                   static_cast<Slot*>(ptr)->inUse = false;
                 },
                 slot};
+      }
+      // Vulkan-only: defer slot release until GPU frame fence signals.
+      // The pool pointer must be valid and implement scheduleDeferredRelease for the Slot type.
+      template<typename Slot>
+      static Releaser forVulkanSlotDeferred(Z3DScratchResourcePool* pool, Slot* slot)
+      {
+        struct Payload
+        {
+          Z3DScratchResourcePool* pool;
+          void* slot;
+        };
+        auto* payload = new Payload{pool, slot};
+        return {[](void* p) {
+                  auto* pl = static_cast<Payload*>(p);
+                  if (pl && pl->pool) {
+                    pl->pool->scheduleDeferredRelease(static_cast<Slot*>(pl->slot));
+                  }
+                  delete pl;
+                },
+                payload};
       }
     };
 
@@ -306,6 +327,26 @@ public:
   ZVulkanDevice* vulkanDevice();
   ZVulkanDevice& ensureVulkanDevice();
 
+  // Stage 2: Defer Vulkan scratch slot reuse until the frame fence signals
+  // The backend installs a scheduler that enqueues closures to run once the
+  // current frame completes. The pool uses it to delay marking Vulkan slots as free.
+  void setVulkanReleaseScheduler(std::function<void(std::function<void()>)> scheduler)
+  {
+    m_vulkanReleaseScheduler = std::move(scheduler);
+  }
+
+  // Vulkan scratch slot (public because used in public method signature)
+  struct VulkanScratchSlot
+  {
+    std::unique_ptr<ZVulkanScratchImage> image;
+    ScratchImageDescriptor descriptor;
+    bool inUse = false;
+    uint64_t lastUseTick = 0;
+  };
+
+  // Internal hook used by RenderTargetLease::Releaser for Vulkan slots
+  void scheduleDeferredRelease(VulkanScratchSlot* slot);
+
   // Inject a shared Vulkan device owned by the rendering engine. When set, the
   // pool will use this device and will not create its own context/device.
   void setVulkanDevice(ZVulkanDevice* device)
@@ -435,14 +476,6 @@ private:
 
   mutable std::array<DescriptionCacheEntry, 2> m_descriptionCache{};
 
-  struct VulkanScratchSlot
-  {
-    std::unique_ptr<ZVulkanScratchImage> image;
-    ScratchImageDescriptor descriptor;
-    bool inUse = false;
-    uint64_t lastUseTick = 0;
-  };
-
   struct VulkanEnvironment
   {
     std::unique_ptr<ZVulkanDevice> device;
@@ -456,6 +489,7 @@ private:
   std::array<std::vector<std::unique_ptr<VulkanScratchSlot>>, kScratchUsageCount> m_vulkanSlots;
   RenderBackend m_defaultBackend = RenderBackend::OpenGL;
   ZVulkanDevice* m_externalVkDevice = nullptr; // non-owning
+  std::function<void(std::function<void()>)> m_vulkanReleaseScheduler; // installed by backend per-frame
 
   static constexpr uint32_t kTrimAcquireInterval = 512;
   static constexpr uint64_t kTrimAgeTicks = 1024;

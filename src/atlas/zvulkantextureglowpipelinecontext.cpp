@@ -8,7 +8,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
@@ -58,9 +57,6 @@ void ZVulkanTextureGlowPipelineContext::resetDescriptors()
 {
   m_blurDescriptor.reset();
   m_glowDescriptor.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
 }
 
 void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
@@ -89,14 +85,10 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  ensureVertexCapacity(4);
-  uploadGeometry();
-  if (!m_vertexBuffer || m_vertexCount == 0) {
-    return;
-  }
+  // Shared fullscreen quad
+  m_vertexCount = 4;
 
   ensureDescriptorLayouts();
-  ensureDescriptorPool();
 
   const vk::Format colorFormat = colorTexture.format();
   ensureIntermediateTextures(size, colorFormat);
@@ -215,8 +207,7 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
   cmd.beginRendering(renderingInfo);
 
   if (!m_glowDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_glowSetLayout);
-    m_glowDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    m_glowDescriptor = m_backend.allocateFrameDescriptorSet(**m_glowSetLayout);
   }
 
   m_glowDescriptor->updateTexture(0, colorTexture);
@@ -234,7 +225,8 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, glowPipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
+  auto& quad = m_backend.fullscreenQuadVertexBuffer();
+  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
   if (m_glowDescriptor) {
     std::array<vk::DescriptorSet, 1> sets{m_glowDescriptor->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, glowPipeline.pipeline->pipelineLayout(), 0, sets, {});
@@ -316,12 +308,7 @@ void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()
   }
 }
 
-void ZVulkanTextureGlowPipelineContext::ensureDescriptorPool()
-{
-  if (!m_descriptorPool) {
-    m_descriptorPool = m_backend.device().createDescriptorPool();
-  }
-}
+void ZVulkanTextureGlowPipelineContext::ensureDescriptorPool() {}
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureGlowPipelineContext::makeVertexInputState() const
 {
@@ -378,21 +365,7 @@ void ZVulkanTextureGlowPipelineContext::ensureIntermediateTextures(const glm::uv
                 vk::ImageLayout::eDepthStencilReadOnlyOptimal);
 }
 
-void ZVulkanTextureGlowPipelineContext::ensureVertexCapacity(size_t vertexCount)
-{
-  const size_t requiredBytes = vertexCount * sizeof(QuadVertex);
-  if (requiredBytes <= m_vertexCapacity) {
-    return;
-  }
-
-  size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
-  auto& device = m_backend.device();
-  m_vertexBuffer =
-    device.createBuffer(newCapacity,
-                        vk::BufferUsageFlagBits::eVertexBuffer,
-                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  m_vertexCapacity = newCapacity;
-}
+void ZVulkanTextureGlowPipelineContext::ensureVertexCapacity(size_t) {}
 
 void ZVulkanTextureGlowPipelineContext::uploadGeometry()
 {
@@ -401,11 +374,6 @@ void ZVulkanTextureGlowPipelineContext::uploadGeometry()
                                            QuadVertex{glm::vec3(1.f, 1.f, kQuadDepth)},
                                            QuadVertex{glm::vec3(1.f, -1.f, kQuadDepth)}};
 
-  if (!m_vertexBuffer) {
-    return;
-  }
-
-  m_vertexBuffer->copyData(vertices.data(), vertices.size() * sizeof(QuadVertex));
   m_vertexCount = vertices.size();
 }
 
@@ -558,8 +526,7 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
   cmd.beginRendering(renderingInfo);
 
   if (!m_blurDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_blurSetLayout);
-    m_blurDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    m_blurDescriptor = m_backend.allocateFrameDescriptorSet(**m_blurSetLayout);
   }
 
   m_blurDescriptor->updateTexture(0, inputColor);
@@ -575,7 +542,8 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
+  auto& quad = m_backend.fullscreenQuadVertexBuffer();
+  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
   if (m_blurDescriptor) {
     std::array<vk::DescriptorSet, 1> sets{m_blurDescriptor->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});

@@ -8,7 +8,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
@@ -63,9 +62,6 @@ void ZVulkanTextureBlendPipelineContext::resetFrame()
 void ZVulkanTextureBlendPipelineContext::resetDescriptors()
 {
   m_descriptorSet.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
 }
 
 void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
@@ -94,10 +90,8 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
   auto& depth1 =
     vulkan::textureFromHandle(payload.depthAttachmentHandle1, m_backend.device(), "texture-blend depth attachment 1");
 
-  uploadGeometry();
-  if (!m_vertexBuffer || m_vertexCount == 0) {
-    return;
-  }
+  // Shared fullscreen quad
+  m_vertexCount = 4;
 
   ensureDescriptorLayout();
   ensureDescriptorSet();
@@ -121,7 +115,8 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
+  auto& quad = m_backend.fullscreenQuadVertexBuffer();
+  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
 
   if (m_descriptorSet) {
     std::array<vk::DescriptorSet, 1> sets{m_descriptorSet->descriptorSet()};
@@ -191,14 +186,8 @@ void ZVulkanTextureBlendPipelineContext::ensureDescriptorSet()
 {
   ensureDescriptorLayout();
 
-  auto& device = m_backend.device();
-  if (!m_descriptorPool) {
-    m_descriptorPool = device.createDescriptorPool();
-  }
-
   if (!m_descriptorSet) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_setTextures);
-    m_descriptorSet = std::make_unique<ZVulkanDescriptorSet>(device, std::move(descriptorSet));
+    m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setTextures);
   }
 }
 
@@ -222,37 +211,8 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureBlendPipelineContext::makeV
   return info;
 }
 
-void ZVulkanTextureBlendPipelineContext::ensureVertexCapacity(size_t vertexCount)
-{
-  const size_t requiredBytes = vertexCount * sizeof(QuadVertex);
-  if (requiredBytes <= m_vertexCapacity) {
-    return;
-  }
-
-  size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
-  auto& device = m_backend.device();
-  m_vertexBuffer =
-    device.createBuffer(newCapacity,
-                        vk::BufferUsageFlagBits::eVertexBuffer,
-                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  m_vertexCapacity = newCapacity;
-}
-
-void ZVulkanTextureBlendPipelineContext::uploadGeometry()
-{
-  const std::array<QuadVertex, 4> vertices{QuadVertex{glm::vec3(-1.f, 1.f, kQuadDepth)},
-                                           QuadVertex{glm::vec3(-1.f, -1.f, kQuadDepth)},
-                                           QuadVertex{glm::vec3(1.f, 1.f, kQuadDepth)},
-                                           QuadVertex{glm::vec3(1.f, -1.f, kQuadDepth)}};
-
-  ensureVertexCapacity(vertices.size());
-  if (!m_vertexBuffer) {
-    return;
-  }
-
-  m_vertexBuffer->copyData(vertices.data(), vertices.size() * sizeof(QuadVertex));
-  m_vertexCount = vertices.size();
-}
+void ZVulkanTextureBlendPipelineContext::ensureVertexCapacity(size_t) {}
+void ZVulkanTextureBlendPipelineContext::uploadGeometry() {}
 
 ZVulkanTextureBlendPipelineContext::PipelineInstance&
 ZVulkanTextureBlendPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats)

@@ -9,7 +9,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkanbuffer.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
 #include "zvulkanuniforms.h"
@@ -116,9 +115,6 @@ void ZVulkanLinePipelineContext::resetDescriptors()
   m_dsTexture.reset();
   m_dsLighting.reset();
   m_dsTransforms.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
 }
 
 void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
@@ -184,28 +180,17 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
 {
   (void)renderer;
   ensureDescriptorLayouts();
-  auto& device = m_backend.device();
+  if (!m_dsLighting) m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+  if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+  if (!m_dsTexture) m_dsTexture = m_backend.allocateFrameDescriptorSet(**m_setTexture);
 
-  if (!m_descriptorPool) {
-    m_descriptorPool = device.createDescriptorPool();
-  }
-
-  if (!m_dsLighting || !m_dsTransforms || !m_dsTexture) {
-    auto dsLighting = m_descriptorPool->allocateDescriptorSet(**m_setLighting);
-    auto dsTransforms = m_descriptorPool->allocateDescriptorSet(**m_setTransforms);
-    auto dsTexture = m_descriptorPool->allocateDescriptorSet(**m_setTexture);
-    m_dsLighting = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsLighting));
-    m_dsTransforms = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsTransforms));
-    m_dsTexture = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsTexture));
-  }
-
-  if (m_uboLighting) {
+  if (m_uboLighting && m_dsLighting) {
     m_dsLighting->updateUniformBuffer(0, *m_uboLighting);
   }
-  if (m_uboTransforms) {
+  if (m_uboTransforms && m_dsTransforms) {
     m_dsTransforms->updateUniformBuffer(0, *m_uboTransforms);
   }
-  if (m_uboMaterial) {
+  if (m_uboMaterial && m_dsTransforms) {
     m_dsTransforms->updateUniformBuffer(1, *m_uboMaterial);
   }
 
@@ -617,13 +602,13 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
                                                  m_backend.device(),
                                                  "line dual-depth-peeling depth blender");
-      m_dsTexture->updateTexture(1, depthTex, **m_sampler);
+      m_dsTexture->updateTexture(1, depthTex, m_backend.defaultSampler());
     }
     if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
       auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
                                                  m_backend.device(),
                                                  "line dual-depth-peeling front blender");
-      m_dsTexture->updateTexture(2, frontTex, **m_sampler);
+      m_dsTexture->updateTexture(2, frontTex, m_backend.defaultSampler());
     }
   } else if (m_dsTexture) {
     auto& tex = m_backend.defaultPlaceholderTexture2D();

@@ -20,7 +20,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
 class ZVulkanBuffer;
 
@@ -76,7 +75,6 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder;
   std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
   std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
-  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
 

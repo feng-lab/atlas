@@ -367,6 +367,21 @@ Risks and Mitigations
 Status Tracking
 - Small win already applied: centralized placeholder sampling resources (shared 1x1 RGBA8 texture + linear clamp sampler) under the backend, reused by common contexts.
 
+2025-10-05 Progress — Stage 2 (completed)
+- Backend descriptor arena [Done]:
+  - Per-frame descriptor arena lives in `Z3DRendererVulkanBackend`; contexts allocate via `allocateFrameDescriptorSet(layout)`.
+  - Arena reset is scheduled once in `endRender()` and applied in the next `beginRender()` after the frame fence signals.
+  - VLOG(1): per-frame descriptor set allocations and arena reset/lease recycle counters.
+- Context conversion [Done]:
+  - Background, Texture Copy, Texture Blend, Texture Glow, Line, Sphere, Ellipsoid, Cone, Mesh, Image Slice, and Image Raycaster now allocate descriptor sets from the per-frame arena. All per-context descriptor pools removed from steady state.
+- Lease fence integration [Done]:
+  - `Z3DScratchResourcePool` defers Vulkan scratch slot reuse until the owning frame’s fence signals. The backend installs a per-frame scheduler; deferred releases execute at the next `beginRender()`.
+  - VLOG(1) includes `lease_recycle_queued`/`executed` counters per frame.
+- Shared fullscreen quad [Done]:
+  - Backend provides a static fullscreen quad VBO used by background + texture-based contexts (copy/blend/glow).
+- Samplers [Done]:
+  - Backend exposes linear-clamp and nearest-clamp samplers; contexts use backend samplers and stop creating per-context ones.
+
 Small wins already applied:
 - Centralized placeholder sampling resources: a shared 1x1 RGBA8 texture and linear clamp sampler now live under `Z3DRendererVulkanBackend` and are reused by common pipeline contexts (line, cone, sphere, ellipsoid). This avoids repeatedly creating tiny textures/samplers per context and reduces CPU overhead and VRAM churn.
 

@@ -7,7 +7,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
@@ -41,9 +40,6 @@ void ZVulkanTextureWeightedBlendedPipelineContext::resetFrame()
 void ZVulkanTextureWeightedBlendedPipelineContext::resetDescriptors()
 {
   m_descriptorSet.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& renderer,
@@ -61,13 +57,10 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     return;
   }
 
-  uploadGeometry();
-  if (!m_vertexBuffer || m_vertexCount == 0) {
-    return;
-  }
+  // Shared fullscreen quad
+  m_vertexCount = 4;
 
   ensureDescriptorLayout();
-  ensureDescriptorPool();
   ensureDescriptorSet();
   if (!m_descriptorSet) {
     return;
@@ -93,7 +86,8 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
+  auto& quad = m_backend.fullscreenQuadVertexBuffer();
+  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
 
   if (m_descriptorSet) {
     std::array<vk::DescriptorSet, 1> sets{m_descriptorSet->descriptorSet()};
@@ -154,21 +148,14 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorLayout()
   m_setLayout.emplace(vkDevice, createInfo);
 }
 
-void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorPool()
-{
-  if (!m_descriptorPool) {
-    m_descriptorPool = m_backend.device().createDescriptorPool();
-  }
-}
+void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorPool() {}
 
 void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorSet()
 {
   ensureDescriptorLayout();
-  ensureDescriptorPool();
 
   if (!m_descriptorSet) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_setLayout);
-    m_descriptorSet = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setLayout);
   }
 }
 
@@ -208,21 +195,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureVertexCapacity(size_t v
   m_vertexCapacity = newCapacity;
 }
 
-void ZVulkanTextureWeightedBlendedPipelineContext::uploadGeometry()
-{
-  const std::array<glm::vec3, 4> vertices{glm::vec3(-1.f, 1.f, kQuadDepth),
-                                          glm::vec3(-1.f, -1.f, kQuadDepth),
-                                          glm::vec3(1.f, 1.f, kQuadDepth),
-                                          glm::vec3(1.f, -1.f, kQuadDepth)};
-
-  ensureVertexCapacity(vertices.size());
-  if (!m_vertexBuffer) {
-    return;
-  }
-
-  m_vertexBuffer->copyData(vertices.data(), vertices.size() * sizeof(glm::vec3));
-  m_vertexCount = vertices.size();
-}
+void ZVulkanTextureWeightedBlendedPipelineContext::uploadGeometry() {}
 
 ZVulkanTextureWeightedBlendedPipelineContext::PipelineInstance&
 ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& key,

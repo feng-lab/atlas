@@ -1509,7 +1509,12 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
     lease.backend = RenderBackend::Vulkan;
     lease.vulkanImage = newSlot->image.get();
     lease.attachments = colorAttachmentCount(descriptor);
-    lease.releaser = RenderTargetLease::Releaser::forSlot(newSlot.get());
+    // Defer release to frame completion when possible
+    if (m_vulkanReleaseScheduler) {
+      lease.releaser = RenderTargetLease::Releaser::forVulkanSlotDeferred(this, newSlot.get());
+    } else {
+      lease.releaser = RenderTargetLease::Releaser::forSlot(newSlot.get());
+    }
     slots.emplace_back(std::move(newSlot));
     ++m_creationCounter;
     maybeTrimAfterAcquire();
@@ -1523,7 +1528,11 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
   lease.backend = RenderBackend::Vulkan;
   lease.vulkanImage = slot->image.get();
   lease.attachments = colorAttachmentCount(descriptor);
-  lease.releaser = RenderTargetLease::Releaser::forSlot(slot);
+  if (m_vulkanReleaseScheduler) {
+    lease.releaser = RenderTargetLease::Releaser::forVulkanSlotDeferred(this, slot);
+  } else {
+    lease.releaser = RenderTargetLease::Releaser::forSlot(slot);
+  }
   maybeTrimAfterAcquire();
   return lease;
 }
@@ -1537,6 +1546,21 @@ ZVulkanDevice& Z3DScratchResourcePool::ensureVulkanDevice()
 {
   CHECK(m_externalVkDevice != nullptr) << "External Vulkan device must be injected before Vulkan scratch allocation";
   return *m_externalVkDevice;
+}
+
+void Z3DScratchResourcePool::scheduleDeferredRelease(Z3DScratchResourcePool::VulkanScratchSlot* slot)
+{
+  if (!slot) {
+    return;
+  }
+  if (m_vulkanReleaseScheduler) {
+    // Capture just the slot pointer; the scheduler executes later on the render thread.
+    m_vulkanReleaseScheduler([slot]() { slot->inUse = false; });
+  } else {
+    // Fallback: release immediately if no scheduler is installed (should not happen during active frames)
+    slot->inUse = false;
+    VLOG(1) << "scratch pool: immediate Vulkan slot release (no scheduler installed)";
+  }
 }
 
 } // namespace nim

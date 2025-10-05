@@ -7,7 +7,6 @@
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanrenderconversions.h"
@@ -55,9 +54,6 @@ void ZVulkanBackgroundPipelineContext::resetDescriptors()
 {
   m_dsLighting.reset();
   m_dsTransforms.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
 }
 
 void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
@@ -71,10 +67,8 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  uploadGeometry();
-  if (m_vertexCount == 0) {
-    return;
-  }
+  // Shared fullscreen quad geometry
+  m_vertexCount = 4;
 
   updateLightingUBO(renderer, batch, payload);
   updateTransformUBO(renderer, batch, payload);
@@ -92,7 +86,8 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
+  auto& quad = m_backend.fullscreenQuadVertexBuffer();
+  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
 
   if (m_dsLighting && m_dsTransforms) {
     std::array<vk::DescriptorSet, 2> sets{m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
@@ -171,18 +166,12 @@ void ZVulkanBackgroundPipelineContext::ensureDescriptorSets()
   ensureDescriptorLayouts();
 
   auto& device = m_backend.device();
-  if (!m_descriptorPool) {
-    m_descriptorPool = device.createDescriptorPool();
-  }
-
   if (!m_dsLighting) {
-    auto dsLighting = m_descriptorPool->allocateDescriptorSet(**m_setLighting);
-    m_dsLighting = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsLighting));
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
   }
 
   if (!m_dsTransforms) {
-    auto dsTransforms = m_descriptorPool->allocateDescriptorSet(**m_setTransforms);
-    m_dsTransforms = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsTransforms));
+    m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
   }
 
   if (m_dsLighting && m_uboLighting) {
@@ -307,6 +296,9 @@ ZVulkanBackgroundPipelineContext::ensurePipeline(const PipelineKey& key, const v
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+  // Background should not participate in depth testing/writes
+  instance.pipeline->setDepthTestEnable(false);
+  instance.pipeline->setDepthWriteEnable(false);
 
   std::array<vk::SpecializationMapEntry, 5> entries{
     vk::SpecializationMapEntry{.constantID = 30, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
@@ -368,40 +360,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanBackgroundPipelineContext::makeVer
   return info;
 }
 
-void ZVulkanBackgroundPipelineContext::ensureVertexCapacity(size_t vertexCount)
-{
-  const size_t requiredBytes = vertexCount * sizeof(BackgroundVertex);
-  if (requiredBytes <= m_vertexCapacity) {
-    return;
-  }
-
-  size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
-  auto& device = m_backend.device();
-  m_vertexBuffer =
-    device.createBuffer(newCapacity,
-                        vk::BufferUsageFlagBits::eVertexBuffer,
-                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  m_vertexCapacity = newCapacity;
-}
-
-void ZVulkanBackgroundPipelineContext::uploadGeometry()
-{
-  ensureVertexCapacity(4);
-  m_vertexCount = 4;
-
-  const std::array<glm::vec3, 4> kVertices{glm::vec3(-1.0f, 1.0f, 1.0f - 1e-5f),
-                                           glm::vec3(-1.0f, -1.0f, 1.0f - 1e-5f),
-                                           glm::vec3(1.0f, 1.0f, 1.0f - 1e-5f),
-                                           glm::vec3(1.0f, -1.0f, 1.0f - 1e-5f)};
-
-  auto mapping = m_vertexBuffer->mapRange(0, m_vertexCount * sizeof(BackgroundVertex));
-  auto* vertices = mapping.as<BackgroundVertex>();
-  if (!vertices) {
-    throw ZException("Failed to map background vertex buffer");
-  }
-  for (size_t i = 0; i < m_vertexCount; ++i) {
-    vertices[i].position = kVertices[i];
-  }
-}
+void ZVulkanBackgroundPipelineContext::ensureVertexCapacity(size_t) {}
+void ZVulkanBackgroundPipelineContext::uploadGeometry() {}
 
 } // namespace nim

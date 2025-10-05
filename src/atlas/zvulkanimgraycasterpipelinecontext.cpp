@@ -403,8 +403,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureEmptyDescriptor()
   if (m_emptyDescriptor) {
     return;
   }
-  auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_emptySetLayout);
-  m_emptyDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+  m_emptyDescriptor = m_backend.allocateFrameDescriptorSet(**m_emptySetLayout);
 }
 
 void ZVulkanImgRaycasterPipelineContext::ensureEntryVertexCapacity(size_t vertexCount, size_t indexCount)
@@ -789,8 +788,7 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
 void ZVulkanImgRaycasterPipelineContext::bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray)
 {
   if (!m_mergeDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_mergeSetLayout);
-    m_mergeDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    m_mergeDescriptor = m_backend.allocateFrameDescriptorSet(**m_mergeSetLayout);
   }
 
   m_mergeDescriptor->updateTexture(0, colorArray);
@@ -956,8 +954,7 @@ void ZVulkanImgRaycasterPipelineContext::updateChannelFastDescriptors(ChannelRes
 {
   (void)channelIndex;
   if (!resources.fastDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_fastSetLayout);
-    resources.fastDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    resources.fastDescriptor = m_backend.allocateFrameDescriptorSet(**m_fastSetLayout);
   }
 
   resources.fastDescriptor->updateTexture(0, entryExitTexture);
@@ -981,8 +978,7 @@ void ZVulkanImgRaycasterPipelineContext::updateChannelFastDescriptors(ChannelRes
   resources.rayParamBuffer->copyData(&params, sizeof(RayParamsData));
 
   if (!resources.rayParamDescriptor) {
-    auto ds = m_descriptorPool->allocateDescriptorSet(**m_rayParamSetLayout);
-    resources.rayParamDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(ds));
+    resources.rayParamDescriptor = m_backend.allocateFrameDescriptorSet(**m_rayParamSetLayout);
   }
 
   resources.rayParamDescriptor->updateUniformBuffer(3, *resources.rayParamBuffer);
@@ -1000,8 +996,7 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
                                                                float zeToScreenPixelVoxelSize)
 {
   if (!resources.pagedDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_progressiveSetLayout);
-    resources.pagedDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    resources.pagedDescriptor = m_backend.allocateFrameDescriptorSet(**m_progressiveSetLayout);
   }
 
   if (!resources.pagedDescriptor) {
@@ -1048,8 +1043,7 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
   resources.pageDataCapacity = pageData.size();
 
   if (!resources.pageDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_pageSetLayout);
-    resources.pageDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    resources.pageDescriptor = m_backend.allocateFrameDescriptorSet(**m_pageSetLayout);
   }
 
   if (!resources.pageDescriptor) {
@@ -1800,8 +1794,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   auto& layerCopyPipeline = ensureCopyPipeline(layerCopyKey, layerFormats);
 
   if (!m_copyDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_copySetLayout);
-    m_copyDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    m_copyDescriptor = m_backend.allocateFrameDescriptorSet(**m_copySetLayout);
   }
   m_copyDescriptor->updateTexture(0, *currentColor);
   m_copyDescriptor->updateTexture(1, *currentDepth);

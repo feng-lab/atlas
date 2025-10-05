@@ -179,9 +179,7 @@ void ZVulkanImgSlicePipelineContext::resetDescriptors()
   }
   m_emptyDescriptor.reset();
   m_mergeDescriptor.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
+  // Descriptors are per-frame arena allocated; nothing to reset here.
 }
 
 void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
@@ -699,21 +697,14 @@ void ZVulkanImgSlicePipelineContext::ensureDescriptorLayouts()
   }
 }
 
-void ZVulkanImgSlicePipelineContext::ensureDescriptorPool()
-{
-  if (!m_descriptorPool) {
-    m_descriptorPool = m_backend.device().createDescriptorPool();
-  }
-}
+void ZVulkanImgSlicePipelineContext::ensureDescriptorPool() {}
 
 void ZVulkanImgSlicePipelineContext::ensureEmptyDescriptor()
 {
   if (m_emptyDescriptor || !m_emptySetLayout) {
     return;
   }
-  ensureDescriptorPool();
-  auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_emptySetLayout);
-  m_emptyDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+  m_emptyDescriptor = m_backend.allocateFrameDescriptorSet(**m_emptySetLayout);
 }
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanImgSlicePipelineContext::makeSliceVertexInputState() const
@@ -924,9 +915,7 @@ void ZVulkanImgSlicePipelineContext::updateFastDescriptors(ChannelResources& res
                                                            ZVulkanTexture& colormap)
 {
   if (!resources.fastTextureDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_fastSliceSetLayout);
-    resources.fastTextureDescriptor =
-      std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    resources.fastTextureDescriptor = m_backend.allocateFrameDescriptorSet(**m_fastSliceSetLayout);
   }
   resources.fastTextureDescriptor->updateTexture(0, volume);
   resources.fastTextureDescriptor->updateTexture(1, colormap);
@@ -946,9 +935,7 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
                                                             float zeToScreenPixelVoxelSize)
 {
   if (!resources.pagedTextureDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_pagedSliceSetLayout);
-    resources.pagedTextureDescriptor =
-      std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    resources.pagedTextureDescriptor = m_backend.allocateFrameDescriptorSet(**m_pagedSliceSetLayout);
   }
   resources.pagedTextureDescriptor->updateTexture(0, pageDirectory);
   resources.pagedTextureDescriptor->updateTexture(1, pageTable);
@@ -971,8 +958,7 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
   resources.pageDataCapacity = pageData.size();
 
   if (!resources.pageDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_slicePageSetLayout);
-    resources.pageDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    resources.pageDescriptor = m_backend.allocateFrameDescriptorSet(**m_slicePageSetLayout);
   }
   resources.pageDescriptor->updateUniformBuffer(2, *resources.pageDataBuffer);
 
@@ -1106,8 +1092,7 @@ ZVulkanImgSlicePipelineContext::ensureMergePipeline(const MergePipelineKey& key,
 void ZVulkanImgSlicePipelineContext::bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray)
 {
   if (!m_mergeDescriptor) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_mergeSetLayout);
-    m_mergeDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    m_mergeDescriptor = m_backend.allocateFrameDescriptorSet(**m_mergeSetLayout);
   }
 
   m_mergeDescriptor->updateTexture(0, colorArray);

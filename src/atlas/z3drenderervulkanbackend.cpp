@@ -29,6 +29,7 @@
 #include "zvulkanrenderconversions.h"
 #include "z3drenderglobalstate.h"
 #include "z3dscratchresourcepool.h"
+#include "zvulkanbuffer.h"
 
 #include <algorithm>
 #include <array>
@@ -192,6 +193,14 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 
   auto& frameResources = ensureFrameResourcesForKey(m_activeFrameHandle->key());
 
+  // Stage 2: apply descriptor arena reset when reusing this in-flight frame.
+  // Safe point: frame executor waited for the fence when acquiring the frame.
+  applyPendingArenaReset(frameResources);
+  ensureArenaOnFrame(frameResources);
+  frameResources.descriptorSetsAllocated = 0;
+  frameResources.leaseRecycleQueued = 0;
+  frameResources.leaseRecycleExecuted = 0;
+
   collectFrameTimings(frameResources);
   frameResources.gpuScopes.clear();
   frameResources.cpuScopes.clear();
@@ -206,6 +215,12 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 
   m_activeFrame = &frameResources;
   m_frameRecording = true;
+
+  // Install scratch-pool deferred release scheduler for this active frame
+  {
+    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+    pool.setVulkanReleaseScheduler([this](std::function<void()> fn) { this->scheduleAfterCurrentFrameCompletion(std::move(fn)); });
+  }
 }
 
 void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
@@ -261,6 +276,12 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   } catch (const std::exception& e) {
     LOG(WARNING) << "Vulkan queue submit failed: " << e.what();
   }
+
+  // Stage 2: schedule exactly one descriptor arena reset for this frame.
+  scheduleArenaReset(frame);
+
+  // VLOG(1) frame recycling stats (descriptors and arena reset scheduling)
+  vlogFrameRecyclingStats(frame);
 
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
@@ -831,16 +852,7 @@ void Z3DRendererVulkanBackend::ensureDefaultPlaceholders()
     uint32_t pixel = 0xffffffffu;
     m_defaultPlaceholder2D->uploadData(&pixel, sizeof(pixel));
   }
-  if (!m_defaultSampler) {
-    vk::SamplerCreateInfo samplerInfo{.magFilter = vk::Filter::eLinear,
-                                      .minFilter = vk::Filter::eLinear,
-                                      .mipmapMode = vk::SamplerMipmapMode::eNearest,
-                                      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
-                                      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
-                                      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
-                                      .borderColor = vk::BorderColor::eFloatOpaqueWhite};
-    m_defaultSampler.emplace(m_sharedDevice->context().device(), samplerInfo);
-  }
+  ensureSharedSamplers();
 }
 
 ZVulkanTexture& Z3DRendererVulkanBackend::defaultPlaceholderTexture2D()
@@ -855,6 +867,68 @@ vk::Sampler Z3DRendererVulkanBackend::defaultSampler()
   return **m_defaultSampler;
 }
 
+void Z3DRendererVulkanBackend::ensureSharedSamplers()
+{
+  if (!m_sharedDevice) {
+    return;
+  }
+  auto& vkDevice = m_sharedDevice->context().device();
+  if (!m_defaultSampler) {
+    vk::SamplerCreateInfo samplerInfo{.magFilter = vk::Filter::eLinear,
+                                      .minFilter = vk::Filter::eLinear,
+                                      .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+                                      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+                                      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+                                      .borderColor = vk::BorderColor::eFloatOpaqueWhite};
+    m_defaultSampler.emplace(vkDevice, samplerInfo);
+  }
+  if (!m_nearestClampSampler) {
+    vk::SamplerCreateInfo nearestInfo{.magFilter = vk::Filter::eNearest,
+                                      .minFilter = vk::Filter::eNearest,
+                                      .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                                      .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+                                      .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+                                      .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+                                      .borderColor = vk::BorderColor::eFloatOpaqueWhite};
+    m_nearestClampSampler.emplace(vkDevice, nearestInfo);
+  }
+}
+
+std::unique_ptr<ZVulkanDescriptorSet>
+Z3DRendererVulkanBackend::allocateFrameDescriptorSet(vk::DescriptorSetLayout layout)
+{
+  if (!m_activeFrame || !m_sharedDevice) {
+    VLOG(1) << "allocateFrameDescriptorSet called with no active frame or device";
+    return {};
+  }
+  ensureArenaOnFrame(*m_activeFrame);
+  if (!m_activeFrame->descriptorPool) {
+    VLOG(1) << "Descriptor arena missing; allocation skipped";
+    return {};
+  }
+  auto set = m_sharedDevice->createDescriptorSet(*m_activeFrame->descriptorPool, layout);
+  if (set) {
+    m_activeFrame->descriptorSetsAllocated++;
+  }
+  return set;
+}
+
+void Z3DRendererVulkanBackend::scheduleAfterCurrentFrameCompletion(std::function<void()> fn)
+{
+  if (!fn) {
+    return;
+  }
+  if (!m_activeFrame) {
+    // No active frame; execute immediately to avoid leaks.
+    fn();
+    VLOG(1) << "VK scheduleAfterCurrentFrameCompletion with no active frame; executed immediately";
+    return;
+  }
+  m_activeFrame->deferredReleases.push_back(std::move(fn));
+  m_activeFrame->leaseRecycleQueued++;
+}
+
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()
 {
   CHECK(m_activeFrameHandle && m_activeFrameHandle->valid())
@@ -867,6 +941,12 @@ const vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer() const
   CHECK(m_activeFrameHandle && m_activeFrameHandle->valid())
     << "Command buffer requested outside active frame";
   return m_activeFrameHandle->commandBuffer();
+}
+
+ZVulkanBuffer& Z3DRendererVulkanBackend::fullscreenQuadVertexBuffer()
+{
+  ensureFullscreenQuad();
+  return *m_fullscreenQuadVbo;
 }
 
 void Z3DRendererVulkanBackend::ensureDevice()
@@ -915,7 +995,82 @@ Z3DRendererVulkanBackend::ensureFrameResourcesForKey(void* key)
   auto& vkDevice = m_sharedDevice->context().device();
   vk::QueryPoolCreateInfo queryInfo{.queryType = vk::QueryType::eTimestamp, .queryCount = kMaxTimestampQueries};
   frame.queryPool = vk::raii::QueryPool(vkDevice, queryInfo);
+  frame.descriptorPool = m_sharedDevice->createDescriptorPool();
   return frame;
+}
+
+void Z3DRendererVulkanBackend::ensureArenaOnFrame(FrameResources& frame)
+{
+  if (!frame.descriptorPool) {
+    frame.descriptorPool = m_sharedDevice->createDescriptorPool();
+  }
+}
+
+void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
+{
+  if (!frame.descriptorPool) {
+    return;
+  }
+  if (frame.arenaResetScheduled) {
+    frame.descriptorPool->reset();
+    frame.arenaResetScheduled = false;
+    frame.arenaResetsPerformed++;
+  }
+  if (!frame.deferredReleases.empty()) {
+    for (auto& fn : frame.deferredReleases) {
+      if (fn) {
+        fn();
+        // Count after execution
+        frame.leaseRecycleExecuted++;
+      }
+    }
+    frame.deferredReleases.clear();
+  }
+}
+
+void Z3DRendererVulkanBackend::scheduleArenaReset(FrameResources& frame)
+{
+  // Debug guard: should schedule exactly once per frame
+  if (frame.arenaResetScheduled) {
+    LOG_FIRST_N(ERROR, 1) << "Descriptor arena reset scheduled more than once for the same frame";
+    return;
+  }
+  frame.arenaResetScheduled = true;
+}
+
+void Z3DRendererVulkanBackend::vlogFrameRecyclingStats(const FrameResources& frame) const
+{
+  VLOG(1) << fmt::format("VK frame: descriptor_sets={} arena_resets={} lease_recycle_queued={} executed={}",
+                         frame.descriptorSetsAllocated,
+                         frame.arenaResetsPerformed,
+                         frame.leaseRecycleQueued,
+                         frame.leaseRecycleExecuted);
+}
+
+void Z3DRendererVulkanBackend::ensureFullscreenQuad()
+{
+  if (m_fullscreenQuadVbo) {
+    return;
+  }
+  ensureDevice();
+  auto& dev = device();
+  struct QuadVertex
+  {
+    glm::vec3 pos;
+  };
+  // Use far-plane depth for fullscreen passes that don't explicitly disable
+  // depth writes, so scene geometry isn't occluded by the background.
+  constexpr float z = 1.0f - 1e-5f;
+  const std::array<QuadVertex, 4> vertices{QuadVertex{glm::vec3(-1.0f, 1.0f, z)},
+                                           QuadVertex{glm::vec3(-1.0f, -1.0f, z)},
+                                           QuadVertex{glm::vec3(1.0f, 1.0f, z)},
+                                           QuadVertex{glm::vec3(1.0f, -1.0f, z)}};
+  const size_t bytes = vertices.size() * sizeof(QuadVertex);
+  m_fullscreenQuadVbo = dev.createBuffer(bytes,
+                                         vk::BufferUsageFlagBits::eVertexBuffer,
+                                         vk::MemoryPropertyFlagBits::eHostVisible |
+                                           vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_fullscreenQuadVbo->copyData(vertices.data(), bytes);
 }
 
 void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)

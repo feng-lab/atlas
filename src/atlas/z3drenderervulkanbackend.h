@@ -5,6 +5,9 @@
 #include "zvulkan.h"
 #include "zvulkandevice.h"
 #include "zvulkanframeexecutor.h"
+// Arena allocations for per-frame descriptor sets
+#include "zvulkandescriptorpool.h"
+#include "zvulkandescriptorset.h"
 
 #include <chrono>
 #include <memory>
@@ -31,6 +34,7 @@ class ZVulkanTextureGlowPipelineContext;
 class ZVulkanImgSlicePipelineContext;
 class ZVulkanImgRaycasterPipelineContext;
 class ZVulkanFontPipelineContext;
+class ZVulkanBuffer;
 // Vulkan renderer backend borrows the shared ZVulkanDevice injected through the scratch pool.
 // Lifetime notes:
 //  * Z3DRenderingEngine owns the Vulkan context/device and calls setVulkanDevice() on the pool
@@ -79,6 +83,17 @@ public:
 
   const vk::raii::CommandBuffer& commandBuffer() const;
 
+  // Shared geometry
+  ZVulkanBuffer& fullscreenQuadVertexBuffer();
+
+  // Stage 2: Per-frame descriptor arena API
+  // Allocate a descriptor set from the current frame's arena. Returns null when
+  // no active frame exists (e.g., zero-sized viewport), and logs at VLOG(1).
+  std::unique_ptr<ZVulkanDescriptorSet> allocateFrameDescriptorSet(vk::DescriptorSetLayout layout);
+
+  // Stage 2: Schedule a callback to run once the current frame's fence signals
+  void scheduleAfterCurrentFrameCompletion(std::function<void()> fn);
+
 private:
   friend class Z3DRendererBase;
   void ensureDevice();
@@ -105,6 +120,16 @@ private:
     uint32_t nextQuery = 0;
     std::chrono::steady_clock::time_point cpuStart;
     std::chrono::steady_clock::time_point cpuEnd;
+
+    // Descriptor arena (per-frame)
+    std::unique_ptr<ZVulkanDescriptorPool> descriptorPool; // reset only after fence signal
+    uint32_t descriptorSetsAllocated = 0;                  // VLOG(1) counter per frame
+    bool arenaResetScheduled = false;                      // scheduled at endRender()
+    uint32_t arenaResetsPerformed = 0;                     // count performed resets (debug)
+    // Fence-gated deferred actions (e.g., scratch slot releases)
+    std::vector<std::function<void()>> deferredReleases;
+    uint32_t leaseRecycleQueued = 0;
+    uint32_t leaseRecycleExecuted = 0;
   };
 
   void collectFrameTimings(FrameResources& frame);
@@ -141,7 +166,19 @@ private:
   // Shared fallback resources
   std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;
   std::optional<vk::raii::Sampler> m_defaultSampler;
+  std::optional<vk::raii::Sampler> m_nearestClampSampler;
 
+  // Shared geometry: fullscreen quad VBO
+  std::unique_ptr<ZVulkanBuffer> m_fullscreenQuadVbo;
+
+  // Helpers for descriptor arena lifecycle
+  void ensureArenaOnFrame(FrameResources& frame);
+  void applyPendingArenaReset(FrameResources& frame);
+  void scheduleArenaReset(FrameResources& frame);
+  void vlogFrameRecyclingStats(const FrameResources& frame) const;
+
+  void ensureSharedSamplers();
+  void ensureFullscreenQuad();
   
 };
 

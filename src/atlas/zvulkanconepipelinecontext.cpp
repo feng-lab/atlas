@@ -7,7 +7,6 @@
 #include "zvulkandevice.h"
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanrenderconversions.h"
@@ -80,9 +79,6 @@ void ZVulkanConePipelineContext::resetDescriptors()
   m_dsLighting.reset();
   m_dsTransforms.reset();
   m_dsOIT.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
 }
 
 void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
@@ -262,28 +258,10 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
 {
   ensureDescriptorLayouts();
 
-  auto& device = m_backend.device();
-  if (!m_descriptorPool) {
-    m_descriptorPool = device.createDescriptorPool();
-  }
-
-  if (!m_dsPlaceholder) {
-    auto dsPlaceholder = m_descriptorPool->allocateDescriptorSet(**m_setPlaceholder);
-    m_dsPlaceholder = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsPlaceholder));
-  }
-  if (!m_dsLighting) {
-    auto dsLighting = m_descriptorPool->allocateDescriptorSet(**m_setLighting);
-    m_dsLighting = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsLighting));
-  }
-
-  if (!m_dsTransforms) {
-    auto dsTransforms = m_descriptorPool->allocateDescriptorSet(**m_setTransforms);
-    m_dsTransforms = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsTransforms));
-  }
-  if (!m_dsOIT && m_setOIT) {
-    auto dsOit = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
-    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(device, std::move(dsOit));
-  }
+  if (!m_dsPlaceholder) m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(**m_setPlaceholder);
+  if (!m_dsLighting) m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+  if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+  if (!m_dsOIT && m_setOIT) m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
 
   ensurePlaceholderTexture();
   if (m_dsPlaceholder) {
@@ -307,9 +285,6 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
 void ZVulkanConePipelineContext::ensureOITResources()
 {
   ensureDescriptorLayouts();
-  if (!m_descriptorPool) {
-    m_descriptorPool = m_backend.device().createDescriptorPool();
-  }
   if (!m_uboOIT) {
     m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
                                                vk::BufferUsageFlagBits::eUniformBuffer,
@@ -317,8 +292,7 @@ void ZVulkanConePipelineContext::ensureOITResources()
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_dsOIT && m_setOIT) {
-    auto ds = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
-    m_dsOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(ds));
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
   }
 }
 

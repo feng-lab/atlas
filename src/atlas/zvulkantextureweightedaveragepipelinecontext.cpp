@@ -62,10 +62,8 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
     return;
   }
 
-  uploadGeometry();
-  if (!m_vertexBuffer || m_vertexCount == 0) {
-    return;
-  }
+  // Shared fullscreen quad
+  m_vertexCount = 4;
 
   ensureDescriptorLayout();
   ensureDescriptorPool();
@@ -94,7 +92,8 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
+  auto& quad = m_backend.fullscreenQuadVertexBuffer();
+  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
 
   if (m_descriptorSet) {
     std::array<vk::DescriptorSet, 1> sets{m_descriptorSet->descriptorSet()};
@@ -124,7 +123,6 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
 
   // Ensure and update OIT params UBO (set = 3)
   ensureDescriptorLayout();
-  ensureDescriptorPool();
   ensureOITResources();
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
   if (m_descriptorSetOIT && m_uboOIT) {
@@ -178,26 +176,18 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorLayout()
   }
 }
 
-void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorPool()
-{
-  if (!m_descriptorPool) {
-    m_descriptorPool = m_backend.device().createDescriptorPool();
-  }
-}
+void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorPool() {}
 
 void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorSet()
 {
   ensureDescriptorLayout();
-  ensureDescriptorPool();
 
   if (!m_descriptorSet) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_setLayout);
-    m_descriptorSet = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setLayout);
   }
 
   if (!m_descriptorSetOIT && m_setOIT) {
-    auto oitSet = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
-    m_descriptorSetOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(oitSet));
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
   }
 }
 
@@ -288,12 +278,6 @@ void ZVulkanTextureWeightedAveragePipelineContext::uploadGeometry()
                                           glm::vec3(1.f, 1.f, kQuadDepth),
                                           glm::vec3(1.f, -1.f, kQuadDepth)};
 
-  ensureVertexCapacity(vertices.size());
-  if (!m_vertexBuffer) {
-    return;
-  }
-
-  m_vertexBuffer->copyData(vertices.data(), vertices.size() * sizeof(glm::vec3));
   m_vertexCount = vertices.size();
 }
 
