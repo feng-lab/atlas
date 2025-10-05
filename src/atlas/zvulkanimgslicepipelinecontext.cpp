@@ -40,7 +40,10 @@ constexpr uint32_t kUnmappedBlockID = 0xFFFFFFFFu;
 
 vk::Rect2D makeRect(const glm::uvec2& size)
 {
-  return vk::Rect2D{vk::Offset2D{0, 0}, vk::Extent2D{static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y)}};
+  return vk::Rect2D{
+    vk::Offset2D{0,                             0                            },
+    vk::Extent2D{static_cast<uint32_t>(size.x), static_cast<uint32_t>(size.y)}
+  };
 }
 
 vk::Viewport makeViewport(const glm::uvec2& size)
@@ -82,9 +85,7 @@ inline void appendScalar(std::vector<uint8_t>& buffer, float value)
   appendVec(buffer, glm::vec4(value, 0.0f, 0.0f, 0.0f));
 }
 
-std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image,
-                                         size_t channel,
-                                         float zeToScreenPixelVoxelSize)
+std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVoxelSize)
 {
   const uint32_t levelCount = static_cast<uint32_t>(image.numLevels());
   CHECK(levelCount <= kMaxPagingLevels) << "Unsupported paging level count: " << levelCount;
@@ -202,9 +203,11 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
   auto buildColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-    if (attachment.handle.backend != AttachmentBackend::Vulkan || attachment.handle.id == 0) {
+    if (attachment.handle.id == 0) {
       return std::nullopt;
     }
+    CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
+      << "GL color attachment encountered in Vulkan image-slice pipeline";
     auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
     if (!texture) {
       return std::nullopt;
@@ -227,9 +230,11 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   };
 
   auto buildDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-    if (attachment.handle.backend != AttachmentBackend::Vulkan || attachment.handle.id == 0) {
+    if (attachment.handle.id == 0) {
       return std::nullopt;
     }
+    CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
+      << "GL depth attachment encountered in Vulkan image-slice pipeline";
     auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
     if (!texture) {
       return std::nullopt;
@@ -262,10 +267,12 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
   vk::RenderingAttachmentInfo depthAttachmentInfo;
   vk::RenderingInfo finalInfo{};
-  finalInfo.renderArea = vk::Rect2D{vk::Offset2D{static_cast<int32_t>(batch.pass.viewport.origin.x),
-                                                static_cast<int32_t>(batch.pass.viewport.origin.y)},
-                                    vk::Extent2D{static_cast<uint32_t>(batch.pass.viewport.extent.x),
-                                                 static_cast<uint32_t>(batch.pass.viewport.extent.y)}};
+  finalInfo.renderArea = vk::Rect2D{
+    vk::Offset2D{static_cast<int32_t>(batch.pass.viewport.origin.x),
+                 static_cast<int32_t>(batch.pass.viewport.origin.y) },
+    vk::Extent2D{static_cast<uint32_t>(batch.pass.viewport.extent.x),
+                 static_cast<uint32_t>(batch.pass.viewport.extent.y)}
+  };
   finalInfo.layerCount = 1;
   finalInfo.colorAttachmentCount = static_cast<uint32_t>(originalColorAttachments.size());
   finalInfo.pColorAttachments = originalColorAttachments.empty() ? nullptr : originalColorAttachments.data();
@@ -295,9 +302,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   auto monoEyeIndex = static_cast<size_t>(Z3DEye::MonoEye);
   const auto& monoEyeState = viewState.eyes[monoEyeIndex];
   float nearClip = std::abs(viewState.nearClip) < 1e-6f ? 1e-6f : viewState.nearClip;
-  glm::vec2 pixelEyeSpaceSize = monoEyeState.frustumNearPlaneSize /
-                                glm::vec2(std::max(1u, outputSize.x), std::max(1u, outputSize.y));
-  float zeToScreenPixelVoxelSize = -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / nearClip * sceneState.devicePixelRatio;
+  glm::vec2 pixelEyeSpaceSize =
+    monoEyeState.frustumNearPlaneSize / glm::vec2(std::max(1u, outputSize.x), std::max(1u, outputSize.y));
+  float zeToScreenPixelVoxelSize =
+    -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / nearClip * sceneState.devicePixelRatio;
 
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
   auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
@@ -312,9 +320,8 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     auto& resources = m_channelResources[idx];
     ChannelInputs channel{};
     channel.volume = &ensureVolumeTexture(idx, generation, img, resources);
-    const ZColorMapParameter* cmapParam = (payload.colormaps && idx < payload.colormaps->size())
-                                            ? (*payload.colormaps)[idx].get()
-                                            : nullptr;
+    const ZColorMapParameter* cmapParam =
+      (payload.colormaps && idx < payload.colormaps->size()) ? (*payload.colormaps)[idx].get() : nullptr;
     channel.colormap = &ensureColormapTexture(idx, cmapParam, resources);
 
     if (m_imageBlockUploader) {
@@ -558,12 +565,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   }
 
   for (uint32_t idx = 0; idx < channelCount; ++idx) {
-    recordChannelDraw(idx,
-                      m_channelResources[idx],
-                      *layerColor,
-                      layerDepth,
-                      idx,
-                      usePaging);
+    recordChannelDraw(idx, m_channelResources[idx], *layerColor, layerDepth, idx, usePaging);
   }
 
   transitionToSampled(cmd, *layerColor, vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -601,9 +603,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                  static_cast<float>(std::max<uint32_t>(1u, viewportState.w)),
                                  0.0f,
                                  1.0f};
-    finalScissor = vk::Rect2D{vk::Offset2D{0, 0},
-                              vk::Extent2D{static_cast<uint32_t>(viewportState.z),
-                                           static_cast<uint32_t>(viewportState.w)}};
+    finalScissor = vk::Rect2D{
+      vk::Offset2D{0,                                      0                                     },
+      vk::Extent2D{static_cast<uint32_t>(viewportState.z), static_cast<uint32_t>(viewportState.w)}
+    };
   }
 
   cmd.setViewport(0, finalViewport);
@@ -625,7 +628,8 @@ void ZVulkanImgSlicePipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_fastSliceSetLayout.emplace(vkDevice, createInfo);
@@ -652,7 +656,8 @@ void ZVulkanImgSlicePipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 4,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_pagedSliceSetLayout.emplace(vkDevice, createInfo);
@@ -681,7 +686,8 @@ void ZVulkanImgSlicePipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_mergeSetLayout.emplace(vkDevice, createInfo);
@@ -718,7 +724,8 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanImgSlicePipelineContext::makeSlice
     vk::VertexInputAttributeDescription{.location = 1,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(SliceVertex, texCoord))}};
+                                        .offset = static_cast<uint32_t>(offsetof(SliceVertex, texCoord))}
+  };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
@@ -753,10 +760,10 @@ void ZVulkanImgSlicePipelineContext::ensureSliceVertexCapacity(size_t vertexCoun
 
   auto& device = m_backend.device();
   m_vertexCapacity = std::max(vertexCount, m_vertexCapacity * 2 + 1);
-  m_vertexBuffer = device.createBuffer(m_vertexCapacity * sizeof(SliceVertex),
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible |
-                                         vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(m_vertexCapacity * sizeof(SliceVertex),
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 }
 
 void ZVulkanImgSlicePipelineContext::ensureQuadVertexBuffer()
@@ -767,15 +774,17 @@ void ZVulkanImgSlicePipelineContext::ensureQuadVertexBuffer()
 
   auto& device = m_backend.device();
   m_quadVertexCapacity = 4;
-  m_quadVertexBuffer = device.createBuffer(m_quadVertexCapacity * sizeof(glm::vec3),
-                                           vk::BufferUsageFlagBits::eVertexBuffer,
-                                           vk::MemoryPropertyFlagBits::eHostVisible |
-                                             vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_quadVertexBuffer =
+    device.createBuffer(m_quadVertexCapacity * sizeof(glm::vec3),
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
-  std::array<glm::vec3, 4> quadVertices{glm::vec3{-1.f, -1.f, kQuadDepth},
-                                        glm::vec3{-1.f, 1.f, kQuadDepth},
-                                        glm::vec3{1.f, -1.f, kQuadDepth},
-                                        glm::vec3{1.f, 1.f, kQuadDepth}};
+  std::array<glm::vec3, 4> quadVertices{
+    glm::vec3{-1.f, -1.f, kQuadDepth},
+    glm::vec3{-1.f, 1.f,  kQuadDepth},
+    glm::vec3{1.f,  -1.f, kQuadDepth},
+    glm::vec3{1.f,  1.f,  kQuadDepth}
+  };
   m_quadVertexBuffer->copyData(quadVertices.data(), quadVertices.size() * sizeof(glm::vec3));
   m_quadVertexCount = quadVertices.size();
 }
@@ -846,22 +855,21 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureVolumeTexture(size_t chann
 
   auto& device = m_backend.device();
 
-  const bool needsRecreate = !resources.volumeTexture ||
-                             resources.volumeTexture->extent().width != width ||
+  const bool needsRecreate = !resources.volumeTexture || resources.volumeTexture->extent().width != width ||
                              resources.volumeTexture->extent().height != height ||
                              resources.volumeTexture->extent().depth != depth;
 
   if (needsRecreate) {
-    auto info = ZVulkanTexture::CreateInfo::make3D(width,
-                                                  height,
-                                                  depth,
-                                                  vk::Format::eR8Unorm,
-                                                  vk::ImageUsageFlagBits::eSampled |
-                                                    vk::ImageUsageFlagBits::eTransferDst,
-                                                  vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                  1u,
-                                                  true,
-                                                  vk::ImageLayout::eShaderReadOnlyOptimal);
+    auto info =
+      ZVulkanTexture::CreateInfo::make3D(width,
+                                         height,
+                                         depth,
+                                         vk::Format::eR8Unorm,
+                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                         1u,
+                                         true,
+                                         vk::ImageLayout::eShaderReadOnlyOptimal);
     resources.volumeTexture = device.createTexture(info);
   } else if (resources.volumeGeneration == generation && resources.volumeTexture) {
     return *resources.volumeTexture;
@@ -912,7 +920,8 @@ void ZVulkanImgSlicePipelineContext::updateFastDescriptors(ChannelResources& res
 {
   if (!resources.fastTextureDescriptor) {
     auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_fastSliceSetLayout);
-    resources.fastTextureDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    resources.fastTextureDescriptor =
+      std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
   }
   resources.fastTextureDescriptor->updateTexture(0, volume);
   resources.fastTextureDescriptor->updateTexture(1, colormap);
@@ -933,7 +942,8 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
 {
   if (!resources.pagedTextureDescriptor) {
     auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_pagedSliceSetLayout);
-    resources.pagedTextureDescriptor = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
+    resources.pagedTextureDescriptor =
+      std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(descriptorSet));
   }
   resources.pagedTextureDescriptor->updateTexture(0, pageDirectory);
   resources.pagedTextureDescriptor->updateTexture(1, pageTable);
@@ -944,9 +954,9 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
   auto pageData = buildPageDataBuffer(image, channel, zeToScreenPixelVoxelSize);
   if (!resources.pageDataBuffer || resources.pageDataCapacity < pageData.size()) {
     resources.pageDataBuffer = m_backend.device().createBuffer(pageData.size(),
-                                                              vk::BufferUsageFlagBits::eUniformBuffer,
-                                                              vk::MemoryPropertyFlagBits::eHostVisible |
-                                                                vk::MemoryPropertyFlagBits::eHostCoherent);
+                                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!resources.pageDataBuffer) {
     LOG_FIRST_N(ERROR, 5) << "Failed to allocate paging uniform buffer for Vulkan slice pipeline.";
@@ -978,8 +988,8 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   const bool paged = key.levelCount > 1u;
-  const std::string fragmentShader = paged ? "image3d_slice_with_colormap.frag.spv"
-                                           : "volume_slice_with_colormap_single_channel.frag.spv";
+  const std::string fragmentShader =
+    paged ? "image3d_slice_with_colormap.frag.spv" : "volume_slice_with_colormap_single_channel.frag.spv";
 
   PipelineInstance instance;
   instance.shader = std::make_unique<ZVulkanShader>(device,
@@ -1009,7 +1019,8 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
 
   if (paged) {
     std::array<vk::SpecializationMapEntry, 1> entries{
-      vk::SpecializationMapEntry{.constantID = 70, .offset = 0, .size = sizeof(uint32_t)}};
+      vk::SpecializationMapEntry{.constantID = 70, .offset = 0, .size = sizeof(uint32_t)}
+    };
     uint32_t levelCount = std::max(1u, key.levelCount);
     std::vector<uint8_t> data(sizeof(uint32_t));
     std::memcpy(data.data(), &levelCount, sizeof(uint32_t));
@@ -1018,7 +1029,8 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
                                                 data);
   } else {
     std::array<vk::SpecializationMapEntry, 1> entries{
-      vk::SpecializationMapEntry{.constantID = 50, .offset = 0, .size = sizeof(uint32_t)}};
+      vk::SpecializationMapEntry{.constantID = 50, .offset = 0, .size = sizeof(uint32_t)}
+    };
     uint32_t value = key.validInput ? 1u : 0u;
     std::vector<uint8_t> data(sizeof(uint32_t));
     std::memcpy(data.data(), &value, sizeof(uint32_t));
@@ -1070,7 +1082,8 @@ ZVulkanImgSlicePipelineContext::ensureMergePipeline(const MergePipelineKey& key,
   std::array<vk::SpecializationMapEntry, 3> entries{
     vk::SpecializationMapEntry{.constantID = 70, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 71, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 51, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)}};
+    vk::SpecializationMapEntry{.constantID = 51, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+  };
   std::vector<vk::SpecializationMapEntry> entryVec(entries.begin(), entries.end());
   std::array<uint32_t, 3> values{static_cast<uint32_t>(std::max(1, key.numVolumes)),
                                  key.maxProjectionMerge ? 1u : 0u,
@@ -1134,7 +1147,8 @@ ZVulkanImgSlicePipelineContext::ensureBlockIdPipeline(const BlockIdPipelineKey& 
   instance.pipeline->setColorBlendAttachment(blend);
 
   std::array<vk::SpecializationMapEntry, 1> entries{
-    vk::SpecializationMapEntry{.constantID = 70, .offset = 0, .size = sizeof(uint32_t)}};
+    vk::SpecializationMapEntry{.constantID = 70, .offset = 0, .size = sizeof(uint32_t)}
+  };
   uint32_t levelCount = std::max(1u, key.levelCount);
   std::vector<uint8_t> data(sizeof(uint32_t));
   std::memcpy(data.data(), &levelCount, sizeof(uint32_t));

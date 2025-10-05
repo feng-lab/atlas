@@ -77,10 +77,23 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
     batch.pass.depthAttachment = m_frameState.activeSurface.depthAttachment;
   }
 
+  // Strict backend separation: do not accept GL attachments when targeting Vulkan.
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    for (const auto& att : batch.pass.colorAttachments) {
+      CHECK(att.handle.backend == AttachmentBackend::Vulkan && att.handle.id != 0u)
+        << "GL or invalid color attachment encountered in Vulkan path";
+    }
+    if (batch.pass.depthAttachment) {
+      const auto& datt = *batch.pass.depthAttachment;
+      CHECK(datt.handle.backend == AttachmentBackend::Vulkan && datt.handle.id != 0u)
+        << "GL or invalid depth attachment encountered in Vulkan path";
+    }
+  }
+
   LOG(INFO) << "appendBatch final colors=" << batch.pass.colorAttachments.size()
-            << " depth=" << batch.pass.depthAttachment.has_value()
-            << " (active colors " << m_frameState.activeSurface.colorAttachments.size()
-            << " depth " << m_frameState.activeSurface.depthAttachment.has_value() << ")";
+            << " depth=" << batch.pass.depthAttachment.has_value() << " (active colors "
+            << m_frameState.activeSurface.colorAttachments.size() << " depth "
+            << m_frameState.activeSurface.depthAttachment.has_value() << ")";
 
   m_cpuState.batches.push_back(std::move(batch));
 }
@@ -124,11 +137,11 @@ void Z3DRendererBase::registerPersistentLease(Z3DScratchResourcePool::RenderTarg
   }
 }
 
-Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentTempRenderTarget2D(
-  Z3DScratchResourcePool::RenderTargetLease& lease,
-  const glm::uvec2& size,
-  ScratchFormat colorFormat,
-  ScratchFormat depthFormat)
+Z3DScratchResourcePool::RenderTargetLease&
+Z3DRendererBase::acquirePersistentTempRenderTarget2D(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                     const glm::uvec2& size,
+                                                     ScratchFormat colorFormat,
+                                                     ScratchFormat depthFormat)
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
@@ -136,9 +149,9 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentTem
   return lease;
 }
 
-Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentDualDepthPeelRenderTarget(
-  Z3DScratchResourcePool::RenderTargetLease& lease,
-  const glm::uvec2& size)
+Z3DScratchResourcePool::RenderTargetLease&
+Z3DRendererBase::acquirePersistentDualDepthPeelRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                            const glm::uvec2& size)
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
@@ -150,9 +163,9 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentDua
   return lease;
 }
 
-Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentWeightedAverageRenderTarget(
-  Z3DScratchResourcePool::RenderTargetLease& lease,
-  const glm::uvec2& size)
+Z3DScratchResourcePool::RenderTargetLease&
+Z3DRendererBase::acquirePersistentWeightedAverageRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                              const glm::uvec2& size)
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
@@ -164,9 +177,9 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentWei
   return lease;
 }
 
-Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentWeightedBlendedRenderTarget(
-  Z3DScratchResourcePool::RenderTargetLease& lease,
-  const glm::uvec2& size)
+Z3DScratchResourcePool::RenderTargetLease&
+Z3DRendererBase::acquirePersistentWeightedBlendedRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                              const glm::uvec2& size)
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
@@ -178,9 +191,9 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentWei
   return lease;
 }
 
-Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentRaycastAccumulatorRenderTarget(
-  Z3DScratchResourcePool::RenderTargetLease& lease,
-  const glm::uvec2& size)
+Z3DScratchResourcePool::RenderTargetLease&
+Z3DRendererBase::acquirePersistentRaycastAccumulatorRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                                 const glm::uvec2& size)
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
@@ -188,12 +201,12 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentRay
   return lease;
 }
 
-Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentLayerArrayRenderTarget(
-  Z3DScratchResourcePool::RenderTargetLease& lease,
-  const glm::uvec2& size,
-  uint32_t layers,
-  ScratchFormat colorFormat,
-  ScratchFormat depthFormat)
+Z3DScratchResourcePool::RenderTargetLease&
+Z3DRendererBase::acquirePersistentLayerArrayRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                         const glm::uvec2& size,
+                                                         uint32_t layers,
+                                                         ScratchFormat colorFormat,
+                                                         ScratchFormat depthFormat)
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
@@ -205,11 +218,11 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentLay
   return lease;
 }
 
-Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentEntryExitRenderTarget(
-  Z3DScratchResourcePool::RenderTargetLease& lease,
-  const glm::uvec2& size,
-  uint32_t layers,
-  ScratchFormat colorFormat)
+Z3DScratchResourcePool::RenderTargetLease&
+Z3DRendererBase::acquirePersistentEntryExitRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                        const glm::uvec2& size,
+                                                        uint32_t layers,
+                                                        ScratchFormat colorFormat)
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
@@ -217,11 +230,11 @@ Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentEnt
   return lease;
 }
 
-Z3DScratchResourcePool::RenderTargetLease& Z3DRendererBase::acquirePersistentBlockIdRenderTarget(
-  Z3DScratchResourcePool::RenderTargetLease& lease,
-  const glm::uvec2& viewport,
-  int requestedAttachments,
-  double scale)
+Z3DScratchResourcePool::RenderTargetLease&
+Z3DRendererBase::acquirePersistentBlockIdRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                      const glm::uvec2& viewport,
+                                                      int requestedAttachments,
+                                                      double scale)
 {
   registerPersistentLease(lease);
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
@@ -276,9 +289,7 @@ RendererFrameState::ActiveSurface* surfaceForMutation(std::optional<RendererFram
 
 } // namespace
 
-void Z3DRendererBase::setPendingColorAttachmentsLoadStore(LoadOp loadOp,
-                                                          StoreOp storeOp,
-                                                          const ClearValue& clearValue)
+void Z3DRendererBase::setPendingColorAttachmentsLoadStore(LoadOp loadOp, StoreOp storeOp, const ClearValue& clearValue)
 {
   if (auto* surface = surfaceForMutation(m_pendingActiveSurface, m_frameState)) {
     for (auto& attachment : surface->colorAttachments) {
@@ -289,9 +300,7 @@ void Z3DRendererBase::setPendingColorAttachmentsLoadStore(LoadOp loadOp,
   }
 }
 
-void Z3DRendererBase::setPendingDepthAttachmentLoadStore(LoadOp loadOp,
-                                                         StoreOp storeOp,
-                                                         const ClearValue& clearValue)
+void Z3DRendererBase::setPendingDepthAttachmentLoadStore(LoadOp loadOp, StoreOp storeOp, const ClearValue& clearValue)
 {
   if (auto* surface = surfaceForMutation(m_pendingActiveSurface, m_frameState)) {
     if (surface->depthAttachment) {
@@ -343,8 +352,7 @@ Z3DRendererBase::prepareVulkanSurface(const Z3DScratchResourcePool::RenderTarget
 void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBatches)
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
-  CHECK(m_activeBackend == RenderBackend::Vulkan)
-    << "executeVulkanBatches called with non-Vulkan backend";
+  CHECK(m_activeBackend == RenderBackend::Vulkan) << "executeVulkanBatches called with non-Vulkan backend";
 
   resetCPUState();
 

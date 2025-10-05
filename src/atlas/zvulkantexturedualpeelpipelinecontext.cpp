@@ -52,15 +52,19 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   Stage stage = (payload.stage == TextureDualPeelPayload::Stage::Final) ? Stage::Final : Stage::Blend;
 
   if (stage == Stage::Blend) {
-    if (payload.tempAttachment.backend != AttachmentBackend::Vulkan || !payload.tempAttachment.valid()) {
-      LOG_FIRST_N(WARNING, 5) << "Dual peel blend payload missing Vulkan attachment handle.";
+    CHECK(payload.tempAttachment.backend == AttachmentBackend::Vulkan)
+      << "GL tempAttachment in Vulkan dual-peel blend path";
+    if (!payload.tempAttachment.valid()) {
       return;
     }
   } else {
-    if (payload.frontAttachment.backend != AttachmentBackend::Vulkan || !payload.frontAttachment.valid() ||
-        payload.backAttachment.backend != AttachmentBackend::Vulkan || !payload.backAttachment.valid() ||
-        payload.depthAttachment.backend != AttachmentBackend::Vulkan || !payload.depthAttachment.valid()) {
-      LOG_FIRST_N(WARNING, 5) << "Dual peel final payload missing Vulkan attachment handles.";
+    CHECK(payload.frontAttachment.backend == AttachmentBackend::Vulkan)
+      << "GL frontAttachment in Vulkan dual-peel final path";
+    CHECK(payload.backAttachment.backend == AttachmentBackend::Vulkan)
+      << "GL backAttachment in Vulkan dual-peel final path";
+    CHECK(payload.depthAttachment.backend == AttachmentBackend::Vulkan)
+      << "GL depthAttachment in Vulkan dual-peel final path";
+    if (!payload.frontAttachment.valid() || !payload.backAttachment.valid() || !payload.depthAttachment.valid()) {
       return;
     }
   }
@@ -173,7 +177,8 @@ void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 2,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_finalSetLayout.emplace(vkDevice, createInfo);
@@ -201,8 +206,7 @@ void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorPool()
   }
 }
 
-ZVulkanDescriptorSet*
-ZVulkanTextureDualPeelPipelineContext::ensureDescriptor(Stage stage)
+ZVulkanDescriptorSet* ZVulkanTextureDualPeelPipelineContext::ensureDescriptor(Stage stage)
 {
   ensureDescriptorLayouts();
   ensureDescriptorPool();
@@ -274,7 +278,8 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureDualPeelPipelineContext::ma
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = 0}};
+                                        .offset = 0}
+  };
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
   info.pVertexBindingDescriptions = &binding;
@@ -292,19 +297,19 @@ void ZVulkanTextureDualPeelPipelineContext::ensureVertexCapacity(size_t vertexCo
 
   size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
   auto& device = m_backend.device();
-  m_vertexBuffer = device.createBuffer(newCapacity,
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
 }
 
 void ZVulkanTextureDualPeelPipelineContext::uploadGeometry()
 {
-  const std::array<glm::vec3, 4> vertices{
-    glm::vec3(-1.f, 1.f, kQuadDepth),
-    glm::vec3(-1.f, -1.f, kQuadDepth),
-    glm::vec3(1.f, 1.f, kQuadDepth),
-    glm::vec3(1.f, -1.f, kQuadDepth)};
+  const std::array<glm::vec3, 4> vertices{glm::vec3(-1.f, 1.f, kQuadDepth),
+                                          glm::vec3(-1.f, -1.f, kQuadDepth),
+                                          glm::vec3(1.f, 1.f, kQuadDepth),
+                                          glm::vec3(1.f, -1.f, kQuadDepth)};
 
   ensureVertexCapacity(vertices.size());
   if (!m_vertexBuffer) {
@@ -316,8 +321,7 @@ void ZVulkanTextureDualPeelPipelineContext::uploadGeometry()
 }
 
 ZVulkanTextureDualPeelPipelineContext::PipelineInstance&
-ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key,
-                                                      const vulkan::AttachmentFormats& formats)
+ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats)
 {
   auto it = m_pipelineCache.find(key);
   if (it != m_pipelineCache.end()) {
@@ -327,19 +331,16 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key,
   ensureDescriptorLayouts();
 
   auto& device = m_backend.device();
-  static const std::string shaderBase =
-    ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
+  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
   instance.stage = key.stage;
 
-  const char* fragmentShader = (key.stage == Stage::Final) ? "dual_peeling_final.frag.spv"
-                                                           : "dual_peeling_blend.frag.spv";
+  const char* fragmentShader =
+    (key.stage == Stage::Final) ? "dual_peeling_final.frag.spv" : "dual_peeling_blend.frag.spv";
 
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + fragmentShader,
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device, shaderBase + "pass.vert.spv", shaderBase + fragmentShader, std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);

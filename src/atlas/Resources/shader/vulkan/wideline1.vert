@@ -46,7 +46,9 @@ void main()
 
   vec4 p0 = wpc.viewport_matrix * (xf.projection_view_matrix * (xf.pos_transform * vec4(attr_p0, 1.0)));
   vec4 p1 = wpc.viewport_matrix * (xf.projection_view_matrix * (xf.pos_transform * vec4(attr_p1, 1.0)));
-  ClipSegmentToPlane(p0, p1, vec4(0,0,1,1));
+  // Clip against the near plane in clip coordinates. Vulkan uses depth in [0,1]
+  // so the clip half-space is z >= 0 (i.e., plane (0,0,1,0)).
+  ClipSegmentToPlane(p0, p1, vec4(0,0,1,0));
   p0 /= p0.w; p1 /= p1.w;
   // Provide endpoints for round caps; harmless if not used in FS
   p0p1 = vec4(p0.xy, p1.xy);

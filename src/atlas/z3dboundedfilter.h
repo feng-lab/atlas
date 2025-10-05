@@ -132,7 +132,7 @@ public:
     return m_rendererBase.shaderHookPara();
   }
 
-  [[nodiscard]] const glm::uvec4& currentViewport() const
+  [[nodiscard]] const glm::uvec4& viewport() const
   {
     return m_rendererFrameState.viewport;
   }

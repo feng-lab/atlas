@@ -1295,7 +1295,12 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   const auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
   bool imagesIntegratedViaOIT = false;
 
-  if (useOIT && (!transparentFilters.empty() || !nonOpaqueLayers.empty() || !opaqueFilters.empty())) {
+  // Only engage OIT when there is actual transparency to resolve (either
+  // geometry with transparent fragments or non-opaque image layers). If we
+  // only have opaque geometry, rendering via OIT paths can overwrite the
+  // background with cleared textures (e.g. WA/WB accumulators), yielding a
+  // white or incorrect background.
+  if (useOIT && (!transparentFilters.empty() || !nonOpaqueLayers.empty())) {
     auto dispatchOIT = [&](Z3DScratchResourcePool::RenderTargetLease& lease, AttachmentHandle depthHandle) {
       switch (transparencyMode) {
         case TransparencyMode::DualDepthPeeling:
@@ -1652,15 +1657,14 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   if (m_showAxis.get()) {
     prepareAxisData(eye);
     const glm::mat4 axisTransform = glm::mat4(m_globalParameters.camera.get().rotateMatrix(eye));
-    const glm::uvec4& viewport = currentViewport();
-    glm::uvec4 axisViewport = viewport;
+    glm::uvec4 axisViewport = viewport();
     if (m_region[0] <= 0.f && m_region[2] <= 0.f) {
-      const double startX = viewport.x + static_cast<double>(viewport.z) / m_region[1] * m_region[0];
-      const double startY = viewport.y + static_cast<double>(viewport.w) / m_region[3] * m_region[2];
-      const uint32_t axisSize =
-        static_cast<uint32_t>(std::max(1.0f, std::min<float>(viewport.z, viewport.w) * m_axisRegionRatio.get()));
-      const int axisX = static_cast<int>(viewport.x) - static_cast<int>(std::floor(startX));
-      const int axisY = static_cast<int>(viewport.y) - static_cast<int>(std::floor(startY));
+      const double startX = axisViewport.x + static_cast<double>(axisViewport.z) / m_region[1] * m_region[0];
+      const double startY = axisViewport.y + static_cast<double>(axisViewport.w) / m_region[3] * m_region[2];
+      const uint32_t axisSize = static_cast<uint32_t>(
+        std::max(1.0f, std::min<float>(axisViewport.z, axisViewport.w) * m_axisRegionRatio.get()));
+      const int axisX = static_cast<int>(axisViewport.x) - static_cast<int>(std::floor(startX));
+      const int axisY = static_cast<int>(axisViewport.y) - static_cast<int>(std::floor(startY));
       axisViewport = glm::uvec4(static_cast<uint32_t>(std::max(axisX, 0)),
                                 static_cast<uint32_t>(std::max(axisY, 0)),
                                 axisSize,
@@ -1677,7 +1681,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     clearAxis.depth = 1.0f;
     m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Load, StoreOp::Store);
     m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clearAxis);
-    m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Load, StoreOp::Store);
     m_rendererBase.executeVulkanBatches([&]() {
       if (m_axisMode.get() == "Arrow") {
         renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_arrowRenderer, m_fontRenderer);
@@ -1911,9 +1914,8 @@ void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
     }
 
     const bool backendMismatch = lease.backend != activeBackend;
-    const bool missingResource =
-      (activeBackend == RenderBackend::Vulkan && !hasVulkanImage) ||
-      (activeBackend == RenderBackend::OpenGL && !hasGLTarget);
+    const bool missingResource = (activeBackend == RenderBackend::Vulkan && !hasVulkanImage) ||
+                                 (activeBackend == RenderBackend::OpenGL && !hasGLTarget);
 
     if (missingResource || backendMismatch || sizeMismatch) {
       lease.release();
@@ -1980,6 +1982,8 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
   for (auto* filter : m_vPPort.connectedFilters()) {
     registerFilter(filter);
   }
+
+  setupAxisCamera();
 
   ensureOutputTargets(m_outputSize);
   invalidate(State::AllResultInvalid);
@@ -3356,15 +3360,15 @@ void Z3DCompositor::renderAxis(Z3DEye eye)
   prepareAxisData(eye);
   {
     const glm::mat4 axisTransform = glm::mat4(m_globalParameters.camera.get().rotateMatrix(eye));
-    const glm::uvec4& viewport = currentViewport();
+    const glm::uvec4& vp = viewport();
 
     if (m_region[0] <= 0.f && m_region[2] <= 0.f) {
-      double startX = viewport.x + viewport.z / m_region[1] * m_region[0];
-      double startY = viewport.y + viewport.w / m_region[3] * m_region[2];
+      double startX = vp.x + vp.z / m_region[1] * m_region[0];
+      double startY = vp.y + vp.w / m_region[3] * m_region[2];
 
-      GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
-      glViewport(viewport.x - std::floor(startX), viewport.y - std::floor(startY), size, size);
-      glScissor(viewport.x - std::floor(startX), viewport.y - std::floor(startY), size, size);
+      GLsizei size = std::min(vp.z, vp.w) * m_axisRegionRatio.get();
+      glViewport(vp.x - std::floor(startX), vp.y - std::floor(startY), size, size);
+      glScissor(vp.x - std::floor(startX), vp.y - std::floor(startY), size, size);
       glEnable(GL_SCISSOR_TEST);
       glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -3374,8 +3378,8 @@ void Z3DCompositor::renderAxis(Z3DEye eye)
         renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_lineRenderer, m_fontRenderer);
       }
 
-      glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
-      glScissor(viewport.x, viewport.y, viewport.z, viewport.w);
+      glViewport(vp.x, vp.y, vp.z, vp.w);
+      glScissor(vp.x, vp.y, vp.z, vp.w);
       glDisable(GL_SCISSOR_TEST);
     }
   }
@@ -3402,7 +3406,8 @@ void Z3DCompositor::prepareAxisData(Z3DEye eye)
 
 void Z3DCompositor::setupAxisCamera()
 {
-  Z3DCamera camera;
+  Z3DCamera camera(m_rendererBase.activeBackend() == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan
+                                                                           : Z3DCoordinateSystem::OpenGL);
   glm::vec3 center(0.f);
   camera.setFieldOfView(glm::radians(10.f));
 

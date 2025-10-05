@@ -408,9 +408,7 @@ Z3DScratchResourcePool::RenderTargetLease makeLeaseFromSlot(Slot* slot, uint32_t
 
 } // anonymous namespace
 
-namespace nim {
-
-} // namespace nim
+namespace nim {} // namespace nim
 
 DEFINE_uint32(atlas_blockid_rt_max_attachments, 8, "Max color attachments for block-id FBO");
 DEFINE_double(atlas_blockid_rt_scale, 1.0, "Scale factor for block-id FBO size (relative to viewport)");
@@ -504,6 +502,29 @@ double Z3DScratchResourcePool::blockIdScale() const
 static inline uint64_t bytesPerPixelFromInternal(GLint internal)
 {
   return static_cast<uint64_t>(Z3DTexture::bypePerPixel(internal));
+}
+
+static inline uint64_t bytesPerPixelForScratchFormat(ScratchFormat fmt)
+{
+  switch (fmt) {
+    case ScratchFormat::RGBA8:
+      return 4u;
+    case ScratchFormat::RGBA32UI:
+    case ScratchFormat::RGBA32F:
+      return 16u; // 4 channels * 4 bytes
+    case ScratchFormat::RGBA16:
+    case ScratchFormat::RGBA16F:
+      return 8u; // 4 channels * 2 bytes
+    case ScratchFormat::RG32F:
+      return 8u; // 2 channels * 4 bytes
+    case ScratchFormat::R32F:
+      return 4u;
+    case ScratchFormat::R16F:
+      return 2u;
+    case ScratchFormat::Depth24:
+      return 4u; // D24S8 packed as 32-bit
+  }
+  return 0u;
 }
 
 std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
@@ -759,17 +780,113 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
       return std::pair{bytes, std::move(line)};
     });
 
-  const uint64_t total = blockIdBytes + entryExitBytes + layerArrayBytes + temp2DBytes + raycastBytes + dualDepthBytes +
-                         weightedAvgBytes + weightedBlendBytes;
+  // Add Vulkan-backed scratch images to accounting
+  auto appendDetail = [&](const std::string& line) {
+    if (detailed) {
+      if (!details.empty()) {
+        details += '\n';
+      }
+      details += line;
+    }
+  };
+
+  auto usageName = [](ScratchImageUsage usage) -> const char* {
+    switch (usage) {
+      case ScratchImageUsage::BlockId:
+        return "BlockID";
+      case ScratchImageUsage::EntryExit:
+        return "EntryExit";
+      case ScratchImageUsage::LayerArray:
+        return "LayerArray";
+      case ScratchImageUsage::RaycastAccumulator:
+        return "RaycastAccum";
+      case ScratchImageUsage::Temp2D:
+        return "Temp2D";
+      case ScratchImageUsage::DualDepthPeel:
+        return "DualDepthPeel";
+      case ScratchImageUsage::WeightedAverage:
+        return "WeightedAvg";
+      case ScratchImageUsage::WeightedBlended:
+        return "WeightedBlend";
+    }
+    return "Unknown";
+  };
+
+  auto accumulateVulkan = [&](ScratchImageUsage usage) -> uint64_t {
+    const auto index = static_cast<size_t>(usage);
+    uint64_t bytes = 0;
+    if (index >= m_vulkanSlots.size()) {
+      return 0;
+    }
+    const auto& slots = m_vulkanSlots[index];
+    for (size_t i = 0; i < slots.size(); ++i) {
+      const auto& slot = *slots[i];
+      const auto& desc = slot.descriptor;
+      const uint64_t pixels = static_cast<uint64_t>(desc.size.x) * desc.size.y * std::max<uint32_t>(1u, desc.layers);
+      uint64_t slotBytes = 0;
+      std::string attachmentFormats;
+      if (detailed) {
+        attachmentFormats.reserve(64);
+      }
+      for (const auto& att : desc.attachments) {
+        const uint64_t bpp = bytesPerPixelForScratchFormat(att.format);
+        slotBytes += pixels * bpp;
+        if (detailed) {
+          if (!attachmentFormats.empty()) {
+            attachmentFormats += ", ";
+          }
+          // Reuse scratchFormatLabel for readability even in Vulkan mode
+          attachmentFormats +=
+            fmt::format("{}={}",
+                        (att.kind == ScratchAttachmentKind::Color) ? "c" + std::to_string(att.index) : "depth",
+                        scratchFormatLabel(att.format));
+        }
+      }
+      bytes += slotBytes;
+      if (detailed) {
+        appendDetail(fmt::format("[Vulkan/{}] slot={} size={}x{} layers={} inUse={} bytes={} attachments=[{}]",
+                                 usageName(usage),
+                                 i,
+                                 desc.size.x,
+                                 desc.size.y,
+                                 desc.layers,
+                                 slot.inUse ? 1 : 0,
+                                 slotBytes,
+                                 attachmentFormats));
+      }
+    }
+    return bytes;
+  };
+
+  const uint64_t vkBlockIdBytes = accumulateVulkan(ScratchImageUsage::BlockId);
+  const uint64_t vkEntryExitBytes = accumulateVulkan(ScratchImageUsage::EntryExit);
+  const uint64_t vkLayerArrayBytes = accumulateVulkan(ScratchImageUsage::LayerArray);
+  const uint64_t vkRaycastBytes = accumulateVulkan(ScratchImageUsage::RaycastAccumulator);
+  const uint64_t vkTemp2DBytes = accumulateVulkan(ScratchImageUsage::Temp2D);
+  const uint64_t vkDualDepthBytes = accumulateVulkan(ScratchImageUsage::DualDepthPeel);
+  const uint64_t vkWeightedAvgBytes = accumulateVulkan(ScratchImageUsage::WeightedAverage);
+  const uint64_t vkWeightedBlendBytes = accumulateVulkan(ScratchImageUsage::WeightedBlended);
+
+  const uint64_t totalBlockIdBytes = blockIdBytes + vkBlockIdBytes;
+  const uint64_t totalEntryExitBytes = entryExitBytes + vkEntryExitBytes;
+  const uint64_t totalLayerArrayBytes = layerArrayBytes + vkLayerArrayBytes;
+  const uint64_t totalTemp2DBytes = temp2DBytes + vkTemp2DBytes;
+  const uint64_t totalRaycastBytes = raycastBytes + vkRaycastBytes;
+  const uint64_t totalDualDepthBytes = dualDepthBytes + vkDualDepthBytes;
+  const uint64_t totalWeightedAvgBytes = weightedAvgBytes + vkWeightedAvgBytes;
+  const uint64_t totalWeightedBlendBytes = weightedBlendBytes + vkWeightedBlendBytes;
+
+  const uint64_t total = totalBlockIdBytes + totalEntryExitBytes + totalLayerArrayBytes + totalTemp2DBytes +
+                         totalRaycastBytes + totalDualDepthBytes + totalWeightedAvgBytes + totalWeightedBlendBytes;
   const double totalMiB = static_cast<double>(total) / (1024.0 * 1024.0);
-  const double blockMiB = static_cast<double>(blockIdBytes) / (1024.0 * 1024.0);
-  const double eeMiB = static_cast<double>(entryExitBytes) / (1024.0 * 1024.0);
-  const double layerMiB = static_cast<double>(layerArrayBytes) / (1024.0 * 1024.0);
-  const double tempMiB = static_cast<double>(temp2DBytes) / (1024.0 * 1024.0);
-  const double raycastMiB = static_cast<double>(raycastBytes) / (1024.0 * 1024.0);
-  const double ddpMiB = static_cast<double>(dualDepthBytes) / (1024.0 * 1024.0);
-  const double waMiB = static_cast<double>(weightedAvgBytes) / (1024.0 * 1024.0);
-  const double wbMiB = static_cast<double>(weightedBlendBytes) / (1024.0 * 1024.0);
+  const double blockMiB = static_cast<double>(totalBlockIdBytes) / (1024.0 * 1024.0);
+  const double eeMiB = static_cast<double>(totalEntryExitBytes) / (1024.0 * 1024.0);
+  const double layerMiB = static_cast<double>(totalLayerArrayBytes) / (1024.0 * 1024.0);
+  const double tempMiB = static_cast<double>(totalTemp2DBytes) / (1024.0 * 1024.0);
+  const double raycastMiB = static_cast<double>(totalRaycastBytes) / (1024.0 * 1024.0);
+  const double ddpMiB = static_cast<double>(totalDualDepthBytes) / (1024.0 * 1024.0);
+  const double waMiB = static_cast<double>(totalWeightedAvgBytes) / (1024.0 * 1024.0);
+  const double wbMiB = static_cast<double>(totalWeightedBlendBytes) / (1024.0 * 1024.0);
   auto head = fmt::format(
     "ScratchPool memory: total={} bytes ({:.2f} MiB) (BlockID={} bytes ({:.2f} MiB), "
     "EntryExit={} bytes ({:.2f} MiB), LayerArray={} bytes ({:.2f} MiB), Temp2D={} bytes ({:.2f} MiB), "
@@ -777,21 +894,21 @@ std::string Z3DScratchResourcePool::describeMemoryUsage(bool detailed) const
     "WeightedBlend={} bytes ({:.2f} MiB))",
     total,
     totalMiB,
-    blockIdBytes,
+    totalBlockIdBytes,
     blockMiB,
-    entryExitBytes,
+    totalEntryExitBytes,
     eeMiB,
-    layerArrayBytes,
+    totalLayerArrayBytes,
     layerMiB,
-    temp2DBytes,
+    totalTemp2DBytes,
     tempMiB,
-    raycastBytes,
+    totalRaycastBytes,
     raycastMiB,
-    dualDepthBytes,
+    totalDualDepthBytes,
     ddpMiB,
-    weightedAvgBytes,
+    totalWeightedAvgBytes,
     waMiB,
-    weightedBlendBytes,
+    totalWeightedBlendBytes,
     wbMiB);
 
   std::string result = detailed ? fmt::format("{}\n{}", head, details) : head;

@@ -64,11 +64,10 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  if (payload.colorAttachmentHandle.backend != AttachmentBackend::Vulkan ||
-      payload.depthAttachmentHandle.backend != AttachmentBackend::Vulkan) {
-    LOG_FIRST_N(WARNING, 5) << "Texture glow payload missing Vulkan attachment handles.";
-    return;
-  }
+  CHECK(payload.colorAttachmentHandle.backend == AttachmentBackend::Vulkan)
+    << "GL colorAttachmentHandle in Vulkan path";
+  CHECK(payload.depthAttachmentHandle.backend == AttachmentBackend::Vulkan)
+    << "GL depthAttachmentHandle in Vulkan path";
 
   auto* colorTexture = reinterpret_cast<ZVulkanTexture*>(payload.colorAttachmentHandle.id);
   auto* depthTexture = reinterpret_cast<ZVulkanTexture*>(payload.depthAttachmentHandle.id);
@@ -103,9 +102,11 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     depth.reset();
 
     auto makeColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (attachment.handle.backend != AttachmentBackend::Vulkan || attachment.handle.id == 0) {
+      if (attachment.handle.id == 0) {
         return std::nullopt;
       }
+      CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
+        << "GL color attachment encountered in Vulkan glow pipeline";
       auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
       if (!texture) {
         return std::nullopt;
@@ -128,9 +129,11 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     };
 
     auto makeDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (attachment.handle.backend != AttachmentBackend::Vulkan || attachment.handle.id == 0) {
+      if (attachment.handle.id == 0) {
         return std::nullopt;
       }
+      CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
+        << "GL depth attachment encountered in Vulkan glow pipeline";
       auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
       if (!texture) {
         return std::nullopt;
@@ -188,10 +191,12 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
               payload.blurStrength);
 
   // Final pass rendering begins here
-  const vk::Rect2D renderArea{vk::Offset2D{static_cast<int32_t>(batch.pass.viewport.origin.x),
-                                           static_cast<int32_t>(batch.pass.viewport.origin.y)},
-                              vk::Extent2D{static_cast<uint32_t>(batch.pass.viewport.extent.x),
-                                           static_cast<uint32_t>(batch.pass.viewport.extent.y)}};
+  const vk::Rect2D renderArea{
+    vk::Offset2D{static_cast<int32_t>(batch.pass.viewport.origin.x),
+                 static_cast<int32_t>(batch.pass.viewport.origin.y) },
+    vk::Extent2D{static_cast<uint32_t>(batch.pass.viewport.extent.x),
+                 static_cast<uint32_t>(batch.pass.viewport.extent.y)}
+  };
 
   vk::RenderingInfo renderingInfo;
   renderingInfo.renderArea = renderArea;
@@ -273,7 +278,8 @@ void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
 
     vk::DescriptorSetLayoutCreateInfo blurInfo{.bindingCount = static_cast<uint32_t>(blurBindings.size()),
                                                .pBindings = blurBindings.data()};
@@ -300,7 +306,8 @@ void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()
       vk::DescriptorSetLayoutBinding{.binding = 3,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
 
     vk::DescriptorSetLayoutCreateInfo glowInfo{.bindingCount = static_cast<uint32_t>(glowBindings.size()),
                                                .pBindings = glowBindings.data()};
@@ -324,7 +331,8 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureGlowPipelineContext::makeVe
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = 0}};
+                                        .offset = 0}
+  };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
@@ -336,33 +344,37 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureGlowPipelineContext::makeVe
 
 void ZVulkanTextureGlowPipelineContext::ensureIntermediateTextures(const glm::uvec2& size, vk::Format colorFormat)
 {
-  auto ensureTexture = [&](TextureUpload& upload,
-                           vk::Format format,
-                           vk::ImageUsageFlags usage,
-                           vk::ImageLayout descriptorLayout) {
-    const glm::uvec3 extent(size.x, size.y, 1u);
-    if (!upload.texture || upload.extent != extent || upload.format != format) {
-      auto& device = m_backend.device();
-      auto info = ZVulkanTexture::CreateInfo::make2D(static_cast<uint32_t>(size.x),
-                                                     static_cast<uint32_t>(size.y),
-                                                     format,
-                                                     usage,
-                                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                     1,
-                                                     true,
-                                                     descriptorLayout);
-      upload.texture = device.createTexture(info);
-      upload.extent = extent;
-      upload.format = format;
-    }
-  };
+  auto ensureTexture =
+    [&](TextureUpload& upload, vk::Format format, vk::ImageUsageFlags usage, vk::ImageLayout descriptorLayout) {
+      const glm::uvec3 extent(size.x, size.y, 1u);
+      if (!upload.texture || upload.extent != extent || upload.format != format) {
+        auto& device = m_backend.device();
+        auto info = ZVulkanTexture::CreateInfo::make2D(static_cast<uint32_t>(size.x),
+                                                       static_cast<uint32_t>(size.y),
+                                                       format,
+                                                       usage,
+                                                       vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                                       1,
+                                                       true,
+                                                       descriptorLayout);
+        upload.texture = device.createTexture(info);
+        upload.extent = extent;
+        upload.format = format;
+      }
+    };
 
   const auto colorUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled;
   const auto depthUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled;
   ensureTexture(m_blurIntermediate0.color, colorFormat, colorUsage, vk::ImageLayout::eShaderReadOnlyOptimal);
-  ensureTexture(m_blurIntermediate0.depth, vk::Format::eD32Sfloat, depthUsage, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+  ensureTexture(m_blurIntermediate0.depth,
+                vk::Format::eD32Sfloat,
+                depthUsage,
+                vk::ImageLayout::eDepthStencilReadOnlyOptimal);
   ensureTexture(m_blurIntermediate1.color, colorFormat, colorUsage, vk::ImageLayout::eShaderReadOnlyOptimal);
-  ensureTexture(m_blurIntermediate1.depth, vk::Format::eD32Sfloat, depthUsage, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+  ensureTexture(m_blurIntermediate1.depth,
+                vk::Format::eD32Sfloat,
+                depthUsage,
+                vk::ImageLayout::eDepthStencilReadOnlyOptimal);
 }
 
 void ZVulkanTextureGlowPipelineContext::ensureVertexCapacity(size_t vertexCount)
@@ -374,19 +386,19 @@ void ZVulkanTextureGlowPipelineContext::ensureVertexCapacity(size_t vertexCount)
 
   size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
   auto& device = m_backend.device();
-  m_vertexBuffer = device.createBuffer(newCapacity,
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
 }
 
 void ZVulkanTextureGlowPipelineContext::uploadGeometry()
 {
-  const std::array<QuadVertex, 4> vertices{
-    QuadVertex{glm::vec3(-1.f, 1.f, kQuadDepth)},
-    QuadVertex{glm::vec3(-1.f, -1.f, kQuadDepth)},
-    QuadVertex{glm::vec3(1.f, 1.f, kQuadDepth)},
-    QuadVertex{glm::vec3(1.f, -1.f, kQuadDepth)}};
+  const std::array<QuadVertex, 4> vertices{QuadVertex{glm::vec3(-1.f, 1.f, kQuadDepth)},
+                                           QuadVertex{glm::vec3(-1.f, -1.f, kQuadDepth)},
+                                           QuadVertex{glm::vec3(1.f, 1.f, kQuadDepth)},
+                                           QuadVertex{glm::vec3(1.f, -1.f, kQuadDepth)}};
 
   if (!m_vertexBuffer) {
     return;
@@ -409,10 +421,8 @@ ZVulkanTextureGlowPipelineContext::ensureBlurPipeline(const BlurPipelineKey& key
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + "blur.frag.spv",
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device, shaderBase + "pass.vert.spv", shaderBase + "blur.frag.spv", std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
@@ -432,11 +442,11 @@ ZVulkanTextureGlowPipelineContext::ensureBlurPipeline(const BlurPipelineKey& key
 
   vk::SpecializationMapEntry entry{.constantID = 100, .offset = 0, .size = sizeof(int)};
   const int orientation = key.horizontal ? 0 : 1;
-  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
-                                              {entry},
-                                              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&orientation),
-                                                                   reinterpret_cast<const uint8_t*>(&orientation) +
-                                                                     sizeof(orientation)));
+  instance.shader->setSpecializationConstants(
+    vk::ShaderStageFlagBits::eFragment,
+    {entry},
+    std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&orientation),
+                         reinterpret_cast<const uint8_t*>(&orientation) + sizeof(orientation)));
 
   vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
                               .offset = 0,
@@ -461,10 +471,8 @@ ZVulkanTextureGlowPipelineContext::ensureGlowPipeline(const GlowPipelineKey& key
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + "glow.frag.spv",
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device, shaderBase + "pass.vert.spv", shaderBase + "glow.frag.spv", std::nullopt);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
@@ -484,11 +492,11 @@ ZVulkanTextureGlowPipelineContext::ensureGlowPipeline(const GlowPipelineKey& key
 
   vk::SpecializationMapEntry entry{.constantID = 110, .offset = 0, .size = sizeof(int)};
   const int glowMode = toGlowModeConstant(key.mode);
-  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
-                                              {entry},
-                                              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&glowMode),
-                                                                   reinterpret_cast<const uint8_t*>(&glowMode) +
-                                                                     sizeof(glowMode)));
+  instance.shader->setSpecializationConstants(
+    vk::ShaderStageFlagBits::eFragment,
+    {entry},
+    std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&glowMode),
+                         reinterpret_cast<const uint8_t*>(&glowMode) + sizeof(glowMode)));
 
   vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
                               .offset = 0,
@@ -516,9 +524,7 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
     return;
   }
 
-  output.color.texture->transitionLayout(cmd,
-                                         output.color.texture->layout(),
-                                         vk::ImageLayout::eColorAttachmentOptimal);
+  output.color.texture->transitionLayout(cmd, output.color.texture->layout(), vk::ImageLayout::eColorAttachmentOptimal);
   output.depth.texture->transitionLayout(cmd,
                                          output.depth.texture->layout(),
                                          vk::ImageLayout::eDepthStencilAttachmentOptimal,
@@ -539,7 +545,10 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
   depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
 
   vk::RenderingInfo renderingInfo;
-  renderingInfo.renderArea = vk::Rect2D{vk::Offset2D{0, 0}, vk::Extent2D{size.x, size.y}};
+  renderingInfo.renderArea = vk::Rect2D{
+    vk::Offset2D{0,      0     },
+    vk::Extent2D{size.x, size.y}
+  };
   renderingInfo.layerCount = 1;
   renderingInfo.colorAttachmentCount = 1;
   renderingInfo.pColorAttachments = &colorAttachment;
@@ -580,7 +589,10 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
   localViewport.maxDepth = 1.0f;
   cmd.setViewport(0, localViewport);
 
-  vk::Rect2D localScissor{vk::Offset2D{0, 0}, vk::Extent2D{size.x, size.y}};
+  vk::Rect2D localScissor{
+    vk::Offset2D{0,      0     },
+    vk::Extent2D{size.x, size.y}
+  };
   cmd.setScissor(0, localScissor);
 
   BlurPushConstants constants;

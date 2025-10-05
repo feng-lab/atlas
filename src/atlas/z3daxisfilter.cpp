@@ -156,9 +156,9 @@ void Z3DAxisFilter::renderOpaque(Z3DEye eye)
     const QSignalBlocker blocker(m_rendererParameters.coordTransform);
     m_rendererParameters.coordTransform.set(glm::mat4(m_globalParameters.camera.get().rotateMatrix(eye)));
 
-    const glm::uvec4& viewport = currentViewport();
-    GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
-    glViewport(viewport.x, viewport.y, size, size);
+    const glm::uvec4& vp = viewport();
+    GLsizei size = std::min(vp.z, vp.w) * m_axisRegionRatio.get();
+    glViewport(vp.x, vp.y, size, size);
 
     if (m_mode.get() == "Arrow") {
       renderWithStateAndCamera(eye, m_axisCamera, m_arrowRenderer, m_fontRenderer);
@@ -166,7 +166,7 @@ void Z3DAxisFilter::renderOpaque(Z3DEye eye)
       renderWithStateAndCamera(eye, m_axisCamera, m_lineRenderer, m_fontRenderer);
     }
 
-    glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
+    glViewport(vp.x, vp.y, vp.z, vp.w);
   }
 }
 
@@ -191,7 +191,8 @@ void Z3DAxisFilter::prepareData(Z3DEye eye)
 
 void Z3DAxisFilter::setupCamera()
 {
-  Z3DCamera camera;
+  Z3DCamera camera(m_rendererBase.activeBackend() == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan
+                                                                           : Z3DCoordinateSystem::OpenGL);
   glm::vec3 center(0.f);
   camera.setFieldOfView(glm::radians(10.f));
 
@@ -258,6 +259,12 @@ void Z3DAxisFilter::setupCamera()
   m_arrowRenderer.setArrowColors(&m_textColors);
   m_fontRenderer.setData(&m_textPositions, texts);
   m_fontRenderer.setDataColors(&m_textColors);
+}
+
+void Z3DAxisFilter::switchRendererBackend(RenderBackend backend)
+{
+  Z3DGeometryFilter::switchRendererBackend(backend);
+  setupCamera();
 }
 
 } // namespace nim

@@ -70,13 +70,14 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  if (payload.colorAttachmentHandle0.backend != AttachmentBackend::Vulkan ||
-      payload.depthAttachmentHandle0.backend != AttachmentBackend::Vulkan ||
-      payload.colorAttachmentHandle1.backend != AttachmentBackend::Vulkan ||
-      payload.depthAttachmentHandle1.backend != AttachmentBackend::Vulkan) {
-    LOG_FIRST_N(WARNING, 5) << "Texture blend payload missing Vulkan attachment handles.";
-    return;
-  }
+  CHECK(payload.colorAttachmentHandle0.backend == AttachmentBackend::Vulkan)
+    << "GL colorAttachmentHandle0 in Vulkan path";
+  CHECK(payload.depthAttachmentHandle0.backend == AttachmentBackend::Vulkan)
+    << "GL depthAttachmentHandle0 in Vulkan path";
+  CHECK(payload.colorAttachmentHandle1.backend == AttachmentBackend::Vulkan)
+    << "GL colorAttachmentHandle1 in Vulkan path";
+  CHECK(payload.depthAttachmentHandle1.backend == AttachmentBackend::Vulkan)
+    << "GL depthAttachmentHandle1 in Vulkan path";
 
   auto* color0 = reinterpret_cast<ZVulkanTexture*>(payload.colorAttachmentHandle0.id);
   auto* depth0 = reinterpret_cast<ZVulkanTexture*>(payload.depthAttachmentHandle0.id);
@@ -172,7 +173,8 @@ void ZVulkanTextureBlendPipelineContext::ensureDescriptorLayout()
     vk::DescriptorSetLayoutBinding{.binding = 3,
                                    .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                    .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                   .stageFlags = vk::ShaderStageFlagBits::eFragment}
+  };
 
   vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                .pBindings = bindings.data()};
@@ -203,7 +205,8 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureBlendPipelineContext::makeV
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = 0}};
+                                        .offset = 0}
+  };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
@@ -222,19 +225,19 @@ void ZVulkanTextureBlendPipelineContext::ensureVertexCapacity(size_t vertexCount
 
   size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
   auto& device = m_backend.device();
-  m_vertexBuffer = device.createBuffer(newCapacity,
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
 }
 
 void ZVulkanTextureBlendPipelineContext::uploadGeometry()
 {
-  const std::array<QuadVertex, 4> vertices{
-    QuadVertex{glm::vec3(-1.f, 1.f, kQuadDepth)},
-    QuadVertex{glm::vec3(-1.f, -1.f, kQuadDepth)},
-    QuadVertex{glm::vec3(1.f, 1.f, kQuadDepth)},
-    QuadVertex{glm::vec3(1.f, -1.f, kQuadDepth)}};
+  const std::array<QuadVertex, 4> vertices{QuadVertex{glm::vec3(-1.f, 1.f, kQuadDepth)},
+                                           QuadVertex{glm::vec3(-1.f, -1.f, kQuadDepth)},
+                                           QuadVertex{glm::vec3(1.f, 1.f, kQuadDepth)},
+                                           QuadVertex{glm::vec3(1.f, -1.f, kQuadDepth)}};
 
   ensureVertexCapacity(vertices.size());
   if (!m_vertexBuffer) {
@@ -290,11 +293,11 @@ ZVulkanTextureBlendPipelineContext::ensurePipeline(const PipelineKey& key, const
 
   vk::SpecializationMapEntry entry{.constantID = 60, .offset = 0, .size = sizeof(int)};
   int composeMode = toComposeMode(key.mode);
-  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
-                                              {entry},
-                                              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&composeMode),
-                                                                   reinterpret_cast<const uint8_t*>(&composeMode) +
-                                                                     sizeof(composeMode)));
+  instance.shader->setSpecializationConstants(
+    vk::ShaderStageFlagBits::eFragment,
+    {entry},
+    std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&composeMode),
+                         reinterpret_cast<const uint8_t*>(&composeMode) + sizeof(composeMode)));
 
   vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
                               .offset = 0,

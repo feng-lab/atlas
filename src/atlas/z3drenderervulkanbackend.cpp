@@ -59,16 +59,17 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   if (m_sharedDevice) {
     try {
       m_sharedDevice->context().device().waitIdle();
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
       LOG(WARNING) << "Vulkan waitIdle (shared) failed: " << e.what();
     }
   }
 
-   // Release scratch resources proactively so device teardown is clean
-   if (Z3DRenderGlobalState::instance().hasScratchPool()) {
-     auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-     pool.reset();
-   }
+  // Release scratch resources proactively so device teardown is clean
+  if (Z3DRenderGlobalState::instance().hasScratchPool()) {
+    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+    pool.reset();
+  }
 }
 
 void Z3DRendererVulkanBackend::setGlobalShaderParameters(Z3DRendererBase& renderer,
@@ -219,7 +220,6 @@ std::string_view describeGeometry(const GeometryPayload& geometry)
 
 } // namespace
 
-
 void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const RendererCPUState& state)
 {
   if (!m_activeCommandBuffer || state.batches.empty()) {
@@ -274,9 +274,15 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     };
 
     auto ensureSampledReadable = [&](const AttachmentHandle& handle) {
-      if (handle.backend != AttachmentBackend::Vulkan || !handle.valid()) return;
+      if (!handle.valid()) {
+        return;
+      }
+      CHECK(handle.backend == AttachmentBackend::Vulkan)
+        << "Non-Vulkan sampled attachment encountered in Vulkan backend";
       auto* texture = reinterpret_cast<ZVulkanTexture*>(handle.id);
-      if (!texture) return;
+      if (!texture) {
+        return;
+      }
       const auto samplingState = classifyReadLayout(texture->format());
       // Transition before dynamic rendering begins
       vk::ImageAspectFlags transitionAspect = samplingState.aspect;
@@ -331,9 +337,11 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     colorAttachments.reserve(batch.pass.colorAttachments.size());
 
     auto makeColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (attachment.handle.backend != AttachmentBackend::Vulkan || attachment.handle.id == 0) {
+      if (attachment.handle.id == 0) {
         return std::nullopt;
       }
+      CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
+        << "GL color attachment encountered in Vulkan backend";
       auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
       if (!texture) {
         return std::nullopt;
@@ -359,9 +367,11 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     };
 
     auto makeDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (attachment.handle.backend != AttachmentBackend::Vulkan || attachment.handle.id == 0) {
+      if (attachment.handle.id == 0) {
         return std::nullopt;
       }
+      CHECK(attachment.handle.backend == AttachmentBackend::Vulkan)
+        << "GL depth attachment encountered in Vulkan backend";
       auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
       if (!texture) {
         return std::nullopt;
@@ -532,8 +542,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (!handled) {
       if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
         if (!m_textureWeightedAverageContext) {
-          m_textureWeightedAverageContext =
-            std::make_unique<ZVulkanTextureWeightedAveragePipelineContext>(*this);
+          m_textureWeightedAverageContext = std::make_unique<ZVulkanTextureWeightedAveragePipelineContext>(*this);
         }
         m_textureWeightedAverageContext->record(renderer, batch, *weightedAverage, vkViewport, vkScissor, cmd);
         handled = true;
@@ -543,8 +552,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (!handled) {
       if (const auto* weightedBlended = std::get_if<TextureWeightedBlendedPayload>(&batch.geometry)) {
         if (!m_textureWeightedBlendedContext) {
-          m_textureWeightedBlendedContext =
-            std::make_unique<ZVulkanTextureWeightedBlendedPipelineContext>(*this);
+          m_textureWeightedBlendedContext = std::make_unique<ZVulkanTextureWeightedBlendedPipelineContext>(*this);
         }
         m_textureWeightedBlendedContext->record(renderer, batch, *weightedBlended, vkViewport, vkScissor, cmd);
         handled = true;
@@ -637,9 +645,8 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
           renderer.frameState().viewport.w > 0u) {
         batch.pass.viewport.origin = glm::vec2(static_cast<float>(renderer.frameState().viewport.x),
                                                static_cast<float>(renderer.frameState().viewport.y));
-        batch.pass.viewport.extent =
-          glm::vec2(static_cast<float>(renderer.frameState().viewport.z),
-                    static_cast<float>(renderer.frameState().viewport.w));
+        batch.pass.viewport.extent = glm::vec2(static_cast<float>(renderer.frameState().viewport.z),
+                                               static_cast<float>(renderer.frameState().viewport.w));
         batch.pass.viewport.minDepth = 0.0f;
         batch.pass.viewport.maxDepth = 1.0f;
       }
@@ -654,11 +661,15 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   renderer.executeVulkanBatches([&]() {
     // Opaque first
     for (auto* filter : pass.opaqueFilters) {
-      recordFilterBatches(filter, [&]() { filter->renderOpaque(pass.eye); });
+      recordFilterBatches(filter, [&]() {
+        filter->renderOpaque(pass.eye);
+      });
     }
     // Then transparent
     for (const auto& tb : pass.transparentFilters) {
-      recordFilterBatches(tb.filter, [&]() { tb.filter->renderTransparent(pass.eye); });
+      recordFilterBatches(tb.filter, [&]() {
+        tb.filter->renderTransparent(pass.eye);
+      });
     }
   });
 
@@ -720,7 +731,6 @@ const ZVulkanDevice& Z3DRendererVulkanBackend::device() const
   return *m_sharedDevice;
 }
 
-
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()
 {
   CHECK(m_activeCommandBuffer.has_value());
@@ -743,7 +753,6 @@ void Z3DRendererVulkanBackend::ensureDevice()
   CHECK(dev != nullptr) << "Shared Vulkan device not injected into scratch pool";
   m_sharedDevice = dev;
 }
-
 
 std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend()
 {

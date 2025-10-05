@@ -45,10 +45,10 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
                                                           const vk::Rect2D& scissor,
                                                           vk::raii::CommandBuffer& cmd)
 {
-  if (payload.accumulationAttachment.backend != AttachmentBackend::Vulkan ||
-      payload.momentsAttachment.backend != AttachmentBackend::Vulkan ||
-      !payload.accumulationAttachment.valid() || !payload.momentsAttachment.valid()) {
-    LOG_FIRST_N(WARNING, 5) << "Weighted average payload missing Vulkan attachment handles.";
+  CHECK(payload.accumulationAttachment.backend == AttachmentBackend::Vulkan)
+    << "GL accumulationAttachment in Vulkan path";
+  CHECK(payload.momentsAttachment.backend == AttachmentBackend::Vulkan) << "GL momentsAttachment in Vulkan path";
+  if (!payload.accumulationAttachment.valid() || !payload.momentsAttachment.valid()) {
     return;
   }
 
@@ -144,7 +144,8 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorLayout()
       vk::DescriptorSetLayoutBinding{.binding = 1,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}};
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
 
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
@@ -204,8 +205,8 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureOITResources()
 }
 
 void ZVulkanTextureWeightedAveragePipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
-                                                                     const RenderBatch&,
-                                                                     const glm::vec2& fallbackScreenDimRcp)
+                                                                      const RenderBatch&,
+                                                                      const glm::vec2& fallbackScreenDimRcp)
 {
   if (!m_uboOIT) {
     return;
@@ -233,8 +234,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::updateOITParamsUBO(Z3DRendere
   m_uboOIT->copyData(&oit, sizeof(oit));
 }
 
-vk::PipelineVertexInputStateCreateInfo
-ZVulkanTextureWeightedAveragePipelineContext::makeVertexInputState() const
+vk::PipelineVertexInputStateCreateInfo ZVulkanTextureWeightedAveragePipelineContext::makeVertexInputState() const
 {
   static vk::VertexInputBindingDescription binding{.binding = 0,
                                                    .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
@@ -243,7 +243,8 @@ ZVulkanTextureWeightedAveragePipelineContext::makeVertexInputState() const
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = 0}};
+                                        .offset = 0}
+  };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = 1;
@@ -262,19 +263,19 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureVertexCapacity(size_t v
 
   size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
   auto& device = m_backend.device();
-  m_vertexBuffer = device.createBuffer(newCapacity,
-                                       vk::BufferUsageFlagBits::eVertexBuffer,
-                                       vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_vertexBuffer =
+    device.createBuffer(newCapacity,
+                        vk::BufferUsageFlagBits::eVertexBuffer,
+                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
 }
 
 void ZVulkanTextureWeightedAveragePipelineContext::uploadGeometry()
 {
-  const std::array<glm::vec3, 4> vertices{
-    glm::vec3(-1.f, 1.f, kQuadDepth),
-    glm::vec3(-1.f, -1.f, kQuadDepth),
-    glm::vec3(1.f, 1.f, kQuadDepth),
-    glm::vec3(1.f, -1.f, kQuadDepth)};
+  const std::array<glm::vec3, 4> vertices{glm::vec3(-1.f, 1.f, kQuadDepth),
+                                          glm::vec3(-1.f, -1.f, kQuadDepth),
+                                          glm::vec3(1.f, 1.f, kQuadDepth),
+                                          glm::vec3(1.f, -1.f, kQuadDepth)};
 
   ensureVertexCapacity(vertices.size());
   if (!m_vertexBuffer) {
@@ -297,8 +298,7 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
   ensureDescriptorLayout();
 
   auto& device = m_backend.device();
-  static const std::string shaderBase =
-    ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
+  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
   instance.shader = std::make_unique<ZVulkanShader>(device,

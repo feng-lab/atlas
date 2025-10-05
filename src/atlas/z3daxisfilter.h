@@ -37,6 +37,8 @@ public:
     renderOpaque(eye);
   }
 
+  void switchRendererBackend(RenderBackend backend) override;
+
 protected:
   void prepareData(Z3DEye eye);
 
