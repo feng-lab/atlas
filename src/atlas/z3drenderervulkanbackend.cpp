@@ -238,19 +238,19 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &rawCmd;
 
-  vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  vk::Semaphore waitSemaphore = static_cast<vk::Semaphore>(*frameHandle.acquireSemaphore());
-  if (waitSemaphore) {
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &waitSemaphore;
-    submitInfo.pWaitDstStageMask = waitStages;
-  }
+  // Stage 1 (offscreen/no WSI): do not wait on an acquire semaphore.
+  // These semaphores are reserved for swapchain integration; waiting here
+  // without a prior signal leads to a dead wait and device loss on MoltenVK.
+  // When WSI is wired, plumb an explicit flag to arm these sync points.
 
-  vk::Semaphore signalSemaphore = static_cast<vk::Semaphore>(*frameHandle.releaseSemaphore());
-  if (signalSemaphore) {
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &signalSemaphore;
-  }
+  // Optionally keep signalling the release semaphore for future presentation wiring.
+  // For now, omit both waits and signals to avoid dangling sync dependencies.
+  // Uncomment the following block once presentation path consumes the signal:
+  // vk::Semaphore signalSemaphore = static_cast<vk::Semaphore>(*frameHandle.releaseSemaphore());
+  // if (signalSemaphore) {
+  //   submitInfo.signalSemaphoreCount = 1;
+  //   submitInfo.pSignalSemaphores = &signalSemaphore;
+  // }
 
   try {
     queue.submit(submitInfo, *frameHandle.fence());

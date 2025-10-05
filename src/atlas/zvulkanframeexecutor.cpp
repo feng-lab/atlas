@@ -187,40 +187,51 @@ void ZVulkanFrameExecutor::executeImmediate(const std::function<void(vk::raii::C
     return;
   }
 
-  auto frameHandle = beginFrame();
+  // Use a transient command buffer and fence to avoid interfering with any
+  // actively-recording frame command buffer. This prevents mid-frame resets
+  // when immediate work (uploads/transitions) is issued during a render.
+  auto& context = m_device.context();
+  auto& device = context.device();
+
+  vk::CommandBufferAllocateInfo allocInfo{.commandPool = context.commandPool(),
+                                          .level = vk::CommandBufferLevel::ePrimary,
+                                          .commandBufferCount = 1};
+  vk::raii::CommandBuffers buffers(device, allocInfo);
+  vk::raii::CommandBuffer& cmd = buffers[0];
+
+  vk::FenceCreateInfo fenceInfo{};
+  vk::raii::Fence fence(device, fenceInfo);
 
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
-  frameHandle.commandBuffer().begin(beginInfo);
+  cmd.begin(beginInfo);
 
-  auto* dispatcher = m_device.context().device().getDispatcher();
+  auto* dispatcher = device.getDispatcher();
   if (dispatcher && dispatcher->vkCmdBeginDebugUtilsLabelEXT && !debugLabel.empty()) {
     vk::DebugUtilsLabelEXT labelInfo{};
     labelInfo.pLabelName = debugLabel.data();
-    frameHandle.commandBuffer().beginDebugUtilsLabelEXT(labelInfo);
+    cmd.beginDebugUtilsLabelEXT(labelInfo);
   }
 
-  record(frameHandle.commandBuffer());
+  record(cmd);
 
   if (dispatcher && dispatcher->vkCmdEndDebugUtilsLabelEXT && !debugLabel.empty()) {
-    frameHandle.commandBuffer().endDebugUtilsLabelEXT();
+    cmd.endDebugUtilsLabelEXT();
   }
 
-  frameHandle.commandBuffer().end();
+  cmd.end();
 
-  vk::CommandBuffer rawBuffer = *frameHandle.commandBuffer();
+  vk::CommandBuffer rawBuffer = *cmd;
   vk::SubmitInfo submitInfo{};
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &rawBuffer;
 
-  auto& queue = m_device.context().graphicsQueue();
-  queue.submit(submitInfo, *frameHandle.fence());
-  markSubmitted(frameHandle);
+  auto& queue = context.graphicsQueue();
+  queue.submit(submitInfo, *fence);
 
-  waitForCompletion(frameHandle);
-
-  auto& vkDevice = m_device.context().device();
-  vkDevice.resetFences({*frameHandle.fence()});
-  frameHandle.commandBuffer().reset();
+  // Wait for completion to keep semantics identical to the previous
+  // executeImmediate behaviour.
+  const uint64_t kFenceTimeoutNs = std::numeric_limits<uint64_t>::max();
+  device.waitForFences({*fence}, VK_TRUE, kFenceTimeoutNs);
 }
 
 } // namespace nim
