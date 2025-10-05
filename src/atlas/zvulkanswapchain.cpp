@@ -17,7 +17,6 @@ ZVulkanSwapChain::ZVulkanSwapChain(ZVulkanDevice& device, uint32_t width, uint32
 {
   createAttachments();
   createSampler();
-  createCommandBuffers();
   LOG(INFO) << "ZVulkanSwapChain created with size " << width << "x" << height;
 }
 
@@ -60,22 +59,6 @@ void ZVulkanSwapChain::createSampler()
   m_sampler.emplace(m_device.context().device(), samplerInfo);
 }
 
-void ZVulkanSwapChain::createCommandBuffers()
-{
-  vk::CommandPoolCreateInfo poolInfo{.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-                                     .queueFamilyIndex =
-                                       m_device.context().queueFamilyIndices().graphicsFamily.value()};
-  m_commandPool.emplace(m_device.context().device(), poolInfo);
-
-  vk::CommandBufferAllocateInfo allocInfo{.commandPool = *m_commandPool,
-                                          .level = vk::CommandBufferLevel::ePrimary,
-                                          .commandBufferCount = 1};
-  m_commandBuffers.emplace(m_device.context().device(), allocInfo);
-
-  vk::FenceCreateInfo fenceInfo{.flags = vk::FenceCreateFlagBits::eSignaled};
-  m_inFlightFence.emplace(m_device.context().device(), fenceInfo);
-}
-
 void ZVulkanSwapChain::resize(uint32_t width, uint32_t height)
 {
   if (width == m_width && height == m_height) {
@@ -96,11 +79,38 @@ ZVulkanTexture& ZVulkanSwapChain::depthAttachment()
   return *m_depthAttachment;
 }
 
+void ZVulkanSwapChain::configureAcquireWait(bool enable, vk::PipelineStageFlags stageMask)
+{
+  m_waitOnAcquire = enable;
+  m_acquireWaitStage = stageMask;
+}
+
+vk::Semaphore ZVulkanSwapChain::acquireSemaphore() const
+{
+  if (!m_activeFrame || !m_activeFrame->valid()) {
+    return VK_NULL_HANDLE;
+  }
+  return static_cast<vk::Semaphore>(*m_activeFrame->acquireSemaphore());
+}
+
+vk::Semaphore ZVulkanSwapChain::releaseSemaphore() const
+{
+  if (!m_activeFrame || !m_activeFrame->valid()) {
+    return VK_NULL_HANDLE;
+  }
+  return static_cast<vk::Semaphore>(*m_activeFrame->releaseSemaphore());
+}
+
 vk::raii::CommandBuffer& ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearColor,
                                                       vk::ClearDepthStencilValue clearDepthStencil)
 {
+  CHECK(!m_activeFrame) << "Swapchain beginFrame called while previous frame active";
+
+  m_activeFrame = m_device.frameExecutor().beginFrame();
+  CHECK(m_activeFrame && m_activeFrame->valid()) << "Failed to acquire frame executor slot for swapchain";
+
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
-  auto& cmdBuffer = (*m_commandBuffers)[m_currentBuffer];
+  auto& cmdBuffer = m_activeFrame->commandBuffer();
   cmdBuffer.begin(beginInfo);
 
   // Ensure attachments are in the correct layouts for rendering
@@ -155,19 +165,33 @@ void ZVulkanSwapChain::endFrame(vk::raii::CommandBuffer& commandBuffer)
   commandBuffer.end();
 
   vk::SubmitInfo submitInfo{};
-  vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  submitInfo.waitSemaphoreCount = 0;
-  submitInfo.pWaitSemaphores = nullptr;
-  submitInfo.pWaitDstStageMask = waitStages;
+  vk::PipelineStageFlags waitStages[] = {m_acquireWaitStage};
+  vk::Semaphore waitSemaphore = acquireSemaphore();
+  if (m_waitOnAcquire && waitSemaphore) {
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &waitSemaphore;
+    submitInfo.pWaitDstStageMask = waitStages;
+  }
   submitInfo.commandBufferCount = 1;
   vk::CommandBuffer cmdBuffers[] = {*commandBuffer};
   submitInfo.pCommandBuffers = cmdBuffers;
 
-  // Fence must be unsignaled before submission
-  m_device.context().device().resetFences({*m_inFlightFence});
-  m_device.context().graphicsQueue().submit(submitInfo, *m_inFlightFence);
-  auto waitStatus = m_device.context().device().waitForFences({*m_inFlightFence}, VK_TRUE, UINT64_MAX);
-  (void)waitStatus;
+  vk::Semaphore signalSemaphore = releaseSemaphore();
+  if (signalSemaphore) {
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &signalSemaphore;
+  }
+
+  auto& executor = m_device.frameExecutor();
+  auto& queue = m_device.context().graphicsQueue();
+  try {
+    queue.submit(submitInfo, *m_activeFrame->fence());
+    executor.markSubmitted(*m_activeFrame);
+  } catch (const std::exception& e) {
+    LOG(WARNING) << "Swapchain submit failed: " << e.what();
+  }
+
+  m_activeFrame.reset();
 }
 
 void ZVulkanSwapChain::copyToMemory(void* data, size_t size)

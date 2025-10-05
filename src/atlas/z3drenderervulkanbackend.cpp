@@ -62,34 +62,27 @@ Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend() = default;
 void Z3DRendererVulkanBackend::preBackendSwitch()
 {
   // Finish any in-flight frame before we start tearing resources down.
-  if (m_frameRecording && m_activeFrame) {
+  if (m_frameRecording && m_activeFrameHandle && m_activeFrameHandle->valid()) {
     try {
-      m_activeFrame->commandBuffer.end();
+      m_activeFrameHandle->commandBuffer().end();
     } catch (const std::exception& e) {
       LOG(WARNING) << "Vulkan command buffer end during backend switch failed: " << e.what();
     }
     m_frameRecording = false;
   }
+  m_activeFrameHandle.reset();
+  m_activeFrame = nullptr;
 
   if (m_sharedDevice) {
-    auto& vkDevice = m_sharedDevice->context().device();
-    for (auto& frame : m_frames) {
-      try {
-        const auto waitResult =
-          vkDevice.waitForFences({*frame.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
-        (void)waitResult;
-      } catch (const std::exception& e) {
-        LOG(WARNING) << "Vulkan waitForFences during backend switch failed: " << e.what();
-      }
-      collectFrameTimings(frame);
-      frame.inFlight = false;
-    }
-
     try {
-      vkDevice.waitIdle();
+      m_sharedDevice->context().device().waitIdle();
     }
     catch (const std::exception& e) {
       LOG(WARNING) << "Vulkan waitIdle (shared) failed: " << e.what();
+    }
+
+    for (auto& frame : m_frames) {
+      collectFrameTimings(frame);
     }
   }
 
@@ -168,7 +161,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   if (m_fontContext) {
     m_fontContext->resetFrame();
   }
-  ensureFrameResources();
+  ensureDevice();
 
   const auto& viewport = renderer.frameState().viewport;
   const uint32_t width = viewport.z;
@@ -181,43 +174,54 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
                          surf.depthAttachment.has_value());
 
   if (width == 0U || height == 0U) {
+    m_activeFrameHandle.reset();
     m_activeFrame = nullptr;
     m_frameRecording = false;
     return;
   }
 
-  auto& frame = acquireFrame();
-  frame.inFlight = false;
-  frame.commandBuffer.reset();
-  frame.gpuScopes.clear();
-  frame.cpuScopes.clear();
-  frame.nextQuery = 0;
-  frame.cpuStart = std::chrono::steady_clock::now();
-  frame.cpuEnd = {};
+  m_activeFrameHandle = device().frameExecutor().beginFrame();
+  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    m_activeFrame = nullptr;
+    m_frameRecording = false;
+    return;
+  }
+
+  auto& frameResources = ensureFrameResourcesForKey(m_activeFrameHandle->key());
+
+  collectFrameTimings(frameResources);
+  frameResources.gpuScopes.clear();
+  frameResources.cpuScopes.clear();
+  frameResources.nextQuery = 0;
+  frameResources.cpuStart = std::chrono::steady_clock::now();
+  frameResources.cpuEnd = {};
 
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
-  frame.commandBuffer.begin(beginInfo);
-  frame.commandBuffer.resetQueryPool(*frame.queryPool, 0, kMaxTimestampQueries);
+  auto& cmdBuffer = m_activeFrameHandle->commandBuffer();
+  cmdBuffer.begin(beginInfo);
+  cmdBuffer.resetQueryPool(*frameResources.queryPool, 0, kMaxTimestampQueries);
 
-  m_activeFrame = &frame;
+  m_activeFrame = &frameResources;
   m_frameRecording = true;
 }
 
 void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 {
   (void)renderer;
-  if (!m_activeFrame) {
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
     return;
   }
 
   auto& frame = *m_activeFrame;
+  auto& frameHandle = *m_activeFrameHandle;
 
   if (m_frameRecording) {
     try {
-      frame.commandBuffer.end();
+      frameHandle.commandBuffer().end();
     } catch (const std::exception& e) {
       LOG(WARNING) << "Vulkan command buffer end failed: " << e.what();
       m_frameRecording = false;
+      m_activeFrameHandle.reset();
       m_activeFrame = nullptr;
       return;
     }
@@ -229,23 +233,33 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 
   auto& context = m_sharedDevice->context();
   auto& queue = context.graphicsQueue();
-  vk::CommandBuffer rawCmd = *frame.commandBuffer;
+  vk::CommandBuffer rawCmd = *frameHandle.commandBuffer();
   vk::SubmitInfo submitInfo{};
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &rawCmd;
 
-  vk::Fence fenceHandle = *frame.fence;
-
-  try {
-    queue.submit(submitInfo, fenceHandle);
-    frame.inFlight = true;
-  } catch (const std::exception& e) {
-    LOG(WARNING) << "Vulkan queue submit failed: " << e.what();
-    vk::FenceCreateInfo fenceInfo{.flags = vk::FenceCreateFlagBits::eSignaled};
-    frame.fence = vk::raii::Fence(context.device(), fenceInfo);
-    frame.inFlight = false;
+  vk::PipelineStageFlags waitStages[] = {vk::PipelineStageFlagBits::eColorAttachmentOutput};
+  vk::Semaphore waitSemaphore = static_cast<vk::Semaphore>(*frameHandle.acquireSemaphore());
+  if (waitSemaphore) {
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &waitSemaphore;
+    submitInfo.pWaitDstStageMask = waitStages;
   }
 
+  vk::Semaphore signalSemaphore = static_cast<vk::Semaphore>(*frameHandle.releaseSemaphore());
+  if (signalSemaphore) {
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &signalSemaphore;
+  }
+
+  try {
+    queue.submit(submitInfo, *frameHandle.fence());
+    device().frameExecutor().markSubmitted(frameHandle);
+  } catch (const std::exception& e) {
+    LOG(WARNING) << "Vulkan queue submit failed: " << e.what();
+  }
+
+  m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
 }
 
@@ -306,7 +320,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     return;
   }
 
-  auto& cmd = m_activeFrame->commandBuffer;
+  auto& cmd = m_activeFrameHandle->commandBuffer();
 
   size_t batchIndex = 0;
   for (const auto& batch : state.batches) {
@@ -799,14 +813,16 @@ const ZVulkanDevice& Z3DRendererVulkanBackend::device() const
 
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()
 {
-  CHECK(m_activeFrame != nullptr) << "Command buffer requested outside active frame";
-  return m_activeFrame->commandBuffer;
+  CHECK(m_activeFrameHandle && m_activeFrameHandle->valid())
+    << "Command buffer requested outside active frame";
+  return m_activeFrameHandle->commandBuffer();
 }
 
 const vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer() const
 {
-  CHECK(m_activeFrame != nullptr) << "Command buffer requested outside active frame";
-  return m_activeFrame->commandBuffer;
+  CHECK(m_activeFrameHandle && m_activeFrameHandle->valid())
+    << "Command buffer requested outside active frame";
+  return m_activeFrameHandle->commandBuffer();
 }
 
 void Z3DRendererVulkanBackend::ensureDevice()
@@ -822,70 +838,39 @@ void Z3DRendererVulkanBackend::ensureDevice()
 
 void Z3DRendererVulkanBackend::resetFrameResources()
 {
+  m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
   m_frameRecording = false;
   m_frames.clear();
-  m_frameCursor = 0;
+  m_frameResourceMap.clear();
   m_frameDevice = nullptr;
 }
 
-void Z3DRendererVulkanBackend::ensureFrameResources()
+Z3DRendererVulkanBackend::FrameResources&
+Z3DRendererVulkanBackend::ensureFrameResourcesForKey(void* key)
 {
   ensureDevice();
-  if (!m_sharedDevice) {
-    return;
-  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing";
 
   if (m_frameDevice != m_sharedDevice) {
     m_frames.clear();
-    m_frameCursor = 0;
+    m_frameResourceMap.clear();
     m_frameDevice = m_sharedDevice;
   }
 
-  if (!m_frames.empty()) {
-    return;
+  auto iter = m_frameResourceMap.find(key);
+  if (iter != m_frameResourceMap.end()) {
+    return m_frames[iter->second];
   }
 
-  auto& context = m_sharedDevice->context();
-  auto& vkDevice = context.device();
-  const vk::CommandPool commandPool = context.commandPool();
+  m_frames.emplace_back();
+  const size_t index = m_frames.size() - 1;
+  m_frameResourceMap.emplace(key, index);
 
-  m_frames.reserve(m_maxFramesInFlight);
-  for (uint32_t i = 0; i < m_maxFramesInFlight; ++i) {
-    vk::CommandBufferAllocateInfo allocInfo{.commandPool = commandPool,
-                                           .level = vk::CommandBufferLevel::ePrimary,
-                                           .commandBufferCount = 1};
-    vk::raii::CommandBuffers buffers(vkDevice, allocInfo);
-
-    vk::FenceCreateInfo fenceInfo{.flags = vk::FenceCreateFlagBits::eSignaled};
-
-    m_frames.emplace_back();
-    auto& frame = m_frames.back();
-    frame.commandBuffer = std::move(buffers[0]);
-    frame.fence = vk::raii::Fence(vkDevice, fenceInfo);
-    frame.inFlight = false;
-    vk::QueryPoolCreateInfo queryInfo{.queryType = vk::QueryType::eTimestamp, .queryCount = kMaxTimestampQueries};
-    frame.queryPool = vk::raii::QueryPool(vkDevice, queryInfo);
-  }
-  m_frameCursor = 0;
-}
-
-Z3DRendererVulkanBackend::FrameResources& Z3DRendererVulkanBackend::acquireFrame()
-{
-  ensureFrameResources();
-  CHECK(!m_frames.empty()) << "Frame resources not created";
-  auto& frame = m_frames[m_frameCursor];
-  m_frameCursor = (m_frameCursor + 1) % m_frames.size();
+  auto& frame = m_frames.back();
   auto& vkDevice = m_sharedDevice->context().device();
-  try {
-    const auto waitResult =
-      vkDevice.waitForFences({*frame.fence}, VK_TRUE, std::numeric_limits<uint64_t>::max());
-    (void)waitResult;
-  } catch (const std::exception& e) {
-    LOG(WARNING) << "Vulkan waitForFences before frame reuse failed: " << e.what();
-  }
-  collectFrameTimings(frame);
-  vkDevice.resetFences({*frame.fence});
+  vk::QueryPoolCreateInfo queryInfo{.queryType = vk::QueryType::eTimestamp, .queryCount = kMaxTimestampQueries};
+  frame.queryPool = vk::raii::QueryPool(vkDevice, queryInfo);
   return frame;
 }
 
@@ -957,7 +942,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
 
 std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view label)
 {
-  if (!m_activeFrame || label.empty()) {
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid() || label.empty()) {
     return std::nullopt;
   }
   auto& frame = *m_activeFrame;
@@ -966,7 +951,9 @@ std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view l
     return std::nullopt;
   }
   const uint32_t startIndex = frame.nextQuery++;
-  frame.commandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe, *frame.queryPool, startIndex);
+  m_activeFrameHandle->commandBuffer().writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe,
+                                                      *frame.queryPool,
+                                                      startIndex);
   const uint32_t endIndex = frame.nextQuery++;
   frame.gpuScopes.push_back(GpuScopeRecord{std::string(label), startIndex, endIndex});
   return frame.gpuScopes.size() - 1;
@@ -974,7 +961,7 @@ std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view l
 
 void Z3DRendererVulkanBackend::endGpuScope(size_t token)
 {
-  if (!m_activeFrame) {
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
     return;
   }
   auto& frame = *m_activeFrame;
@@ -982,7 +969,9 @@ void Z3DRendererVulkanBackend::endGpuScope(size_t token)
     return;
   }
   const uint32_t endIndex = frame.gpuScopes[token].endQuery;
-  frame.commandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, *frame.queryPool, endIndex);
+  m_activeFrameHandle->commandBuffer().writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe,
+                                                      *frame.queryPool,
+                                                      endIndex);
 }
 
 void Z3DRendererVulkanBackend::recordCpuScope(std::string_view label, double milliseconds)

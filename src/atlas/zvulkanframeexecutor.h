@@ -18,7 +18,44 @@ class ZVulkanDevice;
  */
 class ZVulkanFrameExecutor
 {
+  struct Frame;
+
 public:
+
+  class ActiveFrame
+  {
+  public:
+    ActiveFrame() = default;
+    ActiveFrame(const ActiveFrame&) = delete;
+    ActiveFrame& operator=(const ActiveFrame&) = delete;
+    ActiveFrame(ActiveFrame&& other) noexcept;
+    ActiveFrame& operator=(ActiveFrame&& other) noexcept;
+    ~ActiveFrame() = default;
+
+    [[nodiscard]] bool valid() const
+    {
+      return m_frame != nullptr;
+    }
+
+    explicit operator bool() const
+    {
+      return valid();
+    }
+
+    [[nodiscard]] vk::raii::CommandBuffer& commandBuffer() const;
+    [[nodiscard]] vk::raii::Fence& fence() const;
+    [[nodiscard]] vk::raii::Semaphore& acquireSemaphore() const;
+    [[nodiscard]] vk::raii::Semaphore& releaseSemaphore() const;
+    [[nodiscard]] void* key() const;
+
+  private:
+    friend class ZVulkanFrameExecutor;
+    ActiveFrame(Frame* frame, ZVulkanFrameExecutor* executor);
+
+    Frame* m_frame = nullptr;
+    ZVulkanFrameExecutor* m_executor = nullptr;
+  };
+
   explicit ZVulkanFrameExecutor(ZVulkanDevice& device, uint32_t maxFramesInFlight = 2);
   ~ZVulkanFrameExecutor();
 
@@ -30,6 +67,10 @@ public:
   {
     return m_maxFramesInFlight;
   }
+
+  ActiveFrame beginFrame();
+  void markSubmitted(ActiveFrame& frame);
+  void waitForCompletion(ActiveFrame& frame);
 
   void executeImmediate(const std::function<void(vk::raii::CommandBuffer&)>& record,
                         std::string_view debugLabel = {});

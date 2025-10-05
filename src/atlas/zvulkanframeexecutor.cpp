@@ -12,6 +12,61 @@ namespace {
 constexpr uint64_t kFenceTimeoutNs = std::numeric_limits<uint64_t>::max();
 }
 
+ZVulkanFrameExecutor::ActiveFrame::ActiveFrame(Frame* frame, ZVulkanFrameExecutor* executor)
+  : m_frame(frame)
+  , m_executor(executor)
+{}
+
+ZVulkanFrameExecutor::ActiveFrame::ActiveFrame(ActiveFrame&& other) noexcept
+  : m_frame(other.m_frame)
+  , m_executor(other.m_executor)
+{
+  other.m_frame = nullptr;
+  other.m_executor = nullptr;
+}
+
+ZVulkanFrameExecutor::ActiveFrame&
+ZVulkanFrameExecutor::ActiveFrame::operator=(ActiveFrame&& other) noexcept
+{
+  if (this == &other) {
+    return *this;
+  }
+  m_frame = other.m_frame;
+  m_executor = other.m_executor;
+  other.m_frame = nullptr;
+  other.m_executor = nullptr;
+  return *this;
+}
+
+vk::raii::CommandBuffer& ZVulkanFrameExecutor::ActiveFrame::commandBuffer() const
+{
+  CHECK(m_frame != nullptr) << "ActiveFrame command buffer requested with no frame";
+  return m_frame->commandBuffer;
+}
+
+vk::raii::Fence& ZVulkanFrameExecutor::ActiveFrame::fence() const
+{
+  CHECK(m_frame != nullptr) << "ActiveFrame fence requested with no frame";
+  return m_frame->fence;
+}
+
+vk::raii::Semaphore& ZVulkanFrameExecutor::ActiveFrame::acquireSemaphore() const
+{
+  CHECK(m_frame != nullptr) << "ActiveFrame acquire semaphore requested with no frame";
+  return m_frame->acquireSemaphore;
+}
+
+vk::raii::Semaphore& ZVulkanFrameExecutor::ActiveFrame::releaseSemaphore() const
+{
+  CHECK(m_frame != nullptr) << "ActiveFrame release semaphore requested with no frame";
+  return m_frame->releaseSemaphore;
+}
+
+void* ZVulkanFrameExecutor::ActiveFrame::key() const
+{
+  return static_cast<void*>(m_frame);
+}
+
 ZVulkanFrameExecutor::ZVulkanFrameExecutor(ZVulkanDevice& device, uint32_t maxFramesInFlight)
   : m_device(device)
   , m_maxFramesInFlight(std::max(1u, maxFramesInFlight))
@@ -34,6 +89,34 @@ void ZVulkanFrameExecutor::trim()
   m_frames.clear();
   m_cursor = 0;
   m_framesDirty = true;
+}
+
+ZVulkanFrameExecutor::ActiveFrame ZVulkanFrameExecutor::beginFrame()
+{
+  Frame& frame = acquireFrame();
+  return ActiveFrame(&frame, this);
+}
+
+void ZVulkanFrameExecutor::markSubmitted(ActiveFrame& frame)
+{
+  if (!frame.valid()) {
+    return;
+  }
+  frame.m_frame->inFlight = true;
+}
+
+void ZVulkanFrameExecutor::waitForCompletion(ActiveFrame& frame)
+{
+  if (!frame.valid() || !frame.m_frame->inFlight) {
+    return;
+  }
+
+  auto& vkDevice = m_device.context().device();
+  const auto waitResult = vkDevice.waitForFences({*frame.fence()}, VK_TRUE, kFenceTimeoutNs);
+  if (waitResult != vk::Result::eSuccess) {
+    LOG(WARNING) << "Frame executor waitForFences returned " << vk::to_string(waitResult);
+  }
+  frame.m_frame->inFlight = false;
 }
 
 void ZVulkanFrameExecutor::ensureFrames()
@@ -104,45 +187,40 @@ void ZVulkanFrameExecutor::executeImmediate(const std::function<void(vk::raii::C
     return;
   }
 
-  auto& frame = acquireFrame();
+  auto frameHandle = beginFrame();
 
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
-  frame.commandBuffer.begin(beginInfo);
+  frameHandle.commandBuffer().begin(beginInfo);
 
   auto* dispatcher = m_device.context().device().getDispatcher();
   if (dispatcher && dispatcher->vkCmdBeginDebugUtilsLabelEXT && !debugLabel.empty()) {
     vk::DebugUtilsLabelEXT labelInfo{};
     labelInfo.pLabelName = debugLabel.data();
-    frame.commandBuffer.beginDebugUtilsLabelEXT(labelInfo);
+    frameHandle.commandBuffer().beginDebugUtilsLabelEXT(labelInfo);
   }
 
-  record(frame.commandBuffer);
+  record(frameHandle.commandBuffer());
 
   if (dispatcher && dispatcher->vkCmdEndDebugUtilsLabelEXT && !debugLabel.empty()) {
-    frame.commandBuffer.endDebugUtilsLabelEXT();
+    frameHandle.commandBuffer().endDebugUtilsLabelEXT();
   }
 
-  frame.commandBuffer.end();
+  frameHandle.commandBuffer().end();
 
-  vk::CommandBuffer rawBuffer = *frame.commandBuffer;
+  vk::CommandBuffer rawBuffer = *frameHandle.commandBuffer();
   vk::SubmitInfo submitInfo{};
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &rawBuffer;
 
   auto& queue = m_device.context().graphicsQueue();
-  queue.submit(submitInfo, *frame.fence);
-  frame.inFlight = true;
+  queue.submit(submitInfo, *frameHandle.fence());
+  markSubmitted(frameHandle);
+
+  waitForCompletion(frameHandle);
 
   auto& vkDevice = m_device.context().device();
-  const auto waitResult = vkDevice.waitForFences({*frame.fence}, VK_TRUE, kFenceTimeoutNs);
-  if (waitResult != vk::Result::eSuccess) {
-    LOG(WARNING) << "Frame executor immediate wait result " << vk::to_string(waitResult);
-  }
-
-  frame.inFlight = false;
-  vkDevice.resetFences({*frame.fence});
-  frame.commandBuffer.reset();
+  vkDevice.resetFences({*frameHandle.fence()});
+  frameHandle.commandBuffer().reset();
 }
 
 } // namespace nim
-

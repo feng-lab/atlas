@@ -4,12 +4,14 @@
 #include "zglmutils.h"
 #include "zvulkan.h"
 #include "zvulkandevice.h"
+#include "zvulkanframeexecutor.h"
 
 #include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace nim {
@@ -75,8 +77,9 @@ public:
 private:
   friend class Z3DRendererBase;
   void ensureDevice();
-  void ensureFrameResources();
   void resetFrameResources();
+  struct FrameResources;
+  FrameResources& ensureFrameResourcesForKey(void* key);
   struct GpuScopeRecord
   {
     std::string label;
@@ -90,9 +93,6 @@ private:
   };
   struct FrameResources
   {
-    vk::raii::CommandBuffer commandBuffer{nullptr};
-    vk::raii::Fence fence{nullptr};
-    bool inFlight = false;
     vk::raii::QueryPool queryPool{nullptr};
     std::vector<GpuScopeRecord> gpuScopes;
     std::vector<CpuScopeRecord> cpuScopes;
@@ -101,7 +101,6 @@ private:
     std::chrono::steady_clock::time_point cpuEnd;
   };
 
-  FrameResources& acquireFrame();
   void collectFrameTimings(FrameResources& frame);
   std::optional<size_t> beginGpuScope(std::string_view label);
   void endGpuScope(size_t token);
@@ -110,7 +109,8 @@ private:
   ZVulkanDevice* m_sharedDevice = nullptr; // non-owning; provided by engine/scratch-pool
   ZVulkanDevice* m_frameDevice = nullptr;    // tracked to rebuild frame resources on device changes
   std::vector<FrameResources> m_frames;
-  size_t m_frameCursor = 0;
+  std::unordered_map<void*, size_t> m_frameResourceMap;
+  std::optional<ZVulkanFrameExecutor::ActiveFrame> m_activeFrameHandle;
   FrameResources* m_activeFrame = nullptr;
   bool m_frameRecording = false;
   uint32_t m_maxFramesInFlight = 2;

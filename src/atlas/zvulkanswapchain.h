@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zvulkan.h"
+#include "zvulkanframeexecutor.h"
 #include <memory>
 #include <optional>
 
@@ -29,6 +30,12 @@ public:
   ZVulkanTexture& colorAttachment();
   ZVulkanTexture& depthAttachment();
 
+  void configureAcquireWait(bool enable,
+                            vk::PipelineStageFlags stageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput);
+
+  [[nodiscard]] vk::Semaphore acquireSemaphore() const;
+  [[nodiscard]] vk::Semaphore releaseSemaphore() const;
+
   vk::raii::CommandBuffer& beginFrame(vk::ClearColorValue clearColor =
                                         vk::ClearColorValue(std::array<float, 4>{{0.0f, 0.0f, 0.0f, 1.0f}}),
                                       vk::ClearDepthStencilValue clearDepthStencil =
@@ -39,7 +46,6 @@ public:
 private:
   void createAttachments();
   void createSampler();
-  void createCommandBuffers();
 
   ZVulkanDevice& m_device;
   uint32_t m_width;
@@ -48,10 +54,9 @@ private:
   std::unique_ptr<ZVulkanTexture> m_colorAttachment;
   std::unique_ptr<ZVulkanTexture> m_depthAttachment;
   std::optional<vk::raii::Sampler> m_sampler;
-  std::optional<vk::raii::CommandPool> m_commandPool;
-  std::optional<vk::raii::CommandBuffers> m_commandBuffers;
-  std::optional<vk::raii::Fence> m_inFlightFence;
-  uint32_t m_currentBuffer = 0;
+  std::optional<ZVulkanFrameExecutor::ActiveFrame> m_activeFrame;
+  vk::PipelineStageFlags m_acquireWaitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  bool m_waitOnAcquire = false;
 };
 
 } // namespace nim
