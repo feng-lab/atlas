@@ -10,8 +10,10 @@
 #include "zvulkandescriptorset.h"
 // Attachment format helpers
 #include "zvulkanrenderconversions.h"
+#include "z3dtypes.h"
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -78,6 +80,7 @@ public:
   // tiny texture/sampler creation.
   ZVulkanTexture& defaultPlaceholderTexture2D();
   vk::Sampler defaultSampler();
+  vk::Sampler nearestClampSampler();
 
   void preBackendSwitch() override;
 
@@ -124,6 +127,19 @@ public:
       }
     }
   }
+
+  // Stage 4: Async Readback API (offscreen)
+  // Request an end-of-frame copy of a color attachment into a host-visible staging buffer.
+  // The provided onReady callback executes after the frame fence signals (on the
+  // rendering thread) with a pointer to the mapped staging memory and metadata.
+  // The callback must not retain the pointer beyond the callback's lifetime.
+  void requestEndOfFrameColorReadback(class ZVulkanTexture& src,
+                                      Z3DEye eye,
+                                      std::function<void(const void* mapped,
+                                                         size_t bytes,
+                                                         vk::Format format,
+                                                         glm::uvec2 size,
+                                                         std::function<void()> releaseSlot)> onReady);
 
 private:
   friend class Z3DRendererBase;
@@ -183,6 +199,23 @@ private:
     // Descriptor guardrails counters
     uint32_t descriptorWritesWhileRecording = 0;   // attempted writes during recording
     uint32_t boundSetRewriteAttempts = 0;          // attempted rewrites of persistent sets
+
+    // Stage 4: end-of-frame readback bookkeeping
+    struct PendingReadback
+    {
+      class ZVulkanTexture* src = nullptr;
+      Z3DEye eye = MonoEye;
+      glm::uvec2 size{0u, 0u};
+      vk::Format format = vk::Format::eUndefined;
+      // Assigned staging slot index in m_readbackSlots
+      int slotIndex = -1;
+      size_t bytes = 0;
+      // Consumer callback (runs after fence signal)
+      std::function<void(const void* mapped, size_t bytes, vk::Format fmt, glm::uvec2 size, std::function<void()> releaseSlot)> onReady;
+    };
+    std::vector<PendingReadback> pendingColorReadbacks;
+    size_t readbackBytesCopied = 0;      // total bytes copied this frame
+    uint32_t readbackSlotsInFlight = 0;  // slots associated with this frame
   };
 
   void collectFrameTimings(FrameResources& frame);
@@ -199,6 +232,9 @@ private:
   bool m_frameRecording = false;
   uint32_t m_maxFramesInFlight = 2;
   float m_timestampPeriod = 1.0f;
+  // Deliver first Vulkan frame to UI immediately after backend switch by
+  // pumping the fence and executing deferred readback consumers once.
+  bool m_pumpFenceAfterFirstSubmit = true;
 
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
@@ -232,7 +268,27 @@ private:
 
   void ensureSharedSamplers();
   void ensureFullscreenQuad();
-  
+
+  // Stage 4: Readback ring buffers
+  struct ReadbackSlot
+  {
+    std::unique_ptr<class ZVulkanBuffer> buffer;
+    void* mapped = nullptr;  // persistent mapping
+    size_t capacity = 0;     // bytes
+    bool inUse = false;      // associated with an in-flight frame
+    // Optional tag for debugging
+    const char* tag = "color";
+  };
+  std::vector<ReadbackSlot> m_readbackSlots; // shared across frames
+  uint32_t m_readbackCursor = 0;
+
+  // Ensure at least N slots exist and each has capacity >= minBytes
+  void ensureReadbackSlots(size_t minBytes, uint32_t minSlots);
+  // Acquire a free slot; returns index or -1 if none available
+  int acquireReadbackSlot(size_t requiredBytes);
+  // Mark slot free (after fence and consumer copy)
+  void releaseReadbackSlot(int index);
+
   // TLS current backend pointer
   static thread_local Z3DRendererVulkanBackend* s_currentBackend;
 };

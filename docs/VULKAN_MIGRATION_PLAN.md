@@ -565,7 +565,7 @@ Deferred/Notes
 - **Scope:**
   - Ring-buffered staging buffers (preferred) or linear images for readback: allocate N host-visible, HOST_COHERENT (and HOST_CACHED when available) buffers sized for the target format (e.g., RGBA8) and persistently map them.
   - Record readback in-frame: at the end of the per-frame command buffer, transition color attachment to TRANSFER_SRC, issue vkCmdCopyImageToBuffer into the current ring buffer, then transition back as needed. Use the frame fence (or a per-frame fence token) to know when the buffer is ready.
-  - One-frame latency handoff: UI/CPU consumption reads the previous frame’s buffer after fence signal; provide a knob `--atlas_vk_readback_lag_frames=N` (default 1) for tuning.
+  - Readback handoff: UI/CPU consumption occurs after the frame fence signals. Immediate UI update is used by default (no lag knob).
   - Optional timeline semaphore path: when available and stable on the platform, replace/augment fence waits with a per-frame timeline semaphore counter for finer-grained readiness tracking. Fallback remains fence-based.
   - Row pitch control: set `bufferRowLength` to the image width (no padding) and copy RGBA8 when possible to reduce CPU swizzling; otherwise, perform a single swizzle step on CPU outside the render thread.
   - Picking batching: accumulate hover-pick requests within the same frame and service them off the most recent ready buffer rather than blocking on the GPU.
@@ -575,6 +575,14 @@ Deferred/Notes
   - Stable one-frame latency (configurable); ring buffers rotate without reuse-before-signal.
   - Data correctness (checksums on a few frames) and consistent pitches.
 - **Docs:** Update USER_GUIDE with new screenshot/picking options; document environment toggles.
+
+Implementation status (2025-10):
+
+- End-of-frame color readback enqueued into host-visible staging buffers; UI consumes after the frame fence (default N=1).
+- Single command buffer per frame preserved; copies are recorded late in-frame before `vk::raii::CommandBuffer::end()`.
+- Ring-backed staging with persistent mapping; slots are not reused before the owning frame’s fence signals.
+- Picking color is batched similarly; interactive hover/select reads from the most recent cached CPU buffer with a fallback to synchronous 1×1 when not yet ready.
+  (No user-facing flags; immediate UI update by default.)
 
 ### Stage 5 – Deferred Enhancements (owner: shared, backlog)
 

@@ -4,6 +4,7 @@
 #include "zglmutils.h"
 #include <cstdint>
 #include <map>
+#include <cstring>
 #include <vector>
 #include <boost/unordered/unordered_flat_map.hpp>
 
@@ -104,6 +105,28 @@ private:
   ZVulkanTexture* m_vkColor = nullptr;
   ZVulkanTexture* m_vkDepth = nullptr;
   glm::uvec2 m_vkSize{0u, 0u};
+
+  // Cached CPU copy of Vulkan picking color buffer (latest ready frame)
+  std::vector<uint8_t> m_cachedColor;
+  glm::uvec2 m_cachedColorSize{0u, 0u};
+  bool m_cachedColorValid = false;
+
+public:
+  // Update cached picking color buffer (RGBA8) from a CPU pointer.
+  // Copies data; safe to call from the rendering thread after fence.
+  void updateCachedVulkanPickingColor(const uint8_t* data, size_t bytes, glm::uvec2 size)
+  {
+    if (!data || size.x == 0u || size.y == 0u || bytes < static_cast<size_t>(size.x) * size.y * 4u) {
+      m_cachedColorValid = false;
+      m_cachedColor.clear();
+      m_cachedColorSize = glm::uvec2(0u);
+      return;
+    }
+    m_cachedColor.resize(static_cast<size_t>(size.x) * size.y * 4u);
+    std::memcpy(m_cachedColor.data(), data, m_cachedColor.size());
+    m_cachedColorSize = size;
+    m_cachedColorValid = true;
+  }
 };
 
 } // namespace nim

@@ -79,7 +79,8 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   if (m_frameRecording && m_activeFrameHandle && m_activeFrameHandle->valid()) {
     try {
       m_activeFrameHandle->commandBuffer().end();
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
       LOG(WARNING) << "Vulkan command buffer end during backend switch failed: " << e.what();
     }
     m_frameRecording = false;
@@ -230,6 +231,10 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.skippedBatchesFormatMismatch = 0;
   frameResources.descriptorWritesWhileRecording = 0;
   frameResources.boundSetRewriteAttempts = 0;
+  // Reset Stage 4 (readback) bookkeeping
+  frameResources.pendingColorReadbacks.clear();
+  frameResources.readbackBytesCopied = 0;
+  frameResources.readbackSlotsInFlight = 0;
 
   // Expose frame resources to allow pre-record descriptor priming
   m_activeFrame = &frameResources;
@@ -277,7 +282,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Install scratch-pool deferred release scheduler for this active frame
   {
     auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-    pool.setVulkanReleaseScheduler([this](std::function<void()> fn) { this->scheduleAfterCurrentFrameCompletion(std::move(fn)); });
+    pool.setVulkanReleaseScheduler([this](std::function<void()> fn) {
+      this->scheduleAfterCurrentFrameCompletion(std::move(fn));
+    });
   }
 }
 
@@ -292,10 +299,48 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   auto& frame = *m_activeFrame;
   auto& frameHandle = *m_activeFrameHandle;
 
+  // Insert end-of-frame image->buffer copies for pending readbacks
+  if (m_frameRecording && !frame.pendingColorReadbacks.empty()) {
+    auto& cmd = frameHandle.commandBuffer();
+    for (auto& pr : frame.pendingColorReadbacks) {
+      if (pr.slotIndex < 0 || pr.src == nullptr) {
+        continue;
+      }
+      try {
+        const auto originalLayout = pr.src->layout();
+        pr.src->transitionLayout(cmd,
+                                 originalLayout,
+                                 vk::ImageLayout::eTransferSrcOptimal,
+                                 vk::ImageAspectFlagBits::eColor);
+        vk::BufferImageCopy region{};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = vk::Offset3D{0, 0, 0};
+        region.imageExtent = vk::Extent3D{pr.size.x, pr.size.y, 1u};
+        const auto& slot = m_readbackSlots[static_cast<size_t>(pr.slotIndex)];
+        cmd.copyImageToBuffer(pr.src->image(), vk::ImageLayout::eTransferSrcOptimal, slot.buffer->buffer(), region);
+        const vk::ImageLayout restore =
+          (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
+        pr.src->transitionLayout(cmd, vk::ImageLayout::eTransferSrcOptimal, restore, vk::ImageAspectFlagBits::eColor);
+        frame.readbackBytesCopied += pr.bytes;
+        frame.readbackSlotsInFlight++;
+      }
+      catch (const std::exception& e) {
+        LOG_FIRST_N(WARNING, 3) << "Vulkan readback copy failed: " << e.what();
+      }
+    }
+  }
+
   if (m_frameRecording) {
     try {
       frameHandle.commandBuffer().end();
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
       LOG(WARNING) << "Vulkan command buffer end failed: " << e.what();
       m_frameRecording = false;
       m_activeFrameHandle.reset();
@@ -332,27 +377,43 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   try {
     queue.submit(submitInfo, *frameHandle.fence());
     device().frameExecutor().markSubmitted(frameHandle);
-  } catch (const std::exception& e) {
+  }
+  catch (const std::exception& e) {
     LOG(WARNING) << "Vulkan queue submit failed: " << e.what();
   }
 
   // Stage 2: schedule exactly one descriptor arena reset for this frame.
   scheduleArenaReset(frame);
 
+  // Deliver callbacks immediately after submission when this frame enqueued
+  // readbacks, to update the UI as soon as the GPU finishes. Also do it once
+  // after a backend switch to ensure the first frame appears promptly.
+  if ((m_activeFrame && !m_activeFrame->pendingColorReadbacks.empty()) || m_pumpFenceAfterFirstSubmit) {
+    device().frameExecutor().waitForCompletion(frameHandle);
+    applyPendingArenaReset(frame); // runs deferred readback consumers now
+    if (m_pumpFenceAfterFirstSubmit) {
+      VLOG(1) << "VK pumped first-frame fence: delivered readback callbacks";
+      m_pumpFenceAfterFirstSubmit = false;
+    }
+  }
+
   // VLOG(1) frame recycling stats (descriptors and arena reset scheduling)
   vlogFrameRecyclingStats(frame);
 
   // Stage 3: VLOG instrumentation for dynamic rendering segments and pipeline stats
-  VLOG(1) << fmt::format("VK segments: began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={} overrides={} skipped_format_mismatch={} descriptor_writes_while_recording={} bound_set_rewrite_attempts={}",
-                         frame.renderingSegmentsBegan,
-                         frame.attachmentClears,
-                         frame.attachmentLoads,
-                         frame.pipelinesCreated,
-                         frame.pipelinesBound.size(),
-                         frame.overrideSetsAllocated,
-                         frame.skippedBatchesFormatMismatch,
-                         frame.descriptorWritesWhileRecording,
-                         frame.boundSetRewriteAttempts);
+  VLOG(1) << fmt::format(
+    "VK segments: began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={} overrides={} skipped_format_mismatch={} descriptor_writes_while_recording={} bound_set_rewrite_attempts={} readback_bytes_copied={} readback_slots_in_flight={}",
+    frame.renderingSegmentsBegan,
+    frame.attachmentClears,
+    frame.attachmentLoads,
+    frame.pipelinesCreated,
+    frame.pipelinesBound.size(),
+    frame.overrideSetsAllocated,
+    frame.skippedBatchesFormatMismatch,
+    frame.descriptorWritesWhileRecording,
+    frame.boundSetRewriteAttempts,
+    frame.readbackBytesCopied,
+    frame.readbackSlotsInFlight);
 
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
@@ -419,10 +480,14 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
   auto& cmd = m_activeFrameHandle->commandBuffer();
 
   // Build a simple attachment key for coalescing
-  struct AttachKey {
+  struct AttachKey
+  {
     std::vector<uint64_t> colors;
     uint64_t depth = 0;
-    bool operator==(const AttachKey& o) const { return depth == o.depth && colors == o.colors; }
+    bool operator==(const AttachKey& o) const
+    {
+      return depth == o.depth && colors == o.colors;
+    }
   };
   auto buildKey = [](const RenderBatch& b) {
     AttachKey k;
@@ -548,25 +613,38 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
     // Ensure any sampled inputs referenced by this batch are transitioned to shader-read
     auto classifyReadLayout = [](vk::Format format) {
-      struct { vk::ImageLayout layout; vk::ImageAspectFlags aspect; } result;
+      struct
+      {
+        vk::ImageLayout layout;
+        vk::ImageAspectFlags aspect;
+      } result;
       switch (format) {
         case vk::Format::eD16Unorm:
         case vk::Format::eX8D24UnormPack32:
         case vk::Format::eD32Sfloat:
-          result.layout = vk::ImageLayout::eDepthReadOnlyOptimal; result.aspect = vk::ImageAspectFlagBits::eDepth; break;
+          result.layout = vk::ImageLayout::eDepthReadOnlyOptimal;
+          result.aspect = vk::ImageAspectFlagBits::eDepth;
+          break;
         case vk::Format::eD16UnormS8Uint:
         case vk::Format::eD24UnormS8Uint:
         case vk::Format::eD32SfloatS8Uint:
-          result.layout = vk::ImageLayout::eDepthStencilReadOnlyOptimal; result.aspect = vk::ImageAspectFlagBits::eDepth; break;
+          result.layout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+          result.aspect = vk::ImageAspectFlagBits::eDepth;
+          break;
         case vk::Format::eS8Uint:
-          result.layout = vk::ImageLayout::eStencilReadOnlyOptimal; result.aspect = vk::ImageAspectFlagBits::eStencil; break;
+          result.layout = vk::ImageLayout::eStencilReadOnlyOptimal;
+          result.aspect = vk::ImageAspectFlagBits::eStencil;
+          break;
         default:
-          result.layout = vk::ImageLayout::eShaderReadOnlyOptimal; result.aspect = {};
+          result.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+          result.aspect = {};
       }
       return result;
     };
     auto ensureSampledReadable = [&](const AttachmentHandle& handle) {
-      if (!handle.valid()) return;
+      if (!handle.valid()) {
+        return;
+      }
       auto& texture = vulkan::textureFromHandle(handle, device(), "renderer sampled attachment");
       const auto samplingState = classifyReadLayout(texture.format());
       vk::ImageAspectFlags transitionAspect = samplingState.aspect;
@@ -882,20 +960,22 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
 
   std::string_view scopeLabel = pass.debugLabel ? std::string_view(pass.debugLabel) : std::string_view();
 
-  renderer.executeVulkanBatches([&]() {
-    // Opaque first
-    for (auto* filter : pass.opaqueFilters) {
-      recordFilterBatches(filter, [&]() {
-        filter->renderOpaque(pass.eye);
-      });
-    }
-    // Then transparent
-    for (const auto& tb : pass.transparentFilters) {
-      recordFilterBatches(tb.filter, [&]() {
-        tb.filter->renderTransparent(pass.eye);
-      });
-    }
-  }, scopeLabel);
+  renderer.executeVulkanBatches(
+    [&]() {
+      // Opaque first
+      for (auto* filter : pass.opaqueFilters) {
+        recordFilterBatches(filter, [&]() {
+          filter->renderOpaque(pass.eye);
+        });
+      }
+      // Then transparent
+      for (const auto& tb : pass.transparentFilters) {
+        recordFilterBatches(tb.filter, [&]() {
+          tb.filter->renderTransparent(pass.eye);
+        });
+      }
+    },
+    scopeLabel);
 
   renderer.setCollectOnly(false);
 }
@@ -963,12 +1043,12 @@ void Z3DRendererVulkanBackend::ensureDefaultPlaceholders()
   }
   if (!m_defaultPlaceholder2D) {
     // 1x1 RGBA8 white texture for placeholder sampling
-    m_defaultPlaceholder2D = m_sharedDevice->createTexture(1,
-                                                           1,
-                                                           vk::Format::eR8G8B8A8Unorm,
-                                                           vk::ImageUsageFlagBits::eSampled |
-                                                             vk::ImageUsageFlagBits::eTransferDst,
-                                                           vk::MemoryPropertyFlagBits::eDeviceLocal);
+    m_defaultPlaceholder2D =
+      m_sharedDevice->createTexture(1,
+                                    1,
+                                    vk::Format::eR8G8B8A8Unorm,
+                                    vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
     uint32_t pixel = 0xffffffffu;
     m_defaultPlaceholder2D->uploadData(&pixel, sizeof(pixel));
   }
@@ -985,6 +1065,13 @@ vk::Sampler Z3DRendererVulkanBackend::defaultSampler()
 {
   ensureDefaultPlaceholders();
   return **m_defaultSampler;
+}
+
+vk::Sampler Z3DRendererVulkanBackend::nearestClampSampler()
+{
+  ensureDefaultPlaceholders();
+  ensureSharedSamplers();
+  return **m_nearestClampSampler;
 }
 
 void Z3DRendererVulkanBackend::ensureSharedSamplers()
@@ -1034,12 +1121,12 @@ Z3DRendererVulkanBackend::allocateFrameDescriptorSet(vk::DescriptorSetLayout lay
   return set;
 }
 
-ZVulkanDescriptorSet*
-Z3DRendererVulkanBackend::allocateOverrideDescriptorSet(vk::DescriptorSetLayout layout)
+ZVulkanDescriptorSet* Z3DRendererVulkanBackend::allocateOverrideDescriptorSet(vk::DescriptorSetLayout layout)
 {
-  auto set = m_sharedDevice && m_activeFrame && m_activeFrame->descriptorPool
-               ? m_sharedDevice->createDescriptorSet(*m_activeFrame->descriptorPool, layout, /*isOverrideTransient*/ true)
-               : nullptr;
+  auto set =
+    m_sharedDevice && m_activeFrame && m_activeFrame->descriptorPool
+      ? m_sharedDevice->createDescriptorSet(*m_activeFrame->descriptorPool, layout, /*isOverrideTransient*/ true)
+      : nullptr;
   if (!set) {
     return nullptr;
   }
@@ -1068,15 +1155,13 @@ void Z3DRendererVulkanBackend::scheduleAfterCurrentFrameCompletion(std::function
 
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()
 {
-  CHECK(m_activeFrameHandle && m_activeFrameHandle->valid())
-    << "Command buffer requested outside active frame";
+  CHECK(m_activeFrameHandle && m_activeFrameHandle->valid()) << "Command buffer requested outside active frame";
   return m_activeFrameHandle->commandBuffer();
 }
 
 const vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer() const
 {
-  CHECK(m_activeFrameHandle && m_activeFrameHandle->valid())
-    << "Command buffer requested outside active frame";
+  CHECK(m_activeFrameHandle && m_activeFrameHandle->valid()) << "Command buffer requested outside active frame";
   return m_activeFrameHandle->commandBuffer();
 }
 
@@ -1107,8 +1192,7 @@ void Z3DRendererVulkanBackend::resetFrameResources()
   m_frameDevice = nullptr;
 }
 
-Z3DRendererVulkanBackend::FrameResources&
-Z3DRendererVulkanBackend::ensureFrameResourcesForKey(void* key)
+Z3DRendererVulkanBackend::FrameResources& Z3DRendererVulkanBackend::ensureFrameResourcesForKey(void* key)
 {
   ensureDevice();
   CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing";
@@ -1187,8 +1271,7 @@ void Z3DRendererVulkanBackend::vlogFrameRecyclingStats(const FrameResources& fra
                          frame.leaseRecycleExecuted);
 }
 
-const std::optional<vulkan::AttachmentFormats>&
-Z3DRendererVulkanBackend::currentSegmentFormats() const
+const std::optional<vulkan::AttachmentFormats>& Z3DRendererVulkanBackend::currentSegmentFormats() const
 {
   static const std::optional<vulkan::AttachmentFormats> kNone;
   if (!m_activeFrame) {
@@ -1214,13 +1297,12 @@ bool Z3DRendererVulkanBackend::validateFormatsOrSkip(const vulkan::AttachmentFor
   }
   m_activeFrame->skippedBatchesFormatMismatch++;
   const std::string ctx = (contextTag && *contextTag) ? fmt::format(" [{}]", contextTag) : std::string();
-  LOG(ERROR) << fmt::format(
-    "VK: format mismatch{}: seg colors={} depth={}, pipeline colors={} depth={}",
-    ctx,
-    seg->colorFormats.size(),
-    seg->depthFormat.has_value(),
-    pipelineFormats.colorFormats.size(),
-    pipelineFormats.depthFormat.has_value());
+  LOG(ERROR) << fmt::format("VK: format mismatch{}: seg colors={} depth={}, pipeline colors={} depth={}",
+                            ctx,
+                            seg->colorFormats.size(),
+                            seg->depthFormat.has_value(),
+                            pipelineFormats.colorFormats.size(),
+                            pipelineFormats.depthFormat.has_value());
   CHECK(false) << "Vulkan dynamic rendering segment/pipeline format mismatch (fatal).";
   return false;
 }
@@ -1244,11 +1326,131 @@ void Z3DRendererVulkanBackend::ensureFullscreenQuad()
                                            QuadVertex{glm::vec3(1.0f, 1.0f, z)},
                                            QuadVertex{glm::vec3(1.0f, -1.0f, z)}};
   const size_t bytes = vertices.size() * sizeof(QuadVertex);
-  m_fullscreenQuadVbo = dev.createBuffer(bytes,
-                                         vk::BufferUsageFlagBits::eVertexBuffer,
-                                         vk::MemoryPropertyFlagBits::eHostVisible |
-                                           vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_fullscreenQuadVbo =
+    dev.createBuffer(bytes,
+                     vk::BufferUsageFlagBits::eVertexBuffer,
+                     vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_fullscreenQuadVbo->copyData(vertices.data(), bytes);
+}
+
+void Z3DRendererVulkanBackend::ensureReadbackSlots(size_t minBytes, uint32_t minSlots)
+{
+  const uint32_t desired = std::max<uint32_t>(minSlots, std::max<uint32_t>(m_maxFramesInFlight, 2));
+  if (m_readbackSlots.size() < desired) {
+    m_readbackSlots.resize(desired);
+  }
+  for (auto& slot : m_readbackSlots) {
+    if (!slot.buffer || slot.capacity < minBytes) {
+      slot.buffer =
+        device().createBuffer(minBytes,
+                              vk::BufferUsageFlagBits::eTransferDst,
+                              vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent |
+                                vk::MemoryPropertyFlagBits::eHostCached);
+      slot.capacity = minBytes;
+      slot.mapped = slot.buffer->map(0, minBytes);
+      slot.inUse = false;
+      slot.tag = "color";
+    }
+  }
+}
+
+int Z3DRendererVulkanBackend::acquireReadbackSlot(size_t requiredBytes)
+{
+  // Ensure baseline capacity: at least 3 slots (previous pinned + current color + picking)
+  if (m_readbackSlots.empty()) {
+    ensureReadbackSlots(requiredBytes,
+                        std::max<uint32_t>(3u, std::max<uint32_t>(m_maxFramesInFlight + 1u, static_cast<uint32_t>(2))));
+  } else {
+    ensureReadbackSlots(requiredBytes, static_cast<uint32_t>(m_readbackSlots.size()));
+  }
+  auto tryAcquire = [&](size_t n) -> int {
+    for (size_t i = 0; i < n; ++i) {
+      const size_t idx = (m_readbackCursor + i) % n;
+      if (!m_readbackSlots[idx].inUse && m_readbackSlots[idx].capacity >= requiredBytes) {
+        m_readbackSlots[idx].inUse = true;
+        m_readbackCursor = static_cast<uint32_t>((idx + 1) % n);
+        return static_cast<int>(idx);
+      }
+    }
+    return -1;
+  };
+
+  size_t n = m_readbackSlots.size();
+  int idx = tryAcquire(n);
+  if (idx >= 0) {
+    return idx;
+  }
+  // All slots busy; grow by one and retry.
+  ensureReadbackSlots(requiredBytes, static_cast<uint32_t>(n + 1));
+  n = m_readbackSlots.size();
+  idx = tryAcquire(n);
+  return idx;
+}
+
+void Z3DRendererVulkanBackend::releaseReadbackSlot(int index)
+{
+  if (index < 0) {
+    return;
+  }
+  const size_t idx = static_cast<size_t>(index);
+  if (idx >= m_readbackSlots.size()) {
+    return;
+  }
+  m_readbackSlots[idx].inUse = false;
+}
+
+void Z3DRendererVulkanBackend::requestEndOfFrameColorReadback(
+  ZVulkanTexture& src,
+  Z3DEye eye,
+  std::function<
+    void(const void* mapped, size_t bytes, vk::Format format, glm::uvec2 size, std::function<void()> releaseSlot)>
+    onReady)
+{
+  CHECK(m_activeFrame && m_activeFrameHandle && m_activeFrameHandle->valid())
+    << "VK readback requested outside of an active frame";
+  const glm::uvec2 size{src.width(), src.height()};
+  const vk::Format fmt = src.format();
+  const size_t bpp = (fmt == vk::Format::eR16G16B16A16Unorm || fmt == vk::Format::eR16G16B16A16Sfloat) ? 8u : 4u;
+  const size_t bytes = static_cast<size_t>(size.x) * size.y * bpp;
+  const int slotIndex = acquireReadbackSlot(bytes);
+  CHECK(slotIndex >= 0) << "VK readback slot unavailable (bytes=" << bytes << ")";
+  VLOG(1) << fmt::format("VK readback enqueue src=0x{:x} size={}x{} bytes={} slot={} eye={}",
+                         reinterpret_cast<uint64_t>(&src),
+                         size.x,
+                         size.y,
+                         bytes,
+                         slotIndex,
+                         static_cast<int>(eye));
+
+  FrameResources::PendingReadback pr{};
+  pr.src = &src;
+  pr.eye = eye;
+  pr.size = size;
+  pr.format = fmt;
+  pr.bytes = bytes;
+  pr.slotIndex = slotIndex;
+  pr.onReady = std::move(onReady);
+  m_activeFrame->pendingColorReadbacks.emplace_back(std::move(pr));
+
+  // Schedule consumer after the frame fence signals.
+  auto consumer = [this, slotIndex, fmt, size, bytes, onReady = m_activeFrame->pendingColorReadbacks.back().onReady]() {
+    CHECK(static_cast<size_t>(slotIndex) < m_readbackSlots.size());
+    const void* mapped = m_readbackSlots[static_cast<size_t>(slotIndex)].mapped;
+    CHECK(mapped != nullptr) << "VK readback mapped pointer is null";
+    VLOG(1) << fmt::format("VK readback consumer begin slot={} bytes={} size={}x{}", slotIndex, bytes, size.x, size.y);
+    if (onReady) {
+      const auto t0 = std::chrono::steady_clock::now();
+      // Hand out a release function to free the slot when the UI is done with it
+      std::function<void()> releaseFn = [this, si = slotIndex]() {
+        this->releaseReadbackSlot(si);
+      };
+      onReady(mapped, bytes, fmt, size, std::move(releaseFn));
+      const auto t1 = std::chrono::steady_clock::now();
+      const double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+      VLOG(1) << fmt::format("VK readback consumer: {} bytes, {:.3f} ms", bytes, ms);
+    }
+  };
+  scheduleAfterCurrentFrameCompletion(std::move(consumer));
 }
 
 void Z3DRendererVulkanBackend::notifyPipelineCreated()
@@ -1287,15 +1489,15 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     auto& device = m_sharedDevice->context().device();
     const auto* dispatcher = device.getDispatcher();
     if (dispatcher && dispatcher->vkGetQueryPoolResults) {
-      const VkResult rawResult = dispatcher->vkGetQueryPoolResults(static_cast<VkDevice>(*device),
-                                                                   static_cast<VkQueryPool>(*frame.queryPool),
-                                                                   0,
-                                                                   frame.nextQuery,
-                                                                   queryData.size() * sizeof(uint64_t),
-                                                                   queryData.data(),
-                                                                   sizeof(uint64_t),
-                                                                   static_cast<VkQueryResultFlags>(
-                                                                     vk::QueryResultFlagBits::e64));
+      const VkResult rawResult =
+        dispatcher->vkGetQueryPoolResults(static_cast<VkDevice>(*device),
+                                          static_cast<VkQueryPool>(*frame.queryPool),
+                                          0,
+                                          frame.nextQuery,
+                                          queryData.size() * sizeof(uint64_t),
+                                          queryData.data(),
+                                          sizeof(uint64_t),
+                                          static_cast<VkQueryResultFlags>(vk::QueryResultFlagBits::e64));
       const auto result = static_cast<vk::Result>(rawResult);
 
       if (result == vk::Result::eSuccess) {
@@ -1318,7 +1520,6 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     } else {
       VLOG(1) << "Vulkan dispatcher missing vkGetQueryPoolResults";
     }
-
   }
 
   for (const auto& cpuScope : frame.cpuScopes) {

@@ -120,13 +120,33 @@ void Z3DCanvas::renderingFinished()
 #else
     const std::scoped_lock lock(m_engine->targetSwitchMutex());
     auto localBuffer = m_engine->monoReadyLocalBuffer();
-    // CHECK(localBuffer);
-    auto pixmap = QPixmap::fromImage(
-      QImage(localBuffer->data.data(), localBuffer->width, localBuffer->height, QImage::Format_ARGB32_Premultiplied)
-        .flipped(Qt::Vertical));
+    QImage image;
+    if (localBuffer->external && localBuffer->width > 0 && localBuffer->height > 0) {
+      // Vulkan zero-copy path: mapped RGBA8 staging
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+      image =
+        QImage(localBuffer->external,
+               static_cast<int>(localBuffer->width),
+               static_cast<int>(localBuffer->height),
+               static_cast<int>(localBuffer->externalStride ? localBuffer->externalStride : localBuffer->width * 4),
+               QImage::Format_RGBA8888_Premultiplied);
+#else
+      image =
+        QImage(localBuffer->external,
+               static_cast<int>(localBuffer->width),
+               static_cast<int>(localBuffer->height),
+               static_cast<int>(localBuffer->externalStride ? localBuffer->externalStride : localBuffer->width * 4),
+               QImage::Format_RGB32); // Fallback; older Qt may lack RGBA8888
+#endif
+    } else {
+      image = QImage(localBuffer->data.data(),
+                     static_cast<int>(localBuffer->width),
+                     static_cast<int>(localBuffer->height),
+                     QImage::Format_ARGB32_Premultiplied);
+    }
+    auto pixmap = QPixmap::fromImage(image.flipped(Qt::Vertical));
     pixmap.setDevicePixelRatio(devicePixelRatio());
     m_pixmapItem->setPixmap(pixmap);
-
     if (m_engine) {
       m_engine->clearNewRenderingFlag();
     }

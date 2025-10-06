@@ -11,12 +11,14 @@
 #include "zimg.h"
 #include "zimgformat.h"
 #include "zvulkantexture.h"
+#include "z3drenderervulkanbackend.h"
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <limits>
 #include <unordered_set>
+#include <optional>
 
 namespace {
 using namespace nim;
@@ -1780,52 +1782,130 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
   // Per-pass recordVulkanBatches has already ended frames it began
 
-  // Finalize frame: download final color to local buffer and signal like GL path
+  // Finalize: enqueue end-of-frame readback to staging and perform CPU copy after fence.
   {
     ZVulkanTexture* finalColor = outLease->colorAttachment(0);
-    if (finalColor) {
-      const auto readbackStart = std::chrono::steady_clock::now();
-      auto* local = (eye == MonoEye)   ? m_monoCurrentLocalBuffer
-                    : (eye == LeftEye) ? m_leftCurrentLocalBuffer
-                                       : m_rightCurrentLocalBuffer;
-      downloadVulkanTextureToLocalColorBuffer(*finalColor, *local);
-      const auto readbackEnd = std::chrono::steady_clock::now();
-      const double readbackMs =
-        std::chrono::duration<double, std::milli>(readbackEnd - readbackStart).count();
-      VLOG(1) << "VK readback eye " << static_cast<int>(eye) << " took " << readbackMs << " ms";
+    // Request readback while a Vulkan frame is active so backend can insert the copy before endRender.
+    // If final color is not RGBA8, first render a copy to an RGBA8 scratch surface, then enqueue the readback inside the same frame.
+    if (finalColor && finalColor->format() != vk::Format::eR8G8B8A8Unorm) {
+      auto rgba8Lease = pool.acquireTempRenderTarget2D(m_outputSize, ScratchFormat::RGBA8, ScratchFormat::Depth24, RenderBackend::Vulkan);
+      if (rgba8Lease && rgba8Lease.backend == RenderBackend::Vulkan) {
+        m_rendererBase.setCollectOnly(true);
+        m_rendererBase.setActiveSurfaceForNextPass(rgba8Lease);
+        ClearValue clear{}; clear.color = glm::vec4(0.0f); clear.depth = 1.0f; clear.stencil = 0u;
+        m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+        m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+        m_rendererBase.recordVulkanBatches([&]() {
+          // GPU copy to RGBA8 first
+          AttachmentHandle srcColor{}; srcColor.backend = AttachmentBackend::Vulkan; srcColor.index = 0; srcColor.id = reinterpret_cast<uint64_t>(finalColor);
+          AttachmentHandle srcDepth{}; srcDepth.backend = AttachmentBackend::Vulkan; srcDepth.index = 0;
+          if (outLease && outLease->depthAttachmentTexture()) {
+            srcDepth.id = reinterpret_cast<uint64_t>(outLease->depthAttachmentTexture());
+          }
+          CHECK(srcColor.id != 0 && srcDepth.id != 0) << "final_rgba8_copy: missing source attachments";
+          VLOG(1) << fmt::format("VK final_rgba8_copy srcColor=0x{:x} srcDepth=0x{:x}",
+                                 static_cast<uint64_t>(srcColor.id), static_cast<uint64_t>(srcDepth.id));
+          m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
+          m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
+          // Enqueue readback while this frame is active
+          if (auto* backend = Z3DRendererVulkanBackend::current()) {
+            ZVulkanTexture* rgba8Tex = rgba8Lease.colorAttachment(0);
+            auto* localPtr = (eye == MonoEye)   ? m_monoCurrentLocalBuffer
+                            : (eye == LeftEye) ? m_leftCurrentLocalBuffer
+                                               : m_rightCurrentLocalBuffer;
+            const Z3DEye eyeCopy = eye;
+            VLOG(1) << fmt::format("VK enqueue final readback tex=0x{:x} size={}x{} eye={}",
+                                   reinterpret_cast<uint64_t>(rgba8Tex), rgba8Tex ? rgba8Tex->width() : 0,
+                                   rgba8Tex ? rgba8Tex->height() : 0, static_cast<int>(eyeCopy));
+            backend->requestEndOfFrameColorReadback(
+              *rgba8Tex,
+              eyeCopy,
+              [this, localPtr, eyeCopy, &pool](const void* mapped, size_t /*bytes*/, vk::Format /*fmt*/, glm::uvec2 size, std::function<void()> releaseSlot) {
+                if (localPtr->externalRelease) { localPtr->externalRelease(); localPtr->externalRelease = {}; }
+                localPtr->external = static_cast<const uint8_t*>(mapped);
+                localPtr->externalStride = static_cast<size_t>(size.x) * 4u;
+                localPtr->externalRelease = std::move(releaseSlot);
+                localPtr->width = size.x; localPtr->height = size.y;
+                VLOG(1) << fmt::format("VK final readback ready mapped={} size={}x{} eye={}", mapped, size.x, size.y, static_cast<int>(eyeCopy));
+                if (eyeCopy == MonoEye) {
+                  { const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+                    std::swap(m_monoReadyLocalBuffer, m_monoCurrentLocalBuffer);
+                    std::swap(m_monoReadyTarget, m_monoCurrentTarget);
+                  }
+                  m_globalParameters.hasNewRendering = true;
+                  static uint64_t s_lastCreate = 0, s_lastChange = 0; const uint64_t curCreate = pool.creationCounter(); const uint64_t curChange = pool.changeCounter();
+                  if (curCreate != s_lastCreate || curChange != s_lastChange) { VLOG(1) << pool.describeMemoryUsage(true); s_lastCreate = curCreate; s_lastChange = curChange; }
+                  VLOG(1) << fmt::format("VK renderingFinished (mono) readyBuffer={}", (void*)m_monoReadyLocalBuffer);
+                  Q_EMIT renderingFinished();
+                } else if (eyeCopy == LeftEye) {
+                  const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+                  std::swap(m_leftReadyLocalBuffer, m_leftCurrentLocalBuffer);
+                  std::swap(m_leftReadyTarget, m_leftCurrentTarget);
+                } else {
+                  { const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+                    std::swap(m_rightReadyLocalBuffer, m_rightCurrentLocalBuffer);
+                    std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+                  }
+                  m_globalParameters.hasNewRendering = true;
+                  VLOG(1) << "VK renderingFinished (right)";
+                  Q_EMIT renderingFinished();
+                }
+              });
+          }
+        }, "final_rgba8_copy_and_readback");
+        m_rendererBase.setCollectOnly(false);
+      }
+    } else if (finalColor) {
+      // No conversion needed; open a mini frame to enqueue readback
+      m_rendererBase.setCollectOnly(true);
+      m_rendererBase.recordVulkanBatches([&]() {
+        if (auto* backend = Z3DRendererVulkanBackend::current()) {
+          auto* localPtr = (eye == MonoEye)   ? m_monoCurrentLocalBuffer
+                          : (eye == LeftEye) ? m_leftCurrentLocalBuffer
+                                             : m_rightCurrentLocalBuffer;
+          const Z3DEye eyeCopy = eye;
+          VLOG(1) << fmt::format("VK enqueue final readback (no copy) tex=0x{:x} size={}x{} eye={}",
+                                 reinterpret_cast<uint64_t>(finalColor), finalColor ? finalColor->width() : 0,
+                                 finalColor ? finalColor->height() : 0, static_cast<int>(eyeCopy));
+          backend->requestEndOfFrameColorReadback(
+            *finalColor,
+            eyeCopy,
+            [this, localPtr, eyeCopy, &pool](const void* mapped, size_t /*bytes*/, vk::Format /*fmt*/, glm::uvec2 size, std::function<void()> releaseSlot) {
+              if (localPtr->externalRelease) { localPtr->externalRelease(); localPtr->externalRelease = {}; }
+              localPtr->external = static_cast<const uint8_t*>(mapped);
+              localPtr->externalStride = static_cast<size_t>(size.x) * 4u;
+              localPtr->externalRelease = std::move(releaseSlot);
+              localPtr->width = size.x; localPtr->height = size.y;
+              VLOG(1) << fmt::format("VK final readback ready (no copy) mapped={} size={}x{} eye={}", mapped, size.x, size.y, static_cast<int>(eyeCopy));
+              if (eyeCopy == MonoEye) {
+                { const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+                  std::swap(m_monoReadyLocalBuffer, m_monoCurrentLocalBuffer);
+                  std::swap(m_monoReadyTarget, m_monoCurrentTarget);
+                }
+                m_globalParameters.hasNewRendering = true;
+                static uint64_t s_lastCreate = 0, s_lastChange = 0; const uint64_t curCreate = pool.creationCounter(); const uint64_t curChange = pool.changeCounter();
+                if (curCreate != s_lastCreate || curChange != s_lastChange) { VLOG(1) << pool.describeMemoryUsage(true); s_lastCreate = curCreate; s_lastChange = curChange; }
+                VLOG(1) << fmt::format("VK renderingFinished (mono, no copy) readyBuffer={}", (void*)m_monoReadyLocalBuffer);
+                Q_EMIT renderingFinished();
+              } else if (eyeCopy == LeftEye) {
+                const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+                std::swap(m_leftReadyLocalBuffer, m_leftCurrentLocalBuffer);
+                std::swap(m_leftReadyTarget, m_leftCurrentTarget);
+              } else {
+                { const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
+                  std::swap(m_rightReadyLocalBuffer, m_rightCurrentLocalBuffer);
+                  std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+                }
+                m_globalParameters.hasNewRendering = true;
+                VLOG(1) << "VK renderingFinished (right, no copy)";
+                Q_EMIT renderingFinished();
+              }
+            });
+        }
+      }, "readback_enqueue");
+      m_rendererBase.setCollectOnly(false);
     }
-
-    if (eye == MonoEye) {
-      {
-        const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-        std::swap(m_monoReadyLocalBuffer, m_monoCurrentLocalBuffer);
-        std::swap(m_monoReadyTarget, m_monoCurrentTarget);
-      }
-      m_globalParameters.hasNewRendering = true;
-      // Log scratch pool memory usage as in GL path
-      static uint64_t s_lastCreate = 0;
-      static uint64_t s_lastChange = 0;
-      const uint64_t curCreate = pool.creationCounter();
-      const uint64_t curChange = pool.changeCounter();
-      if (curCreate != s_lastCreate || curChange != s_lastChange) {
-        VLOG(1) << pool.describeMemoryUsage(true);
-        s_lastCreate = curCreate;
-        s_lastChange = curChange;
-      }
-      Q_EMIT renderingFinished();
-    } else if (eye == LeftEye) {
-      const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-      std::swap(m_leftReadyLocalBuffer, m_leftCurrentLocalBuffer);
-      std::swap(m_leftReadyTarget, m_leftCurrentTarget);
-    } else {
-      {
-        const std::scoped_lock lock(m_globalParameters.targetSwitchMutex);
-        std::swap(m_rightReadyLocalBuffer, m_rightCurrentLocalBuffer);
-        std::swap(m_rightReadyTarget, m_rightCurrentTarget);
-      }
-      m_globalParameters.hasNewRendering = true;
-      Q_EMIT renderingFinished();
-    }
+    // Do not enqueue picking readback; rely on synchronous 1x1 reads on demand.
   }
 
   return 1.0;
@@ -2074,6 +2154,23 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
   // from stale Vulkan textures.
   if (backendRequest == RenderBackend::OpenGL) {
     m_globalParameters.setPickingTargetVulkan(nullptr, nullptr, glm::uvec2(0u, 0u));
+
+    // Clear any lingering Vulkan zero-copy mappings from local buffers to avoid stale UI pointers
+    auto clearExternal = [](Z3DLocalColorBuffer* buf) {
+      if (!buf) return;
+      if (buf->externalRelease) {
+        buf->externalRelease();
+        buf->externalRelease = {};
+      }
+      buf->external = nullptr;
+      buf->externalStride = 0;
+    };
+    clearExternal(m_monoCurrentLocalBuffer);
+    clearExternal(m_monoReadyLocalBuffer);
+    clearExternal(m_leftCurrentLocalBuffer);
+    clearExternal(m_leftReadyLocalBuffer);
+    clearExternal(m_rightCurrentLocalBuffer);
+    clearExternal(m_rightReadyLocalBuffer);
 
     // Rebuild compositor-owned GL shader programs in the new context.
     m_ddpBlendShader = std::make_unique<Z3DShaderProgram>();

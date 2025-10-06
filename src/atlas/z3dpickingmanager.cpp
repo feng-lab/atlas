@@ -95,6 +95,15 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
     pos.x = std::clamp(pos.x, 0, w - 1);
     pos.y = std::clamp(pos.y, 0, h - 1);
     const int yFlip = h - 1 - pos.y;
+    // Prefer cached CPU buffer if available
+    if (m_cachedColorValid && m_cachedColorSize.x == static_cast<uint32_t>(w) &&
+        m_cachedColorSize.y == static_cast<uint32_t>(h) && !m_cachedColor.empty()) {
+      const size_t idx = static_cast<size_t>(yFlip) * static_cast<size_t>(w) + static_cast<size_t>(pos.x);
+      const uint8_t* rgba = &m_cachedColor[4 * idx];
+      glm::col4 c{rgba[0], rgba[1], rgba[2], rgba[3]};
+      return objectOfColor(c);
+    }
+    // Fallback to synchronous 1x1 download when cache not yet ready
     uint8_t rgba[4] = {0, 0, 0, 0};
     try {
       m_vkColor->downloadSubImage(rgba,

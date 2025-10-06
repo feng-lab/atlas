@@ -10,6 +10,7 @@
 #include "z3dinteractionhandler.h"
 #include <vector>
 #include <mutex>
+#include <functional>
 
 namespace nim {
 
@@ -22,6 +23,10 @@ struct Z3DLocalColorBuffer
   std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> data;
   size_t width;
   size_t height;
+  // Optional external view for zero-copy (Vulkan readback ring)
+  const uint8_t* external = nullptr;     // mapped pointer (lifetime managed externally)
+  size_t externalStride = 0;             // bytes per row when using external pointer
+  std::function<void()> externalRelease; // call to release mapped slot when replaced
 };
 
 class Z3DGlobalParameters : public QObject

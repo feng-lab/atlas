@@ -140,7 +140,7 @@ Sections 2–6 walk through setup and the interface. Sections 7–10 cover every
 Perform the following steps the first time you open Atlas:
 
 1. **Start Atlas**. The 2D main window appears.
-2. **Confirm GPU initialization**. In the console/log window you should see messages from `Z3DRenderingEngine` indicating that the OpenGL or Vulkan context initialized.
+2. **Confirm GPU initialization**. In the console/log window you should see messages from `Z3DRenderingEngine` indicating that the OpenGL or Vulkan context initialized. When Vulkan is enabled, Atlas performs asynchronous end‑of‑frame readback (offscreen) with a default one‑frame latency for UI display.
 3. **Open the 3D window** via **View → Open 3D Window** once to confirm that the rendering engine loads correctly. Close it again if you prefer to start in 2D.
 4. **Open the Help dock** and skim navigation shortcuts.
 5. **Generate configuration file** if you require custom flags: **Help → Generate Config File** copies the default `settings_flagfile.txt` into your config directory. You can edit the new `user_settings_flagfile.txt` afterwards.
@@ -768,4 +768,3 @@ Always consult log output for unsupported file types; Atlas reports when a docum
 ---
 
 > 📸 **Screenshot to add:** Closing image showing a completed workspace with 2D and 3D windows side-by-side, annotated with key features referenced in this manual.
-

@@ -332,3 +332,9 @@ Compositor Pass Graph (Vulkan)
 - Some pipeline contexts (image slice/raycast and glow) manage their own dynamic rendering segments today and will be folded into the graph later.
 - Backend VLOG(1) counters help validate improvements: per-frame segments begun and attachments cleared vs loaded.
 - Load/store policy: first writer to an attachment clears; subsequent writers load. The backend emits exactly one `beginRender`/`endRender` per frame; dynamic rendering segments only begin when attachment sets change.
+
+Vulkan async readback (offscreen only)
+
+- The compositor requests an end-of-frame GPU copy of the final color attachment into a host-visible staging buffer. The CPU reads the mapped memory after the frame fence signals (default 1-frame latency) and updates the BGRA8 local buffer for UI consumption.
+- Flags:
+- VLOG(1) includes `readback_bytes_copied` and `readback_slots_in_flight` to track throughput.

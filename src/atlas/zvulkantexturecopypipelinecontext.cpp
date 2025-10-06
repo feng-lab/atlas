@@ -69,7 +69,8 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
     ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
   }
   CHECK(ds != nullptr) << "Texture copy: override descriptor allocation failed (fatal)";
-  auto sampler = m_backend.defaultSampler();
+  // Use nearest clamp sampler to ensure a texel-accurate copy with no filtering
+  auto sampler = m_backend.nearestClampSampler();
   ds->updateTexture(0, colorTexture, sampler);
   ds->updateTexture(1, depthTexture, sampler);
 
@@ -201,9 +202,9 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  instance.pipeline->setDepthTestEnable(true);
-  instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
-  instance.pipeline->setDepthWriteEnable(true);
+  // Depth not needed for full-screen copy
+  instance.pipeline->setDepthTestEnable(false);
+  instance.pipeline->setDepthWriteEnable(false);
 
   vk::PipelineColorBlendAttachmentState blendAttachment{};
   blendAttachment.blendEnable = VK_FALSE;
