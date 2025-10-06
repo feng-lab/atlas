@@ -41,6 +41,7 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
+  friend class Z3DRendererVulkanBackend; // allow backend to prime descriptor sets
   struct ConeVertex
   {
     glm::vec4 origin{0.0f};

@@ -40,6 +40,7 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
+  friend class Z3DRendererVulkanBackend; // allow backend to pre-prime OIT resources
   enum class Stage
   {
     Blend,

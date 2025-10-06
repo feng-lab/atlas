@@ -11,6 +11,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanbindings.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanuniforms.h"
 #include "zlog.h"
@@ -79,10 +80,22 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
                                                    m_backend.device(),
                                                    "texture-weighted-average moments attachment");
 
-  m_descriptorSet->updateTexture(0, accumulationTexture);
-  m_descriptorSet->updateTexture(1, momentsTexture);
+  // Allocate per-draw override descriptor set to avoid update-after-bind
+  ZVulkanDescriptorSet* ds = nullptr;
+  if (m_setLayout) {
+    ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
+  }
+  CHECK(ds != nullptr) << "WA resolve: override descriptor allocation failed (fatal)";
+  ds->updateTexture(vkbind::kBindingWAAccum, accumulationTexture, m_backend.defaultSampler());
+  ds->updateTexture(vkbind::kBindingWAMoments, momentsTexture, m_backend.defaultSampler());
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
+
+  // Composite resolve invariant: single color attachment, no depth
+  CHECK(formats.colorFormats.size() == 1 && !formats.depthFormat.has_value())
+    << "WA resolve invariant violated: expected 1 color, no depth";
+  CHECK(m_backend.validateFormatsOrSkip(formats, "WA_resolve"))
+    << "WA resolve formats mismatched with current segment";
 
   PipelineKey key;
   key.colorFormats = formats.colorFormats;
@@ -95,9 +108,9 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
 
-  if (m_descriptorSet) {
-    std::array<vk::DescriptorSet, 1> sets{m_descriptorSet->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 0, sets, {});
+  {
+    std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
   }
 
   cmd.setViewport(0, viewport);
@@ -121,14 +134,17 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
     constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
   }
 
-  // Ensure and update OIT params UBO (set = 3)
-  ensureDescriptorLayout();
-  ensureOITResources();
+  // Ensure OIT params UBO (set = 3); must be primed before recording
+  if (m_backend.isRecording()) {
+    CHECK(m_descriptorSetOIT && m_uboOIT) << "WA OIT resources not primed before recording";
+  } else {
+    ensureDescriptorLayout();
+    ensureOITResources();
+  }
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
   if (m_descriptorSetOIT && m_uboOIT) {
-    m_descriptorSetOIT->updateUniformBuffer(0, *m_uboOIT);
     std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 3, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
   }
 
   cmd.pushConstants<WeightedAveragePushConstants>(instance.pipeline->pipelineLayout(),
@@ -155,6 +171,10 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorLayout()
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eFragment}
     };
+    // Immutable samplers for resolve inputs to avoid MSL sampler class issues
+    vk::Sampler immutable = m_backend.defaultSampler();
+    bindings[0].pImmutableSamplers = &immutable;
+    bindings[1].pImmutableSamplers = &immutable;
 
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
@@ -199,9 +219,14 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureOITResources()
                                                vk::MemoryPropertyFlagBits::eHostVisible |
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
+  CHECK(m_uboOIT != nullptr) << "WA: failed to allocate OIT UBO";
   if (!m_descriptorSetOIT && m_setOIT) {
-    auto ds = m_descriptorPool->allocateDescriptorSet(**m_setOIT);
-    m_descriptorSetOIT = std::make_unique<ZVulkanDescriptorSet>(m_backend.device(), std::move(ds));
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  }
+  CHECK(m_descriptorSetOIT != nullptr) << "WA: failed to allocate OIT descriptor set";
+  if (m_descriptorSetOIT && m_uboOIT) {
+    // Ensure binding updated at least once per frame
+    m_descriptorSetOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
   }
 }
 

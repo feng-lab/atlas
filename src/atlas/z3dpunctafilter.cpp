@@ -254,7 +254,11 @@ void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
   //    m_rendererBase.render(eye, m_textureCopyRenderer);
   //    renderBoundBox(eye);
   //  }
-  m_rendererBase.render(eye, m_sphereRenderer);
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderVulkan(eye, m_sphereRenderer);
+  } else {
+    m_rendererBase.render(eye, m_sphereRenderer);
+  }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
 }
@@ -271,7 +275,11 @@ void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
   //    m_rendererBase.render(eye, m_textureCopyRenderer);
   //    renderBoundBox(eye);
   //  }
-  m_rendererBase.render(eye, m_sphereRenderer);
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderVulkan(eye, m_sphereRenderer);
+  } else {
+    m_rendererBase.render(eye, m_sphereRenderer);
+  }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
 }
@@ -281,7 +289,11 @@ void Z3DPunctaFilter::renderPicking(Z3DEye eye)
   if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
   }
-  m_rendererBase.renderPicking(eye, m_sphereRenderer);
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderPickingVulkan(eye, m_sphereRenderer);
+  } else {
+    m_rendererBase.renderPicking(eye, m_sphereRenderer);
+  }
 }
 
 void Z3DPunctaFilter::registerPickingObjects()

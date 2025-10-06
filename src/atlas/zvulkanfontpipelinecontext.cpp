@@ -48,31 +48,40 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
                                         const vk::Rect2D& scissor,
                                         vk::raii::CommandBuffer& cmd)
 {
-  if (!payload.renderer || payload.positions.empty() || payload.texcoords.empty() || payload.indices.empty()) {
+  // Allow truly empty payloads to no-op; treat everything else as invariants.
+  if (payload.positions.empty() || payload.texcoords.empty() || payload.indices.empty()) {
     return;
   }
 
-  if (payload.pickingPass && payload.pickingColors.empty()) {
-    return;
+  // GL parity: for picking, missing pickingColors means skip rendering; same for color pass.
+  if (payload.pickingPass) {
+    if (payload.pickingColors.empty() || payload.pickingColors.size() != payload.positions.size()) {
+      return;
+    }
+  } else {
+    if (payload.colors.empty() || payload.colors.size() != payload.positions.size()) {
+      return;
+    }
   }
-  if (!payload.pickingPass && payload.colors.empty()) {
-    return;
-  }
+
+  CHECK(payload.renderer != nullptr) << "Font record called with null renderer while payload not empty";
+  CHECK(payload.positions.size() == payload.texcoords.size())
+    << "Font payload size mismatch: positions=" << payload.positions.size()
+    << " texcoords=" << payload.texcoords.size();
 
   // Upload/prepare geometry
   uploadGeometry(payload);
-  if (!m_vertexBuffer || !m_indexBuffer || m_vertexCount == 0 || m_indexCount == 0) {
-    return;
-  }
+  CHECK(m_vertexBuffer && m_indexBuffer) << "Font buffers not created after uploadGeometry";
+  CHECK(m_vertexCount > 0 && m_indexCount > 0) << "Uploaded empty font geometry";
 
-  // Ensure texture descriptor
+  // Ensure texture descriptor via per-draw override set
   ensureDescriptorLayout();
-  ensureDescriptorSet();
+  CHECK(m_setTexture.has_value()) << "Failed to create font descriptor set layout";
   ZVulkanTexture* atlas = ensureAtlasFromPayload(payload);
-  if (!m_descriptorSet || !atlas) {
-    return;
-  }
-  m_descriptorSet->updateTexture(0, *atlas);
+  CHECK(atlas != nullptr) << "Font atlas texture unavailable";
+  ZVulkanDescriptorSet* ds = m_backend.allocateOverrideDescriptorSet(**m_setTexture);
+  CHECK(ds != nullptr) << "Failed to allocate override descriptor set for font atlas";
+  ds->updateTexture(0, *atlas, m_backend.defaultSampler());
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
@@ -93,10 +102,8 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
   cmd.bindIndexBuffer(m_indexBuffer->buffer(), 0, vk::IndexType::eUint32);
 
-  if (m_descriptorSet) {
-    std::array<vk::DescriptorSet, 1> sets{m_descriptorSet->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
-  }
+  std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
 
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
@@ -156,8 +163,8 @@ void ZVulkanFontPipelineContext::ensureDescriptorSet()
   }
 
   if (!m_descriptorSet) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_setTexture);
-    m_descriptorSet = std::make_unique<ZVulkanDescriptorSet>(device, std::move(descriptorSet));
+  auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_setTexture);
+  m_descriptorSet = std::make_unique<ZVulkanDescriptorSet>(device, descriptorSet, false);
   }
 }
 
@@ -202,6 +209,7 @@ void ZVulkanFontPipelineContext::ensureVertexCapacity(size_t vertexCount)
                         vk::BufferUsageFlagBits::eVertexBuffer,
                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_vertexCapacity = newCapacity;
+  CHECK(m_vertexBuffer != nullptr) << "Failed to allocate font vertex buffer, bytes=" << newCapacity;
 }
 
 void ZVulkanFontPipelineContext::ensureIndexCapacity(size_t indexCount)
@@ -217,6 +225,7 @@ void ZVulkanFontPipelineContext::ensureIndexCapacity(size_t indexCount)
                         vk::BufferUsageFlagBits::eIndexBuffer,
                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_indexCapacity = newCapacity;
+  CHECK(m_indexBuffer != nullptr) << "Failed to allocate font index buffer, bytes=" << newCapacity;
 }
 
 void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
@@ -229,11 +238,22 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
     return;
   }
 
+  CHECK(payload.texcoords.size() == vtxCount)
+    << "Font uploadGeometry size mismatch: positions=" << vtxCount
+    << " texcoords=" << payload.texcoords.size();
+  if (payload.pickingPass) {
+    CHECK(payload.pickingColors.size() == vtxCount)
+      << "Font uploadGeometry pickingColors mismatch: pickingColors=" << payload.pickingColors.size()
+      << " positions=" << vtxCount;
+  } else {
+    CHECK(payload.colors.size() == vtxCount)
+      << "Font uploadGeometry colors mismatch: colors=" << payload.colors.size()
+      << " positions=" << vtxCount;
+  }
+
   ensureVertexCapacity(vtxCount);
   ensureIndexCapacity(idxCount);
-  if (!m_vertexBuffer || !m_indexBuffer) {
-    return;
-  }
+  CHECK(m_vertexBuffer && m_indexBuffer) << "Font buffers missing after ensure capacity";
 
   std::vector<FontVertex> vertices(vtxCount);
   for (size_t i = 0; i < vtxCount; ++i) {
@@ -241,11 +261,16 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
     v.position = payload.positions[i];
     v.texcoord = payload.texcoords[i];
     if (payload.pickingPass) {
-      v.color = payload.pickingColors.empty() ? glm::vec4(0.0f) : payload.pickingColors[i];
+      v.color = payload.pickingColors[i];
     } else {
-      v.color = payload.colors.empty() ? glm::vec4(0.0f) : payload.colors[i];
+      v.color = payload.colors[i];
     }
     vertices[i] = v;
+  }
+
+  // Debug-only guard on index range to catch bad CPU geometry.
+  for (const auto idx : payload.indices) {
+    DCHECK(idx < vtxCount) << "Font index out of range: " << idx << " >= " << vtxCount;
   }
 
   m_vertexBuffer->copyData(vertices.data(), vertices.size() * sizeof(FontVertex));
@@ -284,14 +309,13 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
                                          1u,
                                          true,
                                          vk::ImageLayout::eShaderReadOnlyOptimal);
-    auto tex = device.createTexture(info);
-    if (!tex) {
-      return nullptr;
-    }
-    const size_t byteSize = static_cast<size_t>(payload.atlasWidth) * payload.atlasHeight * 4u;
-    tex->uploadData(payload.atlasPixels, byteSize);
-    auto [inserted, _] = m_atlasCache.emplace(payload.atlasPixels, std::move(tex));
-    return inserted->second.get();
+  auto tex = device.createTexture(info);
+  CHECK(tex != nullptr) << "Failed to create font atlas texture from CPU pixels ("
+                        << payload.atlasWidth << "x" << payload.atlasHeight << ")";
+  const size_t byteSize = static_cast<size_t>(payload.atlasWidth) * payload.atlasHeight * 4u;
+  tex->uploadData(payload.atlasPixels, byteSize);
+  auto [inserted, _] = m_atlasCache.emplace(payload.atlasPixels, std::move(tex));
+  return inserted->second.get();
   }
 
   // Fallback: tiny white
@@ -310,9 +334,7 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
                                        true,
                                        vk::ImageLayout::eShaderReadOnlyOptimal);
   auto tex = device.createTexture(info);
-  if (!tex) {
-    return nullptr;
-  }
+  CHECK(tex != nullptr) << "Failed to create fallback 1x1 white font atlas texture";
   const uint32_t white = 0xffffffffu;
   tex->uploadData(&white, sizeof(white));
   auto [inserted, _] = m_atlasCache.emplace(nullptr, std::move(tex));

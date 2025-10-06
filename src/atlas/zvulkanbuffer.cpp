@@ -48,7 +48,7 @@ ZVulkanBuffer::ZVulkanBuffer(ZVulkanDevice& device,
   , m_memoryProperties(properties)
 {
   createBuffer();
-  LOG(INFO) << "ZVulkanBuffer created: " << size << " bytes";
+  VLOG(2) << "ZVulkanBuffer created: " << size << " bytes";
 }
 
 void ZVulkanBuffer::createBuffer()

@@ -814,7 +814,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
           m_alphaBlendRenderer.setDepthTexture1(tempGeoLease.renderTarget->depthTexture());
           m_alphaBlendRenderer.setColorTexture2(colorTex);
           m_alphaBlendRenderer.setDepthTexture2(depthTex);
-          m_rendererBase.render(eye, m_alphaBlendRenderer);
+          m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
         } else {
           m_firstOnTopBlendRenderer.setColorTexture1(tempGeoLease.renderTarget->colorTexture());
           m_firstOnTopBlendRenderer.setDepthTexture1(tempGeoLease.renderTarget->depthTexture());
@@ -1234,7 +1234,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     sceneOutLease = &sceneLease;
   }
 
-  m_rendererBase.beginVulkanFrame();
+  // Begin/end handled per-pass by recordVulkanBatches
   // Stage 3: background is recorded via the pass-graph driver below
 
   // Decide OIT usage and collect non-opaque image layers (volumes/slices) once
@@ -1330,7 +1330,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                          clear);
       m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
       m_rendererBase.recordVulkanBatches([&]() {
-        m_rendererBase.render(eye, m_alphaBlendRenderer);
+        m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
       }, "transparency_resolve");
       m_rendererBase.setCollectOnly(false);
     }
@@ -1501,7 +1501,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         m_rendererBase.recordVulkanBatches([&]() {
           m_alphaBlendRenderer.setSourceAttachments0(outC, outD);
           m_alphaBlendRenderer.setSourceAttachments1(layers[0].first, layers[0].second);
-          m_rendererBase.render(eye, m_alphaBlendRenderer);
+          m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
         }, "image_blend_single");
       } else {
         // Merge N image layers pairwise into an intermediate lease, then blend onto out
@@ -1516,7 +1516,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         m_rendererBase.recordVulkanBatches([&]() {
           m_MIPImageAlphaBlendRenderer.setSourceAttachments0(layers[0].first, layers[0].second);
           m_MIPImageAlphaBlendRenderer.setSourceAttachments1(layers[1].first, layers[1].second);
-          m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
+          m_rendererBase.renderVulkan(eye, m_MIPImageAlphaBlendRenderer);
         }, "image_merge_initial");
 
         // Subsequent merges: (A + layers[i]) -> B, then swap
@@ -1527,7 +1527,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           m_rendererBase.recordVulkanBatches([&]() {
             m_MIPImageAlphaBlendRenderer.setSourceAttachments0(resHandles.first, resHandles.second);
             m_MIPImageAlphaBlendRenderer.setSourceAttachments1(layers[i].first, layers[i].second);
-            m_rendererBase.render(eye, m_MIPImageAlphaBlendRenderer);
+            m_rendererBase.renderVulkan(eye, m_MIPImageAlphaBlendRenderer);
           }, "image_merge_iter");
           // swap A<->B and update resHandles
           std::swap(mergeLeaseA, mergeLeaseB);
@@ -1606,6 +1606,45 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     const glm::uvec2 pickSize = sceneOutLease->descriptor.size;
     ensurePickingTargetVulkan(pickSize);
 
+    // Collect picking batches from a filter's own renderer base and append
+    // them to the compositor's renderer base under the current active surface.
+    auto recordFilterPickingBatches = [&](Z3DBoundedFilter* filter, auto&& renderFn) {
+      if (!filter) {
+        return;
+      }
+      auto& source = filter->rendererBase();
+      const bool prevCollectOnly = source.collectOnly();
+      const glm::uvec4 previousViewport = source.frameState().viewport;
+      const auto previousSurface = source.frameState().activeSurface;
+      const glm::uvec4 pickViewport(0u, 0u, pickSize.x, pickSize.y);
+      const auto surfaceCopy = m_rendererBase.frameState().activeSurface;
+      source.setCollectOnly(true);
+      source.frameState().updateViewportData(pickViewport);
+      source.frameState().setActiveSurface(surfaceCopy);
+      source.clearPendingActiveSurface();
+      renderFn();
+      auto& batches = source.cpuState().batches;
+      for (auto& batch : batches) {
+        if (batch.pass.colorAttachments.empty() && !surfaceCopy.colorAttachments.empty()) {
+          batch.pass.colorAttachments = surfaceCopy.colorAttachments;
+        }
+        if (!batch.pass.depthAttachment.has_value() && surfaceCopy.depthAttachment.has_value()) {
+          batch.pass.depthAttachment = surfaceCopy.depthAttachment;
+        }
+        if (batch.pass.viewport.extent == glm::vec2(0.0f)) {
+          batch.pass.viewport.origin = glm::vec2(0.0f, 0.0f);
+          batch.pass.viewport.extent = glm::vec2(static_cast<float>(pickSize.x), static_cast<float>(pickSize.y));
+          batch.pass.viewport.minDepth = 0.0f;
+          batch.pass.viewport.maxDepth = 1.0f;
+        }
+        m_rendererBase.appendBatch(std::move(batch));
+      }
+      source.resetCPUState();
+      source.setCollectOnly(prevCollectOnly);
+      source.frameState().updateViewportData(previousViewport);
+      source.frameState().setActiveSurface(previousSurface);
+    };
+
     if (gFilters.empty() && !showHandleFilters.empty()) {
       m_rendererBase.setCollectOnly(true);
       m_rendererBase.setActiveSurfaceForNextPass(m_pickingTargetLease);
@@ -1618,7 +1657,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_rendererBase.recordVulkanBatches([&]() {
         for (auto* f : showHandleFilters) {
           f->setViewport(pickSize);
-          f->renderHandlePicking(eye);
+          recordFilterPickingBatches(f, [&]() { f->renderHandlePicking(eye); });
         }
       }, "picking_handles");
       m_rendererBase.setCollectOnly(false);
@@ -1635,7 +1674,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         for (auto* gf : gFilters) {
           if (gf && gf->isReady(eye)) {
             gf->setViewport(pickSize);
-            gf->renderPicking(eye);
+            recordFilterPickingBatches(gf, [&]() { gf->renderPicking(eye); });
           }
         }
       }, "picking_geometry");
@@ -1658,7 +1697,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_rendererBase.recordVulkanBatches([&]() {
         for (auto* f : showHandleFilters) {
           f->setViewport(pickSize);
-          f->renderHandlePicking(eye);
+          recordFilterPickingBatches(f, [&]() { f->renderHandlePicking(eye); });
         }
       }, "picking_handles_temp");
 
@@ -1670,7 +1709,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         for (auto* gf : gFilters) {
           if (gf && gf->isReady(eye)) {
             gf->setViewport(pickSize);
-            gf->renderPicking(eye);
+            recordFilterPickingBatches(gf, [&]() { gf->renderPicking(eye); });
           }
         }
       }, "picking_geometry_temp");
@@ -1700,7 +1739,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
       m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
       m_rendererBase.recordVulkanBatches([&]() {
-        m_rendererBase.render(eye, m_firstOnTopRenderer);
+        m_rendererBase.renderVulkan(eye, m_firstOnTopRenderer);
       }, "picking_composite");
       m_rendererBase.setCollectOnly(false);
     }
@@ -1734,12 +1773,12 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       srcDepth.index = 0;
       srcDepth.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
       m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
-      m_rendererBase.render(eye, m_textureCopyRenderer);
+      m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
     }, "supersample_resolve");
     m_rendererBase.setCollectOnly(false);
   }
 
-  m_rendererBase.endVulkanFrame();
+  // Per-pass recordVulkanBatches has already ended frames it began
 
   // Finalize frame: download final color to local buffer and signal like GL path
   {
@@ -1822,7 +1861,7 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
     m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
   }
   if (drawBackground && m_showBackground.get()) {
-    m_rendererBase.recordVulkanBatches([&]() { m_rendererBase.render(eye, m_backgroundRenderer); }, "background");
+    m_rendererBase.recordVulkanBatches([&]() { m_rendererBase.renderVulkan(eye, m_backgroundRenderer); }, "background");
   }
 
   if (includeGeometry) {
@@ -3076,7 +3115,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
           continue;
         }
         m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
-        m_rendererBase.render(eye, m_textureCopyRenderer);
+        m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
       }
     }
   }, "transparency_ddp_init");
@@ -3131,7 +3170,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
             continue;
           }
           m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
-          m_rendererBase.render(eye, m_textureCopyRenderer);
+          m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
         }
       }
     }, "transparency_ddp_peel");
@@ -3175,17 +3214,18 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
 
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
+  // Enforce single color attachment and disable depth for composite resolve
+  if (outSurface.colorAttachments.size() > 1) {
+    outSurface.colorAttachments.resize(1);
+  }
+  outSurface.depthAttachment.reset();
   for (auto& attachment : outSurface.colorAttachments) {
     // If a background was drawn earlier into the same surface, keep it.
     attachment.loadOp = m_showBackground.get() ? LoadOp::Load : LoadOp::Clear;
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
-  if (outSurface.depthAttachment) {
-    outSurface.depthAttachment->loadOp = LoadOp::Clear;
-    outSurface.depthAttachment->storeOp = StoreOp::Store;
-    outSurface.depthAttachment->clearValue.depth = 1.0f;
-  }
+  // Depth disabled by invariant; no depth load/store
 
   m_rendererBase.setCollectOnly(true);
   m_rendererBase.setActiveSurfaceForNextPass(std::move(outSurface));
@@ -3332,7 +3372,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
           continue;
         }
         m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
-        m_rendererBase.render(eye, m_textureCopyRenderer);
+        m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
       }
     }
   }, "transparency_wa_init");
@@ -3341,16 +3381,17 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
 
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
+  // Enforce single color attachment and disable depth for composite resolve
+  if (outSurface.colorAttachments.size() > 1) {
+    outSurface.colorAttachments.resize(1);
+  }
+  outSurface.depthAttachment.reset();
   for (auto& attachment : outSurface.colorAttachments) {
     attachment.loadOp = m_showBackground.get() ? LoadOp::Load : LoadOp::Clear;
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
-  if (outSurface.depthAttachment) {
-    outSurface.depthAttachment->loadOp = LoadOp::Clear;
-    outSurface.depthAttachment->storeOp = StoreOp::Store;
-    outSurface.depthAttachment->clearValue.depth = 1.0f;
-  }
+  // Depth disabled by invariant; no depth load/store
 
   m_rendererBase.setCollectOnly(true);
   m_rendererBase.setActiveSurfaceForNextPass(std::move(outSurface));
@@ -3509,16 +3550,17 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
 
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
+  // Enforce single color attachment and disable depth for composite resolve
+  if (outSurface.colorAttachments.size() > 1) {
+    outSurface.colorAttachments.resize(1);
+  }
+  outSurface.depthAttachment.reset();
   for (auto& attachment : outSurface.colorAttachments) {
     attachment.loadOp = m_showBackground.get() ? LoadOp::Load : LoadOp::Clear;
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
-  if (outSurface.depthAttachment) {
-    outSurface.depthAttachment->loadOp = LoadOp::Clear;
-    outSurface.depthAttachment->storeOp = StoreOp::Store;
-    outSurface.depthAttachment->clearValue.depth = 1.0f;
-  }
+  // Depth disabled by invariant; no depth load/store
 
   m_rendererBase.setCollectOnly(true);
   m_rendererBase.setActiveSurfaceForNextPass(std::move(outSurface));

@@ -46,6 +46,7 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
+  friend class Z3DRendererVulkanBackend; // allow backend to prime descriptor sets
   struct PipelineKey
   {
     MeshPayload::ColorSource colorSource = MeshPayload::ColorSource::MeshColor;
@@ -103,6 +104,7 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
+  std::optional<vk::raii::DescriptorSetLayout> m_setDDPPeel;
   std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
   std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
   std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3 (OIT params)
@@ -153,7 +155,9 @@ private:
                          bool useFallbackColor,
                          const glm::vec4& fallbackColor,
                          bool pickingPass);
-  void bindDescriptorSets(vk::raii::CommandBuffer& cmd, const PipelineInstance& pipeline) const;
+  void bindDescriptorSets(vk::raii::CommandBuffer& cmd,
+                          const PipelineInstance& pipeline,
+                          ZVulkanDescriptorSet* texturesOverride = nullptr) const;
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 

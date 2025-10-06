@@ -222,13 +222,29 @@ std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
 void Z3DSwcFilter::renderOpaque(Z3DEye eye)
 {
   if (m_renderingPrimitive.isSelected("Normal")) {
-    m_rendererBase.render(eye, m_sphereRendererForCone, m_coneRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_sphereRendererForCone, m_coneRenderer);
+    } else {
+      m_rendererBase.render(eye, m_sphereRendererForCone, m_coneRenderer);
+    }
   } else if (m_renderingPrimitive.isSelected("Cylinder")) {
-    m_rendererBase.render(eye, m_coneRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_coneRenderer);
+    } else {
+      m_rendererBase.render(eye, m_coneRenderer);
+    }
   } else if (m_renderingPrimitive.isSelected("Line")) {
-    m_rendererBase.render(eye, m_lineRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_lineRenderer);
+    } else {
+      m_rendererBase.render(eye, m_lineRenderer);
+    }
   } else /* (m_renderingPrimitive.get() == "Sphere") */ {
-    m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_lineRenderer, m_sphereRenderer);
+    } else {
+      m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
+    }
   }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
@@ -237,13 +253,29 @@ void Z3DSwcFilter::renderOpaque(Z3DEye eye)
 void Z3DSwcFilter::renderTransparent(Z3DEye eye)
 {
   if (m_renderingPrimitive.isSelected("Normal")) {
-    m_rendererBase.render(eye, m_sphereRendererForCone, m_coneRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_sphereRendererForCone, m_coneRenderer);
+    } else {
+      m_rendererBase.render(eye, m_sphereRendererForCone, m_coneRenderer);
+    }
   } else if (m_renderingPrimitive.isSelected("Cylinder")) {
-    m_rendererBase.render(eye, m_coneRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_coneRenderer);
+    } else {
+      m_rendererBase.render(eye, m_coneRenderer);
+    }
   } else if (m_renderingPrimitive.isSelected("Line")) {
-    m_rendererBase.render(eye, m_lineRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_lineRenderer);
+    } else {
+      m_rendererBase.render(eye, m_lineRenderer);
+    }
   } else /* (m_renderingPrimitive.get() == "Sphere") */ {
-    m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_lineRenderer, m_sphereRenderer);
+    } else {
+      m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
+    }
   }
   renderBoundBox(eye);
   renderEditingSelectionBox(eye);
@@ -256,13 +288,29 @@ void Z3DSwcFilter::renderPicking(Z3DEye eye)
   }
 
   if (m_renderingPrimitive.isSelected("Normal")) {
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderPickingVulkan(eye, m_coneRenderer, m_sphereRendererForCone);
+  } else {
     m_rendererBase.renderPicking(eye, m_coneRenderer, m_sphereRendererForCone);
+  }
   } else if (m_renderingPrimitive.isSelected("Cylinder")) {
-    m_rendererBase.renderPicking(eye, m_coneRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderPickingVulkan(eye, m_coneRenderer);
+    } else {
+      m_rendererBase.renderPicking(eye, m_coneRenderer);
+    }
   } else if (m_renderingPrimitive.isSelected("Line")) {
-    m_rendererBase.renderPicking(eye, m_lineRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderPickingVulkan(eye, m_lineRenderer);
+    } else {
+      m_rendererBase.renderPicking(eye, m_lineRenderer);
+    }
   } else /* (m_renderingPrimitive.get() == "Sphere") */ {
-    m_rendererBase.renderPicking(eye, m_lineRenderer, m_sphereRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderPickingVulkan(eye, m_lineRenderer, m_sphereRenderer);
+    } else {
+      m_rendererBase.renderPicking(eye, m_lineRenderer, m_sphereRenderer);
+    }
   }
 }
 

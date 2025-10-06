@@ -235,8 +235,8 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createIn
     m_layerDepthViews.resize(m_arrayLayers);
     m_layerStencilViews.resize(m_arrayLayers);
   }
-  LOG(INFO) << "ZVulkanTexture created: " << m_extent.width << "x" << m_extent.height << "x" << m_extent.depth
-            << " layers=" << m_arrayLayers;
+  VLOG(2) << "ZVulkanTexture created: " << m_extent.width << "x" << m_extent.height << "x" << m_extent.depth
+          << " layers=" << m_arrayLayers;
 }
 
 ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, uint32_t width, uint32_t height, vk::Format format)

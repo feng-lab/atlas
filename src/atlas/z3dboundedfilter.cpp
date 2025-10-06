@@ -210,7 +210,11 @@ void Z3DBoundedFilter::renderHandle(Z3DEye eye)
       updateHandle();
     }
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    } else {
+      m_rendererBase.render(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    }
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -219,7 +223,11 @@ void Z3DBoundedFilter::renderHandlePicking(Z3DEye eye)
 {
   if (m_isSelected) {
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.renderPicking(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderPickingVulkan(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    } else {
+      m_rendererBase.renderPicking(eye, m_handleArrowRenderer, m_handleCenterRenderer);
+    }
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -237,7 +245,11 @@ void Z3DBoundedFilter::renderSelectionBox(Z3DEye eye)
       m_selectionBoundBoxRenderer.setDataColors(std::span<const glm::vec4>(m_selectionLineColors));
     }
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_selectionBoundBoxRenderer, m_selectionCornerRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_selectionBoundBoxRenderer, m_selectionCornerRenderer);
+    } else {
+      m_rendererBase.render(eye, m_selectionBoundBoxRenderer, m_selectionCornerRenderer);
+    }
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -258,7 +270,11 @@ void Z3DBoundedFilter::renderEditingSelectionBox(Z3DEye eye)
       m_selectionBoundBoxRenderer.setDataColors(std::span<const glm::vec4>(m_selectionLineColors));
     }
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_selectionBoundBoxRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_selectionBoundBoxRenderer);
+    } else {
+      m_rendererBase.render(eye, m_selectionBoundBoxRenderer);
+    }
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -495,7 +511,11 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)
 {
   if (!m_boundBoxMode.isSelected("No Bound Box")) {
     m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_baseBoundBoxRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_baseBoundBoxRenderer);
+    } else {
+      m_rendererBase.render(eye, m_baseBoundBoxRenderer);
+    }
     m_rendererBase.setClipEnabled(true);
   }
 }
@@ -507,17 +527,23 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye, BoundBoxRenderStyle style)
     return;
   }
   if (!m_boundBoxMode.isSelected("No Bound Box")) {
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    auto guard = folly::makeGuard([]() {
-      glBlendFunc(GL_ONE, GL_ZERO);
-      glDisable(GL_BLEND);
-      glDisable(GL_DEPTH_TEST);
-    });
-    m_rendererBase.setClipEnabled(false);
-    m_rendererBase.render(eye, m_baseBoundBoxRenderer);
-    m_rendererBase.setClipEnabled(true);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.setClipEnabled(false);
+      m_rendererBase.renderVulkan(eye, m_baseBoundBoxRenderer);
+      m_rendererBase.setClipEnabled(true);
+    } else {
+      glEnable(GL_DEPTH_TEST);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+      auto guard = folly::makeGuard([]() {
+        glBlendFunc(GL_ONE, GL_ZERO);
+        glDisable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
+      });
+      m_rendererBase.setClipEnabled(false);
+      m_rendererBase.render(eye, m_baseBoundBoxRenderer);
+      m_rendererBase.setClipEnabled(true);
+    }
   }
 }
 

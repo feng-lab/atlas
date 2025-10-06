@@ -116,9 +116,9 @@ private:
     uint64_t volumeGeneration = 0;
     std::unique_ptr<ZVulkanTexture> volumeTexture;
     std::unique_ptr<ZVulkanTexture> colormapTexture;
-    std::unique_ptr<ZVulkanDescriptorSet> fastTextureDescriptor;
-    std::unique_ptr<ZVulkanDescriptorSet> pagedTextureDescriptor;
-    std::unique_ptr<ZVulkanDescriptorSet> pageDescriptor;
+    ZVulkanDescriptorSet* fastTextureDescriptor = nullptr;   // per-draw override (owned by backend)
+    ZVulkanDescriptorSet* pagedTextureDescriptor = nullptr;  // per-draw override (owned by backend)
+    ZVulkanDescriptorSet* pageDescriptor = nullptr;           // per-draw override (owned by backend)
     std::unique_ptr<ZVulkanBuffer> pageDataBuffer;
     size_t pageDataCapacity = 0;
     uint32_t levelCount = 0;
@@ -136,8 +136,8 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_emptySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_mergeSetLayout;
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
-  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor;
-  std::unique_ptr<ZVulkanDescriptorSet> m_mergeDescriptor;
+  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor;   // frame-owned placeholder
+  ZVulkanDescriptorSet* m_mergeDescriptor = nullptr;         // per-draw override (owned by backend)
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;

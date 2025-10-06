@@ -140,18 +140,34 @@ std::shared_ptr<ZWidgetsGroup> Z3DAnimationFilter::widgetsGroup()
 void Z3DAnimationFilter::renderOpaque(Z3DEye eye)
 {
   if (m_showCameraDirection.get()) {
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderVulkan(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
+  } else {
     m_rendererBase.render(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
+  }
+  } else {
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderVulkan(eye, m_lineRenderer, m_triangleListRenderer);
   } else {
     m_rendererBase.render(eye, m_lineRenderer, m_triangleListRenderer);
+  }
   }
 }
 
 void Z3DAnimationFilter::renderTransparent(Z3DEye eye)
 {
   if (m_showCameraDirection.get()) {
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderVulkan(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
+  } else {
     m_rendererBase.render(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
+  }
+  } else {
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderVulkan(eye, m_lineRenderer, m_triangleListRenderer);
   } else {
     m_rendererBase.render(eye, m_lineRenderer, m_triangleListRenderer);
+  }
   }
 }
 

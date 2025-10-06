@@ -53,11 +53,11 @@ private:
     uint64_t volumeGeneration = 0;
     std::unique_ptr<ZVulkanTexture> volumeTexture;
     std::unique_ptr<ZVulkanTexture> transferTexture;
-    std::unique_ptr<ZVulkanDescriptorSet> fastDescriptor;
-    std::unique_ptr<ZVulkanDescriptorSet> rayParamDescriptor;
+    ZVulkanDescriptorSet* fastDescriptor = nullptr;       // per-draw override (backend-owned)
+    ZVulkanDescriptorSet* rayParamDescriptor = nullptr;    // per-draw override (backend-owned)
     std::unique_ptr<ZVulkanBuffer> rayParamBuffer;
-    std::unique_ptr<ZVulkanDescriptorSet> pagedDescriptor;
-    std::unique_ptr<ZVulkanDescriptorSet> pageDescriptor;
+    ZVulkanDescriptorSet* pagedDescriptor = nullptr;       // per-draw override (backend-owned)
+    ZVulkanDescriptorSet* pageDescriptor = nullptr;        // per-draw override (backend-owned)
     std::unique_ptr<ZVulkanBuffer> pageDataBuffer;
     size_t pageDataCapacity = 0;
     uint32_t levelCount = 0;
@@ -173,9 +173,9 @@ private:
   std::map<CopyPipelineKey, PipelineInstance> m_copyPipelines;
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
 
-  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor;
-  std::unique_ptr<ZVulkanDescriptorSet> m_copyDescriptor;
-  std::unique_ptr<ZVulkanDescriptorSet> m_mergeDescriptor;
+  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor; // frame-owned placeholder
+  ZVulkanDescriptorSet* m_copyDescriptor = nullptr;        // per-draw override (backend-owned)
+  ZVulkanDescriptorSet* m_mergeDescriptor = nullptr;       // per-draw override (backend-owned)
 
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;

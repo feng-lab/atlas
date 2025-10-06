@@ -10,6 +10,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanbindings.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanuniforms.h"
 #include "zlog.h"
@@ -68,10 +69,14 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   }
 
   ensureDescriptorLayouts();
-  auto* descriptor = ensureDescriptor(stage);
-  if (!descriptor) {
-    return;
+  ZVulkanDescriptorSet* descriptor = nullptr;
+  // Allocate per-draw override sets for both stages
+  if (stage == Stage::Blend && m_blendSetLayout) {
+    descriptor = m_backend.allocateOverrideDescriptorSet(**m_blendSetLayout);
+  } else if (stage == Stage::Final && m_finalSetLayout) {
+    descriptor = m_backend.allocateOverrideDescriptorSet(**m_finalSetLayout);
   }
+  CHECK(descriptor != nullptr) << "DDP texture stage: override descriptor allocation failed (fatal)";
 
   if (stage == Stage::Blend) {
     if (!payload.tempAttachment.valid()) {
@@ -80,7 +85,7 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
     }
     auto& tempTexture =
       vulkan::textureFromHandle(payload.tempAttachment, m_backend.device(), "dual-peel blend attachment");
-    descriptor->updateTexture(0, tempTexture);
+    descriptor->updateTexture(0, tempTexture, m_backend.defaultSampler());
   } else {
     auto& depthTexture =
       vulkan::textureFromHandle(payload.depthAttachment, m_backend.device(), "dual-peel depth attachment");
@@ -88,12 +93,23 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
       vulkan::textureFromHandle(payload.frontAttachment, m_backend.device(), "dual-peel front attachment");
     auto& backTexture =
       vulkan::textureFromHandle(payload.backAttachment, m_backend.device(), "dual-peel back attachment");
-    descriptor->updateTexture(0, depthTexture);
-    descriptor->updateTexture(1, frontTexture);
-    descriptor->updateTexture(2, backTexture);
+    descriptor->updateTexture(vkbind::kBindingDDPFinalDepth, depthTexture, m_backend.defaultSampler());
+    descriptor->updateTexture(vkbind::kBindingDDPFinalFront, frontTexture, m_backend.defaultSampler());
+    descriptor->updateTexture(vkbind::kBindingDDPFinalBack,  backTexture,  m_backend.defaultSampler());
   }
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
+
+  // Composite resolve invariant: enforce single color / no depth on the final
+  if (stage == Stage::Final) {
+    if (formats.colorFormats.size() != 1 || formats.depthFormat.has_value()) {
+      VLOG(1) << "Skipping DDP final: expected 1 color, no depth.";
+      return;
+    }
+  }
+  if (!m_backend.validateFormatsOrSkip(formats, stage == Stage::Final ? "DDP_final" : "DDP_blend")) {
+    return;
+  }
 
   PipelineKey key;
   key.stage = stage;
@@ -109,7 +125,7 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
 
   if (descriptor) {
     std::array<vk::DescriptorSet, 1> sets{descriptor->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 0, sets, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
   }
 
   cmd.setViewport(0, viewport);
@@ -138,13 +154,12 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
                                            0,
                                            constants);
 
-  // Ensure and bind OIT params (set = 3)
+  // Ensure and bind OIT params (set = 3); descriptor is set at allocation time.
   ensureOITResources();
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
   if (m_descriptorOIT && m_uboOIT) {
-    m_descriptorOIT->updateUniformBuffer(0, *m_uboOIT);
     std::array<vk::DescriptorSet, 1> sets3{m_descriptorOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 3, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
   }
 
   cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
@@ -160,6 +175,9 @@ void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorLayouts()
                                            .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                            .descriptorCount = 1,
                                            .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    // Immutable sampler for blend input
+    vk::Sampler immutable = m_backend.defaultSampler();
+    binding.pImmutableSamplers = &immutable;
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
     m_blendSetLayout.emplace(vkDevice, createInfo);
   }
@@ -179,6 +197,11 @@ void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorLayouts()
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eFragment}
     };
+    // Immutable samplers for final inputs
+    vk::Sampler immutable = m_backend.defaultSampler();
+    bindings[0].pImmutableSamplers = &immutable;
+    bindings[1].pImmutableSamplers = &immutable;
+    bindings[2].pImmutableSamplers = &immutable;
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_finalSetLayout.emplace(vkDevice, createInfo);
@@ -232,6 +255,11 @@ void ZVulkanTextureDualPeelPipelineContext::ensureOITResources()
                                                vk::BufferUsageFlagBits::eUniformBuffer,
                                                vk::MemoryPropertyFlagBits::eHostVisible |
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  CHECK(m_descriptorOIT != nullptr) << "DDP: failed to allocate OIT descriptor set";
+  CHECK(m_uboOIT != nullptr) << "DDP: failed to allocate OIT UBO";
+  if (m_descriptorOIT && m_uboOIT) {
+    m_descriptorOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
   }
 }
 
@@ -356,9 +384,9 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, co
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
 
   if (key.stage == Stage::Final) {
-    instance.pipeline->setDepthTestEnable(true);
-    instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
-    instance.pipeline->setDepthWriteEnable(true);
+    // Composite resolve: depth disabled per invariant
+    instance.pipeline->setDepthTestEnable(false);
+    instance.pipeline->setDepthWriteEnable(false);
   } else {
     instance.pipeline->setDepthTestEnable(false);
     instance.pipeline->setDepthWriteEnable(false);

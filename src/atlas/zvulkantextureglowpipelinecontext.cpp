@@ -11,6 +11,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanbindings.h"
 #include "zvulkanbuffer.h"
 #include "zlog.h"
 
@@ -206,14 +207,15 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
 
   cmd.beginRendering(renderingInfo);
 
-  if (!m_glowDescriptor) {
-    m_glowDescriptor = m_backend.allocateFrameDescriptorSet(**m_glowSetLayout);
+  ZVulkanDescriptorSet* glowDS = nullptr;
+  if (m_glowSetLayout) {
+    glowDS = m_backend.allocateOverrideDescriptorSet(**m_glowSetLayout);
   }
-
-  m_glowDescriptor->updateTexture(0, colorTexture);
-  m_glowDescriptor->updateTexture(1, depthTexture);
-  m_glowDescriptor->updateTexture(2, *m_blurIntermediate1.color.texture);
-  m_glowDescriptor->updateTexture(3, *m_blurIntermediate1.depth.texture);
+  CHECK(glowDS != nullptr) << "Glow final: override descriptor allocation failed (fatal)";
+  glowDS->updateTexture(vkbind::kGlowBindingColorIn, colorTexture, m_backend.defaultSampler());
+  glowDS->updateTexture(vkbind::kGlowBindingDepthIn, depthTexture, m_backend.defaultSampler());
+  glowDS->updateTexture(vkbind::kGlowBindingBlurIn0, *m_blurIntermediate1.color.texture, m_backend.defaultSampler());
+  glowDS->updateTexture(vkbind::kGlowBindingBlurIn1, *m_blurIntermediate1.depth.texture, m_backend.defaultSampler());
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
   GlowPipelineKey glowKey;
@@ -227,9 +229,9 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, glowPipeline.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
-  if (m_glowDescriptor) {
-    std::array<vk::DescriptorSet, 1> sets{m_glowDescriptor->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, glowPipeline.pipeline->pipelineLayout(), 0, sets, {});
+  {
+    std::array<vk::DescriptorSet, 1> sets{glowDS->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, glowPipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
   }
 
   cmd.setViewport(0, viewport);
@@ -346,6 +348,7 @@ void ZVulkanTextureGlowPipelineContext::ensureIntermediateTextures(const glm::uv
                                                        true,
                                                        descriptorLayout);
         upload.texture = device.createTexture(info);
+        CHECK(upload.texture != nullptr) << "Glow: failed to create intermediate texture";
         upload.extent = extent;
         upload.format = format;
       }
@@ -525,12 +528,14 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
 
   cmd.beginRendering(renderingInfo);
 
-  if (!m_blurDescriptor) {
-    m_blurDescriptor = m_backend.allocateFrameDescriptorSet(**m_blurSetLayout);
+  ZVulkanDescriptorSet* blurDS = nullptr;
+  if (m_blurSetLayout) {
+    blurDS = m_backend.allocateOverrideDescriptorSet(**m_blurSetLayout);
   }
+  CHECK(blurDS != nullptr) << "Glow blur: override descriptor allocation failed (fatal)";
 
-  m_blurDescriptor->updateTexture(0, inputColor);
-  m_blurDescriptor->updateTexture(1, inputDepth);
+  blurDS->updateTexture(vkbind::kBlurBindingColorIn, inputColor, m_backend.defaultSampler());
+  blurDS->updateTexture(vkbind::kBlurBindingDepthIn, inputDepth, m_backend.defaultSampler());
 
   vulkan::AttachmentFormats formats;
   formats.colorFormats.push_back(output.color.texture->format());
@@ -544,9 +549,9 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
-  if (m_blurDescriptor) {
-    std::array<vk::DescriptorSet, 1> sets{m_blurDescriptor->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
+  {
+    std::array<vk::DescriptorSet, 1> sets{blurDS->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
   }
 
   vk::Viewport localViewport;

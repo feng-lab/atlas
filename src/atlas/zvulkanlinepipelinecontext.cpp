@@ -184,23 +184,44 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
   if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
   if (!m_dsTexture) m_dsTexture = m_backend.allocateFrameDescriptorSet(**m_setTexture);
 
+  // Ensure UBO buffers exist prior to recording
+  auto& device = m_backend.device();
+  if (!m_uboLighting) {
+    m_uboLighting =
+      device.createBuffer(sizeof(LightingUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_uboTransforms) {
+    m_uboTransforms =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_uboMaterial) {
+    m_uboMaterial =
+      device.createBuffer(sizeof(MaterialUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+
   if (m_uboLighting && m_dsLighting) {
-    m_dsLighting->updateUniformBuffer(0, *m_uboLighting);
+    m_dsLighting->writeUniformBufferOnce(0, *m_uboLighting);
   }
   if (m_uboTransforms && m_dsTransforms) {
-    m_dsTransforms->updateUniformBuffer(0, *m_uboTransforms);
+    m_dsTransforms->writeUniformBufferOnce(0, *m_uboTransforms);
   }
   if (m_uboMaterial && m_dsTransforms) {
-    m_dsTransforms->updateUniformBuffer(1, *m_uboMaterial);
+    m_dsTransforms->writeUniformBufferOnce(1, *m_uboMaterial);
   }
 
   ensurePlaceholderTexture();
   if (m_dsTexture) {
     auto& tex = m_backend.defaultPlaceholderTexture2D();
     auto sampler = m_backend.defaultSampler();
-    m_dsTexture->updateTexture(0, tex, sampler);
-    m_dsTexture->updateTexture(1, tex, sampler);
-    m_dsTexture->updateTexture(2, tex, sampler);
+    m_dsTexture->writeTextureOnce(0, tex, sampler);
+    m_dsTexture->writeTextureOnce(1, tex, sampler);
+    m_dsTexture->writeTextureOnce(2, tex, sampler);
   }
 }
 
@@ -456,13 +477,15 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
 }
 
 void ZVulkanLinePipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd,
-                                                    const PipelineInstance& pipeline) const
+                                                    const PipelineInstance& pipeline,
+                                                    vk::DescriptorSet textureOverride) const
 {
-  if (!m_dsLighting || !m_dsTransforms || !m_dsTexture) {
+  if (!m_dsLighting || !m_dsTransforms || (!m_dsTexture && !textureOverride)) {
     return;
   }
 
-  std::array<vk::DescriptorSet, 3> sets{m_dsTexture->descriptorSet(),
+  const vk::DescriptorSet dsTex = textureOverride ? textureOverride : m_dsTexture->descriptorSet();
+  std::array<vk::DescriptorSet, 3> sets{dsTex,
                                         m_dsLighting->descriptorSet(),
                                         m_dsTransforms->descriptorSet()};
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
@@ -509,6 +532,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
                           vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     m_wideVertexCapacity = allocSize;
+    CHECK(m_wideVertexBuffer != nullptr) << "Failed to allocate wide-line vertex buffer, bytes=" << allocSize;
   }
   if (vertexBytes > 0) {
     m_wideVertexBuffer->copyData(m_wideVertices.data(), vertexBytes);
@@ -522,6 +546,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
                           vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     m_wideIndexCapacity = allocSize;
+    CHECK(m_wideIndexBuffer != nullptr) << "Failed to allocate wide-line index buffer, bytes=" << allocSize;
   }
   if (indexBytes > 0) {
     m_wideIndexBuffer->copyData(m_wideIndices.data(), indexBytes);
@@ -574,6 +599,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
                           vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     m_thinVertexCapacity = allocSize;
+    CHECK(m_thinVertexBuffer != nullptr) << "Failed to allocate thin-line vertex buffer, bytes=" << allocSize;
   }
 
   m_thinVertexBuffer->copyData(m_thinVertices.data(), vertexBytes);
@@ -590,32 +616,57 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
+  // GL parity: skip if no geometry, and in picking pass skip when picking colors
+  // are absent or mismatched in count.
+  if (payload.positions.empty()) {
+    return;
+  }
+  if (payload.pickingPass) {
+    if (payload.pickingColors.empty() || payload.pickingColors.size() != payload.positions.size()) {
+      return;
+    }
+  }
+
   const bool pickingPass = payload.pickingPass;
 
   updateUBOs(renderer, batch);
   ensureDescriptorSets(renderer);
+  CHECK(m_dsLighting && m_dsTransforms) << "Line pipeline descriptor sets missing (lighting/transforms)";
 
   const auto shaderHook = renderer.shaderHookType();
-  if (m_dsTexture && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-    const auto& hookPara = renderer.shaderHookPara();
-    if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-      auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
-                                                 m_backend.device(),
-                                                 "line dual-depth-peeling depth blender");
-      m_dsTexture->updateTexture(1, depthTex, m_backend.defaultSampler());
+  vk::DescriptorSet texOverride{};
+  if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_setTexture) {
+    // Allocate a per-draw override descriptor set for DDP peel inputs to avoid update-after-bind.
+    auto* ds = m_backend.allocateOverrideDescriptorSet(**m_setTexture);
+    CHECK(ds != nullptr) << "Line DDP peel: override descriptor allocation failed (fatal)";
+    if (ds) {
+      auto& tex = m_backend.defaultPlaceholderTexture2D();
+      auto sampler = m_backend.defaultSampler();
+      ds->updateTexture(0, tex, sampler);
+      const auto& hookPara = renderer.shaderHookPara();
+      if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
+        auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                                   m_backend.device(),
+                                                   "line dual-depth-peeling depth blender");
+        ds->updateTexture(1, depthTex, sampler);
+      } else {
+        ds->updateTexture(1, tex, sampler);
+      }
+      if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
+        auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                                   m_backend.device(),
+                                                   "line dual-depth-peeling front blender");
+        ds->updateTexture(2, frontTex, sampler);
+      } else {
+        ds->updateTexture(2, tex, sampler);
+      }
+      texOverride = ds->descriptorSet();
     }
-    if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-      auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
-                                                 m_backend.device(),
-                                                 "line dual-depth-peeling front blender");
-      m_dsTexture->updateTexture(2, frontTex, m_backend.defaultSampler());
-    }
-  } else if (m_dsTexture) {
-    auto& tex = m_backend.defaultPlaceholderTexture2D();
-    auto sampler = m_backend.defaultSampler();
-    m_dsTexture->updateTexture(1, tex, sampler);
-    m_dsTexture->updateTexture(2, tex, sampler);
   }
+  if (shaderHook != Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    CHECK(m_dsTexture != nullptr) << "Line pipeline texture descriptor set not initialised";
+  }
+  // No record-time rewrites of persistent texture set; initialized in ensureDescriptorSets()
 
   PipelineKey key;
   key.useSmooth = payload.useSmoothLine;
@@ -633,7 +684,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   auto& pipeline = ensurePipeline(key, payload, formats);
 
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  bindDescriptorSets(cmd, pipeline);
+  bindDescriptorSets(cmd, pipeline, texOverride);
 
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);

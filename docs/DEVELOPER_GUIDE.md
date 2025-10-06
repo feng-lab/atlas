@@ -27,6 +27,11 @@ Lookup Tables (LUTs)
   - Vulkan descriptor arena (Stage 2): pipeline contexts must allocate descriptor sets from the backend’s per-frame arena via `Z3DRendererVulkanBackend::allocateFrameDescriptorSet(layout)`. Do not create per-context descriptor pools. The arena is reset once per frame (scheduled in `endRender()`, applied on the next `beginRender()` after the frame fence signals).
   - Scratch-pool recycling: Vulkan scratch image leases are released only after the submitting frame’s fence signals. The pool defers slot reuse via a callback provided by the backend each frame.
   - Shared fullscreen quad: use `Z3DRendererVulkanBackend::fullscreenQuadVertexBuffer()` in full-screen passes (background, copy, blend, glow) instead of creating per-context VBOs.
+  - Vulkan descriptor guardrails:
+    - Do not write descriptors while a frame is recording. Persistent sets are write-once per frame; update only UBO contents via `copyData(...)` in record paths.
+    - Route volatile inputs (peel/resolve/composite) through per-draw override sets allocated with `allocateOverrideDescriptorSet(...)`.
+    - Always pass explicit samplers for combined image samplers unless layouts use immutable samplers.
+    - Never free descriptor sets individually; rely on the per-frame pool reset. Clear any retained override sets before reset (backend handles this at frame start).
 - On backend switch, `Z3DRendererBase::releaseBackendResources()` clears renderer caches; `Z3DImgFilter::switchRendererBackend` releases GL volume resources when switching to Vulkan.
 
 Threading Model
@@ -68,11 +73,49 @@ Vulkan Migration Snapshots
 
 - Detailed migration backlog now lives in `docs/VULKAN_MIGRATION_PLAN.md`. Treat it as the canonical task list for Vulkan parity and update it whenever plans change.
 - Backend selection remains a session-level switch. GL stays the default renderer while the Vulkan translation layer comes online; runtime hot-swapping will be revisited once the translators cover the major primitives.
-- Filters continue to own their GL renderers. When we add Vulkan support, expose lightweight translation helpers instead of pushing façade-only abstractions into the filters.
-- Render-surface façade work is paused. Per-eye `Z3DRenderTarget` leases stay with each filter, and consumers pull textures via existing helper accessors (see `docs/RENDER_SURFACE_PORTS.md` for historical notes).
+- Filters continue to own their GL renderers. When we add Vulkan support, renderers expose backend‑neutral batch data via `enqueueRenderBatches` which the Vulkan path consumes. We do not refactor GL draw paths; instead we provide explicit Vulkan entry points in `Z3DRendererBase` that collect batches only (no implicit frame begin/end).
+- Render-surface façade work is paused. Per-eye `Z3DRenderTarget` leases stay with each filter, and consumers pull textures via existing helper accessors. Vulkan dynamic rendering targets are bound via `RendererFrameState::ActiveSurface` and are applied before recording through explicit pass helpers.
 - Several `ZParameter` instances still live inside renderers (GL only). As Vulkan coverage expands, audit each renderer, move persistent parameter state to its owning filter (or a shared bundle), and keep only transient GPU resources inside the renderer so backend resets don’t drop user-facing state.
 - Naming convention: 3D/shared classes use the `Z3D` prefix (e.g., `Z3DImgFilter`, `Z3DRenderSurfaceOutputPort`), while Vulkan-specific helpers use the `ZVulkan` prefix (e.g., `ZVulkanLinePipelineContext`). Keep new files aligned with this scheme for clarity across backends.
 - Renderer subclasses still implement `createResources(RenderBackend backend)` and must guard against unsupported APIs (current GL implementations simply return when `backend != RenderBackend::OpenGL`). This keeps future backend transitions from instantiating GL shaders/VAOs during staging.
+
+Vulkan Pipeline Invariants
+
+- Dynamic rendering is used; a new segment is begun only when attachment sets change.
+- Graphics pipeline keys include attachment formats: `colorFormats[]` and optional `depthFormat` are part of the key in all Vulkan pipeline contexts to avoid layout mismatches.
+- Composite/resolve passes (DDP final, WA resolve, WB resolve) must write to exactly one color attachment; depth is disabled in the pipeline and no depth attachment is bound.
+- Descriptor updates after binding are forbidden. Per‑draw overrides are allocated from the backend’s per‑frame arena and kept alive until the frame fence to satisfy validation rules.
+- Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
+
+Vulkan Entry Points (explicit)
+
+- OpenGL entry points remain `render(...)` and `renderPicking(...)`. These drive the GL path and may begin/end GL frames as needed.
+- Vulkan uses explicit, collection‑only entry points in `Z3DRendererBase`:
+  - `recordVulkanBatches(fn, label)` / `recordVulkanPass(surfaceOrLease, fn, label)`: apply pending surfaces, begin/end the Vulkan frame if needed, set a GPU scope label, run `fn`, and submit.
+  - `renderVulkan(eye, ...)` / `renderPickingVulkan(eye, ...)`: enqueue backend‑neutral batches only. These assert that the backend is Vulkan and `collectOnly==true`.
+- Invariants:
+  - For Vulkan, call `renderVulkan`/`renderPickingVulkan` only inside a `recordVulkanBatches`/`recordVulkanPass` block with `collectOnly=true`.
+  - A valid active surface must be set before the first append in a recording session, or the first batch must carry attachments explicitly. Violations cause a CHECK and include the pass label.
+
+Example (pseudocode)
+
+```
+renderer.setCollectOnly(true);
+renderer.setActiveSurfaceForNextPass(lease);
+renderer.recordVulkanPass(lease, [&](){
+  renderer.renderVulkan(eye, myRenderer);
+}, "my_pass");
+renderer.setCollectOnly(false);
+```
+
+Vulkan Descriptor Set/Binding Map
+
+- See `src/atlas/zvulkanbindings.h` for the canonical constants. Key bindings:
+  - Set 0 (inputs):
+    - DDP peel: binding 0 = depth blender, 1 = front blender (explicit sampler)
+    - WA resolve: binding 0 = accumulation, 1 = moments
+    - WB resolve: binding 0 = accumulation, 1 = transmittance
+  - Set 3 (OIT params): binding 0 = OITParams UBO
 
 Invalidation & Progressive Rendering
 
@@ -135,6 +178,25 @@ Testing and Diagnostics
 - Use verbose logging (`--v=1`) to trace rendering progress and apply order.
 - For headless animation export, try small sizes first, then scale up with `--output_tile_size` and `--output_tile_border`.
 Image Rendering Pipeline
+Invariant Checks and GL Parity (Vulkan)
+
+- Principle: Vulkan paths should match OpenGL renderer behavior for benign skips, and crash fast on invariants that “should never happen”. This helps surface pipeline issues early and keeps parity with long‑standing GL semantics.
+- GL‑parity early returns (no crash):
+  - Empty payloads (no geometry, no image, zero vertices/indices).
+  - Picking passes without picking colors when GL also skips (e.g., fonts, lines, spheres, cones, ellipsoids).
+  - Transient/paged resources not yet ready (e.g., paged volume textures) where GL progressively renders — Vulkan skips that draw safely.
+- Invariant failures (CHECK crash):
+  - Null `renderer` in non‑empty payloads.
+  - Size mismatches between parallel arrays (positions/texcoords/colors/pickingColors, etc.).
+  - Required descriptor set layouts/descriptor sets/buffers fail to allocate or are missing at record time.
+  - Resolve/composite format contracts (e.g., WA/WB resolves require exactly one color attachment and no depth).
+- Debug‑only guards (DCHECK):
+  - Index ranges derived from CPU tensors.
+  - Sanity assertions inside hot loops that are too expensive for release.
+
+Notes
+- OOM or external resource exhaustion may trip CHECKs: we treat these as fatal in Vulkan paths to avoid silent rendering fallthrough. If a path is expected to be optional/transient, prefer a guarded early return and document the GL parity.
+- Per‑draw override descriptor sets are used to avoid update‑after‑bind hazards. Allocation failures are fatal (CHECK) because they indicate broken per‑frame descriptor arenas.
 
 - Overview
   - 3D images are rendered via `Z3DImgFilter`, which hosts two renderer paths:

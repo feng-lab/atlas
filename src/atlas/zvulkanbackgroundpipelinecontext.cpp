@@ -73,6 +73,7 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
   updateLightingUBO(renderer, batch, payload);
   updateTransformUBO(renderer, batch, payload);
   ensureDescriptorSets();
+  CHECK(m_dsLighting && m_dsTransforms) << "Background pipeline descriptor sets missing (lighting/transforms)";
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
@@ -89,10 +90,8 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
 
-  if (m_dsLighting && m_dsTransforms) {
-    std::array<vk::DescriptorSet, 2> sets{m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 1, sets, {});
-  }
+  std::array<vk::DescriptorSet, 2> sets{m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 1, sets, {});
 
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
@@ -173,12 +172,33 @@ void ZVulkanBackgroundPipelineContext::ensureDescriptorSets()
     m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
   }
 
+  // Ensure UBO buffers exist even before per-batch updates
+  auto& device = m_backend.device();
+  if (!m_uboLighting) {
+    m_uboLighting =
+      device.createBuffer(sizeof(LightingUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_uboTransforms) {
+    m_uboTransforms =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_uboMaterial) {
+    m_uboMaterial =
+      device.createBuffer(sizeof(MaterialUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+
   if (m_dsLighting && m_uboLighting) {
-    m_dsLighting->updateUniformBuffer(0, *m_uboLighting);
+    m_dsLighting->writeUniformBufferOnce(0, *m_uboLighting);
   }
   if (m_dsTransforms && m_uboTransforms && m_uboMaterial) {
-    m_dsTransforms->updateUniformBuffer(0, *m_uboTransforms);
-    m_dsTransforms->updateUniformBuffer(1, *m_uboMaterial);
+    m_dsTransforms->writeUniformBufferOnce(0, *m_uboTransforms);
+    m_dsTransforms->writeUniformBufferOnce(1, *m_uboMaterial);
   }
 }
 

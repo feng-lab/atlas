@@ -56,6 +56,9 @@ Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
   , m_backgroundContext(std::make_unique<ZVulkanBackgroundPipelineContext>(*this))
   , m_textureCopyContext(std::make_unique<ZVulkanTextureCopyPipelineContext>(*this))
   , m_textureBlendContext(std::make_unique<ZVulkanTextureBlendPipelineContext>(*this))
+  , m_textureDualPeelContext(std::make_unique<ZVulkanTextureDualPeelPipelineContext>(*this))
+  , m_textureWeightedAverageContext(std::make_unique<ZVulkanTextureWeightedAveragePipelineContext>(*this))
+  , m_textureWeightedBlendedContext(std::make_unique<ZVulkanTextureWeightedBlendedPipelineContext>(*this))
   , m_textureGlowContext(std::make_unique<ZVulkanTextureGlowPipelineContext>(*this))
   , m_imgSliceContext(std::make_unique<ZVulkanImgSlicePipelineContext>(*this))
 {}
@@ -221,13 +224,54 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.attachmentLoads = 0;
   frameResources.pipelinesCreated = 0;
   frameResources.pipelinesBound.clear();
+  frameResources.transientOverrideSets.clear();
+  frameResources.overrideSetsAllocated = 0;
+  frameResources.activeSegmentFormats.reset();
+  frameResources.skippedBatchesFormatMismatch = 0;
+  frameResources.descriptorWritesWhileRecording = 0;
+  frameResources.boundSetRewriteAttempts = 0;
+
+  // Expose frame resources to allow pre-record descriptor priming
+  m_activeFrame = &frameResources;
+
+  // Prime persistent descriptor sets before command buffer recording begins.
+  // This allows UBO/image bindings to be established without violating the
+  // no-descriptor-writes-during-recording invariant.
+  if (m_backgroundContext) {
+    m_backgroundContext->ensureDescriptorSets();
+  }
+  if (m_lineContext) {
+    m_lineContext->ensureDescriptorSets(renderer);
+  }
+  if (m_meshContext) {
+    m_meshContext->ensureDescriptorSets();
+  }
+  if (m_ellipsoidContext) {
+    m_ellipsoidContext->ensureDescriptorSets();
+  }
+  if (m_sphereContext) {
+    m_sphereContext->ensureDescriptorSets();
+  }
+  if (m_coneContext) {
+    m_coneContext->ensureDescriptorSets();
+  }
+  if (m_textureDualPeelContext) {
+    m_textureDualPeelContext->ensureOITResources();
+  }
+  if (m_textureWeightedAverageContext) {
+    m_textureWeightedAverageContext->ensureDescriptorLayout();
+    m_textureWeightedAverageContext->ensureOITResources();
+  }
+  if (m_textureWeightedBlendedContext) {
+    m_textureWeightedBlendedContext->ensureDescriptorLayout();
+    m_textureWeightedBlendedContext->ensureOITResources();
+  }
 
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   auto& cmdBuffer = m_activeFrameHandle->commandBuffer();
   cmdBuffer.begin(beginInfo);
   cmdBuffer.resetQueryPool(*frameResources.queryPool, 0, kMaxTimestampQueries);
 
-  m_activeFrame = &frameResources;
   m_frameRecording = true;
 
   // Install scratch-pool deferred release scheduler for this active frame
@@ -299,12 +343,16 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   vlogFrameRecyclingStats(frame);
 
   // Stage 3: VLOG instrumentation for dynamic rendering segments and pipeline stats
-  VLOG(1) << fmt::format("VK segments: began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={}",
+  VLOG(1) << fmt::format("VK segments: began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={} overrides={} skipped_format_mismatch={} descriptor_writes_while_recording={} bound_set_rewrite_attempts={}",
                          frame.renderingSegmentsBegan,
                          frame.attachmentClears,
                          frame.attachmentLoads,
                          frame.pipelinesCreated,
-                         frame.pipelinesBound.size());
+                         frame.pipelinesBound.size(),
+                         frame.overrideSetsAllocated,
+                         frame.skippedBatchesFormatMismatch,
+                         frame.descriptorWritesWhileRecording,
+                         frame.boundSetRewriteAttempts);
 
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
@@ -445,10 +493,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       depthAttachmentInfo = makeDepthAttachment(*batch.pass.depthAttachment);
     }
 
-    if (colorAttachments.empty() && !depthAttachmentInfo) {
-      VLOG(1) << "VK: skipping segment with no attachments";
-      return false;
-    }
+    CHECK(!(colorAttachments.empty() && !depthAttachmentInfo))
+      << "VK: segment began with no attachments (fatal) label='" << renderer.currentPassLabel() << "'";
 
     const auto vkScissor = vulkan::toVkScissor(batch.pass);
     vk::RenderingInfo renderingInfo;
@@ -580,6 +626,10 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (beginSegmentForBatch(batch)) {
         segmentOpen = true;
         currentKey = key;
+        // Track active segment formats for validation
+        if (m_activeFrame) {
+          m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
+        }
       } else {
         continue;
       }
@@ -590,6 +640,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (beginSegmentForBatch(batch)) {
         segmentOpen = true;
         currentKey = key;
+        if (m_activeFrame) {
+          m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
+        }
       } else {
         continue;
       }
@@ -769,6 +822,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
   if (segmentOpen) {
     cmd.endRendering();
+  }
+  if (m_activeFrame) {
+    m_activeFrame->activeSegmentFormats.reset();
   }
 }
 
@@ -971,11 +1027,28 @@ Z3DRendererVulkanBackend::allocateFrameDescriptorSet(vk::DescriptorSetLayout lay
     VLOG(1) << "Descriptor arena missing; allocation skipped";
     return {};
   }
-  auto set = m_sharedDevice->createDescriptorSet(*m_activeFrame->descriptorPool, layout);
+  auto set = m_sharedDevice->createDescriptorSet(*m_activeFrame->descriptorPool, layout, /*isOverrideTransient*/ false);
   if (set) {
     m_activeFrame->descriptorSetsAllocated++;
   }
   return set;
+}
+
+ZVulkanDescriptorSet*
+Z3DRendererVulkanBackend::allocateOverrideDescriptorSet(vk::DescriptorSetLayout layout)
+{
+  auto set = m_sharedDevice && m_activeFrame && m_activeFrame->descriptorPool
+               ? m_sharedDevice->createDescriptorSet(*m_activeFrame->descriptorPool, layout, /*isOverrideTransient*/ true)
+               : nullptr;
+  if (!set) {
+    return nullptr;
+  }
+  ZVulkanDescriptorSet* raw = set.get();
+  if (m_activeFrame) {
+    m_activeFrame->transientOverrideSets.push_back(std::move(set));
+    m_activeFrame->overrideSetsAllocated++;
+  }
+  return raw;
 }
 
 void Z3DRendererVulkanBackend::scheduleAfterCurrentFrameCompletion(std::function<void()> fn)
@@ -1076,6 +1149,9 @@ void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
     return;
   }
   if (frame.arenaResetScheduled) {
+    // Destroy transient override sets BEFORE resetting the pool to avoid
+    // vkFreeDescriptorSets after implicit free by pool reset.
+    frame.transientOverrideSets.clear();
     frame.descriptorPool->reset();
     frame.arenaResetScheduled = false;
     frame.arenaResetsPerformed++;
@@ -1109,6 +1185,44 @@ void Z3DRendererVulkanBackend::vlogFrameRecyclingStats(const FrameResources& fra
                          frame.arenaResetsPerformed,
                          frame.leaseRecycleQueued,
                          frame.leaseRecycleExecuted);
+}
+
+const std::optional<vulkan::AttachmentFormats>&
+Z3DRendererVulkanBackend::currentSegmentFormats() const
+{
+  static const std::optional<vulkan::AttachmentFormats> kNone;
+  if (!m_activeFrame) {
+    return kNone;
+  }
+  return m_activeFrame->activeSegmentFormats;
+}
+
+bool Z3DRendererVulkanBackend::validateFormatsOrSkip(const vulkan::AttachmentFormats& pipelineFormats,
+                                                     const char* contextTag)
+{
+  if (!m_activeFrame) {
+    return true;
+  }
+  const auto& seg = m_activeFrame->activeSegmentFormats;
+  if (!seg) {
+    return true;
+  }
+  const bool depthMatch = seg->depthFormat == pipelineFormats.depthFormat;
+  const bool colorMatch = seg->colorFormats == pipelineFormats.colorFormats;
+  if (depthMatch && colorMatch) {
+    return true;
+  }
+  m_activeFrame->skippedBatchesFormatMismatch++;
+  const std::string ctx = (contextTag && *contextTag) ? fmt::format(" [{}]", contextTag) : std::string();
+  LOG(ERROR) << fmt::format(
+    "VK: format mismatch{}: seg colors={} depth={}, pipeline colors={} depth={}",
+    ctx,
+    seg->colorFormats.size(),
+    seg->depthFormat.has_value(),
+    pipelineFormats.colorFormats.size(),
+    pipelineFormats.depthFormat.has_value());
+  CHECK(false) << "Vulkan dynamic rendering segment/pipeline format mismatch (fatal).";
+  return false;
 }
 
 void Z3DRendererVulkanBackend::ensureFullscreenQuad()

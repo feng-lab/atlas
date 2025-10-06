@@ -213,15 +213,15 @@ void ZVulkanImgRaycasterPipelineContext::resetFrame()
 void ZVulkanImgRaycasterPipelineContext::resetDescriptors()
 {
   for (auto& channel : m_channelResources) {
-    channel.fastDescriptor.reset();
-    channel.rayParamDescriptor.reset();
-    channel.pagedDescriptor.reset();
-    channel.pageDescriptor.reset();
+    channel.fastDescriptor = nullptr;
+    channel.rayParamDescriptor = nullptr;
+    channel.pagedDescriptor = nullptr;
+    channel.pageDescriptor = nullptr;
     channel.blockIdDescriptor.reset();
   }
   m_emptyDescriptor.reset();
-  m_copyDescriptor.reset();
-  m_mergeDescriptor.reset();
+  m_copyDescriptor = nullptr;
+  m_mergeDescriptor = nullptr;
   if (m_descriptorPool) {
     m_descriptorPool->reset();
   }
@@ -403,6 +403,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureEmptyDescriptor()
     return;
   }
   m_emptyDescriptor = m_backend.allocateFrameDescriptorSet(**m_emptySetLayout);
+  CHECK(m_emptyDescriptor != nullptr) << "Raycaster: failed to allocate empty descriptor set";
 }
 
 void ZVulkanImgRaycasterPipelineContext::ensureEntryVertexCapacity(size_t vertexCount, size_t indexCount)
@@ -414,6 +415,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureEntryVertexCapacity(size_t vertex
       device.createBuffer(m_entryVertexCapacity * sizeof(EntryVertex),
                           vk::BufferUsageFlagBits::eVertexBuffer,
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    CHECK(m_entryVertexBuffer != nullptr) << "Failed to allocate entry vertex buffer, count=" << m_entryVertexCapacity;
   }
 
   if (indexCount > m_entryIndexCapacity) {
@@ -425,6 +427,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureEntryVertexCapacity(size_t vertex
         device.createBuffer(m_entryIndexCapacity * sizeof(uint32_t),
                             vk::BufferUsageFlagBits::eIndexBuffer,
                             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+      CHECK(m_entryIndexBuffer != nullptr) << "Failed to allocate entry index buffer, count=" << m_entryIndexCapacity;
     }
   }
 }
@@ -447,6 +450,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureQuadVertexBuffer()
     device.createBuffer(quad.size() * sizeof(glm::vec2),
                         vk::BufferUsageFlagBits::eVertexBuffer,
                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  CHECK(m_quadVertexBuffer != nullptr) << "Failed to allocate raycaster quad vertex buffer";
   m_quadVertexBuffer->copyData(quad.data(), quad.size() * sizeof(glm::vec2));
 }
 
@@ -787,14 +791,14 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
 void ZVulkanImgRaycasterPipelineContext::bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray)
 {
   if (!m_mergeDescriptor) {
-    m_mergeDescriptor = m_backend.allocateFrameDescriptorSet(**m_mergeSetLayout);
+    m_mergeDescriptor = m_backend.allocateOverrideDescriptorSet(**m_mergeSetLayout);
   }
-
-  m_mergeDescriptor->updateTexture(0, colorArray);
+  CHECK(m_mergeDescriptor != nullptr) << "Raycaster merge: override descriptor allocation failed (fatal)";
+  m_mergeDescriptor->updateTexture(0, colorArray, m_backend.defaultSampler());
   if (depthArray) {
-    m_mergeDescriptor->updateTexture(1, *depthArray);
+    m_mergeDescriptor->updateTexture(1, *depthArray, m_backend.defaultSampler());
   } else {
-    m_mergeDescriptor->updateTexture(1, colorArray);
+    m_mergeDescriptor->updateTexture(1, colorArray, m_backend.defaultSampler());
   }
 }
 
@@ -829,6 +833,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureProgressiveLayerTargets(const glm
                                               true,
                                               vk::ImageLayout::eShaderReadOnlyOptimal);
     m_progressiveLayerColor = m_backend.device().createTexture(colorInfo);
+    CHECK(m_progressiveLayerColor != nullptr) << "Raycaster: failed to create progressive color layer array";
 
     auto depthInfo =
       ZVulkanTexture::CreateInfo::make2DArray(size.x,
@@ -842,6 +847,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureProgressiveLayerTargets(const glm
                                               true,
                                               vk::ImageLayout::eShaderReadOnlyOptimal);
     m_progressiveLayerDepth = m_backend.device().createTexture(depthInfo);
+    CHECK(m_progressiveLayerDepth != nullptr) << "Raycaster: failed to create progressive depth layer array";
 
     m_progressiveLayerSize = size;
     m_progressiveLayerCount = layerCount;
@@ -920,6 +926,7 @@ ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureVolumeTexture(ChannelR
                                          true,
                                          vk::ImageLayout::eShaderReadOnlyOptimal);
     resources.volumeTexture = m_backend.device().createTexture(info);
+    CHECK(resources.volumeTexture != nullptr) << "Raycaster: failed to create 3D volume texture";
   }
 
   if (byteSize > 0 && data) {
@@ -953,12 +960,12 @@ void ZVulkanImgRaycasterPipelineContext::updateChannelFastDescriptors(ChannelRes
 {
   (void)channelIndex;
   if (!resources.fastDescriptor) {
-    resources.fastDescriptor = m_backend.allocateFrameDescriptorSet(**m_fastSetLayout);
+    resources.fastDescriptor = m_backend.allocateOverrideDescriptorSet(**m_fastSetLayout);
   }
-
-  resources.fastDescriptor->updateTexture(0, entryExitTexture);
-  resources.fastDescriptor->updateTexture(1, volume);
-  resources.fastDescriptor->updateTexture(2, transfer);
+  CHECK(resources.fastDescriptor != nullptr) << "Raycaster fast path: override descriptor allocation failed (fatal)";
+  resources.fastDescriptor->updateTexture(0, entryExitTexture, m_backend.defaultSampler());
+  resources.fastDescriptor->updateTexture(1, volume, m_backend.defaultSampler());
+  resources.fastDescriptor->updateTexture(2, transfer, m_backend.defaultSampler());
 
   if (!resources.rayParamBuffer) {
     resources.rayParamBuffer = m_backend.device().createBuffer(sizeof(RayParamsData),
@@ -977,9 +984,9 @@ void ZVulkanImgRaycasterPipelineContext::updateChannelFastDescriptors(ChannelRes
   resources.rayParamBuffer->copyData(&params, sizeof(RayParamsData));
 
   if (!resources.rayParamDescriptor) {
-    resources.rayParamDescriptor = m_backend.allocateFrameDescriptorSet(**m_rayParamSetLayout);
+    resources.rayParamDescriptor = m_backend.allocateOverrideDescriptorSet(**m_rayParamSetLayout);
   }
-
+  CHECK(resources.rayParamDescriptor != nullptr) << "Raycaster params: override descriptor allocation failed (fatal)";
   resources.rayParamDescriptor->updateUniformBuffer(3, *resources.rayParamBuffer);
 }
 
@@ -995,7 +1002,7 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
                                                                float zeToScreenPixelVoxelSize)
 {
   if (!resources.pagedDescriptor) {
-    resources.pagedDescriptor = m_backend.allocateFrameDescriptorSet(**m_progressiveSetLayout);
+    resources.pagedDescriptor = m_backend.allocateOverrideDescriptorSet(**m_progressiveSetLayout);
   }
 
   if (!resources.pagedDescriptor) {
@@ -1014,14 +1021,14 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
     return false;
   }
 
-  resources.pagedDescriptor->updateTexture(0, *pageDirectory);
-  resources.pagedDescriptor->updateTexture(1, *pageTable);
-  resources.pagedDescriptor->updateTexture(2, *imageCache);
-  resources.pagedDescriptor->updateTexture(3, volume);
-  resources.pagedDescriptor->updateTexture(4, transfer);
-  resources.pagedDescriptor->updateTexture(5, entryExit);
-  resources.pagedDescriptor->updateTexture(6, lastDepth);
-  resources.pagedDescriptor->updateTexture(7, lastColor);
+  resources.pagedDescriptor->updateTexture(0, *pageDirectory, m_backend.defaultSampler());
+  resources.pagedDescriptor->updateTexture(1, *pageTable, m_backend.defaultSampler());
+  resources.pagedDescriptor->updateTexture(2, *imageCache, m_backend.defaultSampler());
+  resources.pagedDescriptor->updateTexture(3, volume, m_backend.defaultSampler());
+  resources.pagedDescriptor->updateTexture(4, transfer, m_backend.defaultSampler());
+  resources.pagedDescriptor->updateTexture(5, entryExit, m_backend.defaultSampler());
+  resources.pagedDescriptor->updateTexture(6, lastDepth, m_backend.defaultSampler());
+  resources.pagedDescriptor->updateTexture(7, lastColor, m_backend.defaultSampler());
 
   const uint32_t levelCount = static_cast<uint32_t>(std::min<size_t>(image.numLevels(), kMaxPagingLevels));
   auto pageData = buildPageDataBuffer(image, channelIndex, zeToScreenPixelVoxelSize, levelCount);
@@ -1042,7 +1049,7 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
   resources.pageDataCapacity = pageData.size();
 
   if (!resources.pageDescriptor) {
-    resources.pageDescriptor = m_backend.allocateFrameDescriptorSet(**m_pageSetLayout);
+    resources.pageDescriptor = m_backend.allocateOverrideDescriptorSet(**m_pageSetLayout);
   }
 
   if (!resources.pageDescriptor) {
@@ -1793,10 +1800,11 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   auto& layerCopyPipeline = ensureCopyPipeline(layerCopyKey, layerFormats);
 
   if (!m_copyDescriptor) {
-    m_copyDescriptor = m_backend.allocateFrameDescriptorSet(**m_copySetLayout);
+    m_copyDescriptor = m_backend.allocateOverrideDescriptorSet(**m_copySetLayout);
   }
-  m_copyDescriptor->updateTexture(0, *currentColor);
-  m_copyDescriptor->updateTexture(1, *currentDepth);
+  CHECK(m_copyDescriptor != nullptr) << "Raycaster layer copy: override descriptor allocation failed (fatal)";
+  m_copyDescriptor->updateTexture(0, *currentColor, m_backend.defaultSampler());
+  m_copyDescriptor->updateTexture(1, *currentDepth, m_backend.defaultSampler());
 
   vk::RenderingAttachmentInfo layerColorAttachment{};
   auto layerColorView = layerColor->layerImageView(activeChannelIndex);

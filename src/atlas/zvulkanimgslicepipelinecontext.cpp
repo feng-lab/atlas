@@ -172,12 +172,12 @@ void ZVulkanImgSlicePipelineContext::resetFrame()
 void ZVulkanImgSlicePipelineContext::resetDescriptors()
 {
   for (auto& channel : m_channelResources) {
-    channel.fastTextureDescriptor.reset();
-    channel.pagedTextureDescriptor.reset();
-    channel.pageDescriptor.reset();
+    channel.fastTextureDescriptor = nullptr;
+    channel.pagedTextureDescriptor = nullptr;
+    channel.pageDescriptor = nullptr;
   }
   m_emptyDescriptor.reset();
-  m_mergeDescriptor.reset();
+  m_mergeDescriptor = nullptr;
   // Descriptors are per-frame arena allocated; nothing to reset here.
 }
 
@@ -704,6 +704,7 @@ void ZVulkanImgSlicePipelineContext::ensureEmptyDescriptor()
     return;
   }
   m_emptyDescriptor = m_backend.allocateFrameDescriptorSet(**m_emptySetLayout);
+  CHECK(m_emptyDescriptor != nullptr) << "Slice pipeline: failed to allocate empty descriptor set";
 }
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanImgSlicePipelineContext::makeSliceVertexInputState() const
@@ -759,6 +760,7 @@ void ZVulkanImgSlicePipelineContext::ensureSliceVertexCapacity(size_t vertexCoun
     device.createBuffer(m_vertexCapacity * sizeof(SliceVertex),
                         vk::BufferUsageFlagBits::eVertexBuffer,
                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  CHECK(m_vertexBuffer != nullptr) << "Failed to allocate slice vertex buffer, count=" << m_vertexCapacity;
 }
 
 void ZVulkanImgSlicePipelineContext::ensureQuadVertexBuffer()
@@ -773,6 +775,7 @@ void ZVulkanImgSlicePipelineContext::ensureQuadVertexBuffer()
     device.createBuffer(m_quadVertexCapacity * sizeof(glm::vec3),
                         vk::BufferUsageFlagBits::eVertexBuffer,
                         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  CHECK(m_quadVertexBuffer != nullptr) << "Failed to allocate slice quad vertex buffer";
 
   std::array<glm::vec3, 4> quadVertices{
     glm::vec3{-1.f, -1.f, kQuadDepth},
@@ -866,6 +869,8 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureVolumeTexture(size_t chann
                                          true,
                                          vk::ImageLayout::eShaderReadOnlyOptimal);
     resources.volumeTexture = device.createTexture(info);
+    CHECK(resources.volumeTexture != nullptr) << "Slice: failed to create 3D volume texture (" << width << "x" << height
+                                              << "x" << depth << ")";
   } else if (resources.volumeGeneration == generation && resources.volumeTexture) {
     return *resources.volumeTexture;
   }
@@ -914,10 +919,11 @@ void ZVulkanImgSlicePipelineContext::updateFastDescriptors(ChannelResources& res
                                                            ZVulkanTexture& colormap)
 {
   if (!resources.fastTextureDescriptor) {
-    resources.fastTextureDescriptor = m_backend.allocateFrameDescriptorSet(**m_fastSliceSetLayout);
+    resources.fastTextureDescriptor = m_backend.allocateOverrideDescriptorSet(**m_fastSliceSetLayout);
   }
-  resources.fastTextureDescriptor->updateTexture(0, volume);
-  resources.fastTextureDescriptor->updateTexture(1, colormap);
+  CHECK(resources.fastTextureDescriptor != nullptr) << "Slice fast path: override descriptor allocation failed (fatal)";
+  resources.fastTextureDescriptor->updateTexture(0, volume, m_backend.defaultSampler());
+  resources.fastTextureDescriptor->updateTexture(1, colormap, m_backend.defaultSampler());
   if (!resources.pagedTextureDescriptor) {
     resources.levelCount = 1u;
   }
@@ -934,13 +940,14 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
                                                             float zeToScreenPixelVoxelSize)
 {
   if (!resources.pagedTextureDescriptor) {
-    resources.pagedTextureDescriptor = m_backend.allocateFrameDescriptorSet(**m_pagedSliceSetLayout);
+    resources.pagedTextureDescriptor = m_backend.allocateOverrideDescriptorSet(**m_pagedSliceSetLayout);
   }
-  resources.pagedTextureDescriptor->updateTexture(0, pageDirectory);
-  resources.pagedTextureDescriptor->updateTexture(1, pageTable);
-  resources.pagedTextureDescriptor->updateTexture(2, imageCache);
-  resources.pagedTextureDescriptor->updateTexture(3, volume);
-  resources.pagedTextureDescriptor->updateTexture(4, colormap);
+  CHECK(resources.pagedTextureDescriptor != nullptr) << "Slice paged path: override descriptor allocation failed (fatal)";
+  resources.pagedTextureDescriptor->updateTexture(0, pageDirectory, m_backend.defaultSampler());
+  resources.pagedTextureDescriptor->updateTexture(1, pageTable, m_backend.defaultSampler());
+  resources.pagedTextureDescriptor->updateTexture(2, imageCache, m_backend.defaultSampler());
+  resources.pagedTextureDescriptor->updateTexture(3, volume, m_backend.defaultSampler());
+  resources.pagedTextureDescriptor->updateTexture(4, colormap, m_backend.defaultSampler());
 
   auto pageData = buildPageDataBuffer(image, channel, zeToScreenPixelVoxelSize);
   if (!resources.pageDataBuffer || resources.pageDataCapacity < pageData.size()) {
@@ -957,8 +964,9 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
   resources.pageDataCapacity = pageData.size();
 
   if (!resources.pageDescriptor) {
-    resources.pageDescriptor = m_backend.allocateFrameDescriptorSet(**m_slicePageSetLayout);
+    resources.pageDescriptor = m_backend.allocateOverrideDescriptorSet(**m_slicePageSetLayout);
   }
+  CHECK(resources.pageDescriptor != nullptr) << "Slice page params: override descriptor allocation failed (fatal)";
   resources.pageDescriptor->updateUniformBuffer(2, *resources.pageDataBuffer);
 
   resources.levelCount = static_cast<uint32_t>(std::min<size_t>(image.numLevels(), kMaxPagingLevels));
@@ -1091,14 +1099,14 @@ ZVulkanImgSlicePipelineContext::ensureMergePipeline(const MergePipelineKey& key,
 void ZVulkanImgSlicePipelineContext::bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray)
 {
   if (!m_mergeDescriptor) {
-    m_mergeDescriptor = m_backend.allocateFrameDescriptorSet(**m_mergeSetLayout);
+    m_mergeDescriptor = m_backend.allocateOverrideDescriptorSet(**m_mergeSetLayout);
   }
-
-  m_mergeDescriptor->updateTexture(0, colorArray);
+  CHECK(m_mergeDescriptor != nullptr) << "Slice merge: override descriptor allocation failed (fatal)";
+  m_mergeDescriptor->updateTexture(0, colorArray, m_backend.defaultSampler());
   if (depthArray) {
-    m_mergeDescriptor->updateTexture(1, *depthArray);
+    m_mergeDescriptor->updateTexture(1, *depthArray, m_backend.defaultSampler());
   } else {
-    m_mergeDescriptor->updateTexture(1, colorArray);
+    m_mergeDescriptor->updateTexture(1, colorArray, m_backend.defaultSampler());
   }
 }
 

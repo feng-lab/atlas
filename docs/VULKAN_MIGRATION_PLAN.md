@@ -18,8 +18,44 @@ These instructions are mandatory for every migration change; do not deviate from
 
 - You can use `cmake --build build/Release` to verify compositor changes still compile before pushing them further.
 - **Never run `git checkout`**; we might lose progress forever.
-- Build Vulkan features by translating the existing GL renderer data. Avoid rewriting the GL draw paths; instead, expose the geometry/state they already use and feed that into Vulkan.
-- Dynamic rendering stays the foundation for command recording. Renderers provide backend-neutral batches (via the `enqueueRenderBatches` hook) so the Vulkan backend can cache/create pipelines and issue draws without pre-declared render passes.
+- Build Vulkan features by translating the existing GL renderer data. Avoid rewriting the GL draw paths; expose the geometry/state they already use and feed that into Vulkan.
+- Dynamic rendering stays the foundation for command recording. Renderers provide backend-neutral batches (via the `enqueueRenderBatches` hook). The Vulkan path records through explicit entry points (`recordVulkanBatches`/`recordVulkanPass`) and enqueues via `renderVulkan`/`renderPickingVulkan`.
+
+#### 2025-10 Strictness Updates
+
+- Descriptor writes during recording now crash unless using a per-draw override set. All persistent/frame descriptor sets must be fully written before `vkCmdBeginRendering` on the current command buffer. Any violation triggers a CHECK.
+- Dynamic rendering invariants are enforced: if a pipeline’s attachment formats do not match the currently open dynamic rendering segment, the backend aborts with a CHECK instead of skipping.
+- Surface invariants (new): Vulkan batches must never record without attachments. A pass must set an active surface before the first append, or the batch must provide attachments explicitly. `recordVulkanBatches` applies any pending surface before beginning a Vulkan frame; missing attachments on the first append cause a CHECK that includes the pass label and shader hook type.
+
+#### Vulkan Entry Points (separation from GL)
+
+- OpenGL path: use `render(...)` and `renderPicking(...)` (GL immediate mode), which may begin/end frames.
+- Vulkan path: always wrap work with `recordVulkanBatches(fn, label)` or `recordVulkanPass(surfaceOrLease, fn, label)` and set `collectOnly=true` while recording. Inside the block, call `renderVulkan(eye, ...)` or `renderPickingVulkan(eye, ...)` to enqueue batches only (no begin/end).
+- Calling GL entry points while the backend is Vulkan is an error and will CHECK in development builds to surface misuse early.
+- Dual-depth-peeling (mesh peel) blender samplers moved to set=0, bindings=3/4 to avoid collisions with `mesh_func.glslinc` samplers (bindings 0/1/2). Mesh pipeline and shader sources updated accordingly.
+
+#### 2025-10 Invariant Policy and GL Parity
+
+To make Vulkan failures loud and actionable while maintaining user-visible parity with OpenGL:
+
+- GL-parity early returns (no crash):
+  - Empty or intentionally skipped work: empty geometry, zero indices, no visible channels, or paging inputs not ready yet (where GL also does nothing).
+  - Picking passes where the GL path also skips when picking colors are absent or size-mismatched (fonts, lines, spheres, cones, ellipsoids).
+
+- Enforced invariants (CHECK; no silent fallback):
+  - Non-empty payloads with null `renderer`.
+  - Parallel array size mismatches (e.g., positions vs. texcoords/colors/pickingColors), or out-of-range index issues (DCHECK for hot loops).
+  - Descriptor set layouts/descriptor sets/buffers that fail to allocate or are missing during recording.
+  - Resolve/composite format contracts (e.g., WA/WB resolve must bind exactly one color attachment and no depth).
+  - Vulkan-only resource usage in Vulkan paths: do not fall back to CPU uploads or GL bridges when a Vulkan handle is expected.
+
+- Descriptor update rules:
+  - Persistent/frame descriptor sets are write-once prior to recording; per-draw override sets carry volatile inputs (peels, resolves, composites). Allocation failure of an override set is fatal (CHECK).
+
+- Debug-only (DCHECK):
+  - Use for expensive assertions (e.g., index range checks) to avoid runtime cost in Release.
+
+Rationale: Silent returns mask bugs and create visual uncertainty. This policy trades early crashes for faster diagnosis while keeping GL-parity skips intact for content that was not meant to render.
 
 ## Important Guideline (Review Before Coding)
 
@@ -124,7 +160,7 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
    - **Lines:** Ensure devicePixelRatio scaling, picking outputs, and progressive invalidation hooks mirror GL behaviour.
    - **Meshes:** Port material/light UBOs, depth/cull states, and transparency paths; add placeholder features (e.g., OIT) with stubs until Vulkan parity lands.
   - **Images (including volume rendering within `Z3DImgFilter`):** Rebuild 2D/3D pipelines around Vulkan dynamic rendering or subpasses, matching GL render target chaining.
-   - Each Vulkan renderer should expose GL-compatible entry points to minimise filter churn.
+   - Keep GL entry points intact for GL. For Vulkan, renderers publish batch data through `enqueueRenderBatches`, which `Z3DRendererBase` consumes via `renderVulkan`/`renderPickingVulkan`.
 
 9. **Backend Selection & Persistence**
    - The runtime `RenderBackend` toggle remains planned but not yet wired to a hot-swappable façade. For now the switch is a session-level knob that restarts the engine.
@@ -218,7 +254,33 @@ Status legend: [Done], [In‑Progress], [Todo], [Blocked]
 - Vulkan image layer blending parity (non‑OIT) [Done]
   - Collect per‑filter AttachmentHandles (color+depth) and blend using TextureBlend renderer (DepthTest/MIP modes) with Vulkan attachments when OIT is disabled.
   - Multi‑layer merge via pairwise passes into pooled Vulkan temps, then blend over output; gated so it skips when OIT already consumed the layers.
-  - File ref: src/atlas/z3dcompositor.cpp:1370
+
+## Descriptor Guardrails (Permanent)
+
+- No descriptor writes while a frame is recording.
+  - Global guard in `ZVulkanDescriptorSet`: during recording, persistent sets become write-once; subsequent writes are blocked and logged. Per-draw override sets remain writable.
+  - Telemetry counters per frame: `descriptor_writes_while_recording` and `bound_set_rewrite_attempts` (write attempts on persistent sets after initialization).
+- Volatile inputs route through per‑draw override sets only.
+  - DDP peel: override set 0 binds depth/front blender inputs (with explicit sampler).
+  - WA/WB resolves: override set 0 binds accum/transmittance or accum/moments inputs.
+  - Glow/copy/blend: all sampled inputs use an override set per draw.
+  - If override allocation fails for a required batch, skip the batch rather than mutating shared sets.
+- Persistent sets are write‑once; update only UBO contents per draw.
+  - Lighting/Transforms/OIT descriptors are set when the set is first allocated each frame; per‑draw updates use buffer `copyData(...)` only.
+- Samplers are explicit or immutable.
+  - For combined image samplers, pass an explicit sampler or use immutable samplers in the set layout. DDP peel (geometry), DDP blend/final, and WA/WB resolve layouts now use immutable samplers bound to the backend default sampler to avoid MSL sampler class issues.
+- Arena lifecycle is monotonic per frame.
+  - Per‑frame descriptor sets are allocated from a single pool and never individually freed; the pool is reset once after the frame fence signals. Transient override sets are cleared before the reset.
+- Validation/telemetry
+  - End‑of‑frame VLOG includes: segments, overrides, skipped_format_mismatch, and descriptor guardrail counters.
+  - Guard logs include file/function to surface violations early during development.
+
+Acceptance targets
+
+- No “bound VkDescriptorSet … destroyed or updated” errors and no “_Smplr” MSL issues on MoltenVK across DDP/WA/WB/glow/copy/blend flows.
+- Composite/resolve invariants are preserved: single color attachment; depth disabled.
+
+ 
 
 - OIT parity for geometry/images [Done]
   - Dual depth peeling / weighted average / weighted blended now active for cones, ellipsoids, lines, meshes, spheres, and volume image layers on Vulkan.
@@ -451,6 +513,17 @@ Acceptance Criteria
 - WB final pipelines create successfully on MoltenVK (set 3 layout present); DDP peel shaders compile with explicit samplers.
 - Composite passes render with single color attachment; depth disabled.
 - VLOG shows fewer beginRendering segments; no “skipping segment with no attachments” in normal flows.
+
+### Status/Progress
+- Dynamic Rendering coalescing in place; VLOG per‑frame segment/counter logging wired (segments, clears/loads, pipelines, overrides, skipped_format_mismatch).
+- Pipeline keys extended in ZVulkan* contexts to include colorFormats[] and optional depthFormat; reuse only on format match.
+- Runtime checks: backend asserts current beginRendering formats match pipeline formats; mismatches VLOG(1) and skip batch.
+- Composite/resolve passes (DDP Final, WA Final, WB Final) forced to single color attachment; depth disabled in pipelines and surfaces; OIT UBO bound at set 3.
+- Standardized bindings via `src/atlas/zvulkanbindings.h`:
+  - DDP peel (set 0): binding 0 = depth blender, 1 = front blender (explicit sampler)
+  - WA resolve (set 0): binding 0 = accumulation, 1 = moments
+  - WB resolve (set 0): binding 0 = accumulation, 1 = transmittance; set 3 = OIT UBO
+- Descriptor immutability: per‑draw override sets from the per‑frame arena; retained until frame fence. Implemented for DDP peel, OIT resolves, Glow.
 
 Risks & Performance
 

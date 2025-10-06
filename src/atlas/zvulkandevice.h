@@ -47,7 +47,8 @@ public:
 
   std::unique_ptr<ZVulkanDescriptorPool> createDescriptorPool();
   std::unique_ptr<ZVulkanDescriptorSet> createDescriptorSet(ZVulkanDescriptorPool& pool,
-                                                            vk::DescriptorSetLayout layout);
+                                                            vk::DescriptorSetLayout layout,
+                                                            bool isOverrideTransient = false);
 
   ZVulkanFrameExecutor& frameExecutor();
   const ZVulkanFrameExecutor& frameExecutor() const;

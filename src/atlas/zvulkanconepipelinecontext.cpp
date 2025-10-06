@@ -10,6 +10,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanbindings.h"
 #include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
 #include "zexception.h"
@@ -92,6 +93,13 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
+  // GL parity: in picking pass, require picking colors sized equal to vertices.
+  if (payload.pickingPass) {
+    if (payload.pickingColors.empty() || payload.pickingColors.size() != payload.baseAndRadius.size()) {
+      return;
+    }
+  }
+
   uploadGeometry(payload);
   if (m_vertexCount == 0) {
     return;
@@ -115,31 +123,41 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
     updateOITParamsUBO(renderer, batch, screenRcp);
   }
   ensureDescriptorSets();
+  CHECK(m_dsLighting && m_dsTransforms) << "Cone pipeline descriptor sets missing (lighting/transforms)";
 
-  if (m_dsPlaceholder) {
-    ensurePlaceholderTexture();
-    const auto& hookPara = renderer.shaderHookPara();
-    if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+  ZVulkanDescriptorSet* dsPlaceholderOverride = nullptr;
+  ensurePlaceholderTexture();
+  const auto& hookPara = renderer.shaderHookPara();
+  if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_setPlaceholder) {
+    dsPlaceholderOverride = m_backend.allocateOverrideDescriptorSet(**m_setPlaceholder);
+    CHECK(dsPlaceholderOverride != nullptr) << "Cone DDP peel: override descriptor allocation failed (fatal)";
+    if (dsPlaceholderOverride) {
       if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
         auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
                                                    m_backend.device(),
                                                    "cone dual-depth-peeling depth blender");
-        m_dsPlaceholder->updateTexture(0, depthTex, m_backend.defaultSampler());
+        dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPDepthBlender, depthTex, m_backend.defaultSampler());
+      } else {
+        auto& tex = m_backend.defaultPlaceholderTexture2D();
+        dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPDepthBlender, tex, m_backend.defaultSampler());
       }
       if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
         auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
                                                    m_backend.device(),
                                                    "cone dual-depth-peeling front blender");
-        m_dsPlaceholder->updateTexture(1, frontTex, m_backend.defaultSampler());
+        dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPFrontBlender, frontTex, m_backend.defaultSampler());
+      } else {
+        auto& tex = m_backend.defaultPlaceholderTexture2D();
+        dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPFrontBlender, tex, m_backend.defaultSampler());
       }
-    } else {
-      auto& tex = m_backend.defaultPlaceholderTexture2D();
-      m_dsPlaceholder->updateTexture(0, tex, m_backend.defaultSampler());
-      m_dsPlaceholder->updateTexture(1, tex, m_backend.defaultSampler());
     }
   }
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
+
+  if (!m_backend.validateFormatsOrSkip(formats, "cone")) {
+    return;
+  }
 
   PipelineKey key;
   key.dynamicMaterial = !pickingPass;
@@ -157,15 +175,17 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
     cmd.bindIndexBuffer(m_indexBuffer->buffer(), 0, vk::IndexType::eUint32);
   }
 
-  if (m_dsPlaceholder && m_dsLighting && m_dsTransforms) {
-    std::array<vk::DescriptorSet, 3> sets{m_dsPlaceholder->descriptorSet(),
-                                          m_dsLighting->descriptorSet(),
-                                          m_dsTransforms->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
+  CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
+    << "Cone pipeline placeholder descriptor set not initialised";
+  if ((dsPlaceholderOverride || m_dsPlaceholder) && m_dsLighting && m_dsTransforms) {
+    const vk::DescriptorSet ds0 = dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet()
+                                                        : m_dsPlaceholder->descriptorSet();
+    std::array<vk::DescriptorSet, 3> sets{ds0, m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
   }
   if (m_dsOIT) {
     std::array<vk::DescriptorSet, 1> ds3{m_dsOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 3, ds3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetOITParams, ds3, {});
   }
 
   cmd.setViewport(0, viewport);
@@ -266,19 +286,46 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
   ensurePlaceholderTexture();
   if (m_dsPlaceholder) {
     auto& tex = m_backend.defaultPlaceholderTexture2D();
-    m_dsPlaceholder->updateTexture(0, tex, m_backend.defaultSampler());
-    m_dsPlaceholder->updateTexture(1, tex, m_backend.defaultSampler());
+    m_dsPlaceholder->writeTextureOnce(0, tex, m_backend.defaultSampler());
+    m_dsPlaceholder->writeTextureOnce(1, tex, m_backend.defaultSampler());
+  }
+
+  // Ensure UBO buffers exist prior to recording
+  auto& device = m_backend.device();
+  if (!m_uboLighting) {
+    m_uboLighting =
+      device.createBuffer(sizeof(LightingUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_uboTransforms) {
+    m_uboTransforms =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_uboMaterial) {
+    m_uboMaterial =
+      device.createBuffer(sizeof(MaterialUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_uboOIT) {
+    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
+                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   if (m_dsLighting && m_uboLighting) {
-    m_dsLighting->updateUniformBuffer(0, *m_uboLighting);
+    m_dsLighting->writeUniformBufferOnce(0, *m_uboLighting);
   }
   if (m_dsTransforms && m_uboTransforms && m_uboMaterial) {
-    m_dsTransforms->updateUniformBuffer(0, *m_uboTransforms);
-    m_dsTransforms->updateUniformBuffer(1, *m_uboMaterial);
+    m_dsTransforms->writeUniformBufferOnce(0, *m_uboTransforms);
+    m_dsTransforms->writeUniformBufferOnce(1, *m_uboMaterial);
   }
   if (m_dsOIT && m_uboOIT) {
-    m_dsOIT->updateUniformBuffer(0, *m_uboOIT);
+    m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
   }
 }
 

@@ -47,6 +47,7 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
+  friend class Z3DRendererVulkanBackend; // allow backend to prime descriptor sets
   struct PipelineKey
   {
     bool useSmooth = true;
@@ -121,7 +122,9 @@ private:
   PipelineInstance& ensurePipeline(const PipelineKey& key,
                                    const LinePayload& payload,
                                    const vulkan::AttachmentFormats& formats);
-  void bindDescriptorSets(vk::raii::CommandBuffer& cmd, const PipelineInstance& pipeline) const;
+  void bindDescriptorSets(vk::raii::CommandBuffer& cmd,
+                          const PipelineInstance& pipeline,
+                          vk::DescriptorSet textureOverride = {}) const;
   void uploadWideGeometry(const LinePayload& payload, bool pickingPass);
   void uploadThinGeometry(const LinePayload& payload, bool pickingPass);
   void resetDescriptors();

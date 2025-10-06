@@ -400,7 +400,11 @@ protected:
       m_rendererBase.restoreViewState(previousState);
     });
 
-    m_rendererBase.render(eye, rendererSpan);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, rendererSpan);
+    } else {
+      m_rendererBase.render(eye, rendererSpan);
+    }
   }
 
   void syncRendererState();

@@ -199,7 +199,11 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroupForAnnotationFilter()
 
 void Z3DMeshFilter::renderOpaque(Z3DEye eye)
 {
-  m_rendererBase.render(eye, m_triangleListRenderer);
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderVulkan(eye, m_triangleListRenderer);
+  } else {
+    m_rendererBase.render(eye, m_triangleListRenderer);
+  }
   renderBoundBox(eye);
 }
 
@@ -209,7 +213,11 @@ void Z3DMeshFilter::renderTransparent(Z3DEye eye)
     // Compositor owns glow composition; only render bound box here
     renderBoundBox(eye);
   } else {
-    m_rendererBase.render(eye, m_triangleListRenderer);
+    if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+      m_rendererBase.renderVulkan(eye, m_triangleListRenderer);
+    } else {
+      m_rendererBase.render(eye, m_triangleListRenderer);
+    }
     renderBoundBox(eye);
   }
 }
@@ -219,7 +227,11 @@ void Z3DMeshFilter::renderPicking(Z3DEye eye)
   if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
   }
-  m_rendererBase.renderPicking(eye, m_triangleListRenderer);
+  if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
+    m_rendererBase.renderPickingVulkan(eye, m_triangleListRenderer);
+  } else {
+    m_rendererBase.renderPicking(eye, m_triangleListRenderer);
+  }
 }
 
 void Z3DMeshFilter::prepareData()

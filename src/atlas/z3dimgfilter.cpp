@@ -485,7 +485,7 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
     depthHandle.id = reinterpret_cast<uint64_t>(lease.depthAttachmentTexture());
 
     m_textureCopyRenderer.setSourceAttachments(colorHandle, depthHandle);
-    m_rendererBase.render(eye, m_textureCopyRenderer);
+    m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
     return;
   }
 
@@ -522,7 +522,7 @@ void Z3DImgFilter::renderTransparent(Z3DEye eye)
     depthHandle.id = reinterpret_cast<uint64_t>(lease.depthAttachmentTexture());
 
     m_textureCopyRenderer.setSourceAttachments(colorHandle, depthHandle);
-    m_rendererBase.render(eye, m_textureCopyRenderer);
+    m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
     return;
   }
 
@@ -1250,11 +1250,12 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
     m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
     m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
     m_rendererBase.executeVulkanBatches([&]() {
-      m_rendererBase.render(eye, m_imgRaycasterRenderer);
+      m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
     });
     // Draw bound box using the same active surface; no clears
     m_rendererBase.setActiveSurfaceForNextPass(lease);
     m_rendererBase.executeVulkanBatches([&]() {
+      // Render bound box via Vulkan path
       renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
     });
     m_rendererBase.setCollectOnly(false);

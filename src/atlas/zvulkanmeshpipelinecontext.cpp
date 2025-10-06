@@ -20,6 +20,7 @@
 #include "zlog.h"
 #include "zexception.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanbindings.h"
 
 #include <algorithm>
 #include <array>
@@ -153,12 +154,20 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
+  // GL parity: for picking pass, require per-mesh picking colors; otherwise skip.
+  if (payload.pickingPass) {
+    if (payload.meshPickingColors.empty() || payload.meshPickingColors.size() != payload.meshes.size()) {
+      return;
+    }
+  }
+
   uploadGeometry(payload);
   if (m_draws.empty() || m_vertexCount == 0) {
     return;
   }
 
   const bool pickingPass = payload.pickingPass;
+  const auto shaderHook = renderer.shaderHookType();
 
   updateLightingUBO(renderer, batch, payload, pickingPass);
   updateTransformUBO(renderer, batch);
@@ -175,67 +184,63 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
     updateOITParamsUBO(renderer, batch, screenRcp);
   }
   ensureDescriptorSets();
-  if (!pickingPass && m_dsTextures) {
-    // Bind Vulkan-native texture if provided; otherwise placeholders remain bound.
-    if (payload.textureHandle.valid() && payload.textureHandle.backend == AttachmentBackend::Vulkan) {
-      auto& sampledTexture =
-        vulkan::textureFromHandle(payload.textureHandle, m_backend.device(), "mesh payload sampled texture");
-      switch (payload.colorSource) {
-        case MeshPayload::ColorSource::Mesh1DTexture:
-          m_dsTextures->updateTexture(0, sampledTexture);
-          break;
-        case MeshPayload::ColorSource::Mesh2DTexture:
-          m_dsTextures->updateTexture(1, sampledTexture);
-          break;
-        case MeshPayload::ColorSource::Mesh3DTexture:
-          m_dsTextures->updateTexture(2, sampledTexture);
-          break;
-        default:
-          break;
+  CHECK(m_dsLighting && m_dsTransforms) << "Mesh pipeline descriptor sets missing (lighting/transforms)";
+  // Textures set should be available for normal passes; DDP peel enforces override below.
+  if (renderer.shaderHookType() != Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    CHECK(m_dsTextures != nullptr) << "Mesh pipeline textures descriptor set not initialised";
+  }
+  // Build a per-draw textures descriptor set to avoid any update-after-bind hazards.
+  vk::DescriptorSet boundTexturesOverride{};
+  if (m_setTextures) {
+    if (auto* drawTex = m_backend.allocateOverrideDescriptorSet(**m_setTextures)) {
+      ensurePlaceholderTextures();
+      auto sampler = m_backend.defaultSampler();
+      if (m_placeholder1D && m_placeholder2D && m_placeholder3D) {
+        drawTex->updateTexture(0, *m_placeholder1D, sampler);
+        drawTex->updateTexture(1, *m_placeholder2D, sampler);
+        drawTex->updateTexture(2, *m_placeholder3D, sampler);
+        drawTex->updateTexture(3, *m_placeholder2D, sampler);
+        drawTex->updateTexture(4, *m_placeholder2D, sampler);
       }
+      if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+        const auto& hookPara = renderer.shaderHookPara();
+        if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
+          auto& depthTexture = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                                        m_backend.device(),
+                                                        "mesh dual-depth-peeling depth blender");
+          drawTex->updateTexture(vkbind::kBindingDDPMeshDepthBlender, depthTexture, sampler);
+        }
+        if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
+          auto& frontTexture = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                                        m_backend.device(),
+                                                        "mesh dual-depth-peeling front blender");
+          drawTex->updateTexture(vkbind::kBindingDDPMeshFrontBlender, frontTexture, sampler);
+        }
+      } else if (!pickingPass && payload.textureHandle.valid() &&
+                 payload.textureHandle.backend == AttachmentBackend::Vulkan) {
+        auto& sampledTexture =
+          vulkan::textureFromHandle(payload.textureHandle, m_backend.device(), "mesh payload sampled texture");
+        switch (payload.colorSource) {
+          case MeshPayload::ColorSource::Mesh1DTexture: drawTex->updateTexture(0, sampledTexture, sampler); break;
+          case MeshPayload::ColorSource::Mesh2DTexture: drawTex->updateTexture(1, sampledTexture, sampler); break;
+          case MeshPayload::ColorSource::Mesh3DTexture: drawTex->updateTexture(2, sampledTexture, sampler); break;
+          default: break;
+        }
+      }
+      boundTexturesOverride = drawTex->descriptorSet();
     }
   }
+  // If DDP peel is requested but we could not allocate the per-draw override,
+  // skip to avoid mutating/binding a shared set.
+  if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    CHECK(boundTexturesOverride) << "Mesh DDP peel: override descriptor allocation failed (fatal)";
+  }
 
-  const auto shaderHook = renderer.shaderHookType();
   // Descriptor set to bind for texture set (0). For DDP peel we allocate a per-draw override to
   // avoid mutating a set that may have been bound earlier in the same command buffer.
-  std::unique_ptr<ZVulkanDescriptorSet> dsTexturesOverride;
+  std::unique_ptr<ZVulkanDescriptorSet> dsTexturesOverride; // legacy path, now unused
 
-  if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-    const auto& hookPara = renderer.shaderHookPara();
-    auto* layouts = m_setTextures ? &*m_setTextures : nullptr;
-    if (layouts) {
-      dsTexturesOverride = m_backend.allocateFrameDescriptorSet(**m_setTextures);
-    }
-    auto* dst = dsTexturesOverride ? dsTexturesOverride.get() : m_dsTextures.get();
-    if (dst) {
-      // For DDP peel, bind depth/front blender textures at bindings 0 and 1 to match shader expectations.
-      // Fill unused slots with placeholders as needed.
-      if (m_placeholder1D && m_placeholder2D && m_placeholder3D) {
-        // Placeholders for non-used bindings to keep layout stable
-        dst->updateTexture(2, *m_placeholder3D);
-      }
-      if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-        auto& depthTexture = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
-                                                       m_backend.device(),
-                                                       "mesh dual-depth-peeling depth blender");
-        dst->updateTexture(0, depthTexture, m_backend.defaultSampler());
-      }
-      if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-        auto& frontTexture = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
-                                                       m_backend.device(),
-                                                       "mesh dual-depth-peeling front blender");
-        dst->updateTexture(1, frontTexture, m_backend.defaultSampler());
-      }
-    }
-    if (dsTexturesOverride) {
-      // Keep alive for the rest of the frame
-      m_transientDescriptorSets.push_back(std::move(dsTexturesOverride));
-    }
-  } else if (m_dsTextures && m_placeholder2D) {
-    m_dsTextures->updateTexture(3, *m_placeholder2D);
-    m_dsTextures->updateTexture(4, *m_placeholder2D);
-  }
+  // DDP peel handled by the per-draw override above.
 
   vk::DeviceSize vertexOffset = 0;
   cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {vertexOffset});
@@ -252,6 +257,9 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   const FogMode fogMode = renderer.sceneState().fog.mode;
 
   const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
+  if (!m_backend.validateFormatsOrSkip(formats, "mesh")) {
+    return;
+  }
 
   PipelineInstance* currentPipeline = nullptr;
   if (drawSurface) {
@@ -273,43 +281,38 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       PipelineInstance& pipeline = ensurePipeline(key, formats);
       if (&pipeline != currentPipeline) {
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-        // Initialize default textures set if needed (and not using override)
-        if (!dsTexturesOverride && m_dsTextures && !m_texturesSetInitialized &&
-            m_placeholder1D && m_placeholder2D && m_placeholder3D) {
-          m_dsTextures->updateTexture(0, *m_placeholder1D);
-          m_dsTextures->updateTexture(1, *m_placeholder2D);
-          m_dsTextures->updateTexture(2, *m_placeholder3D);
-          m_dsTextures->updateTexture(3, *m_placeholder2D);
-          m_dsTextures->updateTexture(4, *m_placeholder2D);
-          m_texturesSetInitialized = true;
-        }
         // Bind descriptor sets with optional textures override for set 0
         if (m_dsLighting && m_dsTransforms) {
-          vk::DescriptorSet texturesSet = dsTexturesOverride ? dsTexturesOverride->descriptorSet()
-                                                            : (m_dsTextures ? m_dsTextures->descriptorSet()
-                                                                           : vk::DescriptorSet{});
+          // For DDP peel require override; otherwise fall back to the shared set.
+          vk::DescriptorSet texturesSet = boundTexturesOverride ? boundTexturesOverride
+                                                                : (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel
+                                                                     ? vk::DescriptorSet{}
+                                                                     : (m_dsTextures ? m_dsTextures->descriptorSet()
+                                                                                    : vk::DescriptorSet{}));
           if (texturesSet) {
             std::array<vk::DescriptorSet, 3> sets{texturesSet,
                                                   m_dsLighting->descriptorSet(),
                                                   m_dsTransforms->descriptorSet()};
             cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                    pipeline.pipeline->pipelineLayout(),
-                                   0,
+                                   vkbind::kSetInputs,
                                    sets,
                                    {});
             if (m_dsOIT) {
               std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
               cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                      pipeline.pipeline->pipelineLayout(),
-                                     3,
+                                     vkbind::kSetOITParams,
                                      sets3,
                                      {});
             }
           } else {
-            bindDescriptorSets(cmd, pipeline);
+            // If we cannot bind textures set (e.g., DDP override unavailable), skip pipeline bind
+            // to avoid binding stale/shared sets.
+            return;
           }
         } else {
-          bindDescriptorSets(cmd, pipeline);
+          return;
         }
         
         if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
@@ -362,15 +365,6 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       PipelineInstance& pipeline = ensurePipeline(key, formats);
       if (&pipeline != currentPipeline) {
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-        // Initialize default textures set if needed for wireframe path
-        if (m_dsTextures && !m_texturesSetInitialized && m_placeholder1D && m_placeholder2D && m_placeholder3D) {
-          m_dsTextures->updateTexture(0, *m_placeholder1D);
-          m_dsTextures->updateTexture(1, *m_placeholder2D);
-          m_dsTextures->updateTexture(2, *m_placeholder3D);
-          m_dsTextures->updateTexture(3, *m_placeholder2D);
-          m_dsTextures->updateTexture(4, *m_placeholder2D);
-          m_texturesSetInitialized = true;
-        }
         bindDescriptorSets(cmd, pipeline);
         currentPipeline = &pipeline;
       }
@@ -508,15 +502,43 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
   if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
   if (!m_dsOIT && m_setOIT) m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
 
+  // Ensure UBO buffers exist before recording
+  auto& device = m_backend.device();
+  if (!m_uboLighting) {
+    m_uboLighting =
+      device.createBuffer(sizeof(LightingUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_uboTransforms) {
+    m_uboTransforms =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_uboMaterial) {
+    m_uboMaterial =
+      device.createBuffer(sizeof(MaterialUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+
+  if (!m_uboOIT) {
+    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
+                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+
   if (m_dsLighting && m_uboLighting) {
-    m_dsLighting->updateUniformBuffer(0, *m_uboLighting);
+    m_dsLighting->writeUniformBufferOnce(0, *m_uboLighting);
   }
   if (m_dsTransforms && m_uboTransforms && m_uboMaterial) {
-    m_dsTransforms->updateUniformBuffer(0, *m_uboTransforms);
-    m_dsTransforms->updateUniformBuffer(1, *m_uboMaterial);
+    m_dsTransforms->writeUniformBufferOnce(0, *m_uboTransforms);
+    m_dsTransforms->writeUniformBufferOnce(1, *m_uboMaterial);
   }
   if (m_dsOIT && m_uboOIT) {
-    m_dsOIT->updateUniformBuffer(0, *m_uboOIT);
+    m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
   }
 }
 
@@ -711,19 +733,20 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
 }
 
 void ZVulkanMeshPipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd,
-                                                    const PipelineInstance& pipeline) const
+                                                    const PipelineInstance& pipeline,
+                                                    ZVulkanDescriptorSet* texturesOverride) const
 {
-  if (!m_dsTextures || !m_dsLighting || !m_dsTransforms) {
+  if ((!m_dsTextures && !texturesOverride) || !m_dsLighting || !m_dsTransforms) {
     return;
   }
 
-  std::array<vk::DescriptorSet, 3> sets{m_dsTextures->descriptorSet(),
-                                        m_dsLighting->descriptorSet(),
-                                        m_dsTransforms->descriptorSet()};
-  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
+  const vk::DescriptorSet texSet = texturesOverride ? texturesOverride->descriptorSet()
+                                                    : m_dsTextures->descriptorSet();
+  std::array<vk::DescriptorSet, 3> sets{texSet, m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
   if (m_dsOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 3, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
   }
 }
 

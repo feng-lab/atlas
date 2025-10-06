@@ -39,6 +39,7 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
+  friend class Z3DRendererVulkanBackend; // backend primes descriptor sets pre-recording
   struct BackgroundVertex
   {
     glm::vec3 position{0.0f};

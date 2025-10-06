@@ -570,6 +570,7 @@ set(SOURCES
     zvulkanshader.cpp
     zvulkanpipeline.h
     zvulkanpipeline.cpp
+    zvulkanbindings.h
     zvulkanrenderconversions.h
     zvulkanrenderconversions.cpp
     zvulkanuniforms.h

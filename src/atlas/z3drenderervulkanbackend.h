@@ -8,6 +8,8 @@
 // Arena allocations for per-frame descriptor sets
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
+// Attachment format helpers
+#include "zvulkanrenderconversions.h"
 
 #include <chrono>
 #include <memory>
@@ -95,10 +97,33 @@ public:
   // no active frame exists (e.g., zero-sized viewport), and logs at VLOG(1).
   std::unique_ptr<ZVulkanDescriptorSet> allocateFrameDescriptorSet(vk::DescriptorSetLayout layout);
 
+  // Allocate a per-draw override descriptor set and keep it alive until the
+  // current frame fence signals. Returns a raw pointer owned by the backend.
+  // Use this when updating descriptors per draw to avoid update-after-bind.
+  ZVulkanDescriptorSet* allocateOverrideDescriptorSet(vk::DescriptorSetLayout layout);
+
   // Stage 2: Schedule a callback to run once the current frame's fence signals
   void scheduleAfterCurrentFrameCompletion(std::function<void()> fn);
   void notifyPipelineCreated();
   void notifyPipelineBound(vk::Pipeline pipeline);
+
+  // Current segment attachment formats (if a dynamic rendering segment is open)
+  [[nodiscard]] const std::optional<vulkan::AttachmentFormats>& currentSegmentFormats() const;
+  // Returns true when pipelineFormats match the current segment; increments a
+  // skip counter and logs at VLOG(1) if mismatched.
+  bool validateFormatsOrSkip(const vulkan::AttachmentFormats& pipelineFormats, const char* contextTag = nullptr);
+
+  // Recording state helpers and telemetry hooks
+  [[nodiscard]] bool isRecording() const { return m_frameRecording; }
+  void notifyDescriptorWriteWhileRecording(bool rewriteAttempt)
+  {
+    if (m_activeFrame) {
+      m_activeFrame->descriptorWritesWhileRecording++;
+      if (rewriteAttempt) {
+        m_activeFrame->boundSetRewriteAttempts++;
+      }
+    }
+  }
 
 private:
   friend class Z3DRendererBase;
@@ -145,6 +170,19 @@ private:
     // Pipelines
     uint32_t pipelinesCreated = 0;       // graphics pipelines created this frame
     std::unordered_set<uint64_t> pipelinesBound; // unique pipelines bound this frame
+
+    // Per-draw override descriptor sets kept alive until fence
+    std::vector<std::unique_ptr<ZVulkanDescriptorSet>> transientOverrideSets;
+    uint32_t overrideSetsAllocated = 0;   // count of per-draw override sets
+
+    // Formats of currently open dynamic rendering segment
+    std::optional<vulkan::AttachmentFormats> activeSegmentFormats;
+    // Skipped draws due to pipeline/segment format mismatch
+    uint32_t skippedBatchesFormatMismatch = 0;
+
+    // Descriptor guardrails counters
+    uint32_t descriptorWritesWhileRecording = 0;   // attempted writes during recording
+    uint32_t boundSetRewriteAttempts = 0;          // attempted rewrites of persistent sets
   };
 
   void collectFrameTimings(FrameResources& frame);

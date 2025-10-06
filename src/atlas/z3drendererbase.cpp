@@ -74,9 +74,46 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
 
   const bool hasColorAttachments = !batch.pass.colorAttachments.empty();
   const bool hasDepthAttachment = batch.pass.depthAttachment.has_value();
-  if (!hasColorAttachments && !hasDepthAttachment && !m_frameState.activeSurface.empty()) {
-    batch.pass.colorAttachments = m_frameState.activeSurface.colorAttachments;
-    batch.pass.depthAttachment = m_frameState.activeSurface.depthAttachment;
+  if (!hasColorAttachments && !hasDepthAttachment) {
+    // If this is the first append in a Vulkan recording session and neither
+    // an active nor a pending surface exists, fail early with context.
+    if (m_activeBackend == RenderBackend::Vulkan && m_recordingSessionOpen && !m_firstAppendSeenInSession &&
+        m_requireAttachmentsOnFirstAppend && m_frameState.activeSurface.empty() &&
+        (!m_pendingActiveSurface || (m_pendingActiveSurface->colorAttachments.empty() &&
+                                     !m_pendingActiveSurface->depthAttachment.has_value()))) {
+      CHECK(false) << "Vulkan appendBatch without attachments on first append: shaderHook="
+                   << static_cast<int>(m_shaderHookType) << " label='" << m_currentPassLabel
+                   << "' activeSurfaceColors=" << m_frameState.activeSurface.colorAttachments.size()
+                   << " activeSurfaceHasDepth=" << m_frameState.activeSurface.depthAttachment.has_value();
+    }
+    // Prefer current active surface if present
+    if (!m_frameState.activeSurface.empty()) {
+      batch.pass.colorAttachments = m_frameState.activeSurface.colorAttachments;
+      batch.pass.depthAttachment = m_frameState.activeSurface.depthAttachment;
+    } else if (m_pendingActiveSurface && (!m_pendingActiveSurface->colorAttachments.empty() ||
+                                          m_pendingActiveSurface->depthAttachment.has_value())) {
+      // Fallback: if an active surface has been scheduled but not yet applied,
+      // inherit from the pending surface to preserve the invariant that batches
+      // record against a valid target.
+      batch.pass.colorAttachments = m_pendingActiveSurface->colorAttachments;
+      batch.pass.depthAttachment = m_pendingActiveSurface->depthAttachment;
+    }
+  }
+
+  // Final invariant: for Vulkan backend, a batch must target a valid surface.
+  if (m_activeBackend == RenderBackend::Vulkan) {
+    const bool noColors = batch.pass.colorAttachments.empty();
+    const bool noDepth = !batch.pass.depthAttachment.has_value();
+    CHECK(!(noColors && noDepth)) << "Vulkan appendBatch without attachments: shaderHook="
+                                  << static_cast<int>(m_shaderHookType) << " label='" << m_currentPassLabel
+                                  << "' activeSurfaceColors="
+                                  << m_frameState.activeSurface.colorAttachments.size()
+                                  << " activeSurfaceHasDepth="
+                                  << m_frameState.activeSurface.depthAttachment.has_value()
+                                  << " pendingSurfaceColors="
+                                  << (m_pendingActiveSurface ? m_pendingActiveSurface->colorAttachments.size() : 0)
+                                  << " pendingSurfaceHasDepth="
+                                  << (m_pendingActiveSurface && m_pendingActiveSurface->depthAttachment.has_value());
   }
 
   // Strict backend separation: do not accept GL attachments when targeting Vulkan.
@@ -98,6 +135,7 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
             << m_frameState.activeSurface.depthAttachment.has_value() << ")";
 
   m_cpuState.batches.push_back(std::move(batch));
+  m_firstAppendSeenInSession = true;
 }
 
 const RendererCPUState& Z3DRendererBase::cpuState() const
@@ -380,20 +418,33 @@ void Z3DRendererBase::recordVulkanBatches(const std::function<void()>& recordBat
   CHECK(m_backend != nullptr) << "Renderer backend not set";
   CHECK(m_activeBackend == RenderBackend::Vulkan) << "recordVulkanBatches called with non-Vulkan backend";
 
-  const bool startedFrame = !m_vulkanFrameActive;
-  if (startedFrame) {
-    beginVulkanFrame();
-  }
+  // Start a new recording session:
+  m_recordingSessionOpen = true;
+  m_firstAppendSeenInSession = false;
+  m_currentPassLabel = std::string(label);
 
+  // Clear any previous CPU state; this also resets the active surface.
   resetCPUState();
 
+  // Apply any pending surface before beginning the frame so that the backend
+  // observes the intended attachments from the very first batch/segment.
   if (m_pendingActiveSurface.has_value()) {
     m_frameState.setActiveSurface(*m_pendingActiveSurface);
     m_pendingActiveSurface.reset();
   }
 
-  LOG(INFO) << "recordVulkanBatches activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
-            << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
+  // Preflight: if there is still no active (or pending) surface, then the
+  // first append must provide explicit attachments for Vulkan.
+  m_requireAttachmentsOnFirstAppend = m_frameState.activeSurface.empty();
+
+  LOG(INFO) << "recordVulkanBatches('" << m_currentPassLabel << "') activeSurface colors="
+            << m_frameState.activeSurface.colorAttachments.size() << " depth="
+            << m_frameState.activeSurface.depthAttachment.has_value();
+
+  const bool startedFrame = !m_vulkanFrameActive;
+  if (startedFrame) {
+    beginVulkanFrame();
+  }
 
   std::optional<size_t> gpuScope;
   auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_backend.get());
@@ -411,10 +462,32 @@ void Z3DRendererBase::recordVulkanBatches(const std::function<void()>& recordBat
   if (startedFrame) {
     endVulkanFrame();
   }
+
+  // End of recording session
+  m_recordingSessionOpen = false;
+  m_firstAppendSeenInSession = false;
+  m_requireAttachmentsOnFirstAppend = false;
+  m_currentPassLabel.clear();
 }
 
 void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label)
 {
+  recordVulkanBatches(recordBatches, label);
+}
+
+void Z3DRendererBase::recordVulkanPass(const RendererFrameState::ActiveSurface& surface,
+                                       const std::function<void()>& recordBatches,
+                                       std::string_view label)
+{
+  setActiveSurfaceForNextPass(surface);
+  recordVulkanBatches(recordBatches, label);
+}
+
+void Z3DRendererBase::recordVulkanPass(const Z3DScratchResourcePool::RenderTargetLease& lease,
+                                       const std::function<void()>& recordBatches,
+                                       std::string_view label)
+{
+  setActiveSurfaceForNextPass(lease);
   recordVulkanBatches(recordBatches, label);
 }
 
@@ -588,14 +661,11 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
 
 void Z3DRendererBase::render(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
-  const bool collectingCommandLists = m_activeBackend == RenderBackend::Vulkan && m_collectOnly;
-  if (!collectingCommandLists) {
-    resetCPUState();
-  }
-  if (m_pendingActiveSurface) {
-    m_frameState.setActiveSurface(*m_pendingActiveSurface);
-    m_pendingActiveSurface.reset();
-  }
+  // GL-only path; Vulkan must use renderVulkan inside recordVulkanBatches/recordVulkanPass
+  CHECK(m_activeBackend != RenderBackend::Vulkan)
+    << "render() is GL-only. Use renderVulkan for Vulkan.";
+
+  resetCPUState();
   for (auto* renderer : renderers) {
     CHECK(m_renderers.contains(renderer));
   }
@@ -613,16 +683,13 @@ void Z3DRendererBase::render(Z3DEye eye, Z3DRendererBase::RendererSpan renderers
     if (!useDisplayList(renderers)) {
       renderInstant(renderers);
     } else {
-      // check if render state changed and we need to regenerate display list
       auto& legacy = legacyGL();
       if (legacy.displayList != 0 && legacy.lastRenderingState != m_renderers) {
         invalidateDisplayList();
       }
-
       if (legacy.displayList == 0) {
         generateDisplayList(renderers);
       }
-
       if (glIsList(legacy.displayList)) {
         glCallList(legacy.displayList);
       }
@@ -642,14 +709,11 @@ void Z3DRendererBase::render(Z3DEye eye, Z3DRendererBase::RendererSpan renderers
 
 void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
-  const bool collectingCommandLists = m_activeBackend == RenderBackend::Vulkan && m_collectOnly;
-  if (!collectingCommandLists) {
-    resetCPUState();
-  }
-  if (m_pendingActiveSurface) {
-    m_frameState.setActiveSurface(*m_pendingActiveSurface);
-    m_pendingActiveSurface.reset();
-  }
+  // GL-only path; Vulkan must use renderPickingVulkan inside recordVulkanBatches/recordVulkanPass
+  CHECK(m_activeBackend != RenderBackend::Vulkan)
+    << "renderPicking() is GL-only. Use renderPickingVulkan for Vulkan.";
+
+  resetCPUState();
   for (auto* renderer : renderers) {
     CHECK(m_renderers.contains(renderer));
   }
@@ -667,17 +731,13 @@ void Z3DRendererBase::renderPicking(Z3DEye eye, Z3DRendererBase::RendererSpan re
     if (!useDisplayList(renderers)) {
       renderPickingInstant(renderers);
     } else {
-      // check if render state changed and we need to regenerate display list
       auto& legacy = legacyGL();
       if (legacy.pickingDisplayList != 0 && legacy.lastPickingRenderingState != m_renderers) {
         invalidatePickingDisplayList();
       }
-
       if (legacy.pickingDisplayList == 0) {
         generatePickingDisplayList(renderers);
       }
-
-      // render display list
       if (glIsList(legacy.pickingDisplayList)) {
         glCallList(legacy.pickingDisplayList);
       }
@@ -790,21 +850,11 @@ void Z3DRendererBase::renderPickingInstant(Z3DRendererBase::RendererSpan rendere
 void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
-  if (m_activeBackend == RenderBackend::Vulkan && m_collectOnly) {
-    for (auto* renderer : renderers) {
-      renderer->enqueueRenderBatches(eye, m_activeBackend, false);
-    }
-    return;
-  }
+  CHECK(m_activeBackend != RenderBackend::Vulkan)
+    << "renderUsingGLSL is GL-only. Use renderVulkan for Vulkan.";
   m_backend->beginRender(*this);
-  if (m_activeBackend == RenderBackend::Vulkan) {
-    for (auto* renderer : renderers) {
-      renderer->enqueueRenderBatches(eye, m_activeBackend, false);
-    }
-  } else {
-    for (auto* renderer : renderers) {
-      renderer->render(eye);
-    }
+  for (auto* renderer : renderers) {
+    renderer->render(eye);
   }
   submitBatches();
   m_backend->endRender(*this);
@@ -813,24 +863,47 @@ void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan 
 void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
-  if (m_activeBackend == RenderBackend::Vulkan && m_collectOnly) {
-    for (auto* renderer : renderers) {
-      renderer->enqueueRenderBatches(eye, m_activeBackend, true);
-    }
-    return;
-  }
+  CHECK(m_activeBackend != RenderBackend::Vulkan)
+    << "renderPickingUsingGLSL is GL-only. Use renderPickingVulkan for Vulkan.";
   m_backend->beginRender(*this);
-  if (m_activeBackend == RenderBackend::Vulkan) {
-    for (auto* renderer : renderers) {
-      renderer->enqueueRenderBatches(eye, m_activeBackend, true);
-    }
-  } else {
-    for (auto* renderer : renderers) {
-      renderer->renderPicking(eye);
-    }
+  for (auto* renderer : renderers) {
+    renderer->renderPicking(eye);
   }
   submitBatches();
   m_backend->endRender(*this);
+}
+
+void Z3DRendererBase::renderVulkan(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
+{
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  CHECK(m_activeBackend == RenderBackend::Vulkan)
+    << "renderVulkan requires Vulkan backend (got GL)";
+  CHECK(m_collectOnly) << "renderVulkan must be called under recordVulkanBatches/recordVulkanPass with collectOnly=true";
+
+  VLOG(1) << "vkRender label='" << m_currentPassLabel << "' renderers=" << renderers.size()
+          << " activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
+          << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
+
+  for (auto* renderer : renderers) {
+    renderer->enqueueRenderBatches(eye, m_activeBackend, false);
+  }
+}
+
+void Z3DRendererBase::renderPickingVulkan(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
+{
+  CHECK(m_backend != nullptr) << "Renderer backend not set";
+  CHECK(m_activeBackend == RenderBackend::Vulkan)
+    << "renderPickingVulkan requires Vulkan backend (got GL)";
+  CHECK(m_collectOnly)
+    << "renderPickingVulkan must be called under recordVulkanBatches/recordVulkanPass with collectOnly=true";
+
+  VLOG(1) << "vkRenderPicking label='" << m_currentPassLabel << "' renderers=" << renderers.size()
+          << " activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
+          << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
+
+  for (auto* renderer : renderers) {
+    renderer->enqueueRenderBatches(eye, m_activeBackend, true /*picking*/);
+  }
 }
 
 bool Z3DRendererBase::needLighting(Z3DRendererBase::RendererSpan renderers) const

@@ -83,10 +83,11 @@ std::unique_ptr<ZVulkanDescriptorPool> ZVulkanDevice::createDescriptorPool()
 }
 
 std::unique_ptr<ZVulkanDescriptorSet> ZVulkanDevice::createDescriptorSet(ZVulkanDescriptorPool& pool,
-                                                                         vk::DescriptorSetLayout layout)
+                                                                         vk::DescriptorSetLayout layout,
+                                                                         bool isOverrideTransient)
 {
   auto descriptorSet = pool.allocateDescriptorSet(layout);
-  return std::make_unique<ZVulkanDescriptorSet>(*this, std::move(descriptorSet));
+  return std::make_unique<ZVulkanDescriptorSet>(*this, descriptorSet, isOverrideTransient);
 }
 
 

@@ -559,6 +559,8 @@ void ZVulkanContext::createLogicalDevice()
   // Enable basic features
   enabledPhysicalDeviceFeatures2.features.samplerAnisotropy = physicalDeviceFeatures.samplerAnisotropy;
   enabledPhysicalDeviceFeatures2.features.fillModeNonSolid = physicalDeviceFeatures.fillModeNonSolid;
+  // Enable independentBlend if supported to allow per-attachment blend state
+  enabledPhysicalDeviceFeatures2.features.independentBlend = physicalDeviceFeatures.independentBlend;
 
   if (FLAGS_atlas_debug_vulkan) {
     enabledPhysicalDeviceFeatures2.features.robustBufferAccess = physicalDeviceFeatures.robustBufferAccess;

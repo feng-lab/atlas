@@ -41,6 +41,7 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
+  friend class Z3DRendererVulkanBackend; // allow backend to prime descriptor sets
   struct EllipsoidVertex
   {
     glm::vec4 axis1{0.0f};

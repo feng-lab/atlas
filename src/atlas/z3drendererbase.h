@@ -179,6 +179,10 @@ public:
                                           const ClearValue& clearValue = {});
   void clearPendingActiveSurface();
 
+  // Expose pending active surface for backends that need to preflight
+  // attachments while recording batches.
+  const std::optional<RendererFrameState::ActiveSurface>& pendingActiveSurface() const { return m_pendingActiveSurface; }
+
   RendererFrameState::ActiveSurface
   describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
@@ -205,6 +209,15 @@ public:
     return m_vulkanFrameActive;
   }
   void recordVulkanBatches(const std::function<void()>& recordBatches, std::string_view label = {});
+
+  // Helper to enforce pass ordering: set the surface for the next pass,
+  // then record batches under a labeled scope with correct begin/end.
+  void recordVulkanPass(const RendererFrameState::ActiveSurface& surface,
+                        const std::function<void()>& recordBatches,
+                        std::string_view label = {});
+  void recordVulkanPass(const Z3DScratchResourcePool::RenderTargetLease& lease,
+                        const std::function<void()>& recordBatches,
+                        std::string_view label = {});
 
   [[nodiscard]] bool supportsCommandLists() const;
 
@@ -278,6 +291,19 @@ public:
 
   void render(Z3DEye eye, RendererSpan renderers);
 
+  // Explicit Vulkan-only collection entry points (do not begin/end frames).
+  // Must be called under recordVulkanBatches/recordVulkanPass with collectOnly=true.
+  template<detail::RendererArgument... Renderers>
+  void renderVulkan(Z3DEye eye, Renderers&&... renderers)
+  {
+    static_assert(sizeof...(Renderers) > 0, "renderVulkan requires at least one renderer");
+    std::array<Z3DPrimitiveRenderer*, sizeof...(Renderers)> rendererPtrs{
+      detail::toRendererPointer(std::forward<Renderers>(renderers))...};
+    renderVulkan(eye, RendererSpan(rendererPtrs.data(), rendererPtrs.size()));
+  }
+
+  void renderVulkan(Z3DEye eye, RendererSpan renderers);
+
   template<detail::RendererArgument... Renderers>
   void renderPicking(Z3DEye eye, Renderers&&... renderers)
   {
@@ -288,6 +314,17 @@ public:
   }
 
   void renderPicking(Z3DEye eye, RendererSpan renderers);
+
+  template<detail::RendererArgument... Renderers>
+  void renderPickingVulkan(Z3DEye eye, Renderers&&... renderers)
+  {
+    static_assert(sizeof...(Renderers) > 0, "renderPickingVulkan requires at least one renderer");
+    std::array<Z3DPrimitiveRenderer*, sizeof...(Renderers)> rendererPtrs{
+      detail::toRendererPointer(std::forward<Renderers>(renderers))...};
+    renderPickingVulkan(eye, RendererSpan(rendererPtrs.data(), rendererPtrs.size()));
+  }
+
+  void renderPickingVulkan(Z3DEye eye, RendererSpan renderers);
 
   void setCollectOnly(bool v)
   {
@@ -430,6 +467,16 @@ private:
   RenderBackend m_activeBackend = RenderBackend::OpenGL;
   RenderMethod m_renderMethod;
   bool m_vulkanFrameActive = false;
+
+  // Recording-session diagnostics (Vulkan ordering/attachments invariants)
+  bool m_recordingSessionOpen = false;
+  bool m_firstAppendSeenInSession = false;
+  bool m_requireAttachmentsOnFirstAppend = false;
+  std::string m_currentPassLabel;
+
+public:
+  // Expose current pass label for backend diagnostics/logging
+  std::string_view currentPassLabel() const { return m_currentPassLabel; }
 
   std::vector<Z3DScratchResourcePool::RenderTargetLease*> m_persistentLeases;
 

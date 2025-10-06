@@ -63,12 +63,15 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
 
   ensureDescriptorLayout();
   ensureDescriptorSet();
-  if (!m_descriptorSet) {
-    return;
+  // Allocate per-draw override descriptor set to avoid update-after-bind
+  ZVulkanDescriptorSet* ds = nullptr;
+  if (m_setTextures) {
+    ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
   }
-
-  m_descriptorSet->updateTexture(0, colorTexture);
-  m_descriptorSet->updateTexture(1, depthTexture);
+  CHECK(ds != nullptr) << "Texture copy: override descriptor allocation failed (fatal)";
+  auto sampler = m_backend.defaultSampler();
+  ds->updateTexture(0, colorTexture, sampler);
+  ds->updateTexture(1, depthTexture, sampler);
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
@@ -85,8 +88,8 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
 
-  if (m_descriptorSet) {
-    std::array<vk::DescriptorSet, 1> sets{m_descriptorSet->descriptorSet()};
+  {
+    std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
   }
 

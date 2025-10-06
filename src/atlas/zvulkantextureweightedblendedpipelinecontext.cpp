@@ -10,6 +10,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanbindings.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanuniforms.h"
 #include "zlog.h"
@@ -58,7 +59,11 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
 
   ensureDescriptorLayout();
   ensureDescriptorSet();
-  ensureOITResources();
+  if (m_backend.isRecording()) {
+    CHECK(m_descriptorSetOIT && m_uboOIT) << "WB OIT resources not primed before recording";
+  } else {
+    ensureOITResources();
+  }
   if (!m_descriptorSet) {
     return;
   }
@@ -70,10 +75,22 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
                                                          m_backend.device(),
                                                          "texture-weighted-blended transmittance attachment");
 
-  m_descriptorSet->updateTexture(0, accumulationTexture);
-  m_descriptorSet->updateTexture(1, transmittanceTexture);
+  // Allocate per-draw override descriptor set for inputs
+  ZVulkanDescriptorSet* ds = nullptr;
+  if (m_setLayout) {
+    ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
+  }
+  CHECK(ds != nullptr) << "WB resolve: override descriptor allocation failed (fatal)";
+  ds->updateTexture(vkbind::kBindingWBAccum, accumulationTexture, m_backend.defaultSampler());
+  ds->updateTexture(vkbind::kBindingWBTransmittance, transmittanceTexture, m_backend.defaultSampler());
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
+
+  // Composite resolve invariant: single color attachment, no depth
+  CHECK(formats.colorFormats.size() == 1 && !formats.depthFormat.has_value())
+    << "WB resolve invariant violated: expected 1 color, no depth";
+  CHECK(m_backend.validateFormatsOrSkip(formats, "WB_resolve"))
+    << "WB resolve formats mismatched with current segment";
 
   PipelineKey key;
   key.colorFormats = formats.colorFormats;
@@ -86,16 +103,15 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
 
-  if (m_descriptorSet) {
-    std::array<vk::DescriptorSet, 1> sets{m_descriptorSet->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 0, sets, {});
+  {
+    std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
   }
 
-  // Ensure and bind OIT params (set = 3)
+  // Ensure and bind OIT params (set = 3). Descriptor is set at allocation time.
   if (m_descriptorSetOIT && m_uboOIT) {
-    m_descriptorSetOIT->updateUniformBuffer(0, *m_uboOIT);
     std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 3, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
   }
 
   cmd.setViewport(0, viewport);
@@ -132,9 +148,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
 
 void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorLayout()
 {
-  if (m_setLayout) {
-    // Also ensure OIT set layout
-  } else {
+  if (!m_setLayout) {
     auto& device = m_backend.device();
     auto& vkDevice = device.context().device();
 
@@ -148,10 +162,22 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorLayout()
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eFragment}
     };
+    // Immutable samplers for resolve inputs
+    vk::Sampler immutable = m_backend.defaultSampler();
+    bindings[0].pImmutableSamplers = &immutable;
+    bindings[1].pImmutableSamplers = &immutable;
 
     vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                  .pBindings = bindings.data()};
     m_setLayout.emplace(vkDevice, createInfo);
+  }
+
+  // Ensure placeholder to align set indices (for set 1 and 2)
+  if (!m_setPlaceholder) {
+    auto& device = m_backend.device();
+    auto& vkDevice = device.context().device();
+    vk::DescriptorSetLayoutCreateInfo emptyInfo{.bindingCount = 0, .pBindings = nullptr};
+    m_setPlaceholder.emplace(vkDevice, emptyInfo);
   }
 
   if (!m_setOIT) {
@@ -189,8 +215,13 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureOITResources()
                                                vk::MemoryPropertyFlagBits::eHostVisible |
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
+  CHECK(m_uboOIT != nullptr) << "WB: failed to allocate OIT UBO";
   if (!m_descriptorSetOIT && m_setOIT) {
     m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  }
+  CHECK(m_descriptorSetOIT != nullptr) << "WB: failed to allocate OIT descriptor set";
+  if (m_descriptorSetOIT && m_uboOIT) {
+    m_descriptorSetOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
   }
 }
 
@@ -287,7 +318,14 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
   if (m_setOIT) {
-    instance.pipeline->setDescriptorSetLayouts({**m_setLayout, **m_setOIT});
+    // Preserve set indices: set 0 = inputs, set 1/2 placeholders, set 3 = OIT UBO
+    // Ensure we have placeholder empty layout; reuse WA’s approach by creating a local empty layout if needed
+    if (!m_setPlaceholder) {
+      auto& vkDevice = device.context().device();
+      vk::DescriptorSetLayoutCreateInfo emptyInfo{.bindingCount = 0, .pBindings = nullptr};
+      m_setPlaceholder.emplace(vkDevice, emptyInfo);
+    }
+    instance.pipeline->setDescriptorSetLayouts({**m_setLayout, **m_setPlaceholder, **m_setPlaceholder, **m_setOIT});
   } else {
     instance.pipeline->setDescriptorSetLayouts({**m_setLayout});
   }

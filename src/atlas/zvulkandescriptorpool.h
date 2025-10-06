@@ -16,7 +16,7 @@ public:
   {
     return *m_descriptorPool;
   }
-  vk::raii::DescriptorSet allocateDescriptorSet(vk::DescriptorSetLayout layout);
+  vk::DescriptorSet allocateDescriptorSet(vk::DescriptorSetLayout layout);
   void reset();
 
 private:

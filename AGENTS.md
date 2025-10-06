@@ -69,6 +69,12 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - Follow the façade-first approach: filters talk to API-neutral renderers; backends plug in beneath `Z3DRendererBase`.
 - Maintain feature parity: UI, parameters, and public APIs must not diverge between OpenGL and Vulkan.
 - Document any backend limitations or temporary gaps in `docs/VULKAN_MIGRATION_PLAN.md` and the issue tracker.
+ - Invariant policy (Vulkan):
+   - Match GL for benign skips (empty payloads, paging not ready, missing picking colors where GL also skips). Use early return.
+   - For “should never happen” states, fail fast with `CHECK` (not silent return): null `renderer` on non-empty payloads; array size mismatches; missing/failed descriptor or buffer allocations; resolve/composite format contract violations.
+   - Prefer debug-only `DCHECK` for expensive assertions (e.g., index range checks in hot loops).
+   - Do not introduce CPU-upload or GL-bridging fallbacks in Vulkan paths; if a Vulkan resource is required and unavailable, `CHECK` instead of silently substituting.
+   - Volatile inputs must be bound via per-draw override descriptor sets; allocation failure is fatal.
 
 ## Debugging & Performance
 - Use `--v=1` (or higher) for stage timing logs; wrap hotspots with `ZBenchTimer`.

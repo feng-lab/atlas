@@ -1,8 +1,8 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-layout(set = 0, binding = 0) uniform sampler2D DepthBlenderTex;
-layout(set = 0, binding = 1) uniform sampler2D FrontBlenderTex;
+layout(set = 0, binding = 3) uniform sampler2D DepthBlenderTex;
+layout(set = 0, binding = 4) uniform sampler2D FrontBlenderTex;
 
 
 layout(location = 0) out vec4 FragData0;
