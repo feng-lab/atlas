@@ -24,7 +24,6 @@
 #include "zvulkanpagedimageblockuploader.h"
 #include "zcancellation.h"
 
-#include <fmt/format.h>
 #include <algorithm>
 #include <array>
 #include <limits>

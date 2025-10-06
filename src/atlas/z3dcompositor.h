@@ -94,6 +94,16 @@ protected:
   void updateSize() override;
 
 private:
+  // Stage 3 (Vulkan): pass-graph style driver for background + geometry
+  // - When includeGeometry is false, records only background into sceneOutLease.
+  // - When true, records background then enqueues opaque and transparent filters.
+  void executeCompositorPassesVulkan(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
+                                     const std::vector<Z3DBoundedFilter*>& transparentFilters,
+                                     Z3DScratchResourcePool::RenderTargetLease& sceneOutLease,
+                                     Z3DEye eye,
+                                     bool includeGeometry,
+                                     bool clearAtStart,
+                                     bool drawBackground);
   // little helper function
   void renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                         const std::vector<Z3DBoundedFilter*>& transparentFilters,

@@ -5,7 +5,6 @@
 #include "zvulkantexture.h"
 
 #include <algorithm>
-#include <fmt/format.h>
 
 namespace nim::vulkan {
 namespace {

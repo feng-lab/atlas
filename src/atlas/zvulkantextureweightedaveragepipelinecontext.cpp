@@ -309,9 +309,9 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  instance.pipeline->setDepthTestEnable(true);
-  instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
-  instance.pipeline->setDepthWriteEnable(true);
+  // Resolve pass composites over background; avoid depth testing/writes interfering with blending.
+  instance.pipeline->setDepthTestEnable(false);
+  instance.pipeline->setDepthWriteEnable(false);
 
   // Blend weighted-average result over the existing background using
   // premultiplied alpha semantics (GL: ONE, ONE_MINUS_SRC_ALPHA).

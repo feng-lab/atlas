@@ -10,7 +10,6 @@
 #include "zexception.h"
 #include "zlog.h"
 
-#include <fmt/format.h>
 #include <utility>
 
 namespace nim {

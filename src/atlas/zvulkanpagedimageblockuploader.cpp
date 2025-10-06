@@ -13,7 +13,6 @@
 #include <folly/executors/ThreadPoolExecutor.h>
 
 #include <chrono>
-#include <fmt/format.h>
 
 DECLARE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds);
 

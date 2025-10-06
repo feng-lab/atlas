@@ -27,7 +27,6 @@
 #include <limits>
 #include <vector>
 #include <unordered_set>
-#include <fmt/format.h>
 
 namespace nim {
 

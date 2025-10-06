@@ -387,14 +387,104 @@ Small wins already applied:
 
 ### Stage 3 – Compositor Pass Graph Simplification (owner: compositor team, 2 sprints)
 
-- **Prereqs:** Stage 2 resource recycling.
-- **Scope:**
-  - Build an explicit pass graph (opaque, transparency, glow, overlays, picking) and dispatch through `executeCompositorPass` to avoid repeated collect/submit cycles.
-  - Cache OIT attachment descriptors between frames; minimize redundant clears.
-  - Ensure supersample downsample reuses persistent pipelines.
-  - Tighten attachment clear/load policies using pass history to avoid redundant clears.
-- **Validation:** Automated tests for transparent + glow scenes; compare against Stage 0 baselines.
-- **Docs:** Document pass graph ordering and any behavioural differences; extend USER_GUIDE if controls change.
+- Status: Done (MVP)
+  - Pass graph driver (`executeCompositorPassesVulkan`) records background and geometry in one collect/submit for non‑OIT; in OIT flow, driver draws background on the scene surface and records opaque geometry into an intermediate lease (clear-only, no background) before OIT.
+  - Vulkan backend coalesces dynamic rendering segments across compatible batches; background + geometry share a single `beginRendering` when targeting the same attachments.
+  - Instrumentation (VLOG=1): per‑frame counters for segments begun and attachments cleared vs loaded; descriptor arena stats unchanged (Stage 2).
+  - GL path unchanged; Vulkan remains offscreen; no WSI.
+  - Glow handling: non‑OIT path overlays glow via the pass‑graph driver; OIT path overlays glow after OIT resolution into the scene surface.
+- Next:
+  - Fold self‑managed contexts (glow, slice, raycaster) under the driver without losing their intermediate passes.
+  - Expose pipeline reuse/creation counters across pipeline contexts.
+  - Broaden parity/soak tests and collect new baselines.
+- Validation: Compare Stage 0/2 baselines and observe fewer dynamic rendering begin/end segments; stable descriptor counts; one arena reset per frame.
+
+## Pipeline Invariants & Simplifications (Plan)
+
+Goal: Reduce state-coupling errors and make Vulkan behavior predictable by enforcing a small set of hard invariants. Keep dynamic rendering and dynamic state, but lock in what Vulkan still expects to be fixed.
+
+Why: Dynamic Rendering decouples render passes, and many states are dynamic, but these are fixed and must match at recording time: pipeline layout (descriptor set layouts + push constants), attachment formats/count, per‑attachment blend state (unless `independentBlend` is enabled), and image layouts. Descriptor sets bound in a command buffer must be treated as immutable for the duration of that frame.
+
+Invariants
+
+- Pipelines
+  - Key pipelines by: (shader variant, wireframe flag, fog mode) + (vector of color formats, optional depth format).
+  - Composite/resolves (background/copy/blend/glow/OIT resolves): single color attachment only, depth test/write disabled.
+- Descriptor Sets
+  - Never update a descriptor set after it’s bound within a frame. If bindings must change (DDP peel, glow), allocate per‑draw override sets from the per‑frame arena and keep them alive until the frame fence signals.
+  - Always bind explicit samplers for combined image samplers (MoltenVK consistency).
+  - Standardize bindings across contexts:
+    - DDP peel (set 0): binding 0 = depth blender, binding 1 = front blender.
+    - WA resolve (set 0): binding 0 = accumulation, binding 1 = moments.
+    - WB resolve (set 0): binding 0 = accumulation, binding 1 = transmittance.
+    - OIT params UBO (set 3, binding 0) in all OIT resolve/final and peel shaders.
+- Attachments & Segments
+  - Before pipeline selection/use, assert that the current dynamic rendering attachments (count + vk::Format per attachment and depth presence) match the pipeline’s creation formats.
+  - Clear/load policy: first writer clears; subsequent writers load. Composite/resolve passes must never clear.
+- Recording
+  - Exactly one frame command buffer; pipeline contexts never begin/end frames.
+  - Only begin a new dynamic rendering segment when the attachment set changes; otherwise reuse the open segment.
+  - GPU timestamps only while the command buffer is recording (guarded).
+- OIT
+  - Unify scratch attachment ordering across contexts. DDP mesh peel uses the same set/binding conventions as cones/spheres.
+  - WB final includes set 3 (OIT UBO). Init paths avoid `independentBlend` or use single‑attachment initialization.
+- Features
+  - `independentBlend` disabled by default. If differing per‑attachment blend is required, refactor to a single‑attachment approach or explicitly enable the feature (prefer the former for portability).
+
+Tasks
+
+1) Centralize descriptor set/binding constants for OIT/composites (header used by all contexts).
+2) Backend: include (color formats, depth format) in pipeline key and assert formats match at batch processing time.
+3) Composite pipelines: enforce single color attachment, depth off; update keys and remove depth paths.
+4) Descriptor override utility: per‑draw sets for dynamic sampled inputs; track them in a per‑frame transient list to keep alive until fence.
+5) OIT alignment:
+   - DDP peel: align mesh bindings to (0=depth, 1=front) with explicit samplers.
+   - WA resolve: (0=accumulation, 1=moments).
+   - WB resolve: (0=accumulation, 1=transmittance) and set 3 UBO bound.
+6) Preflight checks: add `assertFormatsMatch(batch, segment)`; log at VLOG(1) and skip batch when mismatched in release builds.
+7) Instrumentation: VLOG counters when a pipeline is skipped due to format mismatch or when an override descriptor set is allocated.
+
+Acceptance Criteria
+
+- No descriptor update/invalid set errors across DDP/WA/WB paths.
+- No layout/attachment format mismatches at pipeline creation or segment begin.
+- WB final pipelines create successfully on MoltenVK (set 3 layout present); DDP peel shaders compile with explicit samplers.
+- Composite passes render with single color attachment; depth disabled.
+- VLOG shows fewer beginRendering segments; no “skipping segment with no attachments” in normal flows.
+
+Risks & Performance
+
+- Per‑draw override descriptor sets come from the per‑frame arena (O(1) alloc), kept alive until fence. Overhead is negligible and avoids expensive validation errors.
+- Single‑attachment composites reduce pipeline key variety and improve cache hits.
+- Format assertions fail fast, improving debuggability with minimal runtime cost.
+
+Timeline
+
+- Week 1: Constants header, backend format asserts, composite pipeline unification.
+- Week 2: OIT binding alignment across contexts, override descriptor utility, logging, doc updates.
+
+Test Plan (Stage 3 MVP)
+
+- Binaries/Flags
+  - Run: `atlas_app --renderer vulkan --v=1` (offscreen)
+- Scenes
+  - Background + opaque mesh
+  - Geometry with transparency disabled (BlendDelayed/NoDepthMask)
+  - Transparency modes (DDP, WA, WB) with volumes and meshes
+  - Glow: enabled on one opaque and one transparent filter
+- Verify
+  - Visual parity vs GL and Stage 2 screenshots (color/depth; no background regression)
+  - Logs show one backend begin/end per frame; fewer `beginRendering` segments (VLOG counters)
+  - Attachments: first writer clears; subsequent writers load (VLOG counters)
+  - Descriptor arena: stable per‑frame allocation counts; exactly one arena reset scheduled (VLOG line)
+  - Supersample 2×2 path renders to intermediate, then resolves into output
+  - Glow is applied exactly once per filter (no double overlay)
+  - No leaks: scratch‑pool recycle counts match queued executions after fence
+
+Deferred/Notes
+
+- Self‑managed pipeline contexts (slice, raycaster) still own local dynamic rendering segments and will be folded into the driver in a follow‑up.
+- Screenshots/readback improvements are tracked under Stage 4.
 
 ### Stage 4 – Async Readback & Picking Optimisation (owner: runtime/UI, 1–2 sprints)
 

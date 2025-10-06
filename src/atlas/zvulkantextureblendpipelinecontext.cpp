@@ -22,8 +22,6 @@ namespace nim {
 
 namespace {
 
-constexpr float kQuadDepth = 0.0f;
-
 int toComposeMode(TextureBlendMode mode)
 {
   switch (mode) {

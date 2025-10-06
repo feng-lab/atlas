@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zvulkan.h"
+#include "z3drenderervulkanbackend.h"
 #include <optional>
 #include <vector>
 
@@ -19,7 +20,11 @@ public:
 
   vk::Pipeline pipeline() const
   {
-    return *m_pipeline;
+    vk::Pipeline handle = static_cast<vk::Pipeline>(*m_pipeline);
+    if (auto* backend = Z3DRendererVulkanBackend::current()) {
+      backend->notifyPipelineBound(handle);
+    }
+    return handle;
   }
   vk::PipelineLayout pipelineLayout() const
   {

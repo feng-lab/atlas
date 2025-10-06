@@ -6,8 +6,6 @@
 #include "zexception.h"
 #include "zlog.h"
 
-#include <fmt/format.h>
-
 namespace nim {
 
 ZVulkanSwapChain::ZVulkanSwapChain(ZVulkanDevice& device, uint32_t width, uint32_t height)

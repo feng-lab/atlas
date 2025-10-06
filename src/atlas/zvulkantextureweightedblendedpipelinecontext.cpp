@@ -11,18 +11,13 @@
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbuffer.h"
+#include "zvulkanuniforms.h"
 #include "zlog.h"
 
 #include <array>
 #include <vector>
 
 namespace nim {
-
-namespace {
-
-constexpr float kQuadDepth = 0.0f;
-
-} // namespace
 
 ZVulkanTextureWeightedBlendedPipelineContext::ZVulkanTextureWeightedBlendedPipelineContext(
   Z3DRendererVulkanBackend& backend)
@@ -40,6 +35,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::resetFrame()
 void ZVulkanTextureWeightedBlendedPipelineContext::resetDescriptors()
 {
   m_descriptorSet.reset();
+  m_descriptorSetOIT.reset();
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& renderer,
@@ -62,6 +58,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
 
   ensureDescriptorLayout();
   ensureDescriptorSet();
+  ensureOITResources();
   if (!m_descriptorSet) {
     return;
   }
@@ -94,6 +91,13 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 0, sets, {});
   }
 
+  // Ensure and bind OIT params (set = 3)
+  if (m_descriptorSetOIT && m_uboOIT) {
+    m_descriptorSetOIT->updateUniformBuffer(0, *m_uboOIT);
+    std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), 3, sets3, {});
+  }
+
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
 
@@ -115,6 +119,9 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
   }
 
+  // Update OIT UBO values
+  updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
+
   cmd.pushConstants<WeightedBlendedPushConstants>(instance.pipeline->pipelineLayout(),
                                                   vk::ShaderStageFlagBits::eFragment,
                                                   0,
@@ -126,26 +133,37 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
 void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorLayout()
 {
   if (m_setLayout) {
-    return;
+    // Also ensure OIT set layout
+  } else {
+    auto& device = m_backend.device();
+    auto& vkDevice = device.context().device();
+
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
+
+    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                                 .pBindings = bindings.data()};
+    m_setLayout.emplace(vkDevice, createInfo);
   }
 
-  auto& device = m_backend.device();
-  auto& vkDevice = device.context().device();
-
-  std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-    vk::DescriptorSetLayoutBinding{.binding = 0,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment},
-    vk::DescriptorSetLayoutBinding{.binding = 1,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment}
-  };
-
-  vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                               .pBindings = bindings.data()};
-  m_setLayout.emplace(vkDevice, createInfo);
+  if (!m_setOIT) {
+    auto& device = m_backend.device();
+    auto& vkDevice = device.context().device();
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
+    m_setOIT.emplace(vkDevice, info);
+  }
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorPool() {}
@@ -157,6 +175,55 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorSet()
   if (!m_descriptorSet) {
     m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setLayout);
   }
+  if (!m_descriptorSetOIT && m_setOIT) {
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  }
+}
+
+void ZVulkanTextureWeightedBlendedPipelineContext::ensureOITResources()
+{
+  // Ensure OIT UBO and descriptor for set = 3
+  if (!m_uboOIT) {
+    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
+                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_descriptorSetOIT && m_setOIT) {
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  }
+}
+
+void ZVulkanTextureWeightedBlendedPipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
+                                                                      const RenderBatch& batch,
+                                                                      const glm::vec2& screenDimRcp)
+{
+  (void)batch;
+  if (!m_uboOIT) {
+    return;
+  }
+
+  OITParamsUBOStd140 oit{};
+
+  glm::vec2 rcp = screenDimRcp;
+  if (!(rcp.x > 0.0f && rcp.y > 0.0f)) {
+    const auto& viewportState = renderer.frameState().viewport;
+    const float w = static_cast<float>(viewportState.z);
+    const float h = static_cast<float>(viewportState.w);
+    if (w > 0.0f && h > 0.0f) {
+      rcp = glm::vec2(1.0f / w, 1.0f / h);
+    }
+  }
+  oit.screen_dim_RCP = rcp;
+
+  const float n = renderer.viewState().nearClip;
+  const float f = renderer.viewState().farClip;
+  const float denom = std::max(f - n, 1e-6f);
+  oit.ze_to_zw_a = (f * n) / denom;
+  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
+  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
+
+  m_uboOIT->copyData(&oit, sizeof(oit));
 }
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureWeightedBlendedPipelineContext::makeVertexInputState() const
@@ -219,7 +286,11 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  instance.pipeline->setDescriptorSetLayouts({**m_setLayout});
+  if (m_setOIT) {
+    instance.pipeline->setDescriptorSetLayouts({**m_setLayout, **m_setOIT});
+  } else {
+    instance.pipeline->setDescriptorSetLayouts({**m_setLayout});
+  }
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);

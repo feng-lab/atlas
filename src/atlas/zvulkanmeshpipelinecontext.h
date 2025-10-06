@@ -111,6 +111,9 @@ private:
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsOIT;
+  // Keep per-draw transient descriptor sets alive for the duration of the frame
+  std::vector<std::unique_ptr<ZVulkanDescriptorSet>> m_transientDescriptorSets;
+  bool m_texturesSetInitialized = false;
 
   std::unique_ptr<ZVulkanTexture> m_placeholder1D;
   std::unique_ptr<ZVulkanTexture> m_placeholder2D;

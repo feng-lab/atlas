@@ -20,12 +20,6 @@
 
 namespace nim {
 
-namespace {
-
-constexpr float kQuadDepth = 0.0f;
-
-} // namespace
-
 ZVulkanTextureCopyPipelineContext::ZVulkanTextureCopyPipelineContext(Z3DRendererVulkanBackend& backend)
   : m_backend(backend)
 {}
@@ -151,7 +145,6 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorSet()
 {
   ensureDescriptorLayout();
 
-  auto& device = m_backend.device();
   if (!m_descriptorSet) {
     m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setTextures);
   }

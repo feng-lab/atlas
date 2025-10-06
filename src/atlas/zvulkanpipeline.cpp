@@ -3,11 +3,11 @@
 #include "zvulkanshader.h"
 #include "zvulkandevice.h"
 #include "zvulkancontext.h"
+#include "z3drenderervulkanbackend.h"
 #include "zexception.h"
 #include "zlog.h"
 
 #include <array>
-#include <fmt/format.h>
 
 namespace nim {
 
@@ -186,6 +186,10 @@ void ZVulkanPipeline::create()
   try {
     m_pipeline.emplace(m_device.context().device(), nullptr, pipelineInfo);
     LOG(INFO) << "Successfully created graphics pipeline";
+    // Stage 3 instrumentation: count pipelines created in the current Vulkan backend frame
+    if (auto* backend = Z3DRendererVulkanBackend::current()) {
+      backend->notifyPipelineCreated();
+    }
   }
   catch (const vk::SystemError& e) {
     LOG(ERROR) << "Failed to create graphics pipeline: " << e.what();

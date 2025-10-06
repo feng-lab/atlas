@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace nim {
@@ -46,6 +47,9 @@ class ZVulkanBuffer;
 class Z3DRendererVulkanBackend final : public Z3DRendererBackend
 {
 public:
+  // Current backend bound to the rendering thread (TLS)
+  static Z3DRendererVulkanBackend* current();
+
   Z3DRendererVulkanBackend();
   ~Z3DRendererVulkanBackend() override;
 
@@ -93,6 +97,8 @@ public:
 
   // Stage 2: Schedule a callback to run once the current frame's fence signals
   void scheduleAfterCurrentFrameCompletion(std::function<void()> fn);
+  void notifyPipelineCreated();
+  void notifyPipelineBound(vk::Pipeline pipeline);
 
 private:
   friend class Z3DRendererBase;
@@ -130,6 +136,15 @@ private:
     std::vector<std::function<void()>> deferredReleases;
     uint32_t leaseRecycleQueued = 0;
     uint32_t leaseRecycleExecuted = 0;
+
+    // Stage 3: instrumentation (per-frame)
+    uint32_t renderingSegmentsBegan = 0; // number of vkCmdBeginRendering calls
+    uint32_t attachmentClears = 0;       // number of attachments begun with Clear loadOp
+    uint32_t attachmentLoads = 0;        // number of attachments begun with Load loadOp
+
+    // Pipelines
+    uint32_t pipelinesCreated = 0;       // graphics pipelines created this frame
+    std::unordered_set<uint64_t> pipelinesBound; // unique pipelines bound this frame
   };
 
   void collectFrameTimings(FrameResources& frame);
@@ -180,6 +195,8 @@ private:
   void ensureSharedSamplers();
   void ensureFullscreenQuad();
   
+  // TLS current backend pointer
+  static thread_local Z3DRendererVulkanBackend* s_currentBackend;
 };
 
 std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend();

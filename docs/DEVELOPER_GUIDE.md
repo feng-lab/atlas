@@ -261,3 +261,12 @@ Additional Architecture Notes
 - Debugging GL state
   - Enable `--atlas_debug_opengl` for per-call error checks (costly); `--atlas_log_glbinding_context_switch` to audit context switches.
   - When diagnosing rendering differences across devices, log `Z3DGpuInfo::instance().logGpuInfo()` output for driver/features.
+
+Compositor Pass Graph (Vulkan)
+
+- Offscreen only; no swapchain.
+- Per frame, the Vulkan compositor executes a simple pass ordering: Background → Opaque Geometry → Transparency → Glow → Overlays.
+- Background + geometry now record via a single driver (`executeCompositorPassesVulkan`), which reduces dynamic rendering begin/end churn by coalescing compatible batches.
+- Some pipeline contexts (image slice/raycast and glow) manage their own dynamic rendering segments today and will be folded into the graph later.
+- Backend VLOG(1) counters help validate improvements: per-frame segments begun and attachments cleared vs loaded.
+- Load/store policy: first writer to an attachment clears; subsequent writers load. The backend emits exactly one `beginRender`/`endRender` per frame; dynamic rendering segments only begin when attachment sets change.

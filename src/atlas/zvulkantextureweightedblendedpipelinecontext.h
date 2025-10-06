@@ -73,8 +73,11 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3 (OIT params)
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
+  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
+  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
@@ -83,10 +86,12 @@ private:
   void ensureDescriptorLayout();
   void ensureDescriptorPool();
   void ensureDescriptorSet();
+  void ensureOITResources();
   void resetDescriptors();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
   void ensureVertexCapacity(size_t vertexCount);
   void uploadGeometry();
+  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& screenDimRcp);
 
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
 };

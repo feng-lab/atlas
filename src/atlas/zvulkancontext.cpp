@@ -3,7 +3,6 @@
 #include "zexception.h"
 #include "zlog.h"
 
-#include <fmt/format.h>
 #include <set>
 
 DEFINE_bool(atlas_debug_vulkan, false, "Whether to enable Vulkan validation and debug utils");

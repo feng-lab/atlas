@@ -6,7 +6,6 @@
 #include "zlog.h"
 
 #include <fstream>
-#include <fmt/format.h>
 
 namespace nim {
 

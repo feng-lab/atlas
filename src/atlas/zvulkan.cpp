@@ -7,7 +7,6 @@
 #include "zglmutils.h"
 #include "zexception.h"
 #include "zlog.h"
-#include <fmt/format.h>
 
 namespace nim {
 

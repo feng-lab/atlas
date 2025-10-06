@@ -45,6 +45,8 @@ namespace {
 constexpr uint32_t kMaxTimestampQueries = 64u;
 }
 
+thread_local Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::s_currentBackend = nullptr;
+
 Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
   : m_lineContext(std::make_unique<ZVulkanLinePipelineContext>(*this))
   , m_meshContext(std::make_unique<ZVulkanMeshPipelineContext>(*this))
@@ -59,6 +61,11 @@ Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
 {}
 
 Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend() = default;
+
+Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::current()
+{
+  return s_currentBackend;
+}
 
 void Z3DRendererVulkanBackend::preBackendSwitch()
 {
@@ -123,6 +130,7 @@ std::string Z3DRendererVulkanBackend::generateGeomHeader(const Z3DRendererBase& 
 
 void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 {
+  s_currentBackend = this;
   if (m_lineContext) {
     m_lineContext->resetFrame();
   }
@@ -207,6 +215,12 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.nextQuery = 0;
   frameResources.cpuStart = std::chrono::steady_clock::now();
   frameResources.cpuEnd = {};
+  // Reset Stage 3 instrumentation
+  frameResources.renderingSegmentsBegan = 0;
+  frameResources.attachmentClears = 0;
+  frameResources.attachmentLoads = 0;
+  frameResources.pipelinesCreated = 0;
+  frameResources.pipelinesBound.clear();
 
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   auto& cmdBuffer = m_activeFrameHandle->commandBuffer();
@@ -227,6 +241,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 {
   (void)renderer;
   if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    s_currentBackend = nullptr;
     return;
   }
 
@@ -283,8 +298,17 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   // VLOG(1) frame recycling stats (descriptors and arena reset scheduling)
   vlogFrameRecyclingStats(frame);
 
+  // Stage 3: VLOG instrumentation for dynamic rendering segments and pipeline stats
+  VLOG(1) << fmt::format("VK segments: began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={}",
+                         frame.renderingSegmentsBegan,
+                         frame.attachmentClears,
+                         frame.attachmentLoads,
+                         frame.pipelinesCreated,
+                         frame.pipelinesBound.size());
+
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
+  s_currentBackend = nullptr;
 }
 
 namespace {
@@ -346,7 +370,124 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
   auto& cmd = m_activeFrameHandle->commandBuffer();
 
+  // Build a simple attachment key for coalescing
+  struct AttachKey {
+    std::vector<uint64_t> colors;
+    uint64_t depth = 0;
+    bool operator==(const AttachKey& o) const { return depth == o.depth && colors == o.colors; }
+  };
+  auto buildKey = [](const RenderBatch& b) {
+    AttachKey k;
+    k.colors.reserve(b.pass.colorAttachments.size());
+    for (const auto& a : b.pass.colorAttachments) {
+      k.colors.push_back(a.handle.id);
+    }
+    if (b.pass.depthAttachment) {
+      k.depth = b.pass.depthAttachment->handle.id;
+    }
+    return k;
+  };
+
+  // Begin a dynamic rendering segment for the batch's attachments
+  auto beginSegmentForBatch = [&](const RenderBatch& batch) {
+    std::vector<vk::RenderingAttachmentInfo> colorAttachments;
+    colorAttachments.reserve(batch.pass.colorAttachments.size());
+
+    auto makeColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
+      if (!attachment.handle.valid()) {
+        return std::nullopt;
+      }
+      auto& texture = vulkan::textureFromHandle(attachment.handle, device(), "renderer color attachment");
+      const auto desiredLayout = vk::ImageLayout::eColorAttachmentOptimal;
+      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
+
+      vk::RenderingAttachmentInfo info;
+      info.imageView = texture.imageView();
+      info.imageLayout = desiredLayout;
+      info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+      info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
+      vk::ClearValue clear{};
+      clear.color = vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
+                                                             attachment.clearValue.color.g,
+                                                             attachment.clearValue.color.b,
+                                                             attachment.clearValue.color.a});
+      info.clearValue = clear;
+      return info;
+    };
+
+    auto makeDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
+      if (!attachment.handle.valid()) {
+        return std::nullopt;
+      }
+      auto& texture = vulkan::textureFromHandle(attachment.handle, device(), "renderer depth attachment");
+      const auto desiredLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
+
+      vk::RenderingAttachmentInfo info;
+      info.imageView = texture.imageView();
+      info.imageLayout = desiredLayout;
+      info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+      info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
+      vk::ClearValue clear{};
+      clear.depthStencil = vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
+      info.clearValue = clear;
+      return info;
+    };
+
+    for (const auto& attachment : batch.pass.colorAttachments) {
+      if (auto vkAttachment = makeColorAttachment(attachment)) {
+        colorAttachments.push_back(*vkAttachment);
+      }
+    }
+
+    std::optional<vk::RenderingAttachmentInfo> depthAttachmentInfo;
+    if (batch.pass.depthAttachment) {
+      depthAttachmentInfo = makeDepthAttachment(*batch.pass.depthAttachment);
+    }
+
+    if (colorAttachments.empty() && !depthAttachmentInfo) {
+      VLOG(1) << "VK: skipping segment with no attachments";
+      return false;
+    }
+
+    const auto vkScissor = vulkan::toVkScissor(batch.pass);
+    vk::RenderingInfo renderingInfo;
+    renderingInfo.renderArea = vkScissor;
+    renderingInfo.layerCount = 1;
+    renderingInfo.pColorAttachments = colorAttachments.empty() ? nullptr : colorAttachments.data();
+    renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
+    renderingInfo.pDepthAttachment = depthAttachmentInfo ? &*depthAttachmentInfo : nullptr;
+
+    cmd.beginRendering(renderingInfo);
+
+    if (m_activeFrame) {
+      m_activeFrame->renderingSegmentsBegan++;
+      for (const auto& a : batch.pass.colorAttachments) {
+        if (a.loadOp == LoadOp::Clear) {
+          m_activeFrame->attachmentClears++;
+        } else {
+          m_activeFrame->attachmentLoads++;
+        }
+      }
+      if (batch.pass.depthAttachment) {
+        if (batch.pass.depthAttachment->loadOp == LoadOp::Clear) {
+          m_activeFrame->attachmentClears++;
+        } else {
+          m_activeFrame->attachmentLoads++;
+        }
+      }
+    }
+    return true;
+  };
+
+  auto isSelfManaged = [](const GeometryPayload& g) -> bool {
+    return std::holds_alternative<TextureGlowPayload>(g) || std::holds_alternative<ImgSlicePayload>(g) ||
+           std::holds_alternative<ImgRaycasterPayload>(g);
+  };
+
   size_t batchIndex = 0;
+  std::optional<AttachKey> currentKey;
+  bool segmentOpen = false;
   for (const auto& batch : state.batches) {
     const auto geom = describeGeometry(batch.geometry);
     VLOG(1) << fmt::format("VK batch[{}]: geom={}, colors={}, depth={} viewport=({},{} {}x{})",
@@ -358,47 +499,30 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
                            static_cast<int>(batch.pass.viewport.origin.y),
                            static_cast<int>(batch.pass.viewport.extent.x),
                            static_cast<int>(batch.pass.viewport.extent.y));
+
     // Ensure any sampled inputs referenced by this batch are transitioned to shader-read
     auto classifyReadLayout = [](vk::Format format) {
-      struct
-      {
-        vk::ImageLayout layout;
-        vk::ImageAspectFlags aspect;
-      } result;
-
+      struct { vk::ImageLayout layout; vk::ImageAspectFlags aspect; } result;
       switch (format) {
         case vk::Format::eD16Unorm:
         case vk::Format::eX8D24UnormPack32:
         case vk::Format::eD32Sfloat:
-          result.layout = vk::ImageLayout::eDepthReadOnlyOptimal;
-          result.aspect = vk::ImageAspectFlagBits::eDepth;
-          break;
+          result.layout = vk::ImageLayout::eDepthReadOnlyOptimal; result.aspect = vk::ImageAspectFlagBits::eDepth; break;
         case vk::Format::eD16UnormS8Uint:
         case vk::Format::eD24UnormS8Uint:
         case vk::Format::eD32SfloatS8Uint:
-          result.layout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
-          result.aspect = vk::ImageAspectFlagBits::eDepth;
-          break;
+          result.layout = vk::ImageLayout::eDepthStencilReadOnlyOptimal; result.aspect = vk::ImageAspectFlagBits::eDepth; break;
         case vk::Format::eS8Uint:
-          result.layout = vk::ImageLayout::eStencilReadOnlyOptimal;
-          result.aspect = vk::ImageAspectFlagBits::eStencil;
-          break;
+          result.layout = vk::ImageLayout::eStencilReadOnlyOptimal; result.aspect = vk::ImageAspectFlagBits::eStencil; break;
         default:
-          result.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-          result.aspect = vk::ImageAspectFlags{};
-          break;
+          result.layout = vk::ImageLayout::eShaderReadOnlyOptimal; result.aspect = {};
       }
       return result;
     };
-
     auto ensureSampledReadable = [&](const AttachmentHandle& handle) {
-      if (!handle.valid()) {
-        return;
-      }
-      auto& texture =
-        vulkan::textureFromHandle(handle, device(), "renderer sampled attachment");
+      if (!handle.valid()) return;
+      auto& texture = vulkan::textureFromHandle(handle, device(), "renderer sampled attachment");
       const auto samplingState = classifyReadLayout(texture.format());
-      // Transition before dynamic rendering begins
       vk::ImageAspectFlags transitionAspect = samplingState.aspect;
       if (transitionAspect == vk::ImageAspectFlagBits::eDepth &&
           (texture.format() == vk::Format::eD16UnormS8Uint || texture.format() == vk::Format::eD24UnormS8Uint ||
@@ -408,7 +532,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       texture.transitionLayout(cmd, texture.layout(), samplingState.layout, transitionAspect);
       texture.setDescriptorLayout(samplingState.layout);
     };
-
     if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
       ensureSampledReadable(weightedAverage->accumulationAttachment);
       ensureSampledReadable(weightedAverage->momentsAttachment);
@@ -436,7 +559,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       ensureSampledReadable(textureGlow->depthAttachmentHandle);
     } else if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
       (void)mesh;
-      // When peeling, mesh shaders sample depth/front blender from hook params
       if (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
         const auto& hookPara = renderer.shaderHookPara();
         if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
@@ -447,82 +569,31 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-    std::vector<vk::RenderingAttachmentInfo> colorAttachments;
-    colorAttachments.reserve(batch.pass.colorAttachments.size());
-
-    auto makeColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (!attachment.handle.valid()) {
-        return std::nullopt;
-      }
-      auto& texture = vulkan::textureFromHandle(attachment.handle,
-                                                device(),
-                                                "renderer color attachment");
-      const auto desiredLayout = vk::ImageLayout::eColorAttachmentOptimal;
-      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
-
-      vk::RenderingAttachmentInfo info;
-      info.imageView = texture.imageView();
-      info.imageLayout = desiredLayout;
-      info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
-      info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-      vk::ClearValue clear{};
-      clear.color = vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
-                                                             attachment.clearValue.color.g,
-                                                             attachment.clearValue.color.b,
-                                                             attachment.clearValue.color.a});
-      info.clearValue = clear;
-      return info;
-    };
-
-    auto makeDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (attachment.handle.id == 0) {
-        return std::nullopt;
-      }
-      auto& texture = vulkan::textureFromHandle(attachment.handle,
-                                                device(),
-                                                "renderer depth attachment");
-      const auto desiredLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
-
-      vk::RenderingAttachmentInfo info;
-      info.imageView = texture.imageView();
-      info.imageLayout = desiredLayout;
-      info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
-      info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-      vk::ClearValue clear{};
-      clear.depthStencil = vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
-      info.clearValue = clear;
-      return info;
-    };
-
-    for (const auto& attachment : batch.pass.colorAttachments) {
-      if (auto vkAttachment = makeColorAttachment(attachment)) {
-        colorAttachments.push_back(*vkAttachment);
-      }
-    }
-
-    std::optional<vk::RenderingAttachmentInfo> depthAttachmentInfo;
-    if (batch.pass.depthAttachment) {
-      depthAttachmentInfo = makeDepthAttachment(*batch.pass.depthAttachment);
-    }
-
-    if (colorAttachments.empty() && !depthAttachmentInfo) {
-      VLOG(1) << "VK: skipping batch with no attachments";
-      LOG_FIRST_N(WARNING, 5) << "Vulkan backend skipping batch with no Vulkan-compatible attachments.";
-      continue;
-    }
 
     const auto vkViewport = vulkan::toVkViewport(batch.pass.viewport);
     const auto vkScissor = vulkan::toVkScissor(batch.pass);
 
-    vk::RenderingInfo renderingInfo;
-    renderingInfo.renderArea = vkScissor;
-    renderingInfo.layerCount = 1;
-    renderingInfo.pColorAttachments = colorAttachments.empty() ? nullptr : colorAttachments.data();
-    renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
-    renderingInfo.pDepthAttachment = depthAttachmentInfo ? &*depthAttachmentInfo : nullptr;
+    const bool selfManaged = isSelfManaged(batch.geometry);
+    const auto key = buildKey(batch);
 
-    cmd.beginRendering(renderingInfo);
+    if (!segmentOpen) {
+      if (beginSegmentForBatch(batch)) {
+        segmentOpen = true;
+        currentKey = key;
+      } else {
+        continue;
+      }
+    } else if (!currentKey || *currentKey != key) {
+      cmd.endRendering();
+      segmentOpen = false;
+      currentKey.reset();
+      if (beginSegmentForBatch(batch)) {
+        segmentOpen = true;
+        currentKey = key;
+      } else {
+        continue;
+      }
+    }
 
     bool handled = false;
     if (const auto* line = std::get_if<LinePayload>(&batch.geometry)) {
@@ -534,7 +605,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         handled = true;
       }
     }
-
     if (!handled) {
       if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
         if (mesh->renderer) {
@@ -546,7 +616,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* sphere = std::get_if<SpherePayload>(&batch.geometry)) {
         if (sphere->renderer) {
@@ -558,7 +627,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* background = std::get_if<BackgroundPayload>(&batch.geometry)) {
         if (background->renderer) {
@@ -570,7 +638,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* slice = std::get_if<ImgSlicePayload>(&batch.geometry)) {
         if (slice->renderer) {
@@ -582,7 +649,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* font = std::get_if<FontPayload>(&batch.geometry)) {
         if (font->renderer) {
@@ -594,7 +660,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* textureCopy = std::get_if<TextureCopyPayload>(&batch.geometry)) {
         if (textureCopy->renderer) {
@@ -606,7 +671,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* textureBlend = std::get_if<TextureBlendPayload>(&batch.geometry)) {
         if (textureBlend->renderer) {
@@ -618,7 +682,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* textureGlow = std::get_if<TextureGlowPayload>(&batch.geometry)) {
         if (textureGlow->renderer) {
@@ -630,7 +693,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* dualPeel = std::get_if<TextureDualPeelPayload>(&batch.geometry)) {
         if (!m_textureDualPeelContext) {
@@ -640,7 +702,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         handled = true;
       }
     }
-
     if (!handled) {
       if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
         if (!m_textureWeightedAverageContext) {
@@ -650,7 +711,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         handled = true;
       }
     }
-
     if (!handled) {
       if (const auto* weightedBlended = std::get_if<TextureWeightedBlendedPayload>(&batch.geometry)) {
         if (!m_textureWeightedBlendedContext) {
@@ -660,7 +720,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         handled = true;
       }
     }
-
     if (!handled) {
       if (const auto* ellipsoid = std::get_if<EllipsoidPayload>(&batch.geometry)) {
         if (ellipsoid->renderer) {
@@ -672,7 +731,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* cone = std::get_if<ConePayload>(&batch.geometry)) {
         if (cone->renderer) {
@@ -684,7 +742,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       if (const auto* raycaster = std::get_if<ImgRaycasterPayload>(&batch.geometry)) {
         if (raycaster->renderer && raycaster->image) {
@@ -696,7 +753,6 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
     }
-
     if (!handled) {
       cmd.setViewport(0, vkViewport);
       cmd.setScissor(0, vkScissor);
@@ -704,6 +760,14 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
                               << describeGeometry(batch.geometry) << "'.";
     }
 
+    // If the context managed its own begin/end logic, treat the segment as closed.
+    if (selfManaged) {
+      segmentOpen = false;
+      currentKey.reset();
+    }
+  }
+
+  if (segmentOpen) {
     cmd.endRendering();
   }
 }
@@ -1073,6 +1137,23 @@ void Z3DRendererVulkanBackend::ensureFullscreenQuad()
   m_fullscreenQuadVbo->copyData(vertices.data(), bytes);
 }
 
+void Z3DRendererVulkanBackend::notifyPipelineCreated()
+{
+  if (m_activeFrame) {
+    m_activeFrame->pipelinesCreated++;
+  }
+}
+
+void Z3DRendererVulkanBackend::notifyPipelineBound(vk::Pipeline pipeline)
+{
+  if (!m_activeFrame) {
+    return;
+  }
+  // Track unique pipeline bindings for per-frame instrumentation
+  VkPipeline raw = static_cast<VkPipeline>(pipeline);
+  m_activeFrame->pipelinesBound.insert(reinterpret_cast<uint64_t>(raw));
+}
+
 void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
 {
   if (frame.cpuStart.time_since_epoch().count() == 0 || frame.cpuEnd.time_since_epoch().count() == 0) {
@@ -1141,7 +1222,7 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
 
 std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view label)
 {
-  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid() || label.empty()) {
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid() || label.empty() || !m_frameRecording) {
     return std::nullopt;
   }
   auto& frame = *m_activeFrame;
@@ -1160,7 +1241,7 @@ std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view l
 
 void Z3DRendererVulkanBackend::endGpuScope(size_t token)
 {
-  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid() || !m_frameRecording) {
     return;
   }
   auto& frame = *m_activeFrame;

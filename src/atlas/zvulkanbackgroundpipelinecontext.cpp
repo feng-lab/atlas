@@ -165,7 +165,6 @@ void ZVulkanBackgroundPipelineContext::ensureDescriptorSets()
 {
   ensureDescriptorLayouts();
 
-  auto& device = m_backend.device();
   if (!m_dsLighting) {
     m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
   }
