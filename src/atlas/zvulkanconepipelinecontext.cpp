@@ -515,11 +515,11 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     vk::SpecializationMapEntry{.constantID = 90, .offset = 0, .size = sizeof(int)}
   };
   std::array<int, 1> specData{key.capsMode};
-  instance.shader->setSpecializationConstants(
-    vk::ShaderStageFlagBits::eFragment,
-    std::vector<vk::SpecializationMapEntry>(specEntries.begin(), specEntries.end()),
-    std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
-                         reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
+  std::vector<vk::SpecializationMapEntry> specEntryVec(specEntries.begin(), specEntries.end());
+  std::vector<uint8_t> specDataVec(reinterpret_cast<const uint8_t*>(specData.data()),
+                                   reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData));
+  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eVertex, specEntryVec, specDataVec);
+  instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment, specEntryVec, specDataVec);
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
