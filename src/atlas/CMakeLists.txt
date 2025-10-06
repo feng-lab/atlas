@@ -398,7 +398,6 @@ set(SOURCES
     z3danimationfilter.h z3danimationfilter.cpp
     z3dcompositor.h z3dcompositor.cpp
     z3dgeometryfilter.h z3dgeometryfilter.cpp
-    z3daxisfilter.h z3daxisfilter.cpp
     z3dboundedfilter.h z3dboundedfilter.cpp
     z3dmeshrenderer.h z3dmeshrenderer.cpp
     z3dtexturecopyrenderer.h z3dtexturecopyrenderer.cpp
