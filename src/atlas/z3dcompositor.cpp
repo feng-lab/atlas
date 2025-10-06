@@ -1861,6 +1861,10 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
     m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
   }
   if (drawBackground && m_showBackground.get()) {
+    if (sceneOutLease && sceneOutLease.backend == RenderBackend::Vulkan) {
+      auto* tex = sceneOutLease.colorAttachment(0);
+      VLOG(1) << "BG pass: sceneOutLease color0 handle=" << reinterpret_cast<uint64_t>(tex);
+    }
     m_rendererBase.recordVulkanBatches([&]() { m_rendererBase.renderVulkan(eye, m_backgroundRenderer); }, "background");
   }
 
@@ -3041,12 +3045,42 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   const glm::vec4 depthClear(-1.0f, -1.0f, 0.0f, 0.0f);
   const glm::vec4 zeroClear(0.0f);
 
-  auto initSurface = ddpBindings.surface;
+  // In Vulkan, fragment outputs at locations 0..N map to the subpass' color
+  // attachments in order. For DDP, we write only 3 outputs (depth blender,
+  // front blender, back temp). Select exactly those attachments for the
+  // current subpass so that locations 0/1/2 route to the desired targets.
+  RendererFrameState::ActiveSurface initSurface;
+  initSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[0]);
+  initSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[1]);
+  initSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[2]);
+  // Also include the back-blend accumulation buffer (attachment 6) in the
+  // first subpass so we can clear it at the start of the frame. Otherwise it
+  // would retain values across frames and cause trail/ghost artifacts.
+  initSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[6]);
+  initSurface.depthAttachment = ddpBindings.surface.depthAttachment;
+  VLOG(1) << "DDP init: color handles="
+          << (ddpBindings.colorHandles.size() >= 8 ? "8" : std::to_string(ddpBindings.colorHandles.size()))
+          << " [0]=" << (ddpBindings.colorHandles.size() > 0 ? ddpBindings.colorHandles[0].id : 0)
+          << " [1]=" << (ddpBindings.colorHandles.size() > 1 ? ddpBindings.colorHandles[1].id : 0)
+          << " [2]=" << (ddpBindings.colorHandles.size() > 2 ? ddpBindings.colorHandles[2].id : 0)
+          << " [3]=" << (ddpBindings.colorHandles.size() > 3 ? ddpBindings.colorHandles[3].id : 0)
+          << " [4]=" << (ddpBindings.colorHandles.size() > 4 ? ddpBindings.colorHandles[4].id : 0)
+          << " [5]=" << (ddpBindings.colorHandles.size() > 5 ? ddpBindings.colorHandles[5].id : 0)
+          << " [6]=" << (ddpBindings.colorHandles.size() > 6 ? ddpBindings.colorHandles[6].id : 0)
+          << " [7]=" << (ddpBindings.colorHandles.size() > 7 ? ddpBindings.colorHandles[7].id : 0);
   for (size_t i = 0; i < initSurface.colorAttachments.size(); ++i) {
     auto& attachment = initSurface.colorAttachments[i];
     attachment.storeOp = StoreOp::Store;
     attachment.loadOp = LoadOp::Clear;
-    attachment.clearValue.color = (i == 0 || i == 3 || i == 7) ? depthClear : zeroClear;
+    // Clear rule:
+    //  - depth blender (0) uses depthClear (-1 in .x)
+    //  - front blender (1) and back temp (2) cleared to zero
+    //  - back blender (6) must be cleared to zero at the start of frame
+    // Note: indexes 3..5 are not part of initSurface; index here is relative
+    // to initSurface order, so check actual handle id if needed. Since we
+    // explicitly appended [0,1,2,6], map by position:
+    const bool isDepthBlender = (i == 0);
+    attachment.clearValue.color = isDepthBlender ? depthClear : zeroClear;
   }
   applyDepthAttachment(initSurface, LoadOp::Load);
 
@@ -3070,6 +3104,11 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
     source.clearPendingActiveSurface();
     renderFn();
     auto& batches = source.cpuState().batches;
+    // Propagate shader-hook parameters (e.g., DDP sampler attachments) from the
+    // source filter renderer to the compositor renderer so Vulkan pipelines
+    // can access them while recording. Without this, peel stages may sample
+    // placeholder textures, producing incorrect colors (e.g., white silhouettes).
+    m_rendererBase.shaderHookPara() = source.shaderHookPara();
     for (auto& batch : batches) {
       if (batch.pass.colorAttachments.empty() && !surface.colorAttachments.empty()) {
         batch.pass.colorAttachments = surface.colorAttachments;
@@ -3129,19 +3168,24 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
     const size_t prevId = 1 - currId;
     const size_t bufOffset = currId * 3;
 
-    auto peelSurface = ddpBindings.surface;
+    // Route locations 0/1/2 to the active ping attachments for this pass.
+    RendererFrameState::ActiveSurface peelSurface;
+    peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 0]);
+    peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 1]);
+    peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 2]);
+    peelSurface.depthAttachment = ddpBindings.surface.depthAttachment;
     for (size_t i = 0; i < peelSurface.colorAttachments.size(); ++i) {
       auto& attachment = peelSurface.colorAttachments[i];
       attachment.storeOp = StoreOp::Store;
       attachment.clearValue.color = zeroClear;
       attachment.loadOp = LoadOp::Load;
     }
-    peelSurface.colorAttachments[bufOffset + 0].loadOp = LoadOp::Clear;
-    peelSurface.colorAttachments[bufOffset + 0].clearValue.color = depthClear;
-    peelSurface.colorAttachments[bufOffset + 1].loadOp = LoadOp::Clear;
-    peelSurface.colorAttachments[bufOffset + 1].clearValue.color = zeroClear;
-    peelSurface.colorAttachments[bufOffset + 2].loadOp = LoadOp::Clear;
-    peelSurface.colorAttachments[bufOffset + 2].clearValue.color = zeroClear;
+    peelSurface.colorAttachments[0].loadOp = LoadOp::Clear;
+    peelSurface.colorAttachments[0].clearValue.color = depthClear;
+    peelSurface.colorAttachments[1].loadOp = LoadOp::Clear;
+    peelSurface.colorAttachments[1].clearValue.color = zeroClear;
+    peelSurface.colorAttachments[2].loadOp = LoadOp::Clear;
+    peelSurface.colorAttachments[2].clearValue.color = zeroClear;
     applyDepthAttachment(peelSurface, LoadOp::Load);
 
     m_rendererBase.setCollectOnly(true);
@@ -3179,6 +3223,14 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
 
     RendererFrameState::ActiveSurface blendSurface;
     blendSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[6]);
+    // Accumulate back colors across peel passes within the same frame.
+    // Use Load so each pass adds into the existing buffer; we already clear
+    // it at frame start during the init subpass above.
+    if (!blendSurface.colorAttachments.empty()) {
+      blendSurface.colorAttachments[0].loadOp = LoadOp::Load;
+      blendSurface.colorAttachments[0].storeOp = StoreOp::Store;
+      blendSurface.colorAttachments[0].clearValue.color = zeroClear;
+    }
 
     m_rendererBase.setCollectOnly(true);
     m_rendererBase.setActiveSurfaceForNextPass(blendSurface);
@@ -3214,17 +3266,21 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
 
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
+  if (!outBindings.colorHandles.empty()) {
+    VLOG(1) << "DDP final: out color handle=" << outBindings.colorHandles[0].id;
+  }
   // Enforce single color attachment and disable depth for composite resolve
   if (outSurface.colorAttachments.size() > 1) {
     outSurface.colorAttachments.resize(1);
   }
   outSurface.depthAttachment.reset();
   for (auto& attachment : outSurface.colorAttachments) {
-    // If a background was drawn earlier into the same surface, keep it.
-    attachment.loadOp = m_showBackground.get() ? LoadOp::Load : LoadOp::Clear;
+    // TEST: force preserve background for DDP final resolve (Load), depth disabled
+    attachment.loadOp = LoadOp::Load;
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
+  VLOG(1) << "DDP final: forcing LoadOp::Load for color, depth disabled";
   // Depth disabled by invariant; no depth load/store
 
   m_rendererBase.setCollectOnly(true);
@@ -3641,6 +3697,8 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderT
   if (axisViewport.z == 0u || axisViewport.w == 0u) {
     return;
   }
+  VLOG(1) << "Axis overlay viewport=" << axisViewport.x << "," << axisViewport.y << " " << axisViewport.z << "x"
+          << axisViewport.w;
 
   auto axisSurface = m_rendererBase.describeSurface(sceneOutLease);
   if (axisSurface.colorAttachments.empty() && !axisSurface.depthAttachment.has_value()) {

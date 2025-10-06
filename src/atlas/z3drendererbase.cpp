@@ -852,12 +852,11 @@ void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan 
   CHECK(m_backend != nullptr) << "Renderer backend not set";
   CHECK(m_activeBackend != RenderBackend::Vulkan)
     << "renderUsingGLSL is GL-only. Use renderVulkan for Vulkan.";
-  m_backend->beginRender(*this);
+  activateClipPlanesGLSL();
   for (auto* renderer : renderers) {
     renderer->render(eye);
   }
-  submitBatches();
-  m_backend->endRender(*this);
+  deactivateClipPlanesGLSL();
 }
 
 void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
@@ -865,12 +864,11 @@ void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, Z3DRendererBase::Render
   CHECK(m_backend != nullptr) << "Renderer backend not set";
   CHECK(m_activeBackend != RenderBackend::Vulkan)
     << "renderPickingUsingGLSL is GL-only. Use renderPickingVulkan for Vulkan.";
-  m_backend->beginRender(*this);
+  activateClipPlanesGLSL();
   for (auto* renderer : renderers) {
     renderer->renderPicking(eye);
   }
-  submitBatches();
-  m_backend->endRender(*this);
+  deactivateClipPlanesGLSL();
 }
 
 void Z3DRendererBase::renderVulkan(Z3DEye eye, Z3DRendererBase::RendererSpan renderers)
@@ -948,6 +946,26 @@ void Z3DRendererBase::deactivateClipPlanesOpenGL()
   }
 }
 #endif
+
+void Z3DRendererBase::activateClipPlanesGLSL()
+{
+  if (!m_clipEnabled) {
+    return;
+  }
+  for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
+    glEnable(GL_CLIP_DISTANCE0 + i);
+  }
+}
+
+void Z3DRendererBase::deactivateClipPlanesGLSL()
+{
+  if (!m_clipEnabled) {
+    return;
+  }
+  for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
+    glDisable(GL_CLIP_DISTANCE0 + i);
+  }
+}
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DRendererBase::invalidateDisplayList()

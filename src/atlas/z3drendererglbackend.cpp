@@ -155,27 +155,9 @@ public:
     return header;
   }
 
-  void beginRender(Z3DRendererBase& renderer) override
-  {
-    if (!renderer.clipEnabled()) {
-      return;
-    }
-    const auto& clipPlanes = renderer.clipPlanes();
-    for (size_t i = 0; i < clipPlanes.size(); ++i) {
-      glEnable(GL_CLIP_DISTANCE0 + i);
-    }
-  }
+  void beginRender(Z3DRendererBase&) override {}
 
-  void endRender(Z3DRendererBase& renderer) override
-  {
-    if (!renderer.clipEnabled()) {
-      return;
-    }
-    const auto& clipPlanes = renderer.clipPlanes();
-    for (size_t i = 0; i < clipPlanes.size(); ++i) {
-      glDisable(GL_CLIP_DISTANCE0 + i);
-    }
-  }
+  void endRender(Z3DRendererBase&) override {}
 
   [[nodiscard]] bool supportsCommandLists() const override
   {

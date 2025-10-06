@@ -581,17 +581,41 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     }
     case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
     case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel: {
-      std::vector<vk::PipelineColorBlendAttachmentState> attachments(formats.colorFormats.size(), baseBlend);
-      for (auto& attachment : attachments) {
-        attachment.blendEnable = VK_TRUE;
-        attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
-        attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
-        attachment.colorBlendOp = vk::BlendOp::eAdd;
-        attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-        attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
-        attachment.alphaBlendOp = vk::BlendOp::eAdd;
+      std::vector<vk::PipelineColorBlendAttachmentState> attachments;
+      attachments.reserve(formats.colorFormats.size());
+      for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
+        auto state = baseBlend;
+        if (i == 0 || i == 3) {
+          state.blendEnable = VK_TRUE;
+          state.srcColorBlendFactor = vk::BlendFactor::eOne;
+          state.dstColorBlendFactor = vk::BlendFactor::eOne;
+          state.colorBlendOp = vk::BlendOp::eMax;
+          state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          state.alphaBlendOp = vk::BlendOp::eMax;
+        } else if (i == 1 || i == 4) {
+          state.blendEnable = VK_TRUE;
+          state.srcColorBlendFactor = vk::BlendFactor::eOne;
+          state.dstColorBlendFactor = vk::BlendFactor::eOne;
+          state.colorBlendOp = vk::BlendOp::eMax;
+          state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          state.alphaBlendOp = vk::BlendOp::eMax;
+        } else if (i == 2 || i == 5) {
+          state.blendEnable = VK_TRUE;
+          state.srcColorBlendFactor = vk::BlendFactor::eOne;
+          state.dstColorBlendFactor = vk::BlendFactor::eOne;
+          state.colorBlendOp = vk::BlendOp::eAdd;
+          state.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          state.alphaBlendOp = vk::BlendOp::eAdd;
+        } else {
+          state.blendEnable = VK_FALSE;
+        }
+        attachments.push_back(state);
       }
       instance.pipeline->setColorBlendAttachments(std::move(attachments));
+      instance.pipeline->setDepthTestEnable(false);
       instance.pipeline->setDepthWriteEnable(false);
       break;
     }

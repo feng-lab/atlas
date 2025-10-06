@@ -125,66 +125,63 @@ public:
 
   void releasePersistentLeases();
 
-  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentTempRenderTarget2D(
-    Z3DScratchResourcePool::RenderTargetLease& lease,
-    const glm::uvec2& size,
-    ScratchFormat colorFormat = ScratchFormat::RGBA16,
-    ScratchFormat depthFormat = ScratchFormat::Depth24);
+  Z3DScratchResourcePool::RenderTargetLease&
+  acquirePersistentTempRenderTarget2D(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                      const glm::uvec2& size,
+                                      ScratchFormat colorFormat = ScratchFormat::RGBA16,
+                                      ScratchFormat depthFormat = ScratchFormat::Depth24);
 
-  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentDualDepthPeelRenderTarget(
-    Z3DScratchResourcePool::RenderTargetLease& lease,
-    const glm::uvec2& size);
+  Z3DScratchResourcePool::RenderTargetLease&
+  acquirePersistentDualDepthPeelRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease, const glm::uvec2& size);
 
-  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentWeightedAverageRenderTarget(
-    Z3DScratchResourcePool::RenderTargetLease& lease,
-    const glm::uvec2& size);
+  Z3DScratchResourcePool::RenderTargetLease&
+  acquirePersistentWeightedAverageRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                               const glm::uvec2& size);
 
-  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentWeightedBlendedRenderTarget(
-    Z3DScratchResourcePool::RenderTargetLease& lease,
-    const glm::uvec2& size);
+  Z3DScratchResourcePool::RenderTargetLease&
+  acquirePersistentWeightedBlendedRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                               const glm::uvec2& size);
 
-  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentRaycastAccumulatorRenderTarget(
-    Z3DScratchResourcePool::RenderTargetLease& lease,
-    const glm::uvec2& size);
+  Z3DScratchResourcePool::RenderTargetLease&
+  acquirePersistentRaycastAccumulatorRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                                  const glm::uvec2& size);
 
-  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentLayerArrayRenderTarget(
-    Z3DScratchResourcePool::RenderTargetLease& lease,
-    const glm::uvec2& size,
-    uint32_t layers,
-    ScratchFormat colorFormat = ScratchFormat::RGBA16,
-    ScratchFormat depthFormat = ScratchFormat::Depth24);
+  Z3DScratchResourcePool::RenderTargetLease&
+  acquirePersistentLayerArrayRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                          const glm::uvec2& size,
+                                          uint32_t layers,
+                                          ScratchFormat colorFormat = ScratchFormat::RGBA16,
+                                          ScratchFormat depthFormat = ScratchFormat::Depth24);
 
-  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentEntryExitRenderTarget(
-    Z3DScratchResourcePool::RenderTargetLease& lease,
-    const glm::uvec2& size,
-    uint32_t layers = 2,
-    ScratchFormat colorFormat = ScratchFormat::RGBA32F);
+  Z3DScratchResourcePool::RenderTargetLease&
+  acquirePersistentEntryExitRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                         const glm::uvec2& size,
+                                         uint32_t layers = 2,
+                                         ScratchFormat colorFormat = ScratchFormat::RGBA32F);
 
-  Z3DScratchResourcePool::RenderTargetLease& acquirePersistentBlockIdRenderTarget(
-    Z3DScratchResourcePool::RenderTargetLease& lease,
-    const glm::uvec2& viewport,
-    int requestedAttachments = -1,
-    double scale = -1.0);
+  Z3DScratchResourcePool::RenderTargetLease&
+  acquirePersistentBlockIdRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,
+                                       const glm::uvec2& viewport,
+                                       int requestedAttachments = -1,
+                                       double scale = -1.0);
 
   void executeCompositorPass(const Z3DCompositorPass& pass);
 
   void setActiveSurfaceForNextPass(const RendererFrameState::ActiveSurface& surface);
   void setActiveSurfaceForNextPass(RendererFrameState::ActiveSurface&& surface);
   void setActiveSurfaceForNextPass(const Z3DScratchResourcePool::RenderTargetLease& lease);
-  void setPendingColorAttachmentsLoadStore(LoadOp loadOp,
-                                           StoreOp storeOp,
-                                           const ClearValue& clearValue = {});
-  void setPendingDepthAttachmentLoadStore(LoadOp loadOp,
-                                          StoreOp storeOp,
-                                          const ClearValue& clearValue = {});
+  void setPendingColorAttachmentsLoadStore(LoadOp loadOp, StoreOp storeOp, const ClearValue& clearValue = {});
+  void setPendingDepthAttachmentLoadStore(LoadOp loadOp, StoreOp storeOp, const ClearValue& clearValue = {});
   void clearPendingActiveSurface();
 
   // Expose pending active surface for backends that need to preflight
   // attachments while recording batches.
-  const std::optional<RendererFrameState::ActiveSurface>& pendingActiveSurface() const { return m_pendingActiveSurface; }
+  const std::optional<RendererFrameState::ActiveSurface>& pendingActiveSurface() const
+  {
+    return m_pendingActiveSurface;
+  }
 
-  RendererFrameState::ActiveSurface
-  describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
+  RendererFrameState::ActiveSurface describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
   struct VulkanSurfaceBindings
   {
@@ -198,8 +195,7 @@ public:
     }
   };
 
-  VulkanSurfaceBindings
-  prepareVulkanSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
+  VulkanSurfaceBindings prepareVulkanSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
   void executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label = {});
   void beginVulkanFrame();
@@ -433,6 +429,9 @@ protected:
   void deactivateClipPlanesOpenGL();
 #endif
 
+  void activateClipPlanesGLSL();
+  void deactivateClipPlanesGLSL();
+
 private:
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void invalidateDisplayList();
@@ -476,7 +475,10 @@ private:
 
 public:
   // Expose current pass label for backend diagnostics/logging
-  std::string_view currentPassLabel() const { return m_currentPassLabel; }
+  std::string_view currentPassLabel() const
+  {
+    return m_currentPassLabel;
+  }
 
   std::vector<Z3DScratchResourcePool::RenderTargetLease*> m_persistentLeases;
 
