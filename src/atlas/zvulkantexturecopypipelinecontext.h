@@ -48,12 +48,13 @@ private:
   {
     bool discardTransparent = true;
     TextureCopyPayload::OutputMode mode = TextureCopyPayload::OutputMode::NoChange;
+    bool flipY = false;
     std::vector<vk::Format> colorFormats;
     std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(discardTransparent, static_cast<int>(mode), colorFormats, depthFormat);
+      return std::tuple(discardTransparent, static_cast<int>(mode), flipY, colorFormats, depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const

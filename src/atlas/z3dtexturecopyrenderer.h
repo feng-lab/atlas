@@ -48,6 +48,11 @@ public:
     m_discardTransparent = v;
   }
 
+  void setFlipY(bool v)
+  {
+    m_flipY = v;
+  }
+
 protected:
   void compile() override;
 
@@ -73,6 +78,7 @@ protected:
 
   std::unique_ptr<Z3DShaderGroup> m_copyTextureShaderGrp;
   bool m_discardTransparent = true;
+  bool m_flipY = false;
 
   OutputColorOption m_mode;
   std::unique_ptr<Z3DVertexArrayObject> m_VAO;

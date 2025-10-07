@@ -9,6 +9,8 @@
 #include <QCoreApplication>
 #include <algorithm>
 
+DECLARE_bool(atlas_vk_copy_yflip_in_shader);
+
 namespace nim {
 
 Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* parent, Qt::WindowFlags f)
@@ -121,7 +123,8 @@ void Z3DCanvas::renderingFinished()
     const std::scoped_lock lock(m_engine->targetSwitchMutex());
     auto localBuffer = m_engine->monoReadyLocalBuffer();
     QImage image;
-    if (localBuffer->external && localBuffer->width > 0 && localBuffer->height > 0) {
+    const bool vulkanZeroCopy = localBuffer->external && localBuffer->width > 0 && localBuffer->height > 0;
+    if (vulkanZeroCopy) {
       // Vulkan zero-copy path: mapped RGBA8 staging
 #if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
       image =
@@ -144,7 +147,9 @@ void Z3DCanvas::renderingFinished()
                      static_cast<int>(localBuffer->height),
                      QImage::Format_ARGB32_Premultiplied);
     }
-    auto pixmap = QPixmap::fromImage(image.flipped(Qt::Vertical));
+    // If shader y-flip is enabled for Vulkan path, present directly; otherwise flip vertically.
+    auto pixmap =
+      QPixmap::fromImage((vulkanZeroCopy && FLAGS_atlas_vk_copy_yflip_in_shader) ? image : image.flipped(Qt::Vertical));
     pixmap.setDevicePixelRatio(devicePixelRatio());
     m_pixmapItem->setPixmap(pixmap);
     if (m_engine) {

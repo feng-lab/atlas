@@ -79,6 +79,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   PipelineKey key;
   key.discardTransparent = payload.discardTransparent;
   key.mode = payload.mode;
+  key.flipY = payload.flipY;
   key.colorFormats = formats.colorFormats;
   key.depthFormat = formats.depthFormat;
 
@@ -94,6 +95,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
   }
 
+  // Use the provided viewport directly (no viewport-based Y flip)
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
 
@@ -191,9 +193,11 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
+  // Select y-flip variant if requested; shader must exist.
+  const std::string frag = key.flipY ? "copyimage_yflip.frag.spv" : "copyimage.frag.spv";
   instance.shader = std::make_unique<ZVulkanShader>(device,
                                                     shaderBase + "pass.vert.spv",
-                                                    shaderBase + "copyimage.frag.spv",
+                                                    shaderBase + frag,
                                                     std::nullopt);
 
   auto vertexInput = makeVertexInputState();

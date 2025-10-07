@@ -61,6 +61,7 @@ TextureCopyPayload Z3DTextureCopyRenderer::buildTextureCopyPayload() const
   payload.colorTexture = m_colorTexture;
   payload.depthTexture = m_depthTexture;
   payload.discardTransparent = m_discardTransparent;
+  payload.flipY = m_flipY;
   payload.colorAttachmentHandle = m_colorAttachmentHandle;
   payload.depthAttachmentHandle = m_depthAttachmentHandle;
 

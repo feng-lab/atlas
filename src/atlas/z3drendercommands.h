@@ -456,6 +456,7 @@ struct TextureCopyPayload
   const Z3DTexture* depthTexture = nullptr;
   bool discardTransparent = true;
   OutputMode mode = OutputMode::NoChange;
+  bool flipY = false;
   AttachmentHandle colorAttachmentHandle;
   AttachmentHandle depthAttachmentHandle;
 };
