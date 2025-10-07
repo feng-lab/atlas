@@ -62,8 +62,7 @@ LayoutState layoutStateFor(vk::ImageLayout layout)
       return {AccessFlagBits::eDepthStencilAttachmentRead | AccessFlagBits::eDepthStencilAttachmentWrite,
               PipelineStageFlagBits::eEarlyFragmentTests | PipelineStageFlagBits::eLateFragmentTests};
     case vk::ImageLayout::eShaderReadOnlyOptimal:
-      return {AccessFlagBits::eShaderRead,
-              PipelineStageFlagBits::eAllGraphics | PipelineStageFlagBits::eComputeShader};
+      return {AccessFlagBits::eShaderRead, PipelineStageFlagBits::eAllGraphics | PipelineStageFlagBits::eComputeShader};
     case vk::ImageLayout::eTransferDstOptimal:
       return {AccessFlagBits::eTransferWrite, PipelineStageFlagBits::eTransfer};
     case vk::ImageLayout::eTransferSrcOptimal:
@@ -79,14 +78,13 @@ LayoutState layoutStateFor(vk::ImageLayout layout)
 
 // ----- CreateInfo helpers ---------------------------------------------------------------------
 
-ZVulkanTexture::CreateInfo
-ZVulkanTexture::CreateInfo::make1D(uint32_t width,
-                                   vk::Format format,
-                                   vk::ImageUsageFlags usage,
-                                   vk::MemoryPropertyFlags memoryProperties,
-                                   uint32_t mipLevels,
-                                   bool createSampler,
-                                   vk::ImageLayout descriptorLayout)
+ZVulkanTexture::CreateInfo ZVulkanTexture::CreateInfo::make1D(uint32_t width,
+                                                              vk::Format format,
+                                                              vk::ImageUsageFlags usage,
+                                                              vk::MemoryPropertyFlags memoryProperties,
+                                                              uint32_t mipLevels,
+                                                              bool createSampler,
+                                                              vk::ImageLayout descriptorLayout)
 {
   CreateInfo info;
   info.imageType = vk::ImageType::e1D;
@@ -103,15 +101,14 @@ ZVulkanTexture::CreateInfo::make1D(uint32_t width,
   return info;
 }
 
-ZVulkanTexture::CreateInfo
-ZVulkanTexture::CreateInfo::make2D(uint32_t width,
-                                   uint32_t height,
-                                   vk::Format format,
-                                   vk::ImageUsageFlags usage,
-                                   vk::MemoryPropertyFlags memoryProperties,
-                                   uint32_t mipLevels,
-                                   bool createSampler,
-                                   vk::ImageLayout descriptorLayout)
+ZVulkanTexture::CreateInfo ZVulkanTexture::CreateInfo::make2D(uint32_t width,
+                                                              uint32_t height,
+                                                              vk::Format format,
+                                                              vk::ImageUsageFlags usage,
+                                                              vk::MemoryPropertyFlags memoryProperties,
+                                                              uint32_t mipLevels,
+                                                              bool createSampler,
+                                                              vk::ImageLayout descriptorLayout)
 {
   CreateInfo info;
   info.imageType = vk::ImageType::e2D;
@@ -128,16 +125,15 @@ ZVulkanTexture::CreateInfo::make2D(uint32_t width,
   return info;
 }
 
-ZVulkanTexture::CreateInfo
-ZVulkanTexture::CreateInfo::make2DArray(uint32_t width,
-                                        uint32_t height,
-                                        uint32_t arrayLayers,
-                                        vk::Format format,
-                                        vk::ImageUsageFlags usage,
-                                        vk::MemoryPropertyFlags memoryProperties,
-                                        uint32_t mipLevels,
-                                        bool createSampler,
-                                        vk::ImageLayout descriptorLayout)
+ZVulkanTexture::CreateInfo ZVulkanTexture::CreateInfo::make2DArray(uint32_t width,
+                                                                   uint32_t height,
+                                                                   uint32_t arrayLayers,
+                                                                   vk::Format format,
+                                                                   vk::ImageUsageFlags usage,
+                                                                   vk::MemoryPropertyFlags memoryProperties,
+                                                                   uint32_t mipLevels,
+                                                                   bool createSampler,
+                                                                   vk::ImageLayout descriptorLayout)
 {
   CreateInfo info;
   info.imageType = vk::ImageType::e2D;
@@ -154,16 +150,15 @@ ZVulkanTexture::CreateInfo::make2DArray(uint32_t width,
   return info;
 }
 
-ZVulkanTexture::CreateInfo
-ZVulkanTexture::CreateInfo::make3D(uint32_t width,
-                                   uint32_t height,
-                                   uint32_t depth,
-                                   vk::Format format,
-                                   vk::ImageUsageFlags usage,
-                                   vk::MemoryPropertyFlags memoryProperties,
-                                   uint32_t mipLevels,
-                                   bool createSampler,
-                                   vk::ImageLayout descriptorLayout)
+ZVulkanTexture::CreateInfo ZVulkanTexture::CreateInfo::make3D(uint32_t width,
+                                                              uint32_t height,
+                                                              uint32_t depth,
+                                                              vk::Format format,
+                                                              vk::ImageUsageFlags usage,
+                                                              vk::MemoryPropertyFlags memoryProperties,
+                                                              uint32_t mipLevels,
+                                                              bool createSampler,
+                                                              vk::ImageLayout descriptorLayout)
 {
   CreateInfo info;
   info.imageType = vk::ImageType::e3D;
@@ -180,15 +175,14 @@ ZVulkanTexture::CreateInfo::make3D(uint32_t width,
   return info;
 }
 
-ZVulkanTexture::CreateInfo
-ZVulkanTexture::CreateInfo::makeCube(uint32_t edgeLength,
-                                     vk::Format format,
-                                     uint32_t mipLevels,
-                                     uint32_t cubeCount,
-                                     vk::ImageUsageFlags usage,
-                                     vk::MemoryPropertyFlags memoryProperties,
-                                     bool createSampler,
-                                     vk::ImageLayout descriptorLayout)
+ZVulkanTexture::CreateInfo ZVulkanTexture::CreateInfo::makeCube(uint32_t edgeLength,
+                                                                vk::Format format,
+                                                                uint32_t mipLevels,
+                                                                uint32_t cubeCount,
+                                                                vk::ImageUsageFlags usage,
+                                                                vk::MemoryPropertyFlags memoryProperties,
+                                                                bool createSampler,
+                                                                vk::ImageLayout descriptorLayout)
 {
   if (cubeCount == 0u) {
     throw ZException("Cube texture must have at least one cube");
@@ -221,7 +215,7 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createIn
   , m_usage(createInfo.usage)
   , m_memoryProperties(createInfo.memoryProperties)
   , m_aspectMask(createInfo.aspectMask == vk::ImageAspectFlags{} ? defaultAspectMask(createInfo.format)
-                                                                  : createInfo.aspectMask)
+                                                                 : createInfo.aspectMask)
   , m_descriptorLayout(createInfo.descriptorLayout)
   , m_descriptorAspectMask(m_aspectMask)
   , m_currentLayout(createInfo.initialLayout)
@@ -456,8 +450,7 @@ vk::ImageView ZVulkanTexture::layerImageView(uint32_t layer, vk::ImageAspectFlag
     return vk::ImageView{};
   }
 
-  const vk::ImageAspectFlags resolvedAspect =
-    (aspect == vk::ImageAspectFlags{}) ? m_descriptorAspectMask : aspect;
+  const vk::ImageAspectFlags resolvedAspect = (aspect == vk::ImageAspectFlags{}) ? m_descriptorAspectMask : aspect;
 
   auto ensureCacheSized = [&](auto& cache) {
     if (cache.empty()) {
@@ -583,8 +576,7 @@ void ZVulkanTexture::allocateMemory()
   bool found = false;
   for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
     const bool typeSupported = (memRequirements.memoryTypeBits & (1u << i)) != 0u;
-    const bool flagsMatch =
-      (memProperties.memoryTypes[i].propertyFlags & m_memoryProperties) == m_memoryProperties;
+    const bool flagsMatch = (memProperties.memoryTypes[i].propertyFlags & m_memoryProperties) == m_memoryProperties;
     if (typeSupported && flagsMatch) {
       memoryTypeIndex = i;
       found = true;
@@ -650,8 +642,7 @@ vk::Extent3D ZVulkanTexture::mipExtent(uint32_t mipLevel) const
   mipLevel = std::min(mipLevel, m_mipLevels - 1u);
   const uint32_t width = std::max(1u, m_extent.width >> mipLevel);
   const uint32_t height = std::max(1u, m_extent.height >> mipLevel);
-  const uint32_t depth =
-    m_createInfo.imageType == vk::ImageType::e3D ? std::max(1u, m_extent.depth >> mipLevel) : 1u;
+  const uint32_t depth = m_createInfo.imageType == vk::ImageType::e3D ? std::max(1u, m_extent.depth >> mipLevel) : 1u;
   return vk::Extent3D{width, height, depth};
 }
 
@@ -698,8 +689,7 @@ void ZVulkanTexture::uploadInternal(const void* data, size_t size, const UploadR
       throw ZException("3D upload region exceeds image depth");
     }
   } else {
-    if (region.baseArrayLayer >= m_arrayLayers ||
-        region.baseArrayLayer + region.layerCount > m_arrayLayers) {
+    if (region.baseArrayLayer >= m_arrayLayers || region.baseArrayLayer + region.layerCount > m_arrayLayers) {
       throw ZException("Upload region exceeds array layer bounds");
     }
   }
@@ -727,10 +717,7 @@ void ZVulkanTexture::uploadInternal(const void* data, size_t size, const UploadR
       copyRegion.imageOffset = region.offset;
       copyRegion.imageExtent = region.extent;
 
-      cmdBuffer.copyBufferToImage(stagingBuffer->buffer(),
-                                  *m_image,
-                                  vk::ImageLayout::eTransferDstOptimal,
-                                  copyRegion);
+      cmdBuffer.copyBufferToImage(stagingBuffer->buffer(), *m_image, vk::ImageLayout::eTransferDstOptimal, copyRegion);
 
       transitionLayout(cmdBuffer, vk::ImageLayout::eTransferDstOptimal, finalLayout, m_aspectMask);
     },

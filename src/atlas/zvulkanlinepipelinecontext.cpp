@@ -30,17 +30,39 @@ namespace {
 vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
 {
   static std::array<vk::VertexInputBindingDescription, 5> bindings{
-    vk::VertexInputBindingDescription{.binding = 0, .stride = static_cast<uint32_t>(sizeof(glm::vec3)), .inputRate = vk::VertexInputRate::eVertex}, // p0
-    vk::VertexInputBindingDescription{.binding = 1, .stride = static_cast<uint32_t>(sizeof(glm::vec3)), .inputRate = vk::VertexInputRate::eVertex}, // p1
-    vk::VertexInputBindingDescription{.binding = 2, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // c0
-    vk::VertexInputBindingDescription{.binding = 3, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // c1
-    vk::VertexInputBindingDescription{.binding = 4, .stride = static_cast<uint32_t>(sizeof(float)),     .inputRate = vk::VertexInputRate::eVertex}  // flags
+    vk::VertexInputBindingDescription{.binding = 0,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // p0
+    vk::VertexInputBindingDescription{.binding = 1,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // p1
+    vk::VertexInputBindingDescription{.binding = 2,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // c0
+    vk::VertexInputBindingDescription{.binding = 3,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // c1
+    vk::VertexInputBindingDescription{.binding = 4,
+                                      .stride = static_cast<uint32_t>(sizeof(float)),
+                                      .inputRate = vk::VertexInputRate::eVertex}  // flags
   };
   static std::array<vk::VertexInputAttributeDescription, 5> attrs{
-    vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 1, .binding = 1, .format = vk::Format::eR32G32B32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 2, .binding = 2, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 3, .binding = 3, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 1,
+                                        .binding = 1,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 2,
+                                        .binding = 2,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 3,
+                                        .binding = 3,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
     vk::VertexInputAttributeDescription{.location = 4, .binding = 4, .format = vk::Format::eR32Sfloat, .offset = 0}
   };
   static vk::PipelineVertexInputStateCreateInfo info{};
@@ -54,12 +76,22 @@ vk::PipelineVertexInputStateCreateInfo makeWideVertexInput()
 vk::PipelineVertexInputStateCreateInfo makeThinVertexInput()
 {
   static std::array<vk::VertexInputBindingDescription, 2> bindings{
-    vk::VertexInputBindingDescription{.binding = 0, .stride = static_cast<uint32_t>(sizeof(glm::vec3)), .inputRate = vk::VertexInputRate::eVertex}, // position
-    vk::VertexInputBindingDescription{.binding = 1, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}  // color
+    vk::VertexInputBindingDescription{.binding = 0,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // position
+    vk::VertexInputBindingDescription{.binding = 1,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}  // color
   };
   static std::array<vk::VertexInputAttributeDescription, 2> attrs{
-    vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 1, .binding = 1, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0}
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32Sfloat,
+                                        .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 1,
+                                        .binding = 1,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0}
   };
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
@@ -89,14 +121,19 @@ ZVulkanLinePipelineContext::~ZVulkanLinePipelineContext() = default;
 
 void ZVulkanLinePipelineContext::resetFrame()
 {
-  m_thinVBBuffer = VK_NULL_HANDLE;
+  m_thinPosBuffer = VK_NULL_HANDLE;
+  m_thinColorBuffer = VK_NULL_HANDLE;
   m_thinPosOffset = 0;
   m_thinColorOffset = 0;
   m_thinUploadVertexCount = 0;
   m_thinUploadIndexBuffer = VK_NULL_HANDLE;
   m_thinUploadIndexOffset = 0;
   m_thinUploadIndexCount = 0;
-  m_wideVBBuffer = VK_NULL_HANDLE;
+  m_wideP0Buffer = VK_NULL_HANDLE;
+  m_wideP1Buffer = VK_NULL_HANDLE;
+  m_wideC0Buffer = VK_NULL_HANDLE;
+  m_wideC1Buffer = VK_NULL_HANDLE;
+  m_wideFlagsBuffer = VK_NULL_HANDLE;
   m_wideP0Offset = 0;
   m_wideP1Offset = 0;
   m_wideC0Offset = 0;
@@ -178,9 +215,15 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
 {
   (void)renderer;
   ensureDescriptorLayouts();
-  if (!m_dsLighting) m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
-  if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
-  if (!m_dsTexture) m_dsTexture = m_backend.allocateFrameDescriptorSet(**m_setTexture);
+  if (!m_dsLighting) {
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+  }
+  if (!m_dsTransforms) {
+    m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+  }
+  if (!m_dsTexture) {
+    m_dsTexture = m_backend.allocateFrameDescriptorSet(**m_setTexture);
+  }
 
   // Ensure UBO buffers exist prior to recording
   auto& device = m_backend.device();
@@ -505,23 +548,25 @@ void ZVulkanLinePipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd
   }
 
   const vk::DescriptorSet dsTex = textureOverride ? textureOverride : m_dsTexture->descriptorSet();
-  std::array<vk::DescriptorSet, 3> sets{dsTex,
-                                        m_dsLighting->descriptorSet(),
-                                        m_dsTransforms->descriptorSet()};
+  std::array<vk::DescriptorSet, 3> sets{dsTex, m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
 }
 
 void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, bool pickingPass)
 {
   // Build wide-line SoA buffers directly from payload spans; copy indices from payload.smoothIndices.
-  m_wideVBBuffer = VK_NULL_HANDLE;
+  m_wideP0Buffer = VK_NULL_HANDLE;
+  m_wideP1Buffer = VK_NULL_HANDLE;
+  m_wideC0Buffer = VK_NULL_HANDLE;
+  m_wideC1Buffer = VK_NULL_HANDLE;
+  m_wideFlagsBuffer = VK_NULL_HANDLE;
   m_wideP0Offset = 0;
   m_wideP1Offset = 0;
   m_wideC0Offset = 0;
   m_wideC1Offset = 0;
   m_wideFlagsOffset = 0;
   m_wideUploadIndexOffset = 0;
-  
+
   // Determine vertex count from smooth P0/P1 positions (clamped to the smallest span).
   const size_t nP0 = payload.smoothP0Positions.size();
   const size_t nP1 = payload.smoothP1Positions.size();
@@ -533,6 +578,14 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
   const size_t pBytes = vertexCount * sizeof(glm::vec3);
   const size_t cBytes = vertexCount * sizeof(glm::vec4);
   const size_t fBytes = vertexCount * sizeof(float);
+  m_backend.reserveUploadSlices({
+    {pBytes,                                          alignof(glm::vec3)},
+    {pBytes,                                          alignof(glm::vec3)},
+    {cBytes,                                          alignof(glm::vec4)},
+    {cBytes,                                          alignof(glm::vec4)},
+    {fBytes,                                          alignof(float)    },
+    {payload.smoothIndices.size() * sizeof(uint32_t), alignof(uint32_t) }
+  });
   auto p0Slice = m_backend.suballocateUpload(pBytes, alignof(glm::vec3));
   auto p1Slice = m_backend.suballocateUpload(pBytes, alignof(glm::vec3));
   auto c0Slice = m_backend.suballocateUpload(cBytes, alignof(glm::vec4));
@@ -587,7 +640,11 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
   const size_t indexCount = payload.smoothIndices.size();
   if (indexCount == 0) {
     // Still keep vertex slice for potential degenerate case, but no draw will occur without indices
-    m_wideVBBuffer = p0Slice.buffer;
+    m_wideP0Buffer = p0Slice.buffer;
+    m_wideP1Buffer = p1Slice.buffer;
+    m_wideC0Buffer = c0Slice.buffer;
+    m_wideC1Buffer = c1Slice.buffer;
+    m_wideFlagsBuffer = flagsSlice.buffer;
     m_wideP0Offset = p0Slice.offset;
     m_wideP1Offset = p1Slice.offset;
     m_wideC0Offset = c0Slice.offset;
@@ -603,7 +660,11 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
   }
   std::memcpy(idxSlice.mapped, payload.smoothIndices.data(), indexCount * sizeof(uint32_t));
 
-  m_wideVBBuffer = p0Slice.buffer;
+  m_wideP0Buffer = p0Slice.buffer;
+  m_wideP1Buffer = p1Slice.buffer;
+  m_wideC0Buffer = c0Slice.buffer;
+  m_wideC1Buffer = c1Slice.buffer;
+  m_wideFlagsBuffer = flagsSlice.buffer;
   m_wideP0Offset = p0Slice.offset;
   m_wideP1Offset = p1Slice.offset;
   m_wideC0Offset = c0Slice.offset;
@@ -693,8 +754,14 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           entry.indexGen = payload.indicesGen;
           restagedBytes += indexCount * sizeof(uint32_t);
         }
-        if (restagedBytes > 0) m_backend.addLineBytesStaged(restagedBytes);
-        m_wideVBBuffer = entry.vb;
+        if (restagedBytes > 0) {
+          m_backend.addLineBytesStaged(restagedBytes);
+        }
+        m_wideP0Buffer = entry.vb;
+        m_wideP1Buffer = entry.vb;
+        m_wideC0Buffer = entry.vb;
+        m_wideC1Buffer = entry.vb;
+        m_wideFlagsBuffer = entry.vb;
         m_wideP0Offset = entry.p0Offset;
         m_wideP1Offset = entry.p1Offset;
         m_wideC0Offset = entry.c0Offset;
@@ -738,7 +805,11 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           }
           entry.indexGen = payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen;
           entry.promoted = true;
-          m_wideVBBuffer = entry.vb;
+          m_wideP0Buffer = entry.vb;
+          m_wideP1Buffer = entry.vb;
+          m_wideC0Buffer = entry.vb;
+          m_wideC1Buffer = entry.vb;
+          m_wideFlagsBuffer = entry.vb;
           m_wideP0Offset = entry.p0Offset;
           m_wideP1Offset = entry.p1Offset;
           m_wideC0Offset = entry.c0Offset;
@@ -766,7 +837,8 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
   const auto positions = payload.positions;
   if (positions.size() < 2) {
     m_thinUploadVertexCount = 0;
-    m_thinVBBuffer = VK_NULL_HANDLE;
+    m_thinPosBuffer = VK_NULL_HANDLE;
+    m_thinColorBuffer = VK_NULL_HANDLE;
     m_thinPosOffset = 0;
     m_thinColorOffset = 0;
     m_thinUploadIndexBuffer = VK_NULL_HANDLE;
@@ -796,9 +868,15 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
   }
   const size_t posBytes = static_cast<size_t>(vertexCount) * sizeof(glm::vec3);
   const size_t colBytes = static_cast<size_t>(vertexCount) * sizeof(glm::vec4);
+  m_backend.reserveUploadSlices({
+    {posBytes,                                                                            alignof(glm::vec3)},
+    {colBytes,                                                                            alignof(glm::vec4)},
+    {payload.isLineStrip ? static_cast<size_t>(positions.size()) * sizeof(uint32_t) : 0u, alignof(uint32_t) }
+  });
   if (vertexCount == 0) {
     m_thinUploadVertexCount = 0;
-    m_thinVBBuffer = VK_NULL_HANDLE;
+    m_thinPosBuffer = VK_NULL_HANDLE;
+    m_thinColorBuffer = VK_NULL_HANDLE;
     m_thinPosOffset = 0;
     m_thinColorOffset = 0;
     return;
@@ -808,7 +886,8 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
   auto colSlice = m_backend.suballocateUpload(colBytes, alignof(glm::vec4));
   if (!posSlice.buffer || !posSlice.mapped || !colSlice.buffer || !colSlice.mapped) {
     m_thinUploadVertexCount = 0;
-    m_thinVBBuffer = VK_NULL_HANDLE;
+    m_thinPosBuffer = VK_NULL_HANDLE;
+    m_thinColorBuffer = VK_NULL_HANDLE;
     m_thinPosOffset = 0;
     m_thinColorOffset = 0;
     return;
@@ -850,7 +929,8 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
   }
 
   m_thinUploadVertexCount = vertexCount;
-  m_thinVBBuffer = posSlice.buffer; // same arena buffer for both slices
+  m_thinPosBuffer = posSlice.buffer;
+  m_thinColorBuffer = colSlice.buffer;
   m_thinPosOffset = posSlice.offset;
   m_thinColorOffset = colSlice.offset;
 
@@ -871,7 +951,8 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
       ThinCacheEntry& entry = it->second;
       const bool sizeSame = (entry.vertexCount == vertexCount) && (entry.indexCount == m_thinUploadIndexCount);
       uint32_t colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
-      const bool gensSame = (entry.positionsGen == payload.positionsGen) && (entry.indexGen == payload.indicesGen) && (entry.colorsGen == colorGen);
+      const bool gensSame = (entry.positionsGen == payload.positionsGen) && (entry.indexGen == payload.indicesGen) &&
+                            (entry.colorsGen == colorGen);
       if (sizeSame && gensSame) {
         entry.unchangedFrames++;
       } else {
@@ -890,12 +971,18 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           m_backend.addLineBytesStaged(colBytes);
         }
         if (payload.isLineStrip && entry.indexGen != payload.indicesGen && m_thinUploadIndexBuffer) {
-          Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer, m_thinUploadIndexOffset, nullptr,
-                                                       static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t)};
-          m_backend.stageCopy(entry.ib ? entry.ib : entry.vb, entry.ib ? entry.ibOffset : entry.posOffset, iUpload, /*isIndexBuffer=*/true);
+          Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer,
+                                                        m_thinUploadIndexOffset,
+                                                        nullptr,
+                                                        static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t)};
+          m_backend.stageCopy(entry.ib ? entry.ib : entry.vb,
+                              entry.ib ? entry.ibOffset : entry.posOffset,
+                              iUpload,
+                              /*isIndexBuffer=*/true);
           entry.indexGen = payload.indicesGen;
         }
-        m_thinVBBuffer = entry.vb;
+        m_thinPosBuffer = entry.vb;
+        m_thinColorBuffer = entry.vb;
         m_thinPosOffset = entry.posOffset;
         m_thinColorOffset = entry.colorOffset;
         if (payload.isLineStrip && entry.ib) {
@@ -910,14 +997,18 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
         auto colDst = m_backend.allocateStaticVB(colBytes, alignof(glm::vec4));
         Z3DRendererVulkanBackend::StaticSlice ibDst{};
         if (payload.isLineStrip && m_thinUploadIndexCount > 0) {
-          ibDst = m_backend.allocateStaticIB(static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t), alignof(uint32_t));
+          ibDst = m_backend.allocateStaticIB(static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t),
+                                             alignof(uint32_t));
         }
         if (posDst.buffer && colDst.buffer && (!payload.isLineStrip || ibDst.buffer)) {
           m_backend.stageCopy(posDst.buffer, posDst.offset, posSlice, false);
           m_backend.stageCopy(colDst.buffer, colDst.offset, colSlice, false);
           if (payload.isLineStrip && m_thinUploadIndexCount > 0) {
-            Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer, m_thinUploadIndexOffset, nullptr,
-                                                         static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t)};
+            Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer,
+                                                          m_thinUploadIndexOffset,
+                                                          nullptr,
+                                                          static_cast<size_t>(m_thinUploadIndexCount) *
+                                                            sizeof(uint32_t)};
             m_backend.stageCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
           }
           entry.vb = posDst.buffer;
@@ -931,18 +1022,22 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           entry.colorsGen = colorGen;
           entry.indexGen = payload.indicesGen;
           entry.promoted = true;
-          m_thinVBBuffer = entry.vb;
+          m_thinPosBuffer = entry.vb;
+          m_thinColorBuffer = entry.vb;
           m_thinPosOffset = entry.posOffset;
           m_thinColorOffset = entry.colorOffset;
           if (payload.isLineStrip && entry.ib) {
             m_thinUploadIndexBuffer = entry.ib;
             m_thinUploadIndexOffset = entry.ibOffset;
           }
-          m_backend.addLineBytesStaged(posBytes + colBytes + (payload.isLineStrip ? static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t) : 0u));
+          m_backend.addLineBytesStaged(
+            posBytes + colBytes +
+            (payload.isLineStrip ? static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t) : 0u));
           VLOG(1) << fmt::format("VK line thin promote: pos={}B col={}B idx={}B",
                                  posBytes,
                                  colBytes,
-                                 payload.isLineStrip ? static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t) : 0u);
+                                 payload.isLineStrip ? static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t)
+                                                     : 0u);
           return;
         }
       }
@@ -1036,15 +1131,19 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
 
   if (payload.useSmoothLine) {
     uploadWideGeometry(payload, pickingPass);
-    if (m_wideVBBuffer == VK_NULL_HANDLE || m_wideUploadIndexCount == 0) {
+    if (m_wideP0Buffer == VK_NULL_HANDLE || m_wideUploadIndexCount == 0) {
       return;
     }
 
     // Bind SoA buffers for wide line
-    std::array<vk::Buffer, 5> wbufs{m_wideVBBuffer, m_wideVBBuffer, m_wideVBBuffer, m_wideVBBuffer, m_wideVBBuffer};
-    std::array<vk::DeviceSize, 5> woffs{m_wideP0Offset, m_wideP1Offset, m_wideC0Offset, m_wideC1Offset, m_wideFlagsOffset};
+    std::array<vk::Buffer, 5> wbufs{m_wideP0Buffer, m_wideP1Buffer, m_wideC0Buffer, m_wideC1Buffer, m_wideFlagsBuffer};
+    std::array<vk::DeviceSize, 5> woffs{m_wideP0Offset,
+                                        m_wideP1Offset,
+                                        m_wideC0Offset,
+                                        m_wideC1Offset,
+                                        m_wideFlagsOffset};
     cmd.bindVertexBuffers(0, wbufs, woffs);
-    vk::Buffer idxBuf = m_wideIndexBuffer ? m_wideIndexBuffer : m_wideVBBuffer;
+    vk::Buffer idxBuf = m_wideIndexBuffer ? m_wideIndexBuffer : m_wideP0Buffer;
     cmd.bindIndexBuffer(idxBuf, m_wideUploadIndexOffset, vk::IndexType::eUint32);
 
     struct WideLinePC
@@ -1100,12 +1199,12 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
 
   } else {
     uploadThinGeometry(payload, pickingPass);
-    if (m_thinUploadVertexCount == 0 || m_thinVBBuffer == VK_NULL_HANDLE) {
+    if (m_thinUploadVertexCount == 0 || m_thinPosBuffer == VK_NULL_HANDLE) {
       return;
     }
 
     // Bind SoA buffers for thin line
-    std::array<vk::Buffer, 2> tbufs{m_thinVBBuffer, m_thinVBBuffer};
+    std::array<vk::Buffer, 2> tbufs{m_thinPosBuffer, m_thinColorBuffer};
     std::array<vk::DeviceSize, 2> toffs{m_thinPosOffset, m_thinColorOffset};
     cmd.bindVertexBuffers(0, tbufs, toffs);
     if (payload.isLineStrip && m_thinUploadIndexBuffer && m_thinUploadIndexCount > 0) {

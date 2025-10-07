@@ -20,10 +20,14 @@ layout(location = 8) out vec4 v_combo1; // bradius, tradius, height, inv_sqr_hei
 
 #include "include/matrices_material.glslinc"
 
+// Cap style specialization to mirror GL #defines
+layout(constant_id = 90) const int CAPS_MODE = 1; // 0=NO_CAPS, 1=FLAT_CAPS, 2=ROUND_CAPS, 3=FLAT_BASE_CAP_ROUND_TOP_CAP, 4=ROUND_BASE_CAP_FLAT_TOP_CAP
+
 void main()
 {
-  float bradius = attr_origin.w * 1.0; // size_scale is in transforms/pos already
-  float tradius = attr_axis.w * 1.0;
+  // Match GL: radii are scaled by global sizeScale (xf.parameters.x).
+  float bradius = attr_origin.w * xf.parameters.x;
+  float tradius = attr_axis.w * xf.parameters.x;
 
   v_color1 = attr_color1;
   v_color2 = attr_color2;
@@ -52,15 +56,25 @@ void main()
   v_U = normalize(view_normal_matrix * u);
   v_V = normalize(view_normal_matrix * v);
 
-  // Compute bounding box vertex
+  // Compute bounding box vertex (account for cap styles, as in GL)
   vec4 vertex = vec4(scaledOrigin, 1.0);
   float sRight   = (2.0 * rightFlag   - 1.0);
   float sForward = (2.0 * forwardFlag - 1.0);
 
   float rMix = mix(bradius, tradius, upFlag);
   vertex.xyz += upFlag * scaledAxis.xyz;
-  vertex.xyz += sRight   * rMix * u;
-  vertex.xyz += sForward * rMix * v;
+  if (CAPS_MODE == 0 || CAPS_MODE == 1) {
+    // NO_CAPS or FLAT_CAPS: linear radius interpolation in u/v plane
+    vertex.xyz += sRight   * rMix * u;
+    vertex.xyz += sForward * rMix * v;
+  } else {
+    // ROUND_CAPS variants: expand top cross-section and add axial offset for round cap
+    float adjustedTopRadius = tradius + tradius * (tradius - bradius) / max(height, 1e-12);
+    float rMixAdj = mix(bradius, adjustedTopRadius, upFlag);
+    vertex.xyz += sRight   * rMixAdj * u;
+    vertex.xyz += sForward * rMixAdj * v;
+    vertex.xyz += (2.0 * upFlag - 1.0) * mix(bradius, tradius, upFlag) * h;
+  }
 
   vec4 base4 = xf.view_matrix * vec4(scaledOrigin, 1.0);
   v_base = base4.xyz;

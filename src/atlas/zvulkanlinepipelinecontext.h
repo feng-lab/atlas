@@ -107,8 +107,9 @@ private:
 
   // All line geometry uses the per-frame upload arena; no per-context VBOs
 
-  // Upload arena-backed SoA for thin line (per-draw)
-  vk::Buffer m_thinVBBuffer{VK_NULL_HANDLE};
+  // Upload arena-backed SoA for thin line (per-draw, per-attribute buffers)
+  vk::Buffer m_thinPosBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_thinColorBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_thinPosOffset{0};
   vk::DeviceSize m_thinColorOffset{0};
   uint32_t m_thinUploadVertexCount{0};
@@ -116,8 +117,12 @@ private:
   vk::DeviceSize m_thinUploadIndexOffset{0};
   uint32_t m_thinUploadIndexCount{0};
 
-  // Upload arena-backed SoA for wide line (per-draw)
-  vk::Buffer m_wideVBBuffer{VK_NULL_HANDLE};
+  // Upload arena-backed SoA for wide line (per-draw, per-attribute buffers)
+  vk::Buffer m_wideP0Buffer{VK_NULL_HANDLE};
+  vk::Buffer m_wideP1Buffer{VK_NULL_HANDLE};
+  vk::Buffer m_wideC0Buffer{VK_NULL_HANDLE};
+  vk::Buffer m_wideC1Buffer{VK_NULL_HANDLE};
+  vk::Buffer m_wideFlagsBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_wideP0Offset{0};
   vk::DeviceSize m_wideP1Offset{0};
   vk::DeviceSize m_wideC0Offset{0};
@@ -134,8 +139,14 @@ private:
     Z3DLineRenderer* renderer = nullptr;
     bool picking = false;
     bool lineStrip = false;
-    auto tie() const { return std::tuple(renderer, picking, lineStrip); }
-    bool operator<(const ThinCacheKey& rhs) const { return tie() < rhs.tie(); }
+    auto tie() const
+    {
+      return std::tuple(renderer, picking, lineStrip);
+    }
+    bool operator<(const ThinCacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
   };
   struct ThinCacheEntry
   {
@@ -158,8 +169,14 @@ private:
   {
     Z3DLineRenderer* renderer = nullptr;
     bool picking = false;
-    auto tie() const { return std::tuple(renderer, picking); }
-    bool operator<(const WideCacheKey& rhs) const { return tie() < rhs.tie(); }
+    auto tie() const
+    {
+      return std::tuple(renderer, picking);
+    }
+    bool operator<(const WideCacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
   };
   struct WideCacheEntry
   {
@@ -189,9 +206,8 @@ private:
   void ensurePlaceholderTexture();
   void ensureDescriptorSets(Z3DRendererBase& renderer);
   void updateUBOs(Z3DRendererBase& renderer, const RenderBatch& batch);
-  PipelineInstance& ensurePipeline(const PipelineKey& key,
-                                   const LinePayload& payload,
-                                   const vulkan::AttachmentFormats& formats);
+  PipelineInstance&
+  ensurePipeline(const PipelineKey& key, const LinePayload& payload, const vulkan::AttachmentFormats& formats);
   void bindDescriptorSets(vk::raii::CommandBuffer& cmd,
                           const PipelineInstance& pipeline,
                           vk::DescriptorSet textureOverride = {}) const;

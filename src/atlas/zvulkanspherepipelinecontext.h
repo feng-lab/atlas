@@ -61,10 +61,7 @@ private:
 
     auto tie() const
     {
-      return std::tuple(dynamicMaterial,
-                        static_cast<int>(shaderHookType),
-                        colorFormats,
-                        depthFormat);
+      return std::tuple(dynamicMaterial, static_cast<int>(shaderHookType), colorFormats, depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const
@@ -103,10 +100,14 @@ private:
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
-  // Upload arena-backed SoA slices
-  vk::Buffer m_vbBuffer{VK_NULL_HANDLE};
+  // Upload arena-backed SoA slices (per-attribute buffers)
+  vk::Buffer m_centerRadiusBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_colorBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_specularBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_flagsBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_centerRadiusOffset{0};
   vk::DeviceSize m_colorOffset{0};
+  vk::DeviceSize m_specularOffset{0};
   vk::DeviceSize m_flagsOffset{0};
   vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_indexUploadOffset{0};
@@ -115,8 +116,7 @@ private:
   void resetDescriptors();
   void ensureDescriptorSets();
   void ensureOITResources();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,
-                          const glm::vec2& screenDimRcp);
+  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& screenDimRcp);
   void ensurePlaceholderTexture();
   void updateLightingUBO(Z3DRendererBase& renderer,
                          const RenderBatch& batch,
@@ -137,14 +137,21 @@ private:
     Z3DSphereRenderer* renderer = nullptr;
     bool picking = false;
     bool dynamicMaterial = true;
-    auto tie() const { return std::tuple(renderer, picking, dynamicMaterial); }
-    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+    auto tie() const
+    {
+      return std::tuple(renderer, picking, dynamicMaterial);
+    }
+    bool operator<(const CacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
   };
   struct CacheEntry
   {
     vk::Buffer vb = VK_NULL_HANDLE;
     vk::DeviceSize centerRadiusOffset = 0;
     vk::DeviceSize colorOffset = 0;
+    vk::DeviceSize specularOffset = 0;
     vk::DeviceSize flagsOffset = 0;
     vk::Buffer ib = VK_NULL_HANDLE;
     vk::DeviceSize ibOffset = 0;
@@ -152,6 +159,7 @@ private:
     uint32_t indexCount = 0;
     uint32_t centersGen = 0;
     uint32_t colorsGen = 0; // or picking
+    uint32_t specularGen = 0;
     uint32_t flagsGen = 0;
     uint32_t indexGen = 0;
     int unchangedFrames = 0;

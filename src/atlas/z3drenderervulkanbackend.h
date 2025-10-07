@@ -101,13 +101,19 @@ public:
     vk::Buffer buffer{VK_NULL_HANDLE};
     vk::DeviceSize offset = 0;
     void* mapped = nullptr; // points into the arena at [offset, offset+size)
-    size_t size = 0;        // requested bytes
+    size_t size = 0; // requested bytes
   };
 
   // Obtain a suballocation in the current frame's upload arena. Grows the
   // underlying buffer if necessary. Returns an empty slice when no active
   // frame is recording (e.g., zero-sized viewport).
   UploadSlice suballocateUpload(size_t bytes, size_t alignment = 16);
+
+  // Precisely reserve space in the per-frame upload arena for a sequence of
+  // slices, each given as {bytes, alignment}. When enabled via flag, this
+  // performs at most one growth before any suballocations to keep all slices
+  // within the same underlying buffer. No-op if not recording or disabled.
+  void reserveUploadSlices(std::initializer_list<std::pair<size_t, size_t>> slices);
 
   // Device-local static buffer arena (lifetime: backend)
   struct StaticSlice
@@ -124,10 +130,7 @@ public:
 
   // Record a copy from an upload slice into a device-local buffer at dst.
   // Inserts a barrier making the data visible to the appropriate pipeline stage.
-  void stageCopy(vk::Buffer dst,
-                 vk::DeviceSize dstOffset,
-                 const UploadSlice& src,
-                 bool isIndexBuffer);
+  void stageCopy(vk::Buffer dst, vk::DeviceSize dstOffset, const UploadSlice& src, bool isIndexBuffer);
 
   // Stage 2: Per-frame descriptor arena API
   // Allocate a descriptor set from the current frame's arena. Returns null when
@@ -151,7 +154,10 @@ public:
   bool validateFormatsOrSkip(const vulkan::AttachmentFormats& pipelineFormats, const char* contextTag = nullptr);
 
   // Recording state helpers and telemetry hooks
-  [[nodiscard]] bool isRecording() const { return m_frameRecording; }
+  [[nodiscard]] bool isRecording() const
+  {
+    return m_frameRecording;
+  }
   void notifyDescriptorWriteWhileRecording(bool rewriteAttempt)
   {
     if (m_activeFrame) {
@@ -167,13 +173,12 @@ public:
   // The provided onReady callback executes after the frame fence signals (on the
   // rendering thread) with a pointer to the mapped staging memory and metadata.
   // The callback must not retain the pointer beyond the callback's lifetime.
-  void requestEndOfFrameColorReadback(class ZVulkanTexture& src,
-                                      Z3DEye eye,
-                                      std::function<void(const void* mapped,
-                                                         size_t bytes,
-                                                         vk::Format format,
-                                                         glm::uvec2 size,
-                                                         std::function<void()> releaseSlot)> onReady);
+  void requestEndOfFrameColorReadback(
+    class ZVulkanTexture& src,
+    Z3DEye eye,
+    std::function<
+      void(const void* mapped, size_t bytes, vk::Format format, glm::uvec2 size, std::function<void()> releaseSlot)>
+      onReady);
 
 private:
   friend class Z3DRendererBase;
@@ -204,9 +209,9 @@ private:
 
     // Descriptor arena (per-frame)
     std::unique_ptr<ZVulkanDescriptorPool> descriptorPool; // reset only after fence signal
-    uint32_t descriptorSetsAllocated = 0;                  // VLOG(1) counter per frame
-    bool arenaResetScheduled = false;                      // scheduled at endRender()
-    uint32_t arenaResetsPerformed = 0;                     // count performed resets (debug)
+    uint32_t descriptorSetsAllocated = 0; // VLOG(1) counter per frame
+    bool arenaResetScheduled = false; // scheduled at endRender()
+    uint32_t arenaResetsPerformed = 0; // count performed resets (debug)
     // Fence-gated deferred actions (e.g., scratch slot releases)
     std::vector<std::function<void()>> deferredReleases;
     uint32_t leaseRecycleQueued = 0;
@@ -214,16 +219,16 @@ private:
 
     // Stage 3: instrumentation (per-frame)
     uint32_t renderingSegmentsBegan = 0; // number of vkCmdBeginRendering calls
-    uint32_t attachmentClears = 0;       // number of attachments begun with Clear loadOp
-    uint32_t attachmentLoads = 0;        // number of attachments begun with Load loadOp
+    uint32_t attachmentClears = 0; // number of attachments begun with Clear loadOp
+    uint32_t attachmentLoads = 0; // number of attachments begun with Load loadOp
 
     // Pipelines
-    uint32_t pipelinesCreated = 0;       // graphics pipelines created this frame
+    uint32_t pipelinesCreated = 0; // graphics pipelines created this frame
     std::unordered_set<uint64_t> pipelinesBound; // unique pipelines bound this frame
 
     // Per-draw override descriptor sets kept alive until fence
     std::vector<std::unique_ptr<ZVulkanDescriptorSet>> transientOverrideSets;
-    uint32_t overrideSetsAllocated = 0;   // count of per-draw override sets
+    uint32_t overrideSetsAllocated = 0; // count of per-draw override sets
 
     // Formats of currently open dynamic rendering segment
     std::optional<vulkan::AttachmentFormats> activeSegmentFormats;
@@ -231,8 +236,8 @@ private:
     uint32_t skippedBatchesFormatMismatch = 0;
 
     // Descriptor guardrails counters
-    uint32_t descriptorWritesWhileRecording = 0;   // attempted writes during recording
-    uint32_t boundSetRewriteAttempts = 0;          // attempted rewrites of persistent sets
+    uint32_t descriptorWritesWhileRecording = 0; // attempted writes during recording
+    uint32_t boundSetRewriteAttempts = 0; // attempted rewrites of persistent sets
 
     // Stage 4: end-of-frame readback bookkeeping
     struct PendingReadback
@@ -245,24 +250,29 @@ private:
       int slotIndex = -1;
       size_t bytes = 0;
       // Consumer callback (runs after fence signal)
-      std::function<void(const void* mapped, size_t bytes, vk::Format fmt, glm::uvec2 size, std::function<void()> releaseSlot)> onReady;
+      std::function<
+        void(const void* mapped, size_t bytes, vk::Format fmt, glm::uvec2 size, std::function<void()> releaseSlot)>
+        onReady;
     };
     std::vector<PendingReadback> pendingColorReadbacks;
-    size_t readbackBytesCopied = 0;      // total bytes copied this frame
-    uint32_t readbackSlotsInFlight = 0;  // slots associated with this frame
+    size_t readbackBytesCopied = 0; // total bytes copied this frame
+    uint32_t readbackSlotsInFlight = 0; // slots associated with this frame
 
     // Per-frame CPU→GPU upload arena for transient vertex/index data
     struct UploadArena
     {
       std::unique_ptr<class ZVulkanBuffer> buffer; // host-visible, host-coherent
-      void* mapped = nullptr;                      // persistent mapping
-      size_t capacity = 0;                         // bytes
-      size_t offset = 0;                           // current write cursor
-      size_t highWatermark = 0;                    // max used this frame (debug)
+      void* mapped = nullptr; // persistent mapping
+      size_t capacity = 0; // bytes
+      size_t offset = 0; // current write cursor
+      size_t highWatermark = 0; // max used this frame (debug)
+      // Keep previous buffers alive if we grow during the frame so earlier
+      // returned mapped pointers remain valid until the frame completes.
+      std::vector<std::unique_ptr<class ZVulkanBuffer>> retiredBuffers;
     } uploadArena;
 
     // Static device-local staging stats
-    size_t staticBytesStaged = 0;      // bytes staged to device-local this frame
+    size_t staticBytesStaged = 0; // bytes staged to device-local this frame
     uint32_t staticStreamRestaged = 0; // number of restaged streams
     // Per-stream-type bytes staged (debug)
     size_t linesBytesStaged = 0;
@@ -285,23 +295,31 @@ private:
 public:
   void addLineBytesStaged(size_t bytes)
   {
-    if (m_activeFrame) m_activeFrame->linesBytesStaged += bytes;
+    if (m_activeFrame) {
+      m_activeFrame->linesBytesStaged += bytes;
+    }
   }
   void addFontBytesStaged(size_t bytes)
   {
-    if (m_activeFrame) m_activeFrame->fontsBytesStaged += bytes;
+    if (m_activeFrame) {
+      m_activeFrame->fontsBytesStaged += bytes;
+    }
   }
   void addMeshBytesStaged(size_t bytes)
   {
-    if (m_activeFrame) m_activeFrame->meshesBytesStaged += bytes;
+    if (m_activeFrame) {
+      m_activeFrame->meshesBytesStaged += bytes;
+    }
   }
   void addSphereBytesStaged(size_t bytes)
   {
-    if (m_activeFrame) m_activeFrame->spheresBytesStaged += bytes;
+    if (m_activeFrame) {
+      m_activeFrame->spheresBytesStaged += bytes;
+    }
   }
 
   ZVulkanDevice* m_sharedDevice = nullptr; // non-owning; provided by engine/scratch-pool
-  ZVulkanDevice* m_frameDevice = nullptr;    // tracked to rebuild frame resources on device changes
+  ZVulkanDevice* m_frameDevice = nullptr; // tracked to rebuild frame resources on device changes
   std::vector<FrameResources> m_frames;
   std::unordered_map<void*, size_t> m_frameResourceMap;
   std::optional<ZVulkanFrameExecutor::ActiveFrame> m_activeFrameHandle;
@@ -342,11 +360,11 @@ public:
   {
     std::unique_ptr<class ZVulkanBuffer> vb; // device-local, eVertexBuffer|eTransferDst
     std::unique_ptr<class ZVulkanBuffer> ib; // device-local, eIndexBuffer|eTransferDst
-    size_t vbCapacity = 0;                   // bytes
-    size_t ibCapacity = 0;                   // bytes
-    size_t vbOffset = 0;                     // bump cursor
-    size_t ibOffset = 0;                     // bump cursor
-    size_t vbHighWatermark = 0;              // peak used for telemetry
+    size_t vbCapacity = 0; // bytes
+    size_t ibCapacity = 0; // bytes
+    size_t vbOffset = 0; // bump cursor
+    size_t ibOffset = 0; // bump cursor
+    size_t vbHighWatermark = 0; // peak used for telemetry
     size_t ibHighWatermark = 0;
   } m_staticArena;
 
@@ -365,9 +383,9 @@ public:
   struct ReadbackSlot
   {
     std::unique_ptr<class ZVulkanBuffer> buffer;
-    void* mapped = nullptr;  // persistent mapping
-    size_t capacity = 0;     // bytes
-    bool inUse = false;      // associated with an in-flight frame
+    void* mapped = nullptr; // persistent mapping
+    size_t capacity = 0; // bytes
+    bool inUse = false; // associated with an in-flight frame
     // Optional tag for debugging
     const char* tag = "color";
   };

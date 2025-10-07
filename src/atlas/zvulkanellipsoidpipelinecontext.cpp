@@ -53,7 +53,13 @@ void ZVulkanEllipsoidPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
-  m_vbBuffer = VK_NULL_HANDLE;
+  m_axis1Buffer = VK_NULL_HANDLE;
+  m_axis2Buffer = VK_NULL_HANDLE;
+  m_axis3Buffer = VK_NULL_HANDLE;
+  m_centerBuffer = VK_NULL_HANDLE;
+  m_colorBuffer = VK_NULL_HANDLE;
+  m_flagsBuffer = VK_NULL_HANDLE;
+  m_specularBuffer = VK_NULL_HANDLE;
   m_axis1Offset = 0;
   m_axis2Offset = 0;
   m_axis3Offset = 0;
@@ -149,10 +155,12 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  // Bind SoA streams (same buffer, different offsets)
+  // Bind SoA streams (per-attribute buffers)
   {
-    std::array<vk::Buffer, 7> bufs{m_vbBuffer, m_vbBuffer, m_vbBuffer, m_vbBuffer, m_vbBuffer, m_vbBuffer, m_vbBuffer};
-    std::array<vk::DeviceSize, 7> offs{m_axis1Offset, m_axis2Offset, m_axis3Offset, m_centerOffset, m_colorOffset, m_flagsOffset, m_specularOffset};
+    std::array<vk::Buffer, 7>
+      bufs{m_axis1Buffer, m_axis2Buffer, m_axis3Buffer, m_centerBuffer, m_colorBuffer, m_flagsBuffer, m_specularBuffer};
+    std::array<vk::DeviceSize, 7>
+      offs{m_axis1Offset, m_axis2Offset, m_axis3Offset, m_centerOffset, m_colorOffset, m_flagsOffset, m_specularOffset};
     cmd.bindVertexBuffers(0, bufs, offs);
   }
   if (m_indexCount > 0 && m_indexUploadBuffer) {
@@ -162,14 +170,22 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
     << "Ellipsoid pipeline placeholder descriptor set not initialised";
   if ((dsPlaceholderOverride || m_dsPlaceholder) && m_dsLighting && m_dsTransforms) {
-    const vk::DescriptorSet ds0 = dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet()
-                                                        : m_dsPlaceholder->descriptorSet();
+    const vk::DescriptorSet ds0 =
+      dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : m_dsPlaceholder->descriptorSet();
     std::array<vk::DescriptorSet, 3> sets{ds0, m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetInputs,
+                           sets,
+                           {});
   }
   if (m_dsOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetOITParams,
+                           sets3,
+                           {});
   }
 
   cmd.setViewport(0, viewport);
@@ -259,10 +275,18 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
 {
   ensureDescriptorLayouts();
 
-  if (!m_dsPlaceholder) m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(**m_setPlaceholder);
-  if (!m_dsLighting) m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
-  if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
-  if (!m_dsOIT && m_setOIT) m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  if (!m_dsPlaceholder) {
+    m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(**m_setPlaceholder);
+  }
+  if (!m_dsLighting) {
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+  }
+  if (!m_dsTransforms) {
+    m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+  }
+  if (!m_dsOIT && m_setOIT) {
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  }
 
   ensurePlaceholderTexture();
   if (m_dsPlaceholder) {
@@ -662,6 +686,16 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
   const size_t colorBytes = m_vertexCount * sizeof(glm::vec4);
   const size_t flagsBytes = m_vertexCount * sizeof(float);
   const size_t specBytes = m_vertexCount * sizeof(glm::vec4);
+  m_backend.reserveUploadSlices({
+    {axisBytes,                       alignof(glm::vec4)},
+    {axisBytes,                       alignof(glm::vec4)},
+    {axisBytes,                       alignof(glm::vec4)},
+    {centerBytes,                     alignof(glm::vec4)},
+    {colorBytes,                      alignof(glm::vec4)},
+    {flagsBytes,                      alignof(float)    },
+    {specBytes,                       alignof(glm::vec4)},
+    {m_indexCount * sizeof(uint32_t), alignof(uint32_t) }
+  });
 
   auto axis1Slice = m_backend.suballocateUpload(axisBytes, alignof(glm::vec4));
   auto axis2Slice = m_backend.suballocateUpload(axisBytes, alignof(glm::vec4));
@@ -733,7 +767,13 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
     m_indexUploadOffset = 0;
   }
   // Save SoA buffer + offsets
-  m_vbBuffer = axis1Slice.buffer; // all slices come from the same arena buffer
+  m_axis1Buffer = axis1Slice.buffer;
+  m_axis2Buffer = axis2Slice.buffer;
+  m_axis3Buffer = axis3Slice.buffer;
+  m_centerBuffer = centerSlice.buffer;
+  m_colorBuffer = colorSlice.buffer;
+  m_flagsBuffer = flagsSlice.buffer;
+  m_specularBuffer = specSlice.buffer;
   m_axis1Offset = axis1Slice.offset;
   m_axis2Offset = axis2Slice.offset;
   m_axis3Offset = axis3Slice.offset;
@@ -773,7 +813,13 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
 
       if (entry.promoted && sizeSame) {
         // Bind static
-        m_vbBuffer = entry.vb;
+        m_axis1Buffer = entry.vb;
+        m_axis2Buffer = entry.vb;
+        m_axis3Buffer = entry.vb;
+        m_centerBuffer = entry.vb;
+        m_colorBuffer = entry.vb;
+        m_flagsBuffer = entry.vb;
+        m_specularBuffer = entry.vb;
         m_axis1Offset = entry.axis1Offset;
         m_axis2Offset = entry.axis2Offset;
         m_axis3Offset = entry.axis3Offset;
@@ -801,8 +847,8 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
         if (m_indexCount > 0) {
           ibDst = m_backend.allocateStaticIB(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
         }
-        if (axis1Dst.buffer && axis2Dst.buffer && axis3Dst.buffer && centerDst.buffer && colorDst.buffer && flagsDst.buffer &&
-            specDst.buffer && (m_indexCount == 0 || ibDst.buffer)) {
+        if (axis1Dst.buffer && axis2Dst.buffer && axis3Dst.buffer && centerDst.buffer && colorDst.buffer &&
+            flagsDst.buffer && specDst.buffer && (m_indexCount == 0 || ibDst.buffer)) {
           // Record per-stream copies
           m_backend.stageCopy(axis1Dst.buffer, axis1Dst.offset, axis1Slice, false);
           m_backend.stageCopy(axis2Dst.buffer, axis2Dst.offset, axis2Slice, false);
@@ -812,8 +858,10 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
           m_backend.stageCopy(flagsDst.buffer, flagsDst.offset, flagsSlice, false);
           m_backend.stageCopy(specDst.buffer, specDst.offset, specSlice, false);
           if (m_indexCount > 0) {
-            Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr,
-                                                         m_indexCount * sizeof(uint32_t)};
+            Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer,
+                                                          m_indexUploadOffset,
+                                                          nullptr,
+                                                          m_indexCount * sizeof(uint32_t)};
             m_backend.stageCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
           }
           VLOG(1) << fmt::format(
@@ -838,7 +886,13 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
           entry.ibOffset = ibDst.offset;
           entry.promoted = true;
           // Bind static for this draw
-          m_vbBuffer = entry.vb;
+          m_axis1Buffer = entry.vb;
+          m_axis2Buffer = entry.vb;
+          m_axis3Buffer = entry.vb;
+          m_centerBuffer = entry.vb;
+          m_colorBuffer = entry.vb;
+          m_flagsBuffer = entry.vb;
+          m_specularBuffer = entry.vb;
           m_axis1Offset = entry.axis1Offset;
           m_axis2Offset = entry.axis2Offset;
           m_axis3Offset = entry.axis3Offset;
@@ -859,22 +913,54 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
 vk::PipelineVertexInputStateCreateInfo ZVulkanEllipsoidPipelineContext::makeVertexInputState() const
 {
   static std::array<vk::VertexInputBindingDescription, 7> bindings{
-    vk::VertexInputBindingDescription{.binding = 0, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // axis1
-    vk::VertexInputBindingDescription{.binding = 1, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // axis2
-    vk::VertexInputBindingDescription{.binding = 2, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // axis3
-    vk::VertexInputBindingDescription{.binding = 3, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // center
-    vk::VertexInputBindingDescription{.binding = 4, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // color
-    vk::VertexInputBindingDescription{.binding = 5, .stride = static_cast<uint32_t>(sizeof(float)),     .inputRate = vk::VertexInputRate::eVertex}, // flags
-    vk::VertexInputBindingDescription{.binding = 6, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}  // specular
+    vk::VertexInputBindingDescription{.binding = 0,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // axis1
+    vk::VertexInputBindingDescription{.binding = 1,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // axis2
+    vk::VertexInputBindingDescription{.binding = 2,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // axis3
+    vk::VertexInputBindingDescription{.binding = 3,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // center
+    vk::VertexInputBindingDescription{.binding = 4,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // color
+    vk::VertexInputBindingDescription{.binding = 5,
+                                      .stride = static_cast<uint32_t>(sizeof(float)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // flags
+    vk::VertexInputBindingDescription{.binding = 6,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}  // specular
   };
   static std::array<vk::VertexInputAttributeDescription, 7> attrs{
-    vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 1, .binding = 1, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 2, .binding = 2, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 3, .binding = 3, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 4, .binding = 4, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 5, .binding = 5, .format = vk::Format::eR32Sfloat,            .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 6, .binding = 6, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0}
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 1,
+                                        .binding = 1,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 2,
+                                        .binding = 2,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 3,
+                                        .binding = 3,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 4,
+                                        .binding = 4,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 5, .binding = 5, .format = vk::Format::eR32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 6,
+                                        .binding = 6,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               }
   };
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());

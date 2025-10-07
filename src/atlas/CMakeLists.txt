@@ -161,6 +161,7 @@ set(ATLAS_VK_SHADER_SOURCES
 
     # Cone
     cone.vert
+    cone_2.vert
     cone.frag
 
     # Compositors and copy

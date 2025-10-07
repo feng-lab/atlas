@@ -108,8 +108,14 @@ private:
     Z3DMeshRenderer* renderer = nullptr;
     MeshPayload::ColorSource colorSource = MeshPayload::ColorSource::MeshColor;
     bool picking = false;
-    auto tie() const { return std::tuple(renderer, static_cast<int>(colorSource), picking); }
-    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+    auto tie() const
+    {
+      return std::tuple(renderer, static_cast<int>(colorSource), picking);
+    }
+    bool operator<(const CacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
   };
   struct CacheEntry
   {
@@ -166,8 +172,11 @@ private:
   // No GL texture bridging: Vulkan mesh pipeline uses placeholders or
   // backend-native textures only.
 
-  // SoA upload arena-backed streams (per-frame concatenated arrays)
-  vk::Buffer m_soaBuffer{VK_NULL_HANDLE};
+  // SoA upload arena-backed streams (per-attribute buffers)
+  vk::Buffer m_posBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_normBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_colorBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_texBuffer{VK_NULL_HANDLE}; // 1D/2D/3D depending on colorSource
   vk::DeviceSize m_posOffset{0};
   vk::DeviceSize m_normOffset{0};
   vk::DeviceSize m_colorOffset{0};
@@ -186,12 +195,9 @@ private:
   void ensurePlaceholderTextures();
   void ensureDescriptorSets();
   void ensureOITResources();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,
-                          const glm::vec2& fallbackScreenDimRcp);
-  void updateLightingUBO(Z3DRendererBase& renderer,
-                         const RenderBatch& batch,
-                         const MeshPayload& payload,
-                         bool pickingPass);
+  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& fallbackScreenDimRcp);
+  void
+  updateLightingUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const MeshPayload& payload, bool pickingPass);
   void updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch);
   void updateMaterialUBO(Z3DRendererBase& renderer,
                          const MeshPayload& payload,

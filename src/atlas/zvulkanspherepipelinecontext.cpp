@@ -63,7 +63,10 @@ void ZVulkanSpherePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
-  m_vbBuffer = VK_NULL_HANDLE;
+  m_centerRadiusBuffer = VK_NULL_HANDLE;
+  m_colorBuffer = VK_NULL_HANDLE;
+  m_specularBuffer = VK_NULL_HANDLE;
+  m_flagsBuffer = VK_NULL_HANDLE;
   m_centerRadiusOffset = 0;
   m_colorOffset = 0;
   m_flagsOffset = 0;
@@ -168,10 +171,10 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-    // Bind SoA buffers: centerRadius, color, flags
-    std::array<vk::Buffer, 3> bufs{m_vbBuffer, m_vbBuffer, m_vbBuffer};
-    std::array<vk::DeviceSize, 3> offs{m_centerRadiusOffset, m_colorOffset, m_flagsOffset};
-    cmd.bindVertexBuffers(0, bufs, offs);
+  // Bind SoA buffers: centerRadius, color, flags, specular/shininess (per-attribute buffers)
+  std::array<vk::Buffer, 4> bufs{m_centerRadiusBuffer, m_colorBuffer, m_flagsBuffer, m_specularBuffer};
+  std::array<vk::DeviceSize, 4> offs{m_centerRadiusOffset, m_colorOffset, m_flagsOffset, m_specularOffset};
+  cmd.bindVertexBuffers(0, bufs, offs);
   if (m_indexCount > 0 && m_indexUploadBuffer) {
     cmd.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
   }
@@ -179,14 +182,22 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
   CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
     << "Sphere pipeline placeholder descriptor set not initialised";
   if ((dsPlaceholderOverride || m_dsPlaceholder) && m_dsLighting && m_dsTransforms) {
-    const vk::DescriptorSet ds0 = dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet()
-                                                        : m_dsPlaceholder->descriptorSet();
+    const vk::DescriptorSet ds0 =
+      dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : m_dsPlaceholder->descriptorSet();
     std::array<vk::DescriptorSet, 3> sets{ds0, m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetInputs,
+                           sets,
+                           {});
   }
   if (m_dsOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetOITParams,
+                           sets3,
+                           {});
   }
 
   cmd.setViewport(0, viewport);
@@ -285,10 +296,18 @@ void ZVulkanSpherePipelineContext::ensureDescriptorSets()
 {
   ensureDescriptorLayouts();
 
-  if (!m_dsPlaceholder) m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(**m_setPlaceholder);
-  if (!m_dsLighting) m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
-  if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
-  if (!m_dsOIT && m_setOIT) m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  if (!m_dsPlaceholder) {
+    m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(**m_setPlaceholder);
+  }
+  if (!m_dsLighting) {
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+  }
+  if (!m_dsTransforms) {
+    m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+  }
+  if (!m_dsOIT && m_setOIT) {
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  }
 
   ensurePlaceholderTexture();
   if (m_dsPlaceholder) {
@@ -520,6 +539,20 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
                                                     shaderBase + selectFragmentShader(key.shaderHookType),
                                                     std::nullopt);
 
+  // Dynamic material specialization (match GL's DYNAMIC_MATERIAL_PROPERTY)
+  {
+    const uint32_t useDynamic = key.dynamicMaterial ? 1u : 0u;
+    std::array<vk::SpecializationMapEntry, 1> entries{
+      vk::SpecializationMapEntry{.constantID = 60, .offset = 0, .size = sizeof(uint32_t)}
+    };
+    std::array<uint32_t, 1> data{useDynamic};
+    auto entriesVec = std::vector<vk::SpecializationMapEntry>(entries.begin(), entries.end());
+    auto dataVec = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(data.data()),
+                                        reinterpret_cast<const uint8_t*>(data.data()) + sizeof(data));
+    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eVertex, entriesVec, dataVec);
+    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment, entriesVec, dataVec);
+  }
+
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
   std::vector<vk::DescriptorSetLayout> layouts{**m_setPlaceholder, **m_setLighting, **m_setTransforms, **m_setOIT};
@@ -603,15 +636,34 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanSpherePipelineContext::makeVertexInputState() const
 {
-  static std::array<vk::VertexInputBindingDescription, 3> bindings{
-    vk::VertexInputBindingDescription{.binding = 0, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // centerRadius
-    vk::VertexInputBindingDescription{.binding = 1, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // color
-    vk::VertexInputBindingDescription{.binding = 2, .stride = static_cast<uint32_t>(sizeof(float)),     .inputRate = vk::VertexInputRate::eVertex}  // flags
+  static std::array<vk::VertexInputBindingDescription, 4> bindings{
+    vk::VertexInputBindingDescription{.binding = 0,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // centerRadius
+    vk::VertexInputBindingDescription{.binding = 1,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // color
+    vk::VertexInputBindingDescription{.binding = 2,
+                                      .stride = static_cast<uint32_t>(sizeof(float)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // flags
+    vk::VertexInputBindingDescription{.binding = 3,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}  // specular/shininess
   };
-  static std::array<vk::VertexInputAttributeDescription, 3> attrs{
-    vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 1, .binding = 1, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 2, .binding = 2, .format = vk::Format::eR32Sfloat,            .offset = 0}
+  static std::array<vk::VertexInputAttributeDescription, 4> attrs{
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 1,
+                                        .binding = 1,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 2, .binding = 2, .format = vk::Format::eR32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 3,
+                                        .binding = 3,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               }
   };
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
@@ -639,12 +691,22 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
 
   const size_t crBytes = m_vertexCount * sizeof(glm::vec4);
   const size_t colBytes = m_vertexCount * sizeof(glm::vec4);
+  const size_t spBytes = m_vertexCount * sizeof(glm::vec4);
   const size_t flBytes = m_vertexCount * sizeof(float);
+  m_backend.reserveUploadSlices({
+    {crBytes,                         alignof(glm::vec4)},
+    {colBytes,                        alignof(glm::vec4)},
+    {spBytes,                         alignof(glm::vec4)},
+    {flBytes,                         alignof(float)    },
+    {m_indexCount * sizeof(uint32_t), alignof(uint32_t) }
+  });
 
   auto crSlice = m_backend.suballocateUpload(crBytes, alignof(glm::vec4));
   auto colSlice = m_backend.suballocateUpload(colBytes, alignof(glm::vec4));
+  auto spSlice = m_backend.suballocateUpload(spBytes, alignof(glm::vec4));
   auto flSlice = m_backend.suballocateUpload(flBytes, alignof(float));
-  if (!crSlice.buffer || !crSlice.mapped || !colSlice.buffer || !colSlice.mapped || !flSlice.buffer || !flSlice.mapped) {
+  if (!crSlice.buffer || !crSlice.mapped || !colSlice.buffer || !colSlice.mapped || !spSlice.buffer ||
+      !spSlice.mapped || !flSlice.buffer || !flSlice.mapped) {
     m_vertexCount = 0;
     m_indexCount = 0;
     return;
@@ -659,6 +721,17 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
     auto* cOut = static_cast<glm::vec4*>(colSlice.mapped);
     for (size_t i = 0; i < m_vertexCount; ++i) {
       cOut[i] = (i < payload.colors.size()) ? payload.colors[i] : glm::vec4(1.0f);
+    }
+  }
+  // Specular/shininess: per-vertex when using dynamic material; otherwise zeros
+  {
+    auto* spOut = static_cast<glm::vec4*>(spSlice.mapped);
+    if (!payload.pickingPass && payload.useDynamicMaterial) {
+      for (size_t i = 0; i < m_vertexCount; ++i) {
+        spOut[i] = (i < payload.specularAndShininess.size()) ? payload.specularAndShininess[i] : glm::vec4(0.0f);
+      }
+    } else {
+      std::memset(spOut, 0, spBytes);
     }
   }
   auto* fOut = static_cast<float*>(flSlice.mapped);
@@ -679,9 +752,13 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
     m_indexUploadBuffer = VK_NULL_HANDLE;
     m_indexUploadOffset = 0;
   }
-  m_vbBuffer = crSlice.buffer;
+  m_centerRadiusBuffer = crSlice.buffer;
+  m_colorBuffer = colSlice.buffer;
+  m_specularBuffer = spSlice.buffer;
+  m_flagsBuffer = flSlice.buffer;
   m_centerRadiusOffset = crSlice.offset;
   m_colorOffset = colSlice.offset;
+  m_specularOffset = spSlice.offset;
   m_flagsOffset = flSlice.offset;
 
   // Attempt static promotion
@@ -697,23 +774,56 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
       entry.flagsGen = payload.flagsGen;
       entry.indexGen = payload.indexGen;
       entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+      entry.specularGen = payload.specularGen;
       m_staticCache.emplace(key, entry);
     } else {
       CacheEntry& entry = it->second;
       const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
       const bool gensSame = entry.centersGen == payload.centersGen && entry.flagsGen == payload.flagsGen &&
                             entry.indexGen == payload.indexGen &&
-                            entry.colorsGen == (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen);
+                            entry.colorsGen == (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen) &&
+                            entry.specularGen == payload.specularGen;
       entry.unchangedFrames = (sizeSame && gensSame) ? (entry.unchangedFrames + 1) : 0;
 
       if (entry.promoted && sizeSame) {
         size_t restaged = 0;
-        if (entry.centersGen != payload.centersGen) { m_backend.stageCopy(entry.vb, entry.centerRadiusOffset, crSlice, false); entry.centersGen = payload.centersGen; restaged += crBytes; }
-        if (entry.colorsGen != (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen)) { m_backend.stageCopy(entry.vb, entry.colorOffset, colSlice, false); entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen; restaged += colBytes; }
-        if (entry.flagsGen != payload.flagsGen) { m_backend.stageCopy(entry.vb, entry.flagsOffset, flSlice, false); entry.flagsGen = payload.flagsGen; restaged += flBytes; }
-        if (entry.indexGen != payload.indexGen && m_indexUploadBuffer && m_indexCount > 0) { Z3DRendererVulkanBackend::UploadSlice idx{m_indexUploadBuffer, m_indexUploadOffset, nullptr, m_indexCount * sizeof(uint32_t)}; m_backend.stageCopy(entry.ib, entry.ibOffset, idx, true); entry.indexGen = payload.indexGen; restaged += m_indexCount * sizeof(uint32_t); }
-        if (restaged > 0) m_backend.addSphereBytesStaged(restaged);
-        m_vbBuffer = entry.vb;
+        if (entry.centersGen != payload.centersGen) {
+          m_backend.stageCopy(entry.vb, entry.centerRadiusOffset, crSlice, false);
+          entry.centersGen = payload.centersGen;
+          restaged += crBytes;
+        }
+        if (entry.colorsGen != (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen)) {
+          m_backend.stageCopy(entry.vb, entry.colorOffset, colSlice, false);
+          entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+          restaged += colBytes;
+        }
+        if (entry.specularGen != payload.specularGen) {
+          m_backend.stageCopy(entry.vb, entry.specularOffset, spSlice, false);
+          entry.specularGen = payload.specularGen;
+          restaged += spBytes;
+        }
+        if (entry.flagsGen != payload.flagsGen) {
+          m_backend.stageCopy(entry.vb, entry.flagsOffset, flSlice, false);
+          entry.flagsGen = payload.flagsGen;
+          restaged += flBytes;
+        }
+        if (entry.indexGen != payload.indexGen && m_indexUploadBuffer && m_indexCount > 0) {
+          Z3DRendererVulkanBackend::UploadSlice idx{m_indexUploadBuffer,
+                                                    m_indexUploadOffset,
+                                                    nullptr,
+                                                    m_indexCount * sizeof(uint32_t)};
+          m_backend.stageCopy(entry.ib, entry.ibOffset, idx, true);
+          entry.indexGen = payload.indexGen;
+          restaged += m_indexCount * sizeof(uint32_t);
+        }
+        if (restaged > 0) {
+          m_backend.addSphereBytesStaged(restaged);
+        }
+        // All attributes reside in the same static buffer
+        m_centerRadiusBuffer = entry.vb;
+        m_colorBuffer = entry.vb;
+        m_specularBuffer = entry.vb;
+        m_flagsBuffer = entry.vb;
         m_centerRadiusOffset = entry.centerRadiusOffset;
         m_colorOffset = entry.colorOffset;
         m_flagsOffset = entry.flagsOffset;
@@ -728,20 +838,36 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
         auto crDst = m_backend.allocateStaticVB(crBytes, alignof(glm::vec4));
         auto colDst = m_backend.allocateStaticVB(colBytes, alignof(glm::vec4));
         auto flDst = m_backend.allocateStaticVB(flBytes, alignof(float));
+        auto spDst = m_backend.allocateStaticVB(spBytes, alignof(glm::vec4));
         Z3DRendererVulkanBackend::StaticSlice ibDst{};
         if (m_indexCount > 0) {
           ibDst = m_backend.allocateStaticIB(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
         }
-        if (crDst.buffer && colDst.buffer && flDst.buffer && (m_indexCount == 0 || ibDst.buffer)) {
+        if (crDst.buffer && colDst.buffer && flDst.buffer && spDst.buffer && (m_indexCount == 0 || ibDst.buffer)) {
           size_t staged = 0;
-          m_backend.stageCopy(crDst.buffer, crDst.offset, crSlice, false); staged += crBytes;
-          m_backend.stageCopy(colDst.buffer, colDst.offset, colSlice, false); staged += colBytes;
-          m_backend.stageCopy(flDst.buffer, flDst.offset, flSlice, false); staged += flBytes;
-          if (m_indexCount > 0) { Z3DRendererVulkanBackend::UploadSlice idx{m_indexUploadBuffer, m_indexUploadOffset, nullptr, m_indexCount * sizeof(uint32_t)}; m_backend.stageCopy(ibDst.buffer, ibDst.offset, idx, true); staged += m_indexCount * sizeof(uint32_t); }
-          if (staged > 0) m_backend.addSphereBytesStaged(staged);
+          m_backend.stageCopy(crDst.buffer, crDst.offset, crSlice, false);
+          staged += crBytes;
+          m_backend.stageCopy(colDst.buffer, colDst.offset, colSlice, false);
+          staged += colBytes;
+          m_backend.stageCopy(spDst.buffer, spDst.offset, spSlice, false);
+          staged += spBytes;
+          m_backend.stageCopy(flDst.buffer, flDst.offset, flSlice, false);
+          staged += flBytes;
+          if (m_indexCount > 0) {
+            Z3DRendererVulkanBackend::UploadSlice idx{m_indexUploadBuffer,
+                                                      m_indexUploadOffset,
+                                                      nullptr,
+                                                      m_indexCount * sizeof(uint32_t)};
+            m_backend.stageCopy(ibDst.buffer, ibDst.offset, idx, true);
+            staged += m_indexCount * sizeof(uint32_t);
+          }
+          if (staged > 0) {
+            m_backend.addSphereBytesStaged(staged);
+          }
           entry.vb = crDst.buffer;
           entry.centerRadiusOffset = crDst.offset;
           entry.colorOffset = colDst.offset;
+          entry.specularOffset = spDst.offset;
           entry.flagsOffset = flDst.offset;
           entry.ib = ibDst.buffer;
           entry.ibOffset = ibDst.offset;
@@ -749,10 +875,15 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
           entry.flagsGen = payload.flagsGen;
           entry.indexGen = payload.indexGen;
           entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+          entry.specularGen = payload.specularGen;
           entry.promoted = true;
-          m_vbBuffer = entry.vb;
+          m_centerRadiusBuffer = entry.vb;
+          m_colorBuffer = entry.vb;
+          m_specularBuffer = entry.vb;
+          m_flagsBuffer = entry.vb;
           m_centerRadiusOffset = entry.centerRadiusOffset;
           m_colorOffset = entry.colorOffset;
+          m_specularOffset = entry.specularOffset;
           m_flagsOffset = entry.flagsOffset;
           if (entry.indexCount > 0 && entry.ib) {
             m_indexUploadBuffer = entry.ib;

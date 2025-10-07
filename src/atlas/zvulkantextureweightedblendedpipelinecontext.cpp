@@ -89,8 +89,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   // Composite resolve invariant: single color attachment, no depth
   CHECK(formats.colorFormats.size() == 1 && !formats.depthFormat.has_value())
     << "WB resolve invariant violated: expected 1 color, no depth";
-  CHECK(m_backend.validateFormatsOrSkip(formats, "WB_resolve"))
-    << "WB resolve formats mismatched with current segment";
+  CHECK(m_backend.validateFormatsOrSkip(formats, "WB_resolve")) << "WB resolve formats mismatched with current segment";
 
   PipelineKey key;
   key.colorFormats = formats.colorFormats;
@@ -105,13 +104,21 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
 
   {
     std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           instance.pipeline->pipelineLayout(),
+                           vkbind::kSetInputs,
+                           sets,
+                           {});
   }
 
   // Ensure and bind OIT params (set = 3). Descriptor is set at allocation time.
   if (m_descriptorSetOIT && m_uboOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           instance.pipeline->pipelineLayout(),
+                           vkbind::kSetOITParams,
+                           sets3,
+                           {});
   }
 
   cmd.setViewport(0, viewport);

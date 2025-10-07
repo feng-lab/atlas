@@ -21,7 +21,6 @@ class ZVulkanFrameExecutor
   struct Frame;
 
 public:
-
   class ActiveFrame
   {
   public:
@@ -72,8 +71,7 @@ public:
   void markSubmitted(ActiveFrame& frame);
   void waitForCompletion(ActiveFrame& frame);
 
-  void executeImmediate(const std::function<void(vk::raii::CommandBuffer&)>& record,
-                        std::string_view debugLabel = {});
+  void executeImmediate(const std::function<void(vk::raii::CommandBuffer&)>& record, std::string_view debugLabel = {});
 
   void trim();
 

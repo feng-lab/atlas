@@ -153,7 +153,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureCopyPipelineContext::makeVe
     vk::VertexInputAttributeDescription{.location = 1,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(QuadVertex, uv))}
+                                        .offset = static_cast<uint32_t>(offsetof(QuadVertex, uv))      }
   };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
@@ -169,9 +169,9 @@ void ZVulkanTextureCopyPipelineContext::ensureVertexCapacity(size_t vertexCount)
   const size_t required = vertexCount * sizeof(QuadVertex);
   if (!m_vertexBuffer || m_vertexCapacity < required) {
     m_vertexBuffer = m_backend.device().createBuffer(required,
-                                                    vk::BufferUsageFlagBits::eVertexBuffer,
-                                                    vk::MemoryPropertyFlagBits::eHostVisible |
-                                                      vk::MemoryPropertyFlagBits::eHostCoherent);
+                                                     vk::BufferUsageFlagBits::eVertexBuffer,
+                                                     vk::MemoryPropertyFlagBits::eHostVisible |
+                                                       vk::MemoryPropertyFlagBits::eHostCoherent);
     m_vertexCapacity = required;
   }
 }
@@ -183,9 +183,9 @@ void ZVulkanTextureCopyPipelineContext::uploadGeometry()
   }
   QuadVertex verts[4] = {
     {glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
-    {glm::vec3(1.0f, -1.0f, 0.0f), glm::vec2(1.0f, 0.0f)},
-    {glm::vec3(-1.0f, 1.0f, 0.0f), glm::vec2(0.0f, 1.0f)},
-    {glm::vec3(1.0f, 1.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+    {glm::vec3(1.0f,  -1.0f, 0.0f), glm::vec2(1.0f, 0.0f)},
+    {glm::vec3(-1.0f, 1.0f,  0.0f), glm::vec2(0.0f, 1.0f)},
+    {glm::vec3(1.0f,  1.0f,  0.0f), glm::vec2(1.0f, 1.0f)},
   };
   m_vertexBuffer->copyData(verts, sizeof(verts));
 }

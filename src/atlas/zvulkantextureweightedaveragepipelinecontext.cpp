@@ -94,8 +94,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   // Composite resolve invariant: single color attachment, no depth
   CHECK(formats.colorFormats.size() == 1 && !formats.depthFormat.has_value())
     << "WA resolve invariant violated: expected 1 color, no depth";
-  CHECK(m_backend.validateFormatsOrSkip(formats, "WA_resolve"))
-    << "WA resolve formats mismatched with current segment";
+  CHECK(m_backend.validateFormatsOrSkip(formats, "WA_resolve")) << "WA resolve formats mismatched with current segment";
 
   PipelineKey key;
   key.colorFormats = formats.colorFormats;
@@ -110,7 +109,11 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
 
   {
     std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           instance.pipeline->pipelineLayout(),
+                           vkbind::kSetInputs,
+                           sets,
+                           {});
   }
 
   cmd.setViewport(0, viewport);
@@ -144,7 +147,11 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
   if (m_descriptorSetOIT && m_uboOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           instance.pipeline->pipelineLayout(),
+                           vkbind::kSetOITParams,
+                           sets3,
+                           {});
   }
 
   cmd.pushConstants<WeightedAveragePushConstants>(instance.pipeline->pipelineLayout(),

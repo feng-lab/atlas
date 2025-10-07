@@ -231,7 +231,11 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
   cmd.bindVertexBuffers(0, {quad.buffer()}, offsets);
   {
     std::array<vk::DescriptorSet, 1> sets{glowDS->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, glowPipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           glowPipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetInputs,
+                           sets,
+                           {});
   }
 
   cmd.setViewport(0, viewport);
@@ -551,7 +555,11 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
   cmd.bindVertexBuffers(0, {quad.buffer()}, offsets);
   {
     std::array<vk::DescriptorSet, 1> sets{blurDS->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetInputs,
+                           sets,
+                           {});
   }
 
   vk::Viewport localViewport;

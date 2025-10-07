@@ -70,14 +70,12 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
-
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
-
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;

@@ -75,7 +75,7 @@ private:
 
   std::optional<vk::raii::DescriptorSetLayout> m_setLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // for set 1/2 alignment
-  std::optional<vk::raii::DescriptorSetLayout> m_setOIT;         // set = 3
+  std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT; // set = 3
@@ -90,8 +90,7 @@ private:
   void ensureDescriptorSet();
   void resetDescriptors();
   void ensureOITResources();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,
-                          const glm::vec2& fallbackScreenDimRcp);
+  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& fallbackScreenDimRcp);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
   void ensureVertexCapacity(size_t vertexCount);
   void uploadGeometry();

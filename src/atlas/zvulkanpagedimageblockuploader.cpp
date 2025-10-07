@@ -64,16 +64,16 @@ std::unique_ptr<ZVulkanTexture> createUint3DTexture(ZVulkanDevice& device, glm::
     return nullptr;
   }
 
-  auto info = ZVulkanTexture::CreateInfo::make3D(size.x,
-                                                 size.y,
-                                                 size.z,
-                                                 vk::Format::eR32G32B32A32Uint,
-                                                 vk::ImageUsageFlagBits::eSampled |
-                                                   vk::ImageUsageFlagBits::eTransferDst,
-                                                 vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                 1u,
-                                                 false,
-                                                 vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto info =
+    ZVulkanTexture::CreateInfo::make3D(size.x,
+                                       size.y,
+                                       size.z,
+                                       vk::Format::eR32G32B32A32Uint,
+                                       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                       vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                       1u,
+                                       false,
+                                       vk::ImageLayout::eShaderReadOnlyOptimal);
   info.createDefaultSampler = false;
   info.samplerInfo = makeNearestSampler();
   return std::make_unique<ZVulkanTexture>(device, info);
@@ -85,16 +85,16 @@ std::unique_ptr<ZVulkanTexture> createImageCacheTexture(ZVulkanDevice& device, g
     return nullptr;
   }
 
-  auto info = ZVulkanTexture::CreateInfo::make3D(size.x,
-                                                 size.y,
-                                                 size.z,
-                                                 vk::Format::eR8Unorm,
-                                                 vk::ImageUsageFlagBits::eSampled |
-                                                   vk::ImageUsageFlagBits::eTransferDst,
-                                                 vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                 1u,
-                                                 false,
-                                                 vk::ImageLayout::eShaderReadOnlyOptimal);
+  auto info =
+    ZVulkanTexture::CreateInfo::make3D(size.x,
+                                       size.y,
+                                       size.z,
+                                       vk::Format::eR8Unorm,
+                                       vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                       vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                       1u,
+                                       false,
+                                       vk::ImageLayout::eShaderReadOnlyOptimal);
   info.createDefaultSampler = false;
   info.samplerInfo = makeLinearSampler();
   return std::make_unique<ZVulkanTexture>(device, info);
@@ -160,10 +160,11 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   const ZImgInfo resInfo(extent.x, extent.y, extent.z, 1);
 
   folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>>, true> imgQueue;
-  [[maybe_unused]] auto readFuture = folly::coro::toFuture(
-    folly::coro::co_withCancellation(cancellationToken,
-                                     image.readImageBlocksToQueueAsync(channel, pendingTasks, resInfo, imgQueue, timer)),
-    cpuExecutor);
+  [[maybe_unused]] auto readFuture =
+    folly::coro::toFuture(folly::coro::co_withCancellation(
+                            cancellationToken,
+                            image.readImageBlocksToQueueAsync(channel, pendingTasks, resInfo, imgQueue, timer)),
+                          cpuExecutor);
 
   size_t emptyBlockCount = 0;
   int remainingBlocks = static_cast<int>(pendingTasks.size());
@@ -247,8 +248,7 @@ void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t chan
   timer.recordEvent("upload page table");
 }
 
-ZVulkanTexture*
-ZVulkanPagedImageBlockUploader::pageDirectoryTexture(const Z3DImg& image, size_t channel) const
+ZVulkanTexture* ZVulkanPagedImageBlockUploader::pageDirectoryTexture(const Z3DImg& image, size_t channel) const
 {
   std::scoped_lock lock(m_mutex);
   const auto* resources = findImageResourcesLocked(image);
@@ -258,8 +258,7 @@ ZVulkanPagedImageBlockUploader::pageDirectoryTexture(const Z3DImg& image, size_t
   return resources->channels[channel].pageDirectory.get();
 }
 
-ZVulkanTexture*
-ZVulkanPagedImageBlockUploader::pageTableTexture(const Z3DImg& image, size_t channel) const
+ZVulkanTexture* ZVulkanPagedImageBlockUploader::pageTableTexture(const Z3DImg& image, size_t channel) const
 {
   std::scoped_lock lock(m_mutex);
   const auto* resources = findImageResourcesLocked(image);
@@ -269,8 +268,7 @@ ZVulkanPagedImageBlockUploader::pageTableTexture(const Z3DImg& image, size_t cha
   return resources->channels[channel].pageTableCache.get();
 }
 
-ZVulkanTexture*
-ZVulkanPagedImageBlockUploader::imageCacheTexture(const Z3DImg& image, size_t channel) const
+ZVulkanTexture* ZVulkanPagedImageBlockUploader::imageCacheTexture(const Z3DImg& image, size_t channel) const
 {
   std::scoped_lock lock(m_mutex);
   const auto* resources = findImageResourcesLocked(image);

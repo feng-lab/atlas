@@ -25,8 +25,7 @@ public:
     uint32_t mipLevels = 1u;
     uint32_t arrayLayers = 1u;
     vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1;
-    vk::ImageUsageFlags usage =
-      vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+    vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
     vk::MemoryPropertyFlags memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal;
     vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor;
     vk::ImageTiling tiling = vk::ImageTiling::eOptimal;
@@ -37,69 +36,54 @@ public:
 
     static CreateInfo make1D(uint32_t width,
                              vk::Format format,
-                             vk::ImageUsageFlags usage =
-                               vk::ImageUsageFlagBits::eSampled |
-                               vk::ImageUsageFlagBits::eTransferDst,
-                             vk::MemoryPropertyFlags memoryProperties =
-                               vk::MemoryPropertyFlagBits::eDeviceLocal,
+                             vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eSampled |
+                                                         vk::ImageUsageFlagBits::eTransferDst,
+                             vk::MemoryPropertyFlags memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal,
                              uint32_t mipLevels = 1u,
                              bool createSampler = true,
-                             vk::ImageLayout descriptorLayout =
-                               vk::ImageLayout::eShaderReadOnlyOptimal);
+                             vk::ImageLayout descriptorLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
 
     static CreateInfo make2D(uint32_t width,
                              uint32_t height,
                              vk::Format format,
-                             vk::ImageUsageFlags usage =
-                               vk::ImageUsageFlagBits::eSampled |
-                               vk::ImageUsageFlagBits::eTransferDst,
-                             vk::MemoryPropertyFlags memoryProperties =
-                               vk::MemoryPropertyFlagBits::eDeviceLocal,
+                             vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eSampled |
+                                                         vk::ImageUsageFlagBits::eTransferDst,
+                             vk::MemoryPropertyFlags memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal,
                              uint32_t mipLevels = 1u,
                              bool createSampler = true,
-                             vk::ImageLayout descriptorLayout =
-                               vk::ImageLayout::eShaderReadOnlyOptimal);
+                             vk::ImageLayout descriptorLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
 
     static CreateInfo make2DArray(uint32_t width,
                                   uint32_t height,
                                   uint32_t arrayLayers,
                                   vk::Format format,
-                                  vk::ImageUsageFlags usage =
-                                    vk::ImageUsageFlagBits::eSampled |
-                                    vk::ImageUsageFlagBits::eTransferDst,
-                                  vk::MemoryPropertyFlags memoryProperties =
-                                    vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                  vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eSampled |
+                                                              vk::ImageUsageFlagBits::eTransferDst,
+                                  vk::MemoryPropertyFlags memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal,
                                   uint32_t mipLevels = 1u,
                                   bool createSampler = true,
-                                  vk::ImageLayout descriptorLayout =
-                                    vk::ImageLayout::eShaderReadOnlyOptimal);
+                                  vk::ImageLayout descriptorLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
 
     static CreateInfo make3D(uint32_t width,
                              uint32_t height,
                              uint32_t depth,
                              vk::Format format,
-                             vk::ImageUsageFlags usage =
-                               vk::ImageUsageFlagBits::eSampled |
-                               vk::ImageUsageFlagBits::eTransferDst,
-                             vk::MemoryPropertyFlags memoryProperties =
-                               vk::MemoryPropertyFlagBits::eDeviceLocal,
+                             vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eSampled |
+                                                         vk::ImageUsageFlagBits::eTransferDst,
+                             vk::MemoryPropertyFlags memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal,
                              uint32_t mipLevels = 1u,
                              bool createSampler = true,
-                             vk::ImageLayout descriptorLayout =
-                               vk::ImageLayout::eShaderReadOnlyOptimal);
+                             vk::ImageLayout descriptorLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
 
     static CreateInfo makeCube(uint32_t edgeLength,
                                vk::Format format,
                                uint32_t mipLevels = 1u,
                                uint32_t cubeCount = 1u,
-                               vk::ImageUsageFlags usage =
-                                 vk::ImageUsageFlagBits::eSampled |
-                                 vk::ImageUsageFlagBits::eTransferDst,
-                               vk::MemoryPropertyFlags memoryProperties =
-                                 vk::MemoryPropertyFlagBits::eDeviceLocal,
+                               vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eSampled |
+                                                           vk::ImageUsageFlagBits::eTransferDst,
+                               vk::MemoryPropertyFlags memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal,
                                bool createSampler = true,
-                               vk::ImageLayout descriptorLayout =
-                                 vk::ImageLayout::eShaderReadOnlyOptimal);
+                               vk::ImageLayout descriptorLayout = vk::ImageLayout::eShaderReadOnlyOptimal);
   };
 
   struct UploadRegion
@@ -139,8 +123,7 @@ public:
                         vk::ImageAspectFlags aspectMask = {});
 
   vk::DescriptorImageInfo descriptorInfo() const;
-  vk::DescriptorImageInfo descriptorInfo(vk::ImageLayout layoutOverride,
-                                         vk::ImageAspectFlags aspectOverride) const;
+  vk::DescriptorImageInfo descriptorInfo(vk::ImageLayout layoutOverride, vk::ImageAspectFlags aspectOverride) const;
   void setDescriptorLayout(vk::ImageLayout layout);
   void setDescriptorAspect(vk::ImageAspectFlags aspect);
   vk::ImageLayout descriptorLayout() const
@@ -200,7 +183,10 @@ public:
   }
 
   // Access owning device for validation/assertions
-  ZVulkanDevice& ownerDevice() const { return m_device; }
+  ZVulkanDevice& ownerDevice() const
+  {
+    return m_device;
+  }
 
 private:
   void createImage();

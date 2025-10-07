@@ -869,8 +869,8 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureVolumeTexture(size_t chann
                                          true,
                                          vk::ImageLayout::eShaderReadOnlyOptimal);
     resources.volumeTexture = device.createTexture(info);
-    CHECK(resources.volumeTexture != nullptr) << "Slice: failed to create 3D volume texture (" << width << "x" << height
-                                              << "x" << depth << ")";
+    CHECK(resources.volumeTexture != nullptr)
+      << "Slice: failed to create 3D volume texture (" << width << "x" << height << "x" << depth << ")";
   } else if (resources.volumeGeneration == generation && resources.volumeTexture) {
     return *resources.volumeTexture;
   }
@@ -942,7 +942,8 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
   if (!resources.pagedTextureDescriptor) {
     resources.pagedTextureDescriptor = m_backend.allocateOverrideDescriptorSet(**m_pagedSliceSetLayout);
   }
-  CHECK(resources.pagedTextureDescriptor != nullptr) << "Slice paged path: override descriptor allocation failed (fatal)";
+  CHECK(resources.pagedTextureDescriptor != nullptr)
+    << "Slice paged path: override descriptor allocation failed (fatal)";
   resources.pagedTextureDescriptor->updateTexture(0, pageDirectory, m_backend.defaultSampler());
   resources.pagedTextureDescriptor->updateTexture(1, pageTable, m_backend.defaultSampler());
   resources.pagedTextureDescriptor->updateTexture(2, imageCache, m_backend.defaultSampler());

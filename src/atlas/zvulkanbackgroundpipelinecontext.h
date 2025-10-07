@@ -90,12 +90,8 @@ private:
   void ensureDescriptorLayouts();
   void resetDescriptors();
   void ensureDescriptorSets();
-  void updateLightingUBO(Z3DRendererBase& renderer,
-                         const RenderBatch& batch,
-                         const BackgroundPayload& payload);
-  void updateTransformUBO(Z3DRendererBase& renderer,
-                          const RenderBatch& batch,
-                          const BackgroundPayload& payload);
+  void updateLightingUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const BackgroundPayload& payload);
+  void updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const BackgroundPayload& payload);
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 

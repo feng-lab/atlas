@@ -36,10 +36,11 @@ public:
   [[nodiscard]] vk::Semaphore acquireSemaphore() const;
   [[nodiscard]] vk::Semaphore releaseSemaphore() const;
 
-  vk::raii::CommandBuffer& beginFrame(vk::ClearColorValue clearColor =
-                                        vk::ClearColorValue(std::array<float, 4>{{0.0f, 0.0f, 0.0f, 1.0f}}),
-                                      vk::ClearDepthStencilValue clearDepthStencil =
-                                        vk::ClearDepthStencilValue(1.0f, 0));
+  vk::raii::CommandBuffer& beginFrame(vk::ClearColorValue clearColor = vk::ClearColorValue(std::array<float, 4>{
+                                        {0.0f, 0.0f, 0.0f, 1.0f}
+  }),
+                                      vk::ClearDepthStencilValue clearDepthStencil = vk::ClearDepthStencilValue(1.0f,
+                                                                                                                0));
   void endFrame(vk::raii::CommandBuffer& commandBuffer);
   void copyToMemory(void* data, size_t size);
 

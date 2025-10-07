@@ -4,14 +4,19 @@
 layout(location = 0) in vec4 attr_vertex; // xyz center, w radius
 layout(location = 1) in vec4 attr_color;
 layout(location = 2) in float attr_flags;
+layout(location = 3) in vec4 attr_specular_shininess; // xyz specular, w shininess
 
 // Varyings
 layout(location = 0) out vec4 v_color;
 layout(location = 1) out vec3 v_sphere_center;
 layout(location = 2) out float v_radius2;
 layout(location = 3) out vec3 v_point;
+layout(location = 4) out vec4 v_material_specular;
+layout(location = 5) out float v_material_shininess;
 
 #include "include/matrices_material.glslinc"
+
+layout(constant_id = 60) const bool USE_DYNAMIC_MATERIAL = false;
 
 // Sphere-specific push constants
 layout(push_constant) uniform SpherePC {
@@ -32,6 +37,13 @@ void main()
   vec4 centerVertex = xf.pos_transform * vec4(attr_vertex.xyz, 1.0);
   v_color = attr_color;
   v_radius2 = radius * radius;
+  if (USE_DYNAMIC_MATERIAL) {
+    v_material_specular = vec4(attr_specular_shininess.xyz, 1.0);
+    v_material_shininess = attr_specular_shininess.w;
+  } else {
+    v_material_specular = vec4(0.0);
+    v_material_shininess = 0.0;
+  }
 
   vec3 rightVector = vec3(xf.view_matrix[0][0], xf.view_matrix[1][0], xf.view_matrix[2][0]);
   vec3 upVector    = vec3(xf.view_matrix[0][1], xf.view_matrix[1][1], xf.view_matrix[2][1]);
@@ -46,4 +58,3 @@ void main()
 
   gl_Position = xf.projection_view_matrix * vertex;
 }
-

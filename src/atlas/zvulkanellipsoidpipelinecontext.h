@@ -110,8 +110,14 @@ private:
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
-  // Upload arena-backed SoA slices (all slices come from the same arena buffer)
-  vk::Buffer m_vbBuffer{VK_NULL_HANDLE};
+  // Upload arena-backed SoA slices (per-attribute buffers)
+  vk::Buffer m_axis1Buffer{VK_NULL_HANDLE};
+  vk::Buffer m_axis2Buffer{VK_NULL_HANDLE};
+  vk::Buffer m_axis3Buffer{VK_NULL_HANDLE};
+  vk::Buffer m_centerBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_colorBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_flagsBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_specularBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_axis1Offset{0};
   vk::DeviceSize m_axis2Offset{0};
   vk::DeviceSize m_axis3Offset{0};
@@ -128,8 +134,14 @@ private:
     Z3DEllipsoidRenderer* renderer = nullptr;
     bool picking = false;
     bool dynamicMaterial = false;
-    auto tie() const { return std::tuple(renderer, picking, dynamicMaterial); }
-    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+    auto tie() const
+    {
+      return std::tuple(renderer, picking, dynamicMaterial);
+    }
+    bool operator<(const CacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
   };
   struct CacheEntry
   {
@@ -147,7 +159,8 @@ private:
     uint32_t vertexCount = 0;
     uint32_t indexCount = 0;
     // Last observed gens
-    uint32_t centersGen = 0, axesGen = 0, colorsGen = 0, pickingColorsGen = 0, specularGen = 0, flagsGen = 0, indexGen = 0;
+    uint32_t centersGen = 0, axesGen = 0, colorsGen = 0, pickingColorsGen = 0, specularGen = 0, flagsGen = 0,
+             indexGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
   };
@@ -157,8 +170,7 @@ private:
   void resetDescriptors();
   void ensureDescriptorSets();
   void ensureOITResources();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,
-                          const glm::vec2& screenDimRcp);
+  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& screenDimRcp);
   void ensurePlaceholderTexture();
   void updateLightingUBO(Z3DRendererBase& renderer,
                          const RenderBatch& batch,

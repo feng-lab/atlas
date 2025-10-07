@@ -39,6 +39,12 @@
 #include <string_view>
 #include <vector>
 
+#include <gflags/gflags.h>
+
+DEFINE_bool(vk_reserve_upload_slices,
+            true,
+            "Reserve per-draw upload arena capacity (precise) before suballocation to avoid mid-upload growth");
+
 namespace nim {
 
 namespace {
@@ -238,6 +244,8 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Reset per-frame upload arena cursor/high-watermark
   frameResources.uploadArena.offset = 0;
   frameResources.uploadArena.highWatermark = 0;
+  // Release any retired upload buffers from a previous use of this frame.
+  frameResources.uploadArena.retiredBuffers.clear();
   // Ensure static arenas exist once a device is present
   ensureStaticArenas();
 
@@ -427,11 +435,10 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     frame.spheresBytesStaged);
 
   // Stage 5: VLOG(1) static/upload arena usage
-  VLOG(1) << fmt::format(
-    "VK arena: upload_high_watermark={}B static_vb_used={}B static_ib_used={}B",
-    m_activeFrame ? m_activeFrame->uploadArena.highWatermark : 0,
-    m_staticArena.vbHighWatermark,
-    m_staticArena.ibHighWatermark);
+  VLOG(1) << fmt::format("VK arena: upload_high_watermark={}B static_vb_used={}B static_ib_used={}B",
+                         m_activeFrame ? m_activeFrame->uploadArena.highWatermark : 0,
+                         m_staticArena.vbHighWatermark,
+                         m_staticArena.ibHighWatermark);
 
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
@@ -1120,11 +1127,11 @@ void Z3DRendererVulkanBackend::ensureSharedSamplers()
   }
 }
 
-Z3DRendererVulkanBackend::UploadSlice
-Z3DRendererVulkanBackend::suballocateUpload(size_t bytes, size_t alignment)
+Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUpload(size_t bytes, size_t alignment)
 {
   UploadSlice slice{};
   if (!m_activeFrame || !m_sharedDevice) {
+    VLOG(2) << "suballocateUpload: inactive frame or device; returning null slice for " << bytes << " bytes";
     return slice;
   }
 
@@ -1146,28 +1153,83 @@ Z3DRendererVulkanBackend::suballocateUpload(size_t bytes, size_t alignment)
     while (newCapacity < minCapacity) {
       newCapacity = newCapacity ? (newCapacity * 2) : (static_cast<size_t>(1) << 20);
     }
-    arena.buffer = m_sharedDevice->createBuffer(newCapacity,
-                                                vk::BufferUsageFlagBits::eVertexBuffer |
-                                                  vk::BufferUsageFlagBits::eIndexBuffer |
-                                                  vk::BufferUsageFlagBits::eTransferDst,
-                                                vk::MemoryPropertyFlagBits::eHostVisible |
-                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
+    // Move the previous buffer to the retired list so any already-returned
+    // mapped pointers remain valid for the rest of the frame.
+    if (arena.buffer) {
+      arena.retiredBuffers.emplace_back(std::move(arena.buffer));
+    }
+    arena.buffer = m_sharedDevice->createBuffer(
+      newCapacity,
+      vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
+        vk::BufferUsageFlagBits::eTransferDst,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     arena.capacity = newCapacity;
     arena.offset = 0;
     // Persistently map the entire buffer
     arena.mapped = arena.buffer->map(0, newCapacity);
   };
 
+  VLOG(2) << "suballocateUpload: request bytes=" << bytes << " align=" << alignment << " arena.off=" << arena.offset
+          << " required=" << required << " cap=" << arena.capacity;
   ensureCapacity(required);
+  VLOG(2) << "suballocateUpload: after ensureCapacity cap=" << arena.capacity << " off=" << arena.offset
+          << " mapped=" << (arena.mapped != nullptr);
 
   slice.buffer = arena.buffer->buffer();
   slice.offset = static_cast<vk::DeviceSize>(alignedOffset);
-  slice.mapped = static_cast<uint8_t*>(arena.mapped) + alignedOffset;
+  if (arena.mapped) {
+    slice.mapped = static_cast<uint8_t*>(arena.mapped) + alignedOffset;
+  } else {
+    slice.mapped = nullptr;
+  }
   slice.size = bytes;
 
   arena.offset = required;
   arena.highWatermark = std::max(arena.highWatermark, required);
+  VLOG(2) << "suballocateUpload: slice buf=" << static_cast<bool>(slice.buffer) << " off=" << slice.offset
+          << " size=" << slice.size << " mapped=" << (slice.mapped != nullptr);
   return slice;
+}
+
+void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pair<size_t, size_t>> slices)
+{
+  if (!FLAGS_vk_reserve_upload_slices) {
+    return;
+  }
+  if (!m_activeFrame || !m_sharedDevice) {
+    return;
+  }
+  auto& arena = m_activeFrame->uploadArena;
+  size_t cursor = arena.offset;
+  for (const auto& s : slices) {
+    const size_t bytes = s.first;
+    const size_t align = s.second ? s.second : 1;
+    if (bytes == 0) {
+      continue;
+    }
+    const size_t aligned = alignUp(cursor, align);
+    cursor = aligned + bytes;
+  }
+  const size_t required = cursor;
+  if (arena.buffer && arena.mapped && arena.capacity >= required) {
+    return;
+  }
+  size_t newCapacity = std::max<size_t>(static_cast<size_t>(1) << 20, arena.capacity);
+  while (newCapacity < required) {
+    newCapacity = newCapacity ? (newCapacity * 2) : (static_cast<size_t>(1) << 20);
+  }
+  if (arena.buffer) {
+    arena.retiredBuffers.emplace_back(std::move(arena.buffer));
+  }
+  arena.buffer =
+    m_sharedDevice->createBuffer(newCapacity,
+                                 vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
+                                   vk::BufferUsageFlagBits::eTransferDst,
+                                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  arena.capacity = newCapacity;
+  arena.offset = 0;
+  arena.mapped = arena.buffer->map(0, newCapacity);
+  VLOG(2) << fmt::format("reserveUploadSlices: grew arena to {} bytes for {} slices", newCapacity, slices.size());
 }
 
 void Z3DRendererVulkanBackend::ensureStaticArenas()
@@ -1179,28 +1241,27 @@ void Z3DRendererVulkanBackend::ensureStaticArenas()
   // revisited; first cut avoids reallocation to keep slices stable.
   if (!m_staticArena.vb) {
     const size_t cap = static_cast<size_t>(32) * 1024 * 1024; // 32 MiB
-    m_staticArena.vb = m_sharedDevice->createBuffer(cap,
-                                                    vk::BufferUsageFlagBits::eVertexBuffer |
-                                                      vk::BufferUsageFlagBits::eTransferDst,
-                                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
+    m_staticArena.vb =
+      m_sharedDevice->createBuffer(cap,
+                                   vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                                   vk::MemoryPropertyFlagBits::eDeviceLocal);
     m_staticArena.vbCapacity = cap;
     m_staticArena.vbOffset = 0;
     m_staticArena.vbHighWatermark = 0;
   }
   if (!m_staticArena.ib) {
     const size_t cap = static_cast<size_t>(8) * 1024 * 1024; // 8 MiB
-    m_staticArena.ib = m_sharedDevice->createBuffer(cap,
-                                                    vk::BufferUsageFlagBits::eIndexBuffer |
-                                                      vk::BufferUsageFlagBits::eTransferDst,
-                                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
+    m_staticArena.ib =
+      m_sharedDevice->createBuffer(cap,
+                                   vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                                   vk::MemoryPropertyFlagBits::eDeviceLocal);
     m_staticArena.ibCapacity = cap;
     m_staticArena.ibOffset = 0;
     m_staticArena.ibHighWatermark = 0;
   }
 }
 
-Z3DRendererVulkanBackend::StaticSlice
-Z3DRendererVulkanBackend::allocateStaticVB(size_t bytes, size_t alignment)
+Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB(size_t bytes, size_t alignment)
 {
   ensureStaticArenas();
   StaticSlice slice{};
@@ -1220,8 +1281,7 @@ Z3DRendererVulkanBackend::allocateStaticVB(size_t bytes, size_t alignment)
   return slice;
 }
 
-Z3DRendererVulkanBackend::StaticSlice
-Z3DRendererVulkanBackend::allocateStaticIB(size_t bytes, size_t alignment)
+Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticIB(size_t bytes, size_t alignment)
 {
   ensureStaticArenas();
   StaticSlice slice{};

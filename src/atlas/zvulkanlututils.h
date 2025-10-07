@@ -12,14 +12,14 @@ inline void ensure1DLUTTexture(ZVulkanDevice& device,
                                vk::ImageLayout finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal)
 {
   if (!texture || texture->extent().width != width) {
-    auto info = ZVulkanTexture::CreateInfo::make1D(width,
-                                                   format,
-                                                   vk::ImageUsageFlagBits::eSampled |
-                                                     vk::ImageUsageFlagBits::eTransferDst,
-                                                   vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                                   1u,
-                                                   true,
-                                                   finalLayout);
+    auto info =
+      ZVulkanTexture::CreateInfo::make1D(width,
+                                         format,
+                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                         1u,
+                                         true,
+                                         finalLayout);
     texture = device.createTexture(info);
   }
 }
@@ -36,4 +36,3 @@ inline void uploadLUT(ZVulkanTexture& texture,
 }
 
 } // namespace nim::vulkan
-

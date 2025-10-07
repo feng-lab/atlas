@@ -166,8 +166,8 @@ void ZVulkanFontPipelineContext::ensureDescriptorSet()
   }
 
   if (!m_descriptorSet) {
-  auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_setTexture);
-  m_descriptorSet = std::make_unique<ZVulkanDescriptorSet>(device, descriptorSet, false);
+    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_setTexture);
+    m_descriptorSet = std::make_unique<ZVulkanDescriptorSet>(device, descriptorSet, false);
   }
 }
 
@@ -210,16 +210,14 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
   }
 
   CHECK(payload.texcoords.size() == vtxCount)
-    << "Font uploadGeometry size mismatch: positions=" << vtxCount
-    << " texcoords=" << payload.texcoords.size();
+    << "Font uploadGeometry size mismatch: positions=" << vtxCount << " texcoords=" << payload.texcoords.size();
   if (payload.pickingPass) {
     CHECK(payload.pickingColors.size() == vtxCount)
       << "Font uploadGeometry pickingColors mismatch: pickingColors=" << payload.pickingColors.size()
       << " positions=" << vtxCount;
   } else {
     CHECK(payload.colors.size() == vtxCount)
-      << "Font uploadGeometry colors mismatch: colors=" << payload.colors.size()
-      << " positions=" << vtxCount;
+      << "Font uploadGeometry colors mismatch: colors=" << payload.colors.size() << " positions=" << vtxCount;
   }
 
   auto vSlice = m_backend.suballocateUpload(vtxCount * sizeof(FontVertex), alignof(FontVertex));
@@ -287,7 +285,9 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
           entry.indexGen = payload.indicesGen;
           restaged += idxCount * sizeof(uint32_t);
         }
-        if (restaged > 0) m_backend.addFontBytesStaged(restaged);
+        if (restaged > 0) {
+          m_backend.addFontBytesStaged(restaged);
+        }
         m_vertexUploadBuffer = entry.vb;
         m_vertexUploadOffset = entry.vbOffset;
         m_indexUploadBuffer = entry.ib;
@@ -351,14 +351,14 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
                                          1u,
                                          true,
                                          vk::ImageLayout::eShaderReadOnlyOptimal);
-  auto tex = device.createTexture(info);
-  CHECK(tex != nullptr) << "Failed to create font atlas texture from CPU pixels ("
-                        << payload.atlasWidth << "x" << payload.atlasHeight << ")";
-  const size_t byteSize = static_cast<size_t>(payload.atlasWidth) * payload.atlasHeight * 4u;
-  tex->uploadData(payload.atlasPixels, byteSize);
-  VLOG(1) << fmt::format("VK font atlas upload: {}x{} {}B", payload.atlasWidth, payload.atlasHeight, byteSize);
-  auto [inserted, _] = m_atlasCache.emplace(payload.atlasPixels, std::move(tex));
-  return inserted->second.get();
+    auto tex = device.createTexture(info);
+    CHECK(tex != nullptr) << "Failed to create font atlas texture from CPU pixels (" << payload.atlasWidth << "x"
+                          << payload.atlasHeight << ")";
+    const size_t byteSize = static_cast<size_t>(payload.atlasWidth) * payload.atlasHeight * 4u;
+    tex->uploadData(payload.atlasPixels, byteSize);
+    VLOG(1) << fmt::format("VK font atlas upload: {}x{} {}B", payload.atlasWidth, payload.atlasHeight, byteSize);
+    auto [inserted, _] = m_atlasCache.emplace(payload.atlasPixels, std::move(tex));
+    return inserted->second.get();
   }
 
   // Fallback: tiny white

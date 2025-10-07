@@ -21,8 +21,7 @@ class ZVulkanBuffer;
 class Z3DTransferFunction;
 class ZVulkanImageBlockUploader;
 
-namespace vulkan
-{
+namespace vulkan {
 struct AttachmentFormats;
 }
 
@@ -53,11 +52,11 @@ private:
     uint64_t volumeGeneration = 0;
     std::unique_ptr<ZVulkanTexture> volumeTexture;
     std::unique_ptr<ZVulkanTexture> transferTexture;
-    ZVulkanDescriptorSet* fastDescriptor = nullptr;       // per-draw override (backend-owned)
-    ZVulkanDescriptorSet* rayParamDescriptor = nullptr;    // per-draw override (backend-owned)
+    ZVulkanDescriptorSet* fastDescriptor = nullptr; // per-draw override (backend-owned)
+    ZVulkanDescriptorSet* rayParamDescriptor = nullptr; // per-draw override (backend-owned)
     std::unique_ptr<ZVulkanBuffer> rayParamBuffer;
-    ZVulkanDescriptorSet* pagedDescriptor = nullptr;       // per-draw override (backend-owned)
-    ZVulkanDescriptorSet* pageDescriptor = nullptr;        // per-draw override (backend-owned)
+    ZVulkanDescriptorSet* pagedDescriptor = nullptr; // per-draw override (backend-owned)
+    ZVulkanDescriptorSet* pageDescriptor = nullptr; // per-draw override (backend-owned)
     std::unique_ptr<ZVulkanBuffer> pageDataBuffer;
     size_t pageDataCapacity = 0;
     uint32_t levelCount = 0;
@@ -174,8 +173,8 @@ private:
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
 
   std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor; // frame-owned placeholder
-  ZVulkanDescriptorSet* m_copyDescriptor = nullptr;        // per-draw override (backend-owned)
-  ZVulkanDescriptorSet* m_mergeDescriptor = nullptr;       // per-draw override (backend-owned)
+  ZVulkanDescriptorSet* m_copyDescriptor = nullptr; // per-draw override (backend-owned)
+  ZVulkanDescriptorSet* m_mergeDescriptor = nullptr; // per-draw override (backend-owned)
 
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
@@ -197,10 +196,8 @@ private:
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
   PipelineInstance& ensureProgressivePipeline(const ProgressivePipelineKey& key,
                                               const vulkan::AttachmentFormats& formats);
-  PipelineInstance& ensureCopyPipeline(const CopyPipelineKey& key,
-                                       const vulkan::AttachmentFormats& formats);
-  PipelineInstance& ensureMergePipeline(const MergePipelineKey& key,
-                                        const vulkan::AttachmentFormats& formats);
+  PipelineInstance& ensureCopyPipeline(const CopyPipelineKey& key, const vulkan::AttachmentFormats& formats);
+  PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
   void uploadEntryGeometry(const ImgRaycasterPayload& payload);
 
   ChannelResources& ensureChannelResources(size_t channelIndex);
@@ -225,20 +222,15 @@ private:
                              size_t channelIndex,
                              float zeToScreenPixelVoxelSize);
 
-  void bindProgressiveDescriptors(ChannelResources& resources,
-                                  vk::PipelineLayout layout,
-                                  vk::raii::CommandBuffer& cmd);
+  void bindProgressiveDescriptors(ChannelResources& resources, vk::PipelineLayout layout, vk::raii::CommandBuffer& cmd);
   void bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray);
   void ensureProgressiveLayerTargets(const glm::uvec2& size,
                                      uint32_t layerCount,
                                      uint32_t generation,
                                      vk::raii::CommandBuffer& cmd);
 
-  ZVulkanTexture& ensureVolumeTexture(ChannelResources& resources,
-                                      const ZImg& image,
-                                      size_t channelIndex);
-  ZVulkanTexture& ensureTransferTexture(ChannelResources& resources,
-                                        const Z3DTransferFunction& transferFunction);
+  ZVulkanTexture& ensureVolumeTexture(ChannelResources& resources, const ZImg& image, size_t channelIndex);
+  ZVulkanTexture& ensureTransferTexture(ChannelResources& resources, const Z3DTransferFunction& transferFunction);
 
   void renderEntryExit(Z3DRendererBase& renderer,
                        const RenderBatch& batch,

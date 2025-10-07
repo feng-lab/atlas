@@ -58,6 +58,7 @@ private:
   struct PipelineKey
   {
     bool dynamicMaterial = true;
+    bool useConeShader2 = false;
     int capsMode = 1;
     Z3DRendererBase::ShaderHookType shaderHookType = Z3DRendererBase::ShaderHookType::Normal;
     std::vector<vk::Format> colorFormats;
@@ -66,6 +67,7 @@ private:
     auto tie() const
     {
       return std::tuple(dynamicMaterial,
+                        useConeShader2,
                         capsMode,
                         static_cast<int>(shaderHookType),
                         colorFormats,
@@ -109,7 +111,11 @@ private:
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
   // Upload arena-backed SoA slices
-  vk::Buffer m_vbBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_originBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_axisBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_flagsBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_baseColorBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_topColorBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_originOffset{0};
   vk::DeviceSize m_axisOffset{0};
   vk::DeviceSize m_flagsOffset{0};
@@ -123,8 +129,14 @@ private:
   {
     Z3DConeRenderer* renderer = nullptr;
     bool picking = false;
-    auto tie() const { return std::tuple(renderer, picking); }
-    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+    auto tie() const
+    {
+      return std::tuple(renderer, picking);
+    }
+    bool operator<(const CacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
   };
   struct CacheEntry
   {
@@ -139,7 +151,8 @@ private:
     uint32_t vertexCount = 0;
     uint32_t indexCount = 0;
     // Last observed gens
-    uint32_t baseGen = 0, axisGen = 0, baseColorGen = 0, topColorGen = 0, pickingColorsGen = 0, flagsGen = 0, indexGen = 0;
+    uint32_t baseGen = 0, axisGen = 0, baseColorGen = 0, topColorGen = 0, pickingColorsGen = 0, flagsGen = 0,
+             indexGen = 0;
     int unchangedFrames = 0;
     bool promoted = false;
   };
@@ -149,17 +162,12 @@ private:
   void resetDescriptors();
   void ensureDescriptorSets();
   void ensureOITResources();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch,
-                          const glm::vec2& screenDimRcp);
+  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& screenDimRcp);
   void ensurePlaceholderTexture();
-  void updateLightingUBO(Z3DRendererBase& renderer,
-                         const RenderBatch& batch,
-                         const ConePayload& payload,
-                         bool pickingPass);
-  void updateTransformUBO(Z3DRendererBase& renderer,
-                          const RenderBatch& batch,
-                          const ConePayload& payload,
-                          bool pickingPass);
+  void
+  updateLightingUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const ConePayload& payload, bool pickingPass);
+  void
+  updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const ConePayload& payload, bool pickingPass);
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 

@@ -95,7 +95,7 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
       vulkan::textureFromHandle(payload.backAttachment, m_backend.device(), "dual-peel back attachment");
     descriptor->updateTexture(vkbind::kBindingDDPFinalDepth, depthTexture, m_backend.defaultSampler());
     descriptor->updateTexture(vkbind::kBindingDDPFinalFront, frontTexture, m_backend.defaultSampler());
-    descriptor->updateTexture(vkbind::kBindingDDPFinalBack,  backTexture,  m_backend.defaultSampler());
+    descriptor->updateTexture(vkbind::kBindingDDPFinalBack, backTexture, m_backend.defaultSampler());
   }
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
@@ -124,7 +124,11 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
 
   if (descriptor) {
     std::array<vk::DescriptorSet, 1> sets{descriptor->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           instance.pipeline->pipelineLayout(),
+                           vkbind::kSetInputs,
+                           sets,
+                           {});
   }
 
   cmd.setViewport(0, viewport);
@@ -158,7 +162,11 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
   if (m_descriptorOIT && m_uboOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_descriptorOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           instance.pipeline->pipelineLayout(),
+                           vkbind::kSetOITParams,
+                           sets3,
+                           {});
   }
 
   cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);

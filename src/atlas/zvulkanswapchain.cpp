@@ -114,11 +114,13 @@ vk::raii::CommandBuffer& ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearC
   // Ensure attachments are in the correct layouts for rendering
   {
     if (m_colorAttachment->layout() != vk::ImageLayout::eColorAttachmentOptimal) {
-      m_colorAttachment->transitionLayout(cmdBuffer, m_colorAttachment->layout(),
+      m_colorAttachment->transitionLayout(cmdBuffer,
+                                          m_colorAttachment->layout(),
                                           vk::ImageLayout::eColorAttachmentOptimal);
     }
     if (m_depthAttachment->layout() != vk::ImageLayout::eDepthStencilAttachmentOptimal) {
-      m_depthAttachment->transitionLayout(cmdBuffer, m_depthAttachment->layout(),
+      m_depthAttachment->transitionLayout(cmdBuffer,
+                                          m_depthAttachment->layout(),
                                           vk::ImageLayout::eDepthStencilAttachmentOptimal);
     }
   }
@@ -185,7 +187,8 @@ void ZVulkanSwapChain::endFrame(vk::raii::CommandBuffer& commandBuffer)
   try {
     queue.submit(submitInfo, *m_activeFrame->fence());
     executor.markSubmitted(*m_activeFrame);
-  } catch (const std::exception& e) {
+  }
+  catch (const std::exception& e) {
     LOG(WARNING) << "Swapchain submit failed: " << e.what();
   }
 
@@ -203,9 +206,7 @@ void ZVulkanSwapChain::copyToMemory(void* data, size_t size)
   m_device.frameExecutor().executeImmediate(
     [&](vk::raii::CommandBuffer& cmd) {
       if (m_colorAttachment->layout() != vk::ImageLayout::eTransferSrcOptimal) {
-        m_colorAttachment->transitionLayout(cmd,
-                                            m_colorAttachment->layout(),
-                                            vk::ImageLayout::eTransferSrcOptimal);
+        m_colorAttachment->transitionLayout(cmd, m_colorAttachment->layout(), vk::ImageLayout::eTransferSrcOptimal);
       }
 
       vk::BufferImageCopy region{};

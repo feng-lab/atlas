@@ -50,9 +50,7 @@ struct ConePushConstants
 {
   glm::mat4 projectionMatrix{1.0f};
   float ortho = 0.0f;
-  float weighted_a = 0.0f;
-  float weighted_b = 0.0f;
-  float weighted_depth_scale = 0.0f;
+  float _pad[3] = {0.0f, 0.0f, 0.0f};
 };
 
 std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
@@ -72,7 +70,11 @@ void ZVulkanConePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
-  m_vbBuffer = VK_NULL_HANDLE;
+  m_originBuffer = VK_NULL_HANDLE;
+  m_axisBuffer = VK_NULL_HANDLE;
+  m_flagsBuffer = VK_NULL_HANDLE;
+  m_baseColorBuffer = VK_NULL_HANDLE;
+  m_topColorBuffer = VK_NULL_HANDLE;
   m_originOffset = 0;
   m_axisOffset = 0;
   m_flagsOffset = 0;
@@ -98,6 +100,11 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
                                         const vk::Rect2D& scissor,
                                         vk::raii::CommandBuffer& cmd)
 {
+  VLOG(2) << "Cone.record begin: payload sizes base=" << payload.baseAndRadius.size()
+          << " axis=" << payload.axisAndTopRadius.size() << " flags=" << payload.flags.size()
+          << " baseColors=" << payload.baseColors.size() << " topColors=" << payload.topColors.size()
+          << " pickingColors=" << payload.pickingColors.size() << " indices=" << payload.indices.size()
+          << " pickingPass=" << payload.pickingPass << " useConeShader2=" << payload.useConeShader2;
   if (!payload.renderer || payload.baseAndRadius.empty()) {
     return;
   }
@@ -110,6 +117,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   }
 
   uploadGeometry(payload);
+  VLOG(2) << "Cone.uploadGeometry -> vertexCount=" << m_vertexCount << " indexCount=" << m_indexCount;
   if (m_vertexCount == 0) {
     return;
   }
@@ -170,6 +178,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineKey key;
   key.dynamicMaterial = !pickingPass;
+  key.useConeShader2 = payload.useConeShader2;
   key.capsMode = toCapsMode(payload.capStyle);
   key.shaderHookType = shaderHook;
   key.colorFormats = formats.colorFormats;
@@ -180,8 +189,12 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
   // Bind SoA streams (same buffer, different offsets)
   {
-    std::array<vk::Buffer, 5> bufs{m_vbBuffer, m_vbBuffer, m_vbBuffer, m_vbBuffer, m_vbBuffer};
-    std::array<vk::DeviceSize, 5> offs{m_originOffset, m_axisOffset, m_flagsOffset, m_baseColorOffset, m_topColorOffset};
+    std::array<vk::Buffer, 5> bufs{m_originBuffer, m_axisBuffer, m_flagsBuffer, m_baseColorBuffer, m_topColorBuffer};
+    std::array<vk::DeviceSize, 5> offs{m_originOffset,
+                                       m_axisOffset,
+                                       m_flagsOffset,
+                                       m_baseColorOffset,
+                                       m_topColorOffset};
     cmd.bindVertexBuffers(0, bufs, offs);
   }
   if (m_indexCount > 0 && m_indexUploadBuffer) {
@@ -191,14 +204,22 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
     << "Cone pipeline placeholder descriptor set not initialised";
   if ((dsPlaceholderOverride || m_dsPlaceholder) && m_dsLighting && m_dsTransforms) {
-    const vk::DescriptorSet ds0 = dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet()
-                                                        : m_dsPlaceholder->descriptorSet();
+    const vk::DescriptorSet ds0 =
+      dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : m_dsPlaceholder->descriptorSet();
     std::array<vk::DescriptorSet, 3> sets{ds0, m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetInputs,
+                           sets,
+                           {});
   }
   if (m_dsOIT) {
     std::array<vk::DescriptorSet, 1> ds3{m_dsOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetOITParams, ds3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetOITParams,
+                           ds3,
+                           {});
   }
 
   cmd.setViewport(0, viewport);
@@ -209,14 +230,6 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   ConePushConstants constants;
   constants.projectionMatrix = eyeState.projectionMatrix;
   constants.ortho = eyeState.isPerspective ? 0.0f : 1.0f;
-  if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
-    const float n = renderer.viewState().nearClip;
-    const float f = renderer.viewState().farClip;
-    const float denom = std::max(f - n, 1e-6f);
-    constants.weighted_a = (f * n) / denom;
-    constants.weighted_b = 0.5f * (f + n) / denom + 0.5f;
-    constants.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-  }
   cmd.pushConstants<ConePushConstants>(pipeline.pipeline->pipelineLayout(),
                                        vk::ShaderStageFlagBits::eFragment,
                                        0,
@@ -291,10 +304,18 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
 {
   ensureDescriptorLayouts();
 
-  if (!m_dsPlaceholder) m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(**m_setPlaceholder);
-  if (!m_dsLighting) m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
-  if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
-  if (!m_dsOIT && m_setOIT) m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  if (!m_dsPlaceholder) {
+    m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(**m_setPlaceholder);
+  }
+  if (!m_dsLighting) {
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+  }
+  if (!m_dsTransforms) {
+    m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+  }
+  if (!m_dsOIT && m_setOIT) {
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  }
 
   ensurePlaceholderTexture();
   if (m_dsPlaceholder) {
@@ -519,8 +540,12 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     }
   };
 
+  const std::string vertName = key.useConeShader2 ? "cone_2.vert.spv" : "cone.vert.spv";
+  VLOG(1) << "Cone.ensurePipeline: selecting shaders vert='" << (shaderBase + vertName) << "' frag='"
+          << (shaderBase + selectFragmentShader(key.shaderHookType)) << "' capsMode=" << key.capsMode
+          << " dynamicMaterial=" << key.dynamicMaterial << " shaderHook=" << static_cast<int>(key.shaderHookType);
   instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "cone.vert.spv",
+                                                    shaderBase + vertName,
                                                     shaderBase + selectFragmentShader(key.shaderHookType),
                                                     std::nullopt);
 
@@ -528,11 +553,14 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     vk::SpecializationMapEntry{.constantID = 90, .offset = 0, .size = sizeof(int)}
   };
   std::array<int, 1> specData{key.capsMode};
-  instance.shader->setSpecializationConstants(
-    vk::ShaderStageFlagBits::eFragment,
-    std::vector<vk::SpecializationMapEntry>(specEntries.begin(), specEntries.end()),
-    std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
-                         reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
+  // Apply CAPS_MODE to both vertex and fragment (cone_2.vert depends on it)
+  {
+    auto entries = std::vector<vk::SpecializationMapEntry>(specEntries.begin(), specEntries.end());
+    auto dataVec = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
+                                        reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData));
+    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eVertex, entries, dataVec);
+    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment, entries, dataVec);
+  }
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
@@ -649,18 +677,40 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 vk::PipelineVertexInputStateCreateInfo ZVulkanConePipelineContext::makeVertexInputState() const
 {
   static std::array<vk::VertexInputBindingDescription, 5> bindings{
-    vk::VertexInputBindingDescription{.binding = 0, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // origin
-    vk::VertexInputBindingDescription{.binding = 1, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // axis
-    vk::VertexInputBindingDescription{.binding = 2, .stride = static_cast<uint32_t>(sizeof(float)),     .inputRate = vk::VertexInputRate::eVertex}, // flags
-    vk::VertexInputBindingDescription{.binding = 3, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // base color
-    vk::VertexInputBindingDescription{.binding = 4, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}  // top color
+    vk::VertexInputBindingDescription{.binding = 0,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // origin
+    vk::VertexInputBindingDescription{.binding = 1,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // axis
+    vk::VertexInputBindingDescription{.binding = 2,
+                                      .stride = static_cast<uint32_t>(sizeof(float)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // flags
+    vk::VertexInputBindingDescription{.binding = 3,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}, // base color
+    vk::VertexInputBindingDescription{.binding = 4,
+                                      .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                      .inputRate = vk::VertexInputRate::eVertex}  // top color
   };
   static std::array<vk::VertexInputAttributeDescription, 5> attrs{
-    vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 1, .binding = 1, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 2, .binding = 2, .format = vk::Format::eR32Sfloat,            .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 3, .binding = 3, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
-    vk::VertexInputAttributeDescription{.location = 4, .binding = 4, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0}
+    vk::VertexInputAttributeDescription{.location = 0,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 1,
+                                        .binding = 1,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 2, .binding = 2, .format = vk::Format::eR32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 3,
+                                        .binding = 3,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               },
+    vk::VertexInputAttributeDescription{.location = 4,
+                                        .binding = 4,
+                                        .format = vk::Format::eR32G32B32A32Sfloat,
+                                        .offset = 0                                                               }
   };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
@@ -676,6 +726,9 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   m_vertexCount = payload.baseAndRadius.size();
   m_indexCount = payload.indices.size();
 
+  VLOG(2) << "Cone.uploadGeometry begin: vertexCount=" << m_vertexCount << " indexCount=" << m_indexCount
+          << " axisCount=" << payload.axisAndTopRadius.size() << " flagsCount=" << payload.flags.size();
+
   if (m_vertexCount == 0) {
     return;
   }
@@ -690,17 +743,38 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   // Allocate SoA slices
   const size_t v4Bytes = m_vertexCount * sizeof(glm::vec4);
   const size_t fBytes = m_vertexCount * sizeof(float);
+  m_backend.reserveUploadSlices({
+    {v4Bytes,                         alignof(glm::vec4)},
+    {v4Bytes,                         alignof(glm::vec4)},
+    {fBytes,                          alignof(float)    },
+    {v4Bytes,                         alignof(glm::vec4)},
+    {v4Bytes,                         alignof(glm::vec4)},
+    {m_indexCount * sizeof(uint32_t), alignof(uint32_t) }
+  });
+  VLOG(2) << "Cone.uploadGeometry allocating: v4Bytes=" << v4Bytes << " fBytes=" << fBytes
+          << " idxBytes=" << (m_indexCount * sizeof(uint32_t));
   auto originSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
   auto axisSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
   auto flagsSlice = m_backend.suballocateUpload(fBytes, alignof(float));
   auto baseColorSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
   auto topColorSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+  VLOG(2) << "Slices: origin(buf=" << static_cast<bool>(originSlice.buffer)
+          << ", mapped=" << (originSlice.mapped != nullptr) << ") axis(buf=" << static_cast<bool>(axisSlice.buffer)
+          << ", mapped=" << (axisSlice.mapped != nullptr) << ") flags(buf=" << static_cast<bool>(flagsSlice.buffer)
+          << ", mapped=" << (flagsSlice.mapped != nullptr)
+          << ") baseColor(buf=" << static_cast<bool>(baseColorSlice.buffer)
+          << ", mapped=" << (baseColorSlice.mapped != nullptr)
+          << ") topColor(buf=" << static_cast<bool>(topColorSlice.buffer)
+          << ", mapped=" << (topColorSlice.mapped != nullptr) << ")";
   if (!originSlice.buffer || !originSlice.mapped || !axisSlice.buffer || !axisSlice.mapped || !flagsSlice.buffer ||
-      !flagsSlice.mapped || !baseColorSlice.buffer || !baseColorSlice.mapped || !topColorSlice.buffer || !topColorSlice.mapped) {
+      !flagsSlice.mapped || !baseColorSlice.buffer || !baseColorSlice.mapped || !topColorSlice.buffer ||
+      !topColorSlice.mapped) {
+    VLOG(2) << "Cone.uploadGeometry: one or more upload slices are invalid (null buffer or mapping). Aborting batch.";
     m_vertexCount = 0;
     m_indexCount = 0;
     return;
   }
+  VLOG(2) << "Cone.uploadGeometry: memcpy origins/axis (" << v4Bytes << " bytes each)";
   auto* originOut = static_cast<glm::vec4*>(originSlice.mapped);
   auto* axisOut = static_cast<glm::vec4*>(axisSlice.mapped);
   auto* flagsOut = static_cast<float*>(flagsSlice.mapped);
@@ -708,16 +782,12 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   auto* topColorOut = static_cast<glm::vec4*>(topColorSlice.mapped);
   std::memcpy(originOut, payload.baseAndRadius.data(), v4Bytes);
   std::memcpy(axisOut, payload.axisAndTopRadius.data(), v4Bytes);
+  VLOG(2) << "Cone.uploadGeometry: filled origin/axis, writing flags/colors";
   for (size_t i = 0; i < m_vertexCount; ++i) {
     float flagsValue = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
-    if (payload.useConeShader2) {
-      float right = std::floor(flagsValue / 16.0f);
-      float up = flagsValue - right * 16.0f;
-      right = std::clamp(right, 0.0f, 1.0f);
-      up = std::clamp(up, 0.0f, 1.0f);
-      float forward = up;
-      flagsValue = right * 256.0f + up * 16.0f + forward;
-    }
+    // GL parity: keep flags encoding as produced by the GL path.
+    // - For cone.vert (8-vertex path), flags are encoded as (right<<8 | up<<4 | out)
+    // - For cone_2.vert (quad path), flags are encoded as (right<<4 | up)
     flagsOut[i] = flagsValue;
   }
   if (payload.pickingPass) {
@@ -739,24 +809,39 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   }
 
   if (m_indexCount > 0) {
+    VLOG(2) << "Cone.uploadGeometry: allocating/staging indices bytes=" << (m_indexCount * sizeof(uint32_t));
     auto iSlice = m_backend.suballocateUpload(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
     if (iSlice.buffer && iSlice.mapped) {
       std::memcpy(iSlice.mapped, payload.indices.data(), m_indexCount * sizeof(uint32_t));
       m_indexUploadBuffer = iSlice.buffer;
       m_indexUploadOffset = iSlice.offset;
+      VLOG(2) << "Cone.uploadGeometry: indices staged at offset=" << m_indexUploadOffset;
     } else {
+      VLOG(2) << "Cone.uploadGeometry: index upload slice invalid; drawing non-indexed";
       m_indexCount = 0;
     }
   } else {
     m_indexUploadBuffer = VK_NULL_HANDLE;
     m_indexUploadOffset = 0;
   }
-  m_vbBuffer = originSlice.buffer;
+  m_originBuffer = originSlice.buffer;
+  m_axisBuffer = axisSlice.buffer;
+  m_flagsBuffer = flagsSlice.buffer;
+  m_baseColorBuffer = baseColorSlice.buffer;
+  m_topColorBuffer = topColorSlice.buffer;
   m_originOffset = originSlice.offset;
   m_axisOffset = axisSlice.offset;
   m_flagsOffset = flagsSlice.offset;
   m_baseColorOffset = baseColorSlice.offset;
   m_topColorOffset = topColorSlice.offset;
+  auto bufToU64 = [](vk::Buffer b) {
+    return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(b)));
+  };
+  VLOG(2) << "Cone.uploadGeometry: VB buffers origin=" << bufToU64(m_originBuffer) << " axis=" << bufToU64(m_axisBuffer)
+          << " flags=" << bufToU64(m_flagsBuffer) << " baseCol=" << bufToU64(m_baseColorBuffer)
+          << " topCol=" << bufToU64(m_topColorBuffer);
+  VLOG(2) << "Cone.uploadGeometry: VB offsets origin=" << m_originOffset << " axis=" << m_axisOffset
+          << " flags=" << m_flagsOffset << " baseCol=" << m_baseColorOffset << " topCol=" << m_topColorOffset;
 
   // Attempt static promotion
   if (payload.renderer) {
@@ -797,8 +882,12 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
           m_backend.stageCopy(entry.vb, entry.topColorOffset, topColorSlice, false);
           entry.topColorGen = payload.topColorGen;
         }
-        // Bind static
-        m_vbBuffer = entry.vb;
+        // Bind static: all attribute streams reside in the same static VB
+        m_originBuffer = entry.vb;
+        m_axisBuffer = entry.vb;
+        m_flagsBuffer = entry.vb;
+        m_baseColorBuffer = entry.vb;
+        m_topColorBuffer = entry.vb;
         m_originOffset = entry.originOffset;
         m_axisOffset = entry.axisOffset;
         m_flagsOffset = entry.flagsOffset;
@@ -829,18 +918,19 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
           m_backend.stageCopy(baseColorDst.buffer, baseColorDst.offset, baseColorSlice, false);
           m_backend.stageCopy(topColorDst.buffer, topColorDst.offset, topColorSlice, false);
           if (m_indexCount > 0) {
-            Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr,
-                                                         m_indexCount * sizeof(uint32_t)};
+            Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer,
+                                                          m_indexUploadOffset,
+                                                          nullptr,
+                                                          m_indexCount * sizeof(uint32_t)};
             m_backend.stageCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
           }
-          VLOG(1) << fmt::format(
-            "VK cone promote: origin={}B axis={}B flags={}B baseColor={}B topColor={}B idx={}B",
-            v4Bytes,
-            v4Bytes,
-            fBytes,
-            v4Bytes,
-            v4Bytes,
-            m_indexCount * sizeof(uint32_t));
+          VLOG(1) << fmt::format("VK cone promote: origin={}B axis={}B flags={}B baseColor={}B topColor={}B idx={}B",
+                                 v4Bytes,
+                                 v4Bytes,
+                                 fBytes,
+                                 v4Bytes,
+                                 v4Bytes,
+                                 m_indexCount * sizeof(uint32_t));
           entry.vb = originDst.buffer;
           entry.originOffset = originDst.offset;
           entry.axisOffset = axisDst.offset;
@@ -850,8 +940,12 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
           entry.ib = ibDst.buffer;
           entry.ibOffset = ibDst.offset;
           entry.promoted = true;
-          // Bind static for this draw
-          m_vbBuffer = entry.vb;
+          // Bind static for this draw: same VB for all attributes
+          m_originBuffer = entry.vb;
+          m_axisBuffer = entry.vb;
+          m_flagsBuffer = entry.vb;
+          m_baseColorBuffer = entry.vb;
+          m_topColorBuffer = entry.vb;
           m_originOffset = entry.originOffset;
           m_axisOffset = entry.axisOffset;
           m_flagsOffset = entry.flagsOffset;

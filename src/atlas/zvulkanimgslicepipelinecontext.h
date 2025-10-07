@@ -116,9 +116,9 @@ private:
     uint64_t volumeGeneration = 0;
     std::unique_ptr<ZVulkanTexture> volumeTexture;
     std::unique_ptr<ZVulkanTexture> colormapTexture;
-    ZVulkanDescriptorSet* fastTextureDescriptor = nullptr;   // per-draw override (owned by backend)
-    ZVulkanDescriptorSet* pagedTextureDescriptor = nullptr;  // per-draw override (owned by backend)
-    ZVulkanDescriptorSet* pageDescriptor = nullptr;           // per-draw override (owned by backend)
+    ZVulkanDescriptorSet* fastTextureDescriptor = nullptr; // per-draw override (owned by backend)
+    ZVulkanDescriptorSet* pagedTextureDescriptor = nullptr; // per-draw override (owned by backend)
+    ZVulkanDescriptorSet* pageDescriptor = nullptr; // per-draw override (owned by backend)
     std::unique_ptr<ZVulkanBuffer> pageDataBuffer;
     size_t pageDataCapacity = 0;
     uint32_t levelCount = 0;
@@ -136,8 +136,8 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_emptySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_mergeSetLayout;
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
-  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor;   // frame-owned placeholder
-  ZVulkanDescriptorSet* m_mergeDescriptor = nullptr;         // per-draw override (owned by backend)
+  std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor; // frame-owned placeholder
+  ZVulkanDescriptorSet* m_mergeDescriptor = nullptr; // per-draw override (owned by backend)
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
@@ -158,18 +158,13 @@ private:
   void ensureSliceVertexCapacity(size_t vertexCount);
   void ensureQuadVertexBuffer();
   void uploadSliceGeometry(std::span<const ZMesh> slices);
-  ZVulkanTexture& ensureVolumeTexture(size_t channel,
-                                      uint64_t generation,
-                                      const ZImg& image,
-                                      ChannelResources& resources);
-  ZVulkanTexture& ensureColormapTexture(size_t channel,
-                                        const ZColorMapParameter* parameter,
-                                        ChannelResources& resources);
+  ZVulkanTexture&
+  ensureVolumeTexture(size_t channel, uint64_t generation, const ZImg& image, ChannelResources& resources);
+  ZVulkanTexture&
+  ensureColormapTexture(size_t channel, const ZColorMapParameter* parameter, ChannelResources& resources);
   void transitionToSampled(vk::raii::CommandBuffer& cmd, ZVulkanTexture& texture, vk::ImageLayout desiredLayout);
 
-  void updateFastDescriptors(ChannelResources& resources,
-                             ZVulkanTexture& volume,
-                             ZVulkanTexture& colormap);
+  void updateFastDescriptors(ChannelResources& resources, ZVulkanTexture& volume, ZVulkanTexture& colormap);
   bool updatePagedDescriptors(ChannelResources& resources,
                               ZVulkanTexture& pageDirectory,
                               ZVulkanTexture& pageTable,

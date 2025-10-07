@@ -608,3 +608,15 @@ Implementation status (2025-10):
 - Atlas renders offscreen only and does not use a swapchain/presentation. All frame outputs are produced into internal attachments, then read back for CPU-side display.
 - Stage 1 semaphore policy: do not wait on acquire semaphores and do not signal release semaphores by default. These synchronization points are reserved for potential future WSI/external hand-offs. For offscreen submission, the frame fence is the single synchronization primitive used to determine completion.
 - Readback policy: prefer enqueueing GPU copies to host-visible staging buffers inside the frame command buffer and consuming results after the frame fence signals. Avoid synchronous immediate submissions that block the render thread.
+### 2025-10 Parity Fixes (Spheres, Ellipsoids, Cones, Fonts)
+
+- Cones: Vulkan `cone.vert` now multiplies base/top radii by the global `sizeScale` (transforms UBO `xf.parameters.x`), matching the GL shaders. This fixes under-sized screen-space bounds that could clip cones and appear as partial pieces. Push-constant layout for cones is aligned with the GLSL include (`projection_matrix`, `ortho`, padding) and weighted OIT parameters are sourced exclusively from the `oit_params` UBO, as in GL.
+- Cones (cone_2): Added `vulkan/cone_2.vert` which mirrors GL `cone_2.vert` screen-space bounding logic (including cap-style dependent bounds) and is selected automatically when `ConePayload::useConeShader2` is true. The cap-style specialization constant is applied to both vertex and fragment shaders to keep behavior identical to GL.
+- Spheres: Vulkan sphere path already matched GL. Size scaling is driven via push constants (`SpherePC.size_scale`), and box-correction is computed from FOV to mirror GL’s silhouette bounding.
+- Spheres: Added full `DYNAMIC_MATERIAL_PROPERTY` parity. Vulkan now supports per‑sphere specular/shininess via a specialization constant (`USE_DYNAMIC_MATERIAL`, id 60), additional vertex attribute for `attr_specular_shininess`, and varyings to the fragment. When disabled, uniform material is used as in GL. Depth uses `projection_matrix` like GL; sizeScale/box‑correction match GL.
+- Ellipsoids: Vulkan vertex scales `T`’s axis columns by `sizeScale` and constructs the clip-space bounding quad identically to GL. Dynamic material specialization and fog variants are wired via specialization constants, as in GL.
+- Fonts: Vulkan SDF text path (`almag.vert/frag`) mirrors GL’s sampling and blending. The pipeline uses premultiplied-alpha blending identical to GL; picking disables lighting/specular as on GL.
+
+Validation notes:
+- Parity validation compares Vulkan vs GL on the same scenes: cones (all cap styles), spheres of varying radii at different FOVs, ellipsoids with anisotropy, and SDF fonts (with/without outline/shadow). For transparency, both weighted-average and weighted-blended init passes are verified and final resolves match when inputs are the same.
+- For MoltenVK, vertex-input dynamic state remains disabled; fixed vertex-input layouts are used to avoid portability issues.

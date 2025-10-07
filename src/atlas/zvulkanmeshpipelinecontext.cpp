@@ -43,45 +43,6 @@ struct MeshVertex
   glm::vec3 tex3d{0.0f};
 };
 
-vk::PipelineVertexInputStateCreateInfo makeMeshVertexInput()
-{
-  static vk::VertexInputBindingDescription binding{.binding = 0,
-                                                   .stride = static_cast<uint32_t>(sizeof(MeshVertex)),
-                                                   .inputRate = vk::VertexInputRate::eVertex};
-  static std::array<vk::VertexInputAttributeDescription, 6> attrs{
-    vk::VertexInputAttributeDescription{.location = 0,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, position))},
-    vk::VertexInputAttributeDescription{.location = 1,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, normal))  },
-    vk::VertexInputAttributeDescription{.location = 2,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, color))   },
-    vk::VertexInputAttributeDescription{.location = 3,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, tex1d))   },
-    vk::VertexInputAttributeDescription{.location = 4,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, tex2d))   },
-    vk::VertexInputAttributeDescription{.location = 5,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(MeshVertex, tex3d))   }
-  };
-  static vk::PipelineVertexInputStateCreateInfo info{};
-  info.vertexBindingDescriptionCount = 1;
-  info.pVertexBindingDescriptions = &binding;
-  info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
-  info.pVertexAttributeDescriptions = attrs.data();
-  return info;
-}
-
 vk::PipelineVertexInputStateCreateInfo makeSoAMeshVertexInput(MeshPayload::ColorSource colorSource)
 {
   static std::array<vk::VertexInputBindingDescription, 4> bindings{};
@@ -119,10 +80,8 @@ vk::PipelineVertexInputStateCreateInfo makeSoAMeshVertexInput(MeshPayload::Color
       bindings[3] = vk::VertexInputBindingDescription{.binding = 3,
                                                       .stride = static_cast<uint32_t>(sizeof(float)),
                                                       .inputRate = vk::VertexInputRate::eVertex};
-      attrs[3] = vk::VertexInputAttributeDescription{.location = 3,
-                                                     .binding = 3,
-                                                     .format = vk::Format::eR32Sfloat,
-                                                     .offset = 0};
+      attrs[3] =
+        vk::VertexInputAttributeDescription{.location = 3, .binding = 3, .format = vk::Format::eR32Sfloat, .offset = 0};
       bindingCount = 4;
       attrCount = 4;
       break;
@@ -210,7 +169,10 @@ void ZVulkanMeshPipelineContext::resetFrame()
   m_vertexCount = 0;
   m_indexCount = 0;
   m_draws.clear();
-  m_soaBuffer = VK_NULL_HANDLE;
+  m_posBuffer = VK_NULL_HANDLE;
+  m_normBuffer = VK_NULL_HANDLE;
+  m_colorBuffer = VK_NULL_HANDLE;
+  m_texBuffer = VK_NULL_HANDLE;
   m_posOffset = m_normOffset = m_colorOffset = m_texOffset = 0;
   m_indexUploadBuffer = VK_NULL_HANDLE;
   m_indexUploadOffset = 0;
@@ -291,14 +253,14 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
         const auto& hookPara = renderer.shaderHookPara();
         if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
           auto& depthTexture = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
-                                                        m_backend.device(),
-                                                        "mesh dual-depth-peeling depth blender");
+                                                         m_backend.device(),
+                                                         "mesh dual-depth-peeling depth blender");
           drawTex->updateTexture(vkbind::kBindingDDPMeshDepthBlender, depthTexture, sampler);
         }
         if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
           auto& frontTexture = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
-                                                        m_backend.device(),
-                                                        "mesh dual-depth-peeling front blender");
+                                                         m_backend.device(),
+                                                         "mesh dual-depth-peeling front blender");
           drawTex->updateTexture(vkbind::kBindingDDPMeshFrontBlender, frontTexture, sampler);
         }
       } else if (!pickingPass && payload.textureHandle.valid() &&
@@ -306,10 +268,17 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
         auto& sampledTexture =
           vulkan::textureFromHandle(payload.textureHandle, m_backend.device(), "mesh payload sampled texture");
         switch (payload.colorSource) {
-          case MeshPayload::ColorSource::Mesh1DTexture: drawTex->updateTexture(0, sampledTexture, sampler); break;
-          case MeshPayload::ColorSource::Mesh2DTexture: drawTex->updateTexture(1, sampledTexture, sampler); break;
-          case MeshPayload::ColorSource::Mesh3DTexture: drawTex->updateTexture(2, sampledTexture, sampler); break;
-          default: break;
+          case MeshPayload::ColorSource::Mesh1DTexture:
+            drawTex->updateTexture(0, sampledTexture, sampler);
+            break;
+          case MeshPayload::ColorSource::Mesh2DTexture:
+            drawTex->updateTexture(1, sampledTexture, sampler);
+            break;
+          case MeshPayload::ColorSource::Mesh3DTexture:
+            drawTex->updateTexture(2, sampledTexture, sampler);
+            break;
+          default:
+            break;
         }
       }
       boundTexturesOverride = drawTex->descriptorSet();
@@ -330,11 +299,15 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   // Bind SoA streams; order must match makeSoAMeshVertexInput()
   std::vector<vk::Buffer> buffers;
   std::vector<vk::DeviceSize> offsets;
-  buffers.push_back(m_soaBuffer); offsets.push_back(m_posOffset);   // binding 0: positions
-  buffers.push_back(m_soaBuffer); offsets.push_back(m_normOffset);  // binding 1: normals
-  buffers.push_back(m_soaBuffer); offsets.push_back(m_colorOffset); // binding 2: colors
+  buffers.push_back(m_posBuffer);
+  offsets.push_back(m_posOffset); // binding 0: positions
+  buffers.push_back(m_normBuffer);
+  offsets.push_back(m_normOffset); // binding 1: normals
+  buffers.push_back(m_colorBuffer);
+  offsets.push_back(m_colorOffset); // binding 2: colors
   if (m_texBinding != TexBinding::None) {
-    buffers.push_back(m_soaBuffer); offsets.push_back(m_texOffset); // binding 3: tex
+    buffers.push_back(m_texBuffer);
+    offsets.push_back(m_texOffset); // binding 3: tex
   }
   cmd.bindVertexBuffers(0, buffers, offsets);
   if (m_indexCount > 0 && m_indexUploadBuffer) {
@@ -373,77 +346,82 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
       PipelineInstance& pipeline = ensurePipeline(key, formats);
       if (&pipeline != currentPipeline) {
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  // Dynamic vertex input (VK_EXT_vertex_input_dynamic_state)
-  if (m_backend.device().supportsVertexInputDynamicState()) {
-    std::vector<vk::VertexInputBindingDescription2EXT> bindings;
-    std::vector<vk::VertexInputAttributeDescription2EXT> attrs;
-    // binding 0: position
-    bindings.emplace_back(vk::VertexInputBindingDescription2EXT{.binding = 0,
-                                                                .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                                .inputRate = vk::VertexInputRate::eVertex,
-                                                                .divisor = 1});
-    attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 0,
-                                                               .binding = 0,
-                                                               .format = vk::Format::eR32G32B32Sfloat,
-                                                               .offset = 0});
-    // binding 1: normal
-    bindings.emplace_back(vk::VertexInputBindingDescription2EXT{.binding = 1,
-                                                                .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                                .inputRate = vk::VertexInputRate::eVertex,
-                                                                .divisor = 1});
-    attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 1,
-                                                               .binding = 1,
-                                                               .format = vk::Format::eR32G32B32Sfloat,
-                                                               .offset = 0});
-    // binding 2: color
-    bindings.emplace_back(vk::VertexInputBindingDescription2EXT{.binding = 2,
-                                                                .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
-                                                                .inputRate = vk::VertexInputRate::eVertex,
-                                                                .divisor = 1});
-    attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 2,
-                                                               .binding = 2,
-                                                               .format = vk::Format::eR32G32B32A32Sfloat,
-                                                               .offset = 0});
-    // binding 3: tex (optional)
-    if (m_texBinding == TexBinding::Tex1D) {
-      bindings.emplace_back(vk::VertexInputBindingDescription2EXT{.binding = 3,
-                                                                  .stride = static_cast<uint32_t>(sizeof(float)),
-                                                                  .inputRate = vk::VertexInputRate::eVertex,
-                                                                  .divisor = 1});
-      attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 3,
-                                                                 .binding = 3,
-                                                                 .format = vk::Format::eR32Sfloat,
-                                                                 .offset = 0});
-    } else if (m_texBinding == TexBinding::Tex2D) {
-      bindings.emplace_back(vk::VertexInputBindingDescription2EXT{.binding = 3,
-                                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec2)),
-                                                                  .inputRate = vk::VertexInputRate::eVertex,
-                                                                  .divisor = 1});
-      attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 4,
-                                                                 .binding = 3,
-                                                                 .format = vk::Format::eR32G32Sfloat,
-                                                                 .offset = 0});
-    } else if (m_texBinding == TexBinding::Tex3D) {
-      bindings.emplace_back(vk::VertexInputBindingDescription2EXT{.binding = 3,
-                                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                                  .inputRate = vk::VertexInputRate::eVertex,
-                                                                  .divisor = 1});
-      attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 5,
-                                                                 .binding = 3,
-                                                                 .format = vk::Format::eR32G32B32Sfloat,
-                                                                 .offset = 0});
-    }
-    cmd.setVertexInputEXT(bindings, attrs);
-  }
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
+        // Dynamic vertex input (VK_EXT_vertex_input_dynamic_state)
+        if (m_backend.device().supportsVertexInputDynamicState()) {
+          std::vector<vk::VertexInputBindingDescription2EXT> bindings;
+          std::vector<vk::VertexInputAttributeDescription2EXT> attrs;
+          // binding 0: position
+          bindings.emplace_back(
+            vk::VertexInputBindingDescription2EXT{.binding = 0,
+                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                                  .inputRate = vk::VertexInputRate::eVertex,
+                                                  .divisor = 1});
+          attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 0,
+                                                                     .binding = 0,
+                                                                     .format = vk::Format::eR32G32B32Sfloat,
+                                                                     .offset = 0});
+          // binding 1: normal
+          bindings.emplace_back(
+            vk::VertexInputBindingDescription2EXT{.binding = 1,
+                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                                  .inputRate = vk::VertexInputRate::eVertex,
+                                                  .divisor = 1});
+          attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 1,
+                                                                     .binding = 1,
+                                                                     .format = vk::Format::eR32G32B32Sfloat,
+                                                                     .offset = 0});
+          // binding 2: color
+          bindings.emplace_back(
+            vk::VertexInputBindingDescription2EXT{.binding = 2,
+                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
+                                                  .inputRate = vk::VertexInputRate::eVertex,
+                                                  .divisor = 1});
+          attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 2,
+                                                                     .binding = 2,
+                                                                     .format = vk::Format::eR32G32B32A32Sfloat,
+                                                                     .offset = 0});
+          // binding 3: tex (optional)
+          if (m_texBinding == TexBinding::Tex1D) {
+            bindings.emplace_back(vk::VertexInputBindingDescription2EXT{.binding = 3,
+                                                                        .stride = static_cast<uint32_t>(sizeof(float)),
+                                                                        .inputRate = vk::VertexInputRate::eVertex,
+                                                                        .divisor = 1});
+            attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 3,
+                                                                       .binding = 3,
+                                                                       .format = vk::Format::eR32Sfloat,
+                                                                       .offset = 0});
+          } else if (m_texBinding == TexBinding::Tex2D) {
+            bindings.emplace_back(
+              vk::VertexInputBindingDescription2EXT{.binding = 3,
+                                                    .stride = static_cast<uint32_t>(sizeof(glm::vec2)),
+                                                    .inputRate = vk::VertexInputRate::eVertex,
+                                                    .divisor = 1});
+            attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 4,
+                                                                       .binding = 3,
+                                                                       .format = vk::Format::eR32G32Sfloat,
+                                                                       .offset = 0});
+          } else if (m_texBinding == TexBinding::Tex3D) {
+            bindings.emplace_back(
+              vk::VertexInputBindingDescription2EXT{.binding = 3,
+                                                    .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                                    .inputRate = vk::VertexInputRate::eVertex,
+                                                    .divisor = 1});
+            attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 5,
+                                                                       .binding = 3,
+                                                                       .format = vk::Format::eR32G32B32Sfloat,
+                                                                       .offset = 0});
+          }
+          cmd.setVertexInputEXT(bindings, attrs);
+        }
         // Bind descriptor sets with optional textures override for set 0
         if (m_dsLighting && m_dsTransforms) {
           // For DDP peel require override; otherwise fall back to the shared set.
-          vk::DescriptorSet texturesSet = boundTexturesOverride ? boundTexturesOverride
-                                                                : (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel
-                                                                     ? vk::DescriptorSet{}
-                                                                     : (m_dsTextures ? m_dsTextures->descriptorSet()
-                                                                                    : vk::DescriptorSet{}));
+          vk::DescriptorSet texturesSet =
+            boundTexturesOverride ? boundTexturesOverride
+                                  : (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel
+                                       ? vk::DescriptorSet{}
+                                       : (m_dsTextures ? m_dsTextures->descriptorSet() : vk::DescriptorSet{}));
           if (texturesSet) {
             std::array<vk::DescriptorSet, 3> sets{texturesSet,
                                                   m_dsLighting->descriptorSet(),
@@ -469,7 +447,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
         } else {
           return;
         }
-        
+
         if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
           const float n = renderer.viewState().nearClip;
           const float f = renderer.viewState().farClip;
@@ -652,10 +630,18 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
   ensureDescriptorLayouts();
   ensurePlaceholderTextures();
 
-  if (!m_dsTextures) m_dsTextures = m_backend.allocateFrameDescriptorSet(**m_setTextures);
-  if (!m_dsLighting) m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
-  if (!m_dsTransforms) m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
-  if (!m_dsOIT && m_setOIT) m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  if (!m_dsTextures) {
+    m_dsTextures = m_backend.allocateFrameDescriptorSet(**m_setTextures);
+  }
+  if (!m_dsLighting) {
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+  }
+  if (!m_dsTransforms) {
+    m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+  }
+  if (!m_dsOIT && m_setOIT) {
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  }
 
   // Ensure UBO buffers exist before recording
   auto& device = m_backend.device();
@@ -895,13 +881,20 @@ void ZVulkanMeshPipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd
     return;
   }
 
-  const vk::DescriptorSet texSet = texturesOverride ? texturesOverride->descriptorSet()
-                                                    : m_dsTextures->descriptorSet();
+  const vk::DescriptorSet texSet = texturesOverride ? texturesOverride->descriptorSet() : m_dsTextures->descriptorSet();
   std::array<vk::DescriptorSet, 3> sets{texSet, m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
-  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                         pipeline.pipeline->pipelineLayout(),
+                         vkbind::kSetInputs,
+                         sets,
+                         {});
   if (m_dsOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetOITParams, sets3, {});
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetOITParams,
+                           sets3,
+                           {});
   }
 }
 
@@ -1170,24 +1163,47 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
   size_t texBytes = 0;
   TexBinding texBinding = TexBinding::None;
   switch (payload.colorSource) {
-    case MeshPayload::ColorSource::Mesh1DTexture: texBinding = TexBinding::Tex1D; texBytes = totalVertices * sizeof(float); break;
-    case MeshPayload::ColorSource::Mesh2DTexture: texBinding = TexBinding::Tex2D; texBytes = totalVertices * sizeof(glm::vec2); break;
-    case MeshPayload::ColorSource::Mesh3DTexture: texBinding = TexBinding::Tex3D; texBytes = totalVertices * sizeof(glm::vec3); break;
+    case MeshPayload::ColorSource::Mesh1DTexture:
+      texBinding = TexBinding::Tex1D;
+      texBytes = totalVertices * sizeof(float);
+      break;
+    case MeshPayload::ColorSource::Mesh2DTexture:
+      texBinding = TexBinding::Tex2D;
+      texBytes = totalVertices * sizeof(glm::vec2);
+      break;
+    case MeshPayload::ColorSource::Mesh3DTexture:
+      texBinding = TexBinding::Tex3D;
+      texBytes = totalVertices * sizeof(glm::vec3);
+      break;
     case MeshPayload::ColorSource::MeshColor:
     case MeshPayload::ColorSource::CustomColor:
-    default: texBinding = TexBinding::None; texBytes = 0; break;
+    default:
+      texBinding = TexBinding::None;
+      texBytes = 0;
+      break;
   }
 
+  m_backend.reserveUploadSlices({
+    {posBytes,                        alignof(glm::vec3)},
+    {normBytes,                       alignof(glm::vec3)},
+    {colorBytes,                      alignof(glm::vec4)},
+    {texBytes,                        4                 },
+    {totalIndices * sizeof(uint32_t), alignof(uint32_t) }
+  });
   auto posSlice = m_backend.suballocateUpload(posBytes, alignof(glm::vec3));
   auto normSlice = m_backend.suballocateUpload(normBytes, alignof(glm::vec3));
   auto colorSlice = m_backend.suballocateUpload(colorBytes, alignof(glm::vec4));
   auto texSlice = (texBytes > 0) ? m_backend.suballocateUpload(texBytes, 4) : Z3DRendererVulkanBackend::UploadSlice{};
-  if (!posSlice.buffer || !posSlice.mapped || !normSlice.buffer || !normSlice.mapped || !colorSlice.buffer || !colorSlice.mapped ||
-      (texBytes > 0 && (!texSlice.buffer || !texSlice.mapped))) {
+  if (!posSlice.buffer || !posSlice.mapped || !normSlice.buffer || !normSlice.mapped || !colorSlice.buffer ||
+      !colorSlice.mapped || (texBytes > 0 && (!texSlice.buffer || !texSlice.mapped))) {
     m_draws.clear();
     return;
   }
-  m_soaBuffer = posSlice.buffer; // default to upload arena; may be replaced by static cache below
+  // default to upload arena; may be replaced by static cache below
+  m_posBuffer = posSlice.buffer;
+  m_normBuffer = normSlice.buffer;
+  m_colorBuffer = colorSlice.buffer;
+  m_texBuffer = texSlice.buffer;
   m_posOffset = posSlice.offset;
   m_normOffset = normSlice.offset;
   m_colorOffset = colorSlice.offset;
@@ -1306,7 +1322,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
       draw.fallbackColor = fallbackColorNeeded ? kFallbackMeshColor : glm::vec4(1.0f);
     }
 
-  m_draws.push_back(draw);
+    m_draws.push_back(draw);
   }
 
   // ScopedMap unmaps automatically on destruction.
@@ -1346,19 +1362,44 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
       // If promoted and sizes match, restage changed streams selectively
       if (entry.promoted && sizeUnchanged) {
         size_t restagedBytes = 0;
-        if (!posSame) { m_backend.stageCopy(entry.vb, entry.posOffset, posSlice, false); entry.posGen = payload.posGen; restagedBytes += posBytes; }
-        if (!normSame) { m_backend.stageCopy(entry.vb, entry.normOffset, normSlice, false); entry.normGen = payload.normGen; restagedBytes += normBytes; }
-        if (!colorSame) { m_backend.stageCopy(entry.vb, entry.colorOffset, colorSlice, false); entry.colorGen = payload.colorGen; restagedBytes += colorBytes; }
-        if (texBytes > 0 && !texSame) { m_backend.stageCopy(entry.vb, entry.texOffset, texSlice, false); entry.texGen = payload.texGen; restagedBytes += texBytes; }
+        if (!posSame) {
+          m_backend.stageCopy(entry.vb, entry.posOffset, posSlice, false);
+          entry.posGen = payload.posGen;
+          restagedBytes += posBytes;
+        }
+        if (!normSame) {
+          m_backend.stageCopy(entry.vb, entry.normOffset, normSlice, false);
+          entry.normGen = payload.normGen;
+          restagedBytes += normBytes;
+        }
+        if (!colorSame) {
+          m_backend.stageCopy(entry.vb, entry.colorOffset, colorSlice, false);
+          entry.colorGen = payload.colorGen;
+          restagedBytes += colorBytes;
+        }
+        if (texBytes > 0 && !texSame) {
+          m_backend.stageCopy(entry.vb, entry.texOffset, texSlice, false);
+          entry.texGen = payload.texGen;
+          restagedBytes += texBytes;
+        }
         if (!idxSame && totalIndices > 0 && m_indexUploadBuffer) {
-          Z3DRendererVulkanBackend::UploadSlice idxUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr, totalIndices * sizeof(uint32_t)};
+          Z3DRendererVulkanBackend::UploadSlice idxUpload{m_indexUploadBuffer,
+                                                          m_indexUploadOffset,
+                                                          nullptr,
+                                                          totalIndices * sizeof(uint32_t)};
           m_backend.stageCopy(entry.ib, entry.indexOffset, idxUpload, true);
           entry.indexGen = payload.indexGen;
           restagedBytes += totalIndices * sizeof(uint32_t);
         }
-        if (restagedBytes > 0) m_backend.addMeshBytesStaged(restagedBytes);
+        if (restagedBytes > 0) {
+          m_backend.addMeshBytesStaged(restagedBytes);
+        }
         // Bind static slices
-        m_soaBuffer = entry.vb;
+        // All attribute streams reside in the same static VB
+        m_posBuffer = entry.vb;
+        m_normBuffer = entry.vb;
+        m_colorBuffer = entry.vb;
+        m_texBuffer = entry.vb;
         m_posOffset = entry.posOffset;
         m_normOffset = entry.normOffset;
         m_colorOffset = entry.colorOffset;
@@ -1385,18 +1426,31 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
         if (totalIndices > 0) {
           idxDst = m_backend.allocateStaticIB(totalIndices * sizeof(uint32_t), alignof(uint32_t));
         }
-        if (posDst.buffer && normDst.buffer && colorDst.buffer && (texBytes == 0 || haveTex) && (totalIndices == 0 || idxDst.buffer)) {
+        if (posDst.buffer && normDst.buffer && colorDst.buffer && (texBytes == 0 || haveTex) &&
+            (totalIndices == 0 || idxDst.buffer)) {
           // Record copies and count bytes
           size_t staged = 0;
-          m_backend.stageCopy(posDst.buffer, posDst.offset, posSlice, false); staged += posBytes;
-          m_backend.stageCopy(normDst.buffer, normDst.offset, normSlice, false); staged += normBytes;
-          m_backend.stageCopy(colorDst.buffer, colorDst.offset, colorSlice, false); staged += colorBytes;
-          if (texBytes > 0) { m_backend.stageCopy(texDst.buffer, texDst.offset, texSlice, false); staged += texBytes; }
-          if (totalIndices > 0) {
-            Z3DRendererVulkanBackend::UploadSlice idxUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr, totalIndices * sizeof(uint32_t)};
-            m_backend.stageCopy(idxDst.buffer, idxDst.offset, idxUpload, true); staged += totalIndices * sizeof(uint32_t);
+          m_backend.stageCopy(posDst.buffer, posDst.offset, posSlice, false);
+          staged += posBytes;
+          m_backend.stageCopy(normDst.buffer, normDst.offset, normSlice, false);
+          staged += normBytes;
+          m_backend.stageCopy(colorDst.buffer, colorDst.offset, colorSlice, false);
+          staged += colorBytes;
+          if (texBytes > 0) {
+            m_backend.stageCopy(texDst.buffer, texDst.offset, texSlice, false);
+            staged += texBytes;
           }
-          if (staged > 0) m_backend.addMeshBytesStaged(staged);
+          if (totalIndices > 0) {
+            Z3DRendererVulkanBackend::UploadSlice idxUpload{m_indexUploadBuffer,
+                                                            m_indexUploadOffset,
+                                                            nullptr,
+                                                            totalIndices * sizeof(uint32_t)};
+            m_backend.stageCopy(idxDst.buffer, idxDst.offset, idxUpload, true);
+            staged += totalIndices * sizeof(uint32_t);
+          }
+          if (staged > 0) {
+            m_backend.addMeshBytesStaged(staged);
+          }
           // Save cache entry
           entry.vb = posDst.buffer; // same buffer for all VB allocs
           entry.posOffset = posDst.offset;
@@ -1416,7 +1470,10 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
           entry.promoted = true;
 
           // Bind static slices immediately
-          m_soaBuffer = entry.vb;
+          m_posBuffer = entry.vb;
+          m_normBuffer = entry.vb;
+          m_colorBuffer = entry.vb;
+          m_texBuffer = entry.vb;
           m_posOffset = entry.posOffset;
           m_normOffset = entry.normOffset;
           m_colorOffset = entry.colorOffset;
@@ -1426,7 +1483,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
             m_indexUploadOffset = entry.indexOffset;
           }
         } else {
-          VLOG(1) << "Mesh static promotion skipped: arena out of space";
+          VLOG(2) << "Mesh static promotion skipped: arena out of space";
         }
       }
     }

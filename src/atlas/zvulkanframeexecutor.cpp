@@ -25,8 +25,7 @@ ZVulkanFrameExecutor::ActiveFrame::ActiveFrame(ActiveFrame&& other) noexcept
   other.m_executor = nullptr;
 }
 
-ZVulkanFrameExecutor::ActiveFrame&
-ZVulkanFrameExecutor::ActiveFrame::operator=(ActiveFrame&& other) noexcept
+ZVulkanFrameExecutor::ActiveFrame& ZVulkanFrameExecutor::ActiveFrame::operator=(ActiveFrame&& other) noexcept
 {
   if (this == &other) {
     return *this;
@@ -138,8 +137,8 @@ void ZVulkanFrameExecutor::rebuildFrames()
 
   for (uint32_t i = 0; i < m_maxFramesInFlight; ++i) {
     vk::CommandBufferAllocateInfo allocInfo{.commandPool = commandPool,
-                                           .level = vk::CommandBufferLevel::ePrimary,
-                                           .commandBufferCount = 1};
+                                            .level = vk::CommandBufferLevel::ePrimary,
+                                            .commandBufferCount = 1};
     vk::raii::CommandBuffers buffers(vkDevice, allocInfo);
 
     vk::FenceCreateInfo fenceInfo{.flags = vk::FenceCreateFlagBits::eSignaled};
@@ -230,8 +229,10 @@ void ZVulkanFrameExecutor::executeImmediate(const std::function<void(vk::raii::C
 
   // Wait for completion to keep semantics identical to the previous
   // executeImmediate behaviour.
-  const uint64_t kFenceTimeoutNs = std::numeric_limits<uint64_t>::max();
-  device.waitForFences({*fence}, VK_TRUE, kFenceTimeoutNs);
+  const auto waitResult2 = device.waitForFences({*fence}, VK_TRUE, kFenceTimeoutNs);
+  if (waitResult2 != vk::Result::eSuccess) {
+    LOG(WARNING) << "Immediate executor waitForFences returned " << vk::to_string(waitResult2);
+  }
 }
 
 } // namespace nim

@@ -109,8 +109,14 @@ private:
   {
     Z3DFontRenderer* renderer = nullptr;
     bool picking = false;
-    auto tie() const { return std::tuple(renderer, picking); }
-    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+    auto tie() const
+    {
+      return std::tuple(renderer, picking);
+    }
+    bool operator<(const CacheKey& rhs) const
+    {
+      return tie() < rhs.tie();
+    }
   };
   struct CacheEntry
   {
