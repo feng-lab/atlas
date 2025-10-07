@@ -100,6 +100,7 @@ private:
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
+  bool m_usedStaticVBThisFrame = false; // debug/telemetry: true if bound static VBs after uploadGeometry
   // Upload arena-backed SoA slices (per-attribute buffers)
   vk::Buffer m_centerRadiusBuffer{VK_NULL_HANDLE};
   vk::Buffer m_colorBuffer{VK_NULL_HANDLE};
@@ -148,7 +149,11 @@ private:
   };
   struct CacheEntry
   {
-    vk::Buffer vb = VK_NULL_HANDLE;
+    // Separate static buffers for each attribute stream (SoA)
+    vk::Buffer vbCenterRadius = VK_NULL_HANDLE;
+    vk::Buffer vbColor = VK_NULL_HANDLE;
+    vk::Buffer vbSpecular = VK_NULL_HANDLE;
+    vk::Buffer vbFlags = VK_NULL_HANDLE;
     vk::DeviceSize centerRadiusOffset = 0;
     vk::DeviceSize colorOffset = 0;
     vk::DeviceSize specularOffset = 0;

@@ -926,6 +926,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
   if (segmentOpen) {
     cmd.endRendering();
   }
+  // Execute any queued upload->static copies now (outside dynamic rendering)
+  flushScheduledCopies(cmd);
   if (m_activeFrame) {
     m_activeFrame->activeSegmentFormats.reset();
   }
@@ -1158,11 +1160,14 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
     if (arena.buffer) {
       arena.retiredBuffers.emplace_back(std::move(arena.buffer));
     }
-    arena.buffer = m_sharedDevice->createBuffer(
-      newCapacity,
-      vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
-        vk::BufferUsageFlagBits::eTransferDst,
-      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    // Upload arena buffers act as sources for GPU copies into device-local
+    // static buffers. They must carry TRANSFER_SRC usage (not DST).
+    arena.buffer = m_sharedDevice->createBuffer(newCapacity,
+                                               vk::BufferUsageFlagBits::eVertexBuffer |
+                                                 vk::BufferUsageFlagBits::eIndexBuffer |
+                                                 vk::BufferUsageFlagBits::eTransferSrc,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
     arena.capacity = newCapacity;
     arena.offset = 0;
     // Persistently map the entire buffer
@@ -1221,11 +1226,14 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   if (arena.buffer) {
     arena.retiredBuffers.emplace_back(std::move(arena.buffer));
   }
-  arena.buffer =
-    m_sharedDevice->createBuffer(newCapacity,
-                                 vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
-                                   vk::BufferUsageFlagBits::eTransferDst,
-                                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  // Upload arena buffers act as the source of GPU copies into device-local
+  // static buffers. They must be created with TRANSFER_SRC usage (not DST).
+  arena.buffer = m_sharedDevice->createBuffer(newCapacity,
+                                             vk::BufferUsageFlagBits::eVertexBuffer |
+                                               vk::BufferUsageFlagBits::eIndexBuffer |
+                                               vk::BufferUsageFlagBits::eTransferSrc,
+                                             vk::MemoryPropertyFlagBits::eHostVisible |
+                                               vk::MemoryPropertyFlagBits::eHostCoherent);
   arena.capacity = newCapacity;
   arena.offset = 0;
   arena.mapped = arena.buffer->map(0, newCapacity);
@@ -1567,6 +1575,29 @@ void Z3DRendererVulkanBackend::ensureFullscreenQuad()
   m_fullscreenQuadVbo->copyData(vertices.data(), bytes);
 }
 
+void Z3DRendererVulkanBackend::ensureDummyVertexBuffer()
+{
+  if (m_dummyVertexBuffer || !m_sharedDevice) {
+    return;
+  }
+  struct Dummy
+  {
+    uint32_t x;
+  } dummy{0u};
+  const size_t bytes = sizeof(Dummy);
+  m_dummyVertexBuffer = m_sharedDevice->createBuffer(bytes,
+                                                     vk::BufferUsageFlagBits::eVertexBuffer,
+                                                     vk::MemoryPropertyFlagBits::eHostVisible |
+                                                       vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_dummyVertexBuffer->copyData(&dummy, bytes);
+}
+
+vk::Buffer Z3DRendererVulkanBackend::dummyVertexBuffer()
+{
+  ensureDummyVertexBuffer();
+  return m_dummyVertexBuffer ? m_dummyVertexBuffer->buffer() : VK_NULL_HANDLE;
+}
+
 void Z3DRendererVulkanBackend::ensureReadbackSlots(size_t minBytes, uint32_t minSlots)
 {
   const uint32_t desired = std::max<uint32_t>(minSlots, std::max<uint32_t>(m_maxFramesInFlight, 2));
@@ -1702,6 +1733,66 @@ void Z3DRendererVulkanBackend::notifyPipelineBound(vk::Pipeline pipeline)
   // Track unique pipeline bindings for per-frame instrumentation
   VkPipeline raw = static_cast<VkPipeline>(pipeline);
   m_activeFrame->pipelinesBound.insert(reinterpret_cast<uint64_t>(raw));
+}
+
+// Queue a static copy to be performed outside dynamic rendering in this frame
+void Z3DRendererVulkanBackend::scheduleStaticCopy(vk::Buffer dst,
+                                                  vk::DeviceSize dstOffset,
+                                                  const UploadSlice& src,
+                                                  bool isIndexBuffer)
+{
+  if (!m_activeFrame) {
+    return;
+  }
+  FrameResources::ScheduledCopy sc{};
+  sc.dst = dst;
+  sc.dstOffset = dstOffset;
+  sc.src = src;
+  sc.isIndex = isIndexBuffer;
+  m_activeFrame->scheduledCopies.push_back(sc);
+}
+
+// Execute queued upload->static copies after all dynamic rendering segments end
+void Z3DRendererVulkanBackend::flushScheduledCopies(vk::raii::CommandBuffer& cmd)
+{
+  if (!m_activeFrame || m_activeFrame->scheduledCopies.empty()) {
+    return;
+  }
+  const size_t queued = m_activeFrame->scheduledCopies.size();
+  size_t flushed = 0;
+  size_t bytes = 0;
+  for (const auto& sc : m_activeFrame->scheduledCopies) {
+    if (!sc.dst || !sc.src.buffer || sc.src.size == 0) {
+      continue;
+    }
+    vk::BufferCopy region{.srcOffset = sc.src.offset,
+                          .dstOffset = sc.dstOffset,
+                          .size = static_cast<vk::DeviceSize>(sc.src.size)};
+    cmd.copyBuffer(sc.src.buffer, sc.dst, region);
+
+    // Make transfer writes visible to vertex input for subsequent frames
+    vk::BufferMemoryBarrier2 barrier{};
+    barrier.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
+    barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+    barrier.dstStageMask = vk::PipelineStageFlagBits2::eVertexInput;
+    barrier.dstAccessMask = sc.isIndex ? vk::AccessFlagBits2::eIndexRead
+                                       : vk::AccessFlagBits2::eVertexAttributeRead;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.buffer = sc.dst;
+    barrier.offset = sc.dstOffset;
+    barrier.size = region.size;
+    vk::DependencyInfo dep{};
+    dep.bufferMemoryBarrierCount = 1;
+    dep.pBufferMemoryBarriers = &barrier;
+    cmd.pipelineBarrier2(dep);
+
+    m_activeFrame->staticBytesStaged += sc.src.size;
+    flushed++;
+    bytes += sc.src.size;
+  }
+  VLOG(1) << fmt::format("VK flush copies: queued={} flushed={} bytes={}", queued, flushed, bytes);
+  m_activeFrame->scheduledCopies.clear();
 }
 
 void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)

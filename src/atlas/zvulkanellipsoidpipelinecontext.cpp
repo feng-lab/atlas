@@ -812,26 +812,65 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
       }
 
       if (entry.promoted && sizeSame) {
-        // Bind static
-        m_axis1Buffer = entry.vb;
-        m_axis2Buffer = entry.vb;
-        m_axis3Buffer = entry.vb;
-        m_centerBuffer = entry.vb;
-        m_colorBuffer = entry.vb;
-        m_flagsBuffer = entry.vb;
-        m_specularBuffer = entry.vb;
-        m_axis1Offset = entry.axis1Offset;
-        m_axis2Offset = entry.axis2Offset;
-        m_axis3Offset = entry.axis3Offset;
-        m_centerOffset = entry.centerOffset;
-        m_colorOffset = entry.colorOffset;
-        m_flagsOffset = entry.flagsOffset;
-        m_specularOffset = entry.specularOffset;
-        if (entry.indexCount > 0 && entry.ib) {
-          m_indexUploadBuffer = entry.ib;
-          m_indexUploadOffset = entry.ibOffset;
+        bool anyChanged = (entry.axesGen != payload.axesGen) || (entry.centersGen != payload.centersGen) ||
+                          (entry.flagsGen != payload.flagsGen) || (entry.indexGen != payload.indexGen);
+        if (payload.pickingPass) {
+          anyChanged = anyChanged || (entry.pickingColorsGen != payload.pickingColorsGen);
+        } else {
+          anyChanged = anyChanged || (entry.colorsGen != payload.colorsGen) ||
+                        (entry.specularGen != payload.specularGen);
         }
-        return;
+        if (entry.axesGen != payload.axesGen) {
+          m_backend.scheduleStaticCopy(entry.vbAxis1, entry.axis1Offset, axis1Slice, false);
+          m_backend.scheduleStaticCopy(entry.vbAxis2, entry.axis2Offset, axis2Slice, false);
+          m_backend.scheduleStaticCopy(entry.vbAxis3, entry.axis3Offset, axis3Slice, false);
+        }
+        if (entry.centersGen != payload.centersGen) {
+          m_backend.scheduleStaticCopy(entry.vbCenter, entry.centerOffset, centerSlice, false);
+        }
+        if (payload.pickingPass) {
+          if (entry.pickingColorsGen != payload.pickingColorsGen) {
+            m_backend.scheduleStaticCopy(entry.vbColor, entry.colorOffset, colorSlice, false);
+          }
+        } else {
+          if (entry.colorsGen != payload.colorsGen) {
+            m_backend.scheduleStaticCopy(entry.vbColor, entry.colorOffset, colorSlice, false);
+          }
+          if (entry.specularGen != payload.specularGen) {
+            m_backend.scheduleStaticCopy(entry.vbSpecular, entry.specularOffset, specSlice, false);
+          }
+        }
+        if (entry.flagsGen != payload.flagsGen) {
+          m_backend.scheduleStaticCopy(entry.vbFlags, entry.flagsOffset, flagsSlice, false);
+        }
+        if (entry.indexGen != payload.indexGen && m_indexUploadBuffer && m_indexCount > 0) {
+          Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr,
+                                                        m_indexCount * sizeof(uint32_t)};
+          m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iUpload, true);
+        }
+        if (!anyChanged) {
+          // Bind static
+          m_axis1Buffer = entry.vbAxis1;
+          m_axis2Buffer = entry.vbAxis2;
+          m_axis3Buffer = entry.vbAxis3;
+          m_centerBuffer = entry.vbCenter;
+          m_colorBuffer = entry.vbColor;
+          m_flagsBuffer = entry.vbFlags;
+          m_specularBuffer = entry.vbSpecular;
+          m_axis1Offset = entry.axis1Offset;
+          m_axis2Offset = entry.axis2Offset;
+          m_axis3Offset = entry.axis3Offset;
+          m_centerOffset = entry.centerOffset;
+          m_colorOffset = entry.colorOffset;
+          m_flagsOffset = entry.flagsOffset;
+          m_specularOffset = entry.specularOffset;
+          if (entry.indexCount > 0 && entry.ib) {
+            m_indexUploadBuffer = entry.ib;
+            m_indexUploadOffset = entry.ibOffset;
+          }
+          return;
+        }
+        return; // use upload slices for this frame
       }
 
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
@@ -850,19 +889,19 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
         if (axis1Dst.buffer && axis2Dst.buffer && axis3Dst.buffer && centerDst.buffer && colorDst.buffer &&
             flagsDst.buffer && specDst.buffer && (m_indexCount == 0 || ibDst.buffer)) {
           // Record per-stream copies
-          m_backend.stageCopy(axis1Dst.buffer, axis1Dst.offset, axis1Slice, false);
-          m_backend.stageCopy(axis2Dst.buffer, axis2Dst.offset, axis2Slice, false);
-          m_backend.stageCopy(axis3Dst.buffer, axis3Dst.offset, axis3Slice, false);
-          m_backend.stageCopy(centerDst.buffer, centerDst.offset, centerSlice, false);
-          m_backend.stageCopy(colorDst.buffer, colorDst.offset, colorSlice, false);
-          m_backend.stageCopy(flagsDst.buffer, flagsDst.offset, flagsSlice, false);
-          m_backend.stageCopy(specDst.buffer, specDst.offset, specSlice, false);
+          m_backend.scheduleStaticCopy(axis1Dst.buffer, axis1Dst.offset, axis1Slice, false);
+          m_backend.scheduleStaticCopy(axis2Dst.buffer, axis2Dst.offset, axis2Slice, false);
+          m_backend.scheduleStaticCopy(axis3Dst.buffer, axis3Dst.offset, axis3Slice, false);
+          m_backend.scheduleStaticCopy(centerDst.buffer, centerDst.offset, centerSlice, false);
+          m_backend.scheduleStaticCopy(colorDst.buffer, colorDst.offset, colorSlice, false);
+          m_backend.scheduleStaticCopy(flagsDst.buffer, flagsDst.offset, flagsSlice, false);
+          m_backend.scheduleStaticCopy(specDst.buffer, specDst.offset, specSlice, false);
           if (m_indexCount > 0) {
             Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer,
                                                           m_indexUploadOffset,
                                                           nullptr,
                                                           m_indexCount * sizeof(uint32_t)};
-            m_backend.stageCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
+            m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
           }
           VLOG(1) << fmt::format(
             "VK ellipsoid promote: axis1={}B axis2={}B axis3={}B center={}B color={}B flags={}B spec={}B idx={}B",
@@ -874,7 +913,13 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
             flagsBytes,
             specBytes,
             m_indexCount * sizeof(uint32_t));
-          entry.vb = axis1Dst.buffer; // all static slices are in same arena buffer
+          entry.vbAxis1 = axis1Dst.buffer;
+          entry.vbAxis2 = axis2Dst.buffer;
+          entry.vbAxis3 = axis3Dst.buffer;
+          entry.vbCenter = centerDst.buffer;
+          entry.vbColor = colorDst.buffer;
+          entry.vbFlags = flagsDst.buffer;
+          entry.vbSpecular = specDst.buffer;
           entry.axis1Offset = axis1Dst.offset;
           entry.axis2Offset = axis2Dst.offset;
           entry.axis3Offset = axis3Dst.offset;
@@ -885,25 +930,7 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
           entry.ib = ibDst.buffer;
           entry.ibOffset = ibDst.offset;
           entry.promoted = true;
-          // Bind static for this draw
-          m_axis1Buffer = entry.vb;
-          m_axis2Buffer = entry.vb;
-          m_axis3Buffer = entry.vb;
-          m_centerBuffer = entry.vb;
-          m_colorBuffer = entry.vb;
-          m_flagsBuffer = entry.vb;
-          m_specularBuffer = entry.vb;
-          m_axis1Offset = entry.axis1Offset;
-          m_axis2Offset = entry.axis2Offset;
-          m_axis3Offset = entry.axis3Offset;
-          m_centerOffset = entry.centerOffset;
-          m_colorOffset = entry.colorOffset;
-          m_flagsOffset = entry.flagsOffset;
-          m_specularOffset = entry.specularOffset;
-          if (entry.indexCount > 0 && entry.ib) {
-            m_indexUploadBuffer = entry.ib;
-            m_indexUploadOffset = entry.ibOffset;
-          }
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
         }
       }
     }

@@ -272,34 +272,40 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
       if (entry.promoted && sizeSame) {
         // Restage VB/IB if any gen changed
         size_t restaged = 0;
+        bool anyChanged = false;
         if (entry.posGen != payload.positionsGen || entry.texGen != payload.texcoordsGen ||
             entry.colorGen != (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen)) {
-          m_backend.stageCopy(entry.vb, entry.vbOffset, vSlice, /*isIndexBuffer=*/false);
+          m_backend.scheduleStaticCopy(entry.vb, entry.vbOffset, vSlice, /*isIndexBuffer=*/false);
           entry.posGen = payload.positionsGen;
           entry.texGen = payload.texcoordsGen;
           entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
           restaged += vtxCount * sizeof(FontVertex);
+          anyChanged = true;
         }
         if (entry.indexGen != payload.indicesGen) {
-          m_backend.stageCopy(entry.ib, entry.ibOffset, iSlice, /*isIndexBuffer=*/true);
+          m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iSlice, /*isIndexBuffer=*/true);
           entry.indexGen = payload.indicesGen;
           restaged += idxCount * sizeof(uint32_t);
+          anyChanged = true;
         }
         if (restaged > 0) {
           m_backend.addFontBytesStaged(restaged);
         }
-        m_vertexUploadBuffer = entry.vb;
-        m_vertexUploadOffset = entry.vbOffset;
-        m_indexUploadBuffer = entry.ib;
-        m_indexUploadOffset = entry.ibOffset;
+        if (!anyChanged) {
+          // Bind statics on steady frames
+          m_vertexUploadBuffer = entry.vb;
+          m_vertexUploadOffset = entry.vbOffset;
+          m_indexUploadBuffer = entry.ib;
+          m_indexUploadOffset = entry.ibOffset;
+        }
         return;
       }
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
         auto vbDst = m_backend.allocateStaticVB(vtxCount * sizeof(FontVertex), alignof(FontVertex));
         auto ibDst = m_backend.allocateStaticIB(idxCount * sizeof(uint32_t), alignof(uint32_t));
         if (vbDst.buffer && ibDst.buffer) {
-          m_backend.stageCopy(vbDst.buffer, vbDst.offset, vSlice, /*isIndexBuffer=*/false);
-          m_backend.stageCopy(ibDst.buffer, ibDst.offset, iSlice, /*isIndexBuffer=*/true);
+          m_backend.scheduleStaticCopy(vbDst.buffer, vbDst.offset, vSlice, /*isIndexBuffer=*/false);
+          m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, iSlice, /*isIndexBuffer=*/true);
           entry.vb = vbDst.buffer;
           entry.vbOffset = vbDst.offset;
           entry.ib = ibDst.buffer;
@@ -310,10 +316,7 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
           entry.indexGen = payload.indicesGen;
           entry.promoted = true;
           m_backend.addFontBytesStaged(vtxCount * sizeof(FontVertex) + idxCount * sizeof(uint32_t));
-          m_vertexUploadBuffer = entry.vb;
-          m_vertexUploadOffset = entry.vbOffset;
-          m_indexUploadBuffer = entry.ib;
-          m_indexUploadOffset = entry.ibOffset;
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
           return;
         }
       }

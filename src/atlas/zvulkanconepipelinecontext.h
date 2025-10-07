@@ -140,7 +140,12 @@ private:
   };
   struct CacheEntry
   {
-    vk::Buffer vb = VK_NULL_HANDLE;
+    // Separate static buffers for each attribute stream
+    vk::Buffer vbOrigin = VK_NULL_HANDLE;
+    vk::Buffer vbAxis = VK_NULL_HANDLE;
+    vk::Buffer vbFlags = VK_NULL_HANDLE;
+    vk::Buffer vbBaseColor = VK_NULL_HANDLE;
+    vk::Buffer vbTopColor = VK_NULL_HANDLE;
     vk::DeviceSize originOffset = 0;
     vk::DeviceSize axisOffset = 0;
     vk::DeviceSize flagsOffset = 0;

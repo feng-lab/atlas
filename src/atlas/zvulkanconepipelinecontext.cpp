@@ -122,6 +122,23 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
+  VLOG(1) << fmt::format(
+    "VK cone draw: picking={} useShader2={} verts={} idx={} buf(origin={}, axis={}, flags={}, base={}, top={}) offs(o={}, a={}, f={}, b={}, t={})",
+    payload.pickingPass,
+    payload.useConeShader2,
+    m_vertexCount,
+    m_indexCount,
+    static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(m_originBuffer))),
+    static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(m_axisBuffer))),
+    static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(m_flagsBuffer))),
+    static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(m_baseColorBuffer))),
+    static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(m_topColorBuffer))),
+    m_originOffset,
+    m_axisOffset,
+    m_flagsOffset,
+    m_baseColorOffset,
+    m_topColorOffset);
+
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = renderer.shaderHookType();
 
@@ -568,7 +585,9 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
-  instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+  // Screen-space cone quads (cone_2.vert) end up with CW winding under Vulkan
+  // due to clip-space conventions. Treat CW as front to match GL behavior.
+  instance.pipeline->setFrontFace(vk::FrontFace::eClockwise);
 
   vk::PipelineColorBlendAttachmentState baseBlend{};
   baseBlend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
@@ -872,30 +891,51 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
       }
 
       if (entry.promoted && sizeSame) {
-        // Optional: restage colors if changed (AoS; we restage full VBO here)
+        bool anyChanged = false;
         if (entry.baseColorGen != payload.baseColorGen || entry.pickingColorsGen != payload.pickingColorsGen) {
-          m_backend.stageCopy(entry.vb, entry.baseColorOffset, baseColorSlice, false);
-          entry.baseColorGen = payload.baseColorGen;
-          entry.pickingColorsGen = payload.pickingColorsGen;
+          m_backend.scheduleStaticCopy(entry.vbBaseColor, entry.baseColorOffset, baseColorSlice, false);
+          anyChanged = true;
         }
         if (!payload.sameColorForBaseAndTop && entry.topColorGen != payload.topColorGen) {
-          m_backend.stageCopy(entry.vb, entry.topColorOffset, topColorSlice, false);
-          entry.topColorGen = payload.topColorGen;
+          m_backend.scheduleStaticCopy(entry.vbTopColor, entry.topColorOffset, topColorSlice, false);
+          anyChanged = true;
         }
-        // Bind static: all attribute streams reside in the same static VB
-        m_originBuffer = entry.vb;
-        m_axisBuffer = entry.vb;
-        m_flagsBuffer = entry.vb;
-        m_baseColorBuffer = entry.vb;
-        m_topColorBuffer = entry.vb;
-        m_originOffset = entry.originOffset;
-        m_axisOffset = entry.axisOffset;
-        m_flagsOffset = entry.flagsOffset;
-        m_baseColorOffset = entry.baseColorOffset;
-        m_topColorOffset = entry.topColorOffset;
-        if (entry.indexCount > 0 && entry.ib) {
-          m_indexUploadBuffer = entry.ib;
-          m_indexUploadOffset = entry.ibOffset;
+        if (entry.axisGen != payload.axisGen) {
+          m_backend.scheduleStaticCopy(entry.vbAxis, entry.axisOffset, axisSlice, false);
+          anyChanged = true;
+        }
+        if (entry.baseGen != payload.baseGen) {
+          m_backend.scheduleStaticCopy(entry.vbOrigin, entry.originOffset, originSlice, false);
+          anyChanged = true;
+        }
+        if (entry.flagsGen != payload.flagsGen) {
+          m_backend.scheduleStaticCopy(entry.vbFlags, entry.flagsOffset, flagsSlice, false);
+          anyChanged = true;
+        }
+        if (entry.indexGen != payload.indexGen && m_indexCount > 0 && m_indexUploadBuffer) {
+          Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr,
+                                                        m_indexCount * sizeof(uint32_t)};
+          m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iUpload, true);
+          anyChanged = true;
+        }
+        if (!anyChanged) {
+          m_originBuffer = entry.vbOrigin;
+          m_axisBuffer = entry.vbAxis;
+          m_flagsBuffer = entry.vbFlags;
+          m_baseColorBuffer = entry.vbBaseColor;
+          m_topColorBuffer = entry.vbTopColor;
+          m_originOffset = entry.originOffset;
+          m_axisOffset = entry.axisOffset;
+          m_flagsOffset = entry.flagsOffset;
+          m_baseColorOffset = entry.baseColorOffset;
+          m_topColorOffset = entry.topColorOffset;
+          if (entry.indexCount > 0 && entry.ib) {
+            m_indexUploadBuffer = entry.ib;
+            m_indexUploadOffset = entry.ibOffset;
+          }
+        } else {
+          // Defer promotion copies to the next frame; use upload slices now.
+          return;
         }
         return;
       }
@@ -912,17 +952,17 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
         }
         if (originDst.buffer && axisDst.buffer && flagsDst.buffer && baseColorDst.buffer && topColorDst.buffer &&
             (m_indexCount == 0 || ibDst.buffer)) {
-          m_backend.stageCopy(originDst.buffer, originDst.offset, originSlice, false);
-          m_backend.stageCopy(axisDst.buffer, axisDst.offset, axisSlice, false);
-          m_backend.stageCopy(flagsDst.buffer, flagsDst.offset, flagsSlice, false);
-          m_backend.stageCopy(baseColorDst.buffer, baseColorDst.offset, baseColorSlice, false);
-          m_backend.stageCopy(topColorDst.buffer, topColorDst.offset, topColorSlice, false);
+          m_backend.scheduleStaticCopy(originDst.buffer, originDst.offset, originSlice, false);
+          m_backend.scheduleStaticCopy(axisDst.buffer, axisDst.offset, axisSlice, false);
+          m_backend.scheduleStaticCopy(flagsDst.buffer, flagsDst.offset, flagsSlice, false);
+          m_backend.scheduleStaticCopy(baseColorDst.buffer, baseColorDst.offset, baseColorSlice, false);
+          m_backend.scheduleStaticCopy(topColorDst.buffer, topColorDst.offset, topColorSlice, false);
           if (m_indexCount > 0) {
             Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer,
                                                           m_indexUploadOffset,
                                                           nullptr,
                                                           m_indexCount * sizeof(uint32_t)};
-            m_backend.stageCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
+            m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
           }
           VLOG(1) << fmt::format("VK cone promote: origin={}B axis={}B flags={}B baseColor={}B topColor={}B idx={}B",
                                  v4Bytes,
@@ -931,7 +971,11 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
                                  v4Bytes,
                                  v4Bytes,
                                  m_indexCount * sizeof(uint32_t));
-          entry.vb = originDst.buffer;
+          entry.vbOrigin = originDst.buffer;
+          entry.vbAxis = axisDst.buffer;
+          entry.vbFlags = flagsDst.buffer;
+          entry.vbBaseColor = baseColorDst.buffer;
+          entry.vbTopColor = topColorDst.buffer;
           entry.originOffset = originDst.offset;
           entry.axisOffset = axisDst.offset;
           entry.flagsOffset = flagsDst.offset;
@@ -940,21 +984,7 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
           entry.ib = ibDst.buffer;
           entry.ibOffset = ibDst.offset;
           entry.promoted = true;
-          // Bind static for this draw: same VB for all attributes
-          m_originBuffer = entry.vb;
-          m_axisBuffer = entry.vb;
-          m_flagsBuffer = entry.vb;
-          m_baseColorBuffer = entry.vb;
-          m_topColorBuffer = entry.vb;
-          m_originOffset = entry.originOffset;
-          m_axisOffset = entry.axisOffset;
-          m_flagsOffset = entry.flagsOffset;
-          m_baseColorOffset = entry.baseColorOffset;
-          m_topColorOffset = entry.topColorOffset;
-          if (entry.indexCount > 0 && entry.ib) {
-            m_indexUploadBuffer = entry.ib;
-            m_indexUploadOffset = entry.ibOffset;
-          }
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
         }
       }
     }

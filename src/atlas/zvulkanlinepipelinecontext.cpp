@@ -714,62 +714,58 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
       }
 
       if (entry.promoted && sizeSame) {
-        size_t restagedBytes = 0;
+        bool anyChanged = (entry.p0Gen != payload.smoothP0PositionsGen) ||
+                          (entry.p1Gen != payload.smoothP1PositionsGen) ||
+                          (entry.flagsGen != payload.smoothFlagsGen) ||
+                          (entry.indexGen != (payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen));
+        if (pickingPass) {
+          anyChanged = anyChanged || (entry.pickGen != payload.smoothPickingColorsGen);
+        } else {
+          anyChanged = anyChanged || (entry.c0Gen != payload.smoothP0ColorsGen) ||
+                        (entry.c1Gen != payload.smoothP1ColorsGen);
+        }
         if (entry.p0Gen != payload.smoothP0PositionsGen) {
-          m_backend.stageCopy(entry.vb, entry.p0Offset, p0Slice, false);
-          entry.p0Gen = payload.smoothP0PositionsGen;
-          restagedBytes += pBytes;
+          m_backend.scheduleStaticCopy(entry.vbP0, entry.p0Offset, p0Slice, false);
         }
         if (entry.p1Gen != payload.smoothP1PositionsGen) {
-          m_backend.stageCopy(entry.vb, entry.p1Offset, p1Slice, false);
-          entry.p1Gen = payload.smoothP1PositionsGen;
-          restagedBytes += pBytes;
+          m_backend.scheduleStaticCopy(entry.vbP1, entry.p1Offset, p1Slice, false);
         }
         if (pickingPass) {
           if (entry.pickGen != payload.smoothPickingColorsGen) {
-            m_backend.stageCopy(entry.vb, entry.c0Offset, c0Slice, false);
-            m_backend.stageCopy(entry.vb, entry.c1Offset, c1Slice, false);
-            entry.pickGen = payload.smoothPickingColorsGen;
-            restagedBytes += 2 * cBytes;
+            m_backend.scheduleStaticCopy(entry.vbC0, entry.c0Offset, c0Slice, false);
+            m_backend.scheduleStaticCopy(entry.vbC1, entry.c1Offset, c1Slice, false);
           }
         } else {
           if (entry.c0Gen != payload.smoothP0ColorsGen) {
-            m_backend.stageCopy(entry.vb, entry.c0Offset, c0Slice, false);
-            entry.c0Gen = payload.smoothP0ColorsGen;
-            restagedBytes += cBytes;
+            m_backend.scheduleStaticCopy(entry.vbC0, entry.c0Offset, c0Slice, false);
           }
           if (entry.c1Gen != payload.smoothP1ColorsGen) {
-            m_backend.stageCopy(entry.vb, entry.c1Offset, c1Slice, false);
-            entry.c1Gen = payload.smoothP1ColorsGen;
-            restagedBytes += cBytes;
+            m_backend.scheduleStaticCopy(entry.vbC1, entry.c1Offset, c1Slice, false);
           }
         }
         if (entry.flagsGen != payload.smoothFlagsGen) {
-          m_backend.stageCopy(entry.vb, entry.flagsOffset, flagsSlice, false);
-          entry.flagsGen = payload.smoothFlagsGen;
-          restagedBytes += fBytes;
+          m_backend.scheduleStaticCopy(entry.vbFlags, entry.flagsOffset, flagsSlice, false);
         }
-        if (entry.indexGen != payload.indicesGen) {
-          m_backend.stageCopy(entry.ib, entry.ibOffset, idxSlice, true);
-          entry.indexGen = payload.indicesGen;
-          restagedBytes += indexCount * sizeof(uint32_t);
+        if (entry.indexGen != (payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen) &&
+            m_wideUploadIndexCount > 0) {
+          m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, idxSlice, true);
         }
-        if (restagedBytes > 0) {
-          m_backend.addLineBytesStaged(restagedBytes);
+        if (!anyChanged) {
+          m_wideP0Buffer = entry.vbP0;
+          m_wideP1Buffer = entry.vbP1;
+          m_wideC0Buffer = entry.vbC0;
+          m_wideC1Buffer = entry.vbC1;
+          m_wideFlagsBuffer = entry.vbFlags;
+          m_wideP0Offset = entry.p0Offset;
+          m_wideP1Offset = entry.p1Offset;
+          m_wideC0Offset = entry.c0Offset;
+          m_wideC1Offset = entry.c1Offset;
+          m_wideFlagsOffset = entry.flagsOffset;
+          m_wideIndexBuffer = entry.ib ? entry.ib : VK_NULL_HANDLE;
+          m_wideUploadIndexOffset = entry.ibOffset;
+          return;
         }
-        m_wideP0Buffer = entry.vb;
-        m_wideP1Buffer = entry.vb;
-        m_wideC0Buffer = entry.vb;
-        m_wideC1Buffer = entry.vb;
-        m_wideFlagsBuffer = entry.vb;
-        m_wideP0Offset = entry.p0Offset;
-        m_wideP1Offset = entry.p1Offset;
-        m_wideC0Offset = entry.c0Offset;
-        m_wideC1Offset = entry.c1Offset;
-        m_wideFlagsOffset = entry.flagsOffset;
-        m_wideIndexBuffer = entry.ib ? entry.ib : entry.vb;
-        m_wideUploadIndexOffset = entry.ibOffset;
-        return;
+        return; // use upload slices for this frame
       }
 
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
@@ -780,13 +776,17 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
         auto fDst = m_backend.allocateStaticVB(fBytes, alignof(float));
         auto ibDst = m_backend.allocateStaticIB(indexCount * sizeof(uint32_t), alignof(uint32_t));
         if (p0Dst.buffer && p1Dst.buffer && c0Dst.buffer && c1Dst.buffer && fDst.buffer && ibDst.buffer) {
-          m_backend.stageCopy(p0Dst.buffer, p0Dst.offset, p0Slice, false);
-          m_backend.stageCopy(p1Dst.buffer, p1Dst.offset, p1Slice, false);
-          m_backend.stageCopy(c0Dst.buffer, c0Dst.offset, c0Slice, false);
-          m_backend.stageCopy(c1Dst.buffer, c1Dst.offset, c1Slice, false);
-          m_backend.stageCopy(fDst.buffer, fDst.offset, flagsSlice, false);
-          m_backend.stageCopy(ibDst.buffer, ibDst.offset, idxSlice, true);
-          entry.vb = p0Dst.buffer;
+          m_backend.scheduleStaticCopy(p0Dst.buffer, p0Dst.offset, p0Slice, false);
+          m_backend.scheduleStaticCopy(p1Dst.buffer, p1Dst.offset, p1Slice, false);
+          m_backend.scheduleStaticCopy(c0Dst.buffer, c0Dst.offset, c0Slice, false);
+          m_backend.scheduleStaticCopy(c1Dst.buffer, c1Dst.offset, c1Slice, false);
+          m_backend.scheduleStaticCopy(fDst.buffer, fDst.offset, flagsSlice, false);
+          m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, idxSlice, true);
+          entry.vbP0 = p0Dst.buffer;
+          entry.vbP1 = p1Dst.buffer;
+          entry.vbC0 = c0Dst.buffer;
+          entry.vbC1 = c1Dst.buffer;
+          entry.vbFlags = fDst.buffer;
           entry.p0Offset = p0Dst.offset;
           entry.p1Offset = p1Dst.offset;
           entry.c0Offset = c0Dst.offset;
@@ -805,18 +805,7 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
           }
           entry.indexGen = payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen;
           entry.promoted = true;
-          m_wideP0Buffer = entry.vb;
-          m_wideP1Buffer = entry.vb;
-          m_wideC0Buffer = entry.vb;
-          m_wideC1Buffer = entry.vb;
-          m_wideFlagsBuffer = entry.vb;
-          m_wideP0Offset = entry.p0Offset;
-          m_wideP1Offset = entry.p1Offset;
-          m_wideC0Offset = entry.c0Offset;
-          m_wideC1Offset = entry.c1Offset;
-          m_wideFlagsOffset = entry.flagsOffset;
-          m_wideIndexBuffer = entry.ib;
-          m_wideUploadIndexOffset = entry.ibOffset;
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
           m_backend.addLineBytesStaged(2 * pBytes + 2 * cBytes + fBytes + indexCount * sizeof(uint32_t));
           VLOG(1) << fmt::format("VK line wide promote: p0={}B p1={}B c0={}B c1={}B flags={}B idx={}B",
                                  pBytes,
@@ -960,36 +949,32 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
       }
 
       if (entry.promoted && sizeSame) {
+        bool anyChanged = (entry.positionsGen != payload.positionsGen) ||
+                          (entry.colorsGen != colorGen) ||
+                          (payload.isLineStrip && entry.indexGen != payload.indicesGen);
         if (entry.positionsGen != payload.positionsGen) {
-          m_backend.stageCopy(entry.vb, entry.posOffset, posSlice, false);
-          entry.positionsGen = payload.positionsGen;
-          m_backend.addLineBytesStaged(posBytes);
+          m_backend.scheduleStaticCopy(entry.vbPos, entry.posOffset, posSlice, false);
         }
         if (entry.colorsGen != colorGen) {
-          m_backend.stageCopy(entry.vb, entry.colorOffset, colSlice, false);
-          entry.colorsGen = colorGen;
-          m_backend.addLineBytesStaged(colBytes);
+          m_backend.scheduleStaticCopy(entry.vbColor, entry.colorOffset, colSlice, false);
         }
         if (payload.isLineStrip && entry.indexGen != payload.indicesGen && m_thinUploadIndexBuffer) {
-          Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer,
-                                                        m_thinUploadIndexOffset,
-                                                        nullptr,
+          Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer, m_thinUploadIndexOffset, nullptr,
                                                         static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t)};
-          m_backend.stageCopy(entry.ib ? entry.ib : entry.vb,
-                              entry.ib ? entry.ibOffset : entry.posOffset,
-                              iUpload,
-                              /*isIndexBuffer=*/true);
-          entry.indexGen = payload.indicesGen;
+          if (entry.ib) m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iUpload, true);
         }
-        m_thinPosBuffer = entry.vb;
-        m_thinColorBuffer = entry.vb;
-        m_thinPosOffset = entry.posOffset;
-        m_thinColorOffset = entry.colorOffset;
-        if (payload.isLineStrip && entry.ib) {
-          m_thinUploadIndexBuffer = entry.ib;
-          m_thinUploadIndexOffset = entry.ibOffset;
+        if (!anyChanged) {
+          m_thinPosBuffer = entry.vbPos;
+          m_thinColorBuffer = entry.vbColor;
+          m_thinPosOffset = entry.posOffset;
+          m_thinColorOffset = entry.colorOffset;
+          if (payload.isLineStrip && entry.ib) {
+            m_thinUploadIndexBuffer = entry.ib;
+            m_thinUploadIndexOffset = entry.ibOffset;
+          }
+          return;
         }
-        return;
+        return; // use upload slices for this frame
       }
 
       if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
@@ -1001,17 +986,18 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
                                              alignof(uint32_t));
         }
         if (posDst.buffer && colDst.buffer && (!payload.isLineStrip || ibDst.buffer)) {
-          m_backend.stageCopy(posDst.buffer, posDst.offset, posSlice, false);
-          m_backend.stageCopy(colDst.buffer, colDst.offset, colSlice, false);
+          m_backend.scheduleStaticCopy(posDst.buffer, posDst.offset, posSlice, false);
+          m_backend.scheduleStaticCopy(colDst.buffer, colDst.offset, colSlice, false);
           if (payload.isLineStrip && m_thinUploadIndexCount > 0) {
             Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer,
                                                           m_thinUploadIndexOffset,
                                                           nullptr,
                                                           static_cast<size_t>(m_thinUploadIndexCount) *
                                                             sizeof(uint32_t)};
-            m_backend.stageCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
+            m_backend.scheduleStaticCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
           }
-          entry.vb = posDst.buffer;
+          entry.vbPos = posDst.buffer;
+          entry.vbColor = colDst.buffer;
           entry.posOffset = posDst.offset;
           entry.colorOffset = colDst.offset;
           entry.ib = ibDst.buffer;
@@ -1022,14 +1008,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           entry.colorsGen = colorGen;
           entry.indexGen = payload.indicesGen;
           entry.promoted = true;
-          m_thinPosBuffer = entry.vb;
-          m_thinColorBuffer = entry.vb;
-          m_thinPosOffset = entry.posOffset;
-          m_thinColorOffset = entry.colorOffset;
-          if (payload.isLineStrip && entry.ib) {
-            m_thinUploadIndexBuffer = entry.ib;
-            m_thinUploadIndexOffset = entry.ibOffset;
-          }
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
           m_backend.addLineBytesStaged(
             posBytes + colBytes +
             (payload.isLineStrip ? static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t) : 0u));

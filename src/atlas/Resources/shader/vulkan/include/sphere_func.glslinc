@@ -36,9 +36,9 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   float dist = b - sqrt(position);
   vec3 ipoint = dist * rayDirection + rayOrigin;
 
-  // Compute depth in NDC using the projection matrix (match GL path)
+  // Compute depth in NDC using the projection matrix (Vulkan z in [0,1])
   vec2 clipZW = ipoint.z * xf.projection_matrix[2].zw + xf.projection_matrix[3].zw;
-  float depth = 0.5 + 0.5 * clipZW.x / clipZW.y;
+  float depth = clipZW.x / clipZW.y;
   if (depth <= 0.0) discard;
   if (depth >= 1.0) discard;
   fragDepth = depth;

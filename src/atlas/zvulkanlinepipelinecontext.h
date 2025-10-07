@@ -150,7 +150,9 @@ private:
   };
   struct ThinCacheEntry
   {
-    vk::Buffer vb = VK_NULL_HANDLE; // device-local VB
+    // Separate static VBs for positions and colors
+    vk::Buffer vbPos = VK_NULL_HANDLE;
+    vk::Buffer vbColor = VK_NULL_HANDLE;
     vk::DeviceSize posOffset = 0;
     vk::DeviceSize colorOffset = 0;
     uint32_t vertexCount = 0;
@@ -180,7 +182,12 @@ private:
   };
   struct WideCacheEntry
   {
-    vk::Buffer vb = VK_NULL_HANDLE; // device-local VB holding SoA streams
+    // Static VBs per attribute (SoA)
+    vk::Buffer vbP0 = VK_NULL_HANDLE;
+    vk::Buffer vbP1 = VK_NULL_HANDLE;
+    vk::Buffer vbC0 = VK_NULL_HANDLE;
+    vk::Buffer vbC1 = VK_NULL_HANDLE;
+    vk::Buffer vbFlags = VK_NULL_HANDLE;
     vk::DeviceSize p0Offset = 0;
     vk::DeviceSize p1Offset = 0;
     vk::DeviceSize c0Offset = 0;

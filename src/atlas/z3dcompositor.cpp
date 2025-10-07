@@ -2072,7 +2072,12 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
       pass.transparency = m_rendererBase.sceneState().transparency;
       pass.msaaMode = m_rendererBase.sceneState().multisample;
       pass.clearColor = false;
-      pass.clearDepth = false;
+      // Clear depth before drawing scene geometry to avoid any stale
+      // depth values from previous frames showing up when content changes
+      // (e.g., color edits) but geometry/targets remain the same. Background
+      // rendering does not write depth in Vulkan, so clearing here is safe
+      // and ensures the very next frame after an edit is fully visible.
+      pass.clearDepth = true;
       pass.clearStencil = false;
       pass.clearValue = {};
       pass.opaqueFilters.assign(opaqueFilters.begin(), opaqueFilters.end());
@@ -2255,6 +2260,12 @@ void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
   ensureLease(m_outRenderTarget2);
   ensureLease(m_leftEyeOutRenderTarget1);
   ensureLease(m_leftEyeOutRenderTarget2);
+
+  // Keep renderer viewport in sync with the active output size so batches
+  // recorded immediately after a resize use a valid renderArea that matches
+  // the attachments. This avoids beginRendering validation errors when the
+  // viewport still reflects the previous size.
+  m_rendererBase.frameState().updateViewportData(size);
 }
 
 void Z3DCompositor::switchBackend(RenderBackend backendRequest)

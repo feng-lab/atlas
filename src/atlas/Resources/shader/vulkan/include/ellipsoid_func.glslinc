@@ -30,7 +30,7 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   vec3 ipoint = dist * rayDirection + rayOrigin;
 
   vec2 clipZW = ipoint.z * xf.projection_matrix[2].zw + xf.projection_matrix[3].zw;
-  float depth = 0.5 + 0.5 * clipZW.x / clipZW.y;
+  float depth = clipZW.x / clipZW.y;
   if (depth <= 0.0 || depth >= 1.0) discard;
   fragDepth = depth;
 

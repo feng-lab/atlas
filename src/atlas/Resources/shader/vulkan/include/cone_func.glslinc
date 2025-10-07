@@ -191,9 +191,9 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
     }
   }
 
-  // Depth from projection matrix
+  // Depth from projection matrix (Vulkan NDC z in [0,1])
   vec2 clipZW = ipoint.z * cpc.projection_matrix[2].zw + cpc.projection_matrix[3].zw;
-  float depth = 0.5 + 0.5 * clipZW.x / clipZW.y;
+  float depth = clipZW.x / clipZW.y;
   if (depth <= 0.0 || depth >= 1.0) discard;
 
   fragDepth = depth;

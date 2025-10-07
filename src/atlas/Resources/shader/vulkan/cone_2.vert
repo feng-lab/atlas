@@ -103,9 +103,13 @@ void main()
   pmax = max(pmax, p2); pmax = max(pmax, p3); pmax = max(pmax, p4);
   pmax = max(pmax, p5); pmax = max(pmax, p6); pmax = max(pmax, p7); pmax = max(pmax, p8);
 
-  float depth = (pmin.z < -1.0 && pmax.z > -1.0) ? -0.999 : pmin.z;
+  // Vulkan: NDC z is [0,1]. If the bounding prism crosses the near plane,
+  // push slightly forward to keep the quad in front of the clear depth.
+  float depth = (pmin.z < 0.0 && pmax.z > 0.0) ? 0.001 : pmin.z;
+  depth = clamp(depth, 0.0, 1.0);
+  // Full-screen clamp test keeps behavior identical; XY ranges remain [-1,1]
   if (pmin.x < -1.0 && pmax.x > 1.0 && pmin.y < -1.0 && pmax.y > 1.0) {
-    depth = -2.0;
+    depth = 0.0;
   }
 
   // Output vertex at selected corner of bounding quad
@@ -124,4 +128,3 @@ void main()
 
   v_combo1 = vec4(bradius, tradius, height, inv_sqr_height);
 }
-

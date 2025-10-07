@@ -119,8 +119,11 @@ private:
   };
   struct CacheEntry
   {
-    // Device-local slices (all in the backend's static VB/IB)
-    vk::Buffer vb = VK_NULL_HANDLE;
+    // Device-local static buffers per attribute (SoA)
+    vk::Buffer vbPos = VK_NULL_HANDLE;
+    vk::Buffer vbNorm = VK_NULL_HANDLE;
+    vk::Buffer vbColor = VK_NULL_HANDLE;
+    vk::Buffer vbTex = VK_NULL_HANDLE; // optional
     vk::DeviceSize posOffset = 0;
     vk::DeviceSize normOffset = 0;
     vk::DeviceSize colorOffset = 0;

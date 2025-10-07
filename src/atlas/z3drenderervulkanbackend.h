@@ -146,6 +146,9 @@ public:
   void scheduleAfterCurrentFrameCompletion(std::function<void()> fn);
   void notifyPipelineCreated();
   void notifyPipelineBound(vk::Pipeline pipeline);
+  // Queue a static copy (upload slice -> device-local VB/IB) to be executed
+  // outside dynamic rendering before command buffer end in this frame.
+  void scheduleStaticCopy(vk::Buffer dst, vk::DeviceSize dstOffset, const UploadSlice& src, bool isIndexBuffer);
 
   // Current segment attachment formats (if a dynamic rendering segment is open)
   [[nodiscard]] const std::optional<vulkan::AttachmentFormats>& currentSegmentFormats() const;
@@ -279,9 +282,19 @@ private:
     size_t fontsBytesStaged = 0;
     size_t meshesBytesStaged = 0;
     size_t spheresBytesStaged = 0;
+
+    struct ScheduledCopy
+    {
+      vk::Buffer dst{VK_NULL_HANDLE};
+      vk::DeviceSize dstOffset{0};
+      UploadSlice src{};
+      bool isIndex = false;
+    };
+    std::vector<ScheduledCopy> scheduledCopies;
   };
 
   void collectFrameTimings(FrameResources& frame);
+  void flushScheduledCopies(vk::raii::CommandBuffer& cmd);
   std::optional<size_t> beginGpuScope(std::string_view label);
   void endGpuScope(size_t token);
   void recordCpuScope(std::string_view label, double milliseconds);
@@ -354,6 +367,7 @@ public:
 
   // Shared geometry: fullscreen quad VBO
   std::unique_ptr<ZVulkanBuffer> m_fullscreenQuadVbo;
+  std::unique_ptr<ZVulkanBuffer> m_dummyVertexBuffer; // tiny VB for unused bindings
 
   // Device-local static arenas for geometry
   struct StaticArena
@@ -376,6 +390,8 @@ public:
 
   void ensureSharedSamplers();
   void ensureFullscreenQuad();
+  void ensureDummyVertexBuffer();
+  vk::Buffer dummyVertexBuffer();
 
   // Upload arena helpers moved to public API above
 

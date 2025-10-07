@@ -43,9 +43,13 @@ struct MeshVertex
   glm::vec3 tex3d{0.0f};
 };
 
-vk::PipelineVertexInputStateCreateInfo makeSoAMeshVertexInput(MeshPayload::ColorSource colorSource)
+vk::PipelineVertexInputStateCreateInfo makeSoAMeshVertexInput(MeshPayload::ColorSource /*colorSource*/)
 {
-  static std::array<vk::VertexInputBindingDescription, 4> bindings{};
+  // Always declare bindings/attributes for all shader-declared locations.
+  // mesh.vert (Vulkan) declares locations 0..5 unconditionally; specialization
+  // constants gate usage but validation requires attribute descriptions to
+  // exist for every declared location when vertex input is not dynamic.
+  static std::array<vk::VertexInputBindingDescription, 6> bindings{};
   // binding 0: position (vec3)
   bindings[0] = vk::VertexInputBindingDescription{.binding = 0,
                                                   .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
@@ -58,8 +62,20 @@ vk::PipelineVertexInputStateCreateInfo makeSoAMeshVertexInput(MeshPayload::Color
   bindings[2] = vk::VertexInputBindingDescription{.binding = 2,
                                                   .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
                                                   .inputRate = vk::VertexInputRate::eVertex};
+  // binding 3: 1D texcoord (float)
+  bindings[3] = vk::VertexInputBindingDescription{.binding = 3,
+                                                  .stride = static_cast<uint32_t>(sizeof(float)),
+                                                  .inputRate = vk::VertexInputRate::eVertex};
+  // binding 4: 2D texcoord (vec2)
+  bindings[4] = vk::VertexInputBindingDescription{.binding = 4,
+                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec2)),
+                                                  .inputRate = vk::VertexInputRate::eVertex};
+  // binding 5: 3D texcoord (vec3)
+  bindings[5] = vk::VertexInputBindingDescription{.binding = 5,
+                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
+                                                  .inputRate = vk::VertexInputRate::eVertex};
 
-  static std::array<vk::VertexInputAttributeDescription, 4> attrs{};
+  static std::array<vk::VertexInputAttributeDescription, 6> attrs{};
   attrs[0] = vk::VertexInputAttributeDescription{.location = 0,
                                                  .binding = 0,
                                                  .format = vk::Format::eR32G32B32Sfloat,
@@ -72,46 +88,24 @@ vk::PipelineVertexInputStateCreateInfo makeSoAMeshVertexInput(MeshPayload::Color
                                                  .binding = 2,
                                                  .format = vk::Format::eR32G32B32A32Sfloat,
                                                  .offset = 0};
+  // location 3: 1D texcoord from binding 3
+  attrs[3] = vk::VertexInputAttributeDescription{.location = 3,
+                                                 .binding = 3,
+                                                 .format = vk::Format::eR32Sfloat,
+                                                 .offset = 0};
+  // location 4: 2D texcoord from binding 4
+  attrs[4] = vk::VertexInputAttributeDescription{.location = 4,
+                                                 .binding = 4,
+                                                 .format = vk::Format::eR32G32Sfloat,
+                                                 .offset = 0};
+  // location 5: 3D texcoord from binding 5
+  attrs[5] = vk::VertexInputAttributeDescription{.location = 5,
+                                                 .binding = 5,
+                                                 .format = vk::Format::eR32G32B32Sfloat,
+                                                 .offset = 0};
 
-  uint32_t bindingCount = 3;
-  uint32_t attrCount = 3;
-  switch (colorSource) {
-    case MeshPayload::ColorSource::Mesh1DTexture:
-      bindings[3] = vk::VertexInputBindingDescription{.binding = 3,
-                                                      .stride = static_cast<uint32_t>(sizeof(float)),
-                                                      .inputRate = vk::VertexInputRate::eVertex};
-      attrs[3] =
-        vk::VertexInputAttributeDescription{.location = 3, .binding = 3, .format = vk::Format::eR32Sfloat, .offset = 0};
-      bindingCount = 4;
-      attrCount = 4;
-      break;
-    case MeshPayload::ColorSource::Mesh2DTexture:
-      bindings[3] = vk::VertexInputBindingDescription{.binding = 3,
-                                                      .stride = static_cast<uint32_t>(sizeof(glm::vec2)),
-                                                      .inputRate = vk::VertexInputRate::eVertex};
-      attrs[3] = vk::VertexInputAttributeDescription{.location = 4,
-                                                     .binding = 3,
-                                                     .format = vk::Format::eR32G32Sfloat,
-                                                     .offset = 0};
-      bindingCount = 4;
-      attrCount = 4;
-      break;
-    case MeshPayload::ColorSource::Mesh3DTexture:
-      bindings[3] = vk::VertexInputBindingDescription{.binding = 3,
-                                                      .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                      .inputRate = vk::VertexInputRate::eVertex};
-      attrs[3] = vk::VertexInputAttributeDescription{.location = 5,
-                                                     .binding = 3,
-                                                     .format = vk::Format::eR32G32B32Sfloat,
-                                                     .offset = 0};
-      bindingCount = 4;
-      attrCount = 4;
-      break;
-    case MeshPayload::ColorSource::CustomColor:
-    case MeshPayload::ColorSource::MeshColor:
-    default:
-      break;
-  }
+  constexpr uint32_t bindingCount = 6;
+  constexpr uint32_t attrCount = 6;
 
   static vk::PipelineVertexInputStateCreateInfo info{};
   info.vertexBindingDescriptionCount = bindingCount;
@@ -296,20 +290,52 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
   // DDP peel handled by the per-draw override above.
 
-  // Bind SoA streams; order must match makeSoAMeshVertexInput()
-  std::vector<vk::Buffer> buffers;
-  std::vector<vk::DeviceSize> offsets;
-  buffers.push_back(m_posBuffer);
-  offsets.push_back(m_posOffset); // binding 0: positions
-  buffers.push_back(m_normBuffer);
-  offsets.push_back(m_normOffset); // binding 1: normals
-  buffers.push_back(m_colorBuffer);
-  offsets.push_back(m_colorOffset); // binding 2: colors
+  // Bind SoA streams: bindings 0..2 always
+  std::vector<vk::Buffer> baseBuffers;
+  std::vector<vk::DeviceSize> baseOffsets;
+  baseBuffers.push_back(m_posBuffer);
+  baseOffsets.push_back(m_posOffset); // binding 0: positions
+  baseBuffers.push_back(m_normBuffer);
+  baseOffsets.push_back(m_normOffset); // binding 1: normals
+  baseBuffers.push_back(m_colorBuffer);
+  baseOffsets.push_back(m_colorOffset); // binding 2: colors
+  cmd.bindVertexBuffers(0, baseBuffers, baseOffsets);
+
+  // Optional texture binding: binding index depends on platform support.
   if (m_texBinding != TexBinding::None) {
-    buffers.push_back(m_texBuffer);
-    offsets.push_back(m_texOffset); // binding 3: tex
+    uint32_t texBindingIndex = 3; // default when using dynamic vertex input state
+    if (!m_backend.device().supportsVertexInputDynamicState()) {
+      switch (m_texBinding) {
+        case TexBinding::Tex1D: texBindingIndex = 3; break;
+        case TexBinding::Tex2D: texBindingIndex = 4; break;
+        case TexBinding::Tex3D: texBindingIndex = 5; break;
+        default: break;
+      }
+    }
+    std::array<vk::Buffer, 1> texBuf{m_texBuffer};
+    std::array<vk::DeviceSize, 1> texOff{m_texOffset};
+    cmd.bindVertexBuffers(texBindingIndex, texBuf, texOff);
   }
-  cmd.bindVertexBuffers(0, buffers, offsets);
+
+  // Bind dummy buffers for any optional bindings (3,4,5) that remain unbound.
+  // Some stacks (e.g., MoltenVK without nullDescriptor) reject VK_NULL_HANDLE
+  // in vkCmdBindVertexBuffers; bind a tiny valid buffer instead.
+  {
+    bool bound3 = (m_texBinding == TexBinding::Tex1D);
+    bool bound4 = (m_texBinding == TexBinding::Tex2D);
+    bool bound5 = (m_texBinding == TexBinding::Tex3D);
+    std::array<vk::Buffer, 1> buf{m_backend.dummyVertexBuffer()};
+    std::array<vk::DeviceSize, 1> off{0};
+    if (!bound3) {
+      cmd.bindVertexBuffers(3, buf, off);
+    }
+    if (!bound4) {
+      cmd.bindVertexBuffers(4, buf, off);
+    }
+    if (!bound5) {
+      cmd.bindVertexBuffers(5, buf, off);
+    }
+  }
   if (m_indexCount > 0 && m_indexUploadBuffer) {
     cmd.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
   }
@@ -1359,56 +1385,46 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
         entry.unchangedFrames = 0;
       }
 
-      // If promoted and sizes match, restage changed streams selectively
+      // If promoted and sizes match, restage on the next frame only. For the
+      // edit frame (any stream changed), keep using upload slices to avoid
+      // hazards; otherwise bind static VBs.
       if (entry.promoted && sizeUnchanged) {
-        size_t restagedBytes = 0;
+        bool anyChanged = (!posSame) || (!normSame) || (!colorSame) || (!texSame) || (!idxSame);
         if (!posSame) {
-          m_backend.stageCopy(entry.vb, entry.posOffset, posSlice, false);
-          entry.posGen = payload.posGen;
-          restagedBytes += posBytes;
+          m_backend.scheduleStaticCopy(entry.vbPos, entry.posOffset, posSlice, false);
         }
         if (!normSame) {
-          m_backend.stageCopy(entry.vb, entry.normOffset, normSlice, false);
-          entry.normGen = payload.normGen;
-          restagedBytes += normBytes;
+          m_backend.scheduleStaticCopy(entry.vbNorm, entry.normOffset, normSlice, false);
         }
         if (!colorSame) {
-          m_backend.stageCopy(entry.vb, entry.colorOffset, colorSlice, false);
-          entry.colorGen = payload.colorGen;
-          restagedBytes += colorBytes;
+          m_backend.scheduleStaticCopy(entry.vbColor, entry.colorOffset, colorSlice, false);
         }
-        if (texBytes > 0 && !texSame) {
-          m_backend.stageCopy(entry.vb, entry.texOffset, texSlice, false);
-          entry.texGen = payload.texGen;
-          restagedBytes += texBytes;
+        if (texBytes > 0 && !texSame && entry.vbTex) {
+          m_backend.scheduleStaticCopy(entry.vbTex, entry.texOffset, texSlice, false);
         }
         if (!idxSame && totalIndices > 0 && m_indexUploadBuffer) {
-          Z3DRendererVulkanBackend::UploadSlice idxUpload{m_indexUploadBuffer,
-                                                          m_indexUploadOffset,
-                                                          nullptr,
+          Z3DRendererVulkanBackend::UploadSlice idxUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr,
                                                           totalIndices * sizeof(uint32_t)};
-          m_backend.stageCopy(entry.ib, entry.indexOffset, idxUpload, true);
-          entry.indexGen = payload.indexGen;
-          restagedBytes += totalIndices * sizeof(uint32_t);
+          m_backend.scheduleStaticCopy(entry.ib, entry.indexOffset, idxUpload, true);
         }
-        if (restagedBytes > 0) {
-          m_backend.addMeshBytesStaged(restagedBytes);
+        if (!anyChanged) {
+          // Bind static slices (per-attribute VBs)
+          m_posBuffer = entry.vbPos;
+          m_normBuffer = entry.vbNorm;
+          m_colorBuffer = entry.vbColor;
+          m_texBuffer = entry.vbTex ? entry.vbTex : VK_NULL_HANDLE;
+          m_posOffset = entry.posOffset;
+          m_normOffset = entry.normOffset;
+          m_colorOffset = entry.colorOffset;
+          m_texOffset = entry.hasTex ? entry.texOffset : 0;
+          if (entry.indexCount > 0 && entry.ib) {
+            m_indexUploadBuffer = entry.ib;
+            m_indexUploadOffset = entry.indexOffset;
+          }
+          return;
         }
-        // Bind static slices
-        // All attribute streams reside in the same static VB
-        m_posBuffer = entry.vb;
-        m_normBuffer = entry.vb;
-        m_colorBuffer = entry.vb;
-        m_texBuffer = entry.vb;
-        m_posOffset = entry.posOffset;
-        m_normOffset = entry.normOffset;
-        m_colorOffset = entry.colorOffset;
-        m_texOffset = entry.hasTex ? entry.texOffset : 0;
-        if (entry.indexCount > 0 && entry.ib) {
-          m_indexUploadBuffer = entry.ib;
-          m_indexUploadOffset = entry.indexOffset;
-        }
-        return; // Done; draws will bind the static buffers
+        // Defer restaging to the next frame; keep upload slices bound.
+        return;
       }
 
       // Consider promotion when stable for N frames
@@ -1430,14 +1446,14 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
             (totalIndices == 0 || idxDst.buffer)) {
           // Record copies and count bytes
           size_t staged = 0;
-          m_backend.stageCopy(posDst.buffer, posDst.offset, posSlice, false);
+          m_backend.scheduleStaticCopy(posDst.buffer, posDst.offset, posSlice, false);
           staged += posBytes;
-          m_backend.stageCopy(normDst.buffer, normDst.offset, normSlice, false);
+          m_backend.scheduleStaticCopy(normDst.buffer, normDst.offset, normSlice, false);
           staged += normBytes;
-          m_backend.stageCopy(colorDst.buffer, colorDst.offset, colorSlice, false);
+          m_backend.scheduleStaticCopy(colorDst.buffer, colorDst.offset, colorSlice, false);
           staged += colorBytes;
           if (texBytes > 0) {
-            m_backend.stageCopy(texDst.buffer, texDst.offset, texSlice, false);
+            m_backend.scheduleStaticCopy(texDst.buffer, texDst.offset, texSlice, false);
             staged += texBytes;
           }
           if (totalIndices > 0) {
@@ -1445,14 +1461,17 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
                                                             m_indexUploadOffset,
                                                             nullptr,
                                                             totalIndices * sizeof(uint32_t)};
-            m_backend.stageCopy(idxDst.buffer, idxDst.offset, idxUpload, true);
+            m_backend.scheduleStaticCopy(idxDst.buffer, idxDst.offset, idxUpload, true);
             staged += totalIndices * sizeof(uint32_t);
           }
           if (staged > 0) {
             m_backend.addMeshBytesStaged(staged);
           }
-          // Save cache entry
-          entry.vb = posDst.buffer; // same buffer for all VB allocs
+          // Save cache entry (per-attribute buffers)
+          entry.vbPos = posDst.buffer;
+          entry.vbNorm = normDst.buffer;
+          entry.vbColor = colorDst.buffer;
+          entry.vbTex = texBytes > 0 ? texDst.buffer : VK_NULL_HANDLE;
           entry.posOffset = posDst.offset;
           entry.normOffset = normDst.offset;
           entry.colorOffset = colorDst.offset;
@@ -1468,20 +1487,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
           entry.texGen = payload.texGen;
           entry.indexGen = payload.indexGen;
           entry.promoted = true;
-
-          // Bind static slices immediately
-          m_posBuffer = entry.vb;
-          m_normBuffer = entry.vb;
-          m_colorBuffer = entry.vb;
-          m_texBuffer = entry.vb;
-          m_posOffset = entry.posOffset;
-          m_normOffset = entry.normOffset;
-          m_colorOffset = entry.colorOffset;
-          m_texOffset = entry.hasTex ? entry.texOffset : 0;
-          if (entry.indexCount > 0 && entry.ib) {
-            m_indexUploadBuffer = entry.ib;
-            m_indexUploadOffset = entry.indexOffset;
-          }
+          // Do not bind statics this frame; keep upload slices. Statics bind next frame.
         } else {
           VLOG(2) << "Mesh static promotion skipped: arena out of space";
         }
