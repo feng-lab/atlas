@@ -152,7 +152,9 @@ void ZVulkanPipeline::create()
     .blendConstants = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}
   };
 
-  std::array<vk::DynamicState, 2> dynamicStates = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+  std::array<vk::DynamicState, 3> dynamicStates = {vk::DynamicState::eViewport,
+                                                   vk::DynamicState::eScissor,
+                                                   vk::DynamicState::eVertexInputEXT};
   vk::PipelineDynamicStateCreateInfo dynamicState{.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
                                                   .pDynamicStates = dynamicStates.data()};
 

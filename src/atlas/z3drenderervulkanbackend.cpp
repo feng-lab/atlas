@@ -235,6 +235,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.pendingColorReadbacks.clear();
   frameResources.readbackBytesCopied = 0;
   frameResources.readbackSlotsInFlight = 0;
+  // Reset per-frame upload arena cursor/high-watermark
+  frameResources.uploadArena.offset = 0;
+  frameResources.uploadArena.highWatermark = 0;
 
   // Expose frame resources to allow pre-record descriptor priming
   m_activeFrame = &frameResources;
@@ -1100,6 +1103,56 @@ void Z3DRendererVulkanBackend::ensureSharedSamplers()
                                       .borderColor = vk::BorderColor::eFloatOpaqueWhite};
     m_nearestClampSampler.emplace(vkDevice, nearestInfo);
   }
+}
+
+Z3DRendererVulkanBackend::UploadSlice
+Z3DRendererVulkanBackend::suballocateUpload(size_t bytes, size_t alignment)
+{
+  UploadSlice slice{};
+  if (!m_activeFrame || !m_sharedDevice) {
+    return slice;
+  }
+
+  auto& arena = m_activeFrame->uploadArena;
+
+  auto alignUp = [](size_t value, size_t alignment) {
+    const size_t mask = alignment - 1;
+    return (value + mask) & ~mask;
+  };
+
+  const size_t alignedOffset = alignUp(arena.offset, std::max<size_t>(1, alignment));
+  const size_t required = alignedOffset + bytes;
+
+  auto ensureCapacity = [&](size_t minCapacity) {
+    if (arena.buffer && arena.mapped && arena.capacity >= minCapacity) {
+      return;
+    }
+    size_t newCapacity = std::max<size_t>(static_cast<size_t>(1) << 20, arena.capacity);
+    while (newCapacity < minCapacity) {
+      newCapacity = newCapacity ? (newCapacity * 2) : (static_cast<size_t>(1) << 20);
+    }
+    arena.buffer = m_sharedDevice->createBuffer(newCapacity,
+                                                vk::BufferUsageFlagBits::eVertexBuffer |
+                                                  vk::BufferUsageFlagBits::eIndexBuffer |
+                                                  vk::BufferUsageFlagBits::eTransferDst,
+                                                vk::MemoryPropertyFlagBits::eHostVisible |
+                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
+    arena.capacity = newCapacity;
+    arena.offset = 0;
+    // Persistently map the entire buffer
+    arena.mapped = arena.buffer->map(0, newCapacity);
+  };
+
+  ensureCapacity(required);
+
+  slice.buffer = arena.buffer->buffer();
+  slice.offset = static_cast<vk::DeviceSize>(alignedOffset);
+  slice.mapped = static_cast<uint8_t*>(arena.mapped) + alignedOffset;
+  slice.size = bytes;
+
+  arena.offset = required;
+  arena.highWatermark = std::max(arena.highWatermark, required);
+  return slice;
 }
 
 std::unique_ptr<ZVulkanDescriptorSet>

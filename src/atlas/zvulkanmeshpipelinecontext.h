@@ -126,10 +126,6 @@ private:
   std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
 
-  std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
-  std::unique_ptr<ZVulkanBuffer> m_indexBuffer;
-  size_t m_vertexCapacity = 0;
-  size_t m_indexCapacity = 0;
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
 
@@ -137,6 +133,22 @@ private:
 
   // No GL texture bridging: Vulkan mesh pipeline uses placeholders or
   // backend-native textures only.
+
+  // SoA upload arena-backed streams (per-frame concatenated arrays)
+  vk::Buffer m_soaBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_posOffset{0};
+  vk::DeviceSize m_normOffset{0};
+  vk::DeviceSize m_colorOffset{0};
+  vk::DeviceSize m_texOffset{0}; // 1D/2D/3D depending on colorSource
+  enum class TexBinding
+  {
+    None,
+    Tex1D,
+    Tex2D,
+    Tex3D
+  } m_texBinding = TexBinding::None;
+  vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_indexUploadOffset{0};
 
   void ensureDescriptorLayouts();
   void ensurePlaceholderTextures();
@@ -161,8 +173,6 @@ private:
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
-  void ensureVertexCapacity(size_t vertexCount);
-  void ensureIndexCapacity(size_t indexCount);
   void uploadGeometry(const MeshPayload& payload);
 
   std::optional<TextureBinding> bindTextureIfNeeded(const MeshPayload& /*payload*/)

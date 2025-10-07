@@ -22,6 +22,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <cstring>
 
 namespace nim {
 namespace {
@@ -104,9 +105,16 @@ ZVulkanLinePipelineContext::~ZVulkanLinePipelineContext() = default;
 
 void ZVulkanLinePipelineContext::resetFrame()
 {
-  m_wideVertices.clear();
-  m_wideIndices.clear();
-  m_thinVertices.clear();
+  m_thinUploadBuffer = VK_NULL_HANDLE;
+  m_thinUploadOffset = 0;
+  m_thinUploadVertexCount = 0;
+  m_thinUploadIndexBuffer = VK_NULL_HANDLE;
+  m_thinUploadIndexOffset = 0;
+  m_thinUploadIndexCount = 0;
+  m_wideUploadBuffer = VK_NULL_HANDLE;
+  m_wideUploadVertexOffset = 0;
+  m_wideUploadIndexOffset = 0;
+  m_wideUploadIndexCount = 0;
   resetDescriptors();
 }
 
@@ -515,72 +523,100 @@ void ZVulkanLinePipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd
 
 void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, bool pickingPass)
 {
-  m_wideVertices.clear();
-  m_wideIndices.clear();
+  // Build wide-line vertices directly from payload spans; copy indices from payload.smoothIndices.
+  m_wideUploadBuffer = VK_NULL_HANDLE;
+  m_wideUploadVertexOffset = 0;
+  m_wideUploadIndexOffset = 0;
 
-  if (!payload.renderer) {
+  // Determine vertex count from smooth P0/P1 positions (clamped to the smallest span).
+  const size_t nP0 = payload.smoothP0Positions.size();
+  const size_t nP1 = payload.smoothP1Positions.size();
+  size_t vertexCount = std::min(nP0, nP1);
+  if (vertexCount == 0) {
     return;
   }
 
-  payload.renderer->buildWideLineGeometry(m_wideVertices, m_wideIndices);
-  if (m_wideVertices.empty() || m_wideIndices.empty()) {
+  const size_t vertexBytes = vertexCount * sizeof(LineWideVertex);
+  auto vtxSlice = m_backend.suballocateUpload(vertexBytes, alignof(LineWideVertex));
+  if (!vtxSlice.buffer || !vtxSlice.mapped) {
     return;
   }
+  auto* vtxOut = static_cast<LineWideVertex*>(vtxSlice.mapped);
+
+  const bool hasP0Colors = !payload.smoothP0Colors.empty();
+  const bool hasP1Colors = !payload.smoothP1Colors.empty();
+  const glm::vec4 defaultColor(0.f, 0.f, 0.f, 1.f);
 
   if (pickingPass) {
     if (!payload.smoothPickingColors.empty()) {
-      const auto pickingSpan = payload.smoothPickingColors;
-      for (size_t i = 0; i < m_wideVertices.size() && i < pickingSpan.size(); ++i) {
-        m_wideVertices[i].c0 = pickingSpan[i];
-        m_wideVertices[i].c1 = pickingSpan[i];
+      const auto pick = payload.smoothPickingColors;
+      const size_t nPick = pick.size();
+      const size_t n = std::min(vertexCount, nPick);
+      for (size_t i = 0; i < n; ++i) {
+        vtxOut[i].p0 = payload.smoothP0Positions[i];
+        vtxOut[i].p1 = payload.smoothP1Positions[i];
+        vtxOut[i].c0 = pick[i];
+        vtxOut[i].c1 = pick[i];
+        vtxOut[i].flags = (i < payload.smoothFlags.size()) ? payload.smoothFlags[i] : 0.0f;
       }
     } else if (!payload.pickingColors.empty()) {
-      const auto pickingSpan = payload.pickingColors;
-      for (size_t i = 0; i < m_wideVertices.size(); ++i) {
-        const size_t colorIndex = std::min(i, pickingSpan.size() - 1);
-        m_wideVertices[i].c0 = pickingSpan[colorIndex];
-        m_wideVertices[i].c1 = pickingSpan[colorIndex];
+      const auto pick = payload.pickingColors;
+      for (size_t i = 0; i < vertexCount; ++i) {
+        const size_t colorIndex = std::min(i, pick.size() - 1);
+        vtxOut[i].p0 = payload.smoothP0Positions[i];
+        vtxOut[i].p1 = payload.smoothP1Positions[i];
+        vtxOut[i].c0 = pick[colorIndex];
+        vtxOut[i].c1 = pick[colorIndex];
+        vtxOut[i].flags = (i < payload.smoothFlags.size()) ? payload.smoothFlags[i] : 0.0f;
       }
+    } else {
+      // No picking colors; skip
+      return;
+    }
+  } else {
+    for (size_t i = 0; i < vertexCount; ++i) {
+      vtxOut[i].p0 = payload.smoothP0Positions[i];
+      vtxOut[i].p1 = payload.smoothP1Positions[i];
+      const glm::vec4 c0 = hasP0Colors ? payload.smoothP0Colors[i] : defaultColor;
+      const glm::vec4 c1 = hasP1Colors ? payload.smoothP1Colors[i] : c0;
+      vtxOut[i].c0 = c0;
+      vtxOut[i].c1 = c1;
+      vtxOut[i].flags = (i < payload.smoothFlags.size()) ? payload.smoothFlags[i] : 0.0f;
     }
   }
 
-  auto& device = m_backend.device();
-
-  const size_t vertexBytes = m_wideVertices.size() * sizeof(LineWideVertex);
-  if (!m_wideVertexBuffer || vertexBytes > m_wideVertexCapacity) {
-    const size_t allocSize = std::max<size_t>(vertexBytes, sizeof(LineWideVertex));
-    m_wideVertexBuffer =
-      device.createBuffer(allocSize,
-                          vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    m_wideVertexCapacity = allocSize;
-    CHECK(m_wideVertexBuffer != nullptr) << "Failed to allocate wide-line vertex buffer, bytes=" << allocSize;
-  }
-  if (vertexBytes > 0) {
-    m_wideVertexBuffer->copyData(m_wideVertices.data(), vertexBytes);
+  // Indices come directly from payload.smoothIndices
+  const size_t indexCount = payload.smoothIndices.size();
+  if (indexCount == 0) {
+    // Still keep vertex slice for potential degenerate case, but no draw will occur without indices
+    m_wideUploadBuffer = vtxSlice.buffer;
+    m_wideUploadVertexOffset = vtxSlice.offset;
+    m_wideUploadIndexOffset = 0;
+    return;
   }
 
-  const size_t indexBytes = m_wideIndices.size() * sizeof(uint32_t);
-  if (!m_wideIndexBuffer || indexBytes > m_wideIndexCapacity) {
-    const size_t allocSize = std::max<size_t>(indexBytes, sizeof(uint32_t));
-    m_wideIndexBuffer =
-      device.createBuffer(allocSize,
-                          vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    m_wideIndexCapacity = allocSize;
-    CHECK(m_wideIndexBuffer != nullptr) << "Failed to allocate wide-line index buffer, bytes=" << allocSize;
+  auto idxSlice = m_backend.suballocateUpload(indexCount * sizeof(uint32_t), alignof(uint32_t));
+  if (!idxSlice.buffer || !idxSlice.mapped) {
+    return;
   }
-  if (indexBytes > 0) {
-    m_wideIndexBuffer->copyData(m_wideIndices.data(), indexBytes);
-  }
+  std::memcpy(idxSlice.mapped, payload.smoothIndices.data(), indexCount * sizeof(uint32_t));
+
+  m_wideUploadBuffer = vtxSlice.buffer;
+  m_wideUploadVertexOffset = vtxSlice.offset;
+  m_wideUploadIndexOffset = idxSlice.offset;
+  m_wideUploadIndexCount = static_cast<uint32_t>(indexCount);
 }
 
 void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, bool pickingPass)
 {
-  m_thinVertices.clear();
-
   const auto positions = payload.positions;
   if (positions.size() < 2) {
+    m_thinUploadVertexCount = 0;
+    m_thinUploadBuffer = VK_NULL_HANDLE;
+    m_thinUploadOffset = 0;
+    m_thinUploadIndexBuffer = VK_NULL_HANDLE;
+    m_thinUploadIndexOffset = 0;
+    m_thinUploadIndexCount = 0;
     return;
   }
 
@@ -596,35 +632,60 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
     return colorSpan[clamped];
   };
 
+  // Compute vertex count and allocate directly from the per-frame upload arena
+  uint32_t vertexCount = 0;
   if (payload.isLineStrip) {
-    for (size_t i = 1; i < positions.size(); ++i) {
-      m_thinVertices.push_back(VulkanThinLineVertex{positions[i - 1], colorAt(i - 1)});
-      m_thinVertices.push_back(VulkanThinLineVertex{positions[i], colorAt(i)});
-    }
+    vertexCount = static_cast<uint32_t>(positions.size());
   } else {
-    for (size_t i = 0; i + 1 < positions.size(); i += 2) {
-      m_thinVertices.push_back(VulkanThinLineVertex{positions[i], colorAt(i)});
-      m_thinVertices.push_back(VulkanThinLineVertex{positions[i + 1], colorAt(i + 1)});
-    }
+    vertexCount = static_cast<uint32_t>((positions.size() / 2) * 2);
   }
-
-  const size_t vertexBytes = m_thinVertices.size() * sizeof(VulkanThinLineVertex);
+  const size_t vertexBytes = static_cast<size_t>(vertexCount) * sizeof(VulkanThinLineVertex);
   if (vertexBytes == 0) {
+    m_thinUploadVertexCount = 0;
+    m_thinUploadBuffer = VK_NULL_HANDLE;
+    m_thinUploadOffset = 0;
     return;
   }
 
-  auto& device = m_backend.device();
-  if (!m_thinVertexBuffer || vertexBytes > m_thinVertexCapacity) {
-    const size_t allocSize = std::max<size_t>(vertexBytes, sizeof(VulkanThinLineVertex));
-    m_thinVertexBuffer =
-      device.createBuffer(allocSize,
-                          vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    m_thinVertexCapacity = allocSize;
-    CHECK(m_thinVertexBuffer != nullptr) << "Failed to allocate thin-line vertex buffer, bytes=" << allocSize;
+  auto slice = m_backend.suballocateUpload(vertexBytes, alignof(VulkanThinLineVertex));
+  if (!slice.buffer || !slice.mapped) {
+    m_thinUploadVertexCount = 0;
+    m_thinUploadBuffer = VK_NULL_HANDLE;
+    m_thinUploadOffset = 0;
+    return;
   }
 
-  m_thinVertexBuffer->copyData(m_thinVertices.data(), vertexBytes);
+  auto* dst = static_cast<VulkanThinLineVertex*>(slice.mapped);
+  uint32_t out = 0;
+  if (payload.isLineStrip) {
+    for (size_t i = 0; i < positions.size(); ++i) {
+      dst[out++] = VulkanThinLineVertex{positions[i], colorAt(i)};
+    }
+    // Build index buffer 0..N-1 for line strip
+    const uint32_t idxCount = static_cast<uint32_t>(positions.size());
+    auto idxSlice = m_backend.suballocateUpload(idxCount * sizeof(uint32_t), alignof(uint32_t));
+    if (idxSlice.buffer && idxSlice.mapped) {
+      auto* idst = static_cast<uint32_t*>(idxSlice.mapped);
+      for (uint32_t i = 0; i < idxCount; ++i) {
+        idst[i] = i;
+      }
+      m_thinUploadIndexBuffer = idxSlice.buffer;
+      m_thinUploadIndexOffset = idxSlice.offset;
+      m_thinUploadIndexCount = idxCount;
+    }
+  } else {
+    for (size_t i = 0; i + 1 < positions.size(); i += 2) {
+      dst[out++] = VulkanThinLineVertex{positions[i], colorAt(i)};
+      dst[out++] = VulkanThinLineVertex{positions[i + 1], colorAt(i + 1)};
+    }
+    m_thinUploadIndexBuffer = VK_NULL_HANDLE;
+    m_thinUploadIndexOffset = 0;
+    m_thinUploadIndexCount = 0;
+  }
+
+  m_thinUploadVertexCount = vertexCount;
+  m_thinUploadBuffer = slice.buffer;
+  m_thinUploadOffset = slice.offset;
 }
 
 void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
@@ -713,13 +774,12 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
 
   if (payload.useSmoothLine) {
     uploadWideGeometry(payload, pickingPass);
-    if (m_wideVertices.empty() || !m_wideVertexBuffer || !m_wideIndexBuffer) {
+    if (m_wideUploadBuffer == VK_NULL_HANDLE || m_wideUploadIndexCount == 0) {
       return;
     }
 
-    vk::DeviceSize offset = 0;
-    cmd.bindVertexBuffers(0, {m_wideVertexBuffer->buffer()}, {offset});
-    cmd.bindIndexBuffer(m_wideIndexBuffer->buffer(), 0, vk::IndexType::eUint32);
+    cmd.bindVertexBuffers(0, {m_wideUploadBuffer}, {m_wideUploadVertexOffset});
+    cmd.bindIndexBuffer(m_wideUploadBuffer, m_wideUploadIndexOffset, vk::IndexType::eUint32);
 
     struct WideLinePC
     {
@@ -740,7 +800,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
 
     const auto widths = payload.perSegmentWidths;
     if (!widths.empty()) {
-      const uint32_t segmentCount = static_cast<uint32_t>(m_wideIndices.size() / 6);
+      const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
       const uint32_t drawSegments = std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size()));
       for (uint32_t i = 0; i < drawSegments; ++i) {
         pc.line_width = resolveWideLineWidth(widths[i]);
@@ -769,18 +829,23 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
                                     vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                                     0,
                                     pc);
-      cmd.drawIndexed(static_cast<uint32_t>(m_wideIndices.size()), 1, 0, 0, 0);
+      cmd.drawIndexed(m_wideUploadIndexCount, 1, 0, 0, 0);
     }
 
   } else {
     uploadThinGeometry(payload, pickingPass);
-    if (m_thinVertices.empty() || !m_thinVertexBuffer) {
+    if (m_thinUploadVertexCount == 0 || m_thinUploadBuffer == VK_NULL_HANDLE) {
       return;
     }
 
-    vk::DeviceSize offset = 0;
-    cmd.bindVertexBuffers(0, {m_thinVertexBuffer->buffer()}, {offset});
-    cmd.draw(static_cast<uint32_t>(m_thinVertices.size()), 1, 0, 0);
+    vk::DeviceSize offset = m_thinUploadOffset;
+    cmd.bindVertexBuffers(0, {m_thinUploadBuffer}, {offset});
+    if (payload.isLineStrip && m_thinUploadIndexBuffer && m_thinUploadIndexCount > 0) {
+      cmd.bindIndexBuffer(m_thinUploadIndexBuffer, m_thinUploadIndexOffset, vk::IndexType::eUint32);
+      cmd.drawIndexed(m_thinUploadIndexCount, 1, 0, 0, 0);
+    } else {
+      cmd.draw(m_thinUploadVertexCount, 1, 0, 0);
+    }
   }
 }
 

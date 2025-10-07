@@ -107,12 +107,13 @@ private:
   std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
 
-  std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
-  std::unique_ptr<ZVulkanBuffer> m_indexBuffer;
-  size_t m_vertexCapacity = 0;
-  size_t m_indexCapacity = 0;
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
+  // Upload arena-backed slices
+  vk::Buffer m_vertexUploadBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_vertexUploadOffset{0};
+  vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_indexUploadOffset{0};
 
   void ensureDescriptorLayouts();
   void resetDescriptors();
@@ -132,8 +133,6 @@ private:
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
-  void ensureVertexCapacity(size_t vertexCount);
-  void ensureIndexCapacity(size_t indexCount);
   void uploadGeometry(const EllipsoidPayload& payload);
 };
 

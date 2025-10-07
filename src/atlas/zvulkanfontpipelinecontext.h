@@ -92,12 +92,13 @@ private:
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
 
-  std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
-  std::unique_ptr<ZVulkanBuffer> m_indexBuffer;
-  size_t m_vertexCapacity = 0;
-  size_t m_indexCapacity = 0;
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
+  // Upload arena-backed slices
+  vk::Buffer m_vertexUploadBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_vertexUploadOffset{0};
+  vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_indexUploadOffset{0};
 
   // Cache CPU-provided atlases keyed by pixel pointer
   std::unordered_map<const void*, std::unique_ptr<ZVulkanTexture>> m_atlasCache;
@@ -107,8 +108,6 @@ private:
   void ensureDescriptorSet();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
-  void ensureVertexCapacity(size_t vertexCount);
-  void ensureIndexCapacity(size_t indexCount);
   void uploadGeometry(const FontPayload& payload);
 
   ZVulkanTexture* ensureAtlasFromPayload(const FontPayload& payload);

@@ -104,16 +104,21 @@ private:
   std::unique_ptr<ZVulkanBuffer> m_uboTransforms;
   std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
 
-  std::unique_ptr<ZVulkanBuffer> m_wideVertexBuffer;
-  std::unique_ptr<ZVulkanBuffer> m_wideIndexBuffer;
-  std::unique_ptr<ZVulkanBuffer> m_thinVertexBuffer;
-  size_t m_wideVertexCapacity = 0;
-  size_t m_wideIndexCapacity = 0;
-  size_t m_thinVertexCapacity = 0;
+  // All line geometry uses the per-frame upload arena; no per-context VBOs
 
-  std::vector<LineWideVertex> m_wideVertices;
-  std::vector<uint32_t> m_wideIndices;
-  std::vector<VulkanThinLineVertex> m_thinVertices;
+  // Upload arena-backed slice for thin line vertices (per-draw)
+  vk::Buffer m_thinUploadBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_thinUploadOffset{0};
+  uint32_t m_thinUploadVertexCount{0};
+  vk::Buffer m_thinUploadIndexBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_thinUploadIndexOffset{0};
+  uint32_t m_thinUploadIndexCount{0};
+
+  // Upload arena-backed slices for wide line vertices/indices (per-draw)
+  vk::Buffer m_wideUploadBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_wideUploadVertexOffset{0};
+  vk::DeviceSize m_wideUploadIndexOffset{0};
+  uint32_t m_wideUploadIndexCount{0};
 
   void ensureDescriptorLayouts();
   void ensurePlaceholderTexture();

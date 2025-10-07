@@ -21,6 +21,7 @@
 #include <array>
 #include <cstddef>
 #include <vector>
+#include <cstring>
 
 namespace nim {
 
@@ -62,6 +63,10 @@ void ZVulkanSpherePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
+  m_vertexUploadBuffer = VK_NULL_HANDLE;
+  m_vertexUploadOffset = 0;
+  m_indexUploadBuffer = VK_NULL_HANDLE;
+  m_indexUploadOffset = 0;
   resetDescriptors();
 }
 
@@ -162,9 +167,9 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
-  if (m_indexCount > 0 && m_indexBuffer) {
-    cmd.bindIndexBuffer(m_indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+  cmd.bindVertexBuffers(0, {m_vertexUploadBuffer}, {m_vertexUploadOffset});
+  if (m_indexCount > 0 && m_indexUploadBuffer) {
+    cmd.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
   }
 
   CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
@@ -207,7 +212,7 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
                                          0,
                                          constants);
 
-  if (m_indexCount > 0 && m_indexBuffer) {
+  if (m_indexCount > 0 && m_indexUploadBuffer) {
     cmd.drawIndexed(static_cast<uint32_t>(m_indexCount), 1, 0, 0, 0);
   } else {
     cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
@@ -620,38 +625,6 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanSpherePipelineContext::makeVertexI
   return info;
 }
 
-void ZVulkanSpherePipelineContext::ensureVertexCapacity(size_t vertexCount)
-{
-  const size_t requiredBytes = vertexCount * sizeof(SphereVertex);
-  if (requiredBytes <= m_vertexCapacity) {
-    return;
-  }
-
-  size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
-  auto& device = m_backend.device();
-  m_vertexBuffer =
-    device.createBuffer(newCapacity,
-                        vk::BufferUsageFlagBits::eVertexBuffer,
-                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  m_vertexCapacity = newCapacity;
-}
-
-void ZVulkanSpherePipelineContext::ensureIndexCapacity(size_t indexCount)
-{
-  const size_t requiredBytes = indexCount * sizeof(uint32_t);
-  if (requiredBytes <= m_indexCapacity) {
-    return;
-  }
-
-  size_t newCapacity = std::max(requiredBytes, m_indexCapacity == 0 ? requiredBytes : m_indexCapacity * 2);
-  auto& device = m_backend.device();
-  m_indexBuffer =
-    device.createBuffer(newCapacity,
-                        vk::BufferUsageFlagBits::eIndexBuffer,
-                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  m_indexCapacity = newCapacity;
-}
-
 void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
 {
   m_vertexCount = payload.pointsAndRadius.size();
@@ -668,16 +641,13 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
     return;
   }
 
-  ensureVertexCapacity(m_vertexCount);
-  if (m_indexCount > 0) {
-    ensureIndexCapacity(m_indexCount);
+  auto vSlice = m_backend.suballocateUpload(m_vertexCount * sizeof(SphereVertex), alignof(SphereVertex));
+  if (!vSlice.buffer || !vSlice.mapped) {
+    m_vertexCount = 0;
+    m_indexCount = 0;
+    return;
   }
-
-  auto mapping = m_vertexBuffer->mapRange(0, m_vertexCount * sizeof(SphereVertex));
-  auto* vertices = mapping.as<SphereVertex>();
-  if (!vertices) {
-    throw ZException("Failed to map sphere vertex buffer");
-  }
+  auto* vertices = static_cast<SphereVertex*>(vSlice.mapped);
   const bool pickingPass = payload.pickingPass;
 
   for (size_t i = 0; i < m_vertexCount; ++i) {
@@ -697,9 +667,21 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
     vertex.flags = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
   }
 
-  if (m_indexCount > 0 && m_indexBuffer) {
-    m_indexBuffer->copyData(payload.indices.data(), m_indexCount * sizeof(uint32_t));
+  if (m_indexCount > 0) {
+    auto iSlice = m_backend.suballocateUpload(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
+    if (iSlice.buffer && iSlice.mapped) {
+      std::memcpy(iSlice.mapped, payload.indices.data(), m_indexCount * sizeof(uint32_t));
+      m_indexUploadBuffer = iSlice.buffer;
+      m_indexUploadOffset = iSlice.offset;
+    } else {
+      m_indexCount = 0;
+    }
+  } else {
+    m_indexUploadBuffer = VK_NULL_HANDLE;
+    m_indexUploadOffset = 0;
   }
+  m_vertexUploadBuffer = vSlice.buffer;
+  m_vertexUploadOffset = vSlice.offset;
 }
 
 } // namespace nim

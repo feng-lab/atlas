@@ -95,6 +95,20 @@ public:
   // Shared geometry
   ZVulkanBuffer& fullscreenQuadVertexBuffer();
 
+  // Upload arena helpers (per-frame transient vertex/index data)
+  struct UploadSlice
+  {
+    vk::Buffer buffer{VK_NULL_HANDLE};
+    vk::DeviceSize offset = 0;
+    void* mapped = nullptr; // points into the arena at [offset, offset+size)
+    size_t size = 0;        // requested bytes
+  };
+
+  // Obtain a suballocation in the current frame's upload arena. Grows the
+  // underlying buffer if necessary. Returns an empty slice when no active
+  // frame is recording (e.g., zero-sized viewport).
+  UploadSlice suballocateUpload(size_t bytes, size_t alignment = 16);
+
   // Stage 2: Per-frame descriptor arena API
   // Allocate a descriptor set from the current frame's arena. Returns null when
   // no active frame exists (e.g., zero-sized viewport), and logs at VLOG(1).
@@ -216,6 +230,16 @@ private:
     std::vector<PendingReadback> pendingColorReadbacks;
     size_t readbackBytesCopied = 0;      // total bytes copied this frame
     uint32_t readbackSlotsInFlight = 0;  // slots associated with this frame
+
+    // Per-frame CPU→GPU upload arena for transient vertex/index data
+    struct UploadArena
+    {
+      std::unique_ptr<class ZVulkanBuffer> buffer; // host-visible, host-coherent
+      void* mapped = nullptr;                      // persistent mapping
+      size_t capacity = 0;                         // bytes
+      size_t offset = 0;                           // current write cursor
+      size_t highWatermark = 0;                    // max used this frame (debug)
+    } uploadArena;
   };
 
   void collectFrameTimings(FrameResources& frame);
@@ -268,6 +292,8 @@ private:
 
   void ensureSharedSamplers();
   void ensureFullscreenQuad();
+
+  // Upload arena helpers moved to public API above
 
   // Stage 4: Readback ring buffers
   struct ReadbackSlot

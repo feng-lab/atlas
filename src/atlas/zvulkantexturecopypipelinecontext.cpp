@@ -37,7 +37,7 @@ void ZVulkanTextureCopyPipelineContext::resetDescriptors()
   m_descriptorSet.reset();
 }
 
-void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
+void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase&,
                                                const RenderBatch& batch,
                                                const TextureCopyPayload& payload,
                                                const vk::Viewport& viewport,

@@ -23,6 +23,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <cstring>
 
 namespace nim {
 namespace {
@@ -52,6 +53,10 @@ void ZVulkanEllipsoidPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
+  m_vertexUploadBuffer = VK_NULL_HANDLE;
+  m_vertexUploadOffset = 0;
+  m_indexUploadBuffer = VK_NULL_HANDLE;
+  m_indexUploadOffset = 0;
   resetDescriptors();
 }
 
@@ -139,9 +144,9 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
 
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
-  if (m_indexCount > 0 && m_indexBuffer) {
-    cmd.bindIndexBuffer(m_indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+  cmd.bindVertexBuffers(0, {m_vertexUploadBuffer}, {m_vertexUploadOffset});
+  if (m_indexCount > 0 && m_indexUploadBuffer) {
+    cmd.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
   }
 
   CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
@@ -175,7 +180,7 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
                                             0,
                                             constants);
 
-  if (m_indexCount > 0 && m_indexBuffer) {
+  if (m_indexCount > 0 && m_indexUploadBuffer) {
     cmd.drawIndexed(static_cast<uint32_t>(m_indexCount), 1, 0, 0, 0);
   } else {
     cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
@@ -624,40 +629,6 @@ ZVulkanEllipsoidPipelineContext::ensurePipeline(const PipelineKey& key, const vu
   return inserted->second;
 }
 
-void ZVulkanEllipsoidPipelineContext::ensureVertexCapacity(size_t vertexCount)
-{
-  const size_t requiredBytes = vertexCount * sizeof(EllipsoidVertex);
-  if (requiredBytes <= m_vertexCapacity) {
-    return;
-  }
-
-  size_t newCapacity = std::max(requiredBytes, m_vertexCapacity == 0 ? requiredBytes : m_vertexCapacity * 2);
-  auto& device = m_backend.device();
-  m_vertexBuffer =
-    device.createBuffer(newCapacity,
-                        vk::BufferUsageFlagBits::eVertexBuffer,
-                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  m_vertexCapacity = newCapacity;
-  CHECK(m_vertexBuffer != nullptr) << "Failed to allocate ellipsoid vertex buffer, bytes=" << newCapacity;
-}
-
-void ZVulkanEllipsoidPipelineContext::ensureIndexCapacity(size_t indexCount)
-{
-  const size_t requiredBytes = indexCount * sizeof(uint32_t);
-  if (requiredBytes <= m_indexCapacity) {
-    return;
-  }
-
-  size_t newCapacity = std::max(requiredBytes, m_indexCapacity == 0 ? requiredBytes : m_indexCapacity * 2);
-  auto& device = m_backend.device();
-  m_indexBuffer =
-    device.createBuffer(newCapacity,
-                        vk::BufferUsageFlagBits::eIndexBuffer,
-                        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  m_indexCapacity = newCapacity;
-  CHECK(m_indexBuffer != nullptr) << "Failed to allocate ellipsoid index buffer, bytes=" << newCapacity;
-}
-
 void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& payload)
 {
   m_vertexCount = payload.centers.size();
@@ -675,9 +646,11 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
     return;
   }
 
-  ensureVertexCapacity(m_vertexCount);
-  if (m_indexCount > 0) {
-    ensureIndexCapacity(m_indexCount);
+  auto vSlice = m_backend.suballocateUpload(m_vertexCount * sizeof(EllipsoidVertex), alignof(EllipsoidVertex));
+  if (!vSlice.buffer || !vSlice.mapped) {
+    m_vertexCount = 0;
+    m_indexCount = 0;
+    return;
   }
 
   if (payload.useDynamicMaterial && payload.specularAndShininess.size() < m_vertexCount) {
@@ -685,11 +658,7 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
       << "Vulkan ellipsoid backend: dynamic material buffer is incomplete; missing values default to zero.";
   }
 
-  auto mapping = m_vertexBuffer->mapRange(0, m_vertexCount * sizeof(EllipsoidVertex));
-  auto* vertices = mapping.as<EllipsoidVertex>();
-  if (!vertices) {
-    throw ZException("Failed to map ellipsoid vertex buffer");
-  }
+  auto* vertices = static_cast<EllipsoidVertex*>(vSlice.mapped);
   const bool pickingPass = payload.pickingPass;
 
   for (size_t i = 0; i < m_vertexCount; ++i) {
@@ -717,9 +686,21 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
     }
   }
 
-  if (m_indexCount > 0 && m_indexBuffer) {
-    m_indexBuffer->copyData(payload.indices.data(), m_indexCount * sizeof(uint32_t));
+  if (m_indexCount > 0) {
+    auto iSlice = m_backend.suballocateUpload(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
+    if (iSlice.buffer && iSlice.mapped) {
+      std::memcpy(iSlice.mapped, payload.indices.data(), m_indexCount * sizeof(uint32_t));
+      m_indexUploadBuffer = iSlice.buffer;
+      m_indexUploadOffset = iSlice.offset;
+    } else {
+      m_indexCount = 0;
+    }
+  } else {
+    m_indexUploadBuffer = VK_NULL_HANDLE;
+    m_indexUploadOffset = 0;
   }
+  m_vertexUploadBuffer = vSlice.buffer;
+  m_vertexUploadOffset = vSlice.offset;
 }
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanEllipsoidPipelineContext::makeVertexInputState() const
