@@ -75,14 +75,15 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
+  // Matches layout(push_constant) in Resources/shader/vulkan/almag.vert/frag
   struct FontPushConstants
   {
-    glm::mat4 mvp{1.0f};
+    glm::mat4 projectionView{1.0f};
+    float alpha = 1.0f;
+    float softedgeScale = 80.0f;
+    glm::vec2 _pad0{0.0f};
     glm::vec4 outlineColor{1.0f};
     glm::vec4 shadowColor{0.0f, 0.0f, 0.0f, 1.0f};
-    float softedgeScale = 80.0f;
-    glm::vec3 _pad{0.0f};
-    uint32_t flags = 0u; // bit0=picking, bit1=outline, bit2=shadow, bits8..=outlineMode
   };
 
   Z3DRendererVulkanBackend& m_backend;

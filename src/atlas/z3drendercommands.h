@@ -367,6 +367,7 @@ struct LinePayload
 
   float srcLineWidth = 1.0f;
   float resolvedLineWidth = 1.0f;
+  float sizeScale = 1.0f;
   bool pickingPass = false;
   // Generation counters for selective restaging
   uint32_t positionsGen = 0;    // raw polyline positions

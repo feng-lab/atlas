@@ -476,6 +476,7 @@ LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
   payload.enableMultisample = m_enableMultisample;
   payload.srcLineWidth = m_srcLineWidth;
   payload.resolvedLineWidth = m_lineWidth;
+  payload.sizeScale = m_rendererBase.parameterState().sizeScale;
   payload.pickingPass = picking;
 
   // Per-stream generation counters

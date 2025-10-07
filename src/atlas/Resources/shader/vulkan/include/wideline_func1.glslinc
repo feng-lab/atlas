@@ -52,5 +52,8 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
     fragColor = col;
   }
 
-  fragDepth = gl_FragDepth; // keep current depth
+  // Preserve the current fragment depth produced by the pipeline
+  // (Vulkan NDC z in [0,1]). Reading gl_FragDepth here is undefined; use
+  // gl_FragCoord.z which reflects interpolated depth for this fragment.
+  fragDepth = gl_FragCoord.z;
 }

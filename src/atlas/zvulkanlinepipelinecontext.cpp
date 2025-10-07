@@ -101,11 +101,6 @@ vk::PipelineVertexInputStateCreateInfo makeThinVertexInput()
   return info;
 }
 
-float resolveWideLineWidth(float srcWidth)
-{
-  return std::max(1.f, srcWidth) - 0.9f;
-}
-
 std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
 {
   return {glm::vec4(matrix[0], 0.0f), glm::vec4(matrix[1], 0.0f), glm::vec4(matrix[2], 0.0f)};
@@ -409,6 +404,9 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, **m_setLighting, **m_setTransforms};
     instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
     instance.pipeline->setDescriptorSetLayouts(setLayouts);
+    // Wide-line quads are generated in screen space; disable culling to avoid
+    // implementation-dependent winding eliminating triangles.
+    instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
 
     vk::PipelineColorBlendAttachmentState baseBlend{};
     baseBlend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
@@ -532,6 +530,9 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, **m_setLighting, **m_setTransforms};
     instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
     instance.pipeline->setDescriptorSetLayouts(setLayouts);
+    // Thin lines may produce implementation-dependent winding; disable culling
+    // to ensure visibility regardless of vertex order.
+    instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
     instance.pipeline->create();
   }
 
@@ -1109,6 +1110,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   cmd.setScissor(0, scissor);
 
   if (payload.useSmoothLine) {
+    // Static vertex input state is defined at pipeline creation; no dynamic state.
     uploadWideGeometry(payload, pickingPass);
     if (m_wideP0Buffer == VK_NULL_HANDLE || m_wideUploadIndexCount == 0) {
       return;
@@ -1140,14 +1142,26 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     const auto& frameState = renderer.frameState();
     pc.viewport_matrix = frameState.viewportMatrix;
     pc.viewport_matrix_inverse = frameState.inverseViewportMatrix;
-    pc.size_scale = renderer.parameterState().sizeScale;
+    pc.size_scale = (payload.sizeScale > 0.0f) ? payload.sizeScale : renderer.parameterState().sizeScale;
 
     const auto widths = payload.perSegmentWidths;
+    const float dpr = renderer.sceneState().devicePixelRatio;
+    const bool msaa2x2 = (renderer.sceneState().multisample == GeometryMSAAMode::MSAA2x2) && payload.enableMultisample;
+    const float sizeScale = (payload.sizeScale > 0.0f) ? payload.sizeScale : renderer.parameterState().sizeScale;
     if (!widths.empty()) {
+      VLOG(1) << fmt::format(
+        "VK wide line: segments={} dpr={:.3f} msaa2x2={} sizeScale={:.3f} resolvedLineWidth={:.3f}",
+        m_wideUploadIndexCount / 6u,
+        dpr,
+        msaa2x2,
+        sizeScale,
+        payload.resolvedLineWidth);
       const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
       const uint32_t drawSegments = std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size()));
       for (uint32_t i = 0; i < drawSegments; ++i) {
-        pc.line_width = resolveWideLineWidth(widths[i]);
+        // Match shader usage: use the raw per-segment width and let size_scale
+        // control the expansion in shader.
+        pc.line_width = widths[i];
         if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
           const float n = renderer.viewState().nearClip;
           const float f = renderer.viewState().farClip;
@@ -1168,7 +1182,10 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
         cmd.drawIndexed(6, 1, i * 6, i * 4, 0);
       }
     } else {
-      pc.line_width = resolveWideLineWidth(payload.srcLineWidth);
+      pc.line_width = payload.resolvedLineWidth;
+      VLOG(1) << fmt::format("VK wide line: single width resolvedLineWidth={:.3f} sizeScale={:.3f}",
+                             payload.resolvedLineWidth,
+                             sizeScale);
       cmd.pushConstants<WideLinePC>(pipeline.pipeline->pipelineLayout(),
                                     vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                                     0,
@@ -1182,6 +1199,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
       return;
     }
 
+    // Static vertex input state is defined at pipeline creation; no dynamic state.
     // Bind SoA buffers for thin line
     std::array<vk::Buffer, 2> tbufs{m_thinPosBuffer, m_thinColorBuffer};
     std::array<vk::DeviceSize, 2> toffs{m_thinPosOffset, m_thinColorOffset};

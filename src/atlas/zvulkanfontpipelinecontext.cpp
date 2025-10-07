@@ -111,27 +111,28 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
 
-  // Compose push constants
+  // Compose push constants (match shader layout)
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   const auto& params = renderer.parameterState();
-  glm::mat4 mvp = eyeState.projectionMatrix * eyeState.viewMatrix * params.coordTransform;
+  glm::mat4 projView = eyeState.projectionMatrix * eyeState.viewMatrix * params.coordTransform;
 
   FontPushConstants constants;
-  constants.mvp = mvp;
+  constants.projectionView = projView;
+  constants.alpha = 1.0f; // fully opaque text; fragment premultiplies
+  constants.softedgeScale = payload.softedgeScale;
   constants.outlineColor = payload.outlineColor;
   constants.shadowColor = payload.shadowColor;
-  constants.softedgeScale = payload.softedgeScale;
-  uint32_t flags = 0u;
-  flags |= (payload.pickingPass ? 1u : 0u);
-  flags |= (payload.showOutline ? (1u << 1) : 0u);
-  flags |= (payload.showShadow ? (1u << 2) : 0u);
-  flags |= (static_cast<uint32_t>(payload.outlineMode & 0xFF) << 8);
-  constants.flags = flags;
 
   cmd.pushConstants<FontPushConstants>(pipeline.pipeline->pipelineLayout(),
                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
                                        0,
                                        constants);
+
+  VLOG(1) << fmt::format("VK font draw: verts={} idx={} picking={} dpr={:.3f}",
+                         m_vertexCount,
+                         m_indexCount,
+                         payload.pickingPass,
+                         renderer.sceneState().devicePixelRatio);
 
   cmd.drawIndexed(static_cast<uint32_t>(m_indexCount), 1, 0, 0, 0);
 }
@@ -410,8 +411,27 @@ ZVulkanFontPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  instance.pipeline->setDepthTestEnable(true);
-  instance.pipeline->setDepthWriteEnable(false);
+  if (key.picking) {
+    instance.pipeline->setDepthTestEnable(true);
+    instance.pipeline->setDepthWriteEnable(false);
+    // No blending needed in picking, rely on color writes only
+  } else {
+    // Overlay text: disable depth test/write to avoid accidental occlusion
+    instance.pipeline->setDepthTestEnable(false);
+    instance.pipeline->setDepthWriteEnable(false);
+    // Premultiplied alpha blending for font shader (rgb is premultiplied by a)
+    vk::PipelineColorBlendAttachmentState blend{};
+    blend.blendEnable = VK_TRUE;
+    blend.srcColorBlendFactor = vk::BlendFactor::eOne;
+    blend.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+    blend.colorBlendOp = vk::BlendOp::eAdd;
+    blend.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    blend.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+    blend.alphaBlendOp = vk::BlendOp::eAdd;
+    blend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    instance.pipeline->setColorBlendAttachment(blend);
+  }
 
   // Blending
   vk::PipelineColorBlendAttachmentState blendAttachment{};

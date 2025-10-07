@@ -44,12 +44,16 @@ void main()
   float rightFlag = flags.x - 1.0;
   float upFlag    = flags.y - 1.0;
 
-  vec4 p0 = wpc.viewport_matrix * (xf.projection_view_matrix * (xf.pos_transform * vec4(attr_p0, 1.0)));
-  vec4 p1 = wpc.viewport_matrix * (xf.projection_view_matrix * (xf.pos_transform * vec4(attr_p1, 1.0)));
+  // Compute clip-space endpoints first
+  vec4 p0clip = xf.projection_view_matrix * (xf.pos_transform * vec4(attr_p0, 1.0));
+  vec4 p1clip = xf.projection_view_matrix * (xf.pos_transform * vec4(attr_p1, 1.0));
   // Clip against the near plane in clip coordinates. Vulkan uses depth in [0,1]
   // so the clip half-space is z >= 0 (i.e., plane (0,0,1,0)).
-  ClipSegmentToPlane(p0, p1, vec4(0,0,1,0));
-  p0 /= p0.w; p1 /= p1.w;
+  ClipSegmentToPlane(p0clip, p1clip, vec4(0,0,1,0));
+  // Perspective divide to NDC, then to viewport for 2D expansion
+  p0clip /= p0clip.w; p1clip /= p1clip.w;
+  vec4 p0 = wpc.viewport_matrix * p0clip;
+  vec4 p1 = wpc.viewport_matrix * p1clip;
   // Provide endpoints for round caps; harmless if not used in FS
   p0p1 = vec4(p0.xy, p1.xy);
 
@@ -79,5 +83,7 @@ void main()
   // interpolate color per-segment end
   v_color = rightFlag > 0.0 ? attr_p1color : attr_p0color;
 
+  // Use viewport-space z,w (mapped from NDC by viewport_matrix) so that
+  // inverseViewportMatrix restores correct clip/NDC depth.
   gl_Position = wpc.viewport_matrix_inverse * vec4(qcorner, rightFlag > 0.0 ? p1.zw : p0.zw);
 }

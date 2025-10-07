@@ -373,73 +373,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       PipelineInstance& pipeline = ensurePipeline(key, formats);
       if (&pipeline != currentPipeline) {
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-        // Dynamic vertex input (VK_EXT_vertex_input_dynamic_state)
-        if (m_backend.device().supportsVertexInputDynamicState()) {
-          std::vector<vk::VertexInputBindingDescription2EXT> bindings;
-          std::vector<vk::VertexInputAttributeDescription2EXT> attrs;
-          // binding 0: position
-          bindings.emplace_back(
-            vk::VertexInputBindingDescription2EXT{.binding = 0,
-                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                  .inputRate = vk::VertexInputRate::eVertex,
-                                                  .divisor = 1});
-          attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 0,
-                                                                     .binding = 0,
-                                                                     .format = vk::Format::eR32G32B32Sfloat,
-                                                                     .offset = 0});
-          // binding 1: normal
-          bindings.emplace_back(
-            vk::VertexInputBindingDescription2EXT{.binding = 1,
-                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                  .inputRate = vk::VertexInputRate::eVertex,
-                                                  .divisor = 1});
-          attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 1,
-                                                                     .binding = 1,
-                                                                     .format = vk::Format::eR32G32B32Sfloat,
-                                                                     .offset = 0});
-          // binding 2: color
-          bindings.emplace_back(
-            vk::VertexInputBindingDescription2EXT{.binding = 2,
-                                                  .stride = static_cast<uint32_t>(sizeof(glm::vec4)),
-                                                  .inputRate = vk::VertexInputRate::eVertex,
-                                                  .divisor = 1});
-          attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 2,
-                                                                     .binding = 2,
-                                                                     .format = vk::Format::eR32G32B32A32Sfloat,
-                                                                     .offset = 0});
-          // binding 3: tex (optional)
-          if (m_texBinding == TexBinding::Tex1D) {
-            bindings.emplace_back(vk::VertexInputBindingDescription2EXT{.binding = 3,
-                                                                        .stride = static_cast<uint32_t>(sizeof(float)),
-                                                                        .inputRate = vk::VertexInputRate::eVertex,
-                                                                        .divisor = 1});
-            attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 3,
-                                                                       .binding = 3,
-                                                                       .format = vk::Format::eR32Sfloat,
-                                                                       .offset = 0});
-          } else if (m_texBinding == TexBinding::Tex2D) {
-            bindings.emplace_back(
-              vk::VertexInputBindingDescription2EXT{.binding = 3,
-                                                    .stride = static_cast<uint32_t>(sizeof(glm::vec2)),
-                                                    .inputRate = vk::VertexInputRate::eVertex,
-                                                    .divisor = 1});
-            attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 4,
-                                                                       .binding = 3,
-                                                                       .format = vk::Format::eR32G32Sfloat,
-                                                                       .offset = 0});
-          } else if (m_texBinding == TexBinding::Tex3D) {
-            bindings.emplace_back(
-              vk::VertexInputBindingDescription2EXT{.binding = 3,
-                                                    .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
-                                                    .inputRate = vk::VertexInputRate::eVertex,
-                                                    .divisor = 1});
-            attrs.emplace_back(vk::VertexInputAttributeDescription2EXT{.location = 5,
-                                                                       .binding = 3,
-                                                                       .format = vk::Format::eR32G32B32Sfloat,
-                                                                       .offset = 0});
-          }
-          cmd.setVertexInputEXT(bindings, attrs);
-        }
+        // Static vertex input state is defined at pipeline creation; no dynamic state.
         // Bind descriptor sets with optional textures override for set 0
         if (m_dsLighting && m_dsTransforms) {
           // For DDP peel require override; otherwise fall back to the shared set.
