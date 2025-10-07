@@ -42,6 +42,7 @@ private:
   struct QuadVertex
   {
     glm::vec3 position{0.0f};
+    glm::vec2 uv{0.0f};
   };
 
   struct PipelineKey
@@ -69,11 +70,6 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
-  struct TextureCopyPushConstants
-  {
-    glm::vec2 screenDimRcp{1.0f};
-    glm::vec2 _pad{0.0f};
-  };
 
   Z3DRendererVulkanBackend& m_backend;
 

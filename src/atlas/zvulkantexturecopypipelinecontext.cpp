@@ -58,7 +58,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   auto& depthTexture =
     vulkan::textureFromHandle(payload.depthAttachmentHandle, m_backend.device(), "texture-copy depth attachment");
 
-  // Shared fullscreen quad
+  // Fullscreen quad with UVs
   m_vertexCount = 4;
 
   ensureDescriptorLayout();
@@ -85,10 +85,13 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
+  // Ensure and bind local quad VBO with positions + UVs
+  ensureVertexCapacity(m_vertexCount);
+  uploadGeometry();
+
   vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
+  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
 
   {
     std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
@@ -99,25 +102,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
 
-  glm::vec2 extent = batch.pass.viewport.extent;
-  if (extent.x <= 0.0f || extent.y <= 0.0f) {
-    const auto& viewportState = renderer.frameState().viewport;
-    extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
-  }
-  if (extent.x <= 0.0f) {
-    extent.x = 1.0f;
-  }
-  if (extent.y <= 0.0f) {
-    extent.y = 1.0f;
-  }
-
-  TextureCopyPushConstants constants;
-  constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
-
-  cmd.pushConstants<TextureCopyPushConstants>(pipeline.pipeline->pipelineLayout(),
-                                              vk::ShaderStageFlagBits::eFragment,
-                                              0,
-                                              constants);
+  // No push constants needed; shader samples via UVs
 
   cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
 }
@@ -161,11 +146,15 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureCopyPipelineContext::makeVe
   static vk::VertexInputBindingDescription binding{.binding = 0,
                                                    .stride = static_cast<uint32_t>(sizeof(QuadVertex)),
                                                    .inputRate = vk::VertexInputRate::eVertex};
-  static std::array<vk::VertexInputAttributeDescription, 1> attrs{
+  static std::array<vk::VertexInputAttributeDescription, 2> attrs{
     vk::VertexInputAttributeDescription{.location = 0,
                                         .binding = 0,
                                         .format = vk::Format::eR32G32B32Sfloat,
-                                        .offset = 0}
+                                        .offset = static_cast<uint32_t>(offsetof(QuadVertex, position))},
+    vk::VertexInputAttributeDescription{.location = 1,
+                                        .binding = 0,
+                                        .format = vk::Format::eR32G32Sfloat,
+                                        .offset = static_cast<uint32_t>(offsetof(QuadVertex, uv))}
   };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
@@ -176,8 +165,31 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanTextureCopyPipelineContext::makeVe
   return info;
 }
 
-void ZVulkanTextureCopyPipelineContext::ensureVertexCapacity(size_t) {}
-void ZVulkanTextureCopyPipelineContext::uploadGeometry() {}
+void ZVulkanTextureCopyPipelineContext::ensureVertexCapacity(size_t vertexCount)
+{
+  const size_t required = vertexCount * sizeof(QuadVertex);
+  if (!m_vertexBuffer || m_vertexCapacity < required) {
+    m_vertexBuffer = m_backend.device().createBuffer(required,
+                                                    vk::BufferUsageFlagBits::eVertexBuffer,
+                                                    vk::MemoryPropertyFlagBits::eHostVisible |
+                                                      vk::MemoryPropertyFlagBits::eHostCoherent);
+    m_vertexCapacity = required;
+  }
+}
+
+void ZVulkanTextureCopyPipelineContext::uploadGeometry()
+{
+  if (!m_vertexBuffer) {
+    return;
+  }
+  QuadVertex verts[4] = {
+    {glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec2(0.0f, 0.0f)},
+    {glm::vec3(1.0f, -1.0f, 0.0f), glm::vec2(1.0f, 0.0f)},
+    {glm::vec3(-1.0f, 1.0f, 0.0f), glm::vec2(0.0f, 1.0f)},
+    {glm::vec3(1.0f, 1.0f, 0.0f), glm::vec2(1.0f, 1.0f)},
+  };
+  m_vertexBuffer->copyData(verts, sizeof(verts));
+}
 
 ZVulkanTextureCopyPipelineContext::PipelineInstance&
 ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats)
@@ -193,11 +205,10 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   PipelineInstance instance;
-  // Select y-flip variant if requested; shader must exist.
-  const std::string frag = key.flipY ? "copyimage_yflip.frag.spv" : "copyimage.frag.spv";
+  // Use single fragment with specialization constant to control Y-flip.
   instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "pass.vert.spv",
-                                                    shaderBase + frag,
+                                                    shaderBase + "pass_with_2dtexture.vert.spv",
+                                                    shaderBase + "copyimage.frag.spv",
                                                     std::nullopt);
 
   auto vertexInput = makeVertexInputState();
@@ -216,19 +227,21 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   instance.pipeline->setColorBlendAttachment(blendAttachment);
 
-  std::array<vk::SpecializationMapEntry, 3> entries{
+  std::array<vk::SpecializationMapEntry, 4> entries{
     vk::SpecializationMapEntry{.constantID = 60, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 61, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
-    vk::SpecializationMapEntry{.constantID = 62, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)}
+    vk::SpecializationMapEntry{.constantID = 62, .offset = 2 * sizeof(uint32_t), .size = sizeof(uint32_t)},
+    vk::SpecializationMapEntry{.constantID = 63, .offset = 3 * sizeof(uint32_t), .size = sizeof(uint32_t)}
   };
 
   const bool discard = key.discardTransparent;
   const bool multiply = key.mode == TextureCopyPayload::OutputMode::MultiplyAlpha;
   const bool divide = key.mode == TextureCopyPayload::OutputMode::DivideByAlpha;
 
-  std::array<uint32_t, 3> specData{static_cast<uint32_t>(discard),
+  std::array<uint32_t, 4> specData{static_cast<uint32_t>(discard),
                                    static_cast<uint32_t>(multiply),
-                                   static_cast<uint32_t>(divide)};
+                                   static_cast<uint32_t>(divide),
+                                   static_cast<uint32_t>(key.flipY)};
 
   instance.shader->setSpecializationConstants(
     vk::ShaderStageFlagBits::eFragment,
@@ -236,10 +249,7 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
     std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(specData.data()),
                          reinterpret_cast<const uint8_t*>(specData.data()) + sizeof(specData)));
 
-  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
-                              .offset = 0,
-                              .size = static_cast<uint32_t>(sizeof(TextureCopyPushConstants))};
-  instance.pipeline->setPushConstantRanges({range});
+  // No push constants used in copy pipeline; UVs drive sampling
   instance.pipeline->create();
 
   auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});
