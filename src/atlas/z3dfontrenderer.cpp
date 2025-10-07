@@ -295,7 +295,6 @@ void Z3DFontRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   payload.pickingColors = spanOrEmpty(m_fontPickingColors);
   payload.indices = spanFromGLuints(m_indexs);
   // Avoid GL bridging for Vulkan: provide CPU atlas
-  payload.atlasTexture = nullptr;
   payload.atlasPixels = font->atlasPixelsBGRA8();
   payload.atlasWidth = font->atlasWidth();
   payload.atlasHeight = font->atlasHeight();

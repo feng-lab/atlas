@@ -78,10 +78,6 @@ TextureBlendPayload Z3DTextureBlendRenderer::buildTextureBlendPayload() const
 {
   TextureBlendPayload payload;
   payload.renderer = const_cast<Z3DTextureBlendRenderer*>(this);
-  payload.colorTexture0 = m_colorTexture1;
-  payload.depthTexture0 = m_depthTexture1;
-  payload.colorTexture1 = m_colorTexture2;
-  payload.depthTexture1 = m_depthTexture2;
   payload.mode = m_blendMode;
   payload.colorAttachmentHandle0 = m_colorAttachmentHandle0;
   payload.depthAttachmentHandle0 = m_depthAttachmentHandle0;
@@ -97,7 +93,6 @@ RenderBatch Z3DTextureBlendRenderer::buildRenderBatch(Z3DEye eye) const
   batch.eye = eye;
 
   const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
   batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
   batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
   batch.pass.viewport.minDepth = 0.0f;

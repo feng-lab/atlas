@@ -58,8 +58,6 @@ TextureCopyPayload Z3DTextureCopyRenderer::buildTextureCopyPayload() const
 {
   TextureCopyPayload payload;
   payload.renderer = const_cast<Z3DTextureCopyRenderer*>(this);
-  payload.colorTexture = m_colorTexture;
-  payload.depthTexture = m_depthTexture;
   payload.discardTransparent = m_discardTransparent;
   payload.flipY = m_flipY;
   payload.colorAttachmentHandle = m_colorAttachmentHandle;
@@ -88,7 +86,6 @@ RenderBatch Z3DTextureCopyRenderer::buildRenderBatch(Z3DEye eye) const
   batch.eye = eye;
 
   const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-  batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
   batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
   batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
   batch.pass.viewport.minDepth = 0.0f;

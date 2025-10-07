@@ -20,7 +20,7 @@
 #include <unordered_set>
 #include <optional>
 
-DEFINE_bool(atlas_vk_copy_yflip_in_shader, false, "Use y-flip in Vulkan final copy shader instead of UI flip");
+DEFINE_bool(atlas_vk_copy_yflip_in_shader, true, "Use y-flip in Vulkan final copy shader instead of UI flip");
 
 namespace {
 using namespace nim;
@@ -3480,7 +3480,6 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
         RenderBatch batch;
         batch.eye = eye;
         const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-        batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
         batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
         batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
         batch.pass.viewport.minDepth = 0.0f;
@@ -3535,7 +3534,6 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       RenderBatch batch;
       batch.eye = eye;
       const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-      batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
       batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
       batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
       batch.pass.viewport.minDepth = 0.0f;
@@ -3708,7 +3706,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
       RenderBatch batch;
       batch.eye = eye;
       const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-      batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+      
       batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
       batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
       batch.pass.viewport.minDepth = 0.0f;
@@ -3886,7 +3884,7 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
       RenderBatch batch;
       batch.eye = eye;
       const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-      batch.pass.extent = glm::uvec2(viewport.z, viewport.w);
+      
       batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
       batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
       batch.pass.viewport.minDepth = 0.0f;

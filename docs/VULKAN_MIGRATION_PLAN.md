@@ -224,6 +224,7 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
   6. **Pipeline Adjustments**
      - Verify all Vulkan pipeline contexts consume attachment handles exclusively, with no CPU upload fallback.
      - Audit layout transitions and descriptor usage for the new Vulkan intermediates.
+     - Payload cleanup: render payloads no longer carry OpenGL `Z3DTexture*` pointers. All inputs are expressed as `AttachmentHandle` (framebuffer attachments) or `SampledImageHandle` (sampled images). `BackendPassDesc::viewport` is the single source of truth for the render area; the old `BackendPassDesc::extent` has been removed.
 
   7. **Documentation & TODOs**
      - Capture remaining gaps in this plan/the issue tracker (e.g., GL fallback removal) so later work is well-scoped.

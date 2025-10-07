@@ -61,10 +61,6 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
             << " activeSurfaceColors=" << m_frameState.activeSurface.colorAttachments.size()
             << " activeSurfaceHasDepth=" << m_frameState.activeSurface.depthAttachment.has_value();
 
-  if (batch.pass.extent == glm::uvec2(0u) && viewportRect.z > 0u && viewportRect.w > 0u) {
-    batch.pass.extent = glm::uvec2(viewportRect.z, viewportRect.w);
-  }
-
   if (batch.pass.viewport.extent == glm::vec2(0.0f) && viewportRect.z > 0u && viewportRect.w > 0u) {
     batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewportRect.x), static_cast<float>(viewportRect.y));
     batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewportRect.z), static_cast<float>(viewportRect.w));

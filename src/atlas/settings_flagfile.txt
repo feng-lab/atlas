@@ -43,6 +43,9 @@
 # define the width, height, and depth of image blocks in the 3D image cache system, can be 64 (default), 128, 256 or 512
 --atlas_image_block_size=64
 
+# Use y-flip in Vulkan final copy shader instead of UI flip
+--atlas_vk_copy_yflip_in_shader=true
+
 # Whether to enable debugging features of vulkan, default is false, can set to true for debugging
 --atlas_debug_vulkan=false
 

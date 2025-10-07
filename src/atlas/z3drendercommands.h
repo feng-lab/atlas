@@ -15,8 +15,6 @@
 #include <limits>
 
 namespace nim {
-
-class Z3DTexture;
 class ZMesh;
 class Z3DLineRenderer;
 class Z3DMeshRenderer;
@@ -184,12 +182,12 @@ struct BackendPassDesc
 
   Kind kind = Kind::Raster;
 
-  glm::uvec2 extent{0u, 0u};
-
   std::vector<AttachmentDesc> colorAttachments;
   std::optional<AttachmentDesc> depthAttachment;
   std::optional<AttachmentDesc> resolveAttachment;
-
+  // Viewport is the single source of truth for the render area.
+  // Backends convert this to native viewport/scissor. If zero, the
+  // renderer provides a default from the current frame viewport.
   ViewportDesc viewport;
   bool enableScissor = false;
   glm::vec4 scissorRect{0.0f, 0.0f, 0.0f, 0.0f};
@@ -360,8 +358,6 @@ struct LinePayload
   std::span<const float> smoothFlags;
   std::span<const uint32_t> smoothIndices;
 
-  Z3DTexture* texture = nullptr;
-
   bool useSmoothLine = true;
   bool useTextureColor = false;
   bool screenAligned = false;
@@ -409,7 +405,6 @@ struct MeshPayload
 
   glm::vec4 wireframeColor{1.0f};
 
-  Z3DTexture* texture = nullptr;
   SampledImageHandle textureHandle; // Vulkan-native sampled image (optional)
 
   bool meshNeedsSplit = false;
@@ -452,8 +447,6 @@ struct TextureCopyPayload
   };
 
   Z3DTextureCopyRenderer* renderer = nullptr;
-  const Z3DTexture* colorTexture = nullptr; // TODO: populate Vulkan handles and remove GL pointers
-  const Z3DTexture* depthTexture = nullptr;
   bool discardTransparent = true;
   OutputMode mode = OutputMode::NoChange;
   bool flipY = false;
@@ -464,10 +457,6 @@ struct TextureCopyPayload
 struct TextureBlendPayload
 {
   Z3DTextureBlendRenderer* renderer = nullptr;
-  const Z3DTexture* colorTexture0 = nullptr; // TODO: populate Vulkan handles and remove GL pointers
-  const Z3DTexture* depthTexture0 = nullptr;
-  const Z3DTexture* colorTexture1 = nullptr;
-  const Z3DTexture* depthTexture1 = nullptr;
   TextureBlendMode mode = TextureBlendMode::DepthTestBlending;
   AttachmentHandle colorAttachmentHandle0;
   AttachmentHandle depthAttachmentHandle0;
@@ -478,8 +467,6 @@ struct TextureBlendPayload
 struct TextureGlowPayload
 {
   Z3DTextureGlowRenderer* renderer = nullptr;
-  const Z3DTexture* colorTexture = nullptr; // TODO: populate Vulkan handles and remove GL pointers
-  const Z3DTexture* depthTexture = nullptr;
   GlowMode mode = GlowMode::Screen;
   int blurRadius = 0;
   float blurScale = 1.0f;
@@ -616,9 +603,7 @@ struct FontPayload
   std::span<const glm::vec4> pickingColors;
   std::span<const uint32_t> indices;
 
-  // Glyph atlas as an OpenGL texture (bridged to Vulkan via CPU upload when needed)
-  const Z3DTexture* atlasTexture = nullptr;
-  // Vulkan: either provide a native handle or CPU pixels (BGRA8) + dimensions.
+  // Glyph atlas: provide a native Vulkan handle or CPU pixels (BGRA8) + dimensions.
   SampledImageHandle atlasHandle;
   const uint8_t* atlasPixels = nullptr;
   uint32_t atlasWidth = 0;

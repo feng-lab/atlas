@@ -647,11 +647,38 @@ For automation or cluster rendering:
 
 ## 10. Configuration, Logs, and Maintenance
 
-### 10.1 Configuration Files and Flags
+### 10.1 Configure via Flag File
 
-1. **Generate config**: **Help → Generate Config File** writes `user_settings_flagfile.txt` from the resource template.
-2. **Edit the file**: set flags like `atlas_block_scene_3d_apply=true`, adjust rendering limits, or enable debugging.
-3. **Command-line flags** override config file settings when needed (see section 12.2).
+Atlas supports a gflags-based configuration file that lets you tweak performance, memory, and debugging behavior without recompiling.
+
+- Generate file: use **Help → Generate Config File**. This copies the template into your config directory as `user_settings_flagfile.txt`.
+- Open location: use **Help → Open Config Folder** to open the directory in your file browser.
+- Edit format: open `user_settings_flagfile.txt` in a text editor. Use one flag per line with `--name=value`. Lines starting with `#` are comments; blank lines are allowed.
+- Apply changes: save the file and restart Atlas. Flags are read at startup. If a value is invalid or misspelled, it will not be applied—check the startup logs for any parse errors.
+
+Examples
+
+```text
+# Increase cache memory usage (50% of RAM)
+--atlas_image_cache_memory_proportion=0.5
+
+# Enable OpenGL debugging (slower; use when diagnosing issues)
+--atlas_debug_opengl=true
+
+# Vulkan validation/diagnostics
+--atlas_debug_vulkan=true
+
+# Raise ray-march rounds for volume rendering
+--atlas_volume_rendering_maximum_round=200
+
+# Increase log verbosity
+--v=1
+```
+
+Tips
+
+- Start conservatively when raising limits (e.g., cache sizes or volume rounds). If performance regresses, reduce the values.
+- Prefer the flagfile for persistent tweaks. Use command-line flags to temporarily override settings (see section 12.2).
 
 ### 10.2 Log Files and Diagnostics
 

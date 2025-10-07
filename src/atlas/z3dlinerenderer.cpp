@@ -452,8 +452,6 @@ LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
   payload.smoothPickingColors = spanOrEmpty(m_smoothLinePickingColors);
   payload.smoothFlags = spanFromGLfloats(m_allFlags);
   payload.smoothIndices = spanFromGLuints(m_indexs);
-
-  payload.texture = m_texture;
   payload.useSmoothLine = m_useSmoothLine;
   payload.useTextureColor = m_useTextureColor;
   payload.screenAligned = m_screenAligned;

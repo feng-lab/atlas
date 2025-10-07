@@ -7,8 +7,6 @@
 #include <memory>
 #include <string>
 
-class Z3DTexture;
-
 namespace nim {
 
 // NOTE: Color of each vertex can comes from many sources, call setColorSource
