@@ -90,6 +90,15 @@ private:
   std::unique_ptr<Z3DVertexBufferObject> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
+
+  // Generation counters for Vulkan selective restaging
+  uint32_t m_baseGen = 0;
+  uint32_t m_axisGen = 0;
+  uint32_t m_baseColorGen = 0;
+  uint32_t m_topColorGen = 0;
+  uint32_t m_pickingColorsGen = 0;
+  uint32_t m_flagsGen = 0;
+  uint32_t m_indexGen = 0;
 };
 
 } // namespace nim

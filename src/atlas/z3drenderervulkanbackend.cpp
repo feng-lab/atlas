@@ -238,6 +238,8 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Reset per-frame upload arena cursor/high-watermark
   frameResources.uploadArena.offset = 0;
   frameResources.uploadArena.highWatermark = 0;
+  // Ensure static arenas exist once a device is present
+  ensureStaticArenas();
 
   // Expose frame resources to allow pre-record descriptor priming
   m_activeFrame = &frameResources;
@@ -405,7 +407,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 
   // Stage 3: VLOG instrumentation for dynamic rendering segments and pipeline stats
   VLOG(1) << fmt::format(
-    "VK segments: began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={} overrides={} skipped_format_mismatch={} descriptor_writes_while_recording={} bound_set_rewrite_attempts={} readback_bytes_copied={} readback_slots_in_flight={}",
+    "VK segments: began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={} overrides={} skipped_format_mismatch={} descriptor_writes_while_recording={} bound_set_rewrite_attempts={} readback_bytes_copied={} readback_slots_in_flight={} static_bytes_staged={} static_stream_restaged={} lines_bytes_staged={} fonts_bytes_staged={} meshes_bytes_staged={} spheres_bytes_staged={}",
     frame.renderingSegmentsBegan,
     frame.attachmentClears,
     frame.attachmentLoads,
@@ -416,7 +418,20 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     frame.descriptorWritesWhileRecording,
     frame.boundSetRewriteAttempts,
     frame.readbackBytesCopied,
-    frame.readbackSlotsInFlight);
+    frame.readbackSlotsInFlight,
+    frame.staticBytesStaged,
+    frame.staticStreamRestaged,
+    frame.linesBytesStaged,
+    frame.fontsBytesStaged,
+    frame.meshesBytesStaged,
+    frame.spheresBytesStaged);
+
+  // Stage 5: VLOG(1) static/upload arena usage
+  VLOG(1) << fmt::format(
+    "VK arena: upload_high_watermark={}B static_vb_used={}B static_ib_used={}B",
+    m_activeFrame ? m_activeFrame->uploadArena.highWatermark : 0,
+    m_staticArena.vbHighWatermark,
+    m_staticArena.ibHighWatermark);
 
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
@@ -1153,6 +1168,112 @@ Z3DRendererVulkanBackend::suballocateUpload(size_t bytes, size_t alignment)
   arena.offset = required;
   arena.highWatermark = std::max(arena.highWatermark, required);
   return slice;
+}
+
+void Z3DRendererVulkanBackend::ensureStaticArenas()
+{
+  if (!m_sharedDevice) {
+    return;
+  }
+  // Create on first use with conservative capacities. Grow policy can be
+  // revisited; first cut avoids reallocation to keep slices stable.
+  if (!m_staticArena.vb) {
+    const size_t cap = static_cast<size_t>(32) * 1024 * 1024; // 32 MiB
+    m_staticArena.vb = m_sharedDevice->createBuffer(cap,
+                                                    vk::BufferUsageFlagBits::eVertexBuffer |
+                                                      vk::BufferUsageFlagBits::eTransferDst,
+                                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
+    m_staticArena.vbCapacity = cap;
+    m_staticArena.vbOffset = 0;
+    m_staticArena.vbHighWatermark = 0;
+  }
+  if (!m_staticArena.ib) {
+    const size_t cap = static_cast<size_t>(8) * 1024 * 1024; // 8 MiB
+    m_staticArena.ib = m_sharedDevice->createBuffer(cap,
+                                                    vk::BufferUsageFlagBits::eIndexBuffer |
+                                                      vk::BufferUsageFlagBits::eTransferDst,
+                                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
+    m_staticArena.ibCapacity = cap;
+    m_staticArena.ibOffset = 0;
+    m_staticArena.ibHighWatermark = 0;
+  }
+}
+
+Z3DRendererVulkanBackend::StaticSlice
+Z3DRendererVulkanBackend::allocateStaticVB(size_t bytes, size_t alignment)
+{
+  ensureStaticArenas();
+  StaticSlice slice{};
+  if (!m_staticArena.vb) {
+    return slice;
+  }
+  const size_t aligned = alignUp(m_staticArena.vbOffset, std::max<size_t>(1, alignment));
+  if (aligned + bytes > m_staticArena.vbCapacity) {
+    VLOG(1) << fmt::format("Static VB arena full: requested={}B have={}B", bytes, m_staticArena.vbCapacity - aligned);
+    return slice;
+  }
+  slice.buffer = m_staticArena.vb->buffer();
+  slice.offset = static_cast<vk::DeviceSize>(aligned);
+  slice.size = bytes;
+  m_staticArena.vbOffset = aligned + bytes;
+  m_staticArena.vbHighWatermark = std::max(m_staticArena.vbHighWatermark, m_staticArena.vbOffset);
+  return slice;
+}
+
+Z3DRendererVulkanBackend::StaticSlice
+Z3DRendererVulkanBackend::allocateStaticIB(size_t bytes, size_t alignment)
+{
+  ensureStaticArenas();
+  StaticSlice slice{};
+  if (!m_staticArena.ib) {
+    return slice;
+  }
+  const size_t aligned = alignUp(m_staticArena.ibOffset, std::max<size_t>(1, alignment));
+  if (aligned + bytes > m_staticArena.ibCapacity) {
+    VLOG(1) << fmt::format("Static IB arena full: requested={}B have={}B", bytes, m_staticArena.ibCapacity - aligned);
+    return slice;
+  }
+  slice.buffer = m_staticArena.ib->buffer();
+  slice.offset = static_cast<vk::DeviceSize>(aligned);
+  slice.size = bytes;
+  m_staticArena.ibOffset = aligned + bytes;
+  m_staticArena.ibHighWatermark = std::max(m_staticArena.ibHighWatermark, m_staticArena.ibOffset);
+  return slice;
+}
+
+void Z3DRendererVulkanBackend::stageCopy(vk::Buffer dst,
+                                         vk::DeviceSize dstOffset,
+                                         const UploadSlice& src,
+                                         bool isIndexBuffer)
+{
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid() || !dst || !src.buffer || src.size == 0) {
+    return;
+  }
+  auto& cmd = m_activeFrameHandle->commandBuffer();
+  vk::BufferCopy region{.srcOffset = src.offset, .dstOffset = dstOffset, .size = static_cast<vk::DeviceSize>(src.size)};
+  std::array<vk::BufferCopy, 1> regions{region};
+  cmd.copyBuffer(src.buffer, dst, regions);
+  if (m_activeFrame) {
+    m_activeFrame->staticBytesStaged += src.size;
+    m_activeFrame->staticStreamRestaged++;
+  }
+
+  // Barrier to make the transfer writes visible to vertex input stage.
+  // We rely on synchronization2 (1.3 or KHR) already enabled by the context.
+  vk::BufferMemoryBarrier2 barrier{};
+  barrier.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
+  barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+  barrier.dstStageMask = vk::PipelineStageFlagBits2::eVertexInput;
+  barrier.dstAccessMask = isIndexBuffer ? vk::AccessFlagBits2::eIndexRead : vk::AccessFlagBits2::eVertexAttributeRead;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.buffer = dst;
+  barrier.offset = dstOffset;
+  barrier.size = region.size;
+  vk::DependencyInfo dep{};
+  dep.bufferMemoryBarrierCount = 1;
+  dep.pBufferMemoryBarriers = &barrier;
+  cmd.pipelineBarrier2(dep);
 }
 
 std::unique_ptr<ZVulkanDescriptorSet>

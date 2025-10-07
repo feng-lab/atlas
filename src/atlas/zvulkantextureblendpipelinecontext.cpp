@@ -114,10 +114,9 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
-  vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
+  cmd.bindVertexBuffers(0, {quad.buffer()}, {vk::DeviceSize(0)});
 
   {
     std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};

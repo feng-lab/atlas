@@ -72,8 +72,12 @@ void ZVulkanConePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
-  m_vertexUploadBuffer = VK_NULL_HANDLE;
-  m_vertexUploadOffset = 0;
+  m_vbBuffer = VK_NULL_HANDLE;
+  m_originOffset = 0;
+  m_axisOffset = 0;
+  m_flagsOffset = 0;
+  m_baseColorOffset = 0;
+  m_topColorOffset = 0;
   m_indexUploadBuffer = VK_NULL_HANDLE;
   m_indexUploadOffset = 0;
   resetDescriptors();
@@ -173,9 +177,13 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
-  vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexUploadBuffer}, {m_vertexUploadOffset});
+  // Bind SoA streams (same buffer, different offsets)
+  {
+    std::array<vk::Buffer, 5> bufs{m_vbBuffer, m_vbBuffer, m_vbBuffer, m_vbBuffer, m_vbBuffer};
+    std::array<vk::DeviceSize, 5> offs{m_originOffset, m_axisOffset, m_flagsOffset, m_baseColorOffset, m_topColorOffset};
+    cmd.bindVertexBuffers(0, bufs, offs);
+  }
   if (m_indexCount > 0 && m_indexUploadBuffer) {
     cmd.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
   }
@@ -640,35 +648,24 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanConePipelineContext::makeVertexInputState() const
 {
-  static vk::VertexInputBindingDescription binding{.binding = 0,
-                                                   .stride = static_cast<uint32_t>(sizeof(ConeVertex)),
-                                                   .inputRate = vk::VertexInputRate::eVertex};
+  static std::array<vk::VertexInputBindingDescription, 5> bindings{
+    vk::VertexInputBindingDescription{.binding = 0, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // origin
+    vk::VertexInputBindingDescription{.binding = 1, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // axis
+    vk::VertexInputBindingDescription{.binding = 2, .stride = static_cast<uint32_t>(sizeof(float)),     .inputRate = vk::VertexInputRate::eVertex}, // flags
+    vk::VertexInputBindingDescription{.binding = 3, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // base color
+    vk::VertexInputBindingDescription{.binding = 4, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}  // top color
+  };
   static std::array<vk::VertexInputAttributeDescription, 5> attrs{
-    vk::VertexInputAttributeDescription{.location = 0,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, origin))   },
-    vk::VertexInputAttributeDescription{.location = 1,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, axis))     },
-    vk::VertexInputAttributeDescription{.location = 2,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, flags))    },
-    vk::VertexInputAttributeDescription{.location = 3,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, colorBase))},
-    vk::VertexInputAttributeDescription{.location = 4,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(ConeVertex, colorTop)) }
+    vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 1, .binding = 1, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 2, .binding = 2, .format = vk::Format::eR32Sfloat,            .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 3, .binding = 3, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 4, .binding = 4, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0}
   };
 
   static vk::PipelineVertexInputStateCreateInfo info{};
-  info.vertexBindingDescriptionCount = 1;
-  info.pVertexBindingDescriptions = &binding;
+  info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
+  info.pVertexBindingDescriptions = bindings.data();
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
   info.pVertexAttributeDescriptions = attrs.data();
   return info;
@@ -690,34 +687,28 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
     return;
   }
 
-  auto vSlice = m_backend.suballocateUpload(m_vertexCount * sizeof(ConeVertex), alignof(ConeVertex));
-  if (!vSlice.buffer || !vSlice.mapped) {
+  // Allocate SoA slices
+  const size_t v4Bytes = m_vertexCount * sizeof(glm::vec4);
+  const size_t fBytes = m_vertexCount * sizeof(float);
+  auto originSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+  auto axisSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+  auto flagsSlice = m_backend.suballocateUpload(fBytes, alignof(float));
+  auto baseColorSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+  auto topColorSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
+  if (!originSlice.buffer || !originSlice.mapped || !axisSlice.buffer || !axisSlice.mapped || !flagsSlice.buffer ||
+      !flagsSlice.mapped || !baseColorSlice.buffer || !baseColorSlice.mapped || !topColorSlice.buffer || !topColorSlice.mapped) {
     m_vertexCount = 0;
     m_indexCount = 0;
     return;
   }
-  auto* vertices = static_cast<ConeVertex*>(vSlice.mapped);
+  auto* originOut = static_cast<glm::vec4*>(originSlice.mapped);
+  auto* axisOut = static_cast<glm::vec4*>(axisSlice.mapped);
+  auto* flagsOut = static_cast<float*>(flagsSlice.mapped);
+  auto* baseColorOut = static_cast<glm::vec4*>(baseColorSlice.mapped);
+  auto* topColorOut = static_cast<glm::vec4*>(topColorSlice.mapped);
+  std::memcpy(originOut, payload.baseAndRadius.data(), v4Bytes);
+  std::memcpy(axisOut, payload.axisAndTopRadius.data(), v4Bytes);
   for (size_t i = 0; i < m_vertexCount; ++i) {
-    auto& vertex = vertices[i];
-    vertex.origin = payload.baseAndRadius[i];
-    vertex.axis = payload.axisAndTopRadius[i];
-    if (i < payload.baseColors.size()) {
-      vertex.colorBase = payload.baseColors[i];
-    } else {
-      vertex.colorBase = glm::vec4(1.0f);
-    }
-    if (payload.pickingPass) {
-      if (i < payload.pickingColors.size()) {
-        vertex.colorBase = payload.pickingColors[i];
-        vertex.colorTop = payload.pickingColors[i];
-      } else {
-        vertex.colorTop = vertex.colorBase;
-      }
-    } else if (!payload.sameColorForBaseAndTop && i < payload.topColors.size()) {
-      vertex.colorTop = payload.topColors[i];
-    } else {
-      vertex.colorTop = vertex.colorBase;
-    }
     float flagsValue = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
     if (payload.useConeShader2) {
       float right = std::floor(flagsValue / 16.0f);
@@ -727,7 +718,24 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
       float forward = up;
       flagsValue = right * 256.0f + up * 16.0f + forward;
     }
-    vertex.flags = flagsValue;
+    flagsOut[i] = flagsValue;
+  }
+  if (payload.pickingPass) {
+    for (size_t i = 0; i < m_vertexCount; ++i) {
+      glm::vec4 c = (i < payload.pickingColors.size()) ? payload.pickingColors[i] : glm::vec4(0.0f);
+      baseColorOut[i] = c;
+      topColorOut[i] = c;
+    }
+  } else {
+    for (size_t i = 0; i < m_vertexCount; ++i) {
+      glm::vec4 base = (i < payload.baseColors.size()) ? payload.baseColors[i] : glm::vec4(1.0f);
+      baseColorOut[i] = base;
+      glm::vec4 top = base;
+      if (!payload.sameColorForBaseAndTop && i < payload.topColors.size()) {
+        top = payload.topColors[i];
+      }
+      topColorOut[i] = top;
+    }
   }
 
   if (m_indexCount > 0) {
@@ -743,8 +751,120 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
     m_indexUploadBuffer = VK_NULL_HANDLE;
     m_indexUploadOffset = 0;
   }
-  m_vertexUploadBuffer = vSlice.buffer;
-  m_vertexUploadOffset = vSlice.offset;
+  m_vbBuffer = originSlice.buffer;
+  m_originOffset = originSlice.offset;
+  m_axisOffset = axisSlice.offset;
+  m_flagsOffset = flagsSlice.offset;
+  m_baseColorOffset = baseColorSlice.offset;
+  m_topColorOffset = topColorSlice.offset;
+
+  // Attempt static promotion
+  if (payload.renderer) {
+    CacheKey key{payload.renderer, payload.pickingPass};
+    auto it = m_staticCache.find(key);
+    const int kPromotionThreshold = 2;
+    if (it == m_staticCache.end()) {
+      CacheEntry entry{};
+      entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+      entry.indexCount = static_cast<uint32_t>(m_indexCount);
+      entry.baseGen = payload.baseGen;
+      entry.axisGen = payload.axisGen;
+      entry.baseColorGen = payload.baseColorGen;
+      entry.topColorGen = payload.topColorGen;
+      entry.pickingColorsGen = payload.pickingColorsGen;
+      entry.flagsGen = payload.flagsGen;
+      entry.indexGen = payload.indexGen;
+      m_staticCache.emplace(key, entry);
+    } else {
+      CacheEntry& entry = it->second;
+      const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
+      const bool shapeSame = entry.baseGen == payload.baseGen && entry.axisGen == payload.axisGen &&
+                             entry.flagsGen == payload.flagsGen && entry.indexGen == payload.indexGen;
+      if (sizeSame && shapeSame) {
+        entry.unchangedFrames++;
+      } else {
+        entry.unchangedFrames = 0;
+      }
+
+      if (entry.promoted && sizeSame) {
+        // Optional: restage colors if changed (AoS; we restage full VBO here)
+        if (entry.baseColorGen != payload.baseColorGen || entry.pickingColorsGen != payload.pickingColorsGen) {
+          m_backend.stageCopy(entry.vb, entry.baseColorOffset, baseColorSlice, false);
+          entry.baseColorGen = payload.baseColorGen;
+          entry.pickingColorsGen = payload.pickingColorsGen;
+        }
+        if (!payload.sameColorForBaseAndTop && entry.topColorGen != payload.topColorGen) {
+          m_backend.stageCopy(entry.vb, entry.topColorOffset, topColorSlice, false);
+          entry.topColorGen = payload.topColorGen;
+        }
+        // Bind static
+        m_vbBuffer = entry.vb;
+        m_originOffset = entry.originOffset;
+        m_axisOffset = entry.axisOffset;
+        m_flagsOffset = entry.flagsOffset;
+        m_baseColorOffset = entry.baseColorOffset;
+        m_topColorOffset = entry.topColorOffset;
+        if (entry.indexCount > 0 && entry.ib) {
+          m_indexUploadBuffer = entry.ib;
+          m_indexUploadOffset = entry.ibOffset;
+        }
+        return;
+      }
+
+      if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
+        auto originDst = m_backend.allocateStaticVB(v4Bytes, alignof(glm::vec4));
+        auto axisDst = m_backend.allocateStaticVB(v4Bytes, alignof(glm::vec4));
+        auto flagsDst = m_backend.allocateStaticVB(fBytes, alignof(float));
+        auto baseColorDst = m_backend.allocateStaticVB(v4Bytes, alignof(glm::vec4));
+        auto topColorDst = m_backend.allocateStaticVB(v4Bytes, alignof(glm::vec4));
+        Z3DRendererVulkanBackend::StaticSlice ibDst{};
+        if (m_indexCount > 0) {
+          ibDst = m_backend.allocateStaticIB(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
+        }
+        if (originDst.buffer && axisDst.buffer && flagsDst.buffer && baseColorDst.buffer && topColorDst.buffer &&
+            (m_indexCount == 0 || ibDst.buffer)) {
+          m_backend.stageCopy(originDst.buffer, originDst.offset, originSlice, false);
+          m_backend.stageCopy(axisDst.buffer, axisDst.offset, axisSlice, false);
+          m_backend.stageCopy(flagsDst.buffer, flagsDst.offset, flagsSlice, false);
+          m_backend.stageCopy(baseColorDst.buffer, baseColorDst.offset, baseColorSlice, false);
+          m_backend.stageCopy(topColorDst.buffer, topColorDst.offset, topColorSlice, false);
+          if (m_indexCount > 0) {
+            Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr,
+                                                         m_indexCount * sizeof(uint32_t)};
+            m_backend.stageCopy(ibDst.buffer, ibDst.offset, iUpload, /*isIndexBuffer=*/true);
+          }
+          VLOG(1) << fmt::format(
+            "VK cone promote: origin={}B axis={}B flags={}B baseColor={}B topColor={}B idx={}B",
+            v4Bytes,
+            v4Bytes,
+            fBytes,
+            v4Bytes,
+            v4Bytes,
+            m_indexCount * sizeof(uint32_t));
+          entry.vb = originDst.buffer;
+          entry.originOffset = originDst.offset;
+          entry.axisOffset = axisDst.offset;
+          entry.flagsOffset = flagsDst.offset;
+          entry.baseColorOffset = baseColorDst.offset;
+          entry.topColorOffset = topColorDst.offset;
+          entry.ib = ibDst.buffer;
+          entry.ibOffset = ibDst.offset;
+          entry.promoted = true;
+          // Bind static for this draw
+          m_vbBuffer = entry.vb;
+          m_originOffset = entry.originOffset;
+          m_axisOffset = entry.axisOffset;
+          m_flagsOffset = entry.flagsOffset;
+          m_baseColorOffset = entry.baseColorOffset;
+          m_topColorOffset = entry.topColorOffset;
+          if (entry.indexCount > 0 && entry.ib) {
+            m_indexUploadBuffer = entry.ib;
+            m_indexUploadOffset = entry.ibOffset;
+          }
+        }
+      }
+    }
+  }
 }
 
 } // namespace nim

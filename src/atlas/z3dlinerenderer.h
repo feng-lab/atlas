@@ -173,6 +173,20 @@ private:
   void refreshSmoothLinePayloads();
   void ensureLineColorStorage();
   void syncPickingColorCount();
+
+  // Generation counters for Vulkan selective restaging
+  uint32_t m_positionsGen = 0;
+  uint32_t m_smoothGen = 0;
+  uint32_t m_indicesGen = 0;
+  uint32_t m_colorsGen = 0;
+  uint32_t m_pickingColorsGen = 0;
+  // Wide-line per-stream gens
+  uint32_t m_smoothP0Gen = 0;
+  uint32_t m_smoothP1Gen = 0;
+  uint32_t m_smoothC0Gen = 0;
+  uint32_t m_smoothC1Gen = 0;
+  uint32_t m_smoothPickGen = 0;
+  uint32_t m_smoothFlagsGen = 0;
 };
 
 } // namespace nim

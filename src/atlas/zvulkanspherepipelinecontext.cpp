@@ -63,8 +63,10 @@ void ZVulkanSpherePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
-  m_vertexUploadBuffer = VK_NULL_HANDLE;
-  m_vertexUploadOffset = 0;
+  m_vbBuffer = VK_NULL_HANDLE;
+  m_centerRadiusOffset = 0;
+  m_colorOffset = 0;
+  m_flagsOffset = 0;
   m_indexUploadBuffer = VK_NULL_HANDLE;
   m_indexUploadOffset = 0;
   resetDescriptors();
@@ -165,9 +167,11 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
-  vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexUploadBuffer}, {m_vertexUploadOffset});
+    // Bind SoA buffers: centerRadius, color, flags
+    std::array<vk::Buffer, 3> bufs{m_vbBuffer, m_vbBuffer, m_vbBuffer};
+    std::array<vk::DeviceSize, 3> offs{m_centerRadiusOffset, m_colorOffset, m_flagsOffset};
+    cmd.bindVertexBuffers(0, bufs, offs);
   if (m_indexCount > 0 && m_indexUploadBuffer) {
     cmd.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
   }
@@ -599,27 +603,19 @@ ZVulkanSpherePipelineContext::ensurePipeline(const PipelineKey& key, const vulka
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanSpherePipelineContext::makeVertexInputState() const
 {
-  static vk::VertexInputBindingDescription binding{.binding = 0,
-                                                   .stride = static_cast<uint32_t>(sizeof(SphereVertex)),
-                                                   .inputRate = vk::VertexInputRate::eVertex};
-  static std::array<vk::VertexInputAttributeDescription, 3> attrs{
-    vk::VertexInputAttributeDescription{.location = 0,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(SphereVertex, centerRadius))},
-    vk::VertexInputAttributeDescription{.location = 1,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32G32B32A32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(SphereVertex, color))       },
-    vk::VertexInputAttributeDescription{.location = 2,
-                                        .binding = 0,
-                                        .format = vk::Format::eR32Sfloat,
-                                        .offset = static_cast<uint32_t>(offsetof(SphereVertex, flags))       }
+  static std::array<vk::VertexInputBindingDescription, 3> bindings{
+    vk::VertexInputBindingDescription{.binding = 0, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // centerRadius
+    vk::VertexInputBindingDescription{.binding = 1, .stride = static_cast<uint32_t>(sizeof(glm::vec4)), .inputRate = vk::VertexInputRate::eVertex}, // color
+    vk::VertexInputBindingDescription{.binding = 2, .stride = static_cast<uint32_t>(sizeof(float)),     .inputRate = vk::VertexInputRate::eVertex}  // flags
   };
-
+  static std::array<vk::VertexInputAttributeDescription, 3> attrs{
+    vk::VertexInputAttributeDescription{.location = 0, .binding = 0, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 1, .binding = 1, .format = vk::Format::eR32G32B32A32Sfloat, .offset = 0},
+    vk::VertexInputAttributeDescription{.location = 2, .binding = 2, .format = vk::Format::eR32Sfloat,            .offset = 0}
+  };
   static vk::PipelineVertexInputStateCreateInfo info{};
-  info.vertexBindingDescriptionCount = 1;
-  info.pVertexBindingDescriptions = &binding;
+  info.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
+  info.pVertexBindingDescriptions = bindings.data();
   info.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
   info.pVertexAttributeDescriptions = attrs.data();
   return info;
@@ -641,30 +637,33 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
     return;
   }
 
-  auto vSlice = m_backend.suballocateUpload(m_vertexCount * sizeof(SphereVertex), alignof(SphereVertex));
-  if (!vSlice.buffer || !vSlice.mapped) {
+  const size_t crBytes = m_vertexCount * sizeof(glm::vec4);
+  const size_t colBytes = m_vertexCount * sizeof(glm::vec4);
+  const size_t flBytes = m_vertexCount * sizeof(float);
+
+  auto crSlice = m_backend.suballocateUpload(crBytes, alignof(glm::vec4));
+  auto colSlice = m_backend.suballocateUpload(colBytes, alignof(glm::vec4));
+  auto flSlice = m_backend.suballocateUpload(flBytes, alignof(float));
+  if (!crSlice.buffer || !crSlice.mapped || !colSlice.buffer || !colSlice.mapped || !flSlice.buffer || !flSlice.mapped) {
     m_vertexCount = 0;
     m_indexCount = 0;
     return;
   }
-  auto* vertices = static_cast<SphereVertex*>(vSlice.mapped);
-  const bool pickingPass = payload.pickingPass;
-
-  for (size_t i = 0; i < m_vertexCount; ++i) {
-    auto& vertex = vertices[i];
-    vertex.centerRadius = payload.pointsAndRadius[i];
-    if (pickingPass) {
-      if (i < payload.pickingColors.size()) {
-        vertex.color = payload.pickingColors[i];
-      } else {
-        vertex.color = glm::vec4(0.0f);
-      }
-    } else if (i < payload.colors.size()) {
-      vertex.color = payload.colors[i];
-    } else {
-      vertex.color = glm::vec4(1.0f);
+  std::memcpy(crSlice.mapped, payload.pointsAndRadius.data(), crBytes);
+  if (payload.pickingPass) {
+    auto* cOut = static_cast<glm::vec4*>(colSlice.mapped);
+    for (size_t i = 0; i < m_vertexCount; ++i) {
+      cOut[i] = (i < payload.pickingColors.size()) ? payload.pickingColors[i] : glm::vec4(0.0f);
     }
-    vertex.flags = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
+  } else {
+    auto* cOut = static_cast<glm::vec4*>(colSlice.mapped);
+    for (size_t i = 0; i < m_vertexCount; ++i) {
+      cOut[i] = (i < payload.colors.size()) ? payload.colors[i] : glm::vec4(1.0f);
+    }
+  }
+  auto* fOut = static_cast<float*>(flSlice.mapped);
+  for (size_t i = 0; i < m_vertexCount; ++i) {
+    fOut[i] = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
   }
 
   if (m_indexCount > 0) {
@@ -680,8 +679,95 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
     m_indexUploadBuffer = VK_NULL_HANDLE;
     m_indexUploadOffset = 0;
   }
-  m_vertexUploadBuffer = vSlice.buffer;
-  m_vertexUploadOffset = vSlice.offset;
+  m_vbBuffer = crSlice.buffer;
+  m_centerRadiusOffset = crSlice.offset;
+  m_colorOffset = colSlice.offset;
+  m_flagsOffset = flSlice.offset;
+
+  // Attempt static promotion
+  if (payload.renderer) {
+    CacheKey key{payload.renderer, payload.pickingPass, payload.useDynamicMaterial};
+    auto it = m_staticCache.find(key);
+    const int kPromotionThreshold = 2;
+    if (it == m_staticCache.end()) {
+      CacheEntry entry{};
+      entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+      entry.indexCount = static_cast<uint32_t>(m_indexCount);
+      entry.centersGen = payload.centersGen;
+      entry.flagsGen = payload.flagsGen;
+      entry.indexGen = payload.indexGen;
+      entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+      m_staticCache.emplace(key, entry);
+    } else {
+      CacheEntry& entry = it->second;
+      const bool sizeSame = (entry.vertexCount == m_vertexCount) && (entry.indexCount == m_indexCount);
+      const bool gensSame = entry.centersGen == payload.centersGen && entry.flagsGen == payload.flagsGen &&
+                            entry.indexGen == payload.indexGen &&
+                            entry.colorsGen == (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen);
+      entry.unchangedFrames = (sizeSame && gensSame) ? (entry.unchangedFrames + 1) : 0;
+
+      if (entry.promoted && sizeSame) {
+        size_t restaged = 0;
+        if (entry.centersGen != payload.centersGen) { m_backend.stageCopy(entry.vb, entry.centerRadiusOffset, crSlice, false); entry.centersGen = payload.centersGen; restaged += crBytes; }
+        if (entry.colorsGen != (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen)) { m_backend.stageCopy(entry.vb, entry.colorOffset, colSlice, false); entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen; restaged += colBytes; }
+        if (entry.flagsGen != payload.flagsGen) { m_backend.stageCopy(entry.vb, entry.flagsOffset, flSlice, false); entry.flagsGen = payload.flagsGen; restaged += flBytes; }
+        if (entry.indexGen != payload.indexGen && m_indexUploadBuffer && m_indexCount > 0) { Z3DRendererVulkanBackend::UploadSlice idx{m_indexUploadBuffer, m_indexUploadOffset, nullptr, m_indexCount * sizeof(uint32_t)}; m_backend.stageCopy(entry.ib, entry.ibOffset, idx, true); entry.indexGen = payload.indexGen; restaged += m_indexCount * sizeof(uint32_t); }
+        if (restaged > 0) m_backend.addSphereBytesStaged(restaged);
+        m_vbBuffer = entry.vb;
+        m_centerRadiusOffset = entry.centerRadiusOffset;
+        m_colorOffset = entry.colorOffset;
+        m_flagsOffset = entry.flagsOffset;
+        if (entry.indexCount > 0 && entry.ib) {
+          m_indexUploadBuffer = entry.ib;
+          m_indexUploadOffset = entry.ibOffset;
+        }
+        return;
+      }
+
+      if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
+        auto crDst = m_backend.allocateStaticVB(crBytes, alignof(glm::vec4));
+        auto colDst = m_backend.allocateStaticVB(colBytes, alignof(glm::vec4));
+        auto flDst = m_backend.allocateStaticVB(flBytes, alignof(float));
+        Z3DRendererVulkanBackend::StaticSlice ibDst{};
+        if (m_indexCount > 0) {
+          ibDst = m_backend.allocateStaticIB(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
+        }
+        if (crDst.buffer && colDst.buffer && flDst.buffer && (m_indexCount == 0 || ibDst.buffer)) {
+          size_t staged = 0;
+          m_backend.stageCopy(crDst.buffer, crDst.offset, crSlice, false); staged += crBytes;
+          m_backend.stageCopy(colDst.buffer, colDst.offset, colSlice, false); staged += colBytes;
+          m_backend.stageCopy(flDst.buffer, flDst.offset, flSlice, false); staged += flBytes;
+          if (m_indexCount > 0) { Z3DRendererVulkanBackend::UploadSlice idx{m_indexUploadBuffer, m_indexUploadOffset, nullptr, m_indexCount * sizeof(uint32_t)}; m_backend.stageCopy(ibDst.buffer, ibDst.offset, idx, true); staged += m_indexCount * sizeof(uint32_t); }
+          if (staged > 0) m_backend.addSphereBytesStaged(staged);
+          entry.vb = crDst.buffer;
+          entry.centerRadiusOffset = crDst.offset;
+          entry.colorOffset = colDst.offset;
+          entry.flagsOffset = flDst.offset;
+          entry.ib = ibDst.buffer;
+          entry.ibOffset = ibDst.offset;
+          entry.centersGen = payload.centersGen;
+          entry.flagsGen = payload.flagsGen;
+          entry.indexGen = payload.indexGen;
+          entry.colorsGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+          entry.promoted = true;
+          m_vbBuffer = entry.vb;
+          m_centerRadiusOffset = entry.centerRadiusOffset;
+          m_colorOffset = entry.colorOffset;
+          m_flagsOffset = entry.flagsOffset;
+          if (entry.indexCount > 0 && entry.ib) {
+            m_indexUploadBuffer = entry.ib;
+            m_indexUploadOffset = entry.ibOffset;
+          }
+          VLOG(1) << fmt::format("VK sphere promote: centerRadius={}B color={}B flags={}B idx={}B",
+                                 crBytes,
+                                 colBytes,
+                                 flBytes,
+                                 m_indexCount * sizeof(uint32_t));
+          return;
+        }
+      }
+    }
+  }
 }
 
 } // namespace nim

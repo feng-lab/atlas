@@ -106,6 +106,13 @@ protected:
   bool m_dataChanged;
   bool m_pickingDataChanged;
 
+  // Generation counters for Vulkan selective restaging
+  uint32_t m_positionsGen = 0;
+  uint32_t m_texcoordsGen = 0;
+  uint32_t m_colorsGen = 0;
+  uint32_t m_pickingColorsGen = 0;
+  uint32_t m_indicesGen = 0;
+
   // GL font atlas cache (OpenGL backend only)
   struct FontGLCache
   {

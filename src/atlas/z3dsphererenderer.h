@@ -86,6 +86,14 @@ private:
   bool m_dataChanged;
   bool m_pickingDataChanged;
   size_t m_oneBatchNumber;
+
+  // Generation counters for Vulkan selective restaging
+  uint32_t m_centersGen = 0;
+  uint32_t m_colorsGen = 0;
+  uint32_t m_pickingColorsGen = 0;
+  uint32_t m_specularGen = 0;
+  uint32_t m_flagsGen = 0;
+  uint32_t m_indexGen = 0;
 };
 
 } // namespace nim

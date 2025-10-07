@@ -103,9 +103,11 @@ private:
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
-  // Upload arena-backed slices
-  vk::Buffer m_vertexUploadBuffer{VK_NULL_HANDLE};
-  vk::DeviceSize m_vertexUploadOffset{0};
+  // Upload arena-backed SoA slices
+  vk::Buffer m_vbBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_centerRadiusOffset{0};
+  vk::DeviceSize m_colorOffset{0};
+  vk::DeviceSize m_flagsOffset{0};
   vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_indexUploadOffset{0};
 
@@ -128,6 +130,34 @@ private:
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
   void uploadGeometry(const SpherePayload& payload);
+
+  // Static promotion cache (SoA)
+  struct CacheKey
+  {
+    Z3DSphereRenderer* renderer = nullptr;
+    bool picking = false;
+    bool dynamicMaterial = true;
+    auto tie() const { return std::tuple(renderer, picking, dynamicMaterial); }
+    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+  };
+  struct CacheEntry
+  {
+    vk::Buffer vb = VK_NULL_HANDLE;
+    vk::DeviceSize centerRadiusOffset = 0;
+    vk::DeviceSize colorOffset = 0;
+    vk::DeviceSize flagsOffset = 0;
+    vk::Buffer ib = VK_NULL_HANDLE;
+    vk::DeviceSize ibOffset = 0;
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t centersGen = 0;
+    uint32_t colorsGen = 0; // or picking
+    uint32_t flagsGen = 0;
+    uint32_t indexGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+  };
+  std::map<CacheKey, CacheEntry> m_staticCache;
 };
 
 } // namespace nim

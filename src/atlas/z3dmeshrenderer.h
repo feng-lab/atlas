@@ -143,6 +143,13 @@ private:
 
   WireframeMode m_wireframeModeValue = WireframeMode::NoWireframe;
   glm::vec4 m_wireframeColorValue{1.f};
+
+  // Per-stream generation counters for Vulkan selective restaging
+  uint32_t m_posGen = 0;
+  uint32_t m_normGen = 0;
+  uint32_t m_colorGen = 0;
+  uint32_t m_texGen = 0;
+  uint32_t m_indexGen = 0;
 };
 
 } // namespace nim

@@ -83,6 +83,11 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
 #endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
+  // Bump gens for base/axis/flags/index streams
+  m_baseGen++;
+  m_axisGen++;
+  m_flagsGen++;
+  m_indexGen++;
 }
 
 void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneColors)
@@ -100,6 +105,9 @@ void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneColors)
   invalidateOpenglRenderer();
 #endif
   m_dataChanged = true;
+  // Single color source duplicated as base and top colors
+  m_baseColorGen++;
+  m_topColorGen++;
 }
 
 void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneBaseColors, std::vector<glm::vec4>* coneTopColors)
@@ -118,6 +126,8 @@ void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneBaseColors, std:
   invalidateOpenglRenderer();
 #endif
   m_dataChanged = true;
+  m_baseColorGen++;
+  m_topColorGen++;
 }
 
 void Z3DConeRenderer::setDataPickingColors(std::vector<glm::vec4>* conePickingColors)
@@ -136,6 +146,7 @@ void Z3DConeRenderer::setDataPickingColors(std::vector<glm::vec4>* conePickingCo
   invalidateOpenglPickingRenderer();
 #endif
   m_pickingDataChanged = true;
+  m_pickingColorsGen++;
 }
 
 void Z3DConeRenderer::compile()
@@ -705,6 +716,14 @@ ConePayload Z3DConeRenderer::buildConePayload() const
   payload.subdivisionAlong = m_cylinderSubdivisionAlongZ;
   payload.sameColorForBaseAndTop = m_sameColorForBaseAndTop;
   payload.useConeShader2 = m_useConeShader2;
+  // Per-stream generation counters
+  payload.baseGen = m_baseGen;
+  payload.axisGen = m_axisGen;
+  payload.baseColorGen = m_baseColorGen;
+  payload.topColorGen = m_topColorGen;
+  payload.pickingColorsGen = m_pickingColorsGen;
+  payload.flagsGen = m_flagsGen;
+  payload.indexGen = m_indexGen;
   return payload;
 }
 

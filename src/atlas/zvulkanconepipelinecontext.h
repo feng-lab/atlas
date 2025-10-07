@@ -24,6 +24,7 @@ class ZVulkanPipeline;
 class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
 class ZVulkanBuffer;
+class Z3DConeRenderer;
 
 class ZVulkanConePipelineContext
 {
@@ -107,11 +108,42 @@ private:
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
-  // Upload arena-backed slices
-  vk::Buffer m_vertexUploadBuffer{VK_NULL_HANDLE};
-  vk::DeviceSize m_vertexUploadOffset{0};
+  // Upload arena-backed SoA slices
+  vk::Buffer m_vbBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_originOffset{0};
+  vk::DeviceSize m_axisOffset{0};
+  vk::DeviceSize m_flagsOffset{0};
+  vk::DeviceSize m_baseColorOffset{0};
+  vk::DeviceSize m_topColorOffset{0};
   vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_indexUploadOffset{0};
+
+  // Static promotion cache
+  struct CacheKey
+  {
+    Z3DConeRenderer* renderer = nullptr;
+    bool picking = false;
+    auto tie() const { return std::tuple(renderer, picking); }
+    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+  };
+  struct CacheEntry
+  {
+    vk::Buffer vb = VK_NULL_HANDLE;
+    vk::DeviceSize originOffset = 0;
+    vk::DeviceSize axisOffset = 0;
+    vk::DeviceSize flagsOffset = 0;
+    vk::DeviceSize baseColorOffset = 0;
+    vk::DeviceSize topColorOffset = 0;
+    vk::Buffer ib = VK_NULL_HANDLE;
+    vk::DeviceSize ibOffset = 0;
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    // Last observed gens
+    uint32_t baseGen = 0, axisGen = 0, baseColorGen = 0, topColorGen = 0, pickingColorsGen = 0, flagsGen = 0, indexGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+  };
+  std::map<CacheKey, CacheEntry> m_staticCache;
 
   void ensureDescriptorLayouts();
   void resetDescriptors();

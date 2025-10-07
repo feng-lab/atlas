@@ -89,9 +89,8 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase&,
   ensureVertexCapacity(m_vertexCount);
   uploadGeometry();
 
-  vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offsets});
+  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {vk::DeviceSize(0)});
 
   {
     std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};

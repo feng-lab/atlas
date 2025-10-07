@@ -53,9 +53,13 @@ public:
   ZVulkanFrameExecutor& frameExecutor();
   const ZVulkanFrameExecutor& frameExecutor() const;
 
+  // Optional features
+  bool supportsVertexInputDynamicState() const { return m_supportsVertexInputDynamicState; }
+
 private:
   ZVulkanContext& m_context;
   std::unique_ptr<ZVulkanFrameExecutor> m_frameExecutor;
+  bool m_supportsVertexInputDynamicState = false; // guarded for MoltenVK
 };
 
 } // namespace nim

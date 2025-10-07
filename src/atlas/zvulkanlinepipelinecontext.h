@@ -24,6 +24,7 @@ class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
+class Z3DLineRenderer;
 
 struct VulkanThinLineVertex
 {
@@ -106,19 +107,83 @@ private:
 
   // All line geometry uses the per-frame upload arena; no per-context VBOs
 
-  // Upload arena-backed slice for thin line vertices (per-draw)
-  vk::Buffer m_thinUploadBuffer{VK_NULL_HANDLE};
-  vk::DeviceSize m_thinUploadOffset{0};
+  // Upload arena-backed SoA for thin line (per-draw)
+  vk::Buffer m_thinVBBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_thinPosOffset{0};
+  vk::DeviceSize m_thinColorOffset{0};
   uint32_t m_thinUploadVertexCount{0};
   vk::Buffer m_thinUploadIndexBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_thinUploadIndexOffset{0};
   uint32_t m_thinUploadIndexCount{0};
 
-  // Upload arena-backed slices for wide line vertices/indices (per-draw)
-  vk::Buffer m_wideUploadBuffer{VK_NULL_HANDLE};
-  vk::DeviceSize m_wideUploadVertexOffset{0};
+  // Upload arena-backed SoA for wide line (per-draw)
+  vk::Buffer m_wideVBBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_wideP0Offset{0};
+  vk::DeviceSize m_wideP1Offset{0};
+  vk::DeviceSize m_wideC0Offset{0};
+  vk::DeviceSize m_wideC1Offset{0};
+  vk::DeviceSize m_wideFlagsOffset{0};
   vk::DeviceSize m_wideUploadIndexOffset{0};
   uint32_t m_wideUploadIndexCount{0};
+  // Separate index buffer handle for wide path (arena uses same buffer; static uses IB buffer)
+  vk::Buffer m_wideIndexBuffer{VK_NULL_HANDLE};
+
+  // Static promotion caches
+  struct ThinCacheKey
+  {
+    Z3DLineRenderer* renderer = nullptr;
+    bool picking = false;
+    bool lineStrip = false;
+    auto tie() const { return std::tuple(renderer, picking, lineStrip); }
+    bool operator<(const ThinCacheKey& rhs) const { return tie() < rhs.tie(); }
+  };
+  struct ThinCacheEntry
+  {
+    vk::Buffer vb = VK_NULL_HANDLE; // device-local VB
+    vk::DeviceSize posOffset = 0;
+    vk::DeviceSize colorOffset = 0;
+    uint32_t vertexCount = 0;
+    vk::Buffer ib = VK_NULL_HANDLE; // only for line strip
+    vk::DeviceSize ibOffset = 0;
+    uint32_t indexCount = 0;
+    uint32_t positionsGen = 0;
+    uint32_t colorsGen = 0; // picking or regular colors depending on pass
+    uint32_t indexGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+  };
+  std::map<ThinCacheKey, ThinCacheEntry> m_thinStaticCache;
+
+  struct WideCacheKey
+  {
+    Z3DLineRenderer* renderer = nullptr;
+    bool picking = false;
+    auto tie() const { return std::tuple(renderer, picking); }
+    bool operator<(const WideCacheKey& rhs) const { return tie() < rhs.tie(); }
+  };
+  struct WideCacheEntry
+  {
+    vk::Buffer vb = VK_NULL_HANDLE; // device-local VB holding SoA streams
+    vk::DeviceSize p0Offset = 0;
+    vk::DeviceSize p1Offset = 0;
+    vk::DeviceSize c0Offset = 0;
+    vk::DeviceSize c1Offset = 0;
+    vk::DeviceSize flagsOffset = 0;
+    vk::Buffer ib = VK_NULL_HANDLE;
+    vk::DeviceSize ibOffset = 0;
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t p0Gen = 0;
+    uint32_t p1Gen = 0;
+    uint32_t c0Gen = 0;
+    uint32_t c1Gen = 0;
+    uint32_t pickGen = 0;
+    uint32_t flagsGen = 0;
+    uint32_t indexGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+  };
+  std::map<WideCacheKey, WideCacheEntry> m_wideStaticCache;
 
   void ensureDescriptorLayouts();
   void ensurePlaceholderTexture();

@@ -55,6 +55,12 @@ void Z3DFontRenderer::setData(std::vector<glm::vec3>* positions, const QStringLi
 #endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
+  // Positions/text changed implies full glyph rebuild
+  m_positionsGen++;
+  m_texcoordsGen++;
+  m_colorsGen++;
+  m_pickingColorsGen++;
+  m_indicesGen++;
 }
 
 void Z3DFontRenderer::setDataColors(std::vector<glm::vec4>* colors)
@@ -65,6 +71,7 @@ void Z3DFontRenderer::setDataColors(std::vector<glm::vec4>* colors)
   invalidateOpenglRenderer();
 #endif
   m_dataChanged = true;
+  m_colorsGen++;
 }
 
 void Z3DFontRenderer::setDataPickingColors(std::vector<glm::vec4>* pickingColors)
@@ -74,6 +81,7 @@ void Z3DFontRenderer::setDataPickingColors(std::vector<glm::vec4>* pickingColors
   invalidateOpenglPickingRenderer();
 #endif
   m_pickingDataChanged = true;
+  m_pickingColorsGen++;
 }
 
 void Z3DFontRenderer::compile()
@@ -306,6 +314,13 @@ void Z3DFontRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   payload.shadowColor = m_fontShadowColor;
   payload.pickingPass = picking;
 
+  // Per-stream generation counters
+  payload.positionsGen = m_positionsGen;
+  payload.texcoordsGen = m_texcoordsGen;
+  payload.colorsGen = m_colorsGen;
+  payload.pickingColorsGen = m_pickingColorsGen;
+  payload.indicesGen = m_indicesGen;
+
   if (payload.positions.empty() || payload.texcoords.empty() || payload.indices.empty()) {
     return;
   }
@@ -470,6 +485,10 @@ void Z3DFontRenderer::setFontName(const QString& fontName)
   m_selectedFontName = m_fontNames[m_selectedFontIndex];
   m_dataChanged = true;
   m_pickingDataChanged = true;
+  // Geometry rebuilt due to font change
+  m_positionsGen++;
+  m_texcoordsGen++;
+  m_indicesGen++;
 }
 
 void Z3DFontRenderer::setFontSize(float size)
@@ -481,6 +500,10 @@ void Z3DFontRenderer::setFontSize(float size)
   m_fontSize = clamped;
   m_dataChanged = true;
   m_pickingDataChanged = true;
+  // Geometry rebuilt due to size change
+  m_positionsGen++;
+  m_texcoordsGen++;
+  m_indicesGen++;
 }
 
 void Z3DFontRenderer::setFontSoftEdgeScale(float scale)

@@ -69,6 +69,11 @@ void Z3DSphereRenderer::setData(std::vector<glm::vec4>* pointAndRadiusInput,
 #endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
+  // Bump generations for geometry/specular/index/flags on content change
+  m_centersGen++;
+  m_specularGen++;
+  m_flagsGen++;
+  m_indexGen++;
 }
 
 void Z3DSphereRenderer::setDataColors(std::vector<glm::vec4>* pointColorsInput)
@@ -84,6 +89,7 @@ void Z3DSphereRenderer::setDataColors(std::vector<glm::vec4>* pointColorsInput)
   invalidateOpenglRenderer();
 #endif
   m_dataChanged = true;
+  m_colorsGen++;
 }
 
 void Z3DSphereRenderer::setDataPickingColors(std::vector<glm::vec4>* pointPickingColorsInput)
@@ -102,6 +108,7 @@ void Z3DSphereRenderer::setDataPickingColors(std::vector<glm::vec4>* pointPickin
   invalidateOpenglPickingRenderer();
 #endif
   m_pickingDataChanged = true;
+  m_pickingColorsGen++;
 }
 
 void Z3DSphereRenderer::compile()
@@ -543,6 +550,13 @@ SpherePayload Z3DSphereRenderer::buildSpherePayload() const
   payload.flags = spanFromGLfloats(m_allFlags);
   payload.indices = spanFromGLuints(m_indexs);
   payload.useDynamicMaterial = m_useDynamicMaterial;
+  // Per-stream generation counters
+  payload.centersGen = m_centersGen;
+  payload.colorsGen = m_colorsGen;
+  payload.pickingColorsGen = m_pickingColorsGen;
+  payload.specularGen = m_specularGen;
+  payload.flagsGen = m_flagsGen;
+  payload.indexGen = m_indexGen;
   return payload;
 }
 

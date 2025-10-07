@@ -225,10 +225,10 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& glowPipeline = ensureGlowPipeline(glowKey, formats);
 
-  vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, glowPipeline.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
+  const vk::DeviceSize offsets[] = {0};
+  cmd.bindVertexBuffers(0, {quad.buffer()}, offsets);
   {
     std::array<vk::DescriptorSet, 1> sets{glowDS->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, glowPipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});
@@ -545,10 +545,10 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
   key.horizontal = horizontal;
   PipelineInstance& pipeline = ensureBlurPipeline(key, formats);
 
-  vk::DeviceSize offsets = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  cmd.bindVertexBuffers(0, {quad.buffer()}, {offsets});
+  const vk::DeviceSize offsets[] = {0};
+  cmd.bindVertexBuffers(0, {quad.buffer()}, offsets);
   {
     std::array<vk::DescriptorSet, 1> sets{blurDS->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), vkbind::kSetInputs, sets, {});

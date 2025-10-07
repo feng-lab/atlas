@@ -90,6 +90,12 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers,
 #endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
+  // Bump gens for centers/axes/specular/flags/index
+  m_centersGen++;
+  m_axesGen++;
+  m_specularGen++;
+  m_flagsGen++;
+  m_indexGen++;
 }
 
 void Z3DEllipsoidRenderer::setDataColors(std::vector<glm::vec4>* ellipsoidColorsInput)
@@ -105,6 +111,7 @@ void Z3DEllipsoidRenderer::setDataColors(std::vector<glm::vec4>* ellipsoidColors
   invalidateOpenglRenderer();
 #endif
   m_dataChanged = true;
+  m_colorsGen++;
 }
 
 void Z3DEllipsoidRenderer::setDataPickingColors(std::vector<glm::vec4>* ellipsoidPickingColorsInput)
@@ -123,6 +130,7 @@ void Z3DEllipsoidRenderer::setDataPickingColors(std::vector<glm::vec4>* ellipsoi
   invalidateOpenglPickingRenderer();
 #endif
   m_pickingDataChanged = true;
+  m_pickingColorsGen++;
 }
 
 void Z3DEllipsoidRenderer::compile()
@@ -609,6 +617,13 @@ EllipsoidPayload Z3DEllipsoidRenderer::buildEllipsoidPayload() const
   payload.flags = spanFromGLfloats(m_allFlags);
   payload.indices = spanFromGLuints(m_indexs);
   payload.useDynamicMaterial = m_useDynamicMaterial;
+  // Per-stream generation counters
+  payload.centersGen = m_centersGen;
+  payload.colorsGen = m_colorsGen;
+  payload.pickingColorsGen = m_pickingColorsGen;
+  payload.specularGen = m_specularGen;
+  payload.flagsGen = m_flagsGen;
+  payload.indexGen = m_indexGen;
   return payload;
 }
 

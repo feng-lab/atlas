@@ -29,6 +29,7 @@ class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
 class ZMesh;
+class Z3DMeshRenderer;
 
 class ZVulkanMeshPipelineContext
 {
@@ -100,6 +101,37 @@ private:
   };
 
   Z3DRendererVulkanBackend& m_backend;
+
+  // Static SoA promotion cache (device-local)
+  struct CacheKey
+  {
+    Z3DMeshRenderer* renderer = nullptr;
+    MeshPayload::ColorSource colorSource = MeshPayload::ColorSource::MeshColor;
+    bool picking = false;
+    auto tie() const { return std::tuple(renderer, static_cast<int>(colorSource), picking); }
+    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+  };
+  struct CacheEntry
+  {
+    // Device-local slices (all in the backend's static VB/IB)
+    vk::Buffer vb = VK_NULL_HANDLE;
+    vk::DeviceSize posOffset = 0;
+    vk::DeviceSize normOffset = 0;
+    vk::DeviceSize colorOffset = 0;
+    vk::DeviceSize texOffset = 0;
+    bool hasTex = false;
+    vk::Buffer ib = VK_NULL_HANDLE;
+    vk::DeviceSize indexOffset = 0;
+
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    // Last observed generation counters
+    uint32_t posGen = 0, normGen = 0, colorGen = 0, texGen = 0, indexGen = 0;
+    // Promotion
+    int unchangedFrames = 0;
+    bool promoted = false;
+  };
+  std::map<CacheKey, CacheEntry> m_staticCache;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 

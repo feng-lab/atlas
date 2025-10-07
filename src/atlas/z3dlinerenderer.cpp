@@ -118,6 +118,13 @@ void Z3DLineRenderer::setData(std::vector<glm::vec3> lines)
 #endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
+  // Bump gens for positions and expanded smooth/indices
+  m_positionsGen++;
+  m_smoothGen++;
+  m_indicesGen++;
+  m_smoothP0Gen++;
+  m_smoothP1Gen++;
+  m_smoothFlagsGen++;
 }
 
 void Z3DLineRenderer::setDataColors(std::span<const glm::vec4> lineColorsInput)
@@ -143,6 +150,11 @@ void Z3DLineRenderer::setDataColors(std::vector<glm::vec4> lineColorsInput)
   invalidateOpenglRenderer();
 #endif
   m_dataChanged = true;
+  // Bump for Vulkan caches
+  m_smoothGen++;
+  m_colorsGen++;
+  m_smoothC0Gen++;
+  m_smoothC1Gen++;
 }
 
 void Z3DLineRenderer::setTexture(Z3DTexture* tex)
@@ -174,6 +186,10 @@ void Z3DLineRenderer::setDataPickingColors(std::vector<glm::vec4> linePickingCol
   invalidateOpenglPickingRenderer();
 #endif
   m_pickingDataChanged = true;
+  // Bump for Vulkan caches
+  m_smoothGen++;
+  m_pickingColorsGen++;
+  m_smoothPickGen++;
 }
 
 void Z3DLineRenderer::clearPickingColors()
@@ -461,6 +477,20 @@ LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
   payload.srcLineWidth = m_srcLineWidth;
   payload.resolvedLineWidth = m_lineWidth;
   payload.pickingPass = picking;
+
+  // Per-stream generation counters
+  payload.positionsGen = m_positionsGen;
+  payload.smoothGen = m_smoothGen;
+  payload.indicesGen = m_indicesGen;
+  payload.colorsGen = m_colorsGen;
+  payload.pickingColorsGen = m_pickingColorsGen;
+  payload.smoothP0PositionsGen = m_smoothP0Gen;
+  payload.smoothP1PositionsGen = m_smoothP1Gen;
+  payload.smoothP0ColorsGen = m_smoothC0Gen;
+  payload.smoothP1ColorsGen = m_smoothC1Gen;
+  payload.smoothPickingColorsGen = m_smoothPickGen;
+  payload.smoothFlagsGen = m_smoothFlagsGen;
+  payload.smoothIndicesGen = m_indicesGen;
 
   return payload;
 }

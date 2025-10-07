@@ -20,6 +20,7 @@ class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
 class ZVulkanTexture;
 class ZVulkanBuffer;
+class Z3DFontRenderer;
 
 namespace vulkan {
 struct AttachmentFormats;
@@ -102,6 +103,31 @@ private:
 
   // Cache CPU-provided atlases keyed by pixel pointer
   std::unordered_map<const void*, std::unique_ptr<ZVulkanTexture>> m_atlasCache;
+
+  // Static promotion cache for geometry
+  struct CacheKey
+  {
+    Z3DFontRenderer* renderer = nullptr;
+    bool picking = false;
+    auto tie() const { return std::tuple(renderer, picking); }
+    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+  };
+  struct CacheEntry
+  {
+    vk::Buffer vb = VK_NULL_HANDLE;
+    vk::DeviceSize vbOffset = 0;
+    vk::Buffer ib = VK_NULL_HANDLE;
+    vk::DeviceSize ibOffset = 0;
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    uint32_t posGen = 0;
+    uint32_t texGen = 0;
+    uint32_t colorGen = 0; // or picking
+    uint32_t indexGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+  };
+  std::map<CacheKey, CacheEntry> m_staticCache;
 
   void ensureDescriptorLayout();
   void resetDescriptors();

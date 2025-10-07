@@ -50,6 +50,10 @@ void Z3DMeshRenderer::setData(std::vector<ZMesh*>* meshInput)
 #endif
   m_dataChanged = true;
   m_pickingDataChanged = true;
+  // Bump geometry-related generations (positions/normals/indices)
+  m_posGen++;
+  m_normGen++;
+  m_indexGen++;
 }
 
 void Z3DMeshRenderer::setDataColors(std::vector<glm::vec4>* meshColorsInput)
@@ -61,6 +65,8 @@ void Z3DMeshRenderer::setDataColors(std::vector<glm::vec4>* meshColorsInput)
   invalidateOpenglRenderer();
 #endif
   m_dataChanged = true;
+  // Only colors stream changed
+  m_colorGen++;
 }
 
 void Z3DMeshRenderer::setTexture(Z3DTexture* tex)
@@ -259,6 +265,13 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
   }
 
   payload.wireframeColor = m_wireframeColorValue;
+
+  // Per-stream generation counters (coarse-grained)
+  payload.posGen = m_posGen;
+  payload.normGen = m_normGen;
+  payload.colorGen = m_colorGen;
+  payload.texGen = m_texGen;   // Note: texcoords live on meshes; renderer cannot always detect
+  payload.indexGen = m_indexGen;
 
   return payload;
 }

@@ -368,6 +368,20 @@ struct LinePayload
   float srcLineWidth = 1.0f;
   float resolvedLineWidth = 1.0f;
   bool pickingPass = false;
+  // Generation counters for selective restaging
+  uint32_t positionsGen = 0;    // raw polyline positions
+  uint32_t smoothGen = 0;       // smooth-line expanded streams/indices
+  uint32_t indicesGen = 0;      // index buffer for strips
+  uint32_t colorsGen = 0;       // thin-line colors
+  uint32_t pickingColorsGen = 0;// thin-line picking colors
+  // Wide-line per-stream gens
+  uint32_t smoothP0PositionsGen = 0;
+  uint32_t smoothP1PositionsGen = 0;
+  uint32_t smoothP0ColorsGen = 0;
+  uint32_t smoothP1ColorsGen = 0;
+  uint32_t smoothPickingColorsGen = 0;
+  uint32_t smoothFlagsGen = 0;
+  uint32_t smoothIndicesGen = 0;
 };
 
 struct LineWideVertex
@@ -411,6 +425,12 @@ struct MeshPayload
   bool meshColorReady = false;
   bool meshPickingColorReady = false;
   bool pickingPass = false;
+  // Per-stream generation counters
+  uint32_t posGen = 0;
+  uint32_t normGen = 0;
+  uint32_t colorGen = 0;
+  uint32_t texGen = 0;
+  uint32_t indexGen = 0;
 };
 
 struct SpherePayload
@@ -425,6 +445,13 @@ struct SpherePayload
 
   bool useDynamicMaterial = true;
   bool pickingPass = false;
+  // Per-stream generation counters
+  uint32_t centersGen = 0;
+  uint32_t colorsGen = 0;
+  uint32_t pickingColorsGen = 0;
+  uint32_t specularGen = 0;
+  uint32_t flagsGen = 0;
+  uint32_t indexGen = 0;
 };
 
 struct BackgroundPayload
@@ -563,6 +590,14 @@ struct EllipsoidPayload
 
   bool useDynamicMaterial = true;
   bool pickingPass = false;
+  // Per-stream generation counters
+  uint32_t centersGen = 0;
+  uint32_t axesGen = 0; // any axis change
+  uint32_t colorsGen = 0;
+  uint32_t pickingColorsGen = 0;
+  uint32_t specularGen = 0;
+  uint32_t flagsGen = 0;
+  uint32_t indexGen = 0;
 };
 
 struct ConePayload
@@ -590,6 +625,14 @@ struct ConePayload
   bool sameColorForBaseAndTop = false;
   bool useConeShader2 = true;
   bool pickingPass = false;
+  // Per-stream generation counters
+  uint32_t baseGen = 0;
+  uint32_t axisGen = 0;
+  uint32_t baseColorGen = 0;
+  uint32_t topColorGen = 0;
+  uint32_t pickingColorsGen = 0;
+  uint32_t flagsGen = 0;
+  uint32_t indexGen = 0;
 };
 
 struct FontPayload
@@ -619,6 +662,12 @@ struct FontPayload
   glm::vec4 shadowColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
   bool pickingPass = false;
+  // Per-stream generation counters
+  uint32_t positionsGen = 0;
+  uint32_t texcoordsGen = 0;
+  uint32_t colorsGen = 0;
+  uint32_t pickingColorsGen = 0;
+  uint32_t indicesGen = 0;
 };
 
 using GeometryPayload = std::variant<std::monostate,

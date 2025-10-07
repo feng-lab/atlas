@@ -24,6 +24,7 @@ class ZVulkanPipeline;
 class ZVulkanDescriptorPool;
 class ZVulkanDescriptorSet;
 class ZVulkanBuffer;
+class Z3DEllipsoidRenderer;
 
 class ZVulkanEllipsoidPipelineContext
 {
@@ -109,11 +110,48 @@ private:
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
-  // Upload arena-backed slices
-  vk::Buffer m_vertexUploadBuffer{VK_NULL_HANDLE};
-  vk::DeviceSize m_vertexUploadOffset{0};
+  // Upload arena-backed SoA slices (all slices come from the same arena buffer)
+  vk::Buffer m_vbBuffer{VK_NULL_HANDLE};
+  vk::DeviceSize m_axis1Offset{0};
+  vk::DeviceSize m_axis2Offset{0};
+  vk::DeviceSize m_axis3Offset{0};
+  vk::DeviceSize m_centerOffset{0};
+  vk::DeviceSize m_colorOffset{0};
+  vk::DeviceSize m_flagsOffset{0};
+  vk::DeviceSize m_specularOffset{0};
   vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_indexUploadOffset{0};
+
+  // Static promotion cache
+  struct CacheKey
+  {
+    Z3DEllipsoidRenderer* renderer = nullptr;
+    bool picking = false;
+    bool dynamicMaterial = false;
+    auto tie() const { return std::tuple(renderer, picking, dynamicMaterial); }
+    bool operator<(const CacheKey& rhs) const { return tie() < rhs.tie(); }
+  };
+  struct CacheEntry
+  {
+    vk::Buffer vb = VK_NULL_HANDLE;
+    // Per-stream static offsets
+    vk::DeviceSize axis1Offset = 0;
+    vk::DeviceSize axis2Offset = 0;
+    vk::DeviceSize axis3Offset = 0;
+    vk::DeviceSize centerOffset = 0;
+    vk::DeviceSize colorOffset = 0;
+    vk::DeviceSize flagsOffset = 0;
+    vk::DeviceSize specularOffset = 0;
+    vk::Buffer ib = VK_NULL_HANDLE;
+    vk::DeviceSize ibOffset = 0;
+    uint32_t vertexCount = 0;
+    uint32_t indexCount = 0;
+    // Last observed gens
+    uint32_t centersGen = 0, axesGen = 0, colorsGen = 0, pickingColorsGen = 0, specularGen = 0, flagsGen = 0, indexGen = 0;
+    int unchangedFrames = 0;
+    bool promoted = false;
+  };
+  std::map<CacheKey, CacheEntry> m_staticCache;
 
   void ensureDescriptorLayouts();
   void resetDescriptors();

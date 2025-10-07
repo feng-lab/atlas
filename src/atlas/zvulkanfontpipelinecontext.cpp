@@ -245,6 +245,80 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
   m_vertexUploadOffset = vSlice.offset;
   m_indexUploadBuffer = iSlice.buffer;
   m_indexUploadOffset = iSlice.offset;
+
+  // Static promotion (AoS)
+  if (payload.renderer) {
+    CacheKey key{payload.renderer, payload.pickingPass};
+    auto it = m_staticCache.find(key);
+    const int kPromotionThreshold = 2;
+    if (it == m_staticCache.end()) {
+      CacheEntry entry{};
+      entry.vertexCount = static_cast<uint32_t>(vtxCount);
+      entry.indexCount = static_cast<uint32_t>(idxCount);
+      entry.posGen = payload.positionsGen;
+      entry.texGen = payload.texcoordsGen;
+      entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+      entry.indexGen = payload.indicesGen;
+      m_staticCache.emplace(key, entry);
+    } else {
+      CacheEntry& entry = it->second;
+      const bool sizeSame = (entry.vertexCount == vtxCount) && (entry.indexCount == idxCount);
+      const bool gensSame = entry.posGen == payload.positionsGen && entry.texGen == payload.texcoordsGen &&
+                            entry.indexGen == payload.indicesGen &&
+                            entry.colorGen == (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen);
+      if (sizeSame && gensSame) {
+        entry.unchangedFrames++;
+      } else {
+        entry.unchangedFrames = 0;
+      }
+      if (entry.promoted && sizeSame) {
+        // Restage VB/IB if any gen changed
+        size_t restaged = 0;
+        if (entry.posGen != payload.positionsGen || entry.texGen != payload.texcoordsGen ||
+            entry.colorGen != (payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen)) {
+          m_backend.stageCopy(entry.vb, entry.vbOffset, vSlice, /*isIndexBuffer=*/false);
+          entry.posGen = payload.positionsGen;
+          entry.texGen = payload.texcoordsGen;
+          entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+          restaged += vtxCount * sizeof(FontVertex);
+        }
+        if (entry.indexGen != payload.indicesGen) {
+          m_backend.stageCopy(entry.ib, entry.ibOffset, iSlice, /*isIndexBuffer=*/true);
+          entry.indexGen = payload.indicesGen;
+          restaged += idxCount * sizeof(uint32_t);
+        }
+        if (restaged > 0) m_backend.addFontBytesStaged(restaged);
+        m_vertexUploadBuffer = entry.vb;
+        m_vertexUploadOffset = entry.vbOffset;
+        m_indexUploadBuffer = entry.ib;
+        m_indexUploadOffset = entry.ibOffset;
+        return;
+      }
+      if (!entry.promoted && sizeSame && entry.unchangedFrames >= kPromotionThreshold) {
+        auto vbDst = m_backend.allocateStaticVB(vtxCount * sizeof(FontVertex), alignof(FontVertex));
+        auto ibDst = m_backend.allocateStaticIB(idxCount * sizeof(uint32_t), alignof(uint32_t));
+        if (vbDst.buffer && ibDst.buffer) {
+          m_backend.stageCopy(vbDst.buffer, vbDst.offset, vSlice, /*isIndexBuffer=*/false);
+          m_backend.stageCopy(ibDst.buffer, ibDst.offset, iSlice, /*isIndexBuffer=*/true);
+          entry.vb = vbDst.buffer;
+          entry.vbOffset = vbDst.offset;
+          entry.ib = ibDst.buffer;
+          entry.ibOffset = ibDst.offset;
+          entry.posGen = payload.positionsGen;
+          entry.texGen = payload.texcoordsGen;
+          entry.colorGen = payload.pickingPass ? payload.pickingColorsGen : payload.colorsGen;
+          entry.indexGen = payload.indicesGen;
+          entry.promoted = true;
+          m_backend.addFontBytesStaged(vtxCount * sizeof(FontVertex) + idxCount * sizeof(uint32_t));
+          m_vertexUploadBuffer = entry.vb;
+          m_vertexUploadOffset = entry.vbOffset;
+          m_indexUploadBuffer = entry.ib;
+          m_indexUploadOffset = entry.ibOffset;
+          return;
+        }
+      }
+    }
+  }
 }
 
 ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPayload& payload)
@@ -282,6 +356,7 @@ ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPay
                         << payload.atlasWidth << "x" << payload.atlasHeight << ")";
   const size_t byteSize = static_cast<size_t>(payload.atlasWidth) * payload.atlasHeight * 4u;
   tex->uploadData(payload.atlasPixels, byteSize);
+  VLOG(1) << fmt::format("VK font atlas upload: {}x{} {}B", payload.atlasWidth, payload.atlasHeight, byteSize);
   auto [inserted, _] = m_atlasCache.emplace(payload.atlasPixels, std::move(tex));
   return inserted->second.get();
   }

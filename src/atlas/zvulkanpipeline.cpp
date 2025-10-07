@@ -152,11 +152,14 @@ void ZVulkanPipeline::create()
     .blendConstants = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}
   };
 
-  std::array<vk::DynamicState, 3> dynamicStates = {vk::DynamicState::eViewport,
-                                                   vk::DynamicState::eScissor,
-                                                   vk::DynamicState::eVertexInputEXT};
-  vk::PipelineDynamicStateCreateInfo dynamicState{.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
-                                                  .pDynamicStates = dynamicStates.data()};
+  std::array<vk::DynamicState, 3> dynAll = {vk::DynamicState::eViewport,
+                                            vk::DynamicState::eScissor,
+                                            vk::DynamicState::eVertexInputEXT};
+  std::array<vk::DynamicState, 2> dynFixed = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+  const bool useDynVI = m_device.supportsVertexInputDynamicState();
+  const vk::DynamicState* dynPtr = useDynVI ? dynAll.data() : dynFixed.data();
+  const uint32_t dynCount = useDynVI ? static_cast<uint32_t>(dynAll.size()) : static_cast<uint32_t>(dynFixed.size());
+  vk::PipelineDynamicStateCreateInfo dynamicState{.dynamicStateCount = dynCount, .pDynamicStates = dynPtr};
 
   const auto& shaderStages = m_shader.shaderStages();
 

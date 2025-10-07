@@ -12,6 +12,12 @@ This plan guides the migration of the Z3D OpenGL renderer to a Vulkan backend, i
   - Status: Vulkan compositor now gathers per-filter image layers from each Z3DImgFilter’s Vulkan scratch leases and blends them with `ZVulkanTextureBlendPipelineContext` (MIP/DepthTestBlending parity). Filters render their final per-eye outputs into their own Vulkan leases; the compositor no longer renders image batches directly to the compositor surface.
 - Implementation language baseline is modern C++20; all new APIs should use standard library facilities (`std::span`, `std::variant`, etc.) rather than third-party helpers when equivalents exist.
 
+### 2025-10 Performance Update
+
+- Introduced device-local static buffer arenas for vertices/indices managed by the Vulkan backend. Streams uploaded to the per-frame host-visible arena can now be copied into persistent device-local buffers and rebound across frames.
+- Added per-stream generation counters to payloads to enable selective restaging (e.g., only colors). Initial wiring covers meshes and spheres; other primitive renderers can adopt the same pattern.
+- Guarded optional VK_EXT_vertex_input_dynamic_state: pipelines omit `eVertexInputEXT` unless supported, and `cmd.setVertexInputEXT` is only called when enabled. MoltenVK paths fall back to fixed vertex input.
+
 ### Development Notes (CRITICAL - ALWAYS FOLLOW)
 
 These instructions are mandatory for every migration change; do not deviate from them.

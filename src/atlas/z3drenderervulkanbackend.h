@@ -109,6 +109,26 @@ public:
   // frame is recording (e.g., zero-sized viewport).
   UploadSlice suballocateUpload(size_t bytes, size_t alignment = 16);
 
+  // Device-local static buffer arena (lifetime: backend)
+  struct StaticSlice
+  {
+    vk::Buffer buffer{VK_NULL_HANDLE};
+    vk::DeviceSize offset = 0;
+    size_t size = 0;
+  };
+
+  // Allocate space in the device-local vertex/index arenas. Returns an empty
+  // slice on allocation failure.
+  StaticSlice allocateStaticVB(size_t bytes, size_t alignment = 16);
+  StaticSlice allocateStaticIB(size_t bytes, size_t alignment = 4);
+
+  // Record a copy from an upload slice into a device-local buffer at dst.
+  // Inserts a barrier making the data visible to the appropriate pipeline stage.
+  void stageCopy(vk::Buffer dst,
+                 vk::DeviceSize dstOffset,
+                 const UploadSlice& src,
+                 bool isIndexBuffer);
+
   // Stage 2: Per-frame descriptor arena API
   // Allocate a descriptor set from the current frame's arena. Returns null when
   // no active frame exists (e.g., zero-sized viewport), and logs at VLOG(1).
@@ -240,12 +260,45 @@ private:
       size_t offset = 0;                           // current write cursor
       size_t highWatermark = 0;                    // max used this frame (debug)
     } uploadArena;
+
+    // Static device-local staging stats
+    size_t staticBytesStaged = 0;      // bytes staged to device-local this frame
+    uint32_t staticStreamRestaged = 0; // number of restaged streams
+    // Per-stream-type bytes staged (debug)
+    size_t linesBytesStaged = 0;
+    size_t fontsBytesStaged = 0;
+    size_t meshesBytesStaged = 0;
+    size_t spheresBytesStaged = 0;
   };
 
   void collectFrameTimings(FrameResources& frame);
   std::optional<size_t> beginGpuScope(std::string_view label);
   void endGpuScope(size_t token);
   void recordCpuScope(std::string_view label, double milliseconds);
+  void ensureStaticArenas();
+  static size_t alignUp(size_t value, size_t alignment)
+  {
+    const size_t mask = alignment ? (alignment - 1) : 0;
+    return alignment ? ((value + mask) & ~mask) : value;
+  }
+
+public:
+  void addLineBytesStaged(size_t bytes)
+  {
+    if (m_activeFrame) m_activeFrame->linesBytesStaged += bytes;
+  }
+  void addFontBytesStaged(size_t bytes)
+  {
+    if (m_activeFrame) m_activeFrame->fontsBytesStaged += bytes;
+  }
+  void addMeshBytesStaged(size_t bytes)
+  {
+    if (m_activeFrame) m_activeFrame->meshesBytesStaged += bytes;
+  }
+  void addSphereBytesStaged(size_t bytes)
+  {
+    if (m_activeFrame) m_activeFrame->spheresBytesStaged += bytes;
+  }
 
   ZVulkanDevice* m_sharedDevice = nullptr; // non-owning; provided by engine/scratch-pool
   ZVulkanDevice* m_frameDevice = nullptr;    // tracked to rebuild frame resources on device changes
@@ -283,6 +336,19 @@ private:
 
   // Shared geometry: fullscreen quad VBO
   std::unique_ptr<ZVulkanBuffer> m_fullscreenQuadVbo;
+
+  // Device-local static arenas for geometry
+  struct StaticArena
+  {
+    std::unique_ptr<class ZVulkanBuffer> vb; // device-local, eVertexBuffer|eTransferDst
+    std::unique_ptr<class ZVulkanBuffer> ib; // device-local, eIndexBuffer|eTransferDst
+    size_t vbCapacity = 0;                   // bytes
+    size_t ibCapacity = 0;                   // bytes
+    size_t vbOffset = 0;                     // bump cursor
+    size_t ibOffset = 0;                     // bump cursor
+    size_t vbHighWatermark = 0;              // peak used for telemetry
+    size_t ibHighWatermark = 0;
+  } m_staticArena;
 
   // Helpers for descriptor arena lifecycle
   void ensureArenaOnFrame(FrameResources& frame);
