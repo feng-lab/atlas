@@ -19,7 +19,8 @@ public:
 
   ~Z3DContext();
 
-  ProcAddress getProcAddress(const char* name) const;
+  // name may be null; returns nullptr in that case
+  ProcAddress getProcAddress(/*nullable*/ const char* name) const;
 
   void makeCurrent() const;
 

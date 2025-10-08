@@ -12,7 +12,7 @@ public:
              const glm::uvec3& dimension,
              GLenum dataFormat,
              GLenum dataType,
-             const GLvoid* data = nullptr,
+             /*nullable*/ const GLvoid* data = nullptr,
              GLint minFilter = GLint(GL_LINEAR),
              GLint magFilter = GLint(GL_LINEAR),
              GLint wrap = GLint(GL_CLAMP_TO_EDGE));
@@ -22,7 +22,7 @@ public:
              const glm::uvec3& dimension,
              GLenum dataFormat,
              GLenum dataType,
-             const GLvoid* data = nullptr,
+             /*nullable*/ const GLvoid* data = nullptr,
              GLint minFilter = GLint(GL_LINEAR),
              GLint magFilter = GLint(GL_LINEAR),
              GLint wrap = GLint(GL_CLAMP_TO_EDGE));
@@ -40,7 +40,8 @@ public:
   //
   void generateMipmap() const;
 
-  void setDimension(const glm::uvec3& dimension, const GLvoid* data = nullptr)
+  // data may be null to reallocate without upload
+  void setDimension(const glm::uvec3& dimension, /*nullable*/ const GLvoid* data = nullptr)
   {
     if (m_dimension != dimension) {
       m_dimension = dimension;
@@ -48,7 +49,8 @@ public:
     }
   }
 
-  void setInternalFormat(GLint internalformat, const GLvoid* data = nullptr)
+  // data may be null to reallocate without upload
+  void setInternalFormat(GLint internalformat, /*nullable*/ const GLvoid* data = nullptr)
   {
     if (m_internalFormat != internalformat) {
       m_internalFormat = internalformat;
@@ -56,7 +58,8 @@ public:
     }
   }
 
-  void setDataFormat(GLenum format, const GLvoid* data = nullptr)
+  // data may be null to reallocate without upload
+  void setDataFormat(GLenum format, /*nullable*/ const GLvoid* data = nullptr)
   {
     if (m_dataFormat != format) {
       m_dataFormat = format;
@@ -64,7 +67,8 @@ public:
     }
   }
 
-  void setDataType(GLenum dataType, const GLvoid* data = nullptr)
+  // data may be null to reallocate without upload
+  void setDataType(GLenum dataType, /*nullable*/ const GLvoid* data = nullptr)
   {
     if (m_dataType != dataType) {
       m_dataType = dataType;
@@ -72,11 +76,11 @@ public:
     }
   }
 
-  // glTexSubImage*D
-  void updateImage(const GLvoid* data) const;
+  // glTexSubImage*D; data may be null when using PBO
+  void updateImage(/*nullable*/ const GLvoid* data) const;
 
-  // glTexSubImage*D
-  void updateSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const;
+  // glTexSubImage*D; data may be null when using PBO
+  void updateSubImage(const glm::uvec3& offset, const glm::uvec3& size, /*nullable*/ const GLvoid* data) const;
 
   // clear image with 0
   void clearImage() const;

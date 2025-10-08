@@ -35,6 +35,7 @@ void Z3DShaderProgram::addShader(Z3DShader& shader)
 
 void Z3DShaderProgram::addShaderFromSourceCode(Z3DShader::Type type, const char* source)
 {
+  CHECK(source);
   m_anonShaders.emplace_back(std::make_unique<Z3DShader>(type));
   m_anonShaders.back()->compileSourceCode(source);
   addShader(*m_anonShaders.back().get());
@@ -342,7 +343,7 @@ void Z3DShaderProgram::storeUniformLocations()
     u.location = glGetUniformLocation(programId(), name.data());
     std::string nm(name.data());
     if (absl::EndsWith(nm, "[0]")) {
-      nm.resize(nm.size() - 3);  // chop last 3 characters
+      nm.resize(nm.size() - 3); // chop last 3 characters
     }
     m_uniforms.insert_or_assign(nm, u);
   }

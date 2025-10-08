@@ -13,13 +13,15 @@ class Z3DTextureGlowRenderer : public Z3DPrimitiveRenderer
 public:
   explicit Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase);
 
-  void setColorTexture(const Z3DTexture* colorTex)
+  // colorTex may be null to clear
+  void setColorTexture(/*nullable*/ const Z3DTexture* colorTex)
   {
     m_colorTexture = colorTex;
     m_colorAttachmentHandle = {};
   }
 
-  void setDepthTexture(const Z3DTexture* depthTex)
+  // depthTex may be null to clear
+  void setDepthTexture(/*nullable*/ const Z3DTexture* depthTex)
   {
     m_depthTexture = depthTex;
     m_depthAttachmentHandle = {};
@@ -40,10 +42,22 @@ public:
   void setBlurStrength(float strength);
 
   // Query current glow parameters (used by compositor when enqueuing batches directly)
-  GlowMode glowMode() const { return m_glowMode; }
-  int blurRadius() const { return m_blurRadius; }
-  float blurScale() const { return m_blurScale; }
-  float blurStrength() const { return m_blurStrength; }
+  GlowMode glowMode() const
+  {
+    return m_glowMode;
+  }
+  int blurRadius() const
+  {
+    return m_blurRadius;
+  }
+  float blurScale() const
+  {
+    return m_blurScale;
+  }
+  float blurStrength() const
+  {
+    return m_blurStrength;
+  }
 
 protected:
   void compile() override;
@@ -56,9 +70,8 @@ protected:
   [[nodiscard]] TextureGlowPayload buildTextureGlowPayload(AttachmentHandle colorHandle,
                                                            AttachmentHandle depthHandle) const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye) const;
-  [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye,
-                                             AttachmentHandle colorHandle,
-                                             AttachmentHandle depthHandle) const;
+  [[nodiscard]] RenderBatch
+  buildRenderBatch(Z3DEye eye, AttachmentHandle colorHandle, AttachmentHandle depthHandle) const;
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
   void renderVulkan(Z3DEye eye, AttachmentHandle colorHandle, AttachmentHandle depthHandle);

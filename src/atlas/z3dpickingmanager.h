@@ -26,7 +26,10 @@ public:
   }
 
   // Vulkan: set color/depth attachments for picking readback
-  void setVulkanTargets(ZVulkanTexture* color, ZVulkanTexture* depth, const glm::uvec2& size)
+  // color/depth may be null
+  void setVulkanTargets(/*nullable*/ ZVulkanTexture* color,
+                        /*nullable*/ ZVulkanTexture* depth,
+                        const glm::uvec2& size)
   {
     m_vkColor = color;
     m_vkDepth = depth;
@@ -114,7 +117,8 @@ private:
 public:
   // Update cached picking color buffer (RGBA8) from a CPU pointer.
   // Copies data; safe to call from the rendering thread after fence.
-  void updateCachedVulkanPickingColor(const uint8_t* data, size_t bytes, glm::uvec2 size)
+  // data may be null to clear the cache
+  void updateCachedVulkanPickingColor(/*nullable*/ const uint8_t* data, size_t bytes, glm::uvec2 size)
   {
     if (!data || size.x == 0u || size.y == 0u || bytes < static_cast<size_t>(size.x) * size.y * 4u) {
       m_cachedColorValid = false;

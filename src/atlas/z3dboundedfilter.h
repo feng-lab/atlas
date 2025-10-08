@@ -107,12 +107,14 @@ public:
     m_rendererBase.setShaderHookType(t);
   }
 
-  virtual void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
+  // optional: texture may be null
+  virtual void setShaderHookParaDDPDepthBlenderTexture(/*nullable*/ const Z3DTexture* t)
   {
     m_rendererBase.setShaderHookParaDDPDepthBlenderTexture(t);
   }
 
-  virtual void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
+  // optional: texture may be null
+  virtual void setShaderHookParaDDPFrontBlenderTexture(/*nullable*/ const Z3DTexture* t)
   {
     m_rendererBase.setShaderHookParaDDPFrontBlenderTexture(t);
   }

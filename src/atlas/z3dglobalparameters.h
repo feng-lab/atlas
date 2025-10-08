@@ -24,8 +24,8 @@ struct Z3DLocalColorBuffer
   size_t width;
   size_t height;
   // Optional external view for zero-copy (Vulkan readback ring)
-  const uint8_t* external = nullptr;     // mapped pointer (lifetime managed externally)
-  size_t externalStride = 0;             // bytes per row when using external pointer
+  const uint8_t* external = nullptr; // mapped pointer (lifetime managed externally)
+  size_t externalStride = 0; // bytes per row when using external pointer
   std::function<void()> externalRelease; // call to release mapped slot when replaced
 };
 
@@ -55,7 +55,10 @@ public:
     pickingManager.setRenderTarget(rt);
   }
 
-  void setPickingTargetVulkan(ZVulkanTexture* color, ZVulkanTexture* depth, const glm::uvec2& size)
+  // color/depth may be null when picking is disabled or not ready
+  void setPickingTargetVulkan(/*nullable*/ ZVulkanTexture* color,
+                              /*nullable*/ ZVulkanTexture* depth,
+                              const glm::uvec2& size)
   {
     pickingManager.setVulkanTargets(color, depth, size);
   }

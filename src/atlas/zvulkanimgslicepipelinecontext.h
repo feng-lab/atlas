@@ -184,7 +184,8 @@ private:
                             vk::PipelineLayout layout,
                             vk::raii::CommandBuffer& cmd,
                             bool usePaging);
-  void bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray);
+  // depthArray is optional
+  void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
 };
 
 } // namespace nim

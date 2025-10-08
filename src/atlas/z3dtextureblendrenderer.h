@@ -18,25 +18,29 @@ public:
   explicit Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase,
                                    TextureBlendMode mode = TextureBlendMode::DepthTestBlending);
 
-  void setColorTexture1(const Z3DTexture* colorTex)
+  // colorTex may be null to clear
+  void setColorTexture1(/*nullable*/ const Z3DTexture* colorTex)
   {
     m_colorTexture1 = colorTex;
     m_colorAttachmentHandle0 = {};
   }
 
-  void setDepthTexture1(const Z3DTexture* depthTex)
+  // depthTex may be null to clear
+  void setDepthTexture1(/*nullable*/ const Z3DTexture* depthTex)
   {
     m_depthTexture1 = depthTex;
     m_depthAttachmentHandle0 = {};
   }
 
-  void setColorTexture2(const Z3DTexture* colorTex)
+  // colorTex may be null to clear
+  void setColorTexture2(/*nullable*/ const Z3DTexture* colorTex)
   {
     m_colorTexture2 = colorTex;
     m_colorAttachmentHandle1 = {};
   }
 
-  void setDepthTexture2(const Z3DTexture* depthTex)
+  // depthTex may be null to clear
+  void setDepthTexture2(/*nullable*/ const Z3DTexture* depthTex)
   {
     m_depthTexture2 = depthTex;
     m_depthAttachmentHandle1 = {};

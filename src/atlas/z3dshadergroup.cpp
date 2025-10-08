@@ -113,6 +113,7 @@ void Z3DShaderGroup::rebuild(const std::string& header, const std::string& geomH
 
 void Z3DShaderGroup::buildNormalShader(Z3DShaderProgram* shader)
 {
+  CHECK(shader);
   if (m_normalShaderFiles.empty()) {
     QStringList allshaders(m_shaderFiles);
     allshaders << "common.frag";
@@ -124,6 +125,7 @@ void Z3DShaderGroup::buildNormalShader(Z3DShaderProgram* shader)
 
 void Z3DShaderGroup::buildDualDepthPeelingInitShader(Z3DShaderProgram* shader)
 {
+  CHECK(shader);
   QStringList allshaders(m_shaderFiles);
   allshaders << "dual_peeling_init.frag";
   shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);
@@ -131,6 +133,7 @@ void Z3DShaderGroup::buildDualDepthPeelingInitShader(Z3DShaderProgram* shader)
 
 void Z3DShaderGroup::buildDualDepthPeelingPeelShader(Z3DShaderProgram* shader)
 {
+  CHECK(shader);
   QStringList allshaders(m_shaderFiles);
   allshaders << "dual_peeling_peel.frag";
   shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);
@@ -138,6 +141,7 @@ void Z3DShaderGroup::buildDualDepthPeelingPeelShader(Z3DShaderProgram* shader)
 
 void Z3DShaderGroup::buildWeightedAverageShader(Z3DShaderProgram* shader)
 {
+  CHECK(shader);
   QStringList allshaders(m_shaderFiles);
   allshaders << "wavg_init.frag";
   shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);
@@ -145,6 +149,7 @@ void Z3DShaderGroup::buildWeightedAverageShader(Z3DShaderProgram* shader)
 
 void Z3DShaderGroup::buildWeightedBlendedShader(Z3DShaderProgram* shader)
 {
+  CHECK(shader);
   QStringList allshaders(m_shaderFiles);
   allshaders << "wblended_init.frag";
   shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);

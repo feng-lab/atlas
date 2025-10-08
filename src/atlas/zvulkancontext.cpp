@@ -39,6 +39,7 @@ std::string versionToString(uint32_t version)
 // Function to check if a layer is available
 bool isLayerAvailable(const char* layerName, const std::vector<vk::LayerProperties>& availableLayers)
 {
+  CHECK(layerName);
   return std::ranges::find_if(availableLayers, [layerName](const vk::LayerProperties& layerProperties) {
            return strcmp(layerName, layerProperties.layerName) == 0;
          }) != availableLayers.end();
@@ -49,6 +50,7 @@ bool addRequiredLayers(const char* layerName,
                        const std::vector<vk::LayerProperties>& availableLayers,
                        bool isOptional = false)
 {
+  CHECK(layerName);
   if (isLayerAvailable(layerName, availableLayers)) {
     enabledExtensions.push_back(layerName);
     return true;
@@ -65,6 +67,7 @@ bool addRequiredLayers(const char* layerName,
 // Function to check if an extension is available
 bool isExtensionAvailable(const char* extensionName, const std::vector<vk::ExtensionProperties>& availableExtensions)
 {
+  CHECK(extensionName);
   return std::ranges::find_if(availableExtensions, [extensionName](const vk::ExtensionProperties& extensionProperties) {
            return strcmp(extensionName, extensionProperties.extensionName) == 0;
          }) != availableExtensions.end();
@@ -75,6 +78,7 @@ bool addRequiredExtension(const char* extensionName,
                           const std::vector<vk::ExtensionProperties>& availableExtensions,
                           bool isOptional = false)
 {
+  CHECK(extensionName);
   if (isExtensionAvailable(extensionName, availableExtensions)) {
     enabledExtensions.push_back(extensionName);
     return true;

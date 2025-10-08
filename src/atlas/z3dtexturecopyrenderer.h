@@ -22,13 +22,15 @@ public:
 
   explicit Z3DTextureCopyRenderer(Z3DRendererBase& rendererBase, OutputColorOption mode = OutputColorOption::NoChange);
 
-  void setColorTexture(const Z3DTexture* colorTex)
+  // colorTex may be null to clear
+  void setColorTexture(/*nullable*/ const Z3DTexture* colorTex)
   {
     m_colorTexture = colorTex;
     m_colorAttachmentHandle = {};
   }
 
-  void setDepthTexture(const Z3DTexture* depthTex)
+  // depthTex may be null to clear
+  void setDepthTexture(/*nullable*/ const Z3DTexture* depthTex)
   {
     m_depthTexture = depthTex;
     m_depthAttachmentHandle = {};

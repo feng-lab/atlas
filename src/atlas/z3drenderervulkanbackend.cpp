@@ -896,11 +896,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
           // If the raycaster just completed a progressive round, finalize it now.
           if (auto fin = m_imgRaycasterContext->takePendingFinalization()) {
             if (fin->streamKey != 0) {
-              finalizeImgRaycasterRoundByKey(renderer,
-                                             fin->streamKey,
-                                             fin->eye,
-                                             fin->lastRound,
-                                             fin->channelCount);
+              finalizeImgRaycasterRoundByKey(renderer, fin->streamKey, fin->eye, fin->lastRound, fin->channelCount);
             }
           }
           handled = true;
@@ -1238,7 +1234,8 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   // static buffers. They must be created with TRANSFER_SRC usage (not DST).
   arena.buffer = m_sharedDevice->createBufferInPool(
     newCapacity,
-    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferSrc,
+    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
+      vk::BufferUsageFlagBits::eTransferSrc,
     vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
     m_sharedDevice->uploadTransientPool());
   arena.capacity = newCapacity;
@@ -1536,7 +1533,7 @@ const std::optional<vulkan::AttachmentFormats>& Z3DRendererVulkanBackend::curren
 }
 
 bool Z3DRendererVulkanBackend::validateFormatsOrSkip(const vulkan::AttachmentFormats& pipelineFormats,
-                                                     const char* contextTag)
+                                                     /*nullable*/ const char* contextTag)
 {
   if (!m_activeFrame) {
     return true;

@@ -347,7 +347,8 @@ public:
     return m_shaderHookPara;
   }
 
-  void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
+  // optional: texture may be null
+  void setShaderHookParaDDPDepthBlenderTexture(/*nullable*/ const Z3DTexture* t)
   {
     m_shaderHookPara.dualDepthPeelingDepthBlenderTexture = t;
     m_shaderHookPara.dualDepthPeelingDepthBlenderHandle = {};
@@ -361,7 +362,8 @@ public:
     }
   }
 
-  void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
+  // optional: texture may be null
+  void setShaderHookParaDDPFrontBlenderTexture(/*nullable*/ const Z3DTexture* t)
   {
     m_shaderHookPara.dualDepthPeelingFrontBlenderTexture = t;
     m_shaderHookPara.dualDepthPeelingFrontBlenderHandle = {};

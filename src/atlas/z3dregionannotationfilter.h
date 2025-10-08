@@ -41,9 +41,11 @@ public:
 
   void setShaderHookType(Z3DRendererBase::ShaderHookType t) override;
 
-  void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t) override;
+  // optional: texture may be null
+  void setShaderHookParaDDPDepthBlenderTexture(/*nullable*/ const Z3DTexture* t) override;
 
-  void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t) override;
+  // optional: texture may be null
+  void setShaderHookParaDDPFrontBlenderTexture(/*nullable*/ const Z3DTexture* t) override;
 
 protected:
   void visibleChanged(bool v);

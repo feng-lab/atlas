@@ -1,6 +1,7 @@
 #include "z3dshader.h"
 
 #include "z3dgl.h"
+#include "zlog.h"
 #include <vector>
 
 namespace nim {
@@ -36,6 +37,7 @@ Z3DShader::~Z3DShader()
 
 void Z3DShader::compileSourceCode(const char* source)
 {
+  CHECK(source);
   if (m_id) {
     GLint length = std::strlen(source);
     glShaderSource(m_id, 1, &source, &length);

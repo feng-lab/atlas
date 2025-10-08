@@ -796,7 +796,9 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
   return inserted->second;
 }
 
-void ZVulkanImgRaycasterPipelineContext::bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray)
+// depthArray is nullable per pointer contract
+void ZVulkanImgRaycasterPipelineContext::bindMergeDescriptor(ZVulkanTexture& colorArray,
+                                                             /*nullable*/ ZVulkanTexture* depthArray)
 {
   if (!m_mergeDescriptor) {
     m_mergeDescriptor = m_backend.allocateOverrideDescriptorSet(**m_mergeSetLayout);

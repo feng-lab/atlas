@@ -15,7 +15,8 @@ public:
   explicit Z3DTextureCoordinateRenderer(Z3DRendererBase& rendererBase);
 
   // triangle list should contains vertexs and 3d texture coordinates
-  void setTriangleList(const ZMesh* mesh)
+  // mesh may be null to clear
+  void setTriangleList(/*nullable*/ const ZMesh* mesh)
   {
     m_mesh = mesh;
     m_dataChanged = true;

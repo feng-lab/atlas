@@ -146,7 +146,7 @@ private:
   void renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& filters,
                             Z3DScratchResourcePool::RenderTargetLease& targetLease,
                             Z3DEye eye,
-                            Z3DTexture* depthTexture,
+                            /*nullable*/ Z3DTexture* depthTexture,
                             const std::vector<const Z3DTexture*>& imageColorTexList,
                             const std::vector<const Z3DTexture*>& imageDepthTexList);
 
@@ -154,7 +154,7 @@ private:
   void renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
                            Z3DScratchResourcePool::RenderTargetLease& targetLease,
                            Z3DEye eye,
-                           Z3DTexture* depthTexture,
+                           /*nullable*/ Z3DTexture* depthTexture,
                            const std::vector<const Z3DTexture*>& imageColorTexList,
                            const std::vector<const Z3DTexture*>& imageDepthTexList);
 
@@ -162,7 +162,7 @@ private:
   void renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
                            Z3DScratchResourcePool::RenderTargetLease& targetLease,
                            Z3DEye eye,
-                           Z3DTexture* depthTexture,
+                           /*nullable*/ Z3DTexture* depthTexture,
                            const std::vector<const Z3DTexture*>& imageColorTexList,
                            const std::vector<const Z3DTexture*>& imageDepthTexList);
 

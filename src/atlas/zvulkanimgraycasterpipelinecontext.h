@@ -240,7 +240,8 @@ private:
                              float zeToScreenPixelVoxelSize);
 
   void bindProgressiveDescriptors(ChannelResources& resources, vk::PipelineLayout layout, vk::raii::CommandBuffer& cmd);
-  void bindMergeDescriptor(ZVulkanTexture& colorArray, ZVulkanTexture* depthArray);
+  // depthArray is optional
+  void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
   void ensureProgressiveLayerTargets(const glm::uvec2& size,
                                      uint32_t layerCount,
                                      uint32_t generation,
