@@ -201,7 +201,7 @@ private:
   void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& fallbackScreenDimRcp);
   void
   updateLightingUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const MeshPayload& payload, bool pickingPass);
-  void updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch);
+  void updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const MeshPayload& payload);
   void updateMaterialUBO(Z3DRendererBase& renderer,
                          const MeshPayload& payload,
                          size_t meshIndex,

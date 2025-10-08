@@ -89,15 +89,11 @@ vk::PipelineVertexInputStateCreateInfo makeSoAMeshVertexInput(MeshPayload::Color
                                                  .format = vk::Format::eR32G32B32A32Sfloat,
                                                  .offset = 0};
   // location 3: 1D texcoord from binding 3
-  attrs[3] = vk::VertexInputAttributeDescription{.location = 3,
-                                                 .binding = 3,
-                                                 .format = vk::Format::eR32Sfloat,
-                                                 .offset = 0};
+  attrs[3] =
+    vk::VertexInputAttributeDescription{.location = 3, .binding = 3, .format = vk::Format::eR32Sfloat, .offset = 0};
   // location 4: 2D texcoord from binding 4
-  attrs[4] = vk::VertexInputAttributeDescription{.location = 4,
-                                                 .binding = 4,
-                                                 .format = vk::Format::eR32G32Sfloat,
-                                                 .offset = 0};
+  attrs[4] =
+    vk::VertexInputAttributeDescription{.location = 4, .binding = 4, .format = vk::Format::eR32G32Sfloat, .offset = 0};
   // location 5: 3D texcoord from binding 5
   attrs[5] = vk::VertexInputAttributeDescription{.location = 5,
                                                  .binding = 5,
@@ -211,7 +207,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   const auto shaderHook = renderer.shaderHookType();
 
   updateLightingUBO(renderer, batch, payload, pickingPass);
-  updateTransformUBO(renderer, batch);
+  updateTransformUBO(renderer, batch, payload);
   // Ensure OIT params UBO for shaders including include/oit_params.glslinc
   ensureOITResources();
   {
@@ -306,10 +302,17 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
     uint32_t texBindingIndex = 3; // default when using dynamic vertex input state
     if (!m_backend.device().supportsVertexInputDynamicState()) {
       switch (m_texBinding) {
-        case TexBinding::Tex1D: texBindingIndex = 3; break;
-        case TexBinding::Tex2D: texBindingIndex = 4; break;
-        case TexBinding::Tex3D: texBindingIndex = 5; break;
-        default: break;
+        case TexBinding::Tex1D:
+          texBindingIndex = 3;
+          break;
+        case TexBinding::Tex2D:
+          texBindingIndex = 4;
+          break;
+        case TexBinding::Tex3D:
+          texBindingIndex = 5;
+          break;
+        default:
+          break;
       }
     }
     std::array<vk::Buffer, 1> texBuf{m_texBuffer};
@@ -742,7 +745,9 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   m_uboLighting->copyData(&lighting, sizeof(lighting));
 }
 
-void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch)
+void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
+                                                    const RenderBatch& batch,
+                                                    const MeshPayload& payload)
 {
   auto& device = m_backend.device();
 
@@ -759,29 +764,29 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer, c
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
+  CHECK(payload.params != nullptr) << "Mesh payload missing params";
   TransformsUBOStd140 transforms{};
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   transforms.view_matrix = eyeState.viewMatrix;
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
-  transforms.pos_transform = renderer.parameterState().coordTransform;
+  transforms.pos_transform = payload.params->coordTransform;
 
   const glm::mat4 combined = eyeState.viewMatrix * transforms.pos_transform;
   const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(combined)));
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  const auto& params = renderer.parameterState();
-  transforms.parameters = glm::vec4(params.sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
   m_uboTransforms->copyData(&transforms, sizeof(transforms));
 
   MaterialUBOStd140 material{};
   const auto& scene = renderer.sceneState();
   material.scene_ambient = scene.sceneAmbient;
-  material.material_ambient = params.materialAmbient;
-  material.material_specular = params.materialSpecular;
-  material.material_shininess = params.materialShininess;
-  material.alpha = params.opacity;
+  material.material_ambient = payload.params->materialAmbient;
+  material.material_specular = payload.params->materialSpecular;
+  material.material_shininess = payload.params->materialShininess;
+  material.alpha = payload.params->opacity;
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
   m_uboMaterial->copyData(&material, sizeof(material));
@@ -800,12 +805,11 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
 
   MaterialUBOStd140 material{};
   const auto& scene = renderer.sceneState();
-  const auto& params = renderer.parameterState();
   material.scene_ambient = scene.sceneAmbient;
-  material.material_ambient = params.materialAmbient;
-  material.material_specular = params.materialSpecular;
-  material.material_shininess = params.materialShininess;
-  material.alpha = params.opacity;
+  material.material_ambient = payload.params->materialAmbient;
+  material.material_specular = payload.params->materialSpecular;
+  material.material_shininess = payload.params->materialShininess;
+  material.alpha = payload.params->opacity;
 
   bool useCustomColor = false;
   glm::vec4 colorValue = fallbackColor;
@@ -1337,7 +1341,9 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
           m_backend.scheduleStaticCopy(entry.vbTex, entry.texOffset, texSlice, false);
         }
         if (!idxSame && totalIndices > 0 && m_indexUploadBuffer) {
-          Z3DRendererVulkanBackend::UploadSlice idxUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr,
+          Z3DRendererVulkanBackend::UploadSlice idxUpload{m_indexUploadBuffer,
+                                                          m_indexUploadOffset,
+                                                          nullptr,
                                                           totalIndices * sizeof(uint32_t)};
           m_backend.scheduleStaticCopy(entry.ib, entry.indexOffset, idxUpload, true);
         }

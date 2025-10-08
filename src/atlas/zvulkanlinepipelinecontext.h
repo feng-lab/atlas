@@ -212,7 +212,7 @@ private:
   void ensureDescriptorLayouts();
   void ensurePlaceholderTexture();
   void ensureDescriptorSets(Z3DRendererBase& renderer);
-  void updateUBOs(Z3DRendererBase& renderer, const RenderBatch& batch);
+  void updateUBOs(Z3DRendererBase& renderer, const RenderBatch& batch, const LinePayload& payload);
   PipelineInstance&
   ensurePipeline(const PipelineKey& key, const LinePayload& payload, const vulkan::AttachmentFormats& formats);
   void bindDescriptorSets(vk::raii::CommandBuffer& cmd,

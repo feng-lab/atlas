@@ -261,7 +261,9 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
   }
 }
 
-void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer, const RenderBatch& batch)
+void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
+                                            const RenderBatch& batch,
+                                            const LinePayload& payload)
 {
   auto& device = m_backend.device();
 
@@ -305,24 +307,23 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer, const Ren
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   transforms.view_matrix = eyeState.viewMatrix;
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
-  const auto& params = renderer.parameterState();
-  const glm::mat4& coordTransform = params.coordTransform;
-  transforms.pos_transform = coordTransform;
+  CHECK(payload.params != nullptr) << "Line payload missing params";
+  transforms.pos_transform = payload.params->coordTransform;
 
   // Line shaders do not consume the normal matrix; keep it as identity to
   // avoid redundant inverse/transpose work.
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(glm::mat3(1.0f));
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  transforms.parameters = glm::vec4(params.sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
   m_uboTransforms->copyData(&transforms, sizeof(transforms));
 
   MaterialUBOStd140 material{};
   material.scene_ambient = sceneState.sceneAmbient;
-  material.material_ambient = params.materialAmbient;
-  material.material_specular = params.materialSpecular;
-  material.material_shininess = params.materialShininess;
-  material.alpha = params.opacity;
+  material.material_ambient = payload.params->materialAmbient;
+  material.material_specular = payload.params->materialSpecular;
+  material.material_shininess = payload.params->materialShininess;
+  material.alpha = payload.params->opacity;
   m_uboMaterial->copyData(&material, sizeof(material));
 }
 
@@ -715,15 +716,15 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
       }
 
       if (entry.promoted && sizeSame) {
-        bool anyChanged = (entry.p0Gen != payload.smoothP0PositionsGen) ||
-                          (entry.p1Gen != payload.smoothP1PositionsGen) ||
-                          (entry.flagsGen != payload.smoothFlagsGen) ||
-                          (entry.indexGen != (payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen));
+        bool anyChanged =
+          (entry.p0Gen != payload.smoothP0PositionsGen) || (entry.p1Gen != payload.smoothP1PositionsGen) ||
+          (entry.flagsGen != payload.smoothFlagsGen) ||
+          (entry.indexGen != (payload.smoothIndicesGen ? payload.smoothIndicesGen : payload.indicesGen));
         if (pickingPass) {
           anyChanged = anyChanged || (entry.pickGen != payload.smoothPickingColorsGen);
         } else {
-          anyChanged = anyChanged || (entry.c0Gen != payload.smoothP0ColorsGen) ||
-                        (entry.c1Gen != payload.smoothP1ColorsGen);
+          anyChanged =
+            anyChanged || (entry.c0Gen != payload.smoothP0ColorsGen) || (entry.c1Gen != payload.smoothP1ColorsGen);
         }
         if (entry.p0Gen != payload.smoothP0PositionsGen) {
           m_backend.scheduleStaticCopy(entry.vbP0, entry.p0Offset, p0Slice, false);
@@ -950,8 +951,7 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
       }
 
       if (entry.promoted && sizeSame) {
-        bool anyChanged = (entry.positionsGen != payload.positionsGen) ||
-                          (entry.colorsGen != colorGen) ||
+        bool anyChanged = (entry.positionsGen != payload.positionsGen) || (entry.colorsGen != colorGen) ||
                           (payload.isLineStrip && entry.indexGen != payload.indicesGen);
         if (entry.positionsGen != payload.positionsGen) {
           m_backend.scheduleStaticCopy(entry.vbPos, entry.posOffset, posSlice, false);
@@ -960,9 +960,13 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
           m_backend.scheduleStaticCopy(entry.vbColor, entry.colorOffset, colSlice, false);
         }
         if (payload.isLineStrip && entry.indexGen != payload.indicesGen && m_thinUploadIndexBuffer) {
-          Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer, m_thinUploadIndexOffset, nullptr,
+          Z3DRendererVulkanBackend::UploadSlice iUpload{m_thinUploadIndexBuffer,
+                                                        m_thinUploadIndexOffset,
+                                                        nullptr,
                                                         static_cast<size_t>(m_thinUploadIndexCount) * sizeof(uint32_t)};
-          if (entry.ib) m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iUpload, true);
+          if (entry.ib) {
+            m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iUpload, true);
+          }
         }
         if (!anyChanged) {
           m_thinPosBuffer = entry.vbPos;
@@ -1049,7 +1053,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
 
   const bool pickingPass = payload.pickingPass;
 
-  updateUBOs(renderer, batch);
+  updateUBOs(renderer, batch, payload);
   ensureDescriptorSets(renderer);
   CHECK(m_dsLighting && m_dsTransforms) << "Line pipeline descriptor sets missing (lighting/transforms)";
 
@@ -1142,12 +1146,13 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     const auto& frameState = renderer.frameState();
     pc.viewport_matrix = frameState.viewportMatrix;
     pc.viewport_matrix_inverse = frameState.inverseViewportMatrix;
-    pc.size_scale = (payload.sizeScale > 0.0f) ? payload.sizeScale : renderer.parameterState().sizeScale;
+    CHECK(payload.params != nullptr) << "Line payload missing params";
+    pc.size_scale = payload.params->sizeScale;
 
     const auto widths = payload.perSegmentWidths;
     const float dpr = renderer.sceneState().devicePixelRatio;
     const bool msaa2x2 = (renderer.sceneState().multisample == GeometryMSAAMode::MSAA2x2) && payload.enableMultisample;
-    const float sizeScale = (payload.sizeScale > 0.0f) ? payload.sizeScale : renderer.parameterState().sizeScale;
+    const float sizeScale = payload.params->sizeScale;
     if (!widths.empty()) {
       VLOG(1) << fmt::format(
         "VK wide line: segments={} dpr={:.3f} msaa2x2={} sizeScale={:.3f} resolvedLineWidth={:.3f}",

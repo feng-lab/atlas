@@ -437,7 +437,7 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
                                                          const EllipsoidPayload& payload,
                                                          bool pickingPass)
 {
-  (void)payload;
+  CHECK(payload.params != nullptr) << "Ellipsoid payload missing params";
   auto& device = m_backend.device();
   if (!m_uboTransforms) {
     m_uboTransforms =
@@ -456,26 +456,24 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
   transforms.view_matrix = eyeState.viewMatrix;
-  transforms.pos_transform = renderer.parameterState().coordTransform;
+  transforms.pos_transform = payload.params->coordTransform;
 
   const glm::mat4 combined = eyeState.viewMatrix * transforms.pos_transform;
   const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(combined)));
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  transforms.parameters =
-    glm::vec4(renderer.parameterState().sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
   m_uboTransforms->copyData(&transforms, sizeof(transforms));
 
   MaterialUBOStd140 material{};
   const auto& scene = renderer.sceneState();
-  const auto& params = renderer.parameterState();
   material.scene_ambient = scene.sceneAmbient;
-  material.material_ambient = params.materialAmbient;
-  material.material_specular = params.materialSpecular;
-  material.material_shininess = params.materialShininess;
-  material.alpha = pickingPass ? 1.0f : params.opacity;
+  material.material_ambient = payload.params->materialAmbient;
+  material.material_specular = payload.params->materialSpecular;
+  material.material_shininess = payload.params->materialShininess;
+  material.alpha = pickingPass ? 1.0f : payload.params->opacity;
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
 
@@ -817,8 +815,8 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
         if (payload.pickingPass) {
           anyChanged = anyChanged || (entry.pickingColorsGen != payload.pickingColorsGen);
         } else {
-          anyChanged = anyChanged || (entry.colorsGen != payload.colorsGen) ||
-                        (entry.specularGen != payload.specularGen);
+          anyChanged =
+            anyChanged || (entry.colorsGen != payload.colorsGen) || (entry.specularGen != payload.specularGen);
         }
         if (entry.axesGen != payload.axesGen) {
           m_backend.scheduleStaticCopy(entry.vbAxis1, entry.axis1Offset, axis1Slice, false);
@@ -844,7 +842,9 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
           m_backend.scheduleStaticCopy(entry.vbFlags, entry.flagsOffset, flagsSlice, false);
         }
         if (entry.indexGen != payload.indexGen && m_indexUploadBuffer && m_indexCount > 0) {
-          Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer, m_indexUploadOffset, nullptr,
+          Z3DRendererVulkanBackend::UploadSlice iUpload{m_indexUploadBuffer,
+                                                        m_indexUploadOffset,
+                                                        nullptr,
                                                         m_indexCount * sizeof(uint32_t)};
           m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iUpload, true);
         }

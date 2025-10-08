@@ -273,6 +273,7 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
   payload.texGen = m_texGen;   // Note: texcoords live on meshes; renderer cannot always detect
   payload.indexGen = m_indexGen;
 
+  payload.params = &m_rendererBase.parameterState();
   return payload;
 }
 

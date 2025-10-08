@@ -312,6 +312,7 @@ void Z3DFontRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   payload.outlineMode = (m_fontOutlineMode == FontOutlineMode::Glow) ? 0 : 1;
   payload.outlineColor = m_fontOutlineColor;
   payload.shadowColor = m_fontShadowColor;
+  payload.params = &m_rendererBase.parameterState();
   payload.pickingPass = picking;
 
   // Per-stream generation counters

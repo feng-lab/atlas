@@ -15,6 +15,7 @@
 #include <limits>
 
 namespace nim {
+  
 class ZMesh;
 class Z3DLineRenderer;
 class Z3DMeshRenderer;
@@ -30,6 +31,7 @@ class Z3DImgSliceRenderer;
 class Z3DImgRaycasterRenderer;
 class Z3DFontRenderer;
 class ZColorMapParameter;
+struct RendererParameterState;
 
 enum class BackgroundMode
 {
@@ -367,7 +369,7 @@ struct LinePayload
 
   float srcLineWidth = 1.0f;
   float resolvedLineWidth = 1.0f;
-  float sizeScale = 1.0f;
+  const RendererParameterState* params = nullptr; // originating renderer params
   bool pickingPass = false;
   // Generation counters for selective restaging
   uint32_t positionsGen = 0;    // raw polyline positions
@@ -432,6 +434,7 @@ struct MeshPayload
   uint32_t colorGen = 0;
   uint32_t texGen = 0;
   uint32_t indexGen = 0;
+  const RendererParameterState* params = nullptr; // originating renderer params
 };
 
 struct SpherePayload
@@ -453,6 +456,7 @@ struct SpherePayload
   uint32_t specularGen = 0;
   uint32_t flagsGen = 0;
   uint32_t indexGen = 0;
+  const RendererParameterState* params = nullptr;
 };
 
 struct BackgroundPayload
@@ -463,6 +467,7 @@ struct BackgroundPayload
   glm::vec4 region{0.0f, 1.0f, 0.0f, 1.0f};
   BackgroundMode mode = BackgroundMode::Gradient;
   BackgroundGradientOrientation orientation = BackgroundGradientOrientation::BottomToTop;
+  const RendererParameterState* params = nullptr; // originating renderer params
 };
 
 struct TextureCopyPayload
@@ -599,6 +604,7 @@ struct EllipsoidPayload
   uint32_t specularGen = 0;
   uint32_t flagsGen = 0;
   uint32_t indexGen = 0;
+  const RendererParameterState* params = nullptr;
 };
 
 struct ConePayload
@@ -634,6 +640,7 @@ struct ConePayload
   uint32_t pickingColorsGen = 0;
   uint32_t flagsGen = 0;
   uint32_t indexGen = 0;
+  const RendererParameterState* params = nullptr;
 };
 
 struct FontPayload
@@ -669,6 +676,7 @@ struct FontPayload
   uint32_t colorsGen = 0;
   uint32_t pickingColorsGen = 0;
   uint32_t indicesGen = 0;
+  const RendererParameterState* params = nullptr;
 };
 
 using GeometryPayload = std::variant<std::monostate,

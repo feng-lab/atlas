@@ -219,8 +219,9 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
 
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
 
+  CHECK(payload.params != nullptr) << "Sphere payload missing params";
   SpherePushConstants constants;
-  constants.sizeScale = renderer.parameterState().sizeScale;
+  constants.sizeScale = payload.params->sizeScale;
   constants.boxCorrection = computeBoxCorrection(glm::degrees(eyeState.fieldOfView));
   constants.ortho = eyeState.isPerspective ? 0.0f : 1.0f;
   if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
@@ -474,7 +475,7 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
                                                       const SpherePayload& payload,
                                                       bool pickingPass)
 {
-  (void)payload;
+  CHECK(payload.params != nullptr) << "Sphere payload missing params";
   auto& device = m_backend.device();
   if (!m_uboTransforms) {
     m_uboTransforms =
@@ -490,29 +491,29 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   }
 
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
-  const auto& params = renderer.parameterState();
 
   TransformsUBOStd140 transforms{};
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
   transforms.view_matrix = eyeState.viewMatrix;
-  transforms.pos_transform = params.coordTransform;
+  transforms.pos_transform = payload.params->coordTransform;
 
-  const glm::mat4 combined = eyeState.viewMatrix * params.coordTransform;
+  const glm::mat4 combined = eyeState.viewMatrix * payload.params->coordTransform;
   const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(combined)));
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  transforms.parameters = glm::vec4(params.sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
   m_uboTransforms->copyData(&transforms, sizeof(transforms));
 
   MaterialUBOStd140 material{};
   const auto& scene = renderer.sceneState();
   material.scene_ambient = scene.sceneAmbient;
-  material.material_ambient = params.materialAmbient;
-  material.material_specular = pickingPass || !payload.useDynamicMaterial ? glm::vec4(0.0f) : params.materialSpecular;
-  material.material_shininess = pickingPass || !payload.useDynamicMaterial ? 0.0f : params.materialShininess;
-  material.alpha = pickingPass ? 1.0f : params.opacity;
+  material.material_ambient = payload.params->materialAmbient;
+  material.material_specular =
+    pickingPass || !payload.useDynamicMaterial ? glm::vec4(0.0f) : payload.params->materialSpecular;
+  material.material_shininess = pickingPass || !payload.useDynamicMaterial ? 0.0f : payload.params->materialShininess;
+  material.alpha = pickingPass ? 1.0f : payload.params->opacity;
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
 
@@ -820,7 +821,9 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
           anyChanged = true;
         }
         if (entry.indexGen != payload.indexGen && m_indexUploadBuffer && m_indexCount > 0) {
-          Z3DRendererVulkanBackend::UploadSlice idx{m_indexUploadBuffer, m_indexUploadOffset, nullptr,
+          Z3DRendererVulkanBackend::UploadSlice idx{m_indexUploadBuffer,
+                                                    m_indexUploadOffset,
+                                                    nullptr,
                                                     m_indexCount * sizeof(uint32_t)};
           m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, idx, true);
           anyChanged = true;

@@ -724,6 +724,7 @@ ConePayload Z3DConeRenderer::buildConePayload() const
   payload.pickingColorsGen = m_pickingColorsGen;
   payload.flagsGen = m_flagsGen;
   payload.indexGen = m_indexGen;
+  payload.params = &m_rendererBase.parameterState();
   return payload;
 }
 
