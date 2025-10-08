@@ -63,6 +63,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - When you need GLM math utilities, include `zglmutils.h`; do not include `<glm/...>` headers directly.
 - Maintain consistent naming: `CamelCase` types, `camelCase` locals, `_member` private fields where applicable.
 - Remove dead code, unused includes, and stale feature flags. Do not leave TODOs without linked issues.
+- Pointer nullability contract: treat all pointer and smart-pointer parameters as non-null by default. At function entry, `CHECK(ptr)` (or `CHECK(ptr != nullptr)`) once, then use directly without additional null branches. Only parameters explicitly marked as nullable (e.g., `/*nullable*/ T*` or documented as such) may be null; handle those paths deliberately. Unmarked pointers must be considered required and validated with a hard `CHECK`.
 
 ## Vulkan Migration Guardrails
 - Follow the façade-first approach: filters talk to API-neutral renderers; backends plug in beneath `Z3DRendererBase`.

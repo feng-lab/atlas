@@ -51,6 +51,47 @@ Threading Model
   - Use `QMetaObject::invokeMethod` to post to engine thread; use `Qt::BlockingQueuedConnection` if you must wait.
   - For parameter changes, queue to the parameter’s owning thread (see `ZParameterAnimation::setCurrentTime`).
 
+Pointer Nullability Contract
+
+- Default non-null: treat all pointer and smart-pointer parameters as required (non-null) unless explicitly marked as nullable.
+- Entry checks only: validate required pointers once at function entry with `CHECK(ptr)` (or `CHECK(ptr != nullptr)`), then use directly without `if (!ptr)` branches.
+ - Explicitly nullable: annotate nullable parameters with `/*nullable*/` in the declaration. Optionally add a short preceding comment noting which parameters/return values are nullable. Handle the null path deliberately. No Doxygen is required.
+- Smart pointers: apply the same rules. Required `std::unique_ptr<T>&` / `std::shared_ptr<T> const&` must pass `CHECK(ptr)`; nullable variants must be annotated `/*nullable*/`.
+- Prefer `std::optional<T>` for value-semantics optional data; for non-owning optional references, prefer `/*nullable*/ T*`.
+
+Examples
+
+```cpp
+// Required pointer: check once, then use directly
+void renderPass(Z3DRendererBase* renderer, const ZScene* scene) {
+  CHECK(renderer);
+  CHECK(scene);
+  renderer->beginPass(*scene);
+}
+
+// Explicitly nullable: annotation + deliberate handling
+void setLabel(Z3DCanvas* canvas, /*nullable*/ const char* text) {
+  CHECK(canvas);
+  if (!text) return;  // documented nullable
+  canvas->setStatusText(text);
+}
+
+// Smart pointer parameter with required contract
+void attachTexture(const std::shared_ptr<ZTexture>& tex) {
+  CHECK(tex);
+  bindTexture(*tex);
+}
+```
+
+Optional comment style (when a signature is crowded or readability benefits):
+
+```cpp
+// Nullable: text
+void setLabel(Z3DCanvas* canvas, /*nullable*/ const char* text);
+```
+
+This mirrors the Coding Standards in `AGENTS.md` and helps simplify control flow while catching contract violations early.
+
 Scene Load/Save (JSON)
 
 - Load: `ZMainWindow::loadJsonSceneImpl`
