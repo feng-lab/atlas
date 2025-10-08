@@ -20,10 +20,74 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   LOG(INFO) << "ZVulkanDevice created";
   // Do not require VK_EXT_vertex_input_dynamic_state (MoltenVK lacks it).
   // Keep the flag false by default; contexts will fall back to fixed VI.
+
+  // Initialize VMA allocator using dynamically resolved function loaders
+  static vk::detail::DynamicLoader sLoader;
+  auto fpGetInstanceProcAddr = sLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+  auto fpGetDeviceProcAddr = sLoader.getProcAddress<PFN_vkGetDeviceProcAddr>("vkGetDeviceProcAddr");
+  CHECK(fpGetInstanceProcAddr != nullptr && fpGetDeviceProcAddr != nullptr)
+    << "Failed to resolve Vulkan loader entry points dynamically.";
+
+  VmaVulkanFunctions funcs{};
+  funcs.vkGetInstanceProcAddr = fpGetInstanceProcAddr;
+  funcs.vkGetDeviceProcAddr = fpGetDeviceProcAddr;
+
+  VmaAllocatorCreateInfo info{};
+  info.instance = *m_context.instance();
+  info.physicalDevice = *m_context.physicalDevice();
+  info.device = *m_context.device();
+  info.pVulkanFunctions = &funcs;
+  info.vulkanApiVersion= m_context.physicalDevice().getProperties().apiVersion;
+  VkResult res = vmaCreateAllocator(&info, &m_allocator);
+  if (res != VK_SUCCESS) {
+    throw ZException("Failed to create VMA allocator");
+  }
+
+  // Create tuned VMA pools
+  auto createPool = [&](VkMemoryPropertyFlags reqFlags, VkDeviceSize blockSize) -> VmaPool {
+    VmaPoolCreateInfo pci{};
+    const uint32_t typeIndex = findMemoryTypeIndex(reqFlags);
+    if (typeIndex == UINT32_MAX) {
+      LOG_FIRST_N(WARNING, 3) << "VMA: no memory type for pool flags=" << std::hex << reqFlags;
+      return VK_NULL_HANDLE;
+    }
+    pci.memoryTypeIndex = typeIndex;
+    pci.blockSize = blockSize;
+    VmaPool pool = VK_NULL_HANDLE;
+    if (vmaCreatePool(m_allocator, &pci, &pool) != VK_SUCCESS) {
+      LOG_FIRST_N(WARNING, 3) << "VMA: pool creation failed for type=" << typeIndex;
+      return VK_NULL_HANDLE;
+    }
+    return pool;
+  };
+  // Host-visible transient per-frame uploads
+  m_uploadTransientPool = createPool(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                     32ull * 1024ull * 1024ull);
+  // Host-visible longer-lived staging allocations
+  m_uploadStagingPool = createPool(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                   64ull * 1024ull * 1024ull);
+  // Device-local static content
+  m_deviceLocalPool = createPool(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 128ull * 1024ull * 1024ull);
 }
 
 ZVulkanDevice::~ZVulkanDevice()
 {
+  if (m_uploadTransientPool != VK_NULL_HANDLE) {
+    vmaDestroyPool(m_allocator, m_uploadTransientPool);
+    m_uploadTransientPool = VK_NULL_HANDLE;
+  }
+  if (m_uploadStagingPool != VK_NULL_HANDLE) {
+    vmaDestroyPool(m_allocator, m_uploadStagingPool);
+    m_uploadStagingPool = VK_NULL_HANDLE;
+  }
+  if (m_deviceLocalPool != VK_NULL_HANDLE) {
+    vmaDestroyPool(m_allocator, m_deviceLocalPool);
+    m_deviceLocalPool = VK_NULL_HANDLE;
+  }
+  if (m_allocator != VK_NULL_HANDLE) {
+    vmaDestroyAllocator(m_allocator);
+    m_allocator = VK_NULL_HANDLE;
+  }
   LOG(INFO) << "Destroying ZVulkanDevice";
 }
 
@@ -90,6 +154,41 @@ std::unique_ptr<ZVulkanDescriptorSet> ZVulkanDevice::createDescriptorSet(ZVulkan
 {
   auto descriptorSet = pool.allocateDescriptorSet(layout);
   return std::make_unique<ZVulkanDescriptorSet>(*this, descriptorSet, isOverrideTransient);
+}
+
+std::unique_ptr<ZVulkanBuffer>
+ZVulkanDevice::createBufferInPool(size_t size,
+                                  vk::BufferUsageFlags usage,
+                                  vk::MemoryPropertyFlags properties,
+                                  VmaPool poolOverride)
+{
+  return std::make_unique<ZVulkanBuffer>(*this, size, usage, properties, poolOverride);
+}
+
+
+uint32_t ZVulkanDevice::findMemoryTypeIndex(VkMemoryPropertyFlags requiredFlags, VkMemoryPropertyFlags preferredFlags) const
+{
+  auto& phys = m_context.physicalDevice();
+  const auto memProps = phys.getMemoryProperties();
+  auto matches = [&](uint32_t i, VkMemoryPropertyFlags req, VkMemoryPropertyFlags pref) {
+    VkMemoryPropertyFlags flags = static_cast<VkMemoryPropertyFlags>(memProps.memoryTypes[i].propertyFlags);
+    if ((flags & req) != req) return false;
+    if (pref != 0 && (flags & pref) != pref) return false;
+    return true;
+  };
+  for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
+    if (matches(i, requiredFlags, preferredFlags)) {
+      return i;
+    }
+  }
+  if (preferredFlags != 0) {
+    for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i) {
+      if (matches(i, requiredFlags, 0)) {
+        return i;
+      }
+    }
+  }
+  return UINT32_MAX;
 }
 
 

@@ -12,6 +12,12 @@ class ZVulkanBuffer
 {
 public:
   ZVulkanBuffer(ZVulkanDevice& device, size_t size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
+  ZVulkanBuffer(ZVulkanDevice& device,
+                size_t size,
+                vk::BufferUsageFlags usage,
+                vk::MemoryPropertyFlags properties,
+                VmaPool poolOverride);
+  ~ZVulkanBuffer();
 
   // RAII view over a mapped buffer range; automatically unmaps in its destructor and
   // follows move-only semantics so mappings cannot be double-unmapped accidentally.
@@ -49,11 +55,11 @@ public:
 
   vk::Buffer buffer() const
   {
-    return *m_buffer;
+    return m_buffer;
   }
   vk::DeviceMemory memory() const
   {
-    return *m_bufferMemory;
+    return VK_NULL_HANDLE; // Not exposed with VMA-backed buffers
   }
   size_t size() const
   {
@@ -73,8 +79,9 @@ private:
   void createBuffer();
 
   ZVulkanDevice& m_device;
-  std::optional<vk::raii::Buffer> m_buffer;
-  std::optional<vk::raii::DeviceMemory> m_bufferMemory;
+  vk::Buffer m_buffer{};
+  VmaAllocation m_allocation = VK_NULL_HANDLE;
+  VmaPool m_poolOverride = VK_NULL_HANDLE;
   size_t m_size;
   vk::BufferUsageFlags m_usage;
   vk::MemoryPropertyFlags m_memoryProperties;

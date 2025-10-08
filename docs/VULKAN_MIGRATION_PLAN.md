@@ -618,6 +618,7 @@ Implementation status (2025-10):
 - Spheres: Added full `DYNAMIC_MATERIAL_PROPERTY` parity. Vulkan now supports per‑sphere specular/shininess via a specialization constant (`USE_DYNAMIC_MATERIAL`, id 60), additional vertex attribute for `attr_specular_shininess`, and varyings to the fragment. When disabled, uniform material is used as in GL. Depth uses `projection_matrix` like GL; sizeScale/box‑correction match GL.
 - Ellipsoids: Vulkan vertex scales `T`’s axis columns by `sizeScale` and constructs the clip-space bounding quad identically to GL. Dynamic material specialization and fog variants are wired via specialization constants, as in GL.
 - Fonts: Vulkan SDF text path (`almag.vert/frag`) mirrors GL’s sampling and blending. The pipeline uses premultiplied-alpha blending identical to GL; picking disables lighting/specular as on GL.
+  - MoltenVK fix (macOS): removed `gl_FragDepth` writes from the Vulkan font fragment shader to avoid intermittent color stripes and missing text in small overlay viewports. Depth testing/writing is disabled for overlay text and not required for picking (depth write is off). Behavior matches GL visually with premultiplied blending.
 
 Validation notes:
 - Parity validation compares Vulkan vs GL on the same scenes: cones (all cap styles), spheres of varying radii at different FOVs, ellipsoids with anisotropy, and SDF fonts (with/without outline/shadow). For transparency, both weighted-average and weighted-blended init passes are verified and final resolves match when inputs are the same.

@@ -157,7 +157,7 @@ public:
   }
   vk::Image image() const
   {
-    return *m_image;
+    return m_image;
   }
   vk::ImageView imageView() const
   {
@@ -208,8 +208,8 @@ private:
   vk::ImageAspectFlags m_aspectMask;
   vk::ImageLayout m_descriptorLayout;
   vk::ImageAspectFlags m_descriptorAspectMask;
-  std::optional<vk::raii::Image> m_image;
-  std::optional<vk::raii::DeviceMemory> m_imageMemory;
+  vk::Image m_image{VK_NULL_HANDLE};
+  VmaAllocation m_imageAllocation = VK_NULL_HANDLE;
   std::optional<vk::raii::ImageView> m_imageView;
   std::optional<vk::raii::Sampler> m_sampler;
   mutable std::optional<vk::raii::ImageView> m_depthAspectView;

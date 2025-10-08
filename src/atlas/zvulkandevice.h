@@ -56,10 +56,31 @@ public:
   // Optional features
   bool supportsVertexInputDynamicState() const { return m_supportsVertexInputDynamicState; }
 
+  // VMA allocator handle
+  VmaAllocator allocator() const { return m_allocator; }
+  // VMA pools: host-visible transient/staging and device-local pools
+  VmaPool uploadTransientPool() const { return m_uploadTransientPool; }
+  VmaPool uploadStagingPool() const { return m_uploadStagingPool; }
+  VmaPool deviceLocalPool() const { return m_deviceLocalPool; }
+
+  // Utility to query a memory type index with required flags
+  uint32_t findMemoryTypeIndex(VkMemoryPropertyFlags requiredFlags, VkMemoryPropertyFlags preferredFlags = 0) const;
+
+  // Optional pool-aware buffer creation
+  std::unique_ptr<class ZVulkanBuffer>
+  createBufferInPool(size_t size,
+                     vk::BufferUsageFlags usage,
+                     vk::MemoryPropertyFlags properties,
+                     VmaPool poolOverride);
+
 private:
   ZVulkanContext& m_context;
   std::unique_ptr<ZVulkanFrameExecutor> m_frameExecutor;
   bool m_supportsVertexInputDynamicState = false; // guarded for MoltenVK
+  VmaAllocator m_allocator = VK_NULL_HANDLE;
+  VmaPool m_uploadTransientPool = VK_NULL_HANDLE;
+  VmaPool m_uploadStagingPool = VK_NULL_HANDLE;
+  VmaPool m_deviceLocalPool = VK_NULL_HANDLE;
 };
 
 } // namespace nim

@@ -265,13 +265,18 @@ private:
     struct UploadArena
     {
       std::unique_ptr<class ZVulkanBuffer> buffer; // host-visible, host-coherent
+      VmaVirtualBlock block = VK_NULL_HANDLE; // VMA virtual allocator over buffer
       void* mapped = nullptr; // persistent mapping
       size_t capacity = 0; // bytes
-      size_t offset = 0; // current write cursor
       size_t highWatermark = 0; // max used this frame (debug)
-      // Keep previous buffers alive if we grow during the frame so earlier
+      // Keep previous buffers + virtual blocks alive if we grow during the frame so earlier
       // returned mapped pointers remain valid until the frame completes.
-      std::vector<std::unique_ptr<class ZVulkanBuffer>> retiredBuffers;
+      struct Retired
+      {
+        std::unique_ptr<class ZVulkanBuffer> buffer;
+        VmaVirtualBlock block = VK_NULL_HANDLE;
+      };
+      std::vector<Retired> retiredBuffers;
     } uploadArena;
 
     // Static device-local staging stats

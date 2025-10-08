@@ -14,6 +14,7 @@
 
 #define VULKAN_HPP_NO_CONSTRUCTORS
 #include <vulkan/vulkan_raii.hpp>
+#include <vma/vk_mem_alloc.h>
 
 #include "zglmutils.h"
 #include "zlog.h"

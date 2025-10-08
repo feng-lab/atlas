@@ -87,6 +87,21 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   CHECK(ds != nullptr) << "Failed to allocate override descriptor set for font atlas";
   ds->updateTexture(0, *atlas, m_backend.defaultSampler());
 
+  // Debug: verify viewport/scissor and atlas metadata for MoltenVK issues
+  VLOG(1) << fmt::format("VK font state: viewport=({:.1f},{:.1f} {:.1f}x{:.1f}) scissor=({},{} {}x{}) atlas={}x{} fmt={} picking={}",
+                         viewport.x,
+                         viewport.y,
+                         viewport.width,
+                         viewport.height,
+                         scissor.offset.x,
+                         scissor.offset.y,
+                         scissor.extent.width,
+                         scissor.extent.height,
+                         atlas->width(),
+                         atlas->height(),
+                         static_cast<int>(atlas->format()),
+                         payload.pickingPass);
+
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
   PipelineKey key;
@@ -434,22 +449,7 @@ ZVulkanFontPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     instance.pipeline->setColorBlendAttachment(blend);
   }
 
-  // Blending
-  vk::PipelineColorBlendAttachmentState blendAttachment{};
-  if (key.picking) {
-    blendAttachment.blendEnable = VK_FALSE;
-  } else {
-    blendAttachment.blendEnable = VK_TRUE;
-    blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
-    blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-    blendAttachment.colorBlendOp = vk::BlendOp::eAdd;
-    blendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-    blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-    blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
-  }
-  blendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-                                   vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-  instance.pipeline->setColorBlendAttachment(blendAttachment);
+  // Blending configured above per picking/overlay case
 
   // Specialization constants are not strictly required here; flags are passed via push constants.
   vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
@@ -457,6 +457,14 @@ ZVulkanFontPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
                               .size = static_cast<uint32_t>(sizeof(FontPushConstants))};
   instance.pipeline->setPushConstantRanges({range});
   instance.pipeline->create();
+
+  VLOG(1) << fmt::format(
+    "VK font pipeline created: picking={} colorAttachments={} depthFormat={} blend=premul(One,OneMinusSrcAlpha) depthTest={} depthWrite={}",
+    key.picking,
+    formats.colorFormats.size(),
+    key.depthFormat ? static_cast<int>(*key.depthFormat) : static_cast<int>(vk::Format::eUndefined),
+    key.picking ? 1 : 0,
+    0);
 
   auto [inserted, _2] = m_pipelineCache.insert({key, std::move(instance)});
   return inserted->second;

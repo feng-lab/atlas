@@ -566,6 +566,7 @@ set(SOURCES
     zvulkandescriptorset.h
     zvulkandescriptorset.cpp
     zvulkan.cpp
+    zvulkan_vma.cpp
     zvulkanshader.h
     zvulkanshader.cpp
     zvulkanpipeline.h
@@ -713,8 +714,8 @@ else (WIN32)
   endif ()
 
   # for some files
-  set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS
-                              "-Wno-unused-parameter")
+  set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter")
+  set_source_files_properties(zvulkan_vma.cpp PROPERTIES COMPILE_FLAGS "-Wno-nullability-completeness -Wno-unused-parameter -Wno-missing-field-initializers -Wno-unused-variable -Wno-unused-private-field")
 
   if (APPLE)
     message(STATUS "Qt6Core_INCLUDE_DIRS: ${Qt6Core_INCLUDE_DIRS}")

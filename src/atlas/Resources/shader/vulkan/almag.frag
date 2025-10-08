@@ -73,6 +73,4 @@ void main()
     baseColor.rgb *= baseColor.a; // premultiply
 
     FragData0 = baseColor;
-    gl_FragDepth = baseColor.a > 0.0 ? gl_FragCoord.z : 1.0;
 }
-

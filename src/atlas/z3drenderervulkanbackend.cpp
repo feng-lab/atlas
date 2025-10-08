@@ -242,10 +242,19 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.pendingColorReadbacks.clear();
   frameResources.readbackBytesCopied = 0;
   frameResources.readbackSlotsInFlight = 0;
-  // Reset per-frame upload arena cursor/high-watermark
-  frameResources.uploadArena.offset = 0;
+  // Reset per-frame upload arena virtual block; free retired resources
+  if (frameResources.uploadArena.block != VK_NULL_HANDLE) {
+    vmaClearVirtualBlock(frameResources.uploadArena.block);
+  }
   frameResources.uploadArena.highWatermark = 0;
   // Release any retired upload buffers from a previous use of this frame.
+  for (auto& r : frameResources.uploadArena.retiredBuffers) {
+    if (r.block != VK_NULL_HANDLE) {
+      vmaDestroyVirtualBlock(r.block);
+      r.block = VK_NULL_HANDLE;
+    }
+    r.buffer.reset();
+  }
   frameResources.uploadArena.retiredBuffers.clear();
   // Ensure static arenas exist once a device is present
   ensureStaticArenas();
@@ -1128,13 +1137,7 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
 
   auto& arena = m_activeFrame->uploadArena;
 
-  auto alignUp = [](size_t value, size_t alignment) {
-    const size_t mask = alignment - 1;
-    return (value + mask) & ~mask;
-  };
-
-  const size_t alignedOffset = alignUp(arena.offset, std::max<size_t>(1, alignment));
-  const size_t required = alignedOffset + bytes;
+  const size_t required = bytes; // virtual allocator handles alignment and placement
 
   auto ensureCapacity = [&](size_t minCapacity) {
     if (arena.buffer && arena.mapped && arena.capacity >= minCapacity) {
@@ -1147,38 +1150,54 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
     // Move the previous buffer to the retired list so any already-returned
     // mapped pointers remain valid for the rest of the frame.
     if (arena.buffer) {
-      arena.retiredBuffers.emplace_back(std::move(arena.buffer));
+      arena.retiredBuffers.push_back({std::move(arena.buffer), arena.block});
+      arena.block = VK_NULL_HANDLE;
     }
     // Upload arena buffers act as sources for GPU copies into device-local
     // static buffers. They must carry TRANSFER_SRC usage (not DST).
-    arena.buffer = m_sharedDevice->createBuffer(
+    arena.buffer = m_sharedDevice->createBufferInPool(
       newCapacity,
       vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
         vk::BufferUsageFlagBits::eTransferSrc,
-      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+      m_sharedDevice->uploadTransientPool());
     arena.capacity = newCapacity;
-    arena.offset = 0;
     // Persistently map the entire buffer
     arena.mapped = arena.buffer->map(0, newCapacity);
+    // Create a fresh virtual block spanning [0, capacity)
+    VmaVirtualBlockCreateInfo vinfo{};
+    vinfo.size = newCapacity;
+    if (vmaCreateVirtualBlock(&vinfo, &arena.block) != VK_SUCCESS) {
+      arena.block = VK_NULL_HANDLE;
+      LOG_FIRST_N(ERROR, 3) << "Failed to create VMA virtual block for upload arena";
+    }
   };
 
-  VLOG(2) << "suballocateUpload: request bytes=" << bytes << " align=" << alignment << " arena.off=" << arena.offset
-          << " required=" << required << " cap=" << arena.capacity;
+  VLOG(2) << "suballocateUpload: request bytes=" << bytes << " align=" << alignment << " required=" << required
+          << " cap=" << arena.capacity;
   ensureCapacity(required);
-  VLOG(2) << "suballocateUpload: after ensureCapacity cap=" << arena.capacity << " off=" << arena.offset
+  VLOG(2) << "suballocateUpload: after ensureCapacity cap=" << arena.capacity
           << " mapped=" << (arena.mapped != nullptr);
 
-  slice.buffer = arena.buffer->buffer();
-  slice.offset = static_cast<vk::DeviceSize>(alignedOffset);
-  if (arena.mapped) {
-    slice.mapped = static_cast<uint8_t*>(arena.mapped) + alignedOffset;
-  } else {
-    slice.mapped = nullptr;
+  // Allocate from the virtual block
+  VmaVirtualAllocationCreateInfo ainfo{};
+  ainfo.size = bytes;
+  ainfo.alignment = std::max<size_t>(1, alignment);
+  VmaVirtualAllocation alloc = VK_NULL_HANDLE;
+  VkDeviceSize vOffset = 0;
+  if (arena.block == VK_NULL_HANDLE || vmaVirtualAllocate(arena.block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
+    VLOG(1) << "suballocateUpload: virtual allocate failed; attempting to grow arena";
+    ensureCapacity(arena.capacity + required);
+    if (arena.block == VK_NULL_HANDLE || vmaVirtualAllocate(arena.block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
+      VLOG(1) << "suballocateUpload: virtual allocate failed after growth";
+      return slice;
+    }
   }
+  slice.buffer = arena.buffer->buffer();
+  slice.offset = static_cast<vk::DeviceSize>(vOffset);
+  slice.mapped = arena.mapped ? static_cast<uint8_t*>(arena.mapped) + static_cast<size_t>(vOffset) : nullptr;
   slice.size = bytes;
-
-  arena.offset = required;
-  arena.highWatermark = std::max(arena.highWatermark, required);
+  arena.highWatermark = std::max<vk::DeviceSize>(arena.highWatermark, vOffset + static_cast<VkDeviceSize>(bytes));
   VLOG(2) << "suballocateUpload: slice buf=" << static_cast<bool>(slice.buffer) << " off=" << slice.offset
           << " size=" << slice.size << " mapped=" << (slice.mapped != nullptr);
   return slice;
@@ -1193,7 +1212,7 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
     return;
   }
   auto& arena = m_activeFrame->uploadArena;
-  size_t cursor = arena.offset;
+  size_t cursor = 0; // virtual block will handle placement; we just size the buffer
   for (const auto& s : slices) {
     const size_t bytes = s.first;
     const size_t align = s.second ? s.second : 1;
@@ -1212,18 +1231,25 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
     newCapacity = newCapacity ? (newCapacity * 2) : (static_cast<size_t>(1) << 20);
   }
   if (arena.buffer) {
-    arena.retiredBuffers.emplace_back(std::move(arena.buffer));
+    arena.retiredBuffers.push_back({std::move(arena.buffer), arena.block});
+    arena.block = VK_NULL_HANDLE;
   }
   // Upload arena buffers act as the source of GPU copies into device-local
   // static buffers. They must be created with TRANSFER_SRC usage (not DST).
-  arena.buffer =
-    m_sharedDevice->createBuffer(newCapacity,
-                                 vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
-                                   vk::BufferUsageFlagBits::eTransferSrc,
-                                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  arena.buffer = m_sharedDevice->createBufferInPool(
+    newCapacity,
+    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferSrc,
+    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+    m_sharedDevice->uploadTransientPool());
   arena.capacity = newCapacity;
-  arena.offset = 0;
   arena.mapped = arena.buffer->map(0, newCapacity);
+  // Create a fresh virtual block spanning [0, capacity)
+  VmaVirtualBlockCreateInfo vinfo{};
+  vinfo.size = newCapacity;
+  if (vmaCreateVirtualBlock(&vinfo, &arena.block) != VK_SUCCESS) {
+    arena.block = VK_NULL_HANDLE;
+    LOG_FIRST_N(ERROR, 3) << "Failed to create VMA virtual block for upload arena (reserve)";
+  }
   VLOG(2) << fmt::format("reserveUploadSlices: grew arena to {} bytes for {} slices", newCapacity, slices.size());
 }
 
@@ -1593,11 +1619,12 @@ void Z3DRendererVulkanBackend::ensureReadbackSlots(size_t minBytes, uint32_t min
   }
   for (auto& slot : m_readbackSlots) {
     if (!slot.buffer || slot.capacity < minBytes) {
-      slot.buffer =
-        device().createBuffer(minBytes,
-                              vk::BufferUsageFlagBits::eTransferDst,
-                              vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent |
-                                vk::MemoryPropertyFlagBits::eHostCached);
+      slot.buffer = device().createBufferInPool(minBytes,
+                                                vk::BufferUsageFlagBits::eTransferDst,
+                                                vk::MemoryPropertyFlagBits::eHostVisible |
+                                                  vk::MemoryPropertyFlagBits::eHostCoherent |
+                                                  vk::MemoryPropertyFlagBits::eHostCached,
+                                                device().uploadStagingPool());
       slot.capacity = minBytes;
       slot.mapped = slot.buffer->map(0, minBytes);
       slot.inUse = false;

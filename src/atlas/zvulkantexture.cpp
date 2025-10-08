@@ -246,7 +246,25 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device,
   : ZVulkanTexture(device, CreateInfo::make2D(width, height, format, usage, memoryProperties))
 {}
 
-ZVulkanTexture::~ZVulkanTexture() = default;
+ZVulkanTexture::~ZVulkanTexture()
+{
+  // Destroy views/samplers first to avoid referencing the image during teardown
+  m_layerImageViews.clear();
+  m_layerDepthViews.clear();
+  m_layerStencilViews.clear();
+  m_genericAspectViews.clear();
+  if (m_imageView) {
+    m_imageView.reset();
+  }
+  if (m_sampler) {
+    m_sampler.reset();
+  }
+  if (m_image != VK_NULL_HANDLE && m_imageAllocation != VK_NULL_HANDLE) {
+    vmaDestroyImage(m_device.allocator(), m_image, m_imageAllocation);
+    m_image = VK_NULL_HANDLE;
+    m_imageAllocation = VK_NULL_HANDLE;
+  }
+}
 // ----- Public API -----------------------------------------------------------------------------
 
 void ZVulkanTexture::uploadData(const void* data, size_t size)
@@ -295,7 +313,7 @@ void ZVulkanTexture::downloadData(void* data, size_t size)
                                         m_extent.height,
                                         m_createInfo.imageType == vk::ImageType::e3D ? m_extent.depth : 1u};
 
-      cmdBuffer.copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
+      cmdBuffer.copyImageToBuffer(m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
       // Do not transition back to an undefined layout; use GENERAL if the prior layout was undefined.
       const vk::ImageLayout restoreLayout =
         (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
@@ -340,7 +358,7 @@ void ZVulkanTexture::downloadSubImage(void* data,
       region.imageOffset = offset;
       region.imageExtent = extent;
 
-      cmdBuffer.copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
+      cmdBuffer.copyImageToBuffer(m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
       const vk::ImageLayout restoreLayout =
         (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
       transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, aspect);
@@ -373,7 +391,7 @@ void ZVulkanTexture::transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
   barrier.dstAccessMask = dstState.access;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = *m_image;
+  barrier.image = m_image;
   barrier.subresourceRange.aspectMask = aspect;
   barrier.subresourceRange.baseMipLevel = 0;
   barrier.subresourceRange.levelCount = m_mipLevels;
@@ -473,7 +491,7 @@ vk::ImageView ZVulkanTexture::layerImageView(uint32_t layer, vk::ImageAspectFlag
 
   if (!cache[layer].has_value()) {
     vk::ImageViewCreateInfo viewInfo{};
-    viewInfo.image = **m_image;
+    viewInfo.image = m_image;
     viewInfo.viewType = vk::ImageViewType::e2D;
     viewInfo.format = m_format;
     viewInfo.components = vk::ComponentMapping{};
@@ -514,7 +532,7 @@ vk::ImageView ZVulkanTexture::imageViewForAspect(vk::ImageAspectFlags aspect) co
 
   auto buildView = [&](vk::ImageAspectFlags aspectMask) {
     vk::ImageViewCreateInfo viewInfo{};
-    viewInfo.image = **m_image;
+    viewInfo.image = m_image;
     viewInfo.viewType = m_createInfo.viewType;
     viewInfo.format = m_format;
     viewInfo.components = vk::ComponentMapping{};
@@ -553,6 +571,11 @@ vk::ImageView ZVulkanTexture::imageViewForAspect(vk::ImageAspectFlags aspect) co
 
 void ZVulkanTexture::createImage()
 {
+  // No-op: image creation is handled by VMA in allocateMemory().
+}
+
+void ZVulkanTexture::allocateMemory()
+{
   vk::ImageCreateInfo imageInfo{};
   imageInfo.flags = createFlagsForView(m_createInfo.viewType);
   imageInfo.imageType = m_createInfo.imageType;
@@ -564,39 +587,75 @@ void ZVulkanTexture::createImage()
   imageInfo.tiling = m_createInfo.tiling;
   imageInfo.usage = m_usage;
   imageInfo.sharingMode = vk::SharingMode::eExclusive;
-  m_image.emplace(m_device.context().device(), imageInfo);
-}
 
-void ZVulkanTexture::allocateMemory()
-{
-  const auto memRequirements = m_image->getMemoryRequirements();
-  const auto memProperties = m_device.context().physicalDevice().getMemoryProperties();
+  VmaAllocationCreateInfo allocCI{};
+  // Prefer usage-based auto selection
+  allocCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+  if (m_memoryProperties & vk::MemoryPropertyFlagBits::eDeviceLocal) {
+    allocCI.requiredFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  }
+  if (m_memoryProperties & vk::MemoryPropertyFlagBits::eHostVisible) {
+    allocCI.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  }
+  if (m_memoryProperties & vk::MemoryPropertyFlagBits::eHostCoherent) {
+    allocCI.requiredFlags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+  }
 
-  uint32_t memoryTypeIndex = 0;
-  bool found = false;
-  for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
-    const bool typeSupported = (memRequirements.memoryTypeBits & (1u << i)) != 0u;
-    const bool flagsMatch = (memProperties.memoryTypes[i].propertyFlags & m_memoryProperties) == m_memoryProperties;
-    if (typeSupported && flagsMatch) {
-      memoryTypeIndex = i;
-      found = true;
-      break;
+  // Prefer device-local pool for images
+  // Choose pool
+  VmaPool pool = VK_NULL_HANDLE;
+  if ((m_memoryProperties & vk::MemoryPropertyFlagBits::eDeviceLocal) && m_device.deviceLocalPool() != VK_NULL_HANDLE) {
+    pool = m_device.deviceLocalPool();
+  }
+
+  auto tryCreate = [&](VmaPool p, bool dedicated) -> VkResult {
+    VmaAllocationCreateInfo ci = allocCI;
+    ci.pool = p;
+    if (dedicated) {
+      ci.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+      ci.pool = VK_NULL_HANDLE;
+    }
+    VkImage img = VK_NULL_HANDLE;
+    VkResult r = vmaCreateImage(m_device.allocator(),
+                                reinterpret_cast<const VkImageCreateInfo*>(&imageInfo),
+                                &ci,
+                                &img,
+                                &m_imageAllocation,
+                                nullptr);
+    if (r == VK_SUCCESS) {
+      m_image = img;
+    }
+    return r;
+  };
+
+  // Heuristic: prefer dedicated for large images
+  const VkDeviceSize approxSize = static_cast<VkDeviceSize>(m_extent.width) * m_extent.height *
+                                  std::max<VkDeviceSize>(1, m_extent.depth) * 4; // 4B/px guess
+  bool preferDedicated = (approxSize >= (128ull * 1024ull * 1024ull) / 2); // >=64MiB
+
+  VkResult res = VK_ERROR_INITIALIZATION_FAILED;
+  if (preferDedicated) {
+    res = tryCreate(VK_NULL_HANDLE, true);
+  } else if (pool != VK_NULL_HANDLE) {
+    res = tryCreate(pool, false);
+  }
+  if (res != VK_SUCCESS) {
+    if (!preferDedicated) {
+      res = tryCreate(VK_NULL_HANDLE, true);
+    }
+    if (res != VK_SUCCESS) {
+      res = tryCreate(VK_NULL_HANDLE, false);
     }
   }
-
-  if (!found) {
-    throw ZException("Failed to find suitable memory type for Vulkan image");
+  if (res != VK_SUCCESS) {
+    throw ZException("Failed to create VMA image (with fallbacks)");
   }
-
-  vk::MemoryAllocateInfo allocInfo{.allocationSize = memRequirements.size, .memoryTypeIndex = memoryTypeIndex};
-  m_imageMemory.emplace(m_device.context().device(), allocInfo);
-  m_image->bindMemory(*m_imageMemory, 0);
 }
 
 void ZVulkanTexture::createImageView()
 {
   vk::ImageViewCreateInfo viewInfo{};
-  viewInfo.image = *m_image;
+  viewInfo.image = m_image;
   viewInfo.viewType = m_createInfo.viewType;
   viewInfo.format = m_format;
   viewInfo.subresourceRange.aspectMask = m_aspectMask;
@@ -717,7 +776,7 @@ void ZVulkanTexture::uploadInternal(const void* data, size_t size, const UploadR
       copyRegion.imageOffset = region.offset;
       copyRegion.imageExtent = region.extent;
 
-      cmdBuffer.copyBufferToImage(stagingBuffer->buffer(), *m_image, vk::ImageLayout::eTransferDstOptimal, copyRegion);
+      cmdBuffer.copyBufferToImage(stagingBuffer->buffer(), m_image, vk::ImageLayout::eTransferDstOptimal, copyRegion);
 
       transitionLayout(cmdBuffer, vk::ImageLayout::eTransferDstOptimal, finalLayout, m_aspectMask);
     },
