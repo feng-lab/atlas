@@ -994,3 +994,6 @@ void Z3DRendererBase::compile()
 }
 
 } // namespace nim
+
+namespace nim {
+} // namespace nim

@@ -1,7 +1,6 @@
 #include "zvulkanimgraycasterpipelinecontext.h"
 
 #include "z3dimg.h"
-#include "z3dimgraycasterrenderer.h"
 #include "z3drendererbase.h"
 #include "z3drendererstates.h"
 #include "z3dtransferfunction.h"
@@ -210,6 +209,14 @@ void ZVulkanImgRaycasterPipelineContext::resetFrame()
   resetDescriptors();
 }
 
+std::optional<ZVulkanImgRaycasterPipelineContext::Finalization>
+ZVulkanImgRaycasterPipelineContext::takePendingFinalization()
+{
+  auto ret = m_pendingFinalization;
+  m_pendingFinalization.reset();
+  return ret;
+}
+
 void ZVulkanImgRaycasterPipelineContext::resetDescriptors()
 {
   for (auto& channel : m_channelResources) {
@@ -234,6 +241,7 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
                                                 const vk::Rect2D& scissor,
                                                 vk::raii::CommandBuffer& cmd)
 {
+  m_pendingFinalization.reset();
   if (!payload.entryExitLease || !payload.entryExitLease->hasVulkanImage()) {
     LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster missing entry/exit lease.";
     return;
@@ -941,10 +949,24 @@ ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureTransferTexture(Channe
 {
   auto& device = m_backend.device();
   const uint32_t width = static_cast<uint32_t>(transferFunction.dimensions().x);
-  std::vector<uint8_t> texels;
-  transferFunction.buildLUTBGRA8(texels, width);
-  vulkan::ensure1DLUTTexture(device, resources.transferTexture, width);
-  vulkan::uploadLUT(*resources.transferTexture, texels.data(), texels.size());
+  const uint64_t gen = transferFunction.generation();
+
+  bool createdOrResized = false;
+  if (!resources.transferTexture || resources.transferWidth != width) {
+    vulkan::ensure1DLUTTexture(device, resources.transferTexture, width);
+    resources.transferWidth = width;
+    createdOrResized = true;
+  }
+
+  if (createdOrResized || resources.transferGeneration != gen) {
+    std::vector<uint8_t> texels;
+    transferFunction.buildLUTBGRA8(texels, width);
+    if (!texels.empty()) {
+      vulkan::uploadLUT(*resources.transferTexture, texels.data(), texels.size());
+      resources.transferGeneration = gen;
+    }
+  }
+
   return *resources.transferTexture;
 }
 
@@ -1243,8 +1265,8 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     return;
   }
 
-  if (!payload.renderer || !payload.image) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster missing renderer or image context.";
+  if (!payload.image) {
+    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster missing image context.";
     return;
   }
 
@@ -1322,7 +1344,9 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
   const float zeToZW_a = farClip * nearClip / (farClip - nearClip);
   const float zeToZW_b = 0.5f * (farClip + nearClip) / (farClip - nearClip) + 0.5f;
 
-  const auto& transferFunctions = payload.renderer->transferFunctions();
+  CHECK(payload.transferFunctions != nullptr)
+    << "Raycaster fast path: payload missing transferFunctions vector (fatal)";
+  const auto& transferFunctions = *payload.transferFunctions;
 
   ensureFastPipeline(sanitizeMode(payload.compositingMode), resultsOpaque(payload.compositingMode));
 
@@ -1575,7 +1599,9 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
   ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex);
-  const auto& transferList = payload.renderer->transferFunctions();
+  CHECK(payload.transferFunctions != nullptr)
+    << "Raycaster progressive path: payload missing transferFunctions vector (fatal)";
+  const auto& transferList = *payload.transferFunctions;
   if (channelIndex >= transferList.size() || transferList[channelIndex] == nullptr) {
     LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster missing transfer function for channel " << channelIndex;
     return;
@@ -1948,7 +1974,13 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   cmd.draw(static_cast<uint32_t>(m_quadVertexCount), 1, 0, 0);
   cmd.endRendering();
 
-  payload.renderer->finalizeProgressiveRound(batch.eye, lastRound, payload.visibleChannels.size());
+  // Defer progressive finalization to the backend/renderer; just stash the result.
+  if (payload.streamKey != 0) {
+    m_pendingFinalization = Finalization{.streamKey = payload.streamKey,
+                                         .eye = batch.eye,
+                                         .lastRound = lastRound,
+                                         .channelCount = static_cast<uint32_t>(payload.visibleChannels.size())};
+  }
 }
 
 } // namespace nim

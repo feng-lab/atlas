@@ -32,6 +32,14 @@ Lookup Tables (LUTs)
     - Route volatile inputs (peel/resolve/composite) through per-draw override sets allocated with `allocateOverrideDescriptorSet(...)`.
     - Always pass explicit samplers for combined image samplers unless layouts use immutable samplers.
     - Never free descriptor sets individually; rely on the per-frame pool reset. Clear any retained override sets before reset (backend handles this at frame start).
+
+ImgRaycaster Vulkan
+
+- Payloads are POD-only: the Vulkan raycaster no longer carries a `Z3DImgRaycasterRenderer*` in `ImgRaycasterPayload`.
+  - Transfer functions are provided directly in the payload as `const std::vector<Z3DTransferFunction*>* transferFunctions`.
+  - Vulkan caches per-channel transfer LUT textures by `(generation,width)` and only re-uploads when either changes (mirrors the ImgSlice colormap path).
+  - Progressive bookkeeping is outside the Vulkan pipeline context. The context computes whether a progressive round finished and the backend calls back to the renderer using a stable `streamKey` identity to finalize (`finalizeProgressiveRound`).
+  - GL paths are unchanged.
 - On backend switch, `Z3DRendererBase::releaseBackendResources()` clears renderer caches; `Z3DImgFilter::switchRendererBackend` releases GL volume resources when switching to Vulkan.
 
 Threading Model

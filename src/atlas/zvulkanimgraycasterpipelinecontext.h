@@ -5,6 +5,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -31,6 +32,18 @@ public:
   explicit ZVulkanImgRaycasterPipelineContext(Z3DRendererVulkanBackend& backend);
   ~ZVulkanImgRaycasterPipelineContext();
 
+  // Pending-finalization record for progressive rounds
+  struct Finalization
+  {
+    uint64_t streamKey = 0;
+    Z3DEye eye = MonoEye;
+    bool lastRound = false;
+    uint32_t channelCount = 0;
+  };
+
+  // Expose pending-finalization pull for the backend driver (no friendship).
+  std::optional<Finalization> takePendingFinalization();
+
   void resetFrame();
 
   void record(Z3DRendererBase& renderer,
@@ -52,6 +65,8 @@ private:
     uint64_t volumeGeneration = 0;
     std::unique_ptr<ZVulkanTexture> volumeTexture;
     std::unique_ptr<ZVulkanTexture> transferTexture;
+    uint64_t transferGeneration = 0;
+    uint32_t transferWidth = 0;
     ZVulkanDescriptorSet* fastDescriptor = nullptr; // per-draw override (backend-owned)
     ZVulkanDescriptorSet* rayParamDescriptor = nullptr; // per-draw override (backend-owned)
     std::unique_ptr<ZVulkanBuffer> rayParamBuffer;
@@ -184,6 +199,8 @@ private:
   uint32_t m_progressiveLayerCount = 0u;
   uint32_t m_progressiveGeneration = 0u;
 
+  std::optional<Finalization> m_pendingFinalization;
+
   void ensureDescriptorPool();
   void resetDescriptors();
   void ensureEntryVertexCapacity(size_t vertexCount, size_t indexCount);
@@ -250,6 +267,8 @@ private:
                              const vk::Viewport& viewport,
                              const vk::Rect2D& scissor,
                              vk::raii::CommandBuffer& cmd);
+
+  // (public) see takePendingFinalization() above
 };
 
 } // namespace nim

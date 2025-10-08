@@ -25,6 +25,7 @@
 #include "zvulkantextureglowpipelinecontext.h"
 #include "zvulkanimgslicepipelinecontext.h"
 #include "zvulkanimgraycasterpipelinecontext.h"
+#include "z3dimgraycasterrenderer.h"
 #include "zvulkanfontpipelinecontext.h"
 #include "zvulkanrenderconversions.h"
 #include "z3drenderglobalstate.h"
@@ -883,6 +884,16 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
             m_imgRaycasterContext = std::make_unique<ZVulkanImgRaycasterPipelineContext>(*this);
           }
           m_imgRaycasterContext->record(renderer, batch, *raycaster, vkViewport, vkScissor, cmd);
+          // If the raycaster just completed a progressive round, finalize it now.
+          if (auto fin = m_imgRaycasterContext->takePendingFinalization()) {
+            if (fin->streamKey != 0) {
+              finalizeImgRaycasterRoundByKey(renderer,
+                                             fin->streamKey,
+                                             fin->eye,
+                                             fin->lastRound,
+                                             fin->channelCount);
+            }
+          }
           handled = true;
         }
       }

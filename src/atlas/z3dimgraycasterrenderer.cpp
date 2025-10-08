@@ -84,7 +84,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   }
 
   ImgRaycasterPayload payload;
-  payload.renderer = this;
+  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
   payload.image = m_img;
   payload.outputSize = m_outputSize;
   payload.samplingRate = m_samplingRateValue;
@@ -101,6 +101,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   payload.activeChannel = visibleChannels.empty() ? std::numeric_limits<size_t>::max() : visibleChannels.front();
   payload.activeChannelIndex = 0u;
   payload.progressiveGeneration = m_progressiveGeneration[eye];
+  payload.transferFunctions = &m_transferFunctions;
   if (!payload.fastPathOnly) {
     if (m_channelIdx[eye] < 0) {
       m_channelIdx[eye] = 0;
@@ -1447,6 +1448,21 @@ Z3DTexture* Z3DImgRaycasterRenderer::transferTextureGL(const Z3DTransferFunction
     m_transferCache.meta[&tf] = std::make_pair(gen, width);
   }
   return m_transferCache.textures[&tf].get();
+}
+
+bool finalizeImgRaycasterRoundByKey(Z3DRendererBase& rendererBase,
+                                    uint64_t streamKey,
+                                    Z3DEye eye,
+                                    bool lastRound,
+                                    uint32_t channelCount)
+{
+  (void)rendererBase;
+  auto* ptr = reinterpret_cast<Z3DPrimitiveRenderer*>(static_cast<uintptr_t>(streamKey));
+  if (auto* rc = dynamic_cast<Z3DImgRaycasterRenderer*>(ptr)) {
+    rc->finalizeProgressiveRound(eye, lastRound, channelCount);
+    return true;
+  }
+  return false;
 }
 
 void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vector<size_t>& visibleIdxs)

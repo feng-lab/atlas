@@ -15,6 +15,7 @@
 namespace nim {
 
 class Z3DImg;
+class Z3DRendererBase;
 
 // use raycaster to render volume or 2D Image (stack with depth==1) with color
 // transfer functions
@@ -282,5 +283,13 @@ private:
     m_entryExitLease; // holds lifetime of entry/exit render target during a frame
   Z3DScratchResourcePool::RenderTargetLease m_progressiveLayerLease; // persistent across progressive rounds
 };
+
+// Helper to finalize progressive rounds for ImgRaycaster by stream identity.
+// Used by the Vulkan backend to notify the originating renderer after GPU work completes.
+bool finalizeImgRaycasterRoundByKey(Z3DRendererBase& rendererBase,
+                                    uint64_t streamKey,
+                                    Z3DEye eye,
+                                    bool lastRound,
+                                    uint32_t channelCount);
 
 } // namespace nim

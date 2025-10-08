@@ -18,8 +18,8 @@ namespace nim {
   
 class ZMesh;
 class Z3DImg;
-class Z3DImgRaycasterRenderer;
 class ZColorMap;
+class Z3DTransferFunction;
 struct RendererParameterState;
 
 enum class BackgroundMode
@@ -538,7 +538,8 @@ struct ImgSlicePayload
 
 struct ImgRaycasterPayload
 {
-  Z3DImgRaycasterRenderer* renderer = nullptr;
+  // Stable identity of the source renderer/stream
+  uint64_t streamKey = 0;
   Z3DImg* image = nullptr;
   std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> entryExitLease;
   std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> blockIdLease;
@@ -559,6 +560,9 @@ struct ImgRaycasterPayload
   bool entryHasIndices = false;
   bool entryFlipped = false;
   std::vector<size_t> visibleChannels;
+  // Transfer function inputs (one per channel). The vector must be non-null
+  // and have size >= max(visibleChannels)+1 when used by Vulkan.
+  const std::vector<Z3DTransferFunction*>* transferFunctions = nullptr;
   std::vector<uint32_t> blockIdReadback;
   uint32_t blockIdAttachmentCount = 0u;
   uint32_t roundsCompleted = 0u;
