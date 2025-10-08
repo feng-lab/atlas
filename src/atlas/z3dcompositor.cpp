@@ -1429,7 +1429,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_rendererBase.recordVulkanBatches(
         [&]() {
           TextureGlowPayload glowPayload;
-          glowPayload.renderer = &m_glowRenderer;
           glowPayload.colorAttachmentHandle = colorHandle;
           glowPayload.depthAttachmentHandle = depthHandle;
           glowPayload.mode = m_glowRenderer.glowMode();
@@ -2197,7 +2196,6 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
         m_rendererBase.recordVulkanBatches(
           [&]() {
             TextureGlowPayload glowPayload;
-            glowPayload.renderer = &m_glowRenderer;
             glowPayload.colorAttachmentHandle = colorHandle;
             glowPayload.depthAttachmentHandle = depthHandle;
             glowPayload.mode = m_glowRenderer.glowMode();

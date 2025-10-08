@@ -105,7 +105,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
           << " baseColors=" << payload.baseColors.size() << " topColors=" << payload.topColors.size()
           << " pickingColors=" << payload.pickingColors.size() << " indices=" << payload.indices.size()
           << " pickingPass=" << payload.pickingPass << " useConeShader2=" << payload.useConeShader2;
-  if (!payload.renderer || payload.baseAndRadius.empty()) {
+  if (payload.baseAndRadius.empty()) {
     return;
   }
 
@@ -442,7 +442,7 @@ void ZVulkanConePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   availableLights = std::min(availableLights, static_cast<size_t>(scene.lighting.lightCount));
 
   lighting.numLights = static_cast<int>(std::min(availableLights, lighting.lights.size()));
-  const bool enableLighting = !pickingPass && payload.renderer && payload.renderer->needLighting();
+  const bool enableLighting = !pickingPass && payload.wantsLighting;
   lighting.lighting_enabled = enableLighting ? 1 : 0;
 
   glm::vec2 extent = batch.pass.viewport.extent;
@@ -523,6 +523,13 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
   m_uboMaterial->copyData(&material, sizeof(material));
+
+  VLOG(2) << fmt::format(
+    "VK cone params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
+    payload.params->sizeScale,
+    material.alpha,
+    pickingPass,
+    (eyeState.isPerspective ? 0 : 1));
 }
 
 ZVulkanConePipelineContext::PipelineInstance&
@@ -862,8 +869,9 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
           << " flags=" << m_flagsOffset << " baseCol=" << m_baseColorOffset << " topCol=" << m_topColorOffset;
 
   // Attempt static promotion
-  if (payload.renderer) {
-    CacheKey key{payload.renderer, payload.pickingPass};
+  {
+    CHECK(payload.streamKey != 0) << "Cone payload missing streamKey";
+    CacheKey key{payload.streamKey, payload.pickingPass};
     auto it = m_staticCache.find(key);
     const int kPromotionThreshold = 2;
     if (it == m_staticCache.end()) {

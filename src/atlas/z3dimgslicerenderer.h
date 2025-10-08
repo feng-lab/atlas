@@ -119,6 +119,8 @@ protected:
 
   Z3DImg* m_img = nullptr;
   const std::vector<std::unique_ptr<ZColorMapParameter>>* m_colormaps = nullptr;
+  // Cached direct ZColorMap pointers for Vulkan payloads
+  std::vector<const ZColorMap*> m_colormapsRaw;
   std::vector<std::string> m_volumeUniformNames;
   std::vector<std::string> m_colormapUniformNames;
 

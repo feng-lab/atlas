@@ -110,12 +110,28 @@ renderer.setCollectOnly(false);
 
 Vulkan Descriptor Set/Binding Map
 
-- See `src/atlas/zvulkanbindings.h` for the canonical constants. Key bindings:
-  - Set 0 (inputs):
-    - DDP peel: binding 0 = depth blender, 1 = front blender (explicit sampler)
+- See `src/atlas/zvulkanbindings.h` for canonical indices. Standard layout:
+  - Set 0 — Inputs (sampled images):
+    - Mesh textures (1D/2D/3D) and wideline texture (emulated 1D)
+    - DDP peel: binding 0 = depth blender, 1 = front blender
     - WA resolve: binding 0 = accumulation, 1 = moments
     - WB resolve: binding 0 = accumulation, 1 = transmittance
-  - Set 3 (OIT params): binding 0 = OITParams UBO
+  - Set 1 — Lighting UBO (std140):
+    - `lighting_enabled`, `numLights`, fog parameters, per‑light arrays
+    - Fragment stage; see `Resources/shader/vulkan/include/lighting.glslinc`
+  - Set 2 — Transforms/Material UBOs (std140):
+    - Binding 0: `Transforms` (proj/view matrices, `pos_transform`, normal matrix, `parameters.x=sizeScale`)
+    - Binding 1: `MaterialUBO` (sceneAmbient, materialAmbient/specular/shininess, alpha, optional customColor)
+    - Vertex + fragment stages; see `Resources/shader/vulkan/include/matrices_material.glslinc`
+  - Set 3 — OIT Params UBO (std140):
+    - Binding 0: `OITParams` (`screen_dim_RCP`, `ze_to_zw_a/b`, `weighted_blended_depth_scale`)
+    - Fragment stage; see `Resources/shader/vulkan/include/oit_params.glslinc`
+
+Guidelines
+- Allocate frame‑scoped descriptor sets from the backend arena; avoid per‑context pools.
+- Do not rewrite persistent descriptors during recording; update UBO contents only.
+- Use per‑draw override sets for volatile inputs (peel/resolve/composite images).
+- Keep this set ordering consistent across contexts.
 
 Invalidation & Progressive Rendering
 

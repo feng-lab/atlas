@@ -101,7 +101,6 @@ void Z3DTextureGlowRenderer::render(Z3DEye eye)
 TextureGlowPayload Z3DTextureGlowRenderer::buildTextureGlowPayload() const
 {
   TextureGlowPayload payload;
-  payload.renderer = const_cast<Z3DTextureGlowRenderer*>(this);
   payload.mode = m_glowMode;
   payload.blurRadius = m_blurRadius;
   payload.blurScale = m_blurScale;

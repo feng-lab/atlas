@@ -23,7 +23,7 @@ class ZVulkanBuffer;
 class ZMesh;
 class ZImg;
 class Z3DImg;
-class ZColorMapParameter;
+class ZColorMap;
 class ZVulkanImageBlockUploader;
 
 namespace vulkan {
@@ -116,6 +116,8 @@ private:
     uint64_t volumeGeneration = 0;
     std::unique_ptr<ZVulkanTexture> volumeTexture;
     std::unique_ptr<ZVulkanTexture> colormapTexture;
+    uint64_t colormapGeneration = 0;
+    uint32_t colormapWidth = 0;
     ZVulkanDescriptorSet* fastTextureDescriptor = nullptr; // per-draw override (owned by backend)
     ZVulkanDescriptorSet* pagedTextureDescriptor = nullptr; // per-draw override (owned by backend)
     ZVulkanDescriptorSet* pageDescriptor = nullptr; // per-draw override (owned by backend)
@@ -160,8 +162,7 @@ private:
   void uploadSliceGeometry(std::span<const ZMesh> slices);
   ZVulkanTexture&
   ensureVolumeTexture(size_t channel, uint64_t generation, const ZImg& image, ChannelResources& resources);
-  ZVulkanTexture&
-  ensureColormapTexture(size_t channel, const ZColorMapParameter* parameter, ChannelResources& resources);
+  ZVulkanTexture& ensureColormapTexture(size_t channel, const ZColorMap* colorMap, ChannelResources& resources);
   void transitionToSampled(vk::raii::CommandBuffer& cmd, ZVulkanTexture& texture, vk::ImageLayout desiredLayout);
 
   void updateFastDescriptors(ChannelResources& resources, ZVulkanTexture& volume, ZVulkanTexture& colormap);

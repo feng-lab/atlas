@@ -69,9 +69,7 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
                                                 const vk::Rect2D& scissor,
                                                 vk::raii::CommandBuffer& cmd)
 {
-  if (!payload.renderer) {
-    return;
-  }
+  (void)payload;
 
   if (!payload.colorAttachmentHandle0.valid() || !payload.depthAttachmentHandle0.valid() ||
       !payload.colorAttachmentHandle1.valid() || !payload.depthAttachmentHandle1.valid()) {

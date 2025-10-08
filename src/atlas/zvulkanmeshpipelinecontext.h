@@ -105,12 +105,12 @@ private:
   // Static SoA promotion cache (device-local)
   struct CacheKey
   {
-    Z3DMeshRenderer* renderer = nullptr;
+    uint64_t streamKey = 0;
     MeshPayload::ColorSource colorSource = MeshPayload::ColorSource::MeshColor;
     bool picking = false;
     auto tie() const
     {
-      return std::tuple(renderer, static_cast<int>(colorSource), picking);
+      return std::tuple(streamKey, static_cast<int>(colorSource), picking);
     }
     bool operator<(const CacheKey& rhs) const
     {

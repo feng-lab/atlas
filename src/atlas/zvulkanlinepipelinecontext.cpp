@@ -12,6 +12,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
 #include "zvulkanuniforms.h"
+#include "zvulkanbindings.h"
 #include "zsysteminfo.h"
 #include "z3dlinerenderer.h"
 #include "zvulkanrenderconversions.h"
@@ -145,6 +146,7 @@ void ZVulkanLinePipelineContext::resetDescriptors()
   m_dsTexture.reset();
   m_dsLighting.reset();
   m_dsTransforms.reset();
+  m_dsOIT.reset();
 }
 
 void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
@@ -202,6 +204,15 @@ void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
                                                  .pBindings = bindings.data()};
     m_setTransforms.emplace(vkDevice, createInfo);
   }
+
+  if (!m_setOIT) {
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
+    m_setOIT.emplace(vkDevice, createInfo);
+  }
 }
 
 void ZVulkanLinePipelineContext::ensurePlaceholderTexture() {}
@@ -218,6 +229,20 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
   }
   if (!m_dsTexture) {
     m_dsTexture = m_backend.allocateFrameDescriptorSet(**m_setTexture);
+  }
+
+  // Ensure OIT UBO and descriptor set (only bound for WB init when needed)
+  if (!m_uboOIT) {
+    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
+                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+  }
+  if (!m_dsOIT && m_setOIT) {
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+  }
+  if (m_dsOIT && m_uboOIT) {
+    m_dsOIT->writeUniformBufferOnce(0, *m_uboOIT);
   }
 
   // Ensure UBO buffers exist prior to recording
@@ -325,6 +350,35 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   material.material_shininess = payload.params->materialShininess;
   material.alpha = payload.params->opacity;
   m_uboMaterial->copyData(&material, sizeof(material));
+
+  VLOG(2) << fmt::format(
+    "VK line params: sizeScale={:.3f} alpha={:.3f} ortho={} picking={}",
+    payload.params->sizeScale,
+    payload.params->opacity,
+    (eyeState.isPerspective ? 0 : 1),
+    payload.pickingPass);
+
+  // OIT params: used by weighted-blended wideline init
+  if (m_uboOIT) {
+    OITParamsUBOStd140 oit{};
+    glm::vec2 rcp = glm::vec2(0.0f);
+    if (extent.x > 0.0f && extent.y > 0.0f) {
+      rcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
+    } else {
+      const auto& viewport = renderer.frameState().viewport;
+      if (viewport.z > 0 && viewport.w > 0) {
+        rcp = glm::vec2(1.0f / viewport.z, 1.0f / viewport.w);
+      }
+    }
+    oit.screen_dim_RCP = rcp;
+    const float n = renderer.viewState().nearClip;
+    const float f = renderer.viewState().farClip;
+    const float denom = std::max(f - n, 1e-6f);
+    oit.ze_to_zw_a = (f * n) / denom;
+    oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
+    oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
+    m_uboOIT->copyData(&oit, sizeof(oit));
+  }
 }
 
 ZVulkanLinePipelineContext::PipelineInstance&
@@ -403,6 +457,9 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     auto vi = makeWideVertexInput();
     instance.pipeline = device.createPipeline(*instance.shader, vi, vk::PrimitiveTopology::eTriangleList);
     std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, **m_setLighting, **m_setTransforms};
+    if (key.shaderHookType == Z3DRendererBase::ShaderHookType::WeightedBlendedInit && m_setOIT) {
+      setLayouts.push_back(**m_setOIT);
+    }
     instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
     instance.pipeline->setDescriptorSetLayouts(setLayouts);
     // Wide-line quads are generated in screen space; disable culling to avoid
@@ -679,8 +736,9 @@ void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, 
   m_backend.addLineBytesStaged(2 * pBytes + 2 * cBytes + fBytes + indexCount * sizeof(uint32_t));
 
   // Static promotion (wide)
-  if (payload.renderer) {
-    WideCacheKey key{payload.renderer, payload.pickingPass};
+  {
+    CHECK(payload.streamKey != 0) << "Line payload missing streamKey";
+    WideCacheKey key{payload.streamKey, payload.pickingPass};
     auto it = m_wideStaticCache.find(key);
     const int kPromotionThreshold = 2;
     if (it == m_wideStaticCache.end()) {
@@ -926,8 +984,9 @@ void ZVulkanLinePipelineContext::uploadThinGeometry(const LinePayload& payload, 
   m_thinColorOffset = colSlice.offset;
 
   // Static promotion (thin)
-  if (payload.renderer) {
-    ThinCacheKey key{payload.renderer, payload.pickingPass, payload.isLineStrip};
+  {
+    CHECK(payload.streamKey != 0) << "Line payload missing streamKey";
+    ThinCacheKey key{payload.streamKey, payload.pickingPass, payload.isLineStrip};
     auto it = m_thinStaticCache.find(key);
     const int kPromotionThreshold = 2;
     if (it == m_thinStaticCache.end()) {
@@ -1036,9 +1095,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
                                         const vk::Rect2D& scissor,
                                         vk::raii::CommandBuffer& cmd)
 {
-  if (!payload.renderer) {
-    return;
-  }
+  // No-op if payload empty
 
   // GL parity: skip if no geometry, and in picking pass skip when picking colors
   // are absent or mismatched in count.
@@ -1109,6 +1166,15 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
 
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
   bindDescriptorSets(cmd, pipeline, texOverride);
+
+  if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit && m_dsOIT) {
+    std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           vkbind::kSetOITParams,
+                           sets3,
+                           {});
+  }
 
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);

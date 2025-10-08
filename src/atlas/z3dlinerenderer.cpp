@@ -448,8 +448,7 @@ void Z3DLineRenderer::buildWideLineGeometry(std::vector<LineWideVertex>& outVert
 LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
 {
   LinePayload payload;
-
-  payload.renderer = const_cast<Z3DLineRenderer*>(this);
+  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
 
   payload.positions = spanOrEmpty(m_linePositions);
 

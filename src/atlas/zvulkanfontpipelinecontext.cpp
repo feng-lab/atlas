@@ -68,7 +68,7 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
     }
   }
 
-  CHECK(payload.renderer != nullptr) << "Font record called with null renderer while payload not empty";
+  // payload is self-contained; no renderer pointer expected
   CHECK(payload.positions.size() == payload.texcoords.size())
     << "Font payload size mismatch: positions=" << payload.positions.size()
     << " texcoords=" << payload.texcoords.size();
@@ -128,7 +128,7 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
                                        0,
                                        constants);
 
-  VLOG(1) << fmt::format("VK font draw: verts={} idx={} picking={} dpr={:.3f}",
+  VLOG(1) << fmt::format("VK font draw: verts={} idx={} picking={} dpr={:.3f} usesCoordXf=1",
                          m_vertexCount,
                          m_indexCount,
                          payload.pickingPass,
@@ -246,8 +246,9 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
   m_indexUploadOffset = iSlice.offset;
 
   // Static promotion (AoS)
-  if (payload.renderer) {
-    CacheKey key{payload.renderer, payload.pickingPass};
+  {
+    CHECK(payload.streamKey != 0) << "Font payload missing streamKey";
+    CacheKey key{payload.streamKey, payload.pickingPass};
     auto it = m_staticCache.find(key);
     const int kPromotionThreshold = 2;
     if (it == m_staticCache.end()) {

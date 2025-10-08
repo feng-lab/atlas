@@ -188,7 +188,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                             const vk::Rect2D& scissor,
                                             vk::raii::CommandBuffer& cmd)
 {
-  if (!payload.renderer || !payload.image || payload.slices.empty()) {
+  if (!payload.image || payload.slices.empty()) {
     return;
   }
 
@@ -316,15 +316,17 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
   std::vector<ChannelInputs> channels(channelCount);
 
+  CHECK(payload.colormaps != nullptr) << "Slice payload missing colormaps vector";
   for (size_t idx = 0; idx < channelCount; ++idx) {
     const ZImg& img = *payload.image->channelImageShared(idx);
     const uint64_t generation = payload.image->volumeGeneration(idx);
     auto& resources = m_channelResources[idx];
     ChannelInputs channel{};
     channel.volume = &ensureVolumeTexture(idx, generation, img, resources);
-    const ZColorMapParameter* cmapParam =
-      (payload.colormaps && idx < payload.colormaps->size()) ? (*payload.colormaps)[idx].get() : nullptr;
-    channel.colormap = &ensureColormapTexture(idx, cmapParam, resources);
+    CHECK(idx < payload.colormaps->size()) << "Slice payload colormaps size < channelCount";
+    const ZColorMap* colorMap = (*payload.colormaps)[idx];
+    CHECK(colorMap != nullptr) << "Slice payload has null ZColorMap at channel " << idx;
+    channel.colormap = &ensureColormapTexture(idx, colorMap, resources);
 
     if (m_imageBlockUploader) {
       channel.pageDirectory = m_imageBlockUploader->pageDirectoryTexture(*payload.image, idx);
@@ -884,22 +886,34 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureVolumeTexture(size_t chann
 }
 
 ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureColormapTexture(size_t channel,
-                                                                      const ZColorMapParameter* parameter,
+                                                                      const ZColorMap* colorMap,
                                                                       ChannelResources& resources)
-
 {
   (void)channel;
   constexpr uint32_t kColormapWidth = 256u;
   auto& device = m_backend.device();
-  const ZColorMap* colorMap = parameter ? &parameter->get() : nullptr;
-  std::vector<uint8_t> texels;
-  if (colorMap) {
-    colorMap->buildLUTBGRA8(texels, kColormapWidth);
-  } else {
-    texels.assign(static_cast<size_t>(kColormapWidth) * 4u, 0xFF);
+
+  // Ensure texture exists and matches desired width
+  bool createdOrResized = false;
+  if (!resources.colormapTexture || resources.colormapWidth != kColormapWidth) {
+    vulkan::ensure1DLUTTexture(device, resources.colormapTexture, kColormapWidth);
+    resources.colormapWidth = kColormapWidth;
+    createdOrResized = true;
   }
-  vulkan::ensure1DLUTTexture(device, resources.colormapTexture, kColormapWidth);
-  vulkan::uploadLUT(*resources.colormapTexture, texels.data(), texels.size());
+
+  CHECK(colorMap != nullptr) << "ensureColormapTexture called with null ZColorMap";
+  const uint64_t gen = colorMap->generation();
+
+  // Upload on first create/resize or when the colormap generation changes.
+  if (createdOrResized || gen != resources.colormapGeneration) {
+    std::vector<uint8_t> texels;
+    colorMap->buildLUTBGRA8(texels, kColormapWidth);
+    if (!texels.empty()) {
+      vulkan::uploadLUT(*resources.colormapTexture, texels.data(), texels.size());
+      resources.colormapGeneration = gen;
+    }
+  }
+
   return *resources.colormapTexture;
 }
 

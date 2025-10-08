@@ -44,9 +44,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase&,
                                                const vk::Rect2D& scissor,
                                                vk::raii::CommandBuffer& cmd)
 {
-  if (!payload.renderer) {
-    return;
-  }
+  (void)payload;
 
   if (!payload.colorAttachmentHandle.valid() || !payload.depthAttachmentHandle.valid()) {
     LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan texture copy pass due to missing attachments";

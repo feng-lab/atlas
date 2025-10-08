@@ -29,6 +29,12 @@ void Z3DImgSliceRenderer::setData(Z3DImg& img, const std::vector<std::unique_ptr
 
   m_img = &img;
   m_colormaps = &colormaps;
+  // Build raw ZColorMap pointer cache for Vulkan payloads
+  m_colormapsRaw.clear();
+  m_colormapsRaw.reserve(colormaps.size());
+  for (const auto& p : colormaps) {
+    m_colormapsRaw.push_back(&(p->get()));
+  }
 
   if (m_img->numChannels() != m_volumeUniformNames.size()) {
     compile();
@@ -52,9 +58,8 @@ void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend
   }
 
   ImgSlicePayload payload;
-  payload.renderer = this;
   payload.image = m_img;
-  payload.colormaps = m_colormaps;
+  payload.colormaps = &m_colormapsRaw;
   payload.slices = std::span<const ZMesh>(m_slices.data(), m_slices.size());
   payload.outputSize = m_outputSize;
   payload.fastPathOnly = m_fastRendering;

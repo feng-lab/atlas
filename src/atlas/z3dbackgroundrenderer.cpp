@@ -172,7 +172,6 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
 BackgroundPayload Z3DBackgroundRenderer::buildBackgroundPayload() const
 {
   BackgroundPayload payload;
-  payload.renderer = const_cast<Z3DBackgroundRenderer*>(this);
   payload.color1 = m_firstColorValue;
   payload.color2 = m_secondColorValue;
   payload.region = m_region;

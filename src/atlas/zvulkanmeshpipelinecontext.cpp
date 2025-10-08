@@ -187,7 +187,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
                                         const vk::Rect2D& scissor,
                                         vk::raii::CommandBuffer& cmd)
 {
-  if (!payload.renderer || payload.meshes.empty()) {
+  if (payload.meshes.empty()) {
     return;
   }
 
@@ -707,8 +707,7 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   availableLights = std::min(availableLights, static_cast<size_t>(scene.lighting.lightCount));
 
   lighting.numLights = static_cast<int>(std::min(availableLights, lighting.lights.size()));
-  const bool enableLighting =
-    !pickingPass && lighting.numLights > 0 && payload.renderer && payload.renderer->needLighting();
+  const bool enableLighting = !pickingPass && lighting.numLights > 0 && payload.wantsLighting;
   lighting.lighting_enabled = enableLighting ? 1 : 0;
 
   const glm::vec2 extent = batch.pass.viewport.extent;
@@ -790,6 +789,11 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
   m_uboMaterial->copyData(&material, sizeof(material));
+
+  VLOG(2) << fmt::format(
+    "VK mesh xf params: sizeScale={:.3f} ortho={}",
+    payload.params->sizeScale,
+    (eyeState.isPerspective ? 0 : 1));
 }
 
 void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
@@ -835,6 +839,12 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
   material.custom_color = colorValue;
 
   m_uboMaterial->copyData(&material, sizeof(material));
+
+  VLOG(2) << fmt::format(
+    "VK mesh material: alpha={:.3f} picking={} useCustomColor={}",
+    material.alpha,
+    pickingPass,
+    material.use_custom_color != 0);
 }
 
 void ZVulkanMeshPipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd,
@@ -1295,8 +1305,9 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
   m_indexCount = totalIndices;
 
   // Attempt static SoA promotion based on renderer identity + gen counters
-  if (payload.renderer) {
-    CacheKey key{payload.renderer, payload.colorSource, payload.pickingPass};
+  {
+    CHECK(payload.streamKey != 0) << "Mesh payload missing streamKey";
+    CacheKey key{payload.streamKey, payload.colorSource, payload.pickingPass};
     auto it = m_staticCache.find(key);
     const int kPromotionThreshold = 2; // frames unchanged before promotion
     if (it == m_staticCache.end()) {

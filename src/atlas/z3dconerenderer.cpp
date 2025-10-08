@@ -684,8 +684,7 @@ void Z3DConeRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
 ConePayload Z3DConeRenderer::buildConePayload() const
 {
   ConePayload payload;
-
-  payload.renderer = const_cast<Z3DConeRenderer*>(this);
+  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
   payload.baseAndRadius = spanOrEmpty(m_baseAndBaseRadius);
   payload.axisAndTopRadius = spanOrEmpty(m_axisAndTopRadius);
   payload.baseColors = spanOrEmpty(m_coneBaseColors);
@@ -725,6 +724,7 @@ ConePayload Z3DConeRenderer::buildConePayload() const
   payload.flagsGen = m_flagsGen;
   payload.indexGen = m_indexGen;
   payload.params = &m_rendererBase.parameterState();
+  payload.wantsLighting = needLighting();
   return payload;
 }
 

@@ -77,7 +77,6 @@ void Z3DTextureBlendRenderer::render(Z3DEye eye)
 TextureBlendPayload Z3DTextureBlendRenderer::buildTextureBlendPayload() const
 {
   TextureBlendPayload payload;
-  payload.renderer = const_cast<Z3DTextureBlendRenderer*>(this);
   payload.mode = m_blendMode;
   payload.colorAttachmentHandle0 = m_colorAttachmentHandle0;
   payload.depthAttachmentHandle0 = m_depthAttachmentHandle0;

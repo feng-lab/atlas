@@ -63,9 +63,7 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
                                               const vk::Rect2D& scissor,
                                               vk::raii::CommandBuffer& cmd)
 {
-  if (!payload.renderer) {
-    return;
-  }
+  (void)payload;
 
   // Shared fullscreen quad geometry
   m_vertexCount = 4;
@@ -285,6 +283,11 @@ void ZVulkanBackgroundPipelineContext::updateTransformUBO(Z3DRendererBase& rende
   material.custom_color = glm::vec4(1.0f);
 
   m_uboMaterial->copyData(&material, sizeof(material));
+
+  VLOG(2) << fmt::format(
+    "VK background params: sizeScale={:.3f} alpha={:.3f}",
+    payload.params->sizeScale,
+    material.alpha);
 }
 
 ZVulkanBackgroundPipelineContext::PipelineInstance&

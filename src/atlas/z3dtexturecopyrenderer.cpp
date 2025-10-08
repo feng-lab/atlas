@@ -57,7 +57,6 @@ void Z3DTextureCopyRenderer::render(Z3DEye eye)
 TextureCopyPayload Z3DTextureCopyRenderer::buildTextureCopyPayload() const
 {
   TextureCopyPayload payload;
-  payload.renderer = const_cast<Z3DTextureCopyRenderer*>(this);
   payload.discardTransparent = m_discardTransparent;
   payload.flipY = m_flipY;
   payload.colorAttachmentHandle = m_colorAttachmentHandle;

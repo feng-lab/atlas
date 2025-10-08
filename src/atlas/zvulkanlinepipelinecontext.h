@@ -97,6 +97,7 @@ private:
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTexture;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
+  std::unique_ptr<ZVulkanDescriptorSet> m_dsOIT;
 
   std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
   std::optional<vk::raii::Sampler> m_sampler;
@@ -104,6 +105,9 @@ private:
   std::unique_ptr<ZVulkanBuffer> m_uboLighting;
   std::unique_ptr<ZVulkanBuffer> m_uboTransforms;
   std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
+  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
+
+  std::optional<vk::raii::DescriptorSetLayout> m_setOIT;
 
   // All line geometry uses the per-frame upload arena; no per-context VBOs
 
@@ -136,12 +140,12 @@ private:
   // Static promotion caches
   struct ThinCacheKey
   {
-    Z3DLineRenderer* renderer = nullptr;
+    uint64_t streamKey = 0;
     bool picking = false;
     bool lineStrip = false;
     auto tie() const
     {
-      return std::tuple(renderer, picking, lineStrip);
+      return std::tuple(streamKey, picking, lineStrip);
     }
     bool operator<(const ThinCacheKey& rhs) const
     {
@@ -169,11 +173,11 @@ private:
 
   struct WideCacheKey
   {
-    Z3DLineRenderer* renderer = nullptr;
+    uint64_t streamKey = 0;
     bool picking = false;
     auto tie() const
     {
-      return std::tuple(renderer, picking);
+      return std::tuple(streamKey, picking);
     }
     bool operator<(const WideCacheKey& rhs) const
     {

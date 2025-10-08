@@ -296,7 +296,7 @@ void Z3DFontRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   }
 
   FontPayload payload;
-  payload.renderer = this;
+  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
   payload.positions = spanOrEmpty(m_fontPositions);
   payload.texcoords = spanOrEmpty(m_fontTextureCoords);
   payload.colors = spanOrEmpty(m_fontColors);

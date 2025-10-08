@@ -93,7 +93,7 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
                                           const vk::Rect2D& scissor,
                                           vk::raii::CommandBuffer& cmd)
 {
-  if (!payload.renderer || payload.pointsAndRadius.empty()) {
+  if (payload.pointsAndRadius.empty()) {
     return;
   }
 
@@ -434,7 +434,7 @@ void ZVulkanSpherePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   availableLights = std::min(availableLights, static_cast<size_t>(scene.lighting.lightCount));
 
   lighting.numLights = static_cast<int>(std::min(availableLights, lighting.lights.size()));
-  const bool enableLighting = !pickingPass && payload.renderer && payload.renderer->needLighting();
+  const bool enableLighting = !pickingPass && payload.wantsLighting;
   lighting.lighting_enabled = enableLighting ? 1 : 0;
 
   glm::vec2 extent = batch.pass.viewport.extent;
@@ -518,6 +518,13 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.custom_color = glm::vec4(1.0f);
 
   m_uboMaterial->copyData(&material, sizeof(material));
+
+  VLOG(2) << fmt::format(
+    "VK sphere params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
+    payload.params->sizeScale,
+    material.alpha,
+    pickingPass,
+    (eyeState.isPerspective ? 0 : 1));
 }
 
 ZVulkanSpherePipelineContext::PipelineInstance&
@@ -779,8 +786,9 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
   m_flagsOffset = flSlice.offset;
 
   // Attempt static promotion
-  if (payload.renderer) {
-    CacheKey key{payload.renderer, payload.pickingPass, payload.useDynamicMaterial};
+  {
+    CHECK(payload.streamKey != 0) << "Sphere payload missing streamKey";
+    CacheKey key{payload.streamKey, payload.pickingPass, payload.useDynamicMaterial};
     auto it = m_staticCache.find(key);
     const int kPromotionThreshold = 2;
     if (it == m_staticCache.end()) {

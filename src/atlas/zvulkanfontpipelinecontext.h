@@ -108,11 +108,11 @@ private:
   // Static promotion cache for geometry
   struct CacheKey
   {
-    Z3DFontRenderer* renderer = nullptr;
+    uint64_t streamKey = 0;
     bool picking = false;
     auto tie() const
     {
-      return std::tuple(renderer, picking);
+      return std::tuple(streamKey, picking);
     }
     bool operator<(const CacheKey& rhs) const
     {

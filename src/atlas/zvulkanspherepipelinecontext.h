@@ -135,12 +135,12 @@ private:
   // Static promotion cache (SoA)
   struct CacheKey
   {
-    Z3DSphereRenderer* renderer = nullptr;
+    uint64_t streamKey = 0; // stable identity of source stream/renderer
     bool picking = false;
     bool dynamicMaterial = true;
     auto tie() const
     {
-      return std::tuple(renderer, picking, dynamicMaterial);
+      return std::tuple(streamKey, picking, dynamicMaterial);
     }
     bool operator<(const CacheKey& rhs) const
     {

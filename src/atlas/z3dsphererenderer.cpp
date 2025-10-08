@@ -542,7 +542,7 @@ SpherePayload Z3DSphereRenderer::buildSpherePayload() const
 {
   SpherePayload payload;
 
-  payload.renderer = const_cast<Z3DSphereRenderer*>(this);
+  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
   payload.pointsAndRadius = spanOrEmpty(m_pointAndRadius);
   payload.colors = spanOrEmpty(m_pointColors);
   payload.pickingColors = spanOrEmpty(m_pointPickingColors);
@@ -550,6 +550,7 @@ SpherePayload Z3DSphereRenderer::buildSpherePayload() const
   payload.flags = spanFromGLfloats(m_allFlags);
   payload.indices = spanFromGLuints(m_indexs);
   payload.useDynamicMaterial = m_useDynamicMaterial;
+  payload.wantsLighting = needLighting();
   payload.params = &m_rendererBase.parameterState();
   // Per-stream generation counters
   payload.centersGen = m_centersGen;

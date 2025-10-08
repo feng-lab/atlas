@@ -219,8 +219,7 @@ void Z3DMeshRenderer::prepareMeshPickingColor()
 MeshPayload Z3DMeshRenderer::buildMeshPayload() const
 {
   MeshPayload payload;
-
-  payload.renderer = const_cast<Z3DMeshRenderer*>(this);
+  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
 
   payload.meshes = spanOrEmpty(m_meshPt);
   if (m_meshColorReady) {
@@ -274,6 +273,7 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
   payload.indexGen = m_indexGen;
 
   payload.params = &m_rendererBase.parameterState();
+  payload.wantsLighting = needLighting();
   return payload;
 }
 

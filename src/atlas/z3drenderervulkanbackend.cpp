@@ -753,100 +753,82 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
     bool handled = false;
     if (const auto* line = std::get_if<LinePayload>(&batch.geometry)) {
-      if (line->renderer) {
-        if (!m_lineContext) {
-          m_lineContext = std::make_unique<ZVulkanLinePipelineContext>(*this);
+      if (!m_lineContext) {
+        m_lineContext = std::make_unique<ZVulkanLinePipelineContext>(*this);
+      }
+      m_lineContext->record(renderer, batch, *line, vkViewport, vkScissor, cmd);
+      handled = true;
+    }
+    if (!handled) {
+      if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
+        if (!m_meshContext) {
+          m_meshContext = std::make_unique<ZVulkanMeshPipelineContext>(*this);
         }
-        m_lineContext->record(renderer, batch, *line, vkViewport, vkScissor, cmd);
+        m_meshContext->record(renderer, batch, *mesh, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
-      if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
-        if (mesh->renderer) {
-          if (!m_meshContext) {
-            m_meshContext = std::make_unique<ZVulkanMeshPipelineContext>(*this);
-          }
-          m_meshContext->record(renderer, batch, *mesh, vkViewport, vkScissor, cmd);
-          handled = true;
-        }
-      }
-    }
-    if (!handled) {
       if (const auto* sphere = std::get_if<SpherePayload>(&batch.geometry)) {
-        if (sphere->renderer) {
-          if (!m_sphereContext) {
-            m_sphereContext = std::make_unique<ZVulkanSpherePipelineContext>(*this);
-          }
-          m_sphereContext->record(renderer, batch, *sphere, vkViewport, vkScissor, cmd);
-          handled = true;
+        if (!m_sphereContext) {
+          m_sphereContext = std::make_unique<ZVulkanSpherePipelineContext>(*this);
         }
+        m_sphereContext->record(renderer, batch, *sphere, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
     if (!handled) {
       if (const auto* background = std::get_if<BackgroundPayload>(&batch.geometry)) {
-        if (background->renderer) {
-          if (!m_backgroundContext) {
-            m_backgroundContext = std::make_unique<ZVulkanBackgroundPipelineContext>(*this);
-          }
-          m_backgroundContext->record(renderer, batch, *background, vkViewport, vkScissor, cmd);
-          handled = true;
+        if (!m_backgroundContext) {
+          m_backgroundContext = std::make_unique<ZVulkanBackgroundPipelineContext>(*this);
         }
+        m_backgroundContext->record(renderer, batch, *background, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
     if (!handled) {
       if (const auto* slice = std::get_if<ImgSlicePayload>(&batch.geometry)) {
-        if (slice->renderer) {
-          if (!m_imgSliceContext) {
-            m_imgSliceContext = std::make_unique<ZVulkanImgSlicePipelineContext>(*this);
-          }
-          m_imgSliceContext->record(renderer, batch, *slice, vkViewport, vkScissor, cmd);
-          handled = true;
+        if (!m_imgSliceContext) {
+          m_imgSliceContext = std::make_unique<ZVulkanImgSlicePipelineContext>(*this);
         }
+        m_imgSliceContext->record(renderer, batch, *slice, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
     if (!handled) {
       if (const auto* font = std::get_if<FontPayload>(&batch.geometry)) {
-        if (font->renderer) {
-          if (!m_fontContext) {
-            m_fontContext = std::make_unique<ZVulkanFontPipelineContext>(*this);
-          }
-          m_fontContext->record(renderer, batch, *font, vkViewport, vkScissor, cmd);
-          handled = true;
+        if (!m_fontContext) {
+          m_fontContext = std::make_unique<ZVulkanFontPipelineContext>(*this);
         }
+        m_fontContext->record(renderer, batch, *font, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
     if (!handled) {
       if (const auto* textureCopy = std::get_if<TextureCopyPayload>(&batch.geometry)) {
-        if (textureCopy->renderer) {
-          if (!m_textureCopyContext) {
-            m_textureCopyContext = std::make_unique<ZVulkanTextureCopyPipelineContext>(*this);
-          }
-          m_textureCopyContext->record(renderer, batch, *textureCopy, vkViewport, vkScissor, cmd);
-          handled = true;
+        if (!m_textureCopyContext) {
+          m_textureCopyContext = std::make_unique<ZVulkanTextureCopyPipelineContext>(*this);
         }
+        m_textureCopyContext->record(renderer, batch, *textureCopy, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
     if (!handled) {
       if (const auto* textureBlend = std::get_if<TextureBlendPayload>(&batch.geometry)) {
-        if (textureBlend->renderer) {
-          if (!m_textureBlendContext) {
-            m_textureBlendContext = std::make_unique<ZVulkanTextureBlendPipelineContext>(*this);
-          }
-          m_textureBlendContext->record(renderer, batch, *textureBlend, vkViewport, vkScissor, cmd);
-          handled = true;
+        if (!m_textureBlendContext) {
+          m_textureBlendContext = std::make_unique<ZVulkanTextureBlendPipelineContext>(*this);
         }
+        m_textureBlendContext->record(renderer, batch, *textureBlend, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
     if (!handled) {
       if (const auto* textureGlow = std::get_if<TextureGlowPayload>(&batch.geometry)) {
-        if (textureGlow->renderer) {
-          if (!m_textureGlowContext) {
-            m_textureGlowContext = std::make_unique<ZVulkanTextureGlowPipelineContext>(*this);
-          }
-          m_textureGlowContext->record(renderer, batch, *textureGlow, vkViewport, vkScissor, cmd);
-          handled = true;
+        if (!m_textureGlowContext) {
+          m_textureGlowContext = std::make_unique<ZVulkanTextureGlowPipelineContext>(*this);
         }
+        m_textureGlowContext->record(renderer, batch, *textureGlow, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
     if (!handled) {
@@ -878,29 +860,25 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     }
     if (!handled) {
       if (const auto* ellipsoid = std::get_if<EllipsoidPayload>(&batch.geometry)) {
-        if (ellipsoid->renderer) {
-          if (!m_ellipsoidContext) {
-            m_ellipsoidContext = std::make_unique<ZVulkanEllipsoidPipelineContext>(*this);
-          }
-          m_ellipsoidContext->record(renderer, batch, *ellipsoid, vkViewport, vkScissor, cmd);
-          handled = true;
+        if (!m_ellipsoidContext) {
+          m_ellipsoidContext = std::make_unique<ZVulkanEllipsoidPipelineContext>(*this);
         }
+        m_ellipsoidContext->record(renderer, batch, *ellipsoid, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
     if (!handled) {
       if (const auto* cone = std::get_if<ConePayload>(&batch.geometry)) {
-        if (cone->renderer) {
-          if (!m_coneContext) {
-            m_coneContext = std::make_unique<ZVulkanConePipelineContext>(*this);
-          }
-          m_coneContext->record(renderer, batch, *cone, vkViewport, vkScissor, cmd);
-          handled = true;
+        if (!m_coneContext) {
+          m_coneContext = std::make_unique<ZVulkanConePipelineContext>(*this);
         }
+        m_coneContext->record(renderer, batch, *cone, vkViewport, vkScissor, cmd);
+        handled = true;
       }
     }
     if (!handled) {
       if (const auto* raycaster = std::get_if<ImgRaycasterPayload>(&batch.geometry)) {
-        if (raycaster->renderer && raycaster->image) {
+        if (raycaster->image) {
           if (!m_imgRaycasterContext) {
             m_imgRaycasterContext = std::make_unique<ZVulkanImgRaycasterPipelineContext>(*this);
           }
@@ -1162,12 +1140,11 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
     }
     // Upload arena buffers act as sources for GPU copies into device-local
     // static buffers. They must carry TRANSFER_SRC usage (not DST).
-    arena.buffer = m_sharedDevice->createBuffer(newCapacity,
-                                               vk::BufferUsageFlagBits::eVertexBuffer |
-                                                 vk::BufferUsageFlagBits::eIndexBuffer |
-                                                 vk::BufferUsageFlagBits::eTransferSrc,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+    arena.buffer = m_sharedDevice->createBuffer(
+      newCapacity,
+      vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
+        vk::BufferUsageFlagBits::eTransferSrc,
+      vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     arena.capacity = newCapacity;
     arena.offset = 0;
     // Persistently map the entire buffer
@@ -1228,12 +1205,11 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   }
   // Upload arena buffers act as the source of GPU copies into device-local
   // static buffers. They must be created with TRANSFER_SRC usage (not DST).
-  arena.buffer = m_sharedDevice->createBuffer(newCapacity,
-                                             vk::BufferUsageFlagBits::eVertexBuffer |
-                                               vk::BufferUsageFlagBits::eIndexBuffer |
-                                               vk::BufferUsageFlagBits::eTransferSrc,
-                                             vk::MemoryPropertyFlagBits::eHostVisible |
-                                               vk::MemoryPropertyFlagBits::eHostCoherent);
+  arena.buffer =
+    m_sharedDevice->createBuffer(newCapacity,
+                                 vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eIndexBuffer |
+                                   vk::BufferUsageFlagBits::eTransferSrc,
+                                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   arena.capacity = newCapacity;
   arena.offset = 0;
   arena.mapped = arena.buffer->map(0, newCapacity);
@@ -1585,10 +1561,10 @@ void Z3DRendererVulkanBackend::ensureDummyVertexBuffer()
     uint32_t x;
   } dummy{0u};
   const size_t bytes = sizeof(Dummy);
-  m_dummyVertexBuffer = m_sharedDevice->createBuffer(bytes,
-                                                     vk::BufferUsageFlagBits::eVertexBuffer,
-                                                     vk::MemoryPropertyFlagBits::eHostVisible |
-                                                       vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_dummyVertexBuffer =
+    m_sharedDevice->createBuffer(bytes,
+                                 vk::BufferUsageFlagBits::eVertexBuffer,
+                                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_dummyVertexBuffer->copyData(&dummy, bytes);
 }
 
@@ -1775,8 +1751,7 @@ void Z3DRendererVulkanBackend::flushScheduledCopies(vk::raii::CommandBuffer& cmd
     barrier.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
     barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
     barrier.dstStageMask = vk::PipelineStageFlagBits2::eVertexInput;
-    barrier.dstAccessMask = sc.isIndex ? vk::AccessFlagBits2::eIndexRead
-                                       : vk::AccessFlagBits2::eVertexAttributeRead;
+    barrier.dstAccessMask = sc.isIndex ? vk::AccessFlagBits2::eIndexRead : vk::AccessFlagBits2::eVertexAttributeRead;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.buffer = sc.dst;

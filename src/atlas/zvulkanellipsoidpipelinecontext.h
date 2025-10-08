@@ -131,12 +131,12 @@ private:
   // Static promotion cache
   struct CacheKey
   {
-    Z3DEllipsoidRenderer* renderer = nullptr;
+    uint64_t streamKey = 0;
     bool picking = false;
     bool dynamicMaterial = false;
     auto tie() const
     {
-      return std::tuple(renderer, picking, dynamicMaterial);
+      return std::tuple(streamKey, picking, dynamicMaterial);
     }
     bool operator<(const CacheKey& rhs) const
     {

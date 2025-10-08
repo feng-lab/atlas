@@ -605,8 +605,7 @@ void Z3DEllipsoidRenderer::appendDefaultColors()
 EllipsoidPayload Z3DEllipsoidRenderer::buildEllipsoidPayload() const
 {
   EllipsoidPayload payload;
-
-  payload.renderer = const_cast<Z3DEllipsoidRenderer*>(this);
+  payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
   payload.centers = spanOrEmpty(m_centers);
   payload.axis1 = spanOrEmpty(m_axis1);
   payload.axis2 = spanOrEmpty(m_axis2);
@@ -617,6 +616,7 @@ EllipsoidPayload Z3DEllipsoidRenderer::buildEllipsoidPayload() const
   payload.flags = spanFromGLfloats(m_allFlags);
   payload.indices = spanFromGLuints(m_indexs);
   payload.params = &m_rendererBase.parameterState();
+  payload.wantsLighting = needLighting();
   payload.useDynamicMaterial = m_useDynamicMaterial;
   // Per-stream generation counters
   payload.centersGen = m_centersGen;
