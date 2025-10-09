@@ -3420,7 +3420,11 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   m_rendererBase.setCollectOnly(false);
   resetHooks();
 
-  constexpr size_t kMaxPasses = 4;
+  // TODO(vulkan-ddp): restore occlusion-query based early exit so we don't
+  // have to iterate a fixed number of peel passes each frame. Eight passes
+  // mirrors the GL fallback (g_numPasses = 100 with early exit) closely
+  // enough for typical neuron scenes without leaving back faces visible.
+  constexpr size_t kMaxPasses = 8;
   size_t currId = 0;
   for (size_t pass = 1; pass < kMaxPasses; ++pass) {
     currId = pass % 2;

@@ -163,6 +163,7 @@ set(ATLAS_VK_SHADER_SOURCES
     cone.vert
     cone_2.vert
     cone.frag
+    cone_2.frag
 
     # Compositors and copy
     compositor.frag
@@ -184,6 +185,8 @@ set(ATLAS_VK_SHADER_SOURCES
     # Dual depth peeling (shape init/peel)
     dual_peeling_init_cone.frag
     dual_peeling_peel_cone.frag
+    dual_peeling_init_cone_2.frag
+    dual_peeling_peel_cone_2.frag
     dual_peeling_init_sphere.frag
     dual_peeling_peel_sphere.frag
     dual_peeling_init_ellipsoid.frag
@@ -198,11 +201,13 @@ set(ATLAS_VK_SHADER_SOURCES
     wblended_final.frag
     # Weighted OIT (shape init passes)
     wavg_init_cone.frag
+    wavg_init_cone_2.frag
     wavg_init_sphere.frag
     wavg_init_ellipsoid.frag
     wavg_init_mesh.frag
     wavg_init_wideline.frag
     wblended_init_cone.frag
+    wblended_init_cone_2.frag
     wblended_init_sphere.frag
     wblended_init_ellipsoid.frag
     wblended_init_mesh.frag

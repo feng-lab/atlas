@@ -547,19 +547,20 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 
   PipelineInstance instance;
 
-  auto selectFragmentShader = [](Z3DRendererBase::ShaderHookType hook) -> std::string {
+  auto selectFragmentShader = [&](Z3DRendererBase::ShaderHookType hook) -> std::string {
+    const char* suffix = key.useConeShader2 ? "_2" : "";
     switch (hook) {
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingInit:
-        return "dual_peeling_init_cone.frag.spv";
+        return std::string("dual_peeling_init_cone") + suffix + ".frag.spv";
       case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel:
-        return "dual_peeling_peel_cone.frag.spv";
+        return std::string("dual_peeling_peel_cone") + suffix + ".frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit:
-        return "wavg_init_cone.frag.spv";
+        return std::string("wavg_init_cone") + suffix + ".frag.spv";
       case Z3DRendererBase::ShaderHookType::WeightedBlendedInit:
-        return "wblended_init_cone.frag.spv";
+        return std::string("wblended_init_cone") + suffix + ".frag.spv";
       case Z3DRendererBase::ShaderHookType::Normal:
       default:
-        return "cone.frag.spv";
+        return std::string("cone") + suffix + ".frag.spv";
     }
   };
 
