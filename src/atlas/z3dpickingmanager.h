@@ -7,6 +7,7 @@
 #include <cstring>
 #include <vector>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <glog/logging.h>
 
 namespace nim {
 
@@ -15,9 +16,11 @@ class ZVulkanTexture; // forward declare
 class Z3DPickingManager
 {
 public:
-  // input render target should have color internal format as GL_RGBA8
-  // must call
-  void setRenderTarget(Z3DRenderTarget& rt);
+  // Input render target should have color internal format GL_RGBA8.
+  void setPickingTarget(Z3DRenderTarget& rt);
+  void setPickingTarget(ZVulkanTexture& color,
+                        ZVulkanTexture& depth,
+                        const glm::uvec2& size);
 
   // must call
   void setDevicePixelRatio(double dpr)
@@ -25,16 +28,7 @@ public:
     m_devicePixelRatio = dpr;
   }
 
-  // Vulkan: set color/depth attachments for picking readback
-  // color/depth may be null
-  void setVulkanTargets(/*nullable*/ ZVulkanTexture* color,
-                        /*nullable*/ ZVulkanTexture* depth,
-                        const glm::uvec2& size)
-  {
-    m_vkColor = color;
-    m_vkDepth = depth;
-    m_vkSize = size;
-  }
+  void resetRenderTarget();
 
   glm::col4 registerObject(const void* obj);
 
@@ -67,13 +61,25 @@ public:
     return (objectAtWidgetPos(pos) == obj);
   }
 
+  [[nodiscard]] bool hasGlTarget() const
+  {
+    return m_renderTarget != nullptr;
+  }
+
+  [[nodiscard]] bool hasVulkanTarget() const
+  {
+    return m_vkColor != nullptr && m_vkDepth != nullptr;
+  }
+
   void bindTarget()
   {
+    CHECK(m_renderTarget != nullptr) << "Attempted to bind picking target before it was set";
     m_renderTarget->bind();
   }
 
   void releaseTarget()
   {
+    CHECK(m_renderTarget != nullptr) << "Attempted to release picking target before it was set";
     m_renderTarget->release();
   }
 
@@ -96,6 +102,7 @@ public:
 
 private:
   void increaseColor();
+  void clearVulkanState();
 
 private:
   boost::unordered_flat_map<glm::col4, const void*> m_colorToObject;

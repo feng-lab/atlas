@@ -34,7 +34,8 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   , m_rendererBase(m_rendererParameterState,
                    m_rendererFrameState,
                    Z3DRenderGlobalState::instance().rendererState().viewState,
-                   Z3DRenderGlobalState::instance().rendererState().sceneState)
+                   Z3DRenderGlobalState::instance().rendererState().sceneState,
+                   static_cast<RenderBackend>(globalPara.renderBackend.associatedData()))
   , m_baseBoundBoxRenderer(m_rendererBase)
   , m_selectionBoundBoxRenderer(m_rendererBase)
   , m_selectionCornerRenderer(m_rendererBase)
@@ -549,6 +550,7 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye, BoundBoxRenderStyle style)
 
 void Z3DBoundedFilter::switchRendererBackend(RenderBackend backendRequest)
 {
+  VLOG(1) << "Switching renderer backend for " << className();
   m_rendererBase.setBackend(backendRequest);
 }
 

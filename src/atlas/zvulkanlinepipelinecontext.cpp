@@ -348,7 +348,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   material.material_ambient = payload.params->materialAmbient;
   material.material_specular = payload.params->materialSpecular;
   material.material_shininess = payload.params->materialShininess;
-  material.alpha = payload.params->opacity;
+  material.alpha = payload.pickingPass ? 1.0f : payload.params->opacity;
   m_uboMaterial->copyData(&material, sizeof(material));
 
   VLOG(2) << fmt::format(
@@ -430,7 +430,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
 
     const uint32_t useTex = key.useTextureColor ? 1u : 0u;
     const uint32_t roundCap = key.roundCap ? 1u : 0u;
-    const uint32_t lighting = 0u;
+    const uint32_t lighting = key.picking ? 0u : 1u;
 
     std::array<vk::SpecializationMapEntry, 3> specEntries{
       vk::SpecializationMapEntry{.constantID = 98,  .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
@@ -457,7 +457,10 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     auto vi = makeWideVertexInput();
     instance.pipeline = device.createPipeline(*instance.shader, vi, vk::PrimitiveTopology::eTriangleList);
     std::vector<vk::DescriptorSetLayout> setLayouts = {**m_setTexture, **m_setLighting, **m_setTransforms};
-    if (key.shaderHookType == Z3DRendererBase::ShaderHookType::WeightedBlendedInit && m_setOIT) {
+    if ((key.shaderHookType == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+         key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) &&
+        m_setOIT) {
       setLayouts.push_back(**m_setOIT);
     }
     instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
@@ -591,6 +594,45 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     // Thin lines may produce implementation-dependent winding; disable culling
     // to ensure visibility regardless of vertex order.
     instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
+    if (key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+        key.shaderHookType == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+      std::vector<vk::PipelineColorBlendAttachmentState> attachments(formats.colorFormats.size());
+      for (size_t i = 0; i < attachments.size(); ++i) {
+        auto& attachment = attachments[i];
+        attachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+        if (i == 0 || i == 3) {
+          attachment.blendEnable = VK_TRUE;
+          attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.colorBlendOp = vk::BlendOp::eMax;
+          attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.alphaBlendOp = vk::BlendOp::eMax;
+        } else if (i == 1 || i == 4) {
+          attachment.blendEnable = VK_TRUE;
+          attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.colorBlendOp = vk::BlendOp::eMax;
+          attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.alphaBlendOp = vk::BlendOp::eMax;
+        } else if (i == 2 || i == 5) {
+          attachment.blendEnable = VK_TRUE;
+          attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
+          attachment.colorBlendOp = vk::BlendOp::eAdd;
+          attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
+          attachment.alphaBlendOp = vk::BlendOp::eAdd;
+        } else {
+          attachment.blendEnable = VK_FALSE;
+        }
+      }
+      instance.pipeline->setColorBlendAttachments(std::move(attachments));
+      instance.pipeline->setDepthTestEnable(false);
+      instance.pipeline->setDepthWriteEnable(false);
+    }
     instance.pipeline->create();
   }
 
@@ -1167,7 +1209,10 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
   bindDescriptorSets(cmd, pipeline, texOverride);
 
-  if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit && m_dsOIT) {
+  if ((shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
+       shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+       shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) &&
+      m_dsOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                            pipeline.pipeline->pipelineLayout(),

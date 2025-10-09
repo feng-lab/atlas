@@ -1013,13 +1013,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     case Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel: {
       for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
         auto state = makeDefaultBlendAttachment();
-        // Attachments layout (see makeDualDepthPeelDescriptor):
-        // 0: RG32F depth blender ping A (MAX), 1: RGBA16 front blender ping A (MAX),
-        // 2: RGBA16 back temp ping A (ADD), 3: RG32F depth blender ping B (MAX),
-        // 4: RGBA16 front blender ping B (MAX), 5: RGBA16 back temp ping B (ADD),
-        // 6: RGBA16 back blend accumulation (unused here), 7: R32F depth texture (unused here)
         if (i == 0 || i == 3) {
-          // Depth blender: keep max of (-z, z)
           state.blendEnable = VK_TRUE;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
@@ -1028,7 +1022,6 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           state.alphaBlendOp = vk::BlendOp::eMax;
         } else if (i == 1 || i == 4) {
-          // Front blender: monotonically increasing; use MAX for pass-through behavior
           state.blendEnable = VK_TRUE;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
@@ -1037,7 +1030,6 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           state.alphaBlendOp = vk::BlendOp::eMax;
         } else if (i == 2 || i == 5) {
-          // Back temp: accumulate within the pass
           state.blendEnable = VK_TRUE;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
@@ -1046,7 +1038,6 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           state.alphaBlendOp = vk::BlendOp::eAdd;
         } else {
-          // Unused in these passes
           state.blendEnable = VK_FALSE;
         }
         blendAttachments.push_back(state);

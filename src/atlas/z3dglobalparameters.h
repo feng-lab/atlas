@@ -49,20 +49,6 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup(bool includeCamera, Z3DRenderingEngine& engine);
 
-  // must call
-  void setPickingTarget(Z3DRenderTarget& rt)
-  {
-    pickingManager.setRenderTarget(rt);
-  }
-
-  // color/depth may be null when picking is disabled or not ready
-  void setPickingTargetVulkan(/*nullable*/ ZVulkanTexture* color,
-                              /*nullable*/ ZVulkanTexture* depth,
-                              const glm::uvec2& size)
-  {
-    pickingManager.setVulkanTargets(color, depth, size);
-  }
-
   void cameraFocusesOn(double x, double y, double z, double radius = 64);
 
   void cameraFocusesOn(const ZBBox<glm::dvec3>& bound, double minRadius = 64);

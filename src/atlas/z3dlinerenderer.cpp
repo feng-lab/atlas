@@ -12,20 +12,6 @@ namespace nim {
 
 Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
-  , m_hasExplicitColors(false)
-  , m_useSmoothLine(true)
-  , m_srcLineWidth(1)
-  , m_lineWidth(1.f)
-  , m_enableMultisample(true)
-  , m_texture(nullptr)
-  , m_dataChanged(false)
-  , m_pickingDataChanged(false)
-  , m_isLineStrip(false)
-  , m_useTextureColor(false)
-  , m_screenAligned(false)
-  , m_roundCap(true)
-  , m_oneBatchNumber(4e6)
-  , m_useGeomLineShader(false)
 {
   updateLineWidth();
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)

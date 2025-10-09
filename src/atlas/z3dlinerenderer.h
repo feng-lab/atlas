@@ -125,28 +125,28 @@ protected:
   std::vector<glm::vec3> m_linePositions;
   std::vector<glm::vec4> m_lineColors;
   std::vector<glm::vec4> m_linePickingColors;
-  bool m_hasExplicitColors;
+  bool m_hasExplicitColors = false;
 
-  bool m_useSmoothLine;
-  float m_srcLineWidth;
+  bool m_useSmoothLine = true;
+  float m_srcLineWidth = 1.f;
   float m_lineWidth = 1.f;
-  bool m_enableMultisample;
+  bool m_enableMultisample = true;
   std::vector<float> m_lineWidthArray;
 
-  Z3DTexture* m_texture;
+  Z3DTexture* m_texture = nullptr;
 
 private:
   std::unique_ptr<Z3DVertexArrayObject> m_VAO;
   std::unique_ptr<Z3DVertexArrayObject> m_pickingVAO;
   std::unique_ptr<Z3DVertexBufferObject> m_VBOs;
   std::unique_ptr<Z3DVertexBufferObject> m_pickingVBOs;
-  bool m_dataChanged;
-  bool m_pickingDataChanged;
-  bool m_isLineStrip;
+  bool m_dataChanged = false;
+  bool m_pickingDataChanged = false;
+  bool m_isLineStrip = false;
 
-  bool m_useTextureColor;
-  bool m_screenAligned;
-  bool m_roundCap;
+  bool m_useTextureColor = false;
+  bool m_screenAligned = false;
+  bool m_roundCap = true;
 
   void renderSmooth(Z3DEye eye);
 
@@ -164,8 +164,8 @@ private:
   std::unique_ptr<Z3DVertexArrayObject> m_pickingVAOs;
   std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_batchVBOs;
   std::vector<std::unique_ptr<Z3DVertexBufferObject>> m_batchPickingVBOs;
-  size_t m_oneBatchNumber;
-  bool m_useGeomLineShader;
+  size_t m_oneBatchNumber = 4e6;
+  bool m_useGeomLineShader = false;
 
   [[nodiscard]] LinePayload buildLinePayload(bool picking) const;
   [[nodiscard]] RenderBatch buildRenderBatch(Z3DEye eye, bool picking) const;

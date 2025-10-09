@@ -11,16 +11,36 @@
 
 namespace nim {
 
-void Z3DPickingManager::setRenderTarget(Z3DRenderTarget& rt)
+void Z3DPickingManager::setPickingTarget(Z3DRenderTarget& rt)
 {
   CHECK(rt.attachment(GL_COLOR_ATTACHMENT0)->internalFormat() == GL_RGBA8);
   m_renderTarget = &rt;
-  // Switching to a GL picking target should invalidate any Vulkan pointers.
-  // Otherwise, callers like objectAtWidgetPos()/depthAtWidgetPos would keep
-  // using stale Vulkan textures after a backend switch (Vulkan -> OpenGL).
-  m_vkColor = nullptr;
-  m_vkDepth = nullptr;
-  m_vkSize = glm::uvec2(0u, 0u);
+  // Switching to a GL picking target should invalidate any Vulkan pointers
+  // and cached mappings so subsequent queries do not read stale data.
+  clearVulkanState();
+}
+
+void Z3DPickingManager::setPickingTarget(ZVulkanTexture& color,
+                                         ZVulkanTexture& depth,
+                                         const glm::uvec2& size)
+{
+  m_renderTarget = nullptr;
+
+  CHECK_GT(size.x, 0u);
+  CHECK_GT(size.y, 0u);
+
+  const bool attachmentsChanged =
+    (m_vkColor != &color) || (m_vkDepth != &depth) || (m_vkSize != size);
+
+  m_vkColor = &color;
+  m_vkDepth = &depth;
+  m_vkSize = size;
+
+  if (attachmentsChanged) {
+    m_cachedColorValid = false;
+    m_cachedColor.clear();
+    m_cachedColorSize = glm::uvec2(0u);
+  }
 }
 
 glm::col4 Z3DPickingManager::registerObject(const void* obj)
@@ -120,6 +140,9 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
     return objectOfColor(c);
   }
 
+  if (!m_renderTarget) {
+    return nullptr;
+  }
   auto texSize = glm::ivec3(m_renderTarget->attachment(GL_COLOR_ATTACHMENT0)->dimension());
   pos[1] = texSize[1] - pos[1];
   return objectOfColor(m_renderTarget->colorAtPos(pos));
@@ -175,6 +198,9 @@ GLfloat Z3DPickingManager::depthAtWidgetPos(glm::ivec2 pos)
     return static_cast<float>(packed & 0x00FFFFFFu) / static_cast<float>(0x00FFFFFFu);
   }
 
+  if (!m_renderTarget) {
+    return 1.0f;
+  }
   auto texSize = glm::ivec2(m_renderTarget->size());
   pos[1] = texSize[1] - pos[1];
   return m_renderTarget->depthAtPos(pos);
@@ -182,6 +208,9 @@ GLfloat Z3DPickingManager::depthAtWidgetPos(glm::ivec2 pos)
 
 std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm::ivec2& pos, int radius, bool ascend)
 {
+  if (!m_renderTarget) {
+    return {};
+  }
   boost::unordered_flat_map<glm::col4, int> col2dist;
   const Z3DTexture* tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
   GLenum dataFormat = GL_BGRA;
@@ -229,6 +258,22 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
     }
   }
   return res;
+}
+
+void Z3DPickingManager::resetRenderTarget()
+{
+  m_renderTarget = nullptr;
+  clearVulkanState();
+}
+
+void Z3DPickingManager::clearVulkanState()
+{
+  m_vkColor = nullptr;
+  m_vkDepth = nullptr;
+  m_vkSize = glm::uvec2(0u);
+  m_cachedColorValid = false;
+  m_cachedColor.clear();
+  m_cachedColorSize = glm::uvec2(0u);
 }
 
 void Z3DPickingManager::clearTarget()

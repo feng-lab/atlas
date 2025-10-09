@@ -238,6 +238,7 @@ protected:
   }
 
 private:
+  bool m_blockSubParameterSignals = false;
   ZStringIntOptionParameter m_projectionType;
   ZVec3Parameter m_eye;
   ZVec3Parameter m_center;

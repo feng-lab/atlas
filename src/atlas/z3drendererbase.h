@@ -81,6 +81,12 @@ public:
     AttachmentHandle dualDepthPeelingFrontBlenderHandle;
   };
 
+  Z3DRendererBase(RendererParameterState& parameterState,
+                  RendererFrameState& frameState,
+                  RendererViewState& viewState,
+                  RendererSceneState& sceneState,
+                  RenderBackend initialBackend);
+
   // need valid camera and viewport
   void setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye eye);
 
@@ -98,11 +104,6 @@ public:
   void releaseBackendResources();
 
   void buildBackendResources(RenderBackend backend);
-
-  Z3DRendererBase(RendererParameterState& parameterState,
-                  RendererFrameState& frameState,
-                  RendererViewState& viewState,
-                  RendererSceneState& sceneState);
 
   [[nodiscard]] RendererViewState pushViewStateFromCamera(const Z3DCamera& camera);
 

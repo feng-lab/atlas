@@ -4,7 +4,7 @@
 #include "zlog.h"
 #include <QWidget>
 #include <QGroupBox>
-#include <QSignalBlocker>
+#include <QScopedValueRollback>
 
 namespace nim {
 
@@ -173,6 +173,9 @@ void Z3DCameraParameter::setWindowsAspectRatio(float r)
 
 void Z3DCameraParameter::updateProjectionType()
 {
+  if (m_blockSubParameterSignals) {
+    return;
+  }
   if (m_projectionType.isSelected("Perspective")) {
     m_value.setProjectionType(Z3DCamera::ProjectionType::Perspective);
   } else {
@@ -183,36 +186,54 @@ void Z3DCameraParameter::updateProjectionType()
 
 void Z3DCameraParameter::updateEye()
 {
+  if (m_blockSubParameterSignals) {
+    return;
+  }
   m_value.setEye(m_eye.get());
   Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateCenter()
 {
+  if (m_blockSubParameterSignals) {
+    return;
+  }
   m_value.setCenter(m_center.get());
   Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateUpVector()
 {
+  if (m_blockSubParameterSignals) {
+    return;
+  }
   m_value.setUpVector(m_upVector.get());
   Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateEyeSeparationAngle()
 {
+  if (m_blockSubParameterSignals) {
+    return;
+  }
   m_value.setEyeSeparationAngle(glm::radians(m_eyeSeparationAngle.get()));
   Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateFieldOfView()
 {
+  if (m_blockSubParameterSignals) {
+    return;
+  }
   m_value.setFieldOfView(glm::radians(m_fieldOfView.get()));
   Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateNearDist()
 {
+  if (m_blockSubParameterSignals) {
+    return;
+  }
   m_value.setNearDist(m_nearDist.get());
   m_farDist.setRange(m_value.nearDist(), std::numeric_limits<float>::max());
   Q_EMIT valueChanged();
@@ -220,6 +241,9 @@ void Z3DCameraParameter::updateNearDist()
 
 void Z3DCameraParameter::updateFarDist()
 {
+  if (m_blockSubParameterSignals) {
+    return;
+  }
   m_value.setFarDist(m_farDist.get());
   m_nearDist.setRange(1e-10, m_value.farDist());
   Q_EMIT valueChanged();
@@ -255,15 +279,7 @@ void Z3DCameraParameter::beforeChange(Z3DCamera& value)
 
 void Z3DCameraParameter::updateWidget(Z3DCamera& value)
 {
-  // Prevent sub-parameter updates from recursively emitting valueChanged.
-  QSignalBlocker blockProjection(&m_projectionType);
-  QSignalBlocker blockEye(&m_eye);
-  QSignalBlocker blockCenter(&m_center);
-  QSignalBlocker blockUp(&m_upVector);
-  QSignalBlocker blockEyeSep(&m_eyeSeparationAngle);
-  QSignalBlocker blockFov(&m_fieldOfView);
-  QSignalBlocker blockNear(&m_nearDist);
-  QSignalBlocker blockFar(&m_farDist);
+  QScopedValueRollback<bool> guard(m_blockSubParameterSignals, true);
 
   m_eye.set(value.eye());
   m_center.set(value.center());

@@ -13,13 +13,15 @@
 #include <algorithm>
 #include <optional>
 #include <utility>
+#include <fmt/format.h>
 
 namespace nim {
 
 Z3DRendererBase::Z3DRendererBase(RendererParameterState& parameterState,
                                  RendererFrameState& frameState,
                                  RendererViewState& viewState,
-                                 RendererSceneState& sceneState)
+                                 RendererSceneState& sceneState,
+                                 RenderBackend initialBackend)
   : m_parameters(parameterState)
   , m_frameState(frameState)
   , m_viewState(viewState)
@@ -28,10 +30,10 @@ Z3DRendererBase::Z3DRendererBase(RendererParameterState& parameterState,
   , m_shaderHookType(ShaderHookType::Normal)
   , m_renderMethod(RenderMethod::GLSL)
 {
-  setBackend(RenderBackend::OpenGL);
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   m_legacyGLState = std::make_unique<LegacyGLState>();
 #endif
+  setBackend(initialBackend);
 }
 
 RendererViewState Z3DRendererBase::pushViewStateFromCamera(const Z3DCamera& camera)
@@ -542,17 +544,23 @@ const Z3DRendererBase::LegacyGLState& Z3DRendererBase::legacyGL() const
 
 void Z3DRendererBase::setBackend(RenderBackend backendType)
 {
+  VLOG(1) << fmt::format("RendererBase backend switch requested: current={} target={}",
+                         enumToString(m_activeBackend),
+                         enumToString(backendType));
   if (m_backend && m_activeBackend == backendType) {
+    VLOG(1) << "RendererBase backend already active; skipping switch";
     return;
   }
 
   std::unique_ptr<Z3DRendererBackend> newBackend;
   switch (backendType) {
     case RenderBackend::OpenGL:
+      VLOG(1) << "Creating OpenGL renderer backend";
       newBackend = createGLRendererBackend();
       break;
     case RenderBackend::Vulkan:
       try {
+        VLOG(1) << "Creating Vulkan renderer backend";
         newBackend = createVulkanRendererBackend();
       }
       catch (const ZException&) {
@@ -568,14 +576,17 @@ void Z3DRendererBase::setBackend(RenderBackend backendType)
   }
 
   if (m_backend) {
+    VLOG(1) << fmt::format("Invoking preBackendSwitch on {}", enumToString(m_activeBackend));
     m_backend->preBackendSwitch();
   }
+  VLOG(1) << "Releasing renderer backend resources prior to switch";
   releaseBackendResources();
   releasePersistentLeases();
 
   m_backend = std::move(newBackend);
   m_activeBackend = backendType;
   buildBackendResources(backendType);
+  VLOG(1) << fmt::format("RendererBase backend switch complete: active={}", enumToString(m_activeBackend));
 }
 
 void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye eye)

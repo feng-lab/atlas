@@ -17,6 +17,7 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <span>
 #include <unordered_set>
 #include <optional>
 
@@ -1791,9 +1792,13 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
     // Update global picking manager with current Vulkan picking attachments for interactive queries
     if (m_pickingTargetLease && m_pickingTargetLease.backend == RenderBackend::Vulkan) {
-      m_globalParameters.setPickingTargetVulkan(m_pickingTargetLease.colorAttachment(0),
-                                                m_pickingTargetLease.depthAttachmentTexture(),
-                                                m_pickingTargetLease.descriptor.size);
+      auto* colorTex = m_pickingTargetLease.colorAttachment(0);
+      auto* depthTex = m_pickingTargetLease.depthAttachmentTexture();
+      if (colorTex && depthTex) {
+        m_globalParameters.pickingManager.setPickingTarget(*colorTex, *depthTex, m_pickingTargetLease.descriptor.size);
+      } else {
+        m_globalParameters.pickingManager.resetRenderTarget();
+      }
     }
   }
 
@@ -2268,25 +2273,18 @@ void Z3DCompositor::ensureOutputTargets(const glm::uvec2& size)
 
 void Z3DCompositor::switchBackend(RenderBackend backendRequest)
 {
-  Z3DBoundedFilter::switchRendererBackend(backendRequest);
+  const RenderBackend previousBackend = m_rendererBase.activeBackend();
+  VLOG(1) << fmt::format("Compositor switching backend to {}", enumToString(backendRequest));
 
-  // If switching away from OpenGL, proactively dispose compositor-owned GL
-  // shader programs while a valid GL context is current to avoid deleting
-  // them later against a different or missing context.
-  if (backendRequest == RenderBackend::Vulkan) {
-    m_ddpBlendShader.reset();
-    m_ddpFinalShader.reset();
-    m_waFinalShader.reset();
-    m_wbFinalShader.reset();
+  if (previousBackend != backendRequest) {
+    VLOG(1) << "Resetting picking manager render target for backend change";
+    m_globalParameters.pickingManager.resetRenderTarget();
   }
 
-  // Extra safety: if switching to OpenGL, clear any lingering Vulkan
-  // picking attachments so picking paths won’t accidentally try to read
-  // from stale Vulkan textures.
-  if (backendRequest == RenderBackend::OpenGL) {
-    m_globalParameters.setPickingTargetVulkan(nullptr, nullptr, glm::uvec2(0u, 0u));
-
-    // Clear any lingering Vulkan zero-copy mappings from local buffers to avoid stale UI pointers
+  // When leaving Vulkan, release any outstanding zero-copy readback leases while the Vulkan
+  // backend is still alive; the release lambdas close over the backend instance.
+  if (previousBackend == RenderBackend::Vulkan && backendRequest == RenderBackend::OpenGL) {
+    VLOG(1) << "Releasing outstanding Vulkan readback leases before backend switch";
     auto clearExternal = [](Z3DLocalColorBuffer* buf) {
       if (!buf) {
         return;
@@ -2304,8 +2302,24 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
     clearExternal(m_leftReadyLocalBuffer);
     clearExternal(m_rightCurrentLocalBuffer);
     clearExternal(m_rightReadyLocalBuffer);
+  }
 
+  Z3DBoundedFilter::switchRendererBackend(backendRequest);
+
+  // If switching away from OpenGL, proactively dispose compositor-owned GL
+  // shader programs while a valid GL context is current to avoid deleting
+  // them later against a different or missing context.
+  if (backendRequest == RenderBackend::Vulkan) {
+    VLOG(1) << "Releasing compositor-owned GL shader programs before switching to Vulkan";
+    m_ddpBlendShader.reset();
+    m_ddpFinalShader.reset();
+    m_waFinalShader.reset();
+    m_wbFinalShader.reset();
+  }
+
+  if (backendRequest == RenderBackend::OpenGL) {
     // Rebuild compositor-owned GL shader programs in the new context.
+    VLOG(1) << "Recreating compositor-owned GL shader programs after switching to OpenGL";
     m_ddpBlendShader = std::make_unique<Z3DShaderProgram>();
     m_ddpBlendShader->loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
 
@@ -2322,20 +2336,30 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
   std::unordered_set<Z3DBoundedFilter*> seen;
   auto registerFilter = [&](Z3DBoundedFilter* filter) {
     if (filter && seen.insert(filter).second) {
+      VLOG(1) << fmt::format("Propagating backend to filter {}", static_cast<const void*>(filter));
       filter->switchRendererBackend(backendRequest);
     }
   };
 
-  for (auto* filter : m_gPPort.connectedFilters()) {
+  const auto geometryFilters = m_gPPort.connectedFilters();
+  const auto volumeFilters = m_vPPort.connectedFilters();
+  VLOG(1) << fmt::format("Notifying {} geometry filters and {} volume filters of backend change",
+                         geometryFilters.size(),
+                         volumeFilters.size());
+
+  for (auto* filter : geometryFilters) {
     registerFilter(filter);
   }
-  for (auto* filter : m_vPPort.connectedFilters()) {
+  for (auto* filter : volumeFilters) {
     registerFilter(filter);
   }
 
+  VLOG(1) << "Updating axis camera for new backend";
   setupAxisCamera();
 
+  VLOG(1) << "Invalidating compositor state after backend switch";
   invalidate(State::AllResultInvalid);
+  VLOG(1) << "Compositor backend switch complete";
 }
 
 bool Z3DCompositor::tryRenderGeometriesPass(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
@@ -3136,7 +3160,7 @@ void Z3DCompositor::ensurePickingTarget(const glm::uvec2& size)
   }
 
   CHECK(m_pickingTargetLease.renderTarget != nullptr);
-  m_globalParameters.setPickingTarget(*m_pickingTargetLease.renderTarget);
+  m_globalParameters.pickingManager.setPickingTarget(*m_pickingTargetLease.renderTarget);
 }
 
 void Z3DCompositor::ensurePickingTargetVulkan(const glm::uvec2& size)
@@ -4045,6 +4069,7 @@ void Z3DCompositor::prepareAxisData(Z3DEye eye)
   m_textPositions.push_back(m_XEnd * glm::vec3(0.93));
   m_textPositions.push_back(m_YEnd * glm::vec3(0.93));
   m_textPositions.push_back(m_ZEnd * glm::vec3(0.93));
+
   QStringList texts;
   texts.push_back("X");
   texts.push_back("Y");
@@ -4115,6 +4140,7 @@ void Z3DCompositor::setupAxisCamera()
 
   m_lineRenderer.setData(std::move(m_lines));
   m_lineRenderer.setDataColors(std::move(m_lineColors));
+  m_lineRenderer.setLineWidth(6.f);
   m_arrowRenderer.setArrowData(&m_tailPosAndTailRadius, &m_headPosAndHeadRadius, .1f);
   m_arrowRenderer.setArrowColors(&m_textColors);
   m_fontRenderer.setDataColors(&m_textColors);
