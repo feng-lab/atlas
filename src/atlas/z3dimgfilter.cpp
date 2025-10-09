@@ -1425,6 +1425,12 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
   renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
   CHECK_GL_ERROR
 
+  // Entry/exit is only needed within a single frame for GL rendering when not
+  // progressively accumulating. When progressive, keep it until completion.
+  if (!m_progressiveRendering || progress >= 1.0) {
+    m_imgRaycasterRenderer.releaseEntryExit();
+  }
+
   return progress;
 }
 

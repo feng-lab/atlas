@@ -223,8 +223,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
                                                       2u,
                                                       ScratchFormat::RGBA32F,
                                                       std::optional<RenderBackend>(RenderBackend::Vulkan));
-  payload.entryExitLease =
-    std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(entryLease));
+  payload.entryExitLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(entryLease));
 
   if (visibleChannels.size() > 1 && payload.fastPathOnly) {
     auto layerLease = pool.acquireLayerArrayRenderTarget(m_outputSize,
@@ -232,8 +231,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
                                                          ScratchFormat::RGBA16,
                                                          ScratchFormat::Depth24,
                                                          std::optional<RenderBackend>(RenderBackend::Vulkan));
-    payload.channelLayerLease =
-      std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(layerLease));
+    payload.channelLayerLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(layerLease));
   }
 
   if (!payload.fastPathOnly) {
@@ -250,13 +248,10 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
       payload.currentAccumLease = shareLease(m_currentRaycastAccum[eye]);
     }
 
-    auto blockLease = pool.acquireBlockIdRenderTarget(m_outputSize,
-                                                      -1,
-                                                      -1.0,
-                                                      std::optional<RenderBackend>(RenderBackend::Vulkan));
+    auto blockLease =
+      pool.acquireBlockIdRenderTarget(m_outputSize, -1, -1.0, std::optional<RenderBackend>(RenderBackend::Vulkan));
     payload.blockIdAttachmentCount = blockLease.attachments;
-    payload.blockIdLease =
-      std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(blockLease));
+    payload.blockIdLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(blockLease));
   }
 
   if (!m_blockIDs.empty()) {
@@ -281,8 +276,8 @@ void Z3DImgRaycasterRenderer::ensureRaycastAccumulators(Z3DEye eye)
       const bool sizeMismatch = lease.descriptor.size != m_outputSize;
       if (!lease.hasVulkanImage() || sizeMismatch) {
         lease.release();
-        lease = pool.acquireRaycastAccumulatorRenderTarget(m_outputSize,
-                                                           std::optional<RenderBackend>(RenderBackend::Vulkan));
+        lease =
+          pool.acquireRaycastAccumulatorRenderTarget(m_outputSize, std::optional<RenderBackend>(RenderBackend::Vulkan));
       }
     };
     ensureLease(m_lastRaycastAccum[eye]);
@@ -301,9 +296,7 @@ void Z3DImgRaycasterRenderer::ensureRaycastAccumulators(Z3DEye eye)
   ensureGlLease(m_currentRaycastAccum[eye]);
 }
 
-void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye,
-                                                       bool lastRound,
-                                                       size_t channelCount)
+void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye, bool lastRound, size_t channelCount)
 {
   std::swap(m_lastRaycastAccum[eye], m_currentRaycastAccum[eye]);
 
@@ -344,7 +337,6 @@ void Z3DImgRaycasterRenderer::setChannelCount(size_t count)
 
 void Z3DImgRaycasterRenderer::releaseScratchResources()
 {
-  m_entryExitTexCoordAndZeTexture = nullptr;
   if (m_entryExitLease) {
     m_entryExitLease.release();
   }
@@ -402,7 +394,7 @@ void Z3DImgRaycasterRenderer::addQuad(const ZMesh& quad)
     return;
   }
   m_quads.push_back(quad);
-  m_entryExitTexCoordAndZeTexture = nullptr;
+  m_entryExitLease.release();
 }
 
 void Z3DImgRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& shader) const
@@ -497,7 +489,6 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
     m_entryExitMeshValid = true;
     m_entryExitMeshFlipped = flipped;
     m_entryExitSize = size;
-    m_entryExitTexCoordAndZeTexture = nullptr;
     m_quads.clear();
     return;
   }
@@ -540,9 +531,6 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
   // restore
   glCullFace(GL_BACK);
   glDisable(GL_CULL_FACE);
-
-  // Hand off to raycaster
-  m_entryExitTexCoordAndZeTexture = m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0);
 }
 
 std::string Z3DImgRaycasterRenderer::generateHeader()
@@ -635,7 +623,7 @@ double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
   }
 
   if (m_quads.empty()) {
-    if (m_entryExitTexCoordAndZeTexture == nullptr) {
+    if (!m_entryExitLease) {
       VLOG(1) << "no entry exit texture";
       return progress;
     }
@@ -711,7 +699,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
   });
 
   if (m_quads.empty()) {
-    if (m_entryExitTexCoordAndZeTexture == nullptr) {
+    if (!m_entryExitLease) {
       return;
     }
   } else {
@@ -866,7 +854,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
       });
 
       m_image3DSliceWithTransferfunBlockIDsShader->setUniform("ze_to_screen_pixel_voxel_size",
-                                                             ze_to_screen_pixel_voxel_size);
+                                                              ze_to_screen_pixel_voxel_size);
       m_image3DSliceWithTransferfunBlockIDsShader->setProjectionViewMatrixUniform(eyeState.projectionViewMatrix);
       m_image3DSliceWithTransferfunBlockIDsShader->setViewMatrixUniform(eyeState.viewMatrix);
 
@@ -1148,7 +1136,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
             debugTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
             if (round == 0) {
               filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
-              m_entryExitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
+              m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
             }
           }
         }
@@ -1248,7 +1236,8 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   m_image3DRaycasterBlockIDsShader->setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
   // entry exit points
-  m_image3DRaycasterBlockIDsShader->bindTexture("ray_entry_exit_tex_coord", m_entryExitTexCoordAndZeTexture);
+  m_image3DRaycasterBlockIDsShader->bindTexture("ray_entry_exit_tex_coord",
+                                                m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
 
   m_image3DRaycasterBlockIDsShader->setUniform("sampling_rate", m_samplingRateValue);
 
@@ -1387,7 +1376,8 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   m_image3DRaycasterShader->setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
   // entry exit points
-  m_image3DRaycasterShader->bindTexture("ray_entry_exit_tex_coord", m_entryExitTexCoordAndZeTexture);
+  m_image3DRaycasterShader->bindTexture("ray_entry_exit_tex_coord",
+                                        m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
 
   m_image3DRaycasterShader->bindTexture("last_color", lastTarget->attachment(GL_COLOR_ATTACHMENT0));
   m_image3DRaycasterShader->bindTexture("last_ray_depth", lastTarget->attachment(GL_COLOR_ATTACHMENT1));
@@ -1433,8 +1423,7 @@ Z3DTexture* Z3DImgRaycasterRenderer::transferTextureGL(const Z3DTransferFunction
   const uint32_t width = static_cast<uint32_t>(tf.dimensions().x);
   auto itMeta = m_transferCache.meta.find(&tf);
   auto itTex = m_transferCache.textures.find(&tf);
-  const bool needCreate = itMeta == m_transferCache.meta.end() ||
-                          itTex == m_transferCache.textures.end() ||
+  const bool needCreate = itMeta == m_transferCache.meta.end() || itTex == m_transferCache.textures.end() ||
                           itMeta->second.first != gen || itMeta->second.second != width;
   if (needCreate) {
     std::vector<uint8_t> lut;
@@ -1442,7 +1431,8 @@ Z3DTexture* Z3DImgRaycasterRenderer::transferTextureGL(const Z3DTransferFunction
     if (lut.empty()) {
       return nullptr;
     }
-    auto tex = std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
+    auto tex =
+      std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
     tex->updateImage(lut.data());
     m_transferCache.textures[&tf] = std::move(tex);
     m_transferCache.meta[&tf] = std::make_pair(gen, width);
@@ -1480,8 +1470,9 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vecto
   m_scRaycasterShader->setUniform("ze_to_zw_a", a);
 
   // entry exit points
-  m_scRaycasterShader->bindTexture("ray_entry_exit_tex_coord", m_entryExitTexCoordAndZeTexture);
-  // m_entryExitTexCoordAndZeTexture->saveAsRGBAFloatImage("/Users/feng/Downloads/abcd_entryexit.tif");
+  m_scRaycasterShader->bindTexture("ray_entry_exit_tex_coord",
+                                   m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0));
+  // m_entryExitLease.renderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("/Users/feng/Downloads/abcd_entryexit.tif");
 
   if (m_compositingModeValue == ImgCompositingMode::IsoSurface) {
     m_scRaycasterShader->setUniform("iso_value", m_isoValue);
@@ -1548,19 +1539,17 @@ void Z3DImgRaycasterRenderer::createResources(RenderBackend backend)
   const std::string headerSource = m_rendererBase.generateHeader() + generateHeader();
   m_scRaycasterShader->loadFromSourceFile("pass.vert", "volume_raycaster_single_channel.frag", headerSource);
   m_sc2dImageShader->loadFromSourceFile("transform_with_2dtexture.vert",
-                                       "image2d_with_transfun_single_channel.frag",
-                                       headerSource);
+                                        "image2d_with_transfun_single_channel.frag",
+                                        headerSource);
   m_scVolumeSliceWithTransferfunShader->loadFromSourceFile("transform_with_3dtexture.vert",
-                                                          "volume_slice_with_transfun_single_channel.frag",
+                                                           "volume_slice_with_transfun_single_channel.frag",
+                                                           headerSource);
+  m_image3DSliceWithTransferfunBlockIDsShader->loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
+                                                                  "image3d_slice_with_transfun_blockID.frag",
+                                                                  headerSource);
+  m_image3DSliceWithTransferfunShader->loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
+                                                          "image3d_slice_with_transfun.frag",
                                                           headerSource);
-  m_image3DSliceWithTransferfunBlockIDsShader->loadFromSourceFile(
-    "transform_with_3dtexture_and_eye_coordinate.vert",
-    "image3d_slice_with_transfun_blockID.frag",
-    headerSource);
-  m_image3DSliceWithTransferfunShader->loadFromSourceFile(
-    "transform_with_3dtexture_and_eye_coordinate.vert",
-    "image3d_slice_with_transfun.frag",
-    headerSource);
   m_image3DRaycasterBlockIDsShader->loadFromSourceFile("pass.vert", "image3d_raycaster_blockID.frag", headerSource);
   m_image3DRaycasterShader->loadFromSourceFile("pass.vert", "image3d_raycaster.frag", headerSource);
   m_mergeChannelShader->loadFromSourceFile("pass.vert", "image2d_array_compositor.frag", headerSource);

@@ -155,6 +155,21 @@ public:
   {
     m_channelIdx[eye] = -1;
     m_round[eye] = 0;
+    // Also release per-frame resources that can be reacquired on demand
+    if (m_entryExitLease) {
+      m_entryExitLease.release();
+    }
+    if (m_progressiveLayerLease) {
+      m_progressiveLayerLease.release();
+    }
+  }
+
+  // Release entry/exit lease so the scratch pool can reuse it
+  void releaseEntryExit()
+  {
+    if (m_entryExitLease) {
+      m_entryExitLease.release();
+    }
   }
 
   // Notify renderer that a progressive round has completed so internal
@@ -247,7 +262,6 @@ protected:
 
 private:
   std::vector<ZMesh> m_quads;
-  const Z3DTexture* m_entryExitTexCoordAndZeTexture = nullptr;
   ZMesh m_entryExitMesh;
   bool m_entryExitMeshValid = false;
   bool m_entryExitMeshFlipped = false;
