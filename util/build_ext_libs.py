@@ -1972,8 +1972,17 @@ def build_freeimage(src_dir: str, install_dir: str):
     patches = [
         FilePatcher(
             orig_file=os.path.join(src_dir, 'fipMakefile.srcs'),
-            from_texts=[r'Source/LibTIFF4/tif_dir.c '],
-            to_texts=[r'Source/LibTIFF4/tif_dir.c Source/LibTIFF4/tif_hash_set.c '],
+            from_texts=[r'Source/LibTIFF4/tif_dir.c ',
+                        r'Source/LibPNG/png.c Source/LibPNG/pngerror.c Source/LibPNG/pngget.c Source/LibPNG/pngmem.c Source/LibPNG/pngpread.c Source/LibPNG/pngread.c Source/LibPNG/pngrio.c Source/LibPNG/pngrtran.c Source/LibPNG/pngrutil.c Source/LibPNG/pngset.c Source/LibPNG/pngtrans.c Source/LibPNG/pngwio.c Source/LibPNG/pngwrite.c Source/LibPNG/pngwtran.c Source/LibPNG/pngwutil.c ',
+                        r'./Source/FreeImage/PluginPNG.cpp '],
+            to_texts=[r'Source/LibTIFF4/tif_dir.c Source/LibTIFF4/tif_hash_set.c ',
+                      r'',
+                      r''],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'Source', 'FreeImage', 'Plugin.cpp'),
+            from_texts=[r's_plugins->AddNode(InitPNG);'],
+            to_texts=[r''],
         ),
         FilePatcher(
             orig_file=os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'FreeImagePlus.h'),
