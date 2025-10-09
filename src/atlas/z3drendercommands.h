@@ -504,11 +504,19 @@ struct TextureDualPeelPayload
     Final
   } stage = Stage::Blend;
 
+  static constexpr uint32_t kInvalidQueryIndex = std::numeric_limits<uint32_t>::max();
+
   AttachmentHandle tempAttachment;
   AttachmentHandle frontAttachment;
   AttachmentHandle backAttachment;
   AttachmentHandle depthAttachment;
   glm::vec2 screenDimRcp{1.0f};
+  uint32_t occlusionQueryIndex = kInvalidQueryIndex;
+
+  [[nodiscard]] bool hasOcclusionQuery() const
+  {
+    return occlusionQueryIndex != kInvalidQueryIndex;
+  }
 };
 
 struct TextureWeightedAveragePayload

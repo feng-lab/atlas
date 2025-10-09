@@ -218,6 +218,16 @@ public:
 
   [[nodiscard]] bool supportsCommandLists() const;
 
+  [[nodiscard]] Z3DRendererBackend* backend()
+  {
+    return m_backend.get();
+  }
+
+  [[nodiscard]] const Z3DRendererBackend* backend() const
+  {
+    return m_backend.get();
+  }
+
   static RendererViewState buildViewStateFromCamera(const Z3DCamera& camera);
 
   void markRenderDataDirty()

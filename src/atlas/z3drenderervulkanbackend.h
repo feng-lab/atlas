@@ -184,6 +184,20 @@ public:
       void(const void* mapped, size_t bytes, vk::Format format, glm::uvec2 size, std::function<void()> releaseSlot)>
       onReady);
 
+  [[nodiscard]] bool supportsOcclusionQueries() const
+  {
+    return true;
+  }
+
+  std::optional<uint32_t> allocateOcclusionQuery();
+  void beginOcclusionQuery(vk::raii::CommandBuffer& cmd, uint32_t index);
+  void endOcclusionQuery(vk::raii::CommandBuffer& cmd, uint32_t index);
+  [[nodiscard]] uint64_t lastOcclusionQueryResult(uint32_t index) const;
+  [[nodiscard]] const std::vector<uint64_t>& recentOcclusionResults() const
+  {
+    return m_recentOcclusionResults;
+  }
+
 private:
   friend class Z3DRendererBase;
   void ensureDevice();
@@ -205,9 +219,13 @@ private:
   struct FrameResources
   {
     vk::raii::QueryPool queryPool{nullptr};
+    vk::raii::QueryPool occlusionQueryPool{nullptr};
     std::vector<GpuScopeRecord> gpuScopes;
     std::vector<CpuScopeRecord> cpuScopes;
     uint32_t nextQuery = 0;
+    uint32_t nextOcclusionQuery = 0;
+    bool occlusionQueryNeedsWait = false;
+    std::vector<uint64_t> occlusionQueryResults;
     std::chrono::steady_clock::time_point cpuStart;
     std::chrono::steady_clock::time_point cpuEnd;
 
@@ -365,6 +383,8 @@ public:
   std::unique_ptr<ZVulkanImgSlicePipelineContext> m_imgSliceContext;
   std::unique_ptr<ZVulkanImgRaycasterPipelineContext> m_imgRaycasterContext;
   std::unique_ptr<ZVulkanFontPipelineContext> m_fontContext;
+
+  std::vector<uint64_t> m_recentOcclusionResults;
 
   // Shared fallback resources
   std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;

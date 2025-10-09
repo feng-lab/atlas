@@ -2842,7 +2842,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   glClear(GL_COLOR_BUFFER_BIT);
 
   size_t currId = 0;
-
+  size_t executedPasses = 0;
   for (size_t pass = 1; g_useOQ && pass < g_numPasses; pass++) {
     currId = pass % 2;
     auto prevId = 1 - currId;
@@ -2911,7 +2911,9 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
         break;
       }
     }
+    executedPasses++;
   }
+  VLOG(1) << fmt::format("DDP GL executed {} peel passes", executedPasses);
 
   if (depthTexture) {
     ddpRT.detach(GL_DEPTH_ATTACHMENT);
@@ -3253,6 +3255,9 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
     return;
   }
 
+  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
+  const bool occlusionSupported = (vkBackend != nullptr) && vkBackend->supportsOcclusionQueries();
+
   auto ddpBindings = m_rendererBase.prepareVulkanSurface(ddpLease);
   if (ddpBindings.colorHandles.size() < 8 || ddpBindings.surface.colorAttachments.size() < 7) {
     LOG_FIRST_N(WARNING, 3) << "Dual depth peeling Vulkan target incomplete.";
@@ -3420,12 +3425,9 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   m_rendererBase.setCollectOnly(false);
   resetHooks();
 
-  // TODO(vulkan-ddp): restore occlusion-query based early exit so we don't
-  // have to iterate a fixed number of peel passes each frame. Eight passes
-  // mirrors the GL fallback (g_numPasses = 100 with early exit) closely
-  // enough for typical neuron scenes without leaving back faces visible.
-  constexpr size_t kMaxPasses = 8;
+  constexpr size_t kMaxPasses = 100;
   size_t currId = 0;
+  size_t executedPasses = 0;
   for (size_t pass = 1; pass < kMaxPasses; ++pass) {
     currId = pass % 2;
     const size_t prevId = 1 - currId;
@@ -3507,12 +3509,20 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
     const glm::vec2 screenDimRcp(targetSize.x > 0u ? 1.f / static_cast<float>(targetSize.x) : 0.f,
                                  targetSize.y > 0u ? 1.f / static_cast<float>(targetSize.y) : 0.f);
 
+    uint32_t occlusionQueryIndex = TextureDualPeelPayload::kInvalidQueryIndex;
+    if (occlusionSupported) {
+      if (auto queryOpt = vkBackend->allocateOcclusionQuery()) {
+        occlusionQueryIndex = *queryOpt;
+      }
+    }
+
     m_rendererBase.recordVulkanBatches(
       [&]() {
         TextureDualPeelPayload payload;
         payload.stage = TextureDualPeelPayload::Stage::Blend;
         payload.tempAttachment = backTempPing[currId];
         payload.screenDimRcp = screenDimRcp;
+        payload.occlusionQueryIndex = occlusionQueryIndex;
 
         RenderBatch batch;
         batch.eye = eye;
@@ -3532,7 +3542,19 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
       "transparency_ddp_blend");
     m_rendererBase.setCollectOnly(false);
     resetHooks();
+
+    executedPasses++;
+
+    if (occlusionSupported && occlusionQueryIndex != TextureDualPeelPayload::kInvalidQueryIndex) {
+      const uint64_t samples = vkBackend->lastOcclusionQueryResult(occlusionQueryIndex);
+      if (samples == 0u) {
+        break;
+      }
+    }
   }
+
+  VLOG(1) << fmt::format("DDP Vulkan executed {} peel passes", executedPasses);
+  // TODO: Consider option (2) for Vulkan dual-depth peeling. Record each peel pass in a separate command buffer, flush, read occlusion query results immediately, and stop submitting once a pass reports zero samples. This would mirror GL behaviour but requires reworking command buffer submission per pass. (See discussion about matching GL pass counts.)
 
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;

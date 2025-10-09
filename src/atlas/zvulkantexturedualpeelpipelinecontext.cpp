@@ -56,6 +56,8 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   m_vertexCount = 4;
 
   Stage stage = (payload.stage == TextureDualPeelPayload::Stage::Final) ? Stage::Final : Stage::Blend;
+  const bool useOcclusionQuery =
+    (stage == Stage::Blend) && payload.hasOcclusionQuery() && m_backend.supportsOcclusionQueries();
 
   if (stage == Stage::Blend) {
     CHECK(payload.tempAttachment.backend == AttachmentBackend::Vulkan)
@@ -169,7 +171,15 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
                            {});
   }
 
+  if (useOcclusionQuery) {
+    m_backend.beginOcclusionQuery(cmd, payload.occlusionQueryIndex);
+  }
+
   cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
+
+  if (useOcclusionQuery) {
+    m_backend.endOcclusionQuery(cmd, payload.occlusionQueryIndex);
+  }
 }
 
 void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorLayouts()

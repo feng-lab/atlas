@@ -50,6 +50,16 @@ namespace nim {
 
 namespace {
 constexpr uint32_t kMaxTimestampQueries = 64u;
+constexpr uint32_t kMaxOcclusionQueries = 64u;
+
+// TODO: option (2) - split each peel pass into its own command buffer, wait for the GPU to finish,
+// read the occlusion query immediately, and stop submitting once no fragments are left. This would
+// mirror GL behaviour but requires a per-pass submit/wait model.
+
+inline bool queryPoolValid(const vk::raii::QueryPool& pool)
+{
+  return static_cast<VkQueryPool>(*pool) != VK_NULL_HANDLE;
+}
 }
 
 thread_local Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::s_currentBackend = nullptr;
@@ -261,6 +271,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 
   // Expose frame resources to allow pre-record descriptor priming
   m_activeFrame = &frameResources;
+  frameResources.nextOcclusionQuery = 0;
+  frameResources.occlusionQueryNeedsWait = false;
+  frameResources.occlusionQueryResults.assign(kMaxOcclusionQueries, 0u);
 
   // Prime persistent descriptor sets before command buffer recording begins.
   // This allows UBO/image bindings to be established without violating the
@@ -299,6 +312,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   auto& cmdBuffer = m_activeFrameHandle->commandBuffer();
   cmdBuffer.begin(beginInfo);
   cmdBuffer.resetQueryPool(*frameResources.queryPool, 0, kMaxTimestampQueries);
+  if (queryPoolValid(frameResources.occlusionQueryPool)) {
+    cmdBuffer.resetQueryPool(*frameResources.occlusionQueryPool, 0, kMaxOcclusionQueries);
+  }
 
   m_frameRecording = true;
 
@@ -408,16 +424,55 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   // Stage 2: schedule exactly one descriptor arena reset for this frame.
   scheduleArenaReset(frame);
 
-  // Deliver callbacks immediately after submission when this frame enqueued
-  // readbacks, to update the UI as soon as the GPU finishes. Also do it once
-  // after a backend switch to ensure the first frame appears promptly.
-  if ((m_activeFrame && !m_activeFrame->pendingColorReadbacks.empty()) || m_pumpFenceAfterFirstSubmit) {
+  const bool waitForReadbacks = (m_activeFrame && !m_activeFrame->pendingColorReadbacks.empty());
+  const bool waitForOcclusion = frame.occlusionQueryNeedsWait;
+  const bool needFenceWait = waitForReadbacks || waitForOcclusion || m_pumpFenceAfterFirstSubmit;
+
+  if (needFenceWait) {
     device().frameExecutor().waitForCompletion(frameHandle);
     applyPendingArenaReset(frame); // runs deferred readback consumers now
+
+    if (waitForOcclusion && queryPoolValid(frame.occlusionQueryPool) && frame.nextOcclusionQuery > 0) {
+      frame.occlusionQueryResults.resize(frame.nextOcclusionQuery, 0u);
+      auto& vkDevice = m_sharedDevice->context().device();
+      const auto* dispatcher = vkDevice.getDispatcher();
+      if (dispatcher && dispatcher->vkGetQueryPoolResults) {
+        const vk::QueryResultFlags queryFlags = vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait;
+        const VkResult raw = dispatcher->vkGetQueryPoolResults(static_cast<VkDevice>(*vkDevice),
+                                                               static_cast<VkQueryPool>(*frame.occlusionQueryPool),
+                                                               0,
+                                                               frame.nextOcclusionQuery,
+                                                               frame.occlusionQueryResults.size() * sizeof(uint64_t),
+                                                               frame.occlusionQueryResults.data(),
+                                                               sizeof(uint64_t),
+                                                               static_cast<VkQueryResultFlags>(queryFlags));
+        const auto result = static_cast<vk::Result>(raw);
+        if (result == vk::Result::eSuccess) {
+          m_recentOcclusionResults.assign(frame.occlusionQueryResults.begin(),
+                                          frame.occlusionQueryResults.begin() + frame.nextOcclusionQuery);
+        } else {
+          VLOG(1) << "Vulkan occlusion query results unavailable: " << vk::to_string(result);
+          m_recentOcclusionResults.clear();
+        }
+      } else {
+        VLOG(1) << "Vulkan dispatcher missing vkGetQueryPoolResults";
+        m_recentOcclusionResults.clear();
+      }
+    } else {
+      m_recentOcclusionResults.clear();
+    }
+
+    frame.occlusionQueryNeedsWait = false;
+    frame.nextOcclusionQuery = 0;
+
     if (m_pumpFenceAfterFirstSubmit) {
       VLOG(1) << "VK pumped first-frame fence: delivered readback callbacks";
       m_pumpFenceAfterFirstSubmit = false;
     }
+  } else {
+    m_recentOcclusionResults.clear();
+    frame.nextOcclusionQuery = 0;
+    frame.occlusionQueryNeedsWait = false;
   }
 
   // VLOG(1) frame recycling stats (descriptors and arena reset scheduling)
@@ -1405,6 +1460,51 @@ void Z3DRendererVulkanBackend::scheduleAfterCurrentFrameCompletion(std::function
   m_activeFrame->leaseRecycleQueued++;
 }
 
+std::optional<uint32_t> Z3DRendererVulkanBackend::allocateOcclusionQuery()
+{
+  if (!m_activeFrame || !m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    return std::nullopt;
+  }
+  auto& frame = *m_activeFrame;
+  if (!queryPoolValid(frame.occlusionQueryPool)) {
+    return std::nullopt;
+  }
+  if (frame.nextOcclusionQuery >= kMaxOcclusionQueries) {
+    LOG_FIRST_N(WARNING, 1) << "Vulkan occlusion query budget exceeded";
+    return std::nullopt;
+  }
+  frame.occlusionQueryNeedsWait = true;
+  const uint32_t index = frame.nextOcclusionQuery++;
+  return index;
+}
+
+void Z3DRendererVulkanBackend::beginOcclusionQuery(vk::raii::CommandBuffer& cmd, uint32_t index)
+{
+  if (!m_activeFrame || !queryPoolValid(m_activeFrame->occlusionQueryPool)) {
+    return;
+  }
+  cmd.beginQuery(*m_activeFrame->occlusionQueryPool, index, {});
+}
+
+void Z3DRendererVulkanBackend::endOcclusionQuery(vk::raii::CommandBuffer& cmd, uint32_t index)
+{
+  if (!m_activeFrame || !queryPoolValid(m_activeFrame->occlusionQueryPool)) {
+    return;
+  }
+  cmd.endQuery(*m_activeFrame->occlusionQueryPool, index);
+}
+
+uint64_t Z3DRendererVulkanBackend::lastOcclusionQueryResult(uint32_t index) const
+{
+  if (m_recentOcclusionResults.empty()) {
+    return 1u;
+  }
+  if (index < m_recentOcclusionResults.size()) {
+    return m_recentOcclusionResults[index];
+  }
+  return 0u;
+}
+
 vk::raii::CommandBuffer& Z3DRendererVulkanBackend::commandBuffer()
 {
   CHECK(m_activeFrameHandle && m_activeFrameHandle->valid()) << "Command buffer requested outside active frame";
@@ -1469,6 +1569,9 @@ Z3DRendererVulkanBackend::FrameResources& Z3DRendererVulkanBackend::ensureFrameR
   vk::QueryPoolCreateInfo queryInfo{.queryType = vk::QueryType::eTimestamp, .queryCount = kMaxTimestampQueries};
   frame.queryPool = vk::raii::QueryPool(vkDevice, queryInfo);
   frame.descriptorPool = m_sharedDevice->createDescriptorPool();
+  vk::QueryPoolCreateInfo occlusionInfo{.queryType = vk::QueryType::eOcclusion, .queryCount = kMaxOcclusionQueries};
+  frame.occlusionQueryPool = vk::raii::QueryPool(vkDevice, occlusionInfo);
+  frame.occlusionQueryResults.clear();
   return frame;
 }
 
