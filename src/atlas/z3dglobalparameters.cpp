@@ -50,7 +50,7 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     std::make_pair(QStringLiteral("Weighted Average"), static_cast<int>(TransparencyMode::WeightedAverage)),
     std::make_pair(QStringLiteral("Weighted Blended"), static_cast<int>(TransparencyMode::WeightedBlended)),
     std::make_pair(QStringLiteral("Dual Depth Peeling"), static_cast<int>(TransparencyMode::DualDepthPeeling)));
-  transparencyMethod.select(QStringLiteral("Weighted Average"));
+  transparencyMethod.select(QStringLiteral("Weighted Blended"));
   // weightedBlendedDepthScale.setStyle("SPINBOX");
 
   //  if (Z3DGpuInfoInstance.isLinkedListSupported())

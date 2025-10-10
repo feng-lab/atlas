@@ -168,7 +168,7 @@ struct RendererSceneState
   glm::vec4 sceneAmbient{0.2f, 0.2f, 0.2f, 1.f};
   float weightedBlendedDepthScale = 1.f;
   float devicePixelRatio = 1.f;
-  TransparencyMode transparency = TransparencyMode::WeightedAverage;
+  TransparencyMode transparency = TransparencyMode::WeightedBlended;
   GeometryMSAAMode multisample = GeometryMSAAMode::MSAA2x2;
 
   struct FogState
