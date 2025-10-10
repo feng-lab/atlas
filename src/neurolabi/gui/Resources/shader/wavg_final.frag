@@ -49,8 +49,10 @@ void main(void)
 		discard;
 	}
 
-	vec3 AvgColor = SumColor.rgb / SumColor.a;
-	float AvgAlpha = SumColor.a / n;
+        float sumAlpha = SumColor.a;
+        float invSumAlpha = 1.0 / max(sumAlpha, 1e-6);
+        vec3 AvgColor = SumColor.rgb * invSumAlpha;
+        float AvgAlpha = sumAlpha / n;
 
 	float T = pow(1.0-AvgAlpha, n);
 	FragData0.a = 1 - T;
