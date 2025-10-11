@@ -30,7 +30,7 @@ vk::DescriptorSet ZVulkanDescriptorPool::allocateDescriptorSet(vk::DescriptorSet
                                    .pSetLayouts = &layout};
   auto sets = m_device.context().device().allocateDescriptorSets(ai);
   if (sets.empty()) {
-    throw std::runtime_error("allocateDescriptorSets returned no sets");
+    throw ZException("allocateDescriptorSets returned no sets");
   }
   // Detach the descriptor set from the RAII container to avoid vkFree on
   // scope exit; we manage lifetime via pool reset after the frame fence.

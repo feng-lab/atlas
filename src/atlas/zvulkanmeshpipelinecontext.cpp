@@ -1076,11 +1076,9 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
     return;
   }
 
-  if (payload.colorSource == MeshPayload::ColorSource::CustomColor &&
-      payload.meshColors.size() < payload.meshes.size()) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan mesh backend skipping batch: custom color array is incomplete.";
-    return;
-  }
+  CHECK(payload.colorSource != MeshPayload::ColorSource::CustomColor ||
+        payload.meshColors.size() >= payload.meshes.size())
+    << "Vulkan mesh backend skipping batch: custom color array is incomplete.";
 
   size_t totalVertices = 0;
   size_t totalIndices = 0;
@@ -1091,10 +1089,9 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
       continue;
     }
 
-    if (!payload.pickingPass && !validateTexturePrerequisites(payload, *mesh)) {
-      LOG_FIRST_N(WARNING, 5) << "Vulkan mesh backend skipping batch: texture prerequisites not met.";
-      m_draws.clear();
-      return;
+    if (!payload.pickingPass) {
+      CHECK(validateTexturePrerequisites(payload, *mesh))
+        << "Vulkan mesh backend skipping batch: texture prerequisites not met.";
     }
 
     if (mesh->numVertices() == 0) {

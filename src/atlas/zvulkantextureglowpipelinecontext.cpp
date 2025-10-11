@@ -69,10 +69,8 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
 {
   (void)payload;
 
-  if (!payload.colorAttachmentHandle.valid() || !payload.depthAttachmentHandle.valid()) {
-    LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan glow pass due to missing attachments";
-    return;
-  }
+  CHECK(payload.colorAttachmentHandle.valid() && payload.depthAttachmentHandle.valid())
+    << "Skipping Vulkan glow pass due to missing attachments";
 
   auto& colorTexture =
     vulkan::textureFromHandle(payload.colorAttachmentHandle, m_backend.device(), "texture-glow color attachment");

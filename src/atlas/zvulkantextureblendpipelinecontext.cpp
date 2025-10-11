@@ -71,11 +71,9 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
 {
   (void)payload;
 
-  if (!payload.colorAttachmentHandle0.valid() || !payload.depthAttachmentHandle0.valid() ||
-      !payload.colorAttachmentHandle1.valid() || !payload.depthAttachmentHandle1.valid()) {
-    LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan texture blend pass due to missing attachments";
-    return;
-  }
+  CHECK(payload.colorAttachmentHandle0.valid() && payload.depthAttachmentHandle0.valid() &&
+        payload.colorAttachmentHandle1.valid() && payload.depthAttachmentHandle1.valid())
+    << "Skipping Vulkan texture blend pass due to missing attachments";
 
   auto& color0 =
     vulkan::textureFromHandle(payload.colorAttachmentHandle0, m_backend.device(), "texture-blend color attachment 0");

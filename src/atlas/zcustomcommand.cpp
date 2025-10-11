@@ -507,7 +507,7 @@ void stnTrajectory()
         }
 #endif
         if (line.empty()) {
-          LOG(WARNING) << "WTF";
+          LOG(ERROR) << "WTF";
         } else {
           lines.push_back(line);
         }

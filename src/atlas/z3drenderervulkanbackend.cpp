@@ -98,7 +98,7 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
       m_activeFrameHandle->commandBuffer().end();
     }
     catch (const std::exception& e) {
-      LOG(WARNING) << "Vulkan command buffer end during backend switch failed: " << e.what();
+      LOG(ERROR) << "Vulkan command buffer end during backend switch failed: " << e.what();
     }
     m_frameRecording = false;
   }
@@ -110,7 +110,7 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
       m_sharedDevice->context().device().waitIdle();
     }
     catch (const std::exception& e) {
-      LOG(WARNING) << "Vulkan waitIdle (shared) failed: " << e.what();
+      LOG(ERROR) << "Vulkan waitIdle (shared) failed: " << e.what();
     }
 
     for (auto& frame : m_frames) {
@@ -134,7 +134,7 @@ void Z3DRendererVulkanBackend::setGlobalShaderParameters(Z3DRendererBase& render
   (void)renderer;
   (void)shader;
   (void)eye;
-  LOG_FIRST_N(WARNING, 1) << "Vulkan backend does not provide GLSL shader parameter bindings";
+  CHECK(false) << "Vulkan backend does not provide GLSL shader parameter bindings";
 }
 
 std::string Z3DRendererVulkanBackend::generateHeader(const Z3DRendererBase& renderer) const
@@ -414,7 +414,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
         frame.readbackSlotsInFlight++;
       }
       catch (const std::exception& e) {
-        LOG_FIRST_N(WARNING, 3) << "Vulkan readback copy failed: " << e.what();
+        LOG(ERROR) << "Vulkan readback copy failed: " << e.what();
       }
     }
   }
@@ -424,7 +424,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
       frameHandle.commandBuffer().end();
     }
     catch (const std::exception& e) {
-      LOG(WARNING) << "Vulkan command buffer end failed: " << e.what();
+      LOG(ERROR) << "Vulkan command buffer end failed: " << e.what();
       m_frameRecording = false;
       m_activeFrameHandle.reset();
       m_activeFrame = nullptr;
@@ -462,7 +462,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     device().frameExecutor().markSubmitted(frameHandle);
   }
   catch (const std::exception& e) {
-    LOG(WARNING) << "Vulkan queue submit failed: " << e.what();
+    LOG(ERROR) << "Vulkan queue submit failed: " << e.what();
   }
 
   // Stage 2: schedule exactly one descriptor arena reset for this frame.
@@ -1054,8 +1054,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (!handled) {
       cmd.setViewport(0, vkViewport);
       cmd.setScissor(0, vkScissor);
-      LOG_FIRST_N(WARNING, 5) << "Vulkan backend has not yet implemented draw emission for geometry type '"
-                              << describeGeometry(batch.geometry) << "'.";
+      CHECK(false) << "Vulkan backend has not yet implemented draw emission for geometry type '"
+                   << describeGeometry(batch.geometry) << "'.";
     }
 
     // If the context managed its own begin/end logic, treat the segment as closed.
@@ -1313,7 +1313,7 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
     vinfo.size = newCapacity;
     if (vmaCreateVirtualBlock(&vinfo, &arena.block) != VK_SUCCESS) {
       arena.block = nullptr;
-      LOG_FIRST_N(ERROR, 3) << "Failed to create VMA virtual block for upload arena";
+      LOG(ERROR) << "Failed to create VMA virtual block for upload arena";
     }
   };
 
@@ -1393,7 +1393,7 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   vinfo.size = newCapacity;
   if (vmaCreateVirtualBlock(&vinfo, &arena.block) != VK_SUCCESS) {
     arena.block = nullptr;
-    LOG_FIRST_N(ERROR, 3) << "Failed to create VMA virtual block for upload arena (reserve)";
+    LOG(ERROR) << "Failed to create VMA virtual block for upload arena (reserve)";
   }
   VLOG(2) << fmt::format("reserveUploadSlices: grew arena to {} bytes for {} slices", newCapacity, slices.size());
 }
@@ -1563,7 +1563,7 @@ std::optional<uint32_t> Z3DRendererVulkanBackend::allocateOcclusionQuery()
     return std::nullopt;
   }
   if (frame.nextOcclusionQuery >= kMaxOcclusionQueries) {
-    LOG_FIRST_N(WARNING, 1) << "Vulkan occlusion query budget exceeded";
+    LOG(ERROR) << "Vulkan occlusion query budget exceeded";
     return std::nullopt;
   }
   frame.occlusionQueryNeedsWait = true;
@@ -1702,10 +1702,7 @@ void Z3DRendererVulkanBackend::applyPendingArenaReset(FrameResources& frame)
 void Z3DRendererVulkanBackend::scheduleArenaReset(FrameResources& frame)
 {
   // Debug guard: should schedule exactly once per frame
-  if (frame.arenaResetScheduled) {
-    LOG_FIRST_N(ERROR, 1) << "Descriptor arena reset scheduled more than once for the same frame";
-    return;
-  }
+  CHECK(!frame.arenaResetScheduled) << "Descriptor arena reset scheduled more than once for the same frame";
   frame.arenaResetScheduled = true;
 }
 
@@ -2062,7 +2059,7 @@ std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view l
   }
   auto& frame = *m_activeFrame;
   if (frame.nextQuery + 2 > kMaxTimestampQueries) {
-    LOG_FIRST_N(WARNING, 1) << "Vulkan timestamp query budget exceeded";
+    LOG(ERROR) << "Vulkan timestamp query budget exceeded";
     return std::nullopt;
   }
   const uint32_t startIndex = frame.nextQuery++;

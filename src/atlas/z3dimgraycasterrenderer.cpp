@@ -78,10 +78,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     return;
   }
 
-  if (m_outputSize.x == 0u || m_outputSize.y == 0u) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster output size is zero.";
-    return;
-  }
+  CHECK(m_outputSize.x > 0u && m_outputSize.y > 0u) << "Vulkan img raycaster output size is zero.";
 
   ImgRaycasterPayload payload;
   payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
@@ -209,10 +206,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     populateFromQuads();
   }
 
-  if (payload.entryPositions.empty()) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster is missing entry geometry for the current draw.";
-    return;
-  }
+  CHECK(!payload.entryPositions.empty()) << "Vulkan img raycaster is missing entry geometry for the current draw.";
 
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   auto entryLease = pool.acquireEntryExitRenderTarget(m_outputSize,
@@ -385,7 +379,7 @@ void Z3DImgRaycasterRenderer::addQuad(const ZMesh& quad)
 {
   if (quad.empty() || (quad.numVertices() != 4 && quad.numVertices() != 6) ||
       (quad.numVertices() != quad.num2DTextureCoordinates() && quad.numVertices() != quad.num3DTextureCoordinates())) {
-    LOG(ERROR) << "Input quad should be 2D slice with either 2D or 3D texture coordinates";
+    CHECK(false) << "Input quad should be 2D slice with either 2D or 3D texture coordinates";
     return;
   }
   m_quads.push_back(quad);

@@ -133,7 +133,7 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
                                   vk::ImageAspectFlagBits::eColor);
     }
     catch (const std::exception& e) {
-      LOG_FIRST_N(WARNING, 3) << "Vulkan picking color download failed: " << e.what();
+      LOG(ERROR) << "Vulkan picking color download failed: " << e.what();
       return nullptr;
     }
     glm::col4 c{rgba[0], rgba[1], rgba[2], rgba[3]};
@@ -177,7 +177,7 @@ GLfloat Z3DPickingManager::depthAtWidgetPos(glm::ivec2 pos)
                                     vk::ImageAspectFlagBits::eDepth);
       }
       catch (const std::exception& e) {
-        LOG_FIRST_N(WARNING, 3) << "Vulkan picking depth download failed: " << e.what();
+        LOG(ERROR) << "Vulkan picking depth download failed: " << e.what();
         return 1.0f;
       }
       return val;
@@ -192,7 +192,7 @@ GLfloat Z3DPickingManager::depthAtWidgetPos(glm::ivec2 pos)
                                   vk::ImageAspectFlagBits::eDepth);
     }
     catch (const std::exception& e) {
-      LOG_FIRST_N(WARNING, 3) << "Vulkan picking depth download failed: " << e.what();
+      LOG(ERROR) << "Vulkan picking depth download failed: " << e.what();
       return 1.0f;
     }
     return static_cast<float>(packed & 0x00FFFFFFu) / static_cast<float>(0x00FFFFFFu);

@@ -758,12 +758,8 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
     return;
   }
 
-  if (payload.axisAndTopRadius.size() != m_vertexCount || payload.flags.size() != m_vertexCount) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan cone backend skipping batch: attribute buffers are incomplete.";
-    m_vertexCount = 0;
-    m_indexCount = 0;
-    return;
-  }
+  CHECK(payload.axisAndTopRadius.size() == m_vertexCount && payload.flags.size() == m_vertexCount)
+    << "Vulkan cone backend skipping batch: attribute buffers are incomplete.";
 
   // Allocate SoA slices
   const size_t v4Bytes = m_vertexCount * sizeof(glm::vec4);

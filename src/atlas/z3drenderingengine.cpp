@@ -231,7 +231,7 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
       m_vkDevice->context().device().waitIdle();
     }
   } catch (const std::exception& e) {
-    LOG(WARNING) << "Vulkan waitIdle during engine shutdown failed: " << e.what();
+    LOG(ERROR) << "Vulkan waitIdle during engine shutdown failed: " << e.what();
   }
 }
 
@@ -1465,19 +1465,11 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
 
 void Z3DRenderingEngine::saveCurrentFrameColor(const QString& filename, Z3DEye eye)
 {
-  if (!m_compositor) {
-    LOG(WARNING) << "Compositor not initialized";
-    return;
-  }
   m_compositor->saveOutputColorToImage(filename, eye);
 }
 
 void Z3DRenderingEngine::saveCurrentFrameDepth(const QString& filename, Z3DEye eye)
 {
-  if (!m_compositor) {
-    LOG(WARNING) << "Compositor not initialized";
-    return;
-  }
   m_compositor->saveOutputDepthToImage(filename, eye);
 }
 
@@ -1527,7 +1519,7 @@ void Z3DRenderingEngine::applyBackendSwitch()
     try {
       m_vkDevice->context().device().waitIdle();
     } catch (const std::exception& e) {
-      LOG(WARNING) << "Vulkan waitIdle before pool reset failed: " << e.what();
+      LOG(ERROR) << "Vulkan waitIdle before pool reset failed: " << e.what();
     }
 
     VLOG(1) << "Ensuring OpenGL context is current for backend switch";

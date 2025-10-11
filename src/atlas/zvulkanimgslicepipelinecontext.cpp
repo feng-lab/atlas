@@ -345,10 +345,8 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     }
     for (size_t idx = 0; idx < channelCount; ++idx) {
       const auto& channel = channels[idx];
-      if (!channel.pageDirectory || !channel.pageTable || !channel.imageCache) {
-        LOG_FIRST_N(WARNING, 5) << "Paging textures missing for Vulkan slice pipeline channel " << idx;
-        return false;
-      }
+      CHECK(channel.pageDirectory && channel.pageTable && channel.imageCache)
+        << "Paging textures missing for Vulkan slice pipeline channel " << idx;
     }
     return true;
   };
@@ -557,20 +555,12 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  if (!payload.layerLease) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan slice pipeline requires a layer render target for multi-channel rendering.";
-    ensureFinalRendering();
-    return;
-  }
+  CHECK(payload.layerLease) << "Vulkan slice pipeline requires a layer render target for multi-channel rendering.";
 
   auto& layerLease = *payload.layerLease;
   ZVulkanTexture* layerColor = layerLease.colorAttachment(0);
   ZVulkanTexture* layerDepth = layerLease.depthAttachmentTexture();
-  if (!layerColor) {
-    LOG_FIRST_N(WARNING, 5) << "Layer array render target is missing color attachments for Vulkan slice pipeline.";
-    ensureFinalRendering();
-    return;
-  }
+  CHECK(layerColor) << "Layer array render target is missing color attachments for Vulkan slice pipeline.";
 
   for (uint32_t idx = 0; idx < channelCount; ++idx) {
     recordChannelDraw(idx, m_channelResources[idx], *layerColor, layerDepth, idx, usePaging);
@@ -900,6 +890,8 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureColormapTexture(size_t cha
   // Ensure texture exists and matches desired width
   bool createdOrResized = false;
   if (!resources.colormapTexture || resources.colormapWidth != kColormapWidth) {
+    // Prefer RGBA textures in Vulkan; build an RGBA8 LUT and use
+    // eR8G8B8A8Unorm to match channel order.
     vulkan::ensure1DLUTTexture(device, resources.colormapTexture, kColormapWidth);
     resources.colormapWidth = kColormapWidth;
     createdOrResized = true;
@@ -911,7 +903,7 @@ ZVulkanTexture& ZVulkanImgSlicePipelineContext::ensureColormapTexture(size_t cha
   // Upload on first create/resize or when the colormap generation changes.
   if (createdOrResized || gen != resources.colormapGeneration) {
     std::vector<uint8_t> texels;
-    colorMap->buildLUTBGRA8(texels, kColormapWidth);
+    colorMap->buildLUTRGBA8(texels, kColormapWidth);
     if (!texels.empty()) {
       vulkan::uploadLUT(*resources.colormapTexture, texels.data(), texels.size());
       resources.colormapGeneration = gen;
@@ -976,7 +968,7 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
                                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!resources.pageDataBuffer) {
-    LOG_FIRST_N(ERROR, 5) << "Failed to allocate paging uniform buffer for Vulkan slice pipeline.";
+    LOG(ERROR) << "Failed to allocate paging uniform buffer for Vulkan slice pipeline.";
     return false;
   }
   resources.pageDataBuffer->copyData(pageData.data(), pageData.size());

@@ -146,10 +146,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
     imageCacheTexture = resources->channels[channel].imageCache.get();
   }
 
-  if (imageCacheTexture == nullptr) {
-    LOG(WARNING) << "Vulkan image cache texture missing for channel " << channel;
-    return 0;
-  }
+  CHECK(imageCacheTexture) << "Vulkan image cache texture missing for channel " << channel;
 
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   auto* threadPool = dynamic_cast<folly::ThreadPoolExecutor*>(cpuExecutor.get());

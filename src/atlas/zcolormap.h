@@ -210,6 +210,10 @@ public:
   // Build a BGRA8 look-up table of the given width in CPU memory.
   void buildLUTBGRA8(std::vector<uint8_t>& out, uint32_t width) const;
 
+  // Build an RGBA8 look-up table of the given width in CPU memory.
+  // Matches Vulkan's natural `vk::Format::eR8G8B8A8Unorm` channel order.
+  void buildLUTRGBA8(std::vector<uint8_t>& out, uint32_t width) const;
+
   double domainMin() const;
 
   double domainMax() const;

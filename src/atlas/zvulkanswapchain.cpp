@@ -209,7 +209,7 @@ void ZVulkanSwapChain::endFrame(vk::raii::CommandBuffer& commandBuffer)
     }
   }
   catch (const std::exception& e) {
-    LOG(WARNING) << "Swapchain submit failed: " << e.what();
+    LOG(ERROR) << "Swapchain submit failed: " << e.what();
   }
 
   m_activeFrame.reset();

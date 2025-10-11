@@ -420,15 +420,10 @@ std::shared_ptr<ZWidgetsGroup> Z3DCompositor::axisWidgetsGroup()
 void Z3DCompositor::savePickingBufferToImage(const QString& filename)
 {
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
-    if (!m_pickingTargetLease) {
-      LOG(WARNING) << "Vulkan picking save requested but picking target is not initialized.";
-      return;
-    }
+    CHECK(m_pickingTargetLease) << "Vulkan picking save requested but picking target is not initialized.";
     auto* vtex = m_pickingTargetLease.colorAttachment(0);
-    if (!vtex) {
-      LOG(WARNING) << "Vulkan picking color attachment not available.";
-      return;
-    }
+    CHECK(vtex) << "Vulkan picking color attachment not available.";
+
     const uint32_t w = vtex->width();
     const uint32_t h = vtex->height();
     std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> raw;
@@ -466,15 +461,12 @@ void Z3DCompositor::saveOutputColorToImage(const QString& filename, Z3DEye eye)
     const Z3DScratchResourcePool::RenderTargetLease* ready = (eye == MonoEye)   ? m_monoReadyTarget
                                                              : (eye == LeftEye) ? m_leftReadyTarget
                                                                                 : m_rightReadyTarget;
-    if (!ready || !*ready || ready->backend != RenderBackend::Vulkan) {
-      LOG(WARNING) << "Vulkan output save requested but ready lease is not Vulkan-backed.";
-      return;
-    }
+    CHECK(ready && *ready && ready->backend == RenderBackend::Vulkan)
+      << "Vulkan output save requested but ready lease is not Vulkan-backed.";
+
     ZVulkanTexture* vtex = ready->colorAttachment(0);
-    if (!vtex) {
-      LOG(WARNING) << "Vulkan output color attachment not available.";
-      return;
-    }
+    CHECK(vtex) << "Vulkan output color attachment not available.";
+
     Z3DLocalColorBuffer temp{};
     downloadVulkanTextureToLocalColorBuffer(*vtex, temp);
     // Convert to planar RGBA and save
@@ -497,10 +489,8 @@ void Z3DCompositor::saveOutputColorToImage(const QString& filename, Z3DEye eye)
   const Z3DScratchResourcePool::RenderTargetLease* ready = (eye == MonoEye)   ? m_monoReadyTarget
                                                            : (eye == LeftEye) ? m_leftReadyTarget
                                                                               : m_rightReadyTarget;
-  if (!ready || !ready->renderTarget) {
-    LOG(WARNING) << "GL output save requested but ready render target missing.";
-    return;
-  }
+  CHECK(ready && ready->renderTarget) << "GL output save requested but ready render target missing.";
+
   const Z3DTexture* tex = ready->renderTarget->attachment(GL_COLOR_ATTACHMENT0);
   tex->saveAsColorImage(filename);
 }
@@ -511,15 +501,12 @@ void Z3DCompositor::saveOutputDepthToImage(const QString& filename, Z3DEye eye)
     const Z3DScratchResourcePool::RenderTargetLease* ready = (eye == MonoEye)   ? m_monoReadyTarget
                                                              : (eye == LeftEye) ? m_leftReadyTarget
                                                                                 : m_rightReadyTarget;
-    if (!ready || !*ready || ready->backend != RenderBackend::Vulkan) {
-      LOG(WARNING) << "Vulkan depth save requested but ready lease is not Vulkan-backed.";
-      return;
-    }
+    CHECK(ready && *ready && ready->backend == RenderBackend::Vulkan)
+      << "Vulkan depth save requested but ready lease is not Vulkan-backed.";
+
     ZVulkanTexture* dtex = ready->depthAttachmentTexture();
-    if (!dtex) {
-      LOG(WARNING) << "Vulkan output depth attachment not available.";
-      return;
-    }
+    CHECK(dtex) << "Vulkan output depth attachment not available.";
+
     const uint32_t w = dtex->width();
     const uint32_t h = dtex->height();
     const size_t pixels = static_cast<size_t>(w) * h;
@@ -555,10 +542,8 @@ void Z3DCompositor::saveOutputDepthToImage(const QString& filename, Z3DEye eye)
   const Z3DScratchResourcePool::RenderTargetLease* ready = (eye == MonoEye)   ? m_monoReadyTarget
                                                            : (eye == LeftEye) ? m_leftReadyTarget
                                                                               : m_rightReadyTarget;
-  if (!ready || !ready->renderTarget) {
-    LOG(WARNING) << "GL depth save requested but ready render target missing.";
-    return;
-  }
+  CHECK(ready && ready->renderTarget) << "GL depth save requested but ready render target missing.";
+
   ready->renderTarget->saveAsDepthImage(filename);
 }
 
@@ -3300,19 +3285,14 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
 {
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   auto& ddpLease = ensureDDPRenderTarget(targetSize);
-  if (ddpLease.backend != RenderBackend::Vulkan) {
-    LOG_FIRST_N(WARNING, 3) << "Dual depth peeling Vulkan path missing Vulkan render target; falling back to GL logic.";
-    return;
-  }
+  CHECK(ddpLease.backend == RenderBackend::Vulkan);
 
   auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
   const bool occlusionSupported = (vkBackend != nullptr) && vkBackend->supportsOcclusionQueries();
 
   auto ddpBindings = m_rendererBase.prepareVulkanSurface(ddpLease);
-  if (ddpBindings.colorHandles.size() < 8 || ddpBindings.surface.colorAttachments.size() < 7) {
-    LOG_FIRST_N(WARNING, 3) << "Dual depth peeling Vulkan target incomplete.";
-    return;
-  }
+  CHECK(ddpBindings.colorHandles.size() >= 8 && ddpBindings.surface.colorAttachments.size() >= 7)
+    << "Dual depth peeling Vulkan target incomplete.";
 
   auto makeHandle = [&](size_t idx) {
     return ddpBindings.colorHandles.at(idx);
@@ -3680,16 +3660,11 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
 {
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   auto& waLease = ensureWARenderTarget(targetSize);
-  if (waLease.backend != RenderBackend::Vulkan) {
-    LOG_FIRST_N(WARNING, 3) << "Weighted average Vulkan path missing Vulkan render target; falling back to GL logic.";
-    return;
-  }
+  CHECK(waLease.backend == RenderBackend::Vulkan);
 
   auto waBindings = m_rendererBase.prepareVulkanSurface(waLease);
-  if (waBindings.colorHandles.size() < 2 || waBindings.surface.colorAttachments.size() < 2) {
-    LOG_FIRST_N(WARNING, 3) << "Weighted average Vulkan target incomplete.";
-    return;
-  }
+  CHECK(waBindings.colorHandles.size() >= 2 && waBindings.surface.colorAttachments.size() >= 2)
+    << "Weighted average Vulkan target incomplete.";
 
   auto configureSurface = [&](RendererFrameState::ActiveSurface surface) {
     for (auto& attachment : surface.colorAttachments) {
@@ -3855,16 +3830,11 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
 {
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   auto& wbLease = ensureWBRenderTarget(targetSize);
-  if (wbLease.backend != RenderBackend::Vulkan) {
-    LOG_FIRST_N(WARNING, 3) << "Weighted blended Vulkan path missing Vulkan render target; falling back to GL logic.";
-    return;
-  }
+  CHECK(wbLease.backend == RenderBackend::Vulkan);
 
   auto wbBindings = m_rendererBase.prepareVulkanSurface(wbLease);
-  if (wbBindings.colorHandles.size() < 2 || wbBindings.surface.colorAttachments.size() < 2) {
-    LOG_FIRST_N(WARNING, 3) << "Weighted blended Vulkan target incomplete.";
-    return;
-  }
+  CHECK(wbBindings.colorHandles.size() >= 2 && wbBindings.surface.colorAttachments.size() >= 2)
+    << "Weighted blended Vulkan target incomplete.";
 
   auto configureSurface = [&](RendererFrameState::ActiveSurface surface) {
     if (surface.colorAttachments.size() > 0) {
@@ -4078,10 +4048,8 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderT
           << axisViewport.w;
 
   auto axisSurface = m_rendererBase.describeSurface(sceneOutLease);
-  if (axisSurface.colorAttachments.empty() && !axisSurface.depthAttachment.has_value()) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan axis overlay skipped: compositor output lease has no Vulkan attachments.";
-    return;
-  }
+  CHECK(!(axisSurface.colorAttachments.empty() && !axisSurface.depthAttachment.has_value()))
+    << "Vulkan axis overlay skipped: compositor output lease has no Vulkan attachments.";
 
   const glm::uvec4 prevViewport = m_rendererBase.frameState().viewport;
   const auto prevSurface = m_rendererBase.frameState().activeSurface;
@@ -4358,7 +4326,7 @@ void Z3DCompositor::downloadTextureToLocalColorBuffer(const Z3DTexture& tex, Z3D
       std::memcpy(localColorBuffer.data.data(), ptr, desiredSize);
       glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
     } else {
-      LOG(WARNING) << "glMapBuffer failed on PBO";
+      LOG(ERROR) << "glMapBuffer failed on PBO";
       tex.downloadTextureToBuffer(dataFormat, dataType, localColorBuffer.data.data());
     }
     m_PBO.release(GL_PIXEL_PACK_BUFFER);

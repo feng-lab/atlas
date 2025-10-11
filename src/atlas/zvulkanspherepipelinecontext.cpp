@@ -740,12 +740,7 @@ void ZVulkanSpherePipelineContext::uploadGeometry(const SpherePayload& payload)
     return;
   }
 
-  if (payload.flags.size() != m_vertexCount) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan sphere backend skipping batch: flag buffer is incomplete.";
-    m_vertexCount = 0;
-    m_indexCount = 0;
-    return;
-  }
+  CHECK(payload.flags.size() == m_vertexCount) << "Vulkan sphere backend skipping batch: flag buffer is incomplete.";
 
   const size_t crBytes = m_vertexCount * sizeof(glm::vec4);
   const size_t colBytes = m_vertexCount * sizeof(glm::vec4);

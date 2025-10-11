@@ -484,12 +484,11 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
 
   m_uboMaterial->copyData(&material, sizeof(material));
 
-  VLOG(2) << fmt::format(
-    "VK ellipsoid params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
-    payload.params->sizeScale,
-    material.alpha,
-    pickingPass,
-    (eyeState.isPerspective ? 0 : 1));
+  VLOG(2) << fmt::format("VK ellipsoid params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
+                         payload.params->sizeScale,
+                         material.alpha,
+                         pickingPass,
+                         (eyeState.isPerspective ? 0 : 1));
 }
 
 ZVulkanEllipsoidPipelineContext::PipelineInstance&
@@ -677,13 +676,9 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
     return;
   }
 
-  if (payload.axis1.size() != m_vertexCount || payload.axis2.size() != m_vertexCount ||
-      payload.axis3.size() != m_vertexCount || payload.centers.size() != m_vertexCount) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan ellipsoid backend skipping batch: axis buffers are incomplete.";
-    m_vertexCount = 0;
-    m_indexCount = 0;
-    return;
-  }
+  CHECK(payload.axis1.size() == m_vertexCount && payload.axis2.size() == m_vertexCount &&
+        payload.axis3.size() == m_vertexCount && payload.centers.size() == m_vertexCount)
+    << "Vulkan ellipsoid backend skipping batch: axis buffers are incomplete.";
 
   // Allocate SoA slices
   const size_t axisBytes = m_vertexCount * sizeof(glm::vec4);
@@ -718,8 +713,8 @@ void ZVulkanEllipsoidPipelineContext::uploadGeometry(const EllipsoidPayload& pay
     return;
   }
 
-  if (payload.useDynamicMaterial && payload.specularAndShininess.size() < m_vertexCount) {
-    LOG_FIRST_N(WARNING, 3)
+  if (payload.useDynamicMaterial) {
+    CHECK(payload.specularAndShininess.size() >= m_vertexCount)
       << "Vulkan ellipsoid backend: dynamic material buffer is incomplete; missing values default to zero.";
   }
   auto* axis1Out = static_cast<glm::vec4*>(axis1Slice.mapped);

@@ -266,6 +266,24 @@ void ZColorMap::buildLUTBGRA8(std::vector<uint8_t>& out, uint32_t width) const
   }
 }
 
+void ZColorMap::buildLUTRGBA8(std::vector<uint8_t>& out, uint32_t width) const
+{
+  if (width == 0u) {
+    out.clear();
+    return;
+  }
+  out.resize(static_cast<size_t>(width) * 4u);
+  for (uint32_t x = 0; x < width; ++x) {
+    const double t = width > 1 ? static_cast<double>(x) / static_cast<double>(width - 1u) : 0.0;
+    const glm::col4 c = mappedColor(t);
+    const size_t idx = static_cast<size_t>(x) * 4u;
+    out[idx + 0] = static_cast<uint8_t>(c.r);
+    out[idx + 1] = static_cast<uint8_t>(c.g);
+    out[idx + 2] = static_cast<uint8_t>(c.b);
+    out[idx + 3] = static_cast<uint8_t>(c.a);
+  }
+}
+
 ZColorMap::ZColorMap(ZColorMap&& other) noexcept
 {
   swap(other);

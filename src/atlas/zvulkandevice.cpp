@@ -41,14 +41,14 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
     VmaPoolCreateInfo pci{};
     const uint32_t typeIndex = findMemoryTypeIndex(reqFlags);
     if (typeIndex == UINT32_MAX) {
-      LOG_FIRST_N(WARNING, 3) << "VMA: no memory type for pool flags=" << std::hex << reqFlags;
+      LOG(ERROR) << "VMA: no memory type for pool flags=" << std::hex << reqFlags;
       return nullptr;
     }
     pci.memoryTypeIndex = typeIndex;
     pci.blockSize = blockSize;
     VmaPool pool = nullptr;
     if (vmaCreatePool(m_allocator, &pci, &pool) != VK_SUCCESS) {
-      LOG_FIRST_N(WARNING, 3) << "VMA: pool creation failed for type=" << typeIndex;
+      LOG(ERROR) << "VMA: pool creation failed for type=" << typeIndex;
       return nullptr;
     }
     return pool;

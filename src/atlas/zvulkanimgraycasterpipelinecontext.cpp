@@ -265,20 +265,19 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
                                                 const vk::Rect2D& scissor,
                                                 vk::raii::CommandBuffer& cmd)
 {
-  VLOG(2) << fmt::format("Raycaster::record begin fastOnly={} channels={} out={}x{} leases: entryExit={} lastAccum={} currentAccum={} blockId={}",
-                         payload.fastPathOnly,
-                         payload.visibleChannels.size(),
-                         static_cast<int>(payload.outputSize.x),
-                         static_cast<int>(payload.outputSize.y),
-                         static_cast<bool>(payload.entryExitLease && payload.entryExitLease->hasVulkanImage()),
-                         static_cast<bool>(payload.lastAccumLease && payload.lastAccumLease->hasVulkanImage()),
-                         static_cast<bool>(payload.currentAccumLease && payload.currentAccumLease->hasVulkanImage()),
-                         static_cast<bool>(payload.blockIdLease && payload.blockIdLease->hasVulkanImage()));
+  VLOG(2) << fmt::format(
+    "Raycaster::record begin fastOnly={} channels={} out={}x{} leases: entryExit={} lastAccum={} currentAccum={} blockId={}",
+    payload.fastPathOnly,
+    payload.visibleChannels.size(),
+    static_cast<int>(payload.outputSize.x),
+    static_cast<int>(payload.outputSize.y),
+    static_cast<bool>(payload.entryExitLease && payload.entryExitLease->hasVulkanImage()),
+    static_cast<bool>(payload.lastAccumLease && payload.lastAccumLease->hasVulkanImage()),
+    static_cast<bool>(payload.currentAccumLease && payload.currentAccumLease->hasVulkanImage()),
+    static_cast<bool>(payload.blockIdLease && payload.blockIdLease->hasVulkanImage()));
   m_pendingFinalization.reset();
-  if (!payload.entryExitLease || !payload.entryExitLease->hasVulkanImage()) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster missing entry/exit lease.";
-    return;
-  }
+  CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
+    << "Vulkan img raycaster missing entry/exit lease.";
 
   if (payload.visibleChannels.empty()) {
     return;
@@ -1114,6 +1113,8 @@ ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureTransferTexture(Channe
 
   bool createdOrResized = false;
   if (!resources.transferTexture || resources.transferWidth != width) {
+    // Vulkan path prefers RGBA textures; build an RGBA8 LUT and use
+    // eR8G8B8A8Unorm to match channel order.
     vulkan::ensure1DLUTTexture(device, resources.transferTexture, width);
     resources.transferWidth = width;
     createdOrResized = true;
@@ -1121,7 +1122,7 @@ ZVulkanTexture& ZVulkanImgRaycasterPipelineContext::ensureTransferTexture(Channe
 
   if (createdOrResized || resources.transferGeneration != gen) {
     std::vector<uint8_t> texels;
-    transferFunction.buildLUTBGRA8(texels, width);
+    transferFunction.buildLUTRGBA8(texels, width);
     if (!texels.empty()) {
       vulkan::uploadLUT(*resources.transferTexture, texels.data(), texels.size());
       resources.transferGeneration = gen;
@@ -1194,10 +1195,7 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
     resources.pagedDescriptor = m_backend.allocateOverrideDescriptorSet(**m_progressiveSetLayout);
   }
 
-  if (!resources.pagedDescriptor) {
-    LOG_FIRST_N(ERROR, 5) << "Failed to allocate Vulkan raycaster paging descriptor set.";
-    return false;
-  }
+  CHECK(resources.pagedDescriptor) << "Failed to allocate Vulkan raycaster paging descriptor set.";
 
   auto* pageDirectory =
     m_imageBlockUploader ? m_imageBlockUploader->pageDirectoryTexture(*payload.image, channelIndex) : nullptr;
@@ -1205,10 +1203,8 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
     m_imageBlockUploader ? m_imageBlockUploader->pageTableTexture(*payload.image, channelIndex) : nullptr;
   auto* imageCache =
     m_imageBlockUploader ? m_imageBlockUploader->imageCacheTexture(*payload.image, channelIndex) : nullptr;
-  if (!pageDirectory || !pageTable || !imageCache) {
-    LOG_FIRST_N(WARNING, 5) << "Paging textures unavailable for Vulkan raycaster channel " << channelIndex;
-    return false;
-  }
+  CHECK(pageDirectory && pageTable && imageCache)
+    << "Paging textures unavailable for Vulkan raycaster channel " << channelIndex;
 
   resources.pagedDescriptor->updateTexture(0, *pageDirectory, m_backend.defaultSampler());
   resources.pagedDescriptor->updateTexture(1, *pageTable, m_backend.defaultSampler());
@@ -1230,10 +1226,7 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
                                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
-  if (!resources.pageDataBuffer) {
-    LOG_FIRST_N(ERROR, 5) << "Failed to allocate Vulkan raycaster paging uniform buffer.";
-    return false;
-  }
+  CHECK(resources.pageDataBuffer) << "Failed to allocate Vulkan raycaster paging uniform buffer.";
 
   resources.pageDataBuffer->copyData(pageData.data(), pageData.size());
   resources.pageDataCapacity = pageData.size();
@@ -1242,10 +1235,7 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
     resources.pageDescriptor = m_backend.allocateOverrideDescriptorSet(**m_pageSetLayout);
   }
 
-  if (!resources.pageDescriptor) {
-    LOG_FIRST_N(ERROR, 5) << "Failed to allocate Vulkan raycaster page descriptor set.";
-    return false;
-  }
+  CHECK(resources.pageDescriptor) << "Failed to allocate Vulkan raycaster page descriptor set.";
 
   resources.pageDescriptor->updateUniformBuffer(2, *resources.pageDataBuffer);
   if (resources.rayParamBuffer) {
@@ -1260,10 +1250,8 @@ void ZVulkanImgRaycasterPipelineContext::bindProgressiveDescriptors(ChannelResou
                                                                     vk::PipelineLayout layout,
                                                                     vk::raii::CommandBuffer& cmd)
 {
-  if (!resources.pagedDescriptor || !resources.pageDescriptor) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster progressive descriptors not initialised.";
-    return;
-  }
+  CHECK(resources.pagedDescriptor && resources.pageDescriptor)
+    << "Vulkan raycaster progressive descriptors not initialised.";
 
   ensureEmptyDescriptor();
 
@@ -1282,10 +1270,7 @@ void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& render
 {
   VLOG(2) << "Raycaster::renderEntryExit begin";
   auto* texture = payload.entryExitLease->colorAttachment(0);
-  if (!texture) {
-    LOG_FIRST_N(WARNING, 5) << "Entry/exit lease missing color attachment.";
-    return;
-  }
+  CHECK(texture) << "Entry/exit lease missing color attachment.";
   VLOG(2) << fmt::format("Raycaster::renderEntryExit target tex=0x{:x}", reinterpret_cast<uint64_t>(texture));
 
   ensureEntryPipelines(texture->format());
@@ -1350,15 +1335,15 @@ void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& render
                                          pushConstant);
     cmd.setViewport(0, viewport);
     cmd.setScissor(0, scissor);
-  if (payload.entryHasIndices && m_entryIndexBuffer) {
-    VLOG(2) << "VK raycaster entry/exit drawIndexed: count=" << payload.entryIndices.size();
-    cmd.bindIndexBuffer(m_entryIndexBuffer->buffer(), 0, vk::IndexType::eUint32);
-    cmd.drawIndexed(static_cast<uint32_t>(payload.entryIndices.size()), 1, 0, 0, 0);
-  } else {
-    VLOG(2) << "VK raycaster entry/exit draw: verts=" << payload.entryPositions.size();
-    cmd.draw(static_cast<uint32_t>(payload.entryPositions.size()), 1, 0, 0);
-  }
-  VLOG(2) << "Raycaster::renderEntryExit end";
+    if (payload.entryHasIndices && m_entryIndexBuffer) {
+      VLOG(2) << "VK raycaster entry/exit drawIndexed: count=" << payload.entryIndices.size();
+      cmd.bindIndexBuffer(m_entryIndexBuffer->buffer(), 0, vk::IndexType::eUint32);
+      cmd.drawIndexed(static_cast<uint32_t>(payload.entryIndices.size()), 1, 0, 0, 0);
+    } else {
+      VLOG(2) << "VK raycaster entry/exit draw: verts=" << payload.entryPositions.size();
+      cmd.draw(static_cast<uint32_t>(payload.entryPositions.size()), 1, 0, 0);
+    }
+    VLOG(2) << "Raycaster::renderEntryExit end";
     cmd.endRendering();
   }
 
@@ -1374,13 +1359,10 @@ void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& render
     if (backend && leaseRef && leaseRef->hasVulkanImage()) {
       backend->scheduleAfterCurrentFrameCompletion([leaseRef]() {
         ZVulkanTexture* tex = leaseRef->colorAttachment(0);
-        if (!tex) {
-          LOG(WARNING) << "Entry/exit debug save: color attachment missing";
-          return;
-        }
-        if (tex->format() != vk::Format::eR32G32B32A32Sfloat) {
-          LOG(WARNING) << "Entry/exit debug save: unsupported format for save (expected RGBA32F)";
-        }
+        CHECK(tex) << "Entry/exit debug save: color attachment missing";
+        CHECK(tex->format() == vk::Format::eR32G32B32A32Sfloat)
+          << "Entry/exit debug save: unsupported format for save (expected RGBA32F)";
+
         const uint32_t w = tex->width();
         const uint32_t h = tex->height();
         const size_t pixels = static_cast<size_t>(w) * h;
@@ -1539,15 +1521,10 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     return;
   }
 
-  if (!payload.image) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster missing image context.";
-    return;
-  }
+  CHECK(payload.image) << "Vulkan img raycaster missing image context.";
 
-  if (!payload.entryExitLease || !payload.entryExitLease->hasVulkanImage()) {
-    LOG_FIRST_N(WARNING, 5) << "Raycaster fast path missing entry/exit lease.";
-    return;
-  }
+  CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
+    << "Raycaster fast path missing entry/exit lease.";
 
   auto buildColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
     if (!attachment.handle.valid()) {
@@ -1613,10 +1590,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
   }
 
   auto* entryTexture = payload.entryExitLease->colorAttachment(0);
-  if (!entryTexture) {
-    LOG_FIRST_N(WARNING, 5) << "Entry/exit texture unavailable.";
-    return;
-  }
+  CHECK(entryTexture) << "Entry/exit texture unavailable.";
   entryTexture->transitionLayout(cmd, entryTexture->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   entryTexture->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
@@ -1639,7 +1613,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
   if (channelCount == 1) {
     const size_t channelIndex = payload.visibleChannels.front();
     if (channelIndex >= transferFunctions.size() || transferFunctions[channelIndex] == nullptr) {
-      LOG_FIRST_N(WARNING, 5) << "Missing transfer function for channel " << channelIndex;
+      LOG(ERROR) << "Missing transfer function for channel " << channelIndex;
       return;
     }
 
@@ -1705,17 +1679,11 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
   }
 
   auto* layerLease = payload.channelLayerLease ? payload.channelLayerLease.get() : nullptr;
-  if (!layerLease || !layerLease->hasVulkanImage()) {
-    LOG_FIRST_N(WARNING, 5) << "Multi-channel raycaster requires layer array lease.";
-    return;
-  }
+  CHECK(layerLease && layerLease->hasVulkanImage()) << "Multi-channel raycaster requires layer array lease.";
 
   ZVulkanTexture* layerColor = layerLease->colorAttachment(0);
   ZVulkanTexture* layerDepth = layerLease->depthAttachmentTexture();
-  if (!layerColor) {
-    LOG_FIRST_N(WARNING, 5) << "Layer array color attachment unavailable.";
-    return;
-  }
+  CHECK(layerColor) << "Layer array color attachment unavailable.";
 
   vulkan::AttachmentFormats layerFormats;
   layerFormats.colorFormats.push_back(layerColor->format());
@@ -1749,10 +1717,8 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
 
   for (size_t order = 0; order < channelCount; ++order) {
     const size_t channelIndex = payload.visibleChannels[order];
-    if (channelIndex >= transferFunctions.size() || transferFunctions[channelIndex] == nullptr) {
-      LOG_FIRST_N(WARNING, 5) << "Missing transfer function for channel " << channelIndex;
-      continue;
-    }
+    CHECK(channelIndex < transferFunctions.size() && transferFunctions[channelIndex] != nullptr)
+      << "Missing transfer function for channel " << channelIndex;
 
     ChannelResources& resources = ensureChannelResources(channelIndex);
     const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
@@ -2029,10 +1995,9 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     if (backend && !colorHandles.empty()) {
       backend->scheduleAfterCurrentFrameCompletion([this, handles = std::move(colorHandles), depthHandle]() {
         const AttachmentHandle& handle = handles.front();
-        if (!handle.valid() || handle.backend != AttachmentBackend::Vulkan) {
-          LOG(WARNING) << "Raycaster merge debug save: invalid color attachment handle";
-          return;
-        }
+        CHECK(handle.valid() && handle.backend == AttachmentBackend::Vulkan)
+          << "Raycaster merge debug save: invalid color attachment handle";
+
         auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "img raycaster merge debug");
         const uint32_t w = tex.width();
         const uint32_t h = tex.height();
@@ -2154,20 +2119,13 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     return;
   }
 
-  if (!payload.blockIdLease || payload.blockIdLease->attachments == 0) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster progressive path missing block-ID lease.";
-    return;
-  }
+  CHECK(payload.blockIdLease && payload.blockIdLease->attachments != 0)
+    << "Vulkan raycaster progressive path missing block-ID lease.";
 
-  if (!payload.lastAccumLease || !payload.currentAccumLease) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster progressive path missing accumulator leases.";
-    return;
-  }
+  CHECK(payload.lastAccumLease && payload.currentAccumLease)
+    << "Vulkan raycaster progressive path missing accumulator leases.";
 
-  if (!m_imageBlockUploader) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster progressive path missing image block uploader.";
-    return;
-  }
+  CHECK(m_imageBlockUploader) << "Vulkan raycaster progressive path missing image block uploader.";
   m_imageBlockUploader->bindToImage(*payload.image);
 
   uint32_t activeChannelIndex = payload.activeChannelIndex;
@@ -2186,10 +2144,8 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   CHECK(payload.transferFunctions != nullptr)
     << "Raycaster progressive path: payload missing transferFunctions vector (fatal)";
   const auto& transferList = *payload.transferFunctions;
-  if (channelIndex >= transferList.size() || transferList[channelIndex] == nullptr) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster missing transfer function for channel " << channelIndex;
-    return;
-  }
+  CHECK(channelIndex < transferList.size() && transferList[channelIndex] != nullptr)
+    << "Vulkan raycaster missing transfer function for channel " << channelIndex;
   ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferList[channelIndex]);
 
   auto* entryTexture = payload.entryExitLease ? payload.entryExitLease->colorAttachment(0) : nullptr;
@@ -2198,24 +2154,16 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   auto* currentColor = payload.currentAccumLease->colorAttachment(0);
   auto* currentDepth = payload.currentAccumLease->colorAttachment(1);
 
-  if (!entryTexture || !lastColor || !lastDepth || !currentColor || !currentDepth) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster progressive path missing required textures.";
-    return;
-  }
+  CHECK(entryTexture && lastColor && lastDepth && currentColor && currentDepth)
+    << "Vulkan raycaster progressive path missing required textures.";
 
   const glm::uvec2 outputSize = payload.outputSize;
-  if (outputSize.x == 0u || outputSize.y == 0u) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster progressive path requires non-zero output size.";
-    return;
-  }
+  CHECK(outputSize.x > 0u && outputSize.y > 0u) << "Vulkan raycaster progressive path requires non-zero output size.";
 
   ensureProgressiveLayerTargets(outputSize, channelCount, payload.progressiveGeneration, cmd);
   ZVulkanTexture* layerColor = m_progressiveLayerColor.get();
   ZVulkanTexture* layerDepth = m_progressiveLayerDepth.get();
-  if (!layerColor || !layerDepth) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster progressive path missing layer-array targets.";
-    return;
-  }
+  CHECK(layerColor && layerDepth) << "Vulkan raycaster progressive path missing layer-array targets.";
 
   const auto& viewState = renderer.viewState();
   const auto& sceneState = renderer.sceneState();
@@ -2271,10 +2219,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   const uint32_t blockAttachmentCount = payload.blockIdLease->attachments;
   auto* firstBlockAttachment = payload.blockIdLease->colorAttachment(0);
-  if (!firstBlockAttachment) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster progressive path missing block-ID attachment.";
-    return;
-  }
+  CHECK(firstBlockAttachment) << "Vulkan raycaster progressive path missing block-ID attachment.";
   const vk::Format blockFormat = firstBlockAttachment->format();
   BlockIdPipelineKey blockKey{resources.levelCount, blockAttachmentCount, blockFormat};
   auto& blockPipeline = ensureBlockIdPipeline(blockKey, blockFormat);
@@ -2296,10 +2241,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     blockAttachments.push_back(attachment);
   }
 
-  if (blockAttachments.empty()) {
-    LOG_FIRST_N(WARNING, 5) << "Vulkan raycaster progressive path failed to prepare block-ID attachments.";
-    return;
-  }
+  CHECK(!blockAttachments.empty()) << "Vulkan raycaster progressive path failed to prepare block-ID attachments.";
 
   vk::Rect2D blockRect = scissor;
   vk::Viewport blockViewport = viewport;

@@ -116,11 +116,9 @@ void Z3DTextureBlendRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     return;
   }
 
-  if (!m_colorAttachmentHandle0.valid() || !m_depthAttachmentHandle0.valid() ||
-      !m_colorAttachmentHandle1.valid() || !m_depthAttachmentHandle1.valid()) {
-    LOG_FIRST_N(WARNING, 5) << "Texture blend renderer missing Vulkan attachment handles.";
-    return;
-  }
+  CHECK(m_colorAttachmentHandle0.valid() && m_depthAttachmentHandle0.valid() && m_colorAttachmentHandle1.valid() &&
+        m_depthAttachmentHandle1.valid())
+    << "Texture blend renderer missing Vulkan attachment handles.";
 
   auto batch = buildRenderBatch(eye);
   m_rendererBase.appendBatch(std::move(batch));

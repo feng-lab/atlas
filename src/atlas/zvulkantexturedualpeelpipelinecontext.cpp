@@ -72,9 +72,9 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
     if (!payload.tempAttachment.valid()) {
       return;
     }
-  } else if (!payload.frontAttachment.valid() || !payload.backAttachment.valid() || !payload.depthAttachment.valid()) {
-    LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan dual-peel final stage due to missing attachments";
-    return;
+  } else {
+    CHECK(payload.frontAttachment.valid() && payload.backAttachment.valid() && payload.depthAttachment.valid())
+      << "Skipping Vulkan dual-peel final stage due to missing attachments";
   }
 
   ensureDescriptorLayouts();
@@ -88,10 +88,7 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   CHECK(descriptor != nullptr) << "DDP texture stage: override descriptor allocation failed (fatal)";
 
   if (stage == Stage::Blend) {
-    if (!payload.tempAttachment.valid()) {
-      LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan dual-peel blend stage because temp attachment is missing";
-      return;
-    }
+    CHECK(payload.tempAttachment.valid()) << "Skipping Vulkan dual-peel blend stage because temp attachment is missing";
     auto& tempTexture =
       vulkan::textureFromHandle(payload.tempAttachment, m_backend.device(), "dual-peel blend attachment");
     VLOG(2) << fmt::format("DDP blend: updating binding0 temp=0x{:x}", payload.tempAttachment.id);

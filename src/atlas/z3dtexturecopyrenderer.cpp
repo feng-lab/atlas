@@ -109,18 +109,14 @@ void Z3DTextureCopyRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend back
     return;
   }
 
-  if (!m_colorAttachmentHandle.valid() || !m_depthAttachmentHandle.valid()) {
-    LOG_FIRST_N(WARNING, 5) << "Texture copy renderer missing Vulkan attachment handles.";
-    return;
-  }
+  CHECK(m_colorAttachmentHandle.valid() && m_depthAttachmentHandle.valid())
+    << "Texture copy renderer missing Vulkan attachment handles.";
 
   auto batch = buildRenderBatch(eye);
   m_rendererBase.appendBatch(std::move(batch));
 }
 
-void Z3DTextureCopyRenderer::renderVulkan(Z3DEye eye,
-                                          AttachmentHandle colorHandle,
-                                          AttachmentHandle depthHandle)
+void Z3DTextureCopyRenderer::renderVulkan(Z3DEye eye, AttachmentHandle colorHandle, AttachmentHandle depthHandle)
 {
   setSourceAttachments(colorHandle, depthHandle);
   auto batch = buildRenderBatch(eye);

@@ -52,10 +52,8 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
                          payload.colorAttachmentHandle.id,
                          payload.depthAttachmentHandle.id);
 
-  if (!payload.colorAttachmentHandle.valid() || !payload.depthAttachmentHandle.valid()) {
-    LOG_FIRST_N(WARNING, 3) << "Skipping Vulkan texture copy pass due to missing attachments";
-    return;
-  }
+  CHECK(payload.colorAttachmentHandle.valid() && payload.depthAttachmentHandle.valid())
+    << "Skipping Vulkan texture copy pass due to missing attachments";
 
   auto& colorTexture =
     vulkan::textureFromHandle(payload.colorAttachmentHandle, m_backend.device(), "texture-copy color attachment");
@@ -171,7 +169,8 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   // Use the provided viewport directly (no viewport-based Y flip)
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
-  VLOG(2) << fmt::format("TextureCopy: viewport=({},{} {}x{})", viewport.x, viewport.y, viewport.width, viewport.height);
+  VLOG(2)
+    << fmt::format("TextureCopy: viewport=({},{} {}x{})", viewport.x, viewport.y, viewport.width, viewport.height);
 
   // No push constants needed; shader samples via UVs
 

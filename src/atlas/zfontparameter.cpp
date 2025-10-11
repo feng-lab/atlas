@@ -48,7 +48,7 @@ void ZFontParameter::readValue(const json::value& jsonValue)
   QString text = asQString(jsonValue);
   QFont font;
   if (!font.fromString(text)) {
-    LOG(WARNING) << "Can not load font " << text;
+    LOG(ERROR) << "Can not load font " << text;
   } else {
     set(font);
   }

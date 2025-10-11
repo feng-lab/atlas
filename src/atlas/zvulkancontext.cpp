@@ -58,7 +58,7 @@ bool addRequiredLayers(const char* layerName,
     if (!isOptional) {
       throw ZException(fmt::format("Required layer {} is not supported by the device.", layerName));
     } else {
-      LOG(WARNING) << fmt::format("Optional layer {} is not supported by the device.", layerName);
+      LOG(ERROR) << fmt::format("Optional layer {} is not supported by the device.", layerName);
     }
   }
   return false;
@@ -86,7 +86,7 @@ bool addRequiredExtension(const char* extensionName,
     if (!isOptional) {
       throw ZException(fmt::format("Required extension {} is not supported by the device.", extensionName));
     } else {
-      LOG(WARNING) << fmt::format("Optional extension {} is not supported by the device.", extensionName);
+      LOG(ERROR) << fmt::format("Optional extension {} is not supported by the device.", extensionName);
     }
   }
   return false;

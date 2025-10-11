@@ -340,7 +340,7 @@ void ZAnimation::rebindView()
     Q_EMIT objViewChanged();
   }
 
-  LOG_FIRST_N(INFO, 1) << "3D animation parameters bound";
+  LOG(INFO) << "3D animation parameters bound";
 }
 
 void ZAnimation::releaseView()
@@ -918,7 +918,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
 
     if (!err.isEmpty()) {
       showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load animation %1").arg(fn), err);
-      LOG(WARNING) << err;
+      LOG(ERROR) << err;
     }
 
     updateObjAnimation();
