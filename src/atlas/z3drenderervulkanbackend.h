@@ -184,6 +184,10 @@ public:
       void(const void* mapped, size_t bytes, vk::Format format, glm::uvec2 size, std::function<void()> releaseSlot)>
       onReady);
 
+  // GPU timestamp scopes (public so pipeline contexts can instrument hot paths)
+  std::optional<size_t> beginGpuScope(std::string_view label);
+  void endGpuScope(size_t token);
+
   [[nodiscard]] bool supportsOcclusionQueries() const
   {
     return true;
@@ -318,8 +322,6 @@ private:
 
   void collectFrameTimings(FrameResources& frame);
   void flushScheduledCopies(vk::raii::CommandBuffer& cmd);
-  std::optional<size_t> beginGpuScope(std::string_view label);
-  void endGpuScope(size_t token);
   void recordCpuScope(std::string_view label, double milliseconds);
   void ensureStaticArenas();
   static size_t alignUp(size_t value, size_t alignment)

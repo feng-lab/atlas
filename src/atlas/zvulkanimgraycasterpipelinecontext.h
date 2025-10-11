@@ -69,12 +69,24 @@ private:
     uint64_t transferGeneration = 0;
     uint32_t transferWidth = 0;
     ZVulkanDescriptorSet* fastDescriptor = nullptr; // per-draw override (backend-owned)
-    ZVulkanDescriptorSet* rayParamDescriptor = nullptr; // per-draw override (backend-owned)
-    std::unique_ptr<ZVulkanBuffer> rayParamBuffer;
+    // Ray params via push constants; no descriptors or buffers needed
+    // Progressive (dynamic) textures (entry/exit, lastDepth, lastColor)
     ZVulkanDescriptorSet* pagedDescriptor = nullptr; // per-draw override (backend-owned)
+    // Progressive static textures (page dir, table, cache, volume, transfer)
+    ZVulkanDescriptorSet* staticDescriptor = nullptr; // per-draw override (backend-owned)
+    std::unique_ptr<ZVulkanDescriptorSet> persistentStaticDescriptor; // cached across frames
+    // Page/params UBOs
     ZVulkanDescriptorSet* pageDescriptor = nullptr; // per-draw override (backend-owned)
+    std::unique_ptr<ZVulkanDescriptorSet> persistentPageDescriptor; // cached across frames
     std::unique_ptr<ZVulkanBuffer> pageDataBuffer;
     size_t pageDataCapacity = 0;
+    ZVulkanBuffer* boundPageDataBuffer = nullptr; // last buffer bound in persistentPageDescriptor
+    // Tracking for persistent static set
+    class ZVulkanTexture* boundPageDirectoryTex = nullptr;
+    class ZVulkanTexture* boundPageTableTex = nullptr;
+    class ZVulkanTexture* boundImageCacheTex = nullptr;
+    class ZVulkanTexture* boundVolumeTex = nullptr;
+    class ZVulkanTexture* boundTransferTex = nullptr;
     uint32_t levelCount = 0;
     std::unique_ptr<ZVulkanDescriptorSet> blockIdDescriptor;
     std::vector<uint32_t> blockIdScratch;
@@ -197,13 +209,15 @@ private:
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::optional<vk::raii::DescriptorSetLayout> m_entrySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_fastSetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_progressiveSetLayout;
+  // Progressive split: static (set=0) and dynamic (set=1)
+  std::optional<vk::raii::DescriptorSetLayout> m_progressiveStaticSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_progressiveDynamicSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_pageSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_transformSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_copySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_mergeSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_emptySetLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_rayParamSetLayout;
+  // Ray parameters use push constants; no descriptor set layout needed.
 
   PipelineInstance m_entryFrontPipeline;
   PipelineInstance m_entryBackPipeline;
@@ -286,7 +300,10 @@ private:
                                      uint32_t generation,
                                      vk::raii::CommandBuffer& cmd);
 
-  ZVulkanTexture& ensureVolumeTexture(ChannelResources& resources, const ZImg& image, size_t channelIndex);
+  ZVulkanTexture& ensureVolumeTexture(ChannelResources& resources,
+                                      const ZImg& image,
+                                      size_t channelIndex,
+                                      uint64_t generation);
   ZVulkanTexture& ensureTransferTexture(ChannelResources& resources, const Z3DTransferFunction& transferFunction);
 
   void renderEntryExit(Z3DRendererBase& renderer,

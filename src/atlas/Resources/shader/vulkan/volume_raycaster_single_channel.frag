@@ -9,13 +9,13 @@ layout(set = 0, binding = 0) uniform sampler2DArray ray_entry_exit_tex_coord;
 layout(set = 0, binding = 1) uniform sampler3D      volume_1;
 layout(set = 0, binding = 2) uniform sampler1D      transfer_function_1;
 
-layout(std140, set = 2, binding = 3) uniform RayParams {
+// Push constants for ray params
+layout(push_constant) uniform RayParams {
   float sampling_rate;
   float iso_value;
   float local_MIP_threshold;
   float ze_to_zw_a;
   float ze_to_zw_b;
-  vec3  volume_dimensions_1;
 } rp;
 
 layout(location = 0) out vec4 FragData0;
@@ -58,7 +58,7 @@ void main()
   vec4 result = vec4(0.0);
   float ch1V = 0.0;
 
-  vec3 numVoxels = abs((exitRayPosition - startRayPosition) * rp.volume_dimensions_1);
+  vec3 numVoxels = abs((exitRayPosition - startRayPosition) * vec3(textureSize(volume_1, 0)));
   float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
   float stepSize = 1.0 / (rp.sampling_rate * numVoxel);
 
@@ -109,4 +109,3 @@ void main()
   result.rgb *= result.a;
   FragData0 = result;
 }
-

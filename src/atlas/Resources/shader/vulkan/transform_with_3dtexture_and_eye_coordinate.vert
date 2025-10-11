@@ -6,7 +6,11 @@ layout(location = 1) in vec3 attr_3dTexCoord0;
 layout(location = 0) out vec3 texCoord0;
 layout(location = 1) out vec4 eyeCoord;
 
-#include "include/matrices_material.glslinc"
+// Minimal push-constant transform block for entry/exit
+layout(push_constant) uniform EntryXf {
+  mat4 projection_view_matrix;
+  mat4 view_matrix;
+} xf;
 
 void main()
 {
@@ -14,4 +18,3 @@ void main()
   texCoord0 = attr_3dTexCoord0;
   eyeCoord = xf.view_matrix * vec4(attr_vertex, 1.0);
 }
-
