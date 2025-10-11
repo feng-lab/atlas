@@ -91,6 +91,45 @@ void downloadVulkanTextureToLocalColorBuffer(ZVulkanTexture& tex, Z3DLocalColorB
   localColorBuffer.width = w;
   localColorBuffer.height = h;
 }
+
+// Lightweight helper to log a Vulkan-backed lease's attachments and size
+static void vlogVulkanLease(std::string_view label, const Z3DScratchResourcePool::RenderTargetLease& lease)
+{
+  if (!VLOG_IS_ON(2)) {
+    return;
+  }
+  if (!lease || lease.backend != RenderBackend::Vulkan) {
+    return;
+  }
+  const glm::uvec2 size = lease.descriptor.size;
+  // Count color attachments advertised by the descriptor
+  uint32_t colorCount = 0;
+  for (const auto& a : lease.descriptor.attachments) {
+    if (a.kind == ScratchAttachmentKind::Color) {
+      colorCount++;
+    }
+  }
+  ZVulkanTexture* c0 = lease.colorAttachment(0);
+  ZVulkanTexture* d0 = lease.depthAttachmentTexture();
+  const uint64_t c0Handle = reinterpret_cast<uint64_t>(c0);
+  const uint64_t dHandle = reinterpret_cast<uint64_t>(d0);
+  auto c0Fmt = c0 ? enumOrUnderlying(c0->format(), 16) : enumOrUnderlying(vk::Format{}, 16);
+  auto dFmt = d0 ? enumOrUnderlying(d0->format(), 16) : enumOrUnderlying(vk::Format{}, 16);
+  VLOG(2) << fmt::format("VK pass '{}': target={}x{} colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{}",
+                         label,
+                         size.x,
+                         size.y,
+                         colorCount,
+                         c0Handle,
+                         c0Fmt,
+                         c0 ? c0->width() : 0u,
+                         c0 ? c0->height() : 0u,
+                         d0 != nullptr,
+                         dHandle,
+                         dFmt,
+                         d0 ? d0->width() : 0u,
+                         d0 ? d0->height() : 0u);
+}
 } // namespace
 
 namespace nim {
@@ -1235,7 +1274,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   if (supersample2x2) {
     const glm::uvec2 ssSize = m_outputSize * 2_u32;
     sceneLease =
-      pool.acquireTempRenderTarget2D(ssSize, ScratchFormat::RGBA16, ScratchFormat::Depth24, RenderBackend::Vulkan);
+      pool.acquireTempRenderTarget2D(ssSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
     sceneOutLease = &sceneLease;
   }
 
@@ -1286,7 +1325,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
       auto leaseOpaque = pool.acquireTempRenderTarget2D(targetSize,
                                                         ScratchFormat::RGBA16,
-                                                        ScratchFormat::Depth24,
+                                                        ScratchFormat::Depth32F,
                                                         RenderBackend::Vulkan);
       // Render opaque geometry into an opaque-only intermediate without drawing background
       executeCompositorPassesVulkan(opaqueFilters,
@@ -1299,7 +1338,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
       auto leaseTrans = pool.acquireTempRenderTarget2D(targetSize,
                                                        ScratchFormat::RGBA16,
-                                                       ScratchFormat::Depth24,
+                                                       ScratchFormat::Depth32F,
                                                        RenderBackend::Vulkan);
       AttachmentHandle depthHandle;
       if (auto* depthTex = leaseOpaque.depthAttachmentTexture()) {
@@ -1344,6 +1383,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                          StoreOp::Store,
                                                          clear);
       m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+      vlogVulkanLease("transparency_resolve", *sceneOutLease);
       m_rendererBase.recordVulkanBatches(
         [&]() {
           m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
@@ -1383,7 +1423,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       // 1) render filter geometry to temp lease
       auto glowGeomLease = pool.acquireTempRenderTarget2D(targetSize,
                                                           ScratchFormat::RGBA16,
-                                                          ScratchFormat::Depth24,
+                                                          ScratchFormat::Depth32F,
                                                           RenderBackend::Vulkan);
       // Clear temp attachments, record filter geometry
       m_rendererBase.setCollectOnly(true);
@@ -1394,6 +1434,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       clear.stencil = 0u;
       m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
       m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+      vlogVulkanLease("glow_geometry", glowGeomLease);
       m_rendererBase.recordVulkanBatches(
         [&]() {
           filter->renderOpaque(eye);
@@ -1427,6 +1468,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_rendererBase.setCollectOnly(true);
       m_rendererBase.setActiveSurfaceForNextPass(*sceneOutLease);
       // Do not clear when overlaying glow; enqueue a glow batch directly
+      vlogVulkanLease("glow_composite", *sceneOutLease);
       m_rendererBase.recordVulkanBatches(
         [&]() {
           TextureGlowPayload glowPayload;
@@ -1527,10 +1569,14 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           "image_blend_single");
       } else {
         // Merge N image layers pairwise into an intermediate lease, then blend onto out
-        auto mergeLeaseA =
-          pool.acquireTempRenderTarget2D(tgtSize, ScratchFormat::RGBA16, ScratchFormat::Depth24, RenderBackend::Vulkan);
-        auto mergeLeaseB =
-          pool.acquireTempRenderTarget2D(tgtSize, ScratchFormat::RGBA16, ScratchFormat::Depth24, RenderBackend::Vulkan);
+        auto mergeLeaseA = pool.acquireTempRenderTarget2D(tgtSize,
+                                                          ScratchFormat::RGBA16,
+                                                          ScratchFormat::Depth32F,
+                                                          RenderBackend::Vulkan);
+        auto mergeLeaseB = pool.acquireTempRenderTarget2D(tgtSize,
+                                                          ScratchFormat::RGBA16,
+                                                          ScratchFormat::Depth32F,
+                                                          RenderBackend::Vulkan);
 
         // First merge: layers[0] and layers[1] -> A
         m_rendererBase.setActiveSurfaceForNextPass(mergeLeaseA);
@@ -1676,6 +1722,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     if (gFilters.empty() && !showHandleFilters.empty()) {
       m_rendererBase.setCollectOnly(true);
       m_rendererBase.setActiveSurfaceForNextPass(m_pickingTargetLease);
+      vlogVulkanLease("picking_handles", m_pickingTargetLease);
       ClearValue clear{};
       clear.color = glm::vec4(0.0f);
       clear.depth = 1.0f;
@@ -1696,6 +1743,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     } else if (showHandleFilters.empty() && !gFilters.empty()) {
       m_rendererBase.setCollectOnly(true);
       m_rendererBase.setActiveSurfaceForNextPass(m_pickingTargetLease);
+      vlogVulkanLease("picking_geometry", m_pickingTargetLease);
       ClearValue clear{};
       clear.color = glm::vec4(0.0f);
       clear.depth = 1.0f;
@@ -1717,13 +1765,14 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_rendererBase.setCollectOnly(false);
     } else if (!gFilters.empty() && !showHandleFilters.empty()) {
       auto leaseHandles =
-        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA8, ScratchFormat::Depth24, RenderBackend::Vulkan);
+        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA8, ScratchFormat::Depth32F, RenderBackend::Vulkan);
       auto leaseGeoms =
-        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA8, ScratchFormat::Depth24, RenderBackend::Vulkan);
+        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA8, ScratchFormat::Depth32F, RenderBackend::Vulkan);
 
       // Record handle picking
       m_rendererBase.setCollectOnly(true);
       m_rendererBase.setActiveSurfaceForNextPass(leaseHandles);
+      vlogVulkanLease("picking_handles_temp", leaseHandles);
       ClearValue clear{};
       clear.color = glm::vec4(0.0f);
       clear.depth = 1.0f;
@@ -1743,6 +1792,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
       // Record geometry picking
       m_rendererBase.setActiveSurfaceForNextPass(leaseGeoms);
+      vlogVulkanLease("picking_geometry_temp", leaseGeoms);
       m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
       m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
       m_rendererBase.recordVulkanBatches(
@@ -1823,6 +1873,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         srcDepth.backend = AttachmentBackend::Vulkan;
         srcDepth.index = 0;
         srcDepth.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
+        // Internal resolve: no Y-flip
+        m_textureCopyRenderer.setFlipY(false);
         m_textureCopyRenderer.setSourceAttachments(srcColor, srcDepth);
         m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
       },
@@ -1841,7 +1893,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     if (finalColor && finalColor->format() != vk::Format::eR8G8B8A8Unorm) {
       auto rgba8Lease = pool.acquireTempRenderTarget2D(m_outputSize,
                                                        ScratchFormat::RGBA8,
-                                                       ScratchFormat::Depth24,
+                                                       ScratchFormat::Depth32F,
                                                        RenderBackend::Vulkan);
       if (rgba8Lease && rgba8Lease.backend == RenderBackend::Vulkan) {
         m_rendererBase.setCollectOnly(true);
@@ -2054,10 +2106,7 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
     m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
   }
   if (drawBackground && m_showBackground.get()) {
-    if (sceneOutLease && sceneOutLease.backend == RenderBackend::Vulkan) {
-      auto* tex = sceneOutLease.colorAttachment(0);
-      VLOG(1) << "BG pass: sceneOutLease color0 handle=" << reinterpret_cast<uint64_t>(tex);
-    }
+    vlogVulkanLease("background", sceneOutLease);
     m_rendererBase.recordVulkanBatches(
       [&]() {
         m_rendererBase.renderVulkan(eye, m_backgroundRenderer);
@@ -2093,6 +2142,7 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
         pass.transparentFilters.push_back(tb);
       }
       pass.debugLabel = "geometry";
+      vlogVulkanLease("geometry", sceneOutLease);
       m_rendererBase.executeCompositorPass(pass);
     }
 
@@ -2156,7 +2206,7 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
         // 1) render filter geometry to temp lease
         auto glowGeomLease = pool.acquireTempRenderTarget2D(targetSize,
                                                             ScratchFormat::RGBA16,
-                                                            ScratchFormat::Depth24,
+                                                            ScratchFormat::Depth32F,
                                                             RenderBackend::Vulkan);
         // Clear temp attachments, record filter geometry (submit immediately)
         m_rendererBase.setActiveSurfaceForNextPass(glowGeomLease);
@@ -3158,7 +3208,7 @@ void Z3DCompositor::ensurePickingTarget(const glm::uvec2& size)
     m_rendererBase.acquirePersistentTempRenderTarget2D(m_pickingTargetLease,
                                                        size,
                                                        ScratchFormat::RGBA8,
-                                                       ScratchFormat::Depth24);
+                                                       ScratchFormat::Depth32F);
   }
 
   CHECK(m_pickingTargetLease.renderTarget != nullptr);
@@ -3177,7 +3227,7 @@ void Z3DCompositor::ensurePickingTargetVulkan(const glm::uvec2& size)
     m_rendererBase.acquirePersistentTempRenderTarget2D(m_pickingTargetLease,
                                                        size,
                                                        ScratchFormat::RGBA8,
-                                                       ScratchFormat::Depth24);
+                                                       ScratchFormat::Depth32F);
   }
   CHECK(m_pickingTargetLease);
 }
@@ -3416,6 +3466,8 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
           if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
             continue;
           }
+          // Image OIT init copy: do not flip
+          m_textureCopyRenderer.setFlipY(false);
           m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
           m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
         }
@@ -3474,6 +3526,11 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
         }
         if (!imageLayers.empty()) {
           m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+          // Ensure image peel path samples the correct blender textures
+          // from the previous ping (prevId). Without this, the copy pipeline
+          // will bind placeholders and contribute nothing.
+          m_rendererBase.setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
+          m_rendererBase.setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
           for (const auto& layer : imageLayers) {
             const auto& colorDesc = layer.colorAttachment;
             const auto& depthDesc = layer.depthAttachment;
@@ -3483,6 +3540,8 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
             if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
               continue;
             }
+            // Image OIT peel: do not flip
+            m_textureCopyRenderer.setFlipY(false);
             m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
             m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
           }
@@ -3554,7 +3613,10 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   }
 
   VLOG(1) << fmt::format("DDP Vulkan executed {} peel passes", executedPasses);
-  // TODO: Consider option (2) for Vulkan dual-depth peeling. Record each peel pass in a separate command buffer, flush, read occlusion query results immediately, and stop submitting once a pass reports zero samples. This would mirror GL behaviour but requires reworking command buffer submission per pass. (See discussion about matching GL pass counts.)
+  // TODO: Consider option (2) for Vulkan dual-depth peeling. Record each peel pass in a separate command buffer, flush,
+  // read occlusion query results immediately, and stop submitting once a pass reports zero samples. This would mirror
+  // GL behaviour but requires reworking command buffer submission per pass. (See discussion about matching GL pass
+  // counts.)
 
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
@@ -3726,6 +3788,8 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
           if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
             continue;
           }
+          // WA image init copy: do not flip
+          m_textureCopyRenderer.setFlipY(false);
           m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
           m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
         }
@@ -3765,7 +3829,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
       RenderBatch batch;
       batch.eye = eye;
       const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-      
+
       batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
       batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
       batch.pass.viewport.minDepth = 0.0f;
@@ -3904,8 +3968,10 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
           if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
             continue;
           }
+          // WB image init copy: do not flip
+          m_textureCopyRenderer.setFlipY(false);
           m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
-          m_rendererBase.render(eye, m_textureCopyRenderer);
+          m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
         }
       }
     },
@@ -3943,7 +4009,7 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
       RenderBatch batch;
       batch.eye = eye;
       const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-      
+
       batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
       batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
       batch.pass.viewport.minDepth = 0.0f;

@@ -70,17 +70,17 @@ void ZVulkanConePipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
-  m_originBuffer = VK_NULL_HANDLE;
-  m_axisBuffer = VK_NULL_HANDLE;
-  m_flagsBuffer = VK_NULL_HANDLE;
-  m_baseColorBuffer = VK_NULL_HANDLE;
-  m_topColorBuffer = VK_NULL_HANDLE;
+  m_originBuffer = nullptr;
+  m_axisBuffer = nullptr;
+  m_flagsBuffer = nullptr;
+  m_baseColorBuffer = nullptr;
+  m_topColorBuffer = nullptr;
   m_originOffset = 0;
   m_axisOffset = 0;
   m_flagsOffset = 0;
   m_baseColorOffset = 0;
   m_topColorOffset = 0;
-  m_indexUploadBuffer = VK_NULL_HANDLE;
+  m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
   resetDescriptors();
 }
@@ -524,12 +524,11 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.custom_color = glm::vec4(1.0f);
   m_uboMaterial->copyData(&material, sizeof(material));
 
-  VLOG(2) << fmt::format(
-    "VK cone params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
-    payload.params->sizeScale,
-    material.alpha,
-    pickingPass,
-    (eyeState.isPerspective ? 0 : 1));
+  VLOG(2) << fmt::format("VK cone params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
+                         payload.params->sizeScale,
+                         material.alpha,
+                         pickingPass,
+                         (eyeState.isPerspective ? 0 : 1));
 }
 
 ZVulkanConePipelineContext::PipelineInstance&
@@ -599,13 +598,13 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   vk::PipelineColorBlendAttachmentState baseBlend{};
   baseBlend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-  baseBlend.blendEnable = VK_FALSE;
+  baseBlend.blendEnable = false;
 
   switch (key.shaderHookType) {
     case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
       std::vector<vk::PipelineColorBlendAttachmentState> attachments(formats.colorFormats.size(), baseBlend);
       for (auto& attachment : attachments) {
-        attachment.blendEnable = VK_TRUE;
+        attachment.blendEnable = true;
         attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
         attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
         attachment.colorBlendOp = vk::BlendOp::eAdd;
@@ -624,7 +623,7 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
         attachments.reserve(formats.colorFormats.size());
         for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
           auto state = baseBlend;
-          state.blendEnable = VK_TRUE;
+          state.blendEnable = true;
           if (i == 0) {
             state.srcColorBlendFactor = vk::BlendFactor::eOne;
             state.dstColorBlendFactor = vk::BlendFactor::eOne;
@@ -653,7 +652,7 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
       for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
         auto state = baseBlend;
         if (i == 0 || i == 3) {
-          state.blendEnable = VK_TRUE;
+          state.blendEnable = true;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
           state.colorBlendOp = vk::BlendOp::eMax;
@@ -661,7 +660,7 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           state.alphaBlendOp = vk::BlendOp::eMax;
         } else if (i == 1 || i == 4) {
-          state.blendEnable = VK_TRUE;
+          state.blendEnable = true;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
           state.colorBlendOp = vk::BlendOp::eMax;
@@ -669,7 +668,7 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           state.alphaBlendOp = vk::BlendOp::eMax;
         } else if (i == 2 || i == 5) {
-          state.blendEnable = VK_TRUE;
+          state.blendEnable = true;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
           state.colorBlendOp = vk::BlendOp::eAdd;
@@ -677,7 +676,7 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           state.alphaBlendOp = vk::BlendOp::eAdd;
         } else {
-          state.blendEnable = VK_FALSE;
+          state.blendEnable = false;
         }
         attachments.push_back(state);
       }
@@ -847,7 +846,7 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
       m_indexCount = 0;
     }
   } else {
-    m_indexUploadBuffer = VK_NULL_HANDLE;
+    m_indexUploadBuffer = nullptr;
     m_indexUploadOffset = 0;
   }
   m_originBuffer = originSlice.buffer;

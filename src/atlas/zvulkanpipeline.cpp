@@ -103,15 +103,15 @@ void ZVulkanPipeline::create()
     .pPushConstantRanges = m_pushConstantRanges.empty() ? nullptr : m_pushConstantRanges.data()};
   m_pipelineLayout.emplace(m_device.context().device(), pipelineLayoutInfo);
 
-  vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = m_topology, .primitiveRestartEnable = VK_FALSE};
+  vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = m_topology, .primitiveRestartEnable = false};
 
   vk::PipelineViewportStateCreateInfo viewportState{.viewportCount = 1,
                                                     .pViewports = nullptr,
                                                     .scissorCount = 1,
                                                     .pScissors = nullptr};
 
-  vk::PipelineRasterizationStateCreateInfo rasterizer{.depthClampEnable = VK_FALSE,
-                                                      .rasterizerDiscardEnable = VK_FALSE,
+  vk::PipelineRasterizationStateCreateInfo rasterizer{.depthClampEnable = false,
+                                                      .rasterizerDiscardEnable = false,
                                                       .polygonMode = m_polygonMode,
                                                       .cullMode = m_cullMode,
                                                       .frontFace = m_frontFace,
@@ -122,17 +122,17 @@ void ZVulkanPipeline::create()
                                                       .lineWidth = m_lineWidth};
 
   vk::PipelineMultisampleStateCreateInfo multisampling{.rasterizationSamples = vk::SampleCountFlagBits::e1,
-                                                       .sampleShadingEnable = VK_FALSE,
+                                                       .sampleShadingEnable = false,
                                                        .minSampleShading = 1.0f,
                                                        .pSampleMask = nullptr,
-                                                       .alphaToCoverageEnable = VK_FALSE,
-                                                       .alphaToOneEnable = VK_FALSE};
+                                                       .alphaToCoverageEnable = false,
+                                                       .alphaToOneEnable = false};
 
   vk::PipelineDepthStencilStateCreateInfo depthStencil{.depthTestEnable = static_cast<vk::Bool32>(m_depthTestEnable),
                                                        .depthWriteEnable = static_cast<vk::Bool32>(m_depthWriteEnable),
                                                        .depthCompareOp = m_depthCompareOp,
-                                                       .depthBoundsTestEnable = VK_FALSE,
-                                                       .stencilTestEnable = VK_FALSE,
+                                                       .depthBoundsTestEnable = false,
+                                                       .stencilTestEnable = false,
                                                        .front = {},
                                                        .back = {},
                                                        .minDepthBounds = 0.0f,
@@ -145,7 +145,7 @@ void ZVulkanPipeline::create()
   const vk::PipelineColorBlendAttachmentState* blendAttachmentPtr =
     blendAttachmentCount == 0u ? nullptr : m_colorBlendAttachments.data();
   vk::PipelineColorBlendStateCreateInfo colorBlending{
-    .logicOpEnable = VK_FALSE,
+    .logicOpEnable = false,
     .logicOp = vk::LogicOp::eCopy,
     .attachmentCount = blendAttachmentCount,
     .pAttachments = blendAttachmentPtr,

@@ -117,6 +117,10 @@ public:
                         vk::Offset3D offset,
                         vk::Extent3D extent,
                         vk::ImageAspectFlags aspectMask = {});
+  // Download a single array layer (for 2D array images). The buffer size must be
+  // width*height*pixelStride bytes for color images (depth=1). For 3D images this
+  // behaves like downloadSubImage with baseArrayLayer=0.
+  void downloadArrayLayer(void* data, size_t size, uint32_t arrayLayer, vk::ImageAspectFlags aspectMask = {});
   void transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
                         vk::ImageLayout oldLayout,
                         vk::ImageLayout newLayout,
@@ -208,8 +212,8 @@ private:
   vk::ImageAspectFlags m_aspectMask;
   vk::ImageLayout m_descriptorLayout;
   vk::ImageAspectFlags m_descriptorAspectMask;
-  vk::Image m_image{VK_NULL_HANDLE};
-  VmaAllocation m_imageAllocation = VK_NULL_HANDLE;
+  vk::Image m_image{};
+  VmaAllocation m_imageAllocation = nullptr;
   std::optional<vk::raii::ImageView> m_imageView;
   std::optional<vk::raii::Sampler> m_sampler;
   mutable std::optional<vk::raii::ImageView> m_depthAspectView;

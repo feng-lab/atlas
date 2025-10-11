@@ -130,8 +130,8 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
       }
       auto& texture =
         vulkan::textureFromHandle(attachment.handle, m_backend.device(), "texture-glow intermediate depth attachment");
-      const auto desiredLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
+      const auto desiredLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+      texture.transitionLayout(cmd, texture.layout(), desiredLayout, vk::ImageAspectFlagBits::eDepth);
 
       vk::RenderingAttachmentInfo info;
       info.imageView = texture.imageView();
@@ -359,15 +359,9 @@ void ZVulkanTextureGlowPipelineContext::ensureIntermediateTextures(const glm::uv
   const auto colorUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled;
   const auto depthUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled;
   ensureTexture(m_blurIntermediate0.color, colorFormat, colorUsage, vk::ImageLayout::eShaderReadOnlyOptimal);
-  ensureTexture(m_blurIntermediate0.depth,
-                vk::Format::eD32Sfloat,
-                depthUsage,
-                vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+  ensureTexture(m_blurIntermediate0.depth, vk::Format::eD32Sfloat, depthUsage, vk::ImageLayout::eDepthReadOnlyOptimal);
   ensureTexture(m_blurIntermediate1.color, colorFormat, colorUsage, vk::ImageLayout::eShaderReadOnlyOptimal);
-  ensureTexture(m_blurIntermediate1.depth,
-                vk::Format::eD32Sfloat,
-                depthUsage,
-                vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+  ensureTexture(m_blurIntermediate1.depth, vk::Format::eD32Sfloat, depthUsage, vk::ImageLayout::eDepthReadOnlyOptimal);
 }
 
 void ZVulkanTextureGlowPipelineContext::ensureVertexCapacity(size_t) {}
@@ -499,10 +493,13 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
   }
 
   output.color.texture->transitionLayout(cmd, output.color.texture->layout(), vk::ImageLayout::eColorAttachmentOptimal);
-  output.depth.texture->transitionLayout(cmd,
-                                         output.depth.texture->layout(),
-                                         vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                                         vk::ImageAspectFlagBits::eDepth);
+  {
+    // Always use depth-only layout/aspect (stencil unused)
+    output.depth.texture->transitionLayout(cmd,
+                                           output.depth.texture->layout(),
+                                           vk::ImageLayout::eDepthAttachmentOptimal,
+                                           vk::ImageAspectFlagBits::eDepth);
+  }
 
   vk::RenderingAttachmentInfo colorAttachment;
   colorAttachment.imageView = output.color.texture->imageView();
@@ -513,7 +510,7 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
 
   vk::RenderingAttachmentInfo depthAttachment;
   depthAttachment.imageView = output.depth.texture->imageView();
-  depthAttachment.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+  depthAttachment.imageLayout = output.depth.texture->layout();
   depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
   depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
   depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
@@ -592,8 +589,8 @@ void ZVulkanTextureGlowPipelineContext::runBlurPass(Z3DRendererBase& renderer,
                                          vk::ImageLayout::eColorAttachmentOptimal,
                                          vk::ImageLayout::eShaderReadOnlyOptimal);
   output.depth.texture->transitionLayout(cmd,
-                                         vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                                         vk::ImageLayout::eDepthStencilReadOnlyOptimal,
+                                         vk::ImageLayout::eDepthAttachmentOptimal,
+                                         vk::ImageLayout::eDepthReadOnlyOptimal,
                                          vk::ImageAspectFlagBits::eDepth);
 }
 

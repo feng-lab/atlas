@@ -111,17 +111,17 @@ private:
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
   // Upload arena-backed SoA slices
-  vk::Buffer m_originBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_axisBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_flagsBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_baseColorBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_originBuffer{};
+  vk::Buffer m_axisBuffer{};
+  vk::Buffer m_flagsBuffer{};
+  vk::Buffer m_baseColorBuffer{};
   vk::Buffer m_topColorBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_originOffset{0};
   vk::DeviceSize m_axisOffset{0};
   vk::DeviceSize m_flagsOffset{0};
   vk::DeviceSize m_baseColorOffset{0};
   vk::DeviceSize m_topColorOffset{0};
-  vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_indexUploadBuffer{};
   vk::DeviceSize m_indexUploadOffset{0};
 
   // Static promotion cache

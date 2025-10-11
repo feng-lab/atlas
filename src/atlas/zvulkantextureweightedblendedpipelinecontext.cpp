@@ -46,6 +46,9 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
                                                           const vk::Rect2D& scissor,
                                                           vk::raii::CommandBuffer& cmd)
 {
+  VLOG(2) << fmt::format("WB::record begin accum=0x{:x} trans=0x{:x}",
+                         payload.accumulationAttachment.id,
+                         payload.transmittanceAttachment.id);
   CHECK(payload.accumulationAttachment.backend == AttachmentBackend::Vulkan)
     << "GL accumulationAttachment in Vulkan path";
   CHECK(payload.transmittanceAttachment.backend == AttachmentBackend::Vulkan)
@@ -81,6 +84,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
   }
   CHECK(ds != nullptr) << "WB resolve: override descriptor allocation failed (fatal)";
+  VLOG(2) << "WB: updating override set bindings accum/trans";
   ds->updateTexture(vkbind::kBindingWBAccum, accumulationTexture, m_backend.defaultSampler());
   ds->updateTexture(vkbind::kBindingWBTransmittance, transmittanceTexture, m_backend.defaultSampler());
 
@@ -96,6 +100,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   key.depthFormat = formats.depthFormat;
 
   PipelineInstance& instance = ensurePipeline(key, formats);
+  VLOG(2) << fmt::format("WB: ensured pipeline colors={} depth={}", formats.colorFormats.size(), formats.depthFormat.has_value());
 
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
@@ -150,6 +155,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
                                                   0,
                                                   constants);
 
+  VLOG(2) << fmt::format("WB: draw {} verts", m_vertexCount);
   cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
 }
 
@@ -344,7 +350,7 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
 
   // Blend weighted-blended result over background using premultiplied alpha.
   vk::PipelineColorBlendAttachmentState blendAttachment{};
-  blendAttachment.blendEnable = VK_TRUE;
+  blendAttachment.blendEnable = true;
   blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
   blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
   blendAttachment.colorBlendOp = vk::BlendOp::eAdd;

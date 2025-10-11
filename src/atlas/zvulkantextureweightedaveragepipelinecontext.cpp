@@ -56,6 +56,9 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
                                                           const vk::Rect2D& scissor,
                                                           vk::raii::CommandBuffer& cmd)
 {
+  VLOG(2) << fmt::format("WA::record begin accum=0x{:x} moments=0x{:x}",
+                         payload.accumulationAttachment.id,
+                         payload.momentsAttachment.id);
   CHECK(payload.accumulationAttachment.backend == AttachmentBackend::Vulkan)
     << "GL accumulationAttachment in Vulkan path";
   CHECK(payload.momentsAttachment.backend == AttachmentBackend::Vulkan) << "GL momentsAttachment in Vulkan path";
@@ -86,6 +89,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
     ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
   }
   CHECK(ds != nullptr) << "WA resolve: override descriptor allocation failed (fatal)";
+  VLOG(2) << "WA: updating override set bindings accum/moments";
   ds->updateTexture(vkbind::kBindingWAAccum, accumulationTexture, m_backend.defaultSampler());
   ds->updateTexture(vkbind::kBindingWAMoments, momentsTexture, m_backend.defaultSampler());
 
@@ -101,6 +105,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   key.depthFormat = formats.depthFormat;
 
   PipelineInstance& instance = ensurePipeline(key, formats);
+  VLOG(2) << fmt::format("WA: ensured pipeline colors={} depth={}", formats.colorFormats.size(), formats.depthFormat.has_value());
 
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
@@ -147,6 +152,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
   if (m_descriptorSetOIT && m_uboOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
+    VLOG(2) << "WA: binding OIT params set at index 3";
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                            instance.pipeline->pipelineLayout(),
                            vkbind::kSetOITParams,
@@ -159,6 +165,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
                                                   0,
                                                   constants);
 
+  VLOG(2) << fmt::format("WA: draw {} verts", m_vertexCount);
   cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
 }
 
@@ -348,7 +355,7 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
   // Blend weighted-average result over the existing background using
   // premultiplied alpha semantics (GL: ONE, ONE_MINUS_SRC_ALPHA).
   vk::PipelineColorBlendAttachmentState blendAttachment{};
-  blendAttachment.blendEnable = VK_TRUE;
+  blendAttachment.blendEnable = true;
   blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
   blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
   blendAttachment.colorBlendOp = vk::BlendOp::eAdd;

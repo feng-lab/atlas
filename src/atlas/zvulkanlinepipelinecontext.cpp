@@ -117,19 +117,19 @@ ZVulkanLinePipelineContext::~ZVulkanLinePipelineContext() = default;
 
 void ZVulkanLinePipelineContext::resetFrame()
 {
-  m_thinPosBuffer = VK_NULL_HANDLE;
-  m_thinColorBuffer = VK_NULL_HANDLE;
+  m_thinPosBuffer = nullptr;
+  m_thinColorBuffer = nullptr;
   m_thinPosOffset = 0;
   m_thinColorOffset = 0;
   m_thinUploadVertexCount = 0;
-  m_thinUploadIndexBuffer = VK_NULL_HANDLE;
+  m_thinUploadIndexBuffer = nullptr;
   m_thinUploadIndexOffset = 0;
   m_thinUploadIndexCount = 0;
-  m_wideP0Buffer = VK_NULL_HANDLE;
-  m_wideP1Buffer = VK_NULL_HANDLE;
-  m_wideC0Buffer = VK_NULL_HANDLE;
-  m_wideC1Buffer = VK_NULL_HANDLE;
-  m_wideFlagsBuffer = VK_NULL_HANDLE;
+  m_wideP0Buffer = nullptr;
+  m_wideP1Buffer = nullptr;
+  m_wideC0Buffer = nullptr;
+  m_wideC1Buffer = nullptr;
+  m_wideFlagsBuffer = nullptr;
   m_wideP0Offset = 0;
   m_wideP1Offset = 0;
   m_wideC0Offset = 0;
@@ -137,7 +137,7 @@ void ZVulkanLinePipelineContext::resetFrame()
   m_wideFlagsOffset = 0;
   m_wideUploadIndexOffset = 0;
   m_wideUploadIndexCount = 0;
-  m_wideIndexBuffer = VK_NULL_HANDLE;
+  m_wideIndexBuffer = nullptr;
   resetDescriptors();
 }
 
@@ -351,12 +351,11 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   material.alpha = payload.pickingPass ? 1.0f : payload.params->opacity;
   m_uboMaterial->copyData(&material, sizeof(material));
 
-  VLOG(2) << fmt::format(
-    "VK line params: sizeScale={:.3f} alpha={:.3f} ortho={} picking={}",
-    payload.params->sizeScale,
-    payload.params->opacity,
-    (eyeState.isPerspective ? 0 : 1),
-    payload.pickingPass);
+  VLOG(2) << fmt::format("VK line params: sizeScale={:.3f} alpha={:.3f} ortho={} picking={}",
+                         payload.params->sizeScale,
+                         payload.params->opacity,
+                         (eyeState.isPerspective ? 0 : 1),
+                         payload.pickingPass);
 
   // OIT params: used by weighted-blended wideline init
   if (m_uboOIT) {
@@ -472,13 +471,13 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
     vk::PipelineColorBlendAttachmentState baseBlend{};
     baseBlend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                                vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-    baseBlend.blendEnable = VK_FALSE;
+    baseBlend.blendEnable = false;
 
     switch (key.shaderHookType) {
       case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
         auto attachments = makeBlendAttachments(formats.colorFormats.size(), baseBlend);
         for (auto& attachment : attachments) {
-          attachment.blendEnable = VK_TRUE;
+          attachment.blendEnable = true;
           attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
           attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
           attachment.colorBlendOp = vk::BlendOp::eAdd;
@@ -495,7 +494,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
         auto attachments = makeBlendAttachments(formats.colorFormats.size(), baseBlend);
         for (size_t i = 0; i < attachments.size(); ++i) {
           auto& attachment = attachments[i];
-          attachment.blendEnable = VK_TRUE;
+          attachment.blendEnable = true;
           if (i == 0) {
             attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
             attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
@@ -523,7 +522,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
         for (size_t i = 0; i < attachments.size(); ++i) {
           auto& attachment = attachments[i];
           if (i == 0 || i == 3) {
-            attachment.blendEnable = VK_TRUE;
+            attachment.blendEnable = true;
             attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
             attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
             attachment.colorBlendOp = vk::BlendOp::eMax;
@@ -531,7 +530,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
             attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
             attachment.alphaBlendOp = vk::BlendOp::eMax;
           } else if (i == 1 || i == 4) {
-            attachment.blendEnable = VK_TRUE;
+            attachment.blendEnable = true;
             attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
             attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
             attachment.colorBlendOp = vk::BlendOp::eMax;
@@ -539,7 +538,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
             attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
             attachment.alphaBlendOp = vk::BlendOp::eMax;
           } else if (i == 2 || i == 5) {
-            attachment.blendEnable = VK_TRUE;
+            attachment.blendEnable = true;
             attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
             attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
             attachment.colorBlendOp = vk::BlendOp::eAdd;
@@ -547,7 +546,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
             attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
             attachment.alphaBlendOp = vk::BlendOp::eAdd;
           } else {
-            attachment.blendEnable = VK_FALSE;
+            attachment.blendEnable = false;
           }
         }
         instance.pipeline->setColorBlendAttachments(std::move(attachments));
@@ -602,7 +601,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
         attachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                                     vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
         if (i == 0 || i == 3) {
-          attachment.blendEnable = VK_TRUE;
+          attachment.blendEnable = true;
           attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
           attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
           attachment.colorBlendOp = vk::BlendOp::eMax;
@@ -610,7 +609,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
           attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           attachment.alphaBlendOp = vk::BlendOp::eMax;
         } else if (i == 1 || i == 4) {
-          attachment.blendEnable = VK_TRUE;
+          attachment.blendEnable = true;
           attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
           attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
           attachment.colorBlendOp = vk::BlendOp::eMax;
@@ -618,7 +617,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
           attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           attachment.alphaBlendOp = vk::BlendOp::eMax;
         } else if (i == 2 || i == 5) {
-          attachment.blendEnable = VK_TRUE;
+          attachment.blendEnable = true;
           attachment.srcColorBlendFactor = vk::BlendFactor::eOne;
           attachment.dstColorBlendFactor = vk::BlendFactor::eOne;
           attachment.colorBlendOp = vk::BlendOp::eAdd;
@@ -626,7 +625,7 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
           attachment.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           attachment.alphaBlendOp = vk::BlendOp::eAdd;
         } else {
-          attachment.blendEnable = VK_FALSE;
+          attachment.blendEnable = false;
         }
       }
       instance.pipeline->setColorBlendAttachments(std::move(attachments));
@@ -656,11 +655,11 @@ void ZVulkanLinePipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd
 void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, bool pickingPass)
 {
   // Build wide-line SoA buffers directly from payload spans; copy indices from payload.smoothIndices.
-  m_wideP0Buffer = VK_NULL_HANDLE;
-  m_wideP1Buffer = VK_NULL_HANDLE;
-  m_wideC0Buffer = VK_NULL_HANDLE;
-  m_wideC1Buffer = VK_NULL_HANDLE;
-  m_wideFlagsBuffer = VK_NULL_HANDLE;
+  m_wideP0Buffer = nullptr;
+  m_wideP1Buffer = nullptr;
+  m_wideC0Buffer = nullptr;
+  m_wideC1Buffer = nullptr;
+  m_wideFlagsBuffer = nullptr;
   m_wideP0Offset = 0;
   m_wideP1Offset = 0;
   m_wideC0Offset = 0;

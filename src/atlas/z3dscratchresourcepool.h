@@ -58,7 +58,8 @@ enum class ScratchFormat
   RG32F,
   R32F,
   R16F,
-  Depth24
+  Depth24,
+  Depth32F
 };
 
 struct ScratchAttachmentDesc
@@ -282,7 +283,7 @@ public:
   RenderTargetLease acquireLayerArrayRenderTarget(const glm::uvec2& size,
                                                   uint32_t layers,
                                                   ScratchFormat colorFormat = ScratchFormat::RGBA16,
-                                                  ScratchFormat depthFormat = ScratchFormat::Depth24,
+                                                  ScratchFormat depthFormat = ScratchFormat::Depth32F,
                                                   std::optional<RenderBackend> backend = std::nullopt);
 
   // Acquire a raycast accumulator RenderTarget consisting of two RG color attachments.
@@ -295,7 +296,7 @@ public:
   // (GL_TEXTURE_2D) and a 2D depth attachment. Intended for compositor passes.
   RenderTargetLease acquireTempRenderTarget2D(const glm::uvec2& size,
                                               ScratchFormat colorFormat = ScratchFormat::RGBA16,
-                                              ScratchFormat depthFormat = ScratchFormat::Depth24,
+                                              ScratchFormat depthFormat = ScratchFormat::Depth32F,
                                               std::optional<RenderBackend> backend = std::nullopt);
 
   // Acquire compositor-specific RenderTargets.
@@ -408,7 +409,7 @@ private:
     std::unique_ptr<Z3DRenderTarget> fbo;
     uint32_t layers = 0;
     ScratchFormat colorFormat = ScratchFormat::RGBA16;
-    ScratchFormat depthFormat = ScratchFormat::Depth24;
+    ScratchFormat depthFormat = ScratchFormat::Depth32F;
     bool inUse = false;
     uint64_t lastUseTick = 0;
     ScratchImageDescriptor descriptor;
@@ -420,7 +421,7 @@ private:
   {
     std::unique_ptr<Z3DRenderTarget> fbo;
     ScratchFormat colorFormat = ScratchFormat::RGBA16;
-    ScratchFormat depthFormat = ScratchFormat::Depth24;
+    ScratchFormat depthFormat = ScratchFormat::Depth32F;
     bool inUse = false;
     uint64_t lastUseTick = 0;
     ScratchImageDescriptor descriptor;

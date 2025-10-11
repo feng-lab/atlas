@@ -57,9 +57,9 @@ ZVulkanBuffer::ZVulkanBuffer(ZVulkanDevice& device,
                              vk::MemoryPropertyFlags properties,
                              VmaPool poolOverride)
   : m_device(device)
+  , m_poolOverride(poolOverride)
   , m_size(size)
   , m_usage(usage)
-  , m_poolOverride(poolOverride)
   , m_memoryProperties(properties)
 {
   createBuffer();

@@ -244,7 +244,7 @@ ZVulkanTextureBlendPipelineContext::ensurePipeline(const PipelineKey& key, const
   // Final compositor pass needs premultiplied alpha blending over the
   // already-rendered background, matching the GL path.
   vk::PipelineColorBlendAttachmentState blendAttachment{};
-  blendAttachment.blendEnable = VK_TRUE;
+  blendAttachment.blendEnable = true;
   blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
   blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
   blendAttachment.colorBlendOp = vk::BlendOp::eAdd;

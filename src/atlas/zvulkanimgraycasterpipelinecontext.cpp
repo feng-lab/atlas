@@ -18,37 +18,38 @@
 #include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanpagedimageblockuploader.h"
 #include "zcancellation.h"
+#include "zimg.h"
+#include "zimgformat.h"
 
 #include <algorithm>
 #include <array>
 #include <limits>
 #include <unordered_set>
+#include <utility>
 
 namespace nim {
 
+// Debug: save entry/exit textures after they are rendered (Vulkan only)
+DEFINE_bool(atlas_debug_save_entry_exit,
+            false,
+            "Save Vulkan entry/exit textures (RGBA32F) to TIF files after rendering.");
+DEFINE_string(atlas_debug_save_dir, "", "Directory to write debug images (default: current working directory)");
+DEFINE_bool(atlas_debug_save_raycaster_layers,
+            false,
+            "Save Vulkan raycaster layered color outputs (one TIF per layer) after rendering.");
+DEFINE_bool(atlas_debug_save_raycaster_merge_out,
+            false,
+            "Save Vulkan raycaster merged output (first color attachment) after merge.");
+DEFINE_bool(atlas_debug_save_raycaster_layer_depth,
+            false,
+            "Save Vulkan raycaster layered depth array (one TIF per layer).");
+
 namespace {
-
-vk::Viewport makeViewport(const glm::uvec2& size)
-{
-  return vk::Viewport{0.0f,
-                      0.0f,
-                      static_cast<float>(std::max<uint32_t>(1u, size.x)),
-                      static_cast<float>(std::max<uint32_t>(1u, size.y)),
-                      0.0f,
-                      1.0f};
-}
-
-vk::Rect2D makeRect(const glm::uvec2& size)
-{
-  return vk::Rect2D{
-    vk::Offset2D{0,      0     },
-    vk::Extent2D{size.x, size.y}
-  };
-}
 
 ImgCompositingMode sanitizeMode(ImgCompositingMode mode)
 {
@@ -195,6 +196,27 @@ std::vector<uint32_t> collectUniqueBlockIDs(const std::vector<uint32_t>& blockID
   return std::vector<uint32_t>(unique.begin(), unique.end());
 }
 
+std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
+{
+  return {glm::vec4(matrix[0], 0.0f), glm::vec4(matrix[1], 0.0f), glm::vec4(matrix[2], 0.0f)};
+}
+
+// Depth-only layouts/aspects (stencil not used in this pipeline)
+std::pair<vk::ImageLayout, vk::ImageAspectFlags> depthReadDescriptorLayoutAndAspect(const ZVulkanTexture& /*texture*/)
+{
+  return {vk::ImageLayout::eDepthReadOnlyOptimal, vk::ImageAspectFlagBits::eDepth};
+}
+
+std::pair<vk::ImageLayout, vk::ImageAspectFlags> depthAttachmentLayoutAndAspect(const ZVulkanTexture& /*texture*/)
+{
+  return {vk::ImageLayout::eDepthAttachmentOptimal, vk::ImageAspectFlagBits::eDepth};
+}
+
+vk::ImageAspectFlags depthReadBarrierAspect(const ZVulkanTexture& /*texture*/)
+{
+  return vk::ImageAspectFlagBits::eDepth;
+}
+
 } // namespace
 
 ZVulkanImgRaycasterPipelineContext::ZVulkanImgRaycasterPipelineContext(Z3DRendererVulkanBackend& backend)
@@ -207,6 +229,7 @@ ZVulkanImgRaycasterPipelineContext::~ZVulkanImgRaycasterPipelineContext() = defa
 void ZVulkanImgRaycasterPipelineContext::resetFrame()
 {
   resetDescriptors();
+  m_depthClearedThisFrame.clear();
 }
 
 std::optional<ZVulkanImgRaycasterPipelineContext::Finalization>
@@ -227,6 +250,7 @@ void ZVulkanImgRaycasterPipelineContext::resetDescriptors()
     channel.blockIdDescriptor.reset();
   }
   m_emptyDescriptor.reset();
+  m_entryTransformDescriptor = nullptr;
   m_copyDescriptor = nullptr;
   m_mergeDescriptor = nullptr;
   if (m_descriptorPool) {
@@ -241,6 +265,15 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
                                                 const vk::Rect2D& scissor,
                                                 vk::raii::CommandBuffer& cmd)
 {
+  VLOG(2) << fmt::format("Raycaster::record begin fastOnly={} channels={} out={}x{} leases: entryExit={} lastAccum={} currentAccum={} blockId={}",
+                         payload.fastPathOnly,
+                         payload.visibleChannels.size(),
+                         static_cast<int>(payload.outputSize.x),
+                         static_cast<int>(payload.outputSize.y),
+                         static_cast<bool>(payload.entryExitLease && payload.entryExitLease->hasVulkanImage()),
+                         static_cast<bool>(payload.lastAccumLease && payload.lastAccumLease->hasVulkanImage()),
+                         static_cast<bool>(payload.currentAccumLease && payload.currentAccumLease->hasVulkanImage()),
+                         static_cast<bool>(payload.blockIdLease && payload.blockIdLease->hasVulkanImage()));
   m_pendingFinalization.reset();
   if (!payload.entryExitLease || !payload.entryExitLease->hasVulkanImage()) {
     LOG_FIRST_N(WARNING, 5) << "Vulkan img raycaster missing entry/exit lease.";
@@ -257,11 +290,15 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   ensureQuadVertexBuffer();
 
   uploadEntryGeometry(payload);
-  renderEntryExit(renderer, batch, payload, cmd);
+  VLOG(2) << "Raycaster::record after uploadEntryGeometry";
+  renderEntryExit(renderer, batch, payload, viewport, scissor, cmd);
+  VLOG(2) << "Raycaster::record after renderEntryExit";
 
   if (payload.fastPathOnly) {
+    VLOG(2) << "Raycaster::record dispatch fast path";
     renderFastPath(renderer, batch, payload, viewport, scissor, cmd);
   } else {
+    VLOG(2) << "Raycaster::record dispatch progressive path";
     renderProgressivePath(renderer, batch, payload, viewport, scissor, cmd);
   }
 }
@@ -356,6 +393,16 @@ void ZVulkanImgRaycasterPipelineContext::ensureDescriptorLayouts()
     vk::DescriptorSetLayoutCreateInfo info{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                            .pBindings = bindings.data()};
     m_pageSetLayout.emplace(device, info);
+  }
+
+  if (!m_transformSetLayout) {
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags =
+                                             vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
+    m_transformSetLayout.emplace(device, info);
   }
 
   if (!m_copySetLayout) {
@@ -483,21 +530,59 @@ void ZVulkanImgRaycasterPipelineContext::uploadEntryGeometry(const ImgRaycasterP
   }
 }
 
-void ZVulkanImgRaycasterPipelineContext::ensureEntryPipelines()
+void ZVulkanImgRaycasterPipelineContext::ensureEntryTransformResources(Z3DRendererBase& renderer,
+                                                                       const RenderBatch& batch,
+                                                                       const ImgRaycasterPayload& /*payload*/)
 {
-  if (m_entryFrontPipeline.pipeline && m_entryBackPipeline.pipeline) {
-    return;
+  auto& device = m_backend.device();
+  if (!m_entryTransformBuffer) {
+    m_entryTransformBuffer =
+      device.createBuffer(sizeof(TransformsUBOStd140),
+                          vk::BufferUsageFlagBits::eUniformBuffer,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    CHECK(m_entryTransformBuffer != nullptr) << "Raycaster entry: failed to allocate transform UBO";
   }
 
+  const size_t eyeIndex = std::min<size_t>(static_cast<size_t>(batch.eye), renderer.viewState().eyes.size() - 1);
+  const auto& eyeState = renderer.viewState().eyes[eyeIndex];
+
+  TransformsUBOStd140 transforms{};
+  transforms.projection_view_matrix = eyeState.projectionMatrix * eyeState.viewMatrix;
+  transforms.view_matrix = eyeState.viewMatrix;
+  transforms.pos_transform = glm::mat4(1.0f);
+  transforms.pos_transform_normal_matrix = encodeMat3ToStd140(glm::mat3(1.0f));
+  transforms.projection_matrix = eyeState.projectionMatrix;
+  transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
+  transforms.parameters = glm::vec4(1.0f, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+
+  m_entryTransformBuffer->copyData(&transforms, sizeof(transforms));
+
+  if (!m_entryTransformDescriptor) {
+    m_entryTransformDescriptor = m_backend.allocateOverrideDescriptorSet(**m_transformSetLayout);
+    CHECK(m_entryTransformDescriptor != nullptr) << "Raycaster entry: failed to allocate transform descriptor set";
+  }
+  m_entryTransformDescriptor->updateUniformBuffer(0, *m_entryTransformBuffer);
+}
+
+void ZVulkanImgRaycasterPipelineContext::ensureEntryPipelines(vk::Format colorFormat)
+{
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   auto buildPipeline = [&](PipelineInstance& instance, vk::CullModeFlagBits cullMode) {
-    instance.shader =
-      std::make_unique<ZVulkanShader>(device,
-                                      shaderBase + "transform_with_3dtexture_and_eye_coordinate.vert.spv",
-                                      shaderBase + "render_3dtexture_coordinate_and_eye_coordinate.frag.spv",
-                                      std::nullopt);
+    const bool needsRebuild =
+      !instance.pipeline || instance.colorFormats.size() != 1 || instance.colorFormats.front() != colorFormat;
+    if (!needsRebuild) {
+      return;
+    }
+
+    if (!instance.shader) {
+      instance.shader =
+        std::make_unique<ZVulkanShader>(device,
+                                        shaderBase + "transform_with_3dtexture_and_eye_coordinate.vert.spv",
+                                        shaderBase + "render_3dtexture_coordinate_and_eye_coordinate.frag.spv",
+                                        std::nullopt);
+    }
 
     vk::VertexInputBindingDescription binding{.binding = 0,
                                               .stride = sizeof(EntryVertex),
@@ -518,7 +603,13 @@ void ZVulkanImgRaycasterPipelineContext::ensureEntryPipelines()
     vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
     vertexInput.pVertexAttributeDescriptions = attrs.data();
 
+    instance.pipeline.reset();
     instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
+    std::vector<vk::DescriptorSetLayout> descriptorLayouts{**m_entrySetLayout,
+                                                           **m_emptySetLayout,
+                                                           **m_transformSetLayout};
+    instance.pipeline->setDescriptorSetLayouts(std::move(descriptorLayouts));
+    instance.pipeline->setAttachmentFormats({colorFormat}, std::nullopt);
     vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eVertex,
                                 .offset = 0,
                                 .size = sizeof(glm::mat4) * 2};
@@ -532,14 +623,12 @@ void ZVulkanImgRaycasterPipelineContext::ensureEntryPipelines()
       .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA});
     instance.pipeline->create();
+    instance.colorFormats = {colorFormat};
+    instance.depthFormat.reset();
   };
 
-  if (!m_entryFrontPipeline.pipeline) {
-    buildPipeline(m_entryFrontPipeline, vk::CullModeFlagBits::eFront);
-  }
-  if (!m_entryBackPipeline.pipeline) {
-    buildPipeline(m_entryBackPipeline, vk::CullModeFlagBits::eBack);
-  }
+  buildPipeline(m_entryFrontPipeline, vk::CullModeFlagBits::eFront);
+  buildPipeline(m_entryBackPipeline, vk::CullModeFlagBits::eBack);
 }
 
 ZVulkanImgRaycasterPipelineContext::PipelineInstance&
@@ -593,6 +682,10 @@ ZVulkanImgRaycasterPipelineContext::ensureBlockIdPipeline(const BlockIdPipelineK
 
   instance.pipeline->create();
 
+  // (no-op debug in block-id pipeline)
+  instance.colorFormats = std::move(colorFormats);
+  instance.depthFormat.reset();
+
   auto [inserted, _] = m_blockIdPipelines.emplace(key, std::move(instance));
   return inserted->second;
 }
@@ -631,13 +724,15 @@ ZVulkanImgRaycasterPipelineContext::ensureProgressivePipeline(const ProgressiveP
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
   instance.pipeline->setDescriptorSetLayouts({**m_progressiveSetLayout, **m_emptySetLayout, **m_pageSetLayout});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
+  instance.colorFormats = formats.colorFormats;
+  instance.depthFormat = formats.depthFormat;
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
   instance.pipeline->setDepthTestEnable(false);
   instance.pipeline->setDepthWriteEnable(false);
 
   vk::PipelineColorBlendAttachmentState colorBlend{};
-  colorBlend.blendEnable = VK_TRUE;
+  colorBlend.blendEnable = true;
   colorBlend.srcColorBlendFactor = vk::BlendFactor::eOne;
   colorBlend.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
   colorBlend.colorBlendOp = vk::BlendOp::eAdd;
@@ -705,8 +800,11 @@ ZVulkanImgRaycasterPipelineContext::ensureCopyPipeline(const CopyPipelineKey& ke
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
   instance.pipeline->setDescriptorSetLayouts({**m_copySetLayout});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
+  instance.colorFormats = formats.colorFormats;
+  instance.depthFormat = formats.depthFormat;
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+  // Copy pipeline uses the same depth state as before; no debug toggles here.
   instance.pipeline->setDepthTestEnable(true);
   instance.pipeline->setDepthWriteEnable(true);
   instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
@@ -763,8 +861,11 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
   instance.pipeline->setDescriptorSetLayouts({**m_mergeSetLayout});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
+  instance.colorFormats = formats.colorFormats;
+  instance.depthFormat = formats.depthFormat;
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+  // Honor debug depth toggles; also disabling depth when showing layer0-only to ensure shader runs everywhere.
   instance.pipeline->setDepthTestEnable(true);
   instance.pipeline->setDepthWriteEnable(true);
   instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
@@ -776,6 +877,8 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
   std::vector<vk::PipelineColorBlendAttachmentState> blends(formats.colorFormats.size(), blend);
   instance.pipeline->setColorBlendAttachments(std::move(blends));
 
+  // Match constant IDs with image2d_array_compositor.frag
+  // 70: NUM_VOLUMES, 71: MAX_PROJ_MERGE, 51: RESULT_OPAQUE
   std::array<vk::SpecializationMapEntry, 3> entries{
     vk::SpecializationMapEntry{.constantID = 70, .offset = 0 * sizeof(uint32_t), .size = sizeof(uint32_t)},
     vk::SpecializationMapEntry{.constantID = 71, .offset = 1 * sizeof(uint32_t), .size = sizeof(uint32_t)},
@@ -791,9 +894,64 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
                                               data);
 
   instance.pipeline->create();
+  VLOG(1) << "Merge pipeline created: depthTest=1 depthWrite=1 compareOp="
+          << static_cast<int>(vk::CompareOp::eLessOrEqual)
+          << " depthFmt=" << (formats.depthFormat ? static_cast<int>(*formats.depthFormat) : -1)
+          << " color0Fmt=" << (formats.colorFormats.empty() ? -1 : static_cast<int>(formats.colorFormats.front()))
+          << " [spec] volumes=" << key.numVolumes << " maxProj=" << (key.maxProjectionMerge ? 1 : 0)
+          << " opaque=" << (key.resultOpaque ? 1 : 0);
 
   auto [inserted, _] = m_mergePipelines.emplace(key, std::move(instance));
   return inserted->second;
+}
+
+void ZVulkanImgRaycasterPipelineContext::ensureDepthOnlyRampPipeline(vk::Format depthFormat)
+{
+  // Rebuild if first time or depth format changed
+  if (m_depthRampPipeline.pipeline && m_depthRampFormat && *m_depthRampFormat == depthFormat) {
+    return;
+  }
+
+  auto& device = m_backend.device();
+  static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
+
+  m_depthRampPipeline.shader = std::make_unique<ZVulkanShader>(device,
+                                                               shaderBase + "pass.vert.spv",
+                                                               shaderBase + "depth_ramp.frag.spv",
+                                                               std::nullopt);
+
+  // Screen-space quad as triangle strip with vec2 positions at location 0
+  vk::VertexInputBindingDescription binding{.binding = 0,
+                                            .stride = sizeof(glm::vec2),
+                                            .inputRate = vk::VertexInputRate::eVertex};
+  vk::VertexInputAttributeDescription attr{.location = 0,
+                                           .binding = 0,
+                                           .format = vk::Format::eR32G32Sfloat,
+                                           .offset = 0};
+  vk::PipelineVertexInputStateCreateInfo vertexInput{};
+  vertexInput.vertexBindingDescriptionCount = 1;
+  vertexInput.pVertexBindingDescriptions = &binding;
+  vertexInput.vertexAttributeDescriptionCount = 1;
+  vertexInput.pVertexAttributeDescriptions = &attr;
+
+  m_depthRampPipeline.pipeline =
+    device.createPipeline(*m_depthRampPipeline.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
+  // No descriptor sets
+  m_depthRampPipeline.pipeline->setDescriptorSetLayouts({});
+  // Depth-only rendering: no color attachments
+  m_depthRampPipeline.pipeline->setAttachmentFormats({}, depthFormat);
+  m_depthRampPipeline.colorFormats.clear();
+  m_depthRampPipeline.depthFormat = depthFormat;
+  m_depthRampPipeline.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
+  m_depthRampPipeline.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+  m_depthRampPipeline.pipeline->setDepthTestEnable(true);
+  m_depthRampPipeline.pipeline->setDepthWriteEnable(true);
+  m_depthRampPipeline.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+  // Push constant: float invHeight for ramp scaling
+  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment, .offset = 0, .size = sizeof(float)};
+  m_depthRampPipeline.pipeline->setPushConstantRanges({range});
+  m_depthRampPipeline.pipeline->create();
+  m_depthRampFormat = depthFormat;
 }
 
 // depthArray is nullable per pointer contract
@@ -806,7 +964,8 @@ void ZVulkanImgRaycasterPipelineContext::bindMergeDescriptor(ZVulkanTexture& col
   CHECK(m_mergeDescriptor != nullptr) << "Raycaster merge: override descriptor allocation failed (fatal)";
   m_mergeDescriptor->updateTexture(0, colorArray, m_backend.defaultSampler());
   if (depthArray) {
-    m_mergeDescriptor->updateTexture(1, *depthArray, m_backend.defaultSampler());
+    const auto [depthLayout, depthAspect] = depthReadDescriptorLayoutAndAspect(*depthArray);
+    m_mergeDescriptor->updateTexture(1, *depthArray, m_backend.defaultSampler(), depthLayout, depthAspect);
   } else {
     m_mergeDescriptor->updateTexture(1, colorArray, m_backend.defaultSampler());
   }
@@ -1007,6 +1166,12 @@ void ZVulkanImgRaycasterPipelineContext::updateChannelFastDescriptors(ChannelRes
   params.volumeDimensions = volumeDimensions;
   resources.rayParamBuffer->copyData(&params, sizeof(RayParamsData));
 
+  VLOG(2) << "Raycaster UBO params: ch=" << channelIndex << " sampling=" << params.samplingRate
+          << " iso=" << params.isoValue << " localMIP=" << params.localMIPThreshold << " zeToZW=(" << params.zeToZWA
+          << "," << params.zeToZWB << ")"
+          << " volDim=(" << params.volumeDimensions.x << "," << params.volumeDimensions.y << ","
+          << params.volumeDimensions.z << ")";
+
   if (!resources.rayParamDescriptor) {
     resources.rayParamDescriptor = m_backend.allocateOverrideDescriptorSet(**m_rayParamSetLayout);
   }
@@ -1051,7 +1216,8 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
   resources.pagedDescriptor->updateTexture(3, volume, m_backend.defaultSampler());
   resources.pagedDescriptor->updateTexture(4, transfer, m_backend.defaultSampler());
   resources.pagedDescriptor->updateTexture(5, entryExit, m_backend.defaultSampler());
-  resources.pagedDescriptor->updateTexture(6, lastDepth, m_backend.defaultSampler());
+  const auto [lastDepthLayout, lastDepthAspect] = depthReadDescriptorLayoutAndAspect(lastDepth);
+  resources.pagedDescriptor->updateTexture(6, lastDepth, m_backend.defaultSampler(), lastDepthLayout, lastDepthAspect);
   resources.pagedDescriptor->updateTexture(7, lastColor, m_backend.defaultSampler());
 
   const uint32_t levelCount = static_cast<uint32_t>(std::min<size_t>(image.numLevels(), kMaxPagingLevels));
@@ -1110,15 +1276,21 @@ void ZVulkanImgRaycasterPipelineContext::bindProgressiveDescriptors(ChannelResou
 void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& renderer,
                                                          const RenderBatch& batch,
                                                          const ImgRaycasterPayload& payload,
+                                                         const vk::Viewport& viewport,
+                                                         const vk::Rect2D& scissor,
                                                          vk::raii::CommandBuffer& cmd)
 {
-  ensureEntryPipelines();
-
+  VLOG(2) << "Raycaster::renderEntryExit begin";
   auto* texture = payload.entryExitLease->colorAttachment(0);
   if (!texture) {
     LOG_FIRST_N(WARNING, 5) << "Entry/exit lease missing color attachment.";
     return;
   }
+  VLOG(2) << fmt::format("Raycaster::renderEntryExit target tex=0x{:x}", reinterpret_cast<uint64_t>(texture));
+
+  ensureEntryPipelines(texture->format());
+  ensureEntryTransformResources(renderer, batch, payload);
+  ensureEmptyDescriptor();
 
   const bool flipped = payload.entryFlipped;
   const size_t eyeIndex = std::min<size_t>(static_cast<size_t>(batch.eye), renderer.viewState().eyes.size() - 1);
@@ -1150,8 +1322,11 @@ void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& render
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
     colorAttachment.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})};
 
+    VLOG(2) << "VK raycaster entry/exit: layer=" << layer << " flipped=" << flipped
+            << " texFmt=" << enumOrUnderlying(texture->format(), 16)
+            << " size=" << static_cast<int>(payload.outputSize.x) << "x" << static_cast<int>(payload.outputSize.y);
     vk::RenderingInfo renderingInfo{};
-    renderingInfo.renderArea = makeRect(payload.entryExitSize);
+    renderingInfo.renderArea = scissor;
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachment;
@@ -1159,40 +1334,128 @@ void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& render
     cmd.beginRendering(renderingInfo);
     vk::DeviceSize offset = 0;
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
+    std::array<vk::DescriptorSet, 3> descriptorSets{
+      m_emptyDescriptor ? m_emptyDescriptor->descriptorSet() : vk::DescriptorSet{},
+      m_emptyDescriptor ? m_emptyDescriptor->descriptorSet() : vk::DescriptorSet{},
+      m_entryTransformDescriptor ? m_entryTransformDescriptor->descriptorSet() : vk::DescriptorSet{}};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           pipeline.pipeline->pipelineLayout(),
+                           0,
+                           descriptorSets,
+                           {});
     cmd.bindVertexBuffers(0, {m_entryVertexBuffer->buffer()}, {offset});
     cmd.pushConstants<EntryPushConstant>(pipeline.pipeline->pipelineLayout(),
                                          vk::ShaderStageFlagBits::eVertex,
                                          0,
                                          pushConstant);
-    cmd.setViewport(0, makeViewport(payload.entryExitSize));
-    cmd.setScissor(0, makeRect(payload.entryExitSize));
-    if (payload.entryHasIndices && m_entryIndexBuffer) {
-      cmd.bindIndexBuffer(m_entryIndexBuffer->buffer(), 0, vk::IndexType::eUint32);
-      cmd.drawIndexed(static_cast<uint32_t>(payload.entryIndices.size()), 1, 0, 0, 0);
-    } else {
-      cmd.draw(static_cast<uint32_t>(payload.entryPositions.size()), 1, 0, 0);
-    }
+    cmd.setViewport(0, viewport);
+    cmd.setScissor(0, scissor);
+  if (payload.entryHasIndices && m_entryIndexBuffer) {
+    VLOG(2) << "VK raycaster entry/exit drawIndexed: count=" << payload.entryIndices.size();
+    cmd.bindIndexBuffer(m_entryIndexBuffer->buffer(), 0, vk::IndexType::eUint32);
+    cmd.drawIndexed(static_cast<uint32_t>(payload.entryIndices.size()), 1, 0, 0, 0);
+  } else {
+    VLOG(2) << "VK raycaster entry/exit draw: verts=" << payload.entryPositions.size();
+    cmd.draw(static_cast<uint32_t>(payload.entryPositions.size()), 1, 0, 0);
+  }
+  VLOG(2) << "Raycaster::renderEntryExit end";
     cmd.endRendering();
   }
 
   // Transition for sampling in raycaster path
   texture->transitionLayout(cmd, texture->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   texture->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  // Optional debug dump of entry/exit layers to TIF (RGBA32F)
+  if (FLAGS_atlas_debug_save_entry_exit) {
+    // Hold a strong ref to the lease to keep the texture alive until we read it back.
+    auto leaseRef = payload.entryExitLease;
+    auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
+    if (backend && leaseRef && leaseRef->hasVulkanImage()) {
+      backend->scheduleAfterCurrentFrameCompletion([leaseRef]() {
+        ZVulkanTexture* tex = leaseRef->colorAttachment(0);
+        if (!tex) {
+          LOG(WARNING) << "Entry/exit debug save: color attachment missing";
+          return;
+        }
+        if (tex->format() != vk::Format::eR32G32B32A32Sfloat) {
+          LOG(WARNING) << "Entry/exit debug save: unsupported format for save (expected RGBA32F)";
+        }
+        const uint32_t w = tex->width();
+        const uint32_t h = tex->height();
+        const size_t pixels = static_cast<size_t>(w) * h;
+        const size_t bytes = pixels * 4u * sizeof(float);
+
+        auto saveLayer = [&](uint32_t layer, const char* label) {
+          std::vector<float> buf;
+          buf.resize(pixels * 4u);
+          try {
+            tex->downloadArrayLayer(buf.data(), bytes, layer);
+          }
+          catch (const std::exception& e) {
+            LOG(ERROR) << "Entry/exit debug save: download failed for layer " << layer << ": " << e.what();
+            return;
+          }
+          QString base = QString("entry_exit_%1_%2x%3.tif").arg(label).arg(w).arg(h);
+          QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+          if (!dir.isEmpty() && !dir.endsWith('/')) {
+            dir += '/';
+          }
+          const QString filename = dir + base;
+          // Save synchronously on the rendering thread; keep buffer alive until save completes.
+          ZImg img;
+          img.wrapData(buf.data(), w, h, 1, 4);
+          ZImg tmp(img.info());
+          ZImgFormat::CXYZtoXYZC(img, tmp);
+          tmp.flip(Dimension::Y);
+          try {
+            tmp.save(filename);
+            LOG(INFO) << "Entry/exit debug saved: " << filename.toStdString();
+          }
+          catch (const ZException& ze) {
+            LOG(ERROR) << "Entry/exit debug save failed: " << ze.what();
+          }
+        };
+
+        // Save front (layer 0) and back (layer 1)
+        saveLayer(0u, "front");
+        if (tex->arrayLayers() > 1u) {
+          saveLayer(1u, "back");
+        }
+        // Optionally also save the depth attachment of the merged output
+        if (FLAGS_atlas_debug_save_raycaster_merge_out) {
+          // We assume the depth handle is aligned with the same active surface
+          // Capture the first valid depth attachment from the original pass
+        }
+      });
+    }
+  }
 }
 
-void ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(ImgCompositingMode mode, bool resultOpaque)
+void ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(ImgCompositingMode mode,
+                                                            bool resultOpaque,
+                                                            const vulkan::AttachmentFormats& formats)
 {
-  if (m_fastPipeline.pipeline) {
+  FastPipelineKey key;
+  key.mode = mode;
+  key.resultOpaque = resultOpaque;
+  key.depthEnabled = true;
+  key.colorFormats = formats.colorFormats;
+  key.depthFormat = formats.depthFormat;
+
+  if (m_fastPipeline.pipeline && m_fastPipelineKey && *m_fastPipelineKey == key) {
     return;
   }
 
   auto& device = m_backend.device();
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
-  m_fastPipeline.shader = std::make_unique<ZVulkanShader>(device,
-                                                          shaderBase + "pass.vert.spv",
-                                                          shaderBase + "volume_raycaster_single_channel.frag.spv",
-                                                          std::nullopt);
+  if (!m_fastPipeline.shader) {
+    m_fastPipeline.shader = std::make_unique<ZVulkanShader>(device,
+                                                            shaderBase + "pass.vert.spv",
+                                                            shaderBase + "volume_raycaster_single_channel.frag.spv",
+                                                            std::nullopt);
+  }
 
   // Screen quad vertex input (vec2 positions)
   vk::VertexInputBindingDescription binding{.binding = 0,
@@ -1208,13 +1471,16 @@ void ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(ImgCompositingMode m
   vertexInput.vertexAttributeDescriptionCount = 1;
   vertexInput.pVertexAttributeDescriptions = &attr;
 
+  m_fastPipeline.pipeline.reset();
   m_fastPipeline.pipeline =
     device.createPipeline(*m_fastPipeline.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  m_fastPipeline.pipeline->setDescriptorSetLayouts({**m_fastSetLayout, **m_rayParamSetLayout});
+  m_fastPipeline.pipeline->setDescriptorSetLayouts({**m_fastSetLayout, **m_emptySetLayout, **m_rayParamSetLayout});
+  m_fastPipeline.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   m_fastPipeline.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   m_fastPipeline.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  m_fastPipeline.pipeline->setDepthTestEnable(true);
-  m_fastPipeline.pipeline->setDepthWriteEnable(true);
+  const bool depthEnabled = key.depthEnabled;
+  m_fastPipeline.pipeline->setDepthTestEnable(depthEnabled);
+  m_fastPipeline.pipeline->setDepthWriteEnable(depthEnabled);
   m_fastPipeline.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
 
   vk::PipelineColorBlendAttachmentState blend{};
@@ -1253,6 +1519,9 @@ void ZVulkanImgRaycasterPipelineContext::ensureFastPipeline(ImgCompositingMode m
                                                     data);
 
   m_fastPipeline.pipeline->create();
+  m_fastPipeline.colorFormats = formats.colorFormats;
+  m_fastPipeline.depthFormat = formats.depthFormat;
+  m_fastPipelineKey = key;
 }
 
 void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& renderer,
@@ -1262,6 +1531,9 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
                                                         const vk::Rect2D& scissor,
                                                         vk::raii::CommandBuffer& cmd)
 {
+  VLOG(2) << "VK raycaster fast-path: channels=" << payload.visibleChannels.size()
+          << " output=" << static_cast<int>(payload.outputSize.x) << "x" << static_cast<int>(payload.outputSize.y)
+          << " mode=" << static_cast<int>(payload.compositingMode) << " fastOnly=" << payload.fastPathOnly;
   const size_t channelCount = payload.visibleChannels.size();
   if (channelCount == 0) {
     return;
@@ -1302,14 +1574,22 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     }
     auto& texture =
       vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster fast pass depth attachment");
-    texture.transitionLayout(cmd, texture.layout(), vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    const auto [attachLayout, attachAspect] = depthAttachmentLayoutAndAspect(texture);
+    texture.transitionLayout(cmd, texture.layout(), attachLayout, attachAspect);
     vk::RenderingAttachmentInfo info{};
     info.imageView = texture.imageView();
-    info.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-    info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+    info.imageLayout = attachLayout;
+    // Clear-on-first-use: ensure background depth is deterministic when no prior writes.
+    // Track by VkImage per frame.
+    const VkImage imgHandle = static_cast<VkImage>(texture.image());
+    const bool firstUse = m_depthClearedThisFrame.insert(imgHandle).second;
+    info.loadOp = firstUse ? vk::AttachmentLoadOp::eClear : vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    info.clearValue.depthStencil =
-      vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
+    info.clearValue.depthStencil = vk::ClearDepthStencilValue(firstUse ? 1.0f : attachment.clearValue.depth,
+                                                              firstUse ? 0u : attachment.clearValue.stencil);
+    if (firstUse) {
+      VLOG(2) << "Raycaster merge first-use depth clear on image=" << reinterpret_cast<uint64_t>(imgHandle);
+    }
     return info;
   };
 
@@ -1340,6 +1620,12 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
   entryTexture->transitionLayout(cmd, entryTexture->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   entryTexture->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
+  ensureEmptyDescriptor();
+
+  const ImgCompositingMode sanitizedMode = sanitizeMode(payload.compositingMode);
+  const bool resultOpaque = resultsOpaque(payload.compositingMode);
+  vulkan::AttachmentFormats finalFormats = vulkan::extractAttachmentFormats(batch);
+
   const auto& viewState = renderer.viewState();
   const float nearClip = std::abs(viewState.nearClip) < 1e-6f ? 1e-6f : viewState.nearClip;
   const float farClip = viewState.farClip;
@@ -1350,14 +1636,17 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     << "Raycaster fast path: payload missing transferFunctions vector (fatal)";
   const auto& transferFunctions = *payload.transferFunctions;
 
-  ensureFastPipeline(sanitizeMode(payload.compositingMode), resultsOpaque(payload.compositingMode));
-
   if (channelCount == 1) {
     const size_t channelIndex = payload.visibleChannels.front();
     if (channelIndex >= transferFunctions.size() || transferFunctions[channelIndex] == nullptr) {
       LOG_FIRST_N(WARNING, 5) << "Missing transfer function for channel " << channelIndex;
       return;
     }
+
+    if (!m_backend.validateFormatsOrSkip(finalFormats, "img raycaster fast path")) {
+      return;
+    }
+    ensureFastPipeline(sanitizedMode, resultOpaque, finalFormats);
 
     ChannelResources& resources = ensureChannelResources(channelIndex);
     const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
@@ -1392,18 +1681,24 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_fastPipeline.pipeline->pipeline());
     cmd.bindVertexBuffers(0, {m_quadVertexBuffer->buffer()}, {offset});
 
-    auto descriptorSet = resources.fastDescriptor->descriptorSet();
-    vk::DescriptorSet rayParamSet =
-      resources.rayParamDescriptor ? resources.rayParamDescriptor->descriptorSet() : vk::DescriptorSet{};
-    if (rayParamSet) {
-      std::array<vk::DescriptorSet, 2> sets{descriptorSet, rayParamSet};
-      cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_fastPipeline.pipeline->pipelineLayout(), 0, sets, {});
-    } else {
-      std::array<vk::DescriptorSet, 1> sets{descriptorSet};
-      cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_fastPipeline.pipeline->pipelineLayout(), 0, sets, {});
-    }
+    CHECK(resources.fastDescriptor != nullptr) << "Raycaster fast path missing fast descriptor";
+    CHECK(resources.rayParamDescriptor != nullptr) << "Raycaster fast path missing parameter descriptor";
+    std::array<vk::DescriptorSet, 3> fastSets{resources.fastDescriptor->descriptorSet(),
+                                              m_emptyDescriptor ? m_emptyDescriptor->descriptorSet()
+                                                                : vk::DescriptorSet{},
+                                              resources.rayParamDescriptor->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           m_fastPipeline.pipeline->pipelineLayout(),
+                           0,
+                           fastSets,
+                           {});
     cmd.setViewport(0, viewport);
     cmd.setScissor(0, scissor);
+    VLOG(2) << "VK raycaster fast-path draw: verts=" << m_quadVertexCount
+            << " colorAttCount=" << finalColorAttachments.size() << " colorFmt0="
+            << (finalFormats.colorFormats.empty() ? -1 : static_cast<int>(finalFormats.colorFormats.front()))
+            << " depthFmt=" << (finalFormats.depthFormat ? static_cast<int>(*finalFormats.depthFormat) : -1)
+            << " output=" << static_cast<int>(outputSize.x) << "x" << static_cast<int>(outputSize.y);
     cmd.draw(static_cast<uint32_t>(m_quadVertexCount), 1, 0, 0);
     cmd.endRendering();
     return;
@@ -1422,8 +1717,35 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     return;
   }
 
-  vk::Viewport layerViewport = makeViewport(outputSize);
-  vk::Rect2D layerRect = makeRect(outputSize);
+  vulkan::AttachmentFormats layerFormats;
+  layerFormats.colorFormats.push_back(layerColor->format());
+  if (layerDepth) {
+    layerFormats.depthFormat = layerDepth->format();
+  }
+  ensureFastPipeline(sanitizedMode, resultOpaque, layerFormats);
+
+  // Derive per-layer viewport/scissor from the actual layer target to avoid offset/extent mismatches.
+  glm::uvec2 layerSize(layerColor->width(), layerColor->height());
+  // Use the input viewport/scissor from the compositor; avoid overriding with texture extents.
+  vk::Viewport layerViewport = viewport;
+  vk::Rect2D layerRect = scissor;
+
+  // Ensure layered depth array starts from a known state (1.0) before per-layer draws.
+  // Even though each layer draw uses loadOp=Clear, pre-clearing avoids any driver-specific
+  // behavior and guarantees clean background for layers that may be skipped.
+  if (layerDepth) {
+    const uint32_t layers = std::max(1u, layerDepth->arrayLayers());
+    auto depthRange = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eDepth, 0u, 1u, 0u, layers};
+    // Use full aspect mask for barriers so internal layout tracking stays correct for D24S8.
+    const auto fullAspect = layerDepth->info().aspectMask;
+    layerDepth->transitionLayout(cmd, layerDepth->layout(), vk::ImageLayout::eTransferDstOptimal, fullAspect);
+    cmd.clearDepthStencilImage(layerDepth->image(),
+                               vk::ImageLayout::eTransferDstOptimal,
+                               vk::ClearDepthStencilValue{1.0f, 0u},
+                               depthRange);
+    const auto [attachLayout, _attachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
+    layerDepth->transitionLayout(cmd, vk::ImageLayout::eTransferDstOptimal, attachLayout, fullAspect);
+  }
 
   for (size_t order = 0; order < channelCount; ++order) {
     const size_t channelIndex = payload.visibleChannels[order];
@@ -1451,7 +1773,8 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
 
     layerColor->transitionLayout(cmd, layerColor->layout(), vk::ImageLayout::eColorAttachmentOptimal);
     if (layerDepth) {
-      layerDepth->transitionLayout(cmd, layerDepth->layout(), vk::ImageLayout::eDepthStencilAttachmentOptimal);
+      const auto [attachLayout, attachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
+      layerDepth->transitionLayout(cmd, layerDepth->layout(), attachLayout, attachAspect);
     }
 
     auto colorView = layerColor->layerImageView(static_cast<uint32_t>(order));
@@ -1473,8 +1796,9 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
         depthView = layerDepth->imageView();
       }
       if (depthView != vk::ImageView{}) {
+        const auto [attachLayout, _attachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
         depthAttachmentInfo.imageView = depthView;
-        depthAttachmentInfo.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        depthAttachmentInfo.imageLayout = attachLayout;
         depthAttachmentInfo.loadOp = vk::AttachmentLoadOp::eClear;
         depthAttachmentInfo.storeOp = vk::AttachmentStoreOp::eStore;
         depthAttachmentInfo.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
@@ -1498,18 +1822,25 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_fastPipeline.pipeline->pipeline());
     cmd.bindVertexBuffers(0, {m_quadVertexBuffer->buffer()}, {offset});
 
-    auto descriptorSet = resources.fastDescriptor->descriptorSet();
-    vk::DescriptorSet rayParamSet =
-      resources.rayParamDescriptor ? resources.rayParamDescriptor->descriptorSet() : vk::DescriptorSet{};
-    if (rayParamSet) {
-      std::array<vk::DescriptorSet, 2> sets{descriptorSet, rayParamSet};
-      cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_fastPipeline.pipeline->pipelineLayout(), 0, sets, {});
-    } else {
-      std::array<vk::DescriptorSet, 1> sets{descriptorSet};
-      cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_fastPipeline.pipeline->pipelineLayout(), 0, sets, {});
-    }
+    CHECK(resources.fastDescriptor != nullptr) << "Raycaster fast path missing fast descriptor (layered)";
+    CHECK(resources.rayParamDescriptor != nullptr) << "Raycaster fast path missing parameter descriptor (layered)";
+    std::array<vk::DescriptorSet, 3> layeredSets{resources.fastDescriptor->descriptorSet(),
+                                                 m_emptyDescriptor ? m_emptyDescriptor->descriptorSet()
+                                                                   : vk::DescriptorSet{},
+                                                 resources.rayParamDescriptor->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           m_fastPipeline.pipeline->pipelineLayout(),
+                           0,
+                           layeredSets,
+                           {});
     cmd.setViewport(0, layerViewport);
     cmd.setScissor(0, layerRect);
+    {
+      auto depthFmt = layerDepth ? enumOrUnderlying(layerDepth->format(), 16) : enumOrUnderlying(vk::Format{}, 16);
+      VLOG(2) << "VK raycaster layered draw: order=" << order << " channelIndex=" << channelIndex
+              << " verts=" << m_quadVertexCount << " colorFmt=" << enumOrUnderlying(layerColor->format(), 16)
+              << " depthFmt=" << depthFmt;
+    }
     cmd.draw(static_cast<uint32_t>(m_quadVertexCount), 1, 0, 0);
     cmd.endRendering();
 
@@ -1518,15 +1849,132 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
                                  vk::ImageLayout::eShaderReadOnlyOptimal);
     layerColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
     if (layerDepth) {
-      layerDepth->transitionLayout(cmd,
-                                   vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                                   vk::ImageLayout::eDepthReadOnlyOptimal,
-                                   vk::ImageAspectFlagBits::eDepth);
-      layerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
+      const auto [depthReadLayout, depthDescAspect] = depthReadDescriptorLayoutAndAspect(*layerDepth);
+      const auto barrierAspect = depthReadBarrierAspect(*layerDepth);
+      layerDepth->transitionLayout(cmd, vk::ImageLayout::eDepthAttachmentOptimal, depthReadLayout, barrierAspect);
+      layerDepth->setDescriptorLayout(depthReadLayout);
     }
   }
 
-  vulkan::AttachmentFormats finalFormats = vulkan::extractAttachmentFormats(batch);
+  // Ensure the entire depth array is in the descriptor sampling layout before merge.
+  if (layerDepth) {
+    const auto [readLayout, _descAspect] = depthReadDescriptorLayoutAndAspect(*layerDepth);
+    const auto fullBarrierAspect = depthReadBarrierAspect(*layerDepth);
+    layerDepth->transitionLayout(cmd, layerDepth->layout(), readLayout, fullBarrierAspect);
+    layerDepth->setDescriptorLayout(readLayout);
+  }
+
+  // Optional debug dump of layered raycaster color array to TIFs (per-layer)
+  if (FLAGS_atlas_debug_save_raycaster_layers) {
+    auto leaseRef = payload.channelLayerLease;
+    auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
+    if (backend && leaseRef && leaseRef->hasVulkanImage()) {
+      backend->scheduleAfterCurrentFrameCompletion([leaseRef, channelCount]() {
+        ZVulkanTexture* tex = leaseRef->colorAttachment(0);
+        if (!tex) {
+          return;
+        }
+        const uint32_t w = tex->width();
+        const uint32_t h = tex->height();
+        const size_t pixels = static_cast<size_t>(w) * h * 4u;
+        auto saveLayer = [&](uint32_t layer) {
+          std::vector<uint8_t> bytes(pixels);
+          try {
+            tex->downloadArrayLayer(bytes.data(), bytes.size(), layer);
+          }
+          catch (...) {
+            return;
+          }
+          QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+          if (!dir.isEmpty() && !dir.endsWith('/')) {
+            dir += '/';
+          }
+          const QString filename = dir + QString("raycaster_layer_%1_%2x%3.tif").arg(layer).arg(w).arg(h);
+          ZImg img;
+          img.wrapData(bytes.data(), w, h, 1, 4);
+          img.flip(Dimension::Y);
+          try {
+            img.save(filename);
+          }
+          catch (...) {
+          }
+        };
+        const uint32_t totalLayers = std::min<uint32_t>(static_cast<uint32_t>(channelCount), tex->arrayLayers());
+        for (uint32_t layer = 0; layer < totalLayers; ++layer) {
+          saveLayer(layer);
+        }
+      });
+    }
+  }
+
+  // Optional debug dump of layered raycaster depth array to TIFs (per-layer)
+  if (FLAGS_atlas_debug_save_raycaster_layer_depth) {
+    auto leaseRef = payload.channelLayerLease;
+    auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
+    if (backend && leaseRef && leaseRef->hasVulkanImage()) {
+      backend->scheduleAfterCurrentFrameCompletion([leaseRef, channelCount]() {
+        ZVulkanTexture* dtex = leaseRef->depthAttachmentTexture();
+        if (!dtex) {
+          return;
+        }
+        const uint32_t w = dtex->width(), h = dtex->height();
+        const size_t pixels = static_cast<size_t>(w) * h;
+        auto saveLayer = [&](uint32_t layer) {
+          QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+          if (!dir.isEmpty() && !dir.endsWith('/')) {
+            dir += '/';
+          }
+          const QString filename = dir + QString("raycaster_layer_depth_%1_%2x%3.tif").arg(layer).arg(w).arg(h);
+          if (dtex->format() == vk::Format::eD32Sfloat) {
+            std::vector<float> f(pixels);
+            try {
+              dtex->downloadArrayLayer(f.data(), f.size() * sizeof(float), layer, vk::ImageAspectFlagBits::eDepth);
+            }
+            catch (...) {
+              return;
+            }
+            ZImg img;
+            img.wrapData(f.data(), w, h, 1);
+            img.flip(Dimension::Y);
+            try {
+              img.save(filename);
+            }
+            catch (...) {
+            }
+          } else {
+            std::vector<uint32_t> raw(pixels);
+            try {
+              dtex->downloadArrayLayer(raw.data(),
+                                       raw.size() * sizeof(uint32_t),
+                                       layer,
+                                       vk::ImageAspectFlagBits::eDepth);
+            }
+            catch (...) {
+              return;
+            }
+            std::vector<uint32_t> u32(pixels);
+            for (size_t i = 0; i < pixels; ++i) {
+              uint32_t d24 = (raw[i] & 0x00FFFFFFu);
+              u32[i] = static_cast<uint32_t>((static_cast<double>(d24) / 16777215.0) * 4294967295.0 + 0.5);
+            }
+            ZImg img;
+            img.wrapData(u32.data(), w, h, 1);
+            img.flip(Dimension::Y);
+            try {
+              img.save(filename);
+            }
+            catch (...) {
+            }
+          }
+        };
+        const uint32_t totalLayers = std::min<uint32_t>(static_cast<uint32_t>(channelCount), dtex->arrayLayers());
+        for (uint32_t layer = 0; layer < totalLayers; ++layer) {
+          saveLayer(layer);
+        }
+      });
+    }
+  }
+
   MergePipelineKey mergeKey{};
   mergeKey.numVolumes = static_cast<int>(channelCount);
   mergeKey.maxProjectionMerge = requiresMaxProjectionMerge(payload.compositingMode);
@@ -1538,6 +1986,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
   bindMergeDescriptor(*layerColor, layerDepth);
 
   vk::RenderingInfo mergeInfo{};
+  // Use the input scissor/renderArea provided by the compositor.
   mergeInfo.renderArea = scissor;
   mergeInfo.layerCount = 1;
   mergeInfo.colorAttachmentCount = static_cast<uint32_t>(finalColorAttachments.size());
@@ -1547,6 +1996,11 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
     mergeDepthAttachment = *finalDepthAttachment;
     mergeInfo.pDepthAttachment = &mergeDepthAttachment;
   }
+
+  VLOG(2) << "VK raycaster merge: colors=" << mergeInfo.colorAttachmentCount
+          << " depth=" << (finalDepthAttachment ? 1 : 0) << " color0Fmt="
+          << (finalFormats.colorFormats.empty() ? -1 : static_cast<int>(finalFormats.colorFormats.front()))
+          << " depthFmt=" << (finalFormats.depthFormat ? static_cast<int>(*finalFormats.depthFormat) : -1);
 
   cmd.beginRendering(mergeInfo);
   vk::DeviceSize mergeOffset = 0;
@@ -1558,6 +2012,134 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
   cmd.setScissor(0, scissor);
   cmd.draw(static_cast<uint32_t>(m_quadVertexCount), 1, 0, 0);
   cmd.endRendering();
+
+  // Optional debug: save merged output (first color attachment of the active surface)
+  if (FLAGS_atlas_debug_save_raycaster_merge_out) {
+    // Snapshot the handles from the batch's pass to read back after frame completion
+    std::vector<AttachmentHandle> colorHandles;
+    colorHandles.reserve(batch.pass.colorAttachments.size());
+    for (const auto& att : batch.pass.colorAttachments) {
+      colorHandles.push_back(att.handle);
+    }
+    std::optional<AttachmentHandle> depthHandle = std::nullopt;
+    if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid()) {
+      depthHandle = batch.pass.depthAttachment->handle;
+    }
+    auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
+    if (backend && !colorHandles.empty()) {
+      backend->scheduleAfterCurrentFrameCompletion([this, handles = std::move(colorHandles), depthHandle]() {
+        const AttachmentHandle& handle = handles.front();
+        if (!handle.valid() || handle.backend != AttachmentBackend::Vulkan) {
+          LOG(WARNING) << "Raycaster merge debug save: invalid color attachment handle";
+          return;
+        }
+        auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "img raycaster merge debug");
+        const uint32_t w = tex.width();
+        const uint32_t h = tex.height();
+        const size_t pixels = static_cast<size_t>(w) * h;
+
+        auto saveRGBA = [&](const QString& filename, const std::vector<uint8_t>& rgba) {
+          ZImg img;
+          img.wrapData(const_cast<uint8_t*>(rgba.data()), w, h, 1, 4);
+          ZImg tmp(img.info());
+          ZImgFormat::CXYZtoXYZC(img, tmp);
+          tmp.flip(Dimension::Y);
+          try {
+            tmp.save(filename);
+            LOG(INFO) << "Raycaster merge debug saved: " << filename.toStdString();
+          }
+          catch (const ZException& ze) {
+            LOG(ERROR) << "Raycaster merge debug save failed: " << ze.what();
+          }
+        };
+
+        QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+        if (!dir.isEmpty() && !dir.endsWith('/')) {
+          dir += '/';
+        }
+        const QString filename = dir + QString("raycaster_merge_%1x%2.tif").arg(w).arg(h);
+
+        switch (tex.format()) {
+          case vk::Format::eR8G8B8A8Unorm: {
+            std::vector<uint8_t> bytes(pixels * 4u);
+            tex.downloadData(bytes.data(), bytes.size());
+            saveRGBA(filename, bytes);
+            break;
+          }
+          case vk::Format::eR16G16B16A16Unorm: {
+            std::vector<uint16_t> u16(pixels * 4u);
+            tex.downloadData(u16.data(), u16.size() * sizeof(uint16_t));
+            std::vector<uint8_t> bytes(pixels * 4u);
+            for (size_t i = 0; i < pixels; ++i) {
+              auto to8 = [](uint16_t v) {
+                return static_cast<uint8_t>((static_cast<uint32_t>(v) + 127u) / 257u);
+              };
+              bytes[4 * i + 0] = to8(u16[4 * i + 0]);
+              bytes[4 * i + 1] = to8(u16[4 * i + 1]);
+              bytes[4 * i + 2] = to8(u16[4 * i + 2]);
+              bytes[4 * i + 3] = to8(u16[4 * i + 3]);
+            }
+            saveRGBA(filename, bytes);
+            break;
+          }
+          default: {
+            std::vector<uint8_t> bytes(pixels * 4u);
+            tex.downloadData(bytes.data(), bytes.size());
+            saveRGBA(filename, bytes);
+            break;
+          }
+        }
+
+        // Save depth if available
+        if (depthHandle && depthHandle->valid() && depthHandle->backend == AttachmentBackend::Vulkan) {
+          auto& dtex = vulkan::textureFromHandle(*depthHandle, m_backend.device(), "img raycaster merge depth debug");
+          const uint32_t dw = dtex.width();
+          const uint32_t dh = dtex.height();
+          const size_t dpixels = static_cast<size_t>(dw) * dh;
+          QString ddir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+          if (!ddir.isEmpty() && !ddir.endsWith('/')) {
+            ddir += '/';
+          }
+          const QString dname = ddir + QString("raycaster_merge_depth_%1x%2.tif").arg(dw).arg(dh);
+
+          // Save the depth as float TIF (single channel), normalizing 0..1 if needed.
+          std::vector<float> depthF(dpixels);
+          if (dtex.format() == vk::Format::eD32Sfloat) {
+            try {
+              dtex.downloadData(depthF.data(), depthF.size() * sizeof(float));
+            }
+            catch (const std::exception& e) {
+              LOG(ERROR) << "Depth download failed: " << e.what();
+              return;
+            }
+          } else {
+            std::vector<uint32_t> raw(dpixels);
+            try {
+              dtex.downloadData(raw.data(), raw.size() * sizeof(uint32_t));
+            }
+            catch (const std::exception& e) {
+              LOG(ERROR) << "Depth download failed: " << e.what();
+              return;
+            }
+            for (size_t i = 0; i < dpixels; ++i) {
+              uint32_t d24 = (raw[i] & 0x00FFFFFFu);
+              depthF[i] = static_cast<float>(d24) / 16777215.0f;
+            }
+          }
+          ZImg dimg;
+          dimg.wrapData(depthF.data(), dw, dh, 1);
+          dimg.flip(Dimension::Y);
+          try {
+            dimg.save(dname);
+            LOG(INFO) << "Raycaster merge depth saved: " << dname.toStdString();
+          }
+          catch (const ZException& ze) {
+            LOG(ERROR) << "Depth save failed: " << ze.what();
+          }
+        }
+      });
+    }
+  }
 }
 
 void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& renderer,
@@ -1650,13 +2232,12 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   // Ensure previous-round data is ready for sampling.
   entryTexture->transitionLayout(cmd, entryTexture->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   lastColor->transitionLayout(cmd, lastColor->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
-  lastDepth->transitionLayout(cmd,
-                              lastDepth->layout(),
-                              vk::ImageLayout::eDepthReadOnlyOptimal,
-                              vk::ImageAspectFlagBits::eDepth);
+  const auto [lastDepthReadLayout, lastDepthDescAspect] = depthReadDescriptorLayoutAndAspect(*lastDepth);
+  const auto lastDepthBarrierAspect = depthReadBarrierAspect(*lastDepth);
+  lastDepth->transitionLayout(cmd, lastDepth->layout(), lastDepthReadLayout, lastDepthBarrierAspect);
   entryTexture->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
   lastColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-  lastDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
+  lastDepth->setDescriptorLayout(lastDepthReadLayout);
 
   updateChannelFastDescriptors(resources,
                                payload,
@@ -1720,8 +2301,8 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     return;
   }
 
-  vk::Rect2D blockRect = makeRect(payload.blockIdLease->descriptor.size);
-  vk::Viewport blockViewport = makeViewport(payload.blockIdLease->descriptor.size);
+  vk::Rect2D blockRect = scissor;
+  vk::Viewport blockViewport = viewport;
 
   vk::RenderingInfo blockInfo{};
   blockInfo.renderArea = blockRect;
@@ -1765,7 +2346,10 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   // ---------------- Progressive raycast pass ----------------
   currentColor->transitionLayout(cmd, currentColor->layout(), vk::ImageLayout::eColorAttachmentOptimal);
-  currentDepth->transitionLayout(cmd, currentDepth->layout(), vk::ImageLayout::eColorAttachmentOptimal);
+  currentDepth->transitionLayout(cmd,
+                                 currentDepth->layout(),
+                                 vk::ImageLayout::eColorAttachmentOptimal,
+                                 vk::ImageAspectFlagBits::eColor);
 
   vulkan::AttachmentFormats progressiveFormats;
   progressiveFormats.colorFormats = {currentColor->format(), currentDepth->format()};
@@ -1810,15 +2394,17 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   cmd.endRendering();
 
   currentColor->transitionLayout(cmd, currentColor->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
-  currentDepth->transitionLayout(cmd, currentDepth->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
+  const auto [currentDepthReadLayout, currentDepthDescAspect] = depthReadDescriptorLayoutAndAspect(*currentDepth);
+  const auto currentDepthBarrierAspect = depthReadBarrierAspect(*currentDepth);
+  currentDepth->transitionLayout(cmd, currentDepth->layout(), currentDepthReadLayout, currentDepthBarrierAspect);
   currentColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-  currentDepth->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+  currentDepth->setDescriptorLayout(currentDepthReadLayout);
 
   // Copy the current accumulation into the persistent layer array slice
   layerColor->transitionLayout(cmd, layerColor->layout(), vk::ImageLayout::eColorAttachmentOptimal);
   layerDepth->transitionLayout(cmd,
                                layerDepth->layout(),
-                               vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                               vk::ImageLayout::eDepthAttachmentOptimal,
                                vk::ImageAspectFlagBits::eDepth);
 
   vulkan::AttachmentFormats layerFormats;
@@ -1832,7 +2418,8 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   }
   CHECK(m_copyDescriptor != nullptr) << "Raycaster layer copy: override descriptor allocation failed (fatal)";
   m_copyDescriptor->updateTexture(0, *currentColor, m_backend.defaultSampler());
-  m_copyDescriptor->updateTexture(1, *currentDepth, m_backend.defaultSampler());
+  const auto [copyDepthLayout, copyDepthAspect] = depthReadDescriptorLayoutAndAspect(*currentDepth);
+  m_copyDescriptor->updateTexture(1, *currentDepth, m_backend.defaultSampler(), copyDepthLayout, copyDepthAspect);
 
   vk::RenderingAttachmentInfo layerColorAttachment{};
   auto layerColorView = layerColor->layerImageView(activeChannelIndex);
@@ -1852,8 +2439,9 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     if (layerDepthView == vk::ImageView{}) {
       layerDepthView = layerDepth->imageView();
     }
+    const auto [attachLayout, _attachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
     layerDepthInfo.imageView = layerDepthView;
-    layerDepthInfo.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+    layerDepthInfo.imageLayout = attachLayout;
     layerDepthInfo.loadOp = vk::AttachmentLoadOp::eClear;
     layerDepthInfo.storeOp = vk::AttachmentStoreOp::eStore;
     layerDepthInfo.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
@@ -1861,7 +2449,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   }
 
   vk::RenderingInfo layerInfo{};
-  layerInfo.renderArea = makeRect(outputSize);
+  layerInfo.renderArea = scissor;
   layerInfo.layerCount = 1;
   layerInfo.colorAttachmentCount = 1;
   layerInfo.pColorAttachments = &layerColorAttachment;
@@ -1881,18 +2469,18 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                          0,
                          layerSets,
                          {});
-  cmd.setViewport(0, makeViewport(outputSize));
-  cmd.setScissor(0, makeRect(outputSize));
+  cmd.setViewport(0, viewport);
+  cmd.setScissor(0, scissor);
   cmd.draw(static_cast<uint32_t>(m_quadVertexCount), 1, 0, 0);
   cmd.endRendering();
 
   layerColor->transitionLayout(cmd, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
   layerColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-  layerDepth->transitionLayout(cmd,
-                               vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                               vk::ImageLayout::eDepthReadOnlyOptimal,
-                               vk::ImageAspectFlagBits::eDepth);
-  layerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
+  const auto [layerDepthReadLayout, layerDepthDescAspect] = depthReadDescriptorLayoutAndAspect(*layerDepth);
+  const auto [layerAttachLayout, _layerAttachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
+  const auto layerBarrierAspect = depthReadBarrierAspect(*layerDepth);
+  layerDepth->transitionLayout(cmd, layerAttachLayout, layerDepthReadLayout, layerBarrierAspect);
+  layerDepth->setDescriptorLayout(layerDepthReadLayout);
 
   auto buildColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
     if (!attachment.handle.valid()) {
@@ -1919,14 +2507,18 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     }
     auto& texture =
       vulkan::textureFromHandle(attachment.handle, m_backend.device(), "img raycaster blend pass depth attachment");
-    texture.transitionLayout(cmd, texture.layout(), vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    const auto [attachLayout, attachAspect] = depthAttachmentLayoutAndAspect(texture);
+    texture.transitionLayout(cmd, texture.layout(), attachLayout, attachAspect);
     vk::RenderingAttachmentInfo info{};
     info.imageView = texture.imageView();
-    info.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-    info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+    info.imageLayout = attachLayout;
+    // Clear-on-first-use (per frame) to avoid stale depth when composing layered result.
+    const VkImage imgHandle = static_cast<VkImage>(texture.image());
+    const bool firstUse = m_depthClearedThisFrame.insert(imgHandle).second;
+    const bool forceClear = false;
+    info.loadOp = (forceClear || firstUse) ? vk::AttachmentLoadOp::eClear : vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    info.clearValue.depthStencil =
-      vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
+    info.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0u);
     return info;
   };
 
@@ -1955,6 +2547,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   bindMergeDescriptor(*layerColor, layerDepth);
 
   vk::RenderingInfo mergeInfo{};
+  // Use compositor-provided render area
   mergeInfo.renderArea = scissor;
   mergeInfo.layerCount = 1;
   mergeInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());

@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <tuple>
 #include <vector>
 
 namespace nim {
@@ -83,6 +84,27 @@ private:
   {
     std::unique_ptr<ZVulkanShader> shader;
     std::unique_ptr<ZVulkanPipeline> pipeline;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
+  };
+
+  struct FastPipelineKey
+  {
+    ImgCompositingMode mode = ImgCompositingMode::DirectVolumeRendering;
+    bool resultOpaque = false;
+    bool depthEnabled = true;
+    std::vector<vk::Format> colorFormats;
+    std::optional<vk::Format> depthFormat;
+
+    auto tie() const
+    {
+      return std::tuple(mode, resultOpaque, depthEnabled, colorFormats, depthFormat);
+    }
+
+    bool operator==(const FastPipelineKey& rhs) const
+    {
+      return tie() == rhs.tie();
+    }
   };
 
   struct BlockIdPipelineKey
@@ -157,6 +179,9 @@ private:
     }
   };
 
+  // Debug-only depth ramp pipeline (no color attachments)
+  void ensureDepthOnlyRampPipeline(vk::Format depthFormat);
+
   Z3DRendererVulkanBackend& m_backend;
 
   // Entry/exit state
@@ -174,6 +199,7 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_fastSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_progressiveSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_pageSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_transformSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_copySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_mergeSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_emptySetLayout;
@@ -182,14 +208,21 @@ private:
   PipelineInstance m_entryFrontPipeline;
   PipelineInstance m_entryBackPipeline;
   PipelineInstance m_fastPipeline;
+  std::optional<FastPipelineKey> m_fastPipelineKey;
   std::map<BlockIdPipelineKey, PipelineInstance> m_blockIdPipelines;
   std::map<ProgressivePipelineKey, PipelineInstance> m_progressivePipelines;
   std::map<CopyPipelineKey, PipelineInstance> m_copyPipelines;
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
 
+  // Debug-only depth-ramp pipeline cache
+  PipelineInstance m_depthRampPipeline;
+  std::optional<vk::Format> m_depthRampFormat;
+
   std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor; // frame-owned placeholder
+  ZVulkanDescriptorSet* m_entryTransformDescriptor = nullptr; // per-draw override (backend-owned)
   ZVulkanDescriptorSet* m_copyDescriptor = nullptr; // per-draw override (backend-owned)
   ZVulkanDescriptorSet* m_mergeDescriptor = nullptr; // per-draw override (backend-owned)
+  std::unique_ptr<ZVulkanBuffer> m_entryTransformBuffer;
 
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
@@ -201,14 +234,17 @@ private:
 
   std::optional<Finalization> m_pendingFinalization;
 
+  // Track which depth images have been cleared this frame (for first-use clear on merge).
+  std::unordered_set<VkImage> m_depthClearedThisFrame;
+
   void ensureDescriptorPool();
   void resetDescriptors();
   void ensureEntryVertexCapacity(size_t vertexCount, size_t indexCount);
   void ensureQuadVertexBuffer();
 
   void ensureDescriptorLayouts();
-  void ensureEntryPipelines();
-  void ensureFastPipeline(ImgCompositingMode mode, bool resultOpaque);
+  void ensureEntryPipelines(vk::Format colorFormat);
+  void ensureFastPipeline(ImgCompositingMode mode, bool resultOpaque, const vulkan::AttachmentFormats& formats);
   void ensureEmptyDescriptor();
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
   PipelineInstance& ensureProgressivePipeline(const ProgressivePipelineKey& key,
@@ -216,6 +252,9 @@ private:
   PipelineInstance& ensureCopyPipeline(const CopyPipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
   void uploadEntryGeometry(const ImgRaycasterPayload& payload);
+  void ensureEntryTransformResources(Z3DRendererBase& renderer,
+                                     const RenderBatch& batch,
+                                     const ImgRaycasterPayload& payload);
 
   ChannelResources& ensureChannelResources(size_t channelIndex);
   void updateChannelFastDescriptors(ChannelResources& resources,
@@ -253,6 +292,8 @@ private:
   void renderEntryExit(Z3DRendererBase& renderer,
                        const RenderBatch& batch,
                        const ImgRaycasterPayload& payload,
+                       const vk::Viewport& viewport,
+                       const vk::Rect2D& scissor,
                        vk::raii::CommandBuffer& cmd);
 
   void renderFastPath(Z3DRendererBase& renderer,

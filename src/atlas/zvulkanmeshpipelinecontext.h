@@ -120,16 +120,16 @@ private:
   struct CacheEntry
   {
     // Device-local static buffers per attribute (SoA)
-    vk::Buffer vbPos = VK_NULL_HANDLE;
-    vk::Buffer vbNorm = VK_NULL_HANDLE;
-    vk::Buffer vbColor = VK_NULL_HANDLE;
-    vk::Buffer vbTex = VK_NULL_HANDLE; // optional
+    vk::Buffer vbPos{};
+    vk::Buffer vbNorm{};
+    vk::Buffer vbColor{};
+    vk::Buffer vbTex{}; // optional
     vk::DeviceSize posOffset = 0;
     vk::DeviceSize normOffset = 0;
     vk::DeviceSize colorOffset = 0;
     vk::DeviceSize texOffset = 0;
     bool hasTex = false;
-    vk::Buffer ib = VK_NULL_HANDLE;
+    vk::Buffer ib{};
     vk::DeviceSize indexOffset = 0;
 
     uint32_t vertexCount = 0;
@@ -176,10 +176,10 @@ private:
   // backend-native textures only.
 
   // SoA upload arena-backed streams (per-attribute buffers)
-  vk::Buffer m_posBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_normBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_colorBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_texBuffer{VK_NULL_HANDLE}; // 1D/2D/3D depending on colorSource
+  vk::Buffer m_posBuffer{};
+  vk::Buffer m_normBuffer{};
+  vk::Buffer m_colorBuffer{};
+  vk::Buffer m_texBuffer{}; // 1D/2D/3D depending on colorSource
   vk::DeviceSize m_posOffset{0};
   vk::DeviceSize m_normOffset{0};
   vk::DeviceSize m_colorOffset{0};
@@ -191,7 +191,7 @@ private:
     Tex2D,
     Tex3D
   } m_texBinding = TexBinding::None;
-  vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_indexUploadBuffer{};
   vk::DeviceSize m_indexUploadOffset{0};
 
   void ensureDescriptorLayouts();

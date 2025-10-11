@@ -259,10 +259,10 @@ ZVulkanTexture::~ZVulkanTexture()
   if (m_sampler) {
     m_sampler.reset();
   }
-  if (m_image != VK_NULL_HANDLE && m_imageAllocation != VK_NULL_HANDLE) {
+  if (m_image && m_imageAllocation) {
     vmaDestroyImage(m_device.allocator(), m_image, m_imageAllocation);
-    m_image = VK_NULL_HANDLE;
-    m_imageAllocation = VK_NULL_HANDLE;
+    m_image = vk::Image{};
+    m_imageAllocation = nullptr;
   }
 }
 // ----- Public API -----------------------------------------------------------------------------
@@ -296,15 +296,22 @@ void ZVulkanTexture::downloadData(void* data, size_t size)
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
   auto originalLayout = m_currentLayout;
+  // Vulkan copies require a single aspect in BufferImageCopy. If this image
+  // has combined depth+stencil, prefer copying DEPTH by default.
+  auto effectiveAspect = m_aspectMask;
+  const auto depthStencilMask = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+  if ((effectiveAspect & depthStencilMask) == depthStencilMask) {
+    effectiveAspect = vk::ImageAspectFlagBits::eDepth;
+  }
   m_device.frameExecutor().executeImmediate(
     [&](vk::raii::CommandBuffer& cmdBuffer) {
-      transitionLayout(cmdBuffer, originalLayout, vk::ImageLayout::eTransferSrcOptimal, m_aspectMask);
+      transitionLayout(cmdBuffer, originalLayout, vk::ImageLayout::eTransferSrcOptimal, effectiveAspect);
 
       vk::BufferImageCopy region{};
       region.bufferOffset = 0;
       region.bufferRowLength = 0;
       region.bufferImageHeight = 0;
-      region.imageSubresource.aspectMask = m_aspectMask;
+      region.imageSubresource.aspectMask = effectiveAspect;
       region.imageSubresource.mipLevel = 0;
       region.imageSubresource.baseArrayLayer = 0;
       region.imageSubresource.layerCount = m_createInfo.imageType == vk::ImageType::e3D ? 1u : m_arrayLayers;
@@ -314,10 +321,10 @@ void ZVulkanTexture::downloadData(void* data, size_t size)
                                         m_createInfo.imageType == vk::ImageType::e3D ? m_extent.depth : 1u};
 
       cmdBuffer.copyImageToBuffer(m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
-      // Do not transition back to an undefined layout; use GENERAL if the prior layout was undefined.
+      // Do not transition back to an undefined layout; if unknown, return to descriptor layout.
       const vk::ImageLayout restoreLayout =
-        (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
-      transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, m_aspectMask);
+        (originalLayout == vk::ImageLayout::eUndefined) ? m_descriptorLayout : originalLayout;
+      transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, effectiveAspect);
     },
     "texture_download");
 
@@ -342,7 +349,11 @@ void ZVulkanTexture::downloadSubImage(void* data,
                           vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 
   auto originalLayout = m_currentLayout;
-  const auto aspect = (aspectMask == vk::ImageAspectFlags{}) ? m_aspectMask : aspectMask;
+  auto aspect = (aspectMask == vk::ImageAspectFlags{}) ? m_aspectMask : aspectMask;
+  const auto depthStencilMask = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+  if ((aspect & depthStencilMask) == depthStencilMask) {
+    aspect = vk::ImageAspectFlagBits::eDepth;
+  }
   m_device.frameExecutor().executeImmediate(
     [&](vk::raii::CommandBuffer& cmdBuffer) {
       transitionLayout(cmdBuffer, originalLayout, vk::ImageLayout::eTransferSrcOptimal, aspect);
@@ -360,10 +371,55 @@ void ZVulkanTexture::downloadSubImage(void* data,
 
       cmdBuffer.copyImageToBuffer(m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
       const vk::ImageLayout restoreLayout =
-        (originalLayout == vk::ImageLayout::eUndefined) ? vk::ImageLayout::eGeneral : originalLayout;
+        (originalLayout == vk::ImageLayout::eUndefined) ? m_descriptorLayout : originalLayout;
       transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, aspect);
     },
     "texture_download_subimage");
+
+  void* mapped = stagingBuffer->map(0, size);
+  std::memcpy(data, mapped, size);
+  stagingBuffer->unmap();
+}
+
+void ZVulkanTexture::downloadArrayLayer(void* data, size_t size, uint32_t arrayLayer, vk::ImageAspectFlags aspectMask)
+{
+  if (!data || size == 0) {
+    throw ZException("Invalid download buffer (array layer)");
+  }
+
+  auto stagingBuffer =
+    m_device.createBuffer(size,
+                          vk::BufferUsageFlagBits::eTransferDst,
+                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+  auto originalLayout = m_currentLayout;
+  auto aspect = (aspectMask == vk::ImageAspectFlags{}) ? m_aspectMask : aspectMask;
+  const auto depthStencilMask = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+  if ((aspect & depthStencilMask) == depthStencilMask) {
+    aspect = vk::ImageAspectFlagBits::eDepth;
+  }
+  m_device.frameExecutor().executeImmediate(
+    [&](vk::raii::CommandBuffer& cmdBuffer) {
+      transitionLayout(cmdBuffer, originalLayout, vk::ImageLayout::eTransferSrcOptimal, aspect);
+
+      vk::BufferImageCopy region{};
+      region.bufferOffset = 0;
+      region.bufferRowLength = 0;
+      region.bufferImageHeight = 0;
+      region.imageSubresource.aspectMask = aspect;
+      region.imageSubresource.mipLevel = 0;
+      region.imageSubresource.baseArrayLayer =
+        (m_createInfo.imageType == vk::ImageType::e3D) ? 0u : std::min(arrayLayer, m_arrayLayers - 1u);
+      region.imageSubresource.layerCount = 1;
+      region.imageOffset = vk::Offset3D{0, 0, 0};
+      region.imageExtent = vk::Extent3D{m_extent.width, m_extent.height, 1u};
+
+      cmdBuffer.copyImageToBuffer(m_image, vk::ImageLayout::eTransferSrcOptimal, stagingBuffer->buffer(), region);
+      const vk::ImageLayout restoreLayout =
+        (originalLayout == vk::ImageLayout::eUndefined) ? m_descriptorLayout : originalLayout;
+      transitionLayout(cmdBuffer, vk::ImageLayout::eTransferSrcOptimal, restoreLayout, aspect);
+    },
+    "texture_download_layer");
 
   void* mapped = stagingBuffer->map(0, size);
   std::memcpy(data, mapped, size);
@@ -398,7 +454,14 @@ void ZVulkanTexture::transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
   barrier.subresourceRange.baseArrayLayer = 0;
   barrier.subresourceRange.layerCount = m_arrayLayers;
 
+  VLOG(2) << "VK layout transition image=" << static_cast<void*>(m_image) << " old=" << enumOrUnderlying(oldLayout)
+          << " new=" << enumOrUnderlying(newLayout) << " aspect=0x" << std::hex << static_cast<uint32_t>(aspect)
+          << std::dec << " layers=" << m_arrayLayers << " mips=" << m_mipLevels;
+
   cmdBuffer.pipelineBarrier(srcState.stage, dstState.stage, {}, nullptr, nullptr, barrier);
+  // Update tracked layout regardless of aspect selection; callers often
+  // transition a single aspect on D/S images, and we still need an accurate
+  // logical current layout for validation and descriptor restores.
   m_currentLayout = newLayout;
 }
 
@@ -433,6 +496,12 @@ void ZVulkanTexture::setDescriptorLayout(vk::ImageLayout layout)
 
   switch (layout) {
     case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
+      // When sampling a depth/stencil image in read-only, Vulkan requires the
+      // image view aspect mask to be either DEPTH or STENCIL (not both).
+      // Default to DEPTH for descriptors; callers that need stencil should
+      // override via setDescriptorAspect() or descriptorInfo(..., STENCIL).
+      setDescriptorAspect(vk::ImageAspectFlagBits::eDepth);
+      break;
     case vk::ImageLayout::eDepthReadOnlyOptimal:
       setDescriptorAspect(vk::ImageAspectFlagBits::eDepth);
       break;
@@ -592,19 +661,19 @@ void ZVulkanTexture::allocateMemory()
   // Prefer usage-based auto selection
   allocCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
   if (m_memoryProperties & vk::MemoryPropertyFlagBits::eDeviceLocal) {
-    allocCI.requiredFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    allocCI.requiredFlags |= static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eDeviceLocal);
   }
   if (m_memoryProperties & vk::MemoryPropertyFlagBits::eHostVisible) {
-    allocCI.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    allocCI.requiredFlags |= static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eHostVisible);
   }
   if (m_memoryProperties & vk::MemoryPropertyFlagBits::eHostCoherent) {
-    allocCI.requiredFlags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    allocCI.requiredFlags |= static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
   // Prefer device-local pool for images
   // Choose pool
-  VmaPool pool = VK_NULL_HANDLE;
-  if ((m_memoryProperties & vk::MemoryPropertyFlagBits::eDeviceLocal) && m_device.deviceLocalPool() != VK_NULL_HANDLE) {
+  VmaPool pool = nullptr;
+  if ((m_memoryProperties & vk::MemoryPropertyFlagBits::eDeviceLocal) && m_device.deviceLocalPool() != nullptr) {
     pool = m_device.deviceLocalPool();
   }
 
@@ -613,16 +682,16 @@ void ZVulkanTexture::allocateMemory()
     ci.pool = p;
     if (dedicated) {
       ci.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-      ci.pool = VK_NULL_HANDLE;
+      ci.pool = nullptr;
     }
-    VkImage img = VK_NULL_HANDLE;
+    VkImage img{};
     VkResult r = vmaCreateImage(m_device.allocator(),
                                 reinterpret_cast<const VkImageCreateInfo*>(&imageInfo),
                                 &ci,
                                 &img,
                                 &m_imageAllocation,
                                 nullptr);
-    if (r == VK_SUCCESS) {
+    if (static_cast<vk::Result>(r) == vk::Result::eSuccess) {
       m_image = img;
     }
     return r;
@@ -633,21 +702,21 @@ void ZVulkanTexture::allocateMemory()
                                   std::max<VkDeviceSize>(1, m_extent.depth) * 4; // 4B/px guess
   bool preferDedicated = (approxSize >= (128ull * 1024ull * 1024ull) / 2); // >=64MiB
 
-  VkResult res = VK_ERROR_INITIALIZATION_FAILED;
+  vk::Result res = vk::Result::eErrorInitializationFailed;
   if (preferDedicated) {
-    res = tryCreate(VK_NULL_HANDLE, true);
-  } else if (pool != VK_NULL_HANDLE) {
-    res = tryCreate(pool, false);
+    res = static_cast<vk::Result>(tryCreate(nullptr, true));
+  } else if (pool != nullptr) {
+    res = static_cast<vk::Result>(tryCreate(pool, false));
   }
-  if (res != VK_SUCCESS) {
+  if (res != vk::Result::eSuccess) {
     if (!preferDedicated) {
-      res = tryCreate(VK_NULL_HANDLE, true);
+      res = static_cast<vk::Result>(tryCreate(nullptr, true));
     }
-    if (res != VK_SUCCESS) {
-      res = tryCreate(VK_NULL_HANDLE, false);
+    if (res != vk::Result::eSuccess) {
+      res = static_cast<vk::Result>(tryCreate(nullptr, false));
     }
   }
-  if (res != VK_SUCCESS) {
+  if (res != vk::Result::eSuccess) {
     throw ZException("Failed to create VMA image (with fallbacks)");
   }
 }
@@ -686,9 +755,9 @@ void ZVulkanTexture::createSampler()
   samplerInfo.addressModeV = vk::SamplerAddressMode::eClampToEdge;
   samplerInfo.addressModeW = vk::SamplerAddressMode::eClampToEdge;
   samplerInfo.mipLodBias = 0.0f;
-  samplerInfo.anisotropyEnable = VK_FALSE;
+  samplerInfo.anisotropyEnable = false;
   samplerInfo.maxAnisotropy = 1.0f;
-  samplerInfo.compareEnable = VK_FALSE;
+  samplerInfo.compareEnable = false;
   samplerInfo.minLod = 0.0f;
   samplerInfo.maxLod = static_cast<float>(std::max(1u, m_mipLevels) - 1u);
   samplerInfo.borderColor = vk::BorderColor::eFloatOpaqueWhite;

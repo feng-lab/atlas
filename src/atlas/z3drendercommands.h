@@ -560,7 +560,6 @@ struct ImgRaycasterPayload
   float localMIPThreshold = 0.8f;
   ImgCompositingMode compositingMode = ImgCompositingMode::DirectVolumeRendering;
   bool fastPathOnly = true;
-  glm::uvec2 entryExitSize{0u, 0u};
   std::vector<glm::vec3> entryPositions;
   std::vector<glm::vec3> entryTexCoords;
   std::vector<uint32_t> entryIndices;

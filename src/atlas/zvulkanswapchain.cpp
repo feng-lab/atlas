@@ -47,9 +47,9 @@ void ZVulkanSwapChain::createSampler()
                                     .addressModeV = vk::SamplerAddressMode::eRepeat,
                                     .addressModeW = vk::SamplerAddressMode::eRepeat,
                                     .mipLodBias = 0.0f,
-                                    .anisotropyEnable = VK_TRUE,
+                                    .anisotropyEnable = true,
                                     .maxAnisotropy = 16,
-                                    .compareEnable = VK_FALSE,
+                                    .compareEnable = false,
                                     .compareOp = vk::CompareOp::eAlways,
                                     .minLod = 0.0f,
                                     .maxLod = 0.0f,
@@ -86,7 +86,7 @@ void ZVulkanSwapChain::configureAcquireWait(bool enable, vk::PipelineStageFlags 
 vk::Semaphore ZVulkanSwapChain::acquireSemaphore() const
 {
   if (!m_activeFrame || !m_activeFrame->valid()) {
-    return VK_NULL_HANDLE;
+    return vk::Semaphore{};
   }
   return static_cast<vk::Semaphore>(*m_activeFrame->acquireSemaphore());
 }
@@ -94,7 +94,7 @@ vk::Semaphore ZVulkanSwapChain::acquireSemaphore() const
 vk::Semaphore ZVulkanSwapChain::releaseSemaphore() const
 {
   if (!m_activeFrame || !m_activeFrame->valid()) {
-    return VK_NULL_HANDLE;
+    return vk::Semaphore{};
   }
   return static_cast<vk::Semaphore>(*m_activeFrame->releaseSemaphore());
 }
@@ -110,6 +110,15 @@ vk::raii::CommandBuffer& ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearC
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   auto& cmdBuffer = m_activeFrame->commandBuffer();
   cmdBuffer.begin(beginInfo);
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("Swapchain beginFrame: size={}x{} color=0x{:x} fmt={} depth=0x{:x} fmt={}",
+                           m_width,
+                           m_height,
+                           reinterpret_cast<uint64_t>(m_colorAttachment.get()),
+                           enumOrUnderlying(m_colorAttachment->format(), 16),
+                           reinterpret_cast<uint64_t>(m_depthAttachment.get()),
+                           enumOrUnderlying(m_depthAttachment->format(), 16));
+  }
 
   // Ensure attachments are in the correct layouts for rendering
   {
@@ -118,10 +127,12 @@ vk::raii::CommandBuffer& ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearC
                                           m_colorAttachment->layout(),
                                           vk::ImageLayout::eColorAttachmentOptimal);
     }
-    if (m_depthAttachment->layout() != vk::ImageLayout::eDepthStencilAttachmentOptimal) {
-      m_depthAttachment->transitionLayout(cmdBuffer,
-                                          m_depthAttachment->layout(),
-                                          vk::ImageLayout::eDepthStencilAttachmentOptimal);
+    {
+      const vk::ImageLayout depthLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+      const vk::ImageAspectFlags depthAspect = vk::ImageAspectFlagBits::eDepth;
+      if (m_depthAttachment->layout() != depthLayout) {
+        m_depthAttachment->transitionLayout(cmdBuffer, m_depthAttachment->layout(), depthLayout, depthAspect);
+      }
     }
   }
 
@@ -143,10 +154,12 @@ vk::raii::CommandBuffer& ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearC
 
   vk::RenderingAttachmentInfo depthAttachment;
   depthAttachment.imageView = m_depthAttachment->imageView();
-  depthAttachment.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+  depthAttachment.imageLayout = m_depthAttachment->layout();
   depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
   depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
   depthAttachment.clearValue = *reinterpret_cast<vk::ClearValue*>(&depthClearValue);
+
+  // Unified D/S layout path: do not bind a separate stencil attachment
 
   vk::RenderingInfo renderingInfo;
   renderingInfo.renderArea = vk::Rect2D({0, 0}, {m_width, m_height});
@@ -154,6 +167,7 @@ vk::raii::CommandBuffer& ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearC
   renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
   renderingInfo.pColorAttachments = colorAttachments.data();
   renderingInfo.pDepthAttachment = &depthAttachment;
+  // pStencilAttachment unused in unified layout mode
 
   cmdBuffer.beginRendering(renderingInfo);
   return cmdBuffer;
@@ -161,6 +175,9 @@ vk::raii::CommandBuffer& ZVulkanSwapChain::beginFrame(vk::ClearColorValue clearC
 
 void ZVulkanSwapChain::endFrame(vk::raii::CommandBuffer& commandBuffer)
 {
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << "Swapchain endFrame: submitting command buffer";
+  }
   commandBuffer.endRendering();
   commandBuffer.end();
 
@@ -187,6 +204,9 @@ void ZVulkanSwapChain::endFrame(vk::raii::CommandBuffer& commandBuffer)
   try {
     queue.submit(submitInfo, *m_activeFrame->fence());
     executor.markSubmitted(*m_activeFrame);
+    if (VLOG_IS_ON(2)) {
+      VLOG(2) << "Swapchain submit queued";
+    }
   }
   catch (const std::exception& e) {
     LOG(WARNING) << "Swapchain submit failed: " << e.what();

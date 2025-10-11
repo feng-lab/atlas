@@ -29,10 +29,10 @@ vk::SamplerCreateInfo makeNearestSampler()
   sampler.addressModeU = vk::SamplerAddressMode::eClampToEdge;
   sampler.addressModeV = vk::SamplerAddressMode::eClampToEdge;
   sampler.addressModeW = vk::SamplerAddressMode::eClampToEdge;
-  sampler.unnormalizedCoordinates = VK_FALSE;
+  sampler.unnormalizedCoordinates = false;
   sampler.borderColor = vk::BorderColor::eIntOpaqueBlack;
-  sampler.compareEnable = VK_FALSE;
-  sampler.anisotropyEnable = VK_FALSE;
+  sampler.compareEnable = false;
+  sampler.anisotropyEnable = false;
   sampler.maxAnisotropy = 1.0f;
   sampler.minLod = 0.0f;
   sampler.maxLod = 0.0f;
@@ -48,10 +48,10 @@ vk::SamplerCreateInfo makeLinearSampler()
   sampler.addressModeU = vk::SamplerAddressMode::eClampToBorder;
   sampler.addressModeV = vk::SamplerAddressMode::eClampToBorder;
   sampler.addressModeW = vk::SamplerAddressMode::eClampToBorder;
-  sampler.unnormalizedCoordinates = VK_FALSE;
+  sampler.unnormalizedCoordinates = false;
   sampler.borderColor = vk::BorderColor::eFloatTransparentBlack;
-  sampler.compareEnable = VK_FALSE;
-  sampler.anisotropyEnable = VK_FALSE;
+  sampler.compareEnable = false;
+  sampler.anisotropyEnable = false;
   sampler.maxAnisotropy = 1.0f;
   sampler.minLod = 0.0f;
   sampler.maxLod = 0.0f;

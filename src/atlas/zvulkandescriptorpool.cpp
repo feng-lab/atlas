@@ -11,32 +11,31 @@ ZVulkanDescriptorPool::ZVulkanDescriptorPool(ZVulkanDevice& device)
 {
   // Generous arena to accommodate per-draw override sets in OIT flows.
   std::array<vk::DescriptorPoolSize, 2> poolSizes{
-    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer, .descriptorCount = 2048},
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer,        .descriptorCount = 2048},
     vk::DescriptorPoolSize{.type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 4096},
   };
   vk::DescriptorPoolCreateInfo poolInfo{.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
                                         .maxSets = 4096,
-                                         .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
-                                         .pPoolSizes = poolSizes.data()};
+                                        .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+                                        .pPoolSizes = poolSizes.data()};
   m_descriptorPool.emplace(m_device.context().device(), poolInfo);
 }
 
 vk::DescriptorSet ZVulkanDescriptorPool::allocateDescriptorSet(vk::DescriptorSetLayout layout)
 {
-  VkDescriptorSet rawSet = VK_NULL_HANDLE;
-  VkDescriptorSetLayout rawLayout = layout;
-  VkDescriptorSetAllocateInfo ai{};
-  ai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  ai.descriptorPool = static_cast<VkDescriptorPool>(**m_descriptorPool);
-  ai.descriptorSetCount = 1u;
-  ai.pSetLayouts = &rawLayout;
-
-  auto& dev = m_device.context().device();
-  VkResult res = dev.getDispatcher()->vkAllocateDescriptorSets(static_cast<VkDevice>(*dev), &ai, &rawSet);
-  if (res != VK_SUCCESS) {
-    throw std::runtime_error("vkAllocateDescriptorSets failed");
+  // Use RAII allocation so we stay in the Hpp/RAII style, but explicitly
+  // release ownership so the pool (not the RAII wrapper) owns the lifetime.
+  vk::DescriptorSetAllocateInfo ai{.descriptorPool = **m_descriptorPool,
+                                   .descriptorSetCount = 1u,
+                                   .pSetLayouts = &layout};
+  auto sets = m_device.context().device().allocateDescriptorSets(ai);
+  if (sets.empty()) {
+    throw std::runtime_error("allocateDescriptorSets returned no sets");
   }
-  return rawSet;
+  // Detach the descriptor set from the RAII container to avoid vkFree on
+  // scope exit; we manage lifetime via pool reset after the frame fence.
+  vk::DescriptorSet raw = sets.front().release();
+  return raw;
 }
 
 void ZVulkanDescriptorPool::reset()

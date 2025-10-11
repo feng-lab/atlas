@@ -6,6 +6,7 @@
 #include "zlog.h"
 #include "zvulkandevice.h"
 #include "zvulkantexture.h"
+#include <glbinding-aux/Meta.h>
 #include <cmath>
 #include <limits>
 #include <algorithm>
@@ -54,12 +55,14 @@ GLTextureParams glTextureParamsFor(ScratchFormat format)
       return {GLint(GL_R16F), GL_RED, GL_FLOAT};
     case ScratchFormat::Depth24:
       return {GLint(GL_DEPTH_COMPONENT24), GL_DEPTH_COMPONENT, GL_UNSIGNED_INT};
+    case ScratchFormat::Depth32F:
+      return {GLint(GL_DEPTH_COMPONENT32F), GL_DEPTH_COMPONENT, GL_FLOAT};
   }
   CHECK(false) << "Unhandled ScratchFormat value";
   return {GLint(GL_RGBA16), GL_RGBA, GL_UNSIGNED_SHORT};
 }
 
-std::string scratchFormatLabel(ScratchFormat format)
+const std::string& scratchFormatLabel(ScratchFormat format)
 {
   const auto params = glTextureParamsFor(format);
   return glbinding::aux::Meta::getString(GLenum(params.internalFormat));
@@ -233,7 +236,11 @@ vk::Format vkFormatFor(ScratchFormat format)
     case ScratchFormat::R16F:
       return vk::Format::eR16Sfloat;
     case ScratchFormat::Depth24:
-      return vk::Format::eD24UnormS8Uint;
+      // On Vulkan (MoltenVK), prefer D32Sfloat for depth-only rendering to
+      // ensure dynamic rendering + gl_FragDepth writes and transfer ops are supported.
+      return vk::Format::eD32Sfloat;
+    case ScratchFormat::Depth32F:
+      return vk::Format::eD32Sfloat;
   }
   CHECK(false) << "Unhandled ScratchFormat for Vulkan";
   return vk::Format::eR8G8B8A8Unorm;
@@ -523,6 +530,8 @@ static inline uint64_t bytesPerPixelForScratchFormat(ScratchFormat fmt)
       return 2u;
     case ScratchFormat::Depth24:
       return 4u; // D24S8 packed as 32-bit
+    case ScratchFormat::Depth32F:
+      return 4u; // 32-bit float depth
   }
   return 0u;
 }

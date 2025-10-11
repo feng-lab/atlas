@@ -130,7 +130,7 @@ public:
   acquirePersistentTempRenderTarget2D(Z3DScratchResourcePool::RenderTargetLease& lease,
                                       const glm::uvec2& size,
                                       ScratchFormat colorFormat = ScratchFormat::RGBA16,
-                                      ScratchFormat depthFormat = ScratchFormat::Depth24);
+                                      ScratchFormat depthFormat = ScratchFormat::Depth32F);
 
   Z3DScratchResourcePool::RenderTargetLease&
   acquirePersistentDualDepthPeelRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease, const glm::uvec2& size);
@@ -152,7 +152,7 @@ public:
                                           const glm::uvec2& size,
                                           uint32_t layers,
                                           ScratchFormat colorFormat = ScratchFormat::RGBA16,
-                                          ScratchFormat depthFormat = ScratchFormat::Depth24);
+                                          ScratchFormat depthFormat = ScratchFormat::Depth32F);
 
   Z3DScratchResourcePool::RenderTargetLease&
   acquirePersistentEntryExitRenderTarget(Z3DScratchResourcePool::RenderTargetLease& lease,

@@ -983,7 +983,7 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
     auto& lease = m_opaqueTargets[eye];
     if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
       lease.release();
-      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth24);
+      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F);
     }
 
     auto surface = m_rendererBase.describeSurface(lease);
@@ -1237,7 +1237,7 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
     auto& lease = m_transparentTargets[eye];
     if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
       lease.release();
-      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth24);
+      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F);
     }
 
     // Clear target, set active surface, and record batches for the raycaster

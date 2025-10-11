@@ -24,6 +24,9 @@
 
 #include <functional>
 #include <iosfwd>
+#include <ostream>
+#include <iterator>
+#include <type_traits>
 
 namespace nim {
 
@@ -112,9 +115,64 @@ std::string_view enumToString(TEnum e)
 #else
   if (res.empty()) {
 #endif
-    throw ZException(fmt::format("invalid enum value: {}", std::to_underlying(e)));
+    auto errorMessage =
+      fmt::format("invalid enum value {} of type {}", std::to_underlying(e), reflect::type_name<TEnum>());
+    LOG(ERROR) << errorMessage;
+    throw ZException(errorMessage);
   }
   return res;
+}
+
+// No-throw: return enum name or provided fallback if reflection has no name
+template<typename TEnum>
+  requires std::is_enum_v<TEnum>
+std::string_view enumToStringOr(TEnum e, std::string_view fallback) noexcept
+{
+  auto res = reflect::enum_name(e);
+#ifdef _MSC_VER
+  using namespace std::literals;
+  if (res.empty() || res.find("0x"sv) != res.npos) {
+#else
+  if (res.empty()) {
+#endif
+    return fallback;
+  }
+  return res;
+}
+
+// Qt convenience: return enum name or fallback (no throw)
+template<typename TEnum>
+  requires std::is_enum_v<TEnum>
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+QString enumToQStringOr(TEnum e, QStringView fallback) noexcept
+#else
+QString enumToQStringOr(TEnum e, const QString& fallback) noexcept
+#endif
+{
+  const auto sv = enumToStringOr(e, std::string_view{});
+  if (!sv.empty()) {
+    return QString::fromUtf8(sv.data(), static_cast<int>(sv.size()));
+  }
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  return QString(fallback);
+#else
+  return fallback;
+#endif
+}
+
+// Wrapper for logging: prints enum name if available, otherwise underlying value
+template<typename TEnum>
+struct EnumOrUnderlying
+{
+  static_assert(std::is_enum_v<TEnum>, "TEnum must be an enum type");
+  TEnum value;
+  int base = 10; // 10 for decimal, 16 for hex (0x...)
+};
+
+template<typename TEnum>
+constexpr EnumOrUnderlying<TEnum> enumOrUnderlying(TEnum e, int base = 10) noexcept
+{
+  return {e, base};
 }
 
 template<typename TEnum>
@@ -214,16 +272,12 @@ QString qtTypeToQString(const T& v)
 
 template<typename T>
 concept CanConvertToUtf8QByteArray = requires(const T& a) {
-  {
-    a.toUtf8()
-  } -> std::same_as<QByteArray>;
+  { a.toUtf8() } -> std::same_as<QByteArray>;
 };
 
 template<typename T>
 concept HaveToStringFunction = requires(const T& a) {
-  {
-    a.toString()
-  } -> std::same_as<std::string>;
+  { a.toString() } -> std::same_as<std::string>;
 };
 
 template<class T>
@@ -280,6 +334,45 @@ template<typename T>
 std::ostream& operator<<(std::ostream& s, const T& v)
 {
   return (s << fmt::format("{}", v));
+}
+
+} // namespace nim
+
+// fmt formatter for nim::EnumOrUnderlying<TEnum>
+template<typename TEnum, typename Char>
+struct fmt::formatter<nim::EnumOrUnderlying<TEnum>, Char>
+{
+  // No custom format specifiers; accept default {}
+  constexpr auto parse(fmt::basic_format_parse_context<Char>& ctx)
+  {
+    return ctx.begin();
+  }
+
+  template<typename FormatContext>
+  auto format(const nim::EnumOrUnderlying<TEnum>& w, FormatContext& ctx) const
+  {
+    auto sv = nim::enumToStringOr(w.value, std::string_view{});
+    if (!sv.empty()) {
+      return fmt::format_to(ctx.out(), FMT_STRING("{}"), sv);
+    }
+    using U = std::underlying_type_t<TEnum>;
+    U v = static_cast<U>(w.value);
+    if (w.base == 16) {
+      using Uns = std::make_unsigned_t<U>;
+      return fmt::format_to(ctx.out(), FMT_STRING("0x{:x}"), static_cast<Uns>(v));
+    }
+    return fmt::format_to(ctx.out(), FMT_STRING("{}"), v);
+  }
+};
+
+// ostream << support for nim::EnumOrUnderlying<TEnum>
+namespace nim {
+template<typename TEnum>
+inline std::ostream& operator<<(std::ostream& os, const EnumOrUnderlying<TEnum>& w)
+{
+  // Reuse the fmt::formatter specialization to avoid duplication.
+  fmt::format_to(std::ostream_iterator<char>(os), FMT_STRING("{}"), w);
+  return os;
 }
 
 } // namespace nim

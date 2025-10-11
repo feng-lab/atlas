@@ -3,7 +3,6 @@
 #include "zlog.h"
 #include <glbinding-aux/ContextInfo.h>
 #include <glbinding/Version.h>
-#include <glbinding-aux/Meta.h>
 
 DECLARE_bool(atlas_debug_opengl);
 
@@ -27,8 +26,7 @@ void CheckGLError_Impl(const char* file, int line)
   GLenum err = glGetError();
 
   if (err != GL_NO_ERROR) {
-    google::LogMessage(file, line, google::GLOG_ERROR).stream()
-      << "OpenGL error: " << glbinding::aux::Meta::getString(err);
+    google::LogMessage(file, line, google::GLOG_ERROR).stream() << "OpenGL error: " << enumToString(err);
   }
 }
 

@@ -159,12 +159,12 @@ void ZVulkanMeshPipelineContext::resetFrame()
   m_vertexCount = 0;
   m_indexCount = 0;
   m_draws.clear();
-  m_posBuffer = VK_NULL_HANDLE;
-  m_normBuffer = VK_NULL_HANDLE;
-  m_colorBuffer = VK_NULL_HANDLE;
-  m_texBuffer = VK_NULL_HANDLE;
+  m_posBuffer = nullptr;
+  m_normBuffer = nullptr;
+  m_colorBuffer = nullptr;
+  m_texBuffer = nullptr;
   m_posOffset = m_normOffset = m_colorOffset = m_texOffset = 0;
-  m_indexUploadBuffer = VK_NULL_HANDLE;
+  m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
   m_texBinding = TexBinding::None;
   resetDescriptors();
@@ -321,7 +321,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   }
 
   // Bind dummy buffers for any optional bindings (3,4,5) that remain unbound.
-  // Some stacks (e.g., MoltenVK without nullDescriptor) reject VK_NULL_HANDLE
+  // Some stacks (e.g., MoltenVK without nullDescriptor) reject null image views
   // in vkCmdBindVertexBuffers; bind a tiny valid buffer instead.
   {
     bool bound3 = (m_texBinding == TexBinding::Tex1D);
@@ -790,10 +790,9 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.custom_color = glm::vec4(1.0f);
   m_uboMaterial->copyData(&material, sizeof(material));
 
-  VLOG(2) << fmt::format(
-    "VK mesh xf params: sizeScale={:.3f} ortho={}",
-    payload.params->sizeScale,
-    (eyeState.isPerspective ? 0 : 1));
+  VLOG(2) << fmt::format("VK mesh xf params: sizeScale={:.3f} ortho={}",
+                         payload.params->sizeScale,
+                         (eyeState.isPerspective ? 0 : 1));
 }
 
 void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
@@ -840,11 +839,10 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
 
   m_uboMaterial->copyData(&material, sizeof(material));
 
-  VLOG(2) << fmt::format(
-    "VK mesh material: alpha={:.3f} picking={} useCustomColor={}",
-    material.alpha,
-    pickingPass,
-    material.use_custom_color != 0);
+  VLOG(2) << fmt::format("VK mesh material: alpha={:.3f} picking={} useCustomColor={}",
+                         material.alpha,
+                         pickingPass,
+                         material.use_custom_color != 0);
 }
 
 void ZVulkanMeshPipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd,
@@ -955,7 +953,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     vk::PipelineColorBlendAttachmentState state{};
     state.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                            vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
-    state.blendEnable = VK_FALSE;
+    state.blendEnable = false;
     return state;
   };
 
@@ -966,7 +964,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     case Z3DRendererBase::ShaderHookType::WeightedAverageInit: {
       for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
         auto state = makeDefaultBlendAttachment();
-        state.blendEnable = VK_TRUE;
+        state.blendEnable = true;
         state.srcColorBlendFactor = vk::BlendFactor::eOne;
         state.dstColorBlendFactor = vk::BlendFactor::eOne;
         state.colorBlendOp = vk::BlendOp::eAdd;
@@ -982,7 +980,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     case Z3DRendererBase::ShaderHookType::WeightedBlendedInit: {
       for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
         auto state = makeDefaultBlendAttachment();
-        state.blendEnable = VK_TRUE;
+        state.blendEnable = true;
         if (i == 0) {
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
@@ -1014,7 +1012,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
       for (size_t i = 0; i < formats.colorFormats.size(); ++i) {
         auto state = makeDefaultBlendAttachment();
         if (i == 0 || i == 3) {
-          state.blendEnable = VK_TRUE;
+          state.blendEnable = true;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
           state.colorBlendOp = vk::BlendOp::eMax;
@@ -1022,7 +1020,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           state.alphaBlendOp = vk::BlendOp::eMax;
         } else if (i == 1 || i == 4) {
-          state.blendEnable = VK_TRUE;
+          state.blendEnable = true;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
           state.colorBlendOp = vk::BlendOp::eMax;
@@ -1030,7 +1028,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           state.alphaBlendOp = vk::BlendOp::eMax;
         } else if (i == 2 || i == 5) {
-          state.blendEnable = VK_TRUE;
+          state.blendEnable = true;
           state.srcColorBlendFactor = vk::BlendFactor::eOne;
           state.dstColorBlendFactor = vk::BlendFactor::eOne;
           state.colorBlendOp = vk::BlendOp::eAdd;
@@ -1038,7 +1036,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
           state.dstAlphaBlendFactor = vk::BlendFactor::eOne;
           state.alphaBlendOp = vk::BlendOp::eAdd;
         } else {
-          state.blendEnable = VK_FALSE;
+          state.blendEnable = false;
         }
         blendAttachments.push_back(state);
       }
@@ -1354,7 +1352,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
           m_posBuffer = entry.vbPos;
           m_normBuffer = entry.vbNorm;
           m_colorBuffer = entry.vbColor;
-          m_texBuffer = entry.vbTex ? entry.vbTex : VK_NULL_HANDLE;
+          m_texBuffer = entry.vbTex ? entry.vbTex : vk::Buffer{};
           m_posOffset = entry.posOffset;
           m_normOffset = entry.normOffset;
           m_colorOffset = entry.colorOffset;
@@ -1378,7 +1376,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
         bool haveTex = false;
         if (texBytes > 0) {
           texDst = m_backend.allocateStaticVB(texBytes, 4);
-          haveTex = texDst.buffer != VK_NULL_HANDLE;
+          haveTex = static_cast<bool>(texDst.buffer);
         }
         Z3DRendererVulkanBackend::StaticSlice idxDst{};
         if (totalIndices > 0) {
@@ -1413,7 +1411,7 @@ void ZVulkanMeshPipelineContext::uploadGeometry(const MeshPayload& payload)
           entry.vbPos = posDst.buffer;
           entry.vbNorm = normDst.buffer;
           entry.vbColor = colorDst.buffer;
-          entry.vbTex = texBytes > 0 ? texDst.buffer : VK_NULL_HANDLE;
+          entry.vbTex = texBytes > 0 ? texDst.buffer : vk::Buffer{};
           entry.posOffset = posDst.offset;
           entry.normOffset = normDst.offset;
           entry.colorOffset = colorDst.offset;

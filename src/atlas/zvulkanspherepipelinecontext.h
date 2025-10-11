@@ -102,15 +102,15 @@ private:
   size_t m_indexCount = 0;
   bool m_usedStaticVBThisFrame = false; // debug/telemetry: true if bound static VBs after uploadGeometry
   // Upload arena-backed SoA slices (per-attribute buffers)
-  vk::Buffer m_centerRadiusBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_colorBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_specularBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_flagsBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_centerRadiusBuffer{};
+  vk::Buffer m_colorBuffer{};
+  vk::Buffer m_specularBuffer{};
+  vk::Buffer m_flagsBuffer{};
   vk::DeviceSize m_centerRadiusOffset{0};
   vk::DeviceSize m_colorOffset{0};
   vk::DeviceSize m_specularOffset{0};
   vk::DeviceSize m_flagsOffset{0};
-  vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_indexUploadBuffer{};
   vk::DeviceSize m_indexUploadOffset{0};
 
   void ensureDescriptorLayouts();

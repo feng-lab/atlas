@@ -112,21 +112,21 @@ private:
   // All line geometry uses the per-frame upload arena; no per-context VBOs
 
   // Upload arena-backed SoA for thin line (per-draw, per-attribute buffers)
-  vk::Buffer m_thinPosBuffer{VK_NULL_HANDLE};
-  vk::Buffer m_thinColorBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_thinPosBuffer{};
+  vk::Buffer m_thinColorBuffer{};
   vk::DeviceSize m_thinPosOffset{0};
   vk::DeviceSize m_thinColorOffset{0};
   uint32_t m_thinUploadVertexCount{0};
-  vk::Buffer m_thinUploadIndexBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_thinUploadIndexBuffer{};
   vk::DeviceSize m_thinUploadIndexOffset{0};
   uint32_t m_thinUploadIndexCount{0};
 
   // Upload arena-backed SoA for wide line (per-draw, per-attribute buffers)
-  vk::Buffer m_wideP0Buffer{VK_NULL_HANDLE};
-  vk::Buffer m_wideP1Buffer{VK_NULL_HANDLE};
-  vk::Buffer m_wideC0Buffer{VK_NULL_HANDLE};
-  vk::Buffer m_wideC1Buffer{VK_NULL_HANDLE};
-  vk::Buffer m_wideFlagsBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_wideP0Buffer{};
+  vk::Buffer m_wideP1Buffer{};
+  vk::Buffer m_wideC0Buffer{};
+  vk::Buffer m_wideC1Buffer{};
+  vk::Buffer m_wideFlagsBuffer{};
   vk::DeviceSize m_wideP0Offset{0};
   vk::DeviceSize m_wideP1Offset{0};
   vk::DeviceSize m_wideC0Offset{0};
@@ -135,7 +135,7 @@ private:
   vk::DeviceSize m_wideUploadIndexOffset{0};
   uint32_t m_wideUploadIndexCount{0};
   // Separate index buffer handle for wide path (arena uses same buffer; static uses IB buffer)
-  vk::Buffer m_wideIndexBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_wideIndexBuffer{};
 
   // Static promotion caches
   struct ThinCacheKey
@@ -155,12 +155,12 @@ private:
   struct ThinCacheEntry
   {
     // Separate static VBs for positions and colors
-    vk::Buffer vbPos = VK_NULL_HANDLE;
-    vk::Buffer vbColor = VK_NULL_HANDLE;
+    vk::Buffer vbPos{};
+    vk::Buffer vbColor{};
     vk::DeviceSize posOffset = 0;
     vk::DeviceSize colorOffset = 0;
     uint32_t vertexCount = 0;
-    vk::Buffer ib = VK_NULL_HANDLE; // only for line strip
+    vk::Buffer ib{}; // only for line strip
     vk::DeviceSize ibOffset = 0;
     uint32_t indexCount = 0;
     uint32_t positionsGen = 0;
@@ -187,17 +187,17 @@ private:
   struct WideCacheEntry
   {
     // Static VBs per attribute (SoA)
-    vk::Buffer vbP0 = VK_NULL_HANDLE;
-    vk::Buffer vbP1 = VK_NULL_HANDLE;
-    vk::Buffer vbC0 = VK_NULL_HANDLE;
-    vk::Buffer vbC1 = VK_NULL_HANDLE;
-    vk::Buffer vbFlags = VK_NULL_HANDLE;
+    vk::Buffer vbP0{};
+    vk::Buffer vbP1{};
+    vk::Buffer vbC0{};
+    vk::Buffer vbC1{};
+    vk::Buffer vbFlags{};
     vk::DeviceSize p0Offset = 0;
     vk::DeviceSize p1Offset = 0;
     vk::DeviceSize c0Offset = 0;
     vk::DeviceSize c1Offset = 0;
     vk::DeviceSize flagsOffset = 0;
-    vk::Buffer ib = VK_NULL_HANDLE;
+    vk::Buffer ib{};
     vk::DeviceSize ibOffset = 0;
     uint32_t vertexCount = 0;
     uint32_t indexCount = 0;

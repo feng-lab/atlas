@@ -131,11 +131,6 @@ public:
     return m_entryExitMeshFlipped;
   }
 
-  [[nodiscard]] glm::uvec2 entryExitSize() const
-  {
-    return m_entryExitSize;
-  }
-
   // Ensure internal targets are sized; size is provided by filter
   void setOutputSize(const glm::uvec2& size)
   {
@@ -265,7 +260,6 @@ private:
   ZMesh m_entryExitMesh;
   bool m_entryExitMeshValid = false;
   bool m_entryExitMeshFlipped = false;
-  glm::uvec2 m_entryExitSize{0u, 0u};
 
   std::unique_ptr<Z3DVertexArrayObject> m_VAO;
 

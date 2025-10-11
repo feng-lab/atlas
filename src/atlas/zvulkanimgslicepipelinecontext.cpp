@@ -243,8 +243,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     auto& texture = vulkan::textureFromHandle(attachment.handle, m_backend.device(), "image-slice depth attachment");
 
     vk::RenderingAttachmentInfo info;
-    const auto desiredLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-    texture.transitionLayout(cmd, texture.layout(), desiredLayout);
+    // Enforce depth-only layout; stencil is unused in this pipeline
+    const auto desiredLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+    texture.transitionLayout(cmd, texture.layout(), desiredLayout, vk::ImageAspectFlagBits::eDepth);
     info.imageView = texture.imageView();
     info.imageLayout = desiredLayout;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
@@ -465,7 +466,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                bool paging) {
     colorTarget.transitionLayout(cmd, colorTarget.layout(), vk::ImageLayout::eColorAttachmentOptimal);
     if (depthTarget) {
-      depthTarget->transitionLayout(cmd, depthTarget->layout(), vk::ImageLayout::eDepthStencilAttachmentOptimal);
+      depthTarget->transitionLayout(cmd,
+                                    depthTarget->layout(),
+                                    vk::ImageLayout::eDepthAttachmentOptimal,
+                                    vk::ImageAspectFlagBits::eDepth);
     }
 
     vk::RenderingAttachmentInfo colorAttachment{};
@@ -491,7 +495,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       if (depthView != vk::ImageView{}) {
         depthAttachment = vk::RenderingAttachmentInfo{};
         depthAttachment->imageView = depthView;
-        depthAttachment->imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        depthAttachment->imageLayout = vk::ImageLayout::eDepthAttachmentOptimal;
         depthAttachment->loadOp = vk::AttachmentLoadOp::eClear;
         depthAttachment->storeOp = vk::AttachmentStoreOp::eStore;
         depthAttachment->clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);

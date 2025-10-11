@@ -169,6 +169,7 @@ set(ATLAS_VK_SHADER_SOURCES
     compositor.frag
     image2d_array_compositor.frag
     copy_raycaster_image.frag
+    depth_ramp.frag
 
     # Wide line (non-GS)
     wideline1.vert
@@ -195,6 +196,9 @@ set(ATLAS_VK_SHADER_SOURCES
     dual_peeling_peel_mesh.frag
     dual_peeling_init_wideline.frag
     dual_peeling_peel_wideline.frag
+    # Dual depth peeling (image init/peel)
+    dual_peeling_init_image.frag
+    dual_peeling_peel_image.frag
 
     # Weighted OIT (final passes)
     wavg_final.frag
@@ -206,12 +210,17 @@ set(ATLAS_VK_SHADER_SOURCES
     wavg_init_ellipsoid.frag
     wavg_init_mesh.frag
     wavg_init_wideline.frag
+    # Weighted OIT (image init)
+    wavg_init_image.frag
     wblended_init_cone.frag
     wblended_init_cone_2.frag
     wblended_init_sphere.frag
     wblended_init_ellipsoid.frag
     wblended_init_mesh.frag
     wblended_init_wideline.frag
+    # Weighted OIT (image init)
+    wavg_init_image.frag
+    wblended_init_image.frag
 )
 
 set(_GLSLC_EXE "")

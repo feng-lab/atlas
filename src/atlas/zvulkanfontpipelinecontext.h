@@ -97,9 +97,9 @@ private:
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
   // Upload arena-backed slices
-  vk::Buffer m_vertexUploadBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_vertexUploadBuffer{};
   vk::DeviceSize m_vertexUploadOffset{0};
-  vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
+  vk::Buffer m_indexUploadBuffer{};
   vk::DeviceSize m_indexUploadOffset{0};
 
   // Cache CPU-provided atlases keyed by pixel pointer
@@ -121,9 +121,9 @@ private:
   };
   struct CacheEntry
   {
-    vk::Buffer vb = VK_NULL_HANDLE;
+    vk::Buffer vb{};
     vk::DeviceSize vbOffset = 0;
-    vk::Buffer ib = VK_NULL_HANDLE;
+    vk::Buffer ib{};
     vk::DeviceSize ibOffset = 0;
     uint32_t vertexCount = 0;
     uint32_t indexCount = 0;

@@ -71,7 +71,7 @@ void Z3DImgSliceRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend
     auto lease = scratchPool.acquireLayerArrayRenderTarget(m_outputSize,
                                                           channelCount,
                                                           ScratchFormat::RGBA16,
-                                                          ScratchFormat::Depth24,
+                                                          ScratchFormat::Depth32F,
                                                           std::optional<RenderBackend>(RenderBackend::Vulkan));
     auto leaseHolder = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
     *leaseHolder = std::move(lease);

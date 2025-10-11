@@ -30,9 +30,9 @@ void ZVulkanFontPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
   m_indexCount = 0;
-  m_vertexUploadBuffer = VK_NULL_HANDLE;
+  m_vertexUploadBuffer = nullptr;
   m_vertexUploadOffset = 0;
-  m_indexUploadBuffer = VK_NULL_HANDLE;
+  m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
   resetDescriptors();
 }
@@ -88,19 +88,20 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   ds->updateTexture(0, *atlas, m_backend.defaultSampler());
 
   // Debug: verify viewport/scissor and atlas metadata for MoltenVK issues
-  VLOG(1) << fmt::format("VK font state: viewport=({:.1f},{:.1f} {:.1f}x{:.1f}) scissor=({},{} {}x{}) atlas={}x{} fmt={} picking={}",
-                         viewport.x,
-                         viewport.y,
-                         viewport.width,
-                         viewport.height,
-                         scissor.offset.x,
-                         scissor.offset.y,
-                         scissor.extent.width,
-                         scissor.extent.height,
-                         atlas->width(),
-                         atlas->height(),
-                         static_cast<int>(atlas->format()),
-                         payload.pickingPass);
+  VLOG(1) << fmt::format(
+    "VK font state: viewport=({:.1f},{:.1f} {:.1f}x{:.1f}) scissor=({},{} {}x{}) atlas={}x{} fmt={} picking={}",
+    viewport.x,
+    viewport.y,
+    viewport.width,
+    viewport.height,
+    scissor.offset.x,
+    scissor.offset.y,
+    scissor.extent.width,
+    scissor.extent.height,
+    atlas->width(),
+    atlas->height(),
+    enumOrUnderlying(atlas->format(), 16),
+    payload.pickingPass);
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
@@ -437,7 +438,7 @@ ZVulkanFontPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
     instance.pipeline->setDepthWriteEnable(false);
     // Premultiplied alpha blending for font shader (rgb is premultiplied by a)
     vk::PipelineColorBlendAttachmentState blend{};
-    blend.blendEnable = VK_TRUE;
+    blend.blendEnable = true;
     blend.srcColorBlendFactor = vk::BlendFactor::eOne;
     blend.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
     blend.colorBlendOp = vk::BlendOp::eAdd;

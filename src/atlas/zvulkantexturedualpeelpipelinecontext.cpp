@@ -55,6 +55,13 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   // Shared fullscreen quad
   m_vertexCount = 4;
 
+  VLOG(2) << fmt::format("DDP::record begin stage={} temp=0x{:x} depth=0x{:x} front=0x{:x} back=0x{:x}",
+                         payload.stage == TextureDualPeelPayload::Stage::Final ? "final" : "blend",
+                         payload.tempAttachment.id,
+                         payload.depthAttachment.id,
+                         payload.frontAttachment.id,
+                         payload.backAttachment.id);
+
   Stage stage = (payload.stage == TextureDualPeelPayload::Stage::Final) ? Stage::Final : Stage::Blend;
   const bool useOcclusionQuery =
     (stage == Stage::Blend) && payload.hasOcclusionQuery() && m_backend.supportsOcclusionQueries();
@@ -87,6 +94,7 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
     }
     auto& tempTexture =
       vulkan::textureFromHandle(payload.tempAttachment, m_backend.device(), "dual-peel blend attachment");
+    VLOG(2) << fmt::format("DDP blend: updating binding0 temp=0x{:x}", payload.tempAttachment.id);
     descriptor->updateTexture(0, tempTexture, m_backend.defaultSampler());
   } else {
     auto& depthTexture =
@@ -95,6 +103,10 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
       vulkan::textureFromHandle(payload.frontAttachment, m_backend.device(), "dual-peel front attachment");
     auto& backTexture =
       vulkan::textureFromHandle(payload.backAttachment, m_backend.device(), "dual-peel back attachment");
+    VLOG(2) << fmt::format("DDP final: updating depth/front/back bindings depth=0x{:x} front=0x{:x} back=0x{:x}",
+                           payload.depthAttachment.id,
+                           payload.frontAttachment.id,
+                           payload.backAttachment.id);
     descriptor->updateTexture(vkbind::kBindingDDPFinalDepth, depthTexture, m_backend.defaultSampler());
     descriptor->updateTexture(vkbind::kBindingDDPFinalFront, frontTexture, m_backend.defaultSampler());
     descriptor->updateTexture(vkbind::kBindingDDPFinalBack, backTexture, m_backend.defaultSampler());
@@ -119,6 +131,10 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   key.depthFormat = formats.depthFormat;
 
   PipelineInstance& instance = ensurePipeline(key, formats);
+  VLOG(2) << fmt::format("DDP {}: ensured pipeline colors={} depth={}",
+                         (stage == Stage::Final ? "final" : "blend"),
+                         formats.colorFormats.size(),
+                         formats.depthFormat.has_value());
 
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
@@ -160,10 +176,12 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
                                            constants);
 
   // Ensure and bind OIT params (set = 3); descriptor is set at allocation time.
+  VLOG(2) << "DDP: ensureOITResources + update UBO";
   ensureOITResources();
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
   if (m_descriptorOIT && m_uboOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_descriptorOIT->descriptorSet()};
+    VLOG(2) << "DDP: binding OIT params set at index 3";
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                            instance.pipeline->pipelineLayout(),
                            vkbind::kSetOITParams,
@@ -172,12 +190,15 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   }
 
   if (useOcclusionQuery) {
+    VLOG(2) << fmt::format("DDP: begin occlusion query idx={}", payload.occlusionQueryIndex);
     m_backend.beginOcclusionQuery(cmd, payload.occlusionQueryIndex);
   }
 
+  VLOG(2) << fmt::format("DDP: draw {} verts", m_vertexCount);
   cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
 
   if (useOcclusionQuery) {
+    VLOG(2) << fmt::format("DDP: end occlusion query idx={}", payload.occlusionQueryIndex);
     m_backend.endOcclusionQuery(cmd, payload.occlusionQueryIndex);
   }
 }

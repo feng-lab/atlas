@@ -60,6 +60,12 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - One type per file; match filenames to classes (e.g., `z3dscratchresourcepool.cpp`/`.h`).
 - Thread-safe design: avoid global state mutations without synchronization; keep renderer state local to the rendering thread.
 - Structured logging through `ZLog`; avoid `std::cout`/`printf` in production paths.
+- Enum logging rules (zlog.h):
+  - Prefer `enumOrUnderlying(e, 16)` when logging Vulkan (or other) enums to ensure a readable name if available, or a hex underlying value as a fallback without allocations or exceptions.
+  - When you specifically want a literal fallback string, use `enumToStringOr(e, "<unknown>")` (returns `std::string_view`).
+  - For Qt surfaces/UI text, use `enumToQStringOr(e, u"<unknown>")`.
+  - Avoid `static_cast<int>(e)` and ad‑hoc string munging. Do not call the throwing `enumToString` in logs.
+  - Prefer `std::string_view` results in formatting; don’t materialize `std::string` unless ownership is required.
 - When you need GLM math utilities, include `zglmutils.h`; do not include `<glm/...>` headers directly.
 - Maintain consistent naming: `CamelCase` types, `camelCase` locals, `_member` private fields where applicable.
 - Remove dead code, unused includes, and stale feature flags. Do not leave TODOs without linked issues.
@@ -73,8 +79,19 @@ Scope: Required instructions for anyone (human or automated agent) changing this
    - Match GL for benign skips (empty payloads, paging not ready, missing picking colors where GL also skips). Use early return.
    - For “should never happen” states, fail fast with `CHECK` (not silent return): null `renderer` on non-empty payloads; array size mismatches; missing/failed descriptor or buffer allocations; resolve/composite format contract violations.
    - Prefer debug-only `DCHECK` for expensive assertions (e.g., index range checks in hot loops).
-   - Do not introduce CPU-upload or GL-bridging fallbacks in Vulkan paths; if a Vulkan resource is required and unavailable, `CHECK` instead of silently substituting.
-   - Volatile inputs must be bound via per-draw override descriptor sets; allocation failure is fatal.
+- Do not introduce CPU-upload or GL-bridging fallbacks in Vulkan paths; if a Vulkan resource is required and unavailable, `CHECK` instead of silently substituting.
+- Volatile inputs must be bound via per-draw override descriptor sets; allocation failure is fatal.
+
+### Vulkan-Hpp/RAII Conventions
+- Prefer Vulkan-Hpp and RAII types throughout (`vk::`, `vk::raii::`) instead of C API. Use strong enums/flags (`vk::Result`, `vk::ImageLayout`, etc.).
+- Avoid `VK_TRUE`/`VK_FALSE`; use `bool` fields on Hpp structs. Avoid `VK_NULL_HANDLE`; prefer default-constructed Hpp handles (e.g., `vk::Buffer{}`).
+- Result checks: compare against `vk::Result` (cast when interoping with VMA or C APIs) rather than `VK_SUCCESS`.
+- Descriptor writes during recording are forbidden. Prime descriptor sets and write bindings before command buffer recording begins; during recording, only update buffer contents (host-visible) and bind pre-written sets.
+- Samplers/descriptors: prefer immutable samplers when feasible to avoid platform-specific sampler class issues.
+- Exceptions where C API/macros are acceptable:
+  - VMA (vk_mem_alloc): uses C functions and raw handles; pass Hpp data via `reinterpret_cast` where necessary.
+  - `VK_QUEUE_FAMILY_IGNORED` has no Hpp equivalent; keep using the macro for queue-family-ignored barriers.
+  - Extension function pointers (e.g., debug utils) may be called via dispatcher guards when RAII wrappers are insufficiently portable.
 
 ## Debugging & Performance
 - Use `--v=1` (or higher) for stage timing logs; wrap hotspots with `ZBenchTimer`.

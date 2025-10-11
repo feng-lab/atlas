@@ -111,7 +111,7 @@ void ZVulkanFrameExecutor::waitForCompletion(ActiveFrame& frame)
   }
 
   auto& vkDevice = m_device.context().device();
-  const auto waitResult = vkDevice.waitForFences({*frame.fence()}, VK_TRUE, kFenceTimeoutNs);
+  const auto waitResult = vkDevice.waitForFences({*frame.fence()}, true, kFenceTimeoutNs);
   if (waitResult != vk::Result::eSuccess) {
     LOG(WARNING) << "Frame executor waitForFences returned " << vk::to_string(waitResult);
   }
@@ -167,7 +167,7 @@ ZVulkanFrameExecutor::Frame& ZVulkanFrameExecutor::acquireFrame()
 
   auto& vkDevice = m_device.context().device();
   if (frame.inFlight) {
-    const auto waitResult = vkDevice.waitForFences({*frame.fence}, VK_TRUE, kFenceTimeoutNs);
+    const auto waitResult = vkDevice.waitForFences({*frame.fence}, true, kFenceTimeoutNs);
     if (waitResult != vk::Result::eSuccess) {
       LOG(WARNING) << "Frame executor waitForFences returned " << vk::to_string(waitResult);
     }
@@ -229,7 +229,7 @@ void ZVulkanFrameExecutor::executeImmediate(const std::function<void(vk::raii::C
 
   // Wait for completion to keep semantics identical to the previous
   // executeImmediate behaviour.
-  const auto waitResult2 = device.waitForFences({*fence}, VK_TRUE, kFenceTimeoutNs);
+  const auto waitResult2 = device.waitForFences({*fence}, true, kFenceTimeoutNs);
   if (waitResult2 != vk::Result::eSuccess) {
     LOG(WARNING) << "Immediate executor waitForFences returned " << vk::to_string(waitResult2);
   }

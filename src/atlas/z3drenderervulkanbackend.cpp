@@ -60,7 +60,7 @@ inline bool queryPoolValid(const vk::raii::QueryPool& pool)
 {
   return static_cast<VkQueryPool>(*pool) != VK_NULL_HANDLE;
 }
-}
+} // namespace
 
 thread_local Z3DRendererVulkanBackend* Z3DRendererVulkanBackend::s_currentBackend = nullptr;
 
@@ -191,6 +191,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   if (m_imgSliceContext) {
     m_imgSliceContext->resetFrame();
   }
+  if (m_imgRaycasterContext) {
+    m_imgRaycasterContext->resetFrame();
+  }
   if (m_fontContext) {
     m_fontContext->resetFrame();
   }
@@ -200,11 +203,49 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   const uint32_t width = viewport.z;
   const uint32_t height = viewport.w;
   const auto& surf = renderer.frameState().activeSurface;
-  VLOG(1) << fmt::format("VK beginRender: viewport={}x{}, colors={}, depth={}",
-                         width,
-                         height,
-                         surf.colorAttachments.size(),
-                         surf.depthAttachment.has_value());
+  if (VLOG_IS_ON(2)) {
+    uint64_t c0Handle = 0;
+    uint32_t c0W = 0, c0H = 0;
+    auto c0Fmt = enumOrUnderlying(vk::Format{}, 16);
+    if (!surf.colorAttachments.empty() && surf.colorAttachments[0].handle.valid() &&
+        surf.colorAttachments[0].handle.backend == AttachmentBackend::Vulkan) {
+      auto* tex = reinterpret_cast<ZVulkanTexture*>(surf.colorAttachments[0].handle.id);
+      if (tex) {
+        c0Handle = reinterpret_cast<uint64_t>(tex);
+        c0W = tex->width();
+        c0H = tex->height();
+        c0Fmt = enumOrUnderlying(tex->format(), 16);
+      }
+    }
+    uint64_t dHandle = 0;
+    uint32_t dW = 0, dH = 0;
+    auto dFmt = enumOrUnderlying(vk::Format{}, 16);
+    if (surf.depthAttachment && surf.depthAttachment->handle.valid() &&
+        surf.depthAttachment->handle.backend == AttachmentBackend::Vulkan) {
+      auto* dtex = reinterpret_cast<ZVulkanTexture*>(surf.depthAttachment->handle.id);
+      if (dtex) {
+        dHandle = reinterpret_cast<uint64_t>(dtex);
+        dW = dtex->width();
+        dH = dtex->height();
+        dFmt = enumOrUnderlying(dtex->format(), 16);
+      }
+    }
+    VLOG(2) << fmt::format(
+      "VK beginRender: label='{}' viewport={}x{} colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{}",
+      renderer.currentPassLabel(),
+      width,
+      height,
+      surf.colorAttachments.size(),
+      c0Handle,
+      c0Fmt,
+      c0W,
+      c0H,
+      surf.depthAttachment.has_value(),
+      dHandle,
+      dFmt,
+      dW,
+      dH);
+  }
 
   if (width == 0U || height == 0U) {
     m_activeFrameHandle.reset();
@@ -253,15 +294,15 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.readbackBytesCopied = 0;
   frameResources.readbackSlotsInFlight = 0;
   // Reset per-frame upload arena virtual block; free retired resources
-  if (frameResources.uploadArena.block != VK_NULL_HANDLE) {
+  if (frameResources.uploadArena.block != nullptr) {
     vmaClearVirtualBlock(frameResources.uploadArena.block);
   }
   frameResources.uploadArena.highWatermark = 0;
   // Release any retired upload buffers from a previous use of this frame.
   for (auto& r : frameResources.uploadArena.retiredBuffers) {
-    if (r.block != VK_NULL_HANDLE) {
+    if (r.block != nullptr) {
       vmaDestroyVirtualBlock(r.block);
-      r.block = VK_NULL_HANDLE;
+      r.block = nullptr;
     }
     r.buffer.reset();
   }
@@ -273,7 +314,6 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   m_activeFrame = &frameResources;
   frameResources.nextOcclusionQuery = 0;
   frameResources.occlusionQueryNeedsWait = false;
-  frameResources.occlusionQueryResults.assign(kMaxOcclusionQueries, 0u);
 
   // Prime persistent descriptor sets before command buffer recording begins.
   // This allows UBO/image bindings to be established without violating the
@@ -298,6 +338,10 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
   if (m_textureDualPeelContext) {
     m_textureDualPeelContext->ensureOITResources();
+  }
+  if (m_textureCopyContext) {
+    m_textureCopyContext->ensureDescriptorLayout();
+    m_textureCopyContext->ensureOITResources();
   }
   if (m_textureWeightedAverageContext) {
     m_textureWeightedAverageContext->ensureDescriptorLayout();
@@ -433,29 +477,17 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     applyPendingArenaReset(frame); // runs deferred readback consumers now
 
     if (waitForOcclusion && queryPoolValid(frame.occlusionQueryPool) && frame.nextOcclusionQuery > 0) {
-      frame.occlusionQueryResults.resize(frame.nextOcclusionQuery, 0u);
-      auto& vkDevice = m_sharedDevice->context().device();
-      const auto* dispatcher = vkDevice.getDispatcher();
-      if (dispatcher && dispatcher->vkGetQueryPoolResults) {
-        const vk::QueryResultFlags queryFlags = vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait;
-        const VkResult raw = dispatcher->vkGetQueryPoolResults(static_cast<VkDevice>(*vkDevice),
-                                                               static_cast<VkQueryPool>(*frame.occlusionQueryPool),
-                                                               0,
-                                                               frame.nextOcclusionQuery,
-                                                               frame.occlusionQueryResults.size() * sizeof(uint64_t),
-                                                               frame.occlusionQueryResults.data(),
-                                                               sizeof(uint64_t),
-                                                               static_cast<VkQueryResultFlags>(queryFlags));
-        const auto result = static_cast<vk::Result>(raw);
-        if (result == vk::Result::eSuccess) {
-          m_recentOcclusionResults.assign(frame.occlusionQueryResults.begin(),
-                                          frame.occlusionQueryResults.begin() + frame.nextOcclusionQuery);
-        } else {
-          VLOG(1) << "Vulkan occlusion query results unavailable: " << vk::to_string(result);
-          m_recentOcclusionResults.clear();
-        }
+      const vk::QueryResultFlags queryFlags = vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait;
+      auto [result, queryData] =
+        frame.occlusionQueryPool.getResults<uint64_t>(0,
+                                                      frame.nextOcclusionQuery,
+                                                      frame.nextOcclusionQuery * sizeof(uint64_t),
+                                                      sizeof(uint64_t),
+                                                      queryFlags);
+      if (result == vk::Result::eSuccess) {
+        m_recentOcclusionResults.assign(queryData.begin(), queryData.begin() + frame.nextOcclusionQuery);
       } else {
-        VLOG(1) << "Vulkan dispatcher missing vkGetQueryPoolResults";
+        VLOG(1) << "Vulkan occlusion query results unavailable: " << vk::to_string(result);
         m_recentOcclusionResults.clear();
       }
     } else {
@@ -623,8 +655,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         return std::nullopt;
       }
       auto& texture = vulkan::textureFromHandle(attachment.handle, device(), "renderer depth attachment");
-      const auto desiredLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
+      const auto desiredLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+      texture.transitionLayout(cmd, texture.layout(), desiredLayout, vk::ImageAspectFlagBits::eDepth);
 
       vk::RenderingAttachmentInfo info;
       info.imageView = texture.imageView();
@@ -647,9 +679,37 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (batch.pass.depthAttachment) {
       depthAttachmentInfo = makeDepthAttachment(*batch.pass.depthAttachment);
     }
-
-    CHECK(!(colorAttachments.empty() && !depthAttachmentInfo))
-      << "VK: segment began with no attachments (fatal) label='" << renderer.currentPassLabel() << "'";
+    // Instrumentation: log attachments and render area
+    uint64_t firstColorHandle = 0;
+    auto firstColorFmt = enumOrUnderlying(vk::Format{}, 16);
+    uint32_t firstColorW = 0, firstColorH = 0;
+    uint64_t depthHandle = 0;
+    auto depthFmt = enumOrUnderlying(vk::Format{}, 16);
+    uint32_t depthW = 0, depthH = 0;
+    if (VLOG_IS_ON(2)) {
+      if (!batch.pass.colorAttachments.empty()) {
+        const auto& a = batch.pass.colorAttachments.front();
+        if (a.handle.valid() && a.handle.backend == AttachmentBackend::Vulkan) {
+          auto* tex = reinterpret_cast<ZVulkanTexture*>(a.handle.id);
+          if (tex) {
+            firstColorHandle = reinterpret_cast<uint64_t>(tex);
+            firstColorFmt = enumOrUnderlying(tex->format(), 16);
+            firstColorW = tex->width();
+            firstColorH = tex->height();
+          }
+        }
+      }
+      if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid() &&
+          batch.pass.depthAttachment->handle.backend == AttachmentBackend::Vulkan) {
+        auto* dtex = reinterpret_cast<ZVulkanTexture*>(batch.pass.depthAttachment->handle.id);
+        if (dtex) {
+          depthHandle = reinterpret_cast<uint64_t>(dtex);
+          depthFmt = enumOrUnderlying(dtex->format(), 16);
+          depthW = dtex->width();
+          depthH = dtex->height();
+        }
+      }
+    }
 
     const auto vkScissor = vulkan::toVkScissor(batch.pass);
     vk::RenderingInfo renderingInfo;
@@ -658,7 +718,37 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     renderingInfo.pColorAttachments = colorAttachments.empty() ? nullptr : colorAttachments.data();
     renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
     renderingInfo.pDepthAttachment = depthAttachmentInfo ? &*depthAttachmentInfo : nullptr;
-
+    // Unified D/S layout path does not bind a separate stencil attachment
+    if (colorAttachments.empty() && !depthAttachmentInfo) {
+      if (VLOG_IS_ON(2)) {
+        VLOG(2) << fmt::format("VK skip beginRendering: label='{}' colors=0 depth=0 renderArea=({},{} {}x{})",
+                               renderer.currentPassLabel(),
+                               renderingInfo.renderArea.offset.x,
+                               renderingInfo.renderArea.offset.y,
+                               renderingInfo.renderArea.extent.width,
+                               renderingInfo.renderArea.extent.height);
+      }
+      return false; // Skip empty segments instead of aborting
+    }
+    if (VLOG_IS_ON(2)) {
+      VLOG(2) << fmt::format(
+        "VK beginRendering: label='{}' colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{} renderArea=({},{} {}x{})",
+        renderer.currentPassLabel(),
+        renderingInfo.colorAttachmentCount,
+        firstColorHandle,
+        firstColorFmt,
+        firstColorW,
+        firstColorH,
+        static_cast<bool>(depthAttachmentInfo),
+        depthHandle,
+        depthFmt,
+        depthW,
+        depthH,
+        renderingInfo.renderArea.offset.x,
+        renderingInfo.renderArea.offset.y,
+        renderingInfo.renderArea.extent.width,
+        renderingInfo.renderArea.extent.height);
+    }
     cmd.beginRendering(renderingInfo);
 
     if (m_activeFrame) {
@@ -702,7 +792,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
                            static_cast<int>(batch.pass.viewport.extent.y));
 
     // Ensure any sampled inputs referenced by this batch are transitioned to shader-read
-    auto classifyReadLayout = [](vk::Format format) {
+
+    auto classifyReadLayout = [&](vk::Format format) {
       struct
       {
         vk::ImageLayout layout;
@@ -712,13 +803,11 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         case vk::Format::eD16Unorm:
         case vk::Format::eX8D24UnormPack32:
         case vk::Format::eD32Sfloat:
-          result.layout = vk::ImageLayout::eDepthReadOnlyOptimal;
-          result.aspect = vk::ImageAspectFlagBits::eDepth;
-          break;
         case vk::Format::eD16UnormS8Uint:
         case vk::Format::eD24UnormS8Uint:
         case vk::Format::eD32SfloatS8Uint:
-          result.layout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+          // Treat all depth(-stencil) formats as depth-only for sampling
+          result.layout = vk::ImageLayout::eDepthReadOnlyOptimal;
           result.aspect = vk::ImageAspectFlagBits::eDepth;
           break;
         case vk::Format::eS8Uint:
@@ -735,14 +824,10 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (!handle.valid()) {
         return;
       }
+      VLOG(2) << fmt::format("ensureSampledReadable: handle=0x{:x}", handle.id);
       auto& texture = vulkan::textureFromHandle(handle, device(), "renderer sampled attachment");
       const auto samplingState = classifyReadLayout(texture.format());
       vk::ImageAspectFlags transitionAspect = samplingState.aspect;
-      if (transitionAspect == vk::ImageAspectFlagBits::eDepth &&
-          (texture.format() == vk::Format::eD16UnormS8Uint || texture.format() == vk::Format::eD24UnormS8Uint ||
-           texture.format() == vk::Format::eD32SfloatS8Uint)) {
-        transitionAspect = texture.info().aspectMask;
-      }
       texture.transitionLayout(cmd, texture.layout(), samplingState.layout, transitionAspect);
       texture.setDescriptorLayout(samplingState.layout);
     };
@@ -790,29 +875,37 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     const bool selfManaged = isSelfManaged(batch.geometry);
     const auto key = buildKey(batch);
 
-    if (!segmentOpen) {
-      if (beginSegmentForBatch(batch)) {
-        segmentOpen = true;
-        currentKey = key;
-        // Track active segment formats for validation
-        if (m_activeFrame) {
-          m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
-        }
-      } else {
-        continue;
+    if (selfManaged) {
+      if (segmentOpen) {
+        cmd.endRendering();
+        segmentOpen = false;
+        currentKey.reset();
       }
-    } else if (!currentKey || *currentKey != key) {
-      cmd.endRendering();
-      segmentOpen = false;
-      currentKey.reset();
-      if (beginSegmentForBatch(batch)) {
-        segmentOpen = true;
-        currentKey = key;
-        if (m_activeFrame) {
-          m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
+    } else {
+      if (!segmentOpen) {
+        if (beginSegmentForBatch(batch)) {
+          segmentOpen = true;
+          currentKey = key;
+          // Track active segment formats for validation
+          if (m_activeFrame) {
+            m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
+          }
+        } else {
+          continue;
         }
-      } else {
-        continue;
+      } else if (!currentKey || *currentKey != key) {
+        cmd.endRendering();
+        segmentOpen = false;
+        currentKey.reset();
+        if (beginSegmentForBatch(batch)) {
+          segmentOpen = true;
+          currentKey = key;
+          if (m_activeFrame) {
+            m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
+          }
+        } else {
+          continue;
+        }
       }
     }
 
@@ -1202,7 +1295,7 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
     // mapped pointers remain valid for the rest of the frame.
     if (arena.buffer) {
       arena.retiredBuffers.push_back({std::move(arena.buffer), arena.block});
-      arena.block = VK_NULL_HANDLE;
+      arena.block = nullptr;
     }
     // Upload arena buffers act as sources for GPU copies into device-local
     // static buffers. They must carry TRANSFER_SRC usage (not DST).
@@ -1219,7 +1312,7 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
     VmaVirtualBlockCreateInfo vinfo{};
     vinfo.size = newCapacity;
     if (vmaCreateVirtualBlock(&vinfo, &arena.block) != VK_SUCCESS) {
-      arena.block = VK_NULL_HANDLE;
+      arena.block = nullptr;
       LOG_FIRST_N(ERROR, 3) << "Failed to create VMA virtual block for upload arena";
     }
   };
@@ -1234,12 +1327,12 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
   VmaVirtualAllocationCreateInfo ainfo{};
   ainfo.size = bytes;
   ainfo.alignment = std::max<size_t>(1, alignment);
-  VmaVirtualAllocation alloc = VK_NULL_HANDLE;
+  VmaVirtualAllocation alloc = nullptr;
   VkDeviceSize vOffset = 0;
-  if (arena.block == VK_NULL_HANDLE || vmaVirtualAllocate(arena.block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
+  if (arena.block == nullptr || vmaVirtualAllocate(arena.block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
     VLOG(1) << "suballocateUpload: virtual allocate failed; attempting to grow arena";
     ensureCapacity(arena.capacity + required);
-    if (arena.block == VK_NULL_HANDLE || vmaVirtualAllocate(arena.block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
+    if (arena.block == nullptr || vmaVirtualAllocate(arena.block, &ainfo, &alloc, &vOffset) != VK_SUCCESS) {
       VLOG(1) << "suballocateUpload: virtual allocate failed after growth";
       return slice;
     }
@@ -1283,7 +1376,7 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   }
   if (arena.buffer) {
     arena.retiredBuffers.push_back({std::move(arena.buffer), arena.block});
-    arena.block = VK_NULL_HANDLE;
+    arena.block = nullptr;
   }
   // Upload arena buffers act as the source of GPU copies into device-local
   // static buffers. They must be created with TRANSFER_SRC usage (not DST).
@@ -1299,7 +1392,7 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   VmaVirtualBlockCreateInfo vinfo{};
   vinfo.size = newCapacity;
   if (vmaCreateVirtualBlock(&vinfo, &arena.block) != VK_SUCCESS) {
-    arena.block = VK_NULL_HANDLE;
+    arena.block = nullptr;
     LOG_FIRST_N(ERROR, 3) << "Failed to create VMA virtual block for upload arena (reserve)";
   }
   VLOG(2) << fmt::format("reserveUploadSlices: grew arena to {} bytes for {} slices", newCapacity, slices.size());
@@ -1571,7 +1664,6 @@ Z3DRendererVulkanBackend::FrameResources& Z3DRendererVulkanBackend::ensureFrameR
   frame.descriptorPool = m_sharedDevice->createDescriptorPool();
   vk::QueryPoolCreateInfo occlusionInfo{.queryType = vk::QueryType::eOcclusion, .queryCount = kMaxOcclusionQueries};
   frame.occlusionQueryPool = vk::raii::QueryPool(vkDevice, occlusionInfo);
-  frame.occlusionQueryResults.clear();
   return frame;
 }
 
@@ -1923,41 +2015,31 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
   std::string message = fmt::format("VK batches CPU {:.3f} ms", cpuMs);
 
   if (frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
-    std::vector<uint64_t> queryData(frame.nextQuery, 0u);
-    auto& device = m_sharedDevice->context().device();
-    const auto* dispatcher = device.getDispatcher();
-    if (dispatcher && dispatcher->vkGetQueryPoolResults) {
-      const VkResult rawResult =
-        dispatcher->vkGetQueryPoolResults(static_cast<VkDevice>(*device),
-                                          static_cast<VkQueryPool>(*frame.queryPool),
-                                          0,
-                                          frame.nextQuery,
-                                          queryData.size() * sizeof(uint64_t),
-                                          queryData.data(),
-                                          sizeof(uint64_t),
-                                          static_cast<VkQueryResultFlags>(vk::QueryResultFlagBits::e64));
-      const auto result = static_cast<vk::Result>(rawResult);
+    const auto [result, queryData] = frame.queryPool.getResults<uint64_t>(0,
+                                                                          frame.nextQuery,
+                                                                          frame.nextQuery * sizeof(uint64_t),
+                                                                          sizeof(uint64_t),
+                                                                          vk::QueryResultFlagBits::e64);
 
-      if (result == vk::Result::eSuccess) {
-        for (const auto& scope : frame.gpuScopes) {
-          if (scope.endQuery >= queryData.size() || scope.startQuery >= queryData.size()) {
-            continue;
-          }
-          const uint64_t endTicks = queryData[scope.endQuery];
-          const uint64_t startTicks = queryData[scope.startQuery];
-          if (endTicks <= startTicks) {
-            continue;
-          }
-          const double ns = static_cast<double>(endTicks - startTicks) * static_cast<double>(m_timestampPeriod);
-          const double ms = ns * 1e-6;
-          message += fmt::format(" | {} {:.3f} ms", scope.label, ms);
+    if (result == vk::Result::eSuccess) {
+      for (const auto& scope : frame.gpuScopes) {
+        if (scope.endQuery >= queryData.size() || scope.startQuery >= queryData.size()) {
+          continue;
         }
-      } else {
-        VLOG(1) << "Vulkan query results unavailable: " << vk::to_string(result);
+        const uint64_t endTicks = queryData[scope.endQuery];
+        const uint64_t startTicks = queryData[scope.startQuery];
+        if (endTicks <= startTicks) {
+          continue;
+        }
+        const double ns = static_cast<double>(endTicks - startTicks) * static_cast<double>(m_timestampPeriod);
+        const double ms = ns * 1e-6;
+        message += fmt::format(" | {} {:.3f} ms", scope.label, ms);
       }
     } else {
-      VLOG(1) << "Vulkan dispatcher missing vkGetQueryPoolResults";
+      VLOG(1) << "Vulkan query results unavailable: " << vk::to_string(result);
     }
+  } else {
+    VLOG(1) << "No GPU timestamp scopes recorded this frame";
   }
 
   for (const auto& cpuScope : frame.cpuScopes) {

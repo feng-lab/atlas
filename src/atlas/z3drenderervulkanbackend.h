@@ -98,7 +98,7 @@ public:
   // Upload arena helpers (per-frame transient vertex/index data)
   struct UploadSlice
   {
-    vk::Buffer buffer{VK_NULL_HANDLE};
+    vk::Buffer buffer{};
     vk::DeviceSize offset = 0;
     void* mapped = nullptr; // points into the arena at [offset, offset+size)
     size_t size = 0; // requested bytes
@@ -118,7 +118,7 @@ public:
   // Device-local static buffer arena (lifetime: backend)
   struct StaticSlice
   {
-    vk::Buffer buffer{VK_NULL_HANDLE};
+    vk::Buffer buffer{};
     vk::DeviceSize offset = 0;
     size_t size = 0;
   };
@@ -225,7 +225,6 @@ private:
     uint32_t nextQuery = 0;
     uint32_t nextOcclusionQuery = 0;
     bool occlusionQueryNeedsWait = false;
-    std::vector<uint64_t> occlusionQueryResults;
     std::chrono::steady_clock::time_point cpuStart;
     std::chrono::steady_clock::time_point cpuEnd;
 
@@ -284,7 +283,7 @@ private:
     struct UploadArena
     {
       std::unique_ptr<class ZVulkanBuffer> buffer; // host-visible, host-coherent
-      VmaVirtualBlock block = VK_NULL_HANDLE; // VMA virtual allocator over buffer
+      VmaVirtualBlock block = nullptr; // VMA virtual allocator over buffer
       void* mapped = nullptr; // persistent mapping
       size_t capacity = 0; // bytes
       size_t highWatermark = 0; // max used this frame (debug)
@@ -293,7 +292,7 @@ private:
       struct Retired
       {
         std::unique_ptr<class ZVulkanBuffer> buffer;
-        VmaVirtualBlock block = VK_NULL_HANDLE;
+        VmaVirtualBlock block = nullptr;
       };
       std::vector<Retired> retiredBuffers;
     } uploadArena;
@@ -309,7 +308,7 @@ private:
 
     struct ScheduledCopy
     {
-      vk::Buffer dst{VK_NULL_HANDLE};
+      vk::Buffer dst{};
       vk::DeviceSize dstOffset{0};
       UploadSlice src{};
       bool isIndex = false;

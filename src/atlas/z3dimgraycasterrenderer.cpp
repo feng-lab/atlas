@@ -92,11 +92,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   payload.localMIPThreshold = m_localMIPThreshold;
   payload.compositingMode = m_compositingModeValue;
   payload.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
-  glm::uvec2 entrySize = m_entryExitSize;
-  if (entrySize.x == 0u || entrySize.y == 0u) {
-    entrySize = m_outputSize;
-  }
-  payload.entryExitSize = entrySize;
+  // Vulkan path uses the output size for entry/exit
   payload.visibleChannels = visibleChannels;
   payload.activeChannel = visibleChannels.empty() ? std::numeric_limits<size_t>::max() : visibleChannels.front();
   payload.activeChannelIndex = 0u;
@@ -219,7 +215,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   }
 
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  auto entryLease = pool.acquireEntryExitRenderTarget(entrySize,
+  auto entryLease = pool.acquireEntryExitRenderTarget(m_outputSize,
                                                       2u,
                                                       ScratchFormat::RGBA32F,
                                                       std::optional<RenderBackend>(RenderBackend::Vulkan));
@@ -229,7 +225,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     auto layerLease = pool.acquireLayerArrayRenderTarget(m_outputSize,
                                                          static_cast<uint32_t>(visibleChannels.size()),
                                                          ScratchFormat::RGBA16,
-                                                         ScratchFormat::Depth24,
+                                                         ScratchFormat::Depth32F,
                                                          std::optional<RenderBackend>(RenderBackend::Vulkan));
     payload.channelLayerLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(layerLease));
   }
@@ -351,7 +347,6 @@ void Z3DImgRaycasterRenderer::releaseScratchResources()
 
   m_entryExitMeshValid = false;
   m_entryExitMeshFlipped = false;
-  m_entryExitSize = glm::uvec2(0u);
 }
 
 void Z3DImgRaycasterRenderer::setChannelVisibility(size_t index, bool visible)
@@ -488,7 +483,6 @@ void Z3DImgRaycasterRenderer::prepareEntryExit(const ZMesh& clipped, bool flippe
     m_entryExitMesh = clipped;
     m_entryExitMeshValid = true;
     m_entryExitMeshFlipped = flipped;
-    m_entryExitSize = size;
     m_quads.clear();
     return;
   }

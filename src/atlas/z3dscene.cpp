@@ -5,7 +5,6 @@
 #include "z3dgl.h"
 #include "z3dcanvas.h"
 #include "z3dcanvaspainter.h"
-#include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOpenGLContext>
 

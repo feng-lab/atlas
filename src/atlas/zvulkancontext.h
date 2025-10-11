@@ -18,6 +18,11 @@ public:
   ZVulkanContext();
   ~ZVulkanContext();
 
+  vk::raii::Context& context()
+  {
+    return *m_context;
+  }
+
   // Returns the Vulkan RAII instance
   vk::raii::Instance& instance()
   {

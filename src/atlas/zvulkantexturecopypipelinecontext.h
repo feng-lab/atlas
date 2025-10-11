@@ -39,6 +39,8 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
+  // Allow backend to pre-prime descriptor/UBO resources before recording
+  friend class Z3DRendererVulkanBackend;
   struct QuadVertex
   {
     glm::vec3 position{0.0f};
@@ -50,12 +52,24 @@ private:
     bool discardTransparent = true;
     TextureCopyPayload::OutputMode mode = TextureCopyPayload::OutputMode::NoChange;
     bool flipY = false;
+    bool waInit = false; // use WA-init image shader (writes 2 color attachments with additive blend)
+    bool wbInit = false; // use WB-init image shader (writes 2 color attachments with specific blends)
+    bool ddpInit = false; // use DDP-init image shader (writes depth blender values)
+    bool ddpPeel = false; // use DDP-peel image shader (reads blender tex, updates front/back)
     std::vector<vk::Format> colorFormats;
     std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(discardTransparent, static_cast<int>(mode), flipY, colorFormats, depthFormat);
+      return std::tuple(discardTransparent,
+                        static_cast<int>(mode),
+                        flipY,
+                        waInit,
+                        wbInit,
+                        ddpInit,
+                        ddpPeel,
+                        colorFormats,
+                        depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const
@@ -76,6 +90,10 @@ private:
 
   std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
+  std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // empty layout for set indices 1/2
+  std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set for OIT params when needed
+  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
+  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
@@ -84,6 +102,7 @@ private:
   void ensureDescriptorLayout();
   void resetDescriptors();
   void ensureDescriptorSet();
+  void ensureOITResources();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
 
   void ensureVertexCapacity(size_t vertexCount);

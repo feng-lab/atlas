@@ -17,12 +17,20 @@ public:
   void updateUniformBuffer(uint32_t binding, ZVulkanBuffer& buffer);
   void updateTexture(uint32_t binding, ZVulkanTexture& texture);
   void updateTexture(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler);
+  void updateTexture(uint32_t binding,
+                     ZVulkanTexture& texture,
+                     vk::Sampler sampler,
+                     vk::ImageLayout layoutOverride,
+                     vk::ImageAspectFlags aspectOverride);
 
   // Write-once convenience helpers; return true if wrote, false if skipped
   bool writeUniformBufferOnce(uint32_t binding, ZVulkanBuffer& buffer);
   bool writeTextureOnce(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler);
 
-  vk::DescriptorSet descriptorSet() const { return m_descriptorSet; }
+  vk::DescriptorSet descriptorSet() const
+  {
+    return m_descriptorSet;
+  }
 
 private:
   ZVulkanDevice& m_device;
