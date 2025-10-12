@@ -47,6 +47,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::resetDescriptors()
   if (m_descriptorPool) {
     m_descriptorPool->reset();
   }
+  m_lastInputs = {};
 }
 
 void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& renderer,
@@ -83,15 +84,21 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
                                                    m_backend.device(),
                                                    "texture-weighted-average moments attachment");
 
-  // Allocate per-draw override descriptor set to avoid update-after-bind
+  // Allocate a fresh per-draw override descriptor set to avoid update-after-bind hazards
   ZVulkanDescriptorSet* ds = nullptr;
   if (m_setLayout) {
     ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
   }
   CHECK(ds != nullptr) << "WA resolve: override descriptor allocation failed (fatal)";
-  VLOG(2) << "WA: updating override set bindings accum/moments";
-  ds->updateTexture(vkbind::kBindingWAAccum, accumulationTexture, m_backend.defaultSampler());
-  ds->updateTexture(vkbind::kBindingWAMoments, momentsTexture, m_backend.defaultSampler());
+  const uint64_t accumId = payload.accumulationAttachment.id;
+  const uint64_t momentsId = payload.momentsAttachment.id;
+  if (!m_lastInputs.valid || m_lastInputs.accum != accumId) {
+    ds->updateTexture(vkbind::kBindingWAAccum, accumulationTexture, m_backend.defaultSampler());
+  }
+  if (!m_lastInputs.valid || m_lastInputs.moments != momentsId) {
+    ds->updateTexture(vkbind::kBindingWAMoments, momentsTexture, m_backend.defaultSampler());
+  }
+  m_lastInputs = {accumId, momentsId, true};
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 

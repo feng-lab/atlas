@@ -286,7 +286,8 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     finalInfo.pDepthAttachment = nullptr;
   }
 
-  bool renderingActive = true;
+  // Self-managed: no active dynamic rendering segment on entry
+  bool renderingActive = false;
   auto ensureFinalRendering = [&]() {
     if (!renderingActive) {
       cmd.beginRendering(finalInfo);
@@ -352,11 +353,11 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   };
 
   if (!readyForPaging()) {
-    ensureFinalRendering();
+    // Not ready to draw; do not begin/end rendering.
     return;
   }
 
-  if (usePaging || channelCount > 1) {
+  if ((usePaging || channelCount > 1) && renderingActive) {
     cmd.endRendering();
     renderingActive = false;
   }
@@ -413,6 +414,21 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     vk::DeviceSize offset = 0;
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, blockPipeline.pipeline->pipeline());
     cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offset});
+    // Push vertex shader transforms for block-id pass
+    struct SlicePushConstant
+    {
+      glm::mat4 projectionView;
+      glm::mat4 view;
+    } pcB;
+    {
+      const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
+      pcB.projectionView = eyeState.projectionMatrix * eyeState.viewMatrix;
+      pcB.view = eyeState.viewMatrix;
+    }
+    cmd.pushConstants<SlicePushConstant>(blockPipeline.pipeline->pipelineLayout(),
+                                         vk::ShaderStageFlagBits::eVertex,
+                                         0,
+                                         pcB);
     bindPagedDescriptors(resources, blockPipeline.pipeline->pipelineLayout(), cmd, true);
     cmd.setViewport(0, makeViewport(outputSize));
     cmd.setScissor(0, makeRect(outputSize));
@@ -529,6 +545,21 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     vk::DeviceSize offset = 0;
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
     cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offset});
+    // Push vertex shader transforms
+    struct SlicePushConstant
+    {
+      glm::mat4 projectionView;
+      glm::mat4 view;
+    } pc;
+    {
+      const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
+      pc.projectionView = eyeState.projectionMatrix * eyeState.viewMatrix;
+      pc.view = eyeState.viewMatrix;
+    }
+    cmd.pushConstants<SlicePushConstant>(pipeline.pipeline->pipelineLayout(),
+                                         vk::ShaderStageFlagBits::eVertex,
+                                         0,
+                                         pc);
     bindPagedDescriptors(resources, pipeline.pipeline->pipelineLayout(), cmd, paging);
     cmd.setViewport(0, makeViewport(outputSize));
     cmd.setScissor(0, makeRect(outputSize));
@@ -549,9 +580,28 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
     cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {offset});
     bindPagedDescriptors(m_channelResources[0], pipeline.pipeline->pipelineLayout(), cmd, usePaging);
+    // Push vertex shader transforms
+    struct SlicePushConstant
+    {
+      glm::mat4 projectionView;
+      glm::mat4 view;
+    } pc;
+    {
+      const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
+      pc.projectionView = eyeState.projectionMatrix * eyeState.viewMatrix;
+      pc.view = eyeState.viewMatrix;
+    }
+    cmd.pushConstants<SlicePushConstant>(pipeline.pipeline->pipelineLayout(),
+                                         vk::ShaderStageFlagBits::eVertex,
+                                         0,
+                                         pc);
     cmd.setViewport(0, viewport);
     cmd.setScissor(0, scissor);
     cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
+    if (renderingActive) {
+      cmd.endRendering();
+      renderingActive = false;
+    }
     return;
   }
 
@@ -610,6 +660,10 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   cmd.setViewport(0, finalViewport);
   cmd.setScissor(0, finalScissor);
   cmd.draw(static_cast<uint32_t>(m_quadVertexCount), 1, 0, 0);
+  if (renderingActive) {
+    cmd.endRendering();
+    renderingActive = false;
+  }
 }
 
 void ZVulkanImgSlicePipelineContext::ensureDescriptorLayouts()
@@ -1020,6 +1074,13 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
   instance.pipeline->setDepthWriteEnable(true);
   instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
 
+  // The vertex shader (transform_with_3dtexture_and_eye_coordinate.vert) uses push constants
+  // to receive projection*view and view matrices.
+  vk::PushConstantRange vsRange{.stageFlags = vk::ShaderStageFlagBits::eVertex,
+                                .offset = 0,
+                                .size = static_cast<uint32_t>(sizeof(glm::mat4) * 2)};
+  instance.pipeline->setPushConstantRanges({vsRange});
+
   vk::PipelineColorBlendAttachmentState blend{};
   blend.blendEnable = VK_FALSE;
   blend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
@@ -1149,6 +1210,12 @@ ZVulkanImgSlicePipelineContext::ensureBlockIdPipeline(const BlockIdPipelineKey& 
   instance.pipeline->setDepthTestEnable(false);
   instance.pipeline->setDepthWriteEnable(false);
   instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+
+  // Vertex shader uses push constants for transforms
+  vk::PushConstantRange vsRange{.stageFlags = vk::ShaderStageFlagBits::eVertex,
+                                .offset = 0,
+                                .size = static_cast<uint32_t>(sizeof(glm::mat4) * 2)};
+  instance.pipeline->setPushConstantRanges({vsRange});
 
   vk::PipelineColorBlendAttachmentState blend{};
   blend.blendEnable = VK_FALSE;

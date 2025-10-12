@@ -456,7 +456,7 @@ void Z3DRendererBase::recordVulkanBatches(const std::function<void()>& recordBat
     vkBackend->endGpuScope(*gpuScope);
   }
 
-  if (startedFrame) {
+  if (startedFrame && !m_keepVulkanFrameOpen) {
     endVulkanFrame();
   }
 

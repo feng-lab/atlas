@@ -37,6 +37,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::resetDescriptors()
 {
   m_descriptorSet.reset();
   m_descriptorSetOIT.reset();
+  m_lastInputs = {};
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& renderer,
@@ -78,15 +79,21 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
                                                          m_backend.device(),
                                                          "texture-weighted-blended transmittance attachment");
 
-  // Allocate per-draw override descriptor set for inputs
+  // Allocate a fresh per-draw override descriptor set to avoid update-after-bind hazards
   ZVulkanDescriptorSet* ds = nullptr;
   if (m_setLayout) {
     ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
   }
   CHECK(ds != nullptr) << "WB resolve: override descriptor allocation failed (fatal)";
-  VLOG(2) << "WB: updating override set bindings accum/trans";
-  ds->updateTexture(vkbind::kBindingWBAccum, accumulationTexture, m_backend.defaultSampler());
-  ds->updateTexture(vkbind::kBindingWBTransmittance, transmittanceTexture, m_backend.defaultSampler());
+  const uint64_t accumId = payload.accumulationAttachment.id;
+  const uint64_t transId = payload.transmittanceAttachment.id;
+  if (!m_lastInputs.valid || m_lastInputs.accum != accumId) {
+    ds->updateTexture(vkbind::kBindingWBAccum, accumulationTexture, m_backend.defaultSampler());
+  }
+  if (!m_lastInputs.valid || m_lastInputs.trans != transId) {
+    ds->updateTexture(vkbind::kBindingWBTransmittance, transmittanceTexture, m_backend.defaultSampler());
+  }
+  m_lastInputs = {accumId, transId, true};
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 

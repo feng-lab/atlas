@@ -173,6 +173,13 @@ void ZVulkanTextureBlendPipelineContext::ensureDescriptorLayout()
                                    .stageFlags = vk::ShaderStageFlagBits::eFragment}
   };
 
+  // Immutable default samplers across blend inputs to avoid per-draw sampler writes
+  vk::Sampler immutable = m_backend.defaultSampler();
+  bindings[0].pImmutableSamplers = &immutable;
+  bindings[1].pImmutableSamplers = &immutable;
+  bindings[2].pImmutableSamplers = &immutable;
+  bindings[3].pImmutableSamplers = &immutable;
+
   vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                .pBindings = bindings.data()};
   m_setTextures.emplace(vkDevice, createInfo);

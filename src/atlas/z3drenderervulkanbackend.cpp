@@ -828,7 +828,10 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       auto& texture = vulkan::textureFromHandle(handle, device(), "renderer sampled attachment");
       const auto samplingState = classifyReadLayout(texture.format());
       vk::ImageAspectFlags transitionAspect = samplingState.aspect;
-      texture.transitionLayout(cmd, texture.layout(), samplingState.layout, transitionAspect);
+      // Skip transition if already in the desired sampled layout; still update descriptor layout for depth aspects.
+      if (texture.layout() != samplingState.layout) {
+        texture.transitionLayout(cmd, texture.layout(), samplingState.layout, transitionAspect);
+      }
       texture.setDescriptorLayout(samplingState.layout);
     };
     if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
@@ -1127,6 +1130,7 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
     source.frameState().setActiveSurface(previousSurface);
   };
 
+  // Use pass.debugLabel if provided; otherwise leave empty.
   std::string_view scopeLabel = pass.debugLabel ? std::string_view(pass.debugLabel) : std::string_view();
 
   renderer.executeVulkanBatches(

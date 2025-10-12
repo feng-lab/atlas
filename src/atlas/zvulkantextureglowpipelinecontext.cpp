@@ -156,8 +156,6 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
   std::optional<vk::RenderingAttachmentInfo> depthAttachment;
   rebuildRenderingAttachments(colorAttachments, depthAttachment);
 
-  cmd.endRendering();
-
   runBlurPass(renderer,
               cmd,
               colorTexture,
@@ -257,6 +255,8 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
                                        glowConstants);
 
   cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
+  // Self-managed context: ensure we close the dynamic rendering segment
+  cmd.endRendering();
 }
 
 void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()
@@ -275,6 +275,10 @@ void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eFragment}
     };
+    // Immutable default samplers for blur inputs
+    vk::Sampler immutable = m_backend.defaultSampler();
+    blurBindings[0].pImmutableSamplers = &immutable;
+    blurBindings[1].pImmutableSamplers = &immutable;
 
     vk::DescriptorSetLayoutCreateInfo blurInfo{.bindingCount = static_cast<uint32_t>(blurBindings.size()),
                                                .pBindings = blurBindings.data()};
@@ -303,6 +307,13 @@ void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eFragment}
     };
+
+    // Immutable default samplers for glow inputs
+    vk::Sampler immutableGlow = m_backend.defaultSampler();
+    glowBindings[0].pImmutableSamplers = &immutableGlow;
+    glowBindings[1].pImmutableSamplers = &immutableGlow;
+    glowBindings[2].pImmutableSamplers = &immutableGlow;
+    glowBindings[3].pImmutableSamplers = &immutableGlow;
 
     vk::DescriptorSetLayoutCreateInfo glowInfo{.bindingCount = static_cast<uint32_t>(glowBindings.size()),
                                                .pBindings = glowBindings.data()};

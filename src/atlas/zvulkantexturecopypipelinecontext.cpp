@@ -9,6 +9,7 @@
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
 #include "zvulkandescriptorset.h"
+#include "zvulkandescriptorpool.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbuffer.h"
@@ -35,7 +36,6 @@ void ZVulkanTextureCopyPipelineContext::resetFrame()
 
 void ZVulkanTextureCopyPipelineContext::resetDescriptors()
 {
-  m_descriptorSet.reset();
   m_descriptorSetOIT.reset();
 }
 
@@ -65,35 +65,152 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
 
   ensureDescriptorLayout();
   ensureDescriptorSet();
-  // Allocate per-draw override descriptor set to avoid update-after-bind
-  ZVulkanDescriptorSet* ds = nullptr;
-  if (m_setTextures) {
-    ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
-  }
-  CHECK(ds != nullptr) << "Texture copy: override descriptor allocation failed (fatal)";
-  // Use nearest clamp sampler to ensure a texel-accurate copy with no filtering
-  auto sampler = m_backend.nearestClampSampler();
-  VLOG(2) << "TextureCopy: updating override set bindings 0/1";
-  ds->updateTexture(0, colorTexture, sampler);
-  ds->updateTexture(1, depthTexture, sampler);
-  // Bind DDP blender textures when peeling images
-  if (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-    const auto& hookPara = renderer.shaderHookPara();
-    if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-      auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
-                                            m_backend.device(),
-                                            "DDP depth blender for image peel");
-      VLOG(2) << fmt::format("TextureCopy: updating DDP depth blender binding3 tex=0x{:x}",
-                             hookPara.dualDepthPeelingDepthBlenderHandle.id);
-      ds->updateTexture(3, tex, sampler);
+  // Optionally ensure persistent pool + descriptor set (across frames)
+  if (m_enablePersistentScheduling) {
+    if (!m_pool) {
+      m_pool = m_backend.device().createDescriptorPool();
     }
-    if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-      auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
-                                            m_backend.device(),
-                                            "DDP front blender for image peel");
-      VLOG(2) << fmt::format("TextureCopy: updating DDP front blender binding4 tex=0x{:x}",
-                             hookPara.dualDepthPeelingFrontBlenderHandle.id);
-      ds->updateTexture(4, tex, sampler);
+    if (!m_persistentTexturesDS && m_setTextures && m_pool) {
+      m_persistentTexturesDS = m_backend.device().createDescriptorSet(*m_pool, **m_setTextures, /*override*/ false);
+    }
+  }
+
+  // Decide which descriptor set to bind (persistent vs. per-frame override)
+  const bool ddpPeel = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  uint64_t desiredColor = payload.colorAttachmentHandle.id;
+  uint64_t desiredDepth = payload.depthAttachmentHandle.id;
+  uint64_t desiredDdpDepth = 0;
+  uint64_t desiredDdpFront = 0;
+  if (ddpPeel) {
+    const auto& hookPara = renderer.shaderHookPara();
+    desiredDdpDepth = hookPara.dualDepthPeelingDepthBlenderHandle.id;
+    desiredDdpFront = hookPara.dualDepthPeelingFrontBlenderHandle.id;
+  }
+
+  auto usePersistentNow = [&]() -> bool {
+    if (!m_persistentTexturesDS) return false;
+    if (!m_cachedTextures.valid) return false;
+    if (m_cachedTextures.color != desiredColor || m_cachedTextures.depth != desiredDepth) return false;
+    if (ddpPeel && (m_cachedTextures.ddpDepth != desiredDdpDepth || m_cachedTextures.ddpFront != desiredDdpFront)) {
+      return false;
+    }
+    return true;
+  }();
+
+  ZVulkanDescriptorSet* ds = nullptr;
+  const auto sampler = m_backend.nearestClampSampler();
+  if (!m_backend.isRecording()) {
+    // Safe to rewrite persistent set before recording begins
+    if (m_persistentTexturesDS) {
+      VLOG(2) << "TextureCopy: using persistent textures DS (pre-record rewrite)";
+      m_persistentTexturesDS->updateTexture(0, colorTexture, sampler);
+      m_persistentTexturesDS->updateTexture(1, depthTexture, sampler);
+      if (ddpPeel) {
+        const auto& hookPara = renderer.shaderHookPara();
+        if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
+          auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                                m_backend.device(),
+                                                "DDP depth blender for image peel");
+          m_persistentTexturesDS->updateTexture(3, tex, sampler);
+        }
+        if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
+          auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                                m_backend.device(),
+                                                "DDP front blender for image peel");
+          m_persistentTexturesDS->updateTexture(4, tex, sampler);
+        }
+      }
+      m_cachedTextures = {desiredColor, desiredDepth, desiredDdpDepth, desiredDdpFront, true};
+      ds = m_persistentTexturesDS.get();
+    }
+  } else if (m_enablePersistentScheduling && usePersistentNow) {
+    VLOG(2) << "TextureCopy: using persistent textures DS (cached)";
+    ds = m_persistentTexturesDS.get();
+  } else {
+    // Allocate a fresh per-draw override descriptor set during recording to avoid
+    // update-after-bind hazards when using a single command buffer for all passes.
+    if (m_setTextures) {
+      ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
+    }
+    CHECK(ds != nullptr) << "Texture copy: override descriptor allocation failed (fatal)";
+    // Skip unchanged writes within the frame to reduce CPU churn
+    const bool colorChanged = (!m_cachedTextures.valid || m_cachedTextures.color != desiredColor);
+    const bool depthChanged = (!m_cachedTextures.valid || m_cachedTextures.depth != desiredDepth);
+    if (colorChanged) {
+      VLOG(2) << "TextureCopy: updating binding0 color";
+      ds->updateTexture(0, colorTexture, sampler);
+    }
+    if (depthChanged) {
+      VLOG(2) << "TextureCopy: updating binding1 depth";
+      ds->updateTexture(1, depthTexture, sampler);
+    }
+    if (ddpPeel) {
+      const auto& hookPara = renderer.shaderHookPara();
+      if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
+        const bool ddpDepthChanged = (!m_cachedTextures.valid || m_cachedTextures.ddpDepth != desiredDdpDepth);
+        if (ddpDepthChanged) {
+          auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                                m_backend.device(),
+                                                "DDP depth blender for image peel");
+          VLOG(2) << fmt::format("TextureCopy: updating DDP depth blender binding3 tex=0x{:x}",
+                                 hookPara.dualDepthPeelingDepthBlenderHandle.id);
+          ds->updateTexture(3, tex, sampler);
+        }
+      }
+      if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
+        const bool ddpFrontChanged = (!m_cachedTextures.valid || m_cachedTextures.ddpFront != desiredDdpFront);
+        if (ddpFrontChanged) {
+          auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                                m_backend.device(),
+                                                "DDP front blender for image peel");
+          VLOG(2) << fmt::format("TextureCopy: updating DDP front blender binding4 tex=0x{:x}",
+                                 hookPara.dualDepthPeelingFrontBlenderHandle.id);
+          ds->updateTexture(4, tex, sampler);
+        }
+      }
+    }
+    m_cachedTextures = {desiredColor, desiredDepth, desiredDdpDepth, desiredDdpFront, true};
+    // Optionally schedule a persistent rewrite for the next frame when it is safe
+    if (m_enablePersistentScheduling && m_persistentTexturesDS) {
+      const uint64_t colorId = desiredColor;
+      const uint64_t depthId = desiredDepth;
+      const uint64_t ddpDepthId = desiredDdpDepth;
+      const uint64_t ddpFrontId = desiredDdpFront;
+      m_backend.scheduleAfterCurrentFrameCompletion([this, colorId, depthId, ddpDepthId, ddpFrontId]() {
+        if (!m_persistentTexturesDS || !m_setTextures) {
+          return;
+        }
+        try {
+          auto& colorTex = vulkan::textureFromHandle(AttachmentHandle{colorId, 0u, AttachmentBackend::Vulkan},
+                                                     m_backend.device(),
+                                                     "texture-copy color (scheduled)");
+          auto& depthTex = vulkan::textureFromHandle(AttachmentHandle{depthId, 0u, AttachmentBackend::Vulkan},
+                                                     m_backend.device(),
+                                                     "texture-copy depth (scheduled)");
+          auto samplerLocal = m_backend.nearestClampSampler();
+          m_persistentTexturesDS->updateTexture(0, colorTex, samplerLocal);
+          m_persistentTexturesDS->updateTexture(1, depthTex, samplerLocal);
+          if (ddpDepthId || ddpFrontId) {
+            if (ddpDepthId) {
+              auto& dep = vulkan::textureFromHandle(AttachmentHandle{ddpDepthId, 0u, AttachmentBackend::Vulkan},
+                                                    m_backend.device(),
+                                                    "DDP depth blender (scheduled)");
+              m_persistentTexturesDS->updateTexture(3, dep, samplerLocal);
+            }
+            if (ddpFrontId) {
+              auto& fr = vulkan::textureFromHandle(AttachmentHandle{ddpFrontId, 0u, AttachmentBackend::Vulkan},
+                                                   m_backend.device(),
+                                                   "DDP front blender (scheduled)");
+              m_persistentTexturesDS->updateTexture(4, fr, samplerLocal);
+            }
+          }
+          m_cachedTextures = {colorId, depthId, ddpDepthId, ddpFrontId, true};
+          VLOG(2) << "TextureCopy: scheduled persistent DS rewrite completed";
+        } catch (...) {
+          VLOG(1) << "TextureCopy: scheduled persistent DS rewrite skipped (handles not resolvable)";
+        }
+      });
+      VLOG(2) << "TextureCopy: scheduled persistent textures DS rewrite after frame";
     }
   }
 
@@ -187,24 +304,18 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()
   auto& device = m_backend.device();
   auto& vkDevice = device.context().device();
 
-  std::array<vk::DescriptorSetLayoutBinding, 4> bindings{
-    vk::DescriptorSetLayoutBinding{.binding = 0,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment},
-    vk::DescriptorSetLayoutBinding{.binding = 1,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment},
-    vk::DescriptorSetLayoutBinding{.binding = 3,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment},
-    vk::DescriptorSetLayoutBinding{.binding = 4,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eFragment}
-  };
+  // Immutable nearest-clamp sampler for exact texel copies without filtering
+  vk::Sampler imm = m_backend.nearestClampSampler();
+  std::array<vk::Sampler, 4> imms{imm, imm, imm, imm};
+  std::array<vk::DescriptorSetLayoutBinding, 4> bindings{};
+  const uint32_t map[4] = {0, 1, 3, 4};
+  for (uint32_t i = 0; i < 4; ++i) {
+    bindings[i].binding = map[i];
+    bindings[i].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+    bindings[i].descriptorCount = 1;
+    bindings[i].stageFlags = vk::ShaderStageFlagBits::eFragment;
+    bindings[i].pImmutableSamplers = &imms[i];
+  }
 
   vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                .pBindings = bindings.data()};
@@ -226,10 +337,7 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()
 void ZVulkanTextureCopyPipelineContext::ensureDescriptorSet()
 {
   ensureDescriptorLayout();
-
-  if (!m_descriptorSet) {
-    m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setTextures);
-  }
+  // Textures set is persistent or override per-frame; avoid per-frame alloc here
   if (!m_descriptorSetOIT && m_setOIT) {
     m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
   }
@@ -282,6 +390,7 @@ void ZVulkanTextureCopyPipelineContext::ensureVertexCapacity(size_t vertexCount)
 {
   const size_t required = vertexCount * sizeof(QuadVertex);
   if (!m_vertexBuffer || m_vertexCapacity < required) {
+    // Host-visible VB so we can update without staging inside dynamic rendering
     m_vertexBuffer = m_backend.device().createBuffer(required,
                                                      vk::BufferUsageFlagBits::eVertexBuffer,
                                                      vk::MemoryPropertyFlagBits::eHostVisible |

@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <folly/ScopeGuard.h>
 #include <cmath>
 #include <limits>
 #include <span>
@@ -1250,6 +1251,18 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     return 0.0;
   }
 
+  // If a Vulkan frame is already active (e.g., opened by the evaluator), reuse it.
+  // Otherwise, begin/end locally for standalone invocation.
+  const bool startedHere = !m_rendererBase.isVulkanFrameActive();
+  if (startedHere) {
+    m_rendererBase.beginVulkanFrame();
+  }
+  auto endFrameGuard = folly::makeGuard([&]() {
+    if (startedHere) {
+      m_rendererBase.endVulkanFrame();
+    }
+  });
+
   // Supersample 2x2 parity (render to 2x scene lease, then downsample)
   const bool supersample2x2 = (m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2);
 
@@ -1263,7 +1276,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     sceneOutLease = &sceneLease;
   }
 
-  // Begin/end handled per-pass by recordVulkanBatches
+  // We keep the frame open across all passes; recordVulkanBatches will not
+  // begin/end the frame since it's already active.
   // Stage 3: background is recorded via the pass-graph driver below
 
   // Decide OIT usage and collect non-opaque image layers (volumes/slices) once
@@ -3713,6 +3727,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
           const glm::uvec4 previousViewport = source.frameState().viewport;
           const auto previousSurface = source.frameState().activeSurface;
           source.setCollectOnly(true);
+          // Mirror the compositor viewport into the filter's renderer so batches inherit it
           source.frameState().updateViewportData(m_rendererBase.frameState().viewport);
           source.frameState().setActiveSurface(surface);
           source.clearPendingActiveSurface();
@@ -3725,6 +3740,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
             if (!batch.pass.depthAttachment.has_value() && surface.depthAttachment.has_value()) {
               batch.pass.depthAttachment = surface.depthAttachment;
             }
+            // If a batch doesn't set a viewport, populate it from the compositor's viewport
             if (batch.pass.viewport.extent == glm::vec2(0.0f) && m_rendererBase.frameState().viewport.z > 0u &&
                 m_rendererBase.frameState().viewport.w > 0u) {
               batch.pass.viewport.origin = glm::vec2(static_cast<float>(m_rendererBase.frameState().viewport.x),
@@ -3742,6 +3758,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
           source.frameState().setActiveSurface(previousSurface);
         };
 
+      // 1) Geometry filters
       for (auto* filter : filters) {
         if (!filter) {
           continue;
@@ -3752,6 +3769,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
           filter->renderTransparent(eye);
         });
       }
+      // 2) Image layers: sample from filters' transparent leases using WA image init copy
       if (!imageLayers.empty()) {
         m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
         for (const auto& layer : imageLayers) {

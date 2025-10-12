@@ -201,6 +201,17 @@ public:
   void executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label = {});
   void beginVulkanFrame();
   void endVulkanFrame();
+  // Keep a Vulkan frame open across multiple recordVulkanBatches calls.
+  // When enabled, a frame begun inside recordVulkanBatches will not be
+  // automatically ended; callers must end it explicitly.
+  void setKeepVulkanFrameOpen(bool keep)
+  {
+    m_keepVulkanFrameOpen = keep;
+  }
+  [[nodiscard]] bool keepVulkanFrameOpen() const
+  {
+    return m_keepVulkanFrameOpen;
+  }
   [[nodiscard]] bool isVulkanFrameActive() const
   {
     return m_vulkanFrameActive;
@@ -479,6 +490,7 @@ private:
   RenderBackend m_activeBackend = RenderBackend::OpenGL;
   RenderMethod m_renderMethod;
   bool m_vulkanFrameActive = false;
+  bool m_keepVulkanFrameOpen = false;
 
   // Recording-session diagnostics (Vulkan ordering/attachments invariants)
   bool m_recordingSessionOpen = false;

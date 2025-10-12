@@ -408,32 +408,34 @@ void ZVulkanImgRaycasterPipelineContext::ensureDescriptorLayouts()
   }
 
   if (!m_copySetLayout) {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
-    };
+    // Immutable samplers to avoid sampler writes
+    vk::Sampler imm = m_backend.defaultSampler();
+    std::array<vk::Sampler, 2> imms{imm, imm};
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{};
+    for (uint32_t i = 0; i < bindings.size(); ++i) {
+      bindings[i].binding = i;
+      bindings[i].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+      bindings[i].descriptorCount = 1;
+      bindings[i].stageFlags = vk::ShaderStageFlagBits::eFragment;
+      bindings[i].pImmutableSamplers = &imms[i];
+    }
     vk::DescriptorSetLayoutCreateInfo info{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                            .pBindings = bindings.data()};
     m_copySetLayout.emplace(device, info);
   }
 
   if (!m_mergeSetLayout) {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
-    };
+    // Immutable samplers to avoid sampler writes
+    vk::Sampler imm = m_backend.defaultSampler();
+    std::array<vk::Sampler, 2> imms{imm, imm};
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{};
+    for (uint32_t i = 0; i < bindings.size(); ++i) {
+      bindings[i].binding = i;
+      bindings[i].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+      bindings[i].descriptorCount = 1;
+      bindings[i].stageFlags = vk::ShaderStageFlagBits::eFragment;
+      bindings[i].pImmutableSamplers = &imms[i];
+    }
     vk::DescriptorSetLayoutCreateInfo info{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                            .pBindings = bindings.data()};
     m_mergeSetLayout.emplace(device, info);

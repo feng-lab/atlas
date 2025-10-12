@@ -79,7 +79,7 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
 
   ensureDescriptorLayouts();
   ZVulkanDescriptorSet* descriptor = nullptr;
-  // Allocate per-draw override sets for both stages
+  // Allocate a fresh per-draw override set for each stage to avoid update-after-bind hazards
   if (stage == Stage::Blend && m_blendSetLayout) {
     descriptor = m_backend.allocateOverrideDescriptorSet(**m_blendSetLayout);
   } else if (stage == Stage::Final && m_finalSetLayout) {
