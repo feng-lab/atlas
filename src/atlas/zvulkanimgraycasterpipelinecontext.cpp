@@ -962,7 +962,7 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
   const bool hasDepth = formats.depthFormat.has_value();
   instance.pipeline->setDepthTestEnable(hasDepth);
   instance.pipeline->setDepthWriteEnable(hasDepth);
-  instance.pipeline->setDepthCompareOp(hasDepth ? vk::CompareOp::eAlways : vk::CompareOp::eAlways);
+  instance.pipeline->setDepthCompareOp(hasDepth ? vk::CompareOp::eLessOrEqual : vk::CompareOp::eAlways);
 
   vk::PipelineColorBlendAttachmentState blend{};
   blend.blendEnable = VK_FALSE;
