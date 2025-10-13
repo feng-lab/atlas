@@ -127,6 +127,7 @@ set(ATLAS_VK_SHADER_SOURCES
     mesh.vert
     mesh.frag
     pass.vert
+    transform_with_2dtexture.vert
     pass_with_2dtexture.vert
 
     # 2D single-channel
@@ -139,6 +140,7 @@ set(ATLAS_VK_SHADER_SOURCES
     blur.frag
 
     # 3D slice and transforms
+    transform_with_3dtexture.vert
     transform_with_3dtexture_and_eye_coordinate.vert
     image3d_slice_with_colormap.frag
     image3d_slice_with_transfun.frag

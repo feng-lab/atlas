@@ -45,6 +45,13 @@ vk::Rect2D makeRect(const glm::uvec2& size)
   };
 }
 
+// Depth-only layouts/aspects (stencil not used in this pipeline)
+static inline std::pair<vk::ImageLayout, vk::ImageAspectFlags>
+depthReadDescriptorLayoutAndAspect(const ZVulkanTexture& /*texture*/)
+{
+  return {vk::ImageLayout::eDepthReadOnlyOptimal, vk::ImageAspectFlagBits::eDepth};
+}
+
 vk::Viewport makeViewport(const glm::uvec2& size)
 {
   return vk::Viewport{0.0f,
@@ -260,13 +267,36 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   originalColorAttachments.reserve(batch.pass.colorAttachments.size());
   for (const auto& attachment : batch.pass.colorAttachments) {
     if (auto info = buildColorAttachment(attachment)) {
+      // Always clear before drawing new slices to avoid residual imagery.
+      info->loadOp = vk::AttachmentLoadOp::eClear;
+      info->storeOp = vk::AttachmentStoreOp::eStore;
       originalColorAttachments.push_back(*info);
     }
   }
   std::optional<vk::RenderingAttachmentInfo> originalDepthAttachment;
   if (batch.pass.depthAttachment) {
     originalDepthAttachment = buildDepthAttachment(*batch.pass.depthAttachment);
+    if (originalDepthAttachment) {
+      originalDepthAttachment->loadOp = vk::AttachmentLoadOp::eClear;
+      originalDepthAttachment->storeOp = vk::AttachmentStoreOp::eStore;
+      originalDepthAttachment->clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0u);
+    }
   }
+
+  VLOG(2) << fmt::format(
+    "Slice::record begin fastOnly={} paging={} channels={} out={}x{} colors={} depth={} color0Fmt={} depthFmt={}",
+    payload.fastPathOnly,
+    (!payload.fastPathOnly && payload.image->isVolumeDownsampled()),
+    payload.image->numChannels(),
+    batch.pass.viewport.extent.x,
+    batch.pass.viewport.extent.y,
+    originalColorAttachments.size(),
+    originalDepthAttachment.has_value(),
+    originalColorAttachments.empty() ? -1
+                                     : static_cast<int>(vulkan::extractAttachmentFormats(batch).colorFormats.front()),
+    vulkan::extractAttachmentFormats(batch).depthFormat
+      ? static_cast<int>(*vulkan::extractAttachmentFormats(batch).depthFormat)
+      : -1);
 
   vk::RenderingAttachmentInfo depthAttachmentInfo;
   vk::RenderingInfo finalInfo{};
@@ -527,6 +557,13 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       renderingInfo.pDepthAttachment = &depthAttachmentInfo;
     }
 
+    VLOG(2) << fmt::format("Slice layer draw: ch={} layer={} paging={} colorFmt={} depthFmt={} verts={}",
+                           channel,
+                           layerIndex,
+                           paging,
+                           static_cast<int>(colorTarget.format()),
+                           depthTarget ? static_cast<int>(depthTarget->format()) : -1,
+                           m_vertexCount);
     cmd.beginRendering(renderingInfo);
 
     vulkan::AttachmentFormats channelFormats;
@@ -556,10 +593,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       pc.projectionView = eyeState.projectionMatrix * eyeState.viewMatrix;
       pc.view = eyeState.viewMatrix;
     }
-    cmd.pushConstants<SlicePushConstant>(pipeline.pipeline->pipelineLayout(),
-                                         vk::ShaderStageFlagBits::eVertex,
-                                         0,
-                                         pc);
+    cmd.pushConstants<SlicePushConstant>(pipeline.pipeline->pipelineLayout(), vk::ShaderStageFlagBits::eVertex, 0, pc);
     bindPagedDescriptors(resources, pipeline.pipeline->pipelineLayout(), cmd, paging);
     cmd.setViewport(0, makeViewport(outputSize));
     cmd.setScissor(0, makeRect(outputSize));
@@ -591,10 +625,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       pc.projectionView = eyeState.projectionMatrix * eyeState.viewMatrix;
       pc.view = eyeState.viewMatrix;
     }
-    cmd.pushConstants<SlicePushConstant>(pipeline.pipeline->pipelineLayout(),
-                                         vk::ShaderStageFlagBits::eVertex,
-                                         0,
-                                         pc);
+    cmd.pushConstants<SlicePushConstant>(pipeline.pipeline->pipelineLayout(), vk::ShaderStageFlagBits::eVertex, 0, pc);
     cmd.setViewport(0, viewport);
     cmd.setScissor(0, scissor);
     cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
@@ -618,7 +649,16 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
   transitionToSampled(cmd, *layerColor, vk::ImageLayout::eShaderReadOnlyOptimal);
   if (layerDepth) {
-    transitionToSampled(cmd, *layerDepth, vk::ImageLayout::eShaderReadOnlyOptimal);
+    // Depth arrays must transition to depth-read layout with depth aspect for sampling.
+    if (layerDepth->layout() != vk::ImageLayout::eDepthReadOnlyOptimal) {
+      layerDepth->transitionLayout(cmd,
+                                   layerDepth->layout(),
+                                   vk::ImageLayout::eDepthReadOnlyOptimal,
+                                   vk::ImageAspectFlagBits::eDepth);
+      layerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
+    } else {
+      layerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
+    }
   }
 
   ensureFinalRendering();
@@ -635,6 +675,11 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
 
   vk::DeviceSize quadOffset = 0;
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, mergePipeline.pipeline->pipeline());
+  VLOG(2) << fmt::format("Slice merge: quadVerts={} colorFmt0={} depthFmt={} depthsampLayout={}",
+                         m_quadVertexCount,
+                         formats.colorFormats.empty() ? -1 : static_cast<int>(formats.colorFormats.front()),
+                         formats.depthFormat ? static_cast<int>(*formats.depthFormat) : -1,
+                         layerDepth ? 1 : 0);
   cmd.bindVertexBuffers(0, {m_quadVertexBuffer->buffer()}, {quadOffset});
   if (m_mergeDescriptor) {
     std::array<vk::DescriptorSet, 1> sets{m_mergeDescriptor->descriptorSet()};
@@ -783,6 +828,7 @@ vk::PipelineVertexInputStateCreateInfo ZVulkanImgSlicePipelineContext::makeSlice
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanImgSlicePipelineContext::makeQuadVertexInputState() const
 {
+  // Align with pass.vert (vec3 attribute at location 0)
   static vk::VertexInputBindingDescription binding{.binding = 0,
                                                    .stride = static_cast<uint32_t>(sizeof(glm::vec3)),
                                                    .inputRate = vk::VertexInputRate::eVertex};
@@ -829,9 +875,9 @@ void ZVulkanImgSlicePipelineContext::ensureQuadVertexBuffer()
 
   std::array<glm::vec3, 4> quadVertices{
     glm::vec3{-1.f, -1.f, kQuadDepth},
-    glm::vec3{-1.f, 1.f,  kQuadDepth},
-    glm::vec3{1.f,  -1.f, kQuadDepth},
-    glm::vec3{1.f,  1.f,  kQuadDepth}
+    glm::vec3{-1.f,  1.f, kQuadDepth},
+    glm::vec3{ 1.f, -1.f, kQuadDepth},
+    glm::vec3{ 1.f,  1.f, kQuadDepth}
   };
   m_quadVertexBuffer->copyData(quadVertices.data(), quadVertices.size() * sizeof(glm::vec3));
   m_quadVertexCount = quadVertices.size();
@@ -1051,13 +1097,13 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
   static const std::string shaderBase = ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
 
   const bool paged = key.levelCount > 1u;
+  const std::string vertexShader =
+    paged ? "transform_with_3dtexture_and_eye_coordinate.vert.spv" : "transform_with_3dtexture.vert.spv";
   const std::string fragmentShader =
     paged ? "image3d_slice_with_colormap.frag.spv" : "volume_slice_with_colormap_single_channel.frag.spv";
 
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device,
-                                                    shaderBase + "transform_with_3dtexture_and_eye_coordinate.vert.spv",
-                                                    shaderBase + fragmentShader,
+  instance.shader = std::make_unique<ZVulkanShader>(device, shaderBase + vertexShader, shaderBase + fragmentShader,
                                                     std::nullopt);
 
   auto vertexState = makeSliceVertexInputState();
@@ -1070,19 +1116,30 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  instance.pipeline->setDepthTestEnable(true);
-  instance.pipeline->setDepthWriteEnable(true);
-  instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
+  if (paged) {
+    instance.pipeline->setDepthTestEnable(true);
+    instance.pipeline->setDepthWriteEnable(true);
+    instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
+  } else {
+    instance.pipeline->setDepthTestEnable(false);
+    instance.pipeline->setDepthWriteEnable(false);
+    instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+  }
 
-  // The vertex shader (transform_with_3dtexture_and_eye_coordinate.vert) uses push constants
-  // to receive projection*view and view matrices.
+  // Slice vertex shaders share a push-constant block for projection/view matrices.
   vk::PushConstantRange vsRange{.stageFlags = vk::ShaderStageFlagBits::eVertex,
                                 .offset = 0,
                                 .size = static_cast<uint32_t>(sizeof(glm::mat4) * 2)};
   instance.pipeline->setPushConstantRanges({vsRange});
 
   vk::PipelineColorBlendAttachmentState blend{};
-  blend.blendEnable = VK_FALSE;
+  blend.blendEnable = VK_TRUE;
+  blend.srcColorBlendFactor = vk::BlendFactor::eOne;
+  blend.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  blend.colorBlendOp = vk::BlendOp::eAdd;
+  blend.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+  blend.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+  blend.alphaBlendOp = vk::BlendOp::eAdd;
   blend.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                          vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   instance.pipeline->setColorBlendAttachment(blend);
@@ -1094,16 +1151,6 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
     uint32_t levelCount = std::max(1u, key.levelCount);
     std::vector<uint8_t> data(sizeof(uint32_t));
     std::memcpy(data.data(), &levelCount, sizeof(uint32_t));
-    instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
-                                                std::vector(entries.begin(), entries.end()),
-                                                data);
-  } else {
-    std::array<vk::SpecializationMapEntry, 1> entries{
-      vk::SpecializationMapEntry{.constantID = 50, .offset = 0, .size = sizeof(uint32_t)}
-    };
-    uint32_t value = key.validInput ? 1u : 0u;
-    std::vector<uint8_t> data(sizeof(uint32_t));
-    std::memcpy(data.data(), &value, sizeof(uint32_t));
     instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
                                                 std::vector(entries.begin(), entries.end()),
                                                 data);
@@ -1139,9 +1186,10 @@ ZVulkanImgSlicePipelineContext::ensureMergePipeline(const MergePipelineKey& key,
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  instance.pipeline->setDepthTestEnable(true);
-  instance.pipeline->setDepthWriteEnable(true);
-  instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
+  // Merge is a full-screen composite; match GL by disabling depth test/writes.
+  instance.pipeline->setDepthTestEnable(false);
+  instance.pipeline->setDepthWriteEnable(false);
+  instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
 
   vk::PipelineColorBlendAttachmentState blend{};
   blend.blendEnable = VK_FALSE;
@@ -1178,7 +1226,8 @@ void ZVulkanImgSlicePipelineContext::bindMergeDescriptor(ZVulkanTexture& colorAr
   CHECK(m_mergeDescriptor != nullptr) << "Slice merge: override descriptor allocation failed (fatal)";
   m_mergeDescriptor->updateTexture(0, colorArray, m_backend.defaultSampler());
   if (depthArray) {
-    m_mergeDescriptor->updateTexture(1, *depthArray, m_backend.defaultSampler());
+    const auto [depthLayout, depthAspect] = depthReadDescriptorLayoutAndAspect(*depthArray);
+    m_mergeDescriptor->updateTexture(1, *depthArray, m_backend.defaultSampler(), depthLayout, depthAspect);
   } else {
     m_mergeDescriptor->updateTexture(1, colorArray, m_backend.defaultSampler());
   }

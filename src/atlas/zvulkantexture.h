@@ -7,6 +7,8 @@
 #include <vector>
 #include <cstddef>
 
+class QString;
+
 // Stage 1 prototype helper focused on self-contained texture management.
 
 namespace nim {
@@ -191,6 +193,16 @@ public:
   {
     return m_device;
   }
+
+  struct ImageSaveOptions
+  {
+    std::optional<uint32_t> arrayLayer;
+    vk::ImageAspectFlags aspectMask = {};
+    bool flipY = true;
+  };
+
+  bool saveToImage(const QString& filename, const ImageSaveOptions& options);
+  bool saveToImage(const QString& filename);
 
 private:
   void createImage();

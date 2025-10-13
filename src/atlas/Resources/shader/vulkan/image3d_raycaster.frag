@@ -6,6 +6,9 @@ layout(location = 1) out vec4 FragData1;
 
 #include "include/raycaster_common.glslinc"
 
+// Whether to force opaque output (MIP opaque/local MIP opaque parity)
+layout(constant_id = 51) const bool RESULT_OPAQUE = false;
+
 void main()
 {
   vec2 last = texelFetch(last_ray_depth_tex, ivec2(gl_FragCoord.xy), 0).xy;
@@ -98,14 +101,17 @@ void main()
   }
 
   if (RAY_MODE == 1) result = texture(transfer_function, mipValue);
-  // Opaque option handled by blending config; multiply alpha for pre-multiplied path
+  // Force opaque alpha when requested
+  if (RESULT_OPAQUE) {
+    result.a = 1.0;
+  }
+  // Pre-multiplied alpha for blending path
   result.rgb *= result.a;
 
   float fragDepth;
   if (rayDepth >= 0.0) fragDepth = rp.ze_to_zw_a / mix(zeFront, zeBack, rayDepth) + rp.ze_to_zw_b;
-  else fragDepth = 1.0;
+  else fragDepth = RESULT_OPAQUE ? (rp.ze_to_zw_a / zeFront + rp.ze_to_zw_b) : 1.0;
 
   FragData0 = result;
   FragData1.xy = vec2(1.0, fragDepth);
 }
-

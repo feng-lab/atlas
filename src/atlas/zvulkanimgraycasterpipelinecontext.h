@@ -12,6 +12,14 @@
 
 namespace nim {
 
+struct CompositingConfig
+{
+  ImgCompositingMode mode = ImgCompositingMode::DirectVolumeRendering;
+  bool resultOpaque = false;
+  bool localMip = false;
+  bool maxProjectionMerge = false;
+};
+
 class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanDescriptorPool;
@@ -65,10 +73,14 @@ private:
   {
     uint64_t volumeGeneration = 0;
     std::unique_ptr<ZVulkanTexture> volumeTexture;
+    uint64_t image2DGeneration = 0;
+    std::unique_ptr<ZVulkanTexture> image2DTexture;
     std::unique_ptr<ZVulkanTexture> transferTexture;
     uint64_t transferGeneration = 0;
     uint32_t transferWidth = 0;
     ZVulkanDescriptorSet* fastDescriptor = nullptr; // per-draw override (backend-owned)
+    ZVulkanDescriptorSet* image2DDescriptor = nullptr; // per-draw override (backend-owned)
+    ZVulkanDescriptorSet* sliceDescriptor = nullptr; // per-draw override (backend-owned)
     // Ray params via push constants; no descriptors or buffers needed
     // Progressive (dynamic) textures (entry/exit, lastDepth, lastColor)
     ZVulkanDescriptorSet* pagedDescriptor = nullptr; // per-draw override (backend-owned)
@@ -100,8 +112,16 @@ private:
     std::optional<vk::Format> depthFormat;
   };
 
+  enum class FastPipelineVariant
+  {
+    Volume,
+    Image2D,
+    Slice2D
+  };
+
   struct FastPipelineKey
   {
+    FastPipelineVariant variant = FastPipelineVariant::Volume;
     ImgCompositingMode mode = ImgCompositingMode::DirectVolumeRendering;
     bool resultOpaque = false;
     bool depthEnabled = true;
@@ -110,12 +130,17 @@ private:
 
     auto tie() const
     {
-      return std::tuple(mode, resultOpaque, depthEnabled, colorFormats, depthFormat);
+      return std::tuple(variant, mode, resultOpaque, depthEnabled, colorFormats, depthFormat);
     }
 
     bool operator==(const FastPipelineKey& rhs) const
     {
       return tie() == rhs.tie();
+    }
+
+    bool operator<(const FastPipelineKey& rhs) const
+    {
+      return tie() < rhs.tie();
     }
   };
 
@@ -209,6 +234,8 @@ private:
   std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::optional<vk::raii::DescriptorSetLayout> m_entrySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_fastSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_image2DSetLayout;
+  std::optional<vk::raii::DescriptorSetLayout> m_sliceFastSetLayout;
   // Progressive split: static (set=0) and dynamic (set=1)
   std::optional<vk::raii::DescriptorSetLayout> m_progressiveStaticSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_progressiveDynamicSetLayout;
@@ -221,8 +248,7 @@ private:
 
   PipelineInstance m_entryFrontPipeline;
   PipelineInstance m_entryBackPipeline;
-  PipelineInstance m_fastPipeline;
-  std::optional<FastPipelineKey> m_fastPipelineKey;
+  std::map<FastPipelineKey, PipelineInstance> m_fastPipelines;
   std::map<BlockIdPipelineKey, PipelineInstance> m_blockIdPipelines;
   std::map<ProgressivePipelineKey, PipelineInstance> m_progressivePipelines;
   std::map<CopyPipelineKey, PipelineInstance> m_copyPipelines;
@@ -258,7 +284,7 @@ private:
 
   void ensureDescriptorLayouts();
   void ensureEntryPipelines(vk::Format colorFormat);
-  void ensureFastPipeline(ImgCompositingMode mode, bool resultOpaque, const vulkan::AttachmentFormats& formats);
+  PipelineInstance& ensureFastPipeline(const FastPipelineKey& key);
   void ensureEmptyDescriptor();
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
   PipelineInstance& ensureProgressivePipeline(const ProgressivePipelineKey& key,
@@ -280,6 +306,12 @@ private:
                                     float zeToZW_a,
                                     float zeToZW_b,
                                     const glm::vec3& volumeDimensions);
+  void updateChannelImage2DDescriptors(ChannelResources& resources,
+                                       ZVulkanTexture& imageTexture,
+                                       ZVulkanTexture& transferTexture);
+  void updateChannelSliceDescriptors(ChannelResources& resources,
+                                     ZVulkanTexture& volumeTexture,
+                                     ZVulkanTexture& transferTexture);
 
   bool updatePageDescriptors(ChannelResources& resources,
                              const ImgRaycasterPayload& payload,
@@ -304,6 +336,9 @@ private:
                                       const ZImg& image,
                                       size_t channelIndex,
                                       uint64_t generation);
+  ZVulkanTexture& ensureImage2DTexture(ChannelResources& resources,
+                                       const ZImg& image,
+                                       uint64_t generation);
   ZVulkanTexture& ensureTransferTexture(ChannelResources& resources, const Z3DTransferFunction& transferFunction);
 
   void renderEntryExit(Z3DRendererBase& renderer,
@@ -318,14 +353,38 @@ private:
                       const ImgRaycasterPayload& payload,
                       const vk::Viewport& viewport,
                       const vk::Rect2D& scissor,
-                      vk::raii::CommandBuffer& cmd);
+                      vk::raii::CommandBuffer& cmd,
+                      FastPipelineVariant variant,
+                      const CompositingConfig& composite);
+  void renderFastVolume(Z3DRendererBase& renderer,
+                        const RenderBatch& batch,
+                        const ImgRaycasterPayload& payload,
+                        const vk::Viewport& viewport,
+                        const vk::Rect2D& scissor,
+                        vk::raii::CommandBuffer& cmd,
+                        const CompositingConfig& composite);
+  void renderFastImage2D(Z3DRendererBase& renderer,
+                         const RenderBatch& batch,
+                         const ImgRaycasterPayload& payload,
+                         const vk::Viewport& viewport,
+                         const vk::Rect2D& scissor,
+                         vk::raii::CommandBuffer& cmd,
+                         const CompositingConfig& composite);
+  void renderFastSlice2D(Z3DRendererBase& renderer,
+                         const RenderBatch& batch,
+                         const ImgRaycasterPayload& payload,
+                         const vk::Viewport& viewport,
+                         const vk::Rect2D& scissor,
+                         vk::raii::CommandBuffer& cmd,
+                         const CompositingConfig& composite);
 
   void renderProgressivePath(Z3DRendererBase& renderer,
                              const RenderBatch& batch,
                              const ImgRaycasterPayload& payload,
                              const vk::Viewport& viewport,
                              const vk::Rect2D& scissor,
-                             vk::raii::CommandBuffer& cmd);
+                             vk::raii::CommandBuffer& cmd,
+                             const CompositingConfig& composite);
 
   // (public) see takePendingFinalization() above
 };

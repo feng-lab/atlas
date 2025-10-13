@@ -3,16 +3,23 @@
 #include "zvulkanbuffer.h"
 #include "zvulkancontext.h"
 #include "zvulkanframeexecutor.h"
+#include "zimg.h"
+#include "zimgformat.h"
+#include "zglmutils.h"
+
+#include <glm/gtc/packing.hpp>
 #include "zexception.h"
 #include "zlog.h"
 
+#include <QString>
 #include <unordered_map>
 #include <algorithm>
 #include <cstring>
+#include <type_traits>
+#include <limits>
 
 namespace nim {
 namespace {
-
 vk::ImageAspectFlags defaultAspectMask(vk::Format format)
 {
   switch (format) {
@@ -408,8 +415,9 @@ void ZVulkanTexture::downloadArrayLayer(void* data, size_t size, uint32_t arrayL
       region.bufferImageHeight = 0;
       region.imageSubresource.aspectMask = aspect;
       region.imageSubresource.mipLevel = 0;
+      const uint32_t availableLayers = std::max<uint32_t>(1u, m_arrayLayers);
       region.imageSubresource.baseArrayLayer =
-        (m_createInfo.imageType == vk::ImageType::e3D) ? 0u : std::min(arrayLayer, m_arrayLayers - 1u);
+        (m_createInfo.imageType == vk::ImageType::e3D) ? 0u : std::min(arrayLayer, availableLayers - 1u);
       region.imageSubresource.layerCount = 1;
       region.imageOffset = vk::Offset3D{0, 0, 0};
       region.imageExtent = vk::Extent3D{m_extent.width, m_extent.height, 1u};
@@ -634,6 +642,282 @@ vk::ImageView ZVulkanTexture::imageViewForAspect(vk::ImageAspectFlags aspect) co
     iter = m_genericAspectViews.emplace(aspectKey, buildView(resolvedAspect)).first;
   }
   return *iter->second;
+}
+
+bool ZVulkanTexture::saveToImage(const QString& filename)
+{
+  return saveToImage(filename, ImageSaveOptions{});
+}
+
+bool ZVulkanTexture::saveToImage(const QString& filename, const ImageSaveOptions& options)
+{
+  if (filename.isEmpty()) {
+    LOG(ERROR) << "ZVulkanTexture::saveToImage called with empty filename";
+    return false;
+  }
+
+  const uint32_t w = width();
+  const uint32_t h = height();
+  if (w == 0 || h == 0) {
+    LOG(ERROR) << "ZVulkanTexture::saveToImage received zero-sized texture";
+    return false;
+  }
+
+  const uint32_t arrayLayerCount = std::max<uint32_t>(1u, m_arrayLayers);
+  const uint32_t requestedLayer = options.arrayLayer.value_or(0u);
+  if (requestedLayer >= arrayLayerCount) {
+    LOG(ERROR) << "ZVulkanTexture::saveToImage layer out of range: " << requestedLayer << " (layers=" << arrayLayerCount
+               << ")";
+    return false;
+  }
+
+  const size_t pixels = static_cast<size_t>(w) * h;
+  auto aspect = options.aspectMask == vk::ImageAspectFlags{} ? m_aspectMask : options.aspectMask;
+  if (aspect == vk::ImageAspectFlags{}) {
+    aspect = defaultAspectMask(m_format);
+  }
+
+  auto saveColorImage = [&](auto& buffer, size_t channels) -> bool {
+    ZImg src;
+    src.wrapData(buffer.data(), w, h, 1, channels);
+    try {
+      if (channels > 1) {
+        ZImg converted(src.info());
+        ZImgFormat::CXYZtoXYZC(src, converted);
+        if (options.flipY) {
+          converted.flip(Dimension::Y);
+        }
+        converted.save(filename);
+        return true;
+      }
+      if (options.flipY) {
+        src.flip(Dimension::Y);
+      }
+      src.save(filename);
+    }
+    catch (const ZException& ze) {
+      LOG(ERROR) << "ZVulkanTexture::saveToImage save failed: " << ze.what();
+      return false;
+    }
+    return true;
+  };
+
+  auto saveScalarImage = [&](auto& buffer) -> bool {
+    using ValueType = typename std::remove_reference_t<decltype(buffer)>::value_type;
+    (void)sizeof(ValueType);
+    ZImg img;
+    img.wrapData(buffer.data(), w, h, 1);
+    try {
+      if (options.flipY) {
+        img.flip(Dimension::Y);
+      }
+      img.save(filename);
+    }
+    catch (const ZException& ze) {
+      LOG(ERROR) << "ZVulkanTexture::saveToImage save failed: " << ze.what();
+      return false;
+    }
+    return true;
+  };
+
+  auto saveFromUint8 = [&](size_t channels, uint32_t layerIndex) -> bool {
+    std::vector<uint8_t> data(pixels * channels);
+    downloadArrayLayer(data.data(), data.size(), layerIndex, aspect);
+    return saveColorImage(data, channels);
+  };
+
+  auto saveFromUint16 = [&](size_t channels, uint32_t layerIndex) -> bool {
+    std::vector<uint16_t> data(pixels * channels);
+    downloadArrayLayer(data.data(), data.size() * sizeof(uint16_t), layerIndex, aspect);
+    return saveColorImage(data, channels);
+  };
+
+  auto saveFromFloat = [&](size_t channels, uint32_t layerIndex) -> bool {
+    std::vector<float> data(pixels * channels);
+    downloadArrayLayer(data.data(), data.size() * sizeof(float), layerIndex, aspect);
+    return saveColorImage(data, channels);
+  };
+
+  auto saveFromHalf = [&](size_t channels, uint32_t layerIndex) -> bool {
+    std::vector<uint16_t> halfData(pixels * channels);
+    downloadArrayLayer(halfData.data(), halfData.size() * sizeof(uint16_t), layerIndex, aspect);
+    std::vector<float> floatData(halfData.size());
+    for (size_t i = 0; i < halfData.size(); ++i) {
+      floatData[i] = glm::unpackHalf1x16(halfData[i]);
+    }
+    return saveColorImage(floatData, channels);
+  };
+
+  auto saveFromDouble = [&](size_t channels, uint32_t layerIndex) -> bool {
+    std::vector<double> data(pixels * channels);
+    downloadArrayLayer(data.data(), data.size() * sizeof(double), layerIndex, aspect);
+    return saveColorImage(data, channels);
+  };
+
+  const auto layer = requestedLayer;
+  try {
+    switch (m_format) {
+      case vk::Format::eR8G8B8A8Unorm:
+      case vk::Format::eR8G8B8A8Srgb:
+      case vk::Format::eR8G8B8A8Snorm:
+      case vk::Format::eB8G8R8A8Unorm:
+      case vk::Format::eB8G8R8A8Srgb: {
+        if (!saveFromUint8(4u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR8G8B8Unorm:
+      case vk::Format::eR8G8B8Srgb:
+      case vk::Format::eR8G8B8Snorm:
+      case vk::Format::eB8G8R8Unorm:
+      case vk::Format::eB8G8R8Srgb: {
+        if (!saveFromUint8(3u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR8G8Unorm:
+      case vk::Format::eR8G8Snorm:
+      case vk::Format::eR8G8Srgb: {
+        if (!saveFromUint8(2u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR16G16B16A16Unorm:
+      case vk::Format::eR16G16B16A16Snorm: {
+        if (!saveFromUint16(4u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR16G16B16Unorm:
+      case vk::Format::eR16G16B16Snorm: {
+        if (!saveFromUint16(3u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR16G16Unorm:
+      case vk::Format::eR16G16Snorm: {
+        if (!saveFromUint16(2u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR32G32B32A32Sfloat: {
+        if (!saveFromFloat(4u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR32G32B32Sfloat: {
+        if (!saveFromFloat(3u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR32G32Sfloat: {
+        if (!saveFromFloat(2u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR16G16B16A16Sfloat: {
+        if (!saveFromHalf(4u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR16G16B16Sfloat: {
+        if (!saveFromHalf(3u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR16G16Sfloat: {
+        if (!saveFromHalf(2u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR64G64B64A64Sfloat: {
+        if (!saveFromDouble(4u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR64G64B64Sfloat: {
+        if (!saveFromDouble(3u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eR64G64Sfloat: {
+        if (!saveFromDouble(2u, layer)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eD32Sfloat:
+      case vk::Format::eD16Unorm: {
+        std::vector<float> depth(pixels);
+        if (m_format == vk::Format::eD32Sfloat) {
+          downloadArrayLayer(depth.data(), depth.size() * sizeof(float), layer, aspect);
+        } else {
+          std::vector<uint16_t> raw(pixels);
+          downloadArrayLayer(raw.data(), raw.size() * sizeof(uint16_t), layer, aspect);
+          constexpr float denom = 65535.0f;
+          for (size_t i = 0; i < pixels; ++i) {
+            depth[i] = static_cast<float>(raw[i]) / denom;
+          }
+        }
+        if (!saveScalarImage(depth)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eD32SfloatS8Uint: {
+        std::vector<float> depth(pixels);
+        downloadArrayLayer(depth.data(), depth.size() * sizeof(float), layer, aspect);
+        if (!saveScalarImage(depth)) {
+          return false;
+        }
+        break;
+      }
+      case vk::Format::eD24UnormS8Uint:
+      case vk::Format::eX8D24UnormPack32: {
+        std::vector<uint32_t> raw(pixels);
+        downloadArrayLayer(raw.data(), raw.size() * sizeof(uint32_t), layer, aspect);
+        std::vector<float> depth(pixels);
+        constexpr float denom = 16777215.0f;
+        for (size_t i = 0; i < pixels; ++i) {
+          const uint32_t value = raw[i] & 0x00FFFFFFu;
+          depth[i] = static_cast<float>(value) / denom;
+        }
+        if (!saveScalarImage(depth)) {
+          return false;
+        }
+        break;
+      }
+      default:
+        LOG(ERROR) << "ZVulkanTexture::saveToImage unsupported format: " << enumOrUnderlying(m_format, 16);
+        return false;
+    }
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "ZVulkanTexture::saveToImage download failed: " << e.what();
+    return false;
+  }
+
+  if (arrayLayerCount > 1 || options.arrayLayer.has_value()) {
+    LOG(INFO) << "Saved Vulkan texture layer " << layer << " (" << w << "x" << h
+              << ") to image: " << filename.toStdString();
+  } else {
+    LOG(INFO) << "Saved Vulkan texture (" << w << "x" << h << ") to image: " << filename.toStdString();
+  }
+  return true;
 }
 
 // ----- Private helpers ------------------------------------------------------------------------
