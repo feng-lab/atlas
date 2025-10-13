@@ -20,7 +20,6 @@ class Z3DRendererBase;
 class Z3DRendererVulkanBackend;
 class ZVulkanShader;
 class ZVulkanPipeline;
-class ZVulkanDescriptorSet;
 class ZVulkanBuffer;
 
 class ZVulkanBackgroundPipelineContext
@@ -39,11 +38,7 @@ public:
               vk::raii::CommandBuffer& cmd);
 
 private:
-  friend class Z3DRendererVulkanBackend; // backend primes descriptor sets pre-recording
-  struct BackgroundVertex
-  {
-    glm::vec3 position{0.0f};
-  };
+  friend class Z3DRendererVulkanBackend; // backend drives record()
 
   struct PipelineKey
   {
@@ -73,30 +68,15 @@ private:
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
-  std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder;
-  std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
-  std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
-  std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
+  // Push-constants cache to skip redundant updates
+  bool m_lastPCValid = false;
+  glm::vec2 m_lastScreenDimRCP{0.0f};
+  glm::vec4 m_lastColor1{0.0f};
+  glm::vec4 m_lastColor2{0.0f};
+  glm::vec4 m_lastRegion{0.0f};
 
-  std::unique_ptr<ZVulkanBuffer> m_uboLighting;
-  std::unique_ptr<ZVulkanBuffer> m_uboTransforms;
-  std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
-
-  std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
-  size_t m_vertexCapacity = 0;
-  size_t m_vertexCount = 0;
-
-  void ensureDescriptorLayouts();
-  void resetDescriptors();
-  void ensureDescriptorSets();
-  void updateLightingUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const BackgroundPayload& payload);
-  void updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const BackgroundPayload& payload);
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
-
-  void ensureVertexCapacity(size_t vertexCount);
-  void uploadGeometry();
 };
 
 } // namespace nim

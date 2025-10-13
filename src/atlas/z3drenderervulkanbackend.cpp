@@ -318,9 +318,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Prime persistent descriptor sets before command buffer recording begins.
   // This allows UBO/image bindings to be established without violating the
   // no-descriptor-writes-during-recording invariant.
-  if (m_backgroundContext) {
-    m_backgroundContext->ensureDescriptorSets();
-  }
+  if (m_backgroundContext) {}
   if (m_lineContext) {
     m_lineContext->ensureDescriptorSets(renderer);
   }

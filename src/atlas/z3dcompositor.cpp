@@ -1302,24 +1302,26 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                   /*includeGeometry*/ false,
                                   /*clearAtStart*/ true,
                                   /*drawBackground*/ true);
-    auto dispatchOIT = [&](Z3DScratchResourcePool::RenderTargetLease& lease, AttachmentHandle depthHandle) {
-      switch (transparencyMode) {
-        case TransparencyMode::DualDepthPeeling:
-          renderTransparentDDPVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers);
-          break;
-        case TransparencyMode::WeightedAverage:
-          renderTransparentWAVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers);
-          break;
-        case TransparencyMode::WeightedBlended:
-          renderTransparentWBVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers);
-          break;
-        default:
-          break;
-      }
-    };
+    auto dispatchOIT =
+      [&](Z3DScratchResourcePool::RenderTargetLease& lease, AttachmentHandle depthHandle, bool clearResolve) {
+        switch (transparencyMode) {
+          case TransparencyMode::DualDepthPeeling:
+            renderTransparentDDPVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve);
+            break;
+          case TransparencyMode::WeightedAverage:
+            renderTransparentWAVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve);
+            break;
+          case TransparencyMode::WeightedBlended:
+            renderTransparentWBVulkan(transparentFilters, lease, eye, depthHandle, nonOpaqueLayers, clearResolve);
+            break;
+          default:
+            break;
+        }
+      };
 
     if (opaqueFilters.empty()) {
-      dispatchOIT(*sceneOutLease, {});
+      // Resolve directly to the final scene surface; preserve background
+      dispatchOIT(*sceneOutLease, {}, /*clearResolve=*/false);
     } else {
       const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
       auto leaseOpaque = pool.acquireTempRenderTarget2D(targetSize,
@@ -1345,7 +1347,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         depthHandle.index = 0;
         depthHandle.id = reinterpret_cast<uint64_t>(depthTex);
       }
-      dispatchOIT(leaseTrans, depthHandle);
+      // Write OIT results into a temporary lease; clear it first
+      dispatchOIT(leaseTrans, depthHandle, /*clearResolve=*/true);
 
       AttachmentHandle color0;
       color0.backend = AttachmentBackend::Vulkan;
@@ -1630,31 +1633,258 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     }
   }
 
-  // Render stay-on-top filters without clearing
+  // Render stay-on-top filters by composing them into a separate lease,
+  // then alpha-blending the result on top of the final scene. This ensures
+  // on-top content is not depth-tested against previously rendered geometry.
   if (!onTopOpaqueFilters.empty() || !onTopTransparentFilters.empty()) {
-    Z3DCompositorPass pass;
-    pass.targetLease = sceneOutLease;
-    pass.surface = m_rendererBase.describeSurface(*sceneOutLease);
-    pass.eye = eye;
-    pass.transparency = m_rendererBase.sceneState().transparency;
-    pass.msaaMode = m_rendererBase.sceneState().multisample;
-    pass.clearColor = false;
-    pass.clearDepth = false;
-    pass.clearStencil = false;
-    pass.opaqueFilters.assign(onTopOpaqueFilters.begin(), onTopOpaqueFilters.end());
-    pass.transparentFilters.reserve(onTopTransparentFilters.size());
-    for (auto* f : onTopTransparentFilters) {
-      Z3DCompositorTransparentBatch tb;
-      tb.filter = f;
-      tb.glowEnabled = false;
-      pass.transparentFilters.push_back(tb);
-    }
-    pass.debugLabel = "geometry_on_top";
-    m_rendererBase.executeCompositorPass(pass);
+    const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
+    const bool useOITOnTop = m_rendererBase.sceneState().transparency == TransparencyMode::DualDepthPeeling ||
+                             m_rendererBase.sceneState().transparency == TransparencyMode::WeightedAverage ||
+                             m_rendererBase.sceneState().transparency == TransparencyMode::WeightedBlended;
 
-    // Apply glow for on-top filters
-    applyGlowOverlay(onTopTransparentFilters);
-    applyGlowOverlay(onTopOpaqueFilters);
+    if (!useOITOnTop) {
+      // Non-OIT: render all on-top (opaque+transparent) into a temp lease, then overlay.
+      auto onTopLease = pool.acquireTempRenderTarget2D(targetSize,
+                                                       ScratchFormat::RGBA16,
+                                                       ScratchFormat::Depth32F,
+                                                       RenderBackend::Vulkan);
+      Z3DCompositorPass pass;
+      pass.targetLease = &onTopLease;
+      pass.surface = m_rendererBase.describeSurface(onTopLease);
+      pass.eye = eye;
+      pass.transparency = m_rendererBase.sceneState().transparency;
+      pass.msaaMode = m_rendererBase.sceneState().multisample;
+      pass.clearColor = true;
+      pass.clearDepth = true;
+      pass.clearStencil = false;
+      pass.clearValue.color = glm::vec4(0.0f);
+      pass.clearValue.depth = 1.0f;
+      pass.clearValue.stencil = 0u;
+      pass.opaqueFilters.assign(onTopOpaqueFilters.begin(), onTopOpaqueFilters.end());
+      pass.transparentFilters.reserve(onTopTransparentFilters.size());
+      for (auto* f : onTopTransparentFilters) {
+        Z3DCompositorTransparentBatch tb;
+        tb.filter = f;
+        tb.glowEnabled = false;
+        pass.transparentFilters.push_back(tb);
+      }
+      pass.debugLabel = "geometry_on_top_blend";
+      m_rendererBase.executeCompositorPass(pass);
+
+      // Overlay onto scene output using "first on top" blending
+      AttachmentHandle overlayC{};
+      overlayC.backend = AttachmentBackend::Vulkan;
+      overlayC.index = 0;
+      overlayC.id = reinterpret_cast<uint64_t>(onTopLease.colorAttachment(0));
+      AttachmentHandle overlayD{};
+      overlayD.backend = AttachmentBackend::Vulkan;
+      overlayD.index = 0;
+      overlayD.id = reinterpret_cast<uint64_t>(onTopLease.depthAttachmentTexture());
+
+      AttachmentHandle outC{};
+      outC.backend = AttachmentBackend::Vulkan;
+      outC.index = 0;
+      outC.id = reinterpret_cast<uint64_t>(sceneOutLease->colorAttachment(0));
+      AttachmentHandle outD{};
+      outD.backend = AttachmentBackend::Vulkan;
+      outD.index = 0;
+      outD.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
+
+      ClearValue clear{};
+      clear.color = glm::vec4(0.0f);
+      clear.depth = 1.0f;
+      clear.stencil = 0u;
+      m_rendererBase.setActiveSurfaceForNextPass(*sceneOutLease);
+      m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Load, StoreOp::Store, clear);
+      m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+      m_rendererBase.setCollectOnly(true);
+      m_rendererBase.recordVulkanBatches(
+        [&]() {
+          m_firstOnTopBlendRenderer.setSourceAttachments0(overlayC, overlayD);
+          m_firstOnTopBlendRenderer.setSourceAttachments1(outC, outD);
+          m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
+        },
+        "on_top_overlay_blend");
+      m_rendererBase.setCollectOnly(false);
+
+      // Apply glow for on-top filters
+      applyGlowOverlay(onTopTransparentFilters);
+      applyGlowOverlay(onTopOpaqueFilters);
+    } else {
+      // OIT path: split opaque/transparent, run OIT for transparent with opaque depth, then overlay
+      Z3DScratchResourcePool::RenderTargetLease onTopOpaqueLease;
+      if (!onTopOpaqueFilters.empty()) {
+        onTopOpaqueLease = pool.acquireTempRenderTarget2D(targetSize,
+                                                          ScratchFormat::RGBA16,
+                                                          ScratchFormat::Depth32F,
+                                                          RenderBackend::Vulkan);
+        Z3DCompositorPass pass;
+        pass.targetLease = &onTopOpaqueLease;
+        pass.surface = m_rendererBase.describeSurface(onTopOpaqueLease);
+        pass.eye = eye;
+        pass.transparency = m_rendererBase.sceneState().transparency;
+        pass.msaaMode = m_rendererBase.sceneState().multisample;
+        pass.clearColor = true;
+        pass.clearDepth = true;
+        pass.clearStencil = false;
+        pass.clearValue.color = glm::vec4(0.0f);
+        pass.clearValue.depth = 1.0f;
+        pass.clearValue.stencil = 0u;
+        pass.opaqueFilters.assign(onTopOpaqueFilters.begin(), onTopOpaqueFilters.end());
+        pass.transparentFilters.clear();
+        pass.debugLabel = "geometry_on_top_opaque";
+        m_rendererBase.executeCompositorPass(pass);
+      }
+
+      auto handlesFromLease = [](const Z3DScratchResourcePool::RenderTargetLease& lease) {
+        AttachmentHandle c{};
+        c.backend = AttachmentBackend::Vulkan;
+        c.index = 0;
+        c.id = reinterpret_cast<uint64_t>(lease.colorAttachment(0));
+        AttachmentHandle d{};
+        d.backend = AttachmentBackend::Vulkan;
+        d.index = 0;
+        d.id = reinterpret_cast<uint64_t>(lease.depthAttachmentTexture());
+        return std::make_pair(c, d);
+      };
+
+      // OIT for on-top transparent filters into a temporary lease
+      Z3DScratchResourcePool::RenderTargetLease onTopTransLease;
+      const auto transparencyModeOnTop = m_rendererBase.sceneState().transparency;
+      const bool onTopHasTrans = !onTopTransparentFilters.empty();
+      const bool onTopHasOpaque = !onTopOpaqueFilters.empty();
+      if (onTopHasTrans) {
+        onTopTransLease = pool.acquireTempRenderTarget2D(targetSize,
+                                                         ScratchFormat::RGBA16,
+                                                         ScratchFormat::Depth32F,
+                                                         RenderBackend::Vulkan);
+        AttachmentHandle depthHandle{};
+        if (onTopHasOpaque) {
+          depthHandle.backend = AttachmentBackend::Vulkan;
+          depthHandle.index = 0;
+          depthHandle.id = reinterpret_cast<uint64_t>(onTopOpaqueLease.depthAttachmentTexture());
+        }
+        // Restrict image layers to stay-on-top volumes
+        std::vector<Z3DCompositorImageLayer> onTopImageLayers;
+        for (auto* vf : m_vPPort.connectedFilters()) {
+          if (!vf || !vf->isStayOnTop() || !vf->isReady(eye) || !vf->hasTransparent(eye)) {
+            continue;
+          }
+          Z3DCompositorImageLayer layer;
+          const auto& lease = vf->transparentLease(eye);
+          if (!lease || lease.backend != RenderBackend::Vulkan) {
+            continue;
+          }
+          auto surface = m_rendererBase.describeSurface(lease);
+          if (surface.colorAttachments.empty()) {
+            continue;
+          }
+          layer.colorAttachment = surface.colorAttachments[0];
+          if (surface.depthAttachment) {
+            layer.depthAttachment = *surface.depthAttachment;
+          }
+          onTopImageLayers.push_back(layer);
+        }
+
+        switch (transparencyModeOnTop) {
+          case TransparencyMode::DualDepthPeeling:
+            renderTransparentDDPVulkan(onTopTransparentFilters,
+                                       onTopTransLease,
+                                       eye,
+                                       depthHandle,
+                                       onTopImageLayers,
+                                       /*clearResolveTarget=*/true);
+            break;
+          case TransparencyMode::WeightedAverage:
+            renderTransparentWAVulkan(onTopTransparentFilters,
+                                      onTopTransLease,
+                                      eye,
+                                      depthHandle,
+                                      onTopImageLayers,
+                                      /*clearResolveTarget=*/true);
+            break;
+          case TransparencyMode::WeightedBlended:
+            renderTransparentWBVulkan(onTopTransparentFilters,
+                                      onTopTransLease,
+                                      eye,
+                                      depthHandle,
+                                      onTopImageLayers,
+                                      /*clearResolveTarget=*/true);
+            break;
+          default:
+            break;
+        }
+      }
+
+      // Determine the overlay handles (opaque-only, trans-only, or merged both)
+      std::pair<AttachmentHandle, AttachmentHandle> overlayHandles{};
+      if (onTopHasOpaque && onTopHasTrans) {
+        auto mergeLease = pool.acquireTempRenderTarget2D(targetSize,
+                                                         ScratchFormat::RGBA16,
+                                                         ScratchFormat::Depth32F,
+                                                         RenderBackend::Vulkan);
+        // Clear merge target
+        ClearValue clear{};
+        clear.color = glm::vec4(0.0f);
+        clear.depth = 1.0f;
+        clear.stencil = 0u;
+        m_rendererBase.setActiveSurfaceForNextPass(mergeLease);
+        m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+        m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+        const auto opaqueHandles = handlesFromLease(onTopOpaqueLease);
+        const auto transHandles = handlesFromLease(onTopTransLease);
+        m_rendererBase.setCollectOnly(true);
+        m_rendererBase.recordVulkanBatches(
+          [&]() {
+            // Depth-tested alpha blend to pick per-pixel front-most between opaque and transparent
+            m_alphaBlendRenderer.setSourceAttachments0(opaqueHandles.first, opaqueHandles.second);
+            m_alphaBlendRenderer.setSourceAttachments1(transHandles.first, transHandles.second);
+            m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
+          },
+          "on_top_merge");
+        m_rendererBase.setCollectOnly(false);
+        overlayHandles = handlesFromLease(mergeLease);
+      } else if (onTopHasTrans) {
+        overlayHandles = handlesFromLease(onTopTransLease);
+      } else if (onTopHasOpaque) {
+        overlayHandles = handlesFromLease(onTopOpaqueLease);
+      }
+
+      // Blend overlayHandles onto the final scene surface
+      if (overlayHandles.first.valid()) {
+        AttachmentHandle outC{};
+        outC.backend = AttachmentBackend::Vulkan;
+        outC.index = 0;
+        outC.id = reinterpret_cast<uint64_t>(sceneOutLease->colorAttachment(0));
+        AttachmentHandle outD{};
+        outD.backend = AttachmentBackend::Vulkan;
+        outD.index = 0;
+        outD.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
+
+        // Preserve existing color, clear depth
+        ClearValue clear{};
+        clear.color = glm::vec4(0.0f);
+        clear.depth = 1.0f;
+        clear.stencil = 0u;
+        m_rendererBase.setActiveSurfaceForNextPass(*sceneOutLease);
+        m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Load, StoreOp::Store, clear);
+        m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+        m_rendererBase.setCollectOnly(true);
+        m_rendererBase.recordVulkanBatches(
+          [&]() {
+            // First-on-top blending: overlay (0) over scene (1)
+            m_firstOnTopBlendRenderer.setSourceAttachments0(overlayHandles.first, overlayHandles.second);
+            m_firstOnTopBlendRenderer.setSourceAttachments1(outC, outD);
+            m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
+          },
+          "on_top_overlay");
+        m_rendererBase.setCollectOnly(false);
+      }
+
+      // Apply glow for on-top filters
+      applyGlowOverlay(onTopTransparentFilters);
+      applyGlowOverlay(onTopOpaqueFilters);
+    }
   }
 
   if (m_showAxis.get()) {
@@ -2123,7 +2353,11 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
       pass.eye = eye;
       pass.transparency = m_rendererBase.sceneState().transparency;
       pass.msaaMode = m_rendererBase.sceneState().multisample;
-      pass.clearColor = false;
+      // If we didn't draw a background into this target but the caller asked
+      // for a clear at the start, clear color here so stale contents from a
+      // previous frame are not blended under geometry (e.g., opaque-only
+      // intermediates before OIT resolution).
+      pass.clearColor = (clearAtStart && !drawBackground);
       // Clear depth before drawing scene geometry to avoid any stale
       // depth values from previous frames showing up when content changes
       // (e.g., color edits) but geometry/targets remain the same. Background
@@ -3295,7 +3529,8 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
                                                Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                                Z3DEye eye,
                                                AttachmentHandle depthAttachmentHandle,
-                                               const std::vector<Z3DCompositorImageLayer>& imageLayers)
+                                               const std::vector<Z3DCompositorImageLayer>& imageLayers,
+                                               bool clearResolveTarget)
 {
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   auto& ddpLease = ensureDDPRenderTarget(targetSize);
@@ -3623,12 +3858,12 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   }
   outSurface.depthAttachment.reset();
   for (auto& attachment : outSurface.colorAttachments) {
-    // TEST: force preserve background for DDP final resolve (Load), depth disabled
-    attachment.loadOp = LoadOp::Load;
+    attachment.loadOp = clearResolveTarget ? LoadOp::Clear : LoadOp::Load;
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
-  VLOG(1) << "DDP final: forcing LoadOp::Load for color, depth disabled";
+  VLOG(1) << (clearResolveTarget ? "DDP final: Clear color for intermediate surface"
+                                 : "DDP final: Load color to preserve background");
   // Depth disabled by invariant; no depth load/store
 
   m_rendererBase.setCollectOnly(true);
@@ -3670,7 +3905,8 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
                                               Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                               Z3DEye eye,
                                               AttachmentHandle depthAttachmentHandle,
-                                              const std::vector<Z3DCompositorImageLayer>& imageLayers)
+                                              const std::vector<Z3DCompositorImageLayer>& imageLayers,
+                                              bool clearResolveTarget)
 {
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   auto& waLease = ensureWARenderTarget(targetSize);
@@ -3800,7 +4036,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
   }
   outSurface.depthAttachment.reset();
   for (auto& attachment : outSurface.colorAttachments) {
-    attachment.loadOp = m_showBackground.get() ? LoadOp::Load : LoadOp::Clear;
+    attachment.loadOp = clearResolveTarget ? LoadOp::Clear : (m_showBackground.get() ? LoadOp::Load : LoadOp::Clear);
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
@@ -3844,7 +4080,8 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
                                               Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                               Z3DEye eye,
                                               AttachmentHandle depthAttachmentHandle,
-                                              const std::vector<Z3DCompositorImageLayer>& imageLayers)
+                                              const std::vector<Z3DCompositorImageLayer>& imageLayers,
+                                              bool clearResolveTarget)
 {
   const glm::uvec2 targetSize = targetLease.descriptor.size;
   auto& wbLease = ensureWBRenderTarget(targetSize);
@@ -3975,7 +4212,7 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
   }
   outSurface.depthAttachment.reset();
   for (auto& attachment : outSurface.colorAttachments) {
-    attachment.loadOp = m_showBackground.get() ? LoadOp::Load : LoadOp::Clear;
+    attachment.loadOp = clearResolveTarget ? LoadOp::Clear : (m_showBackground.get() ? LoadOp::Load : LoadOp::Clear);
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
