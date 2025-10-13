@@ -19,16 +19,23 @@
 #include "zvulkanpagedimageblockuploader.h"
 #include "z3drenderglobalstate.h"
 #include "zbenchtimer.h"
+#include "zmesh.h"
+
+#include <gflags/gflags.h>
+#include <QString>
 
 #include <algorithm>
 #include <cmath>
 #include <array>
 #include <cstring>
-#include <limits>
 #include <vector>
 #include <unordered_set>
 
 namespace nim {
+
+DECLARE_bool(atlas_debug_save_slice_layers);
+DECLARE_bool(atlas_debug_save_slice_merge_out);
+DECLARE_string(atlas_debug_save_dir);
 
 namespace {
 
@@ -642,6 +649,32 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   ZVulkanTexture* layerColor = layerLease.colorAttachment(0);
   ZVulkanTexture* layerDepth = layerLease.depthAttachmentTexture();
   CHECK(layerColor) << "Layer array render target is missing color attachments for Vulkan slice pipeline.";
+  const uint32_t layerCount = std::max<uint32_t>(1u, layerLease.descriptor.layers);
+
+  // Clear all array layers up front to avoid residual imagery from previous frames.
+  vk::ImageSubresourceRange colorRange{vk::ImageAspectFlagBits::eColor, 0u, 1u, 0u, layerCount};
+  layerColor->transitionLayout(cmd, layerColor->layout(), vk::ImageLayout::eTransferDstOptimal);
+  vk::ClearColorValue layerClearColor{
+    std::array<float, 4>{0.f, 0.f, 0.f, 0.f}
+  };
+  cmd.clearColorImage(layerColor->image(), vk::ImageLayout::eTransferDstOptimal, layerClearColor, colorRange);
+  layerColor->transitionLayout(cmd, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eColorAttachmentOptimal);
+
+  if (layerDepth) {
+    vk::ImageSubresourceRange depthRange{vk::ImageAspectFlagBits::eDepth, 0u, 1u, 0u, layerCount};
+    layerDepth->transitionLayout(cmd,
+                                 layerDepth->layout(),
+                                 vk::ImageLayout::eTransferDstOptimal,
+                                 vk::ImageAspectFlagBits::eDepth);
+    cmd.clearDepthStencilImage(layerDepth->image(),
+                               vk::ImageLayout::eTransferDstOptimal,
+                               vk::ClearDepthStencilValue{1.0f, 0u},
+                               depthRange);
+    layerDepth->transitionLayout(cmd,
+                                 vk::ImageLayout::eTransferDstOptimal,
+                                 vk::ImageLayout::eDepthAttachmentOptimal,
+                                 vk::ImageAspectFlagBits::eDepth);
+  }
 
   for (uint32_t idx = 0; idx < channelCount; ++idx) {
     recordChannelDraw(idx, m_channelResources[idx], *layerColor, layerDepth, idx, usePaging);
@@ -658,6 +691,52 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       layerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
     } else {
       layerDepth->setDescriptorLayout(vk::ImageLayout::eDepthReadOnlyOptimal);
+    }
+  }
+
+  if (FLAGS_atlas_debug_save_slice_layers) {
+    auto leaseRef = payload.layerLease;
+    auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
+    if (backend && leaseRef && leaseRef->hasVulkanImage()) {
+      const uint32_t saveLayerCount = static_cast<uint32_t>(channelCount);
+      backend->scheduleAfterCurrentFrameCompletion([leaseRef, saveLayerCount]() {
+        ZVulkanTexture* tex = leaseRef->colorAttachment(0);
+        if (tex) {
+          QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+          if (!dir.isEmpty() && !dir.endsWith('/')) {
+            dir += '/';
+          }
+          const uint32_t layers = std::min<uint32_t>(saveLayerCount, tex->arrayLayers());
+          for (uint32_t layer = 0; layer < layers; ++layer) {
+            const QString filename =
+              dir + QString("slice_layer_%1_%2x%3.tif").arg(layer).arg(tex->width()).arg(tex->height());
+            ZVulkanTexture::ImageSaveOptions opts;
+            opts.arrayLayer = layer;
+            if (!tex->saveToImage(filename, opts)) {
+              LOG(ERROR) << "Slice layer debug save failed for color layer " << layer;
+            }
+          }
+        }
+
+        ZVulkanTexture* dtex = leaseRef->depthAttachmentTexture();
+        if (dtex) {
+          QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+          if (!dir.isEmpty() && !dir.endsWith('/')) {
+            dir += '/';
+          }
+          const uint32_t layers = std::min<uint32_t>(saveLayerCount, dtex->arrayLayers());
+          for (uint32_t layer = 0; layer < layers; ++layer) {
+            const QString filename =
+              dir + QString("slice_layer_depth_%1_%2x%3.tif").arg(layer).arg(dtex->width()).arg(dtex->height());
+            ZVulkanTexture::ImageSaveOptions opts;
+            opts.arrayLayer = layer;
+            opts.aspectMask = vk::ImageAspectFlagBits::eDepth;
+            if (!dtex->saveToImage(filename, opts)) {
+              LOG(ERROR) << "Slice layer debug save failed for depth layer " << layer;
+            }
+          }
+        }
+      });
     }
   }
 
@@ -705,6 +784,52 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   cmd.setViewport(0, finalViewport);
   cmd.setScissor(0, finalScissor);
   cmd.draw(static_cast<uint32_t>(m_quadVertexCount), 1, 0, 0);
+
+  if (FLAGS_atlas_debug_save_slice_merge_out) {
+    std::vector<AttachmentHandle> colorHandles;
+    colorHandles.reserve(batch.pass.colorAttachments.size());
+    for (const auto& att : batch.pass.colorAttachments) {
+      colorHandles.push_back(att.handle);
+    }
+    std::optional<AttachmentHandle> depthHandle = std::nullopt;
+    if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid()) {
+      depthHandle = batch.pass.depthAttachment->handle;
+    }
+    auto* backend = dynamic_cast<Z3DRendererVulkanBackend*>(renderer.backend());
+    if (backend && !colorHandles.empty()) {
+      backend->scheduleAfterCurrentFrameCompletion([this, handles = std::move(colorHandles), depthHandle]() {
+        const AttachmentHandle& handle = handles.front();
+        CHECK(handle.valid() && handle.backend == AttachmentBackend::Vulkan)
+          << "Slice merge debug save: invalid color attachment handle";
+
+        auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "slice merge debug");
+        QString dir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+        if (!dir.isEmpty() && !dir.endsWith('/')) {
+          dir += '/';
+        }
+        const QString filename = dir + QString("slice_merge_%1x%2.tif").arg(tex.width()).arg(tex.height());
+        ZVulkanTexture::ImageSaveOptions colorOpts;
+        if (!tex.saveToImage(filename, colorOpts)) {
+          LOG(ERROR) << "Slice merge debug save failed for color attachment";
+        }
+
+        if (depthHandle && depthHandle->valid() && depthHandle->backend == AttachmentBackend::Vulkan) {
+          auto& dtex = vulkan::textureFromHandle(*depthHandle, m_backend.device(), "slice merge depth debug");
+          QString ddir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
+          if (!ddir.isEmpty() && !ddir.endsWith('/')) {
+            ddir += '/';
+          }
+          const QString dname = ddir + QString("slice_merge_depth_%1x%2.tif").arg(dtex.width()).arg(dtex.height());
+          ZVulkanTexture::ImageSaveOptions depthOpts;
+          depthOpts.aspectMask = vk::ImageAspectFlagBits::eDepth;
+          if (!dtex.saveToImage(dname, depthOpts)) {
+            LOG(ERROR) << "Slice merge depth debug save failed";
+          }
+        }
+      });
+    }
+  }
+
   if (renderingActive) {
     cmd.endRendering();
     renderingActive = false;
@@ -875,9 +1000,9 @@ void ZVulkanImgSlicePipelineContext::ensureQuadVertexBuffer()
 
   std::array<glm::vec3, 4> quadVertices{
     glm::vec3{-1.f, -1.f, kQuadDepth},
-    glm::vec3{-1.f,  1.f, kQuadDepth},
-    glm::vec3{ 1.f, -1.f, kQuadDepth},
-    glm::vec3{ 1.f,  1.f, kQuadDepth}
+    glm::vec3{-1.f, 1.f,  kQuadDepth},
+    glm::vec3{1.f,  -1.f, kQuadDepth},
+    glm::vec3{1.f,  1.f,  kQuadDepth}
   };
   m_quadVertexBuffer->copyData(quadVertices.data(), quadVertices.size() * sizeof(glm::vec3));
   m_quadVertexCount = quadVertices.size();
@@ -885,14 +1010,11 @@ void ZVulkanImgSlicePipelineContext::ensureQuadVertexBuffer()
 
 void ZVulkanImgSlicePipelineContext::uploadSliceGeometry(std::span<const ZMesh> slices)
 {
-  size_t estimatedVertices = 0;
+  size_t triangleCount = 0;
   for (const auto& slice : slices) {
-    if (slice.hasIndices()) {
-      estimatedVertices += slice.indices().size();
-    } else {
-      estimatedVertices += slice.vertices().size();
-    }
+    triangleCount += slice.numTriangles();
   }
+  const size_t estimatedVertices = triangleCount * 3;
 
   ensureSliceVertexCapacity(estimatedVertices);
   if (!m_vertexBuffer) {
@@ -904,23 +1026,17 @@ void ZVulkanImgSlicePipelineContext::uploadSliceGeometry(std::span<const ZMesh> 
   vertices.reserve(estimatedVertices);
 
   for (const auto& slice : slices) {
-    const auto& positions = slice.vertices();
-    const auto& texCoords = slice.textureCoordinates3D();
-    if (positions.size() != texCoords.size()) {
+    const size_t triCount = slice.numTriangles();
+    if (triCount == 0) {
       continue;
     }
-
-    if (slice.hasIndices()) {
-      const auto& indices = slice.indices();
-      for (auto idx : indices) {
-        if (idx >= positions.size()) {
-          continue;
-        }
-        vertices.push_back(SliceVertex{positions[idx], texCoords[idx]});
-      }
-    } else {
-      for (size_t idx = 0; idx < positions.size(); ++idx) {
-        vertices.push_back(SliceVertex{positions[idx], texCoords[idx]});
+    const auto& texCoords = slice.textureCoordinates3D();
+    CHECK_EQ(texCoords.size(), slice.vertices().size()) << "Slice mesh missing 3D texture coordinates";
+    for (size_t tri = 0; tri < triCount; ++tri) {
+      const auto triangleVerts = slice.triangleVertices(tri);
+      const auto triangleIdx = slice.triangleIndices(tri);
+      for (int v = 0; v < 3; ++v) {
+        vertices.push_back(SliceVertex{triangleVerts[v], texCoords[triangleIdx[v]]});
       }
     }
   }
@@ -1103,8 +1219,8 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
     paged ? "image3d_slice_with_colormap.frag.spv" : "volume_slice_with_colormap_single_channel.frag.spv";
 
   PipelineInstance instance;
-  instance.shader = std::make_unique<ZVulkanShader>(device, shaderBase + vertexShader, shaderBase + fragmentShader,
-                                                    std::nullopt);
+  instance.shader =
+    std::make_unique<ZVulkanShader>(device, shaderBase + vertexShader, shaderBase + fragmentShader, std::nullopt);
 
   auto vertexState = makeSliceVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexState, vk::PrimitiveTopology::eTriangleList);
@@ -1116,15 +1232,10 @@ ZVulkanImgSlicePipelineContext::ensureSlicePipeline(const SlicePipelineKey& key,
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  if (paged) {
-    instance.pipeline->setDepthTestEnable(true);
-    instance.pipeline->setDepthWriteEnable(true);
-    instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
-  } else {
-    instance.pipeline->setDepthTestEnable(false);
-    instance.pipeline->setDepthWriteEnable(false);
-    instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
-  }
+  const bool hasDepth = formats.depthFormat.has_value();
+  instance.pipeline->setDepthTestEnable(hasDepth);
+  instance.pipeline->setDepthWriteEnable(hasDepth);
+  instance.pipeline->setDepthCompareOp(hasDepth ? vk::CompareOp::eLessOrEqual : vk::CompareOp::eAlways);
 
   // Slice vertex shaders share a push-constant block for projection/view matrices.
   vk::PushConstantRange vsRange{.stageFlags = vk::ShaderStageFlagBits::eVertex,
@@ -1186,10 +1297,10 @@ ZVulkanImgSlicePipelineContext::ensureMergePipeline(const MergePipelineKey& key,
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  // Merge is a full-screen composite; match GL by disabling depth test/writes.
-  instance.pipeline->setDepthTestEnable(false);
-  instance.pipeline->setDepthWriteEnable(false);
-  instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+  const bool hasDepth = formats.depthFormat.has_value();
+  instance.pipeline->setDepthTestEnable(hasDepth);
+  instance.pipeline->setDepthWriteEnable(hasDepth);
+  instance.pipeline->setDepthCompareOp(hasDepth ? vk::CompareOp::eAlways : vk::CompareOp::eAlways);
 
   vk::PipelineColorBlendAttachmentState blend{};
   blend.blendEnable = VK_FALSE;

@@ -43,6 +43,12 @@ DEFINE_bool(atlas_debug_save_raycaster_layers,
 DEFINE_bool(atlas_debug_save_raycaster_merge_out,
             false,
             "Save Vulkan raycaster merged output (first color attachment) after merge.");
+DEFINE_bool(atlas_debug_save_slice_layers,
+            false,
+            "Save Vulkan slice layered outputs (color + depth, one TIF per layer) after rendering.");
+DEFINE_bool(atlas_debug_save_slice_merge_out,
+            false,
+            "Save Vulkan slice merged output (first color attachment) after merge.");
 
 namespace {
 
@@ -953,10 +959,10 @@ ZVulkanImgRaycasterPipelineContext::ensureMergePipeline(const MergePipelineKey& 
   instance.depthFormat = formats.depthFormat;
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  // Merge is a full-screen composite over the destination; match GL by disabling depth test/writes.
-  instance.pipeline->setDepthTestEnable(false);
-  instance.pipeline->setDepthWriteEnable(false);
-  instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+  const bool hasDepth = formats.depthFormat.has_value();
+  instance.pipeline->setDepthTestEnable(hasDepth);
+  instance.pipeline->setDepthWriteEnable(hasDepth);
+  instance.pipeline->setDepthCompareOp(hasDepth ? vk::CompareOp::eAlways : vk::CompareOp::eAlways);
 
   vk::PipelineColorBlendAttachmentState blend{};
   blend.blendEnable = VK_FALSE;

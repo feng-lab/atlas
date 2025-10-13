@@ -451,9 +451,12 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  // Depth not needed for full-screen copy
-  instance.pipeline->setDepthTestEnable(false);
-  instance.pipeline->setDepthWriteEnable(false);
+  const bool hasDepth = formats.depthFormat.has_value();
+  instance.pipeline->setDepthTestEnable(hasDepth);
+  instance.pipeline->setDepthWriteEnable(hasDepth);
+  if (hasDepth) {
+    instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
+  }
 
   if (key.waInit) {
     // Accumulate into both attachments using additive blending (ONE, ONE)

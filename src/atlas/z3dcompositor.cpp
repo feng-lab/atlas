@@ -1764,9 +1764,9 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       m_rendererBase.setCollectOnly(false);
     } else if (!gFilters.empty() && !showHandleFilters.empty()) {
       auto leaseHandles =
-        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA8, ScratchFormat::Depth32F, RenderBackend::Vulkan);
+        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
       auto leaseGeoms =
-        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA8, ScratchFormat::Depth32F, RenderBackend::Vulkan);
+        pool.acquireTempRenderTarget2D(pickSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
 
       // Record handle picking
       m_rendererBase.setCollectOnly(true);

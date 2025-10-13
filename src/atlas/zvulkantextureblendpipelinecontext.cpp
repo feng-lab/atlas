@@ -242,9 +242,12 @@ ZVulkanTextureBlendPipelineContext::ensurePipeline(const PipelineKey& key, const
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  instance.pipeline->setDepthTestEnable(true);
-  instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
-  instance.pipeline->setDepthWriteEnable(true);
+  const bool hasDepth = formats.depthFormat.has_value();
+  instance.pipeline->setDepthTestEnable(hasDepth);
+  instance.pipeline->setDepthWriteEnable(hasDepth);
+  if (hasDepth) {
+    instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
+  }
 
   // Final compositor pass needs premultiplied alpha blending over the
   // already-rendered background, matching the GL path.

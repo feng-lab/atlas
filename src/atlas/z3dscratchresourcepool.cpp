@@ -437,6 +437,16 @@ public:
     return m_descriptor;
   }
 
+  void retarget(const ScratchImageDescriptor& descriptor)
+  {
+    if (m_descriptor.dimension == descriptor.dimension && m_descriptor.size == descriptor.size &&
+        m_descriptor.layers == descriptor.layers && m_descriptor.attachments == descriptor.attachments) {
+      return;
+    }
+    m_descriptor = descriptor;
+    createAttachments();
+  }
+
   ZVulkanTexture* colorAttachment(uint32_t index) const
   {
     if (index >= m_colorAttachments.size()) {
@@ -1508,32 +1518,68 @@ Z3DScratchResourcePool::acquireVulkanScratchImage(const ScratchImageDescriptor& 
     break;
   }
 
+  bool retargeted = false;
+  ScratchImageDescriptor targetDescriptor = descriptor;
   if (!slot) {
-    auto newSlot = std::make_unique<VulkanScratchSlot>();
-    newSlot->image = std::make_unique<ZVulkanScratchImage>(dev, descriptor);
-    newSlot->descriptor = descriptor;
-    markSlotAcquired(*newSlot);
-    auto lease = RenderTargetLease{};
-    lease.descriptor = descriptor;
-    lease.backend = RenderBackend::Vulkan;
-    lease.vulkanImage = newSlot->image.get();
-    lease.attachments = colorAttachmentCount(descriptor);
-    // Defer release to frame completion when possible
-    if (m_vulkanReleaseScheduler) {
-      lease.releaser = RenderTargetLease::Releaser::forVulkanSlotDeferred(this, newSlot.get());
-    } else {
-      lease.releaser = RenderTargetLease::Releaser::forSlot(newSlot.get());
+    VulkanScratchSlot* reusable = nullptr;
+    uint64_t bestDelta = std::numeric_limits<uint64_t>::max();
+    const uint64_t desiredPixels =
+      static_cast<uint64_t>(descriptor.size.x) * descriptor.size.y * std::max<uint32_t>(1u, descriptor.layers);
+    for (auto& candidate : slots) {
+      if (candidate->inUse) {
+        continue;
+      }
+      if (candidate->descriptor.dimension != descriptor.dimension) {
+        continue;
+      }
+      if (candidate->descriptor.attachments.size() != descriptor.attachments.size()) {
+        continue;
+      }
+      if (candidate->descriptor.attachments != descriptor.attachments) {
+        continue;
+      }
+      const auto& candDesc = candidate->descriptor;
+      const uint64_t candidatePixels =
+        static_cast<uint64_t>(candDesc.size.x) * candDesc.size.y * std::max<uint32_t>(1u, candDesc.layers);
+      const uint64_t delta = desiredPixels > candidatePixels ? desiredPixels - candidatePixels
+                                                             : candidatePixels - desiredPixels;
+      if (!reusable || delta < bestDelta) {
+        reusable = candidate.get();
+        bestDelta = delta;
+      }
     }
-    slots.emplace_back(std::move(newSlot));
-    ++m_creationCounter;
-    maybeTrimAfterAcquire();
-    return lease;
+
+    if (reusable) {
+      const auto& candDesc = reusable->descriptor;
+      const bool needRetarget = candDesc.size != descriptor.size || candDesc.layers < descriptor.layers;
+      if (needRetarget) {
+        reusable->image->retarget(descriptor);
+        targetDescriptor = descriptor;
+        retargeted = true;
+      } else {
+        // Keep existing descriptor (may have equal or larger layer count)
+        targetDescriptor = candDesc;
+      }
+      reusable->descriptor = targetDescriptor;
+      slot = reusable;
+    } else {
+      auto newSlot = std::make_unique<VulkanScratchSlot>();
+      newSlot->image = std::make_unique<ZVulkanScratchImage>(dev, descriptor);
+      newSlot->descriptor = descriptor;
+      targetDescriptor = descriptor;
+      slot = newSlot.get();
+      slots.emplace_back(std::move(newSlot));
+      ++m_creationCounter;
+    }
   }
 
-  slot->descriptor = descriptor;
+  slot->descriptor = targetDescriptor;
+  if (retargeted) {
+    ++m_changeCounter;
+  }
   markSlotAcquired(*slot);
   auto lease = RenderTargetLease{};
-  lease.descriptor = descriptor;
+  lease.descriptor = slot->descriptor;
   lease.backend = RenderBackend::Vulkan;
   lease.vulkanImage = slot->image.get();
   lease.attachments = colorAttachmentCount(descriptor);
