@@ -407,41 +407,41 @@ ZTreeNode<T>* ZTreeNode<T>::mergeToParent()
   return p;
 }
 
-template <typename T>
-void ZTreeNode<T>::becomeRoot(bool virtualCheck)
-{
-  if (!isRoot(virtualCheck)) {
-    double weight[2];
+// template <typename T>
+// void ZTreeNode<T>::becomeRoot(bool virtualCheck)
+// {
+//   if (!isRoot(virtualCheck)) {
+//     double weight[2];
 
-    ZTreeNode<T> *buffer1 = this;
-    ZTreeNode<T> *buffer2 = buffer1->parent();
-    ZTreeNode<T> *buffer3 = NULL;
+//     ZTreeNode<T> *buffer1 = this;
+//     ZTreeNode<T> *buffer2 = buffer1->parent();
+//     ZTreeNode<T> *buffer3 = NULL;
 
-    buffer1->detachParent();
+//     buffer1->detachParent();
 
-    weight[0] = buffer1->weight();
-    while (buffer1->isRegular(virtualCheck)){
-      if (buffer2 != NULL) {
-        if (buffer2->isRegular(virtualCheck)) {
-          if (buffer2->isRegular(virtualCheck)) {
-            weight[1] = buffer2->weight();
-            buffer3 = buffer2->parent();
-            buffer2->setWeight(weight[0]);
-            weight[0] = weight[1];
-            buffer1->addChild(buffer2);
-          }
-        }
-      }
-      buffer1 = buffer2;
-      buffer2 = buffer3;
-      if (buffer1 == NULL) {
-        break;
-      }
-    }
+//     weight[0] = buffer1->weight();
+//     while (buffer1->isRegular(virtualCheck)){
+//       if (buffer2 != NULL) {
+//         if (buffer2->isRegular(virtualCheck)) {
+//           if (buffer2->isRegular(virtualCheck)) {
+//             weight[1] = buffer2->weight();
+//             buffer3 = buffer2->parent();
+//             buffer2->setWeight(weight[0]);
+//             weight[0] = weight[1];
+//             buffer1->addChild(buffer2);
+//           }
+//         }
+//       }
+//       buffer1 = buffer2;
+//       buffer2 = buffer3;
+//       if (buffer1 == NULL) {
+//         break;
+//       }
+//     }
 
-    setParent(buffer1);
-  }
-}
+//     setParent(buffer1);
+//   }
+// }
 
 template <typename T>
 double ZTreeNode<T>::getBacktraceWeight(int n) const
@@ -514,21 +514,21 @@ int ZTreeNode<T>::parentId() const
   return id;
 }
 
-template <typename T>
-ZTreeNode<T>* ZTreeNode<T>::getNextAt(int index) const
-{
-  ZTreeNode<T> *next = const_cast<ZTreeNode<T>*>(this);
+// template <typename T>
+// ZTreeNode<T>* ZTreeNode<T>::getNextAt(int index) const
+// {
+//   ZTreeNode<T> *next = const_cast<ZTreeNode<T>*>(this);
 
-  while (index > 0) {
-    if (next == NULL) {
-      break;
-    }
-    next = next->getNext();
-    --index;
-  }
+//   while (index > 0) {
+//     if (next == NULL) {
+//       break;
+//     }
+//     next = next->getNext();
+//     --index;
+//   }
 
-  return next;
-}
+//   return next;
+// }
 
 template <typename T>
 ZTreeNode<T>* ZTreeNode<T>::getChild(int index) const

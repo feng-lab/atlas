@@ -21,7 +21,7 @@ public:
     inline ZTreeNode<T>* nextSibling() const { return m_nextSibling; }
     void setFirstChild(ZTreeNode<T> *child, bool updatingConsisitency = true);
     void setNextSibling(ZTreeNode<T> *sibling, bool updatingConsistency = true);
-    ZTreeNode<T>* getNextAt(int index) const;
+    // ZTreeNode<T>* getNextAt(int index) const;
 
     ZTreeNode<T>* getChild(int index) const;
 
@@ -92,7 +92,7 @@ public:
 
     virtual ZTreeNode<T>* mergeToParent();
 
-    void becomeRoot(bool virtualCheck = true);
+    // void becomeRoot(bool virtualCheck = true);
 
     double getBacktraceWeight(int n) const;
 
