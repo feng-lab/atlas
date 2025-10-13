@@ -102,9 +102,9 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
-  // Composite resolve invariant: single color attachment, no depth
-  CHECK(formats.colorFormats.size() == 1 && !formats.depthFormat.has_value())
-    << "WA resolve invariant violated: expected 1 color, no depth";
+  // Composite resolve invariant: single color attachment; depth optional
+  CHECK(formats.colorFormats.size() == 1)
+    << "WA resolve invariant violated: expected exactly 1 color attachment";
   CHECK(m_backend.validateFormatsOrSkip(formats, "WA_resolve")) << "WA resolve formats mismatched with current segment";
 
   PipelineKey key;
@@ -355,9 +355,11 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  // Resolve pass composites over background; avoid depth testing/writes interfering with blending.
-  instance.pipeline->setDepthTestEnable(false);
-  instance.pipeline->setDepthWriteEnable(false);
+  // Resolve pass also writes a representative depth (mean depth from moments).
+  // Enable depth test with ALWAYS so gl_FragDepth is written for all covered pixels.
+  instance.pipeline->setDepthTestEnable(true);
+  instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+  instance.pipeline->setDepthWriteEnable(true);
 
   // Blend weighted-average result over the existing background using
   // premultiplied alpha semantics (GL: ONE, ONE_MINUS_SRC_ALPHA).

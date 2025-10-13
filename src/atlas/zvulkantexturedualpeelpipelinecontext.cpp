@@ -419,9 +419,10 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, co
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
 
   if (key.stage == Stage::Final) {
-    // Composite resolve: depth disabled per invariant
-    instance.pipeline->setDepthTestEnable(false);
-    instance.pipeline->setDepthWriteEnable(false);
+    // Final composite writes resolved depth (from depth texture). Use ALWAYS to ensure writes.
+    instance.pipeline->setDepthTestEnable(true);
+    instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+    instance.pipeline->setDepthWriteEnable(true);
   } else {
     instance.pipeline->setDepthTestEnable(false);
     instance.pipeline->setDepthWriteEnable(false);

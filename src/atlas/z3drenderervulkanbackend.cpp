@@ -833,17 +833,36 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       texture.setDescriptorLayout(samplingState.layout);
     };
     if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
+      const bool hasDepth = batch.pass.depthAttachment.has_value() &&
+                            batch.pass.depthAttachment->handle.valid();
+      VLOG(1) << fmt::format("WA resolve depthAttachment present={} handle=0x{:x}",
+                             hasDepth,
+                             hasDepth ? batch.pass.depthAttachment->handle.id : 0ull);
+      CHECK(hasDepth) << "WA resolve batch missing depth attachment (required to write gl_FragDepth).";
       ensureSampledReadable(weightedAverage->accumulationAttachment);
       ensureSampledReadable(weightedAverage->momentsAttachment);
     } else if (const auto* dualPeel = std::get_if<TextureDualPeelPayload>(&batch.geometry)) {
       if (dualPeel->stage == TextureDualPeelPayload::Stage::Blend) {
         ensureSampledReadable(dualPeel->tempAttachment);
       } else {
+        const bool hasDepth = batch.pass.depthAttachment.has_value() &&
+                              batch.pass.depthAttachment->handle.valid();
+        VLOG(1) << fmt::format("DDP final depthAttachment present={} handle=0x{:x}",
+                               hasDepth,
+                               hasDepth ? batch.pass.depthAttachment->handle.id : 0ull);
+        CHECK(hasDepth) << "DDP final batch missing depth attachment (required to write gl_FragDepth).";
         ensureSampledReadable(dualPeel->depthAttachment);
         ensureSampledReadable(dualPeel->frontAttachment);
         ensureSampledReadable(dualPeel->backAttachment);
       }
     } else if (const auto* blend = std::get_if<TextureBlendPayload>(&batch.geometry)) {
+      // Alpha/depth composition requires both depth inputs to be present; a missing
+      // depth handle will cause incorrect z resolution (e.g., opaque dominates).
+      CHECK(blend->depthAttachmentHandle0.valid())
+        << "TextureBlendPayload missing depthAttachmentHandle0 (base depth).";
+      CHECK(blend->depthAttachmentHandle1.valid())
+        << "TextureBlendPayload missing depthAttachmentHandle1 (overlay depth).";
+
       ensureSampledReadable(blend->colorAttachmentHandle0);
       ensureSampledReadable(blend->depthAttachmentHandle0);
       ensureSampledReadable(blend->colorAttachmentHandle1);

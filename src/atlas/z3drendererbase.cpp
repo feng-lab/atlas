@@ -581,6 +581,7 @@ void Z3DRendererBase::setBackend(RenderBackend backendType)
     m_backend->preBackendSwitch();
     VLOG(1) << "Releasing renderer backend resources prior to switch";
     releaseBackendResources();
+    VLOG(1) << "Releasing persistent leases prior to switch";
     releasePersistentLeases();
   }
 

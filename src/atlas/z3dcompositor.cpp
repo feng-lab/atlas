@@ -844,7 +844,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
           m_alphaBlendRenderer.setDepthTexture1(tempGeoLease.renderTarget->depthTexture());
           m_alphaBlendRenderer.setColorTexture2(colorTex);
           m_alphaBlendRenderer.setDepthTexture2(depthTex);
-          m_rendererBase.renderVulkan(eye, m_alphaBlendRenderer);
+          m_rendererBase.render(eye, m_alphaBlendRenderer);
         } else {
           m_firstOnTopBlendRenderer.setColorTexture1(tempGeoLease.renderTarget->colorTexture());
           m_firstOnTopBlendRenderer.setDepthTexture1(tempGeoLease.renderTarget->depthTexture());
@@ -1350,25 +1350,31 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       // Write OIT results into a temporary lease; clear it first
       dispatchOIT(leaseTrans, depthHandle, /*clearResolve=*/true);
 
-      AttachmentHandle color0;
-      color0.backend = AttachmentBackend::Vulkan;
-      color0.index = 0;
-      color0.id = reinterpret_cast<uint64_t>(leaseOpaque.colorAttachment(0));
-      AttachmentHandle depth0;
-      depth0.backend = AttachmentBackend::Vulkan;
-      depth0.index = 0;
-      depth0.id = reinterpret_cast<uint64_t>(leaseOpaque.depthAttachmentTexture());
-      AttachmentHandle color1;
-      color1.backend = AttachmentBackend::Vulkan;
-      color1.index = 0;
-      color1.id = reinterpret_cast<uint64_t>(leaseTrans.colorAttachment(0));
-      AttachmentHandle depth1;
-      depth1.backend = AttachmentBackend::Vulkan;
-      depth1.index = 0;
-      depth1.id = reinterpret_cast<uint64_t>(leaseTrans.depthAttachmentTexture());
+      // Compose transparent OIT result over opaque using premultiplied alpha.
+      // Transparent contributions behind opaque were already culled during the
+      // OIT init/peel passes via the provided depth attachment, so the final
+      // resolve does not require an additional depth test here.
+      AttachmentHandle opaqueColor{};
+      opaqueColor.backend = AttachmentBackend::Vulkan;
+      opaqueColor.index = 0;
+      opaqueColor.id = reinterpret_cast<uint64_t>(leaseOpaque.colorAttachment(0));
+      AttachmentHandle opaqueDepth{};
+      opaqueDepth.backend = AttachmentBackend::Vulkan;
+      opaqueDepth.index = 0;
+      opaqueDepth.id = reinterpret_cast<uint64_t>(leaseOpaque.depthAttachmentTexture());
+      AttachmentHandle transColor{};
+      transColor.backend = AttachmentBackend::Vulkan;
+      transColor.index = 0;
+      transColor.id = reinterpret_cast<uint64_t>(leaseTrans.colorAttachment(0));
+      AttachmentHandle transDepth{};
+      transDepth.backend = AttachmentBackend::Vulkan;
+      transDepth.index = 0;
+      transDepth.id = reinterpret_cast<uint64_t>(leaseTrans.depthAttachmentTexture());
 
-      m_alphaBlendRenderer.setSourceAttachments0(color0, depth0);
-      m_alphaBlendRenderer.setSourceAttachments1(color1, depth1);
+      // First-on-top blending expects source 0 to be the overlay and source 1
+      // the base. Put transparent (overlay) in slot 0 and opaque (base) in 1.
+      m_alphaBlendRenderer.setSourceAttachments0(transColor, transDepth);
+      m_alphaBlendRenderer.setSourceAttachments1(opaqueColor, opaqueDepth);
 
       ClearValue clear{};
       // Keep alpha=0 when no background, so screenshots can preserve
@@ -2645,81 +2651,10 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
   VLOG(1) << "Compositor backend switch complete";
 }
 
-bool Z3DCompositor::tryRenderGeometriesPass(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
-                                            const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                                            Z3DScratchResourcePool::RenderTargetLease& targetLease,
-                                            Z3DEye eye)
-{
-  const auto transparencyMode = m_rendererBase.sceneState().transparency;
-  if (transparencyMode != TransparencyMode::BlendNoDepthMask && transparencyMode != TransparencyMode::BlendDelayed) {
-    return false;
-  }
-
-  for (auto* filter : transparentFilters) {
-    if (!filter) {
-      continue;
-    }
-    if (auto* glowParam = filter->parameter("Glow")) {
-      if (auto* glowBool = dynamic_cast<ZBoolParameter*>(glowParam); glowBool && glowBool->get()) {
-        return false;
-      }
-    }
-  }
-
-  const auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
-  if (!nonOpaqueLayers.empty()) {
-    return false;
-  }
-
-  Z3DCompositorPass pass;
-  pass.targetLease = &targetLease;
-  pass.surface = m_rendererBase.describeSurface(targetLease);
-  if (pass.surface.colorAttachments.empty() && !pass.surface.depthAttachment) {
-    return false;
-  }
-
-  pass.eye = eye;
-  pass.transparency = transparencyMode;
-  pass.msaaMode = m_rendererBase.sceneState().multisample;
-
-  pass.clearColor = true;
-  pass.clearDepth = true;
-  pass.clearStencil = false;
-  pass.clearValue.color = glm::vec4(0.f);
-  pass.clearValue.depth = 1.f;
-  pass.clearValue.stencil = 0u;
-
-  pass.opaqueFilters.assign(opaqueFilters.begin(), opaqueFilters.end());
-  pass.transparentFilters.reserve(transparentFilters.size());
-  for (auto* filter : transparentFilters) {
-    Z3DCompositorTransparentBatch batch;
-    batch.filter = filter;
-    batch.glowEnabled = false;
-    pass.transparentFilters.push_back(batch);
-  }
-
-  pass.imageLayers.clear();
-
-  m_rendererBase.executeCompositorPass(pass);
-  return true;
-}
-
 void Z3DCompositor::renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                      const std::vector<Z3DBoundedFilter*>& transparentFilters,
                                      Z3DScratchResourcePool::RenderTargetLease& targetLease,
                                      Z3DEye eye)
-{
-  if (tryRenderGeometriesPass(opaqueFilters, transparentFilters, targetLease, eye)) {
-    return;
-  }
-
-  renderGeometriesLegacy(opaqueFilters, transparentFilters, targetLease, eye);
-}
-
-void Z3DCompositor::renderGeometriesLegacy(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
-                                           const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                                           Z3DScratchResourcePool::RenderTargetLease& targetLease,
-                                           Z3DEye eye)
 {
   const auto transparencyMode = m_rendererBase.sceneState().transparency;
   if (transparencyMode == TransparencyMode::BlendNoDepthMask) {
@@ -3852,11 +3787,15 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   if (!outBindings.colorHandles.empty()) {
     VLOG(1) << "DDP final: out color handle=" << outBindings.colorHandles[0].id;
   }
-  // Enforce single color attachment and disable depth for composite resolve
+  // Enforce single color attachment; keep depth so final pass can write gl_FragDepth
   if (outSurface.colorAttachments.size() > 1) {
     outSurface.colorAttachments.resize(1);
   }
-  outSurface.depthAttachment.reset();
+  if (outSurface.depthAttachment) {
+    outSurface.depthAttachment->loadOp = clearResolveTarget ? LoadOp::Clear : LoadOp::DontCare;
+    outSurface.depthAttachment->storeOp = StoreOp::Store;
+    outSurface.depthAttachment->clearValue.depth = 1.0f;
+  }
   for (auto& attachment : outSurface.colorAttachments) {
     attachment.loadOp = clearResolveTarget ? LoadOp::Clear : LoadOp::Load;
     attachment.storeOp = StoreOp::Store;
@@ -3864,7 +3803,6 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   }
   VLOG(1) << (clearResolveTarget ? "DDP final: Clear color for intermediate surface"
                                  : "DDP final: Load color to preserve background");
-  // Depth disabled by invariant; no depth load/store
 
   m_rendererBase.setCollectOnly(true);
   m_rendererBase.setActiveSurfaceForNextPass(std::move(outSurface));
@@ -4030,11 +3968,15 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
 
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
-  // Enforce single color attachment and disable depth for composite resolve
+  // Enforce single color attachment; keep depth so WA can write gl_FragDepth
   if (outSurface.colorAttachments.size() > 1) {
     outSurface.colorAttachments.resize(1);
   }
-  outSurface.depthAttachment.reset();
+  if (outSurface.depthAttachment) {
+    outSurface.depthAttachment->loadOp = clearResolveTarget ? LoadOp::Clear : LoadOp::DontCare;
+    outSurface.depthAttachment->storeOp = StoreOp::Store;
+    outSurface.depthAttachment->clearValue.depth = 1.0f;
+  }
   for (auto& attachment : outSurface.colorAttachments) {
     attachment.loadOp = clearResolveTarget ? LoadOp::Clear : (m_showBackground.get() ? LoadOp::Load : LoadOp::Clear);
     attachment.storeOp = StoreOp::Store;

@@ -112,16 +112,6 @@ private:
 
   void ensureOutputTargets(const glm::uvec2& size);
 
-  bool tryRenderGeometriesPass(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
-                               const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                               Z3DScratchResourcePool::RenderTargetLease& targetLease,
-                               Z3DEye eye);
-
-  void renderGeometriesLegacy(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
-                              const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                              Z3DScratchResourcePool::RenderTargetLease& targetLease,
-                              Z3DEye eye);
-
   void renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                const std::vector<Z3DBoundedFilter*>& transparentFilters,
                                Z3DScratchResourcePool::RenderTargetLease& targetLease,

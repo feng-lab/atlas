@@ -227,8 +227,20 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   if (!payload.fastPathOnly) {
     ensureRaycastAccumulators(eye);
 
-    auto shareLease = [](Z3DScratchResourcePool::RenderTargetLease& lease) {
-      return std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease>(&lease, [](auto*) {});
+    // Create a non-owning "view" lease that snapshots the pointers/descriptor
+    // from the persistent member lease. The view has an empty releaser so it
+    // will not double-release the underlying slot. This avoids dangling
+    // references when the persistent lease is released during backend switches
+    // (Vulkan path defers actual slot release until the frame fence signals).
+    auto shareLease = [](Z3DScratchResourcePool::RenderTargetLease& src) {
+      auto view = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
+      view->descriptor = src.descriptor;
+      view->backend = src.backend;
+      view->renderTarget = src.renderTarget;
+      view->vulkanImage = src.vulkanImage;
+      view->attachments = src.attachments;
+      // leave view->releaser empty (no-op) to avoid double release
+      return view;
     };
 
     if (m_lastRaycastAccum[eye]) {
