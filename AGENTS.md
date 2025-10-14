@@ -105,4 +105,9 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - Record architectural shifts, threading changes, or resource policies in `docs/DEVELOPER_GUIDE.md`.
 - When handing off work, note pending validation (tests not run, platforms not exercised) and blockers.
 
+## Communication Expectations
+- Final responses must be thorough and explicitly describe the root cause of the issue, the rationale for the chosen solution, and how the patch addresses the problem.
+- Call out the relevant files or code regions that motivated the change so reviewers understand the context behind the fix.
+- Highlight any best practices, trade-offs, or alternative approaches considered when explaining new code paths.
+
 By following this guide, agents maintain Atlas’ stability while iterating quickly. Deviations require prior agreement in the relevant GitHub issue.
