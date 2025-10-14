@@ -113,14 +113,9 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
 
   // Composite resolve invariant: enforce single color attachment; depth optional
   if (stage == Stage::Final) {
-    if (formats.colorFormats.size() != 1) {
-      VLOG(1) << "Skipping DDP final: expected exactly 1 color attachment.";
-      return;
-    }
+    CHECK(formats.colorFormats.size() == 1) << "Skipping DDP final: expected exactly 1 color attachment.";
   }
-  if (!m_backend.validateFormatsOrSkip(formats, stage == Stage::Final ? "DDP_final" : "DDP_blend")) {
-    return;
-  }
+  m_backend.validateFormatsOrCrash(formats, stage == Stage::Final ? "DDP_final" : "DDP_blend");
 
   PipelineKey key;
   key.stage = stage;

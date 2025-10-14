@@ -105,23 +105,13 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
 
+  // Global coordination (device waitIdle, scratch-pool reset) is handled by
+  // the rendering engine during backend switches. Avoid touching global state
+  // here to prevent ordering conflicts with persistent lease release.
   if (m_sharedDevice) {
-    try {
-      m_sharedDevice->context().device().waitIdle();
-    }
-    catch (const std::exception& e) {
-      LOG(ERROR) << "Vulkan waitIdle (shared) failed: " << e.what();
-    }
-
     for (auto& frame : m_frames) {
       collectFrameTimings(frame);
     }
-  }
-
-  // Release scratch resources proactively so device teardown is clean
-  if (Z3DRenderGlobalState::instance().hasScratchPool()) {
-    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-    pool.reset();
   }
 
   resetFrameResources();
@@ -833,8 +823,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       texture.setDescriptorLayout(samplingState.layout);
     };
     if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
-      const bool hasDepth = batch.pass.depthAttachment.has_value() &&
-                            batch.pass.depthAttachment->handle.valid();
+      const bool hasDepth = batch.pass.depthAttachment.has_value() && batch.pass.depthAttachment->handle.valid();
       VLOG(1) << fmt::format("WA resolve depthAttachment present={} handle=0x{:x}",
                              hasDepth,
                              hasDepth ? batch.pass.depthAttachment->handle.id : 0ull);
@@ -845,8 +834,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (dualPeel->stage == TextureDualPeelPayload::Stage::Blend) {
         ensureSampledReadable(dualPeel->tempAttachment);
       } else {
-        const bool hasDepth = batch.pass.depthAttachment.has_value() &&
-                              batch.pass.depthAttachment->handle.valid();
+        const bool hasDepth = batch.pass.depthAttachment.has_value() && batch.pass.depthAttachment->handle.valid();
         VLOG(1) << fmt::format("DDP final depthAttachment present={} handle=0x{:x}",
                                hasDepth,
                                hasDepth ? batch.pass.depthAttachment->handle.id : 0ull);
@@ -1745,20 +1733,20 @@ const std::optional<vulkan::AttachmentFormats>& Z3DRendererVulkanBackend::curren
   return m_activeFrame->activeSegmentFormats;
 }
 
-bool Z3DRendererVulkanBackend::validateFormatsOrSkip(const vulkan::AttachmentFormats& pipelineFormats,
-                                                     /*nullable*/ const char* contextTag)
+void Z3DRendererVulkanBackend::validateFormatsOrCrash(const vulkan::AttachmentFormats& pipelineFormats,
+                                                      /*nullable*/ const char* contextTag)
 {
   if (!m_activeFrame) {
-    return true;
+    return;
   }
   const auto& seg = m_activeFrame->activeSegmentFormats;
   if (!seg) {
-    return true;
+    return;
   }
   const bool depthMatch = seg->depthFormat == pipelineFormats.depthFormat;
   const bool colorMatch = seg->colorFormats == pipelineFormats.colorFormats;
   if (depthMatch && colorMatch) {
-    return true;
+    return;
   }
   m_activeFrame->skippedBatchesFormatMismatch++;
   const std::string ctx = (contextTag && *contextTag) ? fmt::format(" [{}]", contextTag) : std::string();
@@ -1769,7 +1757,6 @@ bool Z3DRendererVulkanBackend::validateFormatsOrSkip(const vulkan::AttachmentFor
                             pipelineFormats.colorFormats.size(),
                             pipelineFormats.depthFormat.has_value());
   CHECK(false) << "Vulkan dynamic rendering segment/pipeline format mismatch (fatal).";
-  return false;
 }
 
 void Z3DRendererVulkanBackend::ensureFullscreenQuad()

@@ -141,9 +141,7 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
 
   const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
 
-  if (!m_backend.validateFormatsOrSkip(formats, "ellipsoid")) {
-    return;
-  }
+  m_backend.validateFormatsOrCrash(formats, "ellipsoid");
 
   PipelineKey key;
   key.dynamicMaterial = payload.useDynamicMaterial && !pickingPass;

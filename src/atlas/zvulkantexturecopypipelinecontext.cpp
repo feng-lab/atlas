@@ -88,9 +88,15 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   }
 
   auto usePersistentNow = [&]() -> bool {
-    if (!m_persistentTexturesDS) return false;
-    if (!m_cachedTextures.valid) return false;
-    if (m_cachedTextures.color != desiredColor || m_cachedTextures.depth != desiredDepth) return false;
+    if (!m_persistentTexturesDS) {
+      return false;
+    }
+    if (!m_cachedTextures.valid) {
+      return false;
+    }
+    if (m_cachedTextures.color != desiredColor || m_cachedTextures.depth != desiredDepth) {
+      return false;
+    }
     if (ddpPeel && (m_cachedTextures.ddpDepth != desiredDdpDepth || m_cachedTextures.ddpFront != desiredDdpFront)) {
       return false;
     }
@@ -133,10 +139,9 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
       ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
     }
     CHECK(ds != nullptr) << "Texture copy: override descriptor allocation failed (fatal)";
-    const bool attachmentsChanged = (!m_cachedTextures.valid || m_cachedTextures.color != desiredColor ||
-                                     m_cachedTextures.depth != desiredDepth ||
-                                     m_cachedTextures.ddpDepth != desiredDdpDepth ||
-                                     m_cachedTextures.ddpFront != desiredDdpFront);
+    const bool attachmentsChanged =
+      (!m_cachedTextures.valid || m_cachedTextures.color != desiredColor || m_cachedTextures.depth != desiredDepth ||
+       m_cachedTextures.ddpDepth != desiredDdpDepth || m_cachedTextures.ddpFront != desiredDdpFront);
     // Override descriptor sets are newly allocated per draw; every binding must be rewritten even
     // when the attachments repeat so we do not replay empty descriptors that would drop colour/depth.
     VLOG(2) << "TextureCopy: writing per-draw override descriptors";
@@ -198,7 +203,8 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
           }
           m_cachedTextures = {colorId, depthId, ddpDepthId, ddpFrontId, true};
           VLOG(2) << "TextureCopy: scheduled persistent DS rewrite completed";
-        } catch (...) {
+        }
+        catch (...) {
           VLOG(1) << "TextureCopy: scheduled persistent DS rewrite skipped (handles not resolvable)";
         }
       });

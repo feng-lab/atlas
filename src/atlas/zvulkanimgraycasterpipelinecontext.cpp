@@ -2006,9 +2006,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
       return;
     }
 
-    if (!m_backend.validateFormatsOrSkip(finalFormats, "img raycaster fast path")) {
-      return;
-    }
+    m_backend.validateFormatsOrCrash(finalFormats, "img raycaster fast path");
     FastPipelineKey fastKey;
     fastKey.variant = FastPipelineVariant::Volume;
     fastKey.mode = composite.mode;
@@ -2476,9 +2474,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
     CHECK(channelIndex < transferFunctions.size() && transferFunctions[channelIndex] != nullptr)
       << "Missing transfer function for channel " << channelIndex;
 
-    if (!m_backend.validateFormatsOrSkip(finalFormats, "img raycaster 2d fast path")) {
-      return;
-    }
+    m_backend.validateFormatsOrCrash(finalFormats, "img raycaster 2d fast path");
 
     ChannelResources& resources = ensureChannelResources(channelIndex);
     const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);
@@ -2789,9 +2785,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
     CHECK(channelIndex < transferFunctions.size() && transferFunctions[channelIndex] != nullptr)
       << "Missing transfer function for channel " << channelIndex;
 
-    if (!m_backend.validateFormatsOrSkip(finalFormats, "img raycaster slice fast path")) {
-      return;
-    }
+    m_backend.validateFormatsOrCrash(finalFormats, "img raycaster slice fast path");
 
     ChannelResources& resources = ensureChannelResources(channelIndex);
     const ZImg& channelImage = *payload.image->channelImageShared(channelIndex);

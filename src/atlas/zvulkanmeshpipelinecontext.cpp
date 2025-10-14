@@ -352,9 +352,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   const FogMode fogMode = renderer.sceneState().fog.mode;
 
   const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
-  if (!m_backend.validateFormatsOrSkip(formats, "mesh")) {
-    return;
-  }
+  m_backend.validateFormatsOrCrash(formats, "mesh");
 
   PipelineInstance* currentPipeline = nullptr;
   if (drawSurface) {

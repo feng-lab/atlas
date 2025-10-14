@@ -172,9 +172,7 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
-  if (!m_backend.validateFormatsOrSkip(formats, "sphere")) {
-    return;
-  }
+  m_backend.validateFormatsOrCrash(formats, "sphere");
 
   PipelineKey key;
   key.dynamicMaterial = payload.useDynamicMaterial && !pickingPass;

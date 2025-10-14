@@ -1574,6 +1574,14 @@ void Z3DRenderingEngine::applyBackendSwitch()
     VLOG(1) << "Updated scratch pool to use active Vulkan device";
   }
 
+  // Ensure scratch-pool deferred-release scheduler is cleared before propagating
+  // the backend switch to filters. This avoids callbacks into a soon-to-be-
+  // destroyed Vulkan backend when filters release their persistent Vulkan leases
+  // during the switch.
+  if (m_scratchPool) {
+    m_scratchPool->setVulkanReleaseScheduler(std::function<void(std::function<void()>)>());
+  }
+
   // Switch renderer backends for compositor + connected filters (this will idle Vulkan via preBackendSwitch)
   VLOG(1) << "Switching compositor and connected filters to new backend";
   m_compositor->switchBackend(backend);

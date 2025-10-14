@@ -101,9 +101,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   // Composite resolve invariant: single color attachment; depth optional
   CHECK_EQ(formats.colorFormats.size(), size_t{1})
     << "WA resolve requires exactly one color attachment.";
-  if (!m_backend.validateFormatsOrSkip(formats, "WA_resolve")) {
-    return;
-  }
+  m_backend.validateFormatsOrCrash(formats, "WA_resolve");
 
   PipelineKey key;
   key.colorFormats = formats.colorFormats;

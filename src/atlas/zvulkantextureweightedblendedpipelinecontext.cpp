@@ -95,18 +95,17 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
   // Composite resolve invariant: single color attachment; depth optional
-  CHECK_EQ(formats.colorFormats.size(), size_t{1})
-    << "WB resolve requires exactly one color attachment.";
-  if (!m_backend.validateFormatsOrSkip(formats, "WB_resolve")) {
-    return;
-  }
+  CHECK_EQ(formats.colorFormats.size(), size_t{1}) << "WB resolve requires exactly one color attachment.";
+  m_backend.validateFormatsOrCrash(formats, "WB_resolve");
 
   PipelineKey key;
   key.colorFormats = formats.colorFormats;
   key.depthFormat = formats.depthFormat;
 
   PipelineInstance& instance = ensurePipeline(key, formats);
-  VLOG(2) << fmt::format("WB: ensured pipeline colors={} depth={}", formats.colorFormats.size(), formats.depthFormat.has_value());
+  VLOG(2) << fmt::format("WB: ensured pipeline colors={} depth={}",
+                         formats.colorFormats.size(),
+                         formats.depthFormat.has_value());
 
   cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();

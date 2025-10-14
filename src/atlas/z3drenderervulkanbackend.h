@@ -152,10 +152,9 @@ public:
 
   // Current segment attachment formats (if a dynamic rendering segment is open)
   [[nodiscard]] const std::optional<vulkan::AttachmentFormats>& currentSegmentFormats() const;
-  // Returns true when pipelineFormats match the current segment; increments a
-  // skip counter and logs at VLOG(1) if mismatched.
-  bool validateFormatsOrSkip(const vulkan::AttachmentFormats& pipelineFormats,
-                             /*nullable*/ const char* contextTag = nullptr);
+  // Crash when pipelineFormats does match the current segment
+  void validateFormatsOrCrash(const vulkan::AttachmentFormats& pipelineFormats,
+                              /*nullable*/ const char* contextTag = nullptr);
 
   // Recording state helpers and telemetry hooks
   [[nodiscard]] bool isRecording() const

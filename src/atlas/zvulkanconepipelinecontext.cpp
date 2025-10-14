@@ -189,9 +189,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
-  if (!m_backend.validateFormatsOrSkip(formats, "cone")) {
-    return;
-  }
+  m_backend.validateFormatsOrCrash(formats, "cone");
 
   PipelineKey key;
   key.dynamicMaterial = !pickingPass;
