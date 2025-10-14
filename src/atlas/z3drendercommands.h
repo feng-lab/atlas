@@ -670,6 +670,7 @@ struct FontPayload
   glm::vec4 shadowColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
   bool pickingPass = false;
+  bool followCoordTransform = true;
   // Per-stream generation counters
   uint32_t positionsGen = 0;
   uint32_t texcoordsGen = 0;

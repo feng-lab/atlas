@@ -314,6 +314,7 @@ void Z3DFontRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bo
   payload.shadowColor = m_fontShadowColor;
   payload.params = &m_rendererBase.parameterState();
   payload.pickingPass = picking;
+  payload.followCoordTransform = m_followCoordTransform;
 
   // Per-stream generation counters
   payload.positionsGen = m_positionsGen;

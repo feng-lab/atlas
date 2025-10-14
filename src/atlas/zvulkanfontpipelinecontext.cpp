@@ -130,7 +130,10 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   // Compose push constants (match shader layout)
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   CHECK(payload.params != nullptr) << "Font payload missing params";
-  glm::mat4 projView = eyeState.projectionMatrix * eyeState.viewMatrix;
+  // Match OpenGL behaviour: renderers that opt out of coord transforms (e.g., the
+  // axis overlay font) expect billboard quads in camera space.
+  const glm::mat4 modelTransform = payload.followCoordTransform ? payload.params->coordTransform : glm::mat4(1.f);
+  glm::mat4 projView = eyeState.projectionMatrix * eyeState.viewMatrix * modelTransform;
 
   FontPushConstants constants;
   constants.projectionView = projView;
