@@ -503,10 +503,9 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   TransformsUBOStd140 transforms{};
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
   transforms.view_matrix = eyeState.viewMatrix;
-  const glm::mat4 coordTransform = payload.followCoordTransform ? payload.params->coordTransform : glm::mat4(1.0f);
-  transforms.pos_transform = coordTransform;
+  transforms.pos_transform = payload.params->coordTransform;
 
-  const glm::mat4 combined = eyeState.viewMatrix * coordTransform;
+  const glm::mat4 combined = eyeState.viewMatrix * payload.params->coordTransform;
   const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(combined)));
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
   transforms.projection_matrix = eyeState.projectionMatrix;

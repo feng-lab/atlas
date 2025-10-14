@@ -715,7 +715,6 @@ ConePayload Z3DConeRenderer::buildConePayload() const
   payload.subdivisionAlong = m_cylinderSubdivisionAlongZ;
   payload.sameColorForBaseAndTop = m_sameColorForBaseAndTop;
   payload.useConeShader2 = m_useConeShader2;
-  payload.followCoordTransform = m_followCoordTransform;
   // Per-stream generation counters
   payload.baseGen = m_baseGen;
   payload.axisGen = m_axisGen;
