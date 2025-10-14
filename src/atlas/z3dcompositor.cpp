@@ -4267,6 +4267,18 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderT
   const auto prevHook = m_rendererBase.shaderHookType();
   const bool hookWasNormal = prevHook == Z3DRendererBase::ShaderHookType::Normal;
 
+  auto& params = m_rendererBase.parameterState();
+  const glm::mat4 previousTransform = params.coordTransform;
+  params.coordTransform = axisTransform;
+  auto transformGuard = folly::makeGuard([&params, previousTransform]() {
+    params.coordTransform = previousTransform;
+  });
+
+  const auto previousViewState = m_rendererBase.pushViewStateFromCamera(m_axisCamera);
+  auto viewGuard = folly::makeGuard([this, previousViewState]() {
+    m_rendererBase.restoreViewState(previousViewState);
+  });
+
   m_rendererBase.frameState().updateViewportData(axisViewport);
   if (!hookWasNormal) {
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
@@ -4284,9 +4296,13 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderT
   m_rendererBase.recordVulkanBatches(
     [&]() {
       if (m_axisMode.get() == "Arrow") {
-        renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_arrowRenderer, m_fontRenderer);
+        std::array<Z3DPrimitiveRenderer*, 2> renderers{&m_arrowRenderer, &m_fontRenderer};
+        std::span<Z3DPrimitiveRenderer*> rendererSpan(renderers.data(), renderers.size());
+        m_rendererBase.renderVulkan(eye, rendererSpan);
       } else {
-        renderWithStateAndCameraAndCoordTransform(eye, m_axisCamera, axisTransform, m_lineRenderer, m_fontRenderer);
+        std::array<Z3DPrimitiveRenderer*, 2> renderers{&m_lineRenderer, &m_fontRenderer};
+        std::span<Z3DPrimitiveRenderer*> rendererSpan(renderers.data(), renderers.size());
+        m_rendererBase.renderVulkan(eye, rendererSpan);
       }
     },
     "axis_overlay");

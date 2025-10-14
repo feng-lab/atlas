@@ -1572,7 +1572,7 @@ std::optional<uint32_t> Z3DRendererVulkanBackend::allocateOcclusionQuery()
     return std::nullopt;
   }
   if (frame.nextOcclusionQuery >= kMaxOcclusionQueries) {
-    LOG(ERROR) << "Vulkan occlusion query budget exceeded";
+    VLOG(1) << "Vulkan occlusion query budget exceeded";
     return std::nullopt;
   }
   frame.occlusionQueryNeedsWait = true;
@@ -2067,7 +2067,7 @@ std::optional<size_t> Z3DRendererVulkanBackend::beginGpuScope(std::string_view l
   }
   auto& frame = *m_activeFrame;
   if (frame.nextQuery + 2 > kMaxTimestampQueries) {
-    LOG(ERROR) << "Vulkan timestamp query budget exceeded";
+    VLOG(1) << "Vulkan timestamp query budget exceeded";
     return std::nullopt;
   }
   const uint32_t startIndex = frame.nextQuery++;

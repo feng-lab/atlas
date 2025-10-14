@@ -90,9 +90,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   }
   CHECK(ds != nullptr) << "WA resolve: override descriptor allocation failed (fatal)";
   // Override sets are transient; every allocation hands us a fresh VkDescriptorSet with
-  // undefined bindings. Always rewrite both textures so repeated draws with identical
-  // attachments do not accidentally reuse the "empty" descriptors from a prior override
-  // allocation—a bug that left the shader sampling null images and prevented depth writes.
+  // undefined bindings, so prime both bindings before issuing the draw.
   ds->updateTexture(vkbind::kBindingWAAccum, accumulationTexture, m_backend.defaultSampler());
   ds->updateTexture(vkbind::kBindingWAMoments, momentsTexture, m_backend.defaultSampler());
 
@@ -352,9 +350,12 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
   // Resolve pass also writes a representative depth (mean depth from moments).
-  // Enable depth test with ALWAYS so gl_FragDepth is written for all covered pixels.
+  // Match the OpenGL resolve behaviour: depth writes only replace stored values
+  // when the resolved depth is closer. Using LessOrEqual prevents transparent
+  // resolves from pushing geometry farther into the depth buffer, which would
+  // break later depth-tested blends (e.g. the compositor's alpha blend stage).
   instance.pipeline->setDepthTestEnable(true);
-  instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+  instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
   instance.pipeline->setDepthWriteEnable(true);
 
   // Blend weighted-average result over the existing background using

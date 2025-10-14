@@ -8,9 +8,9 @@ namespace nim {
 
 // Shared std140 UBO layouts mirrored by Vulkan mesh/line pipelines. Keep the
 // packing rules identical to the GLSL includes under Resources/shader/vulkan.
-struct LightingUBOStd140
+struct alignas(16) LightingUBOStd140
 {
-  struct LightSource
+  struct alignas(16) LightSource
   {
     glm::vec4 position{0.0f};
     glm::vec4 ambient{0.0f};
@@ -38,6 +38,14 @@ struct LightingUBOStd140
   alignas(8) glm::vec2 _pad2{0.0f};
   std::array<LightSource, 5> lights{};
 };
+
+static_assert(alignof(LightingUBOStd140) == 16, "Lighting UBO must be 16-byte aligned (std140)");
+static_assert(alignof(LightingUBOStd140::LightSource) == 16,
+              "Lighting light source must be 16-byte aligned (std140 element stride)");
+static_assert(offsetof(LightingUBOStd140, fog_color_top) == 16);
+static_assert(offsetof(LightingUBOStd140, fog_color_bottom) == 32);
+static_assert(offsetof(LightingUBOStd140, screen_dim_RCP) == 64);
+static_assert(offsetof(LightingUBOStd140, lights) == 80);
 
 struct TransformsUBOStd140
 {

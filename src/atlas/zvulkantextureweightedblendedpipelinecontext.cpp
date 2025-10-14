@@ -86,9 +86,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   }
   CHECK(ds != nullptr) << "WB resolve: override descriptor allocation failed (fatal)";
   // Like the weighted-average resolve, override descriptor sets arrive with undefined
-  // bindings. We must rewrite both textures on every draw; attempting to cache the last
-  // attachment IDs skipped these writes, so subsequent batches sampled null descriptors
-  // and never produced a depth output even though the shader executed.
+  // bindings, so prime both textures before the draw.
   ds->updateTexture(vkbind::kBindingWBAccum, accumulationTexture, m_backend.defaultSampler());
   ds->updateTexture(vkbind::kBindingWBTransmittance, transmittanceTexture, m_backend.defaultSampler());
 
@@ -352,7 +350,10 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
   const bool hasDepth = formats.depthFormat.has_value();
   instance.pipeline->setDepthTestEnable(hasDepth);
   if (hasDepth) {
-    instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+    // Keep Vulkan resolve depth semantics aligned with the OpenGL path: only
+    // commit the resolved depth when it is not farther than the stored value.
+    // This preserves the compositor's follow-up depth-tested blend step.
+    instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
     instance.pipeline->setDepthWriteEnable(true);
   } else {
     instance.pipeline->setDepthWriteEnable(false);
