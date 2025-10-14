@@ -46,6 +46,10 @@ uniform sampler2D ColorTex1;
 uniform vec2 screen_dim_RCP;
 #endif
 
+uniform float ze_to_zw_a;
+uniform float ze_to_zw_b;
+uniform float weighted_blended_depth_scale;
+
 #if GLSL_VERSION >= 330
 layout(location = 0) out vec4 FragData0;
 #elif GLSL_VERSION >= 130
@@ -58,16 +62,42 @@ out vec4 FragData0;  // call glBindFragDataLocation before linking
 #define texture texture2D
 #endif
 
+const float kWeightNumerator = 0.03;
+const float kWeightClampMin = 1e-2;
+const float kWeightClampMax = 3e3;
+const float kAlphaEpsilon = 1e-6;
+const float kWeightEpsilon = 1e-5;
+
 void main(void)
 {
-  #ifdef USE_RECT_TEX
+#ifdef USE_RECT_TEX
   vec4 sumColor = texture2DRect(ColorTex0, gl_FragCoord.xy);
   float transmittance = texture2DRect(ColorTex1, gl_FragCoord.xy).r;
-  #else
+#else
   vec4 sumColor = texture(ColorTex0, gl_FragCoord.xy * screen_dim_RCP);
   float transmittance = texture(ColorTex1, gl_FragCoord.xy * screen_dim_RCP).r;
-  #endif
+#endif
 
-  float a = 1 - transmittance;
-  FragData0 = vec4(sumColor.rgb / clamp(sumColor.a, 1e-4, 5e4) * a, a);
+  float resolvedAlpha = clamp(1.0 - transmittance, 0.0, 1.0);
+  if (resolvedAlpha <= kAlphaEpsilon) {
+    discard;
+  }
+
+  float accumWeightedAlpha = sumColor.a;
+  float weight = accumWeightedAlpha / resolvedAlpha;
+  weight = clamp(weight, kWeightClampMin, kWeightClampMax);
+
+  float depthTerm = kWeightNumerator / weight - kWeightEpsilon;
+  float fragDepth = 1.0;
+  if (depthTerm > 0.0 && weighted_blended_depth_scale > 0.0) {
+    float viewDepth = pow(depthTerm, 0.25) / (0.005 * weighted_blended_depth_scale);
+    if (viewDepth > 1e-5) {
+      fragDepth = clamp(ze_to_zw_a / viewDepth + ze_to_zw_b, 0.0, 1.0);
+    }
+  }
+
+  float denom = clamp(sumColor.a, 1e-4, 5e4);
+  vec3 resolvedColor = sumColor.rgb / denom * resolvedAlpha;
+  FragData0 = vec4(resolvedColor, resolvedAlpha);
+  gl_FragDepth = fragDepth;
 }

@@ -37,7 +37,6 @@ void ZVulkanTextureWeightedBlendedPipelineContext::resetDescriptors()
 {
   m_descriptorSet.reset();
   m_descriptorSetOIT.reset();
-  m_lastInputs = {};
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& renderer,
@@ -63,13 +62,14 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
 
   ensureDescriptorLayout();
   ensureDescriptorSet();
+  if (!m_descriptorSet) {
+    return;
+  }
+
   if (m_backend.isRecording()) {
     CHECK(m_descriptorSetOIT && m_uboOIT) << "WB OIT resources not primed before recording";
   } else {
     ensureOITResources();
-  }
-  if (!m_descriptorSet) {
-    return;
   }
 
   auto& accumulationTexture = vulkan::textureFromHandle(payload.accumulationAttachment,
@@ -85,22 +85,21 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
   }
   CHECK(ds != nullptr) << "WB resolve: override descriptor allocation failed (fatal)";
-  const uint64_t accumId = payload.accumulationAttachment.id;
-  const uint64_t transId = payload.transmittanceAttachment.id;
-  if (!m_lastInputs.valid || m_lastInputs.accum != accumId) {
-    ds->updateTexture(vkbind::kBindingWBAccum, accumulationTexture, m_backend.defaultSampler());
-  }
-  if (!m_lastInputs.valid || m_lastInputs.trans != transId) {
-    ds->updateTexture(vkbind::kBindingWBTransmittance, transmittanceTexture, m_backend.defaultSampler());
-  }
-  m_lastInputs = {accumId, transId, true};
+  // Like the weighted-average resolve, override descriptor sets arrive with undefined
+  // bindings. We must rewrite both textures on every draw; attempting to cache the last
+  // attachment IDs skipped these writes, so subsequent batches sampled null descriptors
+  // and never produced a depth output even though the shader executed.
+  ds->updateTexture(vkbind::kBindingWBAccum, accumulationTexture, m_backend.defaultSampler());
+  ds->updateTexture(vkbind::kBindingWBTransmittance, transmittanceTexture, m_backend.defaultSampler());
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
-  // Composite resolve invariant: single color attachment, no depth
-  CHECK(formats.colorFormats.size() == 1 && !formats.depthFormat.has_value())
-    << "WB resolve invariant violated: expected 1 color, no depth";
-  CHECK(m_backend.validateFormatsOrSkip(formats, "WB_resolve")) << "WB resolve formats mismatched with current segment";
+  // Composite resolve invariant: single color attachment; depth optional
+  CHECK_EQ(formats.colorFormats.size(), size_t{1})
+    << "WB resolve requires exactly one color attachment.";
+  if (!m_backend.validateFormatsOrSkip(formats, "WB_resolve")) {
+    return;
+  }
 
   PipelineKey key;
   key.colorFormats = formats.colorFormats;
@@ -124,15 +123,6 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   }
 
   // Ensure and bind OIT params (set = 3). Descriptor is set at allocation time.
-  if (m_descriptorSetOIT && m_uboOIT) {
-    std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           instance.pipeline->pipelineLayout(),
-                           vkbind::kSetOITParams,
-                           sets3,
-                           {});
-  }
-
   cmd.setViewport(0, viewport);
   cmd.setScissor(0, scissor);
 
@@ -154,8 +144,16 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
   }
 
-  // Update OIT UBO values
+  // Update OIT UBO values before binding the params descriptor.
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
+  if (m_descriptorSetOIT && m_uboOIT) {
+    std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
+    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                           instance.pipeline->pipelineLayout(),
+                           vkbind::kSetOITParams,
+                           sets3,
+                           {});
+  }
 
   cmd.pushConstants<WeightedBlendedPushConstants>(instance.pipeline->pipelineLayout(),
                                                   vk::ShaderStageFlagBits::eFragment,
@@ -352,8 +350,14 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  instance.pipeline->setDepthTestEnable(false);
-  instance.pipeline->setDepthWriteEnable(false);
+  const bool hasDepth = formats.depthFormat.has_value();
+  instance.pipeline->setDepthTestEnable(hasDepth);
+  if (hasDepth) {
+    instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
+    instance.pipeline->setDepthWriteEnable(true);
+  } else {
+    instance.pipeline->setDepthWriteEnable(false);
+  }
 
   // Blend weighted-blended result over background using premultiplied alpha.
   vk::PipelineColorBlendAttachmentState blendAttachment{};

@@ -80,14 +80,6 @@ private:
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
-  // Track last inputs for micro-caching; allocate fresh override set per record
-  struct LastInputs
-  {
-    uint64_t accum = 0;
-    uint64_t trans = 0;
-    bool valid = false;
-  } m_lastInputs;
-
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
   size_t m_vertexCount = 0;
