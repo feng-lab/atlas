@@ -130,7 +130,8 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   // Compose push constants (match shader layout)
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   CHECK(payload.params != nullptr) << "Font payload missing params";
-  glm::mat4 projView = eyeState.projectionMatrix * eyeState.viewMatrix * payload.params->coordTransform;
+  const glm::mat4 coordTransform = payload.followCoordTransform ? payload.params->coordTransform : glm::mat4(1.0f);
+  glm::mat4 projView = eyeState.projectionMatrix * eyeState.viewMatrix * coordTransform;
 
   FontPushConstants constants;
   constants.projectionView = projView;
