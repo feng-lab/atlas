@@ -1251,17 +1251,36 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     return 0.0;
   }
 
-  // If a Vulkan frame is already active (e.g., opened by the evaluator), reuse it.
-  // Otherwise, begin/end locally for standalone invocation.
-  const bool startedHere = !m_rendererBase.isVulkanFrameActive();
-  if (startedHere) {
-    m_rendererBase.beginVulkanFrame();
-  }
-  auto endFrameGuard = folly::makeGuard([&]() {
-    if (startedHere) {
-      m_rendererBase.endVulkanFrame();
-    }
-  });
+  // NOTE: Do not keep a Vulkan frame open across the compositor passes.
+  // Rationale:
+  // - The compositor orchestrates many heterogeneous passes (background, opaque,
+  //   OIT init/peel/resolve, glow, picking) and multiple pipeline contexts
+  //   (mesh/sphere/cone/texture). The Vulkan backend primes descriptor sets,
+  //   UBOs and state per pass inside beginRender().
+  // - Forcing a single long-lived frame here prevents those per-pass priming
+  //   and resets from occurring at the correct time, and allows state to leak
+  //   between passes. In practice this breaks lighting/transparency for common
+  //   geometry (e.g., spheres/cones) and can yield wrong colors.
+  // - recordVulkanBatches()/executeCompositorPass() already manage frame
+  //   begin/end after the target surface and load/store ops are staged. Let
+  //   them own frame lifetime in the compositor.
+  // If you ever need a single command buffer here, you must pre-prime all
+  // contexts before recording (ensureDescriptorSets/ensureOITResources), avoid
+  // descriptor writes during recording, and emulate per-pass resets — which is
+  // fragile and not recommended. Therefore we intentionally disable keep-open.
+  //
+  // const bool startedHere = !m_rendererBase.isVulkanFrameActive();
+  // if (startedHere) {
+  //   m_rendererBase.setKeepVulkanFrameOpen(true);
+  // }
+  // auto endFrameGuard = folly::makeGuard([&]() {
+  //   if (startedHere) {
+  //     if (m_rendererBase.isVulkanFrameActive()) {
+  //       m_rendererBase.endVulkanFrame();
+  //     }
+  //     m_rendererBase.setKeepVulkanFrameOpen(false);
+  //   }
+  // });
 
   // Supersample 2x2 parity (render to 2x scene lease, then downsample)
   const bool supersample2x2 = (m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2);
@@ -1276,8 +1295,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     sceneOutLease = &sceneLease;
   }
 
-  // We keep the frame open across all passes; recordVulkanBatches will not
-  // begin/end the frame since it's already active.
+  // Frame lifetime is managed per call to recordVulkanBatches/executeCompositorPass;
+  // do not keep the frame open across compositor passes.
   // Stage 3: background is recorded via the pass-graph driver below
 
   // Decide OIT usage and collect non-opaque image layers (volumes/slices) once
@@ -3365,8 +3384,7 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   const float b = 0.5f * (farClip + nearClip) / clipDenom + 0.5f;
   m_wbFinalShader->setUniform("ze_to_zw_a", a);
   m_wbFinalShader->setUniform("ze_to_zw_b", b);
-  m_wbFinalShader->setUniform("weighted_blended_depth_scale",
-                              m_rendererBase.sceneState().weightedBlendedDepthScale);
+  m_wbFinalShader->setUniform("weighted_blended_depth_scale", m_rendererBase.sceneState().weightedBlendedDepthScale);
 
   Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_wbFinalShader);
   m_wbFinalShader->release();
@@ -4296,13 +4314,9 @@ void Z3DCompositor::renderAxisVulkan(Z3DEye eye, Z3DScratchResourcePool::RenderT
   m_rendererBase.recordVulkanBatches(
     [&]() {
       if (m_axisMode.get() == "Arrow") {
-        std::array<Z3DPrimitiveRenderer*, 2> renderers{&m_arrowRenderer, &m_fontRenderer};
-        std::span<Z3DPrimitiveRenderer*> rendererSpan(renderers.data(), renderers.size());
-        m_rendererBase.renderVulkan(eye, rendererSpan);
+        m_rendererBase.renderVulkan(eye, m_arrowRenderer, m_fontRenderer);
       } else {
-        std::array<Z3DPrimitiveRenderer*, 2> renderers{&m_lineRenderer, &m_fontRenderer};
-        std::span<Z3DPrimitiveRenderer*> rendererSpan(renderers.data(), renderers.size());
-        m_rendererBase.renderVulkan(eye, rendererSpan);
+        m_rendererBase.renderVulkan(eye, m_lineRenderer, m_fontRenderer);
       }
     },
     "axis_overlay");
