@@ -3358,6 +3358,15 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   const glm::vec2 wbScreenDimRcp(wbSize.x > 0u ? 1.f / static_cast<float>(wbSize.x) : 0.f,
                                  wbSize.y > 0u ? 1.f / static_cast<float>(wbSize.y) : 0.f);
   m_wbFinalShader->setScreenDimRCPUniform(wbScreenDimRcp);
+  const float nearClip = m_rendererBase.viewState().nearClip;
+  const float farClip = m_rendererBase.viewState().farClip;
+  const float clipDenom = std::max(farClip - nearClip, 1e-6f);
+  const float a = farClip * nearClip / clipDenom;
+  const float b = 0.5f * (farClip + nearClip) / clipDenom + 0.5f;
+  m_wbFinalShader->setUniform("ze_to_zw_a", a);
+  m_wbFinalShader->setUniform("ze_to_zw_b", b);
+  m_wbFinalShader->setUniform("weighted_blended_depth_scale",
+                              m_rendererBase.sceneState().weightedBlendedDepthScale);
 
   Z3DPrimitiveRenderer::renderScreenQuad(m_screenQuadVAO, *m_wbFinalShader);
   m_wbFinalShader->release();
@@ -4148,17 +4157,22 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
 
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
-  // Enforce single color attachment and disable depth for composite resolve
+  // Enforce single color attachment; depth is optional and allows the resolve
+  // shader to emit a representative gl_FragDepth when provided.
   if (outSurface.colorAttachments.size() > 1) {
     outSurface.colorAttachments.resize(1);
   }
-  outSurface.depthAttachment.reset();
+  if (outSurface.depthAttachment) {
+    outSurface.depthAttachment->loadOp = clearResolveTarget ? LoadOp::Clear : LoadOp::DontCare;
+    outSurface.depthAttachment->storeOp = StoreOp::Store;
+    outSurface.depthAttachment->clearValue.depth = 1.0f;
+  }
   for (auto& attachment : outSurface.colorAttachments) {
     attachment.loadOp = clearResolveTarget ? LoadOp::Clear : (m_showBackground.get() ? LoadOp::Load : LoadOp::Clear);
     attachment.storeOp = StoreOp::Store;
     attachment.clearValue.color = glm::vec4(0.0f);
   }
-  // Depth disabled by invariant; no depth load/store
+  // Depth load/store configured above when the caller supplied an attachment.
 
   m_rendererBase.setCollectOnly(true);
   m_rendererBase.setActiveSurfaceForNextPass(std::move(outSurface));

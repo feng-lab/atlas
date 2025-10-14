@@ -111,10 +111,10 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
-  // Composite resolve invariant: enforce single color / no depth on the final
+  // Composite resolve invariant: enforce single color attachment; depth optional
   if (stage == Stage::Final) {
-    if (formats.colorFormats.size() != 1 || formats.depthFormat.has_value()) {
-      VLOG(1) << "Skipping DDP final: expected 1 color, no depth.";
+    if (formats.colorFormats.size() != 1) {
+      VLOG(1) << "Skipping DDP final: expected exactly 1 color attachment.";
       return;
     }
   }

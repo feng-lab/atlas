@@ -47,7 +47,6 @@ void ZVulkanTextureWeightedAveragePipelineContext::resetDescriptors()
   if (m_descriptorPool) {
     m_descriptorPool->reset();
   }
-  m_lastInputs = {};
 }
 
 void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& renderer,
@@ -90,22 +89,21 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
     ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
   }
   CHECK(ds != nullptr) << "WA resolve: override descriptor allocation failed (fatal)";
-  const uint64_t accumId = payload.accumulationAttachment.id;
-  const uint64_t momentsId = payload.momentsAttachment.id;
-  if (!m_lastInputs.valid || m_lastInputs.accum != accumId) {
-    ds->updateTexture(vkbind::kBindingWAAccum, accumulationTexture, m_backend.defaultSampler());
-  }
-  if (!m_lastInputs.valid || m_lastInputs.moments != momentsId) {
-    ds->updateTexture(vkbind::kBindingWAMoments, momentsTexture, m_backend.defaultSampler());
-  }
-  m_lastInputs = {accumId, momentsId, true};
+  // Override sets are transient; every allocation hands us a fresh VkDescriptorSet with
+  // undefined bindings. Always rewrite both textures so repeated draws with identical
+  // attachments do not accidentally reuse the "empty" descriptors from a prior override
+  // allocation—a bug that left the shader sampling null images and prevented depth writes.
+  ds->updateTexture(vkbind::kBindingWAAccum, accumulationTexture, m_backend.defaultSampler());
+  ds->updateTexture(vkbind::kBindingWAMoments, momentsTexture, m_backend.defaultSampler());
 
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
   // Composite resolve invariant: single color attachment; depth optional
-  CHECK(formats.colorFormats.size() == 1)
-    << "WA resolve invariant violated: expected exactly 1 color attachment";
-  CHECK(m_backend.validateFormatsOrSkip(formats, "WA_resolve")) << "WA resolve formats mismatched with current segment";
+  CHECK_EQ(formats.colorFormats.size(), size_t{1})
+    << "WA resolve requires exactly one color attachment.";
+  if (!m_backend.validateFormatsOrSkip(formats, "WA_resolve")) {
+    return;
+  }
 
   PipelineKey key;
   key.colorFormats = formats.colorFormats;

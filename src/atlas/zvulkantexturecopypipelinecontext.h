@@ -101,7 +101,7 @@ private:
     uint64_t ddpDepth = 0; // only relevant for DDP peel stage
     uint64_t ddpFront = 0; // only relevant for DDP peel stage
     bool valid = false;
-  } m_cachedTextures;
+  } m_cachedTextures; // tracks last attachments for persistent scheduling only
   // Disabled by default: only enable when inputs are stable across frames
   bool m_enablePersistentScheduling = false;
   std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // empty layout for set indices 1/2

@@ -52,11 +52,12 @@ To make Vulkan failures loud and actionable while maintaining user-visible parit
   - Non-empty payloads with null `renderer`.
   - Parallel array size mismatches (e.g., positions vs. texcoords/colors/pickingColors), or out-of-range index issues (DCHECK for hot loops).
   - Descriptor set layouts/descriptor sets/buffers that fail to allocate or are missing during recording.
-  - Resolve/composite format contracts (e.g., WA/WB resolve must bind exactly one color attachment and no depth).
+  - Resolve/composite format contracts (e.g., WA/WB resolves must bind exactly one color attachment; a depth attachment is optional but must match the pipeline format when present).
   - Vulkan-only resource usage in Vulkan paths: do not fall back to CPU uploads or GL bridges when a Vulkan handle is expected.
 
 - Descriptor update rules:
   - Persistent/frame descriptor sets are write-once prior to recording; per-draw override sets carry volatile inputs (peels, resolves, composites). Allocation failure of an override set is fatal (CHECK).
+  - Override sets never retain their previous writes. Always rewrite every binding after allocation—even when the incoming attachments repeat—to avoid replaying empty descriptors that translate into missing colour/depth outputs.
 
 - Debug-only (DCHECK):
   - Use for expensive assertions (e.g., index range checks) to avoid runtime cost in Release.
@@ -193,7 +194,7 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
   - Add CPU-side unit hooks for the translator helpers to catch regressions without needing GL contexts.
 - **Implemented translators**
   - Lines, meshes, spheres, background quads, ellipsoids, and cones now publish Vulkan-ready batches. `ZVulkanSpherePipelineContext` mirrors the GL box-correction path and disables lighting during picking; `ZVulkanBackgroundPipelineContext` drives the pass shader via specialization constants and push constants; `ZVulkanConePipelineContext` covers all cap styles and reuses picking colours by toggling lighting/material state.
-  - Texture copy (colour + depth) now feeds Vulkan via `ZVulkanTextureCopyPipelineContext`, reusing the fullscreen quad geometry and discard/divide/multiply specialization constants. Inputs are Vulkan `AttachmentHandle`s from scratch-pool leases; no CPU GL↔Vulkan texture bridge is used.
+  - Texture copy (colour + depth) now feeds Vulkan via `ZVulkanTextureCopyPipelineContext`, reusing the fullscreen quad geometry and discard/divide/multiply specialization constants. Inputs are Vulkan `AttachmentHandle`s from scratch-pool leases; no CPU GL↔Vulkan texture bridge is used. Per-draw override descriptor sets are rewritten on every allocation so repeated attachments keep valid colour/depth samples.
   - Texture blend (dual colour/depth compositing) routes through `ZVulkanTextureBlendPipelineContext`, mapping the GL blend/priority modes onto a single specialization constant (`COMPOSE_MODE`). Inputs are Vulkan `AttachmentHandle`s; no CPU upload bridge is used.
 - Texture glow (blur + compositing) executes the two-pass separable blur and final glow combine in `ZVulkanTextureGlowPipelineContext`, translating blur parameters into push constants and using Vulkan attachments end-to-end (temporary blur images are Vulkan scratch textures). No CPU upload bridge is used.
 - Volume slices now render through `ZVulkanImgSlicePipelineContext`, matching the GL block-ID paging flow, per-channel layer array merge, and fast-path descriptors via the shared upload helpers.
@@ -285,12 +286,13 @@ Status legend: [Done], [In‑Progress], [Todo], [Blocked]
 Acceptance targets
 
 - No “bound VkDescriptorSet … destroyed or updated” errors and no “_Smplr” MSL issues on MoltenVK across DDP/WA/WB/glow/copy/blend flows.
-- Composite/resolve invariants are preserved: single color attachment; depth disabled.
+- Composite/resolve invariants are preserved: single color attachment required; optional depth attachment must match the pipeline's expected format and enables depth writes.
 
  
 
 - OIT parity for geometry/images [Done]
   - Dual depth peeling / weighted average / weighted blended now active for cones, ellipsoids, lines, meshes, spheres, and volume image layers on Vulkan.
+  - Weighted-average and weighted-blended resolves approximate `gl_FragDepth` when a depth attachment is supplied, and they rewrite their per-draw override descriptor sets every dispatch so colour/depth outputs remain valid across repeated batches.
   - `processVulkan` always reuses collected non‑opaque image leases when OIT is enabled so volume outputs participate in the same Vulkan OIT helpers before opaque/transparent compositing. The compositor skips the legacy post‑blend path in this case.
   - Vulkan execution stays isolated in the `renderTransparent*Vulkan` helpers, keeping the GL path untouched for reference.
   - File refs: src/atlas/z3dcompositor.cpp:1000, src/atlas/z3dcompositor.cpp:1120
@@ -478,7 +480,7 @@ Invariants
 
 - Pipelines
   - Key pipelines by: (shader variant, wireframe flag, fog mode) + (vector of color formats, optional depth format).
-  - Composite/resolves (background/copy/blend/glow/OIT resolves): single color attachment only, depth test/write disabled.
+  - Composite/resolves (background/copy/blend/glow) stay single-color with depth disabled; OIT resolves require a single color attachment and optionally bind a depth attachment that matches the pipeline format when depth output is requested.
 - Descriptor Sets
   - Never update a descriptor set after it’s bound within a frame. If bindings must change (DDP peel, glow), allocate per‑draw override sets from the per‑frame arena and keep them alive until the frame fence signals.
   - Always bind explicit samplers for combined image samplers (MoltenVK consistency).
@@ -504,7 +506,7 @@ Tasks
 
 1) Centralize descriptor set/binding constants for OIT/composites (header used by all contexts).
 2) Backend: include (color formats, depth format) in pipeline key and assert formats match at batch processing time.
-3) Composite pipelines: enforce single color attachment, depth off; update keys and remove depth paths.
+3) Composite pipelines: enforce single color attachment across background/copy/blend/glow, keep depth disabled there, and key OIT resolves to allow their optional depth attachment without regressing colour-only batches.
 4) Descriptor override utility: per‑draw sets for dynamic sampled inputs; track them in a per‑frame transient list to keep alive until fence.
 5) OIT alignment:
    - DDP peel: align mesh bindings to (0=depth, 1=front) with explicit samplers.
@@ -518,14 +520,14 @@ Acceptance Criteria
 - No descriptor update/invalid set errors across DDP/WA/WB paths.
 - No layout/attachment format mismatches at pipeline creation or segment begin.
 - WB final pipelines create successfully on MoltenVK (set 3 layout present); DDP peel shaders compile with explicit samplers.
-- Composite passes render with single color attachment; depth disabled.
+- Composite passes render with a single color attachment; depth remains disabled except for OIT resolves, which accept an optional depth attachment when emitting `gl_FragDepth`.
 - VLOG shows fewer beginRendering segments; no “skipping segment with no attachments” in normal flows.
 
 ### Status/Progress
 - Dynamic Rendering coalescing in place; VLOG per‑frame segment/counter logging wired (segments, clears/loads, pipelines, overrides, skipped_format_mismatch).
 - Pipeline keys extended in ZVulkan* contexts to include colorFormats[] and optional depthFormat; reuse only on format match.
 - Runtime checks: backend asserts current beginRendering formats match pipeline formats; mismatches VLOG(1) and skip batch.
-- Composite/resolve passes (DDP Final, WA Final, WB Final) forced to single color attachment; depth disabled in pipelines and surfaces; OIT UBO bound at set 3.
+- Composite/resolve passes (DDP Final, WA Final, WB Final) require a single color attachment; pipelines and surfaces accept an optional depth attachment that enables the fragment shader depth write path; OIT UBO bound at set 3.
 - Standardized bindings via `src/atlas/zvulkanbindings.h`:
   - DDP peel (set 0): binding 0 = depth blender, 1 = front blender (explicit sampler)
   - WA resolve (set 0): binding 0 = accumulation, 1 = moments

@@ -133,45 +133,37 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
       ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
     }
     CHECK(ds != nullptr) << "Texture copy: override descriptor allocation failed (fatal)";
-    // Skip unchanged writes within the frame to reduce CPU churn
-    const bool colorChanged = (!m_cachedTextures.valid || m_cachedTextures.color != desiredColor);
-    const bool depthChanged = (!m_cachedTextures.valid || m_cachedTextures.depth != desiredDepth);
-    if (colorChanged) {
-      VLOG(2) << "TextureCopy: updating binding0 color";
-      ds->updateTexture(0, colorTexture, sampler);
-    }
-    if (depthChanged) {
-      VLOG(2) << "TextureCopy: updating binding1 depth";
-      ds->updateTexture(1, depthTexture, sampler);
-    }
+    const bool attachmentsChanged = (!m_cachedTextures.valid || m_cachedTextures.color != desiredColor ||
+                                     m_cachedTextures.depth != desiredDepth ||
+                                     m_cachedTextures.ddpDepth != desiredDdpDepth ||
+                                     m_cachedTextures.ddpFront != desiredDdpFront);
+    // Override descriptor sets are newly allocated per draw; every binding must be rewritten even
+    // when the attachments repeat so we do not replay empty descriptors that would drop colour/depth.
+    VLOG(2) << "TextureCopy: writing per-draw override descriptors";
+    ds->updateTexture(0, colorTexture, sampler);
+    ds->updateTexture(1, depthTexture, sampler);
     if (ddpPeel) {
       const auto& hookPara = renderer.shaderHookPara();
       if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-        const bool ddpDepthChanged = (!m_cachedTextures.valid || m_cachedTextures.ddpDepth != desiredDdpDepth);
-        if (ddpDepthChanged) {
-          auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
-                                                m_backend.device(),
-                                                "DDP depth blender for image peel");
-          VLOG(2) << fmt::format("TextureCopy: updating DDP depth blender binding3 tex=0x{:x}",
-                                 hookPara.dualDepthPeelingDepthBlenderHandle.id);
-          ds->updateTexture(3, tex, sampler);
-        }
+        auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                              m_backend.device(),
+                                              "DDP depth blender for image peel");
+        VLOG(2) << fmt::format("TextureCopy: writing DDP depth blender binding3 tex=0x{:x}",
+                               hookPara.dualDepthPeelingDepthBlenderHandle.id);
+        ds->updateTexture(3, tex, sampler);
       }
       if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-        const bool ddpFrontChanged = (!m_cachedTextures.valid || m_cachedTextures.ddpFront != desiredDdpFront);
-        if (ddpFrontChanged) {
-          auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
-                                                m_backend.device(),
-                                                "DDP front blender for image peel");
-          VLOG(2) << fmt::format("TextureCopy: updating DDP front blender binding4 tex=0x{:x}",
-                                 hookPara.dualDepthPeelingFrontBlenderHandle.id);
-          ds->updateTexture(4, tex, sampler);
-        }
+        auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                              m_backend.device(),
+                                              "DDP front blender for image peel");
+        VLOG(2) << fmt::format("TextureCopy: writing DDP front blender binding4 tex=0x{:x}",
+                               hookPara.dualDepthPeelingFrontBlenderHandle.id);
+        ds->updateTexture(4, tex, sampler);
       }
     }
     m_cachedTextures = {desiredColor, desiredDepth, desiredDdpDepth, desiredDdpFront, true};
     // Optionally schedule a persistent rewrite for the next frame when it is safe
-    if (m_enablePersistentScheduling && m_persistentTexturesDS) {
+    if (m_enablePersistentScheduling && m_persistentTexturesDS && attachmentsChanged) {
       const uint64_t colorId = desiredColor;
       const uint64_t depthId = desiredDepth;
       const uint64_t ddpDepthId = desiredDdpDepth;
