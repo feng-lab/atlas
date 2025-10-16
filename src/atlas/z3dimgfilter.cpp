@@ -931,7 +931,8 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
         } else {
           normal = glm::normalize(normal);
         }
-        ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSliceDistanceToOrigin.get() * normal);
+        ZMesh slice =
+          ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSliceDistanceToOrigin.get() * normal);
         if (!slice.empty()) {
           slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
           m_imgSliceRenderer.addSlice(slice);
@@ -965,7 +966,8 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
         } else {
           normal = glm::normalize(normal);
         }
-        ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSlice2DistanceToOrigin.get() * normal);
+        ZMesh slice =
+          ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSlice2DistanceToOrigin.get() * normal);
         if (!slice.empty()) {
           slice.transformVerticesByMatrix(m_rendererParameters.coordTransform.get());
           m_imgSliceRenderer.addSlice(slice);
@@ -998,29 +1000,21 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
     auto& lease = m_opaqueTargets[eye];
     if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
       lease.release();
-      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F);
+      m_rendererBase.acquirePersistentTempRenderTarget2D(lease,
+                                                         m_outputSize,
+                                                         ScratchFormat::RGBA16,
+                                                         ScratchFormat::Depth32F);
     }
 
     // Record into opaque lease via Vulkan batches
-    m_rendererBase.setCollectOnly(true);
-    {
-      ClearValue clear{};
-      clear.color = glm::vec4(0.0f);
-      clear.depth = 1.0f;
-      clear.stencil = 0u;
-      m_rendererBase.setActiveSurfaceWithLoadStore(lease,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   clear);
-    }
+
+    m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
+
     m_rendererBase.recordVulkanBatchesInActiveFrame(
       [&]() {
         m_rendererBase.renderVulkan(eye, m_imgSliceRenderer);
       },
       "img_slices");
-    m_rendererBase.setCollectOnly(false);
     m_opaqueValid[eye] = true;
     return 1.0;
   }
@@ -1256,37 +1250,41 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
     auto& lease = m_transparentTargets[eye];
     if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
       lease.release();
-      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F);
+      m_rendererBase.acquirePersistentTempRenderTarget2D(lease,
+                                                         m_outputSize,
+                                                         ScratchFormat::RGBA16,
+                                                         ScratchFormat::Depth32F);
     }
 
     // Clear target, set active surface, and record batches for the raycaster and overlay
-    m_rendererBase.setCollectOnly(true);
-    // 1) raycaster (clear)
-    {
-      ClearValue clear{};
-      clear.color = glm::vec4(0.0f);
-      clear.depth = 1.0f;
-      clear.stencil = 0u;
-      m_rendererBase.setActiveSurfaceWithLoadStore(lease,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   clear);
-    }
+    // 1) raycaster (clear at the start of each pass)
+    m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
+
     // Record within the process-managed active frame
-    m_rendererBase.recordVulkanBatchesInActiveFrame([&]() {
-      m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
-    }, "raycaster");
+    m_rendererBase.recordVulkanBatchesInActiveFrame(
+      [&]() {
+        m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
+      },
+      "raycaster");
+
+    // Compute progressive progress to mirror GL behaviour
+    double progress = m_progressiveRendering ? m_imgRaycasterRenderer.progressiveProgress(eye) : 1.0;
+
     // 2) bound box overlay (no clears), same surface
-    m_rendererBase.setActiveSurface(lease);
-    m_rendererBase.recordVulkanBatchesInActiveFrame([&]() {
-      renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
-    }, "bbox_overlay");
-    m_rendererBase.setCollectOnly(false);
+    m_rendererBase.setActiveSurfaceWithLoadStore(lease, Z3DRendererBase::Preserve);
+    m_rendererBase.recordVulkanBatchesInActiveFrame(
+      [&]() {
+        renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
+      },
+      "bbox_overlay");
+
+    // Release entry/exit like GL when not progressive or once finished
+    if (!m_progressiveRendering || progress >= 1.0) {
+      m_imgRaycasterRenderer.releaseEntryExit();
+    }
 
     m_transparentValid[eye] = true;
-    return 1.0;
+    return progress;
   }
 
   Z3DRenderTarget& currentTarget = transparentTarget(eye);
@@ -1471,27 +1469,21 @@ void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
     auto& lease = m_transparentTargets[eye];
     if (!lease || lease.descriptor.size != m_outputSize || !lease.hasVulkanImage()) {
       lease.release();
-      m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F);
+      m_rendererBase.acquirePersistentTempRenderTarget2D(lease,
+                                                         m_outputSize,
+                                                         ScratchFormat::RGBA16,
+                                                         ScratchFormat::Depth32F);
     }
-    m_rendererBase.setCollectOnly(true);
-    m_rendererBase.setActiveSurface(lease);
     // Clear both color and depth for a clean overlay-only target
-    {
-      ClearValue clear{};
-      clear.color = glm::vec4(0.0f);
-      clear.depth = 1.0f;
-      clear.stencil = 0u;
-      m_rendererBase.setActiveSurfaceWithLoadStore(lease,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   LoadOp::Clear,
-                                                   StoreOp::Store,
-                                                   clear);
-    }
-    m_rendererBase.recordVulkanBatchesInActiveFrame([&]() {
-      renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
-    }, "bbox_overlay");
-    m_rendererBase.setCollectOnly(false);
+
+    m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
+
+    m_rendererBase.recordVulkanBatchesInActiveFrame(
+      [&]() {
+        renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
+      },
+      "bbox_overlay");
+
     m_transparentValid[eye] = true;
     return;
   }

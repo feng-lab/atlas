@@ -311,9 +311,13 @@ void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye, bool lastRoun
     m_round[eye] = 0;
   } else {
     if (m_channelIdx[eye] < 0 && channelCount > 0) {
+      // Initialize progressive state; do not count this as a completed full-res
+      // round so the first post-render progress reports ~0.5 (GL parity).
       m_channelIdx[eye] = 0;
+      // keep m_round[eye] at 0
+    } else {
+      ++m_round[eye];
     }
-    ++m_round[eye];
   }
 }
 
@@ -757,6 +761,33 @@ bool Z3DImgRaycasterRenderer::hasVisibleRendering() const
     }
   }
   return false;
+}
+
+double Z3DImgRaycasterRenderer::progressiveProgress(Z3DEye eye) const
+{
+  // Count visible channels
+  size_t visible = 0;
+  for (size_t i = 0; i < m_channelVisibilities.size(); ++i) {
+    if (m_channelVisibilities[i]) {
+      ++visible;
+    }
+  }
+  if (visible == 0) {
+    return 1.0;
+  }
+  // Derive progress from current channel/round state, matching GL semantics
+  const int totalRound = static_cast<int>(visible) * static_cast<int>(FLAGS_atlas_volume_rendering_maximum_round);
+  const int chan = m_channelIdx[eye];
+  const int round = m_round[eye];
+  // If chan < 0, rendering has completed for this eye
+  if (chan < 0) {
+    return 1.0;
+  }
+  const int currentRound = chan * static_cast<int>(FLAGS_atlas_volume_rendering_maximum_round) + round;
+  if (currentRound >= totalRound) {
+    return 1.0;
+  }
+  return static_cast<double>(currentRound) / static_cast<double>(totalRound) * 0.5 + 0.5;
 }
 
 void Z3DImgRaycasterRenderer::render2DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs)

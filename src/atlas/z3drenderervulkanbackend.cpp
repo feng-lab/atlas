@@ -1098,28 +1098,25 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
 void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, const Z3DCompositorPass& pass)
 {
-  // Collect-only recording of batches, then execute as a single begin/end.
-  renderer.setCollectOnly(true);
+  // Record batches, then execute as a single begin/end.
   LOG(INFO) << "processCompositorPass surface colors=" << pass.surface.colorAttachments.size()
             << " depth=" << pass.surface.depthAttachment.has_value();
   // Honor clear policy on this pass
   const LoadOp colorLoad = pass.clearColor ? LoadOp::Clear : LoadOp::Load;
   const LoadOp depthLoad = pass.clearDepth ? LoadOp::Clear : LoadOp::Load;
-  renderer.setActiveSurfaceWithLoadStore(pass.surface, colorLoad, StoreOp::Store, depthLoad, StoreOp::Store, pass.clearValue);
+  renderer
+    .setActiveSurfaceWithLoadStore(pass.surface, colorLoad, StoreOp::Store, depthLoad, StoreOp::Store, pass.clearValue);
 
   auto recordFilterBatches = [&](Z3DBoundedFilter* filter, auto&& renderFn) {
     if (!filter) {
       return;
     }
     auto& source = filter->rendererBase();
-    const bool prevCollectOnly = source.collectOnly();
     const glm::uvec4 previousViewport = source.frameState().viewport;
     const auto previousSurface = source.frameState().activeSurface;
     const auto surfaceCopy = renderer.frameState().activeSurface;
-    source.setCollectOnly(true);
     source.frameState().updateViewportData(renderer.frameState().viewport);
-    source.frameState().setActiveSurface(surfaceCopy);
-    source.clearPendingActiveSurface();
+    source.setActiveSurfaceWithLoadStore(surfaceCopy, Z3DRendererBase::Preserve);
     renderFn();
     auto& batches = source.cpuState().batches;
     for (auto& batch : batches) {
@@ -1141,9 +1138,8 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
       renderer.appendBatch(std::move(batch));
     }
     source.resetCPUState();
-    source.setCollectOnly(prevCollectOnly);
     source.frameState().updateViewportData(previousViewport);
-    source.frameState().setActiveSurface(previousSurface);
+    source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
   };
 
   // Use pass.debugLabel if provided; otherwise leave empty.
@@ -1178,8 +1174,6 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
       },
       scopeLabel);
   }
-
-  renderer.setCollectOnly(false);
 }
 
 bool Z3DRendererVulkanBackend::supportsCommandLists() const

@@ -64,6 +64,12 @@ inline Z3DPrimitiveRenderer* toRendererPointer(Z3DPrimitiveRenderer& renderer)
 class Z3DRendererBase
 {
 public:
+  // Tag type to preserve existing per-attachment Load/Store settings.
+  struct PreserveLoadStoreTag
+  {};
+  // Convenience constant for callers: set surface and preserve per-attachment policy.
+  static constexpr PreserveLoadStoreTag Preserve{};
+
   enum class ShaderHookType
   {
     Normal,
@@ -168,22 +174,6 @@ public:
 
   void executeCompositorPass(const Z3DCompositorPass& pass);
 
-  // Directly set the active surface for subsequent batches (immediate).
-  void setActiveSurface(const RendererFrameState::ActiveSurface& surface);
-  void setActiveSurface(RendererFrameState::ActiveSurface&& surface);
-  void setActiveSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
-  void clearPendingActiveSurface();
-
-  // Expose pending active surface for backends that need to preflight
-  // attachments while recording batches.
-  const std::optional<RendererFrameState::ActiveSurface>& pendingActiveSurface() const
-  {
-    return m_pendingActiveSurface;
-  }
-
-  // Legacy pending-surface APIs are removed; surfaces should be set directly
-  // via setActiveSurface or setActiveSurfaceWithLoadStore.
-
   RendererFrameState::ActiveSurface describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
   struct VulkanSurfaceBindings
@@ -229,12 +219,7 @@ public:
 
   // Helper to enforce pass ordering: set the surface for the next pass,
   // then record batches under a labeled scope with correct begin/end.
-  void executeVulkanPass(const RendererFrameState::ActiveSurface& surface,
-                         const std::function<void()>& recordBatches,
-                         std::string_view label = {});
-  void executeVulkanPass(const Z3DScratchResourcePool::RenderTargetLease& lease,
-                         const std::function<void()>& recordBatches,
-                         std::string_view label = {});
+  // Removed executeVulkanPass overloads; use setActiveSurfaceWithLoadStore + executeVulkanBatches.
 
   // ---------------------------------------------------------------------------
   // Pass setup convenience
@@ -243,20 +228,30 @@ public:
   // LoadOp/StoreOp + clear value, and apply immediately. This replaces the
   // older pending surface + pending load/store sequence.
   void setActiveSurfaceWithLoadStore(const RendererFrameState::ActiveSurface& surface,
-                                     LoadOp colorLoad = LoadOp::Load,
-                                     StoreOp colorStore = StoreOp::Store,
-                                     LoadOp depthLoad = LoadOp::Load,
-                                     StoreOp depthStore = StoreOp::Store,
+                                     LoadOp colorLoad,
+                                     StoreOp colorStore,
+                                     LoadOp depthLoad,
+                                     StoreOp depthStore,
                                      const ClearValue& clearValue = {});
 
+  // Overload: set the surface and preserve existing per-attachment Load/Store
+  // values on the provided surface description (no overrides applied).
+  void setActiveSurfaceWithLoadStore(const RendererFrameState::ActiveSurface& surface, PreserveLoadStoreTag);
+
   void setActiveSurfaceWithLoadStore(const Z3DScratchResourcePool::RenderTargetLease& lease,
-                                     LoadOp colorLoad = LoadOp::Load,
-                                     StoreOp colorStore = StoreOp::Store,
-                                     LoadOp depthLoad = LoadOp::Load,
-                                     StoreOp depthStore = StoreOp::Store,
+                                     LoadOp colorLoad,
+                                     StoreOp colorStore,
+                                     LoadOp depthLoad,
+                                     StoreOp depthStore,
                                      const ClearValue& clearValue = {})
   {
     setActiveSurfaceWithLoadStore(describeSurface(lease), colorLoad, colorStore, depthLoad, depthStore, clearValue);
+  }
+
+  // Overload for leases: preserve existing per-attachment policy.
+  void setActiveSurfaceWithLoadStore(const Z3DScratchResourcePool::RenderTargetLease& lease, PreserveLoadStoreTag)
+  {
+    setActiveSurfaceWithLoadStore(describeSurface(lease), Preserve);
   }
 
   [[nodiscard]] bool supportsCommandLists() const;
@@ -341,8 +336,8 @@ public:
 
   void render(Z3DEye eye, RendererSpan renderers);
 
-  // Explicit Vulkan-only collection entry points (do not begin/end frames).
-  // Must be called inside executeVulkanBatches/recordVulkanBatchesInActiveFrame with collectOnly=true.
+  // Explicit Vulkan-only entry points (do not begin/end frames).
+  // Must be called inside executeVulkanBatches/recordVulkanBatchesInActiveFrame.
   template<detail::RendererArgument... Renderers>
   void renderVulkan(Z3DEye eye, Renderers&&... renderers)
   {
@@ -375,16 +370,6 @@ public:
   }
 
   void renderPickingVulkan(Z3DEye eye, RendererSpan renderers);
-
-  void setCollectOnly(bool v)
-  {
-    m_collectOnly = v;
-  }
-
-  [[nodiscard]] bool collectOnly() const
-  {
-    return m_collectOnly;
-  }
 
   void setShaderHookType(ShaderHookType t)
   {
@@ -501,9 +486,6 @@ protected:
   RendererFrameState& m_frameState;
   RendererViewState& m_viewState;
   RendererSceneState& m_sceneState;
-
-  std::optional<RendererFrameState::ActiveSurface> m_pendingActiveSurface;
-  bool m_collectOnly = false;
   // renderers
   std::set<Z3DPrimitiveRenderer*> m_renderers;
 
@@ -526,8 +508,6 @@ private:
 
   // Recording-session diagnostics (Vulkan ordering/attachments invariants)
   bool m_recordingSessionOpen = false;
-  bool m_firstAppendSeenInSession = false;
-  bool m_requireAttachmentsOnFirstAppend = false;
   std::string m_currentPassLabel;
 
 public:

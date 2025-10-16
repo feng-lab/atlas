@@ -5,8 +5,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 ## Reading Order
 1. `readme.md` — build prerequisites, platform setup, high-level goals.
 2. `docs/DEVELOPER_GUIDE.md` — architecture, threading rules, rendering pipeline.
-3. `docs/VULKAN_MIGRATION_PLAN.md` — mandatory policy for backend work.
-4. `docs/USER_GUIDE.md` — product behavior reference; keep user-facing flows intact.
+3. `docs/USER_GUIDE.md` — product behavior reference; keep user-facing flows intact.
 
 ## Intent & Principles
 - High-performance 2D/3D visualization built in modern C++20 with Qt, OpenGL, and emerging Vulkan support.
@@ -46,6 +45,9 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - When touching numerics or serialization, add or extend tests in `test/` (GoogleTest). Use the `add_gtest_executable` macro defined in `test/test.cmake`.
 - Benchmark additions go in `test/zbenchmark.cpp` and must be guarded to avoid shipping long-running jobs.
 
+## C++ Conventions
+- Avoid `friend` declarations. Do not use `friend` classes or functions unless there is a compelling, well-documented reason that cannot be achieved with proper encapsulation (interfaces, accessors, or helper functions). If you must use `friend`, document the rationale inline at the declaration site and in the PR description.
+
 ## Architecture Highlights
 - **UI Thread**: owns `ZMainWindow`, `Z3DCanvas`, menus, docks. No direct renderer mutations.
 - **Rendering Thread**: `Z3DRenderingEngine` + `Z3DCompositor`; holds global parameters (`Z3DGlobalParameters`) and scratch pool.
@@ -75,7 +77,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 ## Vulkan Migration Guardrails
 - Follow the façade-first approach: filters talk to API-neutral renderers; backends plug in beneath `Z3DRendererBase`.
 - Maintain feature parity: UI, parameters, and public APIs must not diverge between OpenGL and Vulkan.
-- Document any backend limitations or temporary gaps in `docs/VULKAN_MIGRATION_PLAN.md` and the issue tracker.
+- Document any backend limitations or temporary gaps in `docs/DEVELOPER_GUIDE.md` (Vulkan sections) and the issue tracker.
  - Invariant policy (Vulkan):
    - Match GL for benign skips (empty payloads, paging not ready, missing picking colors where GL also skips). Use early return.
    - For “should never happen” states, fail fast with `CHECK` (not silent return): null `renderer` on non-empty payloads; array size mismatches; missing/failed descriptor or buffer allocations; resolve/composite format contract violations.

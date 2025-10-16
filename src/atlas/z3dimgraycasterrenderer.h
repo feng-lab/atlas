@@ -64,6 +64,9 @@ public:
   void compile() override;
 
   double renderProgressively(Z3DEye eye);
+  // Report progressive progress for Vulkan/GL-agnostic callers.
+  // Returns [0.5,1.0] during progressive accumulation, or 1.0 when complete/not started.
+  double progressiveProgress(Z3DEye eye) const;
 
   void enqueueRenderBatches(Z3DEye eye, RenderBackend backend, bool picking) override;
 

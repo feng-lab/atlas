@@ -118,15 +118,13 @@ Compositor and Rendering
 - `Z3DNetworkEvaluator` executes the filter graph and drives progressive updates.
 - `Z3DGlobalParameters` holds camera, lights, fog, global cuts, device pixel ratio, and scratch resource pool.
 
-Vulkan Migration Snapshots
+Vulkan Notes
 
-- Detailed migration backlog now lives in `docs/VULKAN_MIGRATION_PLAN.md`. Treat it as the canonical task list for Vulkan parity and update it whenever plans change.
-- Backend selection remains a session-level switch. GL stays the default renderer while the Vulkan translation layer comes online; runtime hot-swapping will be revisited once the translators cover the major primitives.
-- Filters continue to own their GL renderers. When we add Vulkan support, renderers expose backend‑neutral batch data via `enqueueRenderBatches` which the Vulkan path consumes. We do not refactor GL draw paths; instead we provide explicit Vulkan entry points in `Z3DRendererBase` that collect batches only (no implicit frame begin/end).
-- Render-surface façade work is paused. Per-eye `Z3DRenderTarget` leases stay with each filter, and consumers pull textures via existing helper accessors. Vulkan dynamic rendering targets are bound via `RendererFrameState::ActiveSurface` and are applied before recording through explicit pass helpers.
-- Several `ZParameter` instances still live inside renderers (GL only). As Vulkan coverage expands, audit each renderer, move persistent parameter state to its owning filter (or a shared bundle), and keep only transient GPU resources inside the renderer so backend resets don’t drop user-facing state.
-- Naming convention: 3D/shared classes use the `Z3D` prefix (e.g., `Z3DImgFilter`, `Z3DRenderSurfaceOutputPort`), while Vulkan-specific helpers use the `ZVulkan` prefix (e.g., `ZVulkanLinePipelineContext`). Keep new files aligned with this scheme for clarity across backends.
-- Renderer subclasses still implement `createResources(RenderBackend backend)` and must guard against unsupported APIs (current GL implementations simply return when `backend != RenderBackend::OpenGL`). This keeps future backend transitions from instantiating GL shaders/VAOs during staging.
+- Backend selection is a session-level switch. GL remains supported; Vulkan is the preferred backend for parity.
+- Renderers expose backend‑neutral batch data via `enqueueRenderBatches`; Vulkan records via the explicit entry points in `Z3DRendererBase` (no implicit frame begin/end).
+- Per-eye `Z3DScratchResourcePool` leases stay with each filter. Vulkan dynamic rendering targets are expressed via `RendererFrameState::ActiveSurface` and set with `setActiveSurfaceWithLoadStore(...)` at the call site.
+- Keep renderer parameters persistent at the filter; renderer objects hold transient GPU resources only.
+- Naming convention: cross‑backend code uses `Z3D*`; Vulkan-only uses `ZVulkan*`.
 
 Vulkan Pipeline Invariants
 
@@ -135,6 +133,14 @@ Vulkan Pipeline Invariants
 - Composite/resolve passes (DDP final, WA resolve, WB resolve) must write to exactly one color attachment; depth is disabled in the pipeline and no depth attachment is bound.
 - Descriptor updates after binding are forbidden. Per‑draw overrides are allocated from the backend’s per‑frame arena and kept alive until the frame fence to satisfy validation rules.
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
+
+Descriptor & Recording Guardrails (Vulkan)
+
+- No descriptor writes while a frame is recording. Persistent/frame descriptor sets are write-once before `vkCmdBeginRendering`; per‑draw override sets are allowed during recording.
+- Volatile inputs must use per‑draw override sets (e.g., DDP peel/resolve, WA/WB resolves, glow/copy/blend sources).
+- Prefer explicit or immutable samplers in set layouts to avoid platform-specific sampler class issues.
+- Per‑frame descriptor arenas are monotonic: allocate during the frame, reset once after the frame fence. Clear transient override sets before reset.
+- Validation/telemetry: end‑of‑frame VLOG may include segment counts, descriptor guardrail counters, and skip reasons (format mismatches, etc.).
 
 Pipeline Context Recorder
 
@@ -231,23 +237,34 @@ Vulkan Entry Points (explicit)
 
 - OpenGL entry points remain `render(...)` and `renderPicking(...)`. These drive the GL path and may begin/end GL frames as needed.
 - Vulkan uses explicit, collection‑only entry points in `Z3DRendererBase`:
-  - Execute (may open/close the frame): `executeVulkanBatches(fn, label)` / `executeVulkanPass(surfaceOrLease, fn, label)`
-    - Apply any pending surface, begin the Vulkan frame if none is active, set a GPU scope label, run `fn`, submit, and end the frame unless already active.
+- Execute (may open/close the frame): `executeVulkanBatches(fn, label)`
+  - Begin the Vulkan frame if none is active, set a GPU scope label, run `fn`, submit, and end the frame unless already active.
   - Record within an already‑open frame (never opens/closes): `recordVulkanBatchesInActiveFrame(fn, label)`
     - Asserts an active frame (`beginVulkanFrame()` must have been called by the owner) and performs the same session invariants and submission.
   - Enqueue only: `renderVulkan(eye, ...)` / `renderPickingVulkan(eye, ...)`
-    - Enqueue backend‑neutral batches only. These assert Vulkan backend and `collectOnly==true`.
+- Enqueue backend‑neutral batches only. These assert Vulkan backend.
+  - Aggregators may call `renderVulkan`/`renderPickingVulkan` on source renderers outside an active recording
+    session to collect CPU batches only; submission (begin/end frame and emit) must be done by the owning renderer
+    via `executeVulkanBatches` or `recordVulkanBatchesInActiveFrame`.
 - Invariants:
-  - For Vulkan, call `renderVulkan`/`renderPickingVulkan` only inside an execute/record block with `collectOnly=true`.
+- For Vulkan, call `renderVulkan`/`renderPickingVulkan` inside an execute/record block when emitting from the same
+  renderer that will submit. Aggregation workflows can collect from other renderers out of session and then append
+  those batches to the submitting renderer.
   - A valid active surface must be set before the first append in a recording session, or the first batch must carry attachments explicitly. Violations cause a CHECK and include the pass label.
+
+Pass setup patterns (setActiveSurfaceWithLoadStore):
+- Clear + write: `renderer.setActiveSurfaceWithLoadStore(surfaceOrLease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store, clear)`
+- Overlay (preserve color, reset depth): `renderer.setActiveSurfaceWithLoadStore(surfaceOrLease, LoadOp::Load, StoreOp::Store, LoadOp::Clear, StoreOp::Store, clear)`
+- Preserve per‑attachment policy (DDP/WA/WB surfaces): `renderer.setActiveSurfaceWithLoadStore(surfaceOrLease, Preserve)`
 
 Example (pseudocode)
 
 ```
 // Simple: execute (may open/close frame for you)
 renderer.setCollectOnly(true);
-renderer.setActiveSurfaceForNextPass(lease);
-renderer.executeVulkanPass(lease, [&]{
+// Clear+Store both color and depth at pass start
+renderer.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store, {});
+renderer.executeVulkanBatches([&]{
   renderer.renderVulkan(eye, myRenderer);
 }, "my_pass");
 renderer.setCollectOnly(false);
@@ -256,7 +273,8 @@ renderer.setCollectOnly(false);
 renderer.beginVulkanFrame();
 auto guard = folly::makeGuard([&]{ renderer.endVulkanFrame(); });
 renderer.setCollectOnly(true);
-renderer.setActiveSurfaceForNextPass(lease);
+// Preserve per-attachment load/store on surfaces that encode policy (e.g., OIT)
+renderer.setActiveSurfaceWithLoadStore(lease, Preserve);
 renderer.recordVulkanBatchesInActiveFrame([&]{
   renderer.renderVulkan(eye, myRenderer);
 }, "my_pass");
