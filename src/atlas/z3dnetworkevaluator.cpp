@@ -5,6 +5,8 @@
 #include "z3dfilter.h"
 #include "z3dmeshfilter.h"
 #include "zlog.h"
+#include "z3dperfcollector.h"
+#include "z3drenderglobalstate.h"
 #include "zcancellation.h"
 #include <boost/graph/topological_sort.hpp>
 #include <algorithm>
@@ -62,7 +64,10 @@ Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly
 
   const bool glMode = (m_compositor.rendererBase().activeBackend() == RenderBackend::OpenGL);
 
-  // notify filter wrappers
+  // Mark the start of a new user-visible frame for perf aggregation (create new token first)
+  Z3DRenderGlobalState::instance().beginNewPerfFrameToken();
+
+  // notify filter wrappers (now that token is available for tagging)
   for (auto& filterWrapper : m_filterWrappers) {
     if (!glMode && dynamic_cast<Z3DCheckOpenGLStateFilterWrapper*>(filterWrapper.get()) != nullptr) {
       continue;
@@ -177,6 +182,10 @@ Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly
     filterWrapper->afterNetworkProcess();
   }
   CHECK_GL_ERROR
+
+  // Mark the current perf frame token as closed for aggregation. Actual flush
+  // occurs after query results are ingested on the next submission.
+  nim::Z3DPerfCollector::instance().markClosed(Z3DRenderGlobalState::instance().currentPerfFrameToken());
 
   // m_locked = false;
 
@@ -391,7 +400,9 @@ void Z3DProfileFilterWrapper::afterFilterProcess(const Z3DFilter* p)
 
 void Z3DProfileFilterWrapper::beforeNetworkProcess()
 {
-  m_benchTimer.resetAndStart();
+  // Tag the network timer with the current perf frame token for correlation
+  const uint64_t token = Z3DRenderGlobalState::instance().currentPerfFrameToken();
+  m_benchTimer.resetAndStart(fmt::format("Network [frame#{}]", token));
 }
 
 void Z3DProfileFilterWrapper::afterNetworkProcess()

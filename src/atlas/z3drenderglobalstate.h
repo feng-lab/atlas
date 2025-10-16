@@ -53,6 +53,24 @@ public:
   void ensureViewState(const Z3DCamera& camera);
   void ensureSceneState(const Z3DGlobalParameters& params);
 
+  // ---------------------------------------------------------------------------
+  // Performance aggregation helpers
+  // ---------------------------------------------------------------------------
+  // A monotonically increasing token that identifies a user‑visible "real frame".
+  // Emitted once per Z3DNetworkEvaluator::process() call and propagated to the
+  // Vulkan backend so multiple submissions can be aggregated.
+  uint64_t currentPerfFrameToken() const
+  {
+    return m_currentPerfFrameToken;
+  }
+
+  // Start a new perf frame token (increments by 1).
+  uint64_t beginNewPerfFrameToken()
+  {
+    ++m_currentPerfFrameToken;
+    return m_currentPerfFrameToken;
+  }
+
 private:
   Z3DRenderGlobalState();
 
@@ -61,6 +79,9 @@ private:
   std::unique_ptr<folly::CancellationSource> m_cancellationSource;
   Z3DScratchResourcePool* m_scratchPool = nullptr;
   RendererSharedState m_rendererState;
+
+  // Monotonically increasing identifier for performance aggregation.
+  uint64_t m_currentPerfFrameToken = 0;
 };
 
 } // namespace nim

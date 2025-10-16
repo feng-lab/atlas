@@ -432,6 +432,7 @@ set(SOURCES
     z3drendererbackend.h z3drendererglbackend.cpp
     z3drenderervulkanbackend.h z3drenderervulkanbackend.cpp
     z3drenderglobalstate.h z3drenderglobalstate.cpp
+    z3dperfcollector.h z3dperfcollector.cpp
     z3dprimitiverenderer.h z3dprimitiverenderer.cpp
     z3dcanvaspainter.h z3dcanvaspainter.cpp
     z3dnetworkevaluator.h z3dnetworkevaluator.cpp

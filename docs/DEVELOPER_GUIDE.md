@@ -134,6 +134,14 @@ Vulkan Pipeline Invariants
 - Descriptor updates after binding are forbidden. Per‑draw overrides are allocated from the backend’s per‑frame arena and kept alive until the frame fence to satisfy validation rules.
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
 
+Performance Instrumentation
+
+- Aggregated frame timing: the rendering engine emits a monotonically increasing token per user‑visible frame (one `Z3DNetworkEvaluator::process()` call). The Vulkan backend tags each submission with this token and a submission index.
+- Per‑submission CPU and GPU scopes are ingested and a single summary is logged once a token is safe to flush (typically on the next submission, after fences signal). Summaries appear at `VLOG(1)`.
+- Modes (gflags):
+  - `--atlas_perf_mode=off|light|full` (default `light`). `full` adds nested per‑filter GPU scopes inside compositor passes.
+  - `--atlas_perf_trace=/path/to/trace.json` writes a Chrome trace file for each flushed frame (overwrites).
+
 Descriptor & Recording Guardrails (Vulkan)
 
 - No descriptor writes while a frame is recording. Persistent/frame descriptor sets are write-once before `vkCmdBeginRendering`; per‑draw override sets are allowed during recording.

@@ -32,6 +32,7 @@
 #include "z3drenderglobalstate.h"
 #include "z3dscratchresourcepool.h"
 #include "zvulkanbuffer.h"
+#include "z3dperfcollector.h"
 
 #include <algorithm>
 #include <array>
@@ -46,6 +47,8 @@
 DEFINE_bool(vk_reserve_upload_slices,
             true,
             "Reserve per-draw upload arena capacity (precise) before suballocation to avoid mid-upload growth");
+DECLARE_string(atlas_perf_mode);
+DECLARE_bool(atlas_perf_trace_calibrated);
 
 namespace nim {
 
@@ -114,6 +117,9 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
       collectFrameTimings(frame);
     }
   }
+
+  // Flush any closed perf tokens now that we've ingested outstanding timings.
+  Z3DPerfCollector::instance().maybeFlush(true);
 
   resetFrameResources();
 }
@@ -266,6 +272,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.nextQuery = 0;
   frameResources.cpuStart = std::chrono::steady_clock::now();
   frameResources.cpuEnd = {};
+  // Tag this submission with the current real-frame token and a submission index
+  frameResources.realFrameToken = Z3DRenderGlobalState::instance().currentPerfFrameToken();
+  frameResources.submissionId = ++m_submissionCursor[frameResources.realFrameToken];
   // Reset Stage 3 instrumentation
   frameResources.renderingSegmentsBegan = 0;
   frameResources.attachmentClears = 0;
@@ -1161,15 +1170,49 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
       [&]() {
         // Opaque first
         for (auto* filter : pass.opaqueFilters) {
-          recordFilterBatches(filter, [&]() {
-            filter->renderOpaque(pass.eye);
-          });
+          const bool fullPerf = (FLAGS_atlas_perf_mode == std::string("full"));
+          if (fullPerf && filter) {
+            auto label =
+              fmt::format("comp.opaque:{}@{}", filter->className().toStdString(), static_cast<const void*>(filter));
+            if (auto scope = beginGpuScope(label)) {
+              recordFilterBatches(filter, [&]() {
+                filter->renderOpaque(pass.eye);
+              });
+              endGpuScope(*scope);
+            } else {
+              recordFilterBatches(filter, [&]() {
+                filter->renderOpaque(pass.eye);
+              });
+            }
+          } else {
+            recordFilterBatches(filter, [&]() {
+              filter->renderOpaque(pass.eye);
+            });
+          }
         }
         // Then transparent
         for (const auto& tb : pass.transparentFilters) {
-          recordFilterBatches(tb.filter, [&]() {
-            tb.filter->renderTransparent(pass.eye);
-          });
+          const bool fullPerf = (FLAGS_atlas_perf_mode == std::string("full"));
+          auto* filter = tb.filter;
+          if (fullPerf && filter) {
+            auto label = fmt::format("comp.transparent:{}@{}",
+                                     filter->className().toStdString(),
+                                     static_cast<const void*>(filter));
+            if (auto scope = beginGpuScope(label)) {
+              recordFilterBatches(filter, [&]() {
+                filter->renderTransparent(pass.eye);
+              });
+              endGpuScope(*scope);
+            } else {
+              recordFilterBatches(filter, [&]() {
+                filter->renderTransparent(pass.eye);
+              });
+            }
+          } else {
+            recordFilterBatches(filter, [&]() {
+              filter->renderTransparent(pass.eye);
+            });
+          }
         }
       },
       scopeLabel);
@@ -1651,6 +1694,38 @@ void Z3DRendererVulkanBackend::ensureDevice()
   if (m_sharedDevice != dev) {
     m_sharedDevice = dev;
     resetFrameResources();
+    // Refresh timestamp period from the new physical device (ns per tick)
+    try {
+      auto& phys = m_sharedDevice->context().physicalDevice();
+      auto props = phys.getProperties();
+      m_timestampPeriod = props.limits.timestampPeriod; // nanoseconds per tick
+      if (m_timestampPeriod <= 0.0f) {
+        m_timestampPeriod = 1.0f;
+      }
+      if (!m_loggedCalibrationInfo) {
+        try {
+          auto domains = phys.getCalibrateableTimeDomainsEXT();
+          bool supported = !domains.empty();
+          std::string domList;
+          for (size_t i = 0; i < domains.size(); ++i) {
+            domList += vk::to_string(domains[i]);
+            if (i + 1 < domains.size()) {
+              domList += ",";
+            }
+          }
+          LOG(INFO) << "VK calibrated timestamps: supported=" << supported << " domains=[" << domList
+                    << "] timestampPeriod=" << m_timestampPeriod << " ns/tick";
+        }
+        catch (...) {
+          LOG(INFO) << "VK calibrated timestamps: query not available; timestampPeriod=" << m_timestampPeriod
+                    << " ns/tick";
+        }
+        m_loggedCalibrationInfo = true;
+      }
+    }
+    catch (...) {
+      m_timestampPeriod = 1.0f;
+    }
   }
 }
 
@@ -2035,9 +2110,72 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
   }
 
   const double cpuMs = std::chrono::duration<double, std::milli>(frame.cpuEnd - frame.cpuStart).count();
-  std::string message = fmt::format("VK batches CPU {:.3f} ms", cpuMs);
+  std::string message;
+  if (frame.realFrameToken != 0) {
+    message =
+      fmt::format("VK batches [frame#{} sub#{}] CPU {:.3f} ms", frame.realFrameToken, frame.submissionId, cpuMs);
+  } else {
+    message = fmt::format("VK batches CPU {:.3f} ms", cpuMs);
+  }
+
+  // Calibration state (used for trace timestamp alignment)
+  bool haveCalibration = false;
+  uint64_t deviceCalibTicks = 0;
+  uint64_t hostCalibNs = 0;
 
   if (frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
+    // Optional calibration: map GPU ticks to CPU nanoseconds for trace alignment
+    if (FLAGS_atlas_perf_trace_calibrated) {
+      try {
+        // Check time domain support
+        auto& phys = m_sharedDevice->context().physicalDevice();
+        auto domains = phys.getCalibrateableTimeDomainsEXT();
+        bool haveDevice = false, haveMono = false;
+        for (auto d : domains) {
+          if (d == vk::TimeDomainEXT::eDevice) {
+            haveDevice = true;
+          }
+          if (d == vk::TimeDomainEXT::eClockMonotonic) {
+            haveMono = true;
+          }
+        }
+        if (haveDevice && haveMono) {
+          vk::CalibratedTimestampInfoKHR infoDev{};
+          infoDev.timeDomain = vk::TimeDomainKHR::eDevice;
+          vk::CalibratedTimestampInfoKHR infoMono{};
+          infoMono.timeDomain = vk::TimeDomainKHR::eClockMonotonic;
+          std::array<vk::CalibratedTimestampInfoKHR, 2> infos{infoDev, infoMono};
+          auto& dev = m_sharedDevice->context().device();
+          // Vulkan-Hpp returns {timestamps, maxDeviation} here and throws on failure.
+          auto [timestamps, maxDeviation] = dev.getCalibratedTimestampsEXT(infos);
+          (void)maxDeviation; // not used currently
+          if (timestamps.size() >= 2) {
+            deviceCalibTicks = timestamps[0];
+            hostCalibNs = timestamps[1];
+            haveCalibration = true;
+            if (VLOG_IS_ON(2)) {
+              VLOG(2) << "VK calibration ok: deviceTicks=" << deviceCalibTicks << " hostNs=" << hostCalibNs
+                      << " maxDeviationNs=" << maxDeviation << " tickPeriodNs=" << m_timestampPeriod;
+            }
+          } else {
+            if (VLOG_IS_ON(2)) {
+              VLOG(2) << "VK calibration returned insufficient timestamps: count=" << timestamps.size();
+            }
+          }
+        } else {
+          if (VLOG_IS_ON(2)) {
+            VLOG(2) << "VK calibration skipped: required time domains not both supported (device=" << haveDevice
+                    << ", monotonic=" << haveMono << ")";
+          }
+        }
+      }
+      catch (...) {
+        haveCalibration = false;
+        if (VLOG_IS_ON(2)) {
+          VLOG(2) << "VK calibration threw; falling back to uncalibrated timestamps";
+        }
+      }
+    }
     const auto [result, queryData] = frame.queryPool.getResults<uint64_t>(0,
                                                                           frame.nextQuery,
                                                                           frame.nextQuery * sizeof(uint64_t),
@@ -2070,6 +2208,73 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
   }
 
   VLOG(1) << message;
+
+  // Feed the perf collector with per-submission scopes for aggregation under the real-frame token.
+  std::vector<Z3DPerfCollector::Scope> gpuScopesForCollector;
+  std::vector<Z3DPerfCollector::Scope> cpuScopesForCollector;
+
+  // Re-fetch timestamp query data to compute ms for GPU scopes (we already have message; reconstruct ms values)
+  if (frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
+    const auto [result, queryData] = frame.queryPool.getResults<uint64_t>(0,
+                                                                          frame.nextQuery,
+                                                                          frame.nextQuery * sizeof(uint64_t),
+                                                                          sizeof(uint64_t),
+                                                                          vk::QueryResultFlagBits::e64);
+    if (result == vk::Result::eSuccess) {
+      for (const auto& scope : frame.gpuScopes) {
+        if (scope.endQuery >= queryData.size() || scope.startQuery >= queryData.size()) {
+          continue;
+        }
+        const uint64_t endTicks = queryData[scope.endQuery];
+        const uint64_t startTicks = queryData[scope.startQuery];
+        if (endTicks <= startTicks) {
+          continue;
+        }
+        const double ns = static_cast<double>(endTicks - startTicks) * static_cast<double>(m_timestampPeriod);
+        const double ms = ns * 1e-6;
+        Z3DPerfCollector::Scope sc{scope.label, ms};
+        if (haveCalibration) {
+          const double startNsCpu = static_cast<double>(hostCalibNs) +
+                                    (static_cast<double>(startTicks) - static_cast<double>(deviceCalibTicks)) *
+                                      static_cast<double>(m_timestampPeriod);
+          sc.tsUs = startNsCpu * 1e-3;
+        }
+        gpuScopesForCollector.push_back(std::move(sc));
+      }
+    }
+  }
+
+  for (const auto& cs : frame.cpuScopes) {
+    cpuScopesForCollector.push_back(Z3DPerfCollector::Scope{cs.label, cs.milliseconds});
+  }
+
+  if (frame.realFrameToken != 0) {
+    Z3DPerfCollector::Stats stats{};
+    stats.descriptorSetsAllocated = frame.descriptorSetsAllocated;
+    stats.overrideSetsAllocated = frame.overrideSetsAllocated;
+    stats.pipelinesCreated = frame.pipelinesCreated;
+    stats.pipelinesBoundCount = static_cast<uint32_t>(frame.pipelinesBound.size());
+    stats.renderingSegmentsBegan = frame.renderingSegmentsBegan;
+    stats.attachmentClears = frame.attachmentClears;
+    stats.attachmentLoads = frame.attachmentLoads;
+    stats.descriptorWritesWhileRecording = frame.descriptorWritesWhileRecording;
+    stats.boundSetRewriteAttempts = frame.boundSetRewriteAttempts;
+    stats.uploadHighWatermarkBytes = frame.uploadArena.highWatermark;
+    stats.staticBytesStaged = frame.staticBytesStaged;
+    stats.linesBytesStaged = frame.linesBytesStaged;
+    stats.fontsBytesStaged = frame.fontsBytesStaged;
+    stats.meshesBytesStaged = frame.meshesBytesStaged;
+    stats.spheresBytesStaged = frame.spheresBytesStaged;
+    stats.readbackBytesCopied = frame.readbackBytesCopied;
+    stats.readbackSlotsInFlight = frame.readbackSlotsInFlight;
+
+    Z3DPerfCollector::instance().addSubmission(frame.realFrameToken,
+                                               frame.submissionId,
+                                               cpuMs,
+                                               std::move(gpuScopesForCollector),
+                                               std::move(cpuScopesForCollector),
+                                               stats);
+  }
 
   frame.gpuScopes.clear();
   frame.cpuScopes.clear();
