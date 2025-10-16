@@ -168,11 +168,10 @@ public:
 
   void executeCompositorPass(const Z3DCompositorPass& pass);
 
-  void setActiveSurfaceForNextPass(const RendererFrameState::ActiveSurface& surface);
-  void setActiveSurfaceForNextPass(RendererFrameState::ActiveSurface&& surface);
-  void setActiveSurfaceForNextPass(const Z3DScratchResourcePool::RenderTargetLease& lease);
-  void setPendingColorAttachmentsLoadStore(LoadOp loadOp, StoreOp storeOp, const ClearValue& clearValue = {});
-  void setPendingDepthAttachmentLoadStore(LoadOp loadOp, StoreOp storeOp, const ClearValue& clearValue = {});
+  // Directly set the active surface for subsequent batches (immediate).
+  void setActiveSurface(const RendererFrameState::ActiveSurface& surface);
+  void setActiveSurface(RendererFrameState::ActiveSurface&& surface);
+  void setActiveSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
   void clearPendingActiveSurface();
 
   // Expose pending active surface for backends that need to preflight
@@ -181,6 +180,9 @@ public:
   {
     return m_pendingActiveSurface;
   }
+
+  // Legacy pending-surface APIs are removed; surfaces should be set directly
+  // via setActiveSurface or setActiveSurfaceWithLoadStore.
 
   RendererFrameState::ActiveSurface describeSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
@@ -200,8 +202,8 @@ public:
 
   void beginVulkanFrame();
   void endVulkanFrame();
-  // Keep a Vulkan frame open across multiple recordVulkanBatches calls.
-  // When enabled, a frame begun inside recordVulkanBatches will not be
+  // Keep a Vulkan frame open across multiple batch recordings.
+  // When enabled, a frame begun inside executeVulkanBatches will not be
   // automatically ended; callers must end it explicitly.
   void setKeepVulkanFrameOpen(bool keep)
   {
@@ -215,16 +217,47 @@ public:
   {
     return m_vulkanFrameActive;
   }
-  void recordVulkanBatches(const std::function<void()>& recordBatches, std::string_view label = {});
+  // Variant that requires an already active Vulkan frame and never begins/ends it.
+  // Performs the same recording/session invariants and submits the batches.
+  // Use when the caller explicitly manages beginVulkanFrame/endVulkanFrame.
+  void recordVulkanBatchesInActiveFrame(const std::function<void()>& recordBatches, std::string_view label = {});
+
+  // Clearer aliases for record-and-execute flows (may begin/end the frame):
+  // These apply pending surfaces, open a frame if needed, record, submit,
+  // and end the frame if it was opened here.
+  void executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label = {});
 
   // Helper to enforce pass ordering: set the surface for the next pass,
   // then record batches under a labeled scope with correct begin/end.
-  void recordVulkanPass(const RendererFrameState::ActiveSurface& surface,
-                        const std::function<void()>& recordBatches,
-                        std::string_view label = {});
-  void recordVulkanPass(const Z3DScratchResourcePool::RenderTargetLease& lease,
-                        const std::function<void()>& recordBatches,
-                        std::string_view label = {});
+  void executeVulkanPass(const RendererFrameState::ActiveSurface& surface,
+                         const std::function<void()>& recordBatches,
+                         std::string_view label = {});
+  void executeVulkanPass(const Z3DScratchResourcePool::RenderTargetLease& lease,
+                         const std::function<void()>& recordBatches,
+                         std::string_view label = {});
+
+  // ---------------------------------------------------------------------------
+  // Pass setup convenience
+  // ---------------------------------------------------------------------------
+  // Convenience to set a surface for the next pass, set color/depth
+  // LoadOp/StoreOp + clear value, and apply immediately. This replaces the
+  // older pending surface + pending load/store sequence.
+  void setActiveSurfaceWithLoadStore(const RendererFrameState::ActiveSurface& surface,
+                                     LoadOp colorLoad = LoadOp::Load,
+                                     StoreOp colorStore = StoreOp::Store,
+                                     LoadOp depthLoad = LoadOp::Load,
+                                     StoreOp depthStore = StoreOp::Store,
+                                     const ClearValue& clearValue = {});
+
+  void setActiveSurfaceWithLoadStore(const Z3DScratchResourcePool::RenderTargetLease& lease,
+                                     LoadOp colorLoad = LoadOp::Load,
+                                     StoreOp colorStore = StoreOp::Store,
+                                     LoadOp depthLoad = LoadOp::Load,
+                                     StoreOp depthStore = StoreOp::Store,
+                                     const ClearValue& clearValue = {})
+  {
+    setActiveSurfaceWithLoadStore(describeSurface(lease), colorLoad, colorStore, depthLoad, depthStore, clearValue);
+  }
 
   [[nodiscard]] bool supportsCommandLists() const;
 
@@ -309,7 +342,7 @@ public:
   void render(Z3DEye eye, RendererSpan renderers);
 
   // Explicit Vulkan-only collection entry points (do not begin/end frames).
-  // Must be called under recordVulkanBatches/recordVulkanPass with collectOnly=true.
+  // Must be called inside executeVulkanBatches/recordVulkanBatchesInActiveFrame with collectOnly=true.
   template<detail::RendererArgument... Renderers>
   void renderVulkan(Z3DEye eye, Renderers&&... renderers)
   {

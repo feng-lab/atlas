@@ -25,19 +25,22 @@ These instructions are mandatory for every migration change; do not deviate from
 - You can use `cmake --build build/Release` to verify compositor changes still compile before pushing them further.
 - **Never run `git checkout`**; we might lose progress forever.
 - Build Vulkan features by translating the existing GL renderer data. Avoid rewriting the GL draw paths; expose the geometry/state they already use and feed that into Vulkan.
-- Dynamic rendering stays the foundation for command recording. Renderers provide backend-neutral batches (via the `enqueueRenderBatches` hook). The Vulkan path records through explicit entry points (`recordVulkanBatches`/`recordVulkanPass`) and enqueues via `renderVulkan`/`renderPickingVulkan`.
+- Dynamic rendering stays the foundation for command recording. Renderers provide backend-neutral batches (via the `enqueueRenderBatches` hook). The Vulkan path records through explicit entry points (`executeVulkanBatches/executeVulkanPass` or `recordVulkanBatchesInActiveFrame`) and enqueues via `renderVulkan`/`renderPickingVulkan`.
 
 #### 2025-10 Strictness Updates
 
 - Descriptor writes during recording now crash unless using a per-draw override set. All persistent/frame descriptor sets must be fully written before `vkCmdBeginRendering` on the current command buffer. Any violation triggers a CHECK.
 - Dynamic rendering invariants are enforced: if a pipeline’s attachment formats do not match the currently open dynamic rendering segment, the backend aborts with a CHECK instead of skipping.
-- Surface invariants (new): Vulkan batches must never record without attachments. A pass must set an active surface before the first append, or the batch must provide attachments explicitly. `recordVulkanBatches` applies any pending surface before beginning a Vulkan frame; missing attachments on the first append cause a CHECK that includes the pass label and shader hook type.
+- Surface invariants (new): Vulkan batches must never record without attachments. A pass must set an active surface before the first append, or the batch must provide attachments explicitly. `executeVulkanBatches` and `recordVulkanBatchesInActiveFrame` apply any pending surface before recording; missing attachments on the first append cause a CHECK that includes the pass label and shader hook type.
 - Pipeline context enforcement (new): all Vulkan passes must record via `ZVulkanPipelineCommandRecorder` with fully populated specs. The debug tracker guards viewport/scissor/dynamic-state completeness, descriptor coverage, push constants, and attachment layout transitions (toggle with `--atlas_vk_enforce_pipeline_context` when diagnosing platform issues).
 
 #### Vulkan Entry Points (separation from GL)
 
 - OpenGL path: use `render(...)` and `renderPicking(...)` (GL immediate mode), which may begin/end frames.
-- Vulkan path: always wrap work with `recordVulkanBatches(fn, label)` or `recordVulkanPass(surfaceOrLease, fn, label)` and set `collectOnly=true` while recording. Inside the block, call `renderVulkan(eye, ...)` or `renderPickingVulkan(eye, ...)` to enqueue batches only (no begin/end).
+- Vulkan path: prefer explicit execute/record helpers and keep collection‑only rendering:
+  - Execute (may open/close the frame): `executeVulkanBatches(fn, label)` or `executeVulkanPass(surfaceOrLease, fn, label)`.
+  - Record within an already‑open frame (never opens/closes): `recordVulkanBatchesInActiveFrame(fn, label)`; the caller must have invoked `beginVulkanFrame()` and must call `endVulkanFrame()` (a simple `folly::makeGuard` at the call site is recommended).
+  - Inside these blocks, call `renderVulkan(eye, ...)` or `renderPickingVulkan(eye, ...)` to enqueue batches; do not begin/end rendering from within renderers.
 - Calling GL entry points while the backend is Vulkan is an error and will CHECK in development builds to surface misuse early.
 - Dual-depth-peeling (mesh peel) blender samplers moved to set=0, bindings=3/4 to avoid collisions with `mesh_func.glslinc` samplers (bindings 0/1/2). Mesh pipeline and shader sources updated accordingly.
 
@@ -382,7 +385,7 @@ This roadmap replaces the ad-hoc backlog with a staged plan targeting predictabl
   - Unit test: ensure fence wait path handles device-loss exceptions.
   - Manual: verify no deadlocks when rapidly toggling backend; confirm frame pacing improves in profiler.
 - **Docs:** Record fence configuration, failure-handling policy, and any new developer tooling (e.g., `--atlas_vk_max_frames_in_flight`).
-- **Status (2025-10-08):** Vulkan frames now stay inside a single command buffer per eye: `Z3DRendererBase::beginVulkanFrame`/`recordVulkanBatches` gate command recording so the compositor only submits once at `endVulkanFrame` (`src/atlas/z3drendererbase.cpp#L354`, `src/atlas/z3dcompositor.cpp#L1237`, `src/atlas/z3dcompositor.cpp#L1821`). `Z3DRendererVulkanBackend` borrows `ZVulkanFrameExecutor::ActiveFrame` instances (command buffer + fence; acquire/release semaphores reserved for WSI) for every render call (`src/atlas/z3drenderervulkanbackend.cpp`). `ZVulkanSwapChain` will submit via the same executor, signalling the shared release semaphore and exposing both sync points for presentation wiring (`src/atlas/zvulkanswapchain.cpp`).
+- **Status (2025-10-08):** Vulkan frames are scoped per pass: `Z3DRendererBase::beginVulkanFrame`/`recordVulkanBatchesInActiveFrame` or `executeVulkanBatches` gate command recording so the compositor controls submissions at each pass boundary. `Z3DRendererVulkanBackend` borrows `ZVulkanFrameExecutor::ActiveFrame` instances (command buffer + fence; acquire/release semaphores reserved for WSI) for every render call. `ZVulkanSwapChain` will submit via the same executor, signalling the shared release semaphore and exposing both sync points for presentation wiring.
 
   Regression fixes post-merge:
   - Immediate commands isolation: `ZVulkanFrameExecutor::executeImmediate` no longer reuses the in‑flight frame’s command buffer. It allocates a transient primary command buffer + fence, records, submits, and waits. This avoids accidental `reset()`/`begin()` on the active frame mid‑record, which surfaced as `vkCmdBindVertexBuffers(): was called before vkBeginCommandBuffer()` on MoltenVK (`src/atlas/zvulkanframeexecutor.cpp`).

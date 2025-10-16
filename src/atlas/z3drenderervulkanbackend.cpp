@@ -1102,12 +1102,10 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   renderer.setCollectOnly(true);
   LOG(INFO) << "processCompositorPass surface colors=" << pass.surface.colorAttachments.size()
             << " depth=" << pass.surface.depthAttachment.has_value();
-  renderer.setActiveSurfaceForNextPass(pass.surface);
   // Honor clear policy on this pass
   const LoadOp colorLoad = pass.clearColor ? LoadOp::Clear : LoadOp::Load;
   const LoadOp depthLoad = pass.clearDepth ? LoadOp::Clear : LoadOp::Load;
-  renderer.setPendingColorAttachmentsLoadStore(colorLoad, StoreOp::Store, pass.clearValue);
-  renderer.setPendingDepthAttachmentLoadStore(depthLoad, StoreOp::Store, pass.clearValue);
+  renderer.setActiveSurfaceWithLoadStore(pass.surface, colorLoad, StoreOp::Store, depthLoad, StoreOp::Store, pass.clearValue);
 
   auto recordFilterBatches = [&](Z3DBoundedFilter* filter, auto&& renderFn) {
     if (!filter) {
@@ -1151,22 +1149,35 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   // Use pass.debugLabel if provided; otherwise leave empty.
   std::string_view scopeLabel = pass.debugLabel ? std::string_view(pass.debugLabel) : std::string_view();
 
-  renderer.recordVulkanBatches(
-    [&]() {
-      // Opaque first
-      for (auto* filter : pass.opaqueFilters) {
-        recordFilterBatches(filter, [&]() {
-          filter->renderOpaque(pass.eye);
-        });
+  // Surface is already applied via setActiveSurfaceWithLoadStore
+
+  {
+    const bool startedHere = !renderer.isVulkanFrameActive();
+    if (startedHere) {
+      renderer.beginVulkanFrame();
+    }
+    auto endGuard = folly::makeGuard([&]() {
+      if (startedHere) {
+        renderer.endVulkanFrame();
       }
-      // Then transparent
-      for (const auto& tb : pass.transparentFilters) {
-        recordFilterBatches(tb.filter, [&]() {
-          tb.filter->renderTransparent(pass.eye);
-        });
-      }
-    },
-    scopeLabel);
+    });
+    renderer.recordVulkanBatchesInActiveFrame(
+      [&]() {
+        // Opaque first
+        for (auto* filter : pass.opaqueFilters) {
+          recordFilterBatches(filter, [&]() {
+            filter->renderOpaque(pass.eye);
+          });
+        }
+        // Then transparent
+        for (const auto& tb : pass.transparentFilters) {
+          recordFilterBatches(tb.filter, [&]() {
+            tb.filter->renderTransparent(pass.eye);
+          });
+        }
+      },
+      scopeLabel);
+  }
 
   renderer.setCollectOnly(false);
 }

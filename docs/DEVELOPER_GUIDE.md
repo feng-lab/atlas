@@ -231,18 +231,33 @@ Vulkan Entry Points (explicit)
 
 - OpenGL entry points remain `render(...)` and `renderPicking(...)`. These drive the GL path and may begin/end GL frames as needed.
 - Vulkan uses explicit, collection‑only entry points in `Z3DRendererBase`:
-  - `recordVulkanBatches(fn, label)` / `recordVulkanPass(surfaceOrLease, fn, label)`: apply pending surfaces, begin/end the Vulkan frame if needed, set a GPU scope label, run `fn`, and submit.
-  - `renderVulkan(eye, ...)` / `renderPickingVulkan(eye, ...)`: enqueue backend‑neutral batches only. These assert that the backend is Vulkan and `collectOnly==true`.
+  - Execute (may open/close the frame): `executeVulkanBatches(fn, label)` / `executeVulkanPass(surfaceOrLease, fn, label)`
+    - Apply any pending surface, begin the Vulkan frame if none is active, set a GPU scope label, run `fn`, submit, and end the frame unless already active.
+  - Record within an already‑open frame (never opens/closes): `recordVulkanBatchesInActiveFrame(fn, label)`
+    - Asserts an active frame (`beginVulkanFrame()` must have been called by the owner) and performs the same session invariants and submission.
+  - Enqueue only: `renderVulkan(eye, ...)` / `renderPickingVulkan(eye, ...)`
+    - Enqueue backend‑neutral batches only. These assert Vulkan backend and `collectOnly==true`.
 - Invariants:
-  - For Vulkan, call `renderVulkan`/`renderPickingVulkan` only inside a `recordVulkanBatches`/`recordVulkanPass` block with `collectOnly=true`.
+  - For Vulkan, call `renderVulkan`/`renderPickingVulkan` only inside an execute/record block with `collectOnly=true`.
   - A valid active surface must be set before the first append in a recording session, or the first batch must carry attachments explicitly. Violations cause a CHECK and include the pass label.
 
 Example (pseudocode)
 
 ```
+// Simple: execute (may open/close frame for you)
 renderer.setCollectOnly(true);
 renderer.setActiveSurfaceForNextPass(lease);
-renderer.recordVulkanPass(lease, [&](){
+renderer.executeVulkanPass(lease, [&]{
+  renderer.renderVulkan(eye, myRenderer);
+}, "my_pass");
+renderer.setCollectOnly(false);
+
+// Advanced: owner controls the frame lifetime once
+renderer.beginVulkanFrame();
+auto guard = folly::makeGuard([&]{ renderer.endVulkanFrame(); });
+renderer.setCollectOnly(true);
+renderer.setActiveSurfaceForNextPass(lease);
+renderer.recordVulkanBatchesInActiveFrame([&]{
   renderer.renderVulkan(eye, myRenderer);
 }, "my_pass");
 renderer.setCollectOnly(false);

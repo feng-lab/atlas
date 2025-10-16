@@ -870,17 +870,14 @@ double Z3DImgFilter::process(Z3DEye eye)
   const bool isVulkan = (m_rendererBase.activeBackend() == RenderBackend::Vulkan);
   bool startedHere = false;
   if (isVulkan && !m_rendererBase.isVulkanFrameActive()) {
-    // Keep a single command buffer open across all sub-renderings in this process()
-    m_rendererBase.setKeepVulkanFrameOpen(true);
+    // Explicitly open a Vulkan frame for the entire filter process
+    m_rendererBase.beginVulkanFrame();
     startedHere = true;
   }
-  // Ensure we always restore keep-open state and end a frame we started, even on exceptions
+  // Ensure we always end a frame we started, even on exceptions
   auto vkProcessGuard = folly::makeGuard([&]() {
     if (startedHere) {
-      if (m_rendererBase.isVulkanFrameActive()) {
-        m_rendererBase.endVulkanFrame();
-      }
-      m_rendererBase.setKeepVulkanFrameOpen(false);
+      m_rendererBase.endVulkanFrame();
     }
   });
 
@@ -1006,16 +1003,19 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
 
     // Record into opaque lease via Vulkan batches
     m_rendererBase.setCollectOnly(true);
-    m_rendererBase.setActiveSurfaceForNextPass(lease);
     {
       ClearValue clear{};
       clear.color = glm::vec4(0.0f);
       clear.depth = 1.0f;
       clear.stencil = 0u;
-      m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
-      m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+      m_rendererBase.setActiveSurfaceWithLoadStore(lease,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   clear);
     }
-    m_rendererBase.recordVulkanBatches(
+    m_rendererBase.recordVulkanBatchesInActiveFrame(
       [&]() {
         m_rendererBase.renderVulkan(eye, m_imgSliceRenderer);
       },
@@ -1262,22 +1262,25 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
     // Clear target, set active surface, and record batches for the raycaster and overlay
     m_rendererBase.setCollectOnly(true);
     // 1) raycaster (clear)
-    m_rendererBase.setActiveSurfaceForNextPass(lease);
     {
       ClearValue clear{};
       clear.color = glm::vec4(0.0f);
       clear.depth = 1.0f;
       clear.stencil = 0u;
-      m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
-      m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+      m_rendererBase.setActiveSurfaceWithLoadStore(lease,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   clear);
     }
-    // Begin imgfilter process scoped recording (first call will emit beginRender label)
-    m_rendererBase.recordVulkanBatches([&]() {
+    // Record within the process-managed active frame
+    m_rendererBase.recordVulkanBatchesInActiveFrame([&]() {
       m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
     }, "raycaster");
     // 2) bound box overlay (no clears), same surface
-    m_rendererBase.setActiveSurfaceForNextPass(lease);
-    m_rendererBase.recordVulkanBatches([&]() {
+    m_rendererBase.setActiveSurface(lease);
+    m_rendererBase.recordVulkanBatchesInActiveFrame([&]() {
       renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
     }, "bbox_overlay");
     m_rendererBase.setCollectOnly(false);
@@ -1471,17 +1474,21 @@ void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
       m_rendererBase.acquirePersistentTempRenderTarget2D(lease, m_outputSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F);
     }
     m_rendererBase.setCollectOnly(true);
-    m_rendererBase.setActiveSurfaceForNextPass(lease);
+    m_rendererBase.setActiveSurface(lease);
     // Clear both color and depth for a clean overlay-only target
     {
       ClearValue clear{};
       clear.color = glm::vec4(0.0f);
       clear.depth = 1.0f;
       clear.stencil = 0u;
-      m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
-      m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
+      m_rendererBase.setActiveSurfaceWithLoadStore(lease,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   LoadOp::Clear,
+                                                   StoreOp::Store,
+                                                   clear);
     }
-    m_rendererBase.recordVulkanBatches([&]() {
+    m_rendererBase.recordVulkanBatchesInActiveFrame([&]() {
       renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
     }, "bbox_overlay");
     m_rendererBase.setCollectOnly(false);
