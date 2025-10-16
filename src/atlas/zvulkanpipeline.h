@@ -26,9 +26,17 @@ public:
     }
     return handle;
   }
+  vk::Pipeline pipelineHandle() const
+  {
+    return m_pipeline ? **m_pipeline : vk::Pipeline{};
+  }
   vk::PipelineLayout pipelineLayout() const
   {
     return *m_pipelineLayout;
+  }
+  vk::PipelineLayout pipelineLayoutHandle() const
+  {
+    return m_pipelineLayout ? **m_pipelineLayout : vk::PipelineLayout{};
   }
 
   void setDescriptorSetLayouts(const std::vector<vk::DescriptorSetLayout>& layouts);

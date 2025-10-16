@@ -32,6 +32,7 @@ These instructions are mandatory for every migration change; do not deviate from
 - Descriptor writes during recording now crash unless using a per-draw override set. All persistent/frame descriptor sets must be fully written before `vkCmdBeginRendering` on the current command buffer. Any violation triggers a CHECK.
 - Dynamic rendering invariants are enforced: if a pipeline’s attachment formats do not match the currently open dynamic rendering segment, the backend aborts with a CHECK instead of skipping.
 - Surface invariants (new): Vulkan batches must never record without attachments. A pass must set an active surface before the first append, or the batch must provide attachments explicitly. `recordVulkanBatches` applies any pending surface before beginning a Vulkan frame; missing attachments on the first append cause a CHECK that includes the pass label and shader hook type.
+- Pipeline context enforcement (new): all Vulkan passes must record via `ZVulkanPipelineCommandRecorder` with fully populated specs. The debug tracker guards viewport/scissor/dynamic-state completeness, descriptor coverage, push constants, and attachment layout transitions (toggle with `--atlas_vk_enforce_pipeline_context` when diagnosing platform issues).
 
 #### Vulkan Entry Points (separation from GL)
 
@@ -205,7 +206,7 @@ This roadmap keeps the prototypes isolated—none of these steps touch the live 
 - Backgrounds: verify gradient/uniform output and orientation flags match GL when the Vulkan backend consumes the shared helpers.
 - Lines: cover smooth/wide, per-segment widths, textured lines, and picking IDs. Track open items (round caps, MSAA, dashed paths) here.
 - Meshes: validate material/light UBOs, wireframe overlays, and transparency parity.
-- Volumes & slices: slice renderer parity now verifies against GL captures (fast + paged); raycaster fast-path parity is available for single-channel DVR/MIP, with progressive accumulation and paged updates still tracked.
+- Volumes & slices: slice renderer parity now verifies against GL captures (fast + paged); raycaster fast-path and progressive accumulation both mirror GL results across multi-channel volumes, with paged block uploads shared via the cache uploader.
 - Post effects (axis, glow, screenshot readback): port after primitive renderers are reliable; document any temporary fallbacks.
 - **Upcoming Vulkan Compositor Port Plan**
   1. **Inventory Existing GL Flow**
@@ -565,7 +566,7 @@ Test Plan (Stage 3 MVP)
 
 Deferred/Notes
 
-- Self‑managed pipeline contexts (slice, raycaster) still own local dynamic rendering segments and will be folded into the driver in a follow‑up.
+- Slice and raycaster pipeline contexts now record via `ZVulkanPipelineCommandRecorder`; they remain self-orchestrated but can be folded under the shared driver once we consolidate attachment ownership.
 - Screenshots/readback improvements are tracked under Stage 4.
 
 ### Stage 4 – Async Readback & Picking Optimisation (owner: runtime/UI, 1–2 sprints)

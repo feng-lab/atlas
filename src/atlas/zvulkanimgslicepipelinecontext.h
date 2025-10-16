@@ -137,7 +137,6 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_slicePageSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_emptySetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_mergeSetLayout;
-  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_emptyDescriptor; // frame-owned placeholder
   ZVulkanDescriptorSet* m_mergeDescriptor = nullptr; // per-draw override (owned by backend)
 
@@ -180,10 +179,7 @@ private:
   PipelineInstance& ensureMergePipeline(const MergePipelineKey& key, const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
 
-  void bindPagedDescriptors(ChannelResources& resources,
-                            vk::PipelineLayout layout,
-                            vk::raii::CommandBuffer& cmd,
-                            bool usePaging);
+  std::vector<vk::DescriptorSet> collectSliceDescriptorSets(ChannelResources& resources, bool usePaging);
   // depthArray is optional
   void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
 };

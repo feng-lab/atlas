@@ -473,6 +473,11 @@ void ZVulkanTexture::transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
   m_currentLayout = newLayout;
 }
 
+void ZVulkanTexture::overrideCurrentLayout(vk::ImageLayout layout)
+{
+  m_currentLayout = layout;
+}
+
 vk::DescriptorImageInfo ZVulkanTexture::descriptorInfo() const
 {
   return descriptorInfo(m_descriptorLayout, m_descriptorAspectMask);

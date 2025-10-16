@@ -10,10 +10,10 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanpipelinecontext_raii.h"
 #include "zlog.h"
 
 #include <array>
@@ -40,9 +40,6 @@ void ZVulkanFontPipelineContext::resetFrame()
 void ZVulkanFontPipelineContext::resetDescriptors()
 {
   m_descriptorSet.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
 }
 
 void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
@@ -115,17 +112,7 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
-  // Bind pipeline and resources
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-
-  cmd.bindVertexBuffers(0, {m_vertexUploadBuffer}, {m_vertexUploadOffset});
-  cmd.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
-
-  std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
-  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
-
-  cmd.setViewport(0, viewport);
-  cmd.setScissor(0, scissor);
+  // Draw-only; backend controls attachments and render area
 
   // Compose push constants (match shader layout)
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
@@ -142,18 +129,34 @@ void ZVulkanFontPipelineContext::record(Z3DRendererBase& renderer,
   constants.outlineColor = payload.outlineColor;
   constants.shadowColor = payload.shadowColor;
 
-  cmd.pushConstants<FontPushConstants>(pipeline.pipeline->pipelineLayout(),
-                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                                       0,
-                                       constants);
+  ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = {viewport};
+  drawSpec.scissors = {scissor};
+  drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+  drawSpec.descriptorSetFirst = 0;
+  drawSpec.descriptorSets = {ds->descriptorSet()};
+  drawSpec.expectedDescriptorSetCount = 1;
+  drawSpec.vertexBuffers = {m_vertexUploadBuffer};
+  drawSpec.vertexOffsets = {m_vertexUploadOffset};
+  drawSpec.indexBuffer = m_indexUploadBuffer;
+  drawSpec.indexOffset = m_indexUploadOffset;
+  drawSpec.indexType = vk::IndexType::eUint32;
+  drawSpec.indexCount = static_cast<uint32_t>(m_indexCount);
+  drawSpec.instanceCount = 1;
+  drawSpec.pushConstantsData = &constants;
+  drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(FontPushConstants));
+  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
+  drawSpec.requirePushConstants = true;
 
-  VLOG(1) << fmt::format("VK font draw: verts={} idx={} picking={} dpr={:.3f} usesCoordXf=1",
+  VLOG(1) << fmt::format("VK font draw(recorder): verts={} idx={} picking={} dpr={:.3f} usesCoordXf=1",
                          m_vertexCount,
                          m_indexCount,
                          payload.pickingPass,
                          renderer.sceneState().devicePixelRatio);
 
-  cmd.drawIndexed(static_cast<uint32_t>(m_indexCount), 1, 0, 0, 0);
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  recorder.recordGraphicsDraw(drawSpec);
 }
 
 void ZVulkanFontPipelineContext::ensureDescriptorLayout()
@@ -176,20 +179,7 @@ void ZVulkanFontPipelineContext::ensureDescriptorLayout()
   m_setTexture.emplace(vkDevice, createInfo);
 }
 
-void ZVulkanFontPipelineContext::ensureDescriptorSet()
-{
-  ensureDescriptorLayout();
-
-  auto& device = m_backend.device();
-  if (!m_descriptorPool) {
-    m_descriptorPool = device.createDescriptorPool();
-  }
-
-  if (!m_descriptorSet) {
-    auto descriptorSet = m_descriptorPool->allocateDescriptorSet(**m_setTexture);
-    m_descriptorSet = std::make_unique<ZVulkanDescriptorSet>(device, descriptorSet, false);
-  }
-}
+void ZVulkanFontPipelineContext::ensureDescriptorSet() {}
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanFontPipelineContext::makeVertexInputState() const
 {

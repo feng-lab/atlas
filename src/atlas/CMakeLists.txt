@@ -587,6 +587,8 @@ set(SOURCES
     zvulkanshader.cpp
     zvulkanpipeline.h
     zvulkanpipeline.cpp
+    zvulkanpipelinecontext_raii.h
+    zvulkanpipelinecontext_raii.cpp
     zvulkanbindings.h
     zvulkanrenderconversions.h
     zvulkanrenderconversions.cpp

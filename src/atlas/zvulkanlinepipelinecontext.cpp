@@ -16,6 +16,7 @@
 #include "zsysteminfo.h"
 #include "z3dlinerenderer.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanpipelinecontext_raii.h"
 
 #include <algorithm>
 #include <array>
@@ -639,19 +640,6 @@ ZVulkanLinePipelineContext::ensurePipeline(const PipelineKey& key,
   return insertIt->second;
 }
 
-void ZVulkanLinePipelineContext::bindDescriptorSets(vk::raii::CommandBuffer& cmd,
-                                                    const PipelineInstance& pipeline,
-                                                    vk::DescriptorSet textureOverride) const
-{
-  if (!m_dsLighting || !m_dsTransforms || (!m_dsTexture && !textureOverride)) {
-    return;
-  }
-
-  const vk::DescriptorSet dsTex = textureOverride ? textureOverride : m_dsTexture->descriptorSet();
-  std::array<vk::DescriptorSet, 3> sets{dsTex, m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
-  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
-}
-
 void ZVulkanLinePipelineContext::uploadWideGeometry(const LinePayload& payload, bool pickingPass)
 {
   // Build wide-line SoA buffers directly from payload spans; copy indices from payload.smoothIndices.
@@ -1205,127 +1193,120 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
 
   auto& pipeline = ensurePipeline(key, payload, formats);
 
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  bindDescriptorSets(cmd, pipeline, texOverride);
+  // Build descriptor sets for draw-only recording
+  std::vector<vk::DescriptorSet> descriptorSets;
+  descriptorSets.reserve(3);
+  const vk::DescriptorSet dsTex = texOverride ? texOverride : (m_dsTexture ? m_dsTexture->descriptorSet() : vk::DescriptorSet{});
+  CHECK(dsTex) << "Line pipeline texture descriptor set not initialised";
+  descriptorSets.push_back(dsTex);
+  descriptorSets.push_back(m_dsLighting->descriptorSet());
+  descriptorSets.push_back(m_dsTransforms->descriptorSet());
 
+  uint32_t expectedSets = static_cast<uint32_t>(descriptorSets.size());
+  std::vector<ZVulkanDescriptorBindInfo> extraBinds;
   if ((shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit ||
        shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
-       shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) &&
-      m_dsOIT) {
-    std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           pipeline.pipeline->pipelineLayout(),
-                           vkbind::kSetOITParams,
-                           sets3,
-                           {});
+       shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) && m_dsOIT) {
+    ZVulkanDescriptorBindInfo oitBind{};
+    oitBind.firstSet = vkbind::kSetOITParams;
+    oitBind.sets = {m_dsOIT->descriptorSet()};
+    extraBinds.push_back(oitBind);
+    expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
   }
 
-  cmd.setViewport(0, viewport);
-  cmd.setScissor(0, scissor);
-
   if (payload.useSmoothLine) {
-    // Static vertex input state is defined at pipeline creation; no dynamic state.
     uploadWideGeometry(payload, pickingPass);
     if (m_wideP0Buffer == VK_NULL_HANDLE || m_wideUploadIndexCount == 0) {
       return;
     }
 
-    // Bind SoA buffers for wide line
-    std::array<vk::Buffer, 5> wbufs{m_wideP0Buffer, m_wideP1Buffer, m_wideC0Buffer, m_wideC1Buffer, m_wideFlagsBuffer};
-    std::array<vk::DeviceSize, 5> woffs{m_wideP0Offset,
-                                        m_wideP1Offset,
-                                        m_wideC0Offset,
-                                        m_wideC1Offset,
-                                        m_wideFlagsOffset};
-    cmd.bindVertexBuffers(0, wbufs, woffs);
-    vk::Buffer idxBuf = m_wideIndexBuffer ? m_wideIndexBuffer : m_wideP0Buffer;
-    cmd.bindIndexBuffer(idxBuf, m_wideUploadIndexOffset, vk::IndexType::eUint32);
+    ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
+    drawSpec.viewports = {viewport};
+    drawSpec.scissors = {scissor};
+    drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+    drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+    drawSpec.descriptorSetFirst = 0;
+    drawSpec.descriptorSets = descriptorSets;
+    drawSpec.extraDescriptorBinds = extraBinds;
+    drawSpec.expectedDescriptorSetCount = expectedSets;
 
-    struct WideLinePC
-    {
-      glm::mat4 viewport_matrix{1.0f};
-      glm::mat4 viewport_matrix_inverse{1.0f};
-      float line_width = 1.0f;
-      float size_scale = 1.0f;
-      float weighted_a = 0.0f;
-      float weighted_b = 0.0f;
-      float weighted_depth_scale = 0.0f;
-      float _pad = 0.0f;
-    } pc;
+    const vk::PipelineLayout pipelineLayout = pipeline.pipeline->pipelineLayout();
 
-    const auto& frameState = renderer.frameState();
-    pc.viewport_matrix = frameState.viewportMatrix;
-    pc.viewport_matrix_inverse = frameState.inverseViewportMatrix;
-    CHECK(payload.params != nullptr) << "Line payload missing params";
-    pc.size_scale = payload.params->sizeScale;
+    ZVulkanPipelineCommandRecorder recorder(cmd);
+    recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& cb) {
+      std::array<vk::Buffer, 5> wbufs{m_wideP0Buffer, m_wideP1Buffer, m_wideC0Buffer, m_wideC1Buffer, m_wideFlagsBuffer};
+      std::array<vk::DeviceSize, 5> woffs{m_wideP0Offset, m_wideP1Offset, m_wideC0Offset, m_wideC1Offset, m_wideFlagsOffset};
+      cb.bindVertexBuffers(0, wbufs, woffs);
+      vk::Buffer idxBuf = m_wideIndexBuffer ? m_wideIndexBuffer : m_wideP0Buffer;
+      cb.bindIndexBuffer(idxBuf, m_wideUploadIndexOffset, vk::IndexType::eUint32);
 
-    const auto widths = payload.perSegmentWidths;
-    const float dpr = renderer.sceneState().devicePixelRatio;
-    const bool msaa2x2 = (renderer.sceneState().multisample == GeometryMSAAMode::MSAA2x2) && payload.enableMultisample;
-    const float sizeScale = payload.params->sizeScale;
-    if (!widths.empty()) {
-      VLOG(1) << fmt::format(
-        "VK wide line: segments={} dpr={:.3f} msaa2x2={} sizeScale={:.3f} resolvedLineWidth={:.3f}",
-        m_wideUploadIndexCount / 6u,
-        dpr,
-        msaa2x2,
-        sizeScale,
-        payload.resolvedLineWidth);
-      const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
-      const uint32_t drawSegments = std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size()));
-      for (uint32_t i = 0; i < drawSegments; ++i) {
-        // Match shader usage: use the raw per-segment width and let size_scale
-        // control the expansion in shader.
-        pc.line_width = widths[i];
-        if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
-          const float n = renderer.viewState().nearClip;
-          const float f = renderer.viewState().farClip;
-          const float denom = std::max(f - n, 1e-6f);
-          pc.weighted_a = (f * n) / denom;
-          pc.weighted_b = 0.5f * (f + n) / denom + 0.5f;
-          pc.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-        } else {
-          pc.weighted_a = 0.0f;
-          pc.weighted_b = 0.0f;
-          pc.weighted_depth_scale = 0.0f;
+      struct WideLinePC { glm::mat4 viewport_matrix{1.0f}; glm::mat4 viewport_matrix_inverse{1.0f}; float line_width=1.0f; float size_scale=1.0f; float weighted_a=0.0f; float weighted_b=0.0f; float weighted_depth_scale=0.0f; float _pad=0.0f; } pc;
+
+      const auto& frameState = renderer.frameState();
+      pc.viewport_matrix = frameState.viewportMatrix;
+      pc.viewport_matrix_inverse = frameState.inverseViewportMatrix;
+      CHECK(payload.params != nullptr) << "Line payload missing params";
+      pc.size_scale = payload.params->sizeScale;
+
+      const auto widths = payload.perSegmentWidths;
+      const float dpr = renderer.sceneState().devicePixelRatio;
+      const bool msaa2x2 = (renderer.sceneState().multisample == GeometryMSAAMode::MSAA2x2) && payload.enableMultisample;
+      const float sizeScale = payload.params->sizeScale;
+      if (!widths.empty()) {
+        VLOG(1) << fmt::format("VK wide line: segments={} dpr={:.3f} msaa2x2={} sizeScale={:.3f} resolvedLineWidth={:.3f}", m_wideUploadIndexCount / 6u, dpr, msaa2x2, sizeScale, payload.resolvedLineWidth);
+        const uint32_t segmentCount = m_wideUploadIndexCount / 6u;
+        const uint32_t drawSegments = std::min<uint32_t>(segmentCount, static_cast<uint32_t>(widths.size()));
+        for (uint32_t i = 0; i < drawSegments; ++i) {
+          pc.line_width = widths[i];
+          if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
+            const float n = renderer.viewState().nearClip;
+            const float f = renderer.viewState().farClip;
+            const float denom = std::max(f - n, 1e-6f);
+            pc.weighted_a = (f * n) / denom;
+            pc.weighted_b = 0.5f * (f + n) / denom + 0.5f;
+            pc.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
+          } else { pc.weighted_a = 0.0f; pc.weighted_b = 0.0f; pc.weighted_depth_scale = 0.0f; }
+          cb.pushConstants<WideLinePC>(pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, pc);
+          cb.drawIndexed(6, 1, i * 6, i * 4, 0);
         }
-
-        cmd.pushConstants<WideLinePC>(pipeline.pipeline->pipelineLayout(),
-                                      vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                                      0,
-                                      pc);
-        cmd.drawIndexed(6, 1, i * 6, i * 4, 0);
+      } else {
+        pc.line_width = payload.resolvedLineWidth;
+        VLOG(1) << fmt::format("VK wide line: single width resolvedLineWidth={:.3f} sizeScale={:.3f}", payload.resolvedLineWidth, sizeScale);
+        cb.pushConstants<WideLinePC>(pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, pc);
+        cb.drawIndexed(m_wideUploadIndexCount, 1, 0, 0, 0);
       }
-    } else {
-      pc.line_width = payload.resolvedLineWidth;
-      VLOG(1) << fmt::format("VK wide line: single width resolvedLineWidth={:.3f} sizeScale={:.3f}",
-                             payload.resolvedLineWidth,
-                             sizeScale);
-      cmd.pushConstants<WideLinePC>(pipeline.pipeline->pipelineLayout(),
-                                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-                                    0,
-                                    pc);
-      cmd.drawIndexed(m_wideUploadIndexCount, 1, 0, 0, 0);
-    }
-
-  } else {
-    uploadThinGeometry(payload, pickingPass);
-    if (m_thinUploadVertexCount == 0 || m_thinPosBuffer == VK_NULL_HANDLE) {
-      return;
-    }
-
-    // Static vertex input state is defined at pipeline creation; no dynamic state.
-    // Bind SoA buffers for thin line
-    std::array<vk::Buffer, 2> tbufs{m_thinPosBuffer, m_thinColorBuffer};
-    std::array<vk::DeviceSize, 2> toffs{m_thinPosOffset, m_thinColorOffset};
-    cmd.bindVertexBuffers(0, tbufs, toffs);
-    if (payload.isLineStrip && m_thinUploadIndexBuffer && m_thinUploadIndexCount > 0) {
-      cmd.bindIndexBuffer(m_thinUploadIndexBuffer, m_thinUploadIndexOffset, vk::IndexType::eUint32);
-      cmd.drawIndexed(m_thinUploadIndexCount, 1, 0, 0, 0);
-    } else {
-      cmd.draw(m_thinUploadVertexCount, 1, 0, 0);
-    }
+    });
+    return;
   }
+
+  uploadThinGeometry(payload, pickingPass);
+  if (m_thinUploadVertexCount == 0 || m_thinPosBuffer == VK_NULL_HANDLE) { return; }
+
+  ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = {viewport};
+  drawSpec.scissors = {scissor};
+  drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+  drawSpec.descriptorSetFirst = 0;
+  drawSpec.descriptorSets = descriptorSets;
+  drawSpec.extraDescriptorBinds = extraBinds;
+  drawSpec.expectedDescriptorSetCount = expectedSets;
+
+  drawSpec.vertexBuffers = {m_thinPosBuffer, m_thinColorBuffer};
+  drawSpec.vertexOffsets = {m_thinPosOffset, m_thinColorOffset};
+  if (payload.isLineStrip && m_thinUploadIndexBuffer && m_thinUploadIndexCount > 0) {
+    drawSpec.indexBuffer = m_thinUploadIndexBuffer;
+    drawSpec.indexOffset = m_thinUploadIndexOffset;
+    drawSpec.indexType = vk::IndexType::eUint32;
+    drawSpec.indexCount = m_thinUploadIndexCount;
+  } else {
+    drawSpec.vertexCount = m_thinUploadVertexCount;
+  }
+  drawSpec.instanceCount = 1;
+
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  recorder.recordGraphicsDraw(drawSpec);
+
 }
 
 } // namespace nim

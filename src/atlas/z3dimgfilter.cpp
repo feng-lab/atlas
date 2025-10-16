@@ -1015,9 +1015,11 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
       m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
       m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
     }
-    m_rendererBase.executeVulkanBatches([&]() {
-      m_rendererBase.renderVulkan(eye, m_imgSliceRenderer);
-    }, "img_slices");
+    m_rendererBase.recordVulkanBatches(
+      [&]() {
+        m_rendererBase.renderVulkan(eye, m_imgSliceRenderer);
+      },
+      "img_slices");
     m_rendererBase.setCollectOnly(false);
     m_opaqueValid[eye] = true;
     return 1.0;
@@ -1270,12 +1272,12 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
       m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
     }
     // Begin imgfilter process scoped recording (first call will emit beginRender label)
-    m_rendererBase.executeVulkanBatches([&]() {
+    m_rendererBase.recordVulkanBatches([&]() {
       m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
     }, "raycaster");
     // 2) bound box overlay (no clears), same surface
     m_rendererBase.setActiveSurfaceForNextPass(lease);
-    m_rendererBase.executeVulkanBatches([&]() {
+    m_rendererBase.recordVulkanBatches([&]() {
       renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
     }, "bbox_overlay");
     m_rendererBase.setCollectOnly(false);
@@ -1479,7 +1481,7 @@ void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
       m_rendererBase.setPendingColorAttachmentsLoadStore(LoadOp::Clear, StoreOp::Store, clear);
       m_rendererBase.setPendingDepthAttachmentLoadStore(LoadOp::Clear, StoreOp::Store, clear);
     }
-    m_rendererBase.executeVulkanBatches([&]() {
+    m_rendererBase.recordVulkanBatches([&]() {
       renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
     }, "bbox_overlay");
     m_rendererBase.setCollectOnly(false);

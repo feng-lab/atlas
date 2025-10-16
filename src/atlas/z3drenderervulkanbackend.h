@@ -201,6 +201,10 @@ public:
     return m_recentOcclusionResults;
   }
 
+  // For self-managed recorder passes: decide whether to Clear or Load attachments.
+  // Returns true exactly once per unique attachment set (color IDs + depth ID)
+  // within the current processBatches() invocation.
+
 private:
   friend class Z3DRendererBase;
   void ensureDevice();
@@ -385,6 +389,9 @@ public:
   std::unique_ptr<ZVulkanFontPipelineContext> m_fontContext;
 
   std::vector<uint64_t> m_recentOcclusionResults;
+
+  // Tracking for self-managed clear policy within a single processBatches call
+  std::unordered_set<uint64_t> m_selfManagedClearKeys;
 
   // Shared fallback resources
   std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;

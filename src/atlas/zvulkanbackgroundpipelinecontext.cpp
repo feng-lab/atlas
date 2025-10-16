@@ -9,6 +9,7 @@
 #include "zvulkanshader.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanpipelinecontext_raii.h"
 #include "zsysteminfo.h"
 #include "zexception.h"
 
@@ -37,11 +38,6 @@ ZVulkanBackgroundPipelineContext::ZVulkanBackgroundPipelineContext(Z3DRendererVu
 
 ZVulkanBackgroundPipelineContext::~ZVulkanBackgroundPipelineContext() = default;
 
-void ZVulkanBackgroundPipelineContext::resetFrame()
-{
-  m_lastPCValid = false;
-}
-
 void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
                                               const RenderBatch& batch,
                                               const BackgroundPayload& payload,
@@ -66,14 +62,7 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  cmd.bindVertexBuffers(0, {quad.buffer()}, {vk::DeviceSize(0)});
-
-  // No descriptor sets to bind
-
-  cmd.setViewport(0, viewport);
-  cmd.setScissor(0, scissor);
 
   glm::vec2 extent(viewport.width, viewport.height);
   if (extent.x <= 0.f || extent.y <= 0.f) {
@@ -89,23 +78,25 @@ void ZVulkanBackgroundPipelineContext::record(Z3DRendererBase& renderer,
   constants.color2 = payload.color2;
   constants.region = payload.region;
 
-  // Skip redundant push constant updates when values have not changed
-  const bool changed = !m_lastPCValid || (m_lastScreenDimRCP != constants.screen_dim_RCP) ||
-                       (m_lastColor1 != constants.color1) || (m_lastColor2 != constants.color2) ||
-                       (m_lastRegion != constants.region);
-  if (changed) {
-    cmd.pushConstants<BackgroundPushConstants>(pipeline.pipeline->pipelineLayout(),
-                                               vk::ShaderStageFlagBits::eFragment,
-                                               0,
-                                               constants);
-    m_lastPCValid = true;
-    m_lastScreenDimRCP = constants.screen_dim_RCP;
-    m_lastColor1 = constants.color1;
-    m_lastColor2 = constants.color2;
-    m_lastRegion = constants.region;
-  }
 
-  cmd.draw(vertexCount, 1, 0, 0);
+
+  ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = {viewport};
+  drawSpec.scissors = {scissor};
+  drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+  drawSpec.vertexBuffers = {quad.buffer()};
+  drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+  drawSpec.vertexCount = vertexCount;
+  drawSpec.instanceCount = 1;
+  drawSpec.pushConstantsData = &constants;
+  drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(BackgroundPushConstants));
+  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+  drawSpec.requirePushConstants = true;
+
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  recorder.recordGraphicsDraw(drawSpec);
+
 }
 
 ZVulkanBackgroundPipelineContext::PipelineInstance&

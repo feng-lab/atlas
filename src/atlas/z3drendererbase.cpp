@@ -467,11 +467,6 @@ void Z3DRendererBase::recordVulkanBatches(const std::function<void()>& recordBat
   m_currentPassLabel.clear();
 }
 
-void Z3DRendererBase::executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label)
-{
-  recordVulkanBatches(recordBatches, label);
-}
-
 void Z3DRendererBase::recordVulkanPass(const RendererFrameState::ActiveSurface& surface,
                                        const std::function<void()>& recordBatches,
                                        std::string_view label)

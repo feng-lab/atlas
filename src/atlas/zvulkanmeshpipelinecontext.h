@@ -149,13 +149,13 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
   std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
   std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3 (OIT params)
-  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTextures;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsOIT;
-  // Keep per-draw transient descriptor sets alive for the duration of the frame
-  std::vector<std::unique_ptr<ZVulkanDescriptorSet>> m_transientDescriptorSets;
+  // Per-draw override sets are owned by the backend's per-frame arena.
+  // Track raw pointers here only if needed; do not take ownership.
+  std::vector<ZVulkanDescriptorSet*> m_transientDescriptorSets;
   bool m_texturesSetInitialized = false;
 
   std::unique_ptr<ZVulkanTexture> m_placeholder1D;

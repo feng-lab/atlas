@@ -9,7 +9,6 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkanbuffer.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkantexture.h"
 #include "zvulkanuniforms.h"
@@ -21,6 +20,7 @@
 #include "zexception.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbindings.h"
+#include "zvulkanpipelinecontext_raii.h"
 
 #include <algorithm>
 #include <array>
@@ -29,6 +29,7 @@
 #include <optional>
 #include <span>
 #include <vector>
+#include <unordered_map>
 
 namespace nim {
 namespace {
@@ -191,7 +192,6 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  // GL parity: for picking pass, require per-mesh picking colors; otherwise skip.
   if (payload.pickingPass) {
     if (payload.meshPickingColors.empty() || payload.meshPickingColors.size() != payload.meshes.size()) {
       return;
@@ -208,7 +208,6 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
   updateLightingUBO(renderer, batch, payload, pickingPass);
   updateTransformUBO(renderer, batch, payload);
-  // Ensure OIT params UBO for shaders including include/oit_params.glslinc
   ensureOITResources();
   {
     glm::vec2 extent = batch.pass.viewport.extent;
@@ -222,12 +221,11 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   }
   ensureDescriptorSets();
   CHECK(m_dsLighting && m_dsTransforms) << "Mesh pipeline descriptor sets missing (lighting/transforms)";
-  // Textures set should be available for normal passes; DDP peel enforces override below.
-  if (renderer.shaderHookType() != Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+  if (shaderHook != Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
     CHECK(m_dsTextures != nullptr) << "Mesh pipeline textures descriptor set not initialised";
   }
-  // Build a per-draw textures descriptor set to avoid any update-after-bind hazards.
-  vk::DescriptorSet boundTexturesOverride{};
+
+  ZVulkanDescriptorSet* texturesOverride = nullptr;
   if (m_setTextures) {
     if (auto* drawTex = m_backend.allocateOverrideDescriptorSet(**m_setTextures)) {
       ensurePlaceholderTextures();
@@ -271,207 +269,160 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
             break;
         }
       }
-      boundTexturesOverride = drawTex->descriptorSet();
+      m_transientDescriptorSets.push_back(drawTex);
+      texturesOverride = m_transientDescriptorSets.back();
     }
   }
-  // If DDP peel is requested but we could not allocate the per-draw override,
-  // skip to avoid mutating/binding a shared set.
   if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-    CHECK(boundTexturesOverride) << "Mesh DDP peel: override descriptor allocation failed (fatal)";
+    CHECK(texturesOverride) << "Mesh DDP peel: override descriptor allocation failed (fatal)";
   }
 
-  // Descriptor set to bind for texture set (0). For DDP peel we allocate a per-draw override to
-  // avoid mutating a set that may have been bound earlier in the same command buffer.
-  std::unique_ptr<ZVulkanDescriptorSet> dsTexturesOverride; // legacy path, now unused
+  const vk::DescriptorSet texturesSet = texturesOverride
+                                          ? texturesOverride->descriptorSet()
+                                          : (m_dsTextures ? m_dsTextures->descriptorSet() : vk::DescriptorSet{});
+  if (!texturesSet) {
+    return;
+  }
+  const vk::DescriptorSet lightingSet = m_dsLighting->descriptorSet();
+  const vk::DescriptorSet transformsSet = m_dsTransforms->descriptorSet();
 
-  // DDP peel handled by the per-draw override above.
-
-  // Bind SoA streams: bindings 0..2 always
-  std::vector<vk::Buffer> baseBuffers;
-  std::vector<vk::DeviceSize> baseOffsets;
-  baseBuffers.push_back(m_posBuffer);
-  baseOffsets.push_back(m_posOffset); // binding 0: positions
-  baseBuffers.push_back(m_normBuffer);
-  baseOffsets.push_back(m_normOffset); // binding 1: normals
-  baseBuffers.push_back(m_colorBuffer);
-  baseOffsets.push_back(m_colorOffset); // binding 2: colors
-  cmd.bindVertexBuffers(0, baseBuffers, baseOffsets);
-
-  // Optional texture binding: binding index depends on platform support.
-  if (m_texBinding != TexBinding::None) {
-    uint32_t texBindingIndex = 3; // default when using dynamic vertex input state
-    if (!m_backend.device().supportsVertexInputDynamicState()) {
-      switch (m_texBinding) {
-        case TexBinding::Tex1D:
-          texBindingIndex = 3;
-          break;
-        case TexBinding::Tex2D:
-          texBindingIndex = 4;
-          break;
-        case TexBinding::Tex3D:
-          texBindingIndex = 5;
-          break;
-        default:
-          break;
-      }
-    }
-    std::array<vk::Buffer, 1> texBuf{m_texBuffer};
-    std::array<vk::DeviceSize, 1> texOff{m_texOffset};
-    cmd.bindVertexBuffers(texBindingIndex, texBuf, texOff);
+  std::vector<vk::DescriptorSet> baseDescriptorSets{texturesSet, lightingSet, transformsSet};
+  std::vector<ZVulkanDescriptorBindInfo> baseExtraBinds;
+  uint32_t expectedSetCount = 3;
+  if (m_dsOIT) {
+    ZVulkanDescriptorBindInfo oitBind{};
+    oitBind.firstSet = vkbind::kSetOITParams;
+    oitBind.sets = {m_dsOIT->descriptorSet()};
+    baseExtraBinds.push_back(oitBind);
+    expectedSetCount = std::max(expectedSetCount, vkbind::kSetOITParams + 1);
   }
 
-  // Bind dummy buffers for any optional bindings (3,4,5) that remain unbound.
-  // Some stacks (e.g., MoltenVK without nullDescriptor) reject null image views
-  // in vkCmdBindVertexBuffers; bind a tiny valid buffer instead.
-  {
-    bool bound3 = (m_texBinding == TexBinding::Tex1D);
-    bool bound4 = (m_texBinding == TexBinding::Tex2D);
-    bool bound5 = (m_texBinding == TexBinding::Tex3D);
-    std::array<vk::Buffer, 1> buf{m_backend.dummyVertexBuffer()};
-    std::array<vk::DeviceSize, 1> off{0};
-    if (!bound3) {
-      cmd.bindVertexBuffers(3, buf, off);
-    }
-    if (!bound4) {
-      cmd.bindVertexBuffers(4, buf, off);
-    }
-    if (!bound5) {
-      cmd.bindVertexBuffers(5, buf, off);
-    }
-  }
-  if (m_indexCount > 0 && m_indexUploadBuffer) {
-    cmd.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
-  }
-
-  cmd.setViewport(0, viewport);
-  cmd.setScissor(0, scissor);
-
+  // Group draws by pipeline instance and prepare a common vertex-binding helper
   const bool drawSurface = payload.wireframeMode != MeshPayload::WireframeMode::OnlyWireframe;
   const bool drawWireframe = payload.wireframeMode != MeshPayload::WireframeMode::NoWireframe;
-
   const FogMode fogMode = renderer.sceneState().fog.mode;
-
   const vulkan::AttachmentFormats formats = vulkan::extractAttachmentFormats(batch);
   m_backend.validateFormatsOrCrash(formats, "mesh");
 
-  PipelineInstance* currentPipeline = nullptr;
-  if (drawSurface) {
-    for (const auto& draw : m_draws) {
-      if (!draw.mesh) {
-        continue;
-      }
+  struct DrawCallInfo
+  {
+    const MeshDraw* draw;
+    bool wireframe;
+    glm::vec4 wireColor;
+  };
 
-      PipelineKey key;
-      key.colorSource = payload.colorSource;
-      key.meshType = draw.mesh->type();
-      key.wireframe = false;
-      key.fogMode = fogMode;
-      key.shaderHookType = shaderHook;
+  std::unordered_map<const PipelineInstance*, std::vector<DrawCallInfo>> groupedDraws;
 
-      key.colorFormats = formats.colorFormats;
-      key.depthFormat = formats.depthFormat;
+  auto recordDrawForKey = [&](const MeshDraw& d, bool wire, glm::vec4 wireColor) {
+    PipelineKey key;
+    key.colorSource = payload.colorSource;
+    key.meshType = d.mesh->type();
+    key.wireframe = wire;
+    key.fogMode = fogMode;
+    key.shaderHookType = shaderHook;
+    key.colorFormats = formats.colorFormats;
+    key.depthFormat = formats.depthFormat;
+    PipelineInstance& pipeline = ensurePipeline(key, formats);
+    groupedDraws[&pipeline].push_back(DrawCallInfo{&d, wire, wireColor});
+  };
 
-      PipelineInstance& pipeline = ensurePipeline(key, formats);
-      if (&pipeline != currentPipeline) {
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-        // Static vertex input state is defined at pipeline creation; no dynamic state.
-        // Bind descriptor sets with optional textures override for set 0
-        if (m_dsLighting && m_dsTransforms) {
-          // For DDP peel require override; otherwise fall back to the shared set.
-          vk::DescriptorSet texturesSet =
-            boundTexturesOverride ? boundTexturesOverride
-                                  : (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel
-                                       ? vk::DescriptorSet{}
-                                       : (m_dsTextures ? m_dsTextures->descriptorSet() : vk::DescriptorSet{}));
-          if (texturesSet) {
-            std::array<vk::DescriptorSet, 3> sets{texturesSet,
-                                                  m_dsLighting->descriptorSet(),
-                                                  m_dsTransforms->descriptorSet()};
-            cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                   pipeline.pipeline->pipelineLayout(),
-                                   vkbind::kSetInputs,
-                                   sets,
-                                   {});
-            if (m_dsOIT) {
-              std::array<vk::DescriptorSet, 1> sets3{m_dsOIT->descriptorSet()};
-              cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                     pipeline.pipeline->pipelineLayout(),
-                                     vkbind::kSetOITParams,
-                                     sets3,
-                                     {});
-            }
-          } else {
-            // If we cannot bind textures set (e.g., DDP override unavailable), skip pipeline bind
-            // to avoid binding stale/shared sets.
-            return;
-          }
-        } else {
-          return;
-        }
-
-        if (shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
-          const float n = renderer.viewState().nearClip;
-          const float f = renderer.viewState().farClip;
-          const float a = (f * n) / std::max(f - n, 1e-6f);
-          const float b = 0.5f * (f + n) / std::max(f - n, 1e-6f) + 0.5f;
-          const float depthScale = renderer.sceneState().weightedBlendedDepthScale;
-          glm::vec4 pushConstants(a, b, depthScale, 0.0f);
-          cmd.pushConstants<glm::vec4>(pipeline.pipeline->pipelineLayout(),
-                                       vk::ShaderStageFlagBits::eFragment,
-                                       0,
-                                       pushConstants);
-        }
-        currentPipeline = &pipeline;
-      }
-
-      updateMaterialUBO(renderer,
-                        payload,
-                        draw.payloadMeshIndex,
-                        draw.useFallbackColor,
-                        draw.fallbackColor,
-                        pickingPass);
-
-      if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
-        cmd.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
-      } else {
-        cmd.draw(draw.vertexCount, 1, draw.firstVertex, 0);
-      }
+  for (const auto& draw : m_draws) {
+    if (!draw.mesh) {
+      continue;
+    }
+    if (drawSurface) {
+      recordDrawForKey(draw, false, glm::vec4(0.0f));
+    }
+    if (drawWireframe) {
+      const glm::vec4 wireColor = pickingPass ? draw.fallbackColor : payload.wireframeColor;
+      recordDrawForKey(draw, true, wireColor);
     }
   }
 
-  if (drawWireframe) {
-    currentPipeline = nullptr;
-    for (const auto& draw : m_draws) {
-      if (!draw.mesh) {
-        continue;
+  auto bindCommonBuffers = [&](vk::raii::CommandBuffer& cb) {
+    std::array<vk::Buffer, 3> baseBufs{m_posBuffer, m_normBuffer, m_colorBuffer};
+    std::array<vk::DeviceSize, 3> baseOffs{m_posOffset, m_normOffset, m_colorOffset};
+    cb.bindVertexBuffers(0, baseBufs, baseOffs);
+
+    if (m_texBinding != TexBinding::None && m_texBuffer) {
+      uint32_t texBindingIndex = 3;
+      if (!m_backend.device().supportsVertexInputDynamicState()) {
+        switch (m_texBinding) {
+          case TexBinding::Tex1D: texBindingIndex = 3; break;
+          case TexBinding::Tex2D: texBindingIndex = 4; break;
+          case TexBinding::Tex3D: texBindingIndex = 5; break;
+          default: break;
+        }
       }
-
-      PipelineKey key;
-      key.colorSource = payload.colorSource;
-      key.meshType = draw.mesh->type();
-      key.wireframe = true;
-      key.fogMode = fogMode;
-      key.shaderHookType = shaderHook;
-
-      key.colorFormats = formats.colorFormats;
-      key.depthFormat = formats.depthFormat;
-
-      PipelineInstance& pipeline = ensurePipeline(key, formats);
-      if (&pipeline != currentPipeline) {
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-        bindDescriptorSets(cmd, pipeline);
-        currentPipeline = &pipeline;
-      }
-
-      const glm::vec4 wireColor = pickingPass ? draw.fallbackColor : payload.wireframeColor;
-      updateMaterialUBO(renderer, payload, draw.payloadMeshIndex, true, wireColor, pickingPass);
-
-      if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
-        cmd.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
-      } else {
-        cmd.draw(draw.vertexCount, 1, draw.firstVertex, 0);
-      }
+      std::array<vk::Buffer, 1> texBuf{m_texBuffer};
+      std::array<vk::DeviceSize, 1> texOff{m_texOffset};
+      cb.bindVertexBuffers(texBindingIndex, texBuf, texOff);
     }
+
+    std::array<vk::Buffer, 1> dummyBuf{m_backend.dummyVertexBuffer()};
+    std::array<vk::DeviceSize, 1> dummyOff{0};
+    if (m_texBinding != TexBinding::Tex1D) { cb.bindVertexBuffers(3, dummyBuf, dummyOff); }
+    if (m_texBinding != TexBinding::Tex2D) { cb.bindVertexBuffers(4, dummyBuf, dummyOff); }
+    if (m_texBinding != TexBinding::Tex3D) { cb.bindVertexBuffers(5, dummyBuf, dummyOff); }
+    if (m_indexCount > 0 && m_indexUploadBuffer) {
+      cb.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
+    }
+  };
+
+  for (const auto& groupedEntry : groupedDraws) {
+    const PipelineInstance* pipelinePtr = groupedEntry.first;
+    const auto& draws = groupedEntry.second;
+    if (draws.empty()) {
+      continue;
+    }
+
+    ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
+    drawSpec.viewports = {viewport};
+    drawSpec.scissors = {scissor};
+    drawSpec.pipelineHandle = pipelinePtr->pipeline->pipelineHandle();
+    drawSpec.pipelineLayoutHandle = pipelinePtr->pipeline->pipelineLayoutHandle();
+    drawSpec.descriptorSetFirst = vkbind::kSetInputs;
+    drawSpec.descriptorSets = baseDescriptorSets;
+    drawSpec.extraDescriptorBinds = baseExtraBinds;
+    drawSpec.expectedDescriptorSetCount = expectedSetCount;
+    drawSpec.instanceCount = 1;
+
+    ZVulkanPipelineCommandRecorder recorder(cmd);
+    recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& cb) {
+      bindCommonBuffers(cb);
+      const vk::PipelineLayout layoutHandle = pipelinePtr->pipeline->pipelineLayout();
+
+      for (const auto& entry : draws) {
+        const MeshDraw& draw = *entry.draw;
+        if (entry.wireframe) {
+          updateMaterialUBO(renderer, payload, draw.payloadMeshIndex, true, entry.wireColor, pickingPass);
+        } else {
+          updateMaterialUBO(renderer,
+                            payload,
+                            draw.payloadMeshIndex,
+                            draw.useFallbackColor,
+                            draw.fallbackColor,
+                            pickingPass);
+        }
+
+        if (!entry.wireframe && shaderHook == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
+          const float n = renderer.viewState().nearClip;
+          const float f = renderer.viewState().farClip;
+          const float denom = std::max(f - n, 1e-6f);
+          const float a = (f * n) / denom;
+          const float b = 0.5f * (f + n) / denom + 0.5f;
+          const float depthScale = renderer.sceneState().weightedBlendedDepthScale;
+          glm::vec4 pushConstants(a, b, depthScale, 0.0f);
+          cb.pushConstants<glm::vec4>(layoutHandle, vk::ShaderStageFlagBits::eFragment, 0, pushConstants);
+        }
+
+        if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
+          cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
+        } else {
+          cb.draw(draw.vertexCount, 1, draw.firstVertex, 0);
+        }
+      }
+    });
   }
 }
 

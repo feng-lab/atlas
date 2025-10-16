@@ -118,7 +118,6 @@ private:
 
   std::optional<vk::raii::DescriptorSetLayout> m_blurSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_glowSetLayout;
-  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_blurDescriptor;
   std::unique_ptr<ZVulkanDescriptorSet> m_glowDescriptor;
 

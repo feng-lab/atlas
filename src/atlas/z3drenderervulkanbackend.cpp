@@ -28,6 +28,7 @@
 #include "z3dimgraycasterrenderer.h"
 #include "zvulkanfontpipelinecontext.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanpipelinecontext_raii.h"
 #include "z3drenderglobalstate.h"
 #include "z3dscratchresourcepool.h"
 #include "zvulkanbuffer.h"
@@ -157,9 +158,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   if (m_coneContext) {
     m_coneContext->resetFrame();
   }
-  if (m_backgroundContext) {
-    m_backgroundContext->resetFrame();
-  }
+  if (m_backgroundContext) {}
   if (m_textureCopyContext) {
     m_textureCopyContext->resetFrame();
   }
@@ -589,6 +588,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
   auto& cmd = m_activeFrameHandle->commandBuffer();
 
+  // Reset self-managed clear tracking for this sequence of batches
+  m_selfManagedClearKeys.clear();
+
   // Build a simple attachment key for coalescing
   struct AttachKey
   {
@@ -611,62 +613,74 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     return k;
   };
 
-  // Begin a dynamic rendering segment for the batch's attachments
-  auto beginSegmentForBatch = [&](const RenderBatch& batch) {
-    std::vector<vk::RenderingAttachmentInfo> colorAttachments;
-    colorAttachments.reserve(batch.pass.colorAttachments.size());
+  // Begin a dynamic rendering segment for the batch's attachments via the recorder
+  auto beginSegmentForBatch = [&](const RenderBatch& batch,
+                                  ZVulkanPipelineCommandRecorder& recorder,
+                                  ZVulkanPipelineCommandRecorder::RenderingSegmentSpec& outSpec) {
+    outSpec = {};
+    // Render area from pass viewport/scissor
+    outSpec.renderArea = vulkan::toVkScissor(batch.pass);
 
-    auto makeColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
+    // Build color attachments
+    outSpec.colorAttachments.reserve(batch.pass.colorAttachments.size());
+    for (const auto& attachment : batch.pass.colorAttachments) {
       if (!attachment.handle.valid()) {
-        return std::nullopt;
+        continue;
       }
       auto& texture = vulkan::textureFromHandle(attachment.handle, device(), "renderer color attachment");
-      const auto desiredLayout = vk::ImageLayout::eColorAttachmentOptimal;
-      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
-
-      vk::RenderingAttachmentInfo info;
-      info.imageView = texture.imageView();
-      info.imageLayout = desiredLayout;
+      ZVulkanAttachmentInfo info{};
+      info.image = texture.image();
+      info.view = texture.imageView();
+      info.format = texture.format();
+      info.initialLayout = texture.layout();
+      info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
       info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
       info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
+      info.aspect = vk::ImageAspectFlagBits::eColor;
+      info.trackingTexture = &texture;
       vk::ClearValue clear{};
       clear.color = vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
                                                              attachment.clearValue.color.g,
                                                              attachment.clearValue.color.b,
                                                              attachment.clearValue.color.a});
       info.clearValue = clear;
-      return info;
-    };
+      outSpec.colorAttachments.push_back(info);
+    }
 
-    auto makeDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (!attachment.handle.valid()) {
-        return std::nullopt;
-      }
+    // Optional depth attachment
+    if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid()) {
+      const auto& attachment = *batch.pass.depthAttachment;
       auto& texture = vulkan::textureFromHandle(attachment.handle, device(), "renderer depth attachment");
-      const auto desiredLayout = vk::ImageLayout::eDepthAttachmentOptimal;
-      texture.transitionLayout(cmd, texture.layout(), desiredLayout, vk::ImageAspectFlagBits::eDepth);
-
-      vk::RenderingAttachmentInfo info;
-      info.imageView = texture.imageView();
-      info.imageLayout = desiredLayout;
+      ZVulkanAttachmentInfo info{};
+      info.image = texture.image();
+      info.view = texture.imageView();
+      info.format = texture.format();
+      info.initialLayout = texture.layout();
+      info.finalLayout = vk::ImageLayout::eDepthAttachmentOptimal;
       info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
       info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
+      // Treat all depth(-stencil) formats as depth aspect for rendering; recorder will bind stencil if needed
+      info.aspect = vk::ImageAspectFlagBits::eDepth;
+      info.trackingTexture = &texture;
       vk::ClearValue clear{};
       clear.depthStencil = vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
       info.clearValue = clear;
-      return info;
-    };
+      outSpec.depthStencilAttachment = info;
+    }
 
-    for (const auto& attachment : batch.pass.colorAttachments) {
-      if (auto vkAttachment = makeColorAttachment(attachment)) {
-        colorAttachments.push_back(*vkAttachment);
+    // Skip empty segments
+    if (outSpec.colorAttachments.empty() && !outSpec.depthStencilAttachment.has_value()) {
+      if (VLOG_IS_ON(2)) {
+        VLOG(2) << fmt::format("VK skip beginRendering: label='{}' colors=0 depth=0 renderArea=({},{} {}x{})",
+                               renderer.currentPassLabel(),
+                               outSpec.renderArea.offset.x,
+                               outSpec.renderArea.offset.y,
+                               outSpec.renderArea.extent.width,
+                               outSpec.renderArea.extent.height);
       }
+      return false;
     }
 
-    std::optional<vk::RenderingAttachmentInfo> depthAttachmentInfo;
-    if (batch.pass.depthAttachment) {
-      depthAttachmentInfo = makeDepthAttachment(*batch.pass.depthAttachment);
-    }
     // Instrumentation: log attachments and render area
     uint64_t firstColorHandle = 0;
     auto firstColorFmt = enumOrUnderlying(vk::Format{}, 16);
@@ -697,47 +711,26 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
           depthH = dtex->height();
         }
       }
-    }
-
-    const auto vkScissor = vulkan::toVkScissor(batch.pass);
-    vk::RenderingInfo renderingInfo;
-    renderingInfo.renderArea = vkScissor;
-    renderingInfo.layerCount = 1;
-    renderingInfo.pColorAttachments = colorAttachments.empty() ? nullptr : colorAttachments.data();
-    renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
-    renderingInfo.pDepthAttachment = depthAttachmentInfo ? &*depthAttachmentInfo : nullptr;
-    // Unified D/S layout path does not bind a separate stencil attachment
-    if (colorAttachments.empty() && !depthAttachmentInfo) {
-      if (VLOG_IS_ON(2)) {
-        VLOG(2) << fmt::format("VK skip beginRendering: label='{}' colors=0 depth=0 renderArea=({},{} {}x{})",
-                               renderer.currentPassLabel(),
-                               renderingInfo.renderArea.offset.x,
-                               renderingInfo.renderArea.offset.y,
-                               renderingInfo.renderArea.extent.width,
-                               renderingInfo.renderArea.extent.height);
-      }
-      return false; // Skip empty segments instead of aborting
-    }
-    if (VLOG_IS_ON(2)) {
       VLOG(2) << fmt::format(
-        "VK beginRendering: label='{}' colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{} renderArea=({},{} {}x{})",
+        "VK beginRendering(recorder): label='{}' colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{} renderArea=({},{} {}x{})",
         renderer.currentPassLabel(),
-        renderingInfo.colorAttachmentCount,
+        outSpec.colorAttachments.size(),
         firstColorHandle,
         firstColorFmt,
         firstColorW,
         firstColorH,
-        static_cast<bool>(depthAttachmentInfo),
+        static_cast<bool>(outSpec.depthStencilAttachment.has_value()),
         depthHandle,
         depthFmt,
         depthW,
         depthH,
-        renderingInfo.renderArea.offset.x,
-        renderingInfo.renderArea.offset.y,
-        renderingInfo.renderArea.extent.width,
-        renderingInfo.renderArea.extent.height);
+        outSpec.renderArea.offset.x,
+        outSpec.renderArea.offset.y,
+        outSpec.renderArea.extent.width,
+        outSpec.renderArea.extent.height);
     }
-    cmd.beginRendering(renderingInfo);
+
+    recorder.beginRenderingSegment(outSpec);
 
     if (m_activeFrame) {
       m_activeFrame->renderingSegmentsBegan++;
@@ -767,6 +760,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
   size_t batchIndex = 0;
   std::optional<AttachKey> currentKey;
   bool segmentOpen = false;
+  std::optional<ZVulkanPipelineCommandRecorder::RenderingSegmentSpec> openSpec{};
+  ZVulkanPipelineCommandRecorder recorder(cmd);
   for (const auto& batch : state.batches) {
     const auto geom = describeGeometry(batch.geometry);
     VLOG(1) << fmt::format("VK batch[{}]: geom={}, colors={}, depth={} viewport=({},{} {}x{})",
@@ -885,15 +880,20 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
     if (selfManaged) {
       if (segmentOpen) {
-        cmd.endRendering();
+        if (openSpec) {
+          recorder.endRenderingSegment(*openSpec);
+          openSpec.reset();
+        }
         segmentOpen = false;
         currentKey.reset();
       }
     } else {
       if (!segmentOpen) {
-        if (beginSegmentForBatch(batch)) {
+        ZVulkanPipelineCommandRecorder::RenderingSegmentSpec spec;
+        if (beginSegmentForBatch(batch, recorder, spec)) {
           segmentOpen = true;
           currentKey = key;
+          openSpec = spec;
           // Track active segment formats for validation
           if (m_activeFrame) {
             m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
@@ -902,12 +902,17 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
           continue;
         }
       } else if (!currentKey || *currentKey != key) {
-        cmd.endRendering();
+        if (openSpec) {
+          recorder.endRenderingSegment(*openSpec);
+          openSpec.reset();
+        }
         segmentOpen = false;
         currentKey.reset();
-        if (beginSegmentForBatch(batch)) {
+        ZVulkanPipelineCommandRecorder::RenderingSegmentSpec spec;
+        if (beginSegmentForBatch(batch, recorder, spec)) {
           segmentOpen = true;
           currentKey = key;
+          openSpec = spec;
           if (m_activeFrame) {
             m_activeFrame->activeSegmentFormats = vulkan::extractAttachmentFormats(batch);
           }
@@ -1070,11 +1075,17 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (selfManaged) {
       segmentOpen = false;
       currentKey.reset();
+      openSpec.reset();
     }
   }
 
+  // Close any remaining open segment at the end of batches
   if (segmentOpen) {
-    cmd.endRendering();
+    if (openSpec) {
+      recorder.endRenderingSegment(*openSpec);
+      openSpec.reset();
+    }
+    segmentOpen = false;
   }
   // Execute any queued upload->static copies now (outside dynamic rendering)
   flushScheduledCopies(cmd);
@@ -1082,6 +1093,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     m_activeFrame->activeSegmentFormats.reset();
   }
 }
+
+// Removed: shouldSelfManagedClear was used in earlier self-managed flows.
 
 void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, const Z3DCompositorPass& pass)
 {
@@ -1138,7 +1151,7 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   // Use pass.debugLabel if provided; otherwise leave empty.
   std::string_view scopeLabel = pass.debugLabel ? std::string_view(pass.debugLabel) : std::string_view();
 
-  renderer.executeVulkanBatches(
+  renderer.recordVulkanBatches(
     [&]() {
       // Opaque first
       for (auto* filter : pass.opaqueFilters) {

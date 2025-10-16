@@ -13,6 +13,7 @@
 #include "zvulkanrenderconversions.h"
 #include "zvulkanbindings.h"
 #include "zvulkanbuffer.h"
+#include "zvulkanpipelinecontext_raii.h"
 #include "zlog.h"
 
 #include <algorithm>
@@ -94,68 +95,6 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  auto rebuildRenderingAttachments = [&](std::vector<vk::RenderingAttachmentInfo>& colors,
-                                         std::optional<vk::RenderingAttachmentInfo>& depth) {
-    colors.clear();
-    depth.reset();
-
-    auto makeColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (!attachment.handle.valid()) {
-        return std::nullopt;
-      }
-      auto& texture =
-        vulkan::textureFromHandle(attachment.handle, m_backend.device(), "texture-glow intermediate color attachment");
-      const auto desiredLayout = vk::ImageLayout::eColorAttachmentOptimal;
-      texture.transitionLayout(cmd, texture.layout(), desiredLayout);
-
-      vk::RenderingAttachmentInfo info;
-      info.imageView = texture.imageView();
-      info.imageLayout = desiredLayout;
-      info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
-      info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-      vk::ClearValue clear{};
-      clear.color = vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
-                                                             attachment.clearValue.color.g,
-                                                             attachment.clearValue.color.b,
-                                                             attachment.clearValue.color.a});
-      info.clearValue = clear;
-      return info;
-    };
-
-    auto makeDepthAttachment = [&](const AttachmentDesc& attachment) -> std::optional<vk::RenderingAttachmentInfo> {
-      if (!attachment.handle.valid()) {
-        return std::nullopt;
-      }
-      auto& texture =
-        vulkan::textureFromHandle(attachment.handle, m_backend.device(), "texture-glow intermediate depth attachment");
-      const auto desiredLayout = vk::ImageLayout::eDepthAttachmentOptimal;
-      texture.transitionLayout(cmd, texture.layout(), desiredLayout, vk::ImageAspectFlagBits::eDepth);
-
-      vk::RenderingAttachmentInfo info;
-      info.imageView = texture.imageView();
-      info.imageLayout = desiredLayout;
-      info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
-      info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-      vk::ClearValue clear{};
-      clear.depthStencil = vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
-      info.clearValue = clear;
-      return info;
-    };
-
-    for (const auto& attachment : batch.pass.colorAttachments) {
-      if (auto vkAttachment = makeColorAttachment(attachment)) {
-        colors.push_back(*vkAttachment);
-      }
-    }
-    if (batch.pass.depthAttachment) {
-      depth = makeDepthAttachment(*batch.pass.depthAttachment);
-    }
-  };
-
-  std::vector<vk::RenderingAttachmentInfo> colorAttachments;
-  std::optional<vk::RenderingAttachmentInfo> depthAttachment;
-  rebuildRenderingAttachments(colorAttachments, depthAttachment);
-
   runBlurPass(renderer,
               cmd,
               colorTexture,
@@ -178,29 +117,6 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
               payload.blurScale,
               payload.blurStrength);
 
-  // Final pass rendering begins here
-  const vk::Rect2D renderArea{
-    vk::Offset2D{static_cast<int32_t>(batch.pass.viewport.origin.x),
-                 static_cast<int32_t>(batch.pass.viewport.origin.y) },
-    vk::Extent2D{static_cast<uint32_t>(batch.pass.viewport.extent.x),
-                 static_cast<uint32_t>(batch.pass.viewport.extent.y)}
-  };
-
-  vk::RenderingInfo renderingInfo;
-  renderingInfo.renderArea = renderArea;
-  renderingInfo.layerCount = 1;
-  renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
-  renderingInfo.pColorAttachments = colorAttachments.empty() ? nullptr : colorAttachments.data();
-  vk::RenderingAttachmentInfo depthAttachmentInfo;
-  if (depthAttachment) {
-    depthAttachmentInfo = *depthAttachment;
-    renderingInfo.pDepthAttachment = &depthAttachmentInfo;
-  } else {
-    renderingInfo.pDepthAttachment = nullptr;
-  }
-
-  cmd.beginRendering(renderingInfo);
-
   ZVulkanDescriptorSet* glowDS = nullptr;
   if (m_glowSetLayout) {
     glowDS = m_backend.allocateOverrideDescriptorSet(**m_glowSetLayout);
@@ -219,22 +135,7 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& glowPipeline = ensureGlowPipeline(glowKey, formats);
 
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, glowPipeline.pipeline->pipeline());
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  const vk::DeviceSize offsets[] = {0};
-  cmd.bindVertexBuffers(0, {quad.buffer()}, offsets);
-  {
-    std::array<vk::DescriptorSet, 1> sets{glowDS->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           glowPipeline.pipeline->pipelineLayout(),
-                           vkbind::kSetInputs,
-                           sets,
-                           {});
-  }
-
-  cmd.setViewport(0, viewport);
-  cmd.setScissor(0, scissor);
-
   glm::vec2 finalExtent = batch.pass.viewport.extent;
   if (finalExtent.x <= 0.0f || finalExtent.y <= 0.0f) {
     const auto& viewportState = renderer.frameState().viewport;
@@ -249,14 +150,92 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
 
   GlowPushConstants glowConstants;
   glowConstants.screenDimRcp = glm::vec2(1.0f / finalExtent.x, 1.0f / finalExtent.y);
-  cmd.pushConstants<GlowPushConstants>(glowPipeline.pipeline->pipelineLayout(),
-                                       vk::ShaderStageFlagBits::eFragment,
-                                       0,
-                                       glowConstants);
+  std::vector<ZVulkanAttachmentInfo> colorAttachmentInfos;
+  colorAttachmentInfos.reserve(batch.pass.colorAttachments.size());
+  for (const auto& attachment : batch.pass.colorAttachments) {
+    if (!attachment.handle.valid()) {
+      continue;
+    }
+    auto& attachmentTexture =
+      vulkan::textureFromHandle(attachment.handle, m_backend.device(), "texture-glow final color attachment");
+    ZVulkanAttachmentInfo info{};
+    info.image = attachmentTexture.image();
+    info.view = attachmentTexture.imageView();
+    info.format = attachmentTexture.format();
+    info.initialLayout = attachmentTexture.layout();
+    info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    info.clearValue.color = vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
+                                                                     attachment.clearValue.color.g,
+                                                                     attachment.clearValue.color.b,
+                                                                     attachment.clearValue.color.a});
+    info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+    info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
+    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+    info.srcAccess = {};
+    info.dstAccess = vk::AccessFlagBits2::eColorAttachmentWrite;
+    info.aspect = vk::ImageAspectFlagBits::eColor;
+    info.trackingTexture = &attachmentTexture;
+    colorAttachmentInfos.push_back(info);
+  }
 
-  cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
-  // Self-managed context: ensure we close the dynamic rendering segment
-  cmd.endRendering();
+  std::optional<ZVulkanAttachmentInfo> depthAttachmentInfo;
+  if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid()) {
+    const auto& attachment = *batch.pass.depthAttachment;
+    auto& attachmentTexture =
+      vulkan::textureFromHandle(attachment.handle, m_backend.device(), "texture-glow final depth attachment");
+    ZVulkanAttachmentInfo depthInfo{};
+    depthInfo.image = attachmentTexture.image();
+    depthInfo.view = attachmentTexture.imageView();
+    depthInfo.format = attachmentTexture.format();
+    depthInfo.initialLayout = attachmentTexture.layout();
+    depthInfo.finalLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+    depthInfo.clearValue.depthStencil =
+      vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
+    depthInfo.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
+    depthInfo.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
+    depthInfo.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    depthInfo.dstStage =
+      vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
+    depthInfo.srcAccess = {};
+    depthInfo.dstAccess =
+      vk::AccessFlagBits2::eDepthStencilAttachmentWrite | vk::AccessFlagBits2::eDepthStencilAttachmentRead;
+    const vk::ImageAspectFlags depthAspect = (attachmentTexture.info().aspectMask == vk::ImageAspectFlags{})
+                                               ? vk::ImageAspectFlagBits::eDepth
+                                               : attachmentTexture.info().aspectMask;
+    depthInfo.aspect = depthAspect;
+    depthInfo.trackingTexture = &attachmentTexture;
+    depthAttachmentInfo = depthInfo;
+  }
+
+  const vk::Rect2D renderArea{
+    vk::Offset2D{static_cast<int32_t>(batch.pass.viewport.origin.x),
+                 static_cast<int32_t>(batch.pass.viewport.origin.y)},
+    vk::Extent2D{static_cast<uint32_t>(std::max(0.0f, batch.pass.viewport.extent.x)),
+                 static_cast<uint32_t>(std::max(0.0f, batch.pass.viewport.extent.y))}
+  };
+
+  ZVulkanGraphicsPassSpec glowSpec{};
+  glowSpec.renderArea = renderArea;
+  glowSpec.viewports = {viewport};
+  glowSpec.scissors = {scissor};
+  glowSpec.colorAttachments = std::move(colorAttachmentInfos);
+  glowSpec.depthStencilAttachment = depthAttachmentInfo;
+  glowSpec.pipelineHandle = glowPipeline.pipeline->pipelineHandle();
+  glowSpec.pipelineLayoutHandle = glowPipeline.pipeline->pipelineLayoutHandle();
+  glowSpec.descriptorSets = {glowDS->descriptorSet()};
+  glowSpec.expectedDescriptorSetCount = 1;
+  glowSpec.vertexBuffers = {quad.buffer()};
+  glowSpec.vertexOffsets = {vk::DeviceSize(0)};
+  glowSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
+  glowSpec.instanceCount = 1;
+  glowSpec.pushConstantsData = &glowConstants;
+  glowSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(GlowPushConstants));
+  glowSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+  glowSpec.requirePushConstants = true;
+
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  recorder.recordGraphicsPass(glowSpec);
 }
 
 void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()

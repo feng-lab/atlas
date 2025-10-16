@@ -28,8 +28,6 @@ public:
   explicit ZVulkanBackgroundPipelineContext(Z3DRendererVulkanBackend& backend);
   ~ZVulkanBackgroundPipelineContext();
 
-  void resetFrame();
-
   void record(Z3DRendererBase& renderer,
               const RenderBatch& batch,
               const BackgroundPayload& payload,
@@ -67,13 +65,6 @@ private:
   Z3DRendererVulkanBackend& m_backend;
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
-
-  // Push-constants cache to skip redundant updates
-  bool m_lastPCValid = false;
-  glm::vec2 m_lastScreenDimRCP{0.0f};
-  glm::vec4 m_lastColor1{0.0f};
-  glm::vec4 m_lastColor2{0.0f};
-  glm::vec4 m_lastRegion{0.0f};
 
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;

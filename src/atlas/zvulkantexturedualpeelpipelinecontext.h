@@ -85,7 +85,6 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_finalSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // for set 1/2 alignment
   std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3 OIT params
-  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_blendDescriptor;
   std::unique_ptr<ZVulkanDescriptorSet> m_finalDescriptor;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorOIT;

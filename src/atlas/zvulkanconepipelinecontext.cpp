@@ -10,6 +10,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanbindings.h"
 #include "zvulkanuniforms.h"
 #include "zsysteminfo.h"
@@ -201,60 +202,56 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
 
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  // Bind SoA streams (same buffer, different offsets)
-  {
-    std::array<vk::Buffer, 5> bufs{m_originBuffer, m_axisBuffer, m_flagsBuffer, m_baseColorBuffer, m_topColorBuffer};
-    std::array<vk::DeviceSize, 5> offs{m_originOffset,
-                                       m_axisOffset,
-                                       m_flagsOffset,
-                                       m_baseColorOffset,
-                                       m_topColorOffset};
-    cmd.bindVertexBuffers(0, bufs, offs);
-  }
-  if (m_indexCount > 0 && m_indexUploadBuffer) {
-    cmd.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
-  }
-
-  CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
-    << "Cone pipeline placeholder descriptor set not initialised";
-  if ((dsPlaceholderOverride || m_dsPlaceholder) && m_dsLighting && m_dsTransforms) {
-    const vk::DescriptorSet ds0 =
-      dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : m_dsPlaceholder->descriptorSet();
-    std::array<vk::DescriptorSet, 3> sets{ds0, m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           pipeline.pipeline->pipelineLayout(),
-                           vkbind::kSetInputs,
-                           sets,
-                           {});
-  }
-  if (m_dsOIT) {
-    std::array<vk::DescriptorSet, 1> ds3{m_dsOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           pipeline.pipeline->pipelineLayout(),
-                           vkbind::kSetOITParams,
-                           ds3,
-                           {});
-  }
-
-  cmd.setViewport(0, viewport);
-  cmd.setScissor(0, scissor);
-
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
-
   ConePushConstants constants;
   constants.projectionMatrix = eyeState.projectionMatrix;
   constants.ortho = eyeState.isPerspective ? 0.0f : 1.0f;
-  cmd.pushConstants<ConePushConstants>(pipeline.pipeline->pipelineLayout(),
-                                       vk::ShaderStageFlagBits::eFragment,
-                                       0,
-                                       constants);
+  CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
+    << "Cone pipeline placeholder descriptor set not initialised";
+  std::vector<vk::DescriptorSet> sets;
+  const vk::DescriptorSet ds0 =
+    dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : m_dsPlaceholder->descriptorSet();
+  sets.push_back(ds0);
+  sets.push_back(m_dsLighting->descriptorSet());
+  sets.push_back(m_dsTransforms->descriptorSet());
 
-  if (m_indexCount > 0 && m_indexUploadBuffer) {
-    cmd.drawIndexed(static_cast<uint32_t>(m_indexCount), 1, 0, 0, 0);
-  } else {
-    cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
+  ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = {viewport};
+  drawSpec.scissors = {scissor};
+  drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+  drawSpec.descriptorSetFirst = vkbind::kSetInputs;
+  drawSpec.descriptorSets = sets;
+
+  uint32_t expectedSets = static_cast<uint32_t>(sets.size());
+  if (m_dsOIT) {
+    ZVulkanDescriptorBindInfo oitBind{};
+    oitBind.firstSet = vkbind::kSetOITParams;
+    oitBind.sets = {m_dsOIT->descriptorSet()};
+    drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
+    expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
   }
+  drawSpec.expectedDescriptorSetCount = expectedSets;
+
+  drawSpec.vertexBuffers = {m_originBuffer, m_axisBuffer, m_flagsBuffer, m_baseColorBuffer, m_topColorBuffer};
+  drawSpec.vertexOffsets = {m_originOffset, m_axisOffset, m_flagsOffset, m_baseColorOffset, m_topColorOffset};
+  if (m_indexCount > 0 && m_indexUploadBuffer) {
+    drawSpec.indexBuffer = m_indexUploadBuffer;
+    drawSpec.indexOffset = m_indexUploadOffset;
+    drawSpec.indexType = vk::IndexType::eUint32;
+    drawSpec.indexCount = static_cast<uint32_t>(m_indexCount);
+  } else {
+    drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
+  }
+  drawSpec.instanceCount = 1;
+
+  drawSpec.pushConstantsData = &constants;
+  drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(ConePushConstants));
+  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+  drawSpec.requirePushConstants = true;
+
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  recorder.recordGraphicsDraw(drawSpec);
 }
 
 void ZVulkanConePipelineContext::ensureDescriptorLayouts()

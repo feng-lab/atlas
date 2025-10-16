@@ -198,7 +198,6 @@ public:
 
   VulkanSurfaceBindings prepareVulkanSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
-  void executeVulkanBatches(const std::function<void()>& recordBatches, std::string_view label = {});
   void beginVulkanFrame();
   void endVulkanFrame();
   // Keep a Vulkan frame open across multiple recordVulkanBatches calls.

@@ -136,6 +136,97 @@ Vulkan Pipeline Invariants
 - Descriptor updates after binding are forbidden. Per‑draw overrides are allocated from the backend’s per‑frame arena and kept alive until the frame fence to satisfy validation rules.
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
 
+Pipeline Context Recorder
+
+- Use `ZVulkanPipelineCommandRecorder` to emit hermetic passes. Populate a `ZVulkanGraphicsPassSpec`/`ZVulkanComputePassSpec` with every state your shader relies on (pipeline, layout, descriptor sets, push constants, vertex/index buffers, dynamic state, attachment barriers) and call `recordGraphicsPass` / `recordComputePass`.
+- Debug builds enforce the contract when `--atlas_vk_enforce_pipeline_context=true`: missing viewports/scissors, incomplete descriptor coverage, absent push constants, or unexpected active queries trigger a hard `CHECK`. Disable with the flag only when debugging third-party drivers.
+- `buildStaticSecondary` and `buildStaticSecondaryAsync` wrap secondary command buffer creation (render-pass continue + simultaneous use by default), making it easy to pre-record background layers on worker threads (`folly::coro` ready).
+- Example – graphics pass:
+
+```cpp
+vk::raii::CommandBuffer& cb = ...; // primary command buffer (already begun)
+nim::ZVulkanPipelineCommandRecorder recorder(cb);
+
+nim::ZVulkanGraphicsPassSpec pass{};
+pass.pipeline = &gPipeline;
+pass.pipelineLayout = &gLayout;
+pass.renderArea = vk::Rect2D{{0, 0}, {width, height}};
+pass.viewports = {vk::Viewport{0.f, 0.f, float(width), float(height), 0.f, 1.f}};
+pass.scissors = {vk::Rect2D{{0, 0}, {width, height}}};
+pass.colorAttachments = {colorAttachmentInfo};
+pass.depthStencilAttachment = depthAttachmentInfo;
+pass.descriptorSets = {**frameSet};
+pass.lineWidth = 1.0f;
+pass.depthTestEnable = VK_TRUE;
+pass.depthWriteEnable = VK_TRUE;
+pass.topology = vk::PrimitiveTopology::eTriangleList;
+pass.vertexBuffers = {positionBuffer};
+pass.vertexOffsets = {0};
+pass.indexBuffer = indexBuffer;
+pass.indexType = vk::IndexType::eUint32;
+pass.indexCount = indexCount;
+recorder.recordGraphicsPass(pass);
+```
+
+- Example – compute dispatch:
+
+```cpp
+nim::ZVulkanComputePassSpec compute{};
+compute.pipeline = &computePipeline;
+compute.pipelineLayout = &computeLayout;
+compute.descriptorSets = {**frameSet};
+compute.requirePushConstants = true;
+compute.pushConstantsData = &params;
+compute.pushConstantsSize = sizeof(params);
+compute.groupX = (workWidth + 7) / 8;
+compute.groupY = (workHeight + 7) / 8;
+nim::ZVulkanPipelineCommandRecorder recorder(cb);
+recorder.recordComputePass(compute);
+```
+
+- Compute → graphics hazards are spelled out in the attachment descriptors. Example: transition a storage image written by compute into a sampled image for the lighting pass.
+
+```cpp
+nim::ZVulkanAttachmentInfo gbufferNormal{};
+gbufferNormal.image = **normalsImage;
+gbufferNormal.view = **normalsView;
+gbufferNormal.format = normalsFormat;
+gbufferNormal.initialLayout = vk::ImageLayout::eGeneral; // compute writes
+gbufferNormal.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+gbufferNormal.loadOp = vk::AttachmentLoadOp::eClear;
+gbufferNormal.storeOp = vk::AttachmentStoreOp::eStore;
+gbufferNormal.srcStage = vk::PipelineStageFlagBits2::eComputeShader;
+gbufferNormal.srcAccess = vk::AccessFlagBits2::eShaderWrite;
+gbufferNormal.dstStage = vk::PipelineStageFlagBits2::eFragmentShader;
+gbufferNormal.dstAccess = vk::AccessFlagBits2::eShaderSampledRead;
+lightingPass.colorAttachments = {gbufferNormal, colourAttachment, ...};
+lightingRecorder.recordGraphicsPass(lightingPass);
+```
+
+- Static background recording pattern:
+
+```cpp
+nim::ZVulkanSecondaryBuildInfo info{
+  .device = &device,
+  .commandPool = &secondaryPool,
+  .inheritance = vk::CommandBufferInheritanceInfo{}.setRenderPass(VK_NULL_HANDLE)
+};
+auto staticBackground = nim::buildStaticSecondary(info, [&](vk::raii::CommandBuffer& scb) {
+  nim::ZVulkanPipelineCommandRecorder secondaryRecorder(scb);
+  secondaryRecorder.recordGraphicsPass(backgroundPass);
+});
+  primaryCmd.executeCommands({*staticBackground});
+  ```
+
+ - Pair the recorder with back-end stats to guarantee no state leaks between passes; OpenGL-equivalent code should set the same dynamic values to ease diffing.
+
+**Backend Segment Ownership**
+- Backend/compositor exclusively owns dynamic rendering segments (attachments, clears, begin/end).
+- Pipeline contexts are draw-only: they may not build attachments or call beginRendering/endRendering.
+- Use `ZVulkanPipelineCommandRecorder::beginRenderingSegment/endRenderingSegment` in the backend, passing `ZVulkanRenderingSegmentSpec` with per-attachment transitions and final layouts.
+- Contexts must use `ZVulkanPipelineCommandRecorder::recordGraphicsDraw` with complete state: descriptor coverage, push constants, viewports, scissors, and dynamic state as needed. The debug tracker asserts missing state in debug builds.
+- Clear/load/store decisions are made at segment open; contexts must not gate clears.
+
 Vulkan Entry Points (explicit)
 
 - OpenGL entry points remain `render(...)` and `renderPicking(...)`. These drive the GL path and may begin/end GL frames as needed.

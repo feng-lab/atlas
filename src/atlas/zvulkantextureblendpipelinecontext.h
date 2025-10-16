@@ -79,7 +79,6 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
-  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;

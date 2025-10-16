@@ -127,6 +127,7 @@ public:
                         vk::ImageLayout oldLayout,
                         vk::ImageLayout newLayout,
                         vk::ImageAspectFlags aspectMask = {});
+  void overrideCurrentLayout(vk::ImageLayout layout);
 
   vk::DescriptorImageInfo descriptorInfo() const;
   vk::DescriptorImageInfo descriptorInfo(vk::ImageLayout layoutOverride, vk::ImageAspectFlags aspectOverride) const;

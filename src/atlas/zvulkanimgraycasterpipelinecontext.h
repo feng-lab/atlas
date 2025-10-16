@@ -324,7 +324,7 @@ private:
                              size_t channelIndex,
                              float zeToScreenPixelVoxelSize);
 
-  void bindProgressiveDescriptors(ChannelResources& resources, vk::PipelineLayout layout, vk::raii::CommandBuffer& cmd);
+  std::vector<vk::DescriptorSet> collectProgressiveDescriptorSets(ChannelResources& resources);
   // depthArray is optional
   void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
   void ensureProgressiveLayerTargets(const glm::uvec2& size,
@@ -332,13 +332,9 @@ private:
                                      uint32_t generation,
                                      vk::raii::CommandBuffer& cmd);
 
-  ZVulkanTexture& ensureVolumeTexture(ChannelResources& resources,
-                                      const ZImg& image,
-                                      size_t channelIndex,
-                                      uint64_t generation);
-  ZVulkanTexture& ensureImage2DTexture(ChannelResources& resources,
-                                       const ZImg& image,
-                                       uint64_t generation);
+  ZVulkanTexture&
+  ensureVolumeTexture(ChannelResources& resources, const ZImg& image, size_t channelIndex, uint64_t generation);
+  ZVulkanTexture& ensureImage2DTexture(ChannelResources& resources, const ZImg& image, uint64_t generation);
   ZVulkanTexture& ensureTransferTexture(ChannelResources& resources, const Z3DTransferFunction& transferFunction);
 
   void renderEntryExit(Z3DRendererBase& renderer,

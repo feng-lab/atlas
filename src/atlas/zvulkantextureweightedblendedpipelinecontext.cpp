@@ -10,6 +10,7 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanbindings.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanuniforms.h"
@@ -105,23 +106,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
                          formats.colorFormats.size(),
                          formats.depthFormat.has_value());
 
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
-  auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  const vk::DeviceSize offsets[] = {0};
-  cmd.bindVertexBuffers(0, {quad.buffer()}, offsets);
-
-  {
-    std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           instance.pipeline->pipelineLayout(),
-                           vkbind::kSetInputs,
-                           sets,
-                           {});
-  }
-
-  // Ensure and bind OIT params (set = 3). Descriptor is set at allocation time.
-  cmd.setViewport(0, viewport);
-  cmd.setScissor(0, scissor);
+  // Draw-only: backend manages attachments and area
 
   glm::vec2 extent = batch.pass.viewport.extent;
   if (extent.x <= 0.0f || extent.y <= 0.0f) {
@@ -141,24 +126,38 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
   }
 
-  // Update OIT UBO values before binding the params descriptor.
+  // Update OIT UBO values before recording
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
+
+  ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = {viewport};
+  drawSpec.scissors = {scissor};
+  drawSpec.pipelineHandle = instance.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = instance.pipeline->pipelineLayoutHandle();
+  drawSpec.descriptorSetFirst = vkbind::kSetInputs;
+  drawSpec.descriptorSets = {ds->descriptorSet()};
+  uint32_t expectedSets = 1;
   if (m_descriptorSetOIT && m_uboOIT) {
-    std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           instance.pipeline->pipelineLayout(),
-                           vkbind::kSetOITParams,
-                           sets3,
-                           {});
+    ZVulkanDescriptorBindInfo oitBind{};
+    oitBind.firstSet = vkbind::kSetOITParams;
+    oitBind.sets = {m_descriptorSetOIT->descriptorSet()};
+    drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
+    expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
   }
+  drawSpec.expectedDescriptorSetCount = expectedSets;
+  auto& quad = m_backend.fullscreenQuadVertexBuffer();
+  drawSpec.vertexBuffers = {quad.buffer()};
+  drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+  drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
+  drawSpec.instanceCount = 1;
+  drawSpec.pushConstantsData = &constants;
+  drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(WeightedBlendedPushConstants));
+  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+  drawSpec.requirePushConstants = true;
 
-  cmd.pushConstants<WeightedBlendedPushConstants>(instance.pipeline->pipelineLayout(),
-                                                  vk::ShaderStageFlagBits::eFragment,
-                                                  0,
-                                                  constants);
-
-  VLOG(2) << fmt::format("WB: draw {} verts", m_vertexCount);
-  cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
+  VLOG(2) << fmt::format("WB(draw-only): draw {} verts", m_vertexCount);
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  recorder.recordGraphicsDraw(drawSpec);
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorLayout()

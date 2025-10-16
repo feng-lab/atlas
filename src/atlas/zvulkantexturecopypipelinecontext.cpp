@@ -12,8 +12,10 @@
 #include "zvulkandescriptorpool.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanbindings.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanuniforms.h"
+#include "zvulkanpipelinecontext_raii.h"
 #include "zlog.h"
 
 #include <algorithm>
@@ -238,14 +240,6 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   ensureVertexCapacity(m_vertexCount);
   uploadGeometry();
 
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipeline());
-  cmd.bindVertexBuffers(0, {m_vertexBuffer->buffer()}, {vk::DeviceSize(0)});
-
-  {
-    std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 0, sets, {});
-  }
-
   // Bind OIT UBO when needed for image OIT paths (for screen_dim_RCP and depth transforms)
   if (key.waInit || key.wbInit || key.ddpPeel) {
     // Ensure OIT descriptor/UBO are primed before recording; avoid descriptor writes while recording
@@ -273,24 +267,37 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
       oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
       oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
       m_uboOIT->copyData(&oit, sizeof(oit));
-
-      // Bind OIT set at set index 3 (matches include/oit_params.glslinc)
-      std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
-      VLOG(2) << "TextureCopy: binding OIT params set at index 3";
-      cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.pipeline->pipelineLayout(), 3, sets3, {});
+    } else {
+      CHECK(false) << "Texture copy OIT resources not primed before recording";
     }
   }
 
-  // Use the provided viewport directly (no viewport-based Y flip)
-  cmd.setViewport(0, viewport);
-  cmd.setScissor(0, scissor);
-  VLOG(2)
-    << fmt::format("TextureCopy: viewport=({},{} {}x{})", viewport.x, viewport.y, viewport.width, viewport.height);
+  // Draw-only spec under backend-managed segment
+  ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = {viewport};
+  drawSpec.scissors = {scissor};
+  drawSpec.pipelineHandle = pipeline.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
+  drawSpec.descriptorSetFirst = vkbind::kSetInputs;
+  drawSpec.descriptorSets = {ds->descriptorSet()};
+  drawSpec.vertexBuffers = {m_vertexBuffer->buffer()};
+  drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+  drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
+  drawSpec.instanceCount = 1;
+  if (key.waInit || key.wbInit || key.ddpPeel) {
+    drawSpec.expectedDescriptorSetCount = 4;
+    CHECK(m_descriptorSetOIT) << "Texture copy OIT descriptor set missing";
+    ZVulkanDescriptorBindInfo oitBind{};
+    oitBind.firstSet = 3;
+    oitBind.sets = {m_descriptorSetOIT->descriptorSet()};
+    drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
+  } else {
+    drawSpec.expectedDescriptorSetCount = 1;
+  }
 
-  // No push constants needed; shader samples via UVs
-
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  recorder.recordGraphicsDraw(drawSpec);
   VLOG(2) << fmt::format("TextureCopy: draw {} verts", m_vertexCount);
-  cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
 }
 
 void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()

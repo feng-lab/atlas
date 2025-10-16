@@ -93,7 +93,6 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_setTexture;
   std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
   std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
-  std::unique_ptr<ZVulkanDescriptorPool> m_descriptorPool;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTexture;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
@@ -219,9 +218,6 @@ private:
   void updateUBOs(Z3DRendererBase& renderer, const RenderBatch& batch, const LinePayload& payload);
   PipelineInstance&
   ensurePipeline(const PipelineKey& key, const LinePayload& payload, const vulkan::AttachmentFormats& formats);
-  void bindDescriptorSets(vk::raii::CommandBuffer& cmd,
-                          const PipelineInstance& pipeline,
-                          vk::DescriptorSet textureOverride = {}) const;
   void uploadWideGeometry(const LinePayload& payload, bool pickingPass);
   void uploadThinGeometry(const LinePayload& payload, bool pickingPass);
   void resetDescriptors();

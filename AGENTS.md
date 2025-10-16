@@ -16,7 +16,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - Security/privacy: no unexpected telemetry, no leaking user data in logs.
 
 ## Non-Negotiable Rules
-- **Never run `git checkout`** inside automated workflows; use patch or `git restore --source=HEAD -- <path>` if you must discard *your own* work. Do not touch user changes.
+- **Never run `git checkout`**.
 - Do not modify submodules or vendored third-party code unless explicitly tasked.
 - Respect the single-GL-context assumption: all rendering/glbinding work happens on the rendering thread.
 - Cross threads via `QMetaObject::invokeMethod` (queued connections). Never mutate engine QObjects from the UI thread.

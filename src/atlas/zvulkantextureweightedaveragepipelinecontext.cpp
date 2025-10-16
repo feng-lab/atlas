@@ -7,10 +7,10 @@
 #include "zvulkanpipeline.h"
 #include "zvulkanshader.h"
 #include "zvulkantexture.h"
-#include "zvulkandescriptorpool.h"
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanrenderconversions.h"
+#include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanbindings.h"
 #include "zvulkanbuffer.h"
 #include "zvulkanuniforms.h"
@@ -44,9 +44,6 @@ void ZVulkanTextureWeightedAveragePipelineContext::resetDescriptors()
 {
   m_descriptorSet.reset();
   m_descriptorSetOIT.reset();
-  if (m_descriptorPool) {
-    m_descriptorPool->reset();
-  }
 }
 
 void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& renderer,
@@ -70,7 +67,6 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   m_vertexCount = 4;
 
   ensureDescriptorLayout();
-  ensureDescriptorPool();
   ensureDescriptorSet();
   if (!m_descriptorSet) {
     return;
@@ -108,22 +104,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   PipelineInstance& instance = ensurePipeline(key, formats);
   VLOG(2) << fmt::format("WA: ensured pipeline colors={} depth={}", formats.colorFormats.size(), formats.depthFormat.has_value());
 
-  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, instance.pipeline->pipeline());
-  auto& quad = m_backend.fullscreenQuadVertexBuffer();
-  const vk::DeviceSize offsets[] = {0};
-  cmd.bindVertexBuffers(0, {quad.buffer()}, offsets);
-
-  {
-    std::array<vk::DescriptorSet, 1> sets{ds->descriptorSet()};
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           instance.pipeline->pipelineLayout(),
-                           vkbind::kSetInputs,
-                           sets,
-                           {});
-  }
-
-  cmd.setViewport(0, viewport);
-  cmd.setScissor(0, scissor);
+  // Draw-only; backend manages attachments and render area
 
   glm::vec2 extent = batch.pass.viewport.extent;
   if (extent.x <= 0.0f || extent.y <= 0.0f) {
@@ -151,23 +132,35 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
     ensureOITResources();
   }
   updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
+  ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
+  drawSpec.viewports = {viewport};
+  drawSpec.scissors = {scissor};
+  drawSpec.pipelineHandle = instance.pipeline->pipelineHandle();
+  drawSpec.pipelineLayoutHandle = instance.pipeline->pipelineLayoutHandle();
+  drawSpec.descriptorSetFirst = vkbind::kSetInputs;
+  drawSpec.descriptorSets = {ds->descriptorSet()};
+  uint32_t expectedSets = 1;
   if (m_descriptorSetOIT && m_uboOIT) {
-    std::array<vk::DescriptorSet, 1> sets3{m_descriptorSetOIT->descriptorSet()};
-    VLOG(2) << "WA: binding OIT params set at index 3";
-    cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                           instance.pipeline->pipelineLayout(),
-                           vkbind::kSetOITParams,
-                           sets3,
-                           {});
+    ZVulkanDescriptorBindInfo oitBind{};
+    oitBind.firstSet = vkbind::kSetOITParams;
+    oitBind.sets = {m_descriptorSetOIT->descriptorSet()};
+    drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
+    expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
   }
+  drawSpec.expectedDescriptorSetCount = expectedSets;
+  auto& quad = m_backend.fullscreenQuadVertexBuffer();
+  drawSpec.vertexBuffers = {quad.buffer()};
+  drawSpec.vertexOffsets = {vk::DeviceSize(0)};
+  drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
+  drawSpec.instanceCount = 1;
+  drawSpec.pushConstantsData = &constants;
+  drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(WeightedAveragePushConstants));
+  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
+  drawSpec.requirePushConstants = true;
 
-  cmd.pushConstants<WeightedAveragePushConstants>(instance.pipeline->pipelineLayout(),
-                                                  vk::ShaderStageFlagBits::eFragment,
-                                                  0,
-                                                  constants);
-
-  VLOG(2) << fmt::format("WA: draw {} verts", m_vertexCount);
-  cmd.draw(static_cast<uint32_t>(m_vertexCount), 1, 0, 0);
+  VLOG(2) << fmt::format("WA(draw-only): draw {} verts", m_vertexCount);
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  recorder.recordGraphicsDraw(drawSpec);
 }
 
 void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorLayout()
