@@ -264,6 +264,8 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   frameResources.gpuScopes.clear();
   frameResources.cpuScopes.clear();
   frameResources.nextQuery = 0;
+  // Capture the frame name from the renderer (if provided)
+  frameResources.frameName = std::string(renderer.currentFrameLabel());
   frameResources.cpuStart = std::chrono::steady_clock::now();
   frameResources.cpuEnd = {};
   // Reset Stage 3 instrumentation
@@ -1150,7 +1152,7 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   {
     const bool startedHere = !renderer.isVulkanFrameActive();
     if (startedHere) {
-      renderer.beginVulkanFrame();
+      renderer.beginVulkanFrame(scopeLabel);
     }
     auto endGuard = folly::makeGuard([&]() {
       if (startedHere) {
@@ -2035,7 +2037,12 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
   }
 
   const double cpuMs = std::chrono::duration<double, std::milli>(frame.cpuEnd - frame.cpuStart).count();
-  std::string message = fmt::format("VK batches CPU {:.3f} ms", cpuMs);
+  std::string message;
+  if (!frame.frameName.empty()) {
+    message = fmt::format("VK frame '{}' batches CPU {:.3f} ms", frame.frameName, cpuMs);
+  } else {
+    message = fmt::format("VK batches CPU {:.3f} ms", cpuMs);
+  }
 
   if (frame.nextQuery > 0 && !frame.gpuScopes.empty()) {
     const auto [result, queryData] = frame.queryPool.getResults<uint64_t>(0,

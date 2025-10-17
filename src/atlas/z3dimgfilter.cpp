@@ -870,8 +870,10 @@ double Z3DImgFilter::process(Z3DEye eye)
   const bool isVulkan = (m_rendererBase.activeBackend() == RenderBackend::Vulkan);
   bool startedHere = false;
   if (isVulkan && !m_rendererBase.isVulkanFrameActive()) {
-    // Explicitly open a Vulkan frame for the entire filter process
-    m_rendererBase.beginVulkanFrame();
+    // Explicitly open a Vulkan frame for the entire filter process, with a descriptive name
+    const char* eyeTag = (eye == MonoEye) ? "mono" : (eye == LeftEye) ? "left" : "right";
+    const std::string frameLabel = std::string("img_filter_") + eyeTag;
+    m_rendererBase.beginVulkanFrame(frameLabel);
     startedHere = true;
   }
   // Ensure we always end a frame we started, even on exceptions

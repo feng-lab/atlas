@@ -190,7 +190,8 @@ public:
 
   VulkanSurfaceBindings prepareVulkanSurface(const Z3DScratchResourcePool::RenderTargetLease& lease);
 
-  void beginVulkanFrame();
+  // Optionally name the frame for logging/telemetry
+  void beginVulkanFrame(std::string_view frameLabel = {});
   void endVulkanFrame();
   // Keep a Vulkan frame open across multiple batch recordings.
   // When enabled, a frame begun inside executeVulkanBatches will not be
@@ -509,12 +510,19 @@ private:
   // Recording-session diagnostics (Vulkan ordering/attachments invariants)
   bool m_recordingSessionOpen = false;
   std::string m_currentPassLabel;
+  std::string m_currentFrameLabel;
 
 public:
   // Expose current pass label for backend diagnostics/logging
   std::string_view currentPassLabel() const
   {
     return m_currentPassLabel;
+  }
+
+  // Expose current frame label for backend diagnostics/logging
+  std::string_view currentFrameLabel() const
+  {
+    return m_currentFrameLabel;
   }
 
   std::vector<Z3DScratchResourcePool::RenderTargetLease*> m_persistentLeases;

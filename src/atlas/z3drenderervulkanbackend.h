@@ -229,6 +229,7 @@ private:
     vk::raii::QueryPool occlusionQueryPool{nullptr};
     std::vector<GpuScopeRecord> gpuScopes;
     std::vector<CpuScopeRecord> cpuScopes;
+    std::string frameName; // optional: name of this frame for logs
     uint32_t nextQuery = 0;
     uint32_t nextOcclusionQuery = 0;
     bool occlusionQueryNeedsWait = false;

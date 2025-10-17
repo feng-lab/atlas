@@ -295,15 +295,21 @@ Z3DRendererBase::prepareVulkanSurface(const Z3DScratchResourcePool::RenderTarget
   return bindings;
 }
 
-void Z3DRendererBase::beginVulkanFrame()
+void Z3DRendererBase::beginVulkanFrame(std::string_view frameLabel)
 {
   CHECK(m_backend != nullptr) << "Renderer backend not set";
   CHECK(m_activeBackend == RenderBackend::Vulkan) << "beginVulkanFrame requires a Vulkan backend";
 
   if (m_vulkanFrameActive) {
+    // If a frame is already active, optionally update the label for diagnostics
+    if (!frameLabel.empty()) {
+      m_currentFrameLabel = std::string(frameLabel);
+    }
     return;
   }
 
+  // Set frame label before notifying backend so it can capture it
+  m_currentFrameLabel = std::string(frameLabel);
   m_backend->beginRender(*this);
   m_vulkanFrameActive = true;
 }
@@ -317,6 +323,7 @@ void Z3DRendererBase::endVulkanFrame()
   CHECK(m_backend != nullptr) << "Renderer backend not set";
   m_backend->endRender(*this);
   m_vulkanFrameActive = false;
+  m_currentFrameLabel.clear();
 }
 
 void Z3DRendererBase::recordVulkanBatchesInActiveFrame(const std::function<void()>& recordBatches,
