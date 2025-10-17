@@ -52,6 +52,11 @@ public:
   // (e.g., Vulkan) to idle the device and drop swapchains to ensure safe teardown
   // of resources referenced by in-flight work.
   virtual void preBackendSwitch() {}
+
+  // Optional pass-scope hooks (no-op by default). Vulkan backend uses these
+  // to aggregate per-pass counters and emit a concise end-of-pass summary.
+  virtual void beginPassScope(std::string_view /*label*/) {}
+  virtual void endPassScope() {}
 };
 
 std::unique_ptr<Z3DRendererBackend> createGLRendererBackend();

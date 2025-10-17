@@ -101,7 +101,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
                                         const vk::Rect2D& scissor,
                                         vk::raii::CommandBuffer& cmd)
 {
-  VLOG(2) << "Cone.record begin: payload sizes base=" << payload.baseAndRadius.size()
+  VLOG(2) << "record begin: payload sizes base=" << payload.baseAndRadius.size()
           << " axis=" << payload.axisAndTopRadius.size() << " flags=" << payload.flags.size()
           << " baseColors=" << payload.baseColors.size() << " topColors=" << payload.topColors.size()
           << " pickingColors=" << payload.pickingColors.size() << " indices=" << payload.indices.size()
@@ -118,7 +118,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   }
 
   uploadGeometry(payload);
-  VLOG(2) << "Cone.uploadGeometry -> vertexCount=" << m_vertexCount << " indexCount=" << m_indexCount;
+  VLOG(2) << "uploadGeometry -> vertexCount=" << m_vertexCount << " indexCount=" << m_indexCount;
   if (m_vertexCount == 0) {
     return;
   }
@@ -158,19 +158,19 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
     updateOITParamsUBO(renderer, batch, screenRcp);
   }
   ensureDescriptorSets();
-  CHECK(m_dsLighting && m_dsTransforms) << "Cone pipeline descriptor sets missing (lighting/transforms)";
+  CHECK(m_dsLighting && m_dsTransforms) << "descriptor sets missing (lighting/transforms)";
 
   ZVulkanDescriptorSet* dsPlaceholderOverride = nullptr;
   ensurePlaceholderTexture();
   const auto& hookPara = renderer.shaderHookPara();
   if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_setPlaceholder) {
     dsPlaceholderOverride = m_backend.allocateOverrideDescriptorSet(**m_setPlaceholder);
-    CHECK(dsPlaceholderOverride != nullptr) << "Cone DDP peel: override descriptor allocation failed (fatal)";
+    CHECK(dsPlaceholderOverride != nullptr) << "DDP peel: override descriptor allocation failed (fatal)";
     if (dsPlaceholderOverride) {
       if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
         auto& depthTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
                                                    m_backend.device(),
-                                                   "cone dual-depth-peeling depth blender");
+                                                   "dual-depth-peeling depth blender");
         dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPDepthBlender, depthTex, m_backend.defaultSampler());
       } else {
         auto& tex = m_backend.defaultPlaceholderTexture2D();
@@ -179,7 +179,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
       if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
         auto& frontTex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
                                                    m_backend.device(),
-                                                   "cone dual-depth-peeling front blender");
+                                                   "dual-depth-peeling front blender");
         dsPlaceholderOverride->updateTexture(vkbind::kBindingDDPFrontBlender, frontTex, m_backend.defaultSampler());
       } else {
         auto& tex = m_backend.defaultPlaceholderTexture2D();
@@ -207,7 +207,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   constants.projectionMatrix = eyeState.projectionMatrix;
   constants.ortho = eyeState.isPerspective ? 0.0f : 1.0f;
   CHECK((dsPlaceholderOverride != nullptr) || (m_dsPlaceholder != nullptr))
-    << "Cone pipeline placeholder descriptor set not initialised";
+    << "placeholder descriptor set not initialised";
   std::vector<vk::DescriptorSet> sets;
   const vk::DescriptorSet ds0 =
     dsPlaceholderOverride ? dsPlaceholderOverride->descriptorSet() : m_dsPlaceholder->descriptorSet();
@@ -559,7 +559,7 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
   };
 
   const std::string vertName = key.useConeShader2 ? "cone_2.vert.spv" : "cone.vert.spv";
-  VLOG(1) << "Cone.ensurePipeline: selecting shaders vert='" << (shaderBase + vertName) << "' frag='"
+  VLOG(1) << "selecting shaders vert='" << (shaderBase + vertName) << "' frag='"
           << (shaderBase + selectFragmentShader(key.shaderHookType)) << "' capsMode=" << key.capsMode
           << " dynamicMaterial=" << key.dynamicMaterial << " shaderHook=" << static_cast<int>(key.shaderHookType);
   instance.shader = std::make_unique<ZVulkanShader>(device,
@@ -746,7 +746,7 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   m_vertexCount = payload.baseAndRadius.size();
   m_indexCount = payload.indices.size();
 
-  VLOG(2) << "Cone.uploadGeometry begin: vertexCount=" << m_vertexCount << " indexCount=" << m_indexCount
+  VLOG(2) << "uploadGeometry begin: vertexCount=" << m_vertexCount << " indexCount=" << m_indexCount
           << " axisCount=" << payload.axisAndTopRadius.size() << " flagsCount=" << payload.flags.size();
 
   if (m_vertexCount == 0) {
@@ -767,7 +767,7 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
     {v4Bytes,                         alignof(glm::vec4)},
     {m_indexCount * sizeof(uint32_t), alignof(uint32_t) }
   });
-  VLOG(2) << "Cone.uploadGeometry allocating: v4Bytes=" << v4Bytes << " fBytes=" << fBytes
+  VLOG(2) << "uploadGeometry allocating: v4Bytes=" << v4Bytes << " fBytes=" << fBytes
           << " idxBytes=" << (m_indexCount * sizeof(uint32_t));
   auto originSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
   auto axisSlice = m_backend.suballocateUpload(v4Bytes, alignof(glm::vec4));
@@ -785,12 +785,12 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   if (!originSlice.buffer || !originSlice.mapped || !axisSlice.buffer || !axisSlice.mapped || !flagsSlice.buffer ||
       !flagsSlice.mapped || !baseColorSlice.buffer || !baseColorSlice.mapped || !topColorSlice.buffer ||
       !topColorSlice.mapped) {
-    VLOG(2) << "Cone.uploadGeometry: one or more upload slices are invalid (null buffer or mapping). Aborting batch.";
+    VLOG(2) << "uploadGeometry: one or more upload slices are invalid (null buffer or mapping). Aborting batch.";
     m_vertexCount = 0;
     m_indexCount = 0;
     return;
   }
-  VLOG(2) << "Cone.uploadGeometry: memcpy origins/axis (" << v4Bytes << " bytes each)";
+  VLOG(2) << "uploadGeometry: memcpy origins/axis (" << v4Bytes << " bytes each)";
   auto* originOut = static_cast<glm::vec4*>(originSlice.mapped);
   auto* axisOut = static_cast<glm::vec4*>(axisSlice.mapped);
   auto* flagsOut = static_cast<float*>(flagsSlice.mapped);
@@ -798,7 +798,7 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   auto* topColorOut = static_cast<glm::vec4*>(topColorSlice.mapped);
   std::memcpy(originOut, payload.baseAndRadius.data(), v4Bytes);
   std::memcpy(axisOut, payload.axisAndTopRadius.data(), v4Bytes);
-  VLOG(2) << "Cone.uploadGeometry: filled origin/axis, writing flags/colors";
+  VLOG(2) << "uploadGeometry: filled origin/axis, writing flags/colors";
   for (size_t i = 0; i < m_vertexCount; ++i) {
     float flagsValue = (i < payload.flags.size()) ? payload.flags[i] : 0.0f;
     // GL parity: keep flags encoding as produced by the GL path.
@@ -825,15 +825,15 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   }
 
   if (m_indexCount > 0) {
-    VLOG(2) << "Cone.uploadGeometry: allocating/staging indices bytes=" << (m_indexCount * sizeof(uint32_t));
+    VLOG(2) << "uploadGeometry: allocating/staging indices bytes=" << (m_indexCount * sizeof(uint32_t));
     auto iSlice = m_backend.suballocateUpload(m_indexCount * sizeof(uint32_t), alignof(uint32_t));
     if (iSlice.buffer && iSlice.mapped) {
       std::memcpy(iSlice.mapped, payload.indices.data(), m_indexCount * sizeof(uint32_t));
       m_indexUploadBuffer = iSlice.buffer;
       m_indexUploadOffset = iSlice.offset;
-      VLOG(2) << "Cone.uploadGeometry: indices staged at offset=" << m_indexUploadOffset;
+      VLOG(2) << "uploadGeometry: indices staged at offset=" << m_indexUploadOffset;
     } else {
-      VLOG(2) << "Cone.uploadGeometry: index upload slice invalid; drawing non-indexed";
+      VLOG(2) << "uploadGeometry: index upload slice invalid; drawing non-indexed";
       m_indexCount = 0;
     }
   } else {
@@ -853,10 +853,10 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
   auto bufToU64 = [](vk::Buffer b) {
     return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(b)));
   };
-  VLOG(2) << "Cone.uploadGeometry: VB buffers origin=" << bufToU64(m_originBuffer) << " axis=" << bufToU64(m_axisBuffer)
+  VLOG(2) << "uploadGeometry: VB buffers origin=" << bufToU64(m_originBuffer) << " axis=" << bufToU64(m_axisBuffer)
           << " flags=" << bufToU64(m_flagsBuffer) << " baseCol=" << bufToU64(m_baseColorBuffer)
           << " topCol=" << bufToU64(m_topColorBuffer);
-  VLOG(2) << "Cone.uploadGeometry: VB offsets origin=" << m_originOffset << " axis=" << m_axisOffset
+  VLOG(2) << "uploadGeometry: VB offsets origin=" << m_originOffset << " axis=" << m_axisOffset
           << " flags=" << m_flagsOffset << " baseCol=" << m_baseColorOffset << " topCol=" << m_topColorOffset;
 
   // Attempt static promotion

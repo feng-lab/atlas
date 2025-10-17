@@ -279,7 +279,7 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
                                                 vk::raii::CommandBuffer& cmd)
 {
   VLOG(2) << fmt::format(
-    "Raycaster::record begin fastOnly={} channels={} out={}x{} leases: entryExit={} lastAccum={} currentAccum={} blockId={}",
+    "record begin fastOnly={} channels={} out={}x{} leases: entryExit={} lastAccum={} currentAccum={} blockId={}",
     payload.fastPathOnly,
     payload.visibleChannels.size(),
     static_cast<int>(payload.outputSize.x),
@@ -302,7 +302,7 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   ensureQuadVertexBuffer();
 
   uploadEntryGeometry(payload);
-  VLOG(2) << "Raycaster::record after uploadEntryGeometry";
+  VLOG(2) << "after uploadEntryGeometry";
 
   CHECK(payload.image) << "Raycaster payload missing image pointer.";
   const CompositingConfig composite = evaluateCompositing(payload.compositingMode);
@@ -325,11 +325,11 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
     } else {
       renderEntryExit(renderer, batch, payload, viewport, scissor, cmd);
     }
-    VLOG(2) << "Raycaster::record after renderEntryExit";
+    VLOG(2) << "after renderEntryExit";
   }
 
   if (payload.fastPathOnly) {
-    VLOG(2) << "Raycaster::record dispatch fast path";
+    VLOG(2) << "dispatch fast path";
     if (auto t = m_backend.beginGpuScope("ray_fast")) {
       renderFastPath(renderer, batch, payload, viewport, scissor, cmd, fastVariant, composite);
       m_backend.endGpuScope(*t);
@@ -339,7 +339,7 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   } else {
     CHECK(fastVariant == FastPipelineVariant::Volume)
       << "Progressive raycaster path only supports volumetric rendering.";
-    VLOG(2) << "Raycaster::record dispatch progressive path";
+    VLOG(2) << "dispatch progressive path";
     if (auto t = m_backend.beginGpuScope("ray_progressive")) {
       renderProgressivePath(renderer, batch, payload, viewport, scissor, cmd, composite);
       m_backend.endGpuScope(*t);

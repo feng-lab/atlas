@@ -85,7 +85,7 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
     const bool noColors = batch.pass.colorAttachments.empty();
     const bool noDepth = !batch.pass.depthAttachment.has_value();
     CHECK(!(noColors && noDepth)) << "Vulkan appendBatch without attachments: shaderHook="
-                                  << static_cast<int>(m_shaderHookType) << " label='" << m_currentPassLabel
+                                  << enumToString(m_shaderHookType) << " label='" << m_currentPassLabel
                                   << "' activeSurfaceColors=" << m_frameState.activeSurface.colorAttachments.size()
                                   << " activeSurfaceHasDepth="
                                   << m_frameState.activeSurface.depthAttachment.has_value();
@@ -341,21 +341,27 @@ void Z3DRendererBase::recordVulkanBatchesInActiveFrame(const std::function<void(
   // Clear any previous CPU batches (surface/lifetime are managed by caller).
   resetCPUState();
 
-  LOG(INFO) << "recordVulkanBatchesInActiveFrame('" << m_currentPassLabel
-            << "') activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
-            << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
+  VLOG(1) << "recordVulkanBatchesInActiveFrame('" << m_currentPassLabel
+          << "') activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
+          << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
 
   std::optional<size_t> gpuScope;
   auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_backend.get());
-  if (vkBackend != nullptr && !label.empty()) {
-    gpuScope = vkBackend->beginGpuScope(label);
+  if (vkBackend != nullptr) {
+    m_backend->beginPassScope(label);
+    if (!label.empty()) {
+      gpuScope = vkBackend->beginGpuScope(label);
+    }
   }
   if (recordBatches) {
     recordBatches();
   }
   submitBatches();
-  if (vkBackend != nullptr && gpuScope.has_value()) {
-    vkBackend->endGpuScope(*gpuScope);
+  if (vkBackend != nullptr) {
+    if (gpuScope.has_value()) {
+      vkBackend->endGpuScope(*gpuScope);
+    }
+    m_backend->endPassScope();
   }
 
   // End of recording session
@@ -389,6 +395,10 @@ void Z3DRendererBase::setActiveSurfaceWithLoadStore(const RendererFrameState::Ac
                                                     const ClearValue& clearValue)
 {
   m_frameState.setActiveSurface(surface);
+  VLOG(1) << "activeSurface set: colors=" << m_frameState.activeSurface.colorAttachments.size()
+          << " depth=" << m_frameState.activeSurface.depthAttachment.has_value()
+          << " colorLoad=" << enumToString(colorLoad) << " colorStore=" << enumToString(colorStore)
+          << " depthLoad=" << enumToString(depthLoad) << " depthStore=" << enumToString(depthStore);
   for (auto& attachment : m_frameState.activeSurface.colorAttachments) {
     attachment.loadOp = colorLoad;
     attachment.storeOp = colorStore;
@@ -406,6 +416,8 @@ void Z3DRendererBase::setActiveSurfaceWithLoadStore(const RendererFrameState::Ac
 {
   // Apply the surface as-is without overriding per-attachment load/store.
   m_frameState.setActiveSurface(surface);
+  VLOG(1) << "activeSurface preserved: colors=" << m_frameState.activeSurface.colorAttachments.size()
+          << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
 }
 
 bool Z3DRendererBase::supportsCommandLists() const

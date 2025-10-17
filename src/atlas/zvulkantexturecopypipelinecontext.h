@@ -108,6 +108,8 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set for OIT params when needed
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
+  // Logging guard to avoid repeating OIT priming messages every call within a frame
+  bool m_loggedOitPrimedThisFrame = false;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;

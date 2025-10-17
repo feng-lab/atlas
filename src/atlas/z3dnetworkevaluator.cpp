@@ -27,9 +27,7 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* par
     m_filterWrappers.emplace_back(std::make_unique<Z3DCheckOpenGLStateFilterWrapper>());
   }
 #endif
-  if (VLOG_IS_ON(1)) {
-    m_filterWrappers.emplace_back(std::make_unique<Z3DProfileFilterWrapper>());
-  }
+  m_filterWrappers.emplace_back(std::make_unique<Z3DProfileFilterWrapper>());
 
   updateNetwork();
 }
@@ -407,7 +405,7 @@ void Z3DProfileFilterWrapper::beforeNetworkProcess()
 
 void Z3DProfileFilterWrapper::afterNetworkProcess()
 {
-  STOP_AND_VLOG(m_benchTimer)
+  STOP_AND_LOG(m_benchTimer)
 }
 
 } // namespace nim

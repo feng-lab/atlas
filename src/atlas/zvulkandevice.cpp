@@ -17,7 +17,7 @@ namespace nim {
 ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   : m_context(context)
 {
-  LOG(INFO) << "ZVulkanDevice created";
+  LOG(INFO) << "Vulkan device created";
   // Do not require VK_EXT_vertex_input_dynamic_state (MoltenVK lacks it).
   // Keep the flag false by default; contexts will fall back to fixed VI.
 
@@ -84,7 +84,7 @@ ZVulkanDevice::~ZVulkanDevice()
     vmaDestroyAllocator(m_allocator);
     m_allocator = nullptr;
   }
-  LOG(INFO) << "Destroying ZVulkanDevice";
+  LOG(INFO) << "Destroying Vulkan device";
 }
 
 std::unique_ptr<ZVulkanBuffer>

@@ -53,7 +53,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
                                                           const vk::Rect2D& scissor,
                                                           vk::raii::CommandBuffer& cmd)
 {
-  VLOG(2) << fmt::format("WA::record begin accum=0x{:x} moments=0x{:x}",
+  VLOG(2) << fmt::format("record begin accum=0x{:x} moments=0x{:x}",
                          payload.accumulationAttachment.id,
                          payload.momentsAttachment.id);
   CHECK(payload.accumulationAttachment.backend == AttachmentBackend::Vulkan)
@@ -84,7 +84,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   if (m_setLayout) {
     ds = m_backend.allocateOverrideDescriptorSet(**m_setLayout);
   }
-  CHECK(ds != nullptr) << "WA resolve: override descriptor allocation failed (fatal)";
+  CHECK(ds != nullptr) << "override descriptor allocation failed (fatal)";
   // Override sets are transient; every allocation hands us a fresh VkDescriptorSet with
   // undefined bindings, so prime both bindings before issuing the draw.
   ds->updateTexture(vkbind::kBindingWAAccum, accumulationTexture, m_backend.defaultSampler());
@@ -93,8 +93,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   const auto formats = vulkan::extractAttachmentFormats(batch);
 
   // Composite resolve invariant: single color attachment; depth optional
-  CHECK_EQ(formats.colorFormats.size(), size_t{1})
-    << "WA resolve requires exactly one color attachment.";
+  CHECK_EQ(formats.colorFormats.size(), size_t{1}) << "WA resolve requires exactly one color attachment.";
   m_backend.validateFormatsOrCrash(formats, "WA_resolve");
 
   PipelineKey key;
@@ -102,7 +101,9 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   key.depthFormat = formats.depthFormat;
 
   PipelineInstance& instance = ensurePipeline(key, formats);
-  VLOG(2) << fmt::format("WA: ensured pipeline colors={} depth={}", formats.colorFormats.size(), formats.depthFormat.has_value());
+  VLOG(2) << fmt::format("ensured pipeline colors={} depth={}",
+                         formats.colorFormats.size(),
+                         formats.depthFormat.has_value());
 
   // Draw-only; backend manages attachments and render area
 
@@ -126,7 +127,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
 
   // Ensure OIT params UBO (set = 3); must be primed before recording
   if (m_backend.isRecording()) {
-    CHECK(m_descriptorSetOIT && m_uboOIT) << "WA OIT resources not primed before recording";
+    CHECK(m_descriptorSetOIT && m_uboOIT) << "OIT resources not primed before recording";
   } else {
     ensureDescriptorLayout();
     ensureOITResources();
@@ -158,7 +159,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
   drawSpec.requirePushConstants = true;
 
-  VLOG(2) << fmt::format("WA(draw-only): draw {} verts", m_vertexCount);
+  VLOG(2) << fmt::format("draw-only: {} verts", m_vertexCount);
   ZVulkanPipelineCommandRecorder recorder(cmd);
   recorder.recordGraphicsDraw(drawSpec);
 }

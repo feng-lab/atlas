@@ -236,7 +236,7 @@ ZVulkanTexture::ZVulkanTexture(ZVulkanDevice& device, const CreateInfo& createIn
     m_layerDepthViews.resize(m_arrayLayers);
     m_layerStencilViews.resize(m_arrayLayers);
   }
-  VLOG(2) << "ZVulkanTexture created: " << m_extent.width << "x" << m_extent.height << "x" << m_extent.depth
+  VLOG(2) << "texture created: " << m_extent.width << "x" << m_extent.height << "x" << m_extent.depth
           << " layers=" << m_arrayLayers;
 }
 
@@ -657,22 +657,21 @@ bool ZVulkanTexture::saveToImage(const QString& filename)
 bool ZVulkanTexture::saveToImage(const QString& filename, const ImageSaveOptions& options)
 {
   if (filename.isEmpty()) {
-    LOG(ERROR) << "ZVulkanTexture::saveToImage called with empty filename";
+    LOG(ERROR) << "saveToImage called with empty filename";
     return false;
   }
 
   const uint32_t w = width();
   const uint32_t h = height();
   if (w == 0 || h == 0) {
-    LOG(ERROR) << "ZVulkanTexture::saveToImage received zero-sized texture";
+    LOG(ERROR) << "saveToImage received zero-sized texture";
     return false;
   }
 
   const uint32_t arrayLayerCount = std::max<uint32_t>(1u, m_arrayLayers);
   const uint32_t requestedLayer = options.arrayLayer.value_or(0u);
   if (requestedLayer >= arrayLayerCount) {
-    LOG(ERROR) << "ZVulkanTexture::saveToImage layer out of range: " << requestedLayer << " (layers=" << arrayLayerCount
-               << ")";
+    LOG(ERROR) << "saveToImage layer out of range: " << requestedLayer << " (layers=" << arrayLayerCount << ")";
     return false;
   }
 
@@ -701,7 +700,7 @@ bool ZVulkanTexture::saveToImage(const QString& filename, const ImageSaveOptions
       src.save(filename);
     }
     catch (const ZException& ze) {
-      LOG(ERROR) << "ZVulkanTexture::saveToImage save failed: " << ze.what();
+      LOG(ERROR) << "saveToImage save failed: " << ze.what();
       return false;
     }
     return true;
@@ -719,7 +718,7 @@ bool ZVulkanTexture::saveToImage(const QString& filename, const ImageSaveOptions
       img.save(filename);
     }
     catch (const ZException& ze) {
-      LOG(ERROR) << "ZVulkanTexture::saveToImage save failed: " << ze.what();
+      LOG(ERROR) << "saveToImage save failed: " << ze.what();
       return false;
     }
     return true;
@@ -907,12 +906,12 @@ bool ZVulkanTexture::saveToImage(const QString& filename, const ImageSaveOptions
         break;
       }
       default:
-        LOG(ERROR) << "ZVulkanTexture::saveToImage unsupported format: " << enumOrUnderlying(m_format, 16);
+        LOG(ERROR) << "saveToImage unsupported format: " << enumOrUnderlying(m_format, 16);
         return false;
     }
   }
   catch (const std::exception& e) {
-    LOG(ERROR) << "ZVulkanTexture::saveToImage download failed: " << e.what();
+    LOG(ERROR) << "saveToImage download failed: " << e.what();
     return false;
   }
 

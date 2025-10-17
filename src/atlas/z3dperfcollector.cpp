@@ -200,11 +200,9 @@ void Z3DPerfCollector::flush(uint64_t token)
     msg += " JANK";
   }
 
-  VLOG(1) << msg;
-
-  // Stats line (concise)
+  // One-line frame summary: include concise stats instead of a second line
   std::string stats = fmt::format(
-    "Stats: upload_hi={}B static_staged={}B rb={}B dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={}",
+    " | stats: upload_hi={}B static_staged={}B rb={}B dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={}",
     agg.uploadHighWatermarkBytes,
     agg.staticBytesStaged,
     agg.readbackBytesCopied,
@@ -217,7 +215,7 @@ void Z3DPerfCollector::flush(uint64_t token)
     agg.attachmentLoads,
     agg.descriptorWritesWhileRecording,
     agg.boundSetRewriteAttempts);
-  VLOG(1) << stats;
+  LOG(INFO) << (msg + stats);
 
   // Optional: emit a Chrome trace JSON for this frame
   if (!FLAGS_atlas_perf_trace.empty()) {

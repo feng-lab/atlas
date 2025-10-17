@@ -124,6 +124,108 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   resetFrameResources();
 }
 
+void Z3DRendererVulkanBackend::beginPassScope(std::string_view label)
+{
+  m_passScope = {};
+  m_passScope.active = true;
+  m_passScope.label = std::string(label);
+  m_passScope.start = std::chrono::steady_clock::now();
+  if (m_activeFrame) {
+    m_passScope.baseline.descriptorSetsAllocated = m_activeFrame->descriptorSetsAllocated;
+    m_passScope.baseline.overrideSetsAllocated = m_activeFrame->overrideSetsAllocated;
+    m_passScope.baseline.pipelinesBoundUnique = m_activeFrame->pipelinesBound.size();
+    m_passScope.baseline.renderingSegmentsBegan = m_activeFrame->renderingSegmentsBegan;
+    m_passScope.baseline.attachmentClears = m_activeFrame->attachmentClears;
+    m_passScope.baseline.attachmentLoads = m_activeFrame->attachmentLoads;
+    m_passScope.baseline.descriptorWritesWhileRecording = m_activeFrame->descriptorWritesWhileRecording;
+    m_passScope.baseline.boundSetRewriteAttempts = m_activeFrame->boundSetRewriteAttempts;
+    m_passScope.baseline.uploadHighWatermark = m_activeFrame->uploadArena.highWatermark;
+    m_passScope.baseline.staticBytesStaged = m_activeFrame->staticBytesStaged;
+    m_passScope.baseline.readbackBytesCopied = m_activeFrame->readbackBytesCopied;
+    m_passScope.baseline.readbackSlotsInFlight = m_activeFrame->readbackSlotsInFlight;
+  }
+}
+
+void Z3DRendererVulkanBackend::endPassScope()
+{
+  if (!m_passScope.active) {
+    return;
+  }
+  const double ms =
+    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - m_passScope.start).count();
+  if (!m_passScope.label.empty()) {
+    recordCpuScope(m_passScope.label, ms);
+  }
+  uint32_t dsets = 0, ovsets = 0, segs = 0, clr = 0, ld = 0, dwr = 0, rew = 0;
+  size_t bound = 0;
+  vk::DeviceSize uploadHi = 0;
+  uint64_t staticStaged = 0, rb = 0;
+  uint32_t rbinflight = 0;
+  if (m_activeFrame) {
+    dsets = m_activeFrame->descriptorSetsAllocated - m_passScope.baseline.descriptorSetsAllocated;
+    ovsets = m_activeFrame->overrideSetsAllocated - m_passScope.baseline.overrideSetsAllocated;
+    bound = (m_activeFrame->pipelinesBound.size() >= m_passScope.baseline.pipelinesBoundUnique)
+              ? (m_activeFrame->pipelinesBound.size() - m_passScope.baseline.pipelinesBoundUnique)
+              : 0;
+    segs = m_activeFrame->renderingSegmentsBegan - m_passScope.baseline.renderingSegmentsBegan;
+    clr = m_activeFrame->attachmentClears - m_passScope.baseline.attachmentClears;
+    ld = m_activeFrame->attachmentLoads - m_passScope.baseline.attachmentLoads;
+    dwr = m_activeFrame->descriptorWritesWhileRecording - m_passScope.baseline.descriptorWritesWhileRecording;
+    rew = m_activeFrame->boundSetRewriteAttempts - m_passScope.baseline.boundSetRewriteAttempts;
+    uploadHi = (m_activeFrame->uploadArena.highWatermark >= m_passScope.baseline.uploadHighWatermark)
+                 ? (m_activeFrame->uploadArena.highWatermark - m_passScope.baseline.uploadHighWatermark)
+                 : 0;
+    staticStaged = (m_activeFrame->staticBytesStaged >= m_passScope.baseline.staticBytesStaged)
+                     ? (m_activeFrame->staticBytesStaged - m_passScope.baseline.staticBytesStaged)
+                     : 0;
+    rb = (m_activeFrame->readbackBytesCopied >= m_passScope.baseline.readbackBytesCopied)
+           ? (m_activeFrame->readbackBytesCopied - m_passScope.baseline.readbackBytesCopied)
+           : 0;
+    rbinflight = (m_activeFrame->readbackSlotsInFlight >= m_passScope.baseline.readbackSlotsInFlight)
+                   ? (m_activeFrame->readbackSlotsInFlight - m_passScope.baseline.readbackSlotsInFlight)
+                   : 0;
+  }
+  VLOG(1) << fmt::format(
+    "pass_end pass='{}' cpu={:.3f} ms draws={} segs={} clr={} ld={} dsets={} ovsets={} pipes_bound_delta={} dwr={} rew={} uploads_delta={}B static_delta={}B rb_delta={}B rbinflight_delta={} transitions={} noop={}",
+    m_passScope.label,
+    ms,
+    m_passScope.draws,
+    segs,
+    clr,
+    ld,
+    dsets,
+    ovsets,
+    bound,
+    dwr,
+    rew,
+    static_cast<uint64_t>(uploadHi),
+    staticStaged,
+    rb,
+    rbinflight,
+    m_passScope.layoutTransitions,
+    m_passScope.layoutNoops);
+  m_passScope = {};
+}
+
+void Z3DRendererVulkanBackend::notifyDrawSubmitted()
+{
+  if (m_passScope.active) {
+    m_passScope.draws++;
+  }
+}
+
+void Z3DRendererVulkanBackend::notifyLayoutTransition(bool wasNoop)
+{
+  if (!m_passScope.active) {
+    return;
+  }
+  if (wasNoop) {
+    m_passScope.layoutNoops++;
+  } else {
+    m_passScope.layoutTransitions++;
+  }
+}
+
 void Z3DRendererVulkanBackend::setGlobalShaderParameters(Z3DRendererBase& renderer,
                                                          Z3DShaderProgram& shader,
                                                          Z3DEye eye)
@@ -225,9 +327,14 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
         dFmt = enumOrUnderlying(dtex->format(), 16);
       }
     }
+    // Avoid empty labels in logs; fall back to a stable placeholder.
+    std::string passLabel = std::string(renderer.currentPassLabel());
+    if (passLabel.empty()) {
+      passLabel = "<unnamed>";
+    }
     VLOG(2) << fmt::format(
       "VK beginRender: label='{}' viewport={}x{} colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{}",
-      renderer.currentPassLabel(),
+      passLabel,
       width,
       height,
       surf.colorAttachments.size(),
@@ -753,9 +860,13 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
           depthH = dtex->height();
         }
       }
+      std::string passLabel = std::string(renderer.currentPassLabel());
+      if (passLabel.empty()) {
+        passLabel = "<unnamed>";
+      }
       VLOG(2) << fmt::format(
         "VK beginRendering(recorder): label='{}' colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{} renderArea=({},{} {}x{})",
-        renderer.currentPassLabel(),
+        passLabel,
         outSpec.colorAttachments.size(),
         firstColorHandle,
         firstColorFmt,
@@ -852,16 +963,23 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (!handle.valid()) {
         return;
       }
-      VLOG(2) << fmt::format("ensureSampledReadable: handle=0x{:x}", handle.id);
       auto& texture = vulkan::textureFromHandle(handle, device(), "renderer sampled attachment");
       const auto samplingState = classifyReadLayout(texture.format());
       vk::ImageAspectFlags transitionAspect = samplingState.aspect;
-      VLOG(2) << fmt::format("  currentLayout={} -> targetLayout={} fmt={}",
-                             enumOrUnderlying(texture.layout(), 16),
-                             enumOrUnderlying(samplingState.layout, 16),
-                             enumOrUnderlying(texture.format(), 16));
+      const bool needsTransition = (texture.layout() != samplingState.layout);
+      // Only log when a transition is actually required to reduce noise.
+      if (needsTransition && VLOG_IS_ON(2)) {
+        VLOG(2) << fmt::format("ensureSampledReadable: handle=0x{:x} {} -> {} fmt={}",
+                               handle.id,
+                               enumOrUnderlying(texture.layout(), 16),
+                               enumOrUnderlying(samplingState.layout, 16),
+                               enumOrUnderlying(texture.format(), 16));
+      }
       // Skip transition if already in the desired sampled layout; still update descriptor layout for depth aspects.
-      if (texture.layout() != samplingState.layout) {
+      if (auto* be = Z3DRendererVulkanBackend::current()) {
+        be->notifyLayoutTransition(!needsTransition);
+      }
+      if (needsTransition) {
         texture.transitionLayout(cmd, texture.layout(), samplingState.layout, transitionAspect);
       }
       texture.setDescriptorLayout(samplingState.layout);
@@ -1156,8 +1274,8 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, const Z3DCompositorPass& pass)
 {
   // Record batches, then execute as a single begin/end.
-  LOG(INFO) << "processCompositorPass surface colors=" << pass.surface.colorAttachments.size()
-            << " depth=" << pass.surface.depthAttachment.has_value();
+  VLOG(1) << "processCompositorPass surface colors=" << pass.surface.colorAttachments.size()
+          << " depth=" << pass.surface.depthAttachment.has_value();
   // Honor clear policy on this pass
   const LoadOp colorLoad = pass.clearColor ? LoadOp::Clear : LoadOp::Load;
   const LoadOp depthLoad = pass.clearDepth ? LoadOp::Clear : LoadOp::Load;
@@ -1437,9 +1555,13 @@ Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUploa
 
   VLOG(2) << "suballocateUpload: request bytes=" << bytes << " align=" << alignment << " required=" << required
           << " cap=" << arena.capacity;
+  const size_t prevCap = arena.capacity;
+  void* prevMapped = arena.mapped;
   ensureCapacity(required);
-  VLOG(2) << "suballocateUpload: after ensureCapacity cap=" << arena.capacity
-          << " mapped=" << (arena.mapped != nullptr);
+  if (arena.capacity != prevCap || arena.mapped != prevMapped) {
+    VLOG(2) << "suballocateUpload: after ensureCapacity cap=" << arena.capacity
+            << " mapped=" << (arena.mapped != nullptr);
+  }
 
   // Allocate from the virtual block
   VmaVirtualAllocationCreateInfo ainfo{};
@@ -1664,7 +1786,7 @@ void Z3DRendererVulkanBackend::scheduleAfterCurrentFrameCompletion(std::function
   if (!m_activeFrame) {
     // No active frame; execute immediately to avoid leaks.
     fn();
-    VLOG(1) << "VK scheduleAfterCurrentFrameCompletion with no active frame; executed immediately";
+    VLOG(2) << "VK scheduleAfterCurrentFrameCompletion with no active frame; executed immediately";
     return;
   }
   m_activeFrame->deferredReleases.push_back(std::move(fn));
@@ -2258,7 +2380,24 @@ void Z3DRendererVulkanBackend::collectFrameTimings(FrameResources& frame)
     message += fmt::format(" | {} {:.3f} ms", cpuScope.label, cpuScope.milliseconds);
   }
 
-  VLOG(1) << message;
+  // Append concise per-submission stats (counts and resource deltas)
+  message += fmt::format(
+    " | dsets={} ovsets={} pipes+={} bound={} segs={} clr={} ld={} dwr={} rew={} upload_hi={}B static={}B rb={}B rbinflight={}",
+    frame.descriptorSetsAllocated,
+    frame.overrideSetsAllocated,
+    frame.pipelinesCreated,
+    frame.pipelinesBound.size(),
+    frame.renderingSegmentsBegan,
+    frame.attachmentClears,
+    frame.attachmentLoads,
+    frame.descriptorWritesWhileRecording,
+    frame.boundSetRewriteAttempts,
+    frame.uploadArena.highWatermark,
+    frame.staticBytesStaged,
+    frame.readbackBytesCopied,
+    frame.readbackSlotsInFlight);
+
+  LOG(INFO) << message;
 
   // Feed the perf collector with per-submission scopes for aggregation under the real-frame token.
   std::vector<Z3DPerfCollector::Scope> gpuScopesForCollector;

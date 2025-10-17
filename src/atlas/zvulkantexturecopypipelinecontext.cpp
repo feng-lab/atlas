@@ -33,6 +33,7 @@ ZVulkanTextureCopyPipelineContext::~ZVulkanTextureCopyPipelineContext() = defaul
 void ZVulkanTextureCopyPipelineContext::resetFrame()
 {
   m_vertexCount = 0;
+  m_loggedOitPrimedThisFrame = false;
   resetDescriptors();
 }
 
@@ -49,7 +50,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
                                                vk::raii::CommandBuffer& cmd)
 {
   (void)payload;
-  VLOG(2) << fmt::format("TextureCopy::record begin hook={} color=0x{:x} depth=0x{:x}",
+  VLOG(2) << fmt::format("record begin hook={} color=0x{:x} depth=0x{:x}",
                          static_cast<int>(renderer.shaderHookType()),
                          payload.colorAttachmentHandle.id,
                          payload.depthAttachmentHandle.id);
@@ -62,16 +63,15 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   auto& depthTexture =
     vulkan::textureFromHandle(payload.depthAttachmentHandle, m_backend.device(), "texture-copy depth attachment");
 
-  VLOG(1) << fmt::format(
-    "TextureCopy inputs: color=0x{:x} layout={} descr={} fmt={} | depth=0x{:x} layout={} descr={} fmt={}",
-    payload.colorAttachmentHandle.id,
-    enumOrUnderlying(colorTexture.layout(), 16),
-    enumOrUnderlying(colorTexture.descriptorLayout(), 16),
-    enumOrUnderlying(colorTexture.format(), 16),
-    payload.depthAttachmentHandle.id,
-    enumOrUnderlying(depthTexture.layout(), 16),
-    enumOrUnderlying(depthTexture.descriptorLayout(), 16),
-    enumOrUnderlying(depthTexture.format(), 16));
+  VLOG(1) << fmt::format("inputs: color=0x{:x} layout={} descr={} fmt={} | depth=0x{:x} layout={} descr={} fmt={}",
+                         payload.colorAttachmentHandle.id,
+                         enumOrUnderlying(colorTexture.layout(), 16),
+                         enumOrUnderlying(colorTexture.descriptorLayout(), 16),
+                         enumOrUnderlying(colorTexture.format(), 16),
+                         payload.depthAttachmentHandle.id,
+                         enumOrUnderlying(depthTexture.layout(), 16),
+                         enumOrUnderlying(depthTexture.descriptorLayout(), 16),
+                         enumOrUnderlying(depthTexture.format(), 16));
 
   // Fullscreen quad with UVs
   m_vertexCount = 4;
@@ -121,7 +121,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   if (!m_backend.isRecording()) {
     // Safe to rewrite persistent set before recording begins
     if (m_persistentTexturesDS) {
-      VLOG(2) << "TextureCopy: using persistent textures DS (pre-record rewrite)";
+      VLOG(2) << "using persistent textures DS (pre-record rewrite)";
       m_persistentTexturesDS->updateTexture(0, colorTexture, sampler);
       m_persistentTexturesDS->updateTexture(1, depthTexture, sampler);
       if (ddpPeel) {
@@ -143,7 +143,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
       ds = m_persistentTexturesDS.get();
     }
   } else if (m_enablePersistentScheduling && usePersistentNow) {
-    VLOG(2) << "TextureCopy: using persistent textures DS (cached)";
+    VLOG(2) << "using persistent textures DS (cached)";
     ds = m_persistentTexturesDS.get();
   } else {
     // Allocate a fresh per-draw override descriptor set during recording to avoid
@@ -157,7 +157,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
        m_cachedTextures.ddpDepth != desiredDdpDepth || m_cachedTextures.ddpFront != desiredDdpFront);
     // Override descriptor sets are newly allocated per draw; every binding must be rewritten even
     // when the attachments repeat so we do not replay empty descriptors that would drop colour/depth.
-    VLOG(2) << "TextureCopy: writing per-draw override descriptors";
+    VLOG(2) << "writing per-draw override descriptors";
     ds->updateTexture(0, colorTexture, sampler);
     ds->updateTexture(1, depthTexture, sampler);
     if (ddpPeel) {
@@ -166,7 +166,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
         auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
                                               m_backend.device(),
                                               "DDP depth blender for image peel");
-        VLOG(2) << fmt::format("TextureCopy: writing DDP depth blender binding3 tex=0x{:x}",
+        VLOG(2) << fmt::format("writing DDP depth blender binding3 tex=0x{:x}",
                                hookPara.dualDepthPeelingDepthBlenderHandle.id);
         ds->updateTexture(3, tex, sampler);
       }
@@ -174,7 +174,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
         auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
                                               m_backend.device(),
                                               "DDP front blender for image peel");
-        VLOG(2) << fmt::format("TextureCopy: writing DDP front blender binding4 tex=0x{:x}",
+        VLOG(2) << fmt::format("writing DDP front blender binding4 tex=0x{:x}",
                                hookPara.dualDepthPeelingFrontBlenderHandle.id);
         ds->updateTexture(4, tex, sampler);
       }
@@ -215,13 +215,13 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
             }
           }
           m_cachedTextures = {colorId, depthId, ddpDepthId, ddpFrontId, true};
-          VLOG(2) << "TextureCopy: scheduled persistent DS rewrite completed";
+          VLOG(2) << "scheduled persistent DS rewrite completed";
         }
         catch (...) {
-          VLOG(1) << "TextureCopy: scheduled persistent DS rewrite skipped (handles not resolvable)";
+          VLOG(1) << "scheduled persistent DS rewrite skipped (handles not resolvable)";
         }
       });
-      VLOG(2) << "TextureCopy: scheduled persistent textures DS rewrite after frame";
+      VLOG(2) << "scheduled persistent textures DS rewrite after frame";
     }
   }
 
@@ -239,7 +239,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   key.depthFormat = formats.depthFormat;
 
   PipelineInstance& pipeline = ensurePipeline(key, formats);
-  VLOG(2) << fmt::format("TextureCopy: ensured pipeline waInit={} wbInit={} ddpInit={} ddpPeel={} colors={} depth={}",
+  VLOG(2) << fmt::format("ensured pipeline waInit={} wbInit={} ddpInit={} ddpPeel={} colors={} depth={}",
                          key.waInit,
                          key.wbInit,
                          key.ddpInit,
@@ -308,7 +308,7 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   recorder.recordGraphicsDraw(drawSpec);
-  VLOG(2) << fmt::format("TextureCopy: draw {} verts", m_vertexCount);
+  VLOG(2) << fmt::format("draw {} verts", m_vertexCount);
 }
 
 void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()
@@ -374,7 +374,10 @@ void ZVulkanTextureCopyPipelineContext::ensureOITResources()
   if (m_descriptorSetOIT && m_uboOIT) {
     // One-time descriptor write; must happen before recording begins
     m_descriptorSetOIT->writeUniformBufferOnce(0, *m_uboOIT);
-    VLOG(2) << "TextureCopy: primed OIT UBO descriptor (set=3, binding=0)";
+    if (!m_loggedOitPrimedThisFrame) {
+      VLOG(2) << "primed OIT UBO descriptor (set=3, binding=0)";
+      m_loggedOitPrimedThisFrame = true;
+    }
   }
 }
 

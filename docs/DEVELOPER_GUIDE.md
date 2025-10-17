@@ -348,6 +348,25 @@ Logging
   - “3D scene parameters applied” — deferred scene apply queue drained.
   - “3D animation parameters bound” — first animation binding completed.
   - In debug builds (`ATLAS_DEBUG_VERSION`), you’ll also see: “image filter invalidate: …” with parameter/global/port reasons and state bits.
+- Vulkan logging hygiene:
+  - No-op sampled-read transitions are suppressed: `ensureSampledReadable` only logs when a layout change occurs.
+  - Dynamic rendering ‘begin’ logs always carry a non-empty label; empty pass labels fall back to `<unnamed>`.
+  - `TextureCopy` OIT UBO priming (`set=3,binding=0`) logs at most once per frame per pipeline context.
+  - Immediate execution of deferred callbacks (no active frame) is logged at `VLOG(2)` instead of `VLOG(1)`.
+  - Upload arena capacity changes are logged; steady-state per-call capacity is not repeated.
+
+Level Semantics (Vulkan)
+- info (one line per submission/pass): CPU time, GPU total time, followed by per-scope GPU timings and concise counters appended at the end.
+  - Example: `VK batches [frame#F sub#S] 'pass' CPU 1.234 ms GPU 0.987 ms | scopeA 0.456 ms | scopeB 0.531 ms | dsets=… ovsets=… pipes+=… bound=… segs=… clr=… ld=… dwr=… rew=… upload_hi=…B static=…B rb=…B rbinflight=…`
+- vlog(1): lifecycle and decisions, but no per-draw spam.
+  - Begin: `recordVulkanBatchesInActiveFrame('label') activeSurface colors=N depth=bool`.
+  - End (aggregated): `pass_end pass='label' cpu=… ms draws=… segs=… clr=… ld=… dsets=… ovsets=… pipes_bound_delta=… dwr=… rew=… uploads_delta=…B static_delta=…B rb_delta=…B rbinflight_delta=… transitions=… noop=…`.
+- vlog(2): deep internals (per-draw, per-descriptor, per-layout, allocations). Prefer gating behind `VLOG_IS_ON(2)` and skip unchanged/no-op cases.
+
+Renderer Base surface logs (vlog(1))
+- When the renderer sets or preserves the active surface, a short line is emitted with counts and load/store policies.
+  - `activeSurface set: colors=N depth=bool colorLoad=Load colorStore=Store depthLoad=Clear depthStore=Store`
+  - `activeSurface preserved: colors=N depth=bool`
 
 Runtime Flags and Config Flagfile
 

@@ -2,6 +2,7 @@
 
 #include <gflags/gflags.h>
 #include "zvulkantexture.h"
+#include "z3drenderervulkanbackend.h"
 #include <cstdint>
 
 namespace nim {
@@ -46,6 +47,9 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
   if (info.trackingTexture != nullptr) {
     info.trackingTexture->overrideCurrentLayout(newLayout);
   }
+  if (auto* be = Z3DRendererVulkanBackend::current()) {
+    be->notifyLayoutTransition(false);
+  }
 }
 
 void transitionToFinal(vk::raii::CommandBuffer& cmd,
@@ -68,6 +72,9 @@ void transitionToFinal(vk::raii::CommandBuffer& cmd,
   cmd.pipelineBarrier2(dependency);
   if (info.trackingTexture != nullptr) {
     info.trackingTexture->overrideCurrentLayout(info.finalLayout);
+  }
+  if (auto* be = Z3DRendererVulkanBackend::current()) {
+    be->notifyLayoutTransition(false);
   }
 }
 } // namespace
@@ -1195,6 +1202,9 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
       CHECK(spec.vertexCount > 0) << "Graphics draw requires vertexCount when not indexed";
       m_commandBuffer.draw(spec.vertexCount, spec.instanceCount, spec.firstVertex, spec.firstInstance);
     }
+  }
+  if (auto* be = Z3DRendererVulkanBackend::current()) {
+    be->notifyDrawSubmitted();
   }
 }
 

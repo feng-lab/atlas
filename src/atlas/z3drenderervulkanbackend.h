@@ -84,6 +84,14 @@ public:
 
   void preBackendSwitch() override;
 
+  // Pass-scope aggregation hooks
+  void beginPassScope(std::string_view label) override;
+  void endPassScope() override;
+
+  // Per-draw and transition notifications (used by recorders)
+  void notifyDrawSubmitted();
+  void notifyLayoutTransition(bool wasNoop);
+
   ZVulkanDevice& device();
 
   const ZVulkanDevice& device() const;
@@ -456,6 +464,35 @@ public:
 
   // TLS current backend pointer
   static thread_local Z3DRendererVulkanBackend* s_currentBackend;
+
+  struct PassBaseline
+  {
+    uint32_t descriptorSetsAllocated = 0;
+    uint32_t overrideSetsAllocated = 0;
+    size_t pipelinesBoundUnique = 0;
+    uint32_t renderingSegmentsBegan = 0;
+    uint32_t attachmentClears = 0;
+    uint32_t attachmentLoads = 0;
+    uint32_t descriptorWritesWhileRecording = 0;
+    uint32_t boundSetRewriteAttempts = 0;
+    vk::DeviceSize uploadHighWatermark = 0;
+    uint64_t staticBytesStaged = 0;
+    uint64_t readbackBytesCopied = 0;
+    uint32_t readbackSlotsInFlight = 0;
+  };
+
+  struct PassScope
+  {
+    bool active = false;
+    std::string label;
+    std::chrono::steady_clock::time_point start;
+    PassBaseline baseline{};
+    uint64_t draws = 0;
+    uint64_t layoutTransitions = 0;
+    uint64_t layoutNoops = 0;
+  };
+
+  PassScope m_passScope{};
 
   // Submission index within a real-frame token
   std::unordered_map<uint64_t, uint32_t> m_submissionCursor;

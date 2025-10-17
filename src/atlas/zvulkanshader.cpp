@@ -12,7 +12,7 @@ namespace nim {
 namespace {
 static std::vector<uint32_t> readSpirvFile(const std::string& path)
 {
-  VLOG(2) << "ZVulkanShader: attempting to open SPIR-V file: " << path;
+  VLOG(2) << "opening SPIR-V file: " << path;
   std::ifstream file(path, std::ios::ate | std::ios::binary);
   if (!file) {
     throw ZException(fmt::format("Failed to open SPIR-V file: {}", path));
@@ -49,7 +49,7 @@ vk::raii::ShaderModule ZVulkanShader::createShaderModule(const std::vector<uint3
 
 void ZVulkanShader::addStageFromSPIRVFile(const std::string& spvPath, vk::ShaderStageFlagBits stage)
 {
-  VLOG(2) << "ZVulkanShader: addStageFromSPIRVFile stage=" << static_cast<int>(stage) << " path=" << spvPath;
+  VLOG(2) << "add SPIR-V stage=" << static_cast<int>(stage) << " path=" << spvPath;
   auto spirv = readSpirvFile(spvPath);
   addStageFromSPIRV(spirv, stage);
 }
@@ -69,7 +69,7 @@ void ZVulkanShader::addStageFromSPIRV(const std::vector<uint32_t>& spirv, vk::Sh
     default:
       throw ZException("Unsupported shader stage for SPIR-V load");
   }
-  VLOG(2) << "ZVulkanShader: created module for stage=" << static_cast<int>(stage) << " words=" << spirv.size()
+  VLOG(2) << "created shader module stage=" << static_cast<int>(stage) << " words=" << spirv.size()
           << " bytes=" << (spirv.size() * sizeof(uint32_t));
 
   m_shaderStages.clear();
@@ -106,14 +106,14 @@ void ZVulkanShader::loadFromSPIRVFiles(const std::string& vertexSpvPath,
                                        const std::string& fragmentSpvPath,
                                        const std::optional<std::string>& geometrySpvPath)
 {
-  VLOG(2) << "ZVulkanShader: loadFromSPIRVFiles vert=" << vertexSpvPath
+  VLOG(2) << "load SPIR-V files vert=" << vertexSpvPath
           << (geometrySpvPath ? ", geom=" + *geometrySpvPath : std::string{}) << ", frag=" << fragmentSpvPath;
   addStageFromSPIRVFile(vertexSpvPath, vk::ShaderStageFlagBits::eVertex);
   if (geometrySpvPath && !geometrySpvPath->empty()) {
     addStageFromSPIRVFile(*geometrySpvPath, vk::ShaderStageFlagBits::eGeometry);
   }
   addStageFromSPIRVFile(fragmentSpvPath, vk::ShaderStageFlagBits::eFragment);
-  LOG(INFO) << "Loaded SPIR-V shader modules: vert=" << vertexSpvPath
+  LOG(INFO) << "Loaded SPIR-V modules: vert=" << vertexSpvPath
             << (geometrySpvPath ? ", geom=" + *geometrySpvPath : std::string{}) << ", frag=" << fragmentSpvPath;
 }
 
