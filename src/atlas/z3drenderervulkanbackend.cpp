@@ -2149,8 +2149,30 @@ void Z3DRendererVulkanBackend::requestEndOfFrameColorReadback(
     << "VK readback requested outside of an active frame";
   const glm::uvec2 size{src.width(), src.height()};
   const vk::Format fmt = src.format();
-  const size_t bpp = (fmt == vk::Format::eR16G16B16A16Unorm || fmt == vk::Format::eR16G16B16A16Sfloat) ? 8u : 4u;
-  const size_t bytes = static_cast<size_t>(size.x) * size.y * bpp;
+  auto bytesPerPixel = [](vk::Format f) -> size_t {
+    switch (f) {
+      case vk::Format::eR8Unorm:
+        return 1u;
+      case vk::Format::eR8G8B8A8Unorm:
+        return 4u;
+      case vk::Format::eR16Sfloat:
+        return 2u;
+      case vk::Format::eR16G16B16A16Unorm:
+      case vk::Format::eR16G16B16A16Sfloat:
+        return 8u;
+      case vk::Format::eR32Sfloat:
+        return 4u;
+      case vk::Format::eR32G32Sfloat:
+        return 8u;
+      case vk::Format::eR32G32B32A32Sfloat:
+      case vk::Format::eR32G32B32A32Uint:
+        return 16u;
+      default:
+        // Conservative default for typical color formats
+        return 4u;
+    }
+  };
+  const size_t bytes = static_cast<size_t>(size.x) * size.y * bytesPerPixel(fmt);
   const int slotIndex = acquireReadbackSlot(bytes);
   CHECK(slotIndex >= 0) << "VK readback slot unavailable (bytes=" << bytes << ")";
   VLOG(1) << fmt::format("VK readback enqueue src=0x{:x} size={}x{} bytes={} slot={} eye={}",

@@ -29,7 +29,7 @@ void main()
   int curLevel = 0;
 
   vec3 rayVector = exitRayPosition - startRayPosition;
-  vec3 numVoxels = abs(rayVector * pg.image_dimensions[curLevel]);
+  vec3 numVoxels = abs(rayVector * pg.levels[curLevel].image_dimensions.xyz);
   float stepSize = 1.0 / (rp.sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
 
   uvec3 pageDirAddress = uvec3(0xFFFFFFFFu);
@@ -42,9 +42,9 @@ void main()
   for (int loop0=0; !finished && loop0<255; ++loop0) {
     for (int loop1=0; !finished && loop1<255; ++loop1) {
       float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * pg.ze_to_screen_pixel_voxel_size;
-      while (curLevel + 1 < LEVEL_COUNT && pg.voxel_world_sizes[curLevel+1] <= desiredVoxelSize) {
+      while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel+1].voxel_world_size <= desiredVoxelSize) {
         ++curLevel;
-        numVoxels = abs(rayVector * pg.image_dimensions[curLevel]);
+        numVoxels = abs(rayVector * pg.levels[curLevel].image_dimensions.xyz);
         stepSize = 1.0 / (rp.sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
       }
 
@@ -55,17 +55,17 @@ void main()
       }
 
       vec3 samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-      uvec3 voxelCoord = clamp(uvec3(samplePos * pg.image_dimensions[curLevel]), uvec3(0u), pg.image_dimensions[curLevel] - 1u);
+      uvec3 voxelCoord = clamp(uvec3(samplePos * pg.levels[curLevel].image_dimensions.xyz), uvec3(0u), pg.levels[curLevel].image_dimensions.xyz - 1u);
 
-      uvec3 pageTableCoord = voxelCoord / pg.image_block_size;
-      uvec3 curPageDirAddress = pg.page_directory_bases[curLevel] + pageTableCoord / pg.page_table_block_size;
+      uvec3 pageTableCoord = voxelCoord / pg.image_block_size.xyz;
+      uvec3 curPageDirAddress = pg.levels[curLevel].page_directory_base.xyz + pageTableCoord / pg.page_table_block_size.xyz;
       if (curPageDirAddress != pageDirAddress) {
         pageDirAddress = curPageDirAddress;
         pageDirEntry = texelFetch(page_directory, ivec3(pageDirAddress), 0);
       }
       uint pagingFlag = pageDirEntry.w;
       if (pagingFlag != 0u && pagingFlag != 40000u) {
-        uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % pg.page_table_block_size), 0);
+        uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + (pageTableCoord % pg.page_table_block_size.xyz)), 0);
         pagingFlag = pageTableEntry.w;
         if (pagingFlag != 0u && pagingFlag != 40000u) {
           sampleBlock(pageTableEntry, curLevel, pageTableCoord,
@@ -77,8 +77,8 @@ void main()
           do {
             currentRayLength += stepSize;
             samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-            voxelCoord = clamp(uvec3(samplePos * pg.image_dimensions[curLevel]), uvec3(0u), pg.image_dimensions[curLevel] - 1u);
-          } while (voxelCoord / pg.image_block_size == pageTableCoord && currentRayLength <= 1.0);
+            voxelCoord = clamp(uvec3(samplePos * pg.levels[curLevel].image_dimensions.xyz), uvec3(0u), pg.levels[curLevel].image_dimensions.xyz - 1u);
+          } while (voxelCoord / pg.image_block_size.xyz == pageTableCoord && currentRayLength <= 1.0);
         }
       } else if (pagingFlag == 0u) {
         hitMissedBlock = true;
@@ -86,8 +86,8 @@ void main()
         do {
           currentRayLength += stepSize;
           samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-          voxelCoord = clamp(uvec3(samplePos * pg.image_dimensions[curLevel]), uvec3(0u), pg.image_dimensions[curLevel] - 1u);
-        } while (pg.page_directory_bases[curLevel] + voxelCoord / pg.image_block_size / pg.page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
+          voxelCoord = clamp(uvec3(samplePos * pg.levels[curLevel].image_dimensions.xyz), uvec3(0u), pg.levels[curLevel].image_dimensions.xyz - 1u);
+        } while (pg.levels[curLevel].page_directory_base.xyz + (voxelCoord / pg.image_block_size.xyz) / pg.page_table_block_size.xyz == pageDirAddress && currentRayLength <= 1.0);
       }
       finished = finished || hitMissedBlock || (currentRayLength > 1.0);
     }

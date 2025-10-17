@@ -32,11 +32,44 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
                      vk::PipelineStageFlags2 dstStage,
                      vk::AccessFlags2 dstAccess)
 {
+  // Choose the most reliable oldLayout:
+  // - If the pass clears the attachment (loadOp=CLEAR), we can safely start
+  //   from UNDEFINED regardless of previously tracked layout.
+  // - Otherwise, prefer the tracking texture's current layout when provided.
+  //   This guards against stale initialLayout snapshots.
+  vk::ImageLayout requestedOld = info.initialLayout;
+  vk::ImageLayout trackedOld = requestedOld;
+  if (info.trackingTexture != nullptr) {
+    trackedOld = info.trackingTexture->layout();
+  }
+  vk::ImageLayout effectiveOld = requestedOld;
+  if (info.loadOp == vk::AttachmentLoadOp::eClear) {
+    effectiveOld = vk::ImageLayout::eUndefined;
+  } else if (info.trackingTexture != nullptr && trackedOld != requestedOld) {
+    // Prefer the tracked layout when it disagrees with the provided snapshot.
+    effectiveOld = trackedOld;
+  }
+  // Avoid no-op old==new transitions that leave brand-new images UNDEFINED on GPU.
+  if (effectiveOld == newLayout && trackedOld == vk::ImageLayout::eUndefined) {
+    effectiveOld = vk::ImageLayout::eUndefined;
+  }
+
+  // Diagnostics to help trace unexpected layout state.
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("transitionImage: img=0x{:x} initial={} tracked={} effectiveOld={} new={} aspect=0x{:x}",
+                           reinterpret_cast<uint64_t>(static_cast<VkImage>(info.image)),
+                           enumOrUnderlying(requestedOld, 16),
+                           enumOrUnderlying(trackedOld, 16),
+                           enumOrUnderlying(effectiveOld, 16),
+                           enumOrUnderlying(newLayout, 16),
+                           static_cast<uint32_t>(info.aspect));
+  }
+
   vk::ImageMemoryBarrier2 barrier{.srcStageMask = sanitizeStage(info.srcStage),
                                   .srcAccessMask = sanitizeAccess(info.srcAccess),
                                   .dstStageMask = sanitizeStage(dstStage),
                                   .dstAccessMask = sanitizeAccess(dstAccess),
-                                  .oldLayout = info.initialLayout,
+                                  .oldLayout = effectiveOld,
                                   .newLayout = newLayout,
                                   .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                                   .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -198,8 +231,8 @@ void ZVulkanDebugStateTracker::reset(const ZVulkanGraphicsDrawSpec& spec)
   m_expectedDepthBias = spec.depthBiasEnable.has_value() || spec.depthBiasConstant.has_value() ||
                         spec.depthBiasClamp.has_value() || spec.depthBiasSlope.has_value();
   m_expectedBlendConstants = spec.blendConstants.has_value();
-  m_expectedStencilState = spec.stencilCompareMask.has_value() || spec.stencilWriteMask.has_value() ||
-                           spec.stencilRef.has_value();
+  m_expectedStencilState =
+    spec.stencilCompareMask.has_value() || spec.stencilWriteMask.has_value() || spec.stencilRef.has_value();
   m_expectedCullMode = spec.cullMode.has_value();
   m_expectedFrontFace = spec.frontFace.has_value();
   m_expectedPrimitiveRestart = spec.primitiveRestartEnable.has_value();

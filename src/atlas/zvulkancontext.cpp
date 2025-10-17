@@ -583,12 +583,20 @@ void ZVulkanContext::createLogicalDevice()
     // Enable useful 1.2 features via the 1.2 struct in the chain when supported
     enabledPhysicalDeviceVulkan12Features.separateDepthStencilLayouts =
       physicalDeviceVulkan12Features.separateDepthStencilLayouts;
+    // Allow relaxed uniform buffer layouts used by some shaders (std430-like in uniform buffers)
+    // This matches SPIR-V validation guidance for our block-ID UBO.
+    enabledPhysicalDeviceVulkan12Features.uniformBufferStandardLayout =
+      physicalDeviceVulkan12Features.uniformBufferStandardLayout;
+    enabledPhysicalDeviceVulkan12Features.scalarBlockLayout = physicalDeviceVulkan12Features.scalarBlockLayout;
   } else {
     // For Vulkan 1.2, use extensions
     enabledPhysicalDeviceVulkan12Features.descriptorIndexing = true;
     enabledPhysicalDeviceVulkan12Features.bufferDeviceAddress = true;
     enabledPhysicalDeviceVulkan12Features.separateDepthStencilLayouts =
       physicalDeviceVulkan12Features.separateDepthStencilLayouts;
+    enabledPhysicalDeviceVulkan12Features.uniformBufferStandardLayout =
+      physicalDeviceVulkan12Features.uniformBufferStandardLayout;
+    enabledPhysicalDeviceVulkan12Features.scalarBlockLayout = physicalDeviceVulkan12Features.scalarBlockLayout;
     enabledFeatures2.unlink<vk::PhysicalDeviceVulkan13Features>();
 
     auto deviceExtensionProperties = m_physicalDevices[0].enumerateDeviceExtensionProperties();
@@ -606,7 +614,8 @@ void ZVulkanContext::createLogicalDevice()
   try {
     auto devExtPropsAll = m_physicalDevices[0].enumerateDeviceExtensionProperties();
     addRequiredExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, enabledExtensions, devExtPropsAll, true);
-  } catch (...) {
+  }
+  catch (...) {
     // Ignore; we'll fall back to uncalibrated traces if unavailable
   }
 

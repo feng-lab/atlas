@@ -22,6 +22,7 @@ public:
                      vk::Sampler sampler,
                      vk::ImageLayout layoutOverride,
                      vk::ImageAspectFlags aspectOverride);
+  void updateStorageBuffer(uint32_t binding, ZVulkanBuffer& buffer);
 
   // Write-once convenience helpers; return true if wrote, false if skipped
   bool writeUniformBufferOnce(uint32_t binding, ZVulkanBuffer& buffer);

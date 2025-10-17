@@ -264,6 +264,14 @@ private:
   ZVulkanDescriptorSet* m_mergeDescriptor = nullptr; // per-draw override (backend-owned)
   std::unique_ptr<ZVulkanBuffer> m_entryTransformBuffer;
 
+  // Block-ID compaction (compute) resources
+  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayout;
+  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayout;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipeline;
+  ZVulkanDescriptorSet* m_blockIdCompactDescriptor = nullptr; // per-draw override (backend-owned)
+  std::unique_ptr<ZVulkanBuffer> m_blockIdCompactOutput; // host-visible, compacted result
+  size_t m_blockIdCompactCapacity = 0; // bytes
+
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
   std::unique_ptr<ZVulkanTexture> m_progressiveLayerColor;
@@ -295,6 +303,13 @@ private:
   void ensureEntryTransformResources(Z3DRendererBase& renderer,
                                      const RenderBatch& batch,
                                      const ImgRaycasterPayload& payload);
+
+  void ensureBlockIdCompactionPipeline(uint32_t attachmentCount, int mode);
+  void ensureBlockIdCompactOutput(size_t bytes);
+  void recordBlockIdCompaction(Z3DRendererBase& renderer,
+                               const RenderBatch& batch,
+                               const ImgRaycasterPayload& payload,
+                               vk::raii::CommandBuffer& cmd);
 
   ChannelResources& ensureChannelResources(size_t channelIndex);
   void updateChannelFastDescriptors(ChannelResources& resources,

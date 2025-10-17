@@ -16,15 +16,23 @@ layout(set = 1, binding = 1) uniform sampler2D last_ray_depth_tex;
 layout(set = 1, binding = 2) uniform sampler2D last_color_tex;
 
 // Paging and geometry data (set 2)
+struct PageLevelData {
+  uvec4 page_directory_base;     // .xyz used
+  uvec4 image_dimensions;        // .xyz used
+  uvec4 pos_to_block_ids;        // .xyz used by blockID variant
+  float voxel_world_size;        // scalar
+  vec3  _pad0;                   // pad to 16B
+};
+
 layout(std140, set = 2, binding = 2) uniform PageData {
-  uvec3 page_directory_bases[LEVEL_COUNT];
-  uvec3 page_table_block_size;
-  uvec3 image_dimensions[LEVEL_COUNT];
-  float voxel_world_sizes[LEVEL_COUNT];
-  uvec3 image_block_size;
-  vec3  image_address_to_normalized_texture_coord;
-  float ze_to_screen_pixel_voxel_size;
-  uvec3 pos_to_block_ids[LEVEL_COUNT]; // used by blockID variant
+  // Fixed-size fields
+  uvec4 page_table_block_size;
+  uvec4 image_block_size;
+  vec4  image_address_to_normalized_texture_coord; // .xyz used
+  float ze_to_screen_pixel_voxel_size;             // scalar; CPU writes 16B, std140 pads.
+
+  // Per-level data packed to avoid multiple arrays
+  PageLevelData levels[LEVEL_COUNT];
 } pg;
 
 // Raycaster parameters via push constants
@@ -118,13 +126,13 @@ void sampleBlock(in uvec4 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
                  inout float mipValue)
 {
   vec3 samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-  uvec3 voxelCoord = clamp(uvec3(samplePos * pg.image_dimensions[curLevel]), uvec3(0u), pg.image_dimensions[curLevel] - 1u);
-  bool blockFinished = finished || voxelCoord / pg.image_block_size != pageTableCoord || currentRayLength > 1.0;
+  uvec3 voxelCoord = clamp(uvec3(samplePos * pg.levels[curLevel].image_dimensions.xyz), uvec3(0u), pg.levels[curLevel].image_dimensions.xyz - 1u);
+  bool blockFinished = finished || voxelCoord / pg.image_block_size.xyz != pageTableCoord || currentRayLength > 1.0;
 
   for (int loop0 = 0; !blockFinished && loop0 < 255; ++loop0) {
-    vec3 fFracVoxelCoord = samplePos * pg.image_dimensions[curLevel] - vec3(voxelCoord);
-    vec3 voxelAddress = pageTableEntry.xyz + voxelCoord % pg.image_block_size + fFracVoxelCoord + 2.0;
-    float voxel = texture(image_cache, voxelAddress * pg.image_address_to_normalized_texture_coord).r;
+    vec3 fFracVoxelCoord = samplePos * pg.levels[curLevel].image_dimensions.xyz - vec3(voxelCoord);
+    vec3 voxelAddress = pageTableEntry.xyz + (voxelCoord % pg.image_block_size.xyz) + fFracVoxelCoord + 2.0;
+    float voxel = texture(image_cache, voxelAddress * pg.image_address_to_normalized_texture_coord.xyz).r;
 
     if (RAY_MODE == 1) {
       if (LOCAL_MIP) {
@@ -147,7 +155,7 @@ void sampleBlock(in uvec4 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
 
     currentRayLength += stepSize;
     samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-    voxelCoord = clamp(uvec3(samplePos * pg.image_dimensions[curLevel]), uvec3(0u), pg.image_dimensions[curLevel] - 1u);
-    blockFinished = finished || voxelCoord / pg.image_block_size != pageTableCoord || currentRayLength > 1.0;
+    voxelCoord = clamp(uvec3(samplePos * pg.levels[curLevel].image_dimensions.xyz), uvec3(0u), pg.levels[curLevel].image_dimensions.xyz - 1u);
+    blockFinished = finished || voxelCoord / pg.image_block_size.xyz != pageTableCoord || currentRayLength > 1.0;
   }
 }

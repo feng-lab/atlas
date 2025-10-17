@@ -13,7 +13,7 @@ void main()
 {
   float desiredVoxelSize = eyeCoord.z * pg.ze_to_screen_pixel_voxel_size;
   int curLevel = 0;
-  while (curLevel + 1 < LEVEL_COUNT && pg.voxel_world_sizes[curLevel + 1] <= desiredVoxelSize) {
+  while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel + 1].voxel_world_size <= desiredVoxelSize) {
     ++curLevel;
   }
 
@@ -22,19 +22,23 @@ void main()
     return;
   }
 
-  uvec3 voxelCoord = clamp(uvec3(texCoord0 * pg.image_dimensions[curLevel]), uvec3(0u), pg.image_dimensions[curLevel] - 1u);
-  uvec3 pageTableCoord = voxelCoord / pg.image_block_size;
-  uint blockID = pg.pos_to_block_ids[curLevel].x + pageTableCoord.x
-               + pg.pos_to_block_ids[curLevel].y * pageTableCoord.y
-               + pg.pos_to_block_ids[curLevel].z * pageTableCoord.z;
+  uvec3 voxelCoord = clamp(uvec3(texCoord0 * pg.levels[curLevel].image_dimensions.xyz), uvec3(0u), pg.levels[curLevel].image_dimensions.xyz - 1u);
+  uvec3 pageTableCoord = voxelCoord / pg.image_block_size.xyz;
+  uint blockID = pg.levels[curLevel].pos_to_block_ids.x + pageTableCoord.x
+               + pg.levels[curLevel].pos_to_block_ids.y * pageTableCoord.y
+               + pg.levels[curLevel].pos_to_block_ids.z * pageTableCoord.z;
+  if (curLevel + 1 < LEVEL_COUNT) {
+    uint nextBase = pg.levels[curLevel + 1].pos_to_block_ids.x;
+    if (blockID >= nextBase) { blockID = 0xFFFFFFFFu; }
+  }
 
-  uvec4 pageDirEntry = texelFetch(page_directory, ivec3(pg.page_directory_bases[curLevel] + pageTableCoord / pg.page_table_block_size), 0);
+  uvec4 pageDirEntry = texelFetch(page_directory, ivec3(pg.levels[curLevel].page_directory_base.xyz + pageTableCoord / pg.page_table_block_size.xyz), 0);
   uint pagingFlag = pageDirEntry.w;
   const uint UNMAPPED = 0u;
   const uint EMPTY = 40000u;
 
   if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-    uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % pg.page_table_block_size), 0);
+    uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + (pageTableCoord % pg.page_table_block_size.xyz)), 0);
     pagingFlag = pageTableEntry.w;
     if (pagingFlag != EMPTY) {
       FragData0 = uvec4(blockID, 0u, 0u, 0u);
@@ -47,4 +51,3 @@ void main()
 
   FragData0 = uvec4(0u, 0u, 0u, 0u);
 }
-

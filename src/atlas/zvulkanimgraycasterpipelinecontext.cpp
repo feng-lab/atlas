@@ -21,6 +21,7 @@
 #include "zvulkanuniforms.h"
 #include "zvulkanpipelinecontext_raii.h"
 #include "zsysteminfo.h"
+#include <fstream>
 #include "z3drenderervulkanbackend.h"
 #include "zvulkanpagedimageblockuploader.h"
 #include "zcancellation.h"
@@ -30,6 +31,12 @@
 #include <limits>
 #include <unordered_set>
 #include <utility>
+#include <cstring>
+
+// Forward declaration for local SPIR-V loader
+namespace {
+std::vector<uint32_t> readSpirvFile(const std::string& path);
+}
 
 namespace nim {
 
@@ -50,6 +57,21 @@ DEFINE_bool(atlas_debug_save_slice_layers,
 DEFINE_bool(atlas_debug_save_slice_merge_out,
             false,
             "Save Vulkan slice merged output (first color attachment) after merge.");
+
+// Compaction mode:
+// 0 = Workgroup-local dedupe + global hash insert (SSBO table of 4Mi entries)
+// 1 = Workgroup-local dedupe + global append buffer (SSBO with atomic counter + array)
+DEFINE_int32(atlas_vk_blockid_compaction_mode,
+             0,
+             "Block-ID compaction mode: 0=local-dedupe+hash, 1=local-dedupe+append");
+
+DEFINE_bool(atlas_vk_disable_blockid_compaction, false, "Disable Block-ID compaction compute pass (for diagnostics)");
+
+// Debug dump of Vulkan raycaster inputs before dispatch (CPU-side only)
+DEFINE_bool(atlas_vk_debug_raycaster_dump,
+            false,
+            "Dump Vulkan raycaster inputs (specializations, push constants, page data, bindings)");
+DEFINE_int32(atlas_vk_debug_raycaster_dump_levels, 8, "Max page levels to print when dumping Vulkan raycaster inputs");
 
 namespace {
 
@@ -81,6 +103,13 @@ struct RayParamsData
 };
 
 constexpr uint32_t kMaxPagingLevels = 16u;
+
+// Block-ID compaction table parameters (must match GLSL)
+constexpr uint32_t kBlockIdTableBits = 22u; // 4 Mi entries
+constexpr uint32_t kBlockIdTableSize = (1u << kBlockIdTableBits);
+constexpr size_t kBlockIdCompactBytes = size_t{kBlockIdTableSize} * sizeof(uint32_t); // 16 MiB
+constexpr uint32_t kInvalidBlockID = 0u;
+constexpr uint32_t kEmptyBlockID = 0xFFFFFFFFu;
 
 uint32_t rayModeConstant(ImgCompositingMode mode)
 {
@@ -130,27 +159,35 @@ CompositingConfig evaluateCompositing(ImgCompositingMode rawMode)
   return cfg;
 }
 
-template<typename T>
-void appendScalar(std::vector<uint8_t>& data, T value)
+// Std140-friendly packing helpers for UBO data. We write vec3 as vec4 with padding,
+// and scalar floats as a vec4 with value in x and zeros elsewhere to maintain 16-byte strides.
+inline void appendStd140Vec4(std::vector<uint8_t>& data, const glm::vec4& v)
 {
-  static_assert(std::is_trivially_copyable_v<T>);
   const size_t offset = data.size();
-  data.resize(offset + sizeof(T));
-  std::memcpy(data.data() + offset, &value, sizeof(T));
+  data.resize(offset + sizeof(glm::vec4));
+  std::memcpy(data.data() + offset, &v, sizeof(glm::vec4));
 }
 
-void appendUvec3(std::vector<uint8_t>& data, const glm::uvec3& value)
+inline void appendStd140Uvec4(std::vector<uint8_t>& data, const glm::uvec4& v)
 {
-  appendScalar(data, value.x);
-  appendScalar(data, value.y);
-  appendScalar(data, value.z);
+  const size_t offset = data.size();
+  data.resize(offset + sizeof(glm::uvec4));
+  std::memcpy(data.data() + offset, &v, sizeof(glm::uvec4));
 }
 
-void appendVec3(std::vector<uint8_t>& data, const glm::vec3& value)
+inline void appendUvec3(std::vector<uint8_t>& data, const glm::uvec3& value)
 {
-  appendScalar(data, value.x);
-  appendScalar(data, value.y);
-  appendScalar(data, value.z);
+  appendStd140Uvec4(data, glm::uvec4(value, 0u));
+}
+
+inline void appendVec3(std::vector<uint8_t>& data, const glm::vec3& value)
+{
+  appendStd140Vec4(data, glm::vec4(value, 0.0f));
+}
+
+inline void appendScalar(std::vector<uint8_t>& data, float value)
+{
+  appendStd140Vec4(data, glm::vec4(value, 0.0f, 0.0f, 0.0f));
 }
 
 std::vector<uint8_t>
@@ -160,6 +197,16 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
 
   std::vector<uint8_t> data;
   data.reserve(256);
+
+  CHECK_LT(channel, image.numChannels()) << "Channel index out of range in buildPageDataBuffer: channel=" << channel
+                                         << " channels=" << image.numChannels();
+
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("buildPageDataBuffer: begin channel={} levels={} ze2px={:.6f}",
+                           channel,
+                           levelCount,
+                           zeToScreenPixelVoxelSize);
+  }
 
   const auto& pageDirectoryBases = image.pageDirectoryBases();
   const auto& posToBlockIDs = image.posToBlockIDsLevels();
@@ -171,41 +218,84 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
   CHECK_GE(imageDimensions.size(), levelCount);
   CHECK_GE(voxelWorldSizes.size(), levelCount);
 
-  for (uint32_t level = 0; level < levelCount; ++level) {
-    appendUvec3(data, pageDirectoryBases[level]);
+  // Fixed-size fields first
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << "buildPageDataBuffer: append pageTableBlockSize";
   }
-
   appendUvec3(data, image.pageTableBlockSize());
 
-  for (uint32_t level = 0; level < levelCount; ++level) {
-    appendUvec3(data, imageDimensions[level]);
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << "buildPageDataBuffer: append imageBlockSize";
   }
-
-  for (uint32_t level = 0; level < levelCount; ++level) {
-    appendScalar(data, voxelWorldSizes[level]);
-  }
-
   appendUvec3(data, image.imageBlockSize());
-  appendVec3(data, image.imageAddressToNormalizedTextureCoord(channel));
+
+  // Compute address->normalized coordinate scale without relying on GL textures.
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << "buildPageDataBuffer: compute addr->norm from imageCacheSize";
+  }
+  const glm::uvec3 cacheSize = image.imageCacheSize();
+  CHECK(cacheSize.x > 0u && cacheSize.y > 0u && cacheSize.z > 0u)
+    << "Invalid image cache size: " << cacheSize.x << ", " << cacheSize.y << ", " << cacheSize.z;
+  const glm::vec3 addrNorm = 1.0f / glm::vec3(cacheSize);
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("buildPageDataBuffer: addrNorm=({}, {}, {})", addrNorm.x, addrNorm.y, addrNorm.z);
+  }
+  appendVec3(data, addrNorm);
   appendScalar(data, zeToScreenPixelVoxelSize);
 
-  for (uint32_t level = 0; level < levelCount; ++level) {
-    appendUvec3(data, posToBlockIDs[level]);
+  // Levels packed group-by-level: dirBase, dims, posToBlockIDs, voxelWorldSize
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << "buildPageDataBuffer: append per-level data groups";
   }
-
-  return data;
-}
-
-std::vector<uint32_t> collectUniqueBlockIDs(const std::vector<uint32_t>& blockIDs)
-{
-  std::unordered_set<uint32_t> unique;
-  unique.reserve(blockIDs.size());
-  for (uint32_t id : blockIDs) {
-    if (id != 0u && id != 0xFFFFFFFFu) {
-      unique.insert(id);
+  for (uint32_t level = 0; level < levelCount; ++level) {
+    appendUvec3(data, pageDirectoryBases[level]);
+    appendUvec3(data, imageDimensions[level]);
+    appendUvec3(data, posToBlockIDs[level]);
+    appendScalar(data, voxelWorldSizes[level]);
+    if (FLAGS_atlas_vk_debug_raycaster_dump) {
+      const int maxLevels = std::max(0, FLAGS_atlas_vk_debug_raycaster_dump_levels);
+      if (static_cast<int>(level) < maxLevels) {
+        VLOG(1) << fmt::format(
+          "Page level[{}]: dirBase=({}, {}, {}) dims=({}, {}, {}) posToIDs=({}, {}, {}) voxelWorld={:.6f}",
+          level,
+          pageDirectoryBases[level].x,
+          pageDirectoryBases[level].y,
+          pageDirectoryBases[level].z,
+          imageDimensions[level].x,
+          imageDimensions[level].y,
+          imageDimensions[level].z,
+          posToBlockIDs[level].x,
+          posToBlockIDs[level].y,
+          posToBlockIDs[level].z,
+          voxelWorldSizes[level]);
+      }
     }
   }
-  return std::vector<uint32_t>(unique.begin(), unique.end());
+
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("buildPageDataBuffer: end size={} bytes", data.size());
+  }
+  if (FLAGS_atlas_vk_debug_raycaster_dump) {
+    const auto ptb = image.pageTableBlockSize();
+    const auto ibs = image.imageBlockSize();
+    const glm::uvec3 cacheSize = image.imageCacheSize();
+    VLOG(1) << fmt::format(
+      "Page UBO summary: pageTableBlockSize=({}, {}, {}) imageBlockSize=({}, {}, {}) cacheSize=({}, {}, {}) addrNorm=({}, {}, {}) ze2px={:.6f}",
+      ptb.x,
+      ptb.y,
+      ptb.z,
+      ibs.x,
+      ibs.y,
+      ibs.z,
+      cacheSize.x,
+      cacheSize.y,
+      cacheSize.z,
+      (1.0f / glm::vec3(cacheSize)).x,
+      (1.0f / glm::vec3(cacheSize)).y,
+      (1.0f / glm::vec3(cacheSize)).z,
+      zeToScreenPixelVoxelSize);
+  }
+  return data;
 }
 
 std::array<glm::vec4, 3> encodeMat3ToStd140(const glm::mat3& matrix)
@@ -419,8 +509,9 @@ void ZVulkanImgRaycasterPipelineContext::ensureDescriptorLayouts()
 
   // Progressive static textures: page_directory, page_table_cache, image_cache, volume, transfer
   if (!m_progressiveStaticSetLayout) {
-    // Use immutable samplers to bake the default sampler into the layout.
-    vk::Sampler imm = m_backend.defaultSampler();
+    // Use immutable nearest-clamp samplers to ensure integer formats (e.g., RGBA32UI)
+    // are sampled without linear filtering in all block-ID paths.
+    vk::Sampler imm = m_backend.nearestClampSampler();
     std::array<vk::Sampler, 5> imms{imm, imm, imm, imm, imm};
     std::array<vk::DescriptorSetLayoutBinding, 5> bindings{};
     for (uint32_t i = 0; i < bindings.size(); ++i) {
@@ -437,7 +528,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureDescriptorLayouts()
 
   // Progressive dynamic textures: entry/exit, last_depth, last_color
   if (!m_progressiveDynamicSetLayout) {
-    // Also bake immutable samplers for dynamic set; updates only change image views/layouts.
+    // Dynamic set: default sampler is acceptable; ray textures are float/normalized.
     vk::Sampler imm = m_backend.defaultSampler();
     std::array<vk::Sampler, 3> imms{imm, imm, imm};
     std::array<vk::DescriptorSetLayoutBinding, 3> bindings{};
@@ -647,6 +738,219 @@ void ZVulkanImgRaycasterPipelineContext::ensureEntryTransformResources(Z3DRender
   m_entryTransformDescriptor->updateUniformBuffer(0, *m_entryTransformBuffer);
 }
 
+void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_t attachmentCount, int mode)
+{
+  (void)attachmentCount; // current compaction uses first attachment only
+  static int s_lastMode = -1;
+  auto& device = m_backend.device().context().device();
+  // Descriptor set layout: binding 0 = sampled image (block-ID), binding 1 = storage buffer (bitset/list)
+  std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+    vk::DescriptorSetLayoutBinding{.binding = 0,
+                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                   .descriptorCount = 1,
+                                   .stageFlags = vk::ShaderStageFlagBits::eCompute},
+    vk::DescriptorSetLayoutBinding{.binding = 1,
+                                   .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                   .descriptorCount = 1,
+                                   .stageFlags = vk::ShaderStageFlagBits::eCompute}
+  };
+  m_blockIdCompactSetLayout.emplace(
+    device,
+    vk::DescriptorSetLayoutCreateInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                      .pBindings = bindings.data()});
+  // Push constants: image size (u32 width,height), stride, and base index (optional)
+  vk::PushConstantRange pc{.stageFlags = vk::ShaderStageFlagBits::eCompute, .offset = 0, .size = sizeof(uint32_t) * 4};
+  m_blockIdCompactPipelineLayout.emplace(device,
+                                         vk::PipelineLayoutCreateInfo{.setLayoutCount = 1,
+                                                                      .pSetLayouts = &**m_blockIdCompactSetLayout,
+                                                                      .pushConstantRangeCount = 1,
+                                                                      .pPushConstantRanges = &pc});
+  // Create compute pipeline (choose shader by mode)
+  const std::string shaderBase = nim::ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
+  const std::string compPath =
+    shaderBase + (mode == 1 ? "block_id_compact_append.comp.spv" : "block_id_compact.comp.spv");
+  if (!m_blockIdCompactPipeline || s_lastMode != mode) {
+    auto spirv = readSpirvFile(compPath);
+    vk::raii::ShaderModule compModule(
+      device,
+      vk::ShaderModuleCreateInfo{.codeSize = spirv.size() * sizeof(uint32_t), .pCode = spirv.data()});
+    vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
+                                            .module = *compModule,
+                                            .pName = "main"};
+    m_blockIdCompactPipeline.emplace(
+      device,
+      nullptr,
+      vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayout});
+    s_lastMode = mode;
+  }
+}
+
+void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactOutput(size_t bytes)
+{
+  if (m_blockIdCompactOutput && m_blockIdCompactCapacity >= bytes) {
+    return;
+  }
+  // Allocate host-visible, coherent buffer to receive compacted block IDs or bitset
+  m_blockIdCompactOutput = m_backend.device().createBuffer(
+    bytes,
+    vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_blockIdCompactCapacity = bytes;
+}
+
+void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase& renderer,
+                                                                 const RenderBatch& batch,
+                                                                 const ImgRaycasterPayload& payload,
+                                                                 vk::raii::CommandBuffer& cmd)
+{
+  (void)renderer;
+  (void)batch;
+  if (!payload.blockIdLease || !payload.blockIdLease->hasVulkanImage()) {
+    return;
+  }
+  // Ensure pipeline and output buffer
+  const int mode = FLAGS_atlas_vk_blockid_compaction_mode;
+  // Use the first block-ID attachment (extension: loop over all and OR into bitset)
+  ZVulkanTexture* block0 = payload.blockIdLease->colorAttachment(0);
+  if (!block0) {
+    return;
+  }
+  ensureBlockIdCompactionPipeline(payload.blockIdLease->attachments, mode);
+  uint32_t imgW = block0->width();
+  uint32_t imgH = block0->height();
+  if (mode == 1) {
+    // Append buffer: [count (4B)] + ids[capacity]
+    const uint32_t capacity = std::max<uint32_t>(1u, imgW * imgH); // conservative upper bound
+    const size_t bytes = sizeof(uint32_t) + static_cast<size_t>(capacity) * sizeof(uint32_t);
+    ensureBlockIdCompactOutput(bytes);
+    // Zero the count
+    if (void* mapped = m_blockIdCompactOutput->map(0, sizeof(uint32_t))) {
+      std::memset(mapped, 0x00, sizeof(uint32_t));
+      m_blockIdCompactOutput->unmap();
+    }
+  } else {
+    // Hash table: 4Mi entries * 4 bytes = 16 MiB
+    ensureBlockIdCompactOutput(kBlockIdCompactBytes);
+    // Clear output table to EMPTY (0xFF) before dispatch
+    if (void* mapped = m_blockIdCompactOutput->map(0, kBlockIdCompactBytes)) {
+      std::memset(mapped, 0xFF, kBlockIdCompactBytes);
+      m_blockIdCompactOutput->unmap();
+    }
+  }
+
+  // Build descriptor set
+  if (!m_blockIdCompactDescriptor) {
+    m_blockIdCompactDescriptor = m_backend.allocateOverrideDescriptorSet(**m_blockIdCompactSetLayout);
+  }
+  // Sample in shader-read layout; dynamic rendering transition sets this as final
+  m_blockIdCompactDescriptor->updateTexture(0,
+                                            *block0,
+                                            m_backend.nearestClampSampler(),
+                                            vk::ImageLayout::eShaderReadOnlyOptimal,
+                                            vk::ImageAspectFlags{});
+  m_blockIdCompactDescriptor->updateStorageBuffer(1, *m_blockIdCompactOutput);
+
+  // Record compute dispatch
+  ZVulkanPipelineCommandRecorder recorder(cmd);
+  auto gpuScope = m_backend.beginGpuScope(mode == 1 ? "block_id_compact_append" : "block_id_compact_hash");
+  ZVulkanComputePassSpec spec{};
+  spec.pipeline = &*m_blockIdCompactPipeline;
+  spec.pipelineLayout = &*m_blockIdCompactPipelineLayout;
+  spec.descriptorSets = {m_blockIdCompactDescriptor->descriptorSet()};
+  spec.descriptorSetFirst = 0;
+  spec.expectedDescriptorSetCount = 1;
+  // Push constants: width, height, stride, baseIndex (unused=0)
+  struct PC
+  {
+    uint32_t width;
+    uint32_t height;
+    uint32_t stride;
+    uint32_t baseOrCapacity;
+  } pc{imgW, imgH, imgW, static_cast<uint32_t>((mode == 1) ? (imgW * imgH) : 0u)};
+  spec.pushConstantsData = &pc;
+  spec.pushConstantsSize = sizeof(pc);
+  spec.pushConstantsStages = vk::ShaderStageFlagBits::eCompute;
+  // Workgroup size assumed 16x16 in shader
+  spec.groupX = (pc.width + 15) / 16;
+  spec.groupY = (pc.height + 15) / 16;
+  spec.groupZ = 1;
+  VLOG(2) << fmt::format("record compute: groupX={} groupY={} width={} height={}",
+                         spec.groupX,
+                         spec.groupY,
+                         pc.width,
+                         pc.height);
+  recorder.recordComputePass(spec);
+  if (gpuScope) {
+    m_backend.endGpuScope(*gpuScope);
+  }
+
+  // After fence: parse compacted buffer and update caches
+  auto bufPtr = m_blockIdCompactOutput.get();
+  m_backend.scheduleAfterCurrentFrameCompletion(
+    [bufPtr, mode, imgW, imgH, channelIndex = payload.activeChannel, imagePtr = payload.image]() {
+      if (!bufPtr || !imagePtr) {
+        return;
+      }
+      const size_t bytes =
+        (mode == 1) ? (sizeof(uint32_t) + static_cast<size_t>(imgW) * imgH * sizeof(uint32_t)) : kBlockIdCompactBytes;
+      const void* mapped = bufPtr->map(0, bytes);
+      if (!mapped) {
+        return;
+      }
+      std::vector<uint32_t> missingBlocks;
+      if (mode == 1) {
+        // Append buffer format: [count][ids...]
+        const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
+        const uint32_t count = u32[0];
+        const uint32_t capacity = imgW * imgH;
+        const uint32_t clamped = std::min(count, capacity);
+        missingBlocks.reserve(clamped);
+        for (uint32_t i = 0; i < clamped; ++i) {
+          uint32_t v = u32[1 + i];
+          if (v != kInvalidBlockID && v != kEmptyBlockID && v != 0u) {
+            missingBlocks.push_back(v);
+          }
+        }
+        // CPU-side dedupe (ids may repeat across workgroups)
+        std::unordered_set<uint32_t> uniq;
+        uniq.reserve(missingBlocks.size());
+        std::vector<uint32_t> deduped;
+        deduped.reserve(missingBlocks.size());
+        for (uint32_t v : missingBlocks) {
+          if (uniq.insert(v).second) {
+            deduped.push_back(v);
+          }
+        }
+        missingBlocks.swap(deduped);
+      } else {
+        const uint32_t* keys = static_cast<const uint32_t*>(mapped);
+        size_t nonEmpty = 0;
+        for (size_t i = 0; i < kBlockIdTableSize; ++i) {
+          const uint32_t v = keys[i];
+          if (v != kEmptyBlockID && v != kInvalidBlockID) {
+            ++nonEmpty;
+          }
+        }
+        missingBlocks.reserve(nonEmpty);
+        for (size_t i = 0; i < kBlockIdTableSize; ++i) {
+          const uint32_t v = keys[i];
+          if (v != kEmptyBlockID && v != kInvalidBlockID) {
+            missingBlocks.push_back(v);
+          }
+        }
+      }
+      bufPtr->unmap();
+
+      VLOG(1) << fmt::format("compaction output parsed: keys={} (non-empty)", missingBlocks.size());
+      if (!missingBlocks.empty()) {
+        auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+        ZBenchTimer timer("vulkan_raycaster_blockid_compaction");
+        imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks, channelIndex, cancellationToken, timer);
+        VLOG(1) << fmt::format("cache uploads dispatched: blocks={}", missingBlocks.size());
+      }
+    });
+}
+
 void ZVulkanImgRaycasterPipelineContext::ensureEntryPipelines(vk::Format colorFormat)
 {
   auto& device = m_backend.device();
@@ -747,6 +1051,15 @@ ZVulkanImgRaycasterPipelineContext::ensureBlockIdPipeline(const BlockIdPipelineK
     {**m_progressiveStaticSetLayout, **m_progressiveDynamicSetLayout, **m_pageSetLayout});
   std::vector<vk::Format> colorFormats(std::max(1u, key.attachmentCount), colorFormat);
   instance.pipeline->setAttachmentFormats(colorFormats, std::nullopt);
+  // Disable blending for block-ID outputs (integer formats are not blendable).
+  {
+    vk::PipelineColorBlendAttachmentState att{};
+    att.blendEnable = VK_FALSE;
+    att.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+                         vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+    std::vector<vk::PipelineColorBlendAttachmentState> atts(colorFormats.size(), att);
+    instance.pipeline->setColorBlendAttachments(std::move(atts));
+  }
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
   instance.pipeline->setDepthTestEnable(false);
@@ -762,13 +1075,14 @@ ZVulkanImgRaycasterPipelineContext::ensureBlockIdPipeline(const BlockIdPipelineK
                                               std::vector(entries.begin(), entries.end()),
                                               data);
 
-  instance.pipeline->create();
-
   // Push constants for ray params used by block-ID shader (5 floats)
+  // Must be configured before create() so pipeline layout contains the range.
   vk::PushConstantRange pcRange{.stageFlags = vk::ShaderStageFlagBits::eFragment,
                                 .offset = 0,
                                 .size = sizeof(float) * 5};
   instance.pipeline->setPushConstantRanges({pcRange});
+
+  instance.pipeline->create();
 
   // (no-op debug in block-id pipeline)
   instance.colorFormats = std::move(colorFormats);
@@ -856,6 +1170,19 @@ ZVulkanImgRaycasterPipelineContext::ensureProgressivePipeline(const ProgressiveP
                                               data);
 
   instance.pipeline->create();
+
+  if (FLAGS_atlas_vk_debug_raycaster_dump) {
+    VLOG(1) << fmt::format("Raycaster specializations: mode={} localMip={} opaque={} levels={}",
+                           static_cast<int>(key.mode),
+                           key.localMip,
+                           key.resultOpaque,
+                           key.levelCount);
+    VLOG(1) << fmt::format("Raycaster attachments: colors={} depthPresent={} c0Fmt={} dFmt={}",
+                           formats.colorFormats.size(),
+                           formats.depthFormat.has_value(),
+                           formats.colorFormats.empty() ? -1 : static_cast<int>(formats.colorFormats.front()),
+                           formats.depthFormat ? static_cast<int>(*formats.depthFormat) : -1);
+  }
 
   auto [inserted, _] = m_progressivePipelines.emplace(key, std::move(instance));
   return inserted->second;
@@ -1359,31 +1686,99 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
     m_imageBlockUploader ? m_imageBlockUploader->imageCacheTexture(*payload.image, channelIndex) : nullptr;
   CHECK(pageDirectory && pageTable && imageCache)
     << "Paging textures unavailable for Vulkan raycaster channel " << channelIndex;
-
-  resources.pagedDescriptor->updateTexture(0, *pageDirectory, m_backend.defaultSampler());
-  resources.pagedDescriptor->updateTexture(1, *pageTable, m_backend.defaultSampler());
-  resources.pagedDescriptor->updateTexture(2, *imageCache, m_backend.defaultSampler());
-  resources.pagedDescriptor->updateTexture(3, volume, m_backend.defaultSampler());
-  resources.pagedDescriptor->updateTexture(4, transfer, m_backend.defaultSampler());
-  resources.pagedDescriptor->updateTexture(0, entryExit, m_backend.defaultSampler());
-  const auto [lastDepthLayout, lastDepthAspect] = depthReadDescriptorLayoutAndAspect(lastDepth);
-  resources.pagedDescriptor->updateTexture(1, lastDepth, m_backend.defaultSampler(), lastDepthLayout, lastDepthAspect);
-  resources.pagedDescriptor->updateTexture(2, lastColor, m_backend.defaultSampler());
+  // Dynamic per-draw set (m_progressiveDynamicSetLayout) only binds: entry/exit, last_depth(color), last_color.
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("updatePageDescriptors dynamic set: entryExit img=0x{:x} fmt={} layout={} descLayout={}",
+                           reinterpret_cast<uintptr_t>(static_cast<VkImage>(entryExit.image())),
+                           enumOrUnderlying(entryExit.format(), 16),
+                           enumOrUnderlying(entryExit.layout(), 16),
+                           enumOrUnderlying(entryExit.descriptorLayout(), 16));
+    VLOG(2) << fmt::format(
+      "updatePageDescriptors dynamic set: lastDepth(img/color) img=0x{:x} fmt={} layout={} descLayout={} (override layout {})",
+      reinterpret_cast<uintptr_t>(static_cast<VkImage>(lastDepth.image())),
+      enumOrUnderlying(lastDepth.format(), 16),
+      enumOrUnderlying(lastDepth.layout(), 16),
+      enumOrUnderlying(lastDepth.descriptorLayout(), 16),
+      enumOrUnderlying(vk::ImageLayout::eShaderReadOnlyOptimal, 16));
+    VLOG(2) << fmt::format("updatePageDescriptors dynamic set: lastColor img=0x{:x} fmt={} layout={} descLayout={}",
+                           reinterpret_cast<uintptr_t>(static_cast<VkImage>(lastColor.image())),
+                           enumOrUnderlying(lastColor.format(), 16),
+                           enumOrUnderlying(lastColor.layout(), 16),
+                           enumOrUnderlying(lastColor.descriptorLayout(), 16));
+  }
+  resources.pagedDescriptor->updateTexture(0,
+                                           entryExit,
+                                           m_backend.defaultSampler(),
+                                           vk::ImageLayout::eShaderReadOnlyOptimal,
+                                           vk::ImageAspectFlags{});
+  resources.pagedDescriptor->updateTexture(1,
+                                           lastDepth,
+                                           m_backend.defaultSampler(),
+                                           vk::ImageLayout::eShaderReadOnlyOptimal,
+                                           vk::ImageAspectFlags{});
+  resources.pagedDescriptor->updateTexture(2,
+                                           lastColor,
+                                           m_backend.defaultSampler(),
+                                           vk::ImageLayout::eShaderReadOnlyOptimal,
+                                           vk::ImageAspectFlags{});
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << "updatePageDescriptors: after dynamic writes";
+  }
 
   const uint32_t levelCount = static_cast<uint32_t>(std::min<size_t>(image.numLevels(), kMaxPagingLevels));
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("updatePageDescriptors: building page data, levels={} ze2px={:.6f}",
+                           levelCount,
+                           zeToScreenPixelVoxelSize);
+    // Log source array sizes for early diagnosis of level mismatches.
+    const auto& dbg_pdb = image.pageDirectoryBases();
+    const auto& dbg_p2b = image.posToBlockIDsLevels();
+    const auto& dbg_dims = image.imageDimensionsLevels();
+    const auto& dbg_vox = image.voxelWorldSizesLevels();
+    VLOG(2) << fmt::format(
+      "pageDirectoryBases.size()={} posToBlockIDs.size()={} imageDimensions.size()={} voxelWorldSizes.size()={}",
+      dbg_pdb.size(),
+      dbg_p2b.size(),
+      dbg_dims.size(),
+      dbg_vox.size());
+  }
+  // Enforce levelCount fits backing arrays early with a clear message.
+  {
+    const auto& pdb = image.pageDirectoryBases();
+    const auto& p2b = image.posToBlockIDsLevels();
+    const auto& dims = image.imageDimensionsLevels();
+    const auto& vox = image.voxelWorldSizesLevels();
+    CHECK_GE(pdb.size(), levelCount) << "Insufficient pageDirectoryBases for requested levels: have=" << pdb.size()
+                                     << " need=" << levelCount;
+    CHECK_GE(p2b.size(), levelCount) << "Insufficient posToBlockIDsLevels for requested levels: have=" << p2b.size()
+                                     << " need=" << levelCount;
+    CHECK_GE(dims.size(), levelCount) << "Insufficient imageDimensionsLevels for requested levels: have=" << dims.size()
+                                      << " need=" << levelCount;
+    CHECK_GE(vox.size(), levelCount) << "Insufficient voxelWorldSizesLevels for requested levels: have=" << vox.size()
+                                     << " need=" << levelCount;
+  }
   auto pageData = buildPageDataBuffer(image, channelIndex, zeToScreenPixelVoxelSize, levelCount);
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("updatePageDescriptors: page data size={} bytes", pageData.size());
+  }
 
   if (!resources.pageDataBuffer || resources.pageDataCapacity < pageData.size()) {
     resources.pageDataBuffer = m_backend.device().createBuffer(pageData.size(),
                                                                vk::BufferUsageFlagBits::eUniformBuffer,
                                                                vk::MemoryPropertyFlagBits::eHostVisible |
                                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
+    if (VLOG_IS_ON(2)) {
+      VLOG(2) << fmt::format("updatePageDescriptors: allocated page UBO buffer size={}", pageData.size());
+    }
   }
 
   CHECK(resources.pageDataBuffer) << "Failed to allocate Vulkan raycaster paging uniform buffer.";
 
   resources.pageDataBuffer->copyData(pageData.data(), pageData.size());
   resources.pageDataCapacity = pageData.size();
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << "updatePageDescriptors: copied page data to UBO";
+  }
 
   // Prepare/update a persistent page descriptor set that binds the page UBO (binding=2).
   if (!resources.persistentPageDescriptor) {
@@ -1436,6 +1831,12 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
     resources.staticDescriptor->updateTexture(2, *imageCache, m_backend.defaultSampler());
     resources.staticDescriptor->updateTexture(3, volume, m_backend.defaultSampler());
     resources.staticDescriptor->updateTexture(4, transfer, m_backend.defaultSampler());
+    // Track currently bound textures so we can enforce sampled layouts before use.
+    resources.boundPageDirectoryTex = pageDirectory;
+    resources.boundPageTableTex = pageTable;
+    resources.boundImageCacheTex = imageCache;
+    resources.boundVolumeTex = &volume;
+    resources.boundTransferTex = &transfer;
 
     // Schedule persistent creation after frame completion
     auto* backendPtr = &m_backend;
@@ -1504,9 +1905,32 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
       resources.pageDescriptor = m_backend.allocateOverrideDescriptorSet(**m_pageSetLayout);
     }
     CHECK(resources.pageDescriptor) << "Failed to allocate Vulkan raycaster page descriptor set.";
+    if (VLOG_IS_ON(2)) {
+      VLOG(2) << fmt::format(
+        "updatePageDescriptors: writing page UBO into override DS=0x{:x}",
+        reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(resources.pageDescriptor->descriptorSet())));
+    }
     resources.pageDescriptor->updateUniformBuffer(2, *resources.pageDataBuffer);
+    if (VLOG_IS_ON(2)) {
+      VLOG(2) << "updatePageDescriptors: wrote page UBO into override descriptor";
+    }
   }
 
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format(
+      "updatePageDescriptors done: levelCount={} staticDS={} dynamicDS={} pageDS={}",
+      levelCount,
+      reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(
+        resources.persistentStaticDescriptor
+          ? resources.persistentStaticDescriptor->descriptorSet()
+          : (resources.staticDescriptor ? resources.staticDescriptor->descriptorSet() : vk::DescriptorSet{}))),
+      reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(
+        resources.pagedDescriptor ? resources.pagedDescriptor->descriptorSet() : vk::DescriptorSet{})),
+      reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(
+        resources.persistentPageDescriptor
+          ? resources.persistentPageDescriptor->descriptorSet()
+          : (resources.pageDescriptor ? resources.pageDescriptor->descriptorSet() : vk::DescriptorSet{}))));
+  }
   resources.levelCount = levelCount;
   return true;
 }
@@ -1527,6 +1951,14 @@ ZVulkanImgRaycasterPipelineContext::collectProgressiveDescriptorSets(ChannelReso
       ? resources.persistentPageDescriptor->descriptorSet()
       : (resources.pageDescriptor ? resources.pageDescriptor->descriptorSet() : vk::DescriptorSet{});
   CHECK(pageSet) << "Vulkan raycaster progressive page descriptor missing.";
+
+  if (VLOG_IS_ON(2)) {
+    const auto dynSet = resources.pagedDescriptor->descriptorSet();
+    VLOG(2) << fmt::format("collectProgressiveDescriptorSets: static=0x{:x} dynamic=0x{:x} page=0x{:x}",
+                           reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(staticSet)),
+                           reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(dynSet)),
+                           reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(pageSet)));
+  }
 
   return {staticSet, resources.pagedDescriptor->descriptorSet(), pageSet};
 }
@@ -1578,7 +2010,8 @@ void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& render
     attachment.image = texture->image();
     attachment.view = layerView;
     attachment.format = texture->format();
-    attachment.initialLayout = texture->layout();
+    // Begin from UNDEFINED since loadOp=CLEAR; avoid relying on prior recorded transitions.
+    attachment.initialLayout = vk::ImageLayout::eUndefined;
     // End entry/exit color in sampled layout for downstream reads
     attachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     attachment.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})};
@@ -3166,6 +3599,23 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   const glm::uvec2 outputSize = payload.outputSize;
   CHECK(outputSize.x > 0u && outputSize.y > 0u) << "Vulkan raycaster progressive path requires non-zero output size.";
 
+  if (FLAGS_atlas_vk_debug_raycaster_dump) {
+    VLOG(1) << fmt::format(
+      "Raycaster draw ctx: viewport=({}, {}, {}x{}) scissor=({}, {}, {}x{}) out={}x{} channels={} activeChannel={}",
+      static_cast<int>(viewport.x),
+      static_cast<int>(viewport.y),
+      static_cast<int>(viewport.width),
+      static_cast<int>(viewport.height),
+      scissor.offset.x,
+      scissor.offset.y,
+      scissor.extent.width,
+      scissor.extent.height,
+      static_cast<int>(outputSize.x),
+      static_cast<int>(outputSize.y),
+      payload.visibleChannels.size(),
+      channelIndex);
+  }
+
   ensureProgressiveLayerTargets(outputSize, channelCount, payload.progressiveGeneration, cmd);
   ZVulkanTexture* layerColor = m_progressiveLayerColor.get();
   ZVulkanTexture* layerDepth = m_progressiveLayerDepth.get();
@@ -3183,15 +3633,43 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   float zeToZW_a = farClip * nearClip / (farClip - nearClip);
   float zeToZW_b = 0.5f * (farClip + nearClip) / (farClip - nearClip) + 0.5f;
 
-  // Ensure previous-round data is ready for sampling.
+  // Ensure previous-round data is ready for sampling (all are color images).
   entryTexture->transitionLayout(cmd, entryTexture->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   lastColor->transitionLayout(cmd, lastColor->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
-  const auto [lastDepthReadLayout, lastDepthDescAspect] = depthReadDescriptorLayoutAndAspect(*lastDepth);
-  const auto lastDepthBarrierAspect = depthReadBarrierAspect(*lastDepth);
-  lastDepth->transitionLayout(cmd, lastDepth->layout(), lastDepthReadLayout, lastDepthBarrierAspect);
+  // lastDepth is a color-format accumulation buffer (not a depth image). Sample as shader-read color.
+  lastDepth->transitionLayout(cmd, lastDepth->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   entryTexture->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
   lastColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-  lastDepth->setDescriptorLayout(lastDepthReadLayout);
+  lastDepth->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+
+  if (FLAGS_atlas_vk_debug_raycaster_dump) {
+    auto dumpTex = [](const char* tag, ZVulkanTexture* t) {
+      if (!t) {
+        return;
+      }
+      VLOG(1) << fmt::format("Bind {}: tex=0x{:x} fmt={} size={}x{}x{} layout={} descrLayout={} mips={} layers={}",
+                             tag,
+                             reinterpret_cast<uint64_t>(t),
+                             enumOrUnderlying(t->format(), 16),
+                             t->width(),
+                             t->height(),
+                             t->depth(),
+                             enumOrUnderlying(t->layout(), 16),
+                             enumOrUnderlying(t->descriptorLayout(), 16),
+                             t->mipLevels(),
+                             t->arrayLayers());
+    };
+    dumpTex("entryExit", entryTexture);
+    dumpTex("lastDepth", lastDepth);
+    dumpTex("lastColor", lastColor);
+    dumpTex("layerColor", layerColor);
+    dumpTex("layerDepth", layerDepth);
+    dumpTex("pageDirectory", resources.boundPageDirectoryTex);
+    dumpTex("pageTable", resources.boundPageTableTex);
+    dumpTex("imageCache", resources.boundImageCacheTex);
+    dumpTex("volume", resources.boundVolumeTex);
+    dumpTex("transfer", resources.boundTransferTex);
+  }
 
   updateChannelFastDescriptors(resources,
                                payload,
@@ -3230,6 +3708,24 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   BlockIdPipelineKey blockKey{resources.levelCount, blockAttachmentCount, blockFormat};
   auto& blockPipeline = ensureBlockIdPipeline(blockKey, blockFormat);
 
+  // Let the dynamic rendering pre-transition handle attachment layouts.
+  // Ensure sampled inputs for block-ID pass are in sampled layout.
+  auto ensureSampled = [&](ZVulkanTexture* tex) {
+    if (!tex) {
+      return;
+    }
+    const vk::ImageLayout desired = vk::ImageLayout::eShaderReadOnlyOptimal;
+    if (tex->layout() != desired) {
+      tex->transitionLayout(cmd, tex->layout(), desired);
+    }
+    tex->setDescriptorLayout(desired);
+  };
+  ensureSampled(resources.boundPageDirectoryTex);
+  ensureSampled(resources.boundPageTableTex);
+  ensureSampled(resources.boundImageCacheTex);
+  ensureSampled(resources.boundVolumeTex);
+  ensureSampled(resources.boundTransferTex);
+
   std::vector<ZVulkanAttachmentInfo> blockAttachments;
   blockAttachments.reserve(blockAttachmentCount);
   for (uint32_t att = 0; att < blockAttachmentCount; ++att) {
@@ -3241,15 +3737,18 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     attachment.image = texture->image();
     attachment.view = texture->imageView();
     attachment.format = texture->format();
-    attachment.initialLayout = texture->layout();
-    attachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    // Begin from UNDEFINED; recorder will transition to COLOR_ATTACHMENT_OPTIMAL
+    attachment.initialLayout = vk::ImageLayout::eUndefined;
+    // Make the block-ID image ready for sampling in the compute compaction pass
+    attachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     attachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
     attachment.loadOp = vk::AttachmentLoadOp::eClear;
     attachment.storeOp = vk::AttachmentStoreOp::eStore;
     attachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
-    attachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+    // After rendering, transition for compute read
+    attachment.dstStage = vk::PipelineStageFlagBits2::eComputeShader;
     attachment.srcAccess = {};
-    attachment.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
+    attachment.dstAccess = vk::AccessFlagBits2::eShaderRead;
     attachment.aspect = vk::ImageAspectFlagBits::eColor;
     attachment.trackingTexture = texture;
     blockAttachments.push_back(attachment);
@@ -3265,6 +3764,15 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   {
     float s, i, l, a, b;
   } pcB{payload.samplingRate, payload.isoValue, payload.localMIPThreshold, zeToZW_a, zeToZW_b};
+
+  if (FLAGS_atlas_vk_debug_raycaster_dump) {
+    VLOG(1) << fmt::format("BlockID push: samplingRate={:.6f} iso={:.6f} localMipTh={:.6f} zeA={:.6f} zeB={:.6f}",
+                           pcB.s,
+                           pcB.i,
+                           pcB.l,
+                           pcB.a,
+                           pcB.b);
+  }
 
   ZVulkanGraphicsPassSpec blockSpec{};
   blockSpec.renderArea = blockRect;
@@ -3286,30 +3794,15 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   blockSpec.requirePushConstants = true;
 
   recorder.recordGraphicsPass(blockSpec);
-
-  std::vector<uint32_t> blockIds;
-  for (uint32_t att = 0; att < blockAttachmentCount; ++att) {
-    auto* texture = payload.blockIdLease->colorAttachment(att);
-    if (!texture) {
-      continue;
-    }
-    const vk::Extent3D extent = texture->extent();
-    const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
-    resources.blockIdScratch.resize(pixelCount * 4u);
-    texture->downloadData(resources.blockIdScratch.data(), resources.blockIdScratch.size() * sizeof(uint32_t));
-    blockIds.insert(blockIds.end(), resources.blockIdScratch.begin(), resources.blockIdScratch.end());
+  // Compact block-ID image(s) via compute and schedule a small buffer readback
+  if (!FLAGS_atlas_vk_disable_blockid_compaction) {
+    recordBlockIdCompaction(renderer, batch, payload, cmd);
+  } else if (VLOG_IS_ON(1)) {
+    VLOG(1) << "Block-ID compaction disabled by flag";
   }
 
-  auto missingBlocks = collectUniqueBlockIDs(blockIds);
-  bool lastRound = missingBlocks.empty();
-
-  if (!missingBlocks.empty()) {
-    auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-    ZBenchTimer uploadTimer(fmt::format("vulkan_raycaster_channel_{}", channelIndex));
-    bool fullyCached =
-      payload.image->updateAndUploadPageDirectoryCaches(missingBlocks, channelIndex, cancellationToken, uploadTimer);
-    lastRound = lastRound && fullyCached;
-  }
+  // Streaming continues; do not mark last round prematurely.
+  bool lastRound = false;
 
   // ---------------- Progressive raycast pass ----------------
   vulkan::AttachmentFormats progressiveFormats;
@@ -3321,12 +3814,23 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                                         localMip,
                                         resultOpaque};
   progressiveKey.levelCount = resources.levelCount;
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format(
+      "ensureProgressivePipeline: color0Fmt={} color1Fmt={} levelCount={} mode={} localMip={} opaque={}",
+      enumOrUnderlying(progressiveKey.colorFormat, 16),
+      enumOrUnderlying(progressiveKey.accumulatorFormat, 16),
+      progressiveKey.levelCount,
+      static_cast<int>(progressiveKey.mode),
+      progressiveKey.localMip ? 1 : 0,
+      progressiveKey.resultOpaque ? 1 : 0);
+  }
   auto& progressivePipeline = ensureProgressivePipeline(progressiveKey, progressiveFormats);
 
   ZVulkanAttachmentInfo colorAttachment{};
   colorAttachment.image = currentColor->image();
   colorAttachment.view = currentColor->imageView();
   colorAttachment.format = currentColor->format();
+  // Use tracked layout; pre-transition recorded above keeps validation consistent
   colorAttachment.initialLayout = currentColor->layout();
   colorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
@@ -3359,7 +3863,12 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   progressiveAttachments.push_back(colorAttachment);
   progressiveAttachments.push_back(accumAttachment);
 
+  // Collect descriptor sets for progressive raycast. Expect exactly 3.
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << "about to collect progressive descriptor sets";
+  }
   std::vector<vk::DescriptorSet> progressiveSets = collectProgressiveDescriptorSets(resources);
+  CHECK_EQ(progressiveSets.size(), 3u) << "Progressive raycaster requires exactly 3 descriptor sets";
   struct RayPC2
   {
     float s, i, l, a, b;
@@ -3384,14 +3893,35 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   progressiveSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
   progressiveSpec.requirePushConstants = true;
 
+  if (FLAGS_atlas_vk_debug_raycaster_dump) {
+    // Rough CPU-side estimate of step size for diagnostic purposes
+    glm::vec3 rayVector = glm::vec3(0.0f);
+    // Not available here directly: use unit estimate; detailed logging already in page UBO
+    VLOG(1) << fmt::format("Raycaster push: samplingRate={:.6f} iso={:.6f} localMipTh={:.6f} zeA={:.6f} zeB={:.6f}",
+                           pcP.s,
+                           pcP.i,
+                           pcP.l,
+                           pcP.a,
+                           pcP.b);
+  }
+
+  if (VLOG_IS_ON(2)) {
+    const auto& sets = progressiveSpec.descriptorSets;
+    VLOG(2) << fmt::format(
+      "record progressive pass: pipeline=0x{:x} layout=0x{:x} ds0=0x{:x} ds1=0x{:x} ds2=0x{:x}",
+      reinterpret_cast<uintptr_t>(static_cast<VkPipeline>(progressivePipeline.pipeline->pipeline())),
+      reinterpret_cast<uintptr_t>(static_cast<VkPipelineLayout>(progressivePipeline.pipeline->pipelineLayout())),
+      reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(sets.size() > 0 ? sets[0] : vk::DescriptorSet{})),
+      reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(sets.size() > 1 ? sets[1] : vk::DescriptorSet{})),
+      reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(sets.size() > 2 ? sets[2] : vk::DescriptorSet{})));
+  }
   recorder.recordGraphicsPass(progressiveSpec);
 
   currentColor->transitionLayout(cmd, currentColor->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
-  const auto [currentDepthReadLayout, currentDepthDescAspect] = depthReadDescriptorLayoutAndAspect(*currentDepth);
-  const auto currentDepthBarrierAspect = depthReadBarrierAspect(*currentDepth);
-  currentDepth->transitionLayout(cmd, currentDepth->layout(), currentDepthReadLayout, currentDepthBarrierAspect);
+  // currentDepth is also a color-format accumulation buffer. Sample as shader-read color.
+  currentDepth->transitionLayout(cmd, currentDepth->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   currentColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-  currentDepth->setDescriptorLayout(currentDepthReadLayout);
+  currentDepth->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
   // Copy the current accumulation into the persistent layer array slice
   layerColor->transitionLayout(cmd, layerColor->layout(), vk::ImageLayout::eColorAttachmentOptimal);
@@ -3411,8 +3941,12 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   }
   CHECK(m_copyDescriptor != nullptr) << "Raycaster layer copy: override descriptor allocation failed (fatal)";
   m_copyDescriptor->updateTexture(0, *currentColor, m_backend.defaultSampler());
-  const auto [copyDepthLayout, copyDepthAspect] = depthReadDescriptorLayoutAndAspect(*currentDepth);
-  m_copyDescriptor->updateTexture(1, *currentDepth, m_backend.defaultSampler(), copyDepthLayout, copyDepthAspect);
+  // Bind currentDepth as a regular color sampler (shader-read-only layout, color aspect).
+  m_copyDescriptor->updateTexture(1,
+                                  *currentDepth,
+                                  m_backend.defaultSampler(),
+                                  vk::ImageLayout::eShaderReadOnlyOptimal,
+                                  vk::ImageAspectFlags{});
 
   ZVulkanAttachmentInfo layerColorAttachment{};
   auto layerColorView = layerColor->layerImageView(activeChannelIndex);
@@ -3422,7 +3956,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerColorAttachment.image = layerColor->image();
   layerColorAttachment.view = layerColorView;
   layerColorAttachment.format = layerColor->format();
-  layerColorAttachment.initialLayout = layerColor->layout();
+  layerColorAttachment.initialLayout = vk::ImageLayout::eUndefined;
   layerColorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   layerColorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
   layerColorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
@@ -3479,13 +4013,9 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   recorder.recordGraphicsPass(copySpec);
 
-  layerColor->transitionLayout(cmd, vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-  layerColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-  const auto [layerDepthReadLayout, layerDepthDescAspect] = depthReadDescriptorLayoutAndAspect(*layerDepth);
-  const auto [layerAttachLayout, _layerAttachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
-  const auto layerBarrierAspect = depthReadBarrierAspect(*layerDepth);
-  layerDepth->transitionLayout(cmd, layerAttachLayout, layerDepthReadLayout, layerBarrierAspect);
-  layerDepth->setDescriptorLayout(layerDepthReadLayout);
+  // No explicit post-pass transitions here: recorder sets final layouts and
+  // updates trackingTexture for both attachments (color: ShaderReadOnly,
+  // depth: DepthReadOnly). Avoid duplicating with potentially stale oldLayout.
 
   auto buildColorAttachment = [&](const AttachmentDesc& attachment) -> std::optional<ZVulkanAttachmentInfo> {
     if (!attachment.handle.valid()) {
@@ -3598,3 +4128,22 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 }
 
 } // namespace nim
+namespace {
+// Read SPIR-V file utility (local copy to avoid changing shader subsystem)
+std::vector<uint32_t> readSpirvFile(const std::string& path)
+{
+  VLOG(2) << "opening SPIR-V file: " << path;
+  std::ifstream file(path, std::ios::ate | std::ios::binary);
+  if (!file) {
+    throw nim::ZException(fmt::format("Failed to open SPIR-V file: {}", path));
+  }
+  const size_t fileSize = static_cast<size_t>(file.tellg());
+  if (fileSize % 4 != 0) {
+    throw nim::ZException(fmt::format("Invalid SPIR-V size (must be multiple of 4): {}", path));
+  }
+  std::vector<uint32_t> buffer(fileSize / 4);
+  file.seekg(0);
+  file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
+  return buffer;
+}
+} // namespace

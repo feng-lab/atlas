@@ -47,37 +47,65 @@ vk::ImageCreateFlags createFlagsForView(vk::ImageViewType viewType)
   return flags;
 }
 
+bool isAspectValidForFormat(vk::Format format, vk::ImageAspectFlags aspect)
+{
+  // Allow subset of the permitted aspects for combined depth-stencil formats.
+  switch (format) {
+    case vk::Format::eD16Unorm:
+    case vk::Format::eX8D24UnormPack32:
+    case vk::Format::eD32Sfloat:
+      return aspect == vk::ImageAspectFlagBits::eDepth;
+    case vk::Format::eS8Uint:
+      return aspect == vk::ImageAspectFlagBits::eStencil;
+    case vk::Format::eD16UnormS8Uint:
+    case vk::Format::eD24UnormS8Uint:
+    case vk::Format::eD32SfloatS8Uint: {
+      const auto allowed = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+      return (aspect & ~allowed) == vk::ImageAspectFlags{}; // only depth/stencil bits allowed
+    }
+    default: // all color formats
+      return aspect == vk::ImageAspectFlagBits::eColor;
+  }
+}
+
 struct LayoutState
 {
-  vk::AccessFlags access;
-  vk::PipelineStageFlags stage;
+  vk::AccessFlags2 access;
+  vk::PipelineStageFlags2 stage;
 };
 
 LayoutState layoutStateFor(vk::ImageLayout layout)
 {
-  using vk::AccessFlagBits;
-  using vk::PipelineStageFlagBits;
+  using vk::AccessFlagBits2;
+  using vk::PipelineStageFlagBits2;
 
   switch (layout) {
     case vk::ImageLayout::eUndefined:
-      return {vk::AccessFlags{}, PipelineStageFlagBits::eTopOfPipe};
+      return {vk::AccessFlags2{}, PipelineStageFlagBits2::eTopOfPipe};
     case vk::ImageLayout::eGeneral:
-      return {AccessFlagBits::eShaderRead | AccessFlagBits::eShaderWrite, PipelineStageFlagBits::eAllCommands};
+      return {AccessFlagBits2::eShaderRead | AccessFlagBits2::eShaderWrite, PipelineStageFlagBits2::eAllCommands};
     case vk::ImageLayout::eColorAttachmentOptimal:
-      return {AccessFlagBits::eColorAttachmentWrite, PipelineStageFlagBits::eColorAttachmentOutput};
+      return {AccessFlagBits2::eColorAttachmentWrite, PipelineStageFlagBits2::eColorAttachmentOutput};
     case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-      return {AccessFlagBits::eDepthStencilAttachmentRead | AccessFlagBits::eDepthStencilAttachmentWrite,
-              PipelineStageFlagBits::eEarlyFragmentTests | PipelineStageFlagBits::eLateFragmentTests};
+      return {AccessFlagBits2::eDepthStencilAttachmentRead | AccessFlagBits2::eDepthStencilAttachmentWrite,
+              PipelineStageFlagBits2::eEarlyFragmentTests | PipelineStageFlagBits2::eLateFragmentTests};
+    case vk::ImageLayout::eDepthAttachmentOptimal:
+      return {AccessFlagBits2::eDepthStencilAttachmentRead | AccessFlagBits2::eDepthStencilAttachmentWrite,
+              PipelineStageFlagBits2::eEarlyFragmentTests | PipelineStageFlagBits2::eLateFragmentTests};
+    case vk::ImageLayout::eDepthReadOnlyOptimal:
+      return {AccessFlagBits2::eDepthStencilAttachmentRead,
+              PipelineStageFlagBits2::eEarlyFragmentTests | PipelineStageFlagBits2::eLateFragmentTests};
     case vk::ImageLayout::eShaderReadOnlyOptimal:
-      return {AccessFlagBits::eShaderRead, PipelineStageFlagBits::eAllGraphics | PipelineStageFlagBits::eComputeShader};
+      return {AccessFlagBits2::eShaderRead,
+              PipelineStageFlagBits2::eAllGraphics | PipelineStageFlagBits2::eComputeShader};
     case vk::ImageLayout::eTransferDstOptimal:
-      return {AccessFlagBits::eTransferWrite, PipelineStageFlagBits::eTransfer};
+      return {AccessFlagBits2::eTransferWrite, PipelineStageFlagBits2::eTransfer};
     case vk::ImageLayout::eTransferSrcOptimal:
-      return {AccessFlagBits::eTransferRead, PipelineStageFlagBits::eTransfer};
+      return {AccessFlagBits2::eTransferRead, PipelineStageFlagBits2::eTransfer};
     case vk::ImageLayout::ePreinitialized:
-      return {AccessFlagBits::eHostWrite, PipelineStageFlagBits::eHost};
+      return {AccessFlagBits2::eHostWrite, PipelineStageFlagBits2::eHost};
     default:
-      return {vk::AccessFlags{}, PipelineStageFlagBits::eAllCommands};
+      return {vk::AccessFlags2{}, PipelineStageFlagBits2::eAllCommands};
   }
 }
 
@@ -448,25 +476,31 @@ void ZVulkanTexture::transitionLayout(vk::raii::CommandBuffer& cmdBuffer,
   const auto srcState = layoutStateFor(oldLayout);
   const auto dstState = layoutStateFor(newLayout);
 
-  vk::ImageMemoryBarrier barrier{};
-  barrier.oldLayout = oldLayout;
-  barrier.newLayout = newLayout;
-  barrier.srcAccessMask = srcState.access;
-  barrier.dstAccessMask = dstState.access;
-  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = m_image;
-  barrier.subresourceRange.aspectMask = aspect;
-  barrier.subresourceRange.baseMipLevel = 0;
-  barrier.subresourceRange.levelCount = m_mipLevels;
-  barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount = m_arrayLayers;
+  // Validate aspect/format compatibility early to trip fast if misused.
+  CHECK(isAspectValidForFormat(m_format, aspect))
+    << "Invalid aspect for format in transitionLayout: aspect=0x" << std::hex << static_cast<uint32_t>(aspect)
+    << std::dec << " fmt=" << enumOrUnderlying(m_format, 16);
+
+  vk::ImageMemoryBarrier2 barrier{
+    .srcStageMask = srcState.stage,
+    .srcAccessMask = srcState.access,
+    .dstStageMask = dstState.stage,
+    .dstAccessMask = dstState.access,
+    .oldLayout = oldLayout,
+    .newLayout = newLayout,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .image = m_image,
+    .subresourceRange = vk::ImageSubresourceRange{aspect, 0, m_mipLevels, 0, m_arrayLayers}
+  };
 
   VLOG(2) << "VK layout transition image=" << static_cast<void*>(m_image) << " old=" << enumOrUnderlying(oldLayout)
           << " new=" << enumOrUnderlying(newLayout) << " aspect=0x" << std::hex << static_cast<uint32_t>(aspect)
           << std::dec << " layers=" << m_arrayLayers << " mips=" << m_mipLevels;
 
-  cmdBuffer.pipelineBarrier(srcState.stage, dstState.stage, {}, nullptr, nullptr, barrier);
+  vk::DependencyInfo dep{.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier};
+  cmdBuffer.pipelineBarrier2(dep);
+
   // Update tracked layout regardless of aspect selection; callers often
   // transition a single aspect on D/S images, and we still need an accurate
   // logical current layout for validation and descriptor restores.
@@ -492,6 +526,9 @@ vk::DescriptorImageInfo ZVulkanTexture::descriptorInfo(vk::ImageLayout layoutOve
 
   const vk::ImageAspectFlags resolvedAspect =
     (aspectOverride == vk::ImageAspectFlags{}) ? m_descriptorAspectMask : aspectOverride;
+  CHECK(isAspectValidForFormat(m_format, (resolvedAspect == vk::ImageAspectFlags{} ? m_aspectMask : resolvedAspect)))
+    << "Invalid aspect for format in descriptorInfo: requested=0x" << std::hex << static_cast<uint32_t>(resolvedAspect)
+    << std::dec << " fmt=" << enumOrUnderlying(m_format, 16);
 
   vk::DescriptorImageInfo info{};
   info.imageView = imageViewForAspect(resolvedAspect);

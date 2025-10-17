@@ -100,11 +100,12 @@ inline void appendScalar(std::vector<uint8_t>& buffer, float value)
 
 std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVoxelSize)
 {
-  const uint32_t levelCount = static_cast<uint32_t>(image.numLevels());
+  (void)channel; // channel not needed for addrNorm when using imageCacheSize
+  uint32_t levelCount = static_cast<uint32_t>(image.numLevels());
   CHECK(levelCount <= kMaxPagingLevels) << "Unsupported paging level count: " << levelCount;
 
   std::vector<uint8_t> data;
-  data.reserve((levelCount * 4 + 4) * sizeof(glm::vec4));
+  data.reserve(256);
 
   const auto& pageDirectoryBases = image.pageDirectoryBases();
   const auto& imageDimensions = image.imageDimensionsLevels();
@@ -115,28 +116,22 @@ std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image, size_t channel, fl
   CHECK_EQ(voxelWorldSizes.size(), levelCount);
   CHECK_EQ(posToBlockIDs.size(), levelCount);
 
-  for (uint32_t level = 0; level < levelCount; ++level) {
-    appendUvec3(data, pageDirectoryBases[level]);
-  }
-
+  // Fixed header in std140: ptb, imageBlock, addrNorm, ze2px (each aligned to 16B)
   appendUvec3(data, image.pageTableBlockSize());
-
-  for (uint32_t level = 0; level < levelCount; ++level) {
-    appendUvec3(data, imageDimensions[level]);
-  }
-
-  for (uint32_t level = 0; level < levelCount; ++level) {
-    appendScalar(data, voxelWorldSizes[level]);
-  }
-
   appendUvec3(data, image.imageBlockSize());
-
-  const glm::vec3 addressToNorm = image.imageAddressToNormalizedTextureCoord(channel);
-  appendVec3(data, addressToNorm);
+  const glm::uvec3 cacheSize = image.imageCacheSize();
+  CHECK(cacheSize.x > 0u && cacheSize.y > 0u && cacheSize.z > 0u)
+    << "Invalid image cache size: " << cacheSize.x << ", " << cacheSize.y << ", " << cacheSize.z;
+  const glm::vec3 addrNorm = 1.0f / glm::vec3(cacheSize);
+  appendVec3(data, addrNorm);
   appendScalar(data, zeToScreenPixelVoxelSize);
 
+  // Per-level (grouped): dirBase, dims, posToIDs, voxelWorld
   for (uint32_t level = 0; level < levelCount; ++level) {
+    appendUvec3(data, pageDirectoryBases[level]);
+    appendUvec3(data, imageDimensions[level]);
     appendUvec3(data, posToBlockIDs[level]);
+    appendScalar(data, voxelWorldSizes[level]);
   }
 
   return data;
