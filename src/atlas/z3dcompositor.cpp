@@ -144,7 +144,7 @@ recordInVulkanFrame(Z3DRendererBase& renderer, const std::function<void()>& reco
   // (pending already applied above)
   const bool startedHere = !renderer.isVulkanFrameActive();
   if (startedHere) {
-    renderer.beginVulkanFrame();
+    renderer.beginVulkanFrame(label);
   }
   auto endGuard = folly::makeGuard([&renderer, startedHere]() {
     if (startedHere) {
@@ -3867,6 +3867,14 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
   CHECK(waBindings.colorHandles.size() >= 2 && waBindings.surface.colorAttachments.size() >= 2)
     << "Weighted average Vulkan target incomplete.";
 
+  // Diagnostics: summarize WA init targets and inputs
+  VLOG(1) << fmt::format("WA init: waLease colors[0]=0x{:x} colors[1]=0x{:x} size={}x{} depthParam=0x{:x}",
+                         waBindings.colorHandles[0].id,
+                         waBindings.colorHandles[1].id,
+                         targetSize.x,
+                         targetSize.y,
+                         depthAttachmentHandle.valid() ? depthAttachmentHandle.id : 0ull);
+
   auto configureSurface = [&](RendererFrameState::ActiveSurface surface) {
     for (auto& attachment : surface.colorAttachments) {
       attachment.loadOp = LoadOp::Clear;
@@ -3959,6 +3967,7 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
       // 2) Image layers: sample from filters' transparent leases using WA image init copy
       if (!imageLayers.empty()) {
         m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
+        VLOG(1) << fmt::format("WA init: merging {} image layer(s)", imageLayers.size());
         for (const auto& layer : imageLayers) {
           const auto& colorDesc = layer.colorAttachment;
           const auto& depthDesc = layer.depthAttachment;
@@ -3968,6 +3977,9 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
           if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
             continue;
           }
+          VLOG(1) << fmt::format("WA init: texture_copy layer color=0x{:x} depth=0x{:x}",
+                                 colorDesc.handle.id,
+                                 depthDesc.handle.id);
           // WA image init copy: do not flip
           m_textureCopyRenderer.setFlipY(false);
           m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
@@ -4460,6 +4472,12 @@ std::vector<Z3DCompositorImageLayer> Z3DCompositor::collectNonOpaqueImageLayers(
       layer.glDepthTexture = target.attachment(GL_DEPTH_ATTACHMENT);
     }
 
+    if (useVulkan) {
+      VLOG(1) << fmt::format("ImageLayer collected: filter={} color=0x{:x} depth=0x{:x}",
+                             vf->className().toStdString(),
+                             layer.colorAttachment.handle.id,
+                             layer.depthAttachment.handle.id);
+    }
     layers.push_back(layer);
   }
   return layers;

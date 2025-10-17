@@ -602,6 +602,14 @@ void ZVulkanContext::createLogicalDevice()
   addRequiredExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, enabledExtensions, deviceExtensionProperties, true);
 #endif
 
+  // Optional: enable calibrated timestamps device extension when available
+  try {
+    auto devExtPropsAll = m_physicalDevices[0].enumerateDeviceExtensionProperties();
+    addRequiredExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, enabledExtensions, devExtPropsAll, true);
+  } catch (...) {
+    // Ignore; we'll fall back to uncalibrated traces if unavailable
+  }
+
   // Create the logical device
   vk::DeviceCreateInfo deviceCreateInfo{
     .pNext = &enabledPhysicalDeviceFeatures2,

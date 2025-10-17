@@ -225,6 +225,9 @@ private:
   };
   struct FrameResources
   {
+    // Aggregation keys for per-submission ingestion
+    uint64_t realFrameToken = 0;
+    uint32_t submissionId = 0;
     vk::raii::QueryPool queryPool{nullptr};
     vk::raii::QueryPool occlusionQueryPool{nullptr};
     std::vector<GpuScopeRecord> gpuScopes;
@@ -372,6 +375,8 @@ public:
   // Deliver first Vulkan frame to UI immediately after backend switch by
   // pumping the fence and executing deferred readback consumers once.
   bool m_pumpFenceAfterFirstSubmit = true;
+  // One-time log for calibrated timestamp domain support per device
+  bool m_loggedCalibrationInfo = false;
 
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
@@ -451,6 +456,9 @@ public:
 
   // TLS current backend pointer
   static thread_local Z3DRendererVulkanBackend* s_currentBackend;
+
+  // Submission index within a real-frame token
+  std::unordered_map<uint64_t, uint32_t> m_submissionCursor;
 };
 
 std::unique_ptr<Z3DRendererBackend> createVulkanRendererBackend();

@@ -1579,7 +1579,8 @@ void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& render
     attachment.view = layerView;
     attachment.format = texture->format();
     attachment.initialLayout = texture->layout();
-    attachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    // End entry/exit color in sampled layout for downstream reads
+    attachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     attachment.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})};
     attachment.loadOp = vk::AttachmentLoadOp::eClear;
     attachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -1938,7 +1939,8 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    // Produce color in sampled layout to avoid follow-up transitions
+    info.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
                                                                               attachment.clearValue.color.g,
                                                                               attachment.clearValue.color.b,
@@ -1970,7 +1972,8 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = attachLayout;
+    // After this pass, depth will be sampled in downstream composition/copy
+    info.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
     // Clear-on-first-use: ensure background depth is deterministic when no prior writes.
     // Track by VkImage per frame.
     const VkImage imgHandle = static_cast<VkImage>(texture.image());
@@ -2171,7 +2174,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     colorAttachment.view = colorView;
     colorAttachment.format = layerColor->format();
     colorAttachment.initialLayout = layerColor->layout();
-    colorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    colorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
     colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -2193,7 +2196,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     depthAttachment.view = depthView;
     depthAttachment.format = layerDepth->format();
     depthAttachment.initialLayout = layerDepth->layout();
-    depthAttachment.finalLayout = attachLayout;
+    depthAttachment.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
     depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
     depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -2454,7 +2457,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    info.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
                                                                               attachment.clearValue.color.g,
                                                                               attachment.clearValue.color.b,
@@ -2482,7 +2485,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = attachLayout;
+    info.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
     info.clearValue.depthStencil =
@@ -2641,7 +2644,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
     colorAttachment.view = colorView;
     colorAttachment.format = layerColor->format();
     colorAttachment.initialLayout = layerColor->layout();
-    colorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    colorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
     colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -2663,7 +2666,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
     depthAttachment.view = depthView;
     depthAttachment.format = layerDepth->format();
     depthAttachment.initialLayout = layerDepth->layout();
-    depthAttachment.finalLayout = attachLayout;
+    depthAttachment.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
     depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
     depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -2792,7 +2795,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    info.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
                                                                               attachment.clearValue.color.g,
                                                                               attachment.clearValue.color.b,
@@ -2820,7 +2823,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = attachLayout;
+    info.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
     info.clearValue.depthStencil =
@@ -2982,7 +2985,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
     colorAttachment.view = colorView;
     colorAttachment.format = layerColor->format();
     colorAttachment.initialLayout = layerColor->layout();
-    colorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    colorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
     colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -3004,7 +3007,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
     depthAttachment.view = depthView;
     depthAttachment.format = layerDepth->format();
     depthAttachment.initialLayout = layerDepth->layout();
-    depthAttachment.finalLayout = attachLayout;
+    depthAttachment.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
     depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
     depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -3325,7 +3328,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   colorAttachment.view = currentColor->imageView();
   colorAttachment.format = currentColor->format();
   colorAttachment.initialLayout = currentColor->layout();
-  colorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+  colorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
   colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
   colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -3341,7 +3344,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   accumAttachment.view = currentDepth->imageView();
   accumAttachment.format = currentDepth->format();
   accumAttachment.initialLayout = currentDepth->layout();
-  accumAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+  accumAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   accumAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
   accumAttachment.loadOp = vk::AttachmentLoadOp::eClear;
   accumAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -3420,7 +3423,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerColorAttachment.view = layerColorView;
   layerColorAttachment.format = layerColor->format();
   layerColorAttachment.initialLayout = layerColor->layout();
-  layerColorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+  layerColorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   layerColorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
   layerColorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
   layerColorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -3443,7 +3446,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerDepthAttachment.view = layerDepthView;
   layerDepthAttachment.format = layerDepth->format();
   layerDepthAttachment.initialLayout = layerDepth->layout();
-  layerDepthAttachment.finalLayout = attachLayout;
+  layerDepthAttachment.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
   layerDepthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
   layerDepthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
   layerDepthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -3495,7 +3498,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    info.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
     info.clearValue.color = vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,

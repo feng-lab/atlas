@@ -58,10 +58,10 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
 {
   const glm::uvec4 viewportRect = m_frameState.viewport;
 
-  LOG(INFO) << "appendBatch initial colors=" << batch.pass.colorAttachments.size()
-            << " depth=" << batch.pass.depthAttachment.has_value()
-            << " activeSurfaceColors=" << m_frameState.activeSurface.colorAttachments.size()
-            << " activeSurfaceHasDepth=" << m_frameState.activeSurface.depthAttachment.has_value();
+  VLOG(2) << "appendBatch initial colors=" << batch.pass.colorAttachments.size()
+          << " depth=" << batch.pass.depthAttachment.has_value()
+          << " activeSurfaceColors=" << m_frameState.activeSurface.colorAttachments.size()
+          << " activeSurfaceHasDepth=" << m_frameState.activeSurface.depthAttachment.has_value();
 
   if (batch.pass.viewport.extent == glm::vec2(0.0f) && viewportRect.z > 0u && viewportRect.w > 0u) {
     batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewportRect.x), static_cast<float>(viewportRect.y));
@@ -104,10 +104,10 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
     }
   }
 
-  LOG(INFO) << "appendBatch final colors=" << batch.pass.colorAttachments.size()
-            << " depth=" << batch.pass.depthAttachment.has_value() << " (active colors "
-            << m_frameState.activeSurface.colorAttachments.size() << " depth "
-            << m_frameState.activeSurface.depthAttachment.has_value() << ")";
+  VLOG(2) << "appendBatch final colors=" << batch.pass.colorAttachments.size()
+          << " depth=" << batch.pass.depthAttachment.has_value() << " (active colors "
+          << m_frameState.activeSurface.colorAttachments.size() << " depth "
+          << m_frameState.activeSurface.depthAttachment.has_value() << ")";
 
   m_cpuState.batches.push_back(std::move(batch));
 }

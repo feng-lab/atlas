@@ -242,7 +242,9 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    // End slice color outputs in sampled layout so downstream passes (e.g., WA/WB image resolve
+    // or texture-copy) can read without issuing a transition inside dynamic rendering.
+    info.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     info.clearValue.color = vk::ClearColorValue(std::array<float, 4>{attachment.clearValue.color.r,
                                                                      attachment.clearValue.color.g,
                                                                      attachment.clearValue.color.b,
@@ -269,7 +271,8 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     info.view = texture.imageView();
     info.format = texture.format();
     info.initialLayout = texture.layout();
-    info.finalLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+    // Depth is also sampled in downstream composition; prefer depth-read layout.
+    info.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
     info.clearValue.depthStencil =
       vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
@@ -426,7 +429,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     colorInfo.view = blockColor->imageView();
     colorInfo.format = blockColor->format();
     colorInfo.initialLayout = blockColor->layout();
-    colorInfo.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    colorInfo.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     colorInfo.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})};
     colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
     colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
@@ -546,7 +549,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     colorAttachment.view = colorView;
     colorAttachment.format = colorTarget.format();
     colorAttachment.initialLayout = colorTarget.layout();
-    colorAttachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    colorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
     colorAttachment.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})};
     colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
@@ -569,7 +572,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
         depthInfo.view = depthView;
         depthInfo.format = depthTarget->format();
         depthInfo.initialLayout = depthTarget->layout();
-        depthInfo.finalLayout = vk::ImageLayout::eDepthAttachmentOptimal;
+        depthInfo.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
         depthInfo.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
         depthInfo.loadOp = vk::AttachmentLoadOp::eClear;
         depthInfo.storeOp = vk::AttachmentStoreOp::eStore;

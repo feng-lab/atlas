@@ -62,6 +62,17 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   auto& depthTexture =
     vulkan::textureFromHandle(payload.depthAttachmentHandle, m_backend.device(), "texture-copy depth attachment");
 
+  VLOG(1) << fmt::format(
+    "TextureCopy inputs: color=0x{:x} layout={} descr={} fmt={} | depth=0x{:x} layout={} descr={} fmt={}",
+    payload.colorAttachmentHandle.id,
+    enumOrUnderlying(colorTexture.layout(), 16),
+    enumOrUnderlying(colorTexture.descriptorLayout(), 16),
+    enumOrUnderlying(colorTexture.format(), 16),
+    payload.depthAttachmentHandle.id,
+    enumOrUnderlying(depthTexture.layout(), 16),
+    enumOrUnderlying(depthTexture.descriptorLayout(), 16),
+    enumOrUnderlying(depthTexture.format(), 16));
+
   // Fullscreen quad with UVs
   m_vertexCount = 4;
 
