@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="620" viewBox="0 0 1080 620">
+  <style>
+    .title { font: 600 22px system-ui, sans-serif; }
+    .lane { font: 600 14px system-ui, sans-serif; }
+    .label { font: 13px system-ui, sans-serif; }
+    .box { fill: #fdfdfd; stroke: #c9d2df; }
+    .vline { stroke: #98a6b8; stroke-dasharray: 6 4; }
+    .arrow { stroke: #222; stroke-width: 2; marker-end: url(#arrowhead); fill: none; }
+    .note { fill: #fff8db; stroke: #d4b700; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#222" />
+    </marker>
+  </defs>
+
+  <text x="20" y="30" class="title">Dynamic Paging Sequence (One Progressive Round)</text>
+
+  <!-- Lanes -->
+  <g>
+    <rect x="40" y="50" width="180" height="40" class="box"/>
+    <text x="60" y="75" class="lane">Renderer (GL)</text>
+    <line x1="130" y1="100" x2="130" y2="600" class="vline"/>
+
+    <rect x="260" y="50" width="160" height="40" class="box"/>
+    <text x="275" y="75" class="lane">Z3DImg</text>
+    <line x1="340" y1="100" x2="340" y2="600" class="vline"/>
+
+    <rect x="450" y="50" width="160" height="40" class="box"/>
+    <text x="470" y="75" class="lane">ZImgPack</text>
+    <line x1="530" y1="100" x2="530" y2="600" class="vline"/>
+
+    <rect x="640" y="50" width="160" height="40" class="box"/>
+    <text x="665" y="75" class="lane">CPU Pool</text>
+    <line x1="720" y1="100" x2="720" y2="600" class="vline"/>
+
+    <rect x="830" y="50" width="180" height="40" class="box"/>
+    <text x="860" y="75" class="lane">GPU (GL)</text>
+    <line x1="920" y1="100" x2="920" y2="600" class="vline"/>
+  </g>
+
+  <!-- Block‑ID pass note -->
+  <rect x="70" y="110" width="190" height="34" class="note"/>
+  <text x="80" y="132" class="label">Block‑ID pass (screen quad)</text>
+
+  <!-- IDs to Z3DImg -->
+  <path d="M 130 150 L 340 150" class="arrow"/>
+  <text x="160" y="144" class="label">missing block IDs</text>
+
+  <!-- Update caches call -->
+  <path d="M 340 180 L 530 180" class="arrow"/>
+  <text x="360" y="174" class="label">updateAndUploadPageDirectoryCaches()</text>
+
+  <!-- readRegionToImgAsync -->
+  <path d="M 530 220 L 720 220" class="arrow"/>
+  <text x="540" y="214" class="label">spawn tile reads</text>
+
+  <path d="M 720 250 L 530 250" class="arrow"/>
+  <text x="610" y="244" class="label">assembled tmp ZImg</text>
+
+  <!-- upload to atlas -->
+  <path d="M 340 300 L 920 300" class="arrow"/>
+  <text x="430" y="294" class="label">updateSubImage → image_cache (atlas)</text>
+
+  <!-- update page table + directory -->
+  <path d="M 340 330 L 920 330" class="arrow"/>
+  <text x="390" y="324" class="label">update page_table_cache + page_directory</text>
+
+  <!-- Raycaster pass using caches -->
+  <path d="M 130 390 L 920 390" class="arrow"/>
+  <text x="260" y="384" class="label">Raycaster pass: entry/exit + accumulators + caches</text>
+
+  <!-- Swap accumulators note -->
+  <rect x="70" y="430" width="220" height="34" class="note"/>
+  <text x="80" y="452" class="label">Swap accumulators; next round if needed</text>
+
+  <!-- Footer notes -->
+  <text x="40" y="570" class="label">• Early‑out on empty bricks via m_blockInfo; region and tile caches avoid redundant I/O.</text>
+  <text x="40" y="590" class="label">• Cancellation is honored between steps; uploads are LRU‑managed.</text>
+</svg>
+

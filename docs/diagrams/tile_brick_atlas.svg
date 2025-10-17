@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="520" viewBox="0 0 1080 520">
+  <style>
+    .title { font: 600 22px system-ui, sans-serif; }
+    .subtitle { font: 600 16px system-ui, sans-serif; }
+    .label { font: 13px system-ui, sans-serif; }
+    .small { font: 12px system-ui, sans-serif; }
+    .box { fill: #f8fbff; stroke: #2a6fdb; stroke-width: 2; }
+    .grid { stroke: #b6c6df; }
+    .roi { fill: rgba(255,0,0,0.05); stroke: #c0392b; stroke-dasharray: 5 3; }
+    .arrow { stroke: #222; stroke-width: 2; marker-end: url(#arrowhead); fill: none; }
+    .pad { fill: none; stroke: #888; stroke-dasharray: 3 2; }
+    .brick-front { fill: #bcd4ff; stroke: #356ac3; }
+    .brick-top { fill: #d0e2ff; stroke: #356ac3; }
+    .brick-side { fill: #a6c2ff; stroke: #356ac3; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#222" />
+    </marker>
+  </defs>
+
+  <text x="20" y="32" class="title">Tile → Brick → Atlas</text>
+
+  <!-- Dataset tiles at level L -->
+  <rect x="20" y="60" width="420" height="420" class="box"/>
+  <text x="30" y="85" class="subtitle">Dataset, Level L (xyRatio = 2^L, zRatio = 2^L)</text>
+  <g transform="translate(30,100)" class="grid">
+    <!-- simple 6x6 tile grid -->
+    <rect x="0" y="0" width="380" height="360" fill="none" stroke="#9fb5d8"/>
+    <g>
+      <line x1="63" y1="0" x2="63" y2="360" />
+      <line x1="126" y1="0" x2="126" y2="360" />
+      <line x1="189" y1="0" x2="189" y2="360" />
+      <line x1="252" y1="0" x2="252" y2="360" />
+      <line x1="315" y1="0" x2="315" y2="360" />
+      <line x1="0" y1="60" x2="380" y2="60" />
+      <line x1="0" y1="120" x2="380" y2="120" />
+      <line x1="0" y1="180" x2="380" y2="180" />
+      <line x1="0" y1="240" x2="380" y2="240" />
+      <line x1="0" y1="300" x2="380" y2="300" />
+    </g>
+    <!-- region of interest -->
+    <rect x="95" y="95" width="170" height="140" class="roi"/>
+    <text x="100" y="90" class="small">Base‑space ROI for brick @ level L</text>
+  </g>
+
+  <!-- Assembly → tmp region buffer -->
+  <path d="M 450 240 C 520 240, 520 240, 600 240" class="arrow"/>
+  <text x="470" y="225" class="label">R‑tree tiles → paste with offsets</text>
+
+  <rect x="600" y="200" width="160" height="100" class="box"/>
+  <text x="610" y="220" class="label">tmp region buffer</text>
+  <text x="610" y="240" class="small">ceil(W·xyR/readRx)</text>
+  <text x="610" y="258" class="small">ceil(H·xyR/readRy)</text>
+  <text x="610" y="276" class="small">ceil(D· zR/readRz)</text>
+
+  <!-- Buffer → Brick (with pad), 3D cube -->
+  <path d="M 760 240 C 800 240, 800 240, 840 240" class="arrow"/>
+  <rect x="840" y="190" width="200" height="120" class="box"/>
+  <text x="850" y="210" class="label">brick buffer (with pad)</text>
+  <!-- pad cube (wireframe look by outline only) -->
+  <g>
+    <polygon points="866,212 852,222 1028,222 1042,212" class="pad"/>
+    <polygon points="1028,222 1042,212 1042,296 1028,306" class="pad"/>
+    <rect x="852" y="222" width="176" height="84" class="pad"/>
+  </g>
+  <!-- interior brick cube -->
+  <g>
+    <polygon points="876,220 864,230 1018,230 1030,220" class="brick-top"/>
+    <polygon points="1018,230 1030,220 1030,284 1018,294" class="brick-side"/>
+    <rect x="864" y="230" width="154" height="64" class="brick-front"/>
+  </g>
+  <text x="866" y="252" class="small">interior B³</text>
+  <text x="866" y="270" class="small">pad 2 voxels/side</text>
+
+  <!-- Atlas slot write -->
+  <path d="M 940 310 C 940 380, 940 380, 600 380" class="arrow"/>
+  <text x="700" y="372" class="label">PageTableEntry.xyz → atlas slot</text>
+  <rect x="600" y="360" width="420" height="100" class="box"/>
+  <text x="610" y="382" class="subtitle">Image Cache (Atlas)</text>
+  <g transform="translate(610,395)">
+    <!-- slot 1 -->
+    <polygon points="12,-6 0,0 100,0 112,-6" class="pad"/>
+    <polygon points="100,0 112,-6 112,54 100,60" class="pad"/>
+    <rect x="0" y="0" width="100" height="60" class="pad"/>
+    <polygon points="18,-2 8,6 92,6 102,-2" class="brick-top"/>
+    <polygon points="92,6 102,-2 102,46 92,54" class="brick-side"/>
+    <rect x="8" y="6" width="84" height="48" class="brick-front"/>
+
+    <!-- slot 2 -->
+    <g transform="translate(120,0)">
+      <polygon points="12,-6 0,0 100,0 112,-6" class="pad"/>
+      <polygon points="100,0 112,-6 112,54 100,60" class="pad"/>
+      <rect x="0" y="0" width="100" height="60" class="pad"/>
+      <polygon points="18,-2 8,6 92,6 102,-2" class="brick-top"/>
+      <polygon points="92,6 102,-2 102,46 92,54" class="brick-side"/>
+      <rect x="8" y="6" width="84" height="48" class="brick-front"/>
+    </g>
+
+    <!-- slot 3 -->
+    <g transform="translate(240,0)">
+      <polygon points="12,-6 0,0 100,0 112,-6" class="pad"/>
+      <polygon points="100,0 112,-6 112,54 100,60" class="pad"/>
+      <rect x="0" y="0" width="100" height="60" class="pad"/>
+      <polygon points="18,-2 8,6 92,6 102,-2" class="brick-top"/>
+      <polygon points="92,6 102,-2 102,46 92,54" class="brick-side"/>
+      <rect x="8" y="6" width="84" height="48" class="brick-front"/>
+    </g>
+  </g>
+</svg>
