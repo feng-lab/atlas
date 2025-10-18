@@ -213,4 +213,35 @@ void ZVulkanDescriptorSet::updateStorageBuffer(uint32_t binding, ZVulkanBuffer& 
   VLOG(2) << "Updated storage buffer descriptor at binding " << binding;
 }
 
+void ZVulkanDescriptorSet::updateStorageImage(uint32_t binding,
+                                              ZVulkanTexture& texture,
+                                              vk::ImageLayout layoutOverride,
+                                              vk::ImageAspectFlags aspectOverride)
+{
+  if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
+    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
+    backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
+    if (!m_isOverrideTransient) {
+      CHECK(false) << "Descriptor write attempted during recording (storage image) at binding " << binding;
+    }
+  }
+  // Build image info for storage image (no sampler)
+  auto info = texture.descriptorInfo(layoutOverride, aspectOverride);
+  info.sampler = vk::Sampler{};
+  vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
+                                         .dstBinding = binding,
+                                         .dstArrayElement = 0,
+                                         .descriptorCount = 1,
+                                         .descriptorType = vk::DescriptorType::eStorageImage,
+                                         .pImageInfo = &info,
+                                         .pBufferInfo = nullptr,
+                                         .pTexelBufferView = nullptr};
+  std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
+  std::vector<vk::CopyDescriptorSet> descriptorCopies;
+  m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
+  m_initializedBindings.insert(binding);
+  VLOG(2) << "Updated storage image descriptor at binding " << binding;
+}
+
 } // namespace nim

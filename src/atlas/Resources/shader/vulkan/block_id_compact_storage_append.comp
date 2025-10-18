@@ -1,25 +1,21 @@
 #version 450
 
-// GPU compaction of Block-IDs with workgroup-local dedupe + global append buffer
-// - Input: RGBA32UI usampler2D
-// - Output: SSBO { uint count; uint ids[...] } (append via atomicAdd on count)
-// - FULL 32-bit ID coverage; global writes are coalesced, no global hash atomics
-// - Workgroup size 16x16; dispatch sized to cover the image dimensions
+// GPU compaction of Block-IDs using storage image reads (imageLoad) with global append buffer
+// - Input: RGBA32UI uimage2D (readonly)
+// - Output: SSBO { uint count; uint ids[...] }
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 #define EMPTY           0xFFFFFFFFu
-
-// Local workgroup table (max 16*16*4=1024 possible per tile)
 #define LOCAL_BITS      10u
 #define LOCAL_SIZE      (1u << LOCAL_BITS)
 #define LOCAL_MASK      (LOCAL_SIZE - 1u)
 
-layout(set = 0, binding = 0) uniform usampler2D uBlockIdImage;
+layout(rgba32ui, set = 0, binding = 0) readonly uniform uimage2D uBlockIdImage;
 
 layout(std430, set = 0, binding = 1) buffer BlockList {
-    uint count;       // number of ids written
-    uint ids[];       // capacity provided via push constants
+    uint count;
+    uint ids[];
 };
 
 layout(push_constant) uniform PushConstants {
@@ -54,16 +50,12 @@ void main()
 
     uvec3 gid = gl_GlobalInvocationID;
     if (gid.x >= pc.width || gid.y >= pc.height) {
-        // Out-of-range threads don't insert, but still participate in the final barrier/flush
         barrier();
-        if (gl_LocalInvocationIndex == 0u) {
-            // nothing to flush; lkeys was cleared
-        }
+        if (gl_LocalInvocationIndex == 0u) { }
         return;
     }
 
-    uvec4 ids4 = texelFetch(uBlockIdImage, ivec2(gid.xy), 0);
-    // Per-pixel channel dedupe
+    uvec4 ids4 = imageLoad(uBlockIdImage, ivec2(gid.xy));
     if (ids4.g == ids4.r) ids4.g = 0u;
     if (ids4.b == ids4.r || ids4.b == ids4.g) ids4.b = 0u;
     if (ids4.a == ids4.r || ids4.a == ids4.g || ids4.a == ids4.b) ids4.a = 0u;
@@ -73,7 +65,6 @@ void main()
     localInsert(ids4.a);
 
     barrier();
-    // Flush local unique IDs to global append buffer by a single invoker
     if (gl_LocalInvocationIndex == 0u) {
         for (uint i = 0u; i < LOCAL_SIZE; ++i) {
             uint v = lkeys[i];
@@ -82,7 +73,6 @@ void main()
             if (idx < pc.capacity) {
                 ids[idx] = v;
             }
-            // Overflow: silently drop; CPU will request again in a later round if needed
         }
     }
 }

@@ -139,9 +139,10 @@ set(ATLAS_VK_SHADER_SOURCES
     glow.frag
     blur.frag
 
-    # Compute
-    block_id_compact.comp
+    # Compute (append-only)
     block_id_compact_append.comp
+    block_id_compact_storage_append.comp
+    block_id_compact_buffer_append.comp
 
     # 3D slice and transforms
     transform_with_3dtexture.vert

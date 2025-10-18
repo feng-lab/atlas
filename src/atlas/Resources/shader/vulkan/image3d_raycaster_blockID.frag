@@ -12,9 +12,15 @@ layout(location = 6) out uvec4 FragData6;
 layout(location = 7) out uvec4 FragData7;
 
 #include "include/raycaster_common.glslinc"
+// Match GL shader constants
+const uint UINTMAX = 0xFFFFFFFFu;
 
 void main()
 {
+  // Parity with GL: initialize currentRayLength from last ray depth and discard if already complete
+  float currentRayLength = texelFetch(last_ray_depth_tex, ivec2(gl_FragCoord.xy), 0).x;
+  if (currentRayLength >= 1.0) { discard; }
+
   vec4 entryTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 0), 0);
   vec4 exitTexCoordAndZ  = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 1), 0);
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
@@ -36,9 +42,10 @@ void main()
   uvec3 pageDirAddress = uvec3(0xFFFFFFFFu);
   uvec4 pageDirEntry   = uvec4(0xFFFFFFFFu);
 
-  float currentRayLength = 0.0;
-  for (int loop0=0; missBlockIDsIndex < 32 && loop0<255; ++loop0) {
-    for (int loop1=0; missBlockIDsIndex < 32 && loop1<255; ++loop1) {
+  // currentRayLength initialized from last_ray_depth_tex above
+  bool finished = false;
+  for (int loop0=0; !finished && loop0<255; ++loop0) {
+    for (int loop1=0; !finished && loop1<255; ++loop1) {
       float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * pg.ze_to_screen_pixel_voxel_size;
       while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel+1].voxel_world_size <= desiredVoxelSize) {
         ++curLevel;
@@ -46,7 +53,8 @@ void main()
         stepSize = 1.0 / (rp.sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
       }
       if (curLevel + 1 == LEVEL_COUNT) {
-        missBlockIDs[missBlockIDsIndex++] = 0xFFFFFFFFu; // sentinel
+        missBlockIDs[missBlockIDsIndex++] = UINTMAX;
+        finished = true;
         break;
       }
 
@@ -67,11 +75,8 @@ void main()
             uint blockID = pg.levels[curLevel].pos_to_block_ids.x + pageTableCoord.x
                          + pg.levels[curLevel].pos_to_block_ids.y * pageTableCoord.y
                          + pg.levels[curLevel].pos_to_block_ids.z * pageTableCoord.z;
-            if (curLevel + 1 < LEVEL_COUNT) {
-              uint nextBase = pg.levels[curLevel + 1].pos_to_block_ids.x;
-              if (blockID >= nextBase) { blockID = 0xFFFFFFFFu; }
-            }
             missBlockIDs[missBlockIDsIndex++] = blockID;
+            if (missBlockIDsIndex == 32) { finished = true; }
           }
         }
         // advance to next block
@@ -86,11 +91,8 @@ void main()
           uint blockID = pg.levels[curLevel].pos_to_block_ids.x + pageTableCoord.x
                        + pg.levels[curLevel].pos_to_block_ids.y * pageTableCoord.y
                        + pg.levels[curLevel].pos_to_block_ids.z * pageTableCoord.z;
-          if (curLevel + 1 < LEVEL_COUNT) {
-            uint nextBase = pg.levels[curLevel + 1].pos_to_block_ids.x;
-            if (blockID >= nextBase) { blockID = 0xFFFFFFFFu; }
-          }
           missBlockIDs[missBlockIDsIndex++] = blockID;
+          if (missBlockIDsIndex == 32) { finished = true; }
         }
         // advance to next block
         do {
@@ -105,15 +107,16 @@ void main()
           voxelCoord = clamp(uvec3(samplePos * pg.levels[curLevel].image_dimensions.xyz), uvec3(0u), pg.levels[curLevel].image_dimensions.xyz - 1u);
         } while (pg.levels[curLevel].page_directory_base.xyz + (voxelCoord / pg.image_block_size.xyz) / pg.page_table_block_size.xyz == pageDirAddress && currentRayLength <= 1.0);
       }
+      // Match GL: terminate when the ray marches past 1.0
+      finished = finished || (currentRayLength > 1.0);
     }
   }
 
   // Write 32 IDs across 8 uvec4 attachments
+#if 0
+  // Debug mode: write a known constant per pixel to FragData0 to verify draw
   uvec4 outv[8];
-  for (int i=0;i<8;++i) {
-    int b = i*4;
-    outv[i] = uvec4(missBlockIDs[b+0], missBlockIDs[b+1], missBlockIDs[b+2], missBlockIDs[b+3]);
-  }
+  for (int i=0;i<8;++i) outv[i] = uvec4(123u);
   FragData0 = outv[0];
   FragData1 = outv[1];
   FragData2 = outv[2];
@@ -122,4 +125,14 @@ void main()
   FragData5 = outv[5];
   FragData6 = outv[6];
   FragData7 = outv[7];
+#else
+  FragData0 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
+  FragData1 = uvec4(missBlockIDs[4], missBlockIDs[5], missBlockIDs[6], missBlockIDs[7]);
+  FragData2 = uvec4(missBlockIDs[8], missBlockIDs[9], missBlockIDs[10], missBlockIDs[11]);
+  FragData3 = uvec4(missBlockIDs[12], missBlockIDs[13], missBlockIDs[14], missBlockIDs[15]);
+  FragData4 = uvec4(missBlockIDs[16], missBlockIDs[17], missBlockIDs[18], missBlockIDs[19]);
+  FragData5 = uvec4(missBlockIDs[20], missBlockIDs[21], missBlockIDs[22], missBlockIDs[23]);
+  FragData6 = uvec4(missBlockIDs[24], missBlockIDs[25], missBlockIDs[26], missBlockIDs[27]);
+  FragData7 = uvec4(missBlockIDs[28], missBlockIDs[29], missBlockIDs[30], missBlockIDs[31]);
+#endif
 }

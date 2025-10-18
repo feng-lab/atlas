@@ -1,35 +1,26 @@
 #version 450
 
-// GPU compaction of Block-IDs with workgroup-local dedupe + global hash insert
-// - Input: RGBA32UI usampler2D, each texel has up to 4 block IDs
+// GPU compaction of Block-IDs using storage image reads (imageLoad)
+// - Input: RGBA32UI uimage2D (readonly), each texel has up to 4 block IDs
 // - Output: SSBO uint keys[TABLE_SIZE], filled with 0xFFFFFFFF sentinel before dispatch
-// - FULL 32-bit ID coverage; per-workgroup local table reduces global contention drastically
-// - Workgroup size 16x16; dispatch sized to cover the image dimensions
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-// Configuration
-// 2^22 entries = 4,194,304 table slots = 16 MiB @ 4 B/slot
 #define TABLE_SIZE_BITS 22u                // 4,194,304 entries
 #define TABLE_SIZE      (1u << TABLE_SIZE_BITS)
 #define EMPTY           0xFFFFFFFFu
 #define PROBE_LIMIT     12u
 
-// Local workgroup table (max 16*16*4=1024 possible per tile)
 #define LOCAL_BITS      10u
 #define LOCAL_SIZE      (1u << LOCAL_BITS)
 #define LOCAL_MASK      (LOCAL_SIZE - 1u)
 
-// set=0, binding=0: block-ID image (RGBA32UI)
-// Input: RGBA32UI usampler2D, each texel has up to 4 block IDs
-layout(set = 0, binding = 0) uniform usampler2D uBlockIdImage;
+layout(rgba32ui, set = 0, binding = 0) readonly uniform uimage2D uBlockIdImage;
 
-// set=0, binding=1: output hash set table
 layout(std430, set = 0, binding = 1) buffer BlockSet {
-    uint keys[]; // SIZE = TABLE_SIZE; host must allocate and memset to 0xFF
+    uint keys[]; // SIZE = TABLE_SIZE; host must memset to 0xFF
 };
 
-// Push constants: width, height, stride (width for linear index, reserved), base (reserved)
 layout(push_constant) uniform PushConstants {
     uint width;
     uint height;
@@ -37,25 +28,18 @@ layout(push_constant) uniform PushConstants {
     uint base;
 } pc;
 
-// Knuth multiplicative hash for 32-bit IDs; mask later for table index
-uint hash32(uint x) {
-    return x * 2654435761u;
-}
+uint hash32(uint x) { return x * 2654435761u; }
 
-// Shared local table per workgroup to dedupe IDs before global insert
 shared uint lkeys[LOCAL_SIZE];
 
 void localInsert(uint id)
 {
-    if (id == 0u || id == EMPTY)
-        return;
+    if (id == 0u || id == EMPTY) return;
     uint h = hash32(id) & LOCAL_MASK;
     for (uint p = 0u; p < 8u; ++p) {
         uint idx = (h + p) & LOCAL_MASK;
         uint prev = atomicCompSwap(lkeys[idx], EMPTY, id);
-        if (prev == EMPTY || prev == id) {
-            return;
-        }
+        if (prev == EMPTY || prev == id) return;
     }
 }
 
@@ -66,9 +50,7 @@ void globalInsert(uint id)
     for (uint p = 0u; p < PROBE_LIMIT; ++p) {
         uint idx = (h + p) & mask;
         uint prev = atomicCompSwap(keys[idx], EMPTY, id);
-        if (prev == EMPTY || prev == id) {
-            return;
-        }
+        if (prev == EMPTY || prev == id) return;
     }
 }
 
@@ -82,34 +64,22 @@ void main()
 
     uvec3 gid = gl_GlobalInvocationID;
     if (gid.x >= pc.width || gid.y >= pc.height) {
-        // Out-of-range threads don't insert, but still participate in the final barrier/flush
         barrier();
-        if (gl_LocalInvocationIndex == 0u) {
-            // Nothing to flush from this workgroup since lkeys was cleared
-        }
+        if (gl_LocalInvocationIndex == 0u) { }
         return;
     }
 
-    // Local dedupe for channels (cheap in-tile filtering)
-    uvec4 ids = texelFetch(uBlockIdImage, ivec2(gid.xy), 0);
-    // Avoid redundant channels
+    uvec4 ids = imageLoad(uBlockIdImage, ivec2(gid.xy));
     if (ids.g == ids.r) ids.g = 0u;
     if (ids.b == ids.r || ids.b == ids.g) ids.b = 0u;
     if (ids.a == ids.r || ids.a == ids.g || ids.a == ids.b) ids.a = 0u;
-
-    localInsert(ids.r);
-    localInsert(ids.g);
-    localInsert(ids.b);
-    localInsert(ids.a);
+    localInsert(ids.r); localInsert(ids.g); localInsert(ids.b); localInsert(ids.a);
 
     barrier();
-    // One thread per workgroup flushes local uniques to global hash table
     if (gl_LocalInvocationIndex == 0u) {
         for (uint i = 0u; i < LOCAL_SIZE; ++i) {
             uint v = lkeys[i];
-            if (v != EMPTY && v != 0u) {
-                globalInsert(v);
-            }
+            if (v != EMPTY && v != 0u) globalInsert(v);
         }
     }
 }

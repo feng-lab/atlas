@@ -15,9 +15,7 @@
 
 namespace nim {
 
-DEFINE_int32(atlas_vk_frames_in_flight,
-             2,
-             "Max Vulkan frames in flight (debug: set to 1 to serialize submits)");
+DEFINE_int32(atlas_vk_frames_in_flight, 2, "Max Vulkan frames in flight (debug: set to 1 to serialize submits)");
 
 ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   : m_context(context)
@@ -69,6 +67,33 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   // Device-local static content
   m_deviceLocalPool = createPool(static_cast<VkMemoryPropertyFlags>(vk::MemoryPropertyFlagBits::eDeviceLocal),
                                  128ull * 1024ull * 1024ull);
+
+  // Log a concise feature/format support summary relevant to Block-ID integer images
+  // This helps diagnose sampled vs storage integer image support across stages/drivers.
+  if (VLOG_IS_ON(1)) {
+    const auto& phys = m_context.physicalDevice();
+    const auto features = phys.getFeatures();
+    const auto props = phys.getProperties();
+    const auto fmt = vk::Format::eR32G32B32A32Uint;
+    const auto fprops = phys.getFormatProperties(fmt);
+    const auto optimal = fprops.optimalTilingFeatures;
+    const bool sampledOK = static_cast<bool>(optimal & vk::FormatFeatureFlagBits::eSampledImage);
+    const bool storageOK = static_cast<bool>(optimal & vk::FormatFeatureFlagBits::eStorageImage);
+    const bool sampledLinear = static_cast<bool>(optimal & vk::FormatFeatureFlagBits::eSampledImageFilterLinear);
+    VLOG(1) << "VK Device: 'RGBA32UI' optimal tiling features:"
+            << " sampledImage=" << (sampledOK ? 1 : 0) << " storageImage=" << (storageOK ? 1 : 0)
+            << " sampledLinear=" << (sampledLinear ? 1 : 0) << " apiVersion=0x" << std::hex << props.apiVersion
+            << std::dec;
+    VLOG(1) << "VK Features:"
+            << " sampledImageArrayDynIdx=" << (features.shaderSampledImageArrayDynamicIndexing ? 1 : 0)
+            << " uniformBufArrayDynIdx=" << (features.shaderUniformBufferArrayDynamicIndexing ? 1 : 0)
+            << " storageImageExtendedFmt=" << (features.shaderStorageImageExtendedFormats ? 1 : 0)
+            << " storageImageReadNoFmt=" << (features.shaderStorageImageReadWithoutFormat ? 1 : 0)
+            << " storageImageWriteNoFmt=" << (features.shaderStorageImageWriteWithoutFormat ? 1 : 0);
+    // Note: there is no explicit core feature named 'shaderSampledImageInteger'. Integer sampling
+    // support is covered by the format's sampledImage bit; stage usage (fragment/compute) is not
+    // gated by a separate feature bit.
+  }
 }
 
 ZVulkanDevice::~ZVulkanDevice()

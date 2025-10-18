@@ -254,6 +254,8 @@ private:
   std::map<CopyPipelineKey, PipelineInstance> m_copyPipelines;
   std::map<MergePipelineKey, PipelineInstance> m_mergePipelines;
 
+  // (probes removed)
+
   // Debug-only depth-ramp pipeline cache
   PipelineInstance m_depthRampPipeline;
   std::optional<vk::Format> m_depthRampFormat;
@@ -265,9 +267,20 @@ private:
   std::unique_ptr<ZVulkanBuffer> m_entryTransformBuffer;
 
   // Block-ID compaction (compute) resources
-  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayout;
-  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayout;
-  std::optional<vk::raii::Pipeline> m_blockIdCompactPipeline;
+  // Two read-source variants: 'sampled' (combined image sampler) and 'storage' (uimage2D)
+  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutSampled;
+  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutSampled;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineSampled;
+  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutStorage;
+  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutStorage;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineStorage;
+  // Buffer-based compaction (image copied to SSBO, compute scans SSBO)
+  std::optional<vk::raii::DescriptorSetLayout> m_blockIdCompactSetLayoutBuffer;
+  std::optional<vk::raii::PipelineLayout> m_blockIdCompactPipelineLayoutBuffer;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineBuffer;
+  std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineBufferAppend;
+  std::unique_ptr<ZVulkanBuffer> m_blockIdPixelBuffer; // device-local, TRANSFER_DST | STORAGE_BUFFER
+  size_t m_blockIdPixelBufferCapacity = 0;
   ZVulkanDescriptorSet* m_blockIdCompactDescriptor = nullptr; // per-draw override (backend-owned)
   std::unique_ptr<ZVulkanBuffer> m_blockIdCompactOutput; // host-visible, compacted result
   size_t m_blockIdCompactCapacity = 0; // bytes

@@ -58,14 +58,27 @@ DEFINE_bool(atlas_debug_save_slice_merge_out,
             false,
             "Save Vulkan slice merged output (first color attachment) after merge.");
 
+// Debug: CPU-side count of non-zero block IDs written by the Block-ID pass (per attachment)
+DEFINE_bool(atlas_vk_debug_blockid_count,
+            false,
+            "After Block-ID draw, count non-zero IDs per attachment via CPU readback");
+
 // Compaction mode:
 // 0 = Workgroup-local dedupe + global hash insert (SSBO table of 4Mi entries)
 // 1 = Workgroup-local dedupe + global append buffer (SSBO with atomic counter + array)
-DEFINE_int32(atlas_vk_blockid_compaction_mode,
-             0,
-             "Block-ID compaction mode: 0=local-dedupe+hash, 1=local-dedupe+append");
+DEFINE_int32(atlas_vk_blockid_compaction_mode, 1, "Deprecated; append-only; ignored");
 
 DEFINE_bool(atlas_vk_disable_blockid_compaction, false, "Disable Block-ID compaction compute pass (for diagnostics)");
+// Debug: limit compaction to the first Block-ID attachment to isolate sampling/binding
+DEFINE_bool(atlas_vk_compact_only_first_blockid_attachment,
+            false,
+            "When true, compact only attachment 0 of the Block-ID render target");
+// Debug: log a small sample of raw appended IDs from the compaction buffer
+DEFINE_int32(atlas_vk_compact_log_sample, 16, "Number of initial appended IDs to sample in logs");
+// Compaction read source override (append-only)
+DEFINE_string(atlas_vk_blockid_compaction_source,
+              "buffer",
+              "Block-ID compaction read source: 'buffer' (default), 'storage', or 'sampled' (append-only)");
 
 // Debug dump of Vulkan raycaster inputs before dispatch (CPU-side only)
 DEFINE_bool(atlas_vk_debug_raycaster_dump,
@@ -745,38 +758,55 @@ void ZVulkanImgRaycasterPipelineContext::ensureEntryTransformResources(Z3DRender
   m_entryTransformDescriptor->updateUniformBuffer(0, *m_entryTransformBuffer);
 }
 
-void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_t attachmentCount, int mode)
+namespace {
+inline bool vkBlockIdUseStorage()
+{
+  const std::string v = FLAGS_atlas_vk_blockid_compaction_source;
+  return v == "storage" || v == "Storage" || v == "STORAGE";
+}
+inline bool vkBlockIdUseBuffer()
+{
+  const std::string v = FLAGS_atlas_vk_blockid_compaction_source;
+  return v == "buffer" || v == "Buffer" || v == "BUFFER";
+}
+} // namespace
+
+void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_t attachmentCount, int /*mode*/)
 {
   (void)attachmentCount; // current compaction uses first attachment only
-  static int s_lastMode = -1;
+  // Append-only compaction; rebuild per call to keep compatible with current source
   auto& device = m_backend.device().context().device();
-  // Descriptor set layout: binding 0 = sampled image (block-ID), binding 1 = storage buffer (bitset/list)
-  std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-    vk::DescriptorSetLayoutBinding{.binding = 0,
-                                   .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eCompute},
-    vk::DescriptorSetLayoutBinding{.binding = 1,
-                                   .descriptorType = vk::DescriptorType::eStorageBuffer,
-                                   .descriptorCount = 1,
-                                   .stageFlags = vk::ShaderStageFlagBits::eCompute}
-  };
-  m_blockIdCompactSetLayout.emplace(
-    device,
-    vk::DescriptorSetLayoutCreateInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                      .pBindings = bindings.data()});
-  // Push constants: image size (u32 width,height), stride, and base index (optional)
-  vk::PushConstantRange pc{.stageFlags = vk::ShaderStageFlagBits::eCompute, .offset = 0, .size = sizeof(uint32_t) * 4};
-  m_blockIdCompactPipelineLayout.emplace(device,
-                                         vk::PipelineLayoutCreateInfo{.setLayoutCount = 1,
-                                                                      .pSetLayouts = &**m_blockIdCompactSetLayout,
-                                                                      .pushConstantRangeCount = 1,
-                                                                      .pPushConstantRanges = &pc});
-  // Create compute pipeline (choose shader by mode)
+  const bool storage = vkBlockIdUseStorage();
+  const bool buffer = vkBlockIdUseBuffer();
   const std::string shaderBase = nim::ZSystemInfo::resourcesDirPath().toStdString() + "/shader/vulkan/spv/";
-  const std::string compPath =
-    shaderBase + (mode == 1 ? "block_id_compact_append.comp.spv" : "block_id_compact.comp.spv");
-  if (!m_blockIdCompactPipeline || s_lastMode != mode) {
+  const std::string compPath = buffer ? (shaderBase + "block_id_compact_buffer_append.comp.spv")
+                                      : (storage ? (shaderBase + "block_id_compact_storage_append.comp.spv")
+                                                 : (shaderBase + "block_id_compact_append.comp.spv"));
+
+  if (buffer) {
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute}
+    };
+    m_blockIdCompactSetLayoutBuffer.emplace(
+      device,
+      vk::DescriptorSetLayoutCreateInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                        .pBindings = bindings.data()});
+    vk::PushConstantRange pc{.stageFlags = vk::ShaderStageFlagBits::eCompute,
+                             .offset = 0,
+                             .size = sizeof(uint32_t) * 4};
+    m_blockIdCompactPipelineLayoutBuffer.emplace(
+      device,
+      vk::PipelineLayoutCreateInfo{.setLayoutCount = 1,
+                                   .pSetLayouts = &**m_blockIdCompactSetLayoutBuffer,
+                                   .pushConstantRangeCount = 1,
+                                   .pPushConstantRanges = &pc});
     auto spirv = readSpirvFile(compPath);
     vk::raii::ShaderModule compModule(
       device,
@@ -784,13 +814,94 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_
     vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
                                             .module = *compModule,
                                             .pName = "main"};
-    m_blockIdCompactPipeline.emplace(
+    m_blockIdCompactPipelineBufferAppend.reset();
+    m_blockIdCompactPipelineBufferAppend.emplace(
       device,
       nullptr,
-      vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayout});
-    s_lastMode = mode;
+      vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayoutBuffer});
+  } else if (storage) {
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eStorageImage,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute}
+    };
+    m_blockIdCompactSetLayoutStorage.emplace(
+      device,
+      vk::DescriptorSetLayoutCreateInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                        .pBindings = bindings.data()});
+    vk::PushConstantRange pc{.stageFlags = vk::ShaderStageFlagBits::eCompute,
+                             .offset = 0,
+                             .size = sizeof(uint32_t) * 4};
+    m_blockIdCompactPipelineLayoutStorage.emplace(
+      device,
+      vk::PipelineLayoutCreateInfo{.setLayoutCount = 1,
+                                   .pSetLayouts = &**m_blockIdCompactSetLayoutStorage,
+                                   .pushConstantRangeCount = 1,
+                                   .pPushConstantRanges = &pc});
+    auto spirv = readSpirvFile(compPath);
+    vk::raii::ShaderModule compModule(
+      device,
+      vk::ShaderModuleCreateInfo{.codeSize = spirv.size() * sizeof(uint32_t), .pCode = spirv.data()});
+    vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
+                                            .module = *compModule,
+                                            .pName = "main"};
+    m_blockIdCompactPipelineStorage.reset();
+    m_blockIdCompactPipelineStorage.emplace(
+      device,
+      nullptr,
+      vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayoutStorage});
+  } else {
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute}
+    };
+    m_blockIdCompactSetLayoutSampled.emplace(
+      device,
+      vk::DescriptorSetLayoutCreateInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                        .pBindings = bindings.data()});
+    vk::PushConstantRange pc{.stageFlags = vk::ShaderStageFlagBits::eCompute,
+                             .offset = 0,
+                             .size = sizeof(uint32_t) * 4};
+    m_blockIdCompactPipelineLayoutSampled.emplace(
+      device,
+      vk::PipelineLayoutCreateInfo{.setLayoutCount = 1,
+                                   .pSetLayouts = &**m_blockIdCompactSetLayoutSampled,
+                                   .pushConstantRangeCount = 1,
+                                   .pPushConstantRanges = &pc});
+    auto spirv = readSpirvFile(compPath);
+    vk::raii::ShaderModule compModule(
+      device,
+      vk::ShaderModuleCreateInfo{.codeSize = spirv.size() * sizeof(uint32_t), .pCode = spirv.data()});
+    vk::PipelineShaderStageCreateInfo stage{.stage = vk::ShaderStageFlagBits::eCompute,
+                                            .module = *compModule,
+                                            .pName = "main"};
+    m_blockIdCompactPipelineSampled.reset();
+    m_blockIdCompactPipelineSampled.emplace(
+      device,
+      nullptr,
+      vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayoutSampled});
+  }
+
+  if (VLOG_IS_ON(1)) {
+    VLOG(1) << fmt::format("ensureBlockIdCompactionPipeline: mode={} source={} shader='{}'",
+                           1,
+                           buffer ? "buffer" : (storage ? "storage" : "sampled"),
+                           compPath);
   }
 }
+
+// (probe pipelines removed)
 
 void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactOutput(size_t bytes)
 {
@@ -805,6 +916,10 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactOutput(size_t bytes
   m_blockIdCompactCapacity = bytes;
 }
 
+// (probe pipelines removed)
+
+// (probe pipelines removed)
+
 void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase& renderer,
                                                                  const RenderBatch& batch,
                                                                  const ImgRaycasterPayload& payload,
@@ -817,17 +932,21 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   }
   // Ensure pipeline and output buffer
   const int mode = FLAGS_atlas_vk_blockid_compaction_mode;
-  // Use the first block-ID attachment (extension: loop over all and OR into bitset)
-  ZVulkanTexture* block0 = payload.blockIdLease->colorAttachment(0);
-  if (!block0) {
+  // Use all block-ID attachments (parity with GL): compact each attachment sequentially into the same output
+  ZVulkanTexture* firstBlock = payload.blockIdLease->colorAttachment(0);
+  if (!firstBlock) {
     return;
   }
-  ensureBlockIdCompactionPipeline(payload.blockIdLease->attachments, mode);
-  uint32_t imgW = block0->width();
-  uint32_t imgH = block0->height();
-  if (mode == 1) {
-    // Append buffer: [count (4B)] + ids[capacity]
-    const uint32_t capacity = std::max<uint32_t>(1u, imgW * imgH); // conservative upper bound
+  const uint32_t attachmentCount = std::max<uint32_t>(1u, payload.blockIdLease->attachments);
+  ensureBlockIdCompactionPipeline(attachmentCount, mode);
+  uint32_t imgW = firstBlock->width();
+  uint32_t imgH = firstBlock->height();
+  // Optional: dual probe (sampled + storage) and skip normal compaction
+  // (probes removed)
+  // Append-only compaction (drop hash variants): allocate append buffer
+  {
+    // Append buffer: [count (4B)] + ids[capacity]. Use 4 IDs/pixel capacity to mirror GL per-attachment read.
+    const uint32_t capacity = std::max<uint32_t>(1u, imgW * imgH * 4u);
     const size_t bytes = sizeof(uint32_t) + static_cast<size_t>(capacity) * sizeof(uint32_t);
     ensureBlockIdCompactOutput(bytes);
     // Zero the count
@@ -835,35 +954,27 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
       std::memset(mapped, 0x00, sizeof(uint32_t));
       m_blockIdCompactOutput->unmap();
     }
-  } else {
-    // Hash table: 4Mi entries * 4 bytes = 16 MiB
-    ensureBlockIdCompactOutput(kBlockIdCompactBytes);
-    // Clear output table to EMPTY (0xFF) before dispatch
-    if (void* mapped = m_blockIdCompactOutput->map(0, kBlockIdCompactBytes)) {
-      std::memset(mapped, 0xFF, kBlockIdCompactBytes);
-      m_blockIdCompactOutput->unmap();
+    if (VLOG_IS_ON(1)) {
+      VLOG(1) << fmt::format("BlockID compaction (append): output capacity={} bytes (count + ids)", bytes);
     }
   }
 
-  // Build descriptor set
-  if (!m_blockIdCompactDescriptor) {
-    m_blockIdCompactDescriptor = m_backend.allocateOverrideDescriptorSet(**m_blockIdCompactSetLayout);
-  }
-  // Sample in shader-read layout; dynamic rendering transition sets this as final
-  m_blockIdCompactDescriptor->updateTexture(0,
-                                            *block0,
-                                            m_backend.nearestClampSampler(),
-                                            vk::ImageLayout::eShaderReadOnlyOptimal,
-                                            vk::ImageAspectFlags{});
-  m_blockIdCompactDescriptor->updateStorageBuffer(1, *m_blockIdCompactOutput);
-
   // Record compute dispatch
   ZVulkanPipelineCommandRecorder recorder(cmd);
-  auto gpuScope = m_backend.beginGpuScope(mode == 1 ? "block_id_compact_append" : "block_id_compact_hash");
+  auto gpuScope = m_backend.beginGpuScope("block_id_compact_append");
+  const bool storageRead = vkBlockIdUseStorage();
+  const bool bufferRead = vkBlockIdUseBuffer();
   ZVulkanComputePassSpec spec{};
-  spec.pipeline = &*m_blockIdCompactPipeline;
-  spec.pipelineLayout = &*m_blockIdCompactPipelineLayout;
-  spec.descriptorSets = {m_blockIdCompactDescriptor->descriptorSet()};
+  if (bufferRead) {
+    spec.pipeline = &*m_blockIdCompactPipelineBufferAppend;
+    spec.pipelineLayout = &*m_blockIdCompactPipelineLayoutBuffer;
+  } else if (storageRead) {
+    spec.pipeline = &*m_blockIdCompactPipelineStorage;
+    spec.pipelineLayout = &*m_blockIdCompactPipelineLayoutStorage;
+  } else {
+    spec.pipeline = &*m_blockIdCompactPipelineSampled;
+    spec.pipelineLayout = &*m_blockIdCompactPipelineLayoutSampled;
+  }
   spec.descriptorSetFirst = 0;
   spec.expectedDescriptorSetCount = 1;
   // Push constants: width, height, stride, baseIndex (unused=0)
@@ -873,7 +984,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     uint32_t height;
     uint32_t stride;
     uint32_t baseOrCapacity;
-  } pc{imgW, imgH, imgW, static_cast<uint32_t>((mode == 1) ? (imgW * imgH) : 0u)};
+  } pc{imgW, imgH, imgW, static_cast<uint32_t>(imgW * imgH * 4u)};
   spec.pushConstantsData = &pc;
   spec.pushConstantsSize = sizeof(pc);
   spec.pushConstantsStages = vk::ShaderStageFlagBits::eCompute;
@@ -886,7 +997,157 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                          spec.groupY,
                          pc.width,
                          pc.height);
-  recorder.recordComputePass(spec);
+  // Iterate every Block-ID attachment and dispatch compaction on each.
+  // Allocate a fresh override descriptor set per attachment to avoid updating a bound set.
+  for (uint32_t att = 0; att < attachmentCount; ++att) {
+    if (FLAGS_atlas_vk_compact_only_first_blockid_attachment && att > 0) {
+      continue; // debug isolation: only compact the first attachment
+    }
+    ZVulkanTexture* blockTex = payload.blockIdLease->colorAttachment(att);
+    if (!blockTex) {
+      continue;
+    }
+    // Validate dimensions match the first attachment
+    if (blockTex->width() != imgW || blockTex->height() != imgH) {
+      LOG(WARNING) << "Block-ID attachment size mismatch; skipping att=" << att;
+      continue;
+    }
+    // Barrier + set writes depend on read source
+    if (bufferRead) {
+      // Ensure pixel buffer capacity and record image->buffer copy
+      const size_t needed = static_cast<size_t>(imgW) * imgH * sizeof(uint32_t) * 4ull;
+      if (!m_blockIdPixelBuffer || m_blockIdPixelBufferCapacity < needed) {
+        m_blockIdPixelBuffer = m_backend.device().createBuffer(needed,
+                                                               vk::BufferUsageFlagBits::eTransferDst |
+                                                                 vk::BufferUsageFlagBits::eStorageBuffer,
+                                                               vk::MemoryPropertyFlagBits::eDeviceLocal);
+        m_blockIdPixelBufferCapacity = needed;
+      }
+      // Transition image to transfer src via helper to keep layout tracking consistent
+      blockTex->transitionLayout(cmd,
+                                 blockTex->layout(),
+                                 vk::ImageLayout::eTransferSrcOptimal,
+                                 vk::ImageAspectFlagBits::eColor);
+      {
+        vk::BufferImageCopy region{};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = vk::Offset3D{0, 0, 0};
+        region.imageExtent = vk::Extent3D{imgW, imgH, 1};
+        cmd.copyImageToBuffer(blockTex->image(),
+                              vk::ImageLayout::eTransferSrcOptimal,
+                              m_blockIdPixelBuffer->buffer(),
+                              region);
+      }
+      // Restore original stable layout for downstream readbacks
+      blockTex->transitionLayout(cmd,
+                                 vk::ImageLayout::eTransferSrcOptimal,
+                                 vk::ImageLayout::eShaderReadOnlyOptimal,
+                                 vk::ImageAspectFlagBits::eColor);
+      blockTex->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+      // Barrier for buffer: transfer write -> compute read
+      {
+        vk::BufferMemoryBarrier2 bb{};
+        bb.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
+        bb.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+        bb.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader;
+        bb.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
+        bb.buffer = m_blockIdPixelBuffer->buffer();
+        bb.offset = 0;
+        bb.size = VK_WHOLE_SIZE;
+        vk::DependencyInfo dep{};
+        dep.bufferMemoryBarrierCount = 1;
+        dep.pBufferMemoryBarriers = &bb;
+        cmd.pipelineBarrier2(dep);
+      }
+    } else if (storageRead) {
+      // Transition to GENERAL for storage image reads
+      if (blockTex->layout() != vk::ImageLayout::eGeneral) {
+        blockTex->transitionLayout(cmd, blockTex->layout(), vk::ImageLayout::eGeneral, vk::ImageAspectFlagBits::eColor);
+      }
+      vk::ImageMemoryBarrier2 barrier{};
+      barrier.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+      barrier.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+      barrier.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader;
+      barrier.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
+      barrier.oldLayout = vk::ImageLayout::eGeneral;
+      barrier.newLayout = vk::ImageLayout::eGeneral;
+      barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.image = blockTex->image();
+      barrier.subresourceRange = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+      vk::DependencyInfo dep{};
+      dep.imageMemoryBarrierCount = 1;
+      dep.pImageMemoryBarriers = &barrier;
+      cmd.pipelineBarrier2(dep);
+    } else {
+      // Keep sampled layout; enforce a memory barrier
+      if (blockTex->layout() != vk::ImageLayout::eShaderReadOnlyOptimal) {
+        blockTex->transitionLayout(cmd,
+                                   blockTex->layout(),
+                                   vk::ImageLayout::eShaderReadOnlyOptimal,
+                                   vk::ImageAspectFlagBits::eColor);
+      }
+      vk::ImageMemoryBarrier2 barrier{};
+      barrier.srcStageMask = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+      barrier.srcAccessMask = vk::AccessFlagBits2::eColorAttachmentWrite;
+      barrier.dstStageMask = vk::PipelineStageFlagBits2::eComputeShader;
+      barrier.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
+      barrier.oldLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+      barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+      barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.image = blockTex->image();
+      barrier.subresourceRange = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1};
+      vk::DependencyInfo dep{};
+      dep.imageMemoryBarrierCount = 1;
+      dep.pImageMemoryBarriers = &barrier;
+      cmd.pipelineBarrier2(dep);
+    }
+
+    // Allocate and write a transient override set for this attachment
+    auto* ds = bufferRead    ? m_backend.allocateOverrideDescriptorSet(**m_blockIdCompactSetLayoutBuffer)
+               : storageRead ? m_backend.allocateOverrideDescriptorSet(**m_blockIdCompactSetLayoutStorage)
+                             : m_backend.allocateOverrideDescriptorSet(**m_blockIdCompactSetLayoutSampled);
+    CHECK(ds) << "Failed to allocate override DS for block-id compaction";
+    if (VLOG_IS_ON(2)) {
+      VLOG(2) << fmt::format("Compaction DS: set=0x{:x} att={} img=0x{:x} fmt={} layout={} descLayout={}",
+                             reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(ds->descriptorSet())),
+                             att,
+                             reinterpret_cast<uintptr_t>(static_cast<VkImage>(blockTex->image())),
+                             enumOrUnderlying(blockTex->format(), 16),
+                             enumOrUnderlying(blockTex->layout(), 16),
+                             enumOrUnderlying(blockTex->descriptorLayout(), 16));
+    }
+    if (bufferRead) {
+      // binding 0 = SSBO texels; binding 1 = output buffer
+      ds->updateStorageBuffer(0, *m_blockIdPixelBuffer);
+    } else if (storageRead) {
+      blockTex->setDescriptorLayout(vk::ImageLayout::eGeneral);
+      ds->updateStorageImage(0, *blockTex, vk::ImageLayout::eGeneral, vk::ImageAspectFlagBits::eColor);
+    } else {
+      blockTex->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+      ds->updateTexture(0,
+                        *blockTex,
+                        m_backend.nearestClampSampler(),
+                        vk::ImageLayout::eShaderReadOnlyOptimal,
+                        vk::ImageAspectFlags{});
+    }
+    if (VLOG_IS_ON(2)) {
+      VLOG(2) << fmt::format("Compaction DS storage: set=0x{:x} buf=0x{:x} size={}B",
+                             reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(ds->descriptorSet())),
+                             reinterpret_cast<uintptr_t>(static_cast<VkBuffer>(m_blockIdCompactOutput->buffer())),
+                             m_blockIdCompactOutput->size());
+    }
+    ds->updateStorageBuffer(1, *m_blockIdCompactOutput);
+    spec.descriptorSets = {ds->descriptorSet()};
+    recorder.recordComputePass(spec);
+  }
   if (gpuScope) {
     m_backend.endGpuScope(*gpuScope);
   }
@@ -894,58 +1155,63 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   // After fence: parse compacted buffer and update caches
   auto bufPtr = m_blockIdCompactOutput.get();
   m_backend.scheduleAfterCurrentFrameCompletion(
-    [bufPtr, mode, imgW, imgH, channelIndex = payload.activeChannel, imagePtr = payload.image]() {
+    [bufPtr, imgW, imgH, channelIndex = payload.activeChannel, imagePtr = payload.image]() {
       if (!bufPtr || !imagePtr) {
         return;
       }
-      const size_t bytes =
-        (mode == 1) ? (sizeof(uint32_t) + static_cast<size_t>(imgW) * imgH * sizeof(uint32_t)) : kBlockIdCompactBytes;
+      const size_t bytes = sizeof(uint32_t) + static_cast<size_t>(imgW) * imgH * 4ull * sizeof(uint32_t);
       const void* mapped = bufPtr->map(0, bytes);
       if (!mapped) {
         return;
       }
       std::vector<uint32_t> missingBlocks;
-      if (mode == 1) {
-        // Append buffer format: [count][ids...]
-        const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
-        const uint32_t count = u32[0];
-        const uint32_t capacity = imgW * imgH;
-        const uint32_t clamped = std::min(count, capacity);
-        missingBlocks.reserve(clamped);
+      // Append buffer format: [count][ids...]
+      const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
+      const uint32_t count = u32[0];
+      const uint32_t capacity = imgW * imgH * 4u;
+      const uint32_t clamped = std::min(count, capacity);
+      if (VLOG_IS_ON(1)) {
+        const int toSample = std::max(0, FLAGS_atlas_vk_compact_log_sample);
+        const int sampleCount = std::min<int>(toSample, static_cast<int>(clamped));
+        std::string sample;
+        uint32_t vmin = std::numeric_limits<uint32_t>::max();
+        uint32_t vmax = 0u;
         for (uint32_t i = 0; i < clamped; ++i) {
           uint32_t v = u32[1 + i];
-          if (v != kInvalidBlockID && v != kEmptyBlockID && v != 0u) {
-            missingBlocks.push_back(v);
+          vmin = std::min(vmin, v);
+          vmax = std::max(vmax, v);
+          if (i < static_cast<uint32_t>(sampleCount)) {
+            if (!sample.empty()) {
+              sample += ",";
+            }
+            sample += fmt::format("{}", v);
           }
         }
-        // CPU-side dedupe (ids may repeat across workgroups)
-        std::unordered_set<uint32_t> uniq;
-        uniq.reserve(missingBlocks.size());
-        std::vector<uint32_t> deduped;
-        deduped.reserve(missingBlocks.size());
-        for (uint32_t v : missingBlocks) {
-          if (uniq.insert(v).second) {
-            deduped.push_back(v);
-          }
-        }
-        missingBlocks.swap(deduped);
-      } else {
-        const uint32_t* keys = static_cast<const uint32_t*>(mapped);
-        size_t nonEmpty = 0;
-        for (size_t i = 0; i < kBlockIdTableSize; ++i) {
-          const uint32_t v = keys[i];
-          if (v != kEmptyBlockID && v != kInvalidBlockID) {
-            ++nonEmpty;
-          }
-        }
-        missingBlocks.reserve(nonEmpty);
-        for (size_t i = 0; i < kBlockIdTableSize; ++i) {
-          const uint32_t v = keys[i];
-          if (v != kEmptyBlockID && v != kInvalidBlockID) {
-            missingBlocks.push_back(v);
-          }
+        VLOG(1) << fmt::format("compaction append raw: count={} capacity={} sample=[{}] min={} max={}",
+                               count,
+                               capacity,
+                               sample,
+                               vmin,
+                               vmax);
+      }
+      missingBlocks.reserve(clamped);
+      for (uint32_t i = 0; i < clamped; ++i) {
+        uint32_t v = u32[1 + i];
+        if (v != kInvalidBlockID && v != kEmptyBlockID && v != 0u) {
+          missingBlocks.push_back(v);
         }
       }
+      // CPU-side dedupe (ids may repeat across workgroups)
+      std::unordered_set<uint32_t> uniq;
+      uniq.reserve(missingBlocks.size());
+      std::vector<uint32_t> deduped;
+      deduped.reserve(missingBlocks.size());
+      for (uint32_t v : missingBlocks) {
+        if (uniq.insert(v).second) {
+          deduped.push_back(v);
+        }
+      }
+      missingBlocks.swap(deduped);
       bufPtr->unmap();
 
       VLOG(1) << fmt::format("compaction output parsed: keys={} (non-empty)", missingBlocks.size());
@@ -1081,6 +1347,9 @@ ZVulkanImgRaycasterPipelineContext::ensureBlockIdPipeline(const BlockIdPipelineK
   instance.shader->setSpecializationConstants(vk::ShaderStageFlagBits::eFragment,
                                               std::vector(entries.begin(), entries.end()),
                                               data);
+  if (VLOG_IS_ON(1)) {
+    VLOG(1) << fmt::format("ensureBlockIdPipeline: LEVEL_COUNT specialization = {}", levelCount);
+  }
 
   // Push constants for ray params used by block-ID shader (5 floats)
   // Must be configured before create() so pipeline layout contains the range.
@@ -2557,83 +2826,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex, volGen);
     ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
 
-    // Collect Block-ID in fast path to drive paging, mirroring GL full-res path
-    if (payload.blockIdLease && payload.blockIdLease->hasVulkanImage() && m_imageBlockUploader) {
-      // Compute ze->screen pixel voxel size (same as progressive path)
-      const auto& monoEyeState = renderer.viewState().eyes[static_cast<size_t>(Z3DEye::MonoEye)];
-      glm::vec2 pxSize = monoEyeState.frustumNearPlaneSize /
-                         glm::vec2(std::max(1u, payload.outputSize.x), std::max(1u, payload.outputSize.y));
-      float zeToScreenPixelVoxelSize =
-        -std::min(pxSize.x, pxSize.y) / nearClip * renderer.sceneState().devicePixelRatio;
-
-      // Bind paging descriptors for this channel and render Block-ID attachments
-      if (updatePageDescriptors(resources,
-                                payload,
-                                *entryTexture,
-                                *entryTexture /*placeholder lastDepth*/,
-                                *entryTexture /*placeholder lastColor*/,
-                                volumeTex,
-                                transferTex,
-                                *payload.image,
-                                channelIndex,
-                                zeToScreenPixelVoxelSize,
-                                /*freshOverrideDescriptors=*/true)) {
-        const uint32_t blockAttachmentCount = payload.blockIdLease->attachments;
-        auto* firstBlockAttachment = payload.blockIdLease->colorAttachment(0);
-        if (firstBlockAttachment) {
-          const vk::Format blockFormat = firstBlockAttachment->format();
-          BlockIdPipelineKey blockKey{resources.levelCount, blockAttachmentCount, blockFormat};
-          auto& blockPipeline = ensureBlockIdPipeline(blockKey, blockFormat);
-
-          std::vector<ZVulkanAttachmentInfo> blockAttachments;
-          blockAttachments.reserve(blockAttachmentCount);
-          for (uint32_t att = 0; att < blockAttachmentCount; ++att) {
-            auto* texture = payload.blockIdLease->colorAttachment(att);
-            if (!texture) continue;
-            ZVulkanAttachmentInfo a{};
-            a.image = texture->image();
-            a.view = texture->imageView();
-            a.format = texture->format();
-            a.initialLayout = vk::ImageLayout::eUndefined;
-            a.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-            a.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
-            a.loadOp = vk::AttachmentLoadOp::eClear;
-            a.storeOp = vk::AttachmentStoreOp::eStore;
-            a.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
-            a.dstStage = vk::PipelineStageFlagBits2::eComputeShader;
-            a.srcAccess = {};
-            a.dstAccess = vk::AccessFlagBits2::eShaderRead;
-            a.aspect = vk::ImageAspectFlagBits::eColor;
-            a.trackingTexture = texture;
-            blockAttachments.push_back(a);
-          }
-
-          std::vector<vk::DescriptorSet> blockSets = collectProgressiveDescriptorSets(resources, true);
-          struct RayPC { float s,i,l,a,b; } pcB{payload.samplingRate, payload.isoValue, payload.localMIPThreshold,
-                                                zeToZW_a, zeToZW_b};
-          ZVulkanGraphicsPassSpec blockSpec{};
-          blockSpec.renderArea = scissor;
-          blockSpec.viewports = {viewport};
-          blockSpec.scissors = {scissor};
-          blockSpec.colorAttachments = blockAttachments;
-          blockSpec.pipelineHandle = blockPipeline.pipeline->pipelineHandle();
-          blockSpec.pipelineLayoutHandle = blockPipeline.pipeline->pipelineLayoutHandle();
-          blockSpec.descriptorSets = std::move(blockSets);
-          blockSpec.descriptorSetFirst = 0;
-          blockSpec.expectedDescriptorSetCount = 3;
-          blockSpec.vertexBuffers = {m_quadVertexBuffer->buffer()};
-          blockSpec.vertexOffsets = {0};
-          blockSpec.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
-          blockSpec.instanceCount = 1;
-          blockSpec.pushConstantsData = &pcB;
-          blockSpec.pushConstantsSize = sizeof(pcB);
-          blockSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
-          blockSpec.requirePushConstants = true;
-          recorder.recordGraphicsPass(blockSpec);
-          recordBlockIdCompaction(renderer, batch, payload, cmd);
-        }
-      }
-    }
+    // GL fast path does not run Block-ID; defer paging to the dedicated stage
 
     updateChannelFastDescriptors(resources,
                                  payload,
@@ -2734,79 +2927,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     ZVulkanTexture& volumeTex = ensureVolumeTexture(resources, channelImage, channelIndex, volGen);
     ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferFunctions[channelIndex]);
 
-    // Match GL: collect Block-ID per channel in layered fast mode to drive paging uploads
-    if (payload.blockIdLease && payload.blockIdLease->hasVulkanImage() && m_imageBlockUploader) {
-      const auto& monoEyeState = renderer.viewState().eyes[static_cast<size_t>(Z3DEye::MonoEye)];
-      glm::vec2 pxSize = monoEyeState.frustumNearPlaneSize /
-                         glm::vec2(std::max(1u, payload.outputSize.x), std::max(1u, payload.outputSize.y));
-      const float nearClipL = std::abs(renderer.viewState().nearClip) < 1e-6f ? 1e-6f : renderer.viewState().nearClip;
-      float zeToScreenPixelVoxelSize =
-        -std::min(pxSize.x, pxSize.y) / nearClipL * renderer.sceneState().devicePixelRatio;
-      if (updatePageDescriptors(resources,
-                                payload,
-                                *entryTexture,
-                                *entryTexture,
-                                *entryTexture,
-                                volumeTex,
-                                transferTex,
-                                *payload.image,
-                                channelIndex,
-                                zeToScreenPixelVoxelSize,
-                                /*freshOverrideDescriptors=*/true)) {
-        const uint32_t blockAttachmentCount = payload.blockIdLease->attachments;
-        auto* firstBlockAttachment = payload.blockIdLease->colorAttachment(0);
-        if (firstBlockAttachment) {
-          const vk::Format blockFormat = firstBlockAttachment->format();
-          BlockIdPipelineKey blockKey{resources.levelCount, blockAttachmentCount, blockFormat};
-          auto& blockPipeline = ensureBlockIdPipeline(blockKey, blockFormat);
-          std::vector<ZVulkanAttachmentInfo> blockAttachments;
-          blockAttachments.reserve(blockAttachmentCount);
-          for (uint32_t att = 0; att < blockAttachmentCount; ++att) {
-            auto* texture = payload.blockIdLease->colorAttachment(att);
-            if (!texture) continue;
-            ZVulkanAttachmentInfo a{};
-            a.image = texture->image();
-            a.view = texture->imageView();
-            a.format = texture->format();
-            a.initialLayout = vk::ImageLayout::eUndefined;
-            a.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-            a.clearValue.color = vk::ClearColorValue(std::array<float,4>{0,0,0,0});
-            a.loadOp = vk::AttachmentLoadOp::eClear;
-            a.storeOp = vk::AttachmentStoreOp::eStore;
-            a.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
-            a.dstStage = vk::PipelineStageFlagBits2::eComputeShader;
-            a.srcAccess = {};
-            a.dstAccess = vk::AccessFlagBits2::eShaderRead;
-            a.aspect = vk::ImageAspectFlagBits::eColor;
-            a.trackingTexture = texture;
-            blockAttachments.push_back(a);
-          }
-          std::vector<vk::DescriptorSet> blockSets = collectProgressiveDescriptorSets(resources, true);
-          struct RayPC { float s,i,l,a,b; } pcB{payload.samplingRate, payload.isoValue, payload.localMIPThreshold,
-                                                zeToZW_a, zeToZW_b};
-          ZVulkanGraphicsPassSpec blockSpec{};
-          blockSpec.renderArea = layerRect;
-          blockSpec.viewports = {layerViewport};
-          blockSpec.scissors = {layerRect};
-          blockSpec.colorAttachments = blockAttachments;
-          blockSpec.pipelineHandle = blockPipeline.pipeline->pipelineHandle();
-          blockSpec.pipelineLayoutHandle = blockPipeline.pipeline->pipelineLayoutHandle();
-          blockSpec.descriptorSets = std::move(blockSets);
-          blockSpec.descriptorSetFirst = 0;
-          blockSpec.expectedDescriptorSetCount = 3;
-          blockSpec.vertexBuffers = {m_quadVertexBuffer->buffer()};
-          blockSpec.vertexOffsets = {0};
-          blockSpec.vertexCount = static_cast<uint32_t>(m_quadVertexCount);
-          blockSpec.instanceCount = 1;
-          blockSpec.pushConstantsData = &pcB;
-          blockSpec.pushConstantsSize = sizeof(pcB);
-          blockSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
-          blockSpec.requirePushConstants = true;
-          recorder.recordGraphicsPass(blockSpec);
-          recordBlockIdCompaction(renderer, batch, payload, cmd);
-        }
-      }
-    }
+    // GL fast path does not run Block-ID per channel; skip paging here
 
     updateChannelFastDescriptors(resources,
                                  payload,
@@ -3850,6 +3971,13 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     << "Vulkan raycaster missing transfer function for channel " << channelIndex;
   ZVulkanTexture& transferTex = ensureTransferTexture(resources, *transferList[channelIndex]);
 
+  // Ensure paging caches (page directory + page table) are uploaded before the first Block-ID pass.
+  // Without this, the Vulkan shader may read undefined textures and fail to collect missing blocks.
+  {
+    ZBenchTimer uploadTimer("vulkan_upload_page_caches");
+    m_imageBlockUploader->uploadPageCaches(*payload.image, channelIndex, uploadTimer);
+  }
+
   auto* entryTexture = payload.entryExitLease ? payload.entryExitLease->colorAttachment(0) : nullptr;
   auto* lastColor = payload.lastAccumLease->colorAttachment(0);
   auto* lastDepth = payload.lastAccumLease->colorAttachment(1);
@@ -3858,6 +3986,30 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   CHECK(entryTexture && lastColor && lastDepth && currentColor && currentDepth)
     << "Vulkan raycaster progressive path missing required textures.";
+
+  // GL parity: on round 0, clear the last-accumulator pair explicitly because the Block-ID shader
+  // samples last_ray_depth_tex and last_color_tex. Vulkan normally clears the current accumulators
+  // and swaps after finalize, but for the first round we need last* to be zeroed as GL does.
+  if (payload.roundsCompleted == 0u) {
+    // Clear lastColor (RGBA) to zeros
+    {
+      const auto clear = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
+      const auto range = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0u, 1u, 0u, 1u};
+      lastColor->transitionLayout(cmd, lastColor->layout(), vk::ImageLayout::eTransferDstOptimal);
+      cmd.clearColorImage(lastColor->image(), vk::ImageLayout::eTransferDstOptimal, clear, range);
+      lastColor->transitionLayout(cmd, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+      lastColor->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+    }
+    // Clear lastDepth (accumulator stored as color) to zeros
+    {
+      const auto clear = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
+      const auto range = vk::ImageSubresourceRange{vk::ImageAspectFlagBits::eColor, 0u, 1u, 0u, 1u};
+      lastDepth->transitionLayout(cmd, lastDepth->layout(), vk::ImageLayout::eTransferDstOptimal);
+      cmd.clearColorImage(lastDepth->image(), vk::ImageLayout::eTransferDstOptimal, clear, range);
+      lastDepth->transitionLayout(cmd, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+      lastDepth->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+    }
+  }
 
   const glm::uvec2 outputSize = payload.outputSize;
   CHECK(outputSize.x > 0u && outputSize.y > 0u) << "Vulkan raycaster progressive path requires non-zero output size.";
@@ -4031,7 +4183,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
       attachment.format = texture->format();
       // Begin from UNDEFINED; recorder will transition to COLOR_ATTACHMENT_OPTIMAL
       attachment.initialLayout = vk::ImageLayout::eUndefined;
-      // Make the block-ID image ready for sampling in the compute compaction pass
+      // Make the block-ID image ready for sampled read (texelFetch) in the compute compaction pass
       attachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
       attachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
       attachment.loadOp = vk::AttachmentLoadOp::eClear;
@@ -4087,6 +4239,86 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     blockSpec.requirePushConstants = true;
 
     recorder.recordGraphicsPass(blockSpec);
+    if (FLAGS_atlas_vk_debug_blockid_count) {
+      auto leaseRef = payload.blockIdLease;
+      // Read back via end-of-frame path to guarantee ordering w.r.t GPU writes.
+      // This mirrors how GL readbacks are ordered inside a frame and avoids stale data.
+      if (leaseRef && leaseRef->hasVulkanImage()) {
+        const uint32_t attCount = std::max<uint32_t>(1u, leaseRef->attachments);
+        for (uint32_t att = 0; att < attCount; ++att) {
+          ZVulkanTexture* tex = leaseRef->colorAttachment(att);
+          if (!tex) {
+            continue;
+          }
+          m_backend.requestEndOfFrameColorReadback(
+            *tex,
+            batch.eye,
+            [att](const void* mapped, size_t bytes, vk::Format fmt, glm::uvec2 size, std::function<void()> release) {
+              const uint32_t w = size.x;
+              const uint32_t h = size.y;
+              const size_t elems = static_cast<size_t>(w) * h * 4ull;
+              if (fmt != vk::Format::eR32G32B32A32Uint) {
+                LOG(WARNING) << "BlockID debug readback unexpected format: " << enumOrUnderlying(fmt, 16);
+              }
+              if (bytes < elems * sizeof(uint32_t)) {
+                LOG(ERROR) << "BlockID debug readback buffer too small: bytes=" << bytes
+                           << " need=" << (elems * sizeof(uint32_t));
+                if (release) {
+                  release();
+                }
+                return;
+              }
+              const uint32_t* data = static_cast<const uint32_t*>(mapped);
+              size_t nonZero = 0;
+              size_t validIds = 0;
+              uint32_t rawMin = std::numeric_limits<uint32_t>::max();
+              uint32_t rawMax = 0u;
+              uint32_t validMin = std::numeric_limits<uint32_t>::max();
+              uint32_t validMax = 0u;
+              for (size_t i = 0; i < elems; ++i) {
+                const uint32_t v = data[i];
+                if (v != 0u) {
+                  ++nonZero;
+                }
+                if (v != 0u && v != 0xFFFFFFFFu) {
+                  ++validIds;
+                  if (v < validMin) {
+                    validMin = v;
+                  }
+                  if (v > validMax) {
+                    validMax = v;
+                  }
+                }
+                if (v < rawMin) {
+                  rawMin = v;
+                }
+                if (v > rawMax) {
+                  rawMax = v;
+                }
+              }
+              if (validIds == 0) {
+                validMin = 0u;
+                validMax = 0u;
+              }
+              VLOG(1) << fmt::format(
+                "BlockID debug: att={} nonZero={} validIds={} of {} ({}x{} RGBA32UI) rawMin={} rawMax={} validMin={} validMax={}",
+                att,
+                nonZero,
+                validIds,
+                elems,
+                w,
+                h,
+                rawMin,
+                rawMax,
+                validMin,
+                validMax);
+              if (release) {
+                release();
+              }
+            });
+        }
+      }
+    }
     // Compact block-ID image(s) via compute and schedule a small buffer readback
     if (!FLAGS_atlas_vk_disable_blockid_compaction) {
       recordBlockIdCompaction(renderer, batch, payload, cmd);

@@ -198,6 +198,18 @@ nim::ZVulkanPipelineCommandRecorder recorder(cb);
 recorder.recordComputePass(compute);
 ```
 
+Vulkan Block-ID Compaction
+
+- Append-only model: compaction uses a per-workgroup local dedupe + global append buffer. Hash/CAS variants are deprecated.
+- Read sources (append only):
+  - `--atlas_vk_blockid_compaction_source=buffer|storage|sampled`
+    - `buffer` (default): Copy image → SSBO in-cmd then read from SSBO.
+    - `storage`: Read via `uimage2D + imageLoad` (layout `GENERAL`).
+    - `sampled`: Read via `usampler2D + texelFetch`.
+- Deprecated flag: `--atlas_vk_blockid_compaction_mode`
+  - Ignored; append-only. Keep for compatibility.
+- Synchronization: ColorAttachmentWrite → Compute barrier; for buffer source, image transitions to `TRANSFER_SRC_OPTIMAL`, copy to SSBO, and transitions back. A Transfer→Compute buffer barrier makes the SSBO visible to compute.
+
 - Compute → graphics hazards are spelled out in the attachment descriptors. Example: transition a storage image written by compute into a sampled image for the lighting pass.
 
 ```cpp

@@ -286,11 +286,16 @@ ZVulkanTexture::CreateInfo makeVulkanTextureInfo(const ScratchImageDescriptor& d
                                                  const ScratchAttachmentDesc& attachment)
 {
   const auto format = vkFormatFor(attachment.format);
-  const auto usage = vkUsageFor(attachment);
+  vk::ImageUsageFlags usage = vkUsageFor(attachment);
   const auto aspect = vkAspectMaskFor(attachment.kind, format);
   constexpr auto memory = vk::MemoryPropertyFlagBits::eDeviceLocal;
   constexpr bool createSampler = true;
   const auto descriptorLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+
+  // For Block-ID render targets, allow storage-image reads in compute compaction.
+  if (descriptor.usage == ScratchImageUsage::BlockId && attachment.kind == ScratchAttachmentKind::Color) {
+    usage |= vk::ImageUsageFlagBits::eStorage;
+  }
 
   if (descriptor.dimension == ScratchImageDimension::Tex2D) {
     auto info = ZVulkanTexture::CreateInfo::make2D(descriptor.size.x,
