@@ -822,7 +822,7 @@ void Z3DRendererBase::renderVulkan(Z3DEye eye, Z3DRendererBase::RendererSpan ren
   // different renderer purely to collect CPU batches. Do not require an active
   // recording session here; submission happens on the owning renderer.
 
-  VLOG(1) << "vkRender label='" << m_currentPassLabel << "' renderers=" << renderers.size()
+  VLOG(1) << "VK render label='" << m_currentPassLabel << "' renderers=" << renderers.size()
           << " activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
           << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
 
@@ -837,7 +837,7 @@ void Z3DRendererBase::renderPickingVulkan(Z3DEye eye, Z3DRendererBase::RendererS
   CHECK(m_activeBackend == RenderBackend::Vulkan) << "renderPickingVulkan requires Vulkan backend (got GL)";
   // See comment in renderVulkan: allow out-of-session collection for aggregators.
 
-  VLOG(1) << "vkRenderPicking label='" << m_currentPassLabel << "' renderers=" << renderers.size()
+  VLOG(1) << "VK renderPicking label='" << m_currentPassLabel << "' renderers=" << renderers.size()
           << " activeSurface colors=" << m_frameState.activeSurface.colorAttachments.size()
           << " depth=" << m_frameState.activeSurface.depthAttachment.has_value();
 

@@ -8,6 +8,7 @@
 #include <functional>
 #include <optional>
 #include <vector>
+#include <string>
 
 #include <folly/experimental/coro/Task.h>
 
@@ -134,6 +135,8 @@ struct ZVulkanRenderingSegmentSpec
   vk::Rect2D renderArea{};
   std::vector<ZVulkanAttachmentInfo> colorAttachments{};
   std::optional<ZVulkanAttachmentInfo> depthStencilAttachment{};
+  // Optional debug label for diagnostics/logging
+  std::string debugLabel{};
 };
 
 struct ZVulkanGraphicsDrawSpec

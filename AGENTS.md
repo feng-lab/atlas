@@ -32,10 +32,9 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 
 ## Build & Tooling Cheatsheet
 - **Always read and keep this section handy during a session; it contains the canonical build/test commands.**
-- First-time setup: follow `readme.md` for platform prerequisites (Qt, Intel oneAPI, Vulkan SDK, etc.) before running repo scripts.
-- After external dependencies are in place, run `python3 util/build_ext_libs.py all` to stage bundled libraries.
-- Configure with CMake presets or run `cmake -S . -B build/Release -DCMAKE_BUILD_TYPE=Release` (adjust preset as needed).
-- Incremental build: `cmake --build build/Release` (or your chosen build directory/preset). Prefer running this to confirm edits compile; if you skip it, call out the gap in your handoff.
+- First-time setup: follow `readme.md` for platform prerequisites (Qt, Intel oneAPI, Vulkan SDK, etc.) before running repo scripts. After external dependencies are in place, run `python3 util/build_ext_libs.py all` to stage bundled libraries.
+- Configure with CMake presets or run `cmake -S . -B build/Release -DCMAKE_BUILD_TYPE=Release` (DO NOT adjust preset).
+- Incremental build: `cmake --build build/Release` (DO NOT use other build directory/preset, DO NOT add -j). Prefer running this to confirm edits compile; if you skip it, call out the gap in your handoff.
 - Packaging helper: `python3 util/build_and_deploy_atlas.py [--skip-test]` (wraps build + optional smoke tests).
 - Avoid editing generated files, build artifacts, or anything matched by `.gitignore` (bin/, obj/, artifacts/, logs/, win-mirror/).
 

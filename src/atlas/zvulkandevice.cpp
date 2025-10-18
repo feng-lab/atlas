@@ -7,12 +7,17 @@
 #include "zvulkandescriptorset.h"
 #include "zvulkancontext.h"
 #include "zvulkanframeexecutor.h"
+#include <gflags/gflags.h>
 #include "zexception.h"
 #include "zlog.h"
 
 #include <utility>
 
 namespace nim {
+
+DEFINE_int32(atlas_vk_frames_in_flight,
+             2,
+             "Max Vulkan frames in flight (debug: set to 1 to serialize submits)");
 
 ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
   : m_context(context)
@@ -131,6 +136,9 @@ ZVulkanFrameExecutor& ZVulkanDevice::frameExecutor()
   if (!m_frameExecutor) {
     m_frameExecutor = std::make_unique<ZVulkanFrameExecutor>(*this);
   }
+  // Apply debug gflag on each access to allow runtime tweaks.
+  const uint32_t fif = std::max<int32_t>(1, FLAGS_atlas_vk_frames_in_flight);
+  m_frameExecutor->setMaxFramesInFlight(fif);
   return *m_frameExecutor;
 }
 

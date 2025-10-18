@@ -328,6 +328,10 @@ private:
                                      ZVulkanTexture& volumeTexture,
                                      ZVulkanTexture& transferTexture);
 
+  // If freshOverrideDescriptors is true, force allocation of new per-draw
+  // override descriptor sets to avoid updating sets already bound earlier in
+  // the same command buffer (relevant when splitting into multiple submissions
+  // within a single active frame/command buffer).
   bool updatePageDescriptors(ChannelResources& resources,
                              const ImgRaycasterPayload& payload,
                              ZVulkanTexture& entryExit,
@@ -337,9 +341,11 @@ private:
                              ZVulkanTexture& transfer,
                              const Z3DImg& image,
                              size_t channelIndex,
-                             float zeToScreenPixelVoxelSize);
+                             float zeToScreenPixelVoxelSize,
+                             bool freshOverrideDescriptors = false);
 
-  std::vector<vk::DescriptorSet> collectProgressiveDescriptorSets(ChannelResources& resources);
+  std::vector<vk::DescriptorSet> collectProgressiveDescriptorSets(ChannelResources& resources,
+                                                                  bool preferOverrideStatic = false);
   // depthArray is optional
   void bindMergeDescriptor(ZVulkanTexture& colorArray, /*nullable*/ ZVulkanTexture* depthArray);
   void ensureProgressiveLayerTargets(const glm::uvec2& size,

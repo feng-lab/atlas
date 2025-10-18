@@ -162,14 +162,22 @@ ZVulkanFrameExecutor::Frame& ZVulkanFrameExecutor::acquireFrame()
   ensureFrames();
   CHECK(!m_frames.empty()) << "Frame executor not initialised";
 
-  auto& frame = m_frames[m_cursor];
-  m_cursor = (m_cursor + 1) % m_frames.size();
+  const size_t slot = m_cursor;
+  auto& frame = m_frames[slot];
+  m_cursor = (slot + 1) % m_frames.size();
 
   auto& vkDevice = m_device.context().device();
   if (frame.inFlight) {
     const auto waitResult = vkDevice.waitForFences({*frame.fence}, true, kFenceTimeoutNs);
     if (waitResult != vk::Result::eSuccess) {
       LOG(WARNING) << "Frame executor waitForFences returned " << vk::to_string(waitResult);
+    } else {
+      // Debug note: with frames_in_flight=1, acquiring this slot means the
+      // previous submission finished (fence signaled) before we start
+      // recording the next frame. This does NOT imply the next submit is done
+      // — only that prior work completed and the slot is safe to reuse.
+      VLOG(1) << "VK executor: waited for previous frame fence before reuse"
+              << " (frames_in_flight=" << m_maxFramesInFlight << ", slot=" << slot << ")";
     }
     frame.inFlight = false;
   }

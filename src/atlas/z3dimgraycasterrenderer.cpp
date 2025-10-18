@@ -82,6 +82,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
 
   ImgRaycasterPayload payload;
   payload.streamKey = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(this));
+  payload.stage = m_stageOverride;
   payload.image = m_img;
   payload.outputSize = m_outputSize;
   payload.samplingRate = m_samplingRateValue;

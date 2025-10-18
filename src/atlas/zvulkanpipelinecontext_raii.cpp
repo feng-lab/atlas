@@ -1,14 +1,47 @@
 #include "zvulkanpipelinecontext_raii.h"
 
-#include <gflags/gflags.h>
 #include "zvulkantexture.h"
 #include "z3drenderervulkanbackend.h"
+#include "zvulkancontext.h"
 #include <cstdint>
 
 namespace nim {
 
 namespace {
 constexpr vk::PipelineStageFlags2 kDefaultSrcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+
+// Thread-local label for annotating transition logs with the active pass label.
+// Declared here so all helpers (transitionImage/transitionToFinal) can reference it.
+thread_local std::string g_currentTransitionLabel;
+thread_local bool g_segmentDebugLabelOpen = false;
+
+// Safe wrappers for debug-utils labels; only emit when extension is present.
+inline void cmdBeginDebugLabel(vk::raii::CommandBuffer& cmd, const std::string& label)
+{
+  if (label.empty()) {
+    return;
+  }
+  if (auto* be = Z3DRendererVulkanBackend::current()) {
+    auto& device = be->device().context().device();
+    auto* dispatcher = device.getDispatcher();
+    if (dispatcher && dispatcher->vkCmdBeginDebugUtilsLabelEXT) {
+      vk::DebugUtilsLabelEXT info{};
+      info.pLabelName = label.c_str();
+      cmd.beginDebugUtilsLabelEXT(info);
+    }
+  }
+}
+
+inline void cmdEndDebugLabel(vk::raii::CommandBuffer& cmd)
+{
+  if (auto* be = Z3DRendererVulkanBackend::current()) {
+    auto& device = be->device().context().device();
+    auto* dispatcher = device.getDispatcher();
+    if (dispatcher && dispatcher->vkCmdEndDebugUtilsLabelEXT) {
+      cmd.endDebugUtilsLabelEXT();
+    }
+  }
+}
 
 vk::PipelineStageFlags2 sanitizeStage(vk::PipelineStageFlags2 stage)
 {
@@ -56,13 +89,15 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
 
   // Diagnostics to help trace unexpected layout state.
   if (VLOG_IS_ON(2)) {
-    VLOG(2) << fmt::format("transitionImage: img=0x{:x} initial={} tracked={} effectiveOld={} new={} aspect=0x{:x}",
-                           reinterpret_cast<uint64_t>(static_cast<VkImage>(info.image)),
-                           enumOrUnderlying(requestedOld, 16),
-                           enumOrUnderlying(trackedOld, 16),
-                           enumOrUnderlying(effectiveOld, 16),
-                           enumOrUnderlying(newLayout, 16),
-                           static_cast<uint32_t>(info.aspect));
+    VLOG(2) << fmt::format(
+      "transitionImage(pass='{}'): img=0x{:x} initial={} tracked={} effectiveOld={} new={} aspect=0x{:x}",
+      g_currentTransitionLabel.empty() ? std::string("<unlabeled-pass>") : g_currentTransitionLabel,
+      reinterpret_cast<uint64_t>(static_cast<VkImage>(info.image)),
+      enumOrUnderlying(requestedOld, 16),
+      enumOrUnderlying(trackedOld, 16),
+      enumOrUnderlying(effectiveOld, 16),
+      enumOrUnderlying(newLayout, 16),
+      static_cast<uint32_t>(info.aspect));
   }
 
   vk::ImageMemoryBarrier2 barrier{.srcStageMask = sanitizeStage(info.srcStage),
@@ -91,6 +126,15 @@ void transitionToFinal(vk::raii::CommandBuffer& cmd,
                        vk::PipelineStageFlags2 oldStage,
                        vk::AccessFlags2 oldAccess)
 {
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("transitionToFinal(pass='{}'): img=0x{:x} old={} new={} aspect=0x{:x}",
+                           g_currentTransitionLabel.empty() ? std::string("<unlabeled-pass>")
+                                                            : g_currentTransitionLabel,
+                           reinterpret_cast<uint64_t>(static_cast<VkImage>(info.image)),
+                           enumOrUnderlying(oldLayout, 16),
+                           enumOrUnderlying(info.finalLayout, 16),
+                           static_cast<uint32_t>(info.aspect));
+  }
   vk::ImageMemoryBarrier2 barrier{.srcStageMask = sanitizeStage(oldStage),
                                   .srcAccessMask = sanitizeAccess(oldAccess),
                                   .dstStageMask = sanitizeStage(info.dstStage),
@@ -115,6 +159,8 @@ void transitionToFinal(vk::raii::CommandBuffer& cmd,
 DEFINE_bool(atlas_vk_enforce_pipeline_context,
             true,
             "Enable Vulkan pipeline context debug enforcement (requires debug build)");
+
+DEFINE_bool(atlas_vk_label_draws, false, "Enable per-draw/dispatch Vulkan debug-utils labels (debug tools aid)");
 
 #ifndef NDEBUG
 bool atlasVulkanPipelineContextEnforcementEnabled()
@@ -952,11 +998,28 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
 #endif
 
   CHECK(spec.groupX > 0 && spec.groupY > 0 && spec.groupZ > 0) << "Compute dispatch groups must be non-zero";
-  m_commandBuffer.dispatch(spec.groupX, spec.groupY, spec.groupZ);
+  if (FLAGS_atlas_vk_label_draws) {
+    const std::string label =
+      g_currentTransitionLabel.empty() ? std::string("dispatch") : (g_currentTransitionLabel + ":dispatch");
+    cmdBeginDebugLabel(m_commandBuffer, label);
+    m_commandBuffer.dispatch(spec.groupX, spec.groupY, spec.groupZ);
+    cmdEndDebugLabel(m_commandBuffer);
+  } else {
+    m_commandBuffer.dispatch(spec.groupX, spec.groupY, spec.groupZ);
+  }
 }
 
 void ZVulkanPipelineCommandRecorder::beginRenderingSegment(const ZVulkanRenderingSegmentSpec& spec)
 {
+  // Annotate transitions with the segment's debug label
+  g_currentTransitionLabel = spec.debugLabel;
+  // Open a debug label to wrap the entire segment (pre, rendering, post)
+  if (!g_currentTransitionLabel.empty()) {
+    cmdBeginDebugLabel(m_commandBuffer, g_currentTransitionLabel);
+    g_segmentDebugLabelOpen = true;
+  } else {
+    g_segmentDebugLabelOpen = false;
+  }
   // Pre transitions
   constexpr vk::PipelineStageFlags2 kRenderColorStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
   constexpr vk::AccessFlags2 kRenderColorAccess =
@@ -1018,6 +1081,21 @@ void ZVulkanPipelineCommandRecorder::beginRenderingSegment(const ZVulkanRenderin
 
 void ZVulkanPipelineCommandRecorder::endRenderingSegment(const ZVulkanRenderingSegmentSpec& spec)
 {
+  // Emit a closing log for symmetry with begin
+  if (VLOG_IS_ON(2)) {
+    const uint32_t colors = static_cast<uint32_t>(spec.colorAttachments.size());
+    const bool hasDepth = spec.depthStencilAttachment.has_value();
+    const auto& r = spec.renderArea;
+    const std::string& lbl = g_currentTransitionLabel;
+    VLOG(2) << fmt::format("VK cmdEndRendering: label='{}' colors={} depth={} renderArea=({},{} {}x{})",
+                           lbl.empty() ? std::string("<unlabeled-pass>") : lbl,
+                           colors,
+                           hasDepth,
+                           r.offset.x,
+                           r.offset.y,
+                           r.extent.width,
+                           r.extent.height);
+  }
   m_commandBuffer.endRendering();
   m_segmentActive = false;
   // Post transitions
@@ -1041,6 +1119,13 @@ void ZVulkanPipelineCommandRecorder::endRenderingSegment(const ZVulkanRenderingS
                       depthAttachmentLayoutForAspect(spec.depthStencilAttachment->aspect),
                       kRenderDepthStage,
                       kRenderDepthAccess);
+  }
+  // Clear the label after completing this segment's transitions
+  g_currentTransitionLabel.clear();
+  // Close the debug label region for this segment
+  if (g_segmentDebugLabelOpen) {
+    cmdEndDebugLabel(m_commandBuffer);
+    g_segmentDebugLabelOpen = false;
   }
 }
 
@@ -1222,6 +1307,11 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
   m_debug.assertGraphicsPreDraw(spec);
 #endif
 
+  if (FLAGS_atlas_vk_label_draws) {
+    const std::string label =
+      g_currentTransitionLabel.empty() ? std::string("draw") : (g_currentTransitionLabel + ":draw");
+    cmdBeginDebugLabel(m_commandBuffer, label);
+  }
   if (drawFn) {
     drawFn(m_commandBuffer);
   } else {
@@ -1235,6 +1325,9 @@ void ZVulkanPipelineCommandRecorder::recordGraphicsDraw(const ZVulkanGraphicsDra
       CHECK(spec.vertexCount > 0) << "Graphics draw requires vertexCount when not indexed";
       m_commandBuffer.draw(spec.vertexCount, spec.instanceCount, spec.firstVertex, spec.firstInstance);
     }
+  }
+  if (FLAGS_atlas_vk_label_draws) {
+    cmdEndDebugLabel(m_commandBuffer);
   }
   if (auto* be = Z3DRendererVulkanBackend::current()) {
     be->notifyDrawSubmitted();

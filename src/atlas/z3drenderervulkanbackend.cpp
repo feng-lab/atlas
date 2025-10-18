@@ -334,14 +334,14 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
         dFmt = enumOrUnderlying(dtex->format(), 16);
       }
     }
-    // Avoid empty labels in logs; fall back to a stable placeholder.
-    std::string passLabel = std::string(renderer.currentPassLabel());
-    if (passLabel.empty()) {
-      passLabel = "<unnamed>";
+    // Prefer the frame label here (per-frame), not per-pass label.
+    std::string frameLabel = std::string(renderer.currentFrameLabel());
+    if (frameLabel.empty()) {
+      frameLabel = "<unlabeled-frame>";
     }
     VLOG(2) << fmt::format(
-      "VK beginRender: label='{}' viewport={}x{} colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{}",
-      passLabel,
+      "VK frameBegin: frame='{}' viewport={}x{} colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{}",
+      frameLabel,
       width,
       height,
       surf.colorAttachments.size(),
@@ -466,6 +466,9 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
 
   vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   auto& cmdBuffer = m_activeFrameHandle->commandBuffer();
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << "VK cmdBegin: flags=eOneTimeSubmit";
+  }
   cmdBuffer.begin(beginInfo);
   cmdBuffer.resetQueryPool(*frameResources.queryPool, 0, kMaxTimestampQueries);
   if (queryPoolValid(frameResources.occlusionQueryPool)) {
@@ -534,6 +537,9 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   if (m_frameRecording) {
     try {
       frameHandle.commandBuffer().end();
+      if (VLOG_IS_ON(2)) {
+        VLOG(2) << "VK cmdEnd";
+      }
     }
     catch (const std::exception& e) {
       LOG(ERROR) << "Vulkan command buffer end failed: " << e.what();
@@ -569,6 +575,24 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   //   submitInfo.pSignalSemaphores = &signalSemaphore;
   // }
 
+  // Diagnostics: log submission intent with frame identity and wait conditions.
+  const bool waitForReadbacks = (m_activeFrame && !m_activeFrame->pendingColorReadbacks.empty());
+  const bool waitForOcclusion = frame.occlusionQueryNeedsWait;
+  const bool needFenceWait = waitForReadbacks || waitForOcclusion || m_pumpFenceAfterFirstSubmit;
+  if (VLOG_IS_ON(1)) {
+    VLOG(1) << fmt::format(
+      "VK queueSubmit: frame='{}' token={} submit#{} cmd=0x{:x} fence=0x{:x} wait_readback={} wait_occlusion={} pending_readbacks={} queries={}",
+      frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
+      frame.realFrameToken,
+      frame.submissionId,
+      static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkCommandBuffer>(rawCmd))),
+      static_cast<uint64_t>(reinterpret_cast<uintptr_t>(static_cast<VkFence>(*frameHandle.fence()))),
+      waitForReadbacks,
+      waitForOcclusion,
+      frame.pendingColorReadbacks.size(),
+      frame.nextOcclusionQuery);
+  }
+
   try {
     queue.submit(submitInfo, *frameHandle.fence());
     device().frameExecutor().markSubmitted(frameHandle);
@@ -580,13 +604,11 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   // Stage 2: schedule exactly one descriptor arena reset for this frame.
   scheduleArenaReset(frame);
 
-  const bool waitForReadbacks = (m_activeFrame && !m_activeFrame->pendingColorReadbacks.empty());
-  const bool waitForOcclusion = frame.occlusionQueryNeedsWait;
-  const bool needFenceWait = waitForReadbacks || waitForOcclusion || m_pumpFenceAfterFirstSubmit;
-
   if (needFenceWait) {
     device().frameExecutor().waitForCompletion(frameHandle);
     applyPendingArenaReset(frame); // runs deferred readback consumers now
+
+    // Fence signaled; deferred readbacks/releases executed.
 
     if (waitForOcclusion && queryPoolValid(frame.occlusionQueryPool) && frame.nextOcclusionQuery > 0) {
       const vk::QueryResultFlags queryFlags = vk::QueryResultFlagBits::e64 | vk::QueryResultFlagBits::eWait;
@@ -631,13 +653,17 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
       // Explicitly wait only when the flag requests immediate timing collection.
       device().frameExecutor().waitForCompletion(frameHandle);
       applyPendingArenaReset(frame);
+      // Fence signaled for timings collection.
     }
     collectFrameTimings(frame);
   }
 
   // Stage 3: VLOG instrumentation for dynamic rendering segments and pipeline stats
   VLOG(1) << fmt::format(
-    "VK segments: began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={} overrides={} skipped_format_mismatch={} descriptor_writes_while_recording={} bound_set_rewrite_attempts={} readback_bytes_copied={} readback_slots_in_flight={} static_bytes_staged={} static_stream_restaged={} lines_bytes_staged={} fonts_bytes_staged={} meshes_bytes_staged={} spheres_bytes_staged={}",
+    "VK segments: frame='{}' token={} submit#{} began={} clears={} loads={} pipelines_created={} pipelines_bound_unique={} overrides={} skipped_format_mismatch={} descriptor_writes_while_recording={} bound_set_rewrite_attempts={} readback_bytes_copied={} readback_slots_in_flight={} static_bytes_staged={} static_stream_restaged={} lines_bytes_staged={} fonts_bytes_staged={} meshes_bytes_staged={} spheres_bytes_staged={}",
+    frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
+    frame.realFrameToken,
+    frame.submissionId,
     frame.renderingSegmentsBegan,
     frame.attachmentClears,
     frame.attachmentLoads,
@@ -657,10 +683,14 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     frame.spheresBytesStaged);
 
   // Stage 5: VLOG(1) static/upload arena usage
-  VLOG(1) << fmt::format("VK arena: upload_high_watermark={}B static_vb_used={}B static_ib_used={}B",
-                         m_activeFrame ? m_activeFrame->uploadArena.highWatermark : 0,
-                         m_staticArena.vbHighWatermark,
-                         m_staticArena.ibHighWatermark);
+  VLOG(1) << fmt::format(
+    "VK arena: frame='{}' token={} submit#{} upload_high_watermark={}B static_vb_used={}B static_ib_used={}B",
+    frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
+    frame.realFrameToken,
+    frame.submissionId,
+    m_activeFrame ? m_activeFrame->uploadArena.highWatermark : 0,
+    m_staticArena.vbHighWatermark,
+    m_staticArena.ibHighWatermark);
 
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
@@ -840,7 +870,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     // Skip empty segments
     if (outSpec.colorAttachments.empty() && !outSpec.depthStencilAttachment.has_value()) {
       if (VLOG_IS_ON(2)) {
-        VLOG(2) << fmt::format("VK skip beginRendering: label='{}' colors=0 depth=0 renderArea=({},{} {}x{})",
+        VLOG(2) << fmt::format("VK skip cmdBeginRendering: label='{}' colors=0 depth=0 renderArea=({},{} {}x{})",
                                renderer.currentPassLabel(),
                                outSpec.renderArea.offset.x,
                                outSpec.renderArea.offset.y,
@@ -884,8 +914,9 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       if (passLabel.empty()) {
         passLabel = "<unnamed>";
       }
+      outSpec.debugLabel = passLabel;
       VLOG(2) << fmt::format(
-        "VK beginRendering(recorder): label='{}' colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{} renderArea=({},{} {}x{})",
+        "VK cmdBeginRendering: label='{}' colors={} c0=0x{:x} fmt={} {}x{} depth={} d=0x{:x} fmt={} {}x{} renderArea=({},{} {}x{})",
         passLabel,
         outSpec.colorAttachments.size(),
         firstColorHandle,
@@ -989,7 +1020,12 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
       const bool needsTransition = (texture.layout() != samplingState.layout);
       // Only log when a transition is actually required to reduce noise.
       if (needsTransition && VLOG_IS_ON(2)) {
-        VLOG(2) << fmt::format("ensureSampledReadable: handle=0x{:x} {} -> {} fmt={}",
+        std::string passLabel = std::string(renderer.currentPassLabel());
+        if (passLabel.empty()) {
+          passLabel = "<unlabeled-pass>";
+        }
+        VLOG(2) << fmt::format("ensureSampledReadable('{}'): handle=0x{:x} {} -> {} fmt={}",
+                               passLabel,
                                handle.id,
                                enumOrUnderlying(texture.layout(), 16),
                                enumOrUnderlying(samplingState.layout, 16),
@@ -1917,6 +1953,10 @@ void Z3DRendererVulkanBackend::ensureDevice()
       m_timestampPeriod = 1.0f;
     }
   }
+  // Keep local ring sizes aligned with the device executor setting.
+  if (m_sharedDevice) {
+    m_maxFramesInFlight = m_sharedDevice->frameExecutor().maxFramesInFlight();
+  }
 }
 
 void Z3DRendererVulkanBackend::resetFrameResources()
@@ -2000,11 +2040,15 @@ void Z3DRendererVulkanBackend::scheduleArenaReset(FrameResources& frame)
 
 void Z3DRendererVulkanBackend::vlogFrameRecyclingStats(const FrameResources& frame) const
 {
-  VLOG(1) << fmt::format("VK frame: descriptor_sets={} arena_resets={} lease_recycle_queued={} executed={}",
-                         frame.descriptorSetsAllocated,
-                         frame.arenaResetsPerformed,
-                         frame.leaseRecycleQueued,
-                         frame.leaseRecycleExecuted);
+  VLOG(1) << fmt::format(
+    "VK frame: frame='{}' token={} submit#{} descriptor_sets={} arena_resets={} lease_recycle_queued={} executed={}",
+    frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
+    frame.realFrameToken,
+    frame.submissionId,
+    frame.descriptorSetsAllocated,
+    frame.arenaResetsPerformed,
+    frame.leaseRecycleQueued,
+    frame.leaseRecycleExecuted);
 }
 
 const std::optional<vulkan::AttachmentFormats>& Z3DRendererVulkanBackend::currentSegmentFormats() const
