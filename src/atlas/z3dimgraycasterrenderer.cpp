@@ -93,12 +93,14 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   payload.visibleChannels = visibleChannels;
   payload.activeChannel = visibleChannels.empty() ? std::numeric_limits<size_t>::max() : visibleChannels.front();
   payload.activeChannelIndex = 0u;
-  payload.progressiveGeneration = m_progressiveGeneration[eye];
-  payload.transferFunctions = &m_transferFunctions;
+  // Progressive init parity with GL: on first entry into progressive rendering,
+  // initialize state and advance generation so downstream Vulkan pipelines can
+  // clear/prime their per-generation targets before paging kicks in.
   if (!payload.fastPathOnly) {
     if (m_channelIdx[eye] < 0) {
       m_channelIdx[eye] = 0;
       m_round[eye] = 0;
+      ++m_progressiveGeneration[eye];
     }
     if (!visibleChannels.empty()) {
       const int clampedIndex = std::clamp(m_channelIdx[eye], 0, static_cast<int>(visibleChannels.size() - 1));
@@ -109,6 +111,8 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     m_channelIdx[eye] = -1;
     m_round[eye] = 0;
   }
+  payload.progressiveGeneration = m_progressiveGeneration[eye];
+  payload.transferFunctions = &m_transferFunctions;
   payload.roundsCompleted = static_cast<uint32_t>(std::max(0, m_round[eye]));
   payload.roundsRemaining = FLAGS_atlas_volume_rendering_maximum_round;
 

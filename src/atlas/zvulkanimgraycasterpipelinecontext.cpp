@@ -278,7 +278,6 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
   if (FLAGS_atlas_vk_debug_raycaster_dump) {
     const auto ptb = image.pageTableBlockSize();
     const auto ibs = image.imageBlockSize();
-    const glm::uvec3 cacheSize = image.imageCacheSize();
     VLOG(1) << fmt::format(
       "Page UBO summary: pageTableBlockSize=({}, {}, {}) imageBlockSize=({}, {}, {}) cacheSize=({}, {}, {}) addrNorm=({}, {}, {}) ze2px={:.6f}",
       ptb.x,
@@ -1826,8 +1825,9 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
       resources.staticDescriptor = m_backend.allocateOverrideDescriptorSet(**m_progressiveStaticSetLayout);
     }
     CHECK(resources.staticDescriptor) << "Failed to allocate Vulkan raycaster static descriptor set (override).";
-    resources.staticDescriptor->updateTexture(0, *pageDirectory, m_backend.defaultSampler());
-    resources.staticDescriptor->updateTexture(1, *pageTable, m_backend.defaultSampler());
+    // Integer 3D samplers must use nearest sampling on Vulkan/Metal
+    resources.staticDescriptor->updateTexture(0, *pageDirectory, m_backend.nearestClampSampler());
+    resources.staticDescriptor->updateTexture(1, *pageTable, m_backend.nearestClampSampler());
     resources.staticDescriptor->updateTexture(2, *imageCache, m_backend.defaultSampler());
     resources.staticDescriptor->updateTexture(3, volume, m_backend.defaultSampler());
     resources.staticDescriptor->updateTexture(4, transfer, m_backend.defaultSampler());
@@ -1853,8 +1853,9 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
         ChannelResources& res = ensureChannelResources(resIndexStatic);
         res.persistentStaticDescriptor =
           std::make_unique<ZVulkanDescriptorSet>(backendPtr->device(), raw, /*isOverrideTransient=*/false);
-        res.persistentStaticDescriptor->writeTextureOnce(0, *pd, backendPtr->defaultSampler());
-        res.persistentStaticDescriptor->writeTextureOnce(1, *pt, backendPtr->defaultSampler());
+        // Integer 3D samplers: use nearest clamp sampler
+        res.persistentStaticDescriptor->writeTextureOnce(0, *pd, backendPtr->nearestClampSampler());
+        res.persistentStaticDescriptor->writeTextureOnce(1, *pt, backendPtr->nearestClampSampler());
         res.persistentStaticDescriptor->writeTextureOnce(2, *ic, backendPtr->defaultSampler());
         res.persistentStaticDescriptor->writeTextureOnce(3, *vol, backendPtr->defaultSampler());
         res.persistentStaticDescriptor->writeTextureOnce(4, *tf, backendPtr->defaultSampler());
@@ -1883,8 +1884,8 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
       m_backend.scheduleAfterCurrentFrameCompletion([this, resIndexStatic, pd, pt, ic, vol, tf]() {
         ChannelResources& res = ensureChannelResources(resIndexStatic);
         if (res.persistentStaticDescriptor) {
-          res.persistentStaticDescriptor->updateTexture(0, *pd, m_backend.defaultSampler());
-          res.persistentStaticDescriptor->updateTexture(1, *pt, m_backend.defaultSampler());
+          res.persistentStaticDescriptor->updateTexture(0, *pd, m_backend.nearestClampSampler());
+          res.persistentStaticDescriptor->updateTexture(1, *pt, m_backend.nearestClampSampler());
           res.persistentStaticDescriptor->updateTexture(2, *ic, m_backend.defaultSampler());
           res.persistentStaticDescriptor->updateTexture(3, *vol, m_backend.defaultSampler());
           res.persistentStaticDescriptor->updateTexture(4, *tf, m_backend.defaultSampler());
@@ -3548,6 +3549,21 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 {
   const uint32_t channelCount = static_cast<uint32_t>(payload.visibleChannels.size());
   if (channelCount == 0u) {
+    return;
+  }
+
+  // Match GL behavior: on the first progressive round, render a fast-path
+  // (non-paged) volume and return early. Also prime progressive layer targets
+  // (created/cleared for the current generation) so subsequent rounds can
+  // immediately render into them.
+  if (payload.roundsCompleted == 0u) {
+    // Prime progressive targets for this generation and show fast path only.
+    ensureProgressiveLayerTargets(payload.outputSize, channelCount, payload.progressiveGeneration, cmd);
+    renderFastVolume(renderer, batch, payload, viewport, scissor, cmd, composite);
+    // Do NOT finalize a round here. GL does not increment the progressive
+    // round counter on the initial fast preview; it only updates progress
+    // visually and returns. Keeping m_round at 0 preserves parity for the
+    // next real paged round.
     return;
   }
 

@@ -22,6 +22,7 @@ void main()
   FragAccum = vec4(c.rgb * a, a);
   // For images, treat each fragment as one sample (n += 1), and sum depths
   FragMoments = vec2(1.0, d);
-  // No depth write into a depth attachment for WA init (color-only)
+  // Write depth so the init pass respects the provided depth attachment. This
+  // ensures contributions behind opaque geometry are culled during WA init.
+  gl_FragDepth = d;
 }
-

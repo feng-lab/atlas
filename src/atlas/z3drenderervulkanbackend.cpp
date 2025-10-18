@@ -50,6 +50,13 @@ DEFINE_bool(vk_reserve_upload_slices,
 DECLARE_string(atlas_perf_mode);
 DECLARE_bool(atlas_perf_trace_calibrated);
 
+// Optional: collect frame timings at endRender instead of next beginRender.
+// When true, endRender will fence-wait to harvest GPU timestamps immediately
+// (may reduce concurrency). When false, timings are collected at next beginRender.
+DEFINE_bool(atlas_vk_collect_timings_on_end,
+            false,
+            "Collect and log Vulkan frame timings at endRender (fence-wait as needed)");
+
 namespace nim {
 
 namespace {
@@ -614,6 +621,19 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 
   // VLOG(1) frame recycling stats (descriptors and arena reset scheduling)
   vlogFrameRecyclingStats(frame);
+
+  // Optionally collect and print frame timings at endRender instead of next beginRender.
+  // This provides earlier visibility when we have already waited for the fence
+  // (e.g., due to readbacks or occlusion), or when explicitly requested via flag.
+  const bool collectNow = needFenceWait || FLAGS_atlas_vk_collect_timings_on_end;
+  if (collectNow) {
+    if (!needFenceWait && FLAGS_atlas_vk_collect_timings_on_end) {
+      // Explicitly wait only when the flag requests immediate timing collection.
+      device().frameExecutor().waitForCompletion(frameHandle);
+      applyPendingArenaReset(frame);
+    }
+    collectFrameTimings(frame);
+  }
 
   // Stage 3: VLOG instrumentation for dynamic rendering segments and pipeline stats
   VLOG(1) << fmt::format(

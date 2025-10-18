@@ -343,13 +343,19 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  // Resolve pass also writes a representative depth (mean depth from moments).
-  // Match the OpenGL resolve behaviour: depth writes only replace stored values
-  // when the resolved depth is closer. Using LessOrEqual prevents transparent
-  // resolves from pushing geometry farther into the depth buffer, which would
-  // break later depth-tested blends (e.g. the compositor's alpha blend stage).
+  // Resolve pass writes a representative depth (mean depth from moments) via
+  // gl_FragDepth in the fragment shader. To guarantee the fragment shader runs
+  // across the full-screen quad even when existing depth contains nearer values
+  // (e.g., opaque slices drawn earlier), use Always for the depth compare and
+  // allow the shader to determine the final per-pixel depth. This mirrors the
+  // GL path and avoids early-depth culling of the quad when the VBO places it
+  // at the far plane.
+  // Keep depth test enabled and force Always compare so late depth testing
+  // does not cull fragments before the shader writes gl_FragDepth. Depth
+  // writes remain enabled so the resolved representative depth lands in the
+  // target.
   instance.pipeline->setDepthTestEnable(true);
-  instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
+  instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
   instance.pipeline->setDepthWriteEnable(true);
 
   // Blend weighted-average result over the existing background using

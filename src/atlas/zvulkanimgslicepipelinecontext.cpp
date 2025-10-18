@@ -1199,8 +1199,9 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
   }
   CHECK(resources.pagedTextureDescriptor != nullptr)
     << "Slice paged path: override descriptor allocation failed (fatal)";
-  resources.pagedTextureDescriptor->updateTexture(0, pageDirectory, m_backend.defaultSampler());
-  resources.pagedTextureDescriptor->updateTexture(1, pageTable, m_backend.defaultSampler());
+  // Integer 3D samplers must use nearest sampling on Vulkan/Metal
+  resources.pagedTextureDescriptor->updateTexture(0, pageDirectory, m_backend.nearestClampSampler());
+  resources.pagedTextureDescriptor->updateTexture(1, pageTable, m_backend.nearestClampSampler());
   resources.pagedTextureDescriptor->updateTexture(2, imageCache, m_backend.defaultSampler());
   resources.pagedTextureDescriptor->updateTexture(3, volume, m_backend.defaultSampler());
   resources.pagedTextureDescriptor->updateTexture(4, colormap, m_backend.defaultSampler());
