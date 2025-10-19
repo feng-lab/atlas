@@ -8,7 +8,7 @@
 #include "z3dtextureandeyecoordinaterenderer.h"
 #include "z3dscratchresourcepool.h"
 #include <array>
-#include "z3drendercommands.h" // ImgRaycasterPayload::Stage
+#include "z3drendercommands.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -98,16 +98,6 @@ public:
     }
     m_compositingModeValue = mode;
     compile();
-  }
-
-  // Vulkan split: optionally override which stage to record this submission
-  void setVulkanSplitStageOverride(ImgRaycasterPayload::Stage stage)
-  {
-    m_stageOverride = stage;
-  }
-  ImgRaycasterPayload::Stage vulkanSplitStageOverride() const
-  {
-    return m_stageOverride;
   }
 
   void setChannelCount(size_t count);
@@ -305,8 +295,6 @@ private:
     m_entryExitLease; // holds lifetime of entry/exit render target during a frame
   Z3DScratchResourcePool::RenderTargetLease m_progressiveLayerLease; // persistent across progressive rounds
 
-  // Stage override for Vulkan split (propagated into payload in enqueue)
-  ImgRaycasterPayload::Stage m_stageOverride = ImgRaycasterPayload::Stage::Full;
 };
 
 // Helper to finalize progressive rounds for ImgRaycaster by stream identity.

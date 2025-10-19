@@ -51,6 +51,13 @@ public:
     uint32_t channelCount = 0;
   };
 
+  struct DeferredProgressive
+  {
+    uint64_t streamKey = 0;
+    Z3DEye eye = MonoEye;
+    uint32_t channelCount = 0;
+  };
+
   // Expose pending-finalization pull for the backend driver (no friendship).
   std::optional<Finalization> takePendingFinalization();
 
@@ -299,6 +306,7 @@ private:
   uint32_t m_progressiveGeneration = 0u;
 
   std::optional<Finalization> m_pendingFinalization;
+  std::optional<DeferredProgressive> m_deferredProgressive;
 
   // Track which depth images have been cleared this frame (for first-use clear on merge).
   std::unordered_set<VkImage> m_depthClearedThisFrame;
@@ -352,8 +360,7 @@ private:
 
   // If freshOverrideDescriptors is true, force allocation of new per-draw
   // override descriptor sets to avoid updating sets already bound earlier in
-  // the same command buffer (relevant when splitting into multiple submissions
-  // within a single active frame/command buffer).
+  // the same command buffer.
   bool updatePageDescriptors(ChannelResources& resources,
                              const ImgRaycasterPayload& payload,
                              ZVulkanTexture& entryExit,
@@ -423,7 +430,9 @@ private:
                              const vk::Viewport& viewport,
                              const vk::Rect2D& scissor,
                              vk::raii::CommandBuffer& cmd,
-                             const CompositingConfig& composite);
+                             const CompositingConfig& composite,
+                             bool skipBlockIdPass,
+                             std::optional<Finalization> finalizeAfterProgressive);
 
   // (public) see takePendingFinalization() above
 };

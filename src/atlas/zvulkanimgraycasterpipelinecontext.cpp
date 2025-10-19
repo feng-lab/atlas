@@ -406,11 +406,25 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
 
   CHECK(payload.image) << "Raycaster payload missing image pointer.";
 
-  // If a finalization from the previous frame is pending, skip recording any
-  // progressive work for this stream/eye now. The backend will consume the
-  // finalization immediately after record() and advance the channel, avoiding
-  // an extra compaction pass on the same channel.
-  if (m_pendingFinalization && m_pendingFinalization->streamKey == payload.streamKey &&
+  // Progressive bookkeeping overview:
+  // - m_pendingFinalization carries the round completion that the backend
+  //   should report back to the renderer after this submission.
+  // - m_deferredProgressive is set when the compaction callback discovers that
+  //   the next round only needs the progressive raycast (block-ID pass already
+  //   proved the cache is complete). When present, we skip the block-ID stage
+  //   below but still emit the progressive pass so GL/Vulkan stay in lockstep.
+  std::optional<DeferredProgressive> deferredRound;
+  if (m_deferredProgressive && m_deferredProgressive->streamKey == payload.streamKey &&
+      m_deferredProgressive->eye == batch.eye) {
+    deferredRound = m_deferredProgressive;
+  }
+
+  // If a finalization from the previous frame is pending (and no deferred
+  // progressive-only round is required), skip recording any progressive work
+  // for this stream/eye now. The backend will consume the finalization
+  // immediately after record() and advance the channel, avoiding an extra
+  // compaction pass on the same channel.
+  if (!deferredRound && m_pendingFinalization && m_pendingFinalization->streamKey == payload.streamKey &&
       m_pendingFinalization->eye == batch.eye) {
     VLOG(1) << "Raycaster: skipping progressive work due to pending finalization (will advance channel).";
     return;
@@ -429,10 +443,7 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   }
 
   const bool needsEntryExit = fastVariant == FastPipelineVariant::Volume;
-  const auto stage = payload.stage;
-  const bool skipEntryExit =
-    (stage == ImgRaycasterPayload::Stage::BlockIdOnly || stage == ImgRaycasterPayload::Stage::ProgressiveOnly);
-  if (needsEntryExit && !skipEntryExit) {
+  if (needsEntryExit) {
     if (auto t = m_backend.beginGpuScope("ray_entry_exit")) {
       renderEntryExit(renderer, batch, payload, viewport, scissor, cmd);
       m_backend.endGpuScope(*t);
@@ -442,9 +453,11 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
     VLOG(2) << "after renderEntryExit";
   }
 
-  // Entry/exit-only stage stops after generating the entry/exit targets.
-  if (stage == ImgRaycasterPayload::Stage::EntryExitOnly) {
-    return;
+  const bool skipBlockIdThisFrame = deferredRound.has_value();
+  std::optional<Finalization> finalizeAfterProgressive;
+  if (deferredRound) {
+    finalizeAfterProgressive =
+      Finalization{.streamKey = payload.streamKey, .eye = batch.eye, .lastRound = true, .channelCount = deferredRound->channelCount};
   }
 
   if (payload.fastPathOnly) {
@@ -460,10 +473,29 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
       << "Progressive raycaster path only supports volumetric rendering.";
     VLOG(2) << "dispatch progressive path";
     if (auto t = m_backend.beginGpuScope("ray_progressive")) {
-      renderProgressivePath(renderer, batch, payload, viewport, scissor, cmd, composite);
+      renderProgressivePath(renderer,
+                            batch,
+                            payload,
+                            viewport,
+                            scissor,
+                            cmd,
+                            composite,
+                            skipBlockIdThisFrame,
+                            finalizeAfterProgressive);
       m_backend.endGpuScope(*t);
     } else {
-      renderProgressivePath(renderer, batch, payload, viewport, scissor, cmd, composite);
+      renderProgressivePath(renderer,
+                            batch,
+                            payload,
+                            viewport,
+                            scissor,
+                            cmd,
+                            composite,
+                            skipBlockIdThisFrame,
+                            finalizeAfterProgressive);
+    }
+    if (skipBlockIdThisFrame) {
+      m_deferredProgressive.reset();
     }
   }
 }
@@ -1289,8 +1321,10 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
       VLOG(1) << fmt::format("cache uploads dispatched: blocks={}", missingBlocks.size());
     }
 
-    // Any attachment with zero contribution implies all later attachments would also be zero.
-    bool attAllZero = false;
+    // Track attachments that rendered zero block IDs so we can mirror GL's
+    // "last round" and "skip progressive" heuristics.
+    bool anyZeroAttachment = false;
+    bool allZeroAttachments = (attCount != 0);
     uint32_t zeroAtt = std::numeric_limits<uint32_t>::max();
     if (countSnap) {
       const size_t bytes = static_cast<size_t>(attCount) * sizeof(uint32_t);
@@ -1298,10 +1332,14 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
       CHECK(mappedCnt != nullptr);
       const uint32_t* counts = static_cast<const uint32_t*>(mappedCnt);
       for (uint32_t att = 0; att < attCount; ++att) {
-        if (counts[att] == 0u) {
-          attAllZero = true;
-          zeroAtt = att;
-          break;
+        const bool zero = counts[att] == 0u;
+        if (zero) {
+          if (!anyZeroAttachment) {
+            zeroAtt = att;
+          }
+          anyZeroAttachment = true;
+        } else {
+          allZeroAttachments = false;
         }
       }
       if (VLOG_IS_ON(1)) {
@@ -1313,9 +1351,10 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
           }
           s += fmt::format("{}", counts[att]);
         }
-        VLOG(1) << fmt::format("compaction per-attachment counts: [{}] (allZero={} zeroAtt={})",
+        VLOG(1) << fmt::format("compaction per-attachment counts: [{}] (anyZero={} allZero={} firstZeroAtt={})",
                                s,
-                               attAllZero ? 1 : 0,
+                               anyZeroAttachment ? 1 : 0,
+                               allZeroAttachments ? 1 : 0,
                                (zeroAtt == std::numeric_limits<uint32_t>::max() ? -1 : static_cast<int>(zeroAtt)));
       }
       countSnap->unmap();
@@ -1325,20 +1364,31 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     const size_t cacheCapacity = imagePtr->numCachedImages(channelIndex);
     const bool fitsCache = missingBlocks.size() <= cacheCapacity;
     if (VLOG_IS_ON(1)) {
-      VLOG(1) << fmt::format("compaction last-round check: attAllZero={} fitsCache={} unionSize={} capacity={}",
-                             attAllZero ? 1 : 0,
+      VLOG(1) << fmt::format("compaction last-round check: anyZero={} allZero={} fitsCache={} unionSize={} capacity={}",
+                             anyZeroAttachment ? 1 : 0,
+                             allZeroAttachments ? 1 : 0,
                              fitsCache ? 1 : 0,
                              missingBlocks.size(),
                              cacheCapacity);
     }
-    if (attAllZero && fitsCache) {
+    if (allZeroAttachments) {
+      m_deferredProgressive.reset();
       m_pendingFinalization =
         Finalization{.streamKey = streamKey, .eye = eye, .lastRound = true, .channelCount = channelCount};
-      VLOG(1) << fmt::format("compaction: lastRound=true (channelIndex={} zeroAtt={} unionSize={} capacity={})",
+      VLOG(1) << fmt::format("compaction: skip progressive round (all attachments zero, channelIndex={} unionSize={} capacity={})",
+                             channelIndex,
+                             missingBlocks.size(),
+                             cacheCapacity);
+    } else if (anyZeroAttachment && fitsCache) {
+      m_deferredProgressive = DeferredProgressive{.streamKey = streamKey, .eye = eye, .channelCount = channelCount};
+      VLOG(1) << fmt::format("compaction: schedule progressive-only round (channelIndex={} firstZeroAtt={} unionSize={} capacity={})",
                              channelIndex,
                              (zeroAtt == std::numeric_limits<uint32_t>::max() ? -1 : static_cast<int>(zeroAtt)),
                              missingBlocks.size(),
                              cacheCapacity);
+    } else if (m_deferredProgressive && m_deferredProgressive->streamKey == streamKey &&
+               m_deferredProgressive->eye == eye) {
+      m_deferredProgressive.reset();
     }
   });
 }
@@ -2306,9 +2356,8 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
       });
     }
 
-    // In split submissions, prefer a per-draw override static descriptor to
-    // avoid updating a persistent set that may have been bound earlier in the
-    // same command buffer.
+    // Prefer a per-draw override static descriptor so we never rewrite a
+    // persistent set that might still be referenced later in the frame.
     if (freshOverrideDescriptors) {
       if (!resources.staticDescriptor) {
         resources.staticDescriptor = m_backend.allocateOverrideDescriptorSet(**m_progressiveStaticSetLayout);
@@ -2373,9 +2422,8 @@ ZVulkanImgRaycasterPipelineContext::collectProgressiveDescriptorSets(ChannelReso
 {
   CHECK(resources.pagedDescriptor) << "Vulkan raycaster progressive descriptors not initialised.";
 
-  // In split mode, allocate a fresh override static descriptor every time to
-  // avoid updating a set that may have been bound earlier in the same command
-  // buffer. Do not reuse resources.staticDescriptor here.
+  // Allocate a fresh override static descriptor when requested so we avoid
+  // mutating a set that may have been bound earlier in the same command buffer.
   vk::DescriptorSet staticSet{};
   if (preferOverrideStatic) {
     CHECK(resources.boundPageDirectoryTex && resources.boundPageTableTex && resources.boundImageCacheTex &&
@@ -4032,7 +4080,9 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                                                                const vk::Viewport& viewport,
                                                                const vk::Rect2D& scissor,
                                                                vk::raii::CommandBuffer& cmd,
-                                                               const CompositingConfig& composite)
+                                                               const CompositingConfig& composite,
+                                                               bool skipBlockIdPass,
+                                                               std::optional<Finalization> finalizeAfterProgressive)
 {
   const uint32_t channelCount = static_cast<uint32_t>(payload.visibleChannels.size());
   if (channelCount == 0u) {
@@ -4041,9 +4091,6 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   // GL parity: fast preview indicated by channelIndexRaw < 0.
   if (static_cast<int32_t>(payload.channelIndexRaw) < 0) {
-    if (payload.stage != ImgRaycasterPayload::Stage::Full) {
-      return;
-    }
     ensureProgressiveLayerTargets(payload.outputSize, channelCount, payload.progressiveGeneration, cmd);
     renderFastVolume(renderer, batch, payload, viewport, scissor, cmd, composite);
     // Request renderer to flip channelIdx from -1 to 0 for subsequent rounds (GL parity)
@@ -4062,8 +4109,10 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   const bool resultOpaque = composite.resultOpaque;
   const bool localMip = composite.localMip;
 
-  CHECK(payload.blockIdLease && payload.blockIdLease->attachments != 0)
-    << "Vulkan raycaster progressive path missing block-ID lease.";
+  if (!skipBlockIdPass) {
+    CHECK(payload.blockIdLease && payload.blockIdLease->attachments != 0)
+      << "Vulkan raycaster progressive path missing block-ID lease.";
+  }
 
   CHECK(payload.lastAccumLease && payload.currentAccumLease)
     << "Vulkan raycaster progressive path missing accumulator leases.";
@@ -4152,12 +4201,10 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   ZVulkanTexture* layerColor = nullptr;
   ZVulkanTexture* layerDepth = nullptr;
-  if (payload.stage != ImgRaycasterPayload::Stage::BlockIdOnly) {
-    ensureProgressiveLayerTargets(outputSize, channelCount, payload.progressiveGeneration, cmd);
-    layerColor = m_progressiveLayerColor.get();
-    layerDepth = m_progressiveLayerDepth.get();
-    CHECK(layerColor && layerDepth) << "Vulkan raycaster progressive path missing layer-array targets.";
-  }
+  ensureProgressiveLayerTargets(outputSize, channelCount, payload.progressiveGeneration, cmd);
+  layerColor = m_progressiveLayerColor.get();
+  layerDepth = m_progressiveLayerDepth.get();
+  CHECK(layerColor && layerDepth) << "Vulkan raycaster progressive path missing layer-array targets.";
 
   const auto& viewState = renderer.viewState();
   const auto& sceneState = renderer.sceneState();
@@ -4221,7 +4268,6 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                                          static_cast<float>(channelImage.height()),
                                          static_cast<float>(channelImage.depth())));
 
-  const bool freshOverrideForSplit = (payload.stage != ImgRaycasterPayload::Stage::Full);
   if (!updatePageDescriptors(resources,
                              payload,
                              *entryTexture,
@@ -4232,7 +4278,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                              *payload.image,
                              channelIndex,
                              zeToScreenPixelVoxelSize,
-                             freshOverrideForSplit)) {
+                             /*freshOverrideDescriptors=*/false)) {
     return;
   }
 
@@ -4261,7 +4307,9 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   }
 
   // ---------------- Block-ID pass ----------------
-  if (payload.stage != ImgRaycasterPayload::Stage::ProgressiveOnly) {
+  // When skipBlockIdPass is true we have a deferred progressive-only round and
+  // can reuse the previous frame's block-ID results (no draw or compaction here).
+  if (!skipBlockIdPass) {
     std::vector<uint32_t> rawBlockIds;
     rawBlockIds.reserve(static_cast<size_t>(payload.blockIdLease->descriptor.size.x) *
                         payload.blockIdLease->descriptor.size.y * 4ull);
@@ -4449,13 +4497,6 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   } // end block-ID stage
 
   // Streaming continues; compaction finalization is deferred to a post-fence callback that sets m_pendingFinalization.
-  bool lastRound = false;
-
-  // ---------------- Progressive raycast pass ----------------
-  if (payload.stage == ImgRaycasterPayload::Stage::BlockIdOnly) {
-    // In block-ID-only stage, stop here after compaction.
-    return;
-  }
 
   vulkan::AttachmentFormats progressiveFormats;
   progressiveFormats.colorFormats = {currentColor->format(), currentDepth->format()};
@@ -4581,9 +4622,47 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   currentDepth->setDescriptorLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
   // Copy the current accumulation into the persistent layer array slice
-  layerColor->transitionLayout(cmd, layerColor->layout(), vk::ImageLayout::eColorAttachmentOptimal);
+  // Clear only the active slice before recording the layer copy pass. Vulkan's
+  // loadOp clear applies to the full subresource range referenced by the
+  // attachment view; however, our layout tracking transitions operate on the
+  // entire image. When multiple channels are accumulated in the same array this
+  // can inadvertently wipe previously rendered slices (observed as the final
+  // image disappearing after the third channel). Mirror the GL behaviour by
+  // issuing explicit per-slice clears via the transfer path and then rebind the
+  // slice for color/depth rendering.
+  const vk::ImageSubresourceRange colorSlice{vk::ImageAspectFlagBits::eColor,
+                                             0u,
+                                             1u,
+                                             activeChannelIndex,
+                                             1u};
+  layerColor->transitionLayout(cmd,
+                               layerColor->layout(),
+                               vk::ImageLayout::eTransferDstOptimal,
+                               vk::ImageAspectFlagBits::eColor);
+  cmd.clearColorImage(layerColor->image(),
+                      vk::ImageLayout::eTransferDstOptimal,
+                      vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}),
+                      colorSlice);
+  layerColor->transitionLayout(cmd,
+                               vk::ImageLayout::eTransferDstOptimal,
+                               vk::ImageLayout::eColorAttachmentOptimal,
+                               vk::ImageAspectFlagBits::eColor);
+
+  const vk::ImageSubresourceRange depthSlice{vk::ImageAspectFlagBits::eDepth,
+                                             0u,
+                                             1u,
+                                             activeChannelIndex,
+                                             1u};
   layerDepth->transitionLayout(cmd,
                                layerDepth->layout(),
+                               vk::ImageLayout::eTransferDstOptimal,
+                               vk::ImageAspectFlagBits::eDepth);
+  cmd.clearDepthStencilImage(layerDepth->image(),
+                             vk::ImageLayout::eTransferDstOptimal,
+                             vk::ClearDepthStencilValue{1.0f, 0u},
+                             depthSlice);
+  layerDepth->transitionLayout(cmd,
+                               vk::ImageLayout::eTransferDstOptimal,
                                vk::ImageLayout::eDepthAttachmentOptimal,
                                vk::ImageAspectFlagBits::eDepth);
 
@@ -4612,10 +4691,10 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerColorAttachment.image = layerColor->image();
   layerColorAttachment.view = layerColorView;
   layerColorAttachment.format = layerColor->format();
-  layerColorAttachment.initialLayout = vk::ImageLayout::eUndefined;
+  layerColorAttachment.initialLayout = layerColor->layout();
   layerColorAttachment.finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   layerColorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
-  layerColorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+  layerColorAttachment.loadOp = vk::AttachmentLoadOp::eLoad;
   layerColorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
   layerColorAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
   layerColorAttachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
@@ -4636,7 +4715,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerDepthAttachment.initialLayout = layerDepth->layout();
   layerDepthAttachment.finalLayout = vk::ImageLayout::eDepthReadOnlyOptimal;
   layerDepthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
-  layerDepthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+  layerDepthAttachment.loadOp = vk::AttachmentLoadOp::eLoad;
   layerDepthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
   layerDepthAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
   layerDepthAttachment.dstStage =
@@ -4774,10 +4853,15 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   // Defer progressive finalization to the backend/renderer; just stash the result.
   if (payload.streamKey != 0) {
-    m_pendingFinalization = Finalization{.streamKey = payload.streamKey,
-                                         .eye = batch.eye,
-                                         .lastRound = lastRound,
-                                         .channelCount = static_cast<uint32_t>(payload.visibleChannels.size())};
+    // Default to "continue this channel" unless the compaction callback asked
+    // us to finalize after this progressive-only round.
+    Finalization fin{};
+    fin.streamKey = payload.streamKey;
+    fin.eye = batch.eye;
+    fin.lastRound = finalizeAfterProgressive ? finalizeAfterProgressive->lastRound : false;
+    fin.channelCount = finalizeAfterProgressive ? finalizeAfterProgressive->channelCount
+                                                : static_cast<uint32_t>(payload.visibleChannels.size());
+    m_pendingFinalization = fin;
   }
 }
 

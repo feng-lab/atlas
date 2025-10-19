@@ -12,12 +12,6 @@
 #include <memory>
 #include <utility>
 
-// Split long Vulkan img raycaster command buffers into smaller submissions.
-// Disabled by default to preserve existing single-frame behavior.
-DEFINE_bool(atlas_vk_split_inside_imgfilter,
-            false,
-            "Split Vulkan img raycaster into entry/exit, block-ID, and progressive submissions inside renderImage");
-
 namespace nim {
 
 // const size_t Z3DImgFilter::m_maxNumOfFullResolutionVolumeSlice = 6;
@@ -874,17 +868,10 @@ double Z3DImgFilter::process(Z3DEye eye)
   const bool isVulkan = (m_rendererBase.activeBackend() == RenderBackend::Vulkan);
   bool startedHere = false;
   if (isVulkan && !m_rendererBase.isVulkanFrameActive()) {
-    // Mirror the split decision used in renderImage(): only suppress the outer
-    // frame when splitting is both enabled and warranted for progressive work.
-    const bool progressiveWanted =
-      (!m_imgRaycasterRenderer.isFastRendering() && m_3dImg && m_3dImg->isVolumeDownsampled());
-    const bool willSplit = FLAGS_atlas_vk_split_inside_imgfilter && progressiveWanted;
-    if (!willSplit) {
-      const char* eyeTag = (eye == MonoEye) ? "mono" : (eye == LeftEye) ? "left" : "right";
-      const std::string frameLabel = std::string("img_filter_") + eyeTag;
-      m_rendererBase.beginVulkanFrame(frameLabel);
-      startedHere = true;
-    }
+    const char* eyeTag = (eye == MonoEye) ? "mono" : (eye == LeftEye) ? "left" : "right";
+    const std::string frameLabel = std::string("img_filter_") + eyeTag;
+    m_rendererBase.beginVulkanFrame(frameLabel);
+    startedHere = true;
   }
   // Ensure we always end a frame we started, even on exceptions
   auto vkProcessGuard = folly::makeGuard([&]() {
@@ -1268,151 +1255,26 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
                                                          ScratchFormat::Depth32F);
     }
 
-    // Conditional split to mitigate Metal GPU watchdog for heavy progressive path
-    const bool progressiveWanted =
-      (!m_imgRaycasterRenderer.isFastRendering() && m_3dImg && m_3dImg->isVolumeDownsampled());
-    const bool doSplit = FLAGS_atlas_vk_split_inside_imgfilter && progressiveWanted;
-
     double progress = 1.0;
-    if (doSplit) {
-      const bool firstProgressive = m_progressiveRendering && !m_imgRaycasterRenderer.renderingStarted(eye);
 
-      if (firstProgressive) {
-        // First progressive frame: preview-only inside a single short CB
-        // Open a dedicated frame if not already active
-        bool localFrame = false;
-        if (!m_rendererBase.isVulkanFrameActive()) {
-          m_rendererBase.beginVulkanFrame("img_ray_entry_exit_preview");
-          localFrame = true;
-        }
-        m_rendererBase.setActiveSurfaceWithLoadStore(lease,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store);
-        m_imgRaycasterRenderer.setVulkanSplitStageOverride(ImgRaycasterPayload::Stage::Full);
-        m_rendererBase.recordVulkanBatchesInActiveFrame(
-          [&]() {
-            m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
-          },
-          "img_ray_entry_exit");
-        if (localFrame) {
-          m_rendererBase.endVulkanFrame();
-        }
-        VLOG(1) << "VK split: entry/exit CB submitted (preview)";
-      } else {
-        // CB1: entry/exit only (preserve final surface)
-        bool localFrame1 = false;
-        if (!m_rendererBase.isVulkanFrameActive()) {
-          m_rendererBase.beginVulkanFrame("img_ray_entry_exit");
-          localFrame1 = true;
-        }
-        m_rendererBase.setActiveSurfaceWithLoadStore(lease, Z3DRendererBase::Preserve);
-        m_imgRaycasterRenderer.setVulkanSplitStageOverride(ImgRaycasterPayload::Stage::EntryExitOnly);
-        m_rendererBase.recordVulkanBatchesInActiveFrame(
-          [&]() {
-            m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
-          },
-          "img_ray_entry_exit");
-        if (localFrame1) {
-          m_rendererBase.endVulkanFrame();
-        }
-        VLOG(1) << "VK split: entry/exit CB submitted";
+    // Record the main raycaster pass within the active frame.
+    m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
+    m_rendererBase.recordVulkanBatchesInActiveFrame(
+      [&]() {
+        m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
+      },
+      "raycaster");
 
-        // CB2: block-ID + compaction (preserve final surface)
-        bool localFrame2 = false;
-        if (!m_rendererBase.isVulkanFrameActive()) {
-          m_rendererBase.beginVulkanFrame("img_ray_blockid");
-          localFrame2 = true;
-        }
-        m_rendererBase.setActiveSurfaceWithLoadStore(lease, Z3DRendererBase::Preserve);
-        m_imgRaycasterRenderer.setVulkanSplitStageOverride(ImgRaycasterPayload::Stage::BlockIdOnly);
-        m_rendererBase.recordVulkanBatchesInActiveFrame(
-          [&]() {
-            m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
-          },
-          "img_ray_blockid");
-        if (localFrame2) {
-          m_rendererBase.endVulkanFrame();
-        }
-        VLOG(1) << "VK split: blockID CB submitted";
+    // Compute progressive progress to mirror GL behaviour
+    progress = m_progressiveRendering ? m_imgRaycasterRenderer.progressiveProgress(eye) : 1.0;
 
-        // CB3: progressive raycast + merge (clear final surface once)
-        bool localFrame3 = false;
-        if (!m_rendererBase.isVulkanFrameActive()) {
-          m_rendererBase.beginVulkanFrame("img_ray_progressive");
-          localFrame3 = true;
-        }
-        m_rendererBase.setActiveSurfaceWithLoadStore(lease,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store,
-                                                     LoadOp::Clear,
-                                                     StoreOp::Store);
-        m_imgRaycasterRenderer.setVulkanSplitStageOverride(ImgRaycasterPayload::Stage::ProgressiveOnly);
-        m_rendererBase.recordVulkanBatchesInActiveFrame(
-          [&]() {
-            m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
-          },
-          "img_ray_progressive");
-        if (localFrame3) {
-          m_rendererBase.endVulkanFrame();
-        }
-        VLOG(1) << "VK split: progressive CB submitted";
-      }
-
-      // Reset stage override to default behavior
-      m_imgRaycasterRenderer.setVulkanSplitStageOverride(ImgRaycasterPayload::Stage::Full);
-
-      // Progress mirrors GL progressive semantics
-      progress = m_progressiveRendering ? m_imgRaycasterRenderer.progressiveProgress(eye) : 1.0;
-
-      // Overlay pass (preserve surface)
-      {
-        bool localFrame4 = false;
-        if (!m_rendererBase.isVulkanFrameActive()) {
-          m_rendererBase.beginVulkanFrame("bbox_overlay");
-          localFrame4 = true;
-        }
-        // Wrap in a frame if not already active (split mode may suppress outer frames)
-        bool localFrame = false;
-        if (!m_rendererBase.isVulkanFrameActive()) {
-          m_rendererBase.beginVulkanFrame("bbox_overlay");
-          localFrame = true;
-        }
-        m_rendererBase.setActiveSurfaceWithLoadStore(lease, Z3DRendererBase::Preserve);
-        m_rendererBase.recordVulkanBatchesInActiveFrame(
-          [&]() {
-            renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
-          },
-          "bbox_overlay");
-        if (localFrame) {
-          m_rendererBase.endVulkanFrame();
-        }
-        if (localFrame4) {
-          m_rendererBase.endVulkanFrame();
-        }
-      }
-    } else {
-      // Single-CB behavior (original)
-      // Record within the process-managed active frame
-      m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
-      m_rendererBase.recordVulkanBatchesInActiveFrame(
-        [&]() {
-          m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
-        },
-        "raycaster");
-
-      // Compute progressive progress to mirror GL behaviour
-      progress = m_progressiveRendering ? m_imgRaycasterRenderer.progressiveProgress(eye) : 1.0;
-
-      // 2) bound box overlay (no clears), same surface
-      m_rendererBase.setActiveSurfaceWithLoadStore(lease, Z3DRendererBase::Preserve);
-      m_rendererBase.recordVulkanBatchesInActiveFrame(
-        [&]() {
-          renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
-        },
-        "bbox_overlay");
-    }
+    // Bound box overlay (no clears), same surface
+    m_rendererBase.setActiveSurfaceWithLoadStore(lease, Z3DRendererBase::Preserve);
+    m_rendererBase.recordVulkanBatchesInActiveFrame(
+      [&]() {
+        renderBoundBox(eye, Z3DBoundedFilter::BoundBoxRenderStyle::OverlayAlphaDepth);
+      },
+      "bbox_overlay");
 
     // Release entry/exit when not progressive or once finished
     if (!m_progressiveRendering || progress >= 1.0) {
