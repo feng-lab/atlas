@@ -1234,7 +1234,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   // After fence: parse compacted buffer and update caches; determine if this round is complete
   auto bufPtr = m_blockIdCompactOutput.get();
   auto countSnap = m_blockIdCountSnapshot.get();
-  m_backend.scheduleAfterCurrentFrameCompletion([this,
+  m_backend.scheduleAfterActiveSubmissionFence([this,
                                                  bufPtr,
                                                  countSnap,
                                                  imgW,

@@ -375,6 +375,8 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Stage 2: apply descriptor arena reset when reusing this in-flight frame.
   // Safe point: frame executor waited for the fence when acquiring the frame.
   applyPendingArenaReset(frameResources);
+  // Also drain any submission-fence callbacks whose fences have already signaled.
+  drainPostFenceCallbacks();
   ensureArenaOnFrame(frameResources);
   frameResources.descriptorSetsAllocated = 0;
   frameResources.leaseRecycleQueued = 0;
@@ -607,6 +609,8 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   if (needFenceWait) {
     device().frameExecutor().waitForCompletion(frameHandle);
     applyPendingArenaReset(frame); // runs deferred readback consumers now
+    // Fence signaled: run any pending post-fence callbacks immediately.
+    drainPostFenceCallbacks();
 
     // Fence signaled; deferred readbacks/releases executed.
 
@@ -639,6 +643,8 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     m_recentOcclusionResults.clear();
     frame.nextOcclusionQuery = 0;
     frame.occlusionQueryNeedsWait = false;
+    // Poll post-fence callbacks; some fences may have signaled already.
+    drainPostFenceCallbacks();
   }
 
   // VLOG(1) frame recycling stats (descriptors and arena reset scheduling)
@@ -695,6 +701,45 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
   s_currentBackend = nullptr;
+}
+
+void Z3DRendererVulkanBackend::drainPostFenceCallbacks()
+{
+  if (m_postFenceCallbacks.empty()) {
+    return;
+  }
+  auto& vkDevice = m_sharedDevice->context().device();
+  // Identify callbacks whose fences have signaled
+  std::vector<size_t> ready;
+  ready.reserve(m_postFenceCallbacks.size());
+  for (size_t i = 0; i < m_postFenceCallbacks.size(); ++i) {
+    VkFence raw = m_postFenceCallbacks[i].first;
+    if (!raw) {
+      ready.push_back(i);
+      continue;
+    }
+    // Poll fence status without blocking: timeout = 0
+    vk::Result status = vkDevice.waitForFences({vk::Fence(raw)}, true, 0);
+    if (status == vk::Result::eSuccess) {
+      ready.push_back(i);
+    }
+  }
+  if (ready.empty()) {
+    return;
+  }
+  for (size_t idx : ready) {
+    auto fn = std::move(m_postFenceCallbacks[idx].second);
+    if (fn) {
+      fn();
+    }
+    m_postFenceCallbacks[idx].first = VK_NULL_HANDLE;
+    m_postFenceCallbacks[idx].second = nullptr;
+  }
+  m_postFenceCallbacks.erase(
+    std::remove_if(m_postFenceCallbacks.begin(),
+                   m_postFenceCallbacks.end(),
+                   [](const auto& p) { return p.first == VK_NULL_HANDLE || !static_cast<bool>(p.second); }),
+    m_postFenceCallbacks.end());
 }
 
 namespace {
@@ -1847,6 +1892,20 @@ void Z3DRendererVulkanBackend::scheduleAfterCurrentFrameCompletion(std::function
   }
   m_activeFrame->deferredReleases.push_back(std::move(fn));
   m_activeFrame->leaseRecycleQueued++;
+}
+
+void Z3DRendererVulkanBackend::scheduleAfterActiveSubmissionFence(std::function<void()> fn)
+{
+  if (!fn) {
+    return;
+  }
+  if (!m_activeFrameHandle || !m_activeFrameHandle->valid()) {
+    // Fallback to per-frame queue when no active submission is present.
+    scheduleAfterCurrentFrameCompletion(std::move(fn));
+    return;
+  }
+  VkFence raw = *m_activeFrameHandle->fence();
+  m_postFenceCallbacks.emplace_back(raw, std::move(fn));
 }
 
 std::optional<uint32_t> Z3DRendererVulkanBackend::allocateOcclusionQuery()

@@ -41,6 +41,7 @@ ImgRaycaster Vulkan
   - Progressive bookkeeping is outside the Vulkan pipeline context. The context computes whether a progressive round finished and the backend calls back to the renderer using a stable `streamKey` identity to finalize (`finalizeProgressiveRound`).
   - GL paths are unchanged.
 - On backend switch, `Z3DRendererBase::releaseBackendResources()` clears renderer caches; `Z3DImgFilter::switchRendererBackend` releases GL volume resources when switching to Vulkan.
+ - Post‑fence callbacks (e.g., Block‑ID compaction parsing) are drained as soon as the submission fence signals, independent of the descriptor‑arena reset. This avoids an extra frame of latency when `maxFramesInFlight > 1` and keeps progressive channel bookkeeping in lockstep (advance/skip decisions are applied before the next record).
 
 Threading Model
 

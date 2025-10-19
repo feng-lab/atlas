@@ -152,6 +152,9 @@ public:
 
   // Stage 2: Schedule a callback to run once the current frame's fence signals
   void scheduleAfterCurrentFrameCompletion(std::function<void()> fn);
+  // Schedule a callback gated by the current submission fence. Runs as soon as
+  // the submission finishes (fence signals), without waiting for frame-slot reuse.
+  void scheduleAfterActiveSubmissionFence(std::function<void()> fn);
   void notifyPipelineCreated();
   void notifyPipelineBound(vk::Pipeline pipeline);
   // Queue a static copy (upload slice -> device-local VB/IB) to be executed
@@ -432,6 +435,8 @@ public:
   // Helpers for descriptor arena lifecycle
   void ensureArenaOnFrame(FrameResources& frame);
   void applyPendingArenaReset(FrameResources& frame);
+  // Drain post-fence callbacks whose fences have signaled.
+  void drainPostFenceCallbacks();
   void scheduleArenaReset(FrameResources& frame);
   void vlogFrameRecyclingStats(const FrameResources& frame) const;
 
@@ -454,6 +459,10 @@ public:
   };
   std::vector<ReadbackSlot> m_readbackSlots; // shared across frames
   uint32_t m_readbackCursor = 0;
+
+  // Post-fence callbacks keyed by the submission's raw fence handle.
+  // We poll fence status and run ready callbacks early to reduce per-frame latency.
+  std::vector<std::pair<VkFence, std::function<void()>>> m_postFenceCallbacks;
 
   // Ensure at least N slots exist and each has capacity >= minBytes
   void ensureReadbackSlots(size_t minBytes, uint32_t minSlots);
