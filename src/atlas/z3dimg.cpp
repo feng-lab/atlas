@@ -67,9 +67,7 @@ std::unique_ptr<Z3DTexture> createChannelTexture(const ZImg& image)
 
 } // namespace
 
-Z3DImg::Z3DImg(const ZImgPack& imgPack,
-               const glm::vec3& scale,
-               const std::vector<glm::dvec2>& displayRanges)
+Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vector<glm::dvec2>& displayRanges)
   : m_imgPack(imgPack)
   , m_channelDisplayRanges(displayRanges)
 {
@@ -197,8 +195,7 @@ Z3DTexture* Z3DImg::channelTexture(size_t c) const
   CHECK_LT(c, m_channelResources.size());
   if (!m_channelResources[c].texture && m_channelResources[c].image) {
     // Lazily create GL texture for this channel if needed
-    const_cast<Z3DImg*>(this)->m_channelResources[c].texture =
-      createChannelTexture(*m_channelResources[c].image);
+    const_cast<Z3DImg*>(this)->m_channelResources[c].texture = createChannelTexture(*m_channelResources[c].image);
   }
   return m_channelResources[c].texture.get();
 }
@@ -736,16 +733,16 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   size_t readEmptyBlockCount = 0;
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
-  auto uploadGuard = folly::makeGuard([=, this, &bt]() {
-    checkPageSystemError(c, false);
-    if (m_vulkanImageBlockUploader) {
-      m_vulkanImageBlockUploader->uploadPageCaches(*this, c, bt);
-    } else {
-      m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
-      m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
-      bt.recordEvent("upload page table");
-    }
-  });
+    auto uploadGuard = folly::makeGuard([=, this, &bt]() {
+      checkPageSystemError(c, false);
+      if (m_vulkanImageBlockUploader) {
+        m_vulkanImageBlockUploader->uploadPageCaches(*this, c, bt);
+      } else {
+        m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
+        m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
+        bt.recordEvent("upload page table");
+      }
+    });
 
     // read image
     if (!pendingTasks.empty()) {
@@ -1300,6 +1297,8 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
   boost::unordered_flat_set<glm::uvec3> usedPageTableEntry;
 #endif
   auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
+  VLOG(2) << "checkPageSystemError enter: strict=" << strict << ", channel=" << c << ", pdSize=" << m_pageDirectorySize
+          << ", ptSize=" << m_pageTableCacheSize << ", ibSize=" << imageBlockSize;
   for (size_t i = 0; i < m_channelPageDirectories[c].size(); ++i) {
     if (m_channelPageDirectories[c][i].w == 0) {
       continue;
@@ -1352,8 +1351,12 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
               glm::uvec4 imageCacheKey(glm::uvec3(x, y, z) + pdLoc * m_pageTableBlockSize, level);
               CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey)) << imageCacheKey;
               CHECK(m_channelImageCacheManagers[c]->get(imageCacheKey) == pageTableEntry.xyz());
-              CHECK(glm::all(glm::lessThanEqual(pageTableEntry.xyz() + imageBlockSize,
-                                                m_channelImageCacheTextures[c]->dimension())));
+              // Use CPU-known cache dimensions instead of GL texture dims to avoid
+              // dereferencing GL textures in Vulkan mode.
+              {
+                const glm::uvec3 cacheDims = m_imageCacheNumBlocks * (m_imageBlockSize + m_imageBlockSizePad);
+                CHECK(glm::all(glm::lessThanEqual(pageTableEntry.xyz() + imageBlockSize, cacheDims)));
+              }
 #ifdef ATLAS_CHECK_CACHE
               CHECK(!usedPageTableEntry.contains(pageTableEntry.xyz()));
               usedPageTableEntry.insert(pageTableEntry.xyz());
@@ -1387,10 +1390,14 @@ void Z3DImg::resetCacheSystem(size_t c)
                                                                                m_imageCacheNumBlocks,
                                                                                m_invalidKey);
   std::ranges::fill(m_channelPageDirectories[c], glm::uvec4(0));
-  m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
-
   std::ranges::fill(m_channelPageTableCaches[c], glm::uvec4(0));
-  m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
+  // When Vulkan uploader is active, avoid issuing any GL texture updates here.
+  // The caller (updateAndUploadPageDirectoryCaches) will upload page caches via
+  // the Vulkan path after rebuilding tasks, keeping GL/Vulkan separation intact.
+  if (!m_vulkanImageBlockUploader) {
+    m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
+    m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
+  }
 }
 
 void Z3DImg::rebuildGLPagingResources()
@@ -1429,16 +1436,15 @@ void Z3DImg::rebuildGLPagingResources()
     m_channelPageDirectories[c].resize(size_t(m_pageDirectorySize.x) * m_pageDirectorySize.y * m_pageDirectorySize.z);
     std::ranges::fill(m_channelPageDirectories[c], glm::uvec4(0));
 
-    m_channelPageTableCaches[c].resize(size_t(m_pageTableCacheSize.x) * m_pageTableCacheSize.y * m_pageTableCacheSize.z);
+    m_channelPageTableCaches[c].resize(size_t(m_pageTableCacheSize.x) * m_pageTableCacheSize.y *
+                                       m_pageTableCacheSize.z);
     std::ranges::fill(m_channelPageTableCaches[c], glm::uvec4(0));
 
     // Reset cache managers
-    m_channelPageTableCacheManagers[c] = std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize,
-                                                                                    m_pageTableCacheNumBlocks,
-                                                                                    m_invalidKey);
-    m_channelImageCacheManagers[c] = std::make_unique<Z3DBlockCache<glm::uvec4>>(imageBlockTotal,
-                                                                                 m_imageCacheNumBlocks,
-                                                                                 m_invalidKey);
+    m_channelPageTableCacheManagers[c] =
+      std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, m_invalidKey);
+    m_channelImageCacheManagers[c] =
+      std::make_unique<Z3DBlockCache<glm::uvec4>>(imageBlockTotal, m_imageCacheNumBlocks, m_invalidKey);
 
     // Recreate GL textures
     m_channelPageDirectoryTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,

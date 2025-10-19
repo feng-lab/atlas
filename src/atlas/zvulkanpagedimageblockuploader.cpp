@@ -214,11 +214,13 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
   }
 
   timer.recordEvent("image blocks uploading");
+  VLOG(2) << "Uploaded " << (pendingTasks.size() - emptyBlockCount) << " image blocks to Vulkan image cache.";
   return emptyBlockCount;
 }
 
 void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t channel, ZBenchTimer& timer)
 {
+  VLOG(2) << "Uploading page caches for channel " << channel;
   ZVulkanTexture* pageDirectory = nullptr;
   ZVulkanTexture* pageTableCache = nullptr;
 
@@ -231,6 +233,8 @@ void ZVulkanPagedImageBlockUploader::uploadPageCaches(Z3DImg& image, size_t chan
     pageDirectory = resources.channels[channel].pageDirectory.get();
     pageTableCache = resources.channels[channel].pageTableCache.get();
   }
+
+  VLOG(2) << "Uploading page directory and page table cache textures";
 
   auto pageDirectorySpan = image.pageDirectoryView(channel);
   if (pageDirectory && !pageDirectorySpan.empty()) {
