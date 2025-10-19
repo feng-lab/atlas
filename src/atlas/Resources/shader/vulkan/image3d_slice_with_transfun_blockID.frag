@@ -13,7 +13,7 @@ void main()
 {
   float desiredVoxelSize = eyeCoord.z * pg.ze_to_screen_pixel_voxel_size;
   int curLevel = 0;
-  while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel + 1].voxel_world_size <= desiredVoxelSize) {
+  while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel + 1].voxel_world_size_pad.x <= desiredVoxelSize) {
     ++curLevel;
   }
 

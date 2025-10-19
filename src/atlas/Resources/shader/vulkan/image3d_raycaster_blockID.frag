@@ -15,6 +15,12 @@ layout(location = 7) out uvec4 FragData7;
 // Match GL shader constants
 const uint UINTMAX = 0xFFFFFFFFu;
 
+// Set to 1 to dump diagnostic values instead of block IDs.
+// Writes debug floats (bit-cast to uint) into attachments and returns.
+#ifndef BLOCKID_DEBUG_ZE_DUMP
+#define BLOCKID_DEBUG_ZE_DUMP 0
+#endif
+
 void main()
 {
   // Parity with GL: initialize currentRayLength from last ray depth and discard if already complete
@@ -30,6 +36,28 @@ void main()
   float zeFront = entryTexCoordAndZ.w;
   float zeBack  = exitTexCoordAndZ.w;
   int curLevel = 0;
+
+#if BLOCKID_DEBUG_ZE_DUMP
+  // Debug: emit ze_to_screen_pixel_voxel_size, zeFront, and two highest-level voxel sizes.
+  // Use safe indices in case LEVEL_COUNT < 5.
+  int i3 = min(3, LEVEL_COUNT - 1);
+  int i4 = min(4, LEVEL_COUNT - 1);
+  FragData0 = uvec4(floatBitsToUint(pg.ze_to_screen_pixel_voxel_size),
+                    floatBitsToUint(zeFront),
+                    0u,
+                    0u);
+  FragData1 = uvec4(floatBitsToUint(pg.levels[i3].voxel_world_size_pad.x),
+                    floatBitsToUint(pg.levels[i4].voxel_world_size_pad.x),
+                    0u,
+                    0u);
+  FragData2 = uvec4(0u);
+  FragData3 = uvec4(0u);
+  FragData4 = uvec4(0u);
+  FragData5 = uvec4(0u);
+  FragData6 = uvec4(0u);
+  FragData7 = uvec4(0u);
+  return;
+#endif
 
   vec3 rayVector = exitRayPosition - startRayPosition;
   vec3 numVoxels = abs(rayVector * pg.levels[curLevel].image_dimensions.xyz);
@@ -47,7 +75,7 @@ void main()
   for (int loop0=0; !finished && loop0<255; ++loop0) {
     for (int loop1=0; !finished && loop1<255; ++loop1) {
       float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * pg.ze_to_screen_pixel_voxel_size;
-      while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel+1].voxel_world_size <= desiredVoxelSize) {
+      while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel+1].voxel_world_size_pad.x <= desiredVoxelSize) {
         ++curLevel;
         numVoxels = abs(rayVector * pg.levels[curLevel].image_dimensions.xyz);
         stepSize = 1.0 / (rp.sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
@@ -127,6 +155,7 @@ void main()
   FragData7 = outv[7];
 #else
   FragData0 = uvec4(missBlockIDs[0], missBlockIDs[1], missBlockIDs[2], missBlockIDs[3]);
+  // FragData0 = uvec4(LEVEL_COUNT, uint(curLevel), pageDirEntry.w, 0); 
   FragData1 = uvec4(missBlockIDs[4], missBlockIDs[5], missBlockIDs[6], missBlockIDs[7]);
   FragData2 = uvec4(missBlockIDs[8], missBlockIDs[9], missBlockIDs[10], missBlockIDs[11]);
   FragData3 = uvec4(missBlockIDs[12], missBlockIDs[13], missBlockIDs[14], missBlockIDs[15]);

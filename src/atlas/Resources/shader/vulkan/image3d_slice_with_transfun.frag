@@ -13,8 +13,7 @@ struct PageLevelData {
   uvec4 page_directory_base;
   uvec4 image_dimensions;
   uvec4 pos_to_block_ids;
-  float voxel_world_size;
-  vec3  _pad0;
+  vec4  voxel_world_size_pad; // .x used
 };
 
 layout(std140, set = 2, binding = 2) uniform PageData {
@@ -38,7 +37,7 @@ void main()
 {
   float desiredVoxelSize = eyeCoord.z * pg.ze_to_screen_pixel_voxel_size;
   int curLevel = 0;
-  while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel + 1].voxel_world_size <= desiredVoxelSize) {
+  while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel + 1].voxel_world_size_pad.x <= desiredVoxelSize) {
     ++curLevel;
   }
 

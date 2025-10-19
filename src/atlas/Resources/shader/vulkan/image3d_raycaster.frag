@@ -42,7 +42,7 @@ void main()
   for (int loop0=0; !finished && loop0<255; ++loop0) {
     for (int loop1=0; !finished && loop1<255; ++loop1) {
       float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * pg.ze_to_screen_pixel_voxel_size;
-      while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel+1].voxel_world_size <= desiredVoxelSize) {
+      while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel+1].voxel_world_size_pad.x <= desiredVoxelSize) {
         ++curLevel;
         numVoxels = abs(rayVector * pg.levels[curLevel].image_dimensions.xyz);
         stepSize = 1.0 / (rp.sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
