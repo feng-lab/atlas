@@ -68,11 +68,6 @@ DEFINE_bool(atlas_vk_debug_blockid_count,
 // 1 = Workgroup-local dedupe + global append buffer (SSBO with atomic counter + array)
 DEFINE_int32(atlas_vk_blockid_compaction_mode, 1, "Deprecated; append-only; ignored");
 
-DEFINE_bool(atlas_vk_disable_blockid_compaction, false, "Disable Block-ID compaction compute pass (for diagnostics)");
-// Debug: limit compaction to the first Block-ID attachment to isolate sampling/binding
-DEFINE_bool(atlas_vk_compact_only_first_blockid_attachment,
-            false,
-            "When true, compact only attachment 0 of the Block-ID render target");
 // Debug: log a small sample of raw appended IDs from the compaction buffer
 DEFINE_int32(atlas_vk_compact_log_sample, 16, "Number of initial appended IDs to sample in logs");
 // Compaction read source override (append-only)
@@ -456,8 +451,10 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   const bool skipBlockIdThisFrame = deferredRound.has_value();
   std::optional<Finalization> finalizeAfterProgressive;
   if (deferredRound) {
-    finalizeAfterProgressive =
-      Finalization{.streamKey = payload.streamKey, .eye = batch.eye, .lastRound = true, .channelCount = deferredRound->channelCount};
+    finalizeAfterProgressive = Finalization{.streamKey = payload.streamKey,
+                                            .eye = batch.eye,
+                                            .lastRound = true,
+                                            .channelCount = deferredRound->channelCount};
   }
 
   if (payload.fastPathOnly) {
@@ -1047,11 +1044,8 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   spec.groupX = (imgW + 15) / 16;
   spec.groupY = (imgH + 15) / 16;
   spec.groupZ = 1;
-  VLOG(2) << fmt::format("record compute: groupX={} groupY={} width={} height={}",
-                         spec.groupX,
-                         spec.groupY,
-                         imgW,
-                         imgH);
+  VLOG(2)
+    << fmt::format("record compute: groupX={} groupY={} width={} height={}", spec.groupX, spec.groupY, imgW, imgH);
   // Iterate every Block-ID attachment and dispatch compaction on each.
   // Allocate a fresh override descriptor set per attachment to avoid updating a bound set.
   // Ensure per-attachment counts buffer exists and zero it before the sequence
@@ -1064,9 +1058,6 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   }
 
   for (uint32_t att = 0; att < attachmentCount; ++att) {
-    if (FLAGS_atlas_vk_compact_only_first_blockid_attachment && att > 0) {
-      continue; // debug isolation: only compact the first attachment
-    }
     ZVulkanTexture* blockTex = payload.blockIdLease->colorAttachment(att);
     if (!blockTex) {
       continue;
@@ -1267,7 +1258,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     const uint32_t count = u32[0];
     const uint32_t capacity = imgW * imgH * 4u;
     const uint32_t clamped = std::min(count, capacity);
-    if (false && VLOG_IS_ON(1)) {
+    if (FLAGS_atlas_vk_compact_log_sample && VLOG_IS_ON(2)) {
       const int toSample = std::max(0, FLAGS_atlas_vk_compact_log_sample);
       const int sampleCount = std::min<int>(toSample, static_cast<int>(clamped));
       std::string sample;
@@ -1284,7 +1275,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
           sample += fmt::format("{}", v);
         }
       }
-      VLOG(1) << fmt::format("compaction append raw: count={} capacity={} sample=[{}] min={} max={}",
+      VLOG(2) << fmt::format("compaction append raw: count={} capacity={} sample=[{}] min={} max={}",
                              count,
                              capacity,
                              sample,
@@ -1342,7 +1333,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
           allZeroAttachments = false;
         }
       }
-      if (VLOG_IS_ON(1)) {
+      if (VLOG_IS_ON(2)) {
         std::string s;
         s.reserve(attCount * 6);
         for (uint32_t att = 0; att < attCount; ++att) {
@@ -1351,7 +1342,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
           }
           s += fmt::format("{}", counts[att]);
         }
-        VLOG(1) << fmt::format("compaction per-attachment counts: [{}] (anyZero={} allZero={} firstZeroAtt={})",
+        VLOG(2) << fmt::format("compaction per-attachment counts: [{}] (anyZero={} allZero={} firstZeroAtt={})",
                                s,
                                anyZeroAttachment ? 1 : 0,
                                allZeroAttachments ? 1 : 0,
@@ -1363,8 +1354,8 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     // Last-round decision: require an all-zero attachment AND union fits cache
     const size_t cacheCapacity = imagePtr->numCachedImages(channelIndex);
     const bool fitsCache = missingBlocks.size() <= cacheCapacity;
-    if (VLOG_IS_ON(1)) {
-      VLOG(1) << fmt::format("compaction last-round check: anyZero={} allZero={} fitsCache={} unionSize={} capacity={}",
+    if (VLOG_IS_ON(2)) {
+      VLOG(2) << fmt::format("compaction last-round check: anyZero={} allZero={} fitsCache={} unionSize={} capacity={}",
                              anyZeroAttachment ? 1 : 0,
                              allZeroAttachments ? 1 : 0,
                              fitsCache ? 1 : 0,
@@ -1375,17 +1366,19 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
       m_deferredProgressive.reset();
       m_pendingFinalization =
         Finalization{.streamKey = streamKey, .eye = eye, .lastRound = true, .channelCount = channelCount};
-      VLOG(1) << fmt::format("compaction: skip progressive round (all attachments zero, channelIndex={} unionSize={} capacity={})",
-                             channelIndex,
-                             missingBlocks.size(),
-                             cacheCapacity);
+      VLOG(1) << fmt::format(
+        "compaction: skip progressive round (all attachments zero, channelIndex={} unionSize={} capacity={})",
+        channelIndex,
+        missingBlocks.size(),
+        cacheCapacity);
     } else if (anyZeroAttachment && fitsCache) {
       m_deferredProgressive = DeferredProgressive{.streamKey = streamKey, .eye = eye, .channelCount = channelCount};
-      VLOG(1) << fmt::format("compaction: schedule progressive-only round (channelIndex={} firstZeroAtt={} unionSize={} capacity={})",
-                             channelIndex,
-                             (zeroAtt == std::numeric_limits<uint32_t>::max() ? -1 : static_cast<int>(zeroAtt)),
-                             missingBlocks.size(),
-                             cacheCapacity);
+      VLOG(1) << fmt::format(
+        "compaction: schedule progressive-only round (channelIndex={} firstZeroAtt={} unionSize={} capacity={})",
+        channelIndex,
+        (zeroAtt == std::numeric_limits<uint32_t>::max() ? -1 : static_cast<int>(zeroAtt)),
+        missingBlocks.size(),
+        cacheCapacity);
     } else if (m_deferredProgressive && m_deferredProgressive->streamKey == streamKey &&
                m_deferredProgressive->eye == eye) {
       m_deferredProgressive.reset();
@@ -4489,11 +4482,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
       }
     }
     // Compact block-ID image(s) via compute and schedule a small buffer readback
-    if (!FLAGS_atlas_vk_disable_blockid_compaction) {
-      recordBlockIdCompaction(renderer, batch, payload, cmd);
-    } else if (VLOG_IS_ON(1)) {
-      VLOG(1) << "Block-ID compaction disabled by flag";
-    }
+    recordBlockIdCompaction(renderer, batch, payload, cmd);
   } // end block-ID stage
 
   // Streaming continues; compaction finalization is deferred to a post-fence callback that sets m_pendingFinalization.
@@ -4630,11 +4619,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   // image disappearing after the third channel). Mirror the GL behaviour by
   // issuing explicit per-slice clears via the transfer path and then rebind the
   // slice for color/depth rendering.
-  const vk::ImageSubresourceRange colorSlice{vk::ImageAspectFlagBits::eColor,
-                                             0u,
-                                             1u,
-                                             activeChannelIndex,
-                                             1u};
+  const vk::ImageSubresourceRange colorSlice{vk::ImageAspectFlagBits::eColor, 0u, 1u, activeChannelIndex, 1u};
   layerColor->transitionLayout(cmd,
                                layerColor->layout(),
                                vk::ImageLayout::eTransferDstOptimal,
@@ -4648,11 +4633,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                                vk::ImageLayout::eColorAttachmentOptimal,
                                vk::ImageAspectFlagBits::eColor);
 
-  const vk::ImageSubresourceRange depthSlice{vk::ImageAspectFlagBits::eDepth,
-                                             0u,
-                                             1u,
-                                             activeChannelIndex,
-                                             1u};
+  const vk::ImageSubresourceRange depthSlice{vk::ImageAspectFlagBits::eDepth, 0u, 1u, activeChannelIndex, 1u};
   layerDepth->transitionLayout(cmd,
                                layerDepth->layout(),
                                vk::ImageLayout::eTransferDstOptimal,

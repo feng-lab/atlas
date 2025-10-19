@@ -674,6 +674,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     std::ssize(*m_channelPageTableCacheManagers[c]) - std::ssize(usedPageDirectoryEntryKeys);
   clearAndDeallocate(usedPageDirectoryEntryKeys);
 
+  VLOG(2) << "numAvailablePageCacheBlock: " << numAvailablePageCacheBlock;
+
   for (const auto& [pageDirectoryEntryKey, pageDirectoryEntryPtr, pageTableEntryKey] : pendingBlocks) {
     if (count >= numBlocksToRead + emptyBlockCount) {
       LOG(INFO) << "no space for new image block, skip the remaining image blocks";
@@ -687,7 +689,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       // pageDirectoryEntryPtr->w == 0, page table not mapped
       if (numAvailablePageCacheBlock > 0) {
         // we still have space, construct new page table block
-        // VLOG(1) << pageDirectoryEntryKey;
+        // VLOG(2) << pageDirectoryEntryKey;
         insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
 #ifdef ATLAS_CHECK_CACHE
         CHECK(!usedPageDirectoryEntry.contains(pageDirectoryEntryPtr->xyz())) << *pageDirectoryEntryPtr;
@@ -716,6 +718,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     }
     ++count;
   }
+  VLOG(2) << "pendingTasks size: " << pendingTasks.size();
   clearAndDeallocate(pendingBlocks);
   bt.recordEvent("update cache system");
 
@@ -1049,6 +1052,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                         ZBenchTimer& bt)
 {
   if (m_vulkanImageBlockUploader != nullptr) {
+    VLOG(3) << "using Vulkan image block uploader";
     return m_vulkanImageBlockUploader->readAndUploadImageBlocks(*this, c, pendingTasks, cancellationToken, bt);
   }
 
@@ -1380,6 +1384,7 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
       }
     }
   }
+  VLOG(2) << "checkPageSystemError finished: channel=" << c;
 }
 
 void Z3DImg::resetCacheSystem(size_t c)
@@ -1475,6 +1480,8 @@ void Z3DImg::rebuildGLPagingResources()
                                                                   GLint(GL_CLAMP_TO_BORDER));
     m_channelImageCacheTextures[c]->clearImage();
   }
+  setVulkanImageBlockUploader(nullptr); // reset Vulkan uploader if any
+  VLOG(2) << "rebuildGLPagingResources finished";
 }
 
 } // namespace nim
