@@ -66,6 +66,11 @@ public:
     return m_size;
   }
 
+  vk::BufferUsageFlags usage() const
+  {
+    return m_usage;
+  }
+
   void copyData(const void* data, size_t size);
   void* map(vk::DeviceSize offset, vk::DeviceSize size);
   void unmap();

@@ -197,6 +197,9 @@ void ZVulkanDescriptorSet::updateStorageBuffer(uint32_t binding, ZVulkanBuffer& 
       CHECK(false) << "Descriptor write attempted during recording (storage buffer) at binding " << binding;
     }
   }
+  // Invariant: storage buffer descriptors require buffers created with STORAGE_BUFFER usage.
+  CHECK(static_cast<bool>(buffer.usage() & vk::BufferUsageFlagBits::eStorageBuffer))
+    << "Storage buffer bound at binding " << binding << " was not created with VK_BUFFER_USAGE_STORAGE_BUFFER_BIT";
   vk::DescriptorBufferInfo bufferInfo{.buffer = buffer.buffer(), .offset = 0, .range = buffer.size()};
   vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
                                          .dstBinding = binding,

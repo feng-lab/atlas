@@ -68,8 +68,6 @@ DEFINE_bool(atlas_vk_debug_blockid_count,
 // 1 = Workgroup-local dedupe + global append buffer (SSBO with atomic counter + array)
 DEFINE_int32(atlas_vk_blockid_compaction_mode, 1, "Deprecated; append-only; ignored");
 
-// Debug: log a small sample of raw appended IDs from the compaction buffer
-DEFINE_int32(atlas_vk_compact_log_sample, 16, "Number of initial appended IDs to sample in logs");
 // Compaction read source override (append-only)
 DEFINE_string(atlas_vk_blockid_compaction_source,
               "buffer",
@@ -972,10 +970,12 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCountSnapshot(uint32_t att
   if (m_blockIdCountSnapshot && m_blockIdCountSnapshotCapacity >= bytes) {
     return;
   }
-  m_blockIdCountSnapshot = m_backend.device().createBuffer(bytes,
-                                                           vk::BufferUsageFlagBits::eTransferDst,
-                                                           vk::MemoryPropertyFlagBits::eHostVisible |
-                                                             vk::MemoryPropertyFlagBits::eHostCoherent);
+  // Counts are consumed by the compaction compute shader as an SSBO; they must be
+  // created with STORAGE_BUFFER usage per Vulkan spec.
+  m_blockIdCountSnapshot = m_backend.device().createBuffer(
+    bytes,
+    vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
+    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_blockIdCountSnapshotCapacity = bytes;
 }
 
@@ -1244,6 +1244,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                                                  channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
                                                  attCount = attachmentCount,
                                                  channelIndex = resolvedChannelIndex,
+                                                 channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
                                                  imagePtr = payload.image]() {
     CHECK(bufPtr != nullptr);
     CHECK(imagePtr != nullptr);
@@ -1258,30 +1259,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     const uint32_t count = u32[0];
     const uint32_t capacity = imgW * imgH * 4u;
     const uint32_t clamped = std::min(count, capacity);
-    if (FLAGS_atlas_vk_compact_log_sample && VLOG_IS_ON(2)) {
-      const int toSample = std::max(0, FLAGS_atlas_vk_compact_log_sample);
-      const int sampleCount = std::min<int>(toSample, static_cast<int>(clamped));
-      std::string sample;
-      uint32_t vmin = std::numeric_limits<uint32_t>::max();
-      uint32_t vmax = 0u;
-      for (uint32_t i = 0; i < clamped; ++i) {
-        uint32_t v = u32[1 + i];
-        vmin = std::min(vmin, v);
-        vmax = std::max(vmax, v);
-        if (i < static_cast<uint32_t>(sampleCount)) {
-          if (!sample.empty()) {
-            sample += ",";
-          }
-          sample += fmt::format("{}", v);
-        }
-      }
-      VLOG(2) << fmt::format("compaction append raw: count={} capacity={} sample=[{}] min={} max={}",
-                             count,
-                             capacity,
-                             sample,
-                             vmin,
-                             vmax);
-    }
+    
     missingBlocks.reserve(clamped);
     for (uint32_t i = 0; i < clamped; ++i) {
       uint32_t v = u32[1 + i];
@@ -1367,15 +1345,17 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
       m_pendingFinalization =
         Finalization{.streamKey = streamKey, .eye = eye, .lastRound = true, .channelCount = channelCount};
       VLOG(1) << fmt::format(
-        "compaction: skip progressive round (all attachments zero, channelIndex={} unionSize={} capacity={})",
+        "compaction: skip progressive round (all attachments zero, channelIndex={} (raw={}) unionSize={} capacity={})",
         channelIndex,
+        channelIndexRaw,
         missingBlocks.size(),
         cacheCapacity);
     } else if (anyZeroAttachment && fitsCache) {
       m_deferredProgressive = DeferredProgressive{.streamKey = streamKey, .eye = eye, .channelCount = channelCount};
       VLOG(1) << fmt::format(
-        "compaction: schedule progressive-only round (channelIndex={} firstZeroAtt={} unionSize={} capacity={})",
+        "compaction: schedule progressive-only round (channelIndex={} (raw={}) firstZeroAtt={} unionSize={} capacity={})",
         channelIndex,
+        channelIndexRaw,
         (zeroAtt == std::numeric_limits<uint32_t>::max() ? -1 : static_cast<int>(zeroAtt)),
         missingBlocks.size(),
         cacheCapacity);
