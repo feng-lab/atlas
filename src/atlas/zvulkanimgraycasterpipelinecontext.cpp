@@ -118,10 +118,6 @@ struct RayParamsData
 constexpr uint32_t kMaxPagingLevels = 16u;
 
 // Block-ID compaction table parameters (must match GLSL)
-constexpr uint32_t kBlockIdTableBits = 22u; // 4 Mi entries
-constexpr uint32_t kBlockIdTableSize = (1u << kBlockIdTableBits);
-constexpr size_t kBlockIdCompactBytes = size_t{kBlockIdTableSize} * sizeof(uint32_t); // 16 MiB
-constexpr uint32_t kInvalidBlockID = 0u;
 constexpr uint32_t kEmptyBlockID = 0xFFFFFFFFu;
 
 uint32_t rayModeConstant(ImgCompositingMode mode)
@@ -390,7 +386,9 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
     static_cast<bool>(payload.lastAccumLease && payload.lastAccumLease->hasVulkanImage()),
     static_cast<bool>(payload.currentAccumLease && payload.currentAccumLease->hasVulkanImage()),
     static_cast<bool>(payload.blockIdLease && payload.blockIdLease->hasVulkanImage()));
-  m_pendingFinalization.reset();
+  // Do not clear m_pendingFinalization here; it may contain a completion
+  // request emitted at end of the previous frame (post-fence). The backend
+  // will pull it via takePendingFinalization() after record().
   CHECK(payload.entryExitLease && payload.entryExitLease->hasVulkanImage())
     << "Vulkan img raycaster missing entry/exit lease.";
 
@@ -407,6 +405,17 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   VLOG(2) << "after uploadEntryGeometry";
 
   CHECK(payload.image) << "Raycaster payload missing image pointer.";
+
+  // If a finalization from the previous frame is pending, skip recording any
+  // progressive work for this stream/eye now. The backend will consume the
+  // finalization immediately after record() and advance the channel, avoiding
+  // an extra compaction pass on the same channel.
+  if (m_pendingFinalization && m_pendingFinalization->streamKey == payload.streamKey &&
+      m_pendingFinalization->eye == batch.eye) {
+    VLOG(1) << "Raycaster: skipping progressive work due to pending finalization (will advance channel).";
+    return;
+  }
+
   const CompositingConfig composite = evaluateCompositing(payload.compositingMode);
   const bool hasIndices = payload.entryHasIndices && !payload.entryIndices.empty();
   const bool planarGeometry = !hasIndices;
@@ -784,12 +793,16 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_
                                                  : (shaderBase + "block_id_compact_append.comp.spv"));
 
   if (buffer) {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eStorageBuffer,
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eCompute},
       vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 2,
                                      .descriptorType = vk::DescriptorType::eStorageBuffer,
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eCompute}
@@ -800,7 +813,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_
                                         .pBindings = bindings.data()});
     vk::PushConstantRange pc{.stageFlags = vk::ShaderStageFlagBits::eCompute,
                              .offset = 0,
-                             .size = sizeof(uint32_t) * 4};
+                             .size = sizeof(uint32_t) * 5};
     m_blockIdCompactPipelineLayoutBuffer.emplace(
       device,
       vk::PipelineLayoutCreateInfo{.setLayoutCount = 1,
@@ -820,12 +833,16 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_
       nullptr,
       vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayoutBuffer});
   } else if (storage) {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eStorageImage,
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eCompute},
       vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 2,
                                      .descriptorType = vk::DescriptorType::eStorageBuffer,
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eCompute}
@@ -836,7 +853,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_
                                         .pBindings = bindings.data()});
     vk::PushConstantRange pc{.stageFlags = vk::ShaderStageFlagBits::eCompute,
                              .offset = 0,
-                             .size = sizeof(uint32_t) * 4};
+                             .size = sizeof(uint32_t) * 5};
     m_blockIdCompactPipelineLayoutStorage.emplace(
       device,
       vk::PipelineLayoutCreateInfo{.setLayoutCount = 1,
@@ -856,12 +873,16 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_
       nullptr,
       vk::ComputePipelineCreateInfo{.stage = stage, .layout = **m_blockIdCompactPipelineLayoutStorage});
   } else {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+    std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eCompute},
       vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eCompute},
+      vk::DescriptorSetLayoutBinding{.binding = 2,
                                      .descriptorType = vk::DescriptorType::eStorageBuffer,
                                      .descriptorCount = 1,
                                      .stageFlags = vk::ShaderStageFlagBits::eCompute}
@@ -872,7 +893,7 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactionPipeline(uint32_
                                         .pBindings = bindings.data()});
     vk::PushConstantRange pc{.stageFlags = vk::ShaderStageFlagBits::eCompute,
                              .offset = 0,
-                             .size = sizeof(uint32_t) * 4};
+                             .size = sizeof(uint32_t) * 5};
     m_blockIdCompactPipelineLayoutSampled.emplace(
       device,
       vk::PipelineLayoutCreateInfo{.setLayoutCount = 1,
@@ -914,6 +935,19 @@ void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCompactOutput(size_t bytes
     vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
     vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
   m_blockIdCompactCapacity = bytes;
+}
+
+void ZVulkanImgRaycasterPipelineContext::ensureBlockIdCountSnapshot(uint32_t attachmentCount)
+{
+  const size_t bytes = static_cast<size_t>(attachmentCount) * sizeof(uint32_t);
+  if (m_blockIdCountSnapshot && m_blockIdCountSnapshotCapacity >= bytes) {
+    return;
+  }
+  m_blockIdCountSnapshot = m_backend.device().createBuffer(bytes,
+                                                           vk::BufferUsageFlagBits::eTransferDst,
+                                                           vk::MemoryPropertyFlagBits::eHostVisible |
+                                                             vk::MemoryPropertyFlagBits::eHostCoherent);
+  m_blockIdCountSnapshotCapacity = bytes;
 }
 
 // (probe pipelines removed)
@@ -977,28 +1011,26 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   }
   spec.descriptorSetFirst = 0;
   spec.expectedDescriptorSetCount = 1;
-  // Push constants: width, height, stride, baseIndex (unused=0)
-  struct PC
-  {
-    uint32_t width;
-    uint32_t height;
-    uint32_t stride;
-    uint32_t baseOrCapacity;
-  } pc{imgW, imgH, imgW, static_cast<uint32_t>(imgW * imgH * 4u)};
-  spec.pushConstantsData = &pc;
-  spec.pushConstantsSize = sizeof(pc);
-  spec.pushConstantsStages = vk::ShaderStageFlagBits::eCompute;
   // Workgroup size assumed 16x16 in shader
-  spec.groupX = (pc.width + 15) / 16;
-  spec.groupY = (pc.height + 15) / 16;
+  spec.groupX = (imgW + 15) / 16;
+  spec.groupY = (imgH + 15) / 16;
   spec.groupZ = 1;
   VLOG(2) << fmt::format("record compute: groupX={} groupY={} width={} height={}",
                          spec.groupX,
                          spec.groupY,
-                         pc.width,
-                         pc.height);
+                         imgW,
+                         imgH);
   // Iterate every Block-ID attachment and dispatch compaction on each.
   // Allocate a fresh override descriptor set per attachment to avoid updating a bound set.
+  // Ensure per-attachment counts buffer exists and zero it before the sequence
+  ensureBlockIdCountSnapshot(attachmentCount);
+  if (m_blockIdCountSnapshot) {
+    void* mapped = m_blockIdCountSnapshot->map(0, m_blockIdCountSnapshotCapacity);
+    CHECK(mapped != nullptr);
+    std::memset(mapped, 0x00, m_blockIdCountSnapshotCapacity);
+    m_blockIdCountSnapshot->unmap();
+  }
+
   for (uint32_t att = 0; att < attachmentCount; ++att) {
     if (FLAGS_atlas_vk_compact_only_first_blockid_attachment && att > 0) {
       continue; // debug isolation: only compact the first attachment
@@ -1138,6 +1170,10 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                         vk::ImageLayout::eShaderReadOnlyOptimal,
                         vk::ImageAspectFlags{});
     }
+    // binding 2 = counts buffer
+    ensureBlockIdCountSnapshot(attachmentCount);
+    CHECK(m_blockIdCountSnapshot != nullptr);
+    ds->updateStorageBuffer(2, *m_blockIdCountSnapshot);
     if (VLOG_IS_ON(2)) {
       VLOG(2) << fmt::format("Compaction DS storage: set=0x{:x} buf=0x{:x} size={}B",
                              reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(ds->descriptorSet())),
@@ -1146,82 +1182,165 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     }
     ds->updateStorageBuffer(1, *m_blockIdCompactOutput);
     spec.descriptorSets = {ds->descriptorSet()};
+    // Push constants: width, height, stride, capacity, att index
+    struct PC
+    {
+      uint32_t width;
+      uint32_t height;
+      uint32_t stride;
+      uint32_t capacity;
+      uint32_t att;
+    } pc{imgW, imgH, imgW, static_cast<uint32_t>(imgW * imgH * 4u), att};
+    spec.pushConstantsData = &pc;
+    spec.pushConstantsSize = sizeof(pc);
+    spec.pushConstantsStages = vk::ShaderStageFlagBits::eCompute;
     recorder.recordComputePass(spec);
   }
   if (gpuScope) {
     m_backend.endGpuScope(*gpuScope);
   }
 
-  // After fence: parse compacted buffer and update caches
+  // Resolve channel index from raw booking for post-frame work
+  {
+    const int32_t rawIdx = payload.channelIndexRaw;
+    CHECK_GE(rawIdx, 0);
+    CHECK_LT(static_cast<size_t>(rawIdx), payload.visibleChannels.size());
+  }
+  const size_t resolvedChannelIndex = payload.visibleChannels[static_cast<size_t>(payload.channelIndexRaw)];
+
+  // After fence: parse compacted buffer and update caches; determine if this round is complete
   auto bufPtr = m_blockIdCompactOutput.get();
-  m_backend.scheduleAfterCurrentFrameCompletion(
-    [bufPtr, imgW, imgH, channelIndex = payload.activeChannel, imagePtr = payload.image]() {
-      if (!bufPtr || !imagePtr) {
-        return;
-      }
-      const size_t bytes = sizeof(uint32_t) + static_cast<size_t>(imgW) * imgH * 4ull * sizeof(uint32_t);
-      const void* mapped = bufPtr->map(0, bytes);
-      if (!mapped) {
-        return;
-      }
-      std::vector<uint32_t> missingBlocks;
-      // Append buffer format: [count][ids...]
-      const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
-      const uint32_t count = u32[0];
-      const uint32_t capacity = imgW * imgH * 4u;
-      const uint32_t clamped = std::min(count, capacity);
-      if (VLOG_IS_ON(1)) {
-        const int toSample = std::max(0, FLAGS_atlas_vk_compact_log_sample);
-        const int sampleCount = std::min<int>(toSample, static_cast<int>(clamped));
-        std::string sample;
-        uint32_t vmin = std::numeric_limits<uint32_t>::max();
-        uint32_t vmax = 0u;
-        for (uint32_t i = 0; i < clamped; ++i) {
-          uint32_t v = u32[1 + i];
-          vmin = std::min(vmin, v);
-          vmax = std::max(vmax, v);
-          if (i < static_cast<uint32_t>(sampleCount)) {
-            if (!sample.empty()) {
-              sample += ",";
-            }
-            sample += fmt::format("{}", v);
-          }
-        }
-        VLOG(1) << fmt::format("compaction append raw: count={} capacity={} sample=[{}] min={} max={}",
-                               count,
-                               capacity,
-                               sample,
-                               vmin,
-                               vmax);
-      }
-      missingBlocks.reserve(clamped);
+  auto countSnap = m_blockIdCountSnapshot.get();
+  m_backend.scheduleAfterCurrentFrameCompletion([this,
+                                                 bufPtr,
+                                                 countSnap,
+                                                 imgW,
+                                                 imgH,
+                                                 streamKey = payload.streamKey,
+                                                 eye = batch.eye,
+                                                 channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
+                                                 attCount = attachmentCount,
+                                                 channelIndex = resolvedChannelIndex,
+                                                 imagePtr = payload.image]() {
+    CHECK(bufPtr != nullptr);
+    CHECK(imagePtr != nullptr);
+    const size_t unionBytes = sizeof(uint32_t) + static_cast<size_t>(imgW) * imgH * 4ull * sizeof(uint32_t);
+    const void* mapped = bufPtr->map(0, unionBytes);
+    if (!mapped) {
+      return;
+    }
+    std::vector<uint32_t> missingBlocks;
+    // Append buffer format: [count][ids...]
+    const uint32_t* u32 = static_cast<const uint32_t*>(mapped);
+    const uint32_t count = u32[0];
+    const uint32_t capacity = imgW * imgH * 4u;
+    const uint32_t clamped = std::min(count, capacity);
+    if (false && VLOG_IS_ON(1)) {
+      const int toSample = std::max(0, FLAGS_atlas_vk_compact_log_sample);
+      const int sampleCount = std::min<int>(toSample, static_cast<int>(clamped));
+      std::string sample;
+      uint32_t vmin = std::numeric_limits<uint32_t>::max();
+      uint32_t vmax = 0u;
       for (uint32_t i = 0; i < clamped; ++i) {
         uint32_t v = u32[1 + i];
-        if (v != kInvalidBlockID && v != kEmptyBlockID && v != 0u) {
-          missingBlocks.push_back(v);
+        vmin = std::min(vmin, v);
+        vmax = std::max(vmax, v);
+        if (i < static_cast<uint32_t>(sampleCount)) {
+          if (!sample.empty()) {
+            sample += ",";
+          }
+          sample += fmt::format("{}", v);
         }
       }
-      // CPU-side dedupe (ids may repeat across workgroups)
-      std::unordered_set<uint32_t> uniq;
-      uniq.reserve(missingBlocks.size());
-      std::vector<uint32_t> deduped;
-      deduped.reserve(missingBlocks.size());
-      for (uint32_t v : missingBlocks) {
-        if (uniq.insert(v).second) {
-          deduped.push_back(v);
-        }
+      VLOG(1) << fmt::format("compaction append raw: count={} capacity={} sample=[{}] min={} max={}",
+                             count,
+                             capacity,
+                             sample,
+                             vmin,
+                             vmax);
+    }
+    missingBlocks.reserve(clamped);
+    for (uint32_t i = 0; i < clamped; ++i) {
+      uint32_t v = u32[1 + i];
+      if (v != kEmptyBlockID && v != 0u) {
+        missingBlocks.push_back(v);
       }
-      missingBlocks.swap(deduped);
-      bufPtr->unmap();
+    }
+    // CPU-side dedupe (ids may repeat across workgroups)
+    std::unordered_set<uint32_t> uniq;
+    uniq.reserve(missingBlocks.size());
+    std::vector<uint32_t> deduped;
+    deduped.reserve(missingBlocks.size());
+    for (uint32_t v : missingBlocks) {
+      if (uniq.insert(v).second) {
+        deduped.push_back(v);
+      }
+    }
+    missingBlocks.swap(deduped);
+    bufPtr->unmap();
 
-      VLOG(1) << fmt::format("compaction output parsed: keys={} (non-empty)", missingBlocks.size());
-      if (!missingBlocks.empty()) {
-        auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
-        ZBenchTimer timer("vulkan_raycaster_blockid_compaction");
-        imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks, channelIndex, cancellationToken, timer);
-        VLOG(1) << fmt::format("cache uploads dispatched: blocks={}", missingBlocks.size());
+    VLOG(1) << fmt::format("compaction output parsed: keys={} (non-empty)", missingBlocks.size());
+
+    // Upload missing blocks (if any)
+    if (!missingBlocks.empty()) {
+      auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+      ZBenchTimer timer("vulkan_raycaster_blockid_compaction");
+      imagePtr->updateAndUploadPageDirectoryCaches(missingBlocks, channelIndex, cancellationToken, timer);
+      VLOG(1) << fmt::format("cache uploads dispatched: blocks={}", missingBlocks.size());
+    }
+
+    // Any attachment with zero contribution implies all later attachments would also be zero.
+    bool attAllZero = false;
+    uint32_t zeroAtt = std::numeric_limits<uint32_t>::max();
+    if (countSnap) {
+      const size_t bytes = static_cast<size_t>(attCount) * sizeof(uint32_t);
+      const void* mappedCnt = countSnap->map(0, bytes);
+      CHECK(mappedCnt != nullptr);
+      const uint32_t* counts = static_cast<const uint32_t*>(mappedCnt);
+      for (uint32_t att = 0; att < attCount; ++att) {
+        if (counts[att] == 0u) {
+          attAllZero = true;
+          zeroAtt = att;
+          break;
+        }
       }
-    });
+      if (VLOG_IS_ON(1)) {
+        std::string s;
+        s.reserve(attCount * 6);
+        for (uint32_t att = 0; att < attCount; ++att) {
+          if (att) {
+            s += ",";
+          }
+          s += fmt::format("{}", counts[att]);
+        }
+        VLOG(1) << fmt::format("compaction per-attachment counts: [{}] (allZero={} zeroAtt={})",
+                               s,
+                               attAllZero ? 1 : 0,
+                               (zeroAtt == std::numeric_limits<uint32_t>::max() ? -1 : static_cast<int>(zeroAtt)));
+      }
+      countSnap->unmap();
+    }
+
+    // Last-round decision: require an all-zero attachment AND union fits cache
+    const size_t cacheCapacity = imagePtr->numCachedImages(channelIndex);
+    const bool fitsCache = missingBlocks.size() <= cacheCapacity;
+    if (VLOG_IS_ON(1)) {
+      VLOG(1) << fmt::format("compaction last-round check: attAllZero={} fitsCache={} unionSize={} capacity={}",
+                             attAllZero ? 1 : 0,
+                             fitsCache ? 1 : 0,
+                             missingBlocks.size(),
+                             cacheCapacity);
+    }
+    if (attAllZero && fitsCache) {
+      m_pendingFinalization =
+        Finalization{.streamKey = streamKey, .eye = eye, .lastRound = true, .channelCount = channelCount};
+      VLOG(1) << fmt::format("compaction: lastRound=true (channelIndex={} zeroAtt={} unionSize={} capacity={})",
+                             channelIndex,
+                             (zeroAtt == std::numeric_limits<uint32_t>::max() ? -1 : static_cast<int>(zeroAtt)),
+                             missingBlocks.size(),
+                             cacheCapacity);
+    }
+  });
 }
 
 void ZVulkanImgRaycasterPipelineContext::ensureEntryPipelines(vk::Format colorFormat)
@@ -3920,18 +4039,20 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     return;
   }
 
-  // Match GL behavior: on the first frame of a new progressive generation,
-  // render a non-paged fast preview and return without finalizing a round.
-  // Use the generation bump (renderer-side) to detect "first" instead of the
-  // round counter so we don't loop fast previews.
-  if (payload.progressiveGeneration != m_progressiveGeneration) {
-    // Only the Full stage performs the preview; split sub-stages skip work
-    // during the first progressive frame.
+  // GL parity: fast preview indicated by channelIndexRaw < 0.
+  if (static_cast<int32_t>(payload.channelIndexRaw) < 0) {
     if (payload.stage != ImgRaycasterPayload::Stage::Full) {
       return;
     }
     ensureProgressiveLayerTargets(payload.outputSize, channelCount, payload.progressiveGeneration, cmd);
     renderFastVolume(renderer, batch, payload, viewport, scissor, cmd, composite);
+    // Request renderer to flip channelIdx from -1 to 0 for subsequent rounds (GL parity)
+    if (payload.streamKey != 0) {
+      m_pendingFinalization = Finalization{.streamKey = payload.streamKey,
+                                           .eye = batch.eye,
+                                           .lastRound = false,
+                                           .channelCount = static_cast<uint32_t>(payload.visibleChannels.size())};
+    }
     return;
   }
 
@@ -3950,14 +4071,13 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   CHECK(m_imageBlockUploader) << "Vulkan raycaster progressive path missing image block uploader.";
   m_imageBlockUploader->bindToImage(*payload.image);
 
-  uint32_t activeChannelIndex = payload.activeChannelIndex;
-  if (activeChannelIndex >= channelCount) {
-    activeChannelIndex = 0u;
-  }
-  size_t channelIndex = payload.activeChannel;
-  if (channelIndex == std::numeric_limits<size_t>::max() || activeChannelIndex >= payload.visibleChannels.size()) {
-    channelIndex = payload.visibleChannels[activeChannelIndex];
-  }
+  // Use raw GL booking; negative means fast preview, otherwise raw channel index (validated by renderer)
+  const int32_t rawIdx = payload.channelIndexRaw;
+  CHECK_GE(rawIdx, 0) << "Negative channelIndexRaw (fast preview) not expected in progressive path.";
+  CHECK_LT(static_cast<uint32_t>(rawIdx), channelCount) << "channelIndexRaw out of range for visibleChannels.";
+  const uint32_t activeChannelIndex = static_cast<uint32_t>(rawIdx);
+  CHECK_LT(activeChannelIndex, payload.visibleChannels.size());
+  const size_t channelIndex = payload.visibleChannels[activeChannelIndex];
 
   ChannelResources& resources = ensureChannelResources(channelIndex);
 
@@ -3987,10 +4107,8 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   CHECK(entryTexture && lastColor && lastDepth && currentColor && currentDepth)
     << "Vulkan raycaster progressive path missing required textures.";
 
-  // GL parity: on round 0, clear the last-accumulator pair explicitly because the Block-ID shader
-  // samples last_ray_depth_tex and last_color_tex. Vulkan normally clears the current accumulators
-  // and swaps after finalize, but for the first round we need last* to be zeroed as GL does.
-  if (payload.roundsCompleted == 0u) {
+  // GL parity: on round 0 for a channel, clear the last accumulators before Block-ID pass.
+  if (payload.roundIndexRaw == 0) {
     // Clear lastColor (RGBA) to zeros
     {
       const auto clear = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
@@ -4016,7 +4134,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
 
   if (FLAGS_atlas_vk_debug_raycaster_dump) {
     VLOG(1) << fmt::format(
-      "Raycaster draw ctx: viewport=({}, {}, {}x{}) scissor=({}, {}, {}x{}) out={}x{} channels={} activeChannel={}",
+      "Raycaster draw ctx: viewport=({}, {}, {}x{}) scissor=({}, {}, {}x{}) out={}x{} channels={} channelIdxRaw={} channel={} ",
       static_cast<int>(viewport.x),
       static_cast<int>(viewport.y),
       static_cast<int>(viewport.width),
@@ -4028,6 +4146,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
       static_cast<int>(outputSize.x),
       static_cast<int>(outputSize.y),
       payload.visibleChannels.size(),
+      rawIdx,
       channelIndex);
   }
 
@@ -4117,9 +4236,11 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     return;
   }
 
-  // Prefer an override static descriptor set in split stages to avoid
-  // updating a persistent set already bound earlier in the same command buffer.
-  const bool preferOverrideStaticGlobal = (payload.stage != ImgRaycasterPayload::Stage::Full);
+  // GL parity: bind current textures immediately for the Block-ID pass.
+  // Persistent static descriptors are allocated after frame completion; to
+  // avoid stale bindings when switching channels within the same command buffer,
+  // always prefer a per-draw override static descriptor here.
+  const bool preferOverrideStaticGlobal = true;
 
   if (preferOverrideStaticGlobal) {
     if (!resources.staticDescriptor) {
@@ -4327,7 +4448,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     }
   } // end block-ID stage
 
-  // Streaming continues; do not mark last round prematurely.
+  // Streaming continues; compaction finalization is deferred to a post-fence callback that sets m_pendingFinalization.
   bool lastRound = false;
 
   // ---------------- Progressive raycast pass ----------------
@@ -4485,10 +4606,9 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                                   vk::ImageAspectFlags{});
 
   ZVulkanAttachmentInfo layerColorAttachment{};
+  CHECK_LT(activeChannelIndex, layerColor->arrayLayers());
   auto layerColorView = layerColor->layerImageView(activeChannelIndex);
-  if (layerColorView == vk::ImageView{}) {
-    layerColorView = layerColor->imageView();
-  }
+  CHECK(layerColorView != vk::ImageView{}) << "Layer color view must be valid for active channel.";
   layerColorAttachment.image = layerColor->image();
   layerColorAttachment.view = layerColorView;
   layerColorAttachment.format = layerColor->format();
@@ -4505,10 +4625,8 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerColorAttachment.aspect = vk::ImageAspectFlagBits::eColor;
   layerColorAttachment.trackingTexture = layerColor;
 
+  CHECK_LT(activeChannelIndex, layerDepth->arrayLayers());
   auto layerDepthView = layerDepth->layerImageView(activeChannelIndex);
-  if (layerDepthView == vk::ImageView{}) {
-    layerDepthView = layerDepth->imageView();
-  }
   CHECK(layerDepthView != vk::ImageView{}) << "Layer depth attachment view missing for progressive copy.";
   const auto [attachLayout, _attachAspect] = depthAttachmentLayoutAndAspect(*layerDepth);
   ZVulkanAttachmentInfo layerDepthAttachment{};
@@ -4683,3 +4801,4 @@ std::vector<uint32_t> readSpirvFile(const std::string& path)
   return buffer;
 }
 } // namespace
+  // No extra per-context channel tracking needed; renderer controls payload.roundIndexRaw.

@@ -582,11 +582,16 @@ struct ImgRaycasterPayload
   const std::vector<Z3DTransferFunction*>* transferFunctions = nullptr;
   std::vector<uint32_t> blockIdReadback;
   uint32_t blockIdAttachmentCount = 0u;
-  uint32_t roundsCompleted = 0u;
   uint32_t roundsRemaining = 0u;
-  size_t activeChannel = std::numeric_limits<size_t>::max();
-  uint32_t activeChannelIndex = 0u;
   uint32_t progressiveGeneration = 0u;
+
+  // GL-parity bookkeeping (raw values from renderer state):
+  // channelIndexRaw mirrors renderer m_channelIdx[eye] and may be -1 during the
+  // initial fast-preview frame; roundIndexRaw mirrors m_round[eye] and can be 0+.
+  // No duplicate/clamped channel fields; use channelIndexRaw and visibleChannels
+  // to derive the renderable channel where needed.
+  int32_t channelIndexRaw = -1;
+  int32_t roundIndexRaw = 0;
 };
 
 struct EllipsoidPayload

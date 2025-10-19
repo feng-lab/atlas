@@ -18,11 +18,16 @@ layout(std430, set = 0, binding = 1) buffer BlockList {
     uint ids[];
 };
 
+layout(std430, set = 0, binding = 2) buffer Counts {
+    uint counts[8];
+};
+
 layout(push_constant) uniform PushConstants {
     uint width;
     uint height;
     uint stride;
     uint capacity; // max ids[] entries
+    uint att;
 } pc;
 
 uint hash32(uint x) { return x * 2654435761u; }
@@ -70,6 +75,7 @@ void main()
             uint v = lkeys[i];
             if (v == EMPTY || v == 0u) continue;
             uint idx = atomicAdd(count, 1u);
+            atomicAdd(counts[pc.att], 1u);
             if (idx < pc.capacity) {
                 ids[idx] = v;
             }

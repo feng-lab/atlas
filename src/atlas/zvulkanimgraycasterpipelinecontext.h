@@ -4,6 +4,7 @@
 #include "zvulkan.h"
 
 #include <map>
+#include <unordered_set>
 #include <memory>
 #include <optional>
 #include <span>
@@ -284,6 +285,10 @@ private:
   ZVulkanDescriptorSet* m_blockIdCompactDescriptor = nullptr; // per-draw override (backend-owned)
   std::unique_ptr<ZVulkanBuffer> m_blockIdCompactOutput; // host-visible, compacted result
   size_t m_blockIdCompactCapacity = 0; // bytes
+  // Per-attachment snapshot of append counts (host-visible), used to detect
+  // whether an attachment contributed any IDs (delta == 0 => attachment all zeros).
+  std::unique_ptr<ZVulkanBuffer> m_blockIdCountSnapshot; // host-visible, TRANSFER_DST
+  size_t m_blockIdCountSnapshotCapacity = 0; // bytes
 
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
@@ -297,6 +302,9 @@ private:
 
   // Track which depth images have been cleared this frame (for first-use clear on merge).
   std::unordered_set<VkImage> m_depthClearedThisFrame;
+
+  // No extra per-stream channel bookkeeping; pending finalization is set after
+  // frame completion when compaction finds no missing blocks for the active channel.
 
   void ensureDescriptorPool();
   void resetDescriptors();
@@ -319,6 +327,7 @@ private:
 
   void ensureBlockIdCompactionPipeline(uint32_t attachmentCount, int mode);
   void ensureBlockIdCompactOutput(size_t bytes);
+  void ensureBlockIdCountSnapshot(uint32_t attachmentCount);
   void recordBlockIdCompaction(Z3DRendererBase& renderer,
                                const RenderBatch& batch,
                                const ImgRaycasterPayload& payload,

@@ -92,30 +92,20 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   payload.fastPathOnly = m_fastRendering || !m_img->isVolumeDownsampled();
   // Vulkan path uses the output size for entry/exit
   payload.visibleChannels = visibleChannels;
-  payload.activeChannel = visibleChannels.empty() ? std::numeric_limits<size_t>::max() : visibleChannels.front();
-  payload.activeChannelIndex = 0u;
-  // Progressive init parity with GL: on first entry into progressive rendering,
-  // initialize state and advance generation so downstream Vulkan pipelines can
-  // clear/prime their per-generation targets before paging kicks in.
+  // Progressive init parity with GL: if starting progressive (channelIdx < 0), bump
+  // generation so the Vulkan path clears/refreshes progressive targets. Otherwise,
+  // leave bookkeeping untouched; the pipeline enforces invariants and uses raw values.
   if (!payload.fastPathOnly) {
     if (m_channelIdx[eye] < 0) {
-      m_channelIdx[eye] = 0;
-      m_round[eye] = 0;
       ++m_progressiveGeneration[eye];
     }
-    if (!visibleChannels.empty()) {
-      const int clampedIndex = std::clamp(m_channelIdx[eye], 0, static_cast<int>(visibleChannels.size() - 1));
-      payload.activeChannelIndex = static_cast<uint32_t>(clampedIndex);
-      payload.activeChannel = visibleChannels[static_cast<size_t>(clampedIndex)];
-    }
-  } else {
-    m_channelIdx[eye] = -1;
-    m_round[eye] = 0;
   }
   payload.progressiveGeneration = m_progressiveGeneration[eye];
   payload.transferFunctions = &m_transferFunctions;
-  payload.roundsCompleted = static_cast<uint32_t>(std::max(0, m_round[eye]));
   payload.roundsRemaining = FLAGS_atlas_volume_rendering_maximum_round;
+  // Also pass raw GL-parity booking for clarity
+  payload.channelIndexRaw = m_channelIdx[eye];
+  payload.roundIndexRaw = m_round[eye];
 
   auto populateFromEntryExitMesh = [&]() {
     const auto& positions = m_entryExitMesh.vertices();
@@ -311,18 +301,30 @@ void Z3DImgRaycasterRenderer::finalizeProgressiveRound(Z3DEye eye, bool lastRoun
     return;
   }
 
-  if (lastRound) {
-    m_channelIdx[eye] = -1;
+  // Match GL semantics:
+  // - At the start of progressive rendering, initialize channel index to 0 and round to 0.
+  // - When a channel completes (lastRound == true), advance to the next channel and reset round to 0.
+  // - If the last channel has completed, mark progress as done by setting channelIdx to -1.
+  // - Otherwise (ongoing work on the current channel), increment the round counter.
+  if (m_channelIdx[eye] < 0 && channelCount > 0) {
+    // Initialize progressive state for Vulkan to mirror GL’s first-entry behavior
+    m_channelIdx[eye] = 0;
     m_round[eye] = 0;
-  } else {
-    if (m_channelIdx[eye] < 0 && channelCount > 0) {
-      // Initialize progressive state; do not count this as a completed full-res
-      // round so the first post-render progress reports ~0.5 (GL parity).
-      m_channelIdx[eye] = 0;
-      // keep m_round[eye] at 0
-    } else {
-      ++m_round[eye];
+    return;
+  }
+
+  if (lastRound) {
+    // Advance to next channel
+    ++m_channelIdx[eye];
+    m_round[eye] = 0;
+    if (static_cast<size_t>(m_channelIdx[eye]) >= channelCount) {
+      // All channels complete; mark as finished
+      m_channelIdx[eye] = -1;
+      m_round[eye] = 0;
     }
+  } else {
+    // Continue rounds on current channel
+    ++m_round[eye];
   }
 }
 
