@@ -549,16 +549,6 @@ struct ImgRaycasterPayload
   // Stable identity of the source renderer/stream
   uint64_t streamKey = 0;
   Z3DImg* image = nullptr;
-  // Optional stage override to support split submissions. When Full, the
-  // raycaster records entry/exit + (fast/progressive) as usual. Other stages
-  // allow the caller to segment work across multiple command buffers.
-  enum class Stage
-  {
-    Full,
-    EntryExitOnly,
-    BlockIdOnly,
-    ProgressiveOnly
-  } stage = Stage::Full;
   std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> entryExitLease;
   std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> blockIdLease;
   std::shared_ptr<Z3DScratchResourcePool::RenderTargetLease> lastAccumLease;
