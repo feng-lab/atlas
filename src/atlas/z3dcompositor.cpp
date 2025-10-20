@@ -1293,7 +1293,14 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   // fragile and not recommended. Therefore we intentionally disable keep-open.
 
   // Supersample 2x2 parity (render to 2x scene lease, then downsample)
+  // Note: Vulkan batches use the renderer's frame viewport to define the
+  // render area. When rendering into a supersampled lease, we must temporarily
+  // update the frame viewport to the supersampled size so that every pass
+  // (background, geometry, OIT) covers the full attachment extent. Otherwise
+  // only the lower-left quarter of the supersampled target would be written
+  // and the final resolve would appear scaled down in the corner.
   const bool supersample2x2 = (m_rendererBase.sceneState().multisample == GeometryMSAAMode::MSAA2x2);
+  const glm::uvec4 prevViewport = m_rendererBase.frameState().viewport;
 
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
   Z3DScratchResourcePool::RenderTargetLease sceneLease;
@@ -1303,6 +1310,9 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     sceneLease =
       pool.acquireTempRenderTarget2D(ssSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
     sceneOutLease = &sceneLease;
+    // Temporarily render with a supersampled viewport. The viewport is
+    // restored to prevViewport right before the resolve step below.
+    m_rendererBase.frameState().updateViewportData(ssSize);
   }
 
   // Frame lifetime is managed per pass via recordInVulkanFrame/executeCompositorPass;
@@ -2106,6 +2116,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
   // Downsample supersampled scene into the compositor out surface
   if (supersample2x2) {
+    // Restore viewport to the output size for the resolve/copy pass.
+    m_rendererBase.frameState().updateViewportData(prevViewport);
     m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
                                                  LoadOp::Clear,
                                                  StoreOp::Store,
