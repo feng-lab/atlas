@@ -893,12 +893,32 @@ void Z3DRenderingEngine::setOutputSize(const glm::uvec2& size)
 
 ZImg Z3DRenderingEngine::localColorBufferToRGBAImg(const Z3DLocalColorBuffer& buffer)
 {
-  if (buffer.width == 0 || buffer.height == 0 || buffer.data.empty()) {
+  if (buffer.width == 0 || buffer.height == 0) {
     return {};
   }
 
+  // Prefer zero-copy external view when provided by the Vulkan backend.
+  // In Vulkan path, we expect the compositor to expose a tightly packed
+  // RGBA8 buffer (externalStride == width*4). In GL path, a CPU buffer must
+  // be present. Fail fast if invariants aren’t satisfied.
+  const size_t w = buffer.width;
+  const size_t h = buffer.height;
+  const bool hasExternal = (buffer.external != nullptr);
+  const bool hasCPUData = !buffer.data.empty();
+  CHECK(hasExternal || hasCPUData) << "LocalColorBuffer has no pixels (neither external nor CPU data).";
+
+  const uint8_t* srcPtr = nullptr;
+  if (hasExternal) {
+    const size_t expectedStride = w * 4ull;
+    CHECK(buffer.externalStride == 0 || buffer.externalStride == expectedStride)
+      << "Unexpected external stride for LocalColorBuffer";
+    srcPtr = buffer.external;
+  } else {
+    srcPtr = buffer.data.data();
+  }
+
   ZImg bufImg;
-  bufImg.wrapData(const_cast<uint8_t*>(buffer.data.data()), ZImgInfo(buffer.width, buffer.height, 1, 4));
+  bufImg.wrapData(const_cast<uint8_t*>(srcPtr), ZImgInfo(static_cast<int>(w), static_cast<int>(h), 1, 4));
   ZImg res(bufImg.info());
   ZImgFormat::CXYZtoXYZC(bufImg, res, true);
   res.infoRef().lastChannelIsAlphaChannel = true;
