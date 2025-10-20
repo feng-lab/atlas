@@ -1224,6 +1224,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   std::vector<Z3DBoundedFilter*> transparentFilters;
   std::vector<Z3DBoundedFilter*> onTopOpaqueFilters;
   std::vector<Z3DBoundedFilter*> onTopTransparentFilters;
+  std::vector<Z3DBoundedFilter*> selectedFilters;
+  std::vector<Z3DBoundedFilter*> showHandleFilters;
 
   for (auto* v : vFilters) {
     if (!v) {
@@ -1234,6 +1236,12 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         onTopOpaqueFilters.push_back(v);
       } else {
         opaqueFilters.push_back(v);
+      }
+    }
+    if (v->isSelected()) {
+      selectedFilters.push_back(v);
+      if (v->isTransformEnabled()) {
+        showHandleFilters.push_back(v);
       }
     }
   }
@@ -1256,6 +1264,12 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         onTopTransparentFilters.push_back(gf);
       } else {
         transparentFilters.push_back(gf);
+      }
+    }
+    if (gf->isSelected()) {
+      selectedFilters.push_back(gf);
+      if (gf->isTransformEnabled()) {
+        showHandleFilters.push_back(gf);
       }
     }
   }
@@ -1326,6 +1340,43 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                       transparencyMode == TransparencyMode::WeightedBlended;
   const auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
   bool imagesIntegratedViaOIT = false;
+
+  auto recordFilterBatchesToSurface =
+    [&](Z3DBoundedFilter* filter,
+        const Z3DScratchResourcePool::RenderTargetLease& target,
+        const glm::uvec2& viewportSize,
+        auto&& renderFn) {
+      if (!filter) {
+        return;
+      }
+      auto& source = filter->rendererBase();
+      const glm::uvec4 previousViewport = source.frameState().viewport;
+      const auto previousSurface = source.frameState().activeSurface;
+      const auto surfaceCopy = m_rendererBase.describeSurface(target);
+      source.frameState().updateViewportData(glm::uvec4(0u, 0u, viewportSize.x, viewportSize.y));
+      source.setActiveSurfaceWithLoadStore(surfaceCopy, Z3DRendererBase::Preserve);
+      renderFn();
+      auto& batches = source.cpuState().batches;
+      for (auto& batch : batches) {
+        if (batch.pass.colorAttachments.empty() && !surfaceCopy.colorAttachments.empty()) {
+          batch.pass.colorAttachments = surfaceCopy.colorAttachments;
+        }
+        if (!batch.pass.depthAttachment.has_value() && surfaceCopy.depthAttachment.has_value()) {
+          batch.pass.depthAttachment = surfaceCopy.depthAttachment;
+        }
+        if (batch.pass.viewport.extent == glm::vec2(0.0f)) {
+          batch.pass.viewport.origin = glm::vec2(0.0f, 0.0f);
+          batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewportSize.x),
+                                                 static_cast<float>(viewportSize.y));
+          batch.pass.viewport.minDepth = 0.0f;
+          batch.pass.viewport.maxDepth = 1.0f;
+        }
+        m_rendererBase.appendBatch(std::move(batch));
+      }
+      source.resetCPUState();
+      source.frameState().updateViewportData(previousViewport);
+      source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
+    };
 
   // Only engage OIT when there is actual transparency to resolve (either
   // geometry with transparent fragments or non-opaque image layers). If we
@@ -1917,25 +1968,98 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     }
   }
 
+  if (!showHandleFilters.empty()) {
+    const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
+    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
+    auto handleLease =
+      pool.acquireTempRenderTarget2D(targetSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
+    CHECK(handleLease && handleLease.backend == RenderBackend::Vulkan)
+      << "Failed to acquire Vulkan handle overlay render target";
+
+    m_rendererBase.setActiveSurfaceWithLoadStore(handleLease,
+                                                 LoadOp::Clear,
+                                                 StoreOp::Store,
+                                                 LoadOp::Clear,
+                                                 StoreOp::Store);
+    recordInVulkanFrame(
+      m_rendererBase,
+      [&]() {
+        for (auto* filter : showHandleFilters) {
+          if (!filter) {
+            continue;
+          }
+          filter->setViewport(targetSize);
+          recordFilterBatchesToSurface(filter, handleLease, targetSize, [&]() {
+            filter->renderHandle(eye);
+          });
+        }
+      },
+      "handles_overlay");
+
+    AttachmentHandle handleColor{};
+    handleColor.backend = AttachmentBackend::Vulkan;
+    handleColor.index = 0;
+    handleColor.id = reinterpret_cast<uint64_t>(handleLease.colorAttachment(0));
+    AttachmentHandle handleDepth{};
+    handleDepth.backend = AttachmentBackend::Vulkan;
+    handleDepth.index = 0;
+    handleDepth.id = reinterpret_cast<uint64_t>(handleLease.depthAttachmentTexture());
+    CHECK(handleColor.id != 0 && handleDepth.id != 0) << "Handles overlay lease missing attachments";
+
+    AttachmentHandle sceneColor{};
+    sceneColor.backend = AttachmentBackend::Vulkan;
+    sceneColor.index = 0;
+    sceneColor.id = reinterpret_cast<uint64_t>(sceneOutLease->colorAttachment(0));
+    AttachmentHandle sceneDepth{};
+    sceneDepth.backend = AttachmentBackend::Vulkan;
+    sceneDepth.index = 0;
+    sceneDepth.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
+    CHECK(sceneColor.id != 0 && sceneDepth.id != 0) << "Scene lease missing attachments for handles overlay";
+
+    m_rendererBase.setActiveSurfaceWithLoadStore(*sceneOutLease,
+                                                 LoadOp::Load,
+                                                 StoreOp::Store,
+                                                 LoadOp::Load,
+                                                 StoreOp::Store);
+    recordInVulkanFrame(
+      m_rendererBase,
+      [&]() {
+        m_firstOnTopBlendRenderer.setSourceAttachments0(handleColor, handleDepth);
+        m_firstOnTopBlendRenderer.setSourceAttachments1(sceneColor, sceneDepth);
+        m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
+      },
+      "handles_composite");
+  }
+
+  if (!selectedFilters.empty()) {
+    const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
+    m_rendererBase.setActiveSurfaceWithLoadStore(*sceneOutLease,
+                                                 LoadOp::Load,
+                                                 StoreOp::Store,
+                                                 LoadOp::Load,
+                                                 StoreOp::Store);
+    recordInVulkanFrame(
+      m_rendererBase,
+      [&]() {
+        for (auto* filter : selectedFilters) {
+          if (!filter) {
+            continue;
+          }
+          filter->setViewport(targetSize);
+          recordFilterBatchesToSurface(filter, *sceneOutLease, targetSize, [&]() {
+            filter->renderSelectionBox(eye);
+          });
+        }
+      },
+      "selection_boxes");
+  }
+
   if (m_showAxis.get()) {
     renderAxisVulkan(eye, *sceneOutLease);
   }
 
   // Vulkan picking (render to RGBA8+Depth24 Vulkan scratch image)
   {
-    std::vector<Z3DBoundedFilter*> showHandleFilters;
-    showHandleFilters.reserve(gFilters.size() + vFilters.size());
-    for (auto* v : vFilters) {
-      if (v && v->isSelected() && v->isTransformEnabled()) {
-        showHandleFilters.push_back(v);
-      }
-    }
-    for (auto* gf : gFilters) {
-      if (gf && gf->isSelected() && gf->isTransformEnabled()) {
-        showHandleFilters.push_back(gf);
-      }
-    }
-
     const glm::uvec2 pickSize = sceneOutLease->descriptor.size;
     ensurePickingTargetVulkan(pickSize);
 
