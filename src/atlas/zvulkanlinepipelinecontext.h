@@ -91,8 +91,8 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setTexture;
-  std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
-  std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
+  vk::DescriptorSetLayout m_setLighting{};
+  vk::DescriptorSetLayout m_setTransforms{};
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTexture;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
@@ -106,7 +106,7 @@ private:
   std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
 
-  std::optional<vk::raii::DescriptorSetLayout> m_setOIT;
+  vk::DescriptorSetLayout m_setOIT{};
 
   // All line geometry uses the per-frame upload arena; no per-context VBOs
 

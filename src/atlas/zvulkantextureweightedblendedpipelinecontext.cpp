@@ -188,21 +188,11 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorLayout()
 
   // Ensure placeholder to align set indices (for set 1 and 2)
   if (!m_setPlaceholder) {
-    auto& device = m_backend.device();
-    auto& vkDevice = device.context().device();
-    vk::DescriptorSetLayoutCreateInfo emptyInfo{.bindingCount = 0, .pBindings = nullptr};
-    m_setPlaceholder.emplace(vkDevice, emptyInfo);
+    m_setPlaceholder = m_backend.emptyDescriptorSetLayout();
   }
 
   if (!m_setOIT) {
-    auto& device = m_backend.device();
-    auto& vkDevice = device.context().device();
-    vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
-    m_setOIT.emplace(vkDevice, info);
+    m_setOIT = m_backend.oitDescriptorSetLayout();
   }
 }
 
@@ -216,7 +206,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorSet()
     m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setLayout);
   }
   if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 }
 
@@ -231,7 +221,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureOITResources()
   }
   CHECK(m_uboOIT != nullptr) << "WB: failed to allocate OIT UBO";
   if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
   CHECK(m_descriptorSetOIT != nullptr) << "WB: failed to allocate OIT descriptor set";
   if (m_descriptorSetOIT && m_uboOIT) {
@@ -332,14 +322,12 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
   if (m_setOIT) {
-    // Preserve set indices: set 0 = inputs, set 1/2 placeholders, set 3 = OIT UBO
-    // Ensure we have placeholder empty layout; reuse WA’s approach by creating a local empty layout if needed
-    if (!m_setPlaceholder) {
-      auto& vkDevice = device.context().device();
-      vk::DescriptorSetLayoutCreateInfo emptyInfo{.bindingCount = 0, .pBindings = nullptr};
-      m_setPlaceholder.emplace(vkDevice, emptyInfo);
-    }
-    instance.pipeline->setDescriptorSetLayouts({**m_setLayout, **m_setPlaceholder, **m_setPlaceholder, **m_setOIT});
+    auto resolveSuffix = m_backend.weightedResolveDescriptorSuffixLayouts();
+    std::vector<vk::DescriptorSetLayout> layouts;
+    layouts.reserve(1 + resolveSuffix.size());
+    layouts.push_back(**m_setLayout);
+    layouts.insert(layouts.end(), resolveSuffix.begin(), resolveSuffix.end());
+    instance.pipeline->setDescriptorSetLayouts(layouts);
   } else {
     instance.pipeline->setDescriptorSetLayouts({**m_setLayout});
   }

@@ -74,8 +74,8 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setLayout;
-  std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // for set 1/2 alignment
-  std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3
+  vk::DescriptorSetLayout m_setPlaceholder{}; // for set 1/2 alignment
+  vk::DescriptorSetLayout m_setOIT{}; // set = 3
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT; // set = 3
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;

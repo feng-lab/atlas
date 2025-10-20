@@ -104,8 +104,8 @@ private:
   } m_cachedTextures; // tracks last attachments for persistent scheduling only
   // Disabled by default: only enable when inputs are stable across frames
   bool m_enablePersistentScheduling = false;
-  std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // empty layout for set indices 1/2
-  std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set for OIT params when needed
+  vk::DescriptorSetLayout m_setPlaceholder{}; // empty layout for set indices 1/2
+  vk::DescriptorSetLayout m_setOIT{}; // set for OIT params when needed
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
   // Logging guard to avoid repeating OIT priming messages every call within a frame
