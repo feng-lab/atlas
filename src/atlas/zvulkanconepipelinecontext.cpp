@@ -890,24 +890,34 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
 
       if (entry.promoted && sizeSame) {
         bool anyChanged = false;
-        if (entry.baseColorGen != payload.baseColorGen || entry.pickingColorsGen != payload.pickingColorsGen) {
+        const bool baseColorChanged =
+          (entry.baseColorGen != payload.baseColorGen) || (entry.pickingColorsGen != payload.pickingColorsGen);
+        if (baseColorChanged) {
           m_backend.scheduleStaticCopy(entry.vbBaseColor, entry.baseColorOffset, baseColorSlice, false);
+          entry.baseColorGen = payload.baseColorGen;
+          entry.pickingColorsGen = payload.pickingColorsGen;
           anyChanged = true;
         }
-        if (!payload.sameColorForBaseAndTop && entry.topColorGen != payload.topColorGen) {
+        const bool topColorChanged = (!payload.sameColorForBaseAndTop && entry.topColorGen != payload.topColorGen) ||
+                                     (payload.sameColorForBaseAndTop && baseColorChanged);
+        if (topColorChanged && entry.vbTopColor) {
           m_backend.scheduleStaticCopy(entry.vbTopColor, entry.topColorOffset, topColorSlice, false);
           anyChanged = true;
         }
+        entry.topColorGen = payload.topColorGen;
         if (entry.axisGen != payload.axisGen) {
           m_backend.scheduleStaticCopy(entry.vbAxis, entry.axisOffset, axisSlice, false);
+          entry.axisGen = payload.axisGen;
           anyChanged = true;
         }
         if (entry.baseGen != payload.baseGen) {
           m_backend.scheduleStaticCopy(entry.vbOrigin, entry.originOffset, originSlice, false);
+          entry.baseGen = payload.baseGen;
           anyChanged = true;
         }
         if (entry.flagsGen != payload.flagsGen) {
           m_backend.scheduleStaticCopy(entry.vbFlags, entry.flagsOffset, flagsSlice, false);
+          entry.flagsGen = payload.flagsGen;
           anyChanged = true;
         }
         if (entry.indexGen != payload.indexGen && m_indexCount > 0 && m_indexUploadBuffer) {
@@ -916,8 +926,11 @@ void ZVulkanConePipelineContext::uploadGeometry(const ConePayload& payload)
                                                         nullptr,
                                                         m_indexCount * sizeof(uint32_t)};
           m_backend.scheduleStaticCopy(entry.ib, entry.ibOffset, iUpload, true);
+          entry.indexGen = payload.indexGen;
           anyChanged = true;
         }
+        entry.vertexCount = static_cast<uint32_t>(m_vertexCount);
+        entry.indexCount = static_cast<uint32_t>(m_indexCount);
         if (!anyChanged) {
           m_originBuffer = entry.vbOrigin;
           m_axisBuffer = entry.vbAxis;
