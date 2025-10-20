@@ -294,8 +294,6 @@ private:
   size_t m_blockIdCompactCapacity = 0; // bytes
   // Per-attachment snapshot of append counts (host-visible), used to detect
   // whether an attachment contributed any IDs (delta == 0 => attachment all zeros).
-  std::unique_ptr<ZVulkanBuffer> m_blockIdCountSnapshot; // host-visible, TRANSFER_DST
-  size_t m_blockIdCountSnapshotCapacity = 0; // bytes
 
   std::vector<ChannelResources> m_channelResources;
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
@@ -335,7 +333,6 @@ private:
 
   void ensureBlockIdCompactionPipeline(uint32_t attachmentCount, int mode);
   void ensureBlockIdCompactOutput(size_t bytes);
-  void ensureBlockIdCountSnapshot(uint32_t attachmentCount);
   void recordBlockIdCompaction(Z3DRendererBase& renderer,
                                const RenderBatch& batch,
                                const ImgRaycasterPayload& payload,

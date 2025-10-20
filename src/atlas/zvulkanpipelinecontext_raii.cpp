@@ -956,8 +956,8 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
   m_debug.reset(spec);
 #endif
 
-  if (VLOG_IS_ON(1)) {
-    VLOG(1) << fmt::format("compute.bind: pipeline=0x{:x} layout=0x{:x}",
+  if (VLOG_IS_ON(2)) {
+    VLOG(2) << fmt::format("compute.bind: pipeline=0x{:x} layout=0x{:x}",
                            reinterpret_cast<uintptr_t>(static_cast<VkPipeline>(**spec.pipeline)),
                            reinterpret_cast<uintptr_t>(static_cast<VkPipelineLayout>(**spec.pipelineLayout)));
   }
@@ -970,7 +970,7 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
                                        spec.descriptorSetFirst,
                                        spec.descriptorSets,
                                        spec.dynamicOffsets);
-    if (VLOG_IS_ON(1)) {
+    if (VLOG_IS_ON(2)) {
       std::string setsStr;
       for (size_t i = 0; i < spec.descriptorSets.size(); ++i) {
         if (!setsStr.empty()) {
@@ -979,7 +979,7 @@ void ZVulkanPipelineCommandRecorder::recordComputePass(const ZVulkanComputePassS
         setsStr +=
           fmt::format("0x{:x}", reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(spec.descriptorSets[i])));
       }
-      VLOG(1) << fmt::format("compute.bind.sets: first={} count={} [{}]",
+      VLOG(2) << fmt::format("compute.bind.sets: first={} count={} [{}]",
                              spec.descriptorSetFirst,
                              spec.descriptorSets.size(),
                              setsStr);
