@@ -1,4 +1,5 @@
 #include "zvulkantexture.h"
+#include "zvulkanlayoutstate.h"
 #include "zvulkandevice.h"
 #include "zvulkanbuffer.h"
 #include "zvulkancontext.h"
@@ -65,47 +66,6 @@ bool isAspectValidForFormat(vk::Format format, vk::ImageAspectFlags aspect)
     }
     default: // all color formats
       return aspect == vk::ImageAspectFlagBits::eColor;
-  }
-}
-
-struct LayoutState
-{
-  vk::AccessFlags2 access;
-  vk::PipelineStageFlags2 stage;
-};
-
-LayoutState layoutStateFor(vk::ImageLayout layout)
-{
-  using vk::AccessFlagBits2;
-  using vk::PipelineStageFlagBits2;
-
-  switch (layout) {
-    case vk::ImageLayout::eUndefined:
-      return {vk::AccessFlags2{}, PipelineStageFlagBits2::eTopOfPipe};
-    case vk::ImageLayout::eGeneral:
-      return {AccessFlagBits2::eShaderRead | AccessFlagBits2::eShaderWrite, PipelineStageFlagBits2::eAllCommands};
-    case vk::ImageLayout::eColorAttachmentOptimal:
-      return {AccessFlagBits2::eColorAttachmentWrite, PipelineStageFlagBits2::eColorAttachmentOutput};
-    case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-      return {AccessFlagBits2::eDepthStencilAttachmentRead | AccessFlagBits2::eDepthStencilAttachmentWrite,
-              PipelineStageFlagBits2::eEarlyFragmentTests | PipelineStageFlagBits2::eLateFragmentTests};
-    case vk::ImageLayout::eDepthAttachmentOptimal:
-      return {AccessFlagBits2::eDepthStencilAttachmentRead | AccessFlagBits2::eDepthStencilAttachmentWrite,
-              PipelineStageFlagBits2::eEarlyFragmentTests | PipelineStageFlagBits2::eLateFragmentTests};
-    case vk::ImageLayout::eDepthReadOnlyOptimal:
-      return {AccessFlagBits2::eDepthStencilAttachmentRead,
-              PipelineStageFlagBits2::eEarlyFragmentTests | PipelineStageFlagBits2::eLateFragmentTests};
-    case vk::ImageLayout::eShaderReadOnlyOptimal:
-      return {AccessFlagBits2::eShaderRead,
-              PipelineStageFlagBits2::eAllGraphics | PipelineStageFlagBits2::eComputeShader};
-    case vk::ImageLayout::eTransferDstOptimal:
-      return {AccessFlagBits2::eTransferWrite, PipelineStageFlagBits2::eTransfer};
-    case vk::ImageLayout::eTransferSrcOptimal:
-      return {AccessFlagBits2::eTransferRead, PipelineStageFlagBits2::eTransfer};
-    case vk::ImageLayout::ePreinitialized:
-      return {AccessFlagBits2::eHostWrite, PipelineStageFlagBits2::eHost};
-    default:
-      return {vk::AccessFlags2{}, PipelineStageFlagBits2::eAllCommands};
   }
 }
 
