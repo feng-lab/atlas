@@ -96,7 +96,8 @@ void main()
   if (hitMissedBlock && currentRayLength < 1.0) {
     if (RAY_MODE == 1) FragData0 = vec4(mipValue, 0, 0, 0);
     else FragData0 = result;
-    FragData1.xy = vec2(currentRayLength, rayDepth);
+    // Write full vec4 to mirror GL and avoid undefined components
+    FragData1 = vec4(currentRayLength, rayDepth, 0.0, 1.0);
     return;
   }
 
@@ -113,5 +114,6 @@ void main()
   else fragDepth = RESULT_OPAQUE ? (rp.ze_to_zw_a / zeFront + rp.ze_to_zw_b) : 1.0;
 
   FragData0 = result;
-  FragData1.xy = vec2(1.0, fragDepth);
+  // Mark fully completed ray (length=1) and export resolved depth (match GL write width)
+  FragData1 = vec4(1.0, fragDepth, 0.0, 1.0);
 }
