@@ -203,11 +203,29 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
   CHECK(!payload.entryPositions.empty()) << "Vulkan img raycaster is missing entry geometry for the current draw.";
 
   auto& pool = Z3DRenderGlobalState::instance().scratchPool();
-  auto entryLease = pool.acquireEntryExitRenderTarget(m_outputSize,
-                                                      2u,
-                                                      ScratchFormat::RGBA32F,
-                                                      std::optional<RenderBackend>(RenderBackend::Vulkan));
-  payload.entryExitLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(entryLease));
+  // Provide a persistent entry/exit lease across progressive frames (GL parity).
+  // Create a non-owning view so the underlying slot is not double-released.
+  auto shareLease = [](Z3DScratchResourcePool::RenderTargetLease& src) {
+    auto view = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
+    view->descriptor = src.descriptor;
+    view->backend = src.backend;
+    view->renderTarget = src.renderTarget;
+    view->vulkanImage = src.vulkanImage;
+    view->attachments = src.attachments;
+    // leave view->releaser empty (no-op) to avoid double release
+    return view;
+  };
+
+  // Ensure a persistent Vulkan entry/exit lease of the correct size.
+  if (!m_entryExitLease.hasVulkanImage() || m_entryExitLease.descriptor.size != m_outputSize) {
+    m_entryExitLease.release();
+    m_entryExitLease =
+      pool.acquireEntryExitRenderTarget(m_outputSize,
+                                        2u,
+                                        ScratchFormat::RGBA32F,
+                                        std::optional<RenderBackend>(RenderBackend::Vulkan));
+  }
+  payload.entryExitLease = shareLease(m_entryExitLease);
 
   if (visibleChannels.size() > 1 && payload.fastPathOnly) {
     auto layerLease = pool.acquireLayerArrayRenderTarget(m_outputSize,
@@ -226,17 +244,6 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     // will not double-release the underlying slot. This avoids dangling
     // references when the persistent lease is released during backend switches
     // (Vulkan path defers actual slot release until the frame fence signals).
-    auto shareLease = [](Z3DScratchResourcePool::RenderTargetLease& src) {
-      auto view = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>();
-      view->descriptor = src.descriptor;
-      view->backend = src.backend;
-      view->renderTarget = src.renderTarget;
-      view->vulkanImage = src.vulkanImage;
-      view->attachments = src.attachments;
-      // leave view->releaser empty (no-op) to avoid double release
-      return view;
-    };
-
     if (m_lastRaycastAccum[eye]) {
       payload.lastAccumLease = shareLease(m_lastRaycastAccum[eye]);
     }

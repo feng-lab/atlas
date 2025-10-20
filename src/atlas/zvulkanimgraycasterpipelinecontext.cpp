@@ -333,6 +333,10 @@ void ZVulkanImgRaycasterPipelineContext::resetFrame()
 {
   resetDescriptors();
   m_depthClearedThisFrame.clear();
+  // Drop any carry-over progressive bookkeeping so a cancelled frame
+  // starts clean (GL parity after exception unwinds to next frame).
+  m_pendingFinalization.reset();
+  m_deferredProgressive.reset();
 }
 
 std::optional<ZVulkanImgRaycasterPipelineContext::Finalization>
@@ -369,6 +373,11 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
                                                 const vk::Rect2D& scissor,
                                                 vk::raii::CommandBuffer& cmd)
 {
+  // Cooperative cancellation: mirror GL by polling UI events and
+  // throwing when a cancel is requested.
+  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  processEventsAndMaybeCancel(cancellationToken);
+
   VLOG(2) << fmt::format(
     "record begin fastOnly={} channels={} out={}x{} leases: entryExit={} lastAccum={} currentAccum={} blockId={}",
     payload.fastPathOnly,
@@ -396,6 +405,8 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
 
   uploadEntryGeometry(payload);
   VLOG(2) << "after uploadEntryGeometry";
+
+  processEventsAndMaybeCancel(cancellationToken);
 
   CHECK(payload.image) << "Raycaster payload missing image pointer.";
 
@@ -436,7 +447,11 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
   }
 
   const bool needsEntryExit = fastVariant == FastPipelineVariant::Volume;
-  if (needsEntryExit) {
+  // GL parity for progressive: render entry/exit exactly once per progressive
+  // cycle. Use channelIndexRaw<0 to detect the pre-progressive fast-preview
+  // frame; render every frame for fast-only.
+  const bool entryExitThisFrame = needsEntryExit && (payload.fastPathOnly || payload.channelIndexRaw < 0);
+  if (entryExitThisFrame) {
     if (auto t = m_backend.beginGpuScope("ray_entry_exit")) {
       renderEntryExit(renderer, batch, payload, viewport, scissor, cmd);
       m_backend.endGpuScope(*t);
@@ -444,7 +459,11 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
       renderEntryExit(renderer, batch, payload, viewport, scissor, cmd);
     }
     VLOG(2) << "after renderEntryExit";
+  } else if (needsEntryExit) {
+    VLOG(2) << "skip renderEntryExit (progressive in-flight; reusing existing)";
   }
+
+  processEventsAndMaybeCancel(cancellationToken);
 
   const bool skipBlockIdThisFrame = deferredRound.has_value();
   std::optional<Finalization> finalizeAfterProgressive;
@@ -457,6 +476,7 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
 
   if (payload.fastPathOnly) {
     VLOG(2) << "dispatch fast path";
+    processEventsAndMaybeCancel(cancellationToken);
     if (auto t = m_backend.beginGpuScope("ray_fast")) {
       renderFastPath(renderer, batch, payload, viewport, scissor, cmd, fastVariant, composite);
       m_backend.endGpuScope(*t);
@@ -467,6 +487,7 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
     CHECK(fastVariant == FastPipelineVariant::Volume)
       << "Progressive raycaster path only supports volumetric rendering.";
     VLOG(2) << "dispatch progressive path";
+    processEventsAndMaybeCancel(cancellationToken);
     if (auto t = m_backend.beginGpuScope("ray_progressive")) {
       renderProgressivePath(renderer,
                             batch,
@@ -988,6 +1009,8 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                                                                  const ImgRaycasterPayload& payload,
                                                                  vk::raii::CommandBuffer& cmd)
 {
+  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  processEventsAndMaybeCancel(cancellationToken);
   (void)renderer;
   (void)batch;
   if (!payload.blockIdLease || !payload.blockIdLease->hasVulkanImage()) {
@@ -1058,6 +1081,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   }
 
   for (uint32_t att = 0; att < attachmentCount; ++att) {
+    processEventsAndMaybeCancel(cancellationToken);
     ZVulkanTexture* blockTex = payload.blockIdLease->colorAttachment(att);
     if (!blockTex) {
       continue;
@@ -1235,17 +1259,17 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   auto bufPtr = m_blockIdCompactOutput.get();
   auto countSnap = m_blockIdCountSnapshot.get();
   m_backend.scheduleAfterActiveSubmissionFence([this,
-                                                 bufPtr,
-                                                 countSnap,
-                                                 imgW,
-                                                 imgH,
-                                                 streamKey = payload.streamKey,
-                                                 eye = batch.eye,
-                                                 channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
-                                                 attCount = attachmentCount,
-                                                 channelIndex = resolvedChannelIndex,
-                                                 channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
-                                                 imagePtr = payload.image]() {
+                                                bufPtr,
+                                                countSnap,
+                                                imgW,
+                                                imgH,
+                                                streamKey = payload.streamKey,
+                                                eye = batch.eye,
+                                                channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
+                                                attCount = attachmentCount,
+                                                channelIndex = resolvedChannelIndex,
+                                                channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
+                                                imagePtr = payload.image]() {
     CHECK(bufPtr != nullptr);
     CHECK(imagePtr != nullptr);
     const size_t unionBytes = sizeof(uint32_t) + static_cast<size_t>(imgW) * imgH * 4ull * sizeof(uint32_t);
@@ -1259,7 +1283,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     const uint32_t count = u32[0];
     const uint32_t capacity = imgW * imgH * 4u;
     const uint32_t clamped = std::min(count, capacity);
-    
+
     missingBlocks.reserve(clamped);
     for (uint32_t i = 0; i < clamped; ++i) {
       uint32_t v = u32[1 + i];
@@ -3352,6 +3376,8 @@ void ZVulkanImgRaycasterPipelineContext::renderFastPath(Z3DRendererBase& rendere
                                                         FastPipelineVariant variant,
                                                         const CompositingConfig& composite)
 {
+  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  processEventsAndMaybeCancel(cancellationToken);
   switch (variant) {
     case FastPipelineVariant::Volume:
       renderFastVolume(renderer, batch, payload, viewport, scissor, cmd, composite);
@@ -4057,6 +4083,8 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                                                                bool skipBlockIdPass,
                                                                std::optional<Finalization> finalizeAfterProgressive)
 {
+  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  processEventsAndMaybeCancel(cancellationToken);
   const uint32_t channelCount = static_cast<uint32_t>(payload.visibleChannels.size());
   if (channelCount == 0u) {
     return;
@@ -4083,6 +4111,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   const bool localMip = composite.localMip;
 
   if (!skipBlockIdPass) {
+    processEventsAndMaybeCancel(cancellationToken);
     CHECK(payload.blockIdLease && payload.blockIdLease->attachments != 0)
       << "Vulkan raycaster progressive path missing block-ID lease.";
   }
@@ -4462,6 +4491,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
       }
     }
     // Compact block-ID image(s) via compute and schedule a small buffer readback
+    processEventsAndMaybeCancel(cancellationToken);
     recordBlockIdCompaction(renderer, batch, payload, cmd);
   } // end block-ID stage
 
@@ -4583,6 +4613,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
       reinterpret_cast<uintptr_t>(static_cast<VkDescriptorSet>(sets.size() > 2 ? sets[2] : vk::DescriptorSet{})));
   }
   recorder.recordGraphicsPass(progressiveSpec);
+  processEventsAndMaybeCancel(cancellationToken);
 
   currentColor->transitionLayout(cmd, currentColor->layout(), vk::ImageLayout::eShaderReadOnlyOptimal);
   // currentDepth is also a color-format accumulation buffer. Sample as shader-read color.
@@ -4811,6 +4842,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   finalMergeSpec.instanceCount = 1;
 
   recorder.recordGraphicsPass(finalMergeSpec);
+  processEventsAndMaybeCancel(cancellationToken);
 
   // Defer progressive finalization to the backend/renderer; just stash the result.
   if (payload.streamKey != 0) {

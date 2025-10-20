@@ -7,6 +7,7 @@
 #include "z3drendertarget.h"
 #include "z3drenderglobalstate.h"
 #include "zmesh.h"
+#include "zcancellation.h"
 #include <folly/ScopeGuard.h>
 #include <QMenu>
 #include <memory>
@@ -1259,11 +1260,18 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
 
     // Record the main raycaster pass within the active frame.
     m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
-    m_rendererBase.recordVulkanBatchesInActiveFrame(
-      [&]() {
-        m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
-      },
-      "raycaster");
+    try {
+      m_rendererBase.recordVulkanBatchesInActiveFrame(
+        [&]() {
+          m_rendererBase.renderVulkan(eye, m_imgRaycasterRenderer);
+        },
+        "raycaster");
+    }
+    catch (const ZCancellationException&) {
+      // Mirror GL: on cancel, reset progressive state so next frame starts fresh.
+      m_imgRaycasterRenderer.resetProgress(eye);
+      throw;
+    }
 
     // Compute progressive progress to mirror GL behaviour
     progress = m_progressiveRendering ? m_imgRaycasterRenderer.progressiveProgress(eye) : 1.0;
