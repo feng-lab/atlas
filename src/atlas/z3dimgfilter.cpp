@@ -1010,11 +1010,17 @@ double Z3DImgFilter::renderSlices(Z3DEye eye)
 
     m_rendererBase.setActiveSurfaceWithLoadStore(lease, LoadOp::Clear, StoreOp::Store, LoadOp::Clear, StoreOp::Store);
 
-    m_rendererBase.recordVulkanBatchesInActiveFrame(
-      [&]() {
-        m_rendererBase.renderVulkan(eye, m_imgSliceRenderer);
-      },
-      "img_slices");
+    try {
+      m_rendererBase.recordVulkanBatchesInActiveFrame(
+        [&]() {
+          m_rendererBase.renderVulkan(eye, m_imgSliceRenderer);
+        },
+        "img_slices");
+    }
+    catch (const ZCancellationException&) {
+      m_imgSliceRenderer.resetProgress(eye);
+      throw;
+    }
     m_opaqueValid[eye] = true;
     return 1.0;
   }

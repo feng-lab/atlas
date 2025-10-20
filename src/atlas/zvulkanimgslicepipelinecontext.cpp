@@ -18,6 +18,7 @@
 #include "zvulkanpipelinecontext_raii.h"
 #include "zvulkanpagedimageblockuploader.h"
 #include "z3drenderglobalstate.h"
+#include "zcancellation.h"
 #include "zbenchtimer.h"
 #include "zmesh.h"
 
@@ -197,6 +198,8 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                             const vk::Rect2D& scissor,
                                             vk::raii::CommandBuffer& cmd)
 {
+  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  processEventsAndMaybeCancel(cancellationToken);
   if (!payload.image || payload.slices.empty()) {
     return;
   }
@@ -213,6 +216,8 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   ensureDescriptorPool();
   uploadSliceGeometry(payload.slices);
   ensureQuadVertexBuffer();
+
+  processEventsAndMaybeCancel(cancellationToken);
 
   if (m_vertexCount == 0) {
     return;
@@ -341,7 +346,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   float zeToScreenPixelVoxelSize =
     -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / nearClip * sceneState.devicePixelRatio;
 
-  auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
+  // cancellationToken obtained above
   auto& scratchPool = Z3DRenderGlobalState::instance().scratchPool();
 
   m_channelResources.resize(channelCount);
@@ -468,18 +473,22 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     spec.requirePushConstants = true;
 
     recorder.recordGraphicsPass(spec);
+    processEventsAndMaybeCancel(cancellationToken);
 
     const vk::Extent3D extent = blockColor->extent();
     const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
     std::vector<uint32_t> blockData(pixelCount * 4u, 0u);
     blockColor->downloadData(blockData.data(), blockData.size() * sizeof(uint32_t));
+    processEventsAndMaybeCancel(cancellationToken);
     return collectMissingBlockIDs(blockData);
   };
 
   if (usePaging) {
+    processEventsAndMaybeCancel(cancellationToken);
     for (size_t idx = 0; idx < channelCount; ++idx) {
       auto& resources = m_channelResources[idx];
       auto missingBlocks = runBlockIdPass(idx, resources);
+      processEventsAndMaybeCancel(cancellationToken);
       if (!missingBlocks.empty()) {
         ZBenchTimer timer(fmt::format("vulkan_slice_channel_{}", idx));
         payload.image->updateAndUploadPageDirectoryCaches(missingBlocks, idx, cancellationToken, timer);
@@ -488,6 +497,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   }
 
   for (size_t idx = 0; idx < channelCount; ++idx) {
+    processEventsAndMaybeCancel(cancellationToken);
     auto& resources = m_channelResources[idx];
     auto& channelInputs = channels[idx];
     updateFastDescriptors(resources, *channelInputs.volume, *channelInputs.colormap);
@@ -702,6 +712,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                vk::ImageAspectFlagBits::eDepth);
 
   for (uint32_t idx = 0; idx < channelCount; ++idx) {
+    processEventsAndMaybeCancel(cancellationToken);
     recordChannelDraw(idx, m_channelResources[idx], *layerColor, layerDepth, idx, usePaging);
   }
 
@@ -818,6 +829,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   mergeSpec.instanceCount = 1;
 
   recorder.recordGraphicsPass(mergeSpec);
+  processEventsAndMaybeCancel(cancellationToken);
 
   if (FLAGS_atlas_debug_save_slice_merge_out) {
     std::vector<AttachmentHandle> colorHandles;
