@@ -230,7 +230,8 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
     if (m_vkDevice) {
       m_vkDevice->context().device().waitIdle();
     }
-  } catch (const std::exception& e) {
+  }
+  catch (const std::exception& e) {
     LOG(ERROR) << "Vulkan waitIdle during engine shutdown failed: " << e.what();
   }
 }
@@ -654,21 +655,37 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
           }
         }
 
+        const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+
         if (sst == Z3DScreenShotType::MonoView) {
-          img.flip(Dimension::Y).save(targetFilepath);
+          if (backend == RenderBackend::OpenGL) {
+            img.flip(Dimension::Y).save(targetFilepath);
+          } else {
+            img.save(targetFilepath);
+          }
           LOG(INFO) << fmt::format("Saved rendering ({}, {}) to file: {}", img.width(), img.height(), targetFilepath);
         } else {
           if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-            ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(targetFilepath);
+            if (backend == RenderBackend::OpenGL) {
+              ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
+                .flip(Dimension::Y)
+                .save(targetFilepath);
+            } else {
+              ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).save(targetFilepath);
+            }
             LOG(INFO) << fmt::format("Saved stereo rendering ({} x 2, {}) to file: {}",
                                      img.width(),
                                      img.height(),
                                      targetFilepath);
           } else {
-            ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
-              .zoom(0.5, 1)
-              .flip(Dimension::Y)
-              .save(targetFilepath);
+            if (backend == RenderBackend::OpenGL) {
+              ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
+                .zoom(0.5, 1)
+                .flip(Dimension::Y)
+                .save(targetFilepath);
+            } else {
+              ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).zoom(0.5, 1).save(targetFilepath);
+            }
             LOG(INFO) << fmt::format("Saved half sbs stereo rendering ({}, {}) to file: {}",
                                      img.width(),
                                      img.height(),
@@ -897,30 +914,26 @@ ZImg Z3DRenderingEngine::localColorBufferToRGBAImg(const Z3DLocalColorBuffer& bu
     return {};
   }
 
-  // Prefer zero-copy external view when provided by the Vulkan backend.
-  // In Vulkan path, we expect the compositor to expose a tightly packed
-  // RGBA8 buffer (externalStride == width*4). In GL path, a CPU buffer must
-  // be present. Fail fast if invariants aren’t satisfied.
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+
   const size_t w = buffer.width;
   const size_t h = buffer.height;
-  const bool hasExternal = (buffer.external != nullptr);
-  const bool hasCPUData = !buffer.data.empty();
-  CHECK(hasExternal || hasCPUData) << "LocalColorBuffer has no pixels (neither external nor CPU data).";
-
   const uint8_t* srcPtr = nullptr;
-  if (hasExternal) {
+  if (backend == RenderBackend::Vulkan) {
     const size_t expectedStride = w * 4ull;
+    CHECK(buffer.external != nullptr) << "Vulkan path requires external mapped color buffer";
     CHECK(buffer.externalStride == 0 || buffer.externalStride == expectedStride)
       << "Unexpected external stride for LocalColorBuffer";
     srcPtr = buffer.external;
-  } else {
+  } else { // OpenGL
+    CHECK(!buffer.data.empty()) << "OpenGL path requires CPU localColorBuffer data";
     srcPtr = buffer.data.data();
   }
 
   ZImg bufImg;
   bufImg.wrapData(const_cast<uint8_t*>(srcPtr), ZImgInfo(static_cast<int>(w), static_cast<int>(h), 1, 4));
   ZImg res(bufImg.info());
-  ZImgFormat::CXYZtoXYZC(bufImg, res, true);
+  ZImgFormat::CXYZtoXYZC(bufImg, res, backend == RenderBackend::OpenGL);
   res.infoRef().lastChannelIsAlphaChannel = true;
   res.correctPreMultipliedColor();
   return res;
@@ -1349,18 +1362,32 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
       }
     }
 
+    const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+
     if (sst == Z3DScreenShotType::MonoView) {
-      img.flip(Dimension::Y).save(filename);
+      if (backend == RenderBackend::OpenGL) {
+        img.flip(Dimension::Y).save(filename);
+      } else {
+        img.save(filename);
+      }
       LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
     } else {
       if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-        ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
+        if (backend == RenderBackend::OpenGL) {
+          ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
+        } else {
+          ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).save(filename);
+        }
         LOG(INFO) << "Saved stereo rendering (" << img.width() << " x 2, " << img.height() << ") to file: " << filename;
       } else {
-        ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
-          .zoom(0.5, 1)
-          .flip(Dimension::Y)
-          .save(filename);
+        if (backend == RenderBackend::OpenGL) {
+          ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
+            .zoom(0.5, 1)
+            .flip(Dimension::Y)
+            .save(filename);
+        } else {
+          ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).zoom(0.5, 1).save(filename);
+        }
         LOG(INFO) << "Saved half sbs stereo rendering (" << img.width() << ", " << img.height()
                   << ") to file:" << filename;
       }
@@ -1457,26 +1484,40 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
     m_isRendering = false;
   });
 
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+
   getGLFocus();
   m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
 
   if (sst == Z3DScreenShotType::MonoView) {
     auto img = localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer());
-    img.flip(Dimension::Y).save(filename);
+    if (backend == RenderBackend::OpenGL) {
+      img.flip(Dimension::Y).save(filename);
+    } else {
+      img.save(filename);
+    }
     LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
   } else {
     auto leftImg = localColorBufferToRGBAImg(*m_compositor->leftReadyLocalBuffer());
     auto rightImg = localColorBufferToRGBAImg(*m_compositor->rightReadyLocalBuffer());
 
     if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-      ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
+      if (backend == RenderBackend::OpenGL) {
+        ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
+      } else {
+        ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).save(filename);
+      }
       LOG(INFO) << "Saved stereo rendering (" << leftImg.width() << " x 2, " << leftImg.height()
                 << ") to file: " << filename;
     } else {
-      ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X)
-        .zoom(0.5, 1)
-        .flip(Dimension::Y)
-        .save(filename);
+      if (backend == RenderBackend::OpenGL) {
+        ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X)
+          .zoom(0.5, 1)
+          .flip(Dimension::Y)
+          .save(filename);
+      } else {
+        ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).zoom(0.5, 1).save(filename);
+      }
       LOG(INFO) << "Saved half sbs stereo rendering (" << leftImg.width() << ", " << leftImg.height()
                 << ") to file:" << filename;
     }
@@ -1538,7 +1579,8 @@ void Z3DRenderingEngine::applyBackendSwitch()
     VLOG(1) << "Waiting for Vulkan device to become idle before switching to OpenGL";
     try {
       m_vkDevice->context().device().waitIdle();
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
       LOG(ERROR) << "Vulkan waitIdle before pool reset failed: " << e.what();
     }
 
@@ -1563,7 +1605,8 @@ void Z3DRenderingEngine::applyBackendSwitch()
       VLOG(1) << "Creating Vulkan context";
       try {
         m_vkContext = std::make_unique<ZVulkanContext>();
-      } catch (const std::exception& e) {
+      }
+      catch (const std::exception& e) {
         const auto errorMsg = fmt::format("Failed to create Vulkan context: {}", e.what());
         LOG(ERROR) << errorMsg;
         reportRenderingError(errorMsg);
@@ -1577,7 +1620,8 @@ void Z3DRenderingEngine::applyBackendSwitch()
       VLOG(1) << "Creating Vulkan device";
       try {
         m_vkDevice = m_vkContext->createDevice();
-      } catch (const std::exception& e) {
+      }
+      catch (const std::exception& e) {
         const auto errorMsg = fmt::format("Failed to create Vulkan device: {}", e.what());
         LOG(ERROR) << errorMsg;
         reportRenderingError(errorMsg);

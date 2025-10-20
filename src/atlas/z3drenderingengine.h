@@ -304,7 +304,7 @@ private:
   //                            int numFrame,
   //                            Z3DScreenShotType sst);
 
-  static ZImg localColorBufferToRGBAImg(const Z3DLocalColorBuffer& buffer);
+  ZImg localColorBufferToRGBAImg(const Z3DLocalColorBuffer& buffer);
 
   void onCanvasResized(size_t w, size_t h);
 
