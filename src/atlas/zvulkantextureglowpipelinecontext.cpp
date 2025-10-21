@@ -170,7 +170,7 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
                                                                      attachment.clearValue.color.a});
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     info.srcAccess = {};
     info.dstAccess = vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -194,7 +194,7 @@ void ZVulkanTextureGlowPipelineContext::record(Z3DRendererBase& renderer,
       vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
     depthInfo.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     depthInfo.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    depthInfo.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    depthInfo.srcStage = {};
     depthInfo.dstStage =
       vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
     depthInfo.srcAccess = {};

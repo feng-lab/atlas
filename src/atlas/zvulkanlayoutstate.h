@@ -38,8 +38,7 @@ inline LayoutState layoutStateFor(vk::ImageLayout layout)
               PipelineStageFlagBits2::eEarlyFragmentTests | PipelineStageFlagBits2::eLateFragmentTests};
     case vk::ImageLayout::eShaderReadOnlyOptimal:
       return {AccessFlagBits2::eShaderRead,
-              PipelineStageFlagBits2::eAllGraphics | PipelineStageFlagBits2::eComputeShader |
-                PipelineStageFlagBits2::eRayTracingShaderKHR};
+              PipelineStageFlagBits2::eAllGraphics | PipelineStageFlagBits2::eComputeShader};
     case vk::ImageLayout::eTransferDstOptimal:
       return {AccessFlagBits2::eTransferWrite, PipelineStageFlagBits2::eTransfer};
     case vk::ImageLayout::eTransferSrcOptimal:

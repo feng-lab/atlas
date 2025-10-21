@@ -1230,19 +1230,22 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   }
   const size_t resolvedChannelIndex = payload.visibleChannels[static_cast<size_t>(payload.channelIndexRaw)];
 
-  // After fence: parse compacted buffer and update caches; determine if this round is complete
+  // After submission completion: parse compacted buffer and update caches; determine if this round is complete.
+  // Use end-of-frame callback rather than per-submission fence to guarantee delivery even if
+  // drivers/platforms coalesce or reorder internal submits. This mirrors how readback consumers
+  // are gated and has identical ordering w.r.t. subsequent frames.
   auto bufPtr = m_blockIdCompactOutput.get();
-  m_backend.scheduleAfterActiveSubmissionFence([this,
-                                                bufPtr,
-                                                imgW,
-                                                imgH,
-                                                streamKey = payload.streamKey,
-                                                eye = batch.eye,
-                                                channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
-                                                attCount = attachmentCount,
-                                                channelIndex = resolvedChannelIndex,
-                                                channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
-                                                imagePtr = payload.image]() {
+  m_backend.scheduleAfterCurrentFrameCompletion([this,
+                                                 bufPtr,
+                                                 imgW,
+                                                 imgH,
+                                                 streamKey = payload.streamKey,
+                                                 eye = batch.eye,
+                                                 channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
+                                                 attCount = attachmentCount,
+                                                 channelIndex = resolvedChannelIndex,
+                                                 channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
+                                                 imagePtr = payload.image]() {
     CHECK(bufPtr != nullptr);
     CHECK(imagePtr != nullptr);
     const uint32_t capacityIDs = imgW * imgH * 4u;
@@ -2475,7 +2478,7 @@ void ZVulkanImgRaycasterPipelineContext::renderEntryExit(Z3DRendererBase& render
     attachment.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})};
     attachment.loadOp = vk::AttachmentLoadOp::eClear;
     attachment.storeOp = vk::AttachmentStoreOp::eStore;
-    attachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    attachment.srcStage = {};
     attachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     attachment.srcAccess = {};
     attachment.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -2838,7 +2841,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
                                                                               attachment.clearValue.color.a})};
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     info.srcAccess = {};
     info.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -2873,7 +2876,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
     info.clearValue.depthStencil = vk::ClearDepthStencilValue(firstUse ? 1.0f : attachment.clearValue.depth,
                                                               firstUse ? 0u : attachment.clearValue.stencil);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
     info.srcAccess = {};
     info.dstAccess =
@@ -3079,7 +3082,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
     colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-    colorAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    colorAttachment.srcStage = {};
     colorAttachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     colorAttachment.srcAccess = {};
     colorAttachment.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -3101,7 +3104,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
     depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-    depthAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    depthAttachment.srcStage = {};
     depthAttachment.dstStage =
       vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
     depthAttachment.srcAccess = {};
@@ -3393,7 +3396,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
                                                                               attachment.clearValue.color.a})};
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     info.srcAccess = {};
     info.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -3419,7 +3422,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
     info.clearValue.depthStencil =
       vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
     info.srcAccess = {};
     info.dstAccess =
@@ -3577,7 +3580,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
     colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
     colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-    colorAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    colorAttachment.srcStage = {};
     colorAttachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     colorAttachment.srcAccess = {};
     colorAttachment.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -3599,7 +3602,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastImage2D(Z3DRendererBase& rend
     depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
     depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-    depthAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    depthAttachment.srcStage = {};
     depthAttachment.dstStage =
       vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
     depthAttachment.srcAccess = {};
@@ -3731,7 +3734,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
                                                                               attachment.clearValue.color.a})};
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     info.srcAccess = {};
     info.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -3757,7 +3760,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
     info.clearValue.depthStencil =
       vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
     info.srcAccess = {};
     info.dstAccess =
@@ -3918,7 +3921,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
     colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
     colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-    colorAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    colorAttachment.srcStage = {};
     colorAttachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     colorAttachment.srcAccess = {};
     colorAttachment.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -3940,7 +3943,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastSlice2D(Z3DRendererBase& rend
     depthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
     depthAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     depthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-    depthAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    depthAttachment.srcStage = {};
     depthAttachment.dstStage =
       vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
     depthAttachment.srcAccess = {};
@@ -4320,7 +4323,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
       attachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
       attachment.loadOp = vk::AttachmentLoadOp::eClear;
       attachment.storeOp = vk::AttachmentStoreOp::eStore;
-      attachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+      attachment.srcStage = {};
       // After rendering, transition for compute read
       attachment.dstStage = vk::PipelineStageFlagBits2::eComputeShader;
       attachment.srcAccess = {};
@@ -4489,7 +4492,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   colorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
   colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
   colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-  colorAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+  colorAttachment.srcStage = {};
   colorAttachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
   colorAttachment.srcAccess = {};
   colorAttachment.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -4505,7 +4508,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   accumAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
   accumAttachment.loadOp = vk::AttachmentLoadOp::eClear;
   accumAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-  accumAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+  accumAttachment.srcStage = {};
   accumAttachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
   accumAttachment.srcAccess = {};
   accumAttachment.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -4616,7 +4619,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerColorAttachment.clearValue.color = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
   layerColorAttachment.loadOp = vk::AttachmentLoadOp::eLoad;
   layerColorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-  layerColorAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+  layerColorAttachment.srcStage = {};
   layerColorAttachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
   layerColorAttachment.srcAccess = {};
   layerColorAttachment.dstAccess =
@@ -4637,7 +4640,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   layerDepthAttachment.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
   layerDepthAttachment.loadOp = vk::AttachmentLoadOp::eLoad;
   layerDepthAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-  layerDepthAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+  layerDepthAttachment.srcStage = {};
   layerDepthAttachment.dstStage =
     vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
   layerDepthAttachment.srcAccess = {};
@@ -4688,7 +4691,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                                                                      attachment.clearValue.color.g,
                                                                      attachment.clearValue.color.b,
                                                                      attachment.clearValue.color.a});
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     info.srcAccess = {};
     info.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -4717,7 +4720,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
     info.loadOp = (forceClear || firstUse) ? vk::AttachmentLoadOp::eClear : vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
     info.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0u);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
     info.srcAccess = {};
     info.dstAccess =

@@ -251,7 +251,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
                                                                      attachment.clearValue.color.a});
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     info.srcAccess = {};
     info.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -277,7 +277,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
       vk::ClearDepthStencilValue(attachment.clearValue.depth, attachment.clearValue.stencil);
     info.loadOp = vulkan::toVkLoadOp(attachment.loadOp);
     info.storeOp = vulkan::toVkStoreOp(attachment.storeOp);
-    info.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    info.srcStage = {};
     info.dstStage = vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
     info.srcAccess = {};
     info.dstAccess =
@@ -433,7 +433,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     colorInfo.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})};
     colorInfo.loadOp = vk::AttachmentLoadOp::eClear;
     colorInfo.storeOp = vk::AttachmentStoreOp::eStore;
-    colorInfo.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    colorInfo.srcStage = {};
     colorInfo.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     colorInfo.srcAccess = {};
     colorInfo.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -558,7 +558,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     colorAttachment.clearValue = vk::ClearValue{vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f})};
     colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
     colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
-    colorAttachment.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+    colorAttachment.srcStage = {};
     colorAttachment.dstStage = vk::PipelineStageFlagBits2::eColorAttachmentOutput;
     colorAttachment.srcAccess = {};
     colorAttachment.dstAccess = vk::AccessFlagBits2::eColorAttachmentRead | vk::AccessFlagBits2::eColorAttachmentWrite;
@@ -581,7 +581,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
         depthInfo.clearValue.depthStencil = vk::ClearDepthStencilValue(1.0f, 0);
         depthInfo.loadOp = vk::AttachmentLoadOp::eClear;
         depthInfo.storeOp = vk::AttachmentStoreOp::eStore;
-        depthInfo.srcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
+        depthInfo.srcStage = {};
         depthInfo.dstStage =
           vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests;
         depthInfo.srcAccess = {};
