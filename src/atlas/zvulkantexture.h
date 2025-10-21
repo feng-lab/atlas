@@ -162,6 +162,10 @@ public:
   {
     return m_format;
   }
+  vk::ImageAspectFlags aspectMask() const
+  {
+    return m_aspectMask;
+  }
   vk::Image image() const
   {
     return m_image;

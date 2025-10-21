@@ -1,6 +1,7 @@
 #include "zvulkanpipelinecontext_raii.h"
 
 #include "zvulkantexture.h"
+#include "zvulkanlayoutstate.h"
 #include "z3drenderervulkanbackend.h"
 #include "zvulkancontext.h"
 #include <cstdint>
@@ -8,8 +9,6 @@
 namespace nim {
 
 namespace {
-constexpr vk::PipelineStageFlags2 kDefaultSrcStage = vk::PipelineStageFlagBits2::eTopOfPipe;
-
 // Thread-local label for annotating transition logs with the active pass label.
 // Declared here so all helpers (transitionImage/transitionToFinal) can reference it.
 thread_local std::string g_currentTransitionLabel;
@@ -43,20 +42,45 @@ inline void cmdEndDebugLabel(vk::raii::CommandBuffer& cmd)
   }
 }
 
-vk::PipelineStageFlags2 sanitizeStage(vk::PipelineStageFlags2 stage)
+LayoutState resolveStageAccess(vk::PipelineStageFlags2 stage,
+                               vk::AccessFlags2 access,
+                               vk::ImageLayout layout)
 {
-  return stage == vk::PipelineStageFlags2{} ? kDefaultSrcStage : stage;
+  const LayoutState defaults = layoutStateFor(layout);
+  LayoutState resolved = defaults;
+  if (stage != vk::PipelineStageFlags2{}) {
+    resolved.stage = stage;
+  }
+  if (access != vk::AccessFlags2{}) {
+    resolved.access = access;
+  }
+  return resolved;
 }
 
-vk::AccessFlags2 sanitizeAccess(vk::AccessFlags2 access)
+void validateTrackingTexture(const ZVulkanAttachmentInfo& info)
 {
-  return access;
+  if (info.trackingTexture == nullptr) {
+    return;
+  }
+  CHECK(info.trackingTexture->image() == info.image)
+    << "Attachment info image does not match tracking texture.";
+}
+
+vk::ImageAspectFlags resolveAttachmentAspect(const ZVulkanAttachmentInfo& info)
+{
+  if (info.aspect != vk::ImageAspectFlags{}) {
+    return info.aspect;
+  }
+  CHECK(info.trackingTexture != nullptr)
+    << "Attachment aspect must be specified when no tracking texture is provided.";
+  validateTrackingTexture(info);
+  return info.trackingTexture->aspectMask();
 }
 
 vk::ImageSubresourceRange makeFullSubresourceRange(vk::ImageAspectFlags aspect)
 {
-  auto aspectMask = aspect == vk::ImageAspectFlags{} ? vk::ImageAspectFlagBits::eColor : aspect;
-  return vk::ImageSubresourceRange{aspectMask, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS};
+  CHECK(aspect != vk::ImageAspectFlags{}) << "Attachment aspect mask must be specified.";
+  return vk::ImageSubresourceRange{aspect, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS};
 }
 
 void transitionImage(vk::raii::CommandBuffer& cmd,
@@ -65,6 +89,8 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
                      vk::PipelineStageFlags2 dstStage,
                      vk::AccessFlags2 dstAccess)
 {
+  validateTrackingTexture(info);
+
   // Choose the most reliable oldLayout:
   // - If the pass clears the attachment (loadOp=CLEAR), we can safely start
   //   from UNDEFINED regardless of previously tracked layout.
@@ -87,6 +113,8 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
     effectiveOld = vk::ImageLayout::eUndefined;
   }
 
+  const vk::ImageAspectFlags aspect = resolveAttachmentAspect(info);
+
   // Diagnostics to help trace unexpected layout state.
   if (VLOG_IS_ON(2)) {
     VLOG(2) << fmt::format(
@@ -97,19 +125,24 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
       enumOrUnderlying(trackedOld, 16),
       enumOrUnderlying(effectiveOld, 16),
       enumOrUnderlying(newLayout, 16),
-      static_cast<uint32_t>(info.aspect));
+      static_cast<uint32_t>(aspect));
   }
 
-  vk::ImageMemoryBarrier2 barrier{.srcStageMask = sanitizeStage(info.srcStage),
-                                  .srcAccessMask = sanitizeAccess(info.srcAccess),
-                                  .dstStageMask = sanitizeStage(dstStage),
-                                  .dstAccessMask = sanitizeAccess(dstAccess),
+  const LayoutState srcState = resolveStageAccess(info.srcStage, info.srcAccess, effectiveOld);
+  const LayoutState dstState = resolveStageAccess(dstStage, dstAccess, newLayout);
+
+  // Always emit the barrier, even when layouts match, so color/depth writes are
+  // made visible to subsequent passes and our tracker stays in sync.
+  vk::ImageMemoryBarrier2 barrier{.srcStageMask = srcState.stage,
+                                  .srcAccessMask = srcState.access,
+                                  .dstStageMask = dstState.stage,
+                                  .dstAccessMask = dstState.access,
                                   .oldLayout = effectiveOld,
                                   .newLayout = newLayout,
                                   .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                                   .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                                   .image = info.image,
-                                  .subresourceRange = makeFullSubresourceRange(info.aspect)};
+                                  .subresourceRange = makeFullSubresourceRange(aspect)};
   vk::DependencyInfo dependency{.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier};
   cmd.pipelineBarrier2(dependency);
   if (info.trackingTexture != nullptr) {
@@ -126,6 +159,9 @@ void transitionToFinal(vk::raii::CommandBuffer& cmd,
                        vk::PipelineStageFlags2 oldStage,
                        vk::AccessFlags2 oldAccess)
 {
+  validateTrackingTexture(info);
+  const vk::ImageAspectFlags aspect = resolveAttachmentAspect(info);
+
   if (VLOG_IS_ON(2)) {
     VLOG(2) << fmt::format("transitionToFinal(pass='{}'): img=0x{:x} old={} new={} aspect=0x{:x}",
                            g_currentTransitionLabel.empty() ? std::string("<unlabeled-pass>")
@@ -133,18 +169,24 @@ void transitionToFinal(vk::raii::CommandBuffer& cmd,
                            reinterpret_cast<uint64_t>(static_cast<VkImage>(info.image)),
                            enumOrUnderlying(oldLayout, 16),
                            enumOrUnderlying(info.finalLayout, 16),
-                           static_cast<uint32_t>(info.aspect));
+                           static_cast<uint32_t>(aspect));
   }
-  vk::ImageMemoryBarrier2 barrier{.srcStageMask = sanitizeStage(oldStage),
-                                  .srcAccessMask = sanitizeAccess(oldAccess),
-                                  .dstStageMask = sanitizeStage(info.dstStage),
-                                  .dstAccessMask = sanitizeAccess(info.dstAccess),
+
+  const LayoutState srcState = resolveStageAccess(oldStage, oldAccess, oldLayout);
+  const LayoutState dstState = resolveStageAccess(info.dstStage, info.dstAccess, info.finalLayout);
+
+  // Layout equality still requires a dependency; keep the barrier so writes from
+  // this pass are visible when the attachment is reused.
+  vk::ImageMemoryBarrier2 barrier{.srcStageMask = srcState.stage,
+                                  .srcAccessMask = srcState.access,
+                                  .dstStageMask = dstState.stage,
+                                  .dstAccessMask = dstState.access,
                                   .oldLayout = oldLayout,
                                   .newLayout = info.finalLayout,
                                   .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                                   .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                                   .image = info.image,
-                                  .subresourceRange = makeFullSubresourceRange(info.aspect)};
+                                  .subresourceRange = makeFullSubresourceRange(aspect)};
   vk::DependencyInfo dependency{.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier};
   cmd.pipelineBarrier2(dependency);
   if (info.trackingTexture != nullptr) {
