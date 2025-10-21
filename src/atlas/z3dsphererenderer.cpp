@@ -582,6 +582,10 @@ RenderBatch Z3DSphereRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
 
   auto payload = buildSpherePayload();
   payload.pickingPass = picking;
+  // GL parity: carry follow flags so Vulkan respects per-renderer toggles
+  payload.followCoordTransform = m_followCoordTransform;
+  payload.followSizeScale = m_followSizeScale;
+  payload.followOpacity = m_followOpacity;
   if (picking) {
     payload.useDynamicMaterial = false;
   }

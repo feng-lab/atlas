@@ -360,6 +360,10 @@ struct LinePayload
   float resolvedLineWidth = 1.0f;
   const RendererParameterState* params = nullptr; // originating renderer params
   bool pickingPass = false;
+  // GL parity toggles: whether to apply global renderer transforms/parameters in shader
+  bool followCoordTransform = true;
+  bool followSizeScale = true;
+  bool followOpacity = true;
   // Generation counters for selective restaging
   uint32_t positionsGen = 0;    // raw polyline positions
   uint32_t smoothGen = 0;       // smooth-line expanded streams/indices
@@ -418,6 +422,10 @@ struct MeshPayload
   bool meshPickingColorReady = false;
   bool pickingPass = false;
   bool wantsLighting = false;
+  // GL parity toggles: whether to apply global renderer transforms/parameters in shader
+  bool followCoordTransform = true;
+  bool followSizeScale = true;
+  bool followOpacity = true;
   // Per-stream generation counters
   uint32_t posGen = 0;
   uint32_t normGen = 0;
@@ -441,6 +449,10 @@ struct SpherePayload
   // Whether the renderer requests lighting for this draw (precomputed)
   bool wantsLighting = false;
   bool pickingPass = false;
+  // GL parity toggles: whether to apply global renderer transforms/parameters in shader
+  bool followCoordTransform = true;
+  bool followSizeScale = true;
+  bool followOpacity = true;
   // Per-stream generation counters
   uint32_t centersGen = 0;
   uint32_t colorsGen = 0;
@@ -637,6 +649,10 @@ struct ConePayload
   bool useConeShader2 = true;
   bool pickingPass = false;
   bool wantsLighting = false;
+  // GL parity toggles: whether to apply global renderer transforms/parameters in shader
+  bool followCoordTransform = true;
+  bool followSizeScale = true;
+  bool followOpacity = true;
   // Per-stream generation counters
   uint32_t baseGen = 0;
   uint32_t axisGen = 0;

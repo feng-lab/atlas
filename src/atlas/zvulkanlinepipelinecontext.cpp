@@ -302,14 +302,17 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   transforms.view_matrix = eyeState.viewMatrix;
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
   CHECK(payload.params != nullptr) << "Line payload missing params";
-  transforms.pos_transform = payload.params->coordTransform;
+  const glm::mat4 model = (payload.followCoordTransform && payload.params) ? payload.params->coordTransform
+                                                                           : glm::mat4(1.0f);
+  transforms.pos_transform = model;
 
   // Line shaders do not consume the normal matrix; keep it as identity to
   // avoid redundant inverse/transpose work.
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(glm::mat3(1.0f));
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
+  transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
   m_uboTransforms->copyData(&transforms, sizeof(transforms));
 
   MaterialUBOStd140 material{};
@@ -317,7 +320,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   material.material_ambient = payload.params->materialAmbient;
   material.material_specular = payload.params->materialSpecular;
   material.material_shininess = payload.params->materialShininess;
-  material.alpha = payload.pickingPass ? 1.0f : payload.params->opacity;
+  material.alpha = (payload.pickingPass || !payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
   m_uboMaterial->copyData(&material, sizeof(material));
 
   VLOG(2) << fmt::format("VK line params: sizeScale={:.3f} alpha={:.3f} ortho={} picking={}",

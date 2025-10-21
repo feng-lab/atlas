@@ -133,6 +133,63 @@ static void vlogVulkanLease(std::string_view label, const Z3DScratchResourcePool
                          d0 ? d0->height() : 0u);
 }
 
+// Unified compositor helper: render a filter into a given surface and ingest
+// its recorded batches back into the compositor renderer. Optionally copy the
+// source renderer's shader-hook parameters into the compositor before ingest.
+static void recordFilterBatchesToSurfaceUnified(Z3DRendererBase& compositor,
+                                                Z3DBoundedFilter* filter,
+                                                const RendererFrameState::ActiveSurface& surface,
+                                                const std::function<void()>& renderFn,
+                                                bool propagateHookPara)
+{
+  if (!filter) {
+    return;
+  }
+  auto& source = filter->rendererBase();
+
+  const glm::uvec4 previousViewport = source.frameState().viewport;
+  const auto previousSurface = source.frameState().activeSurface;
+
+  // Mirror compositor viewport and target surface into the source renderer
+  source.frameState().updateViewportData(compositor.frameState().viewport);
+  source.setActiveSurfaceWithLoadStore(surface, Z3DRendererBase::Preserve);
+
+  if (renderFn) {
+    renderFn();
+  }
+
+  // Copy hook params if requested (needed by DDP paths)
+  if (propagateHookPara) {
+    compositor.shaderHookPara() = source.shaderHookPara();
+  }
+
+  auto& batches = source.cpuState().batches;
+  for (auto& batch : batches) {
+    if (batch.pass.colorAttachments.empty() && !surface.colorAttachments.empty()) {
+      batch.pass.colorAttachments = surface.colorAttachments;
+    }
+    if (!batch.pass.depthAttachment.has_value() && surface.depthAttachment.has_value()) {
+      batch.pass.depthAttachment = surface.depthAttachment;
+    }
+    // Populate missing viewport from compositor viewport
+    if (batch.pass.viewport.extent == glm::vec2(0.0f) && compositor.frameState().viewport.z > 0u &&
+        compositor.frameState().viewport.w > 0u) {
+      batch.pass.viewport.origin = glm::vec2(static_cast<float>(compositor.frameState().viewport.x),
+                                             static_cast<float>(compositor.frameState().viewport.y));
+      batch.pass.viewport.extent = glm::vec2(static_cast<float>(compositor.frameState().viewport.z),
+                                             static_cast<float>(compositor.frameState().viewport.w));
+      batch.pass.viewport.minDepth = 0.0f;
+      batch.pass.viewport.maxDepth = 1.0f;
+    }
+    compositor.appendBatch(std::move(batch));
+  }
+  source.resetCPUState();
+
+  // Restore source renderer state
+  source.frameState().updateViewportData(previousViewport);
+  source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
+}
+
 // Record batches within a Vulkan frame, opening/closing the frame if needed.
 // Keeps per-pass priming/reset semantics by scoping begin/end to the call site.
 inline void
@@ -3820,6 +3877,13 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
     m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::Normal);
   };
 
+  // Generic helper to render a filter into a specific surface and ingest its
+  // recorded batches back into the compositor renderer. This unifies the
+  // repeated patterns across DDP/WA/WB and makes the flow easier to follow.
+  // When propagateHookPara is true, shader-hook parameters produced by the
+  // source renderer (e.g., DDP attachment bindings) are copied into the
+  // compositor renderer prior to ingesting batches.
+
   const glm::vec4 depthClear(-1.0f, -1.0f, 0.0f, 0.0f);
   const glm::vec4 zeroClear(0.0f);
 
@@ -3864,48 +3928,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
 
   m_rendererBase.setActiveSurfaceWithLoadStore(initSurface, Z3DRendererBase::Preserve);
 
-  // Helper to record a filter's batches into the compositor using a specific surface
-  auto recordFilterBatchesToSurface =
-    [&](Z3DBoundedFilter* filter, const RendererFrameState::ActiveSurface& surface, auto&& renderFn) {
-      if (!filter) {
-        return;
-      }
-      auto& source = filter->rendererBase();
-
-      const glm::uvec4 previousViewport = source.frameState().viewport;
-      const auto previousSurface = source.frameState().activeSurface;
-
-      source.frameState().updateViewportData(m_rendererBase.frameState().viewport);
-      source.setActiveSurfaceWithLoadStore(surface, Z3DRendererBase::Preserve);
-      renderFn();
-      auto& batches = source.cpuState().batches;
-      // Propagate shader-hook parameters (e.g., DDP sampler attachments) from the
-      // source filter renderer to the compositor renderer so Vulkan pipelines
-      // can access them while recording. Without this, peel stages may sample
-      // placeholder textures, producing incorrect colors (e.g., white silhouettes).
-      m_rendererBase.shaderHookPara() = source.shaderHookPara();
-      for (auto& batch : batches) {
-        if (batch.pass.colorAttachments.empty() && !surface.colorAttachments.empty()) {
-          batch.pass.colorAttachments = surface.colorAttachments;
-        }
-        if (!batch.pass.depthAttachment.has_value() && surface.depthAttachment.has_value()) {
-          batch.pass.depthAttachment = surface.depthAttachment;
-        }
-        if (batch.pass.viewport.extent == glm::vec2(0.0f) && m_rendererBase.frameState().viewport.z > 0u &&
-            m_rendererBase.frameState().viewport.w > 0u) {
-          batch.pass.viewport.origin = glm::vec2(static_cast<float>(m_rendererBase.frameState().viewport.x),
-                                                 static_cast<float>(m_rendererBase.frameState().viewport.y));
-          batch.pass.viewport.extent = glm::vec2(static_cast<float>(m_rendererBase.frameState().viewport.z),
-                                                 static_cast<float>(m_rendererBase.frameState().viewport.w));
-          batch.pass.viewport.minDepth = 0.0f;
-          batch.pass.viewport.maxDepth = 1.0f;
-        }
-        m_rendererBase.appendBatch(std::move(batch));
-      }
-      source.resetCPUState();
-      source.frameState().updateViewportData(previousViewport);
-      source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
-    };
+  // Use unified helper for DDP (propagate hook params for sampler bindings)
 
   // Geometry init step must see DualDepthPeelingInit on the compositor renderer
   m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
@@ -3918,9 +3941,14 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
         }
         filter->setViewport(targetSize);
         filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
-        recordFilterBatchesToSurface(filter, initSurface, [&]() {
-          filter->renderTransparent(eye);
-        });
+        recordFilterBatchesToSurfaceUnified(
+          m_rendererBase,
+          filter,
+          initSurface,
+          [&]() {
+            filter->renderTransparent(eye);
+          },
+          /*propagateHookPara=*/true);
       }
       if (!imageLayers.empty()) {
         m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingInit);
@@ -3987,9 +4015,14 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
           filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
           filter->setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
           filter->setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
-          recordFilterBatchesToSurface(filter, peelSurface, [&]() {
-            filter->renderTransparent(eye);
-          });
+          recordFilterBatchesToSurfaceUnified(
+            m_rendererBase,
+            filter,
+            peelSurface,
+            [&]() {
+              filter->renderTransparent(eye);
+            },
+            /*propagateHookPara=*/true);
         }
         if (!imageLayers.empty()) {
           m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
@@ -4202,47 +4235,6 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
   recordInVulkanFrame(
     m_rendererBase,
     [&]() {
-      // Use the same helper pattern as DDP to avoid nested begin/end
-      auto recordFilterBatchesToSurface =
-        [&](Z3DBoundedFilter* filter, const RendererFrameState::ActiveSurface& surface, auto&& renderFn) {
-          if (!filter) {
-            return;
-          }
-          auto& source = filter->rendererBase();
-
-          const glm::uvec4 previousViewport = source.frameState().viewport;
-          const auto previousSurface = source.frameState().activeSurface;
-
-          // Mirror the compositor viewport into the filter's renderer so batches inherit it
-          source.frameState().updateViewportData(m_rendererBase.frameState().viewport);
-          source.setActiveSurfaceWithLoadStore(surface, Z3DRendererBase::Preserve);
-          renderFn();
-          auto& batches = source.cpuState().batches;
-          for (auto& batch : batches) {
-            if (batch.pass.colorAttachments.empty() && !surface.colorAttachments.empty()) {
-              batch.pass.colorAttachments = surface.colorAttachments;
-            }
-            if (!batch.pass.depthAttachment.has_value() && surface.depthAttachment.has_value()) {
-              batch.pass.depthAttachment = surface.depthAttachment;
-            }
-            // If a batch doesn't set a viewport, populate it from the compositor's viewport
-            if (batch.pass.viewport.extent == glm::vec2(0.0f) && m_rendererBase.frameState().viewport.z > 0u &&
-                m_rendererBase.frameState().viewport.w > 0u) {
-              batch.pass.viewport.origin = glm::vec2(static_cast<float>(m_rendererBase.frameState().viewport.x),
-                                                     static_cast<float>(m_rendererBase.frameState().viewport.y));
-              batch.pass.viewport.extent = glm::vec2(static_cast<float>(m_rendererBase.frameState().viewport.z),
-                                                     static_cast<float>(m_rendererBase.frameState().viewport.w));
-              batch.pass.viewport.minDepth = 0.0f;
-              batch.pass.viewport.maxDepth = 1.0f;
-            }
-            m_rendererBase.appendBatch(std::move(batch));
-          }
-          source.resetCPUState();
-
-          source.frameState().updateViewportData(previousViewport);
-          source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
-        };
-
       // 1) Geometry filters
       for (auto* filter : filters) {
         if (!filter) {
@@ -4250,9 +4242,14 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
         }
         filter->setViewport(targetSize);
         filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedAverageInit);
-        recordFilterBatchesToSurface(filter, waInitSurface, [&]() {
-          filter->renderTransparent(eye);
-        });
+        recordFilterBatchesToSurfaceUnified(
+          m_rendererBase,
+          filter,
+          waInitSurface,
+          [&]() {
+            filter->renderTransparent(eye);
+          },
+          /*propagateHookPara=*/false);
       }
       // 2) Image layers: sample from filters' transparent leases using WA image init copy
       if (!imageLayers.empty()) {
@@ -4390,51 +4387,20 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
   recordInVulkanFrame(
     m_rendererBase,
     [&]() {
-      // Reuse helper from WA block above
-      auto recordFilterBatchesToSurface =
-        [&](Z3DBoundedFilter* filter, const RendererFrameState::ActiveSurface& surface, auto&& renderFn) {
-          if (!filter) {
-            return;
-          }
-          auto& source = filter->rendererBase();
-          const glm::uvec4 previousViewport = source.frameState().viewport;
-          const auto previousSurface = source.frameState().activeSurface;
-          source.frameState().updateViewportData(m_rendererBase.frameState().viewport);
-          source.setActiveSurfaceWithLoadStore(surface, Z3DRendererBase::Preserve);
-          renderFn();
-          auto& batches = source.cpuState().batches;
-          for (auto& batch : batches) {
-            if (batch.pass.colorAttachments.empty() && !surface.colorAttachments.empty()) {
-              batch.pass.colorAttachments = surface.colorAttachments;
-            }
-            if (!batch.pass.depthAttachment.has_value() && surface.depthAttachment.has_value()) {
-              batch.pass.depthAttachment = surface.depthAttachment;
-            }
-            if (batch.pass.viewport.extent == glm::vec2(0.0f) && m_rendererBase.frameState().viewport.z > 0u &&
-                m_rendererBase.frameState().viewport.w > 0u) {
-              batch.pass.viewport.origin = glm::vec2(static_cast<float>(m_rendererBase.frameState().viewport.x),
-                                                     static_cast<float>(m_rendererBase.frameState().viewport.y));
-              batch.pass.viewport.extent = glm::vec2(static_cast<float>(m_rendererBase.frameState().viewport.z),
-                                                     static_cast<float>(m_rendererBase.frameState().viewport.w));
-              batch.pass.viewport.minDepth = 0.0f;
-              batch.pass.viewport.maxDepth = 1.0f;
-            }
-            m_rendererBase.appendBatch(std::move(batch));
-          }
-          source.resetCPUState();
-          source.frameState().updateViewportData(previousViewport);
-          source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
-        };
-
       for (auto* filter : filters) {
         if (!filter) {
           continue;
         }
         filter->setViewport(targetSize);
         filter->setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);
-        recordFilterBatchesToSurface(filter, wbInitSurface, [&]() {
-          filter->renderTransparent(eye);
-        });
+        recordFilterBatchesToSurfaceUnified(
+          m_rendererBase,
+          filter,
+          wbInitSurface,
+          [&]() {
+            filter->renderTransparent(eye);
+          },
+          /*propagateHookPara=*/false);
       }
       if (!imageLayers.empty()) {
         m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::WeightedBlendedInit);

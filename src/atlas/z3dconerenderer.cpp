@@ -749,6 +749,10 @@ RenderBatch Z3DConeRenderer::buildRenderBatch(Z3DEye eye, bool picking) const
   batch.draw.indexCount = static_cast<uint32_t>(m_indexs.size());
   auto payload = buildConePayload();
   payload.pickingPass = picking;
+  // GL parity: carry follow flags so Vulkan respects per-renderer toggles
+  payload.followCoordTransform = m_followCoordTransform;
+  payload.followSizeScale = m_followSizeScale;
+  payload.followOpacity = m_followOpacity;
   batch.geometry = std::move(payload);
   return batch;
 }

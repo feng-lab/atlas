@@ -456,14 +456,17 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   TransformsUBOStd140 transforms{};
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
   transforms.view_matrix = eyeState.viewMatrix;
-  transforms.pos_transform = payload.params->coordTransform;
+  const glm::mat4 model = (payload.followCoordTransform && payload.params) ? payload.params->coordTransform
+                                                                           : glm::mat4(1.0f);
+  transforms.pos_transform = model;
 
-  const glm::mat4 combined = eyeState.viewMatrix * payload.params->coordTransform;
+  const glm::mat4 combined = eyeState.viewMatrix * model;
   const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(combined)));
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
+  transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
   m_uboTransforms->copyData(&transforms, sizeof(transforms));
 
   MaterialUBOStd140 material{};
@@ -472,7 +475,7 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.material_ambient = payload.params->materialAmbient;
   material.material_specular = pickingPass ? glm::vec4(0.0f) : payload.params->materialSpecular;
   material.material_shininess = pickingPass ? 0.0f : payload.params->materialShininess;
-  material.alpha = pickingPass ? 1.0f : payload.params->opacity;
+  material.alpha = (pickingPass || !payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
   m_uboMaterial->copyData(&material, sizeof(material));

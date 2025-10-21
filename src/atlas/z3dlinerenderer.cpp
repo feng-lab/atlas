@@ -463,6 +463,10 @@ LinePayload Z3DLineRenderer::buildLinePayload(bool picking) const
   payload.srcLineWidth = m_srcLineWidth;
   payload.resolvedLineWidth = m_lineWidth;
   payload.pickingPass = picking;
+  // GL parity: carry follow flags so Vulkan respects per-renderer toggles
+  payload.followCoordTransform = m_followCoordTransform;
+  payload.followSizeScale = m_followSizeScale;
+  payload.followOpacity = m_followOpacity;
 
   // Per-stream generation counters
   payload.positionsGen = m_positionsGen;

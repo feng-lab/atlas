@@ -663,14 +663,17 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   transforms.view_matrix = eyeState.viewMatrix;
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
-  transforms.pos_transform = payload.params->coordTransform;
+  const glm::mat4 model = (payload.followCoordTransform && payload.params) ? payload.params->coordTransform
+                                                                           : glm::mat4(1.0f);
+  transforms.pos_transform = model;
 
   const glm::mat4 combined = eyeState.viewMatrix * transforms.pos_transform;
   const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(combined)));
   transforms.pos_transform_normal_matrix = encodeMat3ToStd140(normalMatrix);
   transforms.projection_matrix = eyeState.projectionMatrix;
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
-  transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
+  transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
   m_uboTransforms->copyData(&transforms, sizeof(transforms));
 
@@ -680,7 +683,7 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.material_ambient = payload.params->materialAmbient;
   material.material_specular = payload.params->materialSpecular;
   material.material_shininess = payload.params->materialShininess;
-  material.alpha = payload.params->opacity;
+  material.alpha = (!payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
   m_uboMaterial->copyData(&material, sizeof(material));

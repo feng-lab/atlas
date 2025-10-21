@@ -274,6 +274,10 @@ MeshPayload Z3DMeshRenderer::buildMeshPayload() const
 
   payload.params = &m_rendererBase.parameterState();
   payload.wantsLighting = needLighting();
+  // GL parity: carry follow flags so Vulkan respects per-renderer toggles
+  payload.followCoordTransform = m_followCoordTransform;
+  payload.followSizeScale = m_followSizeScale;
+  payload.followOpacity = m_followOpacity;
   return payload;
 }
 
