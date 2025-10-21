@@ -332,6 +332,23 @@ private:
       std::vector<Retired> retiredBuffers;
     } uploadArena;
 
+    // Per-frame CPU->GPU uniform arena for dynamic UBO slices (host-visible,
+    // persistently mapped); offsets are aligned to
+    // minUniformBufferOffsetAlignment.
+    struct UniformArena
+    {
+      std::unique_ptr<class ZVulkanBuffer> buffer; // host-visible, host-coherent
+      void* mapped = nullptr; // persistent mapping
+      size_t capacity = 0; // bytes
+      size_t cursor = 0; // bump pointer
+      size_t highWatermark = 0; // debug
+      struct Retired
+      {
+        std::unique_ptr<class ZVulkanBuffer> buffer;
+      };
+      std::vector<Retired> retiredBuffers;
+    } uniformArena;
+
     // Static device-local staging stats
     size_t staticBytesStaged = 0; // bytes staged to device-local this frame
     uint32_t staticStreamRestaged = 0; // number of restaged streams
@@ -355,6 +372,19 @@ private:
   void flushScheduledCopies(vk::raii::CommandBuffer& cmd);
   void recordCpuScope(std::string_view label, double milliseconds);
   void ensureStaticArenas();
+  void ensureUniformArena(FrameResources& frame);
+  size_t uniformAlignment() const;
+
+public:
+  struct UniformSlice
+  {
+    vk::Buffer buffer{};
+    vk::DeviceSize offset{0};
+    void* mapped = nullptr;
+    size_t size = 0;
+  };
+  UniformSlice suballocateUniform(size_t bytes, size_t alignment = 0);
+  class ZVulkanBuffer& uniformArenaBuffer();
   static size_t alignUp(size_t value, size_t alignment)
   {
     const size_t mask = alignment ? (alignment - 1) : 0;

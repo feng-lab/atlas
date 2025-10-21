@@ -182,6 +182,9 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   sets.push_back(m_dsLighting->descriptorSet());
   sets.push_back(m_dsTransforms->descriptorSet());
   drawSpec.descriptorSets = sets;
+  drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_dynLightingOffset),
+                             static_cast<uint32_t>(m_dynTransformsOffset),
+                             static_cast<uint32_t>(m_dynMaterialOffset)};
 
   uint32_t expectedSets = static_cast<uint32_t>(sets.size());
   if (m_dsOIT) {
@@ -266,25 +269,13 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
     m_dsPlaceholder->writeTextureOnce(1, tex, m_backend.defaultSampler());
   }
 
-  // Ensure UBO buffers exist prior to recording
-  auto& device = m_backend.device();
-  if (!m_uboLighting) {
-    m_uboLighting =
-      device.createBuffer(sizeof(LightingUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  // Bind dynamic UBOs to the per-frame uniform arena once
+  if (m_dsLighting) {
+    m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
   }
-  if (!m_uboTransforms) {
-    m_uboTransforms =
-      device.createBuffer(sizeof(TransformsUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  if (!m_uboMaterial) {
-    m_uboMaterial =
-      device.createBuffer(sizeof(MaterialUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  if (m_dsTransforms) {
+    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(TransformsUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
   if (!m_uboOIT) {
     m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
@@ -293,13 +284,7 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
-  if (m_dsLighting && m_uboLighting) {
-    m_dsLighting->writeUniformBufferOnce(0, *m_uboLighting);
-  }
-  if (m_dsTransforms && m_uboTransforms && m_uboMaterial) {
-    m_dsTransforms->writeUniformBufferOnce(0, *m_uboTransforms);
-    m_dsTransforms->writeUniformBufferOnce(1, *m_uboMaterial);
-  }
+  // OIT params still use a regular UBO and are primed here.
   if (m_dsOIT && m_uboOIT) {
     m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
   }
@@ -345,13 +330,7 @@ void ZVulkanEllipsoidPipelineContext::updateLightingUBO(Z3DRendererBase& rendere
                                                         const EllipsoidPayload& payload,
                                                         bool pickingPass)
 {
-  auto& device = m_backend.device();
-  if (!m_uboLighting) {
-    m_uboLighting =
-      device.createBuffer(sizeof(LightingUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
+  
 
   LightingUBOStd140 lighting{};
   const auto& scene = renderer.sceneState();
@@ -400,7 +379,11 @@ void ZVulkanEllipsoidPipelineContext::updateLightingUBO(Z3DRendererBase& rendere
     lighting.lights[i].spotDirection = scene.lighting.spotDirection[idx];
   }
 
-  m_uboLighting->copyData(&lighting, sizeof(lighting));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
+    std::memcpy(slice.mapped, &lighting, sizeof(lighting));
+    m_dynLightingOffset = slice.offset;
+  }
 }
 
 void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
@@ -409,19 +392,7 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
                                                          bool pickingPass)
 {
   CHECK(payload.params != nullptr) << "Ellipsoid payload missing params";
-  auto& device = m_backend.device();
-  if (!m_uboTransforms) {
-    m_uboTransforms =
-      device.createBuffer(sizeof(TransformsUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  if (!m_uboMaterial) {
-    m_uboMaterial =
-      device.createBuffer(sizeof(MaterialUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
+  
 
   TransformsUBOStd140 transforms{};
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
@@ -436,7 +407,11 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
-  m_uboTransforms->copyData(&transforms, sizeof(transforms));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
+    std::memcpy(slice.mapped, &transforms, sizeof(transforms));
+    m_dynTransformsOffset = slice.offset;
+  }
 
   MaterialUBOStd140 material{};
   const auto& scene = renderer.sceneState();
@@ -453,7 +428,11 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
     material.material_shininess = 0.0f;
   }
 
-  m_uboMaterial->copyData(&material, sizeof(material));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
+    std::memcpy(slice.mapped, &material, sizeof(material));
+    m_dynMaterialOffset = slice.offset;
+  }
 
   VLOG(2) << fmt::format("VK ellipsoid params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
                          payload.params->sizeScale,

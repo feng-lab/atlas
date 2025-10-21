@@ -168,8 +168,24 @@ void ZVulkanMeshPipelineContext::resetFrame()
   m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
   m_texBinding = TexBinding::None;
+  // Retire per-frame UBOs so they are not overwritten while still in use by
+  // earlier in-flight frames. We defer destruction until the current active
+  // submission finishes.
+  retainUbo(m_uboOIT);
   resetDescriptors();
   m_transientDescriptorSets.clear();
+}
+
+void ZVulkanMeshPipelineContext::flushRetainedUbos()
+{
+  if (m_retainedUbos.empty()) {
+    return;
+  }
+  for (auto& sp : m_retainedUbos) {
+    auto keep = sp;
+    m_backend.scheduleAfterActiveSubmissionFence([keep]() {});
+  }
+  m_retainedUbos.clear();
 }
 
 void ZVulkanMeshPipelineContext::resetDescriptors()
@@ -188,6 +204,8 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
                                         const vk::Rect2D& scissor,
                                         vk::raii::CommandBuffer& cmd)
 {
+  // Ensure previously used UBOs survive until this submission completes.
+  flushRetainedUbos();
   if (payload.meshes.empty()) {
     return;
   }
@@ -416,6 +434,15 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
           cb.pushConstants<glm::vec4>(layoutHandle, vk::ShaderStageFlagBits::eFragment, 0, pushConstants);
         }
 
+        // Re-bind dynamic UBO offsets for lighting/transforms/material before each draw.
+        {
+          std::array<vk::DescriptorSet, 2> dynSets{m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
+          std::array<uint32_t, 3> dynOff{static_cast<uint32_t>(m_dynLightingOffset),
+                                          static_cast<uint32_t>(m_dynTransformsOffset),
+                                          static_cast<uint32_t>(m_dynMaterialOffset)};
+          cb.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layoutHandle, 1, dynSets, dynOff);
+        }
+
         if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
           cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
         } else {
@@ -501,25 +528,13 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
     m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 
-  // Ensure UBO buffers exist before recording
-  auto& device = m_backend.device();
-  if (!m_uboLighting) {
-    m_uboLighting =
-      device.createBuffer(sizeof(LightingUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  // Prime dynamic UBO bindings to the per-frame uniform arena once
+  if (m_dsLighting) {
+    m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
   }
-  if (!m_uboTransforms) {
-    m_uboTransforms =
-      device.createBuffer(sizeof(TransformsUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  if (!m_uboMaterial) {
-    m_uboMaterial =
-      device.createBuffer(sizeof(MaterialUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  if (m_dsTransforms) {
+    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(TransformsUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
 
   if (!m_uboOIT) {
@@ -529,13 +544,7 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
-  if (m_dsLighting && m_uboLighting) {
-    m_dsLighting->writeUniformBufferOnce(0, *m_uboLighting);
-  }
-  if (m_dsTransforms && m_uboTransforms && m_uboMaterial) {
-    m_dsTransforms->writeUniformBufferOnce(0, *m_uboTransforms);
-    m_dsTransforms->writeUniformBufferOnce(1, *m_uboMaterial);
-  }
+  // OIT params still use a dedicated UBO
   if (m_dsOIT && m_uboOIT) {
     m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
   }
@@ -579,14 +588,7 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
                                                    const MeshPayload& payload,
                                                    bool pickingPass)
 {
-  auto& device = m_backend.device();
-
-  if (!m_uboLighting) {
-    m_uboLighting =
-      device.createBuffer(sizeof(LightingUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
+  
 
   LightingUBOStd140 lighting{};
   const auto& scene = renderer.sceneState();
@@ -636,27 +638,19 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
     lighting.lights[i].spotDirection = scene.lighting.spotDirection[idx];
   }
 
-  m_uboLighting->copyData(&lighting, sizeof(lighting));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
+    std::memcpy(slice.mapped, &lighting, sizeof(lighting));
+    m_dynLightingOffset = slice.offset;
+  }
 }
 
 void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
                                                     const RenderBatch& batch,
                                                     const MeshPayload& payload)
 {
-  auto& device = m_backend.device();
-
-  if (!m_uboTransforms) {
-    m_uboTransforms =
-      device.createBuffer(sizeof(TransformsUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  if (!m_uboMaterial) {
-    m_uboMaterial =
-      device.createBuffer(sizeof(MaterialUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
+  
+  
 
   CHECK(payload.params != nullptr) << "Mesh payload missing params";
   TransformsUBOStd140 transforms{};
@@ -675,7 +669,11 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
-  m_uboTransforms->copyData(&transforms, sizeof(transforms));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
+    std::memcpy(slice.mapped, &transforms, sizeof(transforms));
+    m_dynTransformsOffset = slice.offset;
+  }
 
   MaterialUBOStd140 material{};
   const auto& scene = renderer.sceneState();
@@ -686,7 +684,11 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.alpha = (!payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
-  m_uboMaterial->copyData(&material, sizeof(material));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
+    std::memcpy(slice.mapped, &material, sizeof(material));
+    m_dynMaterialOffset = slice.offset;
+  }
 
   VLOG(2) << fmt::format("VK mesh xf params: sizeScale={:.3f} ortho={}",
                          payload.params->sizeScale,
@@ -700,10 +702,6 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
                                                    const glm::vec4& fallbackColor,
                                                    bool pickingPass)
 {
-  if (!m_uboMaterial) {
-    return;
-  }
-
   MaterialUBOStd140 material{};
   const auto& scene = renderer.sceneState();
   material.scene_ambient = scene.sceneAmbient;
@@ -735,7 +733,11 @@ void ZVulkanMeshPipelineContext::updateMaterialUBO(Z3DRendererBase& renderer,
   material.use_custom_color = useCustomColor ? 1 : 0;
   material.custom_color = colorValue;
 
-  m_uboMaterial->copyData(&material, sizeof(material));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
+    std::memcpy(slice.mapped, &material, sizeof(material));
+    m_dynMaterialOffset = slice.offset;
+  }
 
   VLOG(2) << fmt::format("VK mesh material: alpha={:.3f} picking={} useCustomColor={}",
                          material.alpha,

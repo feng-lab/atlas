@@ -15,6 +15,8 @@ public:
   ZVulkanDescriptorSet(ZVulkanDevice& device, vk::DescriptorSet descriptorSet, bool isOverrideTransient);
 
   void updateUniformBuffer(uint32_t binding, ZVulkanBuffer& buffer);
+  void updateUniformBufferDynamic(uint32_t binding, ZVulkanBuffer& buffer);
+  void updateUniformBufferDynamic(uint32_t binding, ZVulkanBuffer& buffer, vk::DeviceSize range);
   void updateTexture(uint32_t binding, ZVulkanTexture& texture);
   void updateTexture(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler);
   void updateTexture(uint32_t binding,
@@ -30,6 +32,9 @@ public:
 
   // Write-once convenience helpers; return true if wrote, false if skipped
   bool writeUniformBufferOnce(uint32_t binding, ZVulkanBuffer& buffer);
+  // Removed two-parameter variant (range is required to satisfy validation).
+  // bool writeUniformBufferDynamicOnce(uint32_t binding, ZVulkanBuffer& buffer);
+  bool writeUniformBufferDynamicOnce(uint32_t binding, ZVulkanBuffer& buffer, vk::DeviceSize range);
   bool writeTextureOnce(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler);
 
   vk::DescriptorSet descriptorSet() const

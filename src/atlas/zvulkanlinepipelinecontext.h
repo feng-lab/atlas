@@ -101,9 +101,6 @@ private:
   std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
   std::optional<vk::raii::Sampler> m_sampler;
 
-  std::unique_ptr<ZVulkanBuffer> m_uboLighting;
-  std::unique_ptr<ZVulkanBuffer> m_uboTransforms;
-  std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
 
   vk::DescriptorSetLayout m_setOIT{};
@@ -211,6 +208,23 @@ private:
     bool promoted = false;
   };
   std::map<WideCacheKey, WideCacheEntry> m_wideStaticCache;
+
+  // UBO lifetime guard: retain previous frame UBOs until the active submission
+  // fence signals to avoid read-after-free glitches. We collect them here in
+  // resetFrame() and hand them to the backend at the first record() call.
+  std::vector<std::shared_ptr<ZVulkanBuffer>> m_retainedUbos;
+  void retainUbo(std::unique_ptr<ZVulkanBuffer>& ubo)
+  {
+    if (ubo) {
+      m_retainedUbos.emplace_back(std::shared_ptr<ZVulkanBuffer>(std::move(ubo)));
+    }
+  }
+  void flushRetainedUbos();
+
+  // Dynamic UBO offsets (per-draw)
+  vk::DeviceSize m_dynLightingOffset{0};
+  vk::DeviceSize m_dynTransformsOffset{0};
+  vk::DeviceSize m_dynMaterialOffset{0};
 
   void ensureDescriptorLayouts();
   void ensurePlaceholderTexture();

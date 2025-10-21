@@ -139,7 +139,26 @@ void ZVulkanLinePipelineContext::resetFrame()
   m_wideUploadIndexOffset = 0;
   m_wideUploadIndexCount = 0;
   m_wideIndexBuffer = nullptr;
+  // Retire per-frame UBOs to avoid cross-frame write-after-use hazards when
+  // more than one frame is in flight. The buffers are released after the
+  // current submission fence signals so the previous frame can safely finish
+  // reading them on the GPU.
+  retainUbo(m_uboOIT);
   resetDescriptors();
+}
+
+void ZVulkanLinePipelineContext::flushRetainedUbos()
+{
+  if (m_retainedUbos.empty()) {
+    return;
+  }
+  // Hand retained UBOs to the backend so destruction happens after the active
+  // submission fence signals. Capture shared_ptr by value to extend lifetime.
+  for (auto& sp : m_retainedUbos) {
+    auto keep = sp; // copy shared ownership into the closure
+    m_backend.scheduleAfterActiveSubmissionFence([keep]() {});
+  }
+  m_retainedUbos.clear();
 }
 
 void ZVulkanLinePipelineContext::resetDescriptors()
@@ -153,8 +172,7 @@ void ZVulkanLinePipelineContext::resetDescriptors()
 void ZVulkanLinePipelineContext::ensureDescriptorLayouts()
 {
   if (!m_setTexture) {
-    auto& device = m_backend.device();
-    auto& vkDevice = device.context().device();
+    auto& vkDevice = m_backend.device().context().device();
     std::array<vk::DescriptorSetLayoutBinding, 3> bindings{
       vk::DescriptorSetLayoutBinding{.binding = 0,
                                      .descriptorType = vk::DescriptorType::eCombinedImageSampler,
@@ -214,35 +232,13 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
     m_dsOIT->writeUniformBufferOnce(0, *m_uboOIT);
   }
 
-  // Ensure UBO buffers exist prior to recording
-  auto& device = m_backend.device();
-  if (!m_uboLighting) {
-    m_uboLighting =
-      device.createBuffer(sizeof(LightingUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  // Bind per-frame uniform arena buffer to dynamic UBO bindings once.
+  if (m_dsLighting) {
+    m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
   }
-  if (!m_uboTransforms) {
-    m_uboTransforms =
-      device.createBuffer(sizeof(TransformsUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  if (!m_uboMaterial) {
-    m_uboMaterial =
-      device.createBuffer(sizeof(MaterialUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-
-  if (m_uboLighting && m_dsLighting) {
-    m_dsLighting->writeUniformBufferOnce(0, *m_uboLighting);
-  }
-  if (m_uboTransforms && m_dsTransforms) {
-    m_dsTransforms->writeUniformBufferOnce(0, *m_uboTransforms);
-  }
-  if (m_uboMaterial && m_dsTransforms) {
-    m_dsTransforms->writeUniformBufferOnce(1, *m_uboMaterial);
+  if (m_dsTransforms) {
+    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(TransformsUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
 
   ensurePlaceholderTexture();
@@ -259,28 +255,8 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
                                             const RenderBatch& batch,
                                             const LinePayload& payload)
 {
-  auto& device = m_backend.device();
-
-  if (!m_uboLighting) {
-    m_uboLighting =
-      device.createBuffer(sizeof(LightingUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  if (!m_uboTransforms) {
-    m_uboTransforms =
-      device.createBuffer(sizeof(TransformsUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  if (!m_uboMaterial) {
-    m_uboMaterial =
-      device.createBuffer(sizeof(MaterialUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-
   LightingUBOStd140 lighting{};
+  lighting.lighting_enabled = 0; // force unlit lines unless explicitly enabled
   glm::vec2 extent = batch.pass.viewport.extent;
   if (extent.x <= 0.f || extent.y <= 0.f) {
     const auto& viewport = renderer.frameState().viewport;
@@ -295,7 +271,11 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
     lighting.fog_color_top = sceneState.fog.topColor;
     lighting.fog_color_bottom = sceneState.fog.bottomColor;
   }
-  m_uboLighting->copyData(&lighting, sizeof(lighting));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
+    std::memcpy(slice.mapped, &lighting, sizeof(lighting));
+    m_dynLightingOffset = slice.offset;
+  }
 
   TransformsUBOStd140 transforms{};
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
@@ -313,7 +293,11 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
-  m_uboTransforms->copyData(&transforms, sizeof(transforms));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
+    std::memcpy(slice.mapped, &transforms, sizeof(transforms));
+    m_dynTransformsOffset = slice.offset;
+  }
 
   MaterialUBOStd140 material{};
   material.scene_ambient = sceneState.sceneAmbient;
@@ -321,7 +305,11 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   material.material_specular = payload.params->materialSpecular;
   material.material_shininess = payload.params->materialShininess;
   material.alpha = (payload.pickingPass || !payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
-  m_uboMaterial->copyData(&material, sizeof(material));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
+    std::memcpy(slice.mapped, &material, sizeof(material));
+    m_dynMaterialOffset = slice.offset;
+  }
 
   VLOG(2) << fmt::format("VK line params: sizeScale={:.3f} alpha={:.3f} ortho={} picking={}",
                          payload.params->sizeScale,
@@ -1095,6 +1083,8 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
                                         const vk::Rect2D& scissor,
                                         vk::raii::CommandBuffer& cmd)
 {
+  // Ensure previously used UBOs survive until this submission completes.
+  flushRetainedUbos();
   // No-op if payload empty
 
   // GL parity: skip if no geometry, and in picking pass skip when picking colors
@@ -1172,6 +1162,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   descriptorSets.push_back(dsTex);
   descriptorSets.push_back(m_dsLighting->descriptorSet());
   descriptorSets.push_back(m_dsTransforms->descriptorSet());
+  // Dynamic offsets added to drawSpec after it is constructed below.
 
   uint32_t expectedSets = static_cast<uint32_t>(descriptorSets.size());
   std::vector<ZVulkanDescriptorBindInfo> extraBinds;
@@ -1198,6 +1189,10 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
     drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
     drawSpec.descriptorSetFirst = 0;
     drawSpec.descriptorSets = descriptorSets;
+    // Dynamic offsets order must match set/binding order: lighting (set1,b0), transforms (set2,b0), material (set2,b1)
+    drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_dynLightingOffset),
+                               static_cast<uint32_t>(m_dynTransformsOffset),
+                               static_cast<uint32_t>(m_dynMaterialOffset)};
     drawSpec.extraDescriptorBinds = extraBinds;
     drawSpec.expectedDescriptorSetCount = expectedSets;
 
@@ -1260,6 +1255,9 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.pipelineLayoutHandle = pipeline.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = 0;
   drawSpec.descriptorSets = descriptorSets;
+  drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_dynLightingOffset),
+                             static_cast<uint32_t>(m_dynTransformsOffset),
+                             static_cast<uint32_t>(m_dynMaterialOffset)};
   drawSpec.extraDescriptorBinds = extraBinds;
   drawSpec.expectedDescriptorSetCount = expectedSets;
 

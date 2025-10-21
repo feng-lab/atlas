@@ -102,9 +102,6 @@ private:
   std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
   std::optional<vk::raii::Sampler> m_sampler;
 
-  std::unique_ptr<ZVulkanBuffer> m_uboLighting;
-  std::unique_ptr<ZVulkanBuffer> m_uboTransforms;
-  std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
 
   size_t m_vertexCount = 0;
@@ -126,6 +123,11 @@ private:
   vk::DeviceSize m_specularOffset{0};
   vk::Buffer m_indexUploadBuffer{VK_NULL_HANDLE};
   vk::DeviceSize m_indexUploadOffset{0};
+
+  // Dynamic UBO offsets for this draw
+  vk::DeviceSize m_dynLightingOffset{0};
+  vk::DeviceSize m_dynTransformsOffset{0};
+  vk::DeviceSize m_dynMaterialOffset{0};
 
   // Static promotion cache
   struct CacheKey

@@ -161,10 +161,23 @@ private:
   std::unique_ptr<ZVulkanTexture> m_placeholder2D;
   std::unique_ptr<ZVulkanTexture> m_placeholder3D;
 
-  std::unique_ptr<ZVulkanBuffer> m_uboLighting;
-  std::unique_ptr<ZVulkanBuffer> m_uboTransforms;
-  std::unique_ptr<ZVulkanBuffer> m_uboMaterial;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
+
+  // Retain last-frame UBOs until the active submission fence signals to
+  // prevent read-after-free artifacts when frames overlap.
+  std::vector<std::shared_ptr<ZVulkanBuffer>> m_retainedUbos;
+  void retainUbo(std::unique_ptr<ZVulkanBuffer>& ubo)
+  {
+    if (ubo) {
+      m_retainedUbos.emplace_back(std::shared_ptr<ZVulkanBuffer>(std::move(ubo)));
+    }
+  }
+  void flushRetainedUbos();
+
+  // Dynamic UBO offsets for this draw
+  vk::DeviceSize m_dynLightingOffset{0};
+  vk::DeviceSize m_dynTransformsOffset{0};
+  vk::DeviceSize m_dynMaterialOffset{0};
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;

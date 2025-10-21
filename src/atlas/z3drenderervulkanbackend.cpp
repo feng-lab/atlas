@@ -57,6 +57,20 @@ DEFINE_bool(atlas_vk_collect_timings_on_end,
             false,
             "Collect and log Vulkan frame timings at endRender (fence-wait as needed)");
 
+// Initial capacity for the per-frame uniform arena (in KiB). This buffer backs
+// all dynamic UBO bindings for the frame. Increasing this reduces the chance of
+// mid-frame growth (which would require swapping the underlying buffer).
+DEFINE_int32(atlas_vk_uniform_arena_kib,
+             256,
+             "Initial per-frame uniform arena capacity in KiB (defaults to 256 KiB)");
+
+// Fail fast when the uniform arena would grow mid-frame. Growth swaps the
+// underlying VkBuffer pointer and can invalidate descriptor bindings if any
+// sets were already bound. Keep this enabled unless explicitly debugging.
+DEFINE_bool(atlas_vk_uniform_arena_fail_on_grow,
+            true,
+            "Hard CHECK if the per-frame uniform arena would grow during a frame");
+
 namespace nim {
 
 namespace {
@@ -379,6 +393,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Also drain any submission-fence callbacks whose fences have already signaled.
   drainPostFenceCallbacks();
   ensureArenaOnFrame(frameResources);
+  ensureUniformArena(frameResources);
   frameResources.descriptorSetsAllocated = 0;
   frameResources.leaseRecycleQueued = 0;
   frameResources.leaseRecycleExecuted = 0;
@@ -689,13 +704,15 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
     frame.meshesBytesStaged,
     frame.spheresBytesStaged);
 
-  // Stage 5: VLOG(1) static/upload arena usage
+  // Stage 5: VLOG(1) static/upload/uniform arena usage
   VLOG(1) << fmt::format(
-    "VK arena: frame='{}' token={} submit#{} upload_high_watermark={}B static_vb_used={}B static_ib_used={}B",
+    "VK arena: frame='{}' token={} submit#{} upload_high_watermark={}B uniform_high_watermark={}B uniform_capacity={}B static_vb_used={}B static_ib_used={}B",
     frame.frameName.empty() ? std::string("<unlabeled-frame>") : frame.frameName,
     frame.realFrameToken,
     frame.submissionId,
     m_activeFrame ? m_activeFrame->uploadArena.highWatermark : 0,
+    frame.uniformArena.highWatermark,
+    frame.uniformArena.capacity,
     m_staticArena.vbHighWatermark,
     m_staticArena.ibHighWatermark);
 
@@ -1620,9 +1637,10 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
 
   if (!m_sharedDescriptorLayouts.lighting) {
     vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
                                            .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+                                           .stageFlags = vk::ShaderStageFlagBits::eVertex |
+                                                         vk::ShaderStageFlagBits::eFragment};
     vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
     m_sharedDescriptorLayouts.lighting.emplace(vkDevice, info);
   }
@@ -1630,12 +1648,12 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
   if (!m_sharedDescriptorLayouts.transforms) {
     std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
       vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                     .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
                                      .descriptorCount = 1,
                                      .stageFlags =
                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
       vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                     .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
                                      .descriptorCount = 1,
                                      .stageFlags =
                                        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
@@ -1905,6 +1923,97 @@ void Z3DRendererVulkanBackend::ensureStaticArenas()
     m_staticArena.ibOffset = 0;
     m_staticArena.ibHighWatermark = 0;
   }
+}
+
+void Z3DRendererVulkanBackend::ensureUniformArena(FrameResources& frame)
+{
+  if (!m_sharedDevice) {
+    return;
+  }
+  // Create if missing
+  if (!frame.uniformArena.buffer) {
+    const size_t requested = static_cast<size_t>(std::max(64, FLAGS_atlas_vk_uniform_arena_kib)) * 1024ull;
+    const size_t cap = requested; // grows on demand (guarded by flag)
+    frame.uniformArena.buffer = m_sharedDevice->createBuffer(cap,
+                                                             vk::BufferUsageFlagBits::eUniformBuffer,
+                                                             vk::MemoryPropertyFlagBits::eHostVisible |
+                                                               vk::MemoryPropertyFlagBits::eHostCoherent);
+    frame.uniformArena.capacity = cap;
+    frame.uniformArena.cursor = 0;
+    frame.uniformArena.highWatermark = 0;
+    frame.uniformArena.mapped = frame.uniformArena.buffer->map(0, cap);
+  } else {
+    // Reset bump pointer for new frame
+    frame.uniformArena.cursor = 0;
+    frame.uniformArena.highWatermark = 0;
+  }
+}
+
+size_t Z3DRendererVulkanBackend::uniformAlignment() const
+{
+  if (!m_sharedDevice) {
+    return 256; // conservative default
+  }
+  auto limits = m_sharedDevice->context().physicalDevice().getProperties().limits;
+  size_t align = static_cast<size_t>(limits.minUniformBufferOffsetAlignment);
+  return align ? align : 256;
+}
+
+Z3DRendererVulkanBackend::UniformSlice Z3DRendererVulkanBackend::suballocateUniform(size_t bytes, size_t alignment)
+{
+  UniformSlice slice{};
+  if (!m_activeFrame) {
+    return slice;
+  }
+  auto& arena = m_activeFrame->uniformArena;
+  if (!arena.buffer) {
+    ensureUniformArena(*m_activeFrame);
+    if (!arena.buffer) {
+      return slice;
+    }
+  }
+  const size_t align = std::max(uniformAlignment(), alignment ? alignment : static_cast<size_t>(1));
+  const size_t aligned = alignUp(arena.cursor, align);
+  if (aligned + bytes > arena.capacity) {
+    if (FLAGS_atlas_vk_uniform_arena_fail_on_grow) {
+      CHECK(false) << fmt::format(
+        "Uniform arena capacity exceeded within frame: need={}B have={}B (cursor={}B, align={}B). "
+        "Increase --atlas_vk_uniform_arena_kib (currently {} KiB) to avoid mid-frame growth.",
+        aligned + bytes,
+        arena.capacity,
+        arena.cursor,
+        align,
+        FLAGS_atlas_vk_uniform_arena_kib);
+    }
+    // Grow: keep previous buffer alive until frame end
+    arena.retiredBuffers.push_back({std::move(arena.buffer)});
+    size_t newCap = arena.capacity ? arena.capacity : (64 * 1024);
+    while (newCap < aligned + bytes) {
+      newCap *= 2;
+    }
+    arena.buffer = m_sharedDevice->createBuffer(newCap,
+                                                vk::BufferUsageFlagBits::eUniformBuffer,
+                                                vk::MemoryPropertyFlagBits::eHostVisible |
+                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
+    arena.capacity = newCap;
+    arena.cursor = 0;
+    arena.highWatermark = 0;
+    arena.mapped = arena.buffer->map(0, newCap);
+  }
+  const size_t off = alignUp(arena.cursor, align);
+  slice.buffer = arena.buffer->buffer();
+  slice.offset = static_cast<vk::DeviceSize>(off);
+  slice.mapped = static_cast<char*>(arena.mapped) + off;
+  slice.size = bytes;
+  arena.cursor = off + bytes;
+  arena.highWatermark = std::max(arena.highWatermark, arena.cursor);
+  return slice;
+}
+
+class ZVulkanBuffer& Z3DRendererVulkanBackend::uniformArenaBuffer()
+{
+  CHECK(m_activeFrame && m_activeFrame->uniformArena.buffer) << "Uniform arena not initialised";
+  return *m_activeFrame->uniformArena.buffer;
 }
 
 Z3DRendererVulkanBackend::StaticSlice Z3DRendererVulkanBackend::allocateStaticVB(size_t bytes, size_t alignment)

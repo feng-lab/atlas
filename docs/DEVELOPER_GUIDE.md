@@ -133,6 +133,9 @@ Vulkan Pipeline Invariants
 - Graphics pipeline keys include attachment formats: `colorFormats[]` and optional `depthFormat` are part of the key in all Vulkan pipeline contexts to avoid layout mismatches.
 - Composite/resolve passes (DDP final, WA resolve, WB resolve) must write to exactly one color attachment; depth is disabled in the pipeline and no depth attachment is bound.
 - Descriptor updates after binding are forbidden. Per‑draw overrides are allocated from the backend’s per‑frame arena and kept alive until the frame fence to satisfy validation rules.
+- Dynamic UBO arena (Vulkan): all per‑draw UBOs are suballocated from a per‑frame, host‑visible "uniform arena" buffer. Two flags control its behavior:
+  - `--atlas_vk_uniform_arena_kib=N` sets the initial capacity (KiB). Defaults to `256` KiB. Increase if toggling overlays/selection causes high UBO churn.
+  - `--atlas_vk_uniform_arena_fail_on_grow=true|false` enforces a hard CHECK if the arena would grow mid‑frame (default `true`). Growth swaps the underlying VkBuffer and can invalidate already‑bound dynamic UBO descriptors; keep this enabled unless explicitly debugging.
 - Backend validates that the pipeline’s attachment formats match the currently active dynamic rendering segment; mismatches are logged at VLOG(1) and the batch is skipped.
 
 Performance Instrumentation

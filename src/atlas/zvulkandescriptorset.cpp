@@ -45,6 +45,61 @@ void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& 
   VLOG(3) << "Updated uniform buffer descriptor at binding " << binding;
 }
 
+void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding, ZVulkanBuffer& buffer)
+{
+  if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
+    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
+    backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
+    if (!m_isOverrideTransient) {
+      CHECK(false) << "Descriptor write attempted during recording (uniform buffer dynamic) at binding " << binding;
+    }
+  }
+  vk::DescriptorBufferInfo bufferInfo{.buffer = buffer.buffer(), .offset = 0, .range = buffer.size()};
+  vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
+                                         .dstBinding = binding,
+                                         .dstArrayElement = 0,
+                                         .descriptorCount = 1,
+                                         .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
+                                         .pImageInfo = nullptr,
+                                         .pBufferInfo = &bufferInfo,
+                                         .pTexelBufferView = nullptr};
+  std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
+  std::vector<vk::CopyDescriptorSet> descriptorCopies;
+  m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
+  m_initializedBindings.insert(binding);
+  VLOG(2) << "Updated uniform buffer dynamic descriptor at binding " << binding;
+}
+
+void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding,
+                                                      ZVulkanBuffer& buffer,
+                                                      vk::DeviceSize range)
+{
+  if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
+    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
+    backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
+    if (!m_isOverrideTransient) {
+      CHECK(false) << "Descriptor write attempted during recording (uniform buffer dynamic, range) at binding "
+                   << binding;
+    }
+  }
+  vk::DescriptorBufferInfo bufferInfo{.buffer = buffer.buffer(), .offset = 0, .range = range};
+  vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
+                                         .dstBinding = binding,
+                                         .dstArrayElement = 0,
+                                         .descriptorCount = 1,
+                                         .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
+                                         .pImageInfo = nullptr,
+                                         .pBufferInfo = &bufferInfo,
+                                         .pTexelBufferView = nullptr};
+  std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
+  std::vector<vk::CopyDescriptorSet> descriptorCopies;
+  m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
+  m_initializedBindings.insert(binding);
+  VLOG(2) << "Updated uniform buffer dynamic descriptor (range) at binding " << binding;
+}
+
 void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& texture)
 {
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
@@ -175,6 +230,19 @@ bool ZVulkanDescriptorSet::writeUniformBufferOnce(uint32_t binding, ZVulkanBuffe
     return false;
   }
   updateUniformBuffer(binding, buffer);
+  return true;
+}
+
+// Removed two-parameter writeUniformBufferDynamicOnce; use the range-aware overload.
+
+bool ZVulkanDescriptorSet::writeUniformBufferDynamicOnce(uint32_t binding,
+                                                         ZVulkanBuffer& buffer,
+                                                         vk::DeviceSize range)
+{
+  if ((m_initializedBindings.find(binding) != m_initializedBindings.end()) && !m_isOverrideTransient) {
+    return false;
+  }
+  updateUniformBufferDynamic(binding, buffer, range);
   return true;
 }
 

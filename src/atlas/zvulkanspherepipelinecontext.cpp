@@ -72,7 +72,23 @@ void ZVulkanSpherePipelineContext::resetFrame()
   m_flagsOffset = 0;
   m_indexUploadBuffer = nullptr;
   m_indexUploadOffset = 0;
+  // Retire per-frame UBOs so previous frames can complete safely on GPU
+  // when multiple frames are in flight. Destruction is deferred until the
+  // active submission fence signals.
+  retainUbo(m_uboOIT);
   resetDescriptors();
+}
+
+void ZVulkanSpherePipelineContext::flushRetainedUbos()
+{
+  if (m_retainedUbos.empty()) {
+    return;
+  }
+  for (auto& sp : m_retainedUbos) {
+    auto keep = sp;
+    m_backend.scheduleAfterActiveSubmissionFence([keep]() {});
+  }
+  m_retainedUbos.clear();
 }
 
 void ZVulkanSpherePipelineContext::resetDescriptors()
@@ -90,6 +106,8 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
                                           const vk::Rect2D& scissor,
                                           vk::raii::CommandBuffer& cmd)
 {
+  // Ensure last frame's UBOs remain alive until this submission completes.
+  flushRetainedUbos();
   if (payload.pointsAndRadius.empty()) {
     return;
   }
@@ -245,6 +263,10 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(SpherePushConstants));
   drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
   drawSpec.requirePushConstants = true;
+  // Dynamic offsets for (set1,b0), (set2,b0), (set2,b1)
+  drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_dynLightingOffset),
+                             static_cast<uint32_t>(m_dynTransformsOffset),
+                             static_cast<uint32_t>(m_dynMaterialOffset)};
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
   recorder.recordGraphicsDraw(drawSpec);
@@ -290,25 +312,13 @@ void ZVulkanSpherePipelineContext::ensureDescriptorSets()
     m_dsPlaceholder->writeTextureOnce(1, tex, m_backend.defaultSampler());
   }
 
-  // Ensure UBO buffers exist prior to recording
-  auto& device = m_backend.device();
-  if (!m_uboLighting) {
-    m_uboLighting =
-      device.createBuffer(sizeof(LightingUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  // Bind dynamic UBOs to the per-frame uniform arena once
+  if (m_dsLighting) {
+    m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
   }
-  if (!m_uboTransforms) {
-    m_uboTransforms =
-      device.createBuffer(sizeof(TransformsUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  if (!m_uboMaterial) {
-    m_uboMaterial =
-      device.createBuffer(sizeof(MaterialUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+  if (m_dsTransforms) {
+    m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(TransformsUBOStd140));
+    m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
   if (!m_uboOIT) {
     m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
@@ -317,13 +327,7 @@ void ZVulkanSpherePipelineContext::ensureDescriptorSets()
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
 
-  if (m_dsLighting && m_uboLighting) {
-    m_dsLighting->writeUniformBufferOnce(0, *m_uboLighting);
-  }
-  if (m_dsTransforms && m_uboTransforms && m_uboMaterial) {
-    m_dsTransforms->writeUniformBufferOnce(0, *m_uboTransforms);
-    m_dsTransforms->writeUniformBufferOnce(1, *m_uboMaterial);
-  }
+  // Dynamic UBOs are already primed above; no per-frame writes needed here.
   if (m_dsOIT && m_uboOIT) {
     m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
   }
@@ -369,13 +373,7 @@ void ZVulkanSpherePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
                                                      const SpherePayload& payload,
                                                      bool pickingPass)
 {
-  auto& device = m_backend.device();
-  if (!m_uboLighting) {
-    m_uboLighting =
-      device.createBuffer(sizeof(LightingUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
+  
 
   LightingUBOStd140 lighting{};
   const auto& scene = renderer.sceneState();
@@ -424,7 +422,11 @@ void ZVulkanSpherePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
     lighting.lights[i].spotDirection = scene.lighting.spotDirection[idx];
   }
 
-  m_uboLighting->copyData(&lighting, sizeof(lighting));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
+    std::memcpy(slice.mapped, &lighting, sizeof(lighting));
+    m_dynLightingOffset = slice.offset;
+  }
 }
 
 void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
@@ -433,19 +435,6 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
                                                       bool pickingPass)
 {
   CHECK(payload.params != nullptr) << "Sphere payload missing params";
-  auto& device = m_backend.device();
-  if (!m_uboTransforms) {
-    m_uboTransforms =
-      device.createBuffer(sizeof(TransformsUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  if (!m_uboMaterial) {
-    m_uboMaterial =
-      device.createBuffer(sizeof(MaterialUBOStd140),
-                          vk::BufferUsageFlagBits::eUniformBuffer,
-                          vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
 
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
 
@@ -464,7 +453,11 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
-  m_uboTransforms->copyData(&transforms, sizeof(transforms));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
+    std::memcpy(slice.mapped, &transforms, sizeof(transforms));
+    m_dynTransformsOffset = slice.offset;
+  }
 
   MaterialUBOStd140 material{};
   const auto& scene = renderer.sceneState();
@@ -477,7 +470,11 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
 
-  m_uboMaterial->copyData(&material, sizeof(material));
+  {
+    auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
+    std::memcpy(slice.mapped, &material, sizeof(material));
+    m_dynMaterialOffset = slice.offset;
+  }
 
   VLOG(2) << fmt::format("VK sphere params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
                          payload.params->sizeScale,

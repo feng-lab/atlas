@@ -10,8 +10,9 @@ ZVulkanDescriptorPool::ZVulkanDescriptorPool(ZVulkanDevice& device)
   : m_device(device)
 {
   // Generous arena to accommodate per-draw override sets in OIT flows.
-  std::array<vk::DescriptorPoolSize, 4> poolSizes{
-    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer,        .descriptorCount = 2048},
+  std::array<vk::DescriptorPoolSize, 5> poolSizes{
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBuffer,        .descriptorCount = 1024},
+    vk::DescriptorPoolSize{.type = vk::DescriptorType::eUniformBufferDynamic, .descriptorCount = 2048},
     vk::DescriptorPoolSize{.type = vk::DescriptorType::eCombinedImageSampler, .descriptorCount = 4096},
     // Add storage buffers for compute workloads (e.g., Block-ID compaction)
     vk::DescriptorPoolSize{.type = vk::DescriptorType::eStorageBuffer,        .descriptorCount = 1024},
