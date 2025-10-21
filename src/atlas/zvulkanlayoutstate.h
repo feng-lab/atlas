@@ -48,13 +48,14 @@ inline LayoutState layoutStateFor(vk::ImageLayout layout)
       return {AccessFlagBits2::eColorAttachmentRead | AccessFlagBits2::eColorAttachmentWrite |
                 AccessFlagBits2::eDepthStencilAttachmentRead | AccessFlagBits2::eDepthStencilAttachmentWrite,
               PipelineStageFlagBits2::eAllGraphics};
-    case vk::ImageLayout::eAttachmentFeedbackLoopOptimalKHR:
+    case vk::ImageLayout::eAttachmentFeedbackLoopOptimalEXT:
       return {AccessFlagBits2::eColorAttachmentRead | AccessFlagBits2::eColorAttachmentWrite |
                 AccessFlagBits2::eDepthStencilAttachmentRead | AccessFlagBits2::eDepthStencilAttachmentWrite |
                 AccessFlagBits2::eShaderRead | AccessFlagBits2::eShaderWrite,
               PipelineStageFlagBits2::eAllGraphics | PipelineStageFlagBits2::eComputeShader};
     case vk::ImageLayout::eFragmentShadingRateAttachmentOptimalKHR:
-      return {AccessFlagBits2::eFragmentShadingRateAttachmentReadKHR, PipelineStageFlagBits2::eFragmentShadingRateAttachmentKHR};
+      return {AccessFlagBits2::eFragmentShadingRateAttachmentReadKHR,
+              PipelineStageFlagBits2::eFragmentShadingRateAttachmentKHR};
     case vk::ImageLayout::eFragmentDensityMapOptimalEXT:
       return {AccessFlagBits2::eFragmentDensityMapReadEXT, PipelineStageFlagBits2::eFragmentDensityProcessEXT};
     case vk::ImageLayout::ePreinitialized:
@@ -69,4 +70,3 @@ inline LayoutState layoutStateFor(vk::ImageLayout layout)
 }
 
 } // namespace nim
-

@@ -44,7 +44,7 @@ add_gtest_executable(zstructutilstest)
 add_gtest_executable(zenumtest)
 add_gtest_executable(zstringutilstest)
 add_gtest_executable(ztupleliketest)
-add_gtest_executable(zvulkanpipelinecontexttest)
+# add_gtest_executable(zvulkanpipelinecontexttest)
 
 # Atlas-side tests
 

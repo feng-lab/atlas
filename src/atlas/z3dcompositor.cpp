@@ -1341,42 +1341,59 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   const auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
   bool imagesIntegratedViaOIT = false;
 
-  auto recordFilterBatchesToSurface =
-    [&](Z3DBoundedFilter* filter,
-        const Z3DScratchResourcePool::RenderTargetLease& target,
-        const glm::uvec2& viewportSize,
-        auto&& renderFn) {
-      if (!filter) {
-        return;
+  auto recordFilterBatchesToSurface = [&](Z3DBoundedFilter* filter,
+                                          const Z3DScratchResourcePool::RenderTargetLease& target,
+                                          const glm::uvec2& viewportSize,
+                                          auto&& renderFn) {
+    if (!filter) {
+      return;
+    }
+    auto& source = filter->rendererBase();
+    const glm::uvec4 previousViewport = source.frameState().viewport;
+    const auto previousSurface = source.frameState().activeSurface;
+    // Describe the target lease into a surface description, then preserve
+    // the per-attachment load/store+clear policy from the current active
+    // surface on the compositor renderer. This ensures that upstream calls
+    // to setActiveSurfaceWithLoadStore (e.g., Clear vs. Load) are honored
+    // when we forward recording through a child filter renderer.
+    auto surfaceCopy = m_rendererBase.describeSurface(target);
+    const auto& active = m_rendererBase.frameState().activeSurface;
+    // Copy color attachment policies when indices align
+    const size_t copyColorCount = std::min(surfaceCopy.colorAttachments.size(), active.colorAttachments.size());
+    for (size_t i = 0; i < copyColorCount; ++i) {
+      surfaceCopy.colorAttachments[i].loadOp = active.colorAttachments[i].loadOp;
+      surfaceCopy.colorAttachments[i].storeOp = active.colorAttachments[i].storeOp;
+      surfaceCopy.colorAttachments[i].clearValue = active.colorAttachments[i].clearValue;
+    }
+    // Depth policy
+    if (surfaceCopy.depthAttachment && active.depthAttachment) {
+      surfaceCopy.depthAttachment->loadOp = active.depthAttachment->loadOp;
+      surfaceCopy.depthAttachment->storeOp = active.depthAttachment->storeOp;
+      surfaceCopy.depthAttachment->clearValue = active.depthAttachment->clearValue;
+    }
+    source.frameState().updateViewportData(glm::uvec4(0u, 0u, viewportSize.x, viewportSize.y));
+    source.setActiveSurfaceWithLoadStore(surfaceCopy, Z3DRendererBase::Preserve);
+    renderFn();
+    auto& batches = source.cpuState().batches;
+    for (auto& batch : batches) {
+      if (batch.pass.colorAttachments.empty() && !surfaceCopy.colorAttachments.empty()) {
+        batch.pass.colorAttachments = surfaceCopy.colorAttachments;
       }
-      auto& source = filter->rendererBase();
-      const glm::uvec4 previousViewport = source.frameState().viewport;
-      const auto previousSurface = source.frameState().activeSurface;
-      const auto surfaceCopy = m_rendererBase.describeSurface(target);
-      source.frameState().updateViewportData(glm::uvec4(0u, 0u, viewportSize.x, viewportSize.y));
-      source.setActiveSurfaceWithLoadStore(surfaceCopy, Z3DRendererBase::Preserve);
-      renderFn();
-      auto& batches = source.cpuState().batches;
-      for (auto& batch : batches) {
-        if (batch.pass.colorAttachments.empty() && !surfaceCopy.colorAttachments.empty()) {
-          batch.pass.colorAttachments = surfaceCopy.colorAttachments;
-        }
-        if (!batch.pass.depthAttachment.has_value() && surfaceCopy.depthAttachment.has_value()) {
-          batch.pass.depthAttachment = surfaceCopy.depthAttachment;
-        }
-        if (batch.pass.viewport.extent == glm::vec2(0.0f)) {
-          batch.pass.viewport.origin = glm::vec2(0.0f, 0.0f);
-          batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewportSize.x),
-                                                 static_cast<float>(viewportSize.y));
-          batch.pass.viewport.minDepth = 0.0f;
-          batch.pass.viewport.maxDepth = 1.0f;
-        }
-        m_rendererBase.appendBatch(std::move(batch));
+      if (!batch.pass.depthAttachment.has_value() && surfaceCopy.depthAttachment.has_value()) {
+        batch.pass.depthAttachment = surfaceCopy.depthAttachment;
       }
-      source.resetCPUState();
-      source.frameState().updateViewportData(previousViewport);
-      source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
-    };
+      if (batch.pass.viewport.extent == glm::vec2(0.0f)) {
+        batch.pass.viewport.origin = glm::vec2(0.0f, 0.0f);
+        batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewportSize.x), static_cast<float>(viewportSize.y));
+        batch.pass.viewport.minDepth = 0.0f;
+        batch.pass.viewport.maxDepth = 1.0f;
+      }
+      m_rendererBase.appendBatch(std::move(batch));
+    }
+    source.resetCPUState();
+    source.frameState().updateViewportData(previousViewport);
+    source.setActiveSurfaceWithLoadStore(previousSurface, Z3DRendererBase::Preserve);
+  };
 
   // Only engage OIT when there is actual transparency to resolve (either
   // geometry with transparent fragments or non-opaque image layers). If we
@@ -1970,7 +1987,6 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
   if (!showHandleFilters.empty()) {
     const glm::uvec2 targetSize = sceneOutLease->descriptor.size;
-    auto& pool = Z3DRenderGlobalState::instance().scratchPool();
     auto handleLease =
       pool.acquireTempRenderTarget2D(targetSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
     CHECK(handleLease && handleLease.backend == RenderBackend::Vulkan)
@@ -2539,7 +2555,22 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
         auto& source = filter->rendererBase();
         const glm::uvec4 previousViewport = source.frameState().viewport;
         const auto previousSurface = source.frameState().activeSurface;
-        const auto surfaceCopy = m_rendererBase.describeSurface(lease);
+        // Describe the lease, then copy per-attachment load/store/clear policy
+        // from the compositor's active surface so CLEAR/LOAD intentions are
+        // preserved for brand-new temp targets.
+        auto surfaceCopy = m_rendererBase.describeSurface(lease);
+        const auto& active = m_rendererBase.frameState().activeSurface;
+        const size_t copyColorCount = std::min(surfaceCopy.colorAttachments.size(), active.colorAttachments.size());
+        for (size_t i = 0; i < copyColorCount; ++i) {
+          surfaceCopy.colorAttachments[i].loadOp = active.colorAttachments[i].loadOp;
+          surfaceCopy.colorAttachments[i].storeOp = active.colorAttachments[i].storeOp;
+          surfaceCopy.colorAttachments[i].clearValue = active.colorAttachments[i].clearValue;
+        }
+        if (surfaceCopy.depthAttachment && active.depthAttachment) {
+          surfaceCopy.depthAttachment->loadOp = active.depthAttachment->loadOp;
+          surfaceCopy.depthAttachment->storeOp = active.depthAttachment->storeOp;
+          surfaceCopy.depthAttachment->clearValue = active.depthAttachment->clearValue;
+        }
         source.frameState().updateViewportData(m_rendererBase.frameState().viewport);
         source.setActiveSurfaceWithLoadStore(surfaceCopy, Z3DRendererBase::Preserve);
         renderFn();

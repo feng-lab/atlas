@@ -42,9 +42,7 @@ inline void cmdEndDebugLabel(vk::raii::CommandBuffer& cmd)
   }
 }
 
-LayoutState resolveStageAccess(vk::PipelineStageFlags2 stage,
-                               vk::AccessFlags2 access,
-                               vk::ImageLayout layout)
+LayoutState resolveStageAccess(vk::PipelineStageFlags2 stage, vk::AccessFlags2 access, vk::ImageLayout layout)
 {
   const LayoutState defaults = layoutStateFor(layout);
   LayoutState resolved = defaults;
@@ -62,8 +60,7 @@ void validateTrackingTexture(const ZVulkanAttachmentInfo& info)
   if (info.trackingTexture == nullptr) {
     return;
   }
-  CHECK(info.trackingTexture->image() == info.image)
-    << "Attachment info image does not match tracking texture.";
+  CHECK(info.trackingTexture->image() == info.image) << "Attachment info image does not match tracking texture.";
 }
 
 vk::ImageAspectFlags resolveAttachmentAspect(const ZVulkanAttachmentInfo& info)
@@ -71,8 +68,7 @@ vk::ImageAspectFlags resolveAttachmentAspect(const ZVulkanAttachmentInfo& info)
   if (info.aspect != vk::ImageAspectFlags{}) {
     return info.aspect;
   }
-  CHECK(info.trackingTexture != nullptr)
-    << "Attachment aspect must be specified when no tracking texture is provided.";
+  CHECK(info.trackingTexture != nullptr) << "Attachment aspect must be specified when no tracking texture is provided.";
   validateTrackingTexture(info);
   return info.trackingTexture->aspectMask();
 }
