@@ -164,7 +164,7 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   ensurePlaceholderTexture();
   const auto& hookPara = renderer.shaderHookPara();
   if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel && m_setPlaceholder) {
-    dsPlaceholderOverride = m_backend.allocateOverrideDescriptorSet(**m_setPlaceholder);
+    dsPlaceholderOverride = m_backend.allocateOverrideDescriptorSet(m_setPlaceholder);
     CHECK(dsPlaceholderOverride != nullptr) << "DDP peel: override descriptor allocation failed (fatal)";
     if (dsPlaceholderOverride) {
       if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
@@ -256,59 +256,17 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
 
 void ZVulkanConePipelineContext::ensureDescriptorLayouts()
 {
-  auto& device = m_backend.device();
-  auto& vkDevice = device.context().device();
-
   if (!m_setPlaceholder) {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
-    };
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                                 .pBindings = bindings.data()};
-    m_setPlaceholder.emplace(vkDevice, createInfo);
+    m_setPlaceholder = m_backend.dualTexturePlaceholderDescriptorSetLayout();
   }
-
   if (!m_setLighting) {
-    vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
-    m_setLighting.emplace(vkDevice, createInfo);
+    m_setLighting = m_backend.lightingDescriptorSetLayout();
   }
-
   if (!m_setTransforms) {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                     .descriptorCount = 1,
-                                     .stageFlags =
-                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                     .descriptorCount = 1,
-                                     .stageFlags =
-                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
-    };
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                                 .pBindings = bindings.data()};
-    m_setTransforms.emplace(vkDevice, createInfo);
+    m_setTransforms = m_backend.transformDescriptorSetLayout();
   }
-
   if (!m_setOIT) {
-    vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
-    m_setOIT.emplace(vkDevice, createInfo);
+    m_setOIT = m_backend.oitDescriptorSetLayout();
   }
 }
 
@@ -317,16 +275,16 @@ void ZVulkanConePipelineContext::ensureDescriptorSets()
   ensureDescriptorLayouts();
 
   if (!m_dsPlaceholder) {
-    m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(**m_setPlaceholder);
+    m_dsPlaceholder = m_backend.allocateFrameDescriptorSet(m_setPlaceholder);
   }
   if (!m_dsLighting) {
-    m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(m_setLighting);
   }
   if (!m_dsTransforms) {
-    m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+    m_dsTransforms = m_backend.allocateFrameDescriptorSet(m_setTransforms);
   }
   if (!m_dsOIT && m_setOIT) {
-    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 
   ensurePlaceholderTexture();
@@ -385,7 +343,7 @@ void ZVulkanConePipelineContext::ensureOITResources()
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_dsOIT && m_setOIT) {
-    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 }
 
@@ -582,7 +540,7 @@ ZVulkanConePipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleList);
-  std::vector<vk::DescriptorSetLayout> layouts{**m_setPlaceholder, **m_setLighting, **m_setTransforms, **m_setOIT};
+  std::vector<vk::DescriptorSetLayout> layouts{m_setPlaceholder, m_setLighting, m_setTransforms, m_setOIT};
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);

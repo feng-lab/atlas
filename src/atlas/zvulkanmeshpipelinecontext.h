@@ -144,11 +144,10 @@ private:
 
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
-  std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
-  std::optional<vk::raii::DescriptorSetLayout> m_setDDPPeel;
-  std::optional<vk::raii::DescriptorSetLayout> m_setLighting;
-  std::optional<vk::raii::DescriptorSetLayout> m_setTransforms;
-  std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3 (OIT params)
+  vk::DescriptorSetLayout m_setTextures{};
+  vk::DescriptorSetLayout m_setLighting{};
+  vk::DescriptorSetLayout m_setTransforms{};
+  vk::DescriptorSetLayout m_setOIT{}; // set = 3 (OIT params)
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTextures;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;

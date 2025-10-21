@@ -338,16 +338,12 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()
   m_setTextures.emplace(vkDevice, createInfo);
   // Empty placeholder layout (for sets 1 and 2 when OIT is used at set=3)
   if (!m_setPlaceholder) {
-    vk::DescriptorSetLayoutCreateInfo emptyInfo{.bindingCount = 0, .pBindings = nullptr};
-    m_setPlaceholder.emplace(vkDevice, emptyInfo);
+    m_setPlaceholder = m_backend.emptyDescriptorSetLayout();
   }
   // OIT params UBO layout (set=3 to match include/oit_params.glslinc)
-  vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                         .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                         .descriptorCount = 1,
-                                         .stageFlags = vk::ShaderStageFlagBits::eFragment};
-  vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
-  m_setOIT.emplace(vkDevice, info);
+  if (!m_setOIT) {
+    m_setOIT = m_backend.oitDescriptorSetLayout();
+  }
 }
 
 void ZVulkanTextureCopyPipelineContext::ensureDescriptorSet()
@@ -355,7 +351,7 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorSet()
   ensureDescriptorLayout();
   // Textures set is persistent or override per-frame; avoid per-frame alloc here
   if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 }
 
@@ -369,7 +365,7 @@ void ZVulkanTextureCopyPipelineContext::ensureOITResources()
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
   if (m_descriptorSetOIT && m_uboOIT) {
     // One-time descriptor write; must happen before recording begins
@@ -463,7 +459,12 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
   if (key.waInit || key.wbInit || key.ddpPeel) {
-    instance.pipeline->setDescriptorSetLayouts({**m_setTextures, **m_setPlaceholder, **m_setPlaceholder, **m_setOIT});
+    auto resolveSuffix = m_backend.weightedResolveDescriptorSuffixLayouts();
+    std::vector<vk::DescriptorSetLayout> layouts;
+    layouts.reserve(1 + resolveSuffix.size());
+    layouts.push_back(**m_setTextures);
+    layouts.insert(layouts.end(), resolveSuffix.begin(), resolveSuffix.end());
+    instance.pipeline->setDescriptorSetLayouts(layouts);
   } else {
     instance.pipeline->setDescriptorSetLayouts({**m_setTextures});
   }

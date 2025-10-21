@@ -191,17 +191,11 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorLayout()
   }
 
   if (!m_setPlaceholder) {
-    vk::DescriptorSetLayoutCreateInfo emptyInfo{.bindingCount = 0, .pBindings = nullptr};
-    m_setPlaceholder.emplace(vkDevice, emptyInfo);
+    m_setPlaceholder = m_backend.emptyDescriptorSetLayout();
   }
 
   if (!m_setOIT) {
-    vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
-    m_setOIT.emplace(vkDevice, info);
+    m_setOIT = m_backend.oitDescriptorSetLayout();
   }
 }
 
@@ -216,7 +210,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorSet()
   }
 
   if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 }
 
@@ -230,7 +224,7 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureOITResources()
   }
   CHECK(m_uboOIT != nullptr) << "WA: failed to allocate OIT UBO";
   if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
   CHECK(m_descriptorSetOIT != nullptr) << "WA: failed to allocate OIT descriptor set";
   if (m_descriptorSetOIT && m_uboOIT) {
@@ -338,7 +332,11 @@ ZVulkanTextureWeightedAveragePipelineContext::ensurePipeline(const PipelineKey& 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
   // Sets: 0 = images, 1/2 = placeholders, 3 = OIT params
-  std::vector<vk::DescriptorSetLayout> layouts{**m_setLayout, **m_setPlaceholder, **m_setPlaceholder, **m_setOIT};
+  auto resolveSuffix = m_backend.weightedResolveDescriptorSuffixLayouts();
+  std::vector<vk::DescriptorSetLayout> layouts;
+  layouts.reserve(1 + resolveSuffix.size());
+  layouts.push_back(**m_setLayout);
+  layouts.insert(layouts.end(), resolveSuffix.begin(), resolveSuffix.end());
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);

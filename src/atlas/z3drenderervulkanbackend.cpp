@@ -103,6 +103,7 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   // Drop shared placeholders; they'll be recreated lazily on next use.
   m_defaultPlaceholder2D.reset();
   m_defaultSampler.reset();
+  m_sharedDescriptorLayouts = {};
   // Finish any in-flight frame before we start tearing resources down.
   if (m_frameRecording && m_activeFrameHandle && m_activeFrameHandle->valid()) {
     try {
@@ -1580,6 +1581,144 @@ vk::Sampler Z3DRendererVulkanBackend::nearestClampSampler()
   return **m_nearestClampSampler;
 }
 
+void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
+{
+  ensureDevice();
+  if (!m_sharedDevice) {
+    return;
+  }
+
+  auto& vkDevice = m_sharedDevice->context().device();
+
+  if (!m_sharedDescriptorLayouts.meshTextures) {
+    std::array<vk::DescriptorSetLayoutBinding, 5> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 2,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 3,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 4,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                           .pBindings = bindings.data()};
+    m_sharedDescriptorLayouts.meshTextures.emplace(vkDevice, info);
+  }
+
+  if (!m_sharedDescriptorLayouts.lighting) {
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
+    m_sharedDescriptorLayouts.lighting.emplace(vkDevice, info);
+  }
+
+  if (!m_sharedDescriptorLayouts.transforms) {
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                     .descriptorCount = 1,
+                                     .stageFlags =
+                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
+    };
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                           .pBindings = bindings.data()};
+    m_sharedDescriptorLayouts.transforms.emplace(vkDevice, info);
+  }
+
+  if (!m_sharedDescriptorLayouts.oitParams) {
+    vk::DescriptorSetLayoutBinding binding{.binding = 0,
+                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
+    m_sharedDescriptorLayouts.oitParams.emplace(vkDevice, info);
+  }
+
+  if (!m_sharedDescriptorLayouts.dualTexturePlaceholder) {
+    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
+      vk::DescriptorSetLayoutBinding{.binding = 0,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
+      vk::DescriptorSetLayoutBinding{.binding = 1,
+                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                                     .descriptorCount = 1,
+                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
+    };
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = static_cast<uint32_t>(bindings.size()),
+                                           .pBindings = bindings.data()};
+    m_sharedDescriptorLayouts.dualTexturePlaceholder.emplace(vkDevice, info);
+  }
+
+  if (!m_sharedDescriptorLayouts.empty) {
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 0, .pBindings = nullptr};
+    m_sharedDescriptorLayouts.empty.emplace(vkDevice, info);
+  }
+}
+
+vk::DescriptorSetLayout Z3DRendererVulkanBackend::meshTextureDescriptorSetLayout()
+{
+  ensureSharedDescriptorLayouts();
+  return m_sharedDescriptorLayouts.meshTextures ? **m_sharedDescriptorLayouts.meshTextures : vk::DescriptorSetLayout{};
+}
+
+vk::DescriptorSetLayout Z3DRendererVulkanBackend::lightingDescriptorSetLayout()
+{
+  ensureSharedDescriptorLayouts();
+  return m_sharedDescriptorLayouts.lighting ? **m_sharedDescriptorLayouts.lighting : vk::DescriptorSetLayout{};
+}
+
+vk::DescriptorSetLayout Z3DRendererVulkanBackend::transformDescriptorSetLayout()
+{
+  ensureSharedDescriptorLayouts();
+  return m_sharedDescriptorLayouts.transforms ? **m_sharedDescriptorLayouts.transforms : vk::DescriptorSetLayout{};
+}
+
+vk::DescriptorSetLayout Z3DRendererVulkanBackend::oitDescriptorSetLayout()
+{
+  ensureSharedDescriptorLayouts();
+  return m_sharedDescriptorLayouts.oitParams ? **m_sharedDescriptorLayouts.oitParams : vk::DescriptorSetLayout{};
+}
+
+vk::DescriptorSetLayout Z3DRendererVulkanBackend::dualTexturePlaceholderDescriptorSetLayout()
+{
+  ensureSharedDescriptorLayouts();
+  return m_sharedDescriptorLayouts.dualTexturePlaceholder ? **m_sharedDescriptorLayouts.dualTexturePlaceholder
+                                                          : vk::DescriptorSetLayout{};
+}
+
+vk::DescriptorSetLayout Z3DRendererVulkanBackend::emptyDescriptorSetLayout()
+{
+  ensureSharedDescriptorLayouts();
+  return m_sharedDescriptorLayouts.empty ? **m_sharedDescriptorLayouts.empty : vk::DescriptorSetLayout{};
+}
+
+std::array<vk::DescriptorSetLayout, 3> Z3DRendererVulkanBackend::weightedResolveDescriptorSuffixLayouts()
+{
+  ensureSharedDescriptorLayouts();
+  return {emptyDescriptorSetLayout(), emptyDescriptorSetLayout(), oitDescriptorSetLayout()};
+}
+
 void Z3DRendererVulkanBackend::ensureSharedSamplers()
 {
   if (!m_sharedDevice) {
@@ -1977,6 +2116,7 @@ void Z3DRendererVulkanBackend::ensureDevice()
   auto* dev = pool.vulkanDevice();
   CHECK(dev != nullptr) << "Shared Vulkan device not injected into scratch pool";
   if (m_sharedDevice != dev) {
+    m_sharedDescriptorLayouts = {};
     m_sharedDevice = dev;
     resetFrameResources();
     // Refresh timestamp period from the new physical device (ns per tick)

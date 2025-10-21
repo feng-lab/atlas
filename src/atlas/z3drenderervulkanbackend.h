@@ -12,6 +12,7 @@
 #include "zvulkanrenderconversions.h"
 #include "z3dtypes.h"
 
+#include <array>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -81,6 +82,17 @@ public:
   ZVulkanTexture& defaultPlaceholderTexture2D();
   vk::Sampler defaultSampler();
   vk::Sampler nearestClampSampler();
+
+  // Shared descriptor set layouts reused across pipeline contexts.
+  vk::DescriptorSetLayout meshTextureDescriptorSetLayout();
+  vk::DescriptorSetLayout lightingDescriptorSetLayout();
+  vk::DescriptorSetLayout transformDescriptorSetLayout();
+  vk::DescriptorSetLayout oitDescriptorSetLayout();
+  vk::DescriptorSetLayout dualTexturePlaceholderDescriptorSetLayout();
+  vk::DescriptorSetLayout emptyDescriptorSetLayout();
+
+  // Suffix layouts used by weighted OIT resolve passes (sets 1-3).
+  std::array<vk::DescriptorSetLayout, 3> weightedResolveDescriptorSuffixLayouts();
 
   void preBackendSwitch() override;
 
@@ -221,6 +233,7 @@ private:
   void ensureDevice();
   void resetFrameResources();
   void ensureDefaultPlaceholders();
+  void ensureSharedDescriptorLayouts();
   struct FrameResources;
   FrameResources& ensureFrameResourcesForKey(void* key);
   struct GpuScopeRecord
@@ -414,6 +427,16 @@ public:
   std::unique_ptr<ZVulkanTexture> m_defaultPlaceholder2D;
   std::optional<vk::raii::Sampler> m_defaultSampler;
   std::optional<vk::raii::Sampler> m_nearestClampSampler;
+
+  struct SharedDescriptorLayouts
+  {
+    std::optional<vk::raii::DescriptorSetLayout> meshTextures;
+    std::optional<vk::raii::DescriptorSetLayout> lighting;
+    std::optional<vk::raii::DescriptorSetLayout> transforms;
+    std::optional<vk::raii::DescriptorSetLayout> oitParams;
+    std::optional<vk::raii::DescriptorSetLayout> dualTexturePlaceholder;
+    std::optional<vk::raii::DescriptorSetLayout> empty;
+  } m_sharedDescriptorLayouts;
 
   // Shared geometry: fullscreen quad VBO
   std::unique_ptr<ZVulkanBuffer> m_fullscreenQuadVbo;

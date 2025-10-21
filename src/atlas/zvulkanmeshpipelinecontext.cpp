@@ -227,7 +227,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
   ZVulkanDescriptorSet* texturesOverride = nullptr;
   if (m_setTextures) {
-    if (auto* drawTex = m_backend.allocateOverrideDescriptorSet(**m_setTextures)) {
+    if (auto* drawTex = m_backend.allocateOverrideDescriptorSet(m_setTextures)) {
       ensurePlaceholderTextures();
       auto sampler = m_backend.defaultSampler();
       if (m_placeholder1D && m_placeholder2D && m_placeholder3D) {
@@ -428,71 +428,17 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
 void ZVulkanMeshPipelineContext::ensureDescriptorLayouts()
 {
-  auto& device = m_backend.device();
-  auto& vkDevice = device.context().device();
-
   if (!m_setTextures) {
-    std::array<vk::DescriptorSetLayoutBinding, 5> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 2,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 3,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 4,
-                                     .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
-    };
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                                 .pBindings = bindings.data()};
-    m_setTextures.emplace(vkDevice, createInfo);
+    m_setTextures = m_backend.meshTextureDescriptorSetLayout();
   }
-
   if (!m_setLighting) {
-    vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
-    m_setLighting.emplace(vkDevice, createInfo);
+    m_setLighting = m_backend.lightingDescriptorSetLayout();
   }
-
   if (!m_setTransforms) {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = 0,
-                                     .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                     .descriptorCount = 1,
-                                     .stageFlags =
-                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment},
-      vk::DescriptorSetLayoutBinding{.binding = 1,
-                                     .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                     .descriptorCount = 1,
-                                     .stageFlags =
-                                       vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment}
-    };
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                                 .pBindings = bindings.data()};
-    m_setTransforms.emplace(vkDevice, createInfo);
+    m_setTransforms = m_backend.transformDescriptorSetLayout();
   }
-
   if (!m_setOIT) {
-    vk::DescriptorSetLayoutBinding binding{.binding = 0,
-                                           .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                           .descriptorCount = 1,
-                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
-    vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = 1, .pBindings = &binding};
-    m_setOIT.emplace(vkDevice, createInfo);
+    m_setOIT = m_backend.oitDescriptorSetLayout();
   }
 }
 
@@ -543,16 +489,16 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
   ensurePlaceholderTextures();
 
   if (!m_dsTextures) {
-    m_dsTextures = m_backend.allocateFrameDescriptorSet(**m_setTextures);
+    m_dsTextures = m_backend.allocateFrameDescriptorSet(m_setTextures);
   }
   if (!m_dsLighting) {
-    m_dsLighting = m_backend.allocateFrameDescriptorSet(**m_setLighting);
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(m_setLighting);
   }
   if (!m_dsTransforms) {
-    m_dsTransforms = m_backend.allocateFrameDescriptorSet(**m_setTransforms);
+    m_dsTransforms = m_backend.allocateFrameDescriptorSet(m_setTransforms);
   }
   if (!m_dsOIT && m_setOIT) {
-    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 
   // Ensure UBO buffers exist before recording
@@ -605,7 +551,7 @@ void ZVulkanMeshPipelineContext::ensureOITResources()
                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
   }
   if (!m_dsOIT && m_setOIT) {
-    m_dsOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
+    m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 }
 
@@ -893,7 +839,7 @@ ZVulkanMeshPipelineContext::ensurePipeline(const PipelineKey& key, const vulkan:
 
   auto vertexInput = makeSoAMeshVertexInput(key.colorSource);
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, toVkTopology(key.meshType));
-  std::vector<vk::DescriptorSetLayout> layouts{**m_setTextures, **m_setLighting, **m_setTransforms, **m_setOIT};
+  std::vector<vk::DescriptorSetLayout> layouts{m_setTextures, m_setLighting, m_setTransforms, m_setOIT};
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setDescriptorSetLayouts(layouts);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
