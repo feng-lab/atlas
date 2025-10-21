@@ -103,6 +103,7 @@ void Z3DRendererVulkanBackend::preBackendSwitch()
   // Drop shared placeholders; they'll be recreated lazily on next use.
   m_defaultPlaceholder2D.reset();
   m_defaultSampler.reset();
+  m_sharedDescriptorLayouts = {};
   // Finish any in-flight frame before we start tearing resources down.
   if (m_frameRecording && m_activeFrameHandle && m_activeFrameHandle->valid()) {
     try {
@@ -2115,6 +2116,7 @@ void Z3DRendererVulkanBackend::ensureDevice()
   auto* dev = pool.vulkanDevice();
   CHECK(dev != nullptr) << "Shared Vulkan device not injected into scratch pool";
   if (m_sharedDevice != dev) {
+    m_sharedDescriptorLayouts = {};
     m_sharedDevice = dev;
     resetFrameResources();
     // Refresh timestamp period from the new physical device (ns per tick)
