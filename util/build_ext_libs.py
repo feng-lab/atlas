@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def macos_min_version():
-    return '11.0'
+    return '12.0'
 
 
 def cpp_standard() -> int:

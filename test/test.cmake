@@ -22,6 +22,16 @@ macro(add_gtest_executable test_name)
 endmacro()
 
 
+# Atlas-aware test: links against the Atlas static library, exporting
+# all required include dirs and link dependencies (Qt, glbinding, etc.).
+macro(add_atlas_gtest_executable test_name)
+  add_executable(${test_name} ${CMAKE_CURRENT_LIST_DIR}/${test_name}.cpp)
+  target_link_libraries(${test_name} PRIVATE GTest::gtest_main atlas_lib)
+  target_compile_definitions(${test_name} PRIVATE ATLAS_TEST_DATA_DIR="${CMAKE_CURRENT_LIST_DIR}/../atlas_test_data")
+  gtest_discover_tests(${test_name} DISCOVERY_TIMEOUT 600)
+endmacro()
+
+
 add_gtest_executable(zclustertest)
 add_gtest_executable(zfilereadtest)
 add_gtest_executable(zimageaffinetransformtest)
@@ -44,7 +54,10 @@ add_gtest_executable(zstructutilstest)
 add_gtest_executable(zenumtest)
 add_gtest_executable(zstringutilstest)
 add_gtest_executable(ztupleliketest)
-# add_gtest_executable(zvulkanpipelinecontexttest)
+
+# Vulkan RAII pipeline recorder debug checks (debug-only assertions in code)
+# This test only exercises header + a few .cpp symbols; there is no GPU work.
+add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 
 # Atlas-side tests
 

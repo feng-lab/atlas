@@ -227,7 +227,7 @@ else (WIN32)
                          -Wno-absolute-value
                          -Wno-unused-but-set-variable -Wno-format)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option -Wno-sometimes-uninitialized)
+    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option -Wno-sometimes-uninitialized -Wno-gnu-folding-constant)
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-old-style-declaration -Wno-implicit-fallthrough
                            -Wno-unused-result -Wno-format -Wno-maybe-uninitialized -Wno-strict-aliasing
