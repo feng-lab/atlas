@@ -115,13 +115,6 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
 
   const vk::ImageAspectFlags aspect = resolveAttachmentAspect(info);
 
-  if (effectiveOld == newLayout && effectiveOld != vk::ImageLayout::eUndefined) {
-    if (info.trackingTexture != nullptr) {
-      info.trackingTexture->overrideCurrentLayout(newLayout);
-    }
-    return;
-  }
-
   // Diagnostics to help trace unexpected layout state.
   if (VLOG_IS_ON(2)) {
     VLOG(2) << fmt::format(
@@ -138,6 +131,8 @@ void transitionImage(vk::raii::CommandBuffer& cmd,
   const LayoutState srcState = resolveStageAccess(info.srcStage, info.srcAccess, effectiveOld);
   const LayoutState dstState = resolveStageAccess(dstStage, dstAccess, newLayout);
 
+  // Always emit the barrier, even when layouts match, so color/depth writes are
+  // made visible to subsequent passes and our tracker stays in sync.
   vk::ImageMemoryBarrier2 barrier{.srcStageMask = srcState.stage,
                                   .srcAccessMask = srcState.access,
                                   .dstStageMask = dstState.stage,
@@ -167,13 +162,6 @@ void transitionToFinal(vk::raii::CommandBuffer& cmd,
   validateTrackingTexture(info);
   const vk::ImageAspectFlags aspect = resolveAttachmentAspect(info);
 
-  if (oldLayout == info.finalLayout && oldLayout != vk::ImageLayout::eUndefined) {
-    if (info.trackingTexture != nullptr) {
-      info.trackingTexture->overrideCurrentLayout(info.finalLayout);
-    }
-    return;
-  }
-
   if (VLOG_IS_ON(2)) {
     VLOG(2) << fmt::format("transitionToFinal(pass='{}'): img=0x{:x} old={} new={} aspect=0x{:x}",
                            g_currentTransitionLabel.empty() ? std::string("<unlabeled-pass>")
@@ -187,6 +175,8 @@ void transitionToFinal(vk::raii::CommandBuffer& cmd,
   const LayoutState srcState = resolveStageAccess(oldStage, oldAccess, oldLayout);
   const LayoutState dstState = resolveStageAccess(info.dstStage, info.dstAccess, info.finalLayout);
 
+  // Layout equality still requires a dependency; keep the barrier so writes from
+  // this pass are visible when the attachment is reused.
   vk::ImageMemoryBarrier2 barrier{.srcStageMask = srcState.stage,
                                   .srcAccessMask = srcState.access,
                                   .dstStageMask = dstState.stage,
