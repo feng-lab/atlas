@@ -220,3 +220,5 @@ src/neurolabi/python/QMakeParser.pyc
 
 # Vulkan compiled SPIR-V outputs (built by CMake)
 src/atlas/Resources/shader/vulkan/spv/
+
+.gradle/

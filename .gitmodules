@@ -74,6 +74,7 @@
 	path = src/3rdparty/fmt
 	url = https://github.com/fmtlib/fmt.git
 	branch = master
+	ignore = dirty
 [submodule "src/3rdparty/libevent"]
 	path = src/3rdparty/libevent
 	url = https://github.com/libevent/libevent.git
