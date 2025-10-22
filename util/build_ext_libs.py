@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def macos_min_version():
-    return '11.0'
+    return '12.0'
 
 
 def cpp_standard() -> int:
@@ -1278,7 +1278,6 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                         r'find_package(LibUnwind)' if is_mac() else '',
                         r'set(FOLLY_USE_SYMBOLIZER ON)',
                         r'    regex',
-                        r'    system',
                         ],
             to_texts=[r'',
                       r'',
@@ -1303,7 +1302,6 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                       r'find_package(LIBURING)',
                       r'find_package(LIBUNWIND)',
                       r'set(FOLLY_USE_SYMBOLIZER OFF)',
-                      r'',
                       r'',
                       ],
         ),
@@ -2100,6 +2098,11 @@ def build_itk(src_dir: str, install_dir: str):
                                    'nifti1_io.c'),
             from_texts=[r'#include <limits.h>'],
             to_texts=['#include <limits.h>\n#include <stdint.h>'],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, 'Modules', 'ThirdParty', 'Eigen3', 'CMakeLists.txt'),                                  
+            from_texts=[r'set(_Eigen3_min_version 3.3)'],
+            to_texts=[r'set(_Eigen3_min_version 5)'],
         ),
     ]
     patch_manager = PatchManager(patches)

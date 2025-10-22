@@ -17,7 +17,7 @@ MODULES = $(SRCS:.c=.o)
 MODULES := $(MODULES:.cpp=.o)
 
 # C flags
-CFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -w -mmacosx-version-min=11.0 -fno-define-target-os-macros -arch x86_64 -arch arm64 -DPNG_ARM_NEON_OPT=0 -Wno-error=implicit-function-declaration
+CFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -w -mmacosx-version-min=12.0 -fno-define-target-os-macros -arch x86_64 -arch arm64 -DPNG_ARM_NEON_OPT=0 -Wno-error=implicit-function-declaration
 # OpenJPEG
 CFLAGS += -DOPJ_STATIC
 # LibRaw
@@ -27,7 +27,7 @@ CFLAGS += -DDISABLE_PERF_MEASUREMENT -D__ANSI__
 CFLAGS += $(INCLUDE)
 
 # C++ flags
-CXXFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -Wno-ctor-dtor-privacy -w -mmacosx-version-min=11.0 -fno-define-target-os-macros -stdlib=libc++ -std=c++14 -fvisibility-inlines-hidden -arch x86_64 -arch arm64
+CXXFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -Wno-ctor-dtor-privacy -w -mmacosx-version-min=12.0 -fno-define-target-os-macros -stdlib=libc++ -std=c++14 -fvisibility-inlines-hidden -arch x86_64 -arch arm64
 # LibJXR
 CXXFLAGS += -D__ANSI__
 CXXFLAGS += $(INCLUDE)
@@ -72,7 +72,7 @@ $(STATICLIB): $(MODULES)
 	$(AR) r $@ $(MODULES)
 
 $(SHAREDLIB): $(MODULES)
-	$(CXX) -arch x86_64 -arch arm64 -dynamiclib -mmacosx-version-min=11.0 -Wl,-headerpad_max_install_names -install_name @rpath/$(LIBNAME) -current_version $(VER_MAJOR).$(VER_MINOR) -compatibility_version $(VER_MAJOR) $(LDFLAGS) -o $@ $(MODULES)
+	$(CXX) -arch x86_64 -arch arm64 -dynamiclib -mmacosx-version-min=12.0 -Wl,-headerpad_max_install_names -install_name @rpath/$(LIBNAME) -current_version $(VER_MAJOR).$(VER_MINOR) -compatibility_version $(VER_MAJOR) $(LDFLAGS) -o $@ $(MODULES)
 
 install:
 	install -d $(INCDIR) $(INSTALLDIR)

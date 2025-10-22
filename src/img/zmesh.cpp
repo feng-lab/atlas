@@ -111,7 +111,7 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh& mesh)
 
   vtkSmartPointer<vtkCellArray> polys = vtkSmartPointer<vtkCellArray>::New();
   size_t numTriangles = mesh.numTriangles();
-  polys->Allocate(numTriangles * 3);
+  polys->AllocateEstimate(numTriangles, 3);
   vtkIdType pts[3];
   for (size_t i = 0; i < numTriangles; ++i) {
     glm::uvec3 tri = mesh.triangleIndices(i);

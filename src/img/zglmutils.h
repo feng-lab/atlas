@@ -12,7 +12,7 @@
 #if defined(__aarch64__) || defined(_M_ARM64)
 #define GLM_FORCE_NEON
 #else
-#define GLM_FORCE_INTRINSICS
+#define GLM_FORCE_AVX
 #endif
 // #define GLM_FORCE_INLINE
 #define GLM_FORCE_SIZE_T_LENGTH

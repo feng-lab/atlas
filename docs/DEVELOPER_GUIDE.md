@@ -9,6 +9,16 @@ Build, Run, and Layout
   - `docs/` — documentation
   - `util/` — build scripts
 
+Testing (Linking Atlas Code)
+
+- Atlas is still a Qt GUI app, but common code is now compiled into an object library `atlas_objs` and archived as a static library `atlas_lib`.
+- Tests can link `atlas_lib` to access internal headers and compiled objects without turning the app itself into a library.
+- Usage in CMake (already wired in `test/test.cmake`):
+  - `add_atlas_gtest_executable(name)` links `GTest::gtest_main` and `atlas_lib`, inheriting all include dirs/defs (Qt, glbinding, Vulkan, etc.).
+  - For headless Qt runs, the tests default to `QT_QPA_PLATFORM=minimal`.
+- Runtime resources (shaders/assets) remain app-packaged; unit tests around Vulkan/RAII pipeline contracts do not depend on runtime discovery.
+- GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.
+
 Architecture Overview
 
 - Main window (`ZMainWindow`) — 2D UI; hosts object manager, docks, menus.

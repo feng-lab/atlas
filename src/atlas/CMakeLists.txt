@@ -638,25 +638,56 @@ set(SOURCES
 
 # our target
 set(APP_NAME Atlas)
-add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
-               ${SYS_SOURCES}
-               ${QTCSV_SOURCES}
-               ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
-               ${SOURCES} ${FORMS} ${RESOURCES} ${ASSETS}
-               ${PROTO_SRCS} ${GRPC_SRCS})
 
-add_dependencies(${APP_NAME} vulkan_shaders)
+set(ATLAS_SOURCES_NO_MAIN ${SOURCES})
+list(REMOVE_ITEM ATLAS_SOURCES_NO_MAIN main.cpp)
 
-target_include_directories(${APP_NAME} SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${APP_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
-target_include_directories(${APP_NAME} PRIVATE ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
+# Static library that compiles all Atlas sources (except main) for reuse by tests and the app.
+add_library(atlas_lib STATIC
+            ${SYS_SOURCES}
+            ${QTCSV_SOURCES}
+            ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
+            ${ATLAS_SOURCES_NO_MAIN} ${FORMS} ${RESOURCES}
+            ${PROTO_SRCS} ${GRPC_SRCS})
+
+add_dependencies(atlas_lib vulkan_shaders)
+
+target_include_directories(atlas_lib
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(atlas_lib
+  SYSTEM PRIVATE
+    ${QTCSVDIR} ${QTCSVDIR}/include
+    ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 if (WIN32)
-  target_include_directories(${APP_NAME} PRIVATE $ENV{VULKAN_SDK}/Include)
+  target_include_directories(atlas_lib PUBLIC $ENV{VULKAN_SDK}/Include)
 else ()
-  target_include_directories(${APP_NAME} PRIVATE $ENV{VULKAN_SDK}/include) # do not use Vulkan::Headers, which might point to /usr/include
+  # Do not use Vulkan::Headers, which might point to /usr/include
+  target_include_directories(atlas_lib PUBLIC $ENV{VULKAN_SDK}/include)
 endif ()
-target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE)
+target_compile_definitions(atlas_lib PUBLIC ATLAS_USE_CORE_PROFILE)
+
+target_link_libraries(atlas_lib PUBLIC
+  img neutu
+  glbinding::glbinding-aux glbinding::glbinding
+  ${OpenCV_LIBS}
+  gflags::gflags
+  Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
+  Qt6::CorePrivate Qt6::Test
+  gRPC::grpc++ protobuf::libprotobuf)
+if (UNIX AND NOT APPLE)
+  target_link_libraries(atlas_lib PUBLIC OpenGL::OpenGL OpenGL::EGL)
+endif ()
+if (ATLAS_USE_OPENGLWIDGET)
+  target_link_libraries(atlas_lib PUBLIC Qt6::OpenGLWidgets)
+endif ()
+
+# Final application links the object files plus the entry point and assets.
+add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
+               main.cpp
+               ${ASSETS})
+add_dependencies(${APP_NAME} vulkan_shaders)
 if (WIN32)
   set_source_files_properties(${LIBQXTDIR}/core/qxtcsvmodel.cpp PROPERTIES COMPILE_FLAGS /wd4458) # declaration of 'd_ptr' hides class member
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
@@ -873,19 +904,5 @@ else (WIN32)
   endif ()
 endif (WIN32)
 
-target_link_libraries(${APP_NAME} PUBLIC img neutu
-                      glbinding::glbinding-aux glbinding::glbinding
-                      ${OpenCV_LIBS}
-                      Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
-                      Qt6::CorePrivate Qt6::Test
-                      gRPC::grpc++ protobuf::libprotobuf
-                      # RocksDB::rocksdb
-)
-
-if (UNIX AND NOT APPLE)
-  target_link_libraries(${APP_NAME} PRIVATE OpenGL::OpenGL OpenGL::EGL)
-endif ()
-
-if (ATLAS_USE_OPENGLWIDGET)
-  target_link_libraries(${APP_NAME} PRIVATE Qt6::OpenGLWidgets)
-endif ()
+# The app consumes the static library (keeps link dependencies centralized).
+target_link_libraries(${APP_NAME} PUBLIC atlas_lib)
