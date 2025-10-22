@@ -1480,7 +1480,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                   eye,
                                   /*includeGeometry*/ false,
                                   /*clearAtStart*/ true,
-                                  /*drawBackground*/ true);
+                                  /*drawBackground*/ m_showBackground.get());
     auto dispatchOIT =
       [&](Z3DScratchResourcePool::RenderTargetLease& lease, AttachmentHandle depthHandle, bool clearResolve) {
         switch (transparencyMode) {
@@ -1563,6 +1563,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                    LoadOp::Clear,
                                                    StoreOp::Store);
       vlogVulkanLease("transparency_resolve", *sceneOutLease);
+      m_alphaBlendRenderer.setEnableFixedBlend(false);
       recordInVulkanFrame(
         m_rendererBase,
         [&]() {
@@ -1580,7 +1581,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                   eye,
                                   /*includeGeometry*/ true,
                                   /*clearAtStart*/ true,
-                                  /*drawBackground*/ true);
+                                  /*drawBackground*/ m_showBackground.get());
   }
 
   auto applyGlowOverlay = [&](const std::vector<Z3DBoundedFilter*>& filters) {
@@ -1755,6 +1756,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           imagesCompositedToFinal = true;
         }
 
+        m_alphaBlendRenderer.setEnableFixedBlend(m_showBackground.get());
         recordInVulkanFrame(
           m_rendererBase,
           [&]() {
@@ -1847,6 +1849,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           imagesCompositedToFinal = true;
         }
 
+        m_alphaBlendRenderer.setEnableFixedBlend(m_showBackground.get());
         recordInVulkanFrame(
           m_rendererBase,
           [&]() {
@@ -1925,6 +1928,10 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                    LoadOp::Clear,
                                                    StoreOp::Store);
 
+      // Overlay on-top content over the scene. In GL, blending is enabled
+      // only when the background is drawn to the destination first. Mirror
+      // that: enable fixed-function blending iff background is shown.
+      m_firstOnTopBlendRenderer.setEnableFixedBlend(m_showBackground.get());
       recordInVulkanFrame(
         m_rendererBase,
         [&]() {
@@ -1933,6 +1940,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
           m_rendererBase.renderVulkan(eye, m_firstOnTopBlendRenderer);
         },
         "on_top_overlay_blend");
+      m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
 
       // Apply glow for on-top filters
       applyGlowOverlay(onTopTransparentFilters);
@@ -2059,6 +2067,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         const auto opaqueHandles = handlesFromLease(onTopOpaqueLease);
         const auto transHandles = handlesFromLease(onTopTransLease);
 
+        m_alphaBlendRenderer.setEnableFixedBlend(false);
         recordInVulkanFrame(
           m_rendererBase,
           [&]() {
@@ -2112,6 +2121,10 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                        StoreOp::Store);
         }
 
+        // First-on-top blend over scene temp into final (no SS) or composite (SS).
+        // Destination may or may not already include background; we do not need
+        // an extra blend here because the shader composes overlay+scene.
+        m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
         recordInVulkanFrame(
           m_rendererBase,
           [&]() {
@@ -2190,19 +2203,30 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         sceneCompositeLease =
           pool.acquireTempRenderTarget2D(ssSize, ScratchFormat::RGBA16, ScratchFormat::Depth32F, RenderBackend::Vulkan);
       }
+      // Supersampled path always composites into a fresh intermediate
       m_rendererBase.setActiveSurfaceWithLoadStore(sceneCompositeLease,
                                                    LoadOp::Clear,
                                                    StoreOp::Store,
                                                    LoadOp::Clear,
                                                    StoreOp::Store);
     } else {
-      // Clear the final surface before composing; the compositor writes full-screen
+      // GL draws the scene (background + geometry) first, then overlays
+      // the handles on top. In Vulkan, depending on earlier passes we may
+      // already have composed content in the final surface (e.g., when an
+      // earlier image/overlay path wrote directly to the output). Clearing
+      // here would darken/erase that background before the compositor
+      // shader mixes the handle+scene textures, making the result look
+      // darker compared to GL. Preserve any existing color in that case.
+      const bool havePriorFinalContent = (!supersample2x2 && (haveOnTop || imagesCompositedToFinal));
       m_rendererBase.setActiveSurfaceWithLoadStore(*outLease,
-                                                   LoadOp::Clear,
+                                                   havePriorFinalContent ? LoadOp::Load : LoadOp::Clear,
                                                    StoreOp::Store,
                                                    LoadOp::Clear,
                                                    StoreOp::Store);
     }
+    // Handle overlay composes handle over scene in-shader; do not enable
+    // fixed-function blending to avoid a second blend.
+    m_firstOnTopBlendRenderer.setEnableFixedBlend(false);
     recordInVulkanFrame(
       m_rendererBase,
       [&]() {

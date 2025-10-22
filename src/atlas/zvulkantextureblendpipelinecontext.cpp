@@ -105,6 +105,7 @@ void ZVulkanTextureBlendPipelineContext::record(Z3DRendererBase& renderer,
 
   PipelineKey key;
   key.mode = payload.mode;
+  key.enableBlend = payload.enableFixedBlend;
   key.colorFormats = formats.colorFormats;
   key.depthFormat = formats.depthFormat;
 
@@ -242,22 +243,26 @@ ZVulkanTextureBlendPipelineContext::ensurePipeline(const PipelineKey& key, const
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
+  // Depth: compositor writes gl_FragDepth; use Always and write enabled.
   instance.pipeline->setDepthTestEnable(true);
   instance.pipeline->setDepthCompareOp(vk::CompareOp::eAlways);
   instance.pipeline->setDepthWriteEnable(true);
 
-  // Final compositor pass needs premultiplied alpha blending over the
-  // already-rendered background, matching the GL path.
+  // Color blending: select at pipeline creation time based on per-draw key.
   vk::PipelineColorBlendAttachmentState blendAttachment{};
-  blendAttachment.blendEnable = true;
-  blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
-  blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-  blendAttachment.colorBlendOp = vk::BlendOp::eAdd;
-  blendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
-  blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
-  blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
   blendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+  if (key.enableBlend) {
+    blendAttachment.blendEnable = VK_TRUE;
+    blendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;             // premultiplied alpha
+    blendAttachment.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+    blendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+    blendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    blendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+    blendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
+  } else {
+    blendAttachment.blendEnable = VK_FALSE;
+  }
   instance.pipeline->setColorBlendAttachment(blendAttachment);
 
   vk::SpecializationMapEntry entry{.constantID = 60, .offset = 0, .size = sizeof(int)};

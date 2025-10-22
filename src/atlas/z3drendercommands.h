@@ -496,6 +496,10 @@ struct TextureBlendPayload
   AttachmentHandle depthAttachmentHandle0;
   AttachmentHandle colorAttachmentHandle1;
   AttachmentHandle depthAttachmentHandle1;
+  // Match GL: some compositor draws are issued with fixed-function blending
+  // enabled (premultiplied ONE, ONE_MINUS_SRC_ALPHA) and some without. Carry
+  // the intent per draw so Vulkan can select the proper pipeline state.
+  bool enableFixedBlend = false;
 };
 
 struct TextureGlowPayload

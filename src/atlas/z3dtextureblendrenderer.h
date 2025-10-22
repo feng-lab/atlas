@@ -60,6 +60,14 @@ public:
 
   void setBlendMode(TextureBlendMode mode);
 
+  // Control whether the Vulkan path should enable fixed-function blending for
+  // this draw (premultiplied ONE, ONE_MINUS_SRC_ALPHA). GL toggles blending
+  // around these draws; mirror that per-draw intent here.
+  void setEnableFixedBlend(bool v)
+  {
+    m_enableFixedBlend = v;
+  }
+
 protected:
   void compile() override;
 
@@ -95,6 +103,7 @@ protected:
 
   TextureBlendMode m_blendMode;
   std::unique_ptr<Z3DVertexArrayObject> m_VAO;
+  bool m_enableFixedBlend = false;
 };
 
 } // namespace nim

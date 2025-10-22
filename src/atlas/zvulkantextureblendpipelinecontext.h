@@ -48,12 +48,13 @@ private:
   struct PipelineKey
   {
     TextureBlendMode mode = TextureBlendMode::DepthTestBlending;
+    bool enableBlend = false; // fixed-function blend enable (premultiplied)
     std::vector<vk::Format> colorFormats;
     std::optional<vk::Format> depthFormat;
 
     auto tie() const
     {
-      return std::tuple(static_cast<int>(mode), colorFormats, depthFormat);
+      return std::tuple(static_cast<int>(mode), enableBlend, colorFormats, depthFormat);
     }
 
     bool operator<(const PipelineKey& rhs) const

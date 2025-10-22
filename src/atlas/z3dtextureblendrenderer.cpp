@@ -82,6 +82,7 @@ TextureBlendPayload Z3DTextureBlendRenderer::buildTextureBlendPayload() const
   payload.depthAttachmentHandle0 = m_depthAttachmentHandle0;
   payload.colorAttachmentHandle1 = m_colorAttachmentHandle1;
   payload.depthAttachmentHandle1 = m_depthAttachmentHandle1;
+  payload.enableFixedBlend = m_enableFixedBlend;
   return payload;
 }
 
