@@ -676,6 +676,14 @@ target_include_directories(atlas_core
   SYSTEM PRIVATE
     ${QTCSVDIR} ${QTCSVDIR}/include
     ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
+# Vulkan headers are required transitively by some core sources/headers (e.g. zvulkan*.h
+# included from renderer base). Ensure the SDK include path is visible to atlas_core too.
+if (WIN32)
+  target_include_directories(atlas_core PUBLIC $ENV{VULKAN_SDK}/Include)
+else ()
+  # Do not use Vulkan::Headers, which might point to /usr/include
+  target_include_directories(atlas_core PUBLIC $ENV{VULKAN_SDK}/include)
+endif ()
 target_compile_definitions(atlas_core PUBLIC ATLAS_USE_CORE_PROFILE)
 
 target_link_libraries(atlas_core PUBLIC
