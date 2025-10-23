@@ -167,7 +167,6 @@ struct ChannelInputs
 
 ZVulkanImgSlicePipelineContext::ZVulkanImgSlicePipelineContext(Z3DRendererVulkanBackend& backend)
   : m_backend(backend)
-  , m_imageBlockUploader(std::make_unique<ZVulkanPagedImageBlockUploader>(backend.device()))
 {}
 
 ZVulkanImgSlicePipelineContext::~ZVulkanImgSlicePipelineContext() = default;
@@ -204,7 +203,12 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  if (m_imageBlockUploader) {
+  const bool usePaging = !payload.fastPathOnly && payload.image->isVolumeDownsampled();
+  if (usePaging) {
+    if (!m_imageBlockUploader) {
+      // Device is guaranteed to be available after beginRender() ensured it on the backend.
+      m_imageBlockUploader = std::make_unique<ZVulkanPagedImageBlockUploader>(m_backend.device());
+    }
     m_imageBlockUploader->bindToImage(*payload.image);
   }
   const size_t channelCount = payload.image->numChannels();
@@ -223,7 +227,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     return;
   }
 
-  const bool usePaging = !payload.fastPathOnly && payload.image->isVolumeDownsampled();
+  // usePaging computed above
 
   // Gather attachment formats to build pipelines.
   const auto formats = vulkan::extractAttachmentFormats(batch);

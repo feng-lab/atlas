@@ -141,7 +141,7 @@ void Z3DSphereRenderer::renderUsingOpengl()
   for (size_t i = 0; i < m_pointAndRadius.size(); i += 4) {
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
-    glm::vec3 loc = glm::applyMatrix(coordTransform(), glm::vec3(m_pointAndRadius[i].xyz()));
+    glm::vec3 loc = glm::applyMatrix(coordTransform(), m_pointAndRadius[i].xyz());
     glTranslatef(loc.x, loc.y, loc.z);
     float diameter = m_pointAndRadius[i].w * sizeScale() * 2;
     glScalef(diameter, diameter, diameter);
@@ -170,7 +170,7 @@ void Z3DSphereRenderer::renderPickingUsingOpengl()
   for (size_t i = 0; i < m_pointAndRadius.size(); i += 4) {
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
-    glm::vec3 loc = glm::applyMatrix(coordTransform(), glm::vec3(m_pointAndRadius[i].xyz()));
+    glm::vec3 loc = glm::applyMatrix(coordTransform(), m_pointAndRadius[i].xyz());
     glTranslatef(loc.x, loc.y, loc.z);
     float radius = m_pointAndRadius[i].w * sizeScale();
     glScalef(radius, radius, radius);

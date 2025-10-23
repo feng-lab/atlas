@@ -251,6 +251,11 @@ ZVulkanContext::ZVulkanContext()
                              VK_VERSION_MINOR(apiVersion),
                              VK_VERSION_PATCH(apiVersion));
 
+    // Enforce minimum Vulkan 1.3 at the instance level
+    if (apiVersion < VK_MAKE_API_VERSION(0, 1, 3, 0)) {
+      throw ZException("Require Vulkan 1.3 (enumerated instance version < 1.3)");
+    }
+
     createInstance();
     setupDebugMessenger();
     pickPhysicalDevice();
@@ -426,9 +431,9 @@ void ZVulkanContext::pickPhysicalDevice()
 
     LOG(INFO) << "-------------------------";
 
-    // Check if device supports required features
-    if (deviceProperties.apiVersion < VK_MAKE_API_VERSION(0, 1, 2, 0)) {
-      LOG(INFO) << "  Device doesn't support Vulkan 1.2, skipping";
+    // Require Vulkan 1.3 device support
+    if (deviceProperties.apiVersion < VK_MAKE_API_VERSION(0, 1, 3, 0)) {
+      LOG(INFO) << "  Device doesn't support Vulkan 1.3, skipping";
       continue;
     }
 
@@ -496,13 +501,7 @@ bool ZVulkanContext::checkDeviceExtensionSupport(vk::raii::PhysicalDevice& physi
   requiredExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
 #endif
 
-  // Add required extensions for functionality
-  auto deviceProperties = physicalDevice.getProperties();
-  if (deviceProperties.apiVersion < VK_MAKE_API_VERSION(0, 1, 3, 0)) {
-    // For Vulkan 1.2, we need these extensions to get 1.3-like functionality
-    requiredExtensions.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-    requiredExtensions.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-  }
+  // No functional device extensions are required when targeting Vulkan 1.3 minimum.
 
   // Check if all required extensions are supported
   for (const auto& requiredExt : requiredExtensions) {
@@ -565,44 +564,27 @@ void ZVulkanContext::createLogicalDevice()
   enabledPhysicalDeviceFeatures2.features.fillModeNonSolid = physicalDeviceFeatures.fillModeNonSolid;
   // Enable independentBlend if supported to allow per-attachment blend state
   enabledPhysicalDeviceFeatures2.features.independentBlend = physicalDeviceFeatures.independentBlend;
+  // Allow storage buffer/image writes in fragment shader when supported
+  enabledPhysicalDeviceFeatures2.features.fragmentStoresAndAtomics = physicalDeviceFeatures.fragmentStoresAndAtomics;
 
   if (FLAGS_atlas_debug_vulkan) {
     enabledPhysicalDeviceFeatures2.features.robustBufferAccess = physicalDeviceFeatures.robustBufferAccess;
   }
 
-  // Get device properties to determine API version
-  auto deviceProperties = m_physicalDevices[0].getProperties();
-
   // Enable required extensions
   std::vector<const char*> enabledExtensions;
 
-  if (deviceProperties.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0)) {
-    // Enable Vulkan 1.3 features
-    enabledPhysicalDeviceVulkan13Features.dynamicRendering = true;
-    enabledPhysicalDeviceVulkan13Features.synchronization2 = true;
-    // Enable useful 1.2 features via the 1.2 struct in the chain when supported
-    enabledPhysicalDeviceVulkan12Features.separateDepthStencilLayouts =
-      physicalDeviceVulkan12Features.separateDepthStencilLayouts;
-    // Allow relaxed uniform buffer layouts used by some shaders (std430-like in uniform buffers)
-    // This matches SPIR-V validation guidance for our block-ID UBO.
-    enabledPhysicalDeviceVulkan12Features.uniformBufferStandardLayout =
-      physicalDeviceVulkan12Features.uniformBufferStandardLayout;
-    enabledPhysicalDeviceVulkan12Features.scalarBlockLayout = physicalDeviceVulkan12Features.scalarBlockLayout;
-  } else {
-    // For Vulkan 1.2, use extensions
-    enabledPhysicalDeviceVulkan12Features.descriptorIndexing = true;
-    enabledPhysicalDeviceVulkan12Features.bufferDeviceAddress = true;
-    enabledPhysicalDeviceVulkan12Features.separateDepthStencilLayouts =
-      physicalDeviceVulkan12Features.separateDepthStencilLayouts;
-    enabledPhysicalDeviceVulkan12Features.uniformBufferStandardLayout =
-      physicalDeviceVulkan12Features.uniformBufferStandardLayout;
-    enabledPhysicalDeviceVulkan12Features.scalarBlockLayout = physicalDeviceVulkan12Features.scalarBlockLayout;
-    enabledFeatures2.unlink<vk::PhysicalDeviceVulkan13Features>();
-
-    auto deviceExtensionProperties = m_physicalDevices[0].enumerateDeviceExtensionProperties();
-    addRequiredExtension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, enabledExtensions, deviceExtensionProperties, false);
-    addRequiredExtension(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME, enabledExtensions, deviceExtensionProperties, false);
-  }
+  // Vulkan 1.3 is required; enable 1.3 core features directly
+  enabledPhysicalDeviceVulkan13Features.dynamicRendering = true;
+  enabledPhysicalDeviceVulkan13Features.synchronization2 = true;
+  enabledPhysicalDeviceVulkan13Features.shaderDemoteToHelperInvocation = true;
+  // Also enable useful Vulkan 1.2 features when supported by the device
+  enabledPhysicalDeviceVulkan12Features.separateDepthStencilLayouts =
+    physicalDeviceVulkan12Features.separateDepthStencilLayouts;
+  enabledPhysicalDeviceVulkan12Features.uniformBufferStandardLayout =
+    physicalDeviceVulkan12Features.uniformBufferStandardLayout;
+  enabledPhysicalDeviceVulkan12Features.scalarBlockLayout = physicalDeviceVulkan12Features.scalarBlockLayout;
+  enabledPhysicalDeviceVulkan12Features.drawIndirectCount = physicalDeviceVulkan12Features.drawIndirectCount;
 
   // Add platform-specific required extensions
 #ifdef __APPLE__

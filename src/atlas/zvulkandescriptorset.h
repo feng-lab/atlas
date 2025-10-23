@@ -36,6 +36,7 @@ public:
   // bool writeUniformBufferDynamicOnce(uint32_t binding, ZVulkanBuffer& buffer);
   bool writeUniformBufferDynamicOnce(uint32_t binding, ZVulkanBuffer& buffer, vk::DeviceSize range);
   bool writeTextureOnce(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler);
+  bool writeStorageBufferOnce(uint32_t binding, ZVulkanBuffer& buffer);
 
   vk::DescriptorSet descriptorSet() const
   {

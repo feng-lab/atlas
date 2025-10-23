@@ -228,6 +228,8 @@ set(ATLAS_VK_SHADER_SOURCES
     # Weighted OIT (image init)
     wavg_init_image.frag
     wblended_init_image.frag
+    # DDP helpers
+    ddp_count.comp
 )
 
 set(_GLSLC_EXE "")
@@ -253,7 +255,7 @@ foreach(SRC ${ATLAS_VK_SHADER_SOURCES})
           OUTPUT ${OUT}
           COMMAND ${CMAKE_COMMAND} -E make_directory ${ATLAS_VULKAN_SHADER_OUT}
           COMMAND ${_GLSLC_EXE}
-          -O
+          -O --target-env=vulkan1.3
           -I ${CMAKE_CURRENT_SOURCE_DIR}/Resources/shader
           -o ${OUT}
           ${ATLAS_VULKAN_SHADER_DIR}/${SRC}
@@ -647,7 +649,7 @@ add_library(atlas_lib STATIC
             ${SYS_SOURCES}
             ${QTCSV_SOURCES}
             ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
-            ${ATLAS_SOURCES_NO_MAIN} ${FORMS} ${RESOURCES}
+            ${ATLAS_SOURCES_NO_MAIN}
             ${PROTO_SRCS} ${GRPC_SRCS})
 
 add_dependencies(atlas_lib vulkan_shaders)
@@ -686,7 +688,7 @@ endif ()
 # Final application links the object files plus the entry point and assets.
 add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                main.cpp
-               ${ASSETS})
+               ${FORMS} ${RESOURCES} ${ASSETS})
 add_dependencies(${APP_NAME} vulkan_shaders)
 if (WIN32)
   set_source_files_properties(${LIBQXTDIR}/core/qxtcsvmodel.cpp PROPERTIES COMPILE_FLAGS /wd4458) # declaration of 'd_ptr' hides class member

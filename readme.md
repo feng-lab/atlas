@@ -66,7 +66,7 @@ conda install numpy python conda-build ninja
     # list modules
     aqt list-tool windows desktop
     ```
-* install vulkan sdk: https://vulkan.lunarg.com/home/welcome
+* install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3): https://vulkan.lunarg.com/home/welcome
 * install golang: https://golang.org, add to path
 * install perl: https://strawberryperl.com/, add to path
 
@@ -92,7 +92,7 @@ conda install numpy python conda-build ninja
     # list modules
     aqt list-tool linux desktop
     ```
-* install vulkan sdk: https://vulkan.lunarg.com/home/welcome with apt
+* install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3). On Debian/Ubuntu, prefer LunarG packages or your distro’s Vulkan 1.3 packages: https://vulkan.lunarg.com/home/welcome
 * install intel oneapi basekit with apt
 
 ### All:

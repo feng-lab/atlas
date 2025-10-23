@@ -124,6 +124,11 @@ private:
   vk::DeviceSize m_dynLightingOffset{0};
   vk::DeviceSize m_dynTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
+  // During DDP passes, dynamic UBO contents are invariant across passes.
+  // Freeze after first allocation to avoid per-pass uniform arena suballocations.
+  bool m_ddpLightingFrozen{false};
+  bool m_ddpTransformsFrozen{false};
+  bool m_ddpMaterialFrozen{false};
 
   void ensureDescriptorLayouts();
   void resetDescriptors();

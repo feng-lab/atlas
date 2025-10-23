@@ -210,20 +210,6 @@ public:
   std::optional<size_t> beginGpuScope(std::string_view label);
   void endGpuScope(size_t token);
 
-  [[nodiscard]] bool supportsOcclusionQueries() const
-  {
-    return true;
-  }
-
-  std::optional<uint32_t> allocateOcclusionQuery();
-  void beginOcclusionQuery(vk::raii::CommandBuffer& cmd, uint32_t index);
-  void endOcclusionQuery(vk::raii::CommandBuffer& cmd, uint32_t index);
-  [[nodiscard]] uint64_t lastOcclusionQueryResult(uint32_t index) const;
-  [[nodiscard]] const std::vector<uint64_t>& recentOcclusionResults() const
-  {
-    return m_recentOcclusionResults;
-  }
-
   // For self-managed recorder passes: decide whether to Clear or Load attachments.
   // Returns true exactly once per unique attachment set (color IDs + depth ID)
   // within the current processBatches() invocation.
@@ -253,13 +239,11 @@ private:
     uint64_t realFrameToken = 0;
     uint32_t submissionId = 0;
     vk::raii::QueryPool queryPool{nullptr};
-    vk::raii::QueryPool occlusionQueryPool{nullptr};
     std::vector<GpuScopeRecord> gpuScopes;
     std::vector<CpuScopeRecord> cpuScopes;
     std::string frameName; // optional: name of this frame for logs
     uint32_t nextQuery = 0;
-    uint32_t nextOcclusionQuery = 0;
-    bool occlusionQueryNeedsWait = false;
+
     std::chrono::steady_clock::time_point cpuStart;
     std::chrono::steady_clock::time_point cpuEnd;
 
@@ -349,6 +333,16 @@ private:
       std::vector<Retired> retiredBuffers;
     } uniformArena;
 
+    // DDP: per-frame resources for indirect-count early stop
+    std::unique_ptr<class ZVulkanBuffer> ddpChangedFlag;   // STORAGE | TRANSFER_DST
+    std::unique_ptr<class ZVulkanBuffer> ddpIndirectCount; // STORAGE | INDIRECT_BUFFER | TRANSFER_DST
+    struct IndirectArena
+    {
+      std::unique_ptr<class ZVulkanBuffer> buffer; // INDIRECT_BUFFER | TRANSFER_DST
+      size_t capacity = 0;
+      size_t cursor = 0;
+    } ddpArgs;
+
     // Static device-local staging stats
     size_t staticBytesStaged = 0; // bytes staged to device-local this frame
     uint32_t staticStreamRestaged = 0; // number of restaged streams
@@ -373,9 +367,40 @@ private:
   void recordCpuScope(std::string_view label, double milliseconds);
   void ensureStaticArenas();
   void ensureUniformArena(FrameResources& frame);
+  // DDP indirect-count: ensure per-frame buffers exist
+  void ensureDDPGatingResources(FrameResources& frame);
+  // DDP indirect-count: ensure shared compute pipeline exists
+  void ensureDDPComputePipeline();
   size_t uniformAlignment() const;
 
 public:
+  // DDP indirect-count gating (device-side early stop for DDP peel)
+  bool ddpIndirectCountEnabled() const;
+  vk::Buffer ddpChangedFlagBuffer();
+  vk::Buffer ddpIndirectCountBuffer();
+  class ZVulkanBuffer* ddpChangedFlagBufferObj();
+  class ZVulkanBuffer* ddpIndirectCountBufferObj();
+  vk::Buffer ddpArgsBuffer();
+  class ZVulkanBuffer* ddpArgsBufferObj();
+  vk::DeviceSize ddpAllocArgsSlot(size_t bytes);
+  void ddpWriteIndexedArgs(vk::raii::CommandBuffer& cmd,
+                           vk::DeviceSize offset,
+                           uint32_t indexCount,
+                           uint32_t instanceCount,
+                           uint32_t firstIndex,
+                           int32_t vertexOffset,
+                           uint32_t firstInstance);
+  void ddpResetForPass(vk::raii::CommandBuffer& cmd, bool firstPass);
+  void ddpBarrierTransferToFrag(vk::raii::CommandBuffer& cmd);
+  void ddpBarrierFragToCompute(vk::raii::CommandBuffer& cmd);
+  void ddpBarrierComputeToIndirect(vk::raii::CommandBuffer& cmd);
+  void ddpDispatchCountCompute(vk::raii::CommandBuffer& cmd);
+
+  // Orchestrate DDP passes while the draw callback records the peel draw per pass.
+  // The callback must record all necessary batches for the given pass into 'cmd'.
+  void ddpOrchestrate(uint32_t maxPasses,
+                      bool useIndirectCount,
+                      const std::function<void(uint32_t, vk::raii::CommandBuffer&)>& drawPass);
   struct UniformSlice
   {
     vk::Buffer buffer{};
@@ -448,8 +473,6 @@ public:
   std::unique_ptr<ZVulkanImgRaycasterPipelineContext> m_imgRaycasterContext;
   std::unique_ptr<ZVulkanFontPipelineContext> m_fontContext;
 
-  std::vector<uint64_t> m_recentOcclusionResults;
-
   // Tracking for self-managed clear policy within a single processBatches call
   std::unordered_set<uint64_t> m_selfManagedClearKeys;
 
@@ -497,6 +520,15 @@ public:
   void ensureFullscreenQuad();
   void ensureDummyVertexBuffer();
   vk::Buffer dummyVertexBuffer();
+
+  // DDP compute pipeline (shared across frames)
+  std::optional<vk::raii::DescriptorSetLayout> m_ddpCountSetLayout;
+  std::optional<vk::raii::PipelineLayout> m_ddpCountPipelineLayout;
+  std::optional<vk::raii::Pipeline> m_ddpCountPipeline;
+
+  // Device feature gates (cached on device change)
+  bool m_supportsDrawIndirectCount = false;
+  bool m_supportsFragStoresAndAtomics = false;
 
   // Upload arena helpers moved to public API above
 

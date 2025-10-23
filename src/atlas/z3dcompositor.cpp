@@ -24,6 +24,7 @@
 #include <optional>
 
 DEFINE_bool(atlas_vk_copy_yflip_in_shader, true, "Use y-flip in Vulkan final copy shader instead of UI flip");
+DECLARE_bool(atlas_vk_ddp_indirect_count);
 
 namespace {
 using namespace nim;
@@ -3857,9 +3858,6 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   auto& ddpLease = ensureDDPRenderTarget(targetSize);
   CHECK(ddpLease.backend == RenderBackend::Vulkan);
 
-  auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend());
-  const bool occlusionSupported = (vkBackend != nullptr) && vkBackend->supportsOcclusionQueries();
-
   auto ddpBindings = m_rendererBase.prepareVulkanSurface(ddpLease);
   CHECK(ddpBindings.colorHandles.size() >= 8 && ddpBindings.surface.colorAttachments.size() >= 7)
     << "Dual depth peeling Vulkan target incomplete.";
@@ -3997,150 +3995,143 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
   resetHooks();
 
   constexpr size_t kMaxPasses = 100;
-  size_t currId = 0;
-  size_t executedPasses = 0;
-  for (size_t pass = 1; pass < kMaxPasses; ++pass) {
-    currId = pass % 2;
-    const size_t prevId = 1 - currId;
-    const size_t bufOffset = currId * 3;
+  // Track the last ping buffer written by the orchestrated peel to feed the
+  // final composite pass. Initialize to the same parity as the first peel
+  // (pass=1 -> currId=1), and update inside the drawPass.
+  size_t finalPingIdx = 1;
 
-    // Route locations 0/1/2 to the active ping attachments for this pass.
-    RendererFrameState::ActiveSurface peelSurface;
-    peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 0]);
-    peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 1]);
-    peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 2]);
-    peelSurface.depthAttachment = ddpBindings.surface.depthAttachment;
-    for (size_t i = 0; i < peelSurface.colorAttachments.size(); ++i) {
-      auto& attachment = peelSurface.colorAttachments[i];
-      attachment.storeOp = StoreOp::Store;
-      attachment.clearValue.color = zeroClear;
-      attachment.loadOp = LoadOp::Load;
-    }
-    peelSurface.colorAttachments[0].loadOp = LoadOp::Clear;
-    peelSurface.colorAttachments[0].clearValue.color = depthClear;
-    peelSurface.colorAttachments[1].loadOp = LoadOp::Clear;
-    peelSurface.colorAttachments[1].clearValue.color = zeroClear;
-    peelSurface.colorAttachments[2].loadOp = LoadOp::Clear;
-    peelSurface.colorAttachments[2].clearValue.color = zeroClear;
-    applyDepthAttachment(peelSurface, LoadOp::Load);
+  // Orchestrated DDP: one driver call handles Transfer->Frag, Frag->Compute, Compute->Indirect per pass.
+  // We provide a drawPass lambda that records the peel geometry and back-blend accumulation for pass i.
+  if (auto* vkBackend = dynamic_cast<Z3DRendererVulkanBackend*>(m_rendererBase.backend())) {
+    const bool useIndirectCount = vkBackend->ddpIndirectCountEnabled();
+    auto drawPass = [&](uint32_t pass, vk::raii::CommandBuffer& /*cmd*/) {
+      // Map orchestrator pass [0..N) to compositor's previous logic [1..N]
+      const size_t logicalPass = static_cast<size_t>(pass) + 1u;
+      const size_t currIdLocal = logicalPass % 2;
+      finalPingIdx = currIdLocal;
+      const size_t prevId = 1 - currIdLocal;
+      const size_t bufOffset = currIdLocal * 3;
 
-    m_rendererBase.setActiveSurfaceWithLoadStore(peelSurface, Z3DRendererBase::Preserve);
+      // Route locations 0/1/2 to the active ping attachments for this pass.
+      RendererFrameState::ActiveSurface peelSurface;
+      peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 0]);
+      peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 1]);
+      peelSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[bufOffset + 2]);
+      peelSurface.depthAttachment = ddpBindings.surface.depthAttachment;
+      for (size_t i = 0; i < peelSurface.colorAttachments.size(); ++i) {
+        auto& attachment = peelSurface.colorAttachments[i];
+        attachment.storeOp = StoreOp::Store;
+        attachment.clearValue.color = zeroClear;
+        attachment.loadOp = LoadOp::Load;
+      }
+      peelSurface.colorAttachments[0].loadOp = LoadOp::Clear;
+      peelSurface.colorAttachments[0].clearValue.color = depthClear;
+      peelSurface.colorAttachments[1].loadOp = LoadOp::Clear;
+      peelSurface.colorAttachments[1].clearValue.color = zeroClear;
+      peelSurface.colorAttachments[2].loadOp = LoadOp::Clear;
+      peelSurface.colorAttachments[2].clearValue.color = zeroClear;
+      applyDepthAttachment(peelSurface, LoadOp::Load);
 
-    // Geometry peel step must see DualDepthPeelingPeel on the compositor renderer
-    m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+      m_rendererBase.setActiveSurfaceWithLoadStore(peelSurface, Z3DRendererBase::Preserve);
+
+      // Geometry peel step must see DualDepthPeelingPeel on the compositor renderer
+      m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+      recordInVulkanFrame(
+        m_rendererBase,
+        [&]() {
+          for (auto* filter : filters) {
+            if (!filter) {
+              continue;
+            }
+            filter->setViewport(targetSize);
+            filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+            filter->setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
+            filter->setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
+            recordFilterBatchesToSurfaceUnified(
+              m_rendererBase,
+              filter,
+              peelSurface,
+              [&]() {
+                filter->renderTransparent(eye);
+              },
+              /*propagateHookPara=*/true);
+          }
+          if (!imageLayers.empty()) {
+            m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+            // Ensure image peel path samples the correct blender textures from the previous ping (prevId).
+            m_rendererBase.setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
+            m_rendererBase.setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
+            for (const auto& layer : imageLayers) {
+              const auto& colorDesc = layer.colorAttachment;
+              const auto& depthDesc = layer.depthAttachment;
+              if (colorDesc.handle.backend != AttachmentBackend::Vulkan || !colorDesc.handle.valid()) {
+                continue;
+              }
+              if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
+                continue;
+              }
+              // Image OIT peel: do not flip
+              m_textureCopyRenderer.setFlipY(false);
+              m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
+              m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
+            }
+          }
+        },
+        "transparency_ddp_peel");
+
+      resetHooks();
+
+      // Accumulate back colors for this pass immediately after peel.
+      RendererFrameState::ActiveSurface blendSurface;
+      blendSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[6]);
+      if (!blendSurface.colorAttachments.empty()) {
+        blendSurface.colorAttachments[0].loadOp = LoadOp::Load;
+        blendSurface.colorAttachments[0].storeOp = StoreOp::Store;
+        blendSurface.colorAttachments[0].clearValue.color = zeroClear;
+      }
+      m_rendererBase.setActiveSurfaceWithLoadStore(blendSurface, Z3DRendererBase::Preserve);
+
+      const glm::vec2 screenDimRcp(targetSize.x > 0u ? 1.f / static_cast<float>(targetSize.x) : 0.f,
+                                   targetSize.y > 0u ? 1.f / static_cast<float>(targetSize.y) : 0.f);
+
+      recordInVulkanFrame(
+        m_rendererBase,
+        [&]() {
+          TextureDualPeelPayload payload;
+          payload.stage = TextureDualPeelPayload::Stage::Blend;
+          payload.tempAttachment = backTempPing[currIdLocal];
+          payload.screenDimRcp = screenDimRcp;
+
+          RenderBatch batch;
+          batch.eye = eye;
+          const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
+          batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
+          batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
+          batch.pass.viewport.minDepth = 0.0f;
+          batch.pass.viewport.maxDepth = 1.0f;
+          batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
+          batch.pass.depthAttachment = std::nullopt;
+          batch.draw.topology = PrimitiveTopology::TriangleStrip;
+          batch.draw.vertexCount = 4;
+          batch.draw.indexCount = 0;
+          batch.geometry = payload;
+          m_rendererBase.appendBatch(std::move(batch));
+        },
+        "transparency_ddp_blend");
+
+      resetHooks();
+    };
+
+    // Execute orchestrated peel passes with centralized barriers and compute.
     recordInVulkanFrame(
       m_rendererBase,
       [&]() {
-        for (auto* filter : filters) {
-          if (!filter) {
-            continue;
-          }
-          filter->setViewport(targetSize);
-          filter->setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-          filter->setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
-          filter->setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
-          recordFilterBatchesToSurfaceUnified(
-            m_rendererBase,
-            filter,
-            peelSurface,
-            [&]() {
-              filter->renderTransparent(eye);
-            },
-            /*propagateHookPara=*/true);
-        }
-        if (!imageLayers.empty()) {
-          m_rendererBase.setShaderHookType(Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-          // Ensure image peel path samples the correct blender textures
-          // from the previous ping (prevId). Without this, the copy pipeline
-          // will bind placeholders and contribute nothing.
-          m_rendererBase.setShaderHookParaDDPDepthBlenderAttachment(depthPing[prevId]);
-          m_rendererBase.setShaderHookParaDDPFrontBlenderAttachment(frontPing[prevId]);
-          for (const auto& layer : imageLayers) {
-            const auto& colorDesc = layer.colorAttachment;
-            const auto& depthDesc = layer.depthAttachment;
-            if (colorDesc.handle.backend != AttachmentBackend::Vulkan || !colorDesc.handle.valid()) {
-              continue;
-            }
-            if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
-              continue;
-            }
-            // Image OIT peel: do not flip
-            m_textureCopyRenderer.setFlipY(false);
-            m_textureCopyRenderer.setSourceAttachments(colorDesc.handle, depthDesc.handle);
-            m_rendererBase.renderVulkan(eye, m_textureCopyRenderer);
-          }
-        }
+        // Previous compositor loop executed passes in [1, kMaxPasses). Match that
+        // count here by invoking orchestrator for exactly (kMaxPasses - 1) passes.
+        vkBackend->ddpOrchestrate(static_cast<uint32_t>(kMaxPasses - 1), useIndirectCount, drawPass);
       },
-      "transparency_ddp_peel");
-
-    resetHooks();
-
-    RendererFrameState::ActiveSurface blendSurface;
-    blendSurface.colorAttachments.push_back(ddpBindings.surface.colorAttachments[6]);
-    // Accumulate back colors across peel passes within the same frame.
-    // Use Load so each pass adds into the existing buffer; we already clear
-    // it at frame start during the init subpass above.
-    if (!blendSurface.colorAttachments.empty()) {
-      blendSurface.colorAttachments[0].loadOp = LoadOp::Load;
-      blendSurface.colorAttachments[0].storeOp = StoreOp::Store;
-      blendSurface.colorAttachments[0].clearValue.color = zeroClear;
-    }
-
-    m_rendererBase.setActiveSurfaceWithLoadStore(blendSurface, Z3DRendererBase::Preserve);
-
-    const glm::vec2 screenDimRcp(targetSize.x > 0u ? 1.f / static_cast<float>(targetSize.x) : 0.f,
-                                 targetSize.y > 0u ? 1.f / static_cast<float>(targetSize.y) : 0.f);
-
-    uint32_t occlusionQueryIndex = TextureDualPeelPayload::kInvalidQueryIndex;
-    if (occlusionSupported) {
-      if (auto queryOpt = vkBackend->allocateOcclusionQuery()) {
-        occlusionQueryIndex = *queryOpt;
-      }
-    }
-
-    recordInVulkanFrame(
-      m_rendererBase,
-      [&]() {
-        TextureDualPeelPayload payload;
-        payload.stage = TextureDualPeelPayload::Stage::Blend;
-        payload.tempAttachment = backTempPing[currId];
-        payload.screenDimRcp = screenDimRcp;
-        payload.occlusionQueryIndex = occlusionQueryIndex;
-
-        RenderBatch batch;
-        batch.eye = eye;
-        const glm::uvec4 viewport = m_rendererBase.frameState().viewport;
-        batch.pass.viewport.origin = glm::vec2(static_cast<float>(viewport.x), static_cast<float>(viewport.y));
-        batch.pass.viewport.extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-        batch.pass.viewport.minDepth = 0.0f;
-        batch.pass.viewport.maxDepth = 1.0f;
-        batch.pass.colorAttachments = m_rendererBase.frameState().activeSurface.colorAttachments;
-        batch.pass.depthAttachment = std::nullopt;
-        batch.draw.topology = PrimitiveTopology::TriangleStrip;
-        batch.draw.vertexCount = 4;
-        batch.draw.indexCount = 0;
-        batch.geometry = payload;
-        m_rendererBase.appendBatch(std::move(batch));
-      },
-      "transparency_ddp_blend");
-
-    resetHooks();
-
-    executedPasses++;
-
-    if (occlusionSupported && occlusionQueryIndex != TextureDualPeelPayload::kInvalidQueryIndex) {
-      const uint64_t samples = vkBackend->lastOcclusionQueryResult(occlusionQueryIndex);
-      if (samples == 0u) {
-        break;
-      }
-    }
+      "transparency_ddp_orchestrate");
   }
-
-  VLOG(1) << fmt::format("DDP Vulkan executed {} peel passes", executedPasses);
-  // TODO: Consider option (2) for Vulkan dual-depth peeling. Record each peel pass in a separate command buffer, flush,
-  // read occlusion query results immediately, and stop submitting once a pass reports zero samples. This would mirror
-  // GL behaviour but requires reworking command buffer submission per pass. (See discussion about matching GL pass
-  // counts.)
 
   auto outBindings = m_rendererBase.prepareVulkanSurface(targetLease);
   RendererFrameState::ActiveSurface outSurface = outBindings.surface;
@@ -4174,7 +4165,8 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
     [&]() {
       TextureDualPeelPayload payload;
       payload.stage = TextureDualPeelPayload::Stage::Final;
-      payload.frontAttachment = frontPing[currId];
+      // Use the last ping written by orchestrated peel passes
+      payload.frontAttachment = frontPing[finalPingIdx];
       payload.backAttachment = backBlend;
       payload.depthAttachment = depthTextureHandle;
       payload.screenDimRcp = screenDimRcp;

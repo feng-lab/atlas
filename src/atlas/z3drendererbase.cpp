@@ -498,14 +498,20 @@ void Z3DRendererBase::setBackend(RenderBackend backendType)
         break;
     }
   }
-  catch (const ZException&) {
+  catch (const ZException& e) {
+    auto errorMsg = fmt::format("ZException creating {} renderer backend: {}", enumToString(backendType), e.what());
+    LOG(ERROR) << errorMsg;
     throw;
   }
   catch (const std::exception& e) {
-    throw ZException(fmt::format("Failed to create {} renderer backend: {}", enumToString(backendType), e.what()));
+    auto errorMsg = fmt::format("Exception creating {} renderer backend: {}", enumToString(backendType), e.what());
+    LOG(ERROR) << errorMsg;
+    throw ZException(errorMsg);
   }
   if (!newBackend) {
-    throw ZException(fmt::format("Failed to create {} renderer backend", enumToString(backendType)));
+    auto errorMsg = fmt::format("Failed to create {} renderer backend", enumToString(backendType));
+    LOG(ERROR) << errorMsg;
+    throw ZException(errorMsg);
   }
 
   if (!initializing) {

@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <span>
@@ -174,6 +175,9 @@ void ZVulkanMeshPipelineContext::resetFrame()
   retainUbo(m_uboOIT);
   resetDescriptors();
   m_transientDescriptorSets.clear();
+  m_ddpLightingFrozen = false;
+  m_ddpTransformsFrozen = false;
+  m_ddpMaterialFrozen = false;
 }
 
 void ZVulkanMeshPipelineContext::flushRetainedUbos()
@@ -237,7 +241,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       (extent.x > 0.0f && extent.y > 0.0f) ? glm::vec2(1.0f / extent.x, 1.0f / extent.y) : glm::vec2(0.0f);
     updateOITParamsUBO(renderer, batch, screenRcp);
   }
-  ensureDescriptorSets();
+  // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
   CHECK(m_dsLighting && m_dsTransforms) << "Mesh pipeline descriptor sets missing (lighting/transforms)";
   if (shaderHook != Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
     CHECK(m_dsTextures != nullptr) << "Mesh pipeline textures descriptor set not initialised";
@@ -301,12 +305,11 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
   if (!texturesSet) {
     return;
   }
-  const vk::DescriptorSet lightingSet = m_dsLighting->descriptorSet();
-  const vk::DescriptorSet transformsSet = m_dsTransforms->descriptorSet();
-
-  std::vector<vk::DescriptorSet> baseDescriptorSets{texturesSet, lightingSet, transformsSet};
+  // Bind only the textures set up-front. Lighting/transforms use dynamic UBOs and are
+  // re-bound per draw with the correct dynamic offsets below to satisfy validation.
+  std::vector<vk::DescriptorSet> baseDescriptorSets{texturesSet};
   std::vector<ZVulkanDescriptorBindInfo> baseExtraBinds;
-  uint32_t expectedSetCount = 3;
+  uint32_t expectedSetCount = 1;
   if (m_dsOIT) {
     ZVulkanDescriptorBindInfo oitBind{};
     oitBind.firstSet = vkbind::kSetOITParams;
@@ -443,10 +446,53 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
           cb.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layoutHandle, 1, dynSets, dynOff);
         }
 
-        if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
-          cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
+        if (m_backend.ddpIndirectCountEnabled() &&
+            shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+          if (static_cast<VkBuffer>(m_backend.ddpArgsBuffer()) != VK_NULL_HANDLE &&
+              static_cast<VkBuffer>(m_backend.ddpIndirectCountBuffer()) != VK_NULL_HANDLE) {
+            if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
+              const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(sizeof(VkDrawIndexedIndirectCommand));
+              const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
+              const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+              m_backend.ddpWriteIndexedArgs(cb,
+                                            off,
+                                            draw.indexCount,
+                                            1,
+                                            draw.firstIndex,
+                                            static_cast<int32_t>(draw.firstVertex),
+                                            0);
+              // Host-visible coherent args; no transfer barrier inside dynamic rendering.
+              cb.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+            } else {
+              struct Cmd
+              {
+                uint32_t vertexCount;
+                uint32_t instanceCount;
+                uint32_t firstVertex;
+                uint32_t firstInstance;
+              } cmdPayload{draw.vertexCount, 1, draw.firstVertex, 0};
+              const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(sizeof(Cmd));
+              const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
+              const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+              auto map = m_backend.ddpArgsBufferObj()->mapRange(off, sizeof(Cmd));
+              if (map) {
+                std::memcpy(map.data(), &cmdPayload, sizeof(Cmd));
+              }
+              cb.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(Cmd));
+            }
+          } else {
+            if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
+              cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
+            } else {
+              cb.draw(draw.vertexCount, 1, draw.firstVertex, 0);
+            }
+          }
         } else {
-          cb.draw(draw.vertexCount, 1, draw.firstVertex, 0);
+          if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
+            cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
+          } else {
+            cb.draw(draw.vertexCount, 1, draw.firstVertex, 0);
+          }
         }
       }
     });
@@ -547,6 +593,11 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
   // OIT params still use a dedicated UBO
   if (m_dsOIT && m_uboOIT) {
     m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
+    if (!m_backend.isRecording()) {
+      if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
+        m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
+      }
+    }
   }
 }
 
@@ -588,6 +639,12 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
                                                    const MeshPayload& payload,
                                                    bool pickingPass)
 {
+  const auto hook = renderer.shaderHookType();
+  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  if (ddp && m_ddpLightingFrozen) {
+    return;
+  }
   
 
   LightingUBOStd140 lighting{};
@@ -642,6 +699,7 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
     auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
     std::memcpy(slice.mapped, &lighting, sizeof(lighting));
     m_dynLightingOffset = slice.offset;
+    if (ddp) { m_ddpLightingFrozen = true; }
   }
 }
 
@@ -649,6 +707,9 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
                                                     const RenderBatch& batch,
                                                     const MeshPayload& payload)
 {
+  const auto hook = renderer.shaderHookType();
+  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   
   
 
@@ -669,10 +730,11 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
-  {
+  if (!(ddp && m_ddpTransformsFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
     std::memcpy(slice.mapped, &transforms, sizeof(transforms));
     m_dynTransformsOffset = slice.offset;
+    if (ddp) { m_ddpTransformsFrozen = true; }
   }
 
   MaterialUBOStd140 material{};
@@ -684,10 +746,11 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   material.alpha = (!payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
   material.use_custom_color = 0;
   material.custom_color = glm::vec4(1.0f);
-  {
+  if (!(ddp && m_ddpMaterialFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
     std::memcpy(slice.mapped, &material, sizeof(material));
     m_dynMaterialOffset = slice.offset;
+    if (ddp) { m_ddpMaterialFrozen = true; }
   }
 
   VLOG(2) << fmt::format("VK mesh xf params: sizeScale={:.3f} ortho={}",

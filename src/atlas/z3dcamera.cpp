@@ -321,7 +321,7 @@ glm::vec3 Z3DCamera::worldToScreen(const glm::vec3& wpt, const glm::ivec4& viewp
   if (clipSpacePos.w == 0.f) {
     return {-1.f, -1.f, -1.f};
   }
-  glm::vec3 ndcSpacePos = glm::vec3(clipSpacePos.xyz()) / clipSpacePos.w;
+  glm::vec3 ndcSpacePos = clipSpacePos.xyz() / clipSpacePos.w;
   return ((ndcSpacePos + 1.f) / 2.f) * glm::vec3(viewport.z, viewport.w, 1.f) + glm::vec3(viewport.x, viewport.y, 0.f);
 }
 

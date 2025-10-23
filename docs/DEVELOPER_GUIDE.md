@@ -2,7 +2,8 @@ Atlas Developer Guide
 
 Build, Run, and Layout
 
-- Build instructions: see `readme.md` (macOS/Linux/Windows, Qt 6.9.x, Intel oneAPI, Vulkan SDK, Ninja, Conda recipe for `zimg`).
+- Build instructions: see `readme.md` (macOS/Linux/Windows, Qt 6.9.x, Intel oneAPI, Vulkan SDK 1.3+, Ninja, Conda recipe for `zimg`).
+  - Minimum Vulkan runtime/driver: 1.3. The engine assumes 1.3 core features (dynamic rendering, synchronization2) and no longer enables 1.2 KHR fallbacks.
 - Source layout (selected):
   - `src/atlas/` — application code (UI, engine, docs, filters, views)
   - `src/img/` — image I/O/processing utilities

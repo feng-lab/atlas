@@ -37,6 +37,7 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
 {
   m_engine = new Z3DRenderingEngine(m_doc);
   m_engine->moveToThread(&m_renderingThread);
+  m_renderingThread.setObjectName("RenderingThread");
   connect(&m_renderingThread, &QThread::finished, m_engine, &QObject::deleteLater);
   m_renderingThread.start();
 

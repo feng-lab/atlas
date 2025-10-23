@@ -455,7 +455,7 @@ void Z3DSwcFilter::prepareData()
     m_baseAndBaseRadius.push_back(baseAndbRadius);
     m_axisAndTopRadius.push_back(axisAndtRadius);
     m_lines.push_back(baseAndbRadius.xyz());
-    m_lines.push_back(glm::vec3(baseAndbRadius.xyz()) + glm::vec3(axisAndtRadius.xyz()));
+    m_lines.push_back(baseAndbRadius.xyz() + axisAndtRadius.xyz());
   }
   for (auto& tn : m_swcPack->decomposedNodes()) {
     m_pointAndRadius.emplace_back(tn->x, tn->y, tn->z, std::max(.5, tn->radius));

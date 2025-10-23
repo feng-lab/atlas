@@ -37,10 +37,9 @@ ZRPCService::ZRPCService(QObject* parent)
 void ZRPCService::init()
 {
   g_sm->checkCurrentOn(ZServiceManager::RPC);
-
-  m_rpcThread = new QThread();
-  QObject::connect(m_rpcThread, &QThread::started, this, &ZRPCService::onRPCThreadStarted, Qt::DirectConnection);
-  m_rpcThread->start();
+  // We are already running on the dedicated RPC thread managed by ZServiceManager.
+  // Start the gRPC server loop directly on this thread.
+  onRPCThreadStarted();
 }
 
 void ZRPCService::shutdown()
@@ -49,18 +48,12 @@ void ZRPCService::shutdown()
 
   m_grpcServer->Shutdown();
   m_grpcServer = nullptr;
-
-  m_rpcThread->quit();
-  m_rpcThread->wait();
-  delete m_rpcThread;
-  m_rpcThread = nullptr;
 }
 
 void ZRPCService::onRPCThreadStarted()
 {
-  if (g_sm->isCurrentOn(ZServiceManager::RPC)) {
-    qFatal("g_sm->CurrentOn(ZServiceManager::RPC)");
-  }
+  // Ensure we are on the RPC thread
+  CHECK(g_sm->isCurrentOn(ZServiceManager::RPC));
 
   std::string server_address("0.0.0.0:50051");
   GreeterServiceImpl service;

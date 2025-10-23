@@ -8,6 +8,9 @@ layout(location = 0) out vec4 FragData0; // depth blender
 layout(location = 1) out vec4 FragData1; // front blender
 layout(location = 2) out vec4 FragData2; // back temp
 
+// DDP indirect-count: mark when this pass updates any pixel
+layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
+
 #include "include/oit_params.glslinc"
 #include "include/copyimage_func.glslinc"
 
@@ -32,6 +35,7 @@ void main()
   }
   if (fragDepth > nearestDepth && fragDepth < farthestDepth) {
     FragData0.xy = vec2(-fragDepth, fragDepth);
+    atomicOr(ddp_flag.changed, 1u);
     return;
   }
 
@@ -41,5 +45,5 @@ void main()
   } else {
     FragData2 += color;
   }
+  atomicOr(ddp_flag.changed, 1u);
 }
-

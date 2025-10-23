@@ -255,6 +255,15 @@ bool ZVulkanDescriptorSet::writeTextureOnce(uint32_t binding, ZVulkanTexture& te
   return true;
 }
 
+bool ZVulkanDescriptorSet::writeStorageBufferOnce(uint32_t binding, ZVulkanBuffer& buffer)
+{
+  if ((m_initializedBindings.find(binding) != m_initializedBindings.end()) && !m_isOverrideTransient) {
+    return false;
+  }
+  updateStorageBuffer(binding, buffer);
+  return true;
+}
+
 void ZVulkanDescriptorSet::updateStorageBuffer(uint32_t binding, ZVulkanBuffer& buffer)
 {
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {

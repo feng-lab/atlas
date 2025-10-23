@@ -11,6 +11,8 @@ inline constexpr uint32_t kSetOITParams = 3;    // OIT params UBO set
 
 // OIT params UBO
 inline constexpr uint32_t kBindingOITParamsUBO = 0;
+// OIT DDP flag SSBO (set 3)
+inline constexpr uint32_t kBindingOITDDPFlag = 1;
 
 // Dual Depth Peeling (geometry peel) sampled inputs (set 0)
 inline constexpr uint32_t kBindingDDPDepthBlender = 0;     // depth blender

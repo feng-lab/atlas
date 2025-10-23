@@ -527,12 +527,6 @@ struct TextureDualPeelPayload
   AttachmentHandle backAttachment;
   AttachmentHandle depthAttachment;
   glm::vec2 screenDimRcp{1.0f};
-  uint32_t occlusionQueryIndex = kInvalidQueryIndex;
-
-  [[nodiscard]] bool hasOcclusionQuery() const
-  {
-    return occlusionQueryIndex != kInvalidQueryIndex;
-  }
 };
 
 struct TextureWeightedAveragePayload

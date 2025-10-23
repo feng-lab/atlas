@@ -24,7 +24,6 @@ private:
   void onRPCThreadStarted();
 
 private:
-  QThread* m_rpcThread = nullptr;
   grpc::Server* m_grpcServer = nullptr;
 };
 

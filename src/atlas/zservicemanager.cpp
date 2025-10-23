@@ -36,6 +36,12 @@ void ZServiceManager::init()
   m_rpcThread = new QThread;
   m_logicThread = new QThread;
 
+  m_ioThread->setObjectName("IOThread");
+  m_dbThread->setObjectName("DBThread");
+  m_pushThread->setObjectName("PushThread");
+  m_rpcThread->setObjectName("RPCThread");
+  m_logicThread->setObjectName("LogicThread");
+
   m_rpcService = new ZRPCService;
   m_rpcService->moveToThread(m_rpcThread);
 
@@ -131,6 +137,15 @@ void ZServiceManager::shutdown()
   delete m_logicThread;
   m_logicThread = nullptr;
 
+  // Stop gRPC server running on the RPC thread, then stop the thread itself.
+  if (m_rpcService) {
+    QMetaObject::invokeMethod(
+      m_rpcService,
+      [this]() {
+        m_rpcService->shutdown();
+      },
+      Qt::BlockingQueuedConnection);
+  }
   m_rpcThread->quit();
   m_rpcThread->wait();
   delete m_rpcThread;

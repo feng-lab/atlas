@@ -25,6 +25,7 @@
 #include <tuple>
 #include <vector>
 #include <cstring>
+#include <cstdint>
 
 namespace nim {
 namespace {
@@ -145,6 +146,9 @@ void ZVulkanLinePipelineContext::resetFrame()
   // reading them on the GPU.
   retainUbo(m_uboOIT);
   resetDescriptors();
+  m_ddpLightingFrozen = false;
+  m_ddpTransformsFrozen = false;
+  m_ddpMaterialFrozen = false;
 }
 
 void ZVulkanLinePipelineContext::flushRetainedUbos()
@@ -230,6 +234,12 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
   }
   if (m_dsOIT && m_uboOIT) {
     m_dsOIT->writeUniformBufferOnce(0, *m_uboOIT);
+    // Prime DDP flag SSBO only when not recording.
+    if (!m_backend.isRecording() && m_backend.ddpIndirectCountEnabled()) {
+      if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
+        m_dsOIT->writeStorageBufferOnce(nim::vkbind::kBindingOITDDPFlag, *buf);
+      }
+    }
   }
 
   // Bind per-frame uniform arena buffer to dynamic UBO bindings once.
@@ -255,6 +265,9 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
                                             const RenderBatch& batch,
                                             const LinePayload& payload)
 {
+  const auto hook = renderer.shaderHookType();
+  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   LightingUBOStd140 lighting{};
   lighting.lighting_enabled = 0; // force unlit lines unless explicitly enabled
   glm::vec2 extent = batch.pass.viewport.extent;
@@ -271,10 +284,11 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
     lighting.fog_color_top = sceneState.fog.topColor;
     lighting.fog_color_bottom = sceneState.fog.bottomColor;
   }
-  {
+  if (!(ddp && m_ddpLightingFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
     std::memcpy(slice.mapped, &lighting, sizeof(lighting));
     m_dynLightingOffset = slice.offset;
+    if (ddp) { m_ddpLightingFrozen = true; }
   }
 
   TransformsUBOStd140 transforms{};
@@ -293,10 +307,11 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
-  {
+  if (!(ddp && m_ddpTransformsFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
     std::memcpy(slice.mapped, &transforms, sizeof(transforms));
     m_dynTransformsOffset = slice.offset;
+    if (ddp) { m_ddpTransformsFrozen = true; }
   }
 
   MaterialUBOStd140 material{};
@@ -305,10 +320,11 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   material.material_specular = payload.params->materialSpecular;
   material.material_shininess = payload.params->materialShininess;
   material.alpha = (payload.pickingPass || !payload.followOpacity || !payload.params) ? 1.0f : payload.params->opacity;
-  {
+  if (!(ddp && m_ddpMaterialFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
     std::memcpy(slice.mapped, &material, sizeof(material));
     m_dynMaterialOffset = slice.offset;
+    if (ddp) { m_ddpMaterialFrozen = true; }
   }
 
   VLOG(2) << fmt::format("VK line params: sizeScale={:.3f} alpha={:.3f} ortho={} picking={}",
@@ -1101,7 +1117,7 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
 
   updateUBOs(renderer, batch, payload);
-  ensureDescriptorSets(renderer);
+  // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
   CHECK(m_dsLighting && m_dsTransforms) << "Line pipeline descriptor sets missing (lighting/transforms)";
 
   const auto shaderHook = renderer.shaderHookType();
@@ -1233,13 +1249,42 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
             pc.weighted_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
           } else { pc.weighted_a = 0.0f; pc.weighted_b = 0.0f; pc.weighted_depth_scale = 0.0f; }
           cb.pushConstants<WideLinePC>(pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, pc);
-          cb.drawIndexed(6, 1, i * 6, i * 4, 0);
+          if (m_backend.ddpIndirectCountEnabled() &&
+              shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+            if (static_cast<VkBuffer>(m_backend.ddpArgsBuffer()) != VK_NULL_HANDLE &&
+                static_cast<VkBuffer>(m_backend.ddpIndirectCountBuffer()) != VK_NULL_HANDLE) {
+              const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(sizeof(VkDrawIndexedIndirectCommand));
+              // Reacquire buffers after potential growth
+              const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
+              const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+              m_backend.ddpWriteIndexedArgs(cb, off, 6, 1, i * 6, static_cast<int32_t>(i * 4), 0);
+              cb.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+            } else {
+              cb.drawIndexed(6, 1, i * 6, i * 4, 0);
+            }
+          } else {
+            cb.drawIndexed(6, 1, i * 6, i * 4, 0);
+          }
         }
       } else {
         pc.line_width = payload.resolvedLineWidth;
         VLOG(1) << fmt::format("VK wide line: single width resolvedLineWidth={:.3f} sizeScale={:.3f}", payload.resolvedLineWidth, sizeScale);
         cb.pushConstants<WideLinePC>(pipelineLayout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, pc);
-        cb.drawIndexed(m_wideUploadIndexCount, 1, 0, 0, 0);
+        if (m_backend.ddpIndirectCountEnabled() &&
+            shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+          if (static_cast<VkBuffer>(m_backend.ddpArgsBuffer()) != VK_NULL_HANDLE &&
+              static_cast<VkBuffer>(m_backend.ddpIndirectCountBuffer()) != VK_NULL_HANDLE) {
+            const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(sizeof(VkDrawIndexedIndirectCommand));
+            const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
+            const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+            m_backend.ddpWriteIndexedArgs(cb, off, m_wideUploadIndexCount, 1, 0, 0, 0);
+            cb.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+          } else {
+            cb.drawIndexed(m_wideUploadIndexCount, 1, 0, 0, 0);
+          }
+        } else {
+          cb.drawIndexed(m_wideUploadIndexCount, 1, 0, 0, 0);
+        }
       }
     });
     return;
@@ -1274,7 +1319,32 @@ void ZVulkanLinePipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.instanceCount = 1;
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
-  recorder.recordGraphicsDraw(drawSpec);
+  if (m_backend.ddpIndirectCountEnabled() &&
+      shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    const bool indexed = (drawSpec.indexCount > 0);
+    if (static_cast<VkBuffer>(m_backend.ddpArgsBuffer()) != VK_NULL_HANDLE &&
+        static_cast<VkBuffer>(m_backend.ddpIndirectCountBuffer()) != VK_NULL_HANDLE) {
+      const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(indexed ? sizeof(VkDrawIndexedIndirectCommand)
+                                                                    : sizeof(VkDrawIndirectCommand));
+      recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
+        const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
+        const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+        if (indexed) {
+          m_backend.ddpWriteIndexedArgs(c, off, drawSpec.indexCount, 1, 0, 0, 0);
+          c.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+        } else {
+          struct Cmd { uint32_t vertexCount; uint32_t instanceCount; uint32_t firstVertex; uint32_t firstInstance; } cmdPayload{drawSpec.vertexCount, 1, 0, 0};
+          auto map = m_backend.ddpArgsBufferObj()->mapRange(off, sizeof(Cmd));
+          if (map) { std::memcpy(map.data(), &cmdPayload, sizeof(Cmd)); }
+          c.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(Cmd));
+        }
+      });
+    } else {
+      recorder.recordGraphicsDraw(drawSpec);
+    }
+  } else {
+    recorder.recordGraphicsDraw(drawSpec);
+  }
 
 }
 

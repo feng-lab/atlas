@@ -746,22 +746,94 @@ def build_glm(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
-    #     orig_file = os.path.join(install_dir, 'include', 'glm', 'detail', 'type_vec_simd.inl')
-    #     patch_file(orig_file,
-    #                from_texts=[r"""template<qualifier Q, int E0, int E1, int E2, int E3>
-    # struct _swizzle_base1<2, float, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, float, Q, E0, E1, E2, E3, false> {};
-    #
-    # template<qualifier Q, int E0, int E1, int E2, int E3>
-    # struct _swizzle_base1<2, int, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, int, Q, E0, E1, E2, E3, false> {};""",
-    #                            r'return !compute_vec_equal<float, Q, false, 32, true>::call(v1, v2);',
-    #                            r'return !compute_vec_equal<uint, Q, false, 32, true>::call(v1, v2);',
-    #                            r'return !compute_vec_equal<int, Q, false, 32, true>::call(v1, v2);',
-    #                            ],
-    #                to_texts=[r'',
-    #                          r'return !compute_vec_equal<L, float, Q, false, 32, true>::call(v1, v2);',
-    #                          r'return !compute_vec_equal<L, uint, Q, false, 32, true>::call(v1, v2);',
-    #                          r'return !compute_vec_equal<L, int, Q, false, 32, true>::call(v1, v2);',
-    #                          ])
+        orig_file = os.path.join(install_dir, 'include', 'glm', 'detail', 'type_vec_simd.inl')
+        patch_file(orig_file,
+                   from_texts=[r"""template<length_t L, qualifier Q, int E0, int E1, int E2, int E3>
+	struct _swizzle_base1<L, float, Q, E0,E1,E2,E3, true> : public _swizzle_base0<float, L>
+	{
+		GLM_FUNC_QUALIFIER vec<L, float, Q> operator ()()  const
+		{
+			__m128 data = *reinterpret_cast<__m128 const*>(&this->_buffer);
+
+			vec<L, float, Q> Result;
+#			if GLM_ARCH & GLM_ARCH_AVX_BIT
+				Result.data = _mm_permute_ps(data, _MM_SHUFFLE(E3, E2, E1, E0));
+#			else
+				Result.data = _mm_shuffle_ps(data, data, _MM_SHUFFLE(E3, E2, E1, E0));
+#			endif
+			return Result;
+		}
+	};""",
+                               r"""template<length_t L, qualifier Q, int E0, int E1, int E2, int E3>
+	struct _swizzle_base1<L, int, Q, E0,E1,E2,E3, true> : public _swizzle_base0<int, L>
+	{
+		GLM_FUNC_QUALIFIER vec<L, int, Q> operator ()()  const
+		{
+			__m128i data = *reinterpret_cast<__m128i const*>(&this->_buffer);
+
+			vec<L, int, Q> Result;
+			Result.data = _mm_shuffle_epi32(data, _MM_SHUFFLE(E3, E2, E1, E0));
+			return Result;
+		}
+	};""",
+                               ],
+                   to_texts=[r"""template<qualifier Q, int E0, int E1, int E2, int E3>
+	struct _swizzle_base1<3, float, Q, E0,E1,E2,E3, true> : public _swizzle_base0<float, 3>
+	{
+		GLM_FUNC_QUALIFIER vec<3, float, Q> operator ()()  const
+		{
+			__m128 data = *reinterpret_cast<__m128 const*>(&this->_buffer);
+
+			vec<3, float, Q> Result;
+#			if GLM_ARCH & GLM_ARCH_AVX_BIT
+				Result.data = _mm_permute_ps(data, _MM_SHUFFLE(E3, E2, E1, E0));
+#			else
+				Result.data = _mm_shuffle_ps(data, data, _MM_SHUFFLE(E3, E2, E1, E0));
+#			endif
+			return Result;
+		}
+	};
+    template<qualifier Q, int E0, int E1, int E2, int E3>
+	struct _swizzle_base1<4, float, Q, E0,E1,E2,E3, true> : public _swizzle_base0<float, 4>
+	{
+		GLM_FUNC_QUALIFIER vec<4, float, Q> operator ()()  const
+		{
+			__m128 data = *reinterpret_cast<__m128 const*>(&this->_buffer);
+
+			vec<4, float, Q> Result;
+#			if GLM_ARCH & GLM_ARCH_AVX_BIT
+				Result.data = _mm_permute_ps(data, _MM_SHUFFLE(E3, E2, E1, E0));
+#			else
+				Result.data = _mm_shuffle_ps(data, data, _MM_SHUFFLE(E3, E2, E1, E0));
+#			endif
+			return Result;
+		}
+	};""",
+                             r"""template<qualifier Q, int E0, int E1, int E2, int E3>
+	struct _swizzle_base1<3, int, Q, E0,E1,E2,E3, true> : public _swizzle_base0<int, 3>
+	{
+		GLM_FUNC_QUALIFIER vec<3, int, Q> operator ()()  const
+		{
+			__m128i data = *reinterpret_cast<__m128i const*>(&this->_buffer);
+
+			vec<3, int, Q> Result;
+			Result.data = _mm_shuffle_epi32(data, _MM_SHUFFLE(E3, E2, E1, E0));
+			return Result;
+		}
+	};
+    template<qualifier Q, int E0, int E1, int E2, int E3>
+	struct _swizzle_base1<4, int, Q, E0,E1,E2,E3, true> : public _swizzle_base0<int, 4>
+	{
+		GLM_FUNC_QUALIFIER vec<4, int, Q> operator ()()  const
+		{
+			__m128i data = *reinterpret_cast<__m128i const*>(&this->_buffer);
+
+			vec<4, int, Q> Result;
+			Result.data = _mm_shuffle_epi32(data, _MM_SHUFFLE(E3, E2, E1, E0));
+			return Result;
+		}
+	};""",
+                             ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 

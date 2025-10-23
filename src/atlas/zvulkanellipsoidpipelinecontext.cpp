@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <cstdint>
 
 namespace nim {
 namespace {
@@ -71,6 +72,9 @@ void ZVulkanEllipsoidPipelineContext::resetFrame()
   m_indexUploadBuffer = VK_NULL_HANDLE;
   m_indexUploadOffset = 0;
   resetDescriptors();
+  m_ddpLightingFrozen = false;
+  m_ddpTransformsFrozen = false;
+  m_ddpMaterialFrozen = false;
 }
 
 void ZVulkanEllipsoidPipelineContext::resetDescriptors()
@@ -109,7 +113,7 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
 
   updateLightingUBO(renderer, batch, payload, pickingPass);
   updateTransformUBO(renderer, batch, payload, pickingPass);
-  ensureDescriptorSets();
+  // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
   CHECK(m_dsLighting && m_dsTransforms) << "Ellipsoid pipeline descriptor sets missing (lighting/transforms)";
 
   ZVulkanDescriptorSet* dsPlaceholderOverride = nullptr;
@@ -226,7 +230,44 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.requirePushConstants = true;
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
-  recorder.recordGraphicsDraw(drawSpec);
+  if (m_backend.ddpIndirectCountEnabled() &&
+      shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    const bool indexed = (drawSpec.indexCount > 0);
+    if (static_cast<VkBuffer>(m_backend.ddpArgsBuffer()) != VK_NULL_HANDLE &&
+        static_cast<VkBuffer>(m_backend.ddpIndirectCountBuffer()) != VK_NULL_HANDLE) {
+      const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(indexed ? sizeof(VkDrawIndexedIndirectCommand)
+                                                                    : sizeof(VkDrawIndirectCommand));
+      recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
+        const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
+        const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+        if (indexed) {
+          m_backend.ddpWriteIndexedArgs(c,
+                                        off,
+                                        drawSpec.indexCount,
+                                        drawSpec.instanceCount,
+                                        drawSpec.firstIndex,
+                                        drawSpec.vertexOffset,
+                                        drawSpec.firstInstance);
+          c.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+        } else {
+          struct Cmd
+          {
+            uint32_t vertexCount;
+            uint32_t instanceCount;
+            uint32_t firstVertex;
+            uint32_t firstInstance;
+          } payload{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
+          auto map = m_backend.ddpArgsBufferObj()->mapRange(off, sizeof(Cmd));
+          if (map) { std::memcpy(map.data(), &payload, sizeof(Cmd)); }
+          c.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndirectCommand));
+        }
+      });
+    } else {
+      recorder.recordGraphicsDraw(drawSpec);
+    }
+  } else {
+    recorder.recordGraphicsDraw(drawSpec);
+  }
 }
 
 void ZVulkanEllipsoidPipelineContext::ensureDescriptorLayouts()
@@ -287,6 +328,11 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
   // OIT params still use a regular UBO and are primed here.
   if (m_dsOIT && m_uboOIT) {
     m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
+    if (!m_backend.isRecording()) {
+      if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
+        m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
+      }
+    }
   }
 }
 
@@ -330,6 +376,12 @@ void ZVulkanEllipsoidPipelineContext::updateLightingUBO(Z3DRendererBase& rendere
                                                         const EllipsoidPayload& payload,
                                                         bool pickingPass)
 {
+  const auto hook = renderer.shaderHookType();
+  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
+  if (ddp && m_ddpLightingFrozen) {
+    return;
+  }
   
 
   LightingUBOStd140 lighting{};
@@ -383,6 +435,7 @@ void ZVulkanEllipsoidPipelineContext::updateLightingUBO(Z3DRendererBase& rendere
     auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
     std::memcpy(slice.mapped, &lighting, sizeof(lighting));
     m_dynLightingOffset = slice.offset;
+    if (ddp) { m_ddpLightingFrozen = true; }
   }
 }
 
@@ -391,6 +444,9 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
                                                          const EllipsoidPayload& payload,
                                                          bool pickingPass)
 {
+  const auto hook = renderer.shaderHookType();
+  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   CHECK(payload.params != nullptr) << "Ellipsoid payload missing params";
   
 
@@ -407,10 +463,11 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   transforms.parameters = glm::vec4(payload.params->sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
 
-  {
+  if (!(ddp && m_ddpTransformsFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
     std::memcpy(slice.mapped, &transforms, sizeof(transforms));
     m_dynTransformsOffset = slice.offset;
+    if (ddp) { m_ddpTransformsFrozen = true; }
   }
 
   MaterialUBOStd140 material{};
@@ -428,10 +485,11 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
     material.material_shininess = 0.0f;
   }
 
-  {
+  if (!(ddp && m_ddpMaterialFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
     std::memcpy(slice.mapped, &material, sizeof(material));
     m_dynMaterialOffset = slice.offset;
+    if (ddp) { m_ddpMaterialFrozen = true; }
   }
 
   VLOG(2) << fmt::format("VK ellipsoid params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",
