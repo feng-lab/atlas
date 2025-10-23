@@ -644,33 +644,41 @@ set(APP_NAME Atlas)
 set(ATLAS_SOURCES_NO_MAIN ${SOURCES})
 list(REMOVE_ITEM ATLAS_SOURCES_NO_MAIN main.cpp)
 
-# Static library that compiles all Atlas sources (except main) for reuse by tests and the app.
-add_library(atlas_lib STATIC
+###
+# Split monolithic atlas_lib into two static libraries to avoid Windows COFF 4GB limit
+# while keeping a stable consumer target name via an umbrella INTERFACE library.
+#
+# atlas_core    — all non-Vulkan code (Z3D*, UI, filters, etc.)
+# atlas_vulkan  — Vulkan-only code (ZVulkan*)
+# atlas_lib     — INTERFACE target that pulls in both (consumers link just atlas_lib)
+###
+
+# Partition core vs Vulkan sources from the full source set (minus main.cpp).
+set(ATLAS_VULKAN_SOURCES ${ATLAS_SOURCES_NO_MAIN})
+list(FILTER ATLAS_VULKAN_SOURCES INCLUDE REGEX "(^|/)zvulkan[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+
+set(ATLAS_CORE_SOURCES ${ATLAS_SOURCES_NO_MAIN})
+list(FILTER ATLAS_CORE_SOURCES EXCLUDE REGEX "(^|/)zvulkan[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
+
+# Core static library
+add_library(atlas_core STATIC
             ${SYS_SOURCES}
             ${QTCSV_SOURCES}
             ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
-            ${ATLAS_SOURCES_NO_MAIN}
+            ${ATLAS_CORE_SOURCES}
             ${PROTO_SRCS} ${GRPC_SRCS})
 
-add_dependencies(atlas_lib vulkan_shaders)
-
-target_include_directories(atlas_lib
+target_include_directories(atlas_core
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(atlas_lib
+target_include_directories(atlas_core
   SYSTEM PRIVATE
     ${QTCSVDIR} ${QTCSVDIR}/include
     ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
-if (WIN32)
-  target_include_directories(atlas_lib PUBLIC $ENV{VULKAN_SDK}/Include)
-else ()
-  # Do not use Vulkan::Headers, which might point to /usr/include
-  target_include_directories(atlas_lib PUBLIC $ENV{VULKAN_SDK}/include)
-endif ()
-target_compile_definitions(atlas_lib PUBLIC ATLAS_USE_CORE_PROFILE)
+target_compile_definitions(atlas_core PUBLIC ATLAS_USE_CORE_PROFILE)
 
-target_link_libraries(atlas_lib PUBLIC
+target_link_libraries(atlas_core PUBLIC
   img neutu
   glbinding::glbinding-aux glbinding::glbinding
   ${OpenCV_LIBS}
@@ -679,11 +687,38 @@ target_link_libraries(atlas_lib PUBLIC
   Qt6::CorePrivate Qt6::Test
   gRPC::grpc++ protobuf::libprotobuf)
 if (UNIX AND NOT APPLE)
-  target_link_libraries(atlas_lib PUBLIC OpenGL::OpenGL OpenGL::EGL)
+  target_link_libraries(atlas_core PUBLIC OpenGL::OpenGL OpenGL::EGL)
 endif ()
 if (ATLAS_USE_OPENGLWIDGET)
-  target_link_libraries(atlas_lib PUBLIC Qt6::OpenGLWidgets)
+  target_link_libraries(atlas_core PUBLIC Qt6::OpenGLWidgets)
 endif ()
+
+# Vulkan static library
+add_library(atlas_vulkan STATIC ${ATLAS_VULKAN_SOURCES})
+
+# Shader build dependency for Vulkan code
+add_dependencies(atlas_vulkan vulkan_shaders)
+
+# Vulkan headers (do not rely on potentially system-wide Vulkan::Headers)
+if (WIN32)
+  target_include_directories(atlas_vulkan PUBLIC $ENV{VULKAN_SDK}/Include)
+else ()
+  target_include_directories(atlas_vulkan PUBLIC $ENV{VULKAN_SDK}/include)
+endif ()
+
+# Share common include roots and definitions as well, to mirror previous atlas_lib behavior
+target_include_directories(atlas_vulkan PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+target_compile_definitions(atlas_vulkan PUBLIC ATLAS_USE_CORE_PROFILE)
+
+# atlas_vulkan depends on core symbols
+target_link_libraries(atlas_vulkan PRIVATE atlas_core)
+
+# Enable IPO/LTCG for Release where supported
+set_property(TARGET atlas_core atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+
+# Umbrella target preserves the original consumer name without producing a giant .lib
+add_library(atlas_lib INTERFACE)
+target_link_libraries(atlas_lib INTERFACE atlas_core atlas_vulkan)
 
 # Final application links the object files plus the entry point and assets.
 add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE

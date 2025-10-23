@@ -12,8 +12,11 @@ Build, Run, and Layout
 
 Testing (Linking Atlas Code)
 
-- Atlas is still a Qt GUI app, but common code is now compiled into an object library `atlas_objs` and archived as a static library `atlas_lib`.
-- Tests can link `atlas_lib` to access internal headers and compiled objects without turning the app itself into a library.
+- Atlas is still a Qt GUI app. Common code now builds as two static libraries to keep Windows COFF archives well under 4GB with LTCG enabled:
+  - `atlas_core` (STATIC) — non‑Vulkan code (`Z3D*`, UI, filters, etc.)
+  - `atlas_vulkan` (STATIC) — Vulkan‑only code (`ZVulkan*`)
+  - `atlas_lib` (INTERFACE) — umbrella target that links both, preserving a single consumer dependency.
+- Tests and apps should continue to link `atlas_lib`; usage requirements (include dirs/defs and transitive link deps) are propagated via the umbrella target.
 - Usage in CMake (already wired in `test/test.cmake`):
   - `add_atlas_gtest_executable(name)` links `GTest::gtest_main` and `atlas_lib`, inheriting all include dirs/defs (Qt, glbinding, Vulkan, etc.).
   - For headless Qt runs, the tests default to `QT_QPA_PLATFORM=minimal`.
