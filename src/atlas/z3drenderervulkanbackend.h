@@ -334,14 +334,18 @@ private:
     } uniformArena;
 
     // DDP: per-frame resources for indirect-count early stop
-    std::unique_ptr<class ZVulkanBuffer> ddpChangedFlag;   // STORAGE | TRANSFER_DST
+    std::unique_ptr<class ZVulkanBuffer> ddpChangedFlag; // STORAGE | TRANSFER_DST
     std::unique_ptr<class ZVulkanBuffer> ddpIndirectCount; // STORAGE | INDIRECT_BUFFER | TRANSFER_DST
-    struct IndirectArena
+    // Removed host-visible args arena; device-local args only
+    // Device-local arena for DDP indirect draw command payloads (args). Contents
+    // are populated via upload arena + scheduleStaticCopy outside dynamic rendering.
+    struct IndirectDeviceArena
     {
-      std::unique_ptr<class ZVulkanBuffer> buffer; // INDIRECT_BUFFER | TRANSFER_DST
+      std::unique_ptr<class ZVulkanBuffer> buffer; // INDIRECT_BUFFER | TRANSFER_DST (device-local)
       size_t capacity = 0;
       size_t cursor = 0;
-    } ddpArgs;
+      std::vector<std::unique_ptr<class ZVulkanBuffer>> retiredBuffers; // keep old buffers alive for frame
+    } ddpArgsDevice;
 
     // Static device-local staging stats
     size_t staticBytesStaged = 0; // bytes staged to device-local this frame
@@ -354,10 +358,16 @@ private:
 
     struct ScheduledCopy
     {
+      enum class Usage
+      {
+        Vertex,
+        Index,
+        Indirect
+      };
       vk::Buffer dst{};
       vk::DeviceSize dstOffset{0};
       UploadSlice src{};
-      bool isIndex = false;
+      Usage usage = Usage::Vertex;
     };
     std::vector<ScheduledCopy> scheduledCopies;
   };
@@ -380,21 +390,16 @@ public:
   vk::Buffer ddpIndirectCountBuffer();
   class ZVulkanBuffer* ddpChangedFlagBufferObj();
   class ZVulkanBuffer* ddpIndirectCountBufferObj();
-  vk::Buffer ddpArgsBuffer();
-  class ZVulkanBuffer* ddpArgsBufferObj();
-  vk::DeviceSize ddpAllocArgsSlot(size_t bytes);
-  void ddpWriteIndexedArgs(vk::raii::CommandBuffer& cmd,
-                           vk::DeviceSize offset,
-                           uint32_t indexCount,
-                           uint32_t instanceCount,
-                           uint32_t firstIndex,
-                           int32_t vertexOffset,
-                           uint32_t firstInstance);
+  // Device-local indirect args arena helpers
+  vk::Buffer ddpDeviceArgsBuffer();
+  vk::DeviceSize ddpAllocDeviceArgsSlot(size_t bytes);
   void ddpResetForPass(vk::raii::CommandBuffer& cmd, bool firstPass);
   void ddpBarrierTransferToFrag(vk::raii::CommandBuffer& cmd);
   void ddpBarrierFragToCompute(vk::raii::CommandBuffer& cmd);
   void ddpBarrierComputeToIndirect(vk::raii::CommandBuffer& cmd);
   void ddpDispatchCountCompute(vk::raii::CommandBuffer& cmd);
+  // Schedule a static copy for indirect args (upload arena -> device-local args buffer)
+  void scheduleStaticCopyIndirect(vk::Buffer dst, vk::DeviceSize dstOffset, const UploadSlice& src);
 
   // Orchestrate DDP passes while the draw callback records the peel draw per pass.
   // The callback must record all necessary batches for the given pass into 'cmd'.

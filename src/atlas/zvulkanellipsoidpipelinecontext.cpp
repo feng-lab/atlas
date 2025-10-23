@@ -72,6 +72,8 @@ void ZVulkanEllipsoidPipelineContext::resetFrame()
   m_indexUploadBuffer = VK_NULL_HANDLE;
   m_indexUploadOffset = 0;
   resetDescriptors();
+  m_ddpArgsPrepared = false;
+  m_ddpArgsOffset = 0;
   m_ddpLightingFrozen = false;
   m_ddpTransformsFrozen = false;
   m_ddpMaterialFrozen = false;
@@ -200,20 +202,10 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   }
   drawSpec.expectedDescriptorSetCount = expectedSets;
 
-  drawSpec.vertexBuffers = {m_axis1Buffer,
-                            m_axis2Buffer,
-                            m_axis3Buffer,
-                            m_centerBuffer,
-                            m_colorBuffer,
-                            m_flagsBuffer,
-                            m_specularBuffer};
-  drawSpec.vertexOffsets = {m_axis1Offset,
-                            m_axis2Offset,
-                            m_axis3Offset,
-                            m_centerOffset,
-                            m_colorOffset,
-                            m_flagsOffset,
-                            m_specularOffset};
+  drawSpec.vertexBuffers =
+    {m_axis1Buffer, m_axis2Buffer, m_axis3Buffer, m_centerBuffer, m_colorBuffer, m_flagsBuffer, m_specularBuffer};
+  drawSpec.vertexOffsets =
+    {m_axis1Offset, m_axis2Offset, m_axis3Offset, m_centerOffset, m_colorOffset, m_flagsOffset, m_specularOffset};
   if (m_indexCount > 0 && m_indexUploadBuffer) {
     drawSpec.indexBuffer = m_indexUploadBuffer;
     drawSpec.indexOffset = m_indexUploadOffset;
@@ -230,41 +222,54 @@ void ZVulkanEllipsoidPipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.requirePushConstants = true;
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
-  if (m_backend.ddpIndirectCountEnabled() &&
-      shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+  if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
     const bool indexed = (drawSpec.indexCount > 0);
-    if (static_cast<VkBuffer>(m_backend.ddpArgsBuffer()) != VK_NULL_HANDLE &&
-        static_cast<VkBuffer>(m_backend.ddpIndirectCountBuffer()) != VK_NULL_HANDLE) {
-      const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(indexed ? sizeof(VkDrawIndexedIndirectCommand)
-                                                                    : sizeof(VkDrawIndirectCommand));
-      recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
-        const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
-        const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
-        if (indexed) {
-          m_backend.ddpWriteIndexedArgs(c,
-                                        off,
-                                        drawSpec.indexCount,
-                                        drawSpec.instanceCount,
-                                        drawSpec.firstIndex,
-                                        drawSpec.vertexOffset,
-                                        drawSpec.firstInstance);
-          c.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
-        } else {
-          struct Cmd
-          {
-            uint32_t vertexCount;
-            uint32_t instanceCount;
-            uint32_t firstVertex;
-            uint32_t firstInstance;
-          } payload{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
-          auto map = m_backend.ddpArgsBufferObj()->mapRange(off, sizeof(Cmd));
-          if (map) { std::memcpy(map.data(), &payload, sizeof(Cmd)); }
-          c.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndirectCommand));
+    if (static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE) {
+      m_ddpArgsOffset = m_backend.ddpAllocDeviceArgsSlot(indexed ? sizeof(VkDrawIndexedIndirectCommand)
+                                                                 : sizeof(VkDrawIndirectCommand));
+      if (indexed) {
+        struct Cmd
+        {
+          uint32_t indexCount, instanceCount, firstIndex;
+          int32_t vertexOffset;
+          uint32_t firstInstance;
+        } cmdPayload{drawSpec.indexCount,
+                     drawSpec.instanceCount,
+                     drawSpec.firstIndex,
+                     drawSpec.vertexOffset,
+                     drawSpec.firstInstance};
+        auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+        if (slice.buffer && slice.mapped) {
+          std::memcpy(slice.mapped, &cmdPayload, sizeof(Cmd));
         }
-      });
-    } else {
-      recorder.recordGraphicsDraw(drawSpec);
+        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), m_ddpArgsOffset, slice);
+      } else {
+        struct Cmd
+        {
+          uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
+        } cmdPayload{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
+        auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+        if (slice.buffer && slice.mapped) {
+          std::memcpy(slice.mapped, &cmdPayload, sizeof(Cmd));
+        }
+        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), m_ddpArgsOffset, slice);
+      }
+      m_ddpArgsPrepared = true;
     }
+    recorder.recordGraphicsDraw(drawSpec);
+  } else if (m_backend.ddpIndirectCountEnabled() &&
+             shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    const bool indexed = (drawSpec.indexCount > 0);
+    recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
+      const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
+      const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+      CHECK(m_ddpArgsPrepared) << "Ellipsoid DDP peel: args not prepared in init";
+      if (indexed) {
+        c.drawIndexedIndirectCount(argsBuf, m_ddpArgsOffset, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+      } else {
+        c.drawIndirectCount(argsBuf, m_ddpArgsOffset, cntBuf, 0, 1, sizeof(VkDrawIndirectCommand));
+      }
+    });
   } else {
     recorder.recordGraphicsDraw(drawSpec);
   }
@@ -382,7 +387,6 @@ void ZVulkanEllipsoidPipelineContext::updateLightingUBO(Z3DRendererBase& rendere
   if (ddp && m_ddpLightingFrozen) {
     return;
   }
-  
 
   LightingUBOStd140 lighting{};
   const auto& scene = renderer.sceneState();
@@ -435,7 +439,9 @@ void ZVulkanEllipsoidPipelineContext::updateLightingUBO(Z3DRendererBase& rendere
     auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
     std::memcpy(slice.mapped, &lighting, sizeof(lighting));
     m_dynLightingOffset = slice.offset;
-    if (ddp) { m_ddpLightingFrozen = true; }
+    if (ddp) {
+      m_ddpLightingFrozen = true;
+    }
   }
 }
 
@@ -448,7 +454,6 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
   const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
                     hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   CHECK(payload.params != nullptr) << "Ellipsoid payload missing params";
-  
 
   TransformsUBOStd140 transforms{};
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
@@ -467,7 +472,9 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
     std::memcpy(slice.mapped, &transforms, sizeof(transforms));
     m_dynTransformsOffset = slice.offset;
-    if (ddp) { m_ddpTransformsFrozen = true; }
+    if (ddp) {
+      m_ddpTransformsFrozen = true;
+    }
   }
 
   MaterialUBOStd140 material{};
@@ -489,7 +496,9 @@ void ZVulkanEllipsoidPipelineContext::updateTransformUBO(Z3DRendererBase& render
     auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
     std::memcpy(slice.mapped, &material, sizeof(material));
     m_dynMaterialOffset = slice.offset;
-    if (ddp) { m_ddpMaterialFrozen = true; }
+    if (ddp) {
+      m_ddpMaterialFrozen = true;
+    }
   }
 
   VLOG(2) << fmt::format("VK ellipsoid params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",

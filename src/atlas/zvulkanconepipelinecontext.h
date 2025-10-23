@@ -139,6 +139,9 @@ private:
   bool m_ddpLightingFrozen{false};
   bool m_ddpTransformsFrozen{false};
   bool m_ddpMaterialFrozen{false};
+  // Device-local indirect args; prepared during DDP init
+  bool m_ddpArgsPrepared{false};
+  vk::DeviceSize m_ddpArgsOffset{0};
 
   // Static promotion cache
   struct CacheKey

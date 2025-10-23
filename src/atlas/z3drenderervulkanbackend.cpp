@@ -1936,16 +1936,18 @@ void Z3DRendererVulkanBackend::ensureDDPGatingResources(FrameResources& frame)
                                      vk::BufferUsageFlagBits::eTransferDst,
                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
   }
-  if (!frame.ddpArgs.buffer) {
-    // Host-visible args buffer so we can CPU-write indirect command payloads without
-    // vkCmdUpdateBuffer inside dynamic rendering segments.
+  if (!frame.ddpArgsDevice.buffer) {
+    // Device-local args buffer for indirect draws; contents populated by copy from upload arena.
     const size_t cap = 64 * sizeof(VkDrawIndexedIndirectCommand);
-    frame.ddpArgs.buffer = m_sharedDevice->createBuffer(cap,
-                                                        vk::BufferUsageFlagBits::eIndirectBuffer,
-                                                        vk::MemoryPropertyFlagBits::eHostVisible |
-                                                          vk::MemoryPropertyFlagBits::eHostCoherent);
-    frame.ddpArgs.capacity = cap;
-    frame.ddpArgs.cursor = 0;
+    frame.ddpArgsDevice.buffer =
+      m_sharedDevice->createBuffer(cap,
+                                   vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst,
+                                   vk::MemoryPropertyFlagBits::eDeviceLocal);
+    frame.ddpArgsDevice.capacity = cap;
+    frame.ddpArgsDevice.cursor = 0;
+  } else {
+    // Reset cursor for new frame
+    frame.ddpArgsDevice.cursor = 0;
   }
 }
 
@@ -2035,70 +2037,51 @@ ZVulkanBuffer* Z3DRendererVulkanBackend::ddpIndirectCountBufferObj()
   return m_activeFrame->ddpIndirectCount.get();
 }
 
-vk::Buffer Z3DRendererVulkanBackend::ddpArgsBuffer()
+vk::Buffer Z3DRendererVulkanBackend::ddpDeviceArgsBuffer()
 {
   if (!m_activeFrame) {
-    return {};
+    return vk::Buffer{};
   }
   ensureDDPGatingResources(*m_activeFrame);
-  return m_activeFrame->ddpArgs.buffer ? m_activeFrame->ddpArgs.buffer->buffer() : vk::Buffer{};
+  return m_activeFrame->ddpArgsDevice.buffer ? m_activeFrame->ddpArgsDevice.buffer->buffer() : vk::Buffer{};
 }
 
-ZVulkanBuffer* Z3DRendererVulkanBackend::ddpArgsBufferObj()
-{
-  if (!m_activeFrame) {
-    return nullptr;
-  }
-  ensureDDPGatingResources(*m_activeFrame);
-  return m_activeFrame->ddpArgs.buffer.get();
-}
-vk::DeviceSize Z3DRendererVulkanBackend::ddpAllocArgsSlot(size_t bytes)
+vk::DeviceSize Z3DRendererVulkanBackend::ddpAllocDeviceArgsSlot(size_t bytes)
 {
   if (!m_activeFrame) {
     return 0;
   }
   ensureDDPGatingResources(*m_activeFrame);
-  auto& arena = m_activeFrame->ddpArgs;
-  if (arena.cursor + bytes > arena.capacity) {
-    // grow
-    size_t newCap = std::max(arena.capacity * 2, arena.cursor + bytes);
+  auto& arena = m_activeFrame->ddpArgsDevice;
+  // Align to 16 bytes to satisfy both VkDraw(Indexed)IndirectCommand requirements
+  const size_t align = 16;
+  auto alignUpSz = [](size_t v, size_t a) {
+    size_t m = a - 1;
+    return (v + m) & ~m;
+  };
+  const size_t off = alignUpSz(arena.cursor, align);
+  if (off + bytes > arena.capacity) {
+    // Grow device-local args arena; keep old buffer alive until frame end
+    size_t newCap = arena.capacity ? arena.capacity : (64 * sizeof(VkDrawIndexedIndirectCommand));
+    while (newCap < off + bytes) {
+      newCap *= 2;
+    }
+    if (arena.buffer) {
+      arena.retiredBuffers.push_back(std::move(arena.buffer));
+    }
     arena.buffer =
       m_sharedDevice->createBuffer(newCap,
                                    vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst,
                                    vk::MemoryPropertyFlagBits::eDeviceLocal);
     arena.capacity = newCap;
     arena.cursor = 0;
+    return ddpAllocDeviceArgsSlot(bytes);
   }
-  const vk::DeviceSize off = arena.cursor;
-  arena.cursor += bytes;
-  return off;
+  m_activeFrame->ddpArgsDevice.cursor = off + bytes;
+  return static_cast<vk::DeviceSize>(off);
 }
 
-void Z3DRendererVulkanBackend::ddpWriteIndexedArgs(vk::raii::CommandBuffer& cmd,
-                                                   vk::DeviceSize offset,
-                                                   uint32_t indexCount,
-                                                   uint32_t instanceCount,
-                                                   uint32_t firstIndex,
-                                                   int32_t vertexOffset,
-                                                   uint32_t firstInstance)
-{
-  (void)cmd; // args are written via host mapping; no GPU update inside recording
-  if (!m_activeFrame || !m_activeFrame->ddpArgs.buffer) {
-    return;
-  }
-  struct Cmd
-  {
-    uint32_t indexCount;
-    uint32_t instanceCount;
-    uint32_t firstIndex;
-    int32_t vertexOffset;
-    uint32_t firstInstance;
-  } payload{indexCount, instanceCount, firstIndex, vertexOffset, firstInstance};
-  auto map = m_activeFrame->ddpArgs.buffer->mapRange(offset, sizeof(Cmd));
-  if (map) {
-    std::memcpy(map.data(), &payload, sizeof(Cmd));
-  }
-}
+// Host-visible args path removed; device-local indirect args only
 
 void Z3DRendererVulkanBackend::ddpResetForPass(vk::raii::CommandBuffer& cmd, bool firstPass)
 {
@@ -2164,6 +2147,22 @@ void Z3DRendererVulkanBackend::ddpDispatchCountCompute(vk::raii::CommandBuffer& 
   cmd.bindPipeline(vk::PipelineBindPoint::eCompute, **m_ddpCountPipeline);
   cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, **m_ddpCountPipelineLayout, 0, {ds->descriptorSet()}, {});
   cmd.dispatch(1, 1, 1);
+}
+
+void Z3DRendererVulkanBackend::scheduleStaticCopyIndirect(vk::Buffer dst,
+                                                          vk::DeviceSize dstOffset,
+                                                          const UploadSlice& src)
+{
+  if (!m_activeFrame) {
+    return;
+  }
+  // Reuse scheduled copy mechanism but ensure barrier targets DrawIndirect stage
+  FrameResources::ScheduledCopy sc{};
+  sc.dst = dst;
+  sc.dstOffset = dstOffset;
+  sc.src = src;
+  sc.usage = FrameResources::ScheduledCopy::Usage::Indirect;
+  m_activeFrame->scheduledCopies.push_back(sc);
 }
 
 void Z3DRendererVulkanBackend::ddpOrchestrate(uint32_t maxPasses,
@@ -2433,15 +2432,16 @@ void Z3DRendererVulkanBackend::ensureDevice()
     resetFrameResources();
     // Cache device feature gates for DDP and fragment SSBO writes
     try {
-      auto features2 = m_sharedDevice->context().physicalDevice()
+      auto features2 = m_sharedDevice->context()
+                         .physicalDevice()
                          .getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan12Features>();
       const auto& f1 = features2.get<vk::PhysicalDeviceFeatures2>().features;
       const auto& f12 = features2.get<vk::PhysicalDeviceVulkan12Features>();
       m_supportsFragStoresAndAtomics = (f1.fragmentStoresAndAtomics == VK_TRUE);
       m_supportsDrawIndirectCount = (f12.drawIndirectCount == VK_TRUE);
       VLOG(1) << fmt::format("VK device gates: fragStoresAndAtomics={} drawIndirectCount={}",
-                              m_supportsFragStoresAndAtomics,
-                              m_supportsDrawIndirectCount);
+                             m_supportsFragStoresAndAtomics,
+                             m_supportsDrawIndirectCount);
     }
     catch (...) {
       m_supportsFragStoresAndAtomics = false;
@@ -2833,7 +2833,7 @@ void Z3DRendererVulkanBackend::scheduleStaticCopy(vk::Buffer dst,
   sc.dst = dst;
   sc.dstOffset = dstOffset;
   sc.src = src;
-  sc.isIndex = isIndexBuffer;
+  sc.usage = isIndexBuffer ? FrameResources::ScheduledCopy::Usage::Index : FrameResources::ScheduledCopy::Usage::Vertex;
   m_activeFrame->scheduledCopies.push_back(sc);
 }
 
@@ -2855,12 +2855,22 @@ void Z3DRendererVulkanBackend::flushScheduledCopies(vk::raii::CommandBuffer& cmd
                           .size = static_cast<vk::DeviceSize>(sc.src.size)};
     cmd.copyBuffer(sc.src.buffer, sc.dst, region);
 
-    // Make transfer writes visible to vertex input for subsequent frames
+    // Make transfer writes visible to the consumer stage for next usage
     vk::BufferMemoryBarrier2 barrier{};
     barrier.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
     barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
-    barrier.dstStageMask = vk::PipelineStageFlagBits2::eVertexInput;
-    barrier.dstAccessMask = sc.isIndex ? vk::AccessFlagBits2::eIndexRead : vk::AccessFlagBits2::eVertexAttributeRead;
+    // Respect scheduled usage tag
+    auto usage = sc.usage;
+    if (usage == FrameResources::ScheduledCopy::Usage::Indirect) {
+      barrier.dstStageMask = vk::PipelineStageFlagBits2::eDrawIndirect;
+      barrier.dstAccessMask = vk::AccessFlagBits2::eIndirectCommandRead;
+    } else if (usage == FrameResources::ScheduledCopy::Usage::Index) {
+      barrier.dstStageMask = vk::PipelineStageFlagBits2::eVertexInput;
+      barrier.dstAccessMask = vk::AccessFlagBits2::eIndexRead;
+    } else {
+      barrier.dstStageMask = vk::PipelineStageFlagBits2::eVertexInput;
+      barrier.dstAccessMask = vk::AccessFlagBits2::eVertexAttributeRead;
+    }
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.buffer = sc.dst;

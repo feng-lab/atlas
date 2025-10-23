@@ -178,6 +178,7 @@ void ZVulkanMeshPipelineContext::resetFrame()
   m_ddpLightingFrozen = false;
   m_ddpTransformsFrozen = false;
   m_ddpMaterialFrozen = false;
+  m_ddpArgsOffsets.clear();
 }
 
 void ZVulkanMeshPipelineContext::flushRetainedUbos()
@@ -369,10 +370,17 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       uint32_t texBindingIndex = 3;
       if (!m_backend.device().supportsVertexInputDynamicState()) {
         switch (m_texBinding) {
-          case TexBinding::Tex1D: texBindingIndex = 3; break;
-          case TexBinding::Tex2D: texBindingIndex = 4; break;
-          case TexBinding::Tex3D: texBindingIndex = 5; break;
-          default: break;
+          case TexBinding::Tex1D:
+            texBindingIndex = 3;
+            break;
+          case TexBinding::Tex2D:
+            texBindingIndex = 4;
+            break;
+          case TexBinding::Tex3D:
+            texBindingIndex = 5;
+            break;
+          default:
+            break;
         }
       }
       std::array<vk::Buffer, 1> texBuf{m_texBuffer};
@@ -382,9 +390,15 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
 
     std::array<vk::Buffer, 1> dummyBuf{m_backend.dummyVertexBuffer()};
     std::array<vk::DeviceSize, 1> dummyOff{0};
-    if (m_texBinding != TexBinding::Tex1D) { cb.bindVertexBuffers(3, dummyBuf, dummyOff); }
-    if (m_texBinding != TexBinding::Tex2D) { cb.bindVertexBuffers(4, dummyBuf, dummyOff); }
-    if (m_texBinding != TexBinding::Tex3D) { cb.bindVertexBuffers(5, dummyBuf, dummyOff); }
+    if (m_texBinding != TexBinding::Tex1D) {
+      cb.bindVertexBuffers(3, dummyBuf, dummyOff);
+    }
+    if (m_texBinding != TexBinding::Tex2D) {
+      cb.bindVertexBuffers(4, dummyBuf, dummyOff);
+    }
+    if (m_texBinding != TexBinding::Tex3D) {
+      cb.bindVertexBuffers(5, dummyBuf, dummyOff);
+    }
     if (m_indexCount > 0 && m_indexUploadBuffer) {
       cb.bindIndexBuffer(m_indexUploadBuffer, m_indexUploadOffset, vk::IndexType::eUint32);
     }
@@ -441,46 +455,63 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
         {
           std::array<vk::DescriptorSet, 2> dynSets{m_dsLighting->descriptorSet(), m_dsTransforms->descriptorSet()};
           std::array<uint32_t, 3> dynOff{static_cast<uint32_t>(m_dynLightingOffset),
-                                          static_cast<uint32_t>(m_dynTransformsOffset),
-                                          static_cast<uint32_t>(m_dynMaterialOffset)};
+                                         static_cast<uint32_t>(m_dynTransformsOffset),
+                                         static_cast<uint32_t>(m_dynMaterialOffset)};
           cb.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, layoutHandle, 1, dynSets, dynOff);
         }
 
-        if (m_backend.ddpIndirectCountEnabled() &&
-            shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
-          if (static_cast<VkBuffer>(m_backend.ddpArgsBuffer()) != VK_NULL_HANDLE &&
-              static_cast<VkBuffer>(m_backend.ddpIndirectCountBuffer()) != VK_NULL_HANDLE) {
+        if (m_backend.ddpIndirectCountEnabled()) {
+          if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
+            // Prepare device-local args and store offsets
+            if (static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE) {
+              if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
+                struct Cmd
+                {
+                  uint32_t indexCount, instanceCount, firstIndex;
+                  int32_t vertexOffset;
+                  uint32_t firstInstance;
+                } cmd{draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0};
+                const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+                auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+                if (slice.buffer && slice.mapped) {
+                  std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
+                }
+                m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+                m_ddpArgsOffsets.push_back(off);
+              } else {
+                struct Cmd
+                {
+                  uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
+                } cmd{draw.vertexCount, 1, draw.firstVertex, 0};
+                const vk::DeviceSize off = m_backend.ddpAllocDeviceArgsSlot(sizeof(Cmd));
+                auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+                if (slice.buffer && slice.mapped) {
+                  std::memcpy(slice.mapped, &cmd, sizeof(Cmd));
+                }
+                m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), off, slice);
+                m_ddpArgsOffsets.push_back(off);
+              }
+            }
+            // Emit init draw as usual
             if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
-              const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(sizeof(VkDrawIndexedIndirectCommand));
-              const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
-              const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
-              m_backend.ddpWriteIndexedArgs(cb,
-                                            off,
-                                            draw.indexCount,
-                                            1,
-                                            draw.firstIndex,
-                                            static_cast<int32_t>(draw.firstVertex),
-                                            0);
-              // Host-visible coherent args; no transfer barrier inside dynamic rendering.
+              cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
+            } else {
+              cb.draw(draw.vertexCount, 1, draw.firstVertex, 0);
+            }
+          } else if (shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+            // Use prepared args in order
+            static size_t ddpCursor = 0;
+            CHECK(ddpCursor < m_ddpArgsOffsets.size()) << "Mesh DDP peel: args not prepared in init";
+            const vk::DeviceSize off = m_ddpArgsOffsets[ddpCursor++];
+            const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
+            const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+            if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
               cb.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
             } else {
-              struct Cmd
-              {
-                uint32_t vertexCount;
-                uint32_t instanceCount;
-                uint32_t firstVertex;
-                uint32_t firstInstance;
-              } cmdPayload{draw.vertexCount, 1, draw.firstVertex, 0};
-              const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(sizeof(Cmd));
-              const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
-              const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
-              auto map = m_backend.ddpArgsBufferObj()->mapRange(off, sizeof(Cmd));
-              if (map) {
-                std::memcpy(map.data(), &cmdPayload, sizeof(Cmd));
-              }
-              cb.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(Cmd));
+              cb.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(uint32_t) * 4);
             }
           } else {
+            // Non-DDP
             if (draw.indexed && draw.indexCount > 0 && m_indexUploadBuffer) {
               cb.drawIndexed(draw.indexCount, 1, draw.firstIndex, static_cast<int32_t>(draw.firstVertex), 0);
             } else {
@@ -645,7 +676,6 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
   if (ddp && m_ddpLightingFrozen) {
     return;
   }
-  
 
   LightingUBOStd140 lighting{};
   const auto& scene = renderer.sceneState();
@@ -699,7 +729,9 @@ void ZVulkanMeshPipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
     auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
     std::memcpy(slice.mapped, &lighting, sizeof(lighting));
     m_dynLightingOffset = slice.offset;
-    if (ddp) { m_ddpLightingFrozen = true; }
+    if (ddp) {
+      m_ddpLightingFrozen = true;
+    }
   }
 }
 
@@ -710,16 +742,14 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   const auto hook = renderer.shaderHookType();
   const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
                     hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  
-  
 
   CHECK(payload.params != nullptr) << "Mesh payload missing params";
   TransformsUBOStd140 transforms{};
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
   transforms.view_matrix = eyeState.viewMatrix;
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
-  const glm::mat4 model = (payload.followCoordTransform && payload.params) ? payload.params->coordTransform
-                                                                           : glm::mat4(1.0f);
+  const glm::mat4 model =
+    (payload.followCoordTransform && payload.params) ? payload.params->coordTransform : glm::mat4(1.0f);
   transforms.pos_transform = model;
 
   const glm::mat4 combined = eyeState.viewMatrix * transforms.pos_transform;
@@ -734,7 +764,9 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
     std::memcpy(slice.mapped, &transforms, sizeof(transforms));
     m_dynTransformsOffset = slice.offset;
-    if (ddp) { m_ddpTransformsFrozen = true; }
+    if (ddp) {
+      m_ddpTransformsFrozen = true;
+    }
   }
 
   MaterialUBOStd140 material{};
@@ -750,7 +782,9 @@ void ZVulkanMeshPipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
     std::memcpy(slice.mapped, &material, sizeof(material));
     m_dynMaterialOffset = slice.offset;
-    if (ddp) { m_ddpMaterialFrozen = true; }
+    if (ddp) {
+      m_ddpMaterialFrozen = true;
+    }
   }
 
   VLOG(2) << fmt::format("VK mesh xf params: sizeScale={:.3f} ortho={}",

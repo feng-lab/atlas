@@ -128,6 +128,9 @@ private:
   vk::DeviceSize m_dynLightingOffset{0};
   vk::DeviceSize m_dynTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
+  // Device-local indirect args for DDP
+  bool m_ddpArgsPrepared{false};
+  vk::DeviceSize m_ddpArgsOffset{0};
   // Freeze dynamic UBOs during DDP passes to avoid per-pass allocations
   bool m_ddpLightingFrozen{false};
   bool m_ddpTransformsFrozen{false};

@@ -91,6 +91,8 @@ void ZVulkanConePipelineContext::resetFrame()
   m_ddpLightingFrozen = false;
   m_ddpTransformsFrozen = false;
   m_ddpMaterialFrozen = false;
+  m_ddpArgsPrepared = false;
+  m_ddpArgsOffset = 0;
 }
 
 void ZVulkanConePipelineContext::flushRetainedUbos()
@@ -276,41 +278,54 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.requirePushConstants = true;
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
-  if (m_backend.ddpIndirectCountEnabled() &&
-      shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+  if (m_backend.ddpIndirectCountEnabled() && shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit) {
     const bool indexed = (drawSpec.indexCount > 0);
-    if (static_cast<VkBuffer>(m_backend.ddpArgsBuffer()) != VK_NULL_HANDLE &&
-        static_cast<VkBuffer>(m_backend.ddpIndirectCountBuffer()) != VK_NULL_HANDLE) {
-      const vk::DeviceSize off = m_backend.ddpAllocArgsSlot(indexed ? sizeof(VkDrawIndexedIndirectCommand)
-                                                                    : sizeof(VkDrawIndirectCommand));
-      recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
-        const vk::Buffer argsBuf = m_backend.ddpArgsBuffer();
-        const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
-        if (indexed) {
-          m_backend.ddpWriteIndexedArgs(c,
-                                        off,
-                                        drawSpec.indexCount,
-                                        drawSpec.instanceCount,
-                                        drawSpec.firstIndex,
-                                        drawSpec.vertexOffset,
-                                        drawSpec.firstInstance);
-          c.drawIndexedIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
-        } else {
-          struct Cmd
-          {
-            uint32_t vertexCount;
-            uint32_t instanceCount;
-            uint32_t firstVertex;
-            uint32_t firstInstance;
-          } payload{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
-          auto map = m_backend.ddpArgsBufferObj()->mapRange(off, sizeof(Cmd));
-          if (map) { std::memcpy(map.data(), &payload, sizeof(Cmd)); }
-          c.drawIndirectCount(argsBuf, off, cntBuf, 0, 1, sizeof(VkDrawIndirectCommand));
+    if (static_cast<VkBuffer>(m_backend.ddpDeviceArgsBuffer()) != VK_NULL_HANDLE) {
+      m_ddpArgsOffset = m_backend.ddpAllocDeviceArgsSlot(indexed ? sizeof(VkDrawIndexedIndirectCommand)
+                                                                 : sizeof(VkDrawIndirectCommand));
+      if (indexed) {
+        struct Cmd
+        {
+          uint32_t indexCount, instanceCount, firstIndex;
+          int32_t vertexOffset;
+          uint32_t firstInstance;
+        } payload{drawSpec.indexCount,
+                  drawSpec.instanceCount,
+                  drawSpec.firstIndex,
+                  drawSpec.vertexOffset,
+                  drawSpec.firstInstance};
+        auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+        if (slice.buffer && slice.mapped) {
+          std::memcpy(slice.mapped, &payload, sizeof(Cmd));
         }
-      });
-    } else {
-      recorder.recordGraphicsDraw(drawSpec);
+        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), m_ddpArgsOffset, slice);
+      } else {
+        struct Cmd
+        {
+          uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
+        } payload{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
+        auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
+        if (slice.buffer && slice.mapped) {
+          std::memcpy(slice.mapped, &payload, sizeof(Cmd));
+        }
+        m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), m_ddpArgsOffset, slice);
+      }
+      m_ddpArgsPrepared = true;
     }
+    recorder.recordGraphicsDraw(drawSpec);
+  } else if (m_backend.ddpIndirectCountEnabled() &&
+             shaderHook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel) {
+    const bool indexed = (drawSpec.indexCount > 0);
+    recorder.recordGraphicsDraw(drawSpec, [&](vk::raii::CommandBuffer& c) {
+      const vk::Buffer argsBuf = m_backend.ddpDeviceArgsBuffer();
+      const vk::Buffer cntBuf = m_backend.ddpIndirectCountBuffer();
+      CHECK(m_ddpArgsPrepared) << "Cone DDP peel: args not prepared in init";
+      if (indexed) {
+        c.drawIndexedIndirectCount(argsBuf, m_ddpArgsOffset, cntBuf, 0, 1, sizeof(VkDrawIndexedIndirectCommand));
+      } else {
+        c.drawIndirectCount(argsBuf, m_ddpArgsOffset, cntBuf, 0, 1, sizeof(VkDrawIndirectCommand));
+      }
+    });
   } else {
     recorder.recordGraphicsDraw(drawSpec);
   }
@@ -479,7 +494,9 @@ void ZVulkanConePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
     auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
     std::memcpy(slice.mapped, &lighting, sizeof(lighting));
     m_dynLightingOffset = slice.offset;
-    if (ddp) { m_ddpLightingFrozen = true; }
+    if (ddp) {
+      m_ddpLightingFrozen = true;
+    }
   }
 }
 
@@ -498,8 +515,8 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   TransformsUBOStd140 transforms{};
   transforms.projection_view_matrix = eyeState.projectionViewMatrix;
   transforms.view_matrix = eyeState.viewMatrix;
-  const glm::mat4 model = (payload.followCoordTransform && payload.params) ? payload.params->coordTransform
-                                                                           : glm::mat4(1.0f);
+  const glm::mat4 model =
+    (payload.followCoordTransform && payload.params) ? payload.params->coordTransform : glm::mat4(1.0f);
   transforms.pos_transform = model;
 
   const glm::mat4 combined = eyeState.viewMatrix * model;
@@ -513,7 +530,9 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
     std::memcpy(slice.mapped, &transforms, sizeof(transforms));
     m_dynTransformsOffset = slice.offset;
-    if (ddp) { m_ddpTransformsFrozen = true; }
+    if (ddp) {
+      m_ddpTransformsFrozen = true;
+    }
   }
 
   MaterialUBOStd140 material{};
@@ -529,7 +548,9 @@ void ZVulkanConePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
     auto slice = m_backend.suballocateUniform(sizeof(MaterialUBOStd140));
     std::memcpy(slice.mapped, &material, sizeof(material));
     m_dynMaterialOffset = slice.offset;
-    if (ddp) { m_ddpMaterialFrozen = true; }
+    if (ddp) {
+      m_ddpMaterialFrozen = true;
+    }
   }
 
   VLOG(2) << fmt::format("VK cone params: sizeScale={:.3f} alpha={:.3f} picking={} ortho={}",

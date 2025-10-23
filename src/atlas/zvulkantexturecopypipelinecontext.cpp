@@ -78,150 +78,30 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
 
   ensureDescriptorLayout();
   ensureDescriptorSet();
-  // Optionally ensure persistent pool + descriptor set (across frames)
-  if (m_enablePersistentScheduling) {
-    if (!m_pool) {
-      m_pool = m_backend.device().createDescriptorPool();
-    }
-    if (!m_persistentTexturesDS && m_setTextures && m_pool) {
-      m_persistentTexturesDS = m_backend.device().createDescriptorSet(*m_pool, **m_setTextures, /*override*/ false);
-    }
-  }
-
-  // Decide which descriptor set to bind (persistent vs. per-frame override)
+  // Always use a per-draw override descriptor set to avoid update-after-bind hazards
   const bool ddpPeel = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  uint64_t desiredColor = payload.colorAttachmentHandle.id;
-  uint64_t desiredDepth = payload.depthAttachmentHandle.id;
-  uint64_t desiredDdpDepth = 0;
-  uint64_t desiredDdpFront = 0;
-  if (ddpPeel) {
-    const auto& hookPara = renderer.shaderHookPara();
-    desiredDdpDepth = hookPara.dualDepthPeelingDepthBlenderHandle.id;
-    desiredDdpFront = hookPara.dualDepthPeelingFrontBlenderHandle.id;
-  }
-
-  auto usePersistentNow = [&]() -> bool {
-    if (!m_persistentTexturesDS) {
-      return false;
-    }
-    if (!m_cachedTextures.valid) {
-      return false;
-    }
-    if (m_cachedTextures.color != desiredColor || m_cachedTextures.depth != desiredDepth) {
-      return false;
-    }
-    if (ddpPeel && (m_cachedTextures.ddpDepth != desiredDdpDepth || m_cachedTextures.ddpFront != desiredDdpFront)) {
-      return false;
-    }
-    return true;
-  }();
-
   ZVulkanDescriptorSet* ds = nullptr;
   const auto sampler = m_backend.nearestClampSampler();
-  if (!m_backend.isRecording()) {
-    // Safe to rewrite persistent set before recording begins
-    if (m_persistentTexturesDS) {
-      VLOG(2) << "using persistent textures DS (pre-record rewrite)";
-      m_persistentTexturesDS->updateTexture(0, colorTexture, sampler);
-      m_persistentTexturesDS->updateTexture(1, depthTexture, sampler);
-      if (ddpPeel) {
-        const auto& hookPara = renderer.shaderHookPara();
-        if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-          auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
-                                                m_backend.device(),
-                                                "DDP depth blender for image peel");
-          m_persistentTexturesDS->updateTexture(3, tex, sampler);
-        }
-        if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-          auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
-                                                m_backend.device(),
-                                                "DDP front blender for image peel");
-          m_persistentTexturesDS->updateTexture(4, tex, sampler);
-        }
-      }
-      m_cachedTextures = {desiredColor, desiredDepth, desiredDdpDepth, desiredDdpFront, true};
-      ds = m_persistentTexturesDS.get();
+  // Allocate a fresh per-draw override descriptor set and write all required bindings
+  CHECK(m_setTextures) << "Texture copy: descriptor set layout not initialized";
+  ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
+  CHECK(ds != nullptr) << "Texture copy: override descriptor allocation failed (fatal)";
+  VLOG(2) << "writing per-draw override descriptors";
+  ds->updateTexture(0, colorTexture, sampler);
+  ds->updateTexture(1, depthTexture, sampler);
+  if (ddpPeel) {
+    const auto& hookPara = renderer.shaderHookPara();
+    if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
+      auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
+                                            m_backend.device(),
+                                            "DDP depth blender for image peel");
+      ds->updateTexture(3, tex, sampler);
     }
-  } else if (m_enablePersistentScheduling && usePersistentNow) {
-    VLOG(2) << "using persistent textures DS (cached)";
-    ds = m_persistentTexturesDS.get();
-  } else {
-    // Allocate a fresh per-draw override descriptor set during recording to avoid
-    // update-after-bind hazards when using a single command buffer for all passes.
-    if (m_setTextures) {
-      ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
-    }
-    CHECK(ds != nullptr) << "Texture copy: override descriptor allocation failed (fatal)";
-    const bool attachmentsChanged =
-      (!m_cachedTextures.valid || m_cachedTextures.color != desiredColor || m_cachedTextures.depth != desiredDepth ||
-       m_cachedTextures.ddpDepth != desiredDdpDepth || m_cachedTextures.ddpFront != desiredDdpFront);
-    // Override descriptor sets are newly allocated per draw; every binding must be rewritten even
-    // when the attachments repeat so we do not replay empty descriptors that would drop colour/depth.
-    VLOG(2) << "writing per-draw override descriptors";
-    ds->updateTexture(0, colorTexture, sampler);
-    ds->updateTexture(1, depthTexture, sampler);
-    if (ddpPeel) {
-      const auto& hookPara = renderer.shaderHookPara();
-      if (hookPara.dualDepthPeelingDepthBlenderHandle.valid()) {
-        auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingDepthBlenderHandle,
-                                              m_backend.device(),
-                                              "DDP depth blender for image peel");
-        VLOG(2) << fmt::format("writing DDP depth blender binding3 tex=0x{:x}",
-                               hookPara.dualDepthPeelingDepthBlenderHandle.id);
-        ds->updateTexture(3, tex, sampler);
-      }
-      if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
-        auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
-                                              m_backend.device(),
-                                              "DDP front blender for image peel");
-        VLOG(2) << fmt::format("writing DDP front blender binding4 tex=0x{:x}",
-                               hookPara.dualDepthPeelingFrontBlenderHandle.id);
-        ds->updateTexture(4, tex, sampler);
-      }
-    }
-    m_cachedTextures = {desiredColor, desiredDepth, desiredDdpDepth, desiredDdpFront, true};
-    // Optionally schedule a persistent rewrite for the next frame when it is safe
-    if (m_enablePersistentScheduling && m_persistentTexturesDS && attachmentsChanged) {
-      const uint64_t colorId = desiredColor;
-      const uint64_t depthId = desiredDepth;
-      const uint64_t ddpDepthId = desiredDdpDepth;
-      const uint64_t ddpFrontId = desiredDdpFront;
-      m_backend.scheduleAfterCurrentFrameCompletion([this, colorId, depthId, ddpDepthId, ddpFrontId]() {
-        if (!m_persistentTexturesDS || !m_setTextures) {
-          return;
-        }
-        try {
-          auto& colorTex = vulkan::textureFromHandle(AttachmentHandle{colorId, 0u, AttachmentBackend::Vulkan},
-                                                     m_backend.device(),
-                                                     "texture-copy color (scheduled)");
-          auto& depthTex = vulkan::textureFromHandle(AttachmentHandle{depthId, 0u, AttachmentBackend::Vulkan},
-                                                     m_backend.device(),
-                                                     "texture-copy depth (scheduled)");
-          auto samplerLocal = m_backend.nearestClampSampler();
-          m_persistentTexturesDS->updateTexture(0, colorTex, samplerLocal);
-          m_persistentTexturesDS->updateTexture(1, depthTex, samplerLocal);
-          if (ddpDepthId || ddpFrontId) {
-            if (ddpDepthId) {
-              auto& dep = vulkan::textureFromHandle(AttachmentHandle{ddpDepthId, 0u, AttachmentBackend::Vulkan},
-                                                    m_backend.device(),
-                                                    "DDP depth blender (scheduled)");
-              m_persistentTexturesDS->updateTexture(3, dep, samplerLocal);
-            }
-            if (ddpFrontId) {
-              auto& fr = vulkan::textureFromHandle(AttachmentHandle{ddpFrontId, 0u, AttachmentBackend::Vulkan},
-                                                   m_backend.device(),
-                                                   "DDP front blender (scheduled)");
-              m_persistentTexturesDS->updateTexture(4, fr, samplerLocal);
-            }
-          }
-          m_cachedTextures = {colorId, depthId, ddpDepthId, ddpFrontId, true};
-          VLOG(2) << "scheduled persistent DS rewrite completed";
-        }
-        catch (...) {
-          VLOG(1) << "scheduled persistent DS rewrite skipped (handles not resolvable)";
-        }
-      });
-      VLOG(2) << "scheduled persistent textures DS rewrite after frame";
+    if (hookPara.dualDepthPeelingFrontBlenderHandle.valid()) {
+      auto& tex = vulkan::textureFromHandle(hookPara.dualDepthPeelingFrontBlenderHandle,
+                                            m_backend.device(),
+                                            "DDP front blender for image peel");
+      ds->updateTexture(4, tex, sampler);
     }
   }
 
@@ -336,10 +216,6 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()
   vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                .pBindings = bindings.data()};
   m_setTextures.emplace(vkDevice, createInfo);
-  // Empty placeholder layout (for sets 1 and 2 when OIT is used at set=3)
-  if (!m_setPlaceholder) {
-    m_setPlaceholder = m_backend.emptyDescriptorSetLayout();
-  }
   // OIT params UBO layout (set=3 to match include/oit_params.glslinc)
   if (!m_setOIT) {
     m_setOIT = m_backend.oitDescriptorSetLayout();
@@ -370,6 +246,12 @@ void ZVulkanTextureCopyPipelineContext::ensureOITResources()
   if (m_descriptorSetOIT && m_uboOIT) {
     // One-time descriptor write; must happen before recording begins
     m_descriptorSetOIT->writeUniformBufferOnce(0, *m_uboOIT);
+    // Bind DDP changed flag SSBO once so image peel participates in early stop
+    if (!m_backend.isRecording() && m_backend.ddpIndirectCountEnabled()) {
+      if (auto* flagBuf = m_backend.ddpChangedFlagBufferObj()) {
+        m_descriptorSetOIT->writeStorageBufferOnce(nim::vkbind::kBindingOITDDPFlag, *flagBuf);
+      }
+    }
     if (!m_loggedOitPrimedThisFrame) {
       VLOG(2) << "primed OIT UBO descriptor (set=3, binding=0)";
       m_loggedOitPrimedThisFrame = true;

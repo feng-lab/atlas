@@ -89,22 +89,6 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
-  // Per-draw override descriptor: allocate fresh in each record() when single-CB batching is active
-  // Do not reuse across draws to avoid update-after-bind hazards in a single command buffer.
-  // Persistent descriptor pool + descriptor set for textures (across frames)
-  std::unique_ptr<class ZVulkanDescriptorPool> m_pool;
-  std::unique_ptr<ZVulkanDescriptorSet> m_persistentTexturesDS;
-  struct CachedTextureBindings
-  {
-    uint64_t color = 0;
-    uint64_t depth = 0;
-    uint64_t ddpDepth = 0; // only relevant for DDP peel stage
-    uint64_t ddpFront = 0; // only relevant for DDP peel stage
-    bool valid = false;
-  } m_cachedTextures; // tracks last attachments for persistent scheduling only
-  // Disabled by default: only enable when inputs are stable across frames
-  bool m_enablePersistentScheduling = false;
-  vk::DescriptorSetLayout m_setPlaceholder{}; // empty layout for set indices 1/2
   vk::DescriptorSetLayout m_setOIT{}; // set for OIT params when needed
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
   std::unique_ptr<ZVulkanBuffer> m_uboOIT;
