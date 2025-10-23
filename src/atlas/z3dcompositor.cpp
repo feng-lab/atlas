@@ -25,6 +25,7 @@
 
 DEFINE_bool(atlas_vk_copy_yflip_in_shader, true, "Use y-flip in Vulkan final copy shader instead of UI flip");
 DECLARE_bool(atlas_vk_ddp_indirect_count);
+DEFINE_int32(atlas_ddp_max_passes, 100, "Maximum dual-depth peeling peel passes (applies to GL and Vulkan)");
 
 namespace {
 using namespace nim;
@@ -3382,7 +3383,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   const GLenum g_db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT7};
 
   bool g_useOQ = true;
-  size_t g_numPasses = 100;
+  size_t g_numPasses = static_cast<size_t>(std::max(1, FLAGS_atlas_ddp_max_passes));
 
 #define MAX_DEPTH 1.0
 
@@ -3994,7 +3995,7 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
 
   resetHooks();
 
-  constexpr size_t kMaxPasses = 100;
+  const size_t kMaxPasses = static_cast<size_t>(std::max(1, FLAGS_atlas_ddp_max_passes));
   // Track the last ping buffer written by the orchestrated peel to feed the
   // final composite pass. Initialize to the same parity as the first peel
   // (pass=1 -> currId=1), and update inside the drawPass.
