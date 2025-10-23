@@ -289,24 +289,24 @@ void ZVulkanConePipelineContext::record(Z3DRendererBase& renderer,
           uint32_t indexCount, instanceCount, firstIndex;
           int32_t vertexOffset;
           uint32_t firstInstance;
-        } payload{drawSpec.indexCount,
-                  drawSpec.instanceCount,
-                  drawSpec.firstIndex,
-                  drawSpec.vertexOffset,
-                  drawSpec.firstInstance};
+        } cmdPayload{drawSpec.indexCount,
+                     drawSpec.instanceCount,
+                     drawSpec.firstIndex,
+                     drawSpec.vertexOffset,
+                     drawSpec.firstInstance};
         auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
         if (slice.buffer && slice.mapped) {
-          std::memcpy(slice.mapped, &payload, sizeof(Cmd));
+          std::memcpy(slice.mapped, &cmdPayload, sizeof(Cmd));
         }
         m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), m_ddpArgsOffset, slice);
       } else {
         struct Cmd
         {
           uint32_t vertexCount, instanceCount, firstVertex, firstInstance;
-        } payload{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
+        } cmdPayload{drawSpec.vertexCount, drawSpec.instanceCount, drawSpec.firstVertex, drawSpec.firstInstance};
         auto slice = m_backend.suballocateUpload(sizeof(Cmd), alignof(Cmd));
         if (slice.buffer && slice.mapped) {
-          std::memcpy(slice.mapped, &payload, sizeof(Cmd));
+          std::memcpy(slice.mapped, &cmdPayload, sizeof(Cmd));
         }
         m_backend.scheduleStaticCopyIndirect(m_backend.ddpDeviceArgsBuffer(), m_ddpArgsOffset, slice);
       }
