@@ -13,9 +13,9 @@ Build, Run, and Layout
 Testing (Linking Atlas Code)
 
 - Atlas is still a Qt GUI app. Common code now builds as three static libraries to keep Windows COFF archives well under 4GB with LTCG enabled, while maintaining clean backend boundaries:
-  - `atlas_core` (STATIC) — non‑graphics/core code (UI, data, utilities)
-  - `atlas_z3d` (STATIC) — shared/OpenGL 3D code (`Z3D*`)
-  - `atlas_vulkan` (STATIC) — Vulkan‑only code (`ZVulkan*`) plus a small set of `Z3D*` bridge sources that integrate with Vulkan
+  - `atlas_core` (STATIC) — non‑graphics/core code (UI, data, utilities). Carries all include dirs/defs/link deps used across Atlas.
+  - `atlas_z3d` (STATIC) — shared/OpenGL 3D code (`Z3D*`). Links to `atlas_core` and inherits its usage requirements.
+  - `atlas_vulkan` (STATIC) — Vulkan‑only code (`ZVulkan*`). Links to `atlas_core` and inherits its usage requirements.
   - `atlas_lib` (INTERFACE) — umbrella target that links all of the above, preserving a single consumer dependency.
 - Tests and apps should continue to link `atlas_lib`; usage requirements (include dirs/defs and transitive link deps) are propagated via the umbrella target.
 - Usage in CMake (already wired in `test/test.cmake`):

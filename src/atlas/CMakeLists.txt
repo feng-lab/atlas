@@ -655,7 +655,7 @@ list(REMOVE_ITEM ATLAS_SOURCES_NO_MAIN main.cpp)
 
 # Partition sources from the full set (minus main.cpp).
 #  - Vulkan-only (zvulkan*)
-#  - Z3D shared/GL (z3d*, minus a handful of Vulkan-bridging .cpp files)
+#  - Z3D shared/GL (z3d*)
 #  - Core (everything else)
 
 # Vulkan-only sources
@@ -665,17 +665,6 @@ list(FILTER ATLAS_VULKAN_SOURCES INCLUDE REGEX "(^|/)zvulkan[^/]*\\.(h|hpp|c|cpp
 # Z3D sources
 set(ATLAS_Z3D_SOURCES ${ATLAS_SOURCES_NO_MAIN})
 list(FILTER ATLAS_Z3D_SOURCES INCLUDE REGEX "(^|/)z3d[^/]*\\.(h|hpp|c|cpp|mm|cxx)$")
-
-# Some z3d files act as Vulkan bridges and include/use Vulkan symbols.
-# Compile those into the Vulkan library to avoid circular static-lib deps.
-set(ATLAS_Z3D_VK_BRIDGE_SOURCES
-    z3dcompositor.cpp
-    z3dimg.cpp
-    z3dpickingmanager.cpp
-    z3drenderervulkanbackend.cpp
-    z3drenderingengine.cpp
-    z3dscratchresourcepool.cpp)
-list(REMOVE_ITEM ATLAS_Z3D_SOURCES ${ATLAS_Z3D_VK_BRIDGE_SOURCES})
 
 # Core: exclude Vulkan-only and Z3D sources
 set(ATLAS_CORE_SOURCES ${ATLAS_SOURCES_NO_MAIN})
@@ -723,52 +712,18 @@ if (ATLAS_USE_OPENGLWIDGET)
   target_link_libraries(atlas_core PUBLIC Qt6::OpenGLWidgets)
 endif ()
 
-# Z3D static library (OpenGL/shared renderer code)
+# Z3D static library (OpenGL/shared renderer code). Keep it simple: inherit everything from atlas_core.
 add_library(atlas_z3d STATIC ${ATLAS_Z3D_SOURCES})
+target_link_libraries(atlas_z3d PRIVATE atlas_core)
 
-target_include_directories(atlas_z3d PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR})
-target_compile_definitions(atlas_z3d PUBLIC ATLAS_USE_CORE_PROFILE)
-target_link_libraries(atlas_z3d PUBLIC
-  img neutu
-  glbinding::glbinding-aux glbinding::glbinding
-  ${OpenCV_LIBS}
-  gflags::gflags
-  Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
-  Qt6::CorePrivate Qt6::Test)
-if (UNIX AND NOT APPLE)
-  target_link_libraries(atlas_z3d PUBLIC OpenGL::OpenGL OpenGL::EGL)
-endif ()
-if (ATLAS_USE_OPENGLWIDGET)
-  target_link_libraries(atlas_z3d PUBLIC Qt6::OpenGLWidgets)
-endif ()
-
-# Vulkan static library
-add_library(atlas_vulkan STATIC ${ATLAS_VULKAN_SOURCES} ${ATLAS_Z3D_VK_BRIDGE_SOURCES})
+# Vulkan static library. Keep it simple: inherit everything from atlas_core.
+add_library(atlas_vulkan STATIC ${ATLAS_VULKAN_SOURCES})
 
 # Shader build dependency for Vulkan code
 add_dependencies(atlas_vulkan vulkan_shaders)
 
-# Vulkan headers (do not rely on potentially system-wide Vulkan::Headers)
-if (WIN32)
-  target_include_directories(atlas_vulkan PUBLIC $ENV{VULKAN_SDK}/Include)
-else ()
-  target_include_directories(atlas_vulkan PUBLIC $ENV{VULKAN_SDK}/include)
-endif ()
-
-# Share common include roots and definitions as well, to mirror previous behavior
-target_include_directories(atlas_vulkan PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-target_compile_definitions(atlas_vulkan PUBLIC ATLAS_USE_CORE_PROFILE)
-
-# Vulkan library needs core and z3d symbols; also inherit public deps for headers used in z3d bridge sources
-target_link_libraries(atlas_vulkan PUBLIC
-  glbinding::glbinding-aux glbinding::glbinding
-  ${OpenCV_LIBS}
-  gflags::gflags
-  Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
-  Qt6::CorePrivate Qt6::Test)
-target_link_libraries(atlas_vulkan PRIVATE atlas_core atlas_z3d)
+# Inherit usage requirements via atlas_core
+target_link_libraries(atlas_vulkan PRIVATE atlas_core)
 
 # Enable IPO/LTCG for Release where supported
 set_property(TARGET atlas_core atlas_z3d atlas_vulkan PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
