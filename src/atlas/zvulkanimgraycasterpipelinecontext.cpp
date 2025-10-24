@@ -32,6 +32,7 @@
 #include <unordered_set>
 #include <utility>
 #include <cstring>
+#include <cmath>
 
 // Forward declaration for local SPIR-V loader
 namespace {
@@ -78,6 +79,20 @@ DEFINE_bool(atlas_vk_debug_raycaster_dump,
             false,
             "Dump Vulkan raycaster inputs (specializations, push constants, page data, bindings)");
 DEFINE_int32(atlas_vk_debug_raycaster_dump_levels, 8, "Max page levels to print when dumping Vulkan raycaster inputs");
+
+// Force page UBO to use per-draw override descriptor every frame instead of
+// binding/updating a persistent descriptor set. Useful to rule out any
+// persistence/lifetime issues when diagnosing paging-related timeouts.
+DEFINE_bool(atlas_vk_force_page_ubo_override,
+            false,
+            "Raycaster: always bind page UBO via override descriptor (no persistent set)");
+
+// Allocate fresh override descriptor sets per draw for dynamic/page/static bindings to
+// avoid any chance of rewriting a set already bound earlier in the same command buffer.
+// Default is false to preserve current behavior; enable to rule out descriptor-lifetime issues.
+DEFINE_bool(atlas_vk_force_fresh_override_sets,
+            false,
+            "Raycaster: allocate fresh override descriptor sets per draw (dynamic/page/static)");
 
 namespace {
 
@@ -196,6 +211,7 @@ std::vector<uint8_t>
 buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVoxelSize, uint32_t levelCount)
 {
   levelCount = std::min<uint32_t>(levelCount, kMaxPagingLevels);
+  CHECK_GT(levelCount, 0u) << "Image has zero paging levels (incomplete setup)";
 
   std::vector<uint8_t> data;
   data.reserve(256);
@@ -220,16 +236,24 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
   CHECK_GE(imageDimensions.size(), levelCount);
   CHECK_GE(voxelWorldSizes.size(), levelCount);
 
+  // Validate invariants before packing
+  const glm::uvec3 ptb = image.pageTableBlockSize();
+  CHECK(ptb.x > 0u && ptb.y > 0u && ptb.z > 0u)
+    << "Invalid pageTableBlockSize: (" << ptb.x << ", " << ptb.y << ", " << ptb.z << ")";
+  const glm::uvec3 ibs = image.imageBlockSize();
+  CHECK(ibs.x > 0u && ibs.y > 0u && ibs.z > 0u)
+    << "Invalid imageBlockSize: (" << ibs.x << ", " << ibs.y << ", " << ibs.z << ")";
+
   // Fixed-size fields first
   if (VLOG_IS_ON(2)) {
     VLOG(2) << "buildPageDataBuffer: append pageTableBlockSize";
   }
-  appendUvec3(data, image.pageTableBlockSize());
+  appendUvec3(data, ptb);
 
   if (VLOG_IS_ON(2)) {
     VLOG(2) << "buildPageDataBuffer: append imageBlockSize";
   }
-  appendUvec3(data, image.imageBlockSize());
+  appendUvec3(data, ibs);
 
   // Compute address->normalized coordinate scale without relying on GL textures.
   if (VLOG_IS_ON(2)) {
@@ -250,10 +274,16 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
     VLOG(2) << "buildPageDataBuffer: append per-level data groups";
   }
   for (uint32_t level = 0; level < levelCount; ++level) {
+    const glm::uvec3 dims = imageDimensions[level];
+    CHECK(dims.x > 0u && dims.y > 0u && dims.z > 0u)
+      << "Invalid image dimensions at level " << level << ": (" << dims.x << ", " << dims.y << ", " << dims.z
+      << ") levelCount=" << levelCount;
     appendUvec3(data, pageDirectoryBases[level]);
-    appendUvec3(data, imageDimensions[level]);
+    appendUvec3(data, dims);
     appendUvec3(data, posToBlockIDs[level]);
-    appendScalar(data, voxelWorldSizes[level]);
+    const float vws = voxelWorldSizes[level];
+    CHECK(std::isfinite(vws) && vws > 0.0f) << "Invalid voxelWorldSize at level " << level << ": " << vws;
+    appendScalar(data, vws);
     if (FLAGS_atlas_vk_debug_raycaster_dump) {
       const int maxLevels = std::max(0, FLAGS_atlas_vk_debug_raycaster_dump_levels);
       if (static_cast<int>(level) < maxLevels) {
@@ -274,12 +304,15 @@ buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVo
     }
   }
 
+  // Sanity: std140 pack size should be 64B header + 64B per level
+  const size_t expectedBytes = 64u + static_cast<size_t>(levelCount) * 64u;
+  CHECK_EQ(data.size(), expectedBytes) << "Unexpected PageData UBO size: got=" << data.size()
+                                       << " expected=" << expectedBytes << " (levels=" << levelCount << ")";
+
   if (VLOG_IS_ON(2)) {
     VLOG(2) << fmt::format("buildPageDataBuffer: end size={} bytes", data.size());
   }
   if (FLAGS_atlas_vk_debug_raycaster_dump) {
-    const auto ptb = image.pageTableBlockSize();
-    const auto ibs = image.imageBlockSize();
     VLOG(2) << fmt::format(
       "Page UBO summary: pageTableBlockSize=({}, {}, {}) imageBlockSize=({}, {}, {}) cacheSize=({}, {}, {}) addrNorm=({}, {}, {}) ze2px={:.6f}",
       ptb.x,
@@ -2080,9 +2113,9 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
                                                                bool freshOverrideDescriptors)
 {
   // Always allocate/update a transient per-draw descriptor for dynamic textures (set=1).
-  // If freshOverrideDescriptors is true, allocate a new override set even if one exists
+  // If freshOverrideDescriptors (or global flag) is true, allocate a new override set even if one exists
   // to avoid updating a set that might still be bound earlier in this command buffer.
-  if (freshOverrideDescriptors || !resources.pagedDescriptor) {
+  if (freshOverrideDescriptors || FLAGS_atlas_vk_force_fresh_override_sets || !resources.pagedDescriptor) {
     resources.pagedDescriptor = m_backend.allocateOverrideDescriptorSet(**m_progressiveDynamicSetLayout);
   }
   CHECK(resources.pagedDescriptor) << "Failed to allocate Vulkan raycaster paging descriptor set.";
@@ -2199,40 +2232,74 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
   }
 
   // Prepare/update a persistent page descriptor set that binds the page UBO (binding=2).
-  if (!resources.persistentPageDescriptor) {
-    auto* backendPtr = &m_backend;
-    auto* pageBufPtr = resources.pageDataBuffer.get();
-    const size_t resIndex = channelIndex;
-    backendPtr->scheduleAfterCurrentFrameCompletion([this, backendPtr, pageBufPtr, resIndex]() {
-      if (!pageBufPtr) {
-        return;
+  if (!FLAGS_atlas_vk_force_page_ubo_override) {
+    if (!resources.persistentPageDescriptor) {
+      auto* backendPtr = &m_backend;
+      auto* pageBufPtr = resources.pageDataBuffer.get();
+      const size_t resIndex = channelIndex;
+      backendPtr->scheduleAfterCurrentFrameCompletion([this, backendPtr, pageBufPtr, resIndex]() {
+        if (!pageBufPtr) {
+          return;
+        }
+        ensureDescriptorPool();
+        try {
+          vk::DescriptorSet raw = m_descriptorPool->allocateDescriptorSet(**m_pageSetLayout);
+          ChannelResources& res = ensureChannelResources(resIndex);
+          res.persistentPageDescriptor =
+            std::make_unique<ZVulkanDescriptorSet>(backendPtr->device(), raw, /*isOverrideTransient=*/false);
+          res.persistentPageDescriptor->writeUniformBufferOnce(2, *pageBufPtr);
+          res.boundPageDataBuffer = pageBufPtr;
+        }
+        catch (const std::exception& e) {
+          LOG(ERROR) << "Failed to allocate persistent page descriptor: " << e.what();
+        }
+      });
+    } else {
+      // If the page buffer object changed since last bind, rewrite the persistent descriptor
+      // after frame completion. Also bind an override descriptor for this frame so the current
+      // draw sees the correct UBO immediately (avoid using stale persistent set for one frame).
+      ZVulkanBuffer* curPageBuf = resources.pageDataBuffer.get();
+      if (curPageBuf != resources.boundPageDataBuffer) {
+        auto* pageBufPtr = curPageBuf;
+        const size_t resIndex2 = channelIndex;
+        // Immediate override for this frame
+        if (!resources.pageDescriptor) {
+          resources.pageDescriptor = m_backend.allocateOverrideDescriptorSet(**m_pageSetLayout);
+        }
+        CHECK(resources.pageDescriptor)
+          << "Failed to allocate Vulkan raycaster page descriptor set (override current).";
+        resources.pageDescriptor->updateUniformBuffer(2, *resources.pageDataBuffer);
+
+        // Deferred persistent update after the active submission completes
+        m_backend.scheduleAfterCurrentFrameCompletion([this, resIndex2, pageBufPtr]() {
+          ChannelResources& res = ensureChannelResources(resIndex2);
+          if (res.persistentPageDescriptor && pageBufPtr) {
+            res.persistentPageDescriptor->updateUniformBuffer(2, *pageBufPtr);
+            res.boundPageDataBuffer = pageBufPtr;
+          }
+        });
       }
-      ensureDescriptorPool();
-      try {
-        vk::DescriptorSet raw = m_descriptorPool->allocateDescriptorSet(**m_pageSetLayout);
-        ChannelResources& res = ensureChannelResources(resIndex);
-        res.persistentPageDescriptor =
-          std::make_unique<ZVulkanDescriptorSet>(backendPtr->device(), raw, /*isOverrideTransient=*/false);
-        res.persistentPageDescriptor->writeUniformBufferOnce(2, *pageBufPtr);
-        res.boundPageDataBuffer = pageBufPtr;
-      }
-      catch (const std::exception& e) {
-        LOG(ERROR) << "Failed to allocate persistent page descriptor: " << e.what();
-      }
-    });
+    }
   } else {
     // If the page buffer object changed since last bind, rewrite the persistent descriptor
-    // after frame completion.
+    // after frame completion. Also bind an override descriptor for this frame so the current
+    // draw sees the correct UBO immediately (avoid using stale persistent set for one frame).
     ZVulkanBuffer* curPageBuf = resources.pageDataBuffer.get();
     if (curPageBuf != resources.boundPageDataBuffer) {
       auto* pageBufPtr = curPageBuf;
       const size_t resIndex2 = channelIndex;
+      // Immediate override for this frame
+      if (!resources.pageDescriptor) {
+        resources.pageDescriptor = m_backend.allocateOverrideDescriptorSet(**m_pageSetLayout);
+      }
+      CHECK(resources.pageDescriptor) << "Failed to allocate Vulkan raycaster page descriptor set (override current).";
+      resources.pageDescriptor->updateUniformBuffer(2, *resources.pageDataBuffer);
+
+      // Deferred persistent update after the active submission completes
       m_backend.scheduleAfterCurrentFrameCompletion([this, resIndex2, pageBufPtr]() {
         ChannelResources& res = ensureChannelResources(resIndex2);
-        if (res.persistentPageDescriptor && pageBufPtr) {
-          res.persistentPageDescriptor->updateUniformBuffer(2, *pageBufPtr);
-          res.boundPageDataBuffer = pageBufPtr;
-        }
+        (void)res;
+        (void)pageBufPtr; // No persistent update in force-override mode
       });
     }
   }
@@ -2407,10 +2474,21 @@ ZVulkanImgRaycasterPipelineContext::collectProgressiveDescriptorSets(ChannelReso
   }
   CHECK(staticSet) << "Vulkan raycaster progressive static descriptor missing.";
 
-  const vk::DescriptorSet pageSet =
-    resources.persistentPageDescriptor
-      ? resources.persistentPageDescriptor->descriptorSet()
-      : (resources.pageDescriptor ? resources.pageDescriptor->descriptorSet() : vk::DescriptorSet{});
+  // Choose page descriptor set: in force-override mode, always use the override set.
+  vk::DescriptorSet pageSet{};
+  const bool persistentValid = resources.persistentPageDescriptor != nullptr;
+  const bool overrideValid = resources.pageDescriptor != nullptr;
+  const bool persistentStale = persistentValid && (resources.boundPageDataBuffer != resources.pageDataBuffer.get());
+  if (FLAGS_atlas_vk_force_page_ubo_override) {
+    CHECK(overrideValid) << "Force-override enabled but no override page descriptor set is bound.";
+    pageSet = resources.pageDescriptor->descriptorSet();
+  } else if (overrideValid && persistentStale) {
+    pageSet = resources.pageDescriptor->descriptorSet();
+  } else if (persistentValid) {
+    pageSet = resources.persistentPageDescriptor->descriptorSet();
+  } else if (overrideValid) {
+    pageSet = resources.pageDescriptor->descriptorSet();
+  }
   CHECK(pageSet) << "Vulkan raycaster progressive page descriptor missing.";
 
   if (VLOG_IS_ON(2)) {
@@ -4244,7 +4322,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
                              *payload.image,
                              channelIndex,
                              zeToScreenPixelVoxelSize,
-                             /*freshOverrideDescriptors=*/false)) {
+                             /*freshOverrideDescriptors=*/FLAGS_atlas_vk_force_fresh_override_sets)) {
     return;
   }
 
@@ -4255,7 +4333,7 @@ void ZVulkanImgRaycasterPipelineContext::renderProgressivePath(Z3DRendererBase& 
   const bool preferOverrideStaticGlobal = true;
 
   if (preferOverrideStaticGlobal) {
-    if (!resources.staticDescriptor) {
+    if (FLAGS_atlas_vk_force_fresh_override_sets || !resources.staticDescriptor) {
       resources.staticDescriptor = m_backend.allocateOverrideDescriptorSet(**m_progressiveStaticSetLayout);
     }
     if (resources.staticDescriptor) {

@@ -11,6 +11,10 @@ layout(constant_id = 51) const bool RESULT_OPAQUE = false;
 
 void main()
 {
+  if (pg.image_block_size.x == 0 || pg.image_block_size.y == 0 || pg.image_block_size.z == 0) {
+    discard;
+  }
+
   vec2 last = texelFetch(last_ray_depth_tex, ivec2(gl_FragCoord.xy), 0).xy;
   vec4 result = texelFetch(last_color_tex, ivec2(gl_FragCoord.xy), 0);
   float currentRayLength = last.x;
@@ -44,6 +48,9 @@ void main()
       float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * pg.ze_to_screen_pixel_voxel_size;
       while (curLevel + 1 < LEVEL_COUNT && pg.levels[curLevel+1].voxel_world_size_pad.x <= desiredVoxelSize) {
         ++curLevel;
+        if (pg.levels[curLevel].image_dimensions.x == 0 || pg.levels[curLevel].image_dimensions.y == 0 || pg.levels[curLevel].image_dimensions.z == 0) {
+          discard;
+        }
         numVoxels = abs(rayVector * pg.levels[curLevel].image_dimensions.xyz);
         stepSize = 1.0 / (rp.sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
       }
@@ -101,7 +108,7 @@ void main()
     return;
   }
 
-  if (RAY_MODE == 1) result = texture(transfer_function, mipValue);
+  if (RAY_MODE == 1) result = texture(transfer_function, vec2(mipValue, 0.5));
   // Force opaque alpha when requested
   if (RESULT_OPAQUE) {
     result.a = 1.0;

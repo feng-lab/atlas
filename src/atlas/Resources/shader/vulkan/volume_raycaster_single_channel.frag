@@ -7,7 +7,7 @@ layout(constant_id = 51) const bool RESULT_OPAQUE = false;
 
 layout(set = 0, binding = 0) uniform sampler2DArray ray_entry_exit_tex_coord;
 layout(set = 0, binding = 1) uniform sampler3D      volume_1;
-layout(set = 0, binding = 2) uniform sampler1D      transfer_function_1;
+layout(set = 0, binding = 2) uniform sampler2D      transfer_function_1;
 
 // Push constants for ray params
 layout(push_constant) uniform RayParams {
@@ -79,7 +79,7 @@ void main()
           finished = ch1V >= 1.0;
         }
       } else {
-        vec4 color = texture(transfer_function_1, voxel);
+        vec4 color = texture(transfer_function_1, vec2(voxel, 0.5));
         if (color.a > 0.0) {
           color.a /= rp.sampling_rate;
           if (RAY_MODE == 2) result = compositeISO(result, color, currentRayLength, rayDepth);
@@ -94,7 +94,7 @@ void main()
     }
   }
 
-  if (RAY_MODE == 1) result = texture(transfer_function_1, ch1V);
+  if (RAY_MODE == 1) result = texture(transfer_function_1, vec2(ch1V, 0.5));
   if (RESULT_OPAQUE) result.a = 1.0;
 
   // Depth

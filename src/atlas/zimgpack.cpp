@@ -13,12 +13,31 @@
 #include <tbb/parallel_for.h>
 #include <boost/iterator/function_output_iterator.hpp>
 #include <cmath>
+#include <algorithm>
 #include <memory>
 #include <zbenchtimer.h>
 
 DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
             false,
             "Whether readRegionToImg uses multithreaded resize, default is false");
+
+// When true, large non-pyramidal sources avoid eager downsampled image generation at open,
+// and instead precompute only tile descriptors (index) without I/O.
+DEFINE_bool(atlas_imgpack_defer_pyramidal,
+            true,
+            "Defer pyramid building for large non-pyramidal images (index only, no image reads)");
+
+// Quick window estimation flags
+DEFINE_bool(atlas_imgpack_quick_window_enable,
+            true,
+            "Enable percentile-based quick window for float data");
+DEFINE_double(atlas_imgpack_quick_window_lower_p, 0.01, "Lower percentile for quick window [0,1]");
+DEFINE_double(atlas_imgpack_quick_window_upper_p, 0.99, "Upper percentile for quick window [0,1]");
+DEFINE_uint32(atlas_imgpack_quick_window_tiles_per_axis, 2, "Tile samples per axis for quick window (>=1)");
+DEFINE_uint32(atlas_imgpack_quick_window_sample_step, 8, "Pixel stride inside tile for sampling (>=1)");
+DEFINE_uint32(atlas_imgpack_quick_window_max_samples,
+              500000,
+              "Max total samples across all tiles/channels for quick window");
 
 #if 0
 DEFINE_uint32(atlas_readRegionToImg_version,
@@ -100,13 +119,20 @@ ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::share
     VLOG(1) << fmt::format("has pyramidal: {}", hasPyramidal);
     buildFastReadIndex(sceneSubBlock);
   } else {
-    VLOG(1) << "building pyramidal";
-    buildPyramidal();
+    if (FLAGS_atlas_imgpack_defer_pyramidal) {
+      VLOG(1) << "building pyramidal index only (no I/O)";
+      buildPyramidalIndexOnly();
+    } else {
+      VLOG(1) << "building pyramidal";
+      buildPyramidal();
+    }
   }
-
+  // Derive a fast initial display window for float data when we don't have full min/max
+  computeQuickWindowIfNeeded();
   updateDerivedData();
   VLOG(1) << "imgpack done";
 }
+
 
 const QString& ZImgPack::sizeInfo() const
 {
@@ -1201,6 +1227,230 @@ void ZImgPack::buildPyramidal()
   createTileIndexStructure();
 }
 
+void ZImgPack::buildPyramidalIndexOnly()
+{
+  // Do not compute global min/max here; keep Invalid to avoid long stalls.
+  m_minMaxState = MinMaxState::Invalid;
+
+  m_allTiles.clear();
+  m_rtToTileIndice.clear();
+  m_rtToTileBoxRTree.clear();
+  m_pyramidalRatios.clear();
+
+  const size_t width = m_imgInfo.width;
+  const size_t height = m_imgInfo.height;
+  const size_t depth = m_imgInfo.depth;
+  const size_t times = m_imgInfo.numTimes;
+
+  // Iterate times and Z slices, generate XY tiles for powers-of-two ratios.
+  for (size_t t = 0; t < times; ++t) {
+    for (size_t z = 0; z < std::max<size_t>(depth, 1); ++z) {
+      for (uint32_t r = 1;; r <<= 1U) {
+        const size_t tileSpanX = m_tileSize * static_cast<size_t>(r);
+        const size_t tileSpanY = m_tileSize * static_cast<size_t>(r);
+        const size_t numX = (width + tileSpanX - 1) / tileSpanX;
+        const size_t numY = (height + tileSpanY - 1) / tileSpanY;
+        for (size_t xi = 0; xi < numX; ++xi) {
+          for (size_t yi = 0; yi < numY; ++yi) {
+            const size_t startX = xi * tileSpanX;
+            const size_t startY = yi * tileSpanY;
+            const size_t endX = std::min(width, startX + tileSpanX);
+            const size_t endY = std::min(height, startY + tileSpanY);
+
+            ZImgSource src = m_imgSource;
+            src.region = ZImgRegion(ZVoxelCoordinate(static_cast<index_t>(startX),
+                                                    static_cast<index_t>(startY),
+                                                    static_cast<index_t>(z),
+                                                    0,
+                                                    static_cast<index_t>(t)),
+                                    ZVoxelCoordinate(static_cast<index_t>(endX),
+                                                    static_cast<index_t>(endY),
+                                                    static_cast<index_t>(z + 1),
+                                                    -1,
+                                                    static_cast<index_t>(t + 1)));
+            auto tile = std::make_shared<ZImgTileSubBlock>(src, r, r, 1, ImgMergeMode::Interpolation);
+            m_allTiles.emplace_back(std::move(tile));
+          }
+        }
+        // Stop when the downsampled image at this ratio would be small (<=64) in both axes
+        if ((width + r - 1) / r <= 64 && (height + r - 1) / r <= 64) {
+          break;
+        }
+      }
+    }
+  }
+
+  createTileIndexStructure();
+}
+
+void ZImgPack::computeQuickWindowIfNeeded()
+{
+  if (!FLAGS_atlas_imgpack_quick_window_enable) {
+    return;
+  }
+  // Only for disk-cached float images without full min/max
+  if (!m_diskCached || m_minMaxState == MinMaxState::Complete || m_imgInfo.voxelFormat != VoxelFormat::Float) {
+    return;
+  }
+  // Must have base-ratio tiles indexed
+  if (m_rtToTileIndice.empty()) {
+    return;
+  }
+
+  const uint32_t K = std::max<uint32_t>(1, FLAGS_atlas_imgpack_quick_window_tiles_per_axis);
+  const uint32_t step = std::max<uint32_t>(1, FLAGS_atlas_imgpack_quick_window_sample_step);
+  const uint32_t maxSamples = std::max<uint32_t>(1, FLAGS_atlas_imgpack_quick_window_max_samples);
+  const double lp = std::clamp(FLAGS_atlas_imgpack_quick_window_lower_p, 0.0, 1.0);
+  const double up = std::clamp(FLAGS_atlas_imgpack_quick_window_upper_p, 0.0, 1.0);
+  if (!(lp < up)) {
+    return;
+  }
+
+  // Determine sampled z,t slices
+  std::vector<size_t> zSamples;
+  if (m_imgInfo.depth <= 1) {
+    zSamples = {0};
+  } else {
+    zSamples = {static_cast<size_t>(m_imgInfo.depth * 1 / 4), static_cast<size_t>(m_imgInfo.depth * 2 / 4),
+                static_cast<size_t>(m_imgInfo.depth * 3 / 4)};
+    for (auto& z : zSamples) {
+      if (z >= m_imgInfo.depth) z = m_imgInfo.depth - 1;
+    }
+  }
+  zSamples.erase(std::unique(zSamples.begin(), zSamples.end()), zSamples.end());
+  if (zSamples.empty()) zSamples.push_back(0);
+
+  std::vector<size_t> tSamples;
+  if (m_imgInfo.numTimes <= 1) {
+    tSamples = {0};
+  } else {
+    tSamples = {0u, m_imgInfo.numTimes - 1};
+    if (m_imgInfo.numTimes > 2) {
+      tSamples.push_back(m_imgInfo.numTimes / 2);
+    }
+    std::sort(tSamples.begin(), tSamples.end());
+    tSamples.erase(std::unique(tSamples.begin(), tSamples.end()), tSamples.end());
+  }
+
+  // Base ratio and tiling info
+  const size_t ratio = 1;
+  const size_t tileSpanX = m_tileSize * ratio;
+  const size_t tileSpanY = m_tileSize * ratio;
+  const size_t numX = (m_imgInfo.width + tileSpanX - 1) / tileSpanX;
+  const size_t numY = (m_imgInfo.height + tileSpanY - 1) / tileSpanY;
+
+  auto pickIndex = [&](size_t n, uint32_t i, uint32_t k) -> size_t {
+    if (k <= 1 || n <= 1) return 0;
+    if (k == 2) return (i == 0 ? 0 : (n - 1));
+    double pos = static_cast<double>(i) * (static_cast<double>(n - 1) / static_cast<double>(k - 1));
+    size_t idx = static_cast<size_t>(std::round(pos));
+    return std::min(idx, n - 1);
+  };
+
+  // Sample vectors per channel
+  std::vector<std::vector<double>> channelSamples(m_imgInfo.numChannels);
+  uint32_t totalSamples = 0;
+
+  for (size_t t : tSamples) {
+    for (size_t z : zSamples) {
+      // Gather K×K tiles spread across the image
+      std::vector<size_t> tileIndices;
+      tileIndices.reserve(K * K);
+      auto tiit = m_rtToTileIndice.find(std::make_tuple(ratio, ratio, 1, t));
+      if (tiit == m_rtToTileIndice.end()) {
+        continue;
+      }
+      for (uint32_t xi = 0; xi < K; ++xi) {
+        for (uint32_t yi = 0; yi < K; ++yi) {
+          size_t tx = pickIndex(numX, xi, K);
+          size_t ty = pickIndex(numY, yi, K);
+          index_t startX = static_cast<index_t>(tx * tileSpanX);
+          index_t startY = static_cast<index_t>(ty * tileSpanY);
+          index_t endX = static_cast<index_t>(std::min(m_imgInfo.width, static_cast<size_t>(startX) + tileSpanX));
+          index_t endY = static_cast<index_t>(std::min(m_imgInfo.height, static_cast<size_t>(startY) + tileSpanY));
+          TileBoxType tileBox(TileCornerType(startX, startY, static_cast<index_t>(z)),
+                              TileCornerType(endX - 1, endY - 1, static_cast<index_t>(z)));
+          std::vector<RTreeValueType> q;
+          if (auto rtreeIt = m_rtToTileBoxRTree.find(std::make_tuple(ratio, ratio, 1, t)); rtreeIt != m_rtToTileBoxRTree.end()) {
+            rtreeIt->second->query(bgi::intersects(tileBox), std::back_inserter(q));
+          }
+          if (!q.empty()) {
+            tileIndices.push_back(q.front().second);
+          }
+        }
+      }
+      // Read tiles and sample
+      for (size_t tileIdx : tileIndices) {
+        const ZImgSubBlock* tile = m_allTiles[tileIdx].get();
+        auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIdx), *tile);
+        if (!imgPtr || imgPtr->isEmpty()) continue;
+        // Sample across XY with stride
+        for (size_t c = 0; c < m_imgInfo.numChannels; ++c) {
+          if (imgPtr->isType<float>()) {
+            for (size_t y = 0; y < imgPtr->height() && totalSamples < maxSamples; y += step) {
+              for (size_t x = 0; x < imgPtr->width() && totalSamples < maxSamples; x += step) {
+                float* p = imgPtr->data<float>(x, y, 0, c, 0);
+                channelSamples[c].push_back(static_cast<double>(*p));
+                ++totalSamples;
+              }
+            }
+          } else if (imgPtr->isType<double>()) {
+            for (size_t y = 0; y < imgPtr->height() && totalSamples < maxSamples; y += step) {
+              for (size_t x = 0; x < imgPtr->width() && totalSamples < maxSamples; x += step) {
+                double* p = imgPtr->data<double>(x, y, 0, c, 0);
+                channelSamples[c].push_back(*p);
+                ++totalSamples;
+              }
+            }
+          } else {
+            // Fallback: fetch value converted to double
+            for (size_t y = 0; y < imgPtr->height() && totalSamples < maxSamples; y += step) {
+              for (size_t x = 0; x < imgPtr->width() && totalSamples < maxSamples; x += step) {
+                double v = imgPtr->value<double>(x, y, 0, c, 0);
+                channelSamples[c].push_back(v);
+                ++totalSamples;
+              }
+            }
+          }
+          if (totalSamples >= maxSamples) break;
+        }
+        if (totalSamples >= maxSamples) break;
+      }
+      if (totalSamples >= maxSamples) break;
+    }
+    if (totalSamples >= maxSamples) break;
+  }
+
+  if (totalSamples == 0) {
+    return;
+  }
+
+  auto percentile = [](std::vector<double>& v, double p) -> double {
+    if (v.empty()) return 0.0;
+    size_t idx = static_cast<size_t>(std::floor(p * (v.size() - 1)));
+    std::nth_element(v.begin(), v.begin() + idx, v.end());
+    return v[idx];
+  };
+
+  double lower = std::numeric_limits<double>::infinity();
+  double upper = -std::numeric_limits<double>::infinity();
+  for (auto& vc : channelSamples) {
+    if (vc.empty()) continue;
+    double l = percentile(vc, lp);
+    double u = percentile(vc, up);
+    if (u < l) std::swap(u, l);
+    lower = std::min(lower, l);
+    upper = std::max(upper, u);
+  }
+  if (!std::isfinite(lower) || !std::isfinite(upper) || lower == upper) {
+    return;
+  }
+
+  m_minIntensity = lower;
+  m_maxIntensity = upper;
+  m_minMaxState = MinMaxState::Partial;
+}
+
 void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock>>& subBlocks)
 {
   // VLOG(1) << "here";
@@ -1398,7 +1648,8 @@ void ZImgPack::updateDerivedData()
   }
   m_rangeMin = m_imgInfo.dataRangeMin<double>();
   m_rangeMax = m_imgInfo.dataRangeMax<double>();
-  if (m_imgInfo.voxelFormat == VoxelFormat::Float && (m_maxIntensity > 1.0 || m_minIntensity < 0.0)) {
+  // For float data, prefer computed min/max when available (Partial or Complete)
+  if (m_imgInfo.voxelFormat == VoxelFormat::Float && m_minMaxState != MinMaxState::Invalid) {
     m_rangeMin = m_minIntensity;
     m_rangeMax = m_maxIntensity;
   }

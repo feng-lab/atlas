@@ -551,8 +551,10 @@ void ZVulkanMeshPipelineContext::ensurePlaceholderTextures()
   auto& device = m_backend.device();
 
   if (!m_placeholder1D) {
+    // Vulkan portability: use 2D Nx1 for the 1D mesh texture path.
     auto info =
-      ZVulkanTexture::CreateInfo::make1D(1,
+      ZVulkanTexture::CreateInfo::make2D(1,
+                                         1,
                                          vk::Format::eR8G8B8A8Unorm,
                                          vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
                                          vk::MemoryPropertyFlagBits::eDeviceLocal);

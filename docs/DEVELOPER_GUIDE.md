@@ -38,7 +38,7 @@ Lookup Tables (LUTs)
   - `generation()` that increments on change for cache invalidation.
 - Renderers/pipeline contexts create and cache backend LUT textures:
   - OpenGL: per-renderer 1D RGBA8 textures for colormaps/transfer functions.
-- Vulkan: pipeline contexts create 1D `ZVulkanTexture`s via a small helper; LUTs are uploaded as RGBA8 and bound through descriptor sets.
+- Vulkan: pipeline contexts create 2D Nx1 `ZVulkanTexture`s via a small helper (MoltenVK portability — Metal lacks native 1D); LUTs are uploaded as RGBA8 and bound through descriptor sets.
   - Vulkan descriptor arena (Stage 2): pipeline contexts must allocate descriptor sets from the backend’s per-frame arena via `Z3DRendererVulkanBackend::allocateFrameDescriptorSet(layout)`. Do not create per-context descriptor pools. The arena is reset once per frame (scheduled in `endRender()`, applied on the next `beginRender()` after the frame fence signals).
   - Scratch-pool recycling: Vulkan scratch image leases are released only after the submitting frame’s fence signals. The pool defers slot reuse via a callback provided by the backend each frame.
   - Shared fullscreen quad: use `Z3DRendererVulkanBackend::fullscreenQuadVertexBuffer()` in full-screen passes (background, copy, blend, glow) instead of creating per-context VBOs.
@@ -593,6 +593,11 @@ Performance Tips (dev)
 - Keep `m_outputSize` consistent across renderers that collaborate in a pass.
 - Use `--v=1` to sample stage timings; wrap expensive sections with `ZBenchTimer`.
 - For very large volumes, tune `atlas_image_block_size` and sampling rates; avoid over-aggressive sampling in DVR.
+
+Vulkan Raycaster (paging) debug flag
+
+- To rule out descriptor persistence/lifetime issues for the Page UBO, you can force per-draw override binding:
+  - `--atlas_vk_force_page_ubo_override=true` — always bind the Page UBO via an override descriptor (no persistent set). Default is false.
 
 Additional Architecture Notes
 

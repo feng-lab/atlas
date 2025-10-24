@@ -47,8 +47,10 @@ Key Components
     - File: src/atlas/z3dimg.h:31
     - File: src/atlas/z3dimg.cpp:1
   - `ZImgPack` provides tiled/pyramidal I/O, min/max, and async region reads used to populate cache bricks.
-    - File: src/atlas/zimgpack.h:1
-    - File: src/atlas/zimgpack.cpp:1
+  - File: src/atlas/zimgpack.h:1
+  - File: src/atlas/zimgpack.cpp:1
+  - Large non‑pyramidal sources (>1GB) now default to index‑only pyramids. On open, no global min/max or downsampled images are built; instead, tile descriptors (512×512 XY tiles at powers‑of‑two ratios, Z=1) are precomputed without reading image data. Actual tile data is read on demand when tiles are displayed or used by paging. This eliminates long “open” stalls while preserving progressive 3D later. Feature flag: `--atlas_imgpack_defer_pyramidal`.
+  - Quick window for float data: when full min/max is unavailable, Atlas samples a few base‑ratio tiles to estimate a percentile‑based display window (default 1%–99%). Flags: `--atlas_imgpack_quick_window_enable`, `--atlas_imgpack_quick_window_lower_p`, `--atlas_imgpack_quick_window_upper_p`, `--atlas_imgpack_quick_window_tiles_per_axis`, `--atlas_imgpack_quick_window_sample_step`, `--atlas_imgpack_quick_window_max_samples`.
 - Scratch resources
   - `Z3DScratchResourcePool` leases FBOs/GPU images for block‑ID, entry/exit, layer arrays, and raycast accumulators.
     - File: src/atlas/z3dscratchresourcepool.h:1
@@ -406,7 +408,7 @@ Conventions
 
 - Color writes use premultiplied alpha (rgb scaled by a) unless forced opaque.
 - Depth mapping uses ze↔zw transforms with uniforms `ze_to_zw_a`, `ze_to_zw_b`: zw = a/ze + b.
-- Transfer functions/colormaps are 1D textures sampled by scalar voxel intensity in [0,1].
+- Transfer functions/colormaps are sampled by scalar voxel intensity in [0,1]. On OpenGL they are 1D textures; on Vulkan they are 2D Nx1 textures for MoltenVK/Metal portability.
 - Progressive raycasting uses a color target and a ray‑state target (ray length and resolved depth). Completed rays mark length=1.
 - Full‑res paging uses a page directory and page table cache (RGBA32UI) to address into an image cache atlas (R8/R16/R32F).
 
@@ -471,7 +473,7 @@ Slice From 3D (paged)
 
 - Transfer‑function slice: page lookup per pixel → sample cache → TF.
   - src/atlas/Resources/shader/image3d_slice_with_transfun.frag:1
-- Colormap slice: same page lookup, then 1D colormap.
+- Colormap slice: same page lookup, then Nx1 2D colormap.
   - src/atlas/Resources/shader/image3d_slice_with_colormap.frag:1
 - Inputs: page directory/table/cache, `image_dimensions`, `image_block_size`, `image_address_to_normalized_texture_coord`, `voxel_world_sizes`, `ze_to_screen_pixel_voxel_size`, and TF/colormap.
 - LOD: chosen from eye‑space pixel footprint (`eyeCoord.z * ze_to_screen_pixel_voxel_size`). Terminal level samples the monolithic `volume`.
@@ -483,7 +485,7 @@ Slice From 3D (paged)
 
 - 2D + TF: sample red from `sampler2D` then TF; premultiply; optionally force opaque.
   - src/atlas/Resources/shader/image2d_with_transfun_single_channel.frag:1
-- 2D + colormap: sample red then 1D LUT; premultiply.
+- 2D + colormap: sample red then Nx1 2D LUT; premultiply.
   - src/atlas/Resources/shader/image2d_with_colormap_single_channel.frag:1
 
 Layer Array Compositor (merge multi‑channel)

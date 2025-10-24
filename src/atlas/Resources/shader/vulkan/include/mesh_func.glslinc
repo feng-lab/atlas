@@ -7,7 +7,7 @@ layout(constant_id = 42) const bool USE_MESH_2DTEXTURE = false;
 layout(constant_id = 43) const bool USE_MESH_3DTEXTURE = false;
 
 // Descriptor set for textures (mutually exclusive usage per pipeline)
-layout(set = 0, binding = 0) uniform sampler1D tex1D;
+layout(set = 0, binding = 0) uniform sampler2D tex1D;
 layout(set = 0, binding = 1) uniform sampler2D tex2D;
 layout(set = 0, binding = 2) uniform sampler3D tex3D;
 
@@ -31,7 +31,7 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
     if (USE_MESH_COLOR)      color = v_color;
     else if (USE_MESH_2DTEXTURE) color = texture(tex2D, v_tc2d);
     else if (USE_MESH_3DTEXTURE) color = texture(tex3D, v_tc3d);
-    else if (USE_MESH_1DTEXTURE) color = texture(tex1D, v_tc1d);
+    else if (USE_MESH_1DTEXTURE) color = texture(tex1D, vec2(v_tc1d, 0.5));
     else color = vec4(1.0);
   }
 

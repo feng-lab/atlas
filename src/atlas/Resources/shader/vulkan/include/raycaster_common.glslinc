@@ -9,7 +9,7 @@ layout(set = 0, binding = 0) uniform usampler3D page_directory;
 layout(set = 0, binding = 1) uniform usampler3D page_table_cache;
 layout(set = 0, binding = 2) uniform sampler3D  image_cache;
 layout(set = 0, binding = 3) uniform sampler3D  volume;
-layout(set = 0, binding = 4) uniform sampler1D  transfer_function;
+layout(set = 0, binding = 4) uniform sampler2D  transfer_function;
 // Dynamic textures (set 1): entry/exit, last depth, last color
 layout(set = 1, binding = 0) uniform sampler2DArray ray_entry_exit_tex_coord;
 layout(set = 1, binding = 1) uniform sampler2D last_ray_depth_tex;
@@ -102,7 +102,7 @@ void sampleVolumeNoPaging(in vec3 startRayPosition, in vec3 exitRayPosition, in 
           finished = mipValue >= 1.0;
         }
       } else {
-        vec4 color = texture(transfer_function, voxel);
+        vec4 color = texture(transfer_function, vec2(voxel, 0.5));
         if (color.a > 0.0) {
           color.a /= rp.sampling_rate;
           if (RAY_MODE == 2) result = compositeISO(result, color, currentRayLength, rayDepth);
@@ -142,7 +142,7 @@ void sampleBlock(in uvec4 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
         finished = mipValue >= 1.0;
       }
     } else {
-      vec4 color = texture(transfer_function, voxel);
+      vec4 color = texture(transfer_function, vec2(voxel, 0.5));
       if (color.a > 0.0) {
         color.a /= rp.sampling_rate;
         if (RAY_MODE == 2) result = compositeISO(result, color, currentRayLength, rayDepth);

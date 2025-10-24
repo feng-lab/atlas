@@ -5,21 +5,24 @@
 
 namespace nim::vulkan {
 
+// Vulkan portability: use 2D Nx1 textures for LUTs (MoltenVK lacks native 1D).
 inline void ensure1DLUTTexture(ZVulkanDevice& device,
                                std::unique_ptr<ZVulkanTexture>& texture,
                                uint32_t width,
                                vk::Format format = vk::Format::eR8G8B8A8Unorm,
                                vk::ImageLayout finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal)
 {
-  if (!texture || texture->extent().width != width) {
-    auto info =
-      ZVulkanTexture::CreateInfo::make1D(width,
-                                         format,
-                                         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-                                         vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                         1u,
-                                         true,
-                                         finalLayout);
+  if (!texture || texture->extent().width != width || texture->extent().height != 1u ||
+      texture->info().imageType != vk::ImageType::e2D) {
+    auto info = ZVulkanTexture::CreateInfo::make2D(width,
+                                                   1u,
+                                                   format,
+                                                   vk::ImageUsageFlagBits::eSampled |
+                                                     vk::ImageUsageFlagBits::eTransferDst,
+                                                   vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                                   1u,
+                                                   true,
+                                                   finalLayout);
     texture = device.createTexture(info);
   }
 }

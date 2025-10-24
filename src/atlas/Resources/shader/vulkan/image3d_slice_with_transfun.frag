@@ -7,7 +7,7 @@ layout(set = 0, binding = 0) uniform usampler3D page_directory;
 layout(set = 0, binding = 1) uniform usampler3D page_table_cache;
 layout(set = 0, binding = 2) uniform sampler3D  image_cache;
 layout(set = 0, binding = 3) uniform sampler3D  volume;
-layout(set = 0, binding = 4) uniform sampler1D  transfer_function;
+layout(set = 0, binding = 4) uniform sampler2D  transfer_function;
 
 struct PageLevelData {
   uvec4 page_directory_base;
@@ -44,7 +44,7 @@ void main()
   vec4 color = vec4(0.0);
 
   if (curLevel + 1 == LEVEL_COUNT) {
-    color = texture(transfer_function, texture(volume, texCoord0).r);
+    color = texture(transfer_function, vec2(texture(volume, texCoord0).r, 0.5));
     if (RESULT_OPAQUE) {
       if (color.a == 0.0) color = vec4(0.0);
       color.a = 1.0;
@@ -68,7 +68,7 @@ void main()
     pagingFlag = pageTableEntry.w;
     if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
       voxelAddress = pageTableEntry.xyz + (voxelCoord % pg.image_block_size.xyz) + fFracVoxelCoord + 2.0;
-      color = texture(transfer_function, texture(image_cache, voxelAddress * pg.image_address_to_normalized_texture_coord.xyz).r);
+      color = texture(transfer_function, vec2(texture(image_cache, voxelAddress * pg.image_address_to_normalized_texture_coord.xyz).r, 0.5));
       if (RESULT_OPAQUE) {
         if (color.a == 0.0) color = vec4(0.0);
         color.a = 1.0;
@@ -79,7 +79,7 @@ void main()
     }
   }
   if (pagingFlag == EMPTY) {
-    color = texture(transfer_function, 0.0);
+    color = texture(transfer_function, vec2(0.0, 0.5));
     if (RESULT_OPAQUE) {
       if (color.a == 0.0) color = vec4(0.0);
       color.a = 1.0;

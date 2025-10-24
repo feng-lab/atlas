@@ -104,6 +104,7 @@ std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image, size_t channel, fl
   (void)channel; // channel not needed for addrNorm when using imageCacheSize
   uint32_t levelCount = static_cast<uint32_t>(image.numLevels());
   CHECK(levelCount <= kMaxPagingLevels) << "Unsupported paging level count: " << levelCount;
+  CHECK_GT(levelCount, 0u) << "Image has zero paging levels (incomplete setup)";
 
   std::vector<uint8_t> data;
   data.reserve(256);
@@ -117,9 +118,17 @@ std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image, size_t channel, fl
   CHECK_EQ(voxelWorldSizes.size(), levelCount);
   CHECK_EQ(posToBlockIDs.size(), levelCount);
 
+  // Validate invariants before packing
+  const glm::uvec3 ptb = image.pageTableBlockSize();
+  CHECK(ptb.x > 0u && ptb.y > 0u && ptb.z > 0u)
+    << "Invalid pageTableBlockSize: (" << ptb.x << ", " << ptb.y << ", " << ptb.z << ")";
+  const glm::uvec3 ibs = image.imageBlockSize();
+  CHECK(ibs.x > 0u && ibs.y > 0u && ibs.z > 0u)
+    << "Invalid imageBlockSize: (" << ibs.x << ", " << ibs.y << ", " << ibs.z << ")";
+
   // Fixed header in std140: ptb, imageBlock, addrNorm, ze2px (each aligned to 16B)
-  appendUvec3(data, image.pageTableBlockSize());
-  appendUvec3(data, image.imageBlockSize());
+  appendUvec3(data, ptb);
+  appendUvec3(data, ibs);
   const glm::uvec3 cacheSize = image.imageCacheSize();
   CHECK(cacheSize.x > 0u && cacheSize.y > 0u && cacheSize.z > 0u)
     << "Invalid image cache size: " << cacheSize.x << ", " << cacheSize.y << ", " << cacheSize.z;
@@ -129,11 +138,22 @@ std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image, size_t channel, fl
 
   // Per-level (grouped): dirBase, dims, posToIDs, voxelWorld
   for (uint32_t level = 0; level < levelCount; ++level) {
+    const glm::uvec3 dims = imageDimensions[level];
+    CHECK(dims.x > 0u && dims.y > 0u && dims.z > 0u)
+      << "Invalid image dimensions at level " << level << ": (" << dims.x << ", " << dims.y << ", " << dims.z
+      << ") levelCount=" << levelCount;
     appendUvec3(data, pageDirectoryBases[level]);
-    appendUvec3(data, imageDimensions[level]);
+    appendUvec3(data, dims);
     appendUvec3(data, posToBlockIDs[level]);
-    appendScalar(data, voxelWorldSizes[level]);
+    const float vws = voxelWorldSizes[level];
+    CHECK(std::isfinite(vws) && vws > 0.0f) << "Invalid voxelWorldSize at level " << level << ": " << vws;
+    appendScalar(data, vws);
   }
+
+  // Sanity: std140 pack size should be 64B header + 64B per level
+  const size_t expectedBytes = 64u + static_cast<size_t>(levelCount) * 64u;
+  CHECK_EQ(data.size(), expectedBytes) << "Unexpected PageData UBO size: got=" << data.size()
+                                       << " expected=" << expectedBytes << " (levels=" << levelCount << ")";
 
   return data;
 }
