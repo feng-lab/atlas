@@ -63,6 +63,13 @@ files_to_download = [
         'filename': 'openjpeg-2.5.3.zip',
     },
     {
+        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-macos-1.4.328.1.zip',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-macos-1.4.328.1.zip',
+        'expected_size': 321957346,
+        'expected_sha256': '571db867d8736e402f6f674f26f17b339495d016f3b2afdbac23a3650475023f',
+        'filename': 'vulkansdk-macos-1.4.328.1.zip',
+    },
+    {
         'url': 'https://neutracing.com/static/atlas_deps/nasm-2.16.03-macosx.zip',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/nasm-2.16.03-macosx.zip',
         'expected_size': 1686077,
@@ -126,13 +133,6 @@ files_to_download = [
         'filename': 'qwtpolar-1.1.1.tar.bz2',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-windows-X64-1.4.321.1.exe',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-windows-X64-1.4.321.1.exe',
-        'expected_size': 256170896,
-        'expected_sha256': 'baaa4f7ca11ed3d82aa1c102b21208915485bbaa473068c763daa425cca468bd',
-        'filename': 'vulkansdk-windows-X64-1.4.321.1.exe',
-    },
-    {
         'url': 'https://neutracing.com/static/atlas_deps/ffmpeg-n8.0-latest-win64-gpl-8.0.zip',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/ffmpeg-n8.0-latest-win64-gpl-8.0.zip',
         'expected_size': 189840786,
@@ -159,6 +159,13 @@ files_to_download = [
         'expected_size': 1448542,
         'expected_sha256': 'f05128cc735e8a4a0dff027a2c54a8ce69c30b4c0774bfb2994638317927c224',
         'filename': 'gawk-3.1.6-1-bin.zip',
+    },
+    {
+        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-linux-x86_64-1.4.328.1.tar.xz',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-linux-x86_64-1.4.328.1.tar.xz',
+        'expected_size': 327881416,
+        'expected_sha256': '241e75b56c91c0d210ed07a7c638ec05a3e5b0e4c66ba9f0ba0f102d823ad6bf',
+        'filename': 'vulkansdk-linux-x86_64-1.4.328.1.tar.xz',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/openssl-3.5.2.tar.gz',
@@ -252,13 +259,6 @@ files_to_download = [
         'filename': 'OpenJDK21U-jre_x64_mac_hotspot_21.0.8_9.tar.gz',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-macos-1.4.321.0.zip',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-macos-1.4.321.0.zip',
-        'expected_size': 341468359,
-        'expected_sha256': 'd873c43acacec1e3330fb530dafd541aa5d8a5726575a98a3f70ca505fc203db',
-        'filename': 'vulkansdk-macos-1.4.321.0.zip',
-    },
-    {
         'url': 'https://neutracing.com/static/atlas_deps/libwebp-1.6.0.tar.gz',
         'backup_url': 'https://fenglab.xyz/static/atlas_deps/libwebp-1.6.0.tar.gz',
         'expected_size': 3833512,
@@ -266,11 +266,11 @@ files_to_download = [
         'filename': 'libwebp-1.6.0.tar.gz',
     },
     {
-        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-linux-x86_64-1.4.321.1.tar.xz',
-        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-linux-x86_64-1.4.321.1.tar.xz',
-        'expected_size': 305518584,
-        'expected_sha256': 'f22a3625bd4d7a32e7a0d926ace16d5278c149e938dac63cecc00537626cbf73',
-        'filename': 'vulkansdk-linux-x86_64-1.4.321.1.tar.xz',
+        'url': 'https://neutracing.com/static/atlas_deps/vulkansdk-windows-X64-1.4.328.1.exe',
+        'backup_url': 'https://fenglab.xyz/static/atlas_deps/vulkansdk-windows-X64-1.4.328.1.exe',
+        'expected_size': 252243416,
+        'expected_sha256': 'a8675df6d538079c2a719a9373994948091db785b48f142e024254e76348d16c',
+        'filename': 'vulkansdk-windows-X64-1.4.328.1.exe',
     },
     {
         'url': 'https://neutracing.com/static/atlas_deps/strawberry-perl-5.32.1.1-64bit.msi',
