@@ -123,8 +123,6 @@ struct RayParamsData
   float padding = 0.0f;
 };
 
-constexpr uint32_t kMaxPagingLevels = 16u;
-
 // Block-ID compaction table parameters (must match GLSL)
 constexpr uint32_t kEmptyBlockID = 0xFFFFFFFFu;
 
@@ -207,10 +205,23 @@ inline void appendScalar(std::vector<uint8_t>& data, float value)
   appendStd140Vec4(data, glm::vec4(value, 0.0f, 0.0f, 0.0f));
 }
 
+// Device-driven cap for paging levels given PageData pack: 64B header + 64B per-level
+inline uint32_t deviceLevelCap(nim::ZVulkanDevice& device)
+{
+  const auto limits = device.context().physicalDevice().getProperties().limits;
+  const uint32_t header = 64u;
+  const uint32_t stride = 64u;
+  if (limits.maxUniformBufferRange <= header) {
+    return 0u;
+  }
+  const uint64_t maxBytes = static_cast<uint64_t>(limits.maxUniformBufferRange);
+  return static_cast<uint32_t>((maxBytes - header) / stride);
+}
+
 std::vector<uint8_t>
 buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVoxelSize, uint32_t levelCount)
 {
-  levelCount = std::min<uint32_t>(levelCount, kMaxPagingLevels);
+  // Caller supplies clamped levelCount; only validate here.
   CHECK_GT(levelCount, 0u) << "Image has zero paging levels (incomplete setup)";
 
   std::vector<uint8_t> data;
@@ -2176,7 +2187,8 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
     VLOG(2) << "updatePageDescriptors: after dynamic writes";
   }
 
-  const uint32_t levelCount = static_cast<uint32_t>(std::min<size_t>(image.numLevels(), kMaxPagingLevels));
+  const uint32_t devCap = deviceLevelCap(m_backend.device());
+  const uint32_t levelCount = static_cast<uint32_t>(std::min<size_t>(image.numLevels(), devCap));
   if (VLOG_IS_ON(2)) {
     VLOG(2) << fmt::format("updatePageDescriptors: building page data, levels={} ze2px={:.6f}",
                            levelCount,

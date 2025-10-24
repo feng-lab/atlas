@@ -41,7 +41,7 @@ DECLARE_string(atlas_debug_save_dir);
 namespace {
 
 constexpr float kQuadDepth = 0.0f;
-constexpr uint32_t kMaxPagingLevels = 16u;
+// Device-driven cap is applied at callsites.
 constexpr uint32_t kInvalidBlockID = 0u;
 constexpr uint32_t kUnmappedBlockID = 0xFFFFFFFFu;
 
@@ -99,11 +99,25 @@ inline void appendScalar(std::vector<uint8_t>& buffer, float value)
   appendVec(buffer, glm::vec4(value, 0.0f, 0.0f, 0.0f));
 }
 
-std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVoxelSize)
+// Device-driven cap for paging levels given PageData pack: 64B header + 64B per-level
+inline uint32_t deviceLevelCap(nim::ZVulkanDevice& device)
+{
+  const auto limits = device.context().physicalDevice().getProperties().limits;
+  const uint32_t header = 64u;
+  const uint32_t stride = 64u;
+  if (limits.maxUniformBufferRange <= header) {
+    return 0u;
+  }
+  const uint64_t maxBytes = static_cast<uint64_t>(limits.maxUniformBufferRange);
+  return static_cast<uint32_t>((maxBytes - header) / stride);
+}
+
+std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image,
+                                         size_t channel,
+                                         float zeToScreenPixelVoxelSize,
+                                         uint32_t levelCount)
 {
   (void)channel; // channel not needed for addrNorm when using imageCacheSize
-  uint32_t levelCount = static_cast<uint32_t>(image.numLevels());
-  CHECK(levelCount <= kMaxPagingLevels) << "Unsupported paging level count: " << levelCount;
   CHECK_GT(levelCount, 0u) << "Image has zero paging levels (incomplete setup)";
 
   std::vector<uint8_t> data;
@@ -1242,7 +1256,9 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
   resources.pagedTextureDescriptor->updateTexture(3, volume, m_backend.defaultSampler());
   resources.pagedTextureDescriptor->updateTexture(4, colormap, m_backend.defaultSampler());
 
-  auto pageData = buildPageDataBuffer(image, channel, zeToScreenPixelVoxelSize);
+  const uint32_t devCap = deviceLevelCap(m_backend.device());
+  const uint32_t levelCount = static_cast<uint32_t>(std::min<size_t>(image.numLevels(), devCap));
+  auto pageData = buildPageDataBuffer(image, channel, zeToScreenPixelVoxelSize, levelCount);
   if (!resources.pageDataBuffer || resources.pageDataCapacity < pageData.size()) {
     resources.pageDataBuffer = m_backend.device().createBuffer(pageData.size(),
                                                                vk::BufferUsageFlagBits::eUniformBuffer,
@@ -1262,7 +1278,7 @@ bool ZVulkanImgSlicePipelineContext::updatePagedDescriptors(ChannelResources& re
   CHECK(resources.pageDescriptor != nullptr) << "Slice page params: override descriptor allocation failed (fatal)";
   resources.pageDescriptor->updateUniformBuffer(2, *resources.pageDataBuffer);
 
-  resources.levelCount = static_cast<uint32_t>(std::min<size_t>(image.numLevels(), kMaxPagingLevels));
+  resources.levelCount = levelCount;
   return true;
 }
 

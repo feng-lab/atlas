@@ -74,6 +74,10 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
     const auto& phys = m_context.physicalDevice();
     const auto features = phys.getFeatures();
     const auto props = phys.getProperties();
+    const auto limits = props.limits;
+    VLOG(1) << "VK limits: maxUniformBufferRange=" << static_cast<unsigned long long>(limits.maxUniformBufferRange)
+            << " minUniformBufferOffsetAlignment="
+            << static_cast<unsigned long long>(limits.minUniformBufferOffsetAlignment);
     const auto fmt = vk::Format::eR32G32B32A32Uint;
     const auto fprops = phys.getFormatProperties(fmt);
     const auto optimal = fprops.optimalTilingFeatures;
