@@ -151,7 +151,6 @@ private:
   std::unique_ptr<ZVulkanImageBlockUploader> m_imageBlockUploader;
 
   void ensureDescriptorLayouts();
-  void ensureDescriptorPool();
   void ensureEmptyDescriptor();
   void resetDescriptors();
   vk::PipelineVertexInputStateCreateInfo makeSliceVertexInputState() const;

@@ -15,8 +15,7 @@ layout(location = 0) in vec4 v_color;
 layout(location = 1) in vec3 v_sphere_center;
 layout(location = 2) in float v_radius2;
 layout(location = 3) in vec3 v_point;
-layout(location = 4) in vec4 v_material_specular;
-layout(location = 5) in float v_material_shininess;
+layout(location = 4) in vec4 v_material_specular; // .w carries shininess when dynamic
 
 void fragment_func(out vec4 fragColor, out float fragDepth)
 {
@@ -54,8 +53,8 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   float shininess = matu.material_shininess;
   vec4 specular   = matu.material_specular;
   if (USE_DYNAMIC_MATERIAL) {
-    shininess = v_material_shininess;
-    specular  = v_material_specular;
+    shininess = v_material_specular.w;
+    specular  = vec4(v_material_specular.xyz, 1.0);
   }
   fragColor = apply_lighting_and_fog(shininess, matu.material_ambient, specular,
                                      normalDirection, ipoint, v_color, matu.alpha * alphaScale);

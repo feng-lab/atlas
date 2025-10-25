@@ -91,7 +91,6 @@ private:
   size_t m_vertexCount = 0;
 
   void ensureDescriptorLayouts();
-  void ensureDescriptorPool();
   void resetDescriptors();
   ZVulkanDescriptorSet* ensureDescriptor(Stage stage);
   void ensureOITResources();

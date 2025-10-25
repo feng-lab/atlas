@@ -37,6 +37,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::resetFrame()
 void ZVulkanTextureWeightedBlendedPipelineContext::resetDescriptors()
 {
   m_descriptorSet.reset();
+  m_dsLighting.reset();
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& renderer,
@@ -116,6 +117,9 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   }
 
   // No OIT UBO required for WB resolve
+  // Pipeline uses lighting UBO (set=1) for depth scale/zw transform
+  m_dynLightingOffset = m_backend.frameSharedLightingOffset();
+  CHECK(m_dsLighting) << "WB resolve: lighting descriptor set not initialised";
 
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
   drawSpec.viewports = {viewport};
@@ -123,8 +127,9 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   drawSpec.pipelineHandle = instance.pipeline->pipelineHandle();
   drawSpec.pipelineLayoutHandle = instance.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = vkbind::kSetInputs;
-  drawSpec.descriptorSets = {ds->descriptorSet()};
-  drawSpec.expectedDescriptorSetCount = 1;
+  drawSpec.descriptorSets = {ds->descriptorSet(), m_dsLighting->descriptorSet()};
+  drawSpec.dynamicOffsets = {static_cast<uint32_t>(m_dynLightingOffset)}; // (set1,b0)
+  drawSpec.expectedDescriptorSetCount = 2;
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   drawSpec.vertexBuffers = {quad.buffer()};
   drawSpec.vertexOffsets = {vk::DeviceSize(0)};
@@ -171,10 +176,11 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorLayout()
     m_setPlaceholder = m_backend.emptyDescriptorSetLayout();
   }
 
+  if (!m_setLighting) {
+    m_setLighting = m_backend.lightingDescriptorSetLayout();
+  }
   
 }
-
-void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorPool() {}
 
 void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorSet()
 {
@@ -185,9 +191,18 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorSet()
   }
 }
 
-void ZVulkanTextureWeightedBlendedPipelineContext::ensureOITResources() {}
-
- 
+void ZVulkanTextureWeightedBlendedPipelineContext::ensureOITResources()
+{
+  // Pre-prime persistent lighting descriptor set (set=1) before recording begins.
+  ensureDescriptorLayout();
+  if (!m_dsLighting && m_setLighting) {
+    m_dsLighting = m_backend.allocateFrameDescriptorSet(m_setLighting);
+  }
+  if (m_dsLighting && !m_backend.isRecording()) {
+    // Safe to write descriptors only when not recording
+    m_dsLighting->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(LightingUBOStd140));
+  }
+}
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureWeightedBlendedPipelineContext::makeVertexInputState() const
 {
@@ -249,13 +264,22 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  instance.pipeline->setDescriptorSetLayouts({**m_setLayout});
+  // Sets: 0 = inputs (samplers), 1 = lighting UBO
+  instance.pipeline->setDescriptorSetLayouts({**m_setLayout, m_setLighting});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  // GL parity: do not write depth in WB resolve; disable depth test/writes
-  instance.pipeline->setDepthTestEnable(false);
-  instance.pipeline->setDepthWriteEnable(false);
+  const bool hasDepth = formats.depthFormat.has_value();
+  instance.pipeline->setDepthTestEnable(hasDepth);
+  if (hasDepth) {
+    // Keep Vulkan resolve depth semantics aligned with the OpenGL path: only
+    // commit the resolved depth when it is not farther than the stored value.
+    // This preserves the compositor's follow-up depth-tested blend step.
+    instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
+    instance.pipeline->setDepthWriteEnable(true);
+  } else {
+    instance.pipeline->setDepthWriteEnable(false);
+  }
 
   // Blend weighted-blended result over background using premultiplied alpha.
   vk::PipelineColorBlendAttachmentState blendAttachment{};

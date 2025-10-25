@@ -79,10 +79,8 @@ private:
   size_t m_vertexCount = 0;
 
   void ensureDescriptorLayout();
-  void ensureDescriptorPool();
   void ensureDescriptorSet();
   void resetDescriptors();
-  void ensureOITResources();
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
   void ensureVertexCapacity(size_t vertexCount);
   void uploadGeometry();

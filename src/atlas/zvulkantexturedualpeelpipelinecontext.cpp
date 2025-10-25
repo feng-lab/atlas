@@ -231,11 +231,6 @@ void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorLayouts()
   }
 }
 
-void ZVulkanTextureDualPeelPipelineContext::ensureDescriptorPool()
-{
-  // No-op: descriptor sets are allocated from the backend per-frame arena.
-}
-
 ZVulkanDescriptorSet* ZVulkanTextureDualPeelPipelineContext::ensureDescriptor(Stage stage)
 {
   ensureDescriptorLayouts();

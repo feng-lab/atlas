@@ -11,8 +11,7 @@ layout(location = 0) out vec4 v_color;
 layout(location = 1) out vec3 v_sphere_center;
 layout(location = 2) out float v_radius2;
 layout(location = 3) out vec3 v_point;
-layout(location = 4) out vec4 v_material_specular;
-layout(location = 5) out float v_material_shininess;
+layout(location = 4) out vec4 v_material_specular; // .w packs shininess when dynamic
 
 #include "include/matrices_material.glslinc"
 
@@ -38,11 +37,10 @@ void main()
   v_color = attr_color;
   v_radius2 = radius * radius;
   if (USE_DYNAMIC_MATERIAL) {
-    v_material_specular = vec4(attr_specular_shininess.xyz, 1.0);
-    v_material_shininess = attr_specular_shininess.w;
+    // Pack shininess into the .w component to avoid an extra varying
+    v_material_specular = attr_specular_shininess;
   } else {
     v_material_specular = vec4(0.0);
-    v_material_shininess = 0.0;
   }
 
   vec3 rightVector = vec3(xf.view_matrix[0][0], xf.view_matrix[1][0], xf.view_matrix[2][0]);

@@ -510,7 +510,6 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   }
   if (m_textureWeightedAverageContext) {
     m_textureWeightedAverageContext->ensureDescriptorLayout();
-    m_textureWeightedAverageContext->ensureOITResources();
   }
   if (m_textureWeightedBlendedContext) {
     m_textureWeightedBlendedContext->ensureDescriptorLayout();

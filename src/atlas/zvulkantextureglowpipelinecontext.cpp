@@ -300,8 +300,6 @@ void ZVulkanTextureGlowPipelineContext::ensureDescriptorLayouts()
   }
 }
 
-void ZVulkanTextureGlowPipelineContext::ensureDescriptorPool() {}
-
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureGlowPipelineContext::makeVertexInputState() const
 {
   static vk::VertexInputBindingDescription binding{.binding = 0,

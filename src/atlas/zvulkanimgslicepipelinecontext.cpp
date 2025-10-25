@@ -251,7 +251,6 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
   }
 
   ensureDescriptorLayouts();
-  ensureDescriptorPool();
   uploadSliceGeometry(payload.slices);
   ensureQuadVertexBuffer();
 
@@ -994,8 +993,6 @@ void ZVulkanImgSlicePipelineContext::ensureDescriptorLayouts()
     m_mergeSetLayout.emplace(vkDevice, createInfo);
   }
 }
-
-void ZVulkanImgSlicePipelineContext::ensureDescriptorPool() {}
 
 void ZVulkanImgSlicePipelineContext::ensureEmptyDescriptor()
 {

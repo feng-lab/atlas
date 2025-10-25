@@ -176,8 +176,6 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorLayout()
   
 }
 
-void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorPool() {}
-
 void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorSet()
 {
   ensureDescriptorLayout();
@@ -186,10 +184,6 @@ void ZVulkanTextureWeightedAveragePipelineContext::ensureDescriptorSet()
     m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setLayout);
   }
 }
-
-void ZVulkanTextureWeightedAveragePipelineContext::ensureOITResources() {}
-
- 
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureWeightedAveragePipelineContext::makeVertexInputState() const
 {
