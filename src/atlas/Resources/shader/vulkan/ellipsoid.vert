@@ -11,8 +11,7 @@ layout(location = 6) in vec4 attr_specular_shininess;
 layout(location = 0) out vec4 v_color;
 layout(location = 1) out mat4 v_MT_inverse;
 layout(location = 5) out vec3 v_point;
-layout(location = 6) out vec4 v_material_specular;
-layout(location = 7) out float v_material_shininess;
+layout(location = 6) out vec4 v_material_specular; // .w packs shininess when dynamic
 
 #include "include/matrices_material.glslinc"
 
@@ -86,11 +85,10 @@ void main()
   v_MT_inverse = inverse_glsl(xf.view_matrix * T);
   v_color = attr_color;
   if (USE_DYNAMIC_MATERIAL) {
-    v_material_specular = vec4(attr_specular_shininess.xyz, 1.0);
-    v_material_shininess = attr_specular_shininess.w;
+    // Pack shininess in the .w component to avoid an extra varying
+    v_material_specular = attr_specular_shininess;
   } else {
     v_material_specular = vec4(0.0);
-    v_material_shininess = 0.0;
   }
 
   vec4 vertex_clipspace = vec4(x, y, 0.0, 1.0);
