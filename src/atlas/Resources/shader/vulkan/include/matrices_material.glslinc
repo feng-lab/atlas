@@ -18,7 +18,6 @@ mat3 compute_view_normal_matrix()
 }
 
 layout(set = 2, binding = 1) uniform MaterialUBO {
-  vec4 scene_ambient;
   vec4 material_ambient;
   vec4 material_specular;
   float material_shininess;

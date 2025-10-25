@@ -78,7 +78,6 @@ void ZVulkanSpherePipelineContext::resetFrame()
   // active submission fence signals.
   retainUbo(m_uboOIT);
   resetDescriptors();
-  m_ddpLightingFrozen = false;
   m_ddpTransformsFrozen = false;
   m_ddpMaterialFrozen = false;
   m_ddpArgsPrepared = false;
@@ -147,7 +146,7 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
   const bool pickingPass = payload.pickingPass;
   const auto shaderHook = renderer.shaderHookType();
 
-  updateLightingUBO(renderer, batch, payload, pickingPass);
+  m_dynLightingOffset = m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload, pickingPass);
   // OIT params UBO for shaders that include oit_params.glslinc
   ensureOITResources();
@@ -431,74 +430,7 @@ void ZVulkanSpherePipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
 
 void ZVulkanSpherePipelineContext::ensurePlaceholderTexture() {}
 
-void ZVulkanSpherePipelineContext::updateLightingUBO(Z3DRendererBase& renderer,
-                                                     const RenderBatch& batch,
-                                                     const SpherePayload& payload,
-                                                     bool pickingPass)
-{
-  const auto hook = renderer.shaderHookType();
-  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
-                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  if (ddp && m_ddpLightingFrozen) {
-    return;
-  }
-
-  LightingUBOStd140 lighting{};
-  const auto& scene = renderer.sceneState();
-
-  size_t availableLights = scene.lighting.positions.size();
-  availableLights = std::min(availableLights, scene.lighting.ambient.size());
-  availableLights = std::min(availableLights, scene.lighting.diffuse.size());
-  availableLights = std::min(availableLights, scene.lighting.specular.size());
-  availableLights = std::min(availableLights, scene.lighting.attenuation.size());
-  availableLights = std::min(availableLights, scene.lighting.spotCutoff.size());
-  availableLights = std::min(availableLights, scene.lighting.spotExponent.size());
-  availableLights = std::min(availableLights, scene.lighting.spotDirection.size());
-  availableLights = std::min(availableLights, static_cast<size_t>(scene.lighting.lightCount));
-
-  lighting.numLights = static_cast<int>(std::min(availableLights, lighting.lights.size()));
-  const bool enableLighting = !pickingPass && payload.wantsLighting;
-  lighting.lighting_enabled = enableLighting ? 1 : 0;
-
-  glm::vec2 extent = batch.pass.viewport.extent;
-  if (extent.x <= 0.0f || extent.y <= 0.0f) {
-    const auto& viewport = renderer.frameState().viewport;
-    extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-  }
-  if (extent.x > 0.0f && extent.y > 0.0f) {
-    lighting.screen_dim_RCP = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
-  }
-
-  lighting.fog_color_top = scene.fog.topColor;
-  lighting.fog_color_bottom = scene.fog.bottomColor;
-  lighting.fog_end = scene.fog.range.y;
-  lighting.fog_scale =
-    scene.fog.range.y > scene.fog.range.x ? 1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) : 0.0f;
-  constexpr float kLog2e = 1.44269504088896340735992468100189214f;
-  lighting.fog_density_log2e = scene.fog.density * kLog2e;
-  lighting.fog_density_density_log2e = scene.fog.density * scene.fog.density * kLog2e;
-
-  for (int i = 0; i < lighting.numLights; ++i) {
-    const size_t idx = static_cast<size_t>(i);
-    lighting.lights[i].position = scene.lighting.positions[idx];
-    lighting.lights[i].ambient = scene.lighting.ambient[idx];
-    lighting.lights[i].diffuse = scene.lighting.diffuse[idx];
-    lighting.lights[i].specular = scene.lighting.specular[idx];
-    lighting.lights[i].attenuation = scene.lighting.attenuation[idx];
-    lighting.lights[i].spotCutoff = scene.lighting.spotCutoff[idx];
-    lighting.lights[i].spotExponent = scene.lighting.spotExponent[idx];
-    lighting.lights[i].spotDirection = scene.lighting.spotDirection[idx];
-  }
-
-  {
-    auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
-    std::memcpy(slice.mapped, &lighting, sizeof(lighting));
-    m_dynLightingOffset = slice.offset;
-    if (ddp) {
-      m_ddpLightingFrozen = true;
-    }
-  }
-}
+// Lighting UBO is shared per frame; no per-batch update required.
 
 void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
                                                       const RenderBatch& batch,
@@ -537,8 +469,6 @@ void ZVulkanSpherePipelineContext::updateTransformUBO(Z3DRendererBase& renderer,
   }
 
   MaterialUBOStd140 material{};
-  const auto& scene = renderer.sceneState();
-  material.scene_ambient = scene.sceneAmbient;
   material.material_ambient = payload.params->materialAmbient;
   material.material_specular =
     pickingPass || !payload.useDynamicMaterial ? glm::vec4(0.0f) : payload.params->materialSpecular;

@@ -126,7 +126,6 @@ private:
   vk::DeviceSize m_dynMaterialOffset{0};
   // During DDP passes, dynamic UBO contents are invariant across passes.
   // Freeze after first allocation to avoid per-pass uniform arena suballocations.
-  bool m_ddpLightingFrozen{false};
   bool m_ddpTransformsFrozen{false};
   bool m_ddpMaterialFrozen{false};
   // Device-local indirect args prepared during DDP init
@@ -139,10 +138,7 @@ private:
   void ensureOITResources();
   void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& screenDimRcp);
   void ensurePlaceholderTexture();
-  void updateLightingUBO(Z3DRendererBase& renderer,
-                         const RenderBatch& batch,
-                         const SpherePayload& payload,
-                         bool pickingPass);
+  // Lighting UBO is shared per-frame; no per-batch update is needed.
   void updateTransformUBO(Z3DRendererBase& renderer,
                           const RenderBatch& batch,
                           const SpherePayload& payload,

@@ -226,7 +226,6 @@ private:
   vk::DeviceSize m_dynTransformsOffset{0};
   vk::DeviceSize m_dynMaterialOffset{0};
   // Freeze dynamic UBOs during DDP passes to avoid per-pass allocations
-  bool m_ddpLightingFrozen{false};
   bool m_ddpTransformsFrozen{false};
   bool m_ddpMaterialFrozen{false};
 

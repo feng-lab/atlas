@@ -29,6 +29,7 @@
 #include "zvulkanfontpipelinecontext.h"
 #include "zvulkanrenderconversions.h"
 #include "zvulkanpipelinecontext_raii.h"
+#include "zvulkanuniforms.h"
 #include "z3drenderglobalstate.h"
 #include "z3dscratchresourcepool.h"
 #include "zvulkanbuffer.h"
@@ -68,12 +69,8 @@ DEFINE_bool(atlas_vk_collect_timings_on_end,
 // mid-frame growth (which would require swapping the underlying buffer).
 DEFINE_int32(atlas_vk_uniform_arena_kib, 256, "Initial per-frame uniform arena capacity in KiB (defaults to 256 KiB)");
 
-// Fail fast when the uniform arena would grow mid-frame. Growth swaps the
-// underlying VkBuffer pointer and can invalidate descriptor bindings if any
-// sets were already bound. Keep this enabled unless explicitly debugging.
-DEFINE_bool(atlas_vk_uniform_arena_fail_on_grow,
-            true,
-            "Hard CHECK if the per-frame uniform arena would grow during a frame");
+// Uniform arena capacity is fixed per frame. Exceeding capacity is a hard
+// CHECK: increase --atlas_vk_uniform_arena_kib or pre-size explicitly.
 
 namespace nim {
 
@@ -387,6 +384,58 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   drainPostFenceCallbacks();
   ensureArenaOnFrame(frameResources);
   ensureUniformArena(frameResources);
+  // Expose frame resources early so suballocateUniform can target this frame.
+  m_activeFrame = &frameResources;
+  // Compute and publish the shared per-frame lighting UBO slice before descriptor priming.
+  {
+    const size_t align = uniformAlignment();
+    LightingUBOStd140 lighting{};
+    const auto& scene = renderer.sceneState();
+    // lighting_enabled: globally enabled when at least one configured light is present
+    const size_t availableLightsRaw = std::min({scene.lighting.positions.size(),
+                                                scene.lighting.ambient.size(),
+                                                scene.lighting.diffuse.size(),
+                                                scene.lighting.specular.size(),
+                                                scene.lighting.attenuation.size(),
+                                                scene.lighting.spotCutoff.size(),
+                                                scene.lighting.spotExponent.size(),
+                                                scene.lighting.spotDirection.size()});
+    const size_t clampedCount = std::min(availableLightsRaw, static_cast<size_t>(scene.lighting.lightCount));
+    lighting.numLights = static_cast<int>(std::min(clampedCount, lighting.lights.size()));
+    lighting.lighting_enabled = (lighting.numLights > 0) ? 1 : 0;
+    // Global scene ambient
+    lighting.scene_ambient = scene.sceneAmbient;
+    // Viewport reciprocal
+    const auto vp = renderer.frameState().viewport;
+    if (vp.z > 0u && vp.w > 0u) {
+      lighting.screen_dim_RCP = glm::vec2(1.0f / static_cast<float>(vp.z), 1.0f / static_cast<float>(vp.w));
+    }
+    // Fog
+    lighting.fog_color_top = scene.fog.topColor;
+    lighting.fog_color_bottom = scene.fog.bottomColor;
+    lighting.fog_end = scene.fog.range.y;
+    lighting.fog_scale =
+      scene.fog.range.y > scene.fog.range.x ? 1.0f / std::max(scene.fog.range.y - scene.fog.range.x, 1e-6f) : 0.0f;
+    constexpr float kLog2e = 1.44269504088896340735992468100189214f;
+    lighting.fog_density_log2e = scene.fog.density * kLog2e;
+    lighting.fog_density_density_log2e = scene.fog.density * scene.fog.density * kLog2e;
+    for (int i = 0; i < lighting.numLights; ++i) {
+      const size_t idx = static_cast<size_t>(i);
+      lighting.lights[i].position = scene.lighting.positions[idx];
+      lighting.lights[i].ambient = scene.lighting.ambient[idx];
+      lighting.lights[i].diffuse = scene.lighting.diffuse[idx];
+      lighting.lights[i].specular = scene.lighting.specular[idx];
+      lighting.lights[i].attenuation = scene.lighting.attenuation[idx];
+      lighting.lights[i].spotCutoff = scene.lighting.spotCutoff[idx];
+      lighting.lights[i].spotExponent = scene.lighting.spotExponent[idx];
+      lighting.lights[i].spotDirection = scene.lighting.spotDirection[idx];
+    }
+    auto slice = suballocateUniform(sizeof(LightingUBOStd140), align);
+    if (slice.mapped) {
+      std::memcpy(slice.mapped, &lighting, sizeof(lighting));
+    }
+    frameResources.lightingDynOffset = slice.offset;
+  }
   frameResources.descriptorSetsAllocated = 0;
   frameResources.leaseRecycleQueued = 0;
   frameResources.leaseRecycleExecuted = 0;
@@ -435,8 +484,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
   // Ensure static arenas exist once a device is present
   ensureStaticArenas();
 
-  // Expose frame resources to allow pre-record descriptor priming
-  m_activeFrame = &frameResources;
+  // Expose frame resources to allow pre-record descriptor priming (already set above)
 
   // Prime persistent descriptor sets before command buffer recording begins.
   // This allows UBO/image bindings to be established without violating the
@@ -1401,6 +1449,71 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   std::string_view scopeLabel = pass.debugLabel ? std::string_view(pass.debugLabel) : std::string_view();
 
   // Surface is already applied via setActiveSurfaceWithLoadStore
+  // Pre-collect CPU batches to estimate uniform arena demand before we open the Vulkan frame.
+  // This avoids mid-record growth and lets us size the per-frame arena precisely.
+  auto estimateUniformBytes = [&]() -> size_t {
+    // Clear any lingering batches
+    renderer.resetCPUState();
+    // Collect opaque
+    for (auto* filter : pass.opaqueFilters) {
+      if (!filter) {
+        continue;
+      }
+      recordFilterBatches(filter, [&]() {
+        filter->renderOpaque(pass.eye);
+      });
+    }
+    // Collect transparent
+    for (const auto& tb : pass.transparentFilters) {
+      auto* filter = tb.filter;
+      if (!filter) {
+        continue;
+      }
+      recordFilterBatches(filter, [&]() {
+        filter->renderTransparent(pass.eye);
+      });
+    }
+    const size_t align = uniformAlignment();
+    const size_t szLighting = alignUp(sizeof(LightingUBOStd140), align);
+    const size_t szTransforms = alignUp(sizeof(TransformsUBOStd140), align);
+    const size_t szMaterial = alignUp(sizeof(MaterialUBOStd140), align);
+    size_t total = 0;
+    const auto& batches = renderer.cpuState().batches;
+    bool anyGeometry = false;
+    for (const auto& b : batches) {
+      // Only geometry batches consume the uniform arena
+      if (std::holds_alternative<MeshPayload>(b.geometry)) {
+        const auto& payload = std::get<MeshPayload>(b.geometry);
+        const size_t draws = payload.meshes.size();
+        total += szTransforms + (draws * szMaterial);
+        anyGeometry = true;
+      } else if (std::holds_alternative<LinePayload>(b.geometry) || std::holds_alternative<SpherePayload>(b.geometry) ||
+                 std::holds_alternative<EllipsoidPayload>(b.geometry) ||
+                 std::holds_alternative<ConePayload>(b.geometry)) {
+        // One material+lighting+transform per batch
+        total += szTransforms + szMaterial;
+        anyGeometry = true;
+      } else {
+        // Non-geometry passes (background, texture copy/blend/glow, image passes) either
+        // do not allocate from the uniform arena or use dedicated UBOs.
+      }
+    }
+    if (anyGeometry) {
+      total += szLighting; // shared per-frame lighting slice once
+    }
+    // Apply a small headroom (e.g., +20%) and align to device uniform alignment.
+    size_t padded = total + (total / 5); // +20%
+    padded = alignUp(padded, align);
+    // Leave batches in place only for estimation; clear before recording to avoid duplication.
+    renderer.resetCPUState();
+    return padded;
+  };
+
+  // Apply capacity hint before opening the frame (may be zero if no batches were collected).
+  const size_t minUniformBytes = estimateUniformBytes();
+  if (minUniformBytes > 0) {
+    m_nextUniformMinCapacity = std::max(m_nextUniformMinCapacity, minUniformBytes);
+  }
 
   {
     const bool startedHere = !renderer.isVulkanFrameActive();
@@ -1900,9 +2013,10 @@ void Z3DRendererVulkanBackend::ensureUniformArena(FrameResources& frame)
     return;
   }
   // Create if missing
+  const size_t baseRequested = static_cast<size_t>(std::max(64, FLAGS_atlas_vk_uniform_arena_kib)) * 1024ull;
+  size_t requested = std::max(baseRequested, m_nextUniformMinCapacity);
   if (!frame.uniformArena.buffer) {
-    const size_t requested = static_cast<size_t>(std::max(64, FLAGS_atlas_vk_uniform_arena_kib)) * 1024ull;
-    const size_t cap = requested; // grows on demand (guarded by flag)
+    const size_t cap = requested;
     frame.uniformArena.buffer = m_sharedDevice->createBuffer(cap,
                                                              vk::BufferUsageFlagBits::eUniformBuffer,
                                                              vk::MemoryPropertyFlagBits::eHostVisible |
@@ -1912,10 +2026,22 @@ void Z3DRendererVulkanBackend::ensureUniformArena(FrameResources& frame)
     frame.uniformArena.highWatermark = 0;
     frame.uniformArena.mapped = frame.uniformArena.buffer->map(0, cap);
   } else {
+    // If an existing arena is smaller than the requested capacity, recreate it now (safe point).
+    if (frame.uniformArena.capacity < requested) {
+      frame.uniformArena.buffer.reset();
+      frame.uniformArena.buffer = m_sharedDevice->createBuffer(requested,
+                                                               vk::BufferUsageFlagBits::eUniformBuffer,
+                                                               vk::MemoryPropertyFlagBits::eHostVisible |
+                                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
+      frame.uniformArena.capacity = requested;
+      frame.uniformArena.mapped = frame.uniformArena.buffer->map(0, requested);
+    }
     // Reset bump pointer for new frame
     frame.uniformArena.cursor = 0;
     frame.uniformArena.highWatermark = 0;
   }
+  // Consume the hint once
+  m_nextUniformMinCapacity = 0;
 }
 
 void Z3DRendererVulkanBackend::ensureDDPGatingResources(FrameResources& frame)
@@ -2209,43 +2335,19 @@ size_t Z3DRendererVulkanBackend::uniformAlignment() const
 Z3DRendererVulkanBackend::UniformSlice Z3DRendererVulkanBackend::suballocateUniform(size_t bytes, size_t alignment)
 {
   UniformSlice slice{};
-  if (!m_activeFrame) {
-    return slice;
-  }
+  CHECK(m_activeFrame != nullptr) << "suballocateUniform called without an active frame";
   auto& arena = m_activeFrame->uniformArena;
-  if (!arena.buffer) {
-    ensureUniformArena(*m_activeFrame);
-    if (!arena.buffer) {
-      return slice;
-    }
-  }
+  // Do not allocate here; fail fast to surface ordering/estimation bugs.
+  CHECK(arena.buffer) << "Uniform arena not initialised before suballocateUniform";
   const size_t align = std::max(uniformAlignment(), alignment ? alignment : static_cast<size_t>(1));
   const size_t aligned = alignUp(arena.cursor, align);
   if (aligned + bytes > arena.capacity) {
-    if (FLAGS_atlas_vk_uniform_arena_fail_on_grow) {
-      CHECK(false) << fmt::format(
-        "Uniform arena capacity exceeded within frame: need={}B have={}B (cursor={}B, align={}B). "
-        "Increase --atlas_vk_uniform_arena_kib (currently {} KiB) to avoid mid-frame growth.",
-        aligned + bytes,
-        arena.capacity,
-        arena.cursor,
-        align,
-        FLAGS_atlas_vk_uniform_arena_kib);
-    }
-    // Grow: keep previous buffer alive until frame end
-    arena.retiredBuffers.push_back({std::move(arena.buffer)});
-    size_t newCap = arena.capacity ? arena.capacity : (64 * 1024);
-    while (newCap < aligned + bytes) {
-      newCap *= 2;
-    }
-    arena.buffer = m_sharedDevice->createBuffer(newCap,
-                                                vk::BufferUsageFlagBits::eUniformBuffer,
-                                                vk::MemoryPropertyFlagBits::eHostVisible |
-                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
-    arena.capacity = newCap;
-    arena.cursor = 0;
-    arena.highWatermark = 0;
-    arena.mapped = arena.buffer->map(0, newCap);
+    CHECK(false) << fmt::format(
+      "Uniform arena capacity exceeded within frame: need={}B have={}B (cursor={}B, align={}B).",
+      aligned + bytes,
+      arena.capacity,
+      arena.cursor,
+      align);
   }
   const size_t off = alignUp(arena.cursor, align);
   slice.buffer = arena.buffer->buffer();
@@ -2454,26 +2556,6 @@ void Z3DRendererVulkanBackend::ensureDevice()
       m_timestampPeriod = props.limits.timestampPeriod; // nanoseconds per tick
       if (m_timestampPeriod <= 0.0f) {
         m_timestampPeriod = 1.0f;
-      }
-      if (!m_loggedCalibrationInfo) {
-        try {
-          auto domains = phys.getCalibrateableTimeDomainsEXT();
-          bool supported = !domains.empty();
-          std::string domList;
-          for (size_t i = 0; i < domains.size(); ++i) {
-            domList += vk::to_string(domains[i]);
-            if (i + 1 < domains.size()) {
-              domList += ",";
-            }
-          }
-          LOG(INFO) << "VK calibrated timestamps: supported=" << supported << " domains=[" << domList
-                    << "] timestampPeriod=" << m_timestampPeriod << " ns/tick";
-        }
-        catch (...) {
-          LOG(INFO) << "VK calibrated timestamps: query not available; timestampPeriod=" << m_timestampPeriod
-                    << " ns/tick";
-        }
-        m_loggedCalibrationInfo = true;
       }
     }
     catch (...) {

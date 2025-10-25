@@ -326,12 +326,9 @@ private:
       size_t capacity = 0; // bytes
       size_t cursor = 0; // bump pointer
       size_t highWatermark = 0; // debug
-      struct Retired
-      {
-        std::unique_ptr<class ZVulkanBuffer> buffer;
-      };
-      std::vector<Retired> retiredBuffers;
     } uniformArena;
+    // Shared per-frame dynamic offset for lighting UBO slice in the uniform arena
+    vk::DeviceSize lightingDynOffset = 0;
 
     // DDP: per-frame resources for indirect-count early stop
     std::unique_ptr<class ZVulkanBuffer> ddpChangedFlag; // STORAGE | TRANSFER_DST
@@ -415,6 +412,12 @@ public:
   };
   UniformSlice suballocateUniform(size_t bytes, size_t alignment = 0);
   class ZVulkanBuffer& uniformArenaBuffer();
+  // Dynamic offset of the shared per-frame lighting UBO slice
+  [[nodiscard]] vk::DeviceSize frameSharedLightingOffset() const
+  {
+    CHECK(m_activeFrame != nullptr) << "frameSharedLightingOffset called without an active frame";
+    return m_activeFrame->lightingDynOffset;
+  }
   static size_t alignUp(size_t value, size_t alignment)
   {
     const size_t mask = alignment ? (alignment - 1) : 0;
@@ -459,8 +462,6 @@ public:
   // Deliver first Vulkan frame to UI immediately after backend switch by
   // pumping the fence and executing deferred readback consumers once.
   bool m_pumpFenceAfterFirstSubmit = true;
-  // One-time log for calibrated timestamp domain support per device
-  bool m_loggedCalibrationInfo = false;
 
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
@@ -563,6 +564,10 @@ public:
 
   // TLS current backend pointer
   static thread_local Z3DRendererVulkanBackend* s_currentBackend;
+
+  // If non-zero, beginRender will ensure the uniform arena capacity is at least this many bytes
+  // before priming persistent descriptor sets. Reset to zero after use.
+  size_t m_nextUniformMinCapacity = 0;
 
   struct PassBaseline
   {

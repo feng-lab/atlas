@@ -22,7 +22,7 @@ ZVulkanDescriptorSet::ZVulkanDescriptorSet(ZVulkanDevice& device,
 void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& buffer)
 {
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
-    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
     backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
     if (!m_isOverrideTransient) {
@@ -41,34 +41,8 @@ void ZVulkanDescriptorSet::updateUniformBuffer(uint32_t binding, ZVulkanBuffer& 
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedBindings.insert(binding);
+  m_initializedMask |= (1ull << binding);
   VLOG(3) << "Updated uniform buffer descriptor at binding " << binding;
-}
-
-void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding, ZVulkanBuffer& buffer)
-{
-  if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
-    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
-    const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
-    backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
-    if (!m_isOverrideTransient) {
-      CHECK(false) << "Descriptor write attempted during recording (uniform buffer dynamic) at binding " << binding;
-    }
-  }
-  vk::DescriptorBufferInfo bufferInfo{.buffer = buffer.buffer(), .offset = 0, .range = buffer.size()};
-  vk::WriteDescriptorSet descriptorWrite{.dstSet = m_descriptorSet,
-                                         .dstBinding = binding,
-                                         .dstArrayElement = 0,
-                                         .descriptorCount = 1,
-                                         .descriptorType = vk::DescriptorType::eUniformBufferDynamic,
-                                         .pImageInfo = nullptr,
-                                         .pBufferInfo = &bufferInfo,
-                                         .pTexelBufferView = nullptr};
-  std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
-  std::vector<vk::CopyDescriptorSet> descriptorCopies;
-  m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedBindings.insert(binding);
-  VLOG(2) << "Updated uniform buffer dynamic descriptor at binding " << binding;
 }
 
 void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding,
@@ -76,7 +50,7 @@ void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding,
                                                       vk::DeviceSize range)
 {
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
-    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
     backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
     if (!m_isOverrideTransient) {
@@ -96,14 +70,14 @@ void ZVulkanDescriptorSet::updateUniformBufferDynamic(uint32_t binding,
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedBindings.insert(binding);
+  m_initializedMask |= (1ull << binding);
   VLOG(2) << "Updated uniform buffer dynamic descriptor (range) at binding " << binding;
 }
 
 void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& texture)
 {
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
-    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
     backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
     if (!m_isOverrideTransient) {
@@ -126,14 +100,14 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedBindings.insert(binding);
+  m_initializedMask |= (1ull << binding);
   VLOG(2) << "Updated texture descriptor (sampler-owned) at binding " << binding;
 }
 
 void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler)
 {
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
-    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
     backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
     if (!m_isOverrideTransient) {
@@ -163,7 +137,7 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding, ZVulkanTexture& textu
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedBindings.insert(binding);
+  m_initializedMask |= (1ull << binding);
   VLOG(2) << "Updated texture descriptor at binding " << binding;
 }
 
@@ -174,7 +148,7 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding,
                                          vk::ImageAspectFlags aspectOverride)
 {
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
-    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
     backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
     if (!m_isOverrideTransient) {
@@ -220,13 +194,13 @@ void ZVulkanDescriptorSet::updateTexture(uint32_t binding,
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedBindings.insert(binding);
+  m_initializedMask |= (1ull << binding);
   VLOG(2) << "Updated texture descriptor (override) at binding " << binding;
 }
 
 bool ZVulkanDescriptorSet::writeUniformBufferOnce(uint32_t binding, ZVulkanBuffer& buffer)
 {
-  if ((m_initializedBindings.find(binding) != m_initializedBindings.end()) && !m_isOverrideTransient) {
+  if (((m_initializedMask & (1ull << binding)) != 0ull) && !m_isOverrideTransient) {
     return false;
   }
   updateUniformBuffer(binding, buffer);
@@ -239,7 +213,7 @@ bool ZVulkanDescriptorSet::writeUniformBufferDynamicOnce(uint32_t binding,
                                                          ZVulkanBuffer& buffer,
                                                          vk::DeviceSize range)
 {
-  if ((m_initializedBindings.find(binding) != m_initializedBindings.end()) && !m_isOverrideTransient) {
+  if (((m_initializedMask & (1ull << binding)) != 0ull) && !m_isOverrideTransient) {
     return false;
   }
   updateUniformBufferDynamic(binding, buffer, range);
@@ -248,7 +222,7 @@ bool ZVulkanDescriptorSet::writeUniformBufferDynamicOnce(uint32_t binding,
 
 bool ZVulkanDescriptorSet::writeTextureOnce(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler)
 {
-  if ((m_initializedBindings.find(binding) != m_initializedBindings.end()) && !m_isOverrideTransient) {
+  if (((m_initializedMask & (1ull << binding)) != 0ull) && !m_isOverrideTransient) {
     return false;
   }
   updateTexture(binding, texture, sampler);
@@ -257,7 +231,7 @@ bool ZVulkanDescriptorSet::writeTextureOnce(uint32_t binding, ZVulkanTexture& te
 
 bool ZVulkanDescriptorSet::writeStorageBufferOnce(uint32_t binding, ZVulkanBuffer& buffer)
 {
-  if ((m_initializedBindings.find(binding) != m_initializedBindings.end()) && !m_isOverrideTransient) {
+  if (((m_initializedMask & (1ull << binding)) != 0ull) && !m_isOverrideTransient) {
     return false;
   }
   updateStorageBuffer(binding, buffer);
@@ -267,7 +241,7 @@ bool ZVulkanDescriptorSet::writeStorageBufferOnce(uint32_t binding, ZVulkanBuffe
 void ZVulkanDescriptorSet::updateStorageBuffer(uint32_t binding, ZVulkanBuffer& buffer)
 {
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
-    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
     backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
     if (!m_isOverrideTransient) {
@@ -289,7 +263,7 @@ void ZVulkanDescriptorSet::updateStorageBuffer(uint32_t binding, ZVulkanBuffer& 
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedBindings.insert(binding);
+  m_initializedMask |= (1ull << binding);
   VLOG(2) << "Updated storage buffer descriptor at binding " << binding;
 }
 
@@ -299,7 +273,7 @@ void ZVulkanDescriptorSet::updateStorageImage(uint32_t binding,
                                               vk::ImageAspectFlags aspectOverride)
 {
   if (auto* backend = Z3DRendererVulkanBackend::current(); backend && backend->isRecording()) {
-    const bool alreadyInit = m_initializedBindings.find(binding) != m_initializedBindings.end();
+    const bool alreadyInit = (m_initializedMask & (1ull << binding)) != 0ull;
     const bool rewriteAttempt = (!m_isOverrideTransient && alreadyInit);
     backend->notifyDescriptorWriteWhileRecording(rewriteAttempt);
     if (!m_isOverrideTransient) {
@@ -320,7 +294,7 @@ void ZVulkanDescriptorSet::updateStorageImage(uint32_t binding,
   std::vector<vk::WriteDescriptorSet> descriptorWrites = {descriptorWrite};
   std::vector<vk::CopyDescriptorSet> descriptorCopies;
   m_device.context().device().updateDescriptorSets(descriptorWrites, descriptorCopies);
-  m_initializedBindings.insert(binding);
+  m_initializedMask |= (1ull << binding);
   VLOG(2) << "Updated storage image descriptor at binding " << binding;
 }
 

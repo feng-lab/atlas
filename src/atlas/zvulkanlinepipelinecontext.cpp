@@ -146,7 +146,6 @@ void ZVulkanLinePipelineContext::resetFrame()
   // reading them on the GPU.
   retainUbo(m_uboOIT);
   resetDescriptors();
-  m_ddpLightingFrozen = false;
   m_ddpTransformsFrozen = false;
   m_ddpMaterialFrozen = false;
 }
@@ -265,33 +264,10 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
                                             const RenderBatch& batch,
                                             const LinePayload& payload)
 {
-  const auto hook = renderer.shaderHookType();
-  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
-                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
-  LightingUBOStd140 lighting{};
-  lighting.lighting_enabled = 0; // force unlit lines unless explicitly enabled
-  glm::vec2 extent = batch.pass.viewport.extent;
-  if (extent.x <= 0.f || extent.y <= 0.f) {
-    const auto& viewport = renderer.frameState().viewport;
-    extent = glm::vec2(static_cast<float>(viewport.z), static_cast<float>(viewport.w));
-  }
-  if (extent.x > 0.f && extent.y > 0.f) {
-    lighting.screen_dim_RCP = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
-  }
-
-  const auto& sceneState = renderer.sceneState();
-  if (sceneState.fog.mode != FogMode::None) {
-    lighting.fog_color_top = sceneState.fog.topColor;
-    lighting.fog_color_bottom = sceneState.fog.bottomColor;
-  }
-  if (!(ddp && m_ddpLightingFrozen)) {
-    auto slice = m_backend.suballocateUniform(sizeof(LightingUBOStd140));
-    std::memcpy(slice.mapped, &lighting, sizeof(lighting));
-    m_dynLightingOffset = slice.offset;
-    if (ddp) {
-      m_ddpLightingFrozen = true;
-    }
-  }
+  (void)batch;
+  (void)payload;
+  // Use shared per-frame lighting UBO dynamic offset
+  m_dynLightingOffset = m_backend.frameSharedLightingOffset();
 
   TransformsUBOStd140 transforms{};
   const auto& eyeState = renderer.viewState().eyes[static_cast<size_t>(batch.eye)];
@@ -309,6 +285,9 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   transforms.inverse_projection_matrix = eyeState.inverseProjectionMatrix;
   const float sizeScale = (payload.followSizeScale && payload.params) ? payload.params->sizeScale : 1.0f;
   transforms.parameters = glm::vec4(sizeScale, eyeState.isPerspective ? 0.0f : 1.0f, 0.0f, 0.0f);
+  const auto hook = renderer.shaderHookType();
+  const bool ddp = (hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingInit ||
+                    hook == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   if (!(ddp && m_ddpTransformsFrozen)) {
     auto slice = m_backend.suballocateUniform(sizeof(TransformsUBOStd140));
     std::memcpy(slice.mapped, &transforms, sizeof(transforms));
@@ -319,7 +298,6 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   }
 
   MaterialUBOStd140 material{};
-  material.scene_ambient = sceneState.sceneAmbient;
   material.material_ambient = payload.params->materialAmbient;
   material.material_specular = payload.params->materialSpecular;
   material.material_shininess = payload.params->materialShininess;
@@ -343,6 +321,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
   if (m_uboOIT) {
     OITParamsUBOStd140 oit{};
     glm::vec2 rcp = glm::vec2(0.0f);
+    glm::vec2 extent = batch.pass.viewport.extent;
     if (extent.x > 0.0f && extent.y > 0.0f) {
       rcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
     } else {

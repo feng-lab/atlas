@@ -69,34 +69,53 @@ ZVulkanDevice::ZVulkanDevice(ZVulkanContext& context)
                                  128ull * 1024ull * 1024ull);
 
   // Log a concise feature/format support summary relevant to Block-ID integer images
-  // This helps diagnose sampled vs storage integer image support across stages/drivers.
-  if (VLOG_IS_ON(1)) {
-    const auto& phys = m_context.physicalDevice();
-    const auto features = phys.getFeatures();
-    const auto props = phys.getProperties();
-    const auto limits = props.limits;
-    VLOG(1) << "VK limits: maxUniformBufferRange=" << static_cast<unsigned long long>(limits.maxUniformBufferRange)
-            << " minUniformBufferOffsetAlignment="
-            << static_cast<unsigned long long>(limits.minUniformBufferOffsetAlignment);
-    const auto fmt = vk::Format::eR32G32B32A32Uint;
-    const auto fprops = phys.getFormatProperties(fmt);
-    const auto optimal = fprops.optimalTilingFeatures;
-    const bool sampledOK = static_cast<bool>(optimal & vk::FormatFeatureFlagBits::eSampledImage);
-    const bool storageOK = static_cast<bool>(optimal & vk::FormatFeatureFlagBits::eStorageImage);
-    const bool sampledLinear = static_cast<bool>(optimal & vk::FormatFeatureFlagBits::eSampledImageFilterLinear);
-    VLOG(1) << "VK Device: 'RGBA32UI' optimal tiling features:"
-            << " sampledImage=" << (sampledOK ? 1 : 0) << " storageImage=" << (storageOK ? 1 : 0)
-            << " sampledLinear=" << (sampledLinear ? 1 : 0) << " apiVersion=0x" << std::hex << props.apiVersion
-            << std::dec;
-    VLOG(1) << "VK Features:"
-            << " sampledImageArrayDynIdx=" << (features.shaderSampledImageArrayDynamicIndexing ? 1 : 0)
-            << " uniformBufArrayDynIdx=" << (features.shaderUniformBufferArrayDynamicIndexing ? 1 : 0)
-            << " storageImageExtendedFmt=" << (features.shaderStorageImageExtendedFormats ? 1 : 0)
-            << " storageImageReadNoFmt=" << (features.shaderStorageImageReadWithoutFormat ? 1 : 0)
-            << " storageImageWriteNoFmt=" << (features.shaderStorageImageWriteWithoutFormat ? 1 : 0);
-    // Note: there is no explicit core feature named 'shaderSampledImageInteger'. Integer sampling
-    // support is covered by the format's sampledImage bit; stage usage (fragment/compute) is not
-    // gated by a separate feature bit.
+  // One-time device limits + calibrated timestamps summary for visibility
+  const auto& phys = m_context.physicalDevice();
+  const auto props = phys.getProperties();
+  const auto& limits = props.limits;
+  const auto features = phys.getFeatures();
+  const auto fmt = vk::Format::eR32G32B32A32Uint;
+  const auto fprops = phys.getFormatProperties(fmt);
+  const auto optimal = fprops.optimalTilingFeatures;
+  const bool sampledOK = static_cast<bool>(optimal & vk::FormatFeatureFlagBits::eSampledImage);
+  const bool storageOK = static_cast<bool>(optimal & vk::FormatFeatureFlagBits::eStorageImage);
+  const bool sampledLinear = static_cast<bool>(optimal & vk::FormatFeatureFlagBits::eSampledImageFilterLinear);
+  LOG(INFO) << fmt::format(
+    "VK device features: api=0x{:x} sampledImageArrayDynIdx={} uniformBufArrayDynIdx={} storageImageExtendedFmt={} storageImageReadNoFmt={} storageImageWriteNoFmt={} RGBA32UI(sampled={},storage={},linear={})",
+    props.apiVersion,
+    (features.shaderSampledImageArrayDynamicIndexing ? 1 : 0),
+    (features.shaderUniformBufferArrayDynamicIndexing ? 1 : 0),
+    (features.shaderStorageImageExtendedFormats ? 1 : 0),
+    (features.shaderStorageImageReadWithoutFormat ? 1 : 0),
+    (features.shaderStorageImageWriteWithoutFormat ? 1 : 0),
+    (sampledOK ? 1 : 0),
+    (storageOK ? 1 : 0),
+    (sampledLinear ? 1 : 0));
+  const size_t minAlign = static_cast<size_t>(limits.minUniformBufferOffsetAlignment);
+  const size_t maxRange = static_cast<size_t>(limits.maxUniformBufferRange);
+  const uint32_t fif = std::max<int32_t>(1, FLAGS_atlas_vk_frames_in_flight);
+  LOG(INFO) << fmt::format(
+    "VK device uniform limits: minUniformBufferOffsetAlignment={}B maxUniformBufferRange={}B framesInFlight={}",
+    (minAlign ? minAlign : static_cast<size_t>(256)),
+    maxRange,
+    fif);
+  try {
+    auto domains = phys.getCalibrateableTimeDomainsEXT();
+    bool supported = !domains.empty();
+    std::string domList;
+    for (size_t i = 0; i < domains.size(); ++i) {
+      domList += vk::to_string(domains[i]);
+      if (i + 1 < domains.size()) {
+        domList += ",";
+      }
+    }
+    const float ts = (props.limits.timestampPeriod > 0.0f) ? props.limits.timestampPeriod : 1.0f;
+    LOG(INFO) << "VK calibrated timestamps: supported=" << supported << " domains=[" << domList
+              << "] timestampPeriod=" << ts << " ns/tick";
+  }
+  catch (...) {
+    const float ts = (props.limits.timestampPeriod > 0.0f) ? props.limits.timestampPeriod : 1.0f;
+    LOG(INFO) << "VK calibrated timestamps: query not available; timestampPeriod=" << ts << " ns/tick";
   }
 }
 

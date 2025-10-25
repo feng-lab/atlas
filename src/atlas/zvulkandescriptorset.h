@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zvulkan.h"
-#include <unordered_set>
 
 namespace nim {
 
@@ -15,7 +14,6 @@ public:
   ZVulkanDescriptorSet(ZVulkanDevice& device, vk::DescriptorSet descriptorSet, bool isOverrideTransient);
 
   void updateUniformBuffer(uint32_t binding, ZVulkanBuffer& buffer);
-  void updateUniformBufferDynamic(uint32_t binding, ZVulkanBuffer& buffer);
   void updateUniformBufferDynamic(uint32_t binding, ZVulkanBuffer& buffer, vk::DeviceSize range);
   void updateTexture(uint32_t binding, ZVulkanTexture& texture);
   void updateTexture(uint32_t binding, ZVulkanTexture& texture, vk::Sampler sampler);
@@ -49,8 +47,8 @@ private:
   // call vkFreeDescriptorSets on this, relying on pool reset per frame.
   vk::DescriptorSet m_descriptorSet{VK_NULL_HANDLE};
   bool m_isOverrideTransient = false;
-  // Track which bindings have been initialized (written) this frame for persistent sets
-  std::unordered_set<uint32_t> m_initializedBindings;
+  // Track which bindings have been initialized (bit per binding index, up to 64)
+  uint64_t m_initializedMask = 0ull;
 };
 
 } // namespace nim

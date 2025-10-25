@@ -36,6 +36,6 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   }
 
   fragDepth = gl_FragCoord.z;
-  fragColor = apply_lighting_and_fog(matu.scene_ambient, matu.material_shininess, matu.material_ambient, matu.material_specular,
+  fragColor = apply_lighting_and_fog(matu.material_shininess, matu.material_ambient, matu.material_specular,
                                      v_normal, v_point, color, matu.alpha);
 }

@@ -44,6 +44,6 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
     specular = v_material_specular;
   }
 
-  fragColor = apply_lighting_and_fog(matu.scene_ambient, shininess, matu.material_ambient, specular,
+  fragColor = apply_lighting_and_fog(shininess, matu.material_ambient, specular,
                                      normalDirection, ipoint, v_color, matu.alpha);
 }

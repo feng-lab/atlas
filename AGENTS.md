@@ -11,6 +11,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - High-performance 2D/3D visualization built in modern C++20 with Qt, OpenGL, and emerging Vulkan support.
 - Preserve progressive rendering, deterministic invalidation, and RAII-managed GPU resources.
 - Respect SOLID/KISS/YAGNI, but never at the expense of correctness or portability.
+- Optimize for post-change clarity: prefer designs that are simplest to read, reason about, and maintain after the refactor, even if they require a larger one-time change. Avoid partial measures or stateful gaps that trade clarity for smaller diffs.
 - Follow Atlas naming conventions (`Z3D*` for shared/OpenGL 3D code, `ZVulkan*` for Vulkan-only). Do not introduce alternate prefixes such as `ZGL*`; keep files feature-scoped.
 - Security/privacy: no unexpected telemetry, no leaking user data in logs.
 
@@ -22,6 +23,12 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - Update documentation (especially `docs/DEVELOPER_GUIDE.md` and migration docs) in the same change when behavior, architecture, or workflows move.
 - **Never commit unless you have successfully compiled/tested the change or the user explicitly confirms it is safe to skip.** If the user instructs you to commit, freeze the work: make no additional edits or follow-up commits unless the user asks for more changes.
 - Prefer hard `CHECK` assertions for every invariant we can satisfy within the engine across the entire code base (descriptor bindings, attachment counts, format contracts, non-null pointers, state machines, UI assumptions, etc.). Only downgrade to early returns when the condition genuinely depends on uncontrolled external inputs (e.g., user-provided files or network payloads), and emit a warning/error in those cases. If an early return is by design, document the rationale inline so reviewers understand why the invariant is soft.
+
+### Invariants & Error Handling Strictness
+- Do not hide invariant violations with sentinel/default values. Never "return 0/{}" or similar fallbacks from internal engine APIs when an invariant should hold. Crash early with `CHECK`.
+- Example: accessors that require an active frame (e.g., querying per‑frame dynamic offsets) must `CHECK(m_activeFrame)` and return the real value; do not return `0` when no frame is active.
+- Optionals and soft error paths are allowed only at system boundaries (user I/O, files, network). Within the engine core and render pipeline, prefer `CHECK` to enforce contracts.
+- Avoid defensive branches that mask bugs (e.g., silent `if (!ptr) return {};`). Either make the pointer nullable by contract and handle it explicitly with logging, or `CHECK`.
 
 ## Workflow Expectations
 - Coordinate work through GitHub Issues (label P0/P1/P2). Document plan, progress, and hand-off notes in the issue thread.

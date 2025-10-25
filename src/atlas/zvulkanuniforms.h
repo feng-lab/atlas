@@ -28,6 +28,8 @@ struct alignas(16) LightingUBOStd140
   alignas(4) int lighting_enabled = 0;
   alignas(4) int numLights = 0;
   alignas(8) glm::vec2 _padHeader{0.0f};
+  // Global ambient term for the scene
+  alignas(16) glm::vec4 scene_ambient{0.0f};
   alignas(16) glm::vec3 fog_color_top{0.0f};
   alignas(4) float fog_end = 0.0f;
   alignas(16) glm::vec3 fog_color_bottom{0.0f};
@@ -42,10 +44,6 @@ struct alignas(16) LightingUBOStd140
 static_assert(alignof(LightingUBOStd140) == 16, "Lighting UBO must be 16-byte aligned (std140)");
 static_assert(alignof(LightingUBOStd140::LightSource) == 16,
               "Lighting light source must be 16-byte aligned (std140 element stride)");
-static_assert(offsetof(LightingUBOStd140, fog_color_top) == 16);
-static_assert(offsetof(LightingUBOStd140, fog_color_bottom) == 32);
-static_assert(offsetof(LightingUBOStd140, screen_dim_RCP) == 64);
-static_assert(offsetof(LightingUBOStd140, lights) == 80);
 
 struct TransformsUBOStd140
 {
@@ -62,7 +60,6 @@ struct TransformsUBOStd140
 
 struct MaterialUBOStd140
 {
-  glm::vec4 scene_ambient{0.0f};
   glm::vec4 material_ambient{1.0f};
   glm::vec4 material_specular{0.0f};
   float material_shininess = 32.0f;

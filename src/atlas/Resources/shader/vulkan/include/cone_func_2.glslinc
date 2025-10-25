@@ -190,8 +190,7 @@ void fragment_func(out vec4 fragColor, out float fragDepth)
   float alphaScale = 1.0;
 #endif
 
-  fragColor = apply_lighting_and_fog(matu.scene_ambient,
-                                     matu.material_shininess,
+  fragColor = apply_lighting_and_fog(matu.material_shininess,
                                      matu.material_ambient,
                                      matu.material_specular,
                                      normalDirection,

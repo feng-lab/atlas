@@ -22,6 +22,8 @@ layout(std140, set = 1, binding = 0) uniform LightingUBO {
   int  lighting_enabled;   // bool as int
   int  numLights;
   vec2 _pad0;
+  // Global ambient term for scene lighting
+  vec4 scene_ambient;
 
   // Fog
   vec3 fog_color_top;      float fog_end;
@@ -73,12 +75,11 @@ vec4 computeColorFromLight(const in vec3 normalDirection, const in int lightIdx,
   return retVal;
 }
 
-vec4 apply_lighting_and_fog(const in vec4 sceneAmbient,
-                            const in float materialShininess, const in vec4 materialAmbient, const in vec4 materialSpecular,
+vec4 apply_lighting_and_fog(const in float materialShininess, const in vec4 materialAmbient, const in vec4 materialSpecular,
                             const in vec3 normalDirection, const in vec3 position, const in vec4 color, const in float alpha)
 {
   if ((uLighting.lighting_enabled != 0) && (uLighting.numLights > 0)) {
-    vec4 finalColor = sceneAmbient * materialAmbient;
+    vec4 finalColor = uLighting.scene_ambient * materialAmbient;
     int count = min(uLighting.numLights, MAX_LIGHTS);
     for (int i = 0; i < count; ++i) {
       finalColor += computeColorFromLight(normalDirection, i, position,

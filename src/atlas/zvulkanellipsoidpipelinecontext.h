@@ -132,7 +132,6 @@ private:
   bool m_ddpArgsPrepared{false};
   vk::DeviceSize m_ddpArgsOffset{0};
   // Freeze dynamic UBOs during DDP passes to avoid per-pass allocations
-  bool m_ddpLightingFrozen{false};
   bool m_ddpTransformsFrozen{false};
   bool m_ddpMaterialFrozen{false};
 
@@ -187,10 +186,7 @@ private:
   void ensureOITResources();
   void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& screenDimRcp);
   void ensurePlaceholderTexture();
-  void updateLightingUBO(Z3DRendererBase& renderer,
-                         const RenderBatch& batch,
-                         const EllipsoidPayload& payload,
-                         bool pickingPass);
+  // Lighting UBO is shared per-frame; no per-batch update is needed.
   void updateTransformUBO(Z3DRendererBase& renderer,
                           const RenderBatch& batch,
                           const EllipsoidPayload& payload,
