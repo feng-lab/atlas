@@ -172,7 +172,7 @@ void ZVulkanMeshPipelineContext::resetFrame()
   // Retire per-frame UBOs so they are not overwritten while still in use by
   // earlier in-flight frames. We defer destruction until the current active
   // submission finishes.
-  retainUbo(m_uboOIT);
+  
   resetDescriptors();
   m_transientDescriptorSets.clear();
   m_ddpTransformsFrozen = false;
@@ -237,9 +237,8 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
       const auto& viewportState = renderer.frameState().viewport;
       extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
     }
-    glm::vec2 screenRcp =
-      (extent.x > 0.0f && extent.y > 0.0f) ? glm::vec2(1.0f / extent.x, 1.0f / extent.y) : glm::vec2(0.0f);
-    updateOITParamsUBO(renderer, batch, screenRcp);
+    // No OIT UBO; set 3 carries only the DDP flag
+    
   }
   // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
   CHECK(m_dsLighting && m_dsTransforms) << "Mesh pipeline descriptor sets missing (lighting/transforms)";
@@ -610,20 +609,10 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
     m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
 
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-
-  // OIT params still use a dedicated UBO
-  if (m_dsOIT && m_uboOIT) {
-    m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
-    if (!m_backend.isRecording()) {
-      if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
-        m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
-      }
+  // Set 3 now only carries the DDP flag SSBO
+  if (m_dsOIT && !m_backend.isRecording()) {
+    if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
+      m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
     }
   }
 }
@@ -631,35 +620,12 @@ void ZVulkanMeshPipelineContext::ensureDescriptorSets()
 void ZVulkanMeshPipelineContext::ensureOITResources()
 {
   ensureDescriptorLayouts();
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
   if (!m_dsOIT && m_setOIT) {
     m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 }
 
-void ZVulkanMeshPipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
-                                                    const RenderBatch& batch,
-                                                    const glm::vec2& fallbackScreenDimRcp)
-{
-  (void)batch;
-  if (!m_uboOIT) {
-    return;
-  }
-  OITParamsUBOStd140 oit{};
-  oit.screen_dim_RCP = fallbackScreenDimRcp;
-  const float n = renderer.viewState().nearClip;
-  const float f = renderer.viewState().farClip;
-  const float denom = std::max(f - n, 1e-6f);
-  oit.ze_to_zw_a = (f * n) / denom;
-  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
-  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-  m_uboOIT->copyData(&oit, sizeof(oit));
-}
+ 
 
 // Lighting UBO is shared per frame; no per-batch update required.
 

@@ -89,10 +89,7 @@ public:
   vk::DescriptorSetLayout transformDescriptorSetLayout();
   vk::DescriptorSetLayout oitDescriptorSetLayout();
   vk::DescriptorSetLayout dualTexturePlaceholderDescriptorSetLayout();
-  vk::DescriptorSetLayout emptyDescriptorSetLayout();
-
-  // Suffix layouts used by weighted OIT resolve passes (sets 1-3).
-  std::array<vk::DescriptorSetLayout, 3> weightedResolveDescriptorSuffixLayouts();
+  vk::DescriptorSetLayout emptyDescriptorSetLayout();  
 
   void preBackendSwitch() override;
 

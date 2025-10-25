@@ -89,9 +89,8 @@ private:
   std::map<PipelineKey, PipelineInstance> m_pipelineCache;
 
   std::optional<vk::raii::DescriptorSetLayout> m_setTextures;
-  vk::DescriptorSetLayout m_setOIT{}; // set for OIT params when needed
+  vk::DescriptorSetLayout m_setOIT{}; // set for DDP flag when needed
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
-  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
   // Logging guard to avoid repeating OIT priming messages every call within a frame
   bool m_loggedOitPrimedThisFrame = false;
 

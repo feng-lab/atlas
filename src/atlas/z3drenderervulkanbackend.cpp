@@ -46,8 +46,6 @@
 #include <cstring>
 #include <cstdint>
 
-#include <gflags/gflags.h>
-
 DEFINE_bool(vk_reserve_upload_slices,
             true,
             "Reserve per-draw upload arena capacity (precise) before suballocation to avoid mid-upload growth");
@@ -57,20 +55,9 @@ DEFINE_bool(atlas_vk_ddp_indirect_count,
             true,
             "Use drawIndirectCount gating for Vulkan dual-depth peeling (device-side early stop)");
 
-// Optional: collect frame timings at endRender instead of next beginRender.
-// When true, endRender will fence-wait to harvest GPU timestamps immediately
-// (may reduce concurrency). When false, timings are collected at next beginRender.
-DEFINE_bool(atlas_vk_collect_timings_on_end,
-            false,
-            "Collect and log Vulkan frame timings at endRender (fence-wait as needed)");
-
 // Initial capacity for the per-frame uniform arena (in KiB). This buffer backs
-// all dynamic UBO bindings for the frame. Increasing this reduces the chance of
-// mid-frame growth (which would require swapping the underlying buffer).
+// all dynamic UBO bindings for the frame.
 DEFINE_int32(atlas_vk_uniform_arena_kib, 256, "Initial per-frame uniform arena capacity in KiB (defaults to 256 KiB)");
-
-// Uniform arena capacity is fixed per frame. Exceeding capacity is a hard
-// CHECK: increase --atlas_vk_uniform_arena_kib or pre-size explicitly.
 
 namespace nim {
 
@@ -419,6 +406,15 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     constexpr float kLog2e = 1.44269504088896340735992468100189214f;
     lighting.fog_density_log2e = scene.fog.density * kLog2e;
     lighting.fog_density_density_log2e = scene.fog.density * scene.fog.density * kLog2e;
+    // Weighted blended OIT global scale shared via lighting UBO
+    lighting.weighted_blended_depth_scale = scene.weightedBlendedDepthScale;
+    // Depth conversion constants (zw = a/ze + b) used by WB init shaders
+    const float n = renderer.viewState().nearClip;
+    const float f = renderer.viewState().farClip;
+    const float denom = std::max(f - n, 1e-6f);
+    lighting.ze_to_zw_a = (f * n) / denom;
+    lighting.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
+
     for (int i = 0; i < lighting.numLights; ++i) {
       const size_t idx = static_cast<size_t>(i);
       lighting.lights[i].position = scene.lighting.positions[idx];
@@ -673,20 +669,6 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
 
   // VLOG(1) frame recycling stats (descriptors and arena reset scheduling)
   vlogFrameRecyclingStats(frame);
-
-  // Optionally collect and print frame timings at endRender instead of next beginRender.
-  // This provides earlier visibility when we have already waited for the fence
-  // (e.g., due to readbacks or occlusion), or when explicitly requested via flag.
-  const bool collectNow = needFenceWait || FLAGS_atlas_vk_collect_timings_on_end;
-  if (collectNow) {
-    if (!needFenceWait && FLAGS_atlas_vk_collect_timings_on_end) {
-      // Explicitly wait only when the flag requests immediate timing collection.
-      device().frameExecutor().waitForCompletion(frameHandle);
-      applyPendingArenaReset(frame);
-      // Fence signaled for timings collection.
-    }
-    collectFrameTimings(frame);
-  }
 
   // Stage 3: VLOG instrumentation for dynamic rendering segments and pipeline stats
   VLOG(1) << fmt::format(
@@ -1738,19 +1720,12 @@ void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
   }
 
   if (!m_sharedDescriptorLayouts.oitParams) {
-    std::array<vk::DescriptorSetLayoutBinding, 2> bindings{
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingOITParamsUBO,
-                                     .descriptorType = vk::DescriptorType::eUniformBuffer,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment},
-      // Optional SSBO used by DDP peel shaders to atomically mark "changed" when any pixel updates
-      vk::DescriptorSetLayoutBinding{.binding = vkbind::kBindingOITDDPFlag,
-                                     .descriptorType = vk::DescriptorType::eStorageBuffer,
-                                     .descriptorCount = 1,
-                                     .stageFlags = vk::ShaderStageFlagBits::eFragment}
-    };
-    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = static_cast<uint32_t>(bindings.size()),
-                                           .pBindings = bindings.data()};
+    // Only DDP flag SSBO remains; the old OIT params UBO has been removed.
+    vk::DescriptorSetLayoutBinding binding{.binding = vkbind::kBindingOITDDPFlag,
+                                           .descriptorType = vk::DescriptorType::eStorageBuffer,
+                                           .descriptorCount = 1,
+                                           .stageFlags = vk::ShaderStageFlagBits::eFragment};
+    vk::DescriptorSetLayoutCreateInfo info{.bindingCount = 1, .pBindings = &binding};
     m_sharedDescriptorLayouts.oitParams.emplace(vkDevice, info);
   }
 
@@ -1811,12 +1786,6 @@ vk::DescriptorSetLayout Z3DRendererVulkanBackend::emptyDescriptorSetLayout()
 {
   ensureSharedDescriptorLayouts();
   return m_sharedDescriptorLayouts.empty ? **m_sharedDescriptorLayouts.empty : vk::DescriptorSetLayout{};
-}
-
-std::array<vk::DescriptorSetLayout, 3> Z3DRendererVulkanBackend::weightedResolveDescriptorSuffixLayouts()
-{
-  ensureSharedDescriptorLayouts();
-  return {emptyDescriptorSetLayout(), emptyDescriptorSetLayout(), oitDescriptorSetLayout()};
 }
 
 void Z3DRendererVulkanBackend::ensureSharedSamplers()

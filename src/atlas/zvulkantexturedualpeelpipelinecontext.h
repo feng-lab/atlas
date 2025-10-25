@@ -71,11 +71,7 @@ private:
     Stage stage = Stage::Blend;
   };
 
-  struct DualPeelPushConstants
-  {
-    glm::vec2 screenDimRcp{1.0f};
-    glm::vec2 _pad{0.0f};
-  };
+  // No push constants required
 
   Z3DRendererVulkanBackend& m_backend;
 
@@ -84,11 +80,11 @@ private:
   std::optional<vk::raii::DescriptorSetLayout> m_blendSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_finalSetLayout;
   std::optional<vk::raii::DescriptorSetLayout> m_setPlaceholder; // for set 1/2 alignment
-  std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3 OIT params
+  std::optional<vk::raii::DescriptorSetLayout> m_setOIT; // set = 3 DDP flag only
   std::unique_ptr<ZVulkanDescriptorSet> m_blendDescriptor;
   std::unique_ptr<ZVulkanDescriptorSet> m_finalDescriptor;
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorOIT;
-  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
+  // No OIT UBO retained; set 3 only carries DDP flag SSBO
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
@@ -99,7 +95,6 @@ private:
   void resetDescriptors();
   ZVulkanDescriptorSet* ensureDescriptor(Stage stage);
   void ensureOITResources();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& fallbackScreenDimRcp);
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
   void ensureVertexCapacity(size_t vertexCount);
   void uploadGeometry();

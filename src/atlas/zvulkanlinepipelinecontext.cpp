@@ -144,7 +144,7 @@ void ZVulkanLinePipelineContext::resetFrame()
   // more than one frame is in flight. The buffers are released after the
   // current submission fence signals so the previous frame can safely finish
   // reading them on the GPU.
-  retainUbo(m_uboOIT);
+  // No OIT UBO retention required
   resetDescriptors();
   m_ddpTransformsFrozen = false;
   m_ddpMaterialFrozen = false;
@@ -221,18 +221,11 @@ void ZVulkanLinePipelineContext::ensureDescriptorSets(Z3DRendererBase& renderer)
     m_dsTexture = m_backend.allocateFrameDescriptorSet(**m_setTexture);
   }
 
-  // Ensure OIT UBO and descriptor set (only bound for WB init when needed)
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
+  // Ensure OIT descriptor set (set 3) for DDP flag SSBO
   if (!m_dsOIT && m_setOIT) {
     m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
-  if (m_dsOIT && m_uboOIT) {
-    m_dsOIT->writeUniformBufferOnce(0, *m_uboOIT);
+  if (m_dsOIT) {
     // Prime DDP flag SSBO only when not recording.
     if (!m_backend.isRecording() && m_backend.ddpIndirectCountEnabled()) {
       if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
@@ -317,28 +310,7 @@ void ZVulkanLinePipelineContext::updateUBOs(Z3DRendererBase& renderer,
                          (eyeState.isPerspective ? 0 : 1),
                          payload.pickingPass);
 
-  // OIT params: used by weighted-blended wideline init
-  if (m_uboOIT) {
-    OITParamsUBOStd140 oit{};
-    glm::vec2 rcp = glm::vec2(0.0f);
-    glm::vec2 extent = batch.pass.viewport.extent;
-    if (extent.x > 0.0f && extent.y > 0.0f) {
-      rcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
-    } else {
-      const auto& viewport = renderer.frameState().viewport;
-      if (viewport.z > 0 && viewport.w > 0) {
-        rcp = glm::vec2(1.0f / viewport.z, 1.0f / viewport.w);
-      }
-    }
-    oit.screen_dim_RCP = rcp;
-    const float n = renderer.viewState().nearClip;
-    const float f = renderer.viewState().farClip;
-    const float denom = std::max(f - n, 1e-6f);
-    oit.ze_to_zw_a = (f * n) / denom;
-    oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
-    oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-    m_uboOIT->copyData(&oit, sizeof(oit));
-  }
+  // No OIT UBO
 }
 
 ZVulkanLinePipelineContext::PipelineInstance&

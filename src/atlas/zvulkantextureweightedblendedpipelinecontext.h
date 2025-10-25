@@ -63,11 +63,7 @@ private:
     std::unique_ptr<ZVulkanPipeline> pipeline;
   };
 
-  struct WeightedBlendedPushConstants
-  {
-    glm::vec2 screenDimRcp{1.0f};
-    glm::vec2 _pad{0.0f};
-  };
+  // No push constants required for resolve shaders
 
   Z3DRendererVulkanBackend& m_backend;
 
@@ -75,10 +71,8 @@ private:
 
   std::optional<vk::raii::DescriptorSetLayout> m_setLayout;
   vk::DescriptorSetLayout m_setPlaceholder{}; // empty layout for set index alignment
-  vk::DescriptorSetLayout m_setOIT{}; // set = 3 (OIT params)
   std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSet;
-  std::unique_ptr<ZVulkanDescriptorSet> m_descriptorSetOIT;
-  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
+  
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
   size_t m_vertexCapacity = 0;
   size_t m_vertexCount = 0;
@@ -91,7 +85,7 @@ private:
   vk::PipelineVertexInputStateCreateInfo makeVertexInputState() const;
   void ensureVertexCapacity(size_t vertexCount);
   void uploadGeometry();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& screenDimRcp);
+  
 
   PipelineInstance& ensurePipeline(const PipelineKey& key, const vulkan::AttachmentFormats& formats);
 };

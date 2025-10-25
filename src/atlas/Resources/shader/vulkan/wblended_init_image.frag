@@ -9,8 +9,10 @@
 layout(location = 0) out vec4 FragAccum;
 layout(location = 1) out vec4 FragTrans;
 
-#include "include/oit_params.glslinc"
+#include "include/lighting.glslinc"
 #include "include/copyimage_func.glslinc"
+
+// Use lighting UBO for depth transform constants
 
 void main()
 {
@@ -18,10 +20,9 @@ void main()
   fragment_func(c, d);
 
   // Compute view-space depth and weight as in geometry WB init shaders
-  float viewDepth = oit.ze_to_zw_a / (d - oit.ze_to_zw_b);
-  float weight = clamp(0.03 / (1e-5 + pow(viewDepth * 0.005 * oit.weighted_blended_depth_scale, 4.0)), 1e-2, 3e3);
+  float viewDepth = uLighting.ze_to_zw_a / (d - uLighting.ze_to_zw_b);
+  float weight = clamp(0.03 / (1e-5 + pow(viewDepth * 0.005 * uLighting.weighted_blended_depth_scale, 4.0)), 1e-2, 3e3);
 
   FragAccum = c * weight;
   FragTrans = vec4(c.a, 0.0, 0.0, 0.0);
 }
-

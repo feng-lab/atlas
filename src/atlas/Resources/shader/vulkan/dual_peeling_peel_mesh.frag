@@ -11,7 +11,6 @@ layout(location = 2) out vec4 FragData2;
 
 layout(set = 3, binding = 1) buffer DDPFlag { uint changed; } ddp_flag;
 
-#include "include/oit_params.glslinc"
 #include "include/mesh_func.glslinc"
 
 void main()
@@ -20,8 +19,9 @@ void main()
   fragment_func(color, fragDepth);
   gl_FragDepth = fragDepth;
 
-  vec2 depthBlender = texture(DepthBlenderTex, gl_FragCoord.xy * oit.screen_dim_RCP).xy;
-  vec4 forwardTemp = texture(FrontBlenderTex, gl_FragCoord.xy * oit.screen_dim_RCP);
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec2 depthBlender = texelFetch(DepthBlenderTex, p, 0).xy;
+  vec4 forwardTemp = texelFetch(FrontBlenderTex, p, 0);
 
   FragData1 = forwardTemp;
   FragData2 = vec4(0.0);

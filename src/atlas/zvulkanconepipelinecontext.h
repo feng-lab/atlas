@@ -102,7 +102,7 @@ private:
   std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
   std::optional<vk::raii::Sampler> m_sampler;
 
-  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
+  // No OIT UBO retained; set 3 only carries DDP flag SSBO
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
@@ -185,7 +185,6 @@ private:
   void resetDescriptors();
   void ensureDescriptorSets();
   void ensureOITResources();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& screenDimRcp);
   void ensurePlaceholderTexture();
   // Lighting UBO is shared per-frame; no per-batch update is needed.
   void

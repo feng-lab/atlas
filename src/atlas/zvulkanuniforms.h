@@ -37,7 +37,11 @@ struct alignas(16) LightingUBOStd140
   alignas(8) float fog_density_log2e = 0.0f;
   alignas(8) float fog_density_density_log2e = 0.0f;
   alignas(8) glm::vec2 screen_dim_RCP{0.0f};
-  alignas(8) glm::vec2 _pad2{0.0f};
+  alignas(4) float weighted_blended_depth_scale = 1.0f;
+  alignas(4) float _pad2 = 0.0f;
+  alignas(4) float ze_to_zw_a = 0.0f;
+  alignas(4) float ze_to_zw_b = 0.0f;
+  alignas(8) glm::vec2 _pad3{0.0f};
   std::array<LightSource, 5> lights{};
 };
 
@@ -67,15 +71,6 @@ struct MaterialUBOStd140
   int use_custom_color = 0;
   float _pad0 = 0.0f;
   glm::vec4 custom_color{1.0f};
-};
-
-// Common OIT parameters UBO, mirrored from Resources/shader/vulkan/include/oit_params.glslinc
-struct OITParamsUBOStd140
-{
-  alignas(8) glm::vec2 screen_dim_RCP{0.0f};
-  alignas(4) float ze_to_zw_a = 0.0f;
-  alignas(4) float ze_to_zw_b = 0.0f;
-  alignas(4) float weighted_blended_depth_scale = 1.0f;
 };
 
 } // namespace nim

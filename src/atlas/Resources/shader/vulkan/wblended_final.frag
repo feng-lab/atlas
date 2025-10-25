@@ -3,7 +3,7 @@
 layout(set = 0, binding = 0) uniform sampler2D ColorTex0; // accumulated color * weight
 layout(set = 0, binding = 1) uniform sampler2D ColorTex1; // transmittance
 
-#include "include/oit_params.glslinc"
+#include "include/lighting.glslinc"
 
 layout(location = 0) out vec4 FragData0;
 
@@ -15,9 +15,9 @@ const float kWeightEpsilon = 1e-5;
 
 void main()
 {
-  vec2 tc = gl_FragCoord.xy * oit.screen_dim_RCP;
-  vec4 sumColor = texture(ColorTex0, tc);
-  float transmittance = texture(ColorTex1, tc).r;
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec4 sumColor = texelFetch(ColorTex0, p, 0);
+  float transmittance = texelFetch(ColorTex1, p, 0).r;
 
   float resolvedAlpha = clamp(1.0 - transmittance, 0.0, 1.0);
   if (resolvedAlpha <= kAlphaEpsilon) {
@@ -30,10 +30,10 @@ void main()
 
   float depthTerm = kWeightNumerator / weight - kWeightEpsilon;
   float fragDepth = 1.0;
-  if (depthTerm > 0.0 && oit.weighted_blended_depth_scale > 0.0) {
-    float viewDepth = pow(depthTerm, 0.25) / (0.005 * oit.weighted_blended_depth_scale);
+  if (depthTerm > 0.0 && uLighting.weighted_blended_depth_scale > 0.0) {
+    float viewDepth = pow(depthTerm, 0.25) / (0.005 * uLighting.weighted_blended_depth_scale);
     if (viewDepth > 1e-5) {
-      fragDepth = clamp(oit.ze_to_zw_a / viewDepth + oit.ze_to_zw_b, 0.0, 1.0);
+      fragDepth = clamp(uLighting.ze_to_zw_a / viewDepth + uLighting.ze_to_zw_b, 0.0, 1.0);
     }
   }
 

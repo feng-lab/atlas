@@ -81,7 +81,8 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   // Always use a per-draw override descriptor set to avoid update-after-bind hazards
   const bool ddpPeel = (renderer.shaderHookType() == Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel);
   ZVulkanDescriptorSet* ds = nullptr;
-  const auto sampler = m_backend.nearestClampSampler();
+  // Use linear filtering to downsample supersampled inputs (color and depth)
+  const auto sampler = m_backend.defaultSampler();
   // Allocate a fresh per-draw override descriptor set and write all required bindings
   CHECK(m_setTextures) << "Texture copy: descriptor set layout not initialized";
   ds = m_backend.allocateOverrideDescriptorSet(**m_setTextures);
@@ -131,35 +132,11 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   ensureVertexCapacity(m_vertexCount);
   uploadGeometry();
 
-  // Bind OIT UBO when needed for image OIT paths (for screen_dim_RCP and depth transforms)
-  if (key.waInit || key.wbInit || key.ddpPeel) {
-    // Ensure OIT descriptor/UBO are primed before recording; avoid descriptor writes while recording
-    if (m_backend.isRecording()) {
-      CHECK(m_descriptorSetOIT && m_uboOIT) << "Texture copy OIT resources not primed before recording";
-    } else {
+  // Bind set=3 only for ddpPeel image path to provide DDP changed flag SSBO
+  if (key.ddpPeel) {
+    if (!m_backend.isRecording()) {
       ensureDescriptorLayout();
       ensureOITResources();
-    }
-    if (m_descriptorSetOIT && m_uboOIT) {
-      // Update UBO contents only (host write is allowed during recording)
-      OITParamsUBOStd140 oit{};
-      glm::vec2 extent = batch.pass.viewport.extent;
-      if (!(extent.x > 0.0f && extent.y > 0.0f)) {
-        const auto& vp = renderer.frameState().viewport;
-        extent = glm::vec2(static_cast<float>(vp.z), static_cast<float>(vp.w));
-      }
-      if (extent.x > 0.0f && extent.y > 0.0f) {
-        oit.screen_dim_RCP = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
-      }
-      const float n = renderer.viewState().nearClip;
-      const float f = renderer.viewState().farClip;
-      const float denom = std::max(f - n, 1e-6f);
-      oit.ze_to_zw_a = (f * n) / denom;
-      oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
-      oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-      m_uboOIT->copyData(&oit, sizeof(oit));
-    } else {
-      CHECK(false) << "Texture copy OIT resources not primed before recording";
     }
   }
 
@@ -175,15 +152,12 @@ void ZVulkanTextureCopyPipelineContext::record(Z3DRendererBase& renderer,
   drawSpec.vertexOffsets = {vk::DeviceSize(0)};
   drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
   drawSpec.instanceCount = 1;
-  if (key.waInit || key.wbInit || key.ddpPeel) {
-    drawSpec.expectedDescriptorSetCount = 4;
-    CHECK(m_descriptorSetOIT) << "Texture copy OIT descriptor set missing";
+  drawSpec.expectedDescriptorSetCount = key.ddpPeel ? 4 : 1;
+  if (key.ddpPeel && m_descriptorSetOIT) {
     ZVulkanDescriptorBindInfo oitBind{};
     oitBind.firstSet = 3;
     oitBind.sets = {m_descriptorSetOIT->descriptorSet()};
     drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
-  } else {
-    drawSpec.expectedDescriptorSetCount = 1;
   }
 
   ZVulkanPipelineCommandRecorder recorder(cmd);
@@ -200,8 +174,8 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()
   auto& device = m_backend.device();
   auto& vkDevice = device.context().device();
 
-  // Immutable nearest-clamp sampler for exact texel copies without filtering
-  vk::Sampler imm = m_backend.nearestClampSampler();
+  // Immutable linear clamp sampler to match GL resolve filtering for color and depth
+  vk::Sampler imm = m_backend.defaultSampler();
   std::array<vk::Sampler, 4> imms{imm, imm, imm, imm};
   std::array<vk::DescriptorSetLayoutBinding, 4> bindings{};
   const uint32_t map[4] = {0, 1, 3, 4};
@@ -216,7 +190,7 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorLayout()
   vk::DescriptorSetLayoutCreateInfo createInfo{.bindingCount = static_cast<uint32_t>(bindings.size()),
                                                .pBindings = bindings.data()};
   m_setTextures.emplace(vkDevice, createInfo);
-  // OIT params UBO layout (set=3 to match include/oit_params.glslinc)
+  // Set=3 for DDP flag SSBO only
   if (!m_setOIT) {
     m_setOIT = m_backend.oitDescriptorSetLayout();
   }
@@ -234,27 +208,14 @@ void ZVulkanTextureCopyPipelineContext::ensureDescriptorSet()
 void ZVulkanTextureCopyPipelineContext::ensureOITResources()
 {
   ensureDescriptorLayout();
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
   if (!m_descriptorSetOIT && m_setOIT) {
     m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
-  if (m_descriptorSetOIT && m_uboOIT) {
-    // One-time descriptor write; must happen before recording begins
-    m_descriptorSetOIT->writeUniformBufferOnce(0, *m_uboOIT);
-    // Bind DDP changed flag SSBO once so image peel participates in early stop
+  if (m_descriptorSetOIT) {
     if (!m_backend.isRecording() && m_backend.ddpIndirectCountEnabled()) {
       if (auto* flagBuf = m_backend.ddpChangedFlagBufferObj()) {
         m_descriptorSetOIT->writeStorageBufferOnce(nim::vkbind::kBindingOITDDPFlag, *flagBuf);
       }
-    }
-    if (!m_loggedOitPrimedThisFrame) {
-      VLOG(2) << "primed OIT UBO descriptor (set=3, binding=0)";
-      m_loggedOitPrimedThisFrame = true;
     }
   }
 }
@@ -340,12 +301,13 @@ ZVulkanTextureCopyPipelineContext::ensurePipeline(const PipelineKey& key, const 
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  if (key.waInit || key.wbInit || key.ddpPeel) {
-    auto resolveSuffix = m_backend.weightedResolveDescriptorSuffixLayouts();
+  if (key.ddpPeel) {
     std::vector<vk::DescriptorSetLayout> layouts;
-    layouts.reserve(1 + resolveSuffix.size());
-    layouts.push_back(**m_setTextures);
-    layouts.insert(layouts.end(), resolveSuffix.begin(), resolveSuffix.end());
+    layouts.reserve(4);
+    layouts.push_back(**m_setTextures);                                  // set 0
+    layouts.push_back(m_backend.emptyDescriptorSetLayout());            // set 1 placeholder
+    layouts.push_back(m_backend.emptyDescriptorSetLayout());            // set 2 placeholder
+    layouts.push_back(m_backend.oitDescriptorSetLayout());              // set 3 (DDP flag)
     instance.pipeline->setDescriptorSetLayouts(layouts);
   } else {
     instance.pipeline->setDescriptorSetLayouts({**m_setTextures});

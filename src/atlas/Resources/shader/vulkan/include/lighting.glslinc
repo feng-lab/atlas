@@ -1,3 +1,7 @@
+// Include guard to prevent duplicate definitions when indirectly included
+#ifndef ATLAS_LIGHTING_GLSLINC
+#define ATLAS_LIGHTING_GLSLINC
+
 // Fog toggles as specialization constants
 layout(constant_id = 20) const bool USE_LINEAR_FOG = false;
 layout(constant_id = 21) const bool USE_EXPONENTIAL_FOG = false;
@@ -29,7 +33,8 @@ layout(std140, set = 1, binding = 0) uniform LightingUBO {
   vec3 fog_color_top;      float fog_end;
   vec3 fog_color_bottom;   float fog_scale;
   float fog_density_log2e; float fog_density_density_log2e;
-  vec2  screen_dim_RCP;    vec2  _pad1;
+  vec2  screen_dim_RCP;    float weighted_blended_depth_scale; float _pad1;
+  float ze_to_zw_a;        float ze_to_zw_b;                    vec2  _pad2;
 
   // Lights
   LightSource lights[MAX_LIGHTS];
@@ -108,3 +113,5 @@ vec4 apply_lighting_and_fog(const in float materialShininess, const in vec4 mate
     return color;
   }
 }
+
+#endif // ATLAS_LIGHTING_GLSLINC

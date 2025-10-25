@@ -322,20 +322,9 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
     m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(TransformsUBOStd140));
     m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-
-  // OIT params still use a regular UBO and are primed here.
-  if (m_dsOIT && m_uboOIT) {
-    m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
-    if (!m_backend.isRecording()) {
-      if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
-        m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
-      }
+  if (m_dsOIT && !m_backend.isRecording()) {
+    if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
+      m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
     }
   }
 }
@@ -343,35 +332,12 @@ void ZVulkanEllipsoidPipelineContext::ensureDescriptorSets()
 void ZVulkanEllipsoidPipelineContext::ensureOITResources()
 {
   ensureDescriptorLayouts();
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
   if (!m_dsOIT && m_setOIT) {
     m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 }
 
-void ZVulkanEllipsoidPipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
-                                                         const RenderBatch& batch,
-                                                         const glm::vec2& screenDimRcp)
-{
-  (void)batch;
-  if (!m_uboOIT) {
-    return;
-  }
-  OITParamsUBOStd140 oit{};
-  oit.screen_dim_RCP = screenDimRcp;
-  const float n = renderer.viewState().nearClip;
-  const float f = renderer.viewState().farClip;
-  const float denom = std::max(f - n, 1e-6f);
-  oit.ze_to_zw_a = (f * n) / denom;
-  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
-  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-  m_uboOIT->copyData(&oit, sizeof(oit));
-}
+ 
 
 void ZVulkanEllipsoidPipelineContext::ensurePlaceholderTexture() {}
 

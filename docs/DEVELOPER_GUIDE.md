@@ -328,14 +328,14 @@ Vulkan Descriptor Set/Binding Map
     - WB resolve: binding 0 = accumulation, 1 = transmittance
   - Set 1 — Lighting UBO (std140):
     - `lighting_enabled`, `numLights`, fog parameters, per‑light arrays
+    - `screen_dim_RCP`, `weighted_blended_depth_scale`, `ze_to_zw_a/b`
     - Fragment stage; see `Resources/shader/vulkan/include/lighting.glslinc`
   - Set 2 — Transforms/Material UBOs (std140):
     - Binding 0: `Transforms` (proj/view matrices, `pos_transform`, normal matrix, `parameters.x=sizeScale`)
     - Binding 1: `MaterialUBO` (sceneAmbient, materialAmbient/specular/shininess, alpha, optional customColor)
     - Vertex + fragment stages; see `Resources/shader/vulkan/include/matrices_material.glslinc`
-  - Set 3 — OIT Params UBO (std140):
-    - Binding 0: `OITParams` (`screen_dim_RCP`, `ze_to_zw_a/b`, `weighted_blended_depth_scale`)
-    - Fragment stage; see `Resources/shader/vulkan/include/oit_params.glslinc`
+  - Set 3 — OIT (DDP flag only):
+    - Binding 1: `DDPFlag` SSBO used by dual-depth-peeling peel passes to mark any-pixel-updated
 
 Guidelines
 - Allocate frame‑scoped descriptor sets from the backend arena; avoid per‑context pools.

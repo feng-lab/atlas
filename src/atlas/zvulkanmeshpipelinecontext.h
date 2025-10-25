@@ -147,7 +147,7 @@ private:
   vk::DescriptorSetLayout m_setTextures{};
   vk::DescriptorSetLayout m_setLighting{};
   vk::DescriptorSetLayout m_setTransforms{};
-  vk::DescriptorSetLayout m_setOIT{}; // set = 3 (OIT params)
+  vk::DescriptorSetLayout m_setOIT{}; // set = 3 (DDP flag only)
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTextures;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
@@ -161,7 +161,7 @@ private:
   std::unique_ptr<ZVulkanTexture> m_placeholder2D;
   std::unique_ptr<ZVulkanTexture> m_placeholder3D;
 
-  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
+  // No OIT UBO retained; set 3 only carries DDP flag SSBO
 
   // Retain last-frame UBOs until the active submission fence signals to
   // prevent read-after-free artifacts when frames overlap.
@@ -215,7 +215,7 @@ private:
   void ensurePlaceholderTextures();
   void ensureDescriptorSets();
   void ensureOITResources();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& fallbackScreenDimRcp);
+  
   // Lighting UBO is shared per-frame; no per-batch update is needed.
   void updateTransformUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const MeshPayload& payload);
   void updateMaterialUBO(const MeshPayload& payload,

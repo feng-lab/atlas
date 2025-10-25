@@ -154,24 +154,15 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
     extent.y = 1.0f;
   }
 
-  DualPeelPushConstants constants;
-  constants.screenDimRcp = payload.screenDimRcp;
-  if (constants.screenDimRcp.x <= 0.0f || constants.screenDimRcp.y <= 0.0f) {
-    constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
-  }
+  // No push constants needed
 
-  cmd.pushConstants<DualPeelPushConstants>(instance.pipeline->pipelineLayout(),
-                                           vk::ShaderStageFlagBits::eFragment,
-                                           0,
-                                           constants);
-
-  // Ensure and bind OIT params (set = 3); descriptor is set at allocation time.
+  // Ensure and bind set 3 (DDP flag); descriptor is set at allocation time.
   VLOG(2) << "DDP: ensureOITResources + update UBO";
   ensureOITResources();
-  updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
-  if (m_descriptorOIT && m_uboOIT) {
+  
+  if (m_descriptorOIT) {
     std::array<vk::DescriptorSet, 1> sets3{m_descriptorOIT->descriptorSet()};
-    VLOG(2) << "DDP: binding OIT params set at index 3";
+    VLOG(2) << "DDP: binding set 3 (DDP flag)";
     cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                            instance.pipeline->pipelineLayout(),
                            vkbind::kSetOITParams,
@@ -268,45 +259,10 @@ void ZVulkanTextureDualPeelPipelineContext::ensureOITResources()
   if (!m_descriptorOIT && m_setOIT) {
     m_descriptorOIT = m_backend.allocateFrameDescriptorSet(**m_setOIT);
   }
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  CHECK(m_descriptorOIT != nullptr) << "DDP: failed to allocate OIT descriptor set";
-  CHECK(m_uboOIT != nullptr) << "DDP: failed to allocate OIT UBO";
-  if (m_descriptorOIT && m_uboOIT) {
-    m_descriptorOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
-  }
+  CHECK(m_descriptorOIT != nullptr) << "DDP: failed to allocate descriptor set";
 }
 
-void ZVulkanTextureDualPeelPipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
-                                                               const RenderBatch&,
-                                                               const glm::vec2& fallbackScreenDimRcp)
-{
-  if (!m_uboOIT) {
-    return;
-  }
-  OITParamsUBOStd140 oit{};
-  glm::vec2 rcp = fallbackScreenDimRcp;
-  if (!(rcp.x > 0.0f && rcp.y > 0.0f)) {
-    const auto& viewportState = renderer.frameState().viewport;
-    const float w = static_cast<float>(viewportState.z);
-    const float h = static_cast<float>(viewportState.w);
-    if (w > 0.0f && h > 0.0f) {
-      rcp = glm::vec2(1.0f / w, 1.0f / h);
-    }
-  }
-  oit.screen_dim_RCP = rcp;
-  const float n = renderer.viewState().nearClip;
-  const float f = renderer.viewState().farClip;
-  const float denom = std::max(f - n, 1e-6f);
-  oit.ze_to_zw_a = (f * n) / denom;
-  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
-  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-  m_uboOIT->copyData(&oit, sizeof(oit));
-}
+ 
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureDualPeelPipelineContext::makeVertexInputState() const
 {
@@ -436,10 +392,8 @@ ZVulkanTextureDualPeelPipelineContext::ensurePipeline(const PipelineKey& key, co
   }
   instance.pipeline->setColorBlendAttachment(blendAttachment);
 
-  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
-                              .offset = 0,
-                              .size = static_cast<uint32_t>(sizeof(DualPeelPushConstants))};
-  instance.pipeline->setPushConstantRanges({range});
+  // No push constants
+  instance.pipeline->setPushConstantRanges({});
   instance.pipeline->create();
 
   auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});

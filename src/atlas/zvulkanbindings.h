@@ -7,10 +7,8 @@ namespace nim::vkbind {
 
 // Set indices
 inline constexpr uint32_t kSetInputs = 0;       // Primary sampled inputs for a pass
-inline constexpr uint32_t kSetOITParams = 3;    // OIT params UBO set
+inline constexpr uint32_t kSetOITParams = 3;    // OIT (DDP flag) set
 
-// OIT params UBO
-inline constexpr uint32_t kBindingOITParamsUBO = 0;
 // OIT DDP flag SSBO (set 3)
 inline constexpr uint32_t kBindingOITDDPFlag = 1;
 

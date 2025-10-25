@@ -6,8 +6,10 @@ layout(location = 1) out vec4 FragData1;
 
 
 #include "include/matrices_material.glslinc"
-#include "include/oit_params.glslinc"
+#include "include/lighting.glslinc"
 #include "include/cone_func.glslinc"
+
+// Use lighting UBO for depth transform constants
 
 void main()
 {
@@ -15,8 +17,8 @@ void main()
   fragment_func(color, fragDepth);
   gl_FragDepth = fragDepth;
 
-  float viewDepth = oit.ze_to_zw_a / (fragDepth - oit.ze_to_zw_b);
-  float weight = clamp(0.03 / (1e-5 + pow(viewDepth * 0.005 * oit.weighted_blended_depth_scale, 4.0)), 1e-2, 3e3);
+  float viewDepth = uLighting.ze_to_zw_a / (fragDepth - uLighting.ze_to_zw_b);
+  float weight = clamp(0.03 / (1e-5 + pow(viewDepth * 0.005 * uLighting.weighted_blended_depth_scale, 4.0)), 1e-2, 3e3);
   FragData0 = color * weight;
   FragData1.x = color.a;
 }

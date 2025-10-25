@@ -76,7 +76,7 @@ void ZVulkanSpherePipelineContext::resetFrame()
   // Retire per-frame UBOs so previous frames can complete safely on GPU
   // when multiple frames are in flight. Destruction is deferred until the
   // active submission fence signals.
-  retainUbo(m_uboOIT);
+  
   resetDescriptors();
   m_ddpTransformsFrozen = false;
   m_ddpMaterialFrozen = false;
@@ -148,18 +148,8 @@ void ZVulkanSpherePipelineContext::record(Z3DRendererBase& renderer,
 
   m_dynLightingOffset = m_backend.frameSharedLightingOffset();
   updateTransformUBO(renderer, batch, payload, pickingPass);
-  // OIT params UBO for shaders that include oit_params.glslinc
+  // Ensure DDP flag descriptor set (set=3) only; no OIT UBO
   ensureOITResources();
-  {
-    glm::vec2 extent = batch.pass.viewport.extent;
-    if (extent.x <= 0.0f || extent.y <= 0.0f) {
-      const auto& viewportState = renderer.frameState().viewport;
-      extent = glm::vec2(static_cast<float>(viewportState.z), static_cast<float>(viewportState.w));
-    }
-    glm::vec2 screenRcp =
-      (extent.x > 0.0f && extent.y > 0.0f) ? glm::vec2(1.0f / extent.x, 1.0f / extent.y) : glm::vec2(0.0f);
-    updateOITParamsUBO(renderer, batch, screenRcp);
-  }
   // Descriptor sets are primed in beginRender(); avoid record-time rewrites.
   CHECK(m_dsLighting && m_dsTransforms) << "Sphere pipeline descriptor sets missing (lighting/transforms)";
 
@@ -377,20 +367,9 @@ void ZVulkanSpherePipelineContext::ensureDescriptorSets()
     m_dsTransforms->writeUniformBufferDynamicOnce(0, m_backend.uniformArenaBuffer(), sizeof(TransformsUBOStd140));
     m_dsTransforms->writeUniformBufferDynamicOnce(1, m_backend.uniformArenaBuffer(), sizeof(MaterialUBOStd140));
   }
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-
-  // Dynamic UBOs are already primed above; no per-frame writes needed here.
-  if (m_dsOIT && m_uboOIT) {
-    m_dsOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
-    if (!m_backend.isRecording()) {
-      if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
-        m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
-      }
+  if (m_dsOIT && !m_backend.isRecording()) {
+    if (auto* buf = m_backend.ddpChangedFlagBufferObj()) {
+      m_dsOIT->writeStorageBufferOnce(vkbind::kBindingOITDDPFlag, *buf);
     }
   }
 }
@@ -398,35 +377,12 @@ void ZVulkanSpherePipelineContext::ensureDescriptorSets()
 void ZVulkanSpherePipelineContext::ensureOITResources()
 {
   ensureDescriptorLayouts();
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
   if (!m_dsOIT && m_setOIT) {
     m_dsOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
   }
 }
 
-void ZVulkanSpherePipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
-                                                      const RenderBatch& batch,
-                                                      const glm::vec2& screenDimRcp)
-{
-  (void)batch;
-  if (!m_uboOIT) {
-    return;
-  }
-  OITParamsUBOStd140 oit{};
-  oit.screen_dim_RCP = screenDimRcp;
-  const float n = renderer.viewState().nearClip;
-  const float f = renderer.viewState().farClip;
-  const float denom = std::max(f - n, 1e-6f);
-  oit.ze_to_zw_a = (f * n) / denom;
-  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
-  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-  m_uboOIT->copyData(&oit, sizeof(oit));
-}
+ 
 
 void ZVulkanSpherePipelineContext::ensurePlaceholderTexture() {}
 

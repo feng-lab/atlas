@@ -37,7 +37,6 @@ void ZVulkanTextureWeightedBlendedPipelineContext::resetFrame()
 void ZVulkanTextureWeightedBlendedPipelineContext::resetDescriptors()
 {
   m_descriptorSet.reset();
-  m_descriptorSetOIT.reset();
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& renderer,
@@ -67,11 +66,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     return;
   }
 
-  if (m_backend.isRecording()) {
-    CHECK(m_descriptorSetOIT && m_uboOIT) << "WB OIT resources not primed before recording";
-  } else {
-    ensureOITResources();
-  }
+  
 
   auto& accumulationTexture = vulkan::textureFromHandle(payload.accumulationAttachment,
                                                         m_backend.device(),
@@ -120,14 +115,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
     extent.y = 1.0f;
   }
 
-  WeightedBlendedPushConstants constants;
-  constants.screenDimRcp = payload.screenDimRcp;
-  if (constants.screenDimRcp.x <= 0.0f || constants.screenDimRcp.y <= 0.0f) {
-    constants.screenDimRcp = glm::vec2(1.0f / extent.x, 1.0f / extent.y);
-  }
-
-  // Update OIT UBO values before recording
-  updateOITParamsUBO(renderer, batch, constants.screenDimRcp);
+  // No OIT UBO required for WB resolve
 
   ZVulkanPipelineCommandRecorder::GraphicsDrawSpec drawSpec{};
   drawSpec.viewports = {viewport};
@@ -136,24 +124,16 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   drawSpec.pipelineLayoutHandle = instance.pipeline->pipelineLayoutHandle();
   drawSpec.descriptorSetFirst = vkbind::kSetInputs;
   drawSpec.descriptorSets = {ds->descriptorSet()};
-  uint32_t expectedSets = 1;
-  if (m_descriptorSetOIT && m_uboOIT) {
-    ZVulkanDescriptorBindInfo oitBind{};
-    oitBind.firstSet = vkbind::kSetOITParams;
-    oitBind.sets = {m_descriptorSetOIT->descriptorSet()};
-    drawSpec.extraDescriptorBinds.push_back(std::move(oitBind));
-    expectedSets = std::max(expectedSets, vkbind::kSetOITParams + 1);
-  }
-  drawSpec.expectedDescriptorSetCount = expectedSets;
+  drawSpec.expectedDescriptorSetCount = 1;
   auto& quad = m_backend.fullscreenQuadVertexBuffer();
   drawSpec.vertexBuffers = {quad.buffer()};
   drawSpec.vertexOffsets = {vk::DeviceSize(0)};
   drawSpec.vertexCount = static_cast<uint32_t>(m_vertexCount);
   drawSpec.instanceCount = 1;
-  drawSpec.pushConstantsData = &constants;
-  drawSpec.pushConstantsSize = static_cast<uint32_t>(sizeof(WeightedBlendedPushConstants));
-  drawSpec.pushConstantsStages = vk::ShaderStageFlagBits::eFragment;
-  drawSpec.requirePushConstants = true;
+  drawSpec.pushConstantsData = nullptr;
+  drawSpec.pushConstantsSize = 0;
+  drawSpec.pushConstantsStages = {};
+  drawSpec.requirePushConstants = false;
 
   VLOG(2) << fmt::format("WB(draw-only): draw {} verts", m_vertexCount);
   ZVulkanPipelineCommandRecorder recorder(cmd);
@@ -191,9 +171,7 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorLayout()
     m_setPlaceholder = m_backend.emptyDescriptorSetLayout();
   }
 
-  if (!m_setOIT) {
-    m_setOIT = m_backend.oitDescriptorSetLayout();
-  }
+  
 }
 
 void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorPool() {}
@@ -205,61 +183,11 @@ void ZVulkanTextureWeightedBlendedPipelineContext::ensureDescriptorSet()
   if (!m_descriptorSet) {
     m_descriptorSet = m_backend.allocateFrameDescriptorSet(**m_setLayout);
   }
-  if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
-  }
 }
 
-void ZVulkanTextureWeightedBlendedPipelineContext::ensureOITResources()
-{
-  // Ensure OIT UBO and descriptor for set = 3
-  if (!m_uboOIT) {
-    m_uboOIT = m_backend.device().createBuffer(sizeof(OITParamsUBOStd140),
-                                               vk::BufferUsageFlagBits::eUniformBuffer,
-                                               vk::MemoryPropertyFlagBits::eHostVisible |
-                                                 vk::MemoryPropertyFlagBits::eHostCoherent);
-  }
-  CHECK(m_uboOIT != nullptr) << "WB: failed to allocate OIT UBO";
-  if (!m_descriptorSetOIT && m_setOIT) {
-    m_descriptorSetOIT = m_backend.allocateFrameDescriptorSet(m_setOIT);
-  }
-  CHECK(m_descriptorSetOIT != nullptr) << "WB: failed to allocate OIT descriptor set";
-  if (m_descriptorSetOIT && m_uboOIT) {
-    m_descriptorSetOIT->writeUniformBufferOnce(vkbind::kBindingOITParamsUBO, *m_uboOIT);
-  }
-}
+void ZVulkanTextureWeightedBlendedPipelineContext::ensureOITResources() {}
 
-void ZVulkanTextureWeightedBlendedPipelineContext::updateOITParamsUBO(Z3DRendererBase& renderer,
-                                                                      const RenderBatch& batch,
-                                                                      const glm::vec2& screenDimRcp)
-{
-  (void)batch;
-  if (!m_uboOIT) {
-    return;
-  }
-
-  OITParamsUBOStd140 oit{};
-
-  glm::vec2 rcp = screenDimRcp;
-  if (!(rcp.x > 0.0f && rcp.y > 0.0f)) {
-    const auto& viewportState = renderer.frameState().viewport;
-    const float w = static_cast<float>(viewportState.z);
-    const float h = static_cast<float>(viewportState.w);
-    if (w > 0.0f && h > 0.0f) {
-      rcp = glm::vec2(1.0f / w, 1.0f / h);
-    }
-  }
-  oit.screen_dim_RCP = rcp;
-
-  const float n = renderer.viewState().nearClip;
-  const float f = renderer.viewState().farClip;
-  const float denom = std::max(f - n, 1e-6f);
-  oit.ze_to_zw_a = (f * n) / denom;
-  oit.ze_to_zw_b = 0.5f * (f + n) / denom + 0.5f;
-  oit.weighted_blended_depth_scale = renderer.sceneState().weightedBlendedDepthScale;
-
-  m_uboOIT->copyData(&oit, sizeof(oit));
-}
+ 
 
 vk::PipelineVertexInputStateCreateInfo ZVulkanTextureWeightedBlendedPipelineContext::makeVertexInputState() const
 {
@@ -321,30 +249,13 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
 
   auto vertexInput = makeVertexInputState();
   instance.pipeline = device.createPipeline(*instance.shader, vertexInput, vk::PrimitiveTopology::eTriangleStrip);
-  if (m_setOIT) {
-    auto resolveSuffix = m_backend.weightedResolveDescriptorSuffixLayouts();
-    std::vector<vk::DescriptorSetLayout> layouts;
-    layouts.reserve(1 + resolveSuffix.size());
-    layouts.push_back(**m_setLayout);
-    layouts.insert(layouts.end(), resolveSuffix.begin(), resolveSuffix.end());
-    instance.pipeline->setDescriptorSetLayouts(layouts);
-  } else {
-    instance.pipeline->setDescriptorSetLayouts({**m_setLayout});
-  }
+  instance.pipeline->setDescriptorSetLayouts({**m_setLayout});
   instance.pipeline->setAttachmentFormats(formats.colorFormats, formats.depthFormat);
   instance.pipeline->setCullMode(vk::CullModeFlagBits::eNone);
   instance.pipeline->setFrontFace(vk::FrontFace::eCounterClockwise);
-  const bool hasDepth = formats.depthFormat.has_value();
-  instance.pipeline->setDepthTestEnable(hasDepth);
-  if (hasDepth) {
-    // Keep Vulkan resolve depth semantics aligned with the OpenGL path: only
-    // commit the resolved depth when it is not farther than the stored value.
-    // This preserves the compositor's follow-up depth-tested blend step.
-    instance.pipeline->setDepthCompareOp(vk::CompareOp::eLessOrEqual);
-    instance.pipeline->setDepthWriteEnable(true);
-  } else {
-    instance.pipeline->setDepthWriteEnable(false);
-  }
+  // GL parity: do not write depth in WB resolve; disable depth test/writes
+  instance.pipeline->setDepthTestEnable(false);
+  instance.pipeline->setDepthWriteEnable(false);
 
   // Blend weighted-blended result over background using premultiplied alpha.
   vk::PipelineColorBlendAttachmentState blendAttachment{};
@@ -359,10 +270,8 @@ ZVulkanTextureWeightedBlendedPipelineContext::ensurePipeline(const PipelineKey& 
                                    vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
   instance.pipeline->setColorBlendAttachment(blendAttachment);
 
-  vk::PushConstantRange range{.stageFlags = vk::ShaderStageFlagBits::eFragment,
-                              .offset = 0,
-                              .size = static_cast<uint32_t>(sizeof(WeightedBlendedPushConstants))};
-  instance.pipeline->setPushConstantRanges({range});
+  // No push constants
+  instance.pipeline->setPushConstantRanges({});
   instance.pipeline->create();
 
   auto [inserted, _] = m_pipelineCache.insert({key, std::move(instance)});

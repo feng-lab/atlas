@@ -1,8 +1,0 @@
-// Common OIT parameters
-layout(std140, set = 3, binding = 0) uniform OITParams {
-  vec2  screen_dim_RCP;           // 1/screen size
-  float ze_to_zw_a;               // depth conversion (zw = a/ze + b)
-  float ze_to_zw_b;
-  float weighted_blended_depth_scale; // WB-OIT depth scale
-} oit;
-

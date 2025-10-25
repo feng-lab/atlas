@@ -83,7 +83,7 @@ private:
   vk::DescriptorSetLayout m_setPlaceholder{};
   vk::DescriptorSetLayout m_setLighting{};
   vk::DescriptorSetLayout m_setTransforms{};
-  vk::DescriptorSetLayout m_setOIT{}; // set = 3
+  vk::DescriptorSetLayout m_setOIT{}; // set = 3 (DDP flag only)
   std::unique_ptr<ZVulkanDescriptorSet> m_dsPlaceholder;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsLighting;
   std::unique_ptr<ZVulkanDescriptorSet> m_dsTransforms;
@@ -92,7 +92,7 @@ private:
   std::unique_ptr<ZVulkanTexture> m_placeholderTexture;
   std::optional<vk::raii::Sampler> m_sampler;
 
-  std::unique_ptr<ZVulkanBuffer> m_uboOIT;
+  // No OIT UBO retained; only DDP flag SSBO remains on set 3
 
   size_t m_vertexCount = 0;
   size_t m_indexCount = 0;
@@ -136,7 +136,6 @@ private:
   void resetDescriptors();
   void ensureDescriptorSets();
   void ensureOITResources();
-  void updateOITParamsUBO(Z3DRendererBase& renderer, const RenderBatch& batch, const glm::vec2& screenDimRcp);
   void ensurePlaceholderTexture();
   // Lighting UBO is shared per-frame; no per-batch update is needed.
   void updateTransformUBO(Z3DRendererBase& renderer,
