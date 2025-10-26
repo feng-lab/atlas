@@ -710,8 +710,7 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   m_activeFrame = nullptr;
   s_currentBackend = nullptr;
 
-  // Record last frame's uniform usage for next-frame pre-sizing decisions
-  m_prevUniformHighWatermark = frame.uniformArena.highWatermark;
+  // No cross-frame uniform sizing heuristics; each frame is sized independently.
 }
 
 void Z3DRendererVulkanBackend::drainPostFenceCallbacks()
@@ -1495,15 +1494,9 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   };
 
   // Apply capacity hint before opening the frame (may be zero if no batches were collected).
-  size_t minUniformBytes = 0;
-  // Optimization: if the previous frame's peak uniform usage fit comfortably under the
-  // baseline, skip the pre-collection estimation and provision the baseline only.
   const size_t baselineBytes = static_cast<size_t>(kUniformArenaBaseKiB) * 1024ull;
-  if (m_prevUniformHighWatermark > baselineBytes) {
-    minUniformBytes = estimateUniformBytes();
-  } else {
-    minUniformBytes = baselineBytes;
-  }
+  const size_t estimatedBytes = estimateUniformBytes();
+  const size_t minUniformBytes = std::max(baselineBytes, estimatedBytes);
   m_nextUniformMinCapacity = std::max(m_nextUniformMinCapacity, minUniformBytes);
 
   {

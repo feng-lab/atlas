@@ -459,9 +459,6 @@ public:
   // Deliver first Vulkan frame to UI immediately after backend switch by
   // pumping the fence and executing deferred readback consumers once.
   bool m_pumpFenceAfterFirstSubmit = true;
-  // Last frame's uniform arena high watermark (bytes): used to skip expensive
-  // pre-collection when comfortably under the baseline capacity.
-  size_t m_prevUniformHighWatermark = 0;
 
   std::unique_ptr<ZVulkanLinePipelineContext> m_lineContext;
   std::unique_ptr<ZVulkanMeshPipelineContext> m_meshContext;
