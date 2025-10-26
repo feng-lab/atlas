@@ -1565,7 +1565,10 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                    LoadOp::Clear,
                                                    StoreOp::Store);
       vlogVulkanLease("transparency_resolve", *sceneOutLease);
-      m_alphaBlendRenderer.setEnableFixedBlend(false);
+      // Enable fixed-function blending when a background was drawn so the
+      // compositor shader output (premultiplied) blends over the background
+      // instead of overwriting it with black where no geometry lies.
+      m_alphaBlendRenderer.setEnableFixedBlend(m_showBackground.get());
       recordInVulkanFrame(
         m_rendererBase,
         [&]() {
