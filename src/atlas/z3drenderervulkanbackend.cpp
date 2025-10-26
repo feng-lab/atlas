@@ -55,9 +55,10 @@ DEFINE_bool(atlas_vk_ddp_indirect_count,
             true,
             "Use drawIndirectCount gating for Vulkan dual-depth peeling (device-side early stop)");
 
-// Initial capacity for the per-frame uniform arena (in KiB). This buffer backs
-// all dynamic UBO bindings for the frame.
-DEFINE_int32(atlas_vk_uniform_arena_kib, 256, "Initial per-frame uniform arena capacity in KiB (defaults to 256 KiB)");
+// Baseline capacity for the per-frame uniform arena (in KiB). This buffer backs
+// all dynamic UBO bindings for the frame. The backend pre-sizes beyond this baseline
+// based on a cheap estimate; mid-frame growth is disallowed.
+static constexpr int kUniformArenaBaseKiB = 256;
 
 namespace nim {
 
@@ -708,6 +709,9 @@ void Z3DRendererVulkanBackend::endRender(Z3DRendererBase& renderer)
   m_activeFrameHandle.reset();
   m_activeFrame = nullptr;
   s_currentBackend = nullptr;
+
+  // Record last frame's uniform usage for next-frame pre-sizing decisions
+  m_prevUniformHighWatermark = frame.uniformArena.highWatermark;
 }
 
 void Z3DRendererVulkanBackend::drainPostFenceCallbacks()
@@ -1491,10 +1495,16 @@ void Z3DRendererVulkanBackend::processCompositorPass(Z3DRendererBase& renderer, 
   };
 
   // Apply capacity hint before opening the frame (may be zero if no batches were collected).
-  const size_t minUniformBytes = estimateUniformBytes();
-  if (minUniformBytes > 0) {
-    m_nextUniformMinCapacity = std::max(m_nextUniformMinCapacity, minUniformBytes);
+  size_t minUniformBytes = 0;
+  // Optimization: if the previous frame's peak uniform usage fit comfortably under the
+  // baseline, skip the pre-collection estimation and provision the baseline only.
+  const size_t baselineBytes = static_cast<size_t>(kUniformArenaBaseKiB) * 1024ull;
+  if (m_prevUniformHighWatermark > baselineBytes) {
+    minUniformBytes = estimateUniformBytes();
+  } else {
+    minUniformBytes = baselineBytes;
   }
+  m_nextUniformMinCapacity = std::max(m_nextUniformMinCapacity, minUniformBytes);
 
   {
     const bool startedHere = !renderer.isVulkanFrameActive();
@@ -1981,7 +1991,7 @@ void Z3DRendererVulkanBackend::ensureUniformArena(FrameResources& frame)
     return;
   }
   // Create if missing
-  const size_t baseRequested = static_cast<size_t>(std::max(64, FLAGS_atlas_vk_uniform_arena_kib)) * 1024ull;
+  const size_t baseRequested = static_cast<size_t>(std::max(64, kUniformArenaBaseKiB)) * 1024ull;
   size_t requested = std::max(baseRequested, m_nextUniformMinCapacity);
   if (!frame.uniformArena.buffer) {
     const size_t cap = requested;
