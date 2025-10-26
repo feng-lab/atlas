@@ -34,13 +34,13 @@ public:
     PreserveViewVector = 1 << 1
   };
 
-  Z3DCamera(Z3DCoordinateSystem coordinateSystem = Z3DCoordinateSystem::OpenGL);
+  Z3DCamera(RenderBackend backend = RenderBackend::OpenGL);
 
   // Set the coordinate system to use (OpenGL or Vulkan)
-  void setCoordinateSystem(Z3DCoordinateSystem system);
+  void setBackend(RenderBackend backend);
   
   // Get the current coordinate system
-  Z3DCoordinateSystem getCoordinateSystem() const { return m_coordinateSystem; }
+  RenderBackend getBackend() const { return m_backend; }
 
   [[nodiscard]] const glm::vec3& eye() const
   {
@@ -407,7 +407,7 @@ private:
   glm::mat4 m_projectionViewMatrices[3];
 
   // Add the coordinate system member
-  Z3DCoordinateSystem m_coordinateSystem;
+  RenderBackend m_backend;
 };
 
 DECLARE_OPERATORS_FOR_ENUM(Z3DCamera::ResetOption)

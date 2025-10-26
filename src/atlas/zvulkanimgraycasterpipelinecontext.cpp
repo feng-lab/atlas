@@ -3387,7 +3387,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
     if (backend && !colorHandles.empty()) {
       backend->scheduleAfterCurrentFrameCompletion([this, handles = std::move(colorHandles), depthHandle]() {
         const AttachmentHandle& handle = handles.front();
-        CHECK(handle.valid() && handle.backend == AttachmentBackend::Vulkan)
+        CHECK(handle.valid() && handle.backend == RenderBackend::Vulkan)
           << "Raycaster merge debug save: invalid color attachment handle";
 
         auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "img raycaster merge debug");
@@ -3403,7 +3403,7 @@ void ZVulkanImgRaycasterPipelineContext::renderFastVolume(Z3DRendererBase& rende
         }
 
         // Save depth if available
-        if (depthHandle && depthHandle->valid() && depthHandle->backend == AttachmentBackend::Vulkan) {
+        if (depthHandle && depthHandle->valid() && depthHandle->backend == RenderBackend::Vulkan) {
           auto& dtex = vulkan::textureFromHandle(*depthHandle, m_backend.device(), "img raycaster merge depth debug");
           QString ddir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
           if (!ddir.isEmpty() && !ddir.endsWith('/')) {

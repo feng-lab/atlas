@@ -65,7 +65,7 @@ void ZVulkanTextureDualPeelPipelineContext::record(Z3DRendererBase& renderer,
   Stage stage = (payload.stage == TextureDualPeelPayload::Stage::Final) ? Stage::Final : Stage::Blend;
 
   if (stage == Stage::Blend) {
-    CHECK(payload.tempAttachment.backend == AttachmentBackend::Vulkan)
+    CHECK(payload.tempAttachment.backend == RenderBackend::Vulkan)
       << "GL tempAttachment in Vulkan dual-peel blend path";
     if (!payload.tempAttachment.valid()) {
       return;

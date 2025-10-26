@@ -304,7 +304,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     uint32_t c0W = 0, c0H = 0;
     auto c0Fmt = enumOrUnderlying(vk::Format{}, 16);
     if (!surf.colorAttachments.empty() && surf.colorAttachments[0].handle.valid() &&
-        surf.colorAttachments[0].handle.backend == AttachmentBackend::Vulkan) {
+        surf.colorAttachments[0].handle.backend == RenderBackend::Vulkan) {
       auto* tex = reinterpret_cast<ZVulkanTexture*>(surf.colorAttachments[0].handle.id);
       if (tex) {
         c0Handle = reinterpret_cast<uint64_t>(tex);
@@ -317,7 +317,7 @@ void Z3DRendererVulkanBackend::beginRender(Z3DRendererBase& renderer)
     uint32_t dW = 0, dH = 0;
     auto dFmt = enumOrUnderlying(vk::Format{}, 16);
     if (surf.depthAttachment && surf.depthAttachment->handle.valid() &&
-        surf.depthAttachment->handle.backend == AttachmentBackend::Vulkan) {
+        surf.depthAttachment->handle.backend == RenderBackend::Vulkan) {
       auto* dtex = reinterpret_cast<ZVulkanTexture*>(surf.depthAttachment->handle.id);
       if (dtex) {
         dHandle = reinterpret_cast<uint64_t>(dtex);
@@ -943,7 +943,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (VLOG_IS_ON(2)) {
       if (!batch.pass.colorAttachments.empty()) {
         const auto& a = batch.pass.colorAttachments.front();
-        if (a.handle.valid() && a.handle.backend == AttachmentBackend::Vulkan) {
+        if (a.handle.valid() && a.handle.backend == RenderBackend::Vulkan) {
           auto* tex = reinterpret_cast<ZVulkanTexture*>(a.handle.id);
           if (tex) {
             firstColorHandle = reinterpret_cast<uint64_t>(tex);
@@ -954,7 +954,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
         }
       }
       if (batch.pass.depthAttachment && batch.pass.depthAttachment->handle.valid() &&
-          batch.pass.depthAttachment->handle.backend == AttachmentBackend::Vulkan) {
+          batch.pass.depthAttachment->handle.backend == RenderBackend::Vulkan) {
         auto* dtex = reinterpret_cast<ZVulkanTexture*>(batch.pass.depthAttachment->handle.id);
         if (dtex) {
           depthHandle = reinterpret_cast<uint64_t>(dtex);
@@ -1582,7 +1582,7 @@ Z3DRendererVulkanBackend::describeSurfaceFromLease(const Z3DScratchResourcePool:
     if (attachment.kind == ScratchAttachmentKind::Color) {
       if (auto* texture = lease.colorAttachment(attachment.index)) {
         AttachmentDesc desc;
-        desc.handle.backend = AttachmentBackend::Vulkan;
+        desc.handle.backend = RenderBackend::Vulkan;
         desc.handle.id = reinterpret_cast<uint64_t>(texture);
         desc.handle.index = attachment.index;
         surface.colorAttachments.push_back(desc);
@@ -1590,7 +1590,7 @@ Z3DRendererVulkanBackend::describeSurfaceFromLease(const Z3DScratchResourcePool:
     } else if (attachment.kind == ScratchAttachmentKind::Depth) {
       if (auto* texture = lease.depthAttachmentTexture()) {
         AttachmentDesc desc;
-        desc.handle.backend = AttachmentBackend::Vulkan;
+        desc.handle.backend = RenderBackend::Vulkan;
         desc.handle.id = reinterpret_cast<uint64_t>(texture);
         desc.handle.index = attachment.index;
         surface.depthAttachment = desc;

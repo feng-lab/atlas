@@ -882,7 +882,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     if (backend && !colorHandles.empty()) {
       backend->scheduleAfterCurrentFrameCompletion([this, handles = std::move(colorHandles), depthHandle]() {
         const AttachmentHandle& handle = handles.front();
-        CHECK(handle.valid() && handle.backend == AttachmentBackend::Vulkan)
+        CHECK(handle.valid() && handle.backend == RenderBackend::Vulkan)
           << "Slice merge debug save: invalid color attachment handle";
 
         auto& tex = vulkan::textureFromHandle(handle, m_backend.device(), "slice merge debug");
@@ -896,7 +896,7 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
           LOG(ERROR) << "Slice merge debug save failed for color attachment";
         }
 
-        if (depthHandle && depthHandle->valid() && depthHandle->backend == AttachmentBackend::Vulkan) {
+        if (depthHandle && depthHandle->valid() && depthHandle->backend == RenderBackend::Vulkan) {
           auto& dtex = vulkan::textureFromHandle(*depthHandle, m_backend.device(), "slice merge depth debug");
           QString ddir = QString::fromStdString(FLAGS_atlas_debug_save_dir);
           if (!ddir.isEmpty() && !ddir.endsWith('/')) {

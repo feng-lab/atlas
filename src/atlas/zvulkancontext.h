@@ -32,7 +32,24 @@ public:
   // Returns the currently selected physical device
   vk::raii::PhysicalDevice& physicalDevice()
   {
-    return m_physicalDevices[0];
+    return m_physicalDevices[m_selectedDeviceIndex];
+  }
+
+  // Returns the Nth enumerated physical device (sorted by preference).
+  // Caller must ensure index < deviceCount().
+  vk::raii::PhysicalDevice& physicalDevice(size_t index)
+  {
+    return m_physicalDevices[index];
+  }
+
+  size_t deviceCount() const
+  {
+    return m_physicalDevices.size();
+  }
+
+  size_t selectedDeviceIndex() const
+  {
+    return m_selectedDeviceIndex;
   }
 
   // Returns the logical device
@@ -82,6 +99,14 @@ public:
   // Check if the device supports the required extensions
   bool checkDeviceExtensionSupport(vk::raii::PhysicalDevice& physicalDevice) const;
 
+  void logGpuInfo() const;
+
+  // Runtime device switching: select a new physical device by sorted index and
+  // recreate the logical device, queues, and command pool. Returns true on
+  // success. Callers must ensure no in-flight work depends on the prior device
+  // (e.g., waitIdle and reset higher-level resources) before calling.
+  bool setSelectedDeviceIndex(size_t index);
+
 private:
   // Vulkan initialization steps
   void createInstance();
@@ -98,6 +123,7 @@ private:
   std::optional<vk::raii::Instance> m_instance;
   std::optional<vk::raii::DebugUtilsMessengerEXT> m_debugMessenger;
   std::vector<vk::raii::PhysicalDevice> m_physicalDevices;
+  size_t m_selectedDeviceIndex = 0; // index into m_physicalDevices
   std::optional<vk::raii::Device> m_device;
   std::optional<vk::raii::Queue> m_graphicsQueue;
   std::optional<vk::raii::Queue> m_presentQueue;

@@ -66,21 +66,11 @@ enum class ImgCompositingMode
   XRay
 };
 
-//------------------------------------------------------------------------------
-// Backend handles
-//------------------------------------------------------------------------------
-enum class AttachmentBackend
-{
-  Unknown,
-  OpenGL,
-  Vulkan
-};
-
 struct AttachmentHandle
 {
   uint64_t id = 0;
   uint32_t index = 0;
-  AttachmentBackend backend = AttachmentBackend::Unknown;
+  RenderBackend backend = RenderBackend::OpenGL;
 
   [[nodiscard]] bool valid() const
   {
@@ -93,7 +83,7 @@ struct AttachmentHandle
 struct SampledImageHandle
 {
   uint64_t id = 0;
-  AttachmentBackend backend = AttachmentBackend::Unknown;
+  RenderBackend backend = RenderBackend::OpenGL;
 
   [[nodiscard]] bool valid() const
   {

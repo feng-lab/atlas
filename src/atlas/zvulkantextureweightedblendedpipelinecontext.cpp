@@ -50,9 +50,9 @@ void ZVulkanTextureWeightedBlendedPipelineContext::record(Z3DRendererBase& rende
   VLOG(2) << fmt::format("WB::record begin accum=0x{:x} trans=0x{:x}",
                          payload.accumulationAttachment.id,
                          payload.transmittanceAttachment.id);
-  CHECK(payload.accumulationAttachment.backend == AttachmentBackend::Vulkan)
+  CHECK(payload.accumulationAttachment.backend == RenderBackend::Vulkan)
     << "GL accumulationAttachment in Vulkan path";
-  CHECK(payload.transmittanceAttachment.backend == AttachmentBackend::Vulkan)
+  CHECK(payload.transmittanceAttachment.backend == RenderBackend::Vulkan)
     << "GL transmittanceAttachment in Vulkan path";
   if (!payload.accumulationAttachment.valid() || !payload.transmittanceAttachment.valid()) {
     return;

@@ -16,7 +16,36 @@ Z3DGpuInfo& Z3DGpuInfo::instance()
 
 Z3DGpuInfo::Z3DGpuInfo()
 {
+  // Do not query GL in the constructor. Backends will initialize us explicitly.
+  // Provide conservative defaults so shared code paths remain safe before init.
+}
+
+void Z3DGpuInfo::initializeFromOpenGL()
+{
   detectGpuInfo();
+}
+
+void Z3DGpuInfo::overrideGenericCaps(const GenericCaps& caps)
+{
+  // Populate generic caps from a non-GL backend (e.g., Vulkan)
+  m_maxTexureSize = static_cast<int>(caps.maxTextureSize);
+  m_max3DTextureSize = static_cast<int>(caps.max3DTextureSize);
+  m_maxArrayTextureLayers = caps.maxArrayTextureLayers;
+  m_maxColorAttachments = caps.maxColorAttachments;
+  m_maxTextureAnisotropy = caps.maxTextureAnisotropy;
+  m_dedicatedVideoMemoryMB = caps.dedicatedVideoMemoryMB;
+  m_maxCombinedTextureImageUnits = caps.maxCombinedTextureImageUnits;
+  m_maxTextureImageUnits = caps.maxTextureImageUnits;
+  m_maxVertexTextureImageUnits = caps.maxVertexTextureImageUnits;
+  m_maxGeometryTextureImageUnits = caps.maxGeometryTextureImageUnits;
+  m_maxTextureBufferSize = caps.maxTextureBufferSize;
+  m_maxDrawBuffer = caps.maxDrawBuffer;
+  m_maxViewportDims = caps.maxViewportDim;
+
+  // Mark as supported so shared code can rely on caps safely.
+  m_isSupported = true;
+  m_notSupportedReason.clear();
+  m_capsBackend = RenderBackend::Vulkan;
 }
 
 int Z3DGpuInfo::glslMajorVersion() const
@@ -144,8 +173,12 @@ bool Z3DGpuInfo::isImagingSupported() const
 void Z3DGpuInfo::logGpuInfo() const
 {
   if (!isSupported()) {
-    LOG(INFO) << "Current GPU card is not supported. Reason: " << m_notSupportedReason;
-    LOG(INFO) << "3D functions will be disabled.";
+    std::string msg;
+    fmt::format_to(std::back_inserter(msg),
+                   "Current GPU card is not supported. Reason: {}\n",
+                   m_notSupportedReason.toStdString());
+    fmt::format_to(std::back_inserter(msg), "3D functions will be disabled.\n");
+    LOG(INFO) << msg;
     return;
   }
 
@@ -160,47 +193,69 @@ void Z3DGpuInfo::logGpuInfo() const
   }
 #endif
 
-  LOG(INFO) << "OpenGL Vendor:                 " << m_glVendorString;
-  LOG(INFO) << "OpenGL Renderer:               " << m_glRendererString;
-  LOG(INFO) << "OpenGL Version:                " << m_glVersionString;
-  LOG(INFO) << "OpenGL SL Version:             " << m_glslVersionString;
-  LOG(INFO) << "Context Core Profile Bit: " << m_contextCoreProfileBit;
-  LOG(INFO) << "Context Compatibility Profile Bit: " << m_contextCompatibilityProfileBit;
-  LOG(INFO) << "Context Flag Forward Compatible Bit: " << m_contextFlagForwardCompatibleBit;
-  LOG(INFO) << "Context Flag Debug Bit: " << m_contextFlagDebugBit;
-  LOG(INFO) << "Context Flag Robust Access Bit: " << m_contextFlagRobustAccessBit;
-  LOG(INFO) << "OpenGL Extensions: " << m_glExtensionsString;
-  LOG(INFO) << "Max Viewport Dimensions:       " << m_maxViewportDims;
-  LOG(INFO) << "Max Renderbuffer Size:         " << m_maxRenderbufferSize;
-  LOG(INFO) << fmt::format("Max Texture Size:              {} (use {})", m_maxTexureSize, maxTextureSize());
-  LOG(INFO) << fmt::format("Max 3D Texture Size:           {} (use {})", m_max3DTextureSize, max3DTextureSize());
-  LOG(INFO) << "Max Color Attachments:         " << m_maxColorAttachments;
-  LOG(INFO) << "Max Draw Buffer:               " << m_maxDrawBuffer;
+  std::string msg;
+  // Header
+  fmt::format_to(std::back_inserter(msg),
+                 "Backend Caps Source: {}\n",
+                 (m_capsBackend == RenderBackend::OpenGL ? "OpenGL" : "Vulkan"));
+
+  if (m_capsBackend == RenderBackend::OpenGL) {
+    fmt::format_to(std::back_inserter(msg), "OpenGL Vendor:                 {}\n", m_glVendorString.toStdString());
+    fmt::format_to(std::back_inserter(msg), "OpenGL Renderer:               {}\n", m_glRendererString.toStdString());
+    fmt::format_to(std::back_inserter(msg), "OpenGL Version:                {}\n", m_glVersionString.toStdString());
+    fmt::format_to(std::back_inserter(msg), "OpenGL SL Version:             {}\n", m_glslVersionString.toStdString());
+    fmt::format_to(std::back_inserter(msg), "Context Core Profile Bit: {}\n", m_contextCoreProfileBit);
+    fmt::format_to(std::back_inserter(msg),
+                   "Context Compatibility Profile Bit: {}\n",
+                   m_contextCompatibilityProfileBit);
+    fmt::format_to(std::back_inserter(msg),
+                   "Context Flag Forward Compatible Bit: {}\n",
+                   m_contextFlagForwardCompatibleBit);
+    fmt::format_to(std::back_inserter(msg), "Context Flag Debug Bit: {}\n", m_contextFlagDebugBit);
+    fmt::format_to(std::back_inserter(msg), "Context Flag Robust Access Bit: {}\n", m_contextFlagRobustAccessBit);
+    fmt::format_to(std::back_inserter(msg), "OpenGL Extensions: {}\n", m_glExtensionsString.toStdString());
+  }
+
+  fmt::format_to(std::back_inserter(msg), "Max Viewport Dimensions:       {}\n", m_maxViewportDims);
+  fmt::format_to(std::back_inserter(msg), "Max Renderbuffer Size:         {}\n", m_maxRenderbufferSize);
+  fmt::format_to(std::back_inserter(msg),
+                 "Max Texture Size:              {} (use {})\n",
+                 m_maxTexureSize,
+                 maxTextureSize());
+  fmt::format_to(std::back_inserter(msg),
+                 "Max 3D Texture Size:           {} (use {})\n",
+                 m_max3DTextureSize,
+                 max3DTextureSize());
+  fmt::format_to(std::back_inserter(msg), "Max Color Attachments:         {}\n", m_maxColorAttachments);
+  fmt::format_to(std::back_inserter(msg), "Max Draw Buffer:               {}\n", m_maxDrawBuffer);
   if (m_maxGeometryOutputVertices > 0) {
-    LOG(INFO) << "Max GS Output Vertices:        " << m_maxGeometryOutputVertices;
+    fmt::format_to(std::back_inserter(msg), "Max GS Output Vertices:        {}\n", m_maxGeometryOutputVertices);
   }
-  LOG(INFO) << "Max VS Texture Image Units:    " << m_maxVertexTextureImageUnits;
+  fmt::format_to(std::back_inserter(msg), "Max VS Texture Image Units:    {}\n", m_maxVertexTextureImageUnits);
   if (m_maxGeometryTextureImageUnits > 0) {
-    LOG(INFO) << "Max GS Texture Image Units:    " << m_maxGeometryTextureImageUnits;
+    fmt::format_to(std::back_inserter(msg), "Max GS Texture Image Units:    {}\n", m_maxGeometryTextureImageUnits);
   }
-  LOG(INFO) << "Max FS Texture Image Units:    " << m_maxTextureImageUnits;
-  LOG(INFO) << "VS+GS+FS Texture Image Units:  " << m_maxCombinedTextureImageUnits;
-  // LOG(INFO) << "Max Texture Coordinates:       " << m_maxTextureCoords;
-  LOG(INFO) << "Max Array Texture Layers:      " << m_maxArrayTextureLayers;
+  fmt::format_to(std::back_inserter(msg), "Max FS Texture Image Units:    {}\n", m_maxTextureImageUnits);
+  fmt::format_to(std::back_inserter(msg), "VS+GS+FS Texture Image Units:  {}\n", m_maxCombinedTextureImageUnits);
+  fmt::format_to(std::back_inserter(msg), "Max Array Texture Layers:      {}\n", m_maxArrayTextureLayers);
+  fmt::format_to(std::back_inserter(msg), "Total Graphics Memory Size:    {} MB\n", dedicatedVideoMemoryMB());
+  fmt::format_to(std::back_inserter(msg),
+                 "Smooth Point Size Range:       ({}, {})\n",
+                 m_minSmoothPointSize,
+                 m_maxSmoothPointSize);
+  fmt::format_to(std::back_inserter(msg), "Smooth Point Size Granularity: {}\n", m_smoothPointSizeGranularity);
+  fmt::format_to(std::back_inserter(msg),
+                 "Smooth Line Width Range:       ({}, {})\n",
+                 m_minSmoothLineWidth,
+                 m_maxSmoothLineWidth);
+  fmt::format_to(std::back_inserter(msg), "Smooth Line Width Granularity: {}\n", m_smoothLineWidthGranularity);
+  fmt::format_to(std::back_inserter(msg),
+                 "Aliased Line Width Range:      ({}, {})\n",
+                 m_minAliasedLineWidth,
+                 m_maxAliasedLineWidth);
+  fmt::format_to(std::back_inserter(msg), "Max Texture Buffer Size:       {}\n\n", m_maxTextureBufferSize);
 
-  LOG(INFO) << fmt::format("Total Graphics Memory Size:    {} MB", dedicatedVideoMemoryMB());
-
-  LOG(INFO) << fmt::format("Smooth Point Size Range:       ({}, {})", m_minSmoothPointSize, m_maxSmoothPointSize);
-  LOG(INFO) << "Smooth Point Size Granularity: " << m_smoothPointSizeGranularity;
-  // LOG(INFO) << fmt::format("Aliased Point Size Range:      ({}, {})", m_minAliasedPointSize, m_maxAliasedPointSize);
-
-  LOG(INFO) << fmt::format("Smooth Line Width Range:       ({}, {})", m_minSmoothLineWidth, m_maxSmoothLineWidth);
-  LOG(INFO) << "Smooth Line Width Granularity: " << m_smoothLineWidthGranularity;
-  LOG(INFO) << fmt::format("Aliased Line Width Range:      ({}, {})", m_minAliasedLineWidth, m_maxAliasedLineWidth);
-
-  LOG(INFO) << "Max Texture Buffer Size:       " << m_maxTextureBufferSize;
-
-  LOG(INFO) << "";
+  LOG(INFO) << msg;
 }
 
 bool Z3DGpuInfo::isLinkedListSupported() const
@@ -210,6 +265,7 @@ bool Z3DGpuInfo::isLinkedListSupported() const
 
 void Z3DGpuInfo::detectGpuInfo()
 {
+  m_capsBackend = RenderBackend::OpenGL;
   // reinterpret_cast allowed (AliasedType is the (possibly cv-qualified) signed or unsigned variant of DynamicType)
   m_glVersionString = QString(reinterpret_cast<const char*>(glGetString(GL_VERSION)));
   m_glVendorString = QString(reinterpret_cast<const char*>(glGetString(GL_VENDOR)));

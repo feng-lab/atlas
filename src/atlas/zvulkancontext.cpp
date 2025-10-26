@@ -4,8 +4,10 @@
 #include "zlog.h"
 
 #include <set>
+#include <algorithm>
 
 DEFINE_bool(atlas_debug_vulkan, false, "Whether to enable Vulkan validation and debug utils");
+DEFINE_int32(atlas_vk_device_index, -1, "Preferred Vulkan physical device index (sorted); -1 for auto");
 
 namespace nim {
 
@@ -92,102 +94,132 @@ bool addRequiredExtension(const char* extensionName,
   return false;
 }
 
-void logVulkan12Features(const vk::PhysicalDeviceVulkan12Features& features)
+std::string logVulkan12Features(const vk::PhysicalDeviceVulkan12Features& features)
 {
-  if (!VLOG_IS_ON(1)) {
-    return;
-  }
-  VLOG(1) << "Vulkan 1.2 Features:";
-  VLOG(1) << fmt::format("  samplerMirrorClampToEdge: {}", features.samplerMirrorClampToEdge);
-  VLOG(1) << fmt::format("  drawIndirectCount: {}", features.drawIndirectCount);
-  VLOG(1) << fmt::format("  storageBuffer8BitAccess: {}", features.storageBuffer8BitAccess);
-  VLOG(1) << fmt::format("  uniformAndStorageBuffer8BitAccess: {}", features.uniformAndStorageBuffer8BitAccess);
-  VLOG(1) << fmt::format("  storagePushConstant8: {}", features.storagePushConstant8);
-  VLOG(1) << fmt::format("  shaderBufferInt64Atomics: {}", features.shaderBufferInt64Atomics);
-  VLOG(1) << fmt::format("  shaderSharedInt64Atomics: {}", features.shaderSharedInt64Atomics);
-  VLOG(1) << fmt::format("  shaderFloat16: {}", features.shaderFloat16);
-  VLOG(1) << fmt::format("  shaderInt8: {}", features.shaderInt8);
-  VLOG(1) << fmt::format("  descriptorIndexing: {}", features.descriptorIndexing);
-  VLOG(1) << fmt::format("  shaderInputAttachmentArrayDynamicIndexing: {}",
-                         features.shaderInputAttachmentArrayDynamicIndexing);
-  VLOG(1) << fmt::format("  shaderUniformTexelBufferArrayDynamicIndexing: {}",
-                         features.shaderUniformTexelBufferArrayDynamicIndexing);
-  VLOG(1) << fmt::format("  shaderStorageTexelBufferArrayDynamicIndexing: {}",
-                         features.shaderStorageTexelBufferArrayDynamicIndexing);
-  VLOG(1) << fmt::format("  shaderUniformBufferArrayNonUniformIndexing: {}",
-                         features.shaderUniformBufferArrayNonUniformIndexing);
-  VLOG(1) << fmt::format("  shaderSampledImageArrayNonUniformIndexing: {}",
-                         features.shaderSampledImageArrayNonUniformIndexing);
-  VLOG(1) << fmt::format("  shaderStorageBufferArrayNonUniformIndexing: {}",
-                         features.shaderStorageBufferArrayNonUniformIndexing);
-  VLOG(1) << fmt::format("  shaderStorageImageArrayNonUniformIndexing: {}",
-                         features.shaderStorageImageArrayNonUniformIndexing);
-  VLOG(1) << fmt::format("  shaderInputAttachmentArrayNonUniformIndexing: {}",
-                         features.shaderInputAttachmentArrayNonUniformIndexing);
-  VLOG(1) << fmt::format("  shaderUniformTexelBufferArrayNonUniformIndexing: {}",
-                         features.shaderUniformTexelBufferArrayNonUniformIndexing);
-  VLOG(1) << fmt::format("  shaderStorageTexelBufferArrayNonUniformIndexing: {}",
-                         features.shaderStorageTexelBufferArrayNonUniformIndexing);
-  VLOG(1) << fmt::format("  descriptorBindingUniformBufferUpdateAfterBind: {}",
-                         features.descriptorBindingUniformBufferUpdateAfterBind);
-  VLOG(1) << fmt::format("  descriptorBindingSampledImageUpdateAfterBind: {}",
-                         features.descriptorBindingSampledImageUpdateAfterBind);
-  VLOG(1) << fmt::format("  descriptorBindingStorageImageUpdateAfterBind: {}",
-                         features.descriptorBindingStorageImageUpdateAfterBind);
-  VLOG(1) << fmt::format("  descriptorBindingStorageBufferUpdateAfterBind: {}",
-                         features.descriptorBindingStorageBufferUpdateAfterBind);
-  VLOG(1) << fmt::format("  descriptorBindingUniformTexelBufferUpdateAfterBind: {}",
-                         features.descriptorBindingUniformTexelBufferUpdateAfterBind);
-  VLOG(1) << fmt::format("  descriptorBindingStorageTexelBufferUpdateAfterBind: {}",
-                         features.descriptorBindingStorageTexelBufferUpdateAfterBind);
-  VLOG(1) << fmt::format("  descriptorBindingUpdateUnusedWhilePending: {}",
-                         features.descriptorBindingUpdateUnusedWhilePending);
-  VLOG(1) << fmt::format("  descriptorBindingPartiallyBound: {}", features.descriptorBindingPartiallyBound);
-  VLOG(1) << fmt::format("  descriptorBindingVariableDescriptorCount: {}",
-                         features.descriptorBindingVariableDescriptorCount);
-  VLOG(1) << fmt::format("  runtimeDescriptorArray: {}", features.runtimeDescriptorArray);
-  VLOG(1) << fmt::format("  samplerFilterMinmax: {}", features.samplerFilterMinmax);
-  VLOG(1) << fmt::format("  scalarBlockLayout: {}", features.scalarBlockLayout);
-  VLOG(1) << fmt::format("  imagelessFramebuffer: {}", features.imagelessFramebuffer);
-  VLOG(1) << fmt::format("  uniformBufferStandardLayout: {}", features.uniformBufferStandardLayout);
-  VLOG(1) << fmt::format("  shaderSubgroupExtendedTypes: {}", features.shaderSubgroupExtendedTypes);
-  VLOG(1) << fmt::format("  separateDepthStencilLayouts: {}", features.separateDepthStencilLayouts);
-  VLOG(1) << fmt::format("  hostQueryReset: {}", features.hostQueryReset);
-  VLOG(1) << fmt::format("  timelineSemaphore: {}", features.timelineSemaphore);
-  VLOG(1) << fmt::format("  bufferDeviceAddress: {}", features.bufferDeviceAddress);
-  VLOG(1) << fmt::format("  bufferDeviceAddressCaptureReplay: {}", features.bufferDeviceAddressCaptureReplay);
-  VLOG(1) << fmt::format("  bufferDeviceAddressMultiDevice: {}", features.bufferDeviceAddressMultiDevice);
-  VLOG(1) << fmt::format("  vulkanMemoryModel: {}", features.vulkanMemoryModel);
-  VLOG(1) << fmt::format("  vulkanMemoryModelDeviceScope: {}", features.vulkanMemoryModelDeviceScope);
-  VLOG(1) << fmt::format("  vulkanMemoryModelAvailabilityVisibilityChains: {}",
-                         features.vulkanMemoryModelAvailabilityVisibilityChains);
-  VLOG(1) << fmt::format("  shaderOutputViewportIndex: {}", features.shaderOutputViewportIndex);
-  VLOG(1) << fmt::format("  shaderOutputLayer: {}", features.shaderOutputLayer);
-  VLOG(1) << fmt::format("  subgroupBroadcastDynamicId: {}", features.subgroupBroadcastDynamicId);
+  std::string s;
+  fmt::format_to(std::back_inserter(s), "Vulkan 1.2 Features:\n");
+  fmt::format_to(std::back_inserter(s), "  samplerMirrorClampToEdge: {}\n", features.samplerMirrorClampToEdge);
+  fmt::format_to(std::back_inserter(s), "  drawIndirectCount: {}\n", features.drawIndirectCount);
+  fmt::format_to(std::back_inserter(s), "  storageBuffer8BitAccess: {}\n", features.storageBuffer8BitAccess);
+  fmt::format_to(std::back_inserter(s),
+                 "  uniformAndStorageBuffer8BitAccess: {}\n",
+                 features.uniformAndStorageBuffer8BitAccess);
+  fmt::format_to(std::back_inserter(s), "  storagePushConstant8: {}\n", features.storagePushConstant8);
+  fmt::format_to(std::back_inserter(s), "  shaderBufferInt64Atomics: {}\n", features.shaderBufferInt64Atomics);
+  fmt::format_to(std::back_inserter(s), "  shaderSharedInt64Atomics: {}\n", features.shaderSharedInt64Atomics);
+  fmt::format_to(std::back_inserter(s), "  shaderFloat16: {}\n", features.shaderFloat16);
+  fmt::format_to(std::back_inserter(s), "  shaderInt8: {}\n", features.shaderInt8);
+  fmt::format_to(std::back_inserter(s), "  descriptorIndexing: {}\n", features.descriptorIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderInputAttachmentArrayDynamicIndexing: {}\n",
+                 features.shaderInputAttachmentArrayDynamicIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderUniformTexelBufferArrayDynamicIndexing: {}\n",
+                 features.shaderUniformTexelBufferArrayDynamicIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderStorageTexelBufferArrayDynamicIndexing: {}\n",
+                 features.shaderStorageTexelBufferArrayDynamicIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderUniformBufferArrayNonUniformIndexing: {}\n",
+                 features.shaderUniformBufferArrayNonUniformIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderSampledImageArrayNonUniformIndexing: {}\n",
+                 features.shaderSampledImageArrayNonUniformIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderStorageBufferArrayNonUniformIndexing: {}\n",
+                 features.shaderStorageBufferArrayNonUniformIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderStorageImageArrayNonUniformIndexing: {}\n",
+                 features.shaderStorageImageArrayNonUniformIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderInputAttachmentArrayNonUniformIndexing: {}\n",
+                 features.shaderInputAttachmentArrayNonUniformIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderUniformTexelBufferArrayNonUniformIndexing: {}\n",
+                 features.shaderUniformTexelBufferArrayNonUniformIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderStorageTexelBufferArrayNonUniformIndexing: {}\n",
+                 features.shaderStorageTexelBufferArrayNonUniformIndexing);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingUniformBufferUpdateAfterBind: {}\n",
+                 features.descriptorBindingUniformBufferUpdateAfterBind);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingSampledImageUpdateAfterBind: {}\n",
+                 features.descriptorBindingSampledImageUpdateAfterBind);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingStorageImageUpdateAfterBind: {}\n",
+                 features.descriptorBindingStorageImageUpdateAfterBind);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingStorageBufferUpdateAfterBind: {}\n",
+                 features.descriptorBindingStorageBufferUpdateAfterBind);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingUniformTexelBufferUpdateAfterBind: {}\n",
+                 features.descriptorBindingUniformTexelBufferUpdateAfterBind);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingStorageTexelBufferUpdateAfterBind: {}\n",
+                 features.descriptorBindingStorageTexelBufferUpdateAfterBind);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingUpdateUnusedWhilePending: {}\n",
+                 features.descriptorBindingUpdateUnusedWhilePending);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingPartiallyBound: {}\n",
+                 features.descriptorBindingPartiallyBound);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingVariableDescriptorCount: {}\n",
+                 features.descriptorBindingVariableDescriptorCount);
+  fmt::format_to(std::back_inserter(s), "  runtimeDescriptorArray: {}\n", features.runtimeDescriptorArray);
+  fmt::format_to(std::back_inserter(s), "  samplerFilterMinmax: {}\n", features.samplerFilterMinmax);
+  fmt::format_to(std::back_inserter(s), "  scalarBlockLayout: {}\n", features.scalarBlockLayout);
+  fmt::format_to(std::back_inserter(s), "  imagelessFramebuffer: {}\n", features.imagelessFramebuffer);
+  fmt::format_to(std::back_inserter(s), "  uniformBufferStandardLayout: {}\n", features.uniformBufferStandardLayout);
+  fmt::format_to(std::back_inserter(s), "  shaderSubgroupExtendedTypes: {}\n", features.shaderSubgroupExtendedTypes);
+  fmt::format_to(std::back_inserter(s), "  separateDepthStencilLayouts: {}\n", features.separateDepthStencilLayouts);
+  fmt::format_to(std::back_inserter(s), "  hostQueryReset: {}\n", features.hostQueryReset);
+  fmt::format_to(std::back_inserter(s), "  timelineSemaphore: {}\n", features.timelineSemaphore);
+  fmt::format_to(std::back_inserter(s), "  bufferDeviceAddress: {}\n", features.bufferDeviceAddress);
+  fmt::format_to(std::back_inserter(s),
+                 "  bufferDeviceAddressCaptureReplay: {}\n",
+                 features.bufferDeviceAddressCaptureReplay);
+  fmt::format_to(std::back_inserter(s),
+                 "  bufferDeviceAddressMultiDevice: {}\n",
+                 features.bufferDeviceAddressMultiDevice);
+  fmt::format_to(std::back_inserter(s), "  vulkanMemoryModel: {}\n", features.vulkanMemoryModel);
+  fmt::format_to(std::back_inserter(s), "  vulkanMemoryModelDeviceScope: {}\n", features.vulkanMemoryModelDeviceScope);
+  fmt::format_to(std::back_inserter(s),
+                 "  vulkanMemoryModelAvailabilityVisibilityChains: {}\n",
+                 features.vulkanMemoryModelAvailabilityVisibilityChains);
+  fmt::format_to(std::back_inserter(s), "  shaderOutputViewportIndex: {}\n", features.shaderOutputViewportIndex);
+  fmt::format_to(std::back_inserter(s), "  shaderOutputLayer: {}\n", features.shaderOutputLayer);
+  fmt::format_to(std::back_inserter(s), "  subgroupBroadcastDynamicId: {}\n", features.subgroupBroadcastDynamicId);
+  return s;
 }
 
-void logVulkan13Features(const vk::PhysicalDeviceVulkan13Features& features)
+std::string logVulkan13Features(const vk::PhysicalDeviceVulkan13Features& features)
 {
-  if (!VLOG_IS_ON(1)) {
-    return;
-  }
-  VLOG(1) << "Vulkan 1.3 Features:";
-  VLOG(1) << fmt::format("  robustImageAccess: {}", features.robustImageAccess);
-  VLOG(1) << fmt::format("  inlineUniformBlock: {}", features.inlineUniformBlock);
-  VLOG(1) << fmt::format("  descriptorBindingInlineUniformBlockUpdateAfterBind: {}",
-                         features.descriptorBindingInlineUniformBlockUpdateAfterBind);
-  VLOG(1) << fmt::format("  pipelineCreationCacheControl: {}", features.pipelineCreationCacheControl);
-  VLOG(1) << fmt::format("  privateData: {}", features.privateData);
-  VLOG(1) << fmt::format("  shaderDemoteToHelperInvocation: {}", features.shaderDemoteToHelperInvocation);
-  VLOG(1) << fmt::format("  shaderTerminateInvocation: {}", features.shaderTerminateInvocation);
-  VLOG(1) << fmt::format("  subgroupSizeControl: {}", features.subgroupSizeControl);
-  VLOG(1) << fmt::format("  computeFullSubgroups: {}", features.computeFullSubgroups);
-  VLOG(1) << fmt::format("  synchronization2: {}", features.synchronization2);
-  VLOG(1) << fmt::format("  textureCompressionASTC_HDR: {}", features.textureCompressionASTC_HDR);
-  VLOG(1) << fmt::format("  shaderZeroInitializeWorkgroupMemory: {}", features.shaderZeroInitializeWorkgroupMemory);
-  VLOG(1) << fmt::format("  dynamicRendering: {}", features.dynamicRendering);
-  VLOG(1) << fmt::format("  shaderIntegerDotProduct: {}", features.shaderIntegerDotProduct);
-  VLOG(1) << fmt::format("  maintenance4: {}", features.maintenance4);
+  std::string s;
+  fmt::format_to(std::back_inserter(s), "Vulkan 1.3 Features:\n");
+  fmt::format_to(std::back_inserter(s), "  robustImageAccess: {}\n", features.robustImageAccess);
+  fmt::format_to(std::back_inserter(s), "  inlineUniformBlock: {}\n", features.inlineUniformBlock);
+  fmt::format_to(std::back_inserter(s),
+                 "  descriptorBindingInlineUniformBlockUpdateAfterBind: {}\n",
+                 features.descriptorBindingInlineUniformBlockUpdateAfterBind);
+  fmt::format_to(std::back_inserter(s), "  pipelineCreationCacheControl: {}\n", features.pipelineCreationCacheControl);
+  fmt::format_to(std::back_inserter(s), "  privateData: {}\n", features.privateData);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderDemoteToHelperInvocation: {}\n",
+                 features.shaderDemoteToHelperInvocation);
+  fmt::format_to(std::back_inserter(s), "  shaderTerminateInvocation: {}\n", features.shaderTerminateInvocation);
+  fmt::format_to(std::back_inserter(s), "  subgroupSizeControl: {}\n", features.subgroupSizeControl);
+  fmt::format_to(std::back_inserter(s), "  computeFullSubgroups: {}\n", features.computeFullSubgroups);
+  fmt::format_to(std::back_inserter(s), "  synchronization2: {}\n", features.synchronization2);
+  fmt::format_to(std::back_inserter(s), "  textureCompressionASTC_HDR: {}\n", features.textureCompressionASTC_HDR);
+  fmt::format_to(std::back_inserter(s),
+                 "  shaderZeroInitializeWorkgroupMemory: {}\n",
+                 features.shaderZeroInitializeWorkgroupMemory);
+  fmt::format_to(std::back_inserter(s), "  dynamicRendering: {}\n", features.dynamicRendering);
+  fmt::format_to(std::back_inserter(s), "  shaderIntegerDotProduct: {}\n", features.shaderIntegerDotProduct);
+  fmt::format_to(std::back_inserter(s), "  maintenance4: {}\n", features.maintenance4);
+  return s;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debugUtilsMessengerCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -279,6 +311,150 @@ ZVulkanContext::~ZVulkanContext()
   // RAII will handle cleanup in reverse order
 }
 
+void ZVulkanContext::logGpuInfo() const
+{
+  if (m_physicalDevices.empty()) {
+    LOG(WARNING) << "Vulkan GPU info requested but no physical devices are available";
+    return;
+  }
+  std::string summary;
+  fmt::format_to(std::back_inserter(summary), "Vulkan GPUs: {} device(s)\n", m_physicalDevices.size());
+  for (size_t i = 0; i < m_physicalDevices.size(); ++i) {
+    const auto& pd = m_physicalDevices[i];
+    auto props = pd.getProperties();
+    auto memProps = pd.getMemoryProperties();
+    uint64_t dedicatedMemoryBytes = 0;
+    for (uint32_t h = 0; h < memProps.memoryHeapCount; ++h) {
+      if (memProps.memoryHeaps[h].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+        dedicatedMemoryBytes += memProps.memoryHeaps[h].size;
+      }
+    }
+    fmt::format_to(std::back_inserter(summary),
+                   "[{}] {}{}\n",
+                   i,
+                   props.deviceName.data(),
+                   (i == m_selectedDeviceIndex ? "  (selected)" : ""));
+    fmt::format_to(std::back_inserter(summary),
+                   "     API Version:              {} (0x{:08x})\n",
+                   versionToString(props.apiVersion),
+                   props.apiVersion);
+    fmt::format_to(std::back_inserter(summary),
+                   "     Driver Version:           {} (0x{:08x})\n",
+                   versionToString(props.driverVersion),
+                   props.driverVersion);
+    fmt::format_to(std::back_inserter(summary), "     Vendor ID:                0x{:04x}\n", props.vendorID);
+    fmt::format_to(std::back_inserter(summary), "     Device ID:                0x{:04x}\n", props.deviceID);
+    fmt::format_to(std::back_inserter(summary), "     Device Type:              {}\n", vk::to_string(props.deviceType));
+    fmt::format_to(std::back_inserter(summary),
+                   "     Dedicated GPU Memory:     {} MB\n",
+                   dedicatedMemoryBytes / (1024 * 1024));
+
+    // Limits/features summary for every device
+    auto features2 = pd.getFeatures2<vk::PhysicalDeviceFeatures2,
+                                     vk::PhysicalDeviceVulkan12Features,
+                                     vk::PhysicalDeviceVulkan13Features>();
+    const auto& features = features2.get<vk::PhysicalDeviceFeatures2>().features;
+    const auto& features12 = features2.get<vk::PhysicalDeviceVulkan12Features>();
+    const auto& features13 = features2.get<vk::PhysicalDeviceVulkan13Features>();
+    fmt::format_to(std::back_inserter(summary),
+                   "     Max 2D Texture Size:      {}\n",
+                   props.limits.maxImageDimension2D);
+    fmt::format_to(std::back_inserter(summary),
+                   "     Max 3D Texture Size:      {}\n",
+                   props.limits.maxImageDimension3D);
+    fmt::format_to(std::back_inserter(summary),
+                   "     Max Array Layers:         {}\n",
+                   props.limits.maxImageArrayLayers);
+    fmt::format_to(std::back_inserter(summary),
+                   "     Max Color Attachments:    {}\n",
+                   props.limits.maxColorAttachments);
+    fmt::format_to(std::back_inserter(summary),
+                   "     Max Sampler Anisotropy:   {:.1f}\n",
+                   features.samplerAnisotropy ? props.limits.maxSamplerAnisotropy : 1.0f);
+    fmt::format_to(
+      std::back_inserter(summary),
+      "     Features: anisotropy={} independentBlend={} fragStoresAndAtomics={} drawIndirectCount={} dynamicRendering={} synchronization2={}\n",
+      features.samplerAnisotropy == VK_TRUE,
+      features.independentBlend == VK_TRUE,
+      features.fragmentStoresAndAtomics == VK_TRUE,
+      features12.drawIndirectCount == VK_TRUE,
+      features13.dynamicRendering == VK_TRUE,
+      features13.synchronization2 == VK_TRUE);
+
+    // Per-device details: extensions and full Vulkan 1.2/1.3 features
+    auto deviceExtensionProperties = pd.enumerateDeviceExtensionProperties();
+    fmt::format_to(std::back_inserter(summary),
+                   "     Supported Device Extensions ({}):\n",
+                   deviceExtensionProperties.size());
+    for (const auto& ext : deviceExtensionProperties) {
+      fmt::format_to(std::back_inserter(summary),
+                     "       - {} (version {})\n",
+                     ext.extensionName.data(),
+                     ext.specVersion);
+    }
+    fmt::format_to(std::back_inserter(summary), "{}", logVulkan12Features(features12));
+    if (props.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0)) {
+      fmt::format_to(std::back_inserter(summary), "{}", logVulkan13Features(features13));
+    }
+    fmt::format_to(std::back_inserter(summary), "\n");
+  }
+  LOG(INFO) << summary;
+}
+
+bool ZVulkanContext::setSelectedDeviceIndex(size_t index)
+{
+  if (index >= m_physicalDevices.size()) {
+    LOG(ERROR) << fmt::format("Requested Vulkan device index {} out of range ({} devices)",
+                              index,
+                              m_physicalDevices.size());
+    return false;
+  }
+  if (index == m_selectedDeviceIndex) {
+    VLOG(1) << fmt::format("Vulkan device index {} already selected; no changes", index);
+    return false;
+  }
+
+  // Validate suitability before switching
+  auto& pd = m_physicalDevices[index];
+  if (!checkDeviceExtensionSupport(pd)) {
+    LOG(ERROR) << fmt::format("Vulkan device {} missing required extensions", index);
+    return false;
+  }
+  auto queues = findQueueFamilies(pd);
+  if (!queues.isComplete()) {
+    LOG(ERROR) << fmt::format("Vulkan device {} does not have required queue families", index);
+    return false;
+  }
+  const auto props = pd.getProperties();
+  if (props.apiVersion < VK_MAKE_API_VERSION(0, 1, 3, 0)) {
+    LOG(ERROR) << fmt::format("Vulkan device {} does not support Vulkan 1.3", index);
+    return false;
+  }
+
+  // Destroy logical device and dependent resources before switching
+  m_commandPool.reset();
+  m_graphicsQueue.reset();
+  m_presentQueue.reset();
+  m_device.reset();
+
+  // Switch selection and queue families, and recreate device/queues/pool
+  m_selectedDeviceIndex = index;
+  m_queueFamilyIndices = queues;
+
+  try {
+    createLogicalDevice();
+    createCommandPool();
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << fmt::format("Failed to recreate Vulkan logical device for index {}: {}", index, e.what());
+    return false;
+  }
+
+  const auto propsNew = m_physicalDevices[m_selectedDeviceIndex].getProperties();
+  LOG(INFO) << fmt::format("Switched to Vulkan device [{}]: {}", m_selectedDeviceIndex, propsNew.deviceName.data());
+  return true;
+}
+
 void ZVulkanContext::createInstance()
 {
   vk::ApplicationInfo appInfo{.pApplicationName = "Atlas",
@@ -289,23 +465,33 @@ void ZVulkanContext::createInstance()
 
   // Get available layers and extensions
   std::vector<vk::LayerProperties> availableLayers = m_context->enumerateInstanceLayerProperties();
-  LOG(INFO) << fmt::format("Available Instance Layers ({})", availableLayers.size());
-  for (const auto& layer : availableLayers) {
-    LOG(INFO) << fmt::format("  Layer Name: {} (Description: {}, Spec Version: {}.{}.{}, Implementation Version: {})",
-                             layer.layerName.data(),
-                             layer.description.data(),
-                             VK_VERSION_MAJOR(layer.specVersion),
-                             VK_VERSION_MINOR(layer.specVersion),
-                             VK_VERSION_PATCH(layer.specVersion),
-                             layer.implementationVersion);
+  {
+    std::string layersMsg;
+    fmt::format_to(std::back_inserter(layersMsg), "Available Instance Layers ({})\n", availableLayers.size());
+    for (const auto& layer : availableLayers) {
+      fmt::format_to(std::back_inserter(layersMsg),
+                     "  Layer Name: {} (Description: {}, Spec Version: {}.{}.{}, Implementation Version: {})\n",
+                     layer.layerName.data(),
+                     layer.description.data(),
+                     VK_VERSION_MAJOR(layer.specVersion),
+                     VK_VERSION_MINOR(layer.specVersion),
+                     VK_VERSION_PATCH(layer.specVersion),
+                     layer.implementationVersion);
+    }
+    LOG(INFO) << layersMsg;
   }
 
   std::vector<vk::ExtensionProperties> availableExtensions = m_context->enumerateInstanceExtensionProperties();
-  LOG(INFO) << fmt::format("Available Instance Extensions ({})", availableExtensions.size());
-  for (const auto& extension : availableExtensions) {
-    LOG(INFO) << fmt::format("  Extension Name: {} (Spec Version: {})",
-                             extension.extensionName.data(),
-                             extension.specVersion);
+  {
+    std::string extMsg;
+    fmt::format_to(std::back_inserter(extMsg), "Available Instance Extensions ({})\n", availableExtensions.size());
+    for (const auto& extension : availableExtensions) {
+      fmt::format_to(std::back_inserter(extMsg),
+                     "  Extension Name: {} (Spec Version: {})\n",
+                     extension.extensionName.data(),
+                     extension.specVersion);
+    }
+    LOG(INFO) << extMsg;
   }
 
   std::vector<const char*> enabledLayers;
@@ -375,96 +561,134 @@ void ZVulkanContext::setupDebugMessenger()
   }
 }
 
+namespace {
+int deviceTypeRank(vk::PhysicalDeviceType type)
+{
+  switch (type) {
+    case vk::PhysicalDeviceType::eDiscreteGpu:
+      return 4;
+    case vk::PhysicalDeviceType::eIntegratedGpu:
+      return 3;
+    case vk::PhysicalDeviceType::eVirtualGpu:
+      return 2;
+    case vk::PhysicalDeviceType::eCpu:
+      return 1;
+    default:
+      return 0;
+  }
+}
+} // namespace
+
 void ZVulkanContext::pickPhysicalDevice()
 {
-  vk::raii::PhysicalDevices physicalDevices(*m_instance);
-
-  if (physicalDevices.empty()) {
+  vk::raii::PhysicalDevices enumerated(*m_instance);
+  if (enumerated.empty()) {
     throw ZException("No Vulkan-compatible devices found");
   }
+  struct DeviceInfo
+  {
+    vk::raii::PhysicalDevice device{nullptr};
+    QueueFamilyIndices queues{};
+    vk::PhysicalDeviceProperties props{};
+    uint64_t dedicatedBytes = 0;
+    bool suitable = false;
+  };
 
-  // Go through the list of physical devices and select only those that are capable
-  for (auto& physicalDevice : physicalDevices) {
-    auto deviceProperties = physicalDevice.getProperties();
-    auto memProperties = physicalDevice.getMemoryProperties();
-    auto deviceExtensionProperties = physicalDevice.enumerateDeviceExtensionProperties();
+  std::vector<DeviceInfo> infos;
+  infos.reserve(enumerated.size());
 
-    auto features2 = physicalDevice.getFeatures2<vk::PhysicalDeviceFeatures2,
-                                                 vk::PhysicalDeviceVulkan12Features,
-                                                 vk::PhysicalDeviceVulkan13Features>();
-    // const vk::PhysicalDeviceFeatures& physicalDeviceFeatures = features2.get<vk::PhysicalDeviceFeatures2>().features;
-    const vk::PhysicalDeviceVulkan12Features& physicalDeviceVulkan12Features =
-      features2.get<vk::PhysicalDeviceVulkan12Features>();
-    const vk::PhysicalDeviceVulkan13Features& physicalDeviceVulkan13Features =
-      features2.get<vk::PhysicalDeviceVulkan13Features>();
-
-    // Calculate dedicated GPU memory
-    vk::DeviceSize dedicatedMemory = 0;
-    for (uint32_t i = 0; i < memProperties.memoryHeapCount; i++) {
-      if (memProperties.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
-        dedicatedMemory += memProperties.memoryHeaps[i].size;
+  // Collect information and suitability for each device
+  for (auto& pd : enumerated) {
+    DeviceInfo info;
+    info.device = std::move(pd);
+    info.props = info.device.getProperties();
+    auto mem = info.device.getMemoryProperties();
+    for (uint32_t i = 0; i < mem.memoryHeapCount; ++i) {
+      if (mem.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+        info.dedicatedBytes += mem.memoryHeaps[i].size;
       }
     }
 
-    LOG(INFO) << fmt::format("Device Name:          {}", deviceProperties.deviceName.data());
-    LOG(INFO) << fmt::format("API Version:          {} ({})",
-                             versionToString(deviceProperties.apiVersion),
-                             deviceProperties.apiVersion);
-    LOG(INFO) << fmt::format("Driver Version:       {} ({})",
-                             versionToString(deviceProperties.driverVersion),
-                             deviceProperties.driverVersion);
-    LOG(INFO) << fmt::format("Device ID:            0x{:04x}", deviceProperties.deviceID);
-    LOG(INFO) << fmt::format("Device Type:          {}", vk::to_string(deviceProperties.deviceType));
-    LOG(INFO) << fmt::format("Dedicated GPU Memory: {} MB", dedicatedMemory / (1024 * 1024));
-    if (VLOG_IS_ON(1)) {
-      VLOG(1) << fmt::format("Vendor ID:            0x{:04x}", deviceProperties.vendorID);
-      VLOG(1) << fmt::format("Pipeline Cache UUID:  {}", uuidToString(deviceProperties.pipelineCacheUUID));
-      VLOG(1) << "Supported Device Extensions: ";
-      for (const auto& ext : deviceExtensionProperties) {
-        VLOG(1) << fmt::format("  - {} (version {})", ext.extensionName.data(), ext.specVersion);
-      }
-      logVulkan12Features(physicalDeviceVulkan12Features);
-      if (deviceProperties.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0)) {
-        logVulkan13Features(physicalDeviceVulkan13Features);
-      }
-    }
+    bool apiOk = (info.props.apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0));
+    bool extOk = checkDeviceExtensionSupport(info.device);
+    info.queues = findQueueFamilies(info.device);
+    bool qOk = info.queues.isComplete();
+    info.suitable = apiOk && extOk && qOk;
 
-    LOG(INFO) << "-------------------------";
-
-    // Require Vulkan 1.3 device support
-    if (deviceProperties.apiVersion < VK_MAKE_API_VERSION(0, 1, 3, 0)) {
-      LOG(INFO) << "  Device doesn't support Vulkan 1.3, skipping";
-      continue;
-    }
-
-    // Check if device has required extensions
-    if (!checkDeviceExtensionSupport(physicalDevice)) {
-      LOG(INFO) << "  Device doesn't support required extensions, skipping";
-      continue;
-    }
-
-    // Check if device has required queue families
-    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
-    if (!indices.isComplete()) {
-      LOG(INFO) << "  Device doesn't have required queue families, skipping";
-      continue;
-    }
-
-    // This device is suitable
-    m_physicalDevices.push_back(physicalDevice);
-    m_queueFamilyIndices = indices;
-
-    if (!m_physicalDevices.empty()) {
-      auto selectedProperties = m_physicalDevices[0].getProperties();
-      LOG(INFO) << fmt::format("Selected physical device: {}", selectedProperties.deviceName.data());
-      LOG(INFO) << fmt::format("  API Version: {}", versionToString(selectedProperties.apiVersion));
-      LOG(INFO) << fmt::format("  Driver Version: {}", versionToString(selectedProperties.driverVersion));
-    }
-
-    return;
+    infos.emplace_back(std::move(info));
   }
 
-  throw ZException("Failed to find a suitable GPU");
+  // Sort by power: dedicated VRAM desc, then device type, then API version desc
+  std::sort(infos.begin(), infos.end(), [](const DeviceInfo& a, const DeviceInfo& b) {
+    const int ra = deviceTypeRank(a.props.deviceType);
+    const int rb = deviceTypeRank(b.props.deviceType);
+    if (ra != rb) {
+      return ra > rb; // Discrete > Integrated > Virtual > CPU
+    }
+    if (a.dedicatedBytes != b.dedicatedBytes) {
+      return a.dedicatedBytes > b.dedicatedBytes; // then VRAM desc
+    }
+    return a.props.apiVersion > b.props.apiVersion; // then newer API
+  });
+
+  // Move sorted devices into member vector
+  m_physicalDevices.clear();
+  m_physicalDevices.reserve(infos.size());
+  for (auto& di : infos) {
+    m_physicalDevices.emplace_back(std::move(di.device));
+  }
+
+  // Pick the first suitable device as selected
+  m_selectedDeviceIndex = 0;
+  bool found = false;
+  for (size_t i = 0; i < infos.size(); ++i) {
+    if (infos[i].suitable) {
+      m_selectedDeviceIndex = i;
+      m_queueFamilyIndices = infos[i].queues;
+      found = true;
+      break;
+    }
+  }
+  // Honor preferred index when explicitly requested
+  if (FLAGS_atlas_vk_device_index >= 0 && static_cast<size_t>(FLAGS_atlas_vk_device_index) < infos.size()) {
+    const size_t pref = static_cast<size_t>(FLAGS_atlas_vk_device_index);
+    if (infos[pref].suitable) {
+      m_selectedDeviceIndex = pref;
+      m_queueFamilyIndices = infos[pref].queues;
+      found = true;
+    } else {
+      LOG(WARNING) << fmt::format("Preferred Vulkan device index {} is not suitable; keeping auto-selected {}",
+                                  pref,
+                                  m_selectedDeviceIndex);
+    }
+  }
+  if (!found) {
+    throw ZException("Failed to find a suitable GPU");
+  }
+
+  // Log properties for all devices and mark selection
+  LOG(INFO) << fmt::format("Found {} Vulkan device(s)", infos.size());
+  for (size_t i = 0; i < infos.size(); ++i) {
+    const auto& p = infos[i].props;
+    LOG(INFO) << fmt::format("[{}] Device Name:          {}{}",
+                             i,
+                             p.deviceName.data(),
+                             (i == m_selectedDeviceIndex ? "  (selected)" : ""));
+    LOG(INFO) << fmt::format("      API Version:          {} (0x{:08x})", versionToString(p.apiVersion), p.apiVersion);
+    LOG(INFO) << fmt::format("      Driver Version:       {} (0x{:08x})",
+                             versionToString(p.driverVersion),
+                             p.driverVersion);
+    LOG(INFO) << fmt::format("      Vendor ID:            0x{:04x}", p.vendorID);
+    LOG(INFO) << fmt::format("      Device ID:            0x{:04x}", p.deviceID);
+    LOG(INFO) << fmt::format("      Device Type:          {}", vk::to_string(p.deviceType));
+    LOG(INFO) << fmt::format("      Dedicated GPU Memory: {} MB", infos[i].dedicatedBytes / (1024 * 1024));
+    LOG(INFO) << "-------------------------";
+  }
+
+  const auto selected = m_physicalDevices[m_selectedDeviceIndex].getProperties();
+  LOG(INFO) << fmt::format("Selected physical device: {}", selected.deviceName.data());
+  LOG(INFO) << fmt::format("  API Version: {}", versionToString(selected.apiVersion));
+  LOG(INFO) << fmt::format("  Driver Version: {}", versionToString(selected.driverVersion));
 }
 
 ZVulkanContext::QueueFamilyIndices ZVulkanContext::findQueueFamilies(vk::raii::PhysicalDevice& physicalDevice) const
@@ -543,7 +767,7 @@ void ZVulkanContext::createLogicalDevice()
   }
 
   // Specify required device features
-  auto features2 = m_physicalDevices[0]
+  auto features2 = m_physicalDevices[m_selectedDeviceIndex]
                      .getFeatures2<vk::PhysicalDeviceFeatures2,
                                    vk::PhysicalDeviceVulkan12Features,
                                    vk::PhysicalDeviceVulkan13Features>();
@@ -588,13 +812,13 @@ void ZVulkanContext::createLogicalDevice()
 
   // Add platform-specific required extensions
 #ifdef __APPLE__
-  auto deviceExtensionProperties = m_physicalDevices[0].enumerateDeviceExtensionProperties();
+  auto deviceExtensionProperties = m_physicalDevices[m_selectedDeviceIndex].enumerateDeviceExtensionProperties();
   addRequiredExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, enabledExtensions, deviceExtensionProperties, true);
 #endif
 
   // Optional: enable calibrated timestamps device extension when available
   try {
-    auto devExtPropsAll = m_physicalDevices[0].enumerateDeviceExtensionProperties();
+    auto devExtPropsAll = m_physicalDevices[m_selectedDeviceIndex].enumerateDeviceExtensionProperties();
     addRequiredExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, enabledExtensions, devExtPropsAll, true);
   }
   catch (...) {
@@ -610,7 +834,7 @@ void ZVulkanContext::createLogicalDevice()
     .ppEnabledExtensionNames = enabledExtensions.data(),
   };
 
-  m_device.emplace(m_physicalDevices[0], deviceCreateInfo);
+  m_device.emplace(m_physicalDevices[m_selectedDeviceIndex], deviceCreateInfo);
   LOG(INFO) << "Logical device created successfully";
 
   // Get device queues

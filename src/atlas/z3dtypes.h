@@ -22,15 +22,6 @@ enum class Z3DScreenShotType
   FullSideBySideStereoView
 };
 
-/**
- * Coordinate system type to handle different graphics APIs
- */
-enum class Z3DCoordinateSystem
-{
-  OpenGL,  // Y-up, depth range [-1, 1]
-  Vulkan   // Y-down, depth range [0, 1]
-};
-
 enum class RenderBackend
 {
   OpenGL = 0,

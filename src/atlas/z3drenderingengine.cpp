@@ -24,6 +24,7 @@
 #include "zvulkandevice.h"
 #include "zvulkan.h"
 #include "z3dshadermanager.h"
+#include "z3dgpuinfo.h"
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
@@ -1084,6 +1085,8 @@ void Z3DRenderingEngine::ensureGLContext()
   });
   glbinding::useContext(0);
 
+  // Populate GL-backed caps and log info
+  Z3DGpuInfo::instance().initializeFromOpenGL();
   Z3DGpuInfo::instance().logGpuInfo();
 
   if (FLAGS_atlas_debug_opengl) {
@@ -1631,6 +1634,43 @@ void Z3DRenderingEngine::applyBackendSwitch()
     } else {
       VLOG(1) << "Reusing existing Vulkan device";
     }
+
+    // Populate generic GPU caps from the selected Vulkan physical device so
+    // shared code (e.g., image scaling limits) uses device-accurate numbers.
+    auto& phys = m_vkContext->physicalDevice();
+    const auto props = phys.getProperties();
+    const auto features = phys.getFeatures();
+    const auto memProps = phys.getMemoryProperties();
+
+    uint64_t vramBytes = 0;
+    for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
+      if (memProps.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+        vramBytes += memProps.memoryHeaps[i].size;
+      }
+    }
+    Z3DGpuInfo::GenericCaps caps;
+    caps.maxTextureSize = props.limits.maxImageDimension2D;
+    caps.max3DTextureSize = props.limits.maxImageDimension3D;
+    caps.maxArrayTextureLayers = static_cast<int>(props.limits.maxImageArrayLayers);
+    caps.maxColorAttachments = static_cast<int>(props.limits.maxColorAttachments);
+    caps.maxTextureAnisotropy = (features.samplerAnisotropy ? props.limits.maxSamplerAnisotropy : 1.0f);
+    caps.dedicatedVideoMemoryMB = static_cast<uint64_t>(vramBytes / (1024ull * 1024ull));
+    caps.maxViewportDim =
+      static_cast<int>(std::min(props.limits.maxViewportDimensions[0], props.limits.maxViewportDimensions[1]));
+    // Reasonable defaults for GL-only caps when running under Vulkan
+    caps.maxCombinedTextureImageUnits = 48;
+    caps.maxTextureImageUnits = 16;
+    caps.maxVertexTextureImageUnits = 16;
+    caps.maxGeometryTextureImageUnits = 16;
+    caps.maxTextureBufferSize = static_cast<int>(props.limits.maxTexelBufferElements);
+    caps.maxDrawBuffer = static_cast<int>(props.limits.maxColorAttachments);
+
+    Z3DGpuInfo::instance().overrideGenericCaps(caps);
+    VLOG(1) << "Updated Z3DGpuInfo caps from Vulkan device";
+
+    // Log Vulkan device/capabilities in a consistent style
+    m_vkContext->logGpuInfo();
+
     // The scratch pool outlives the backend(s) and simply stores a borrowed pointer. All
     // command buffers and attachments retrieved through the Vulkan backend assume the active
     // device matches this pointer, so refresh it immediately after (re-)creating the device.
@@ -1669,8 +1709,7 @@ void Z3DRenderingEngine::applyBackendSwitch()
     VLOG(1) << "Released GL context after switching to Vulkan";
   }
 
-  m_globalParas->camera.get().setCoordinateSystem(backend == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan
-                                                                                   : Z3DCoordinateSystem::OpenGL);
+  m_globalParas->camera.get().setBackend(backend);
 
   // After switching clip space conventions, recompute near/far to avoid
   // accidental clipping differences between backends.
@@ -1682,6 +1721,76 @@ void Z3DRenderingEngine::applyBackendSwitch()
 
   QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   VLOG(1) << fmt::format("Backend switch to {} complete; update event posted", enumToString(backend));
+}
+
+bool Z3DRenderingEngine::switchVulkanDeviceIndex(int index)
+{
+  if (!m_vkContext || !m_vkDevice) {
+    LOG(ERROR) << "Vulkan not initialized; cannot switch device";
+    return false;
+  }
+  // Ensure GPU idle
+  try {
+    m_vkContext->device().waitIdle();
+  }
+  catch (const std::exception& e) {
+    LOG(WARNING) << "Vulkan waitIdle failed before device switch: " << e.what();
+  }
+
+  if (index < 0) {
+    LOG(ERROR) << "Invalid Vulkan device index (<0)";
+    return false;
+  }
+
+  const size_t idx = static_cast<size_t>(index);
+  if (!m_vkContext->setSelectedDeviceIndex(idx)) {
+    return false;
+  }
+
+  // Recreate wrapper and wire into scratch pool
+  m_vkDevice.reset();
+  try {
+    m_vkDevice = m_vkContext->createDevice();
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "Failed to recreate Vulkan device wrapper: " << e.what();
+    return false;
+  }
+  if (m_scratchPool) {
+    m_scratchPool->setVulkanDevice(m_vkDevice.get());
+  }
+
+  // Refresh GPU caps from selected device
+  auto& phys = m_vkContext->physicalDevice();
+  const auto props = phys.getProperties();
+  const auto features = phys.getFeatures();
+  const auto memProps = phys.getMemoryProperties();
+  uint64_t vramBytes = 0;
+  for (uint32_t i = 0; i < memProps.memoryHeapCount; ++i) {
+    if (memProps.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+      vramBytes += memProps.memoryHeaps[i].size;
+    }
+  }
+  Z3DGpuInfo::GenericCaps caps;
+  caps.maxTextureSize = props.limits.maxImageDimension2D;
+  caps.max3DTextureSize = props.limits.maxImageDimension3D;
+  caps.maxArrayTextureLayers = static_cast<int>(props.limits.maxImageArrayLayers);
+  caps.maxColorAttachments = static_cast<int>(props.limits.maxColorAttachments);
+  caps.maxTextureAnisotropy = (features.samplerAnisotropy ? props.limits.maxSamplerAnisotropy : 1.0f);
+  caps.dedicatedVideoMemoryMB = static_cast<uint64_t>(vramBytes / (1024ull * 1024ull));
+  caps.maxViewportDim =
+    static_cast<int>(std::min(props.limits.maxViewportDimensions[0], props.limits.maxViewportDimensions[1]));
+  caps.maxCombinedTextureImageUnits = 48;
+  caps.maxTextureImageUnits = 16;
+  caps.maxVertexTextureImageUnits = 16;
+  caps.maxGeometryTextureImageUnits = 16;
+  caps.maxTextureBufferSize = static_cast<int>(props.limits.maxTexelBufferElements);
+  caps.maxDrawBuffer = static_cast<int>(props.limits.maxColorAttachments);
+  Z3DGpuInfo::instance().overrideGenericCaps(caps);
+
+  m_vkContext->logGpuInfo();
+
+  return true;
 }
 
 } // namespace nim

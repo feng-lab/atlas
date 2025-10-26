@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zglobal.h"
+#include "z3dtypes.h"
 #include <QString>
 
 // This class provides information about the GPU
@@ -16,6 +17,9 @@ class Z3DGpuInfo
 public:
   static Z3DGpuInfo& instance();
 
+  // Source backend for populated caps (OpenGL or Vulkan)
+  RenderBackend capsBackend() const { return m_capsBackend; }
+
   enum class GpuVendor
   {
     NVIDIA,
@@ -25,6 +29,35 @@ public:
   };
 
   Z3DGpuInfo();
+
+  // Initialize caps by querying the current OpenGL context. Safe to call
+  // multiple times; subsequent calls are no-ops once OpenGL caps are set.
+  void initializeFromOpenGL();
+
+  struct GenericCaps
+  {
+    uint32_t maxTextureSize = 8192;          // 2D max dimension
+    uint32_t max3DTextureSize = 2048;        // 3D max dimension
+    int maxArrayTextureLayers = 256;         // array layers
+    int maxColorAttachments = 4;             // FBO color attachments
+    float maxTextureAnisotropy = 1.f;        // sampler anisotropy
+    uint64_t dedicatedVideoMemoryMB = 256;   // VRAM size in MB (approx)
+
+    // The remaining fields are primarily consumed by GL paths; provide
+    // conservative defaults when sourcing from non-GL backends.
+    int maxCombinedTextureImageUnits = 48;   // VS+GS+FS combined
+    int maxTextureImageUnits = 16;           // FS units
+    int maxVertexTextureImageUnits = 16;     // VS units
+    int maxGeometryTextureImageUnits = 16;   // GS units
+    int maxTextureBufferSize = 64 * 1024 * 1024; // texel buffer elements (approx)
+    int maxDrawBuffer = 8;                   // draw buffers (GL only)
+    int maxViewportDim = 16384;              // min of viewport dims
+  };
+
+  // Override generic caps from a non-GL backend (e.g., Vulkan). This sets the
+  // source to Vulkan and marks the info as supported so shared code paths can
+  // use size/limit queries safely even when GL is not initialized.
+  void overrideGenericCaps(const GenericCaps& caps);
 
   [[nodiscard]] bool isSupported() const
   {
@@ -236,55 +269,57 @@ private:
   bool m_isSupported = false; // whether current graphic card is supported
   QString m_notSupportedReason; // Reason why current gpu card are not supported
 
-  int m_glMajorVersion;
-  int m_glMinorVersion;
-  int m_glReleaseVersion;
-  int m_glslMajorVersion;
-  int m_glslMinorVersion;
-  int m_glslReleaseVersion;
+  RenderBackend m_capsBackend = RenderBackend::OpenGL; // where caps came from
+
+  int m_glMajorVersion = 0;
+  int m_glMinorVersion = 0;
+  int m_glReleaseVersion = 0;
+  int m_glslMajorVersion = 0;
+  int m_glslMinorVersion = 0;
+  int m_glslReleaseVersion = 0;
 
   QString m_glVersionString;
   QString m_glExtensionsString;
   QString m_glVendorString;
   QString m_glRendererString;
   QString m_glslVersionString;
-  GpuVendor m_gpuVendor;
+  GpuVendor m_gpuVendor = GpuVendor::UNKNOWN;
 
-  int m_maxViewportDims;
-  int m_maxRenderbufferSize;
-  int m_maxTexureSize;
-  int m_max3DTextureSize;
-  float m_maxTextureAnisotropy;
-  int m_maxColorAttachments;
-  int m_maxDrawBuffer;
-  int m_maxGeometryOutputVertices;
-  int m_maxArrayTextureLayers;
+  int m_maxViewportDims = 16384;
+  int m_maxRenderbufferSize = 8192;
+  int m_maxTexureSize = 8192;
+  int m_max3DTextureSize = 2048;
+  float m_maxTextureAnisotropy = 1.0f;
+  int m_maxColorAttachments = 4;
+  int m_maxDrawBuffer = 8;
+  int m_maxGeometryOutputVertices = 0;
+  int m_maxArrayTextureLayers = 256;
 
-  int m_maxTextureBufferSize;
+  int m_maxTextureBufferSize = 64 * 1024 * 1024;
 
   // Return a value such as 16 or 32. That is the number of image samplers that your GPU supports in the fragment
   // shader.
-  int m_maxTextureImageUnits;
+  int m_maxTextureImageUnits = 16;
   // The following is for the vertex shader (available since GL 2.0). This might return 0 for certain GPUs.
-  int m_maxVertexTextureImageUnits;
+  int m_maxVertexTextureImageUnits = 16;
   // The following is for the geometry shader (available since GL 3.2)
-  int m_maxGeometryTextureImageUnits;
+  int m_maxGeometryTextureImageUnits = 16;
   // The following is VS + GS + FS (available since GL 2.0)
-  int m_maxCombinedTextureImageUnits;
+  int m_maxCombinedTextureImageUnits = 48;
 
-  float m_minSmoothPointSize;
-  float m_maxSmoothPointSize;
-  float m_smoothPointSizeGranularity;
+  float m_minSmoothPointSize = 1.0f;
+  float m_maxSmoothPointSize = 1.0f;
+  float m_smoothPointSizeGranularity = 1.0f;
   // float m_minAliasedPointSize;
   // float m_maxAliasedPointSize;
 
-  float m_minSmoothLineWidth;
-  float m_maxSmoothLineWidth;
-  float m_smoothLineWidthGranularity;
-  float m_minAliasedLineWidth;
-  float m_maxAliasedLineWidth;
+  float m_minSmoothLineWidth = 1.0f;
+  float m_maxSmoothLineWidth = 1.0f;
+  float m_smoothLineWidthGranularity = 1.0f;
+  float m_minAliasedLineWidth = 1.0f;
+  float m_maxAliasedLineWidth = 1.0f;
 
-  uint64_t m_dedicatedVideoMemoryMB;
+  uint64_t m_dedicatedVideoMemoryMB = 256;
 
   bool m_contextCoreProfileBit = false;
   bool m_contextCompatibilityProfileBit = false;

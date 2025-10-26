@@ -56,9 +56,9 @@ void ZVulkanTextureWeightedAveragePipelineContext::record(Z3DRendererBase& rende
   VLOG(2) << fmt::format("record begin accum=0x{:x} moments=0x{:x}",
                          payload.accumulationAttachment.id,
                          payload.momentsAttachment.id);
-  CHECK(payload.accumulationAttachment.backend == AttachmentBackend::Vulkan)
+  CHECK(payload.accumulationAttachment.backend == RenderBackend::Vulkan)
     << "GL accumulationAttachment in Vulkan path";
-  CHECK(payload.momentsAttachment.backend == AttachmentBackend::Vulkan) << "GL momentsAttachment in Vulkan path";
+  CHECK(payload.momentsAttachment.backend == RenderBackend::Vulkan) << "GL momentsAttachment in Vulkan path";
   if (!payload.accumulationAttachment.valid() || !payload.momentsAttachment.valid()) {
     return;
   }

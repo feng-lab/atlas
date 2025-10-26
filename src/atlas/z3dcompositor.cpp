@@ -1524,7 +1524,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                        RenderBackend::Vulkan);
       AttachmentHandle depthHandle;
       if (auto* depthTex = leaseOpaque.depthAttachmentTexture()) {
-        depthHandle.backend = AttachmentBackend::Vulkan;
+        depthHandle.backend = RenderBackend::Vulkan;
         depthHandle.index = 0;
         depthHandle.id = reinterpret_cast<uint64_t>(depthTex);
       }
@@ -1536,19 +1536,19 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       // OIT init/peel passes via the provided depth attachment, so the final
       // resolve does not require an additional depth test here.
       AttachmentHandle opaqueColor{};
-      opaqueColor.backend = AttachmentBackend::Vulkan;
+      opaqueColor.backend = RenderBackend::Vulkan;
       opaqueColor.index = 0;
       opaqueColor.id = reinterpret_cast<uint64_t>(leaseOpaque.colorAttachment(0));
       AttachmentHandle opaqueDepth{};
-      opaqueDepth.backend = AttachmentBackend::Vulkan;
+      opaqueDepth.backend = RenderBackend::Vulkan;
       opaqueDepth.index = 0;
       opaqueDepth.id = reinterpret_cast<uint64_t>(leaseOpaque.depthAttachmentTexture());
       AttachmentHandle transColor{};
-      transColor.backend = AttachmentBackend::Vulkan;
+      transColor.backend = RenderBackend::Vulkan;
       transColor.index = 0;
       transColor.id = reinterpret_cast<uint64_t>(leaseTrans.colorAttachment(0));
       AttachmentHandle transDepth{};
-      transDepth.backend = AttachmentBackend::Vulkan;
+      transDepth.backend = RenderBackend::Vulkan;
       transDepth.index = 0;
       transDepth.id = reinterpret_cast<uint64_t>(leaseTrans.depthAttachmentTexture());
 
@@ -1637,11 +1637,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       }
 
       AttachmentHandle colorHandle;
-      colorHandle.backend = AttachmentBackend::Vulkan;
+      colorHandle.backend = RenderBackend::Vulkan;
       colorHandle.index = 0;
       colorHandle.id = reinterpret_cast<uint64_t>(glowGeomLease.colorAttachment(0));
       AttachmentHandle depthHandle;
-      depthHandle.backend = AttachmentBackend::Vulkan;
+      depthHandle.backend = RenderBackend::Vulkan;
       depthHandle.index = 0;
       depthHandle.id = reinterpret_cast<uint64_t>(glowGeomLease.depthAttachmentTexture());
 
@@ -1699,10 +1699,10 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     for (const auto& layer : imageLayers) {
       const auto& colorDesc = layer.colorAttachment;
       const auto& depthDesc = layer.depthAttachment;
-      if (colorDesc.handle.backend != AttachmentBackend::Vulkan || !colorDesc.handle.valid()) {
+      if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
         continue;
       }
-      if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
+      if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
         continue;
       }
       layers.emplace_back(colorDesc.handle, depthDesc.handle);
@@ -1714,11 +1714,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       // Helper to build handles from a lease
       auto handlesFromLease = [](const Z3DScratchResourcePool::RenderTargetLease& lease) -> LayerHandles {
         AttachmentHandle c{};
-        c.backend = AttachmentBackend::Vulkan;
+        c.backend = RenderBackend::Vulkan;
         c.index = 0;
         c.id = reinterpret_cast<uint64_t>(lease.colorAttachment(0));
         AttachmentHandle d{};
-        d.backend = AttachmentBackend::Vulkan;
+        d.backend = RenderBackend::Vulkan;
         d.index = 0;
         d.id = reinterpret_cast<uint64_t>(lease.depthAttachmentTexture());
         return {c, d};
@@ -1727,11 +1727,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       if (layers.size() == 1) {
         // Blend geometry (current scene) with the single image layer
         AttachmentHandle outC{};
-        outC.backend = AttachmentBackend::Vulkan;
+        outC.backend = RenderBackend::Vulkan;
         outC.index = 0;
         outC.id = reinterpret_cast<uint64_t>(sceneOutLease->colorAttachment(0));
         AttachmentHandle outD{};
-        outD.backend = AttachmentBackend::Vulkan;
+        outD.backend = RenderBackend::Vulkan;
         outD.index = 0;
         outD.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
 
@@ -1820,11 +1820,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
         // Blend geometry (out) with final merged image (res in mergeLeaseA)
         AttachmentHandle outC{};
-        outC.backend = AttachmentBackend::Vulkan;
+        outC.backend = RenderBackend::Vulkan;
         outC.index = 0;
         outC.id = reinterpret_cast<uint64_t>(sceneOutLease->colorAttachment(0));
         AttachmentHandle outD{};
-        outD.backend = AttachmentBackend::Vulkan;
+        outD.backend = RenderBackend::Vulkan;
         outD.index = 0;
         outD.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
 
@@ -1907,20 +1907,20 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
       // Overlay onto scene output using "first on top" blending
       AttachmentHandle overlayC{};
-      overlayC.backend = AttachmentBackend::Vulkan;
+      overlayC.backend = RenderBackend::Vulkan;
       overlayC.index = 0;
       overlayC.id = reinterpret_cast<uint64_t>(onTopLease.colorAttachment(0));
       AttachmentHandle overlayD{};
-      overlayD.backend = AttachmentBackend::Vulkan;
+      overlayD.backend = RenderBackend::Vulkan;
       overlayD.index = 0;
       overlayD.id = reinterpret_cast<uint64_t>(onTopLease.depthAttachmentTexture());
 
       AttachmentHandle outC{};
-      outC.backend = AttachmentBackend::Vulkan;
+      outC.backend = RenderBackend::Vulkan;
       outC.index = 0;
       outC.id = reinterpret_cast<uint64_t>(sceneOutLease->colorAttachment(0));
       AttachmentHandle outD{};
-      outD.backend = AttachmentBackend::Vulkan;
+      outD.backend = RenderBackend::Vulkan;
       outD.index = 0;
       outD.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
 
@@ -1975,11 +1975,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
       auto handlesFromLease = [](const Z3DScratchResourcePool::RenderTargetLease& lease) {
         AttachmentHandle c{};
-        c.backend = AttachmentBackend::Vulkan;
+        c.backend = RenderBackend::Vulkan;
         c.index = 0;
         c.id = reinterpret_cast<uint64_t>(lease.colorAttachment(0));
         AttachmentHandle d{};
-        d.backend = AttachmentBackend::Vulkan;
+        d.backend = RenderBackend::Vulkan;
         d.index = 0;
         d.id = reinterpret_cast<uint64_t>(lease.depthAttachmentTexture());
         return std::make_pair(c, d);
@@ -1997,7 +1997,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
                                                          RenderBackend::Vulkan);
         AttachmentHandle depthHandle{};
         if (onTopHasOpaque) {
-          depthHandle.backend = AttachmentBackend::Vulkan;
+          depthHandle.backend = RenderBackend::Vulkan;
           depthHandle.index = 0;
           depthHandle.id = reinterpret_cast<uint64_t>(onTopOpaqueLease.depthAttachmentTexture());
         }
@@ -2092,11 +2092,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         // Scene inputs come from sceneOutLease (temp); write into outLease (final) when not supersampling,
         // otherwise write into a supersampled composite lease and keep sceneOutLease pointing to it.
         AttachmentHandle sceneC{};
-        sceneC.backend = AttachmentBackend::Vulkan;
+        sceneC.backend = RenderBackend::Vulkan;
         sceneC.index = 0;
         sceneC.id = reinterpret_cast<uint64_t>(sceneOutLease->colorAttachment(0));
         AttachmentHandle sceneD{};
-        sceneD.backend = AttachmentBackend::Vulkan;
+        sceneD.backend = RenderBackend::Vulkan;
         sceneD.index = 0;
         sceneD.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
 
@@ -2177,11 +2177,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
       "handles_overlay");
 
     AttachmentHandle handleColor{};
-    handleColor.backend = AttachmentBackend::Vulkan;
+    handleColor.backend = RenderBackend::Vulkan;
     handleColor.index = 0;
     handleColor.id = reinterpret_cast<uint64_t>(handleLease.colorAttachment(0));
     AttachmentHandle handleDepth{};
-    handleDepth.backend = AttachmentBackend::Vulkan;
+    handleDepth.backend = RenderBackend::Vulkan;
     handleDepth.index = 0;
     handleDepth.id = reinterpret_cast<uint64_t>(handleLease.depthAttachmentTexture());
     CHECK(handleColor.id != 0 && handleDepth.id != 0) << "Handles overlay lease missing attachments";
@@ -2189,11 +2189,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
     // Sample the scene rendered into sceneOutLease (temp) and write to the
     // final output surface (outLease), exactly like the GL path.
     AttachmentHandle sceneColor{};
-    sceneColor.backend = AttachmentBackend::Vulkan;
+    sceneColor.backend = RenderBackend::Vulkan;
     sceneColor.index = 0;
     sceneColor.id = reinterpret_cast<uint64_t>(sceneOutLease->colorAttachment(0));
     AttachmentHandle sceneDepth{};
-    sceneDepth.backend = AttachmentBackend::Vulkan;
+    sceneDepth.backend = RenderBackend::Vulkan;
     sceneDepth.index = 0;
     sceneDepth.id = reinterpret_cast<uint64_t>(sceneOutLease->depthAttachmentTexture());
     CHECK(sceneColor.id != 0 && sceneDepth.id != 0) << "Scene temp lease missing attachments for handles overlay";
@@ -2413,19 +2413,19 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
 
       // Composite into picking target using first-on-top blend
       AttachmentHandle handlesColor{};
-      handlesColor.backend = AttachmentBackend::Vulkan;
+      handlesColor.backend = RenderBackend::Vulkan;
       handlesColor.index = 0;
       handlesColor.id = reinterpret_cast<uint64_t>(leaseHandles.colorAttachment(0));
       AttachmentHandle handlesDepth{};
-      handlesDepth.backend = AttachmentBackend::Vulkan;
+      handlesDepth.backend = RenderBackend::Vulkan;
       handlesDepth.index = 0;
       handlesDepth.id = reinterpret_cast<uint64_t>(leaseHandles.depthAttachmentTexture());
       AttachmentHandle geomsColor{};
-      geomsColor.backend = AttachmentBackend::Vulkan;
+      geomsColor.backend = RenderBackend::Vulkan;
       geomsColor.index = 0;
       geomsColor.id = reinterpret_cast<uint64_t>(leaseGeoms.colorAttachment(0));
       AttachmentHandle geomsDepth{};
-      geomsDepth.backend = AttachmentBackend::Vulkan;
+      geomsDepth.backend = RenderBackend::Vulkan;
       geomsDepth.index = 0;
       geomsDepth.id = reinterpret_cast<uint64_t>(leaseGeoms.depthAttachmentTexture());
 
@@ -2472,11 +2472,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         // If we already composited into a supersampled composite lease, prefer that; otherwise use sceneOutLease.
         Z3DScratchResourcePool::RenderTargetLease* copySrc = sceneOutLease;
         AttachmentHandle srcColor{};
-        srcColor.backend = AttachmentBackend::Vulkan;
+        srcColor.backend = RenderBackend::Vulkan;
         srcColor.index = 0;
         srcColor.id = reinterpret_cast<uint64_t>(copySrc->colorAttachment(0));
         AttachmentHandle srcDepth{};
-        srcDepth.backend = AttachmentBackend::Vulkan;
+        srcDepth.backend = RenderBackend::Vulkan;
         srcDepth.index = 0;
         srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
         // Internal resolve: no Y-flip
@@ -2515,11 +2515,11 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
             const bool compositedToFinal = (!supersample2x2 && (haveHandles || haveOnTop || imagesCompositedToFinal));
             Z3DScratchResourcePool::RenderTargetLease* copySrc = compositedToFinal ? outLease : sceneOutLease;
             AttachmentHandle srcColor{};
-            srcColor.backend = AttachmentBackend::Vulkan;
+            srcColor.backend = RenderBackend::Vulkan;
             srcColor.index = 0;
             srcColor.id = reinterpret_cast<uint64_t>(copySrc->colorAttachment(0));
             AttachmentHandle srcDepth{};
-            srcDepth.backend = AttachmentBackend::Vulkan;
+            srcDepth.backend = RenderBackend::Vulkan;
             srcDepth.index = 0;
             srcDepth.id = reinterpret_cast<uint64_t>(copySrc->depthAttachmentTexture());
             CHECK(srcColor.id != 0 && srcDepth.id != 0) << "final_rgba8_copy: missing source attachments";
@@ -2854,11 +2854,11 @@ void Z3DCompositor::executeCompositorPassesVulkan(const std::vector<Z3DBoundedFi
         }
 
         AttachmentHandle colorHandle;
-        colorHandle.backend = AttachmentBackend::Vulkan;
+        colorHandle.backend = RenderBackend::Vulkan;
         colorHandle.index = 0;
         colorHandle.id = reinterpret_cast<uint64_t>(glowGeomLease.colorAttachment(0));
         AttachmentHandle depthHandle;
-        depthHandle.backend = AttachmentBackend::Vulkan;
+        depthHandle.backend = RenderBackend::Vulkan;
         depthHandle.index = 0;
         depthHandle.id = reinterpret_cast<uint64_t>(glowGeomLease.depthAttachmentTexture());
 
@@ -3978,10 +3978,10 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
         for (const auto& layer : imageLayers) {
           const auto& colorDesc = layer.colorAttachment;
           const auto& depthDesc = layer.depthAttachment;
-          if (colorDesc.handle.backend != AttachmentBackend::Vulkan || !colorDesc.handle.valid()) {
+          if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
             continue;
           }
-          if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
+          if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
             continue;
           }
           // Image OIT init copy: do not flip
@@ -4065,10 +4065,10 @@ void Z3DCompositor::renderTransparentDDPVulkan(const std::vector<Z3DBoundedFilte
             for (const auto& layer : imageLayers) {
               const auto& colorDesc = layer.colorAttachment;
               const auto& depthDesc = layer.depthAttachment;
-              if (colorDesc.handle.backend != AttachmentBackend::Vulkan || !colorDesc.handle.valid()) {
+              if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
                 continue;
               }
-              if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
+              if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
                 continue;
               }
               // Image OIT peel: do not flip
@@ -4275,10 +4275,10 @@ void Z3DCompositor::renderTransparentWAVulkan(const std::vector<Z3DBoundedFilter
         for (const auto& layer : imageLayers) {
           const auto& colorDesc = layer.colorAttachment;
           const auto& depthDesc = layer.depthAttachment;
-          if (colorDesc.handle.backend != AttachmentBackend::Vulkan || !colorDesc.handle.valid()) {
+          if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
             continue;
           }
-          if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
+          if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
             continue;
           }
           VLOG(1) << fmt::format("WA init: texture_copy layer color=0x{:x} depth=0x{:x}",
@@ -4424,10 +4424,10 @@ void Z3DCompositor::renderTransparentWBVulkan(const std::vector<Z3DBoundedFilter
         for (const auto& layer : imageLayers) {
           const auto& colorDesc = layer.colorAttachment;
           const auto& depthDesc = layer.depthAttachment;
-          if (colorDesc.handle.backend != AttachmentBackend::Vulkan || !colorDesc.handle.valid()) {
+          if (colorDesc.handle.backend != RenderBackend::Vulkan || !colorDesc.handle.valid()) {
             continue;
           }
-          if (depthDesc.handle.backend != AttachmentBackend::Vulkan || !depthDesc.handle.valid()) {
+          if (depthDesc.handle.backend != RenderBackend::Vulkan || !depthDesc.handle.valid()) {
             continue;
           }
           // WB image init copy: do not flip
@@ -4520,8 +4520,7 @@ glm::uvec4 Z3DCompositor::axisViewportFor(const glm::uvec4& baseViewport) const
 
 void Z3DCompositor::ensureAxisCameraBackend(RenderBackend backend)
 {
-  const auto expected = backend == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan : Z3DCoordinateSystem::OpenGL;
-  if (m_axisCamera.getCoordinateSystem() != expected) {
+  if (m_axisCamera.getBackend() != backend) {
     setupAxisCamera();
   }
 }
@@ -4646,8 +4645,7 @@ void Z3DCompositor::prepareAxisData(Z3DEye eye)
 
 void Z3DCompositor::setupAxisCamera()
 {
-  Z3DCamera camera(m_rendererBase.activeBackend() == RenderBackend::Vulkan ? Z3DCoordinateSystem::Vulkan
-                                                                           : Z3DCoordinateSystem::OpenGL);
+  Z3DCamera camera(m_rendererBase.activeBackend());
   glm::vec3 center(0.f);
   camera.setFieldOfView(glm::radians(10.f));
 

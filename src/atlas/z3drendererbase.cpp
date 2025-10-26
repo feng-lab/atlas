@@ -94,12 +94,12 @@ void Z3DRendererBase::appendBatch(RenderBatch batch)
   // Strict backend separation: do not accept GL attachments when targeting Vulkan.
   if (m_activeBackend == RenderBackend::Vulkan) {
     for (const auto& att : batch.pass.colorAttachments) {
-      CHECK(att.handle.backend == AttachmentBackend::Vulkan && att.handle.id != 0u)
+      CHECK(att.handle.backend == RenderBackend::Vulkan && att.handle.id != 0u)
         << "GL or invalid color attachment encountered in Vulkan path";
     }
     if (batch.pass.depthAttachment) {
       const auto& datt = *batch.pass.depthAttachment;
-      CHECK(datt.handle.backend == AttachmentBackend::Vulkan && datt.handle.id != 0u)
+      CHECK(datt.handle.backend == RenderBackend::Vulkan && datt.handle.id != 0u)
         << "GL or invalid depth attachment encountered in Vulkan path";
     }
   }

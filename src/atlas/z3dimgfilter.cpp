@@ -476,12 +476,12 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
       return;
     }
     AttachmentHandle colorHandle;
-    colorHandle.backend = AttachmentBackend::Vulkan;
+    colorHandle.backend = RenderBackend::Vulkan;
     colorHandle.index = 0;
     colorHandle.id = reinterpret_cast<uint64_t>(lease.colorAttachment(0));
 
     AttachmentHandle depthHandle;
-    depthHandle.backend = AttachmentBackend::Vulkan;
+    depthHandle.backend = RenderBackend::Vulkan;
     depthHandle.index = 0;
     depthHandle.id = reinterpret_cast<uint64_t>(lease.depthAttachmentTexture());
 
@@ -513,12 +513,12 @@ void Z3DImgFilter::renderTransparent(Z3DEye eye)
       return;
     }
     AttachmentHandle colorHandle;
-    colorHandle.backend = AttachmentBackend::Vulkan;
+    colorHandle.backend = RenderBackend::Vulkan;
     colorHandle.index = 0;
     colorHandle.id = reinterpret_cast<uint64_t>(lease.colorAttachment(0));
 
     AttachmentHandle depthHandle;
-    depthHandle.backend = AttachmentBackend::Vulkan;
+    depthHandle.backend = RenderBackend::Vulkan;
     depthHandle.index = 0;
     depthHandle.id = reinterpret_cast<uint64_t>(lease.depthAttachmentTexture());
 

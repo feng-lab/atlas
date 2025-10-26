@@ -613,6 +613,24 @@ Additional Architecture Notes
 - Debugging GL state
   - Enable `--atlas_debug_opengl` for per-call error checks (costly); `--atlas_log_glbinding_context_switch` to audit context switches.
   - When diagnosing rendering differences across devices, log `Z3DGpuInfo::instance().logGpuInfo()` output for driver/features.
+  - GPU caps source: when the Vulkan backend is active, `Z3DGpuInfo` populates generic limits (max 2D/3D texture size, array
+    layers, anisotropy, approximate VRAM) from the selected Vulkan physical device. OpenGL-specific strings and flags in that
+    log are only meaningful under the OpenGL backend.
+  - For Vulkan-specific details (device name, driver, limits, features, and extensions), call `ZVulkanContext::logGpuInfo()`.
+    This logs a concise summary at INFO and full feature/extension detail at `--v=1`.
+
+Vulkan device selection
+
+- On initialization, all physical devices are enumerated and logged. Devices are sorted by preference: larger dedicated VRAM
+  first, then discrete > integrated > virtual > CPU, then higher API version. The first suitable device (Vulkan 1.3,
+  required extensions, required queue families) is selected and used to create the logical device and queues.
+- `ZVulkanContext::physicalDevice()` returns the currently selected device. `deviceCount()` and `physicalDevice(index)` can be
+  used for explicit per-device introspection. The selected index is exposed via `selectedDeviceIndex()`.
+- Override device selection at startup via `--atlas_vk_device_index=N` (sorted order). When set to a suitable device index,
+  the context selects that device instead of the auto-selected one.
+- Runtime switching: call `Z3DRenderingEngine::switchVulkanDeviceIndex(N)` at a safe point (no in-flight rendering) to switch
+  to device N. The engine waits idle, recreates the logical device wrapper, updates the scratch pool device, refreshes
+  backend‑agnostic GPU caps, and logs the new device inventory.
 
 Compositor Pass Graph (Vulkan)
 

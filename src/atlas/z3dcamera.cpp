@@ -5,17 +5,17 @@
 
 namespace nim {
 
-Z3DCamera::Z3DCamera(Z3DCoordinateSystem coordinateSystem)
-    : m_coordinateSystem(coordinateSystem)
+Z3DCamera::Z3DCamera(RenderBackend backend)
+    : m_backend(backend)
 {
   updateCamera();
   updateFrustum();
 }
 
-void Z3DCamera::setCoordinateSystem(Z3DCoordinateSystem system)
+void Z3DCamera::setBackend(RenderBackend backend)
 {
-  if (m_coordinateSystem != system) {
-    m_coordinateSystem = system;
+  if (m_backend != backend) {
+    m_backend = backend;
     // Recalculate projection matrices for the new coordinate system
     makeProjectionMatrices();
   }
@@ -396,7 +396,7 @@ void Z3DCamera::makeProjectionMatrices()
 {
   if (m_projectionType == ProjectionType::Orthographic) {
     glm::mat4 pmat;
-    if (m_coordinateSystem == Z3DCoordinateSystem::Vulkan) {
+    if (m_backend == RenderBackend::Vulkan) {
       // Vulkan-style depth in [0,1]
       pmat = glm::orthoRH_ZO(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
     } else {
@@ -412,7 +412,7 @@ void Z3DCamera::makeProjectionMatrices()
   } else {
     // Create perspective projection matrices
     auto createFrustum = [this](float left, float right, float bottom, float top, float near, float far) -> glm::mat4 {
-      if (m_coordinateSystem == Z3DCoordinateSystem::Vulkan) {
+      if (m_backend == RenderBackend::Vulkan) {
         return glm::frustumRH_ZO(left, right, bottom, top, near, far);
       }
       return glm::frustum(left, right, bottom, top, near, far);

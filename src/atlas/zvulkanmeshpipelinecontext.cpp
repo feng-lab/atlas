@@ -273,7 +273,7 @@ void ZVulkanMeshPipelineContext::record(Z3DRendererBase& renderer,
           drawTex->updateTexture(vkbind::kBindingDDPMeshFrontBlender, frontTexture, sampler);
         }
       } else if (!pickingPass && payload.textureHandle.valid() &&
-                 payload.textureHandle.backend == AttachmentBackend::Vulkan) {
+                 payload.textureHandle.backend == RenderBackend::Vulkan) {
         auto& sampledTexture =
           vulkan::textureFromHandle(payload.textureHandle, m_backend.device(), "mesh payload sampled texture");
         switch (payload.colorSource) {

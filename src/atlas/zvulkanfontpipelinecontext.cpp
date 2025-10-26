@@ -338,7 +338,7 @@ void ZVulkanFontPipelineContext::uploadGeometry(const FontPayload& payload)
 ZVulkanTexture* ZVulkanFontPipelineContext::ensureAtlasFromPayload(const FontPayload& payload)
 {
   // Priority: native Vulkan handle → CPU pixels → fallback
-  if (payload.atlasHandle.valid() && payload.atlasHandle.backend == AttachmentBackend::Vulkan) {
+  if (payload.atlasHandle.valid() && payload.atlasHandle.backend == RenderBackend::Vulkan) {
     auto& texture = vulkan::textureFromHandle(payload.atlasHandle, m_backend.device(), "font atlas sampled image");
     return &texture;
   }

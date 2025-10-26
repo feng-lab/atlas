@@ -46,7 +46,7 @@ vk::BlendOp toVkBlendOp(BlendOp op)
 ZVulkanTexture&
 textureFromHandle(const AttachmentHandle& handle, ZVulkanDevice& device, std::string_view usageDescription)
 {
-  if (!handle.valid() || handle.backend != AttachmentBackend::Vulkan) {
+  if (!handle.valid() || handle.backend != RenderBackend::Vulkan) {
     throw ZException(fmt::format("{} requires a Vulkan attachment handle", usageDescription));
   }
 
@@ -63,7 +63,7 @@ textureFromHandle(const AttachmentHandle& handle, ZVulkanDevice& device, std::st
 ZVulkanTexture&
 textureFromHandle(const SampledImageHandle& handle, ZVulkanDevice& device, std::string_view usageDescription)
 {
-  if (!handle.valid() || handle.backend != AttachmentBackend::Vulkan) {
+  if (!handle.valid() || handle.backend != RenderBackend::Vulkan) {
     throw ZException(fmt::format("{} requires a Vulkan sampled image handle", usageDescription));
   }
 
@@ -128,7 +128,7 @@ AttachmentFormats extractAttachmentFormats(const RenderBatch& batch)
 {
   AttachmentFormats formats;
   for (const auto& attachment : batch.pass.colorAttachments) {
-    if (attachment.handle.backend != AttachmentBackend::Vulkan || attachment.handle.id == 0u) {
+    if (attachment.handle.backend != RenderBackend::Vulkan || attachment.handle.id == 0u) {
       continue;
     }
     auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id);
@@ -139,7 +139,7 @@ AttachmentFormats extractAttachmentFormats(const RenderBatch& batch)
 
   if (batch.pass.depthAttachment) {
     const auto& attachment = *batch.pass.depthAttachment;
-    if (attachment.handle.backend == AttachmentBackend::Vulkan && attachment.handle.id != 0u) {
+    if (attachment.handle.backend == RenderBackend::Vulkan && attachment.handle.id != 0u) {
       if (auto* texture = reinterpret_cast<ZVulkanTexture*>(attachment.handle.id)) {
         formats.depthFormat = texture->format();
       }
