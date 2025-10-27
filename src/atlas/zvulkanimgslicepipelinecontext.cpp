@@ -112,10 +112,8 @@ inline uint32_t deviceLevelCap(nim::ZVulkanDevice& device)
   return static_cast<uint32_t>((maxBytes - header) / stride);
 }
 
-std::vector<uint8_t> buildPageDataBuffer(const Z3DImg& image,
-                                         size_t channel,
-                                         float zeToScreenPixelVoxelSize,
-                                         uint32_t levelCount)
+std::vector<uint8_t>
+buildPageDataBuffer(const Z3DImg& image, size_t channel, float zeToScreenPixelVoxelSize, uint32_t levelCount)
 {
   (void)channel; // channel not needed for addrNorm when using imageCacheSize
   CHECK_GT(levelCount, 0u) << "Image has zero paging levels (incomplete setup)";
@@ -402,7 +400,8 @@ void ZVulkanImgSlicePipelineContext::record(Z3DRendererBase& renderer,
     CHECK(colorMap != nullptr) << "Slice payload has null ZColorMap at channel " << idx;
     channel.colormap = &ensureColormapTexture(idx, colorMap, resources);
 
-    if (m_imageBlockUploader) {
+    if (usePaging) {
+      CHECK(m_imageBlockUploader) << "Slice pipeline expected uploader when paging is enabled";
       channel.pageDirectory = m_imageBlockUploader->pageDirectoryTexture(*payload.image, idx);
       channel.pageTable = m_imageBlockUploader->pageTableTexture(*payload.image, idx);
       channel.imageCache = m_imageBlockUploader->imageCacheTexture(*payload.image, idx);

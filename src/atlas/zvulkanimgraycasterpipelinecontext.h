@@ -322,6 +322,9 @@ private:
   PipelineInstance& ensureFastPipeline(const FastPipelineKey& key);
   void ensureEmptyDescriptor();
   PipelineInstance& ensureBlockIdPipeline(const BlockIdPipelineKey& key, vk::Format colorFormat);
+  // Lazily create the image block uploader when a Vulkan device is guaranteed
+  // to be available (e.g., during recording after beginRender()).
+  void ensureUploader();
   PipelineInstance& ensureProgressivePipeline(const ProgressivePipelineKey& key,
                                               const vulkan::AttachmentFormats& formats);
   PipelineInstance& ensureCopyPipeline(const CopyPipelineKey& key, const vulkan::AttachmentFormats& formats);

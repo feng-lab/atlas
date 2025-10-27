@@ -81,6 +81,9 @@ Z3DRendererVulkanBackend::Z3DRendererVulkanBackend()
   , m_textureWeightedAverageContext(std::make_unique<ZVulkanTextureWeightedAveragePipelineContext>(*this))
   , m_textureWeightedBlendedContext(std::make_unique<ZVulkanTextureWeightedBlendedPipelineContext>(*this))
   , m_textureGlowContext(std::make_unique<ZVulkanTextureGlowPipelineContext>(*this))
+  , m_imgSliceContext(std::make_unique<ZVulkanImgSlicePipelineContext>(*this))
+  , m_imgRaycasterContext(std::make_unique<ZVulkanImgRaycasterPipelineContext>(*this))
+  , m_fontContext(std::make_unique<ZVulkanFontPipelineContext>(*this))
 {}
 
 Z3DRendererVulkanBackend::~Z3DRendererVulkanBackend() = default;
@@ -1211,125 +1214,97 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
 
     bool handled = false;
     if (const auto* line = std::get_if<LinePayload>(&batch.geometry)) {
-      if (!m_lineContext) {
-        m_lineContext = std::make_unique<ZVulkanLinePipelineContext>(*this);
-      }
+      CHECK(m_lineContext != nullptr) << "Line pipeline context missing";
       m_lineContext->record(renderer, batch, *line, vkViewport, vkScissor, cmd);
       handled = true;
     }
     if (!handled) {
       if (const auto* mesh = std::get_if<MeshPayload>(&batch.geometry)) {
-        if (!m_meshContext) {
-          m_meshContext = std::make_unique<ZVulkanMeshPipelineContext>(*this);
-        }
+        CHECK(m_meshContext != nullptr) << "Mesh pipeline context missing";
         m_meshContext->record(renderer, batch, *mesh, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* sphere = std::get_if<SpherePayload>(&batch.geometry)) {
-        if (!m_sphereContext) {
-          m_sphereContext = std::make_unique<ZVulkanSpherePipelineContext>(*this);
-        }
+        CHECK(m_sphereContext != nullptr) << "Sphere pipeline context missing";
         m_sphereContext->record(renderer, batch, *sphere, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* background = std::get_if<BackgroundPayload>(&batch.geometry)) {
-        if (!m_backgroundContext) {
-          m_backgroundContext = std::make_unique<ZVulkanBackgroundPipelineContext>(*this);
-        }
+        CHECK(m_backgroundContext != nullptr) << "Background pipeline context missing";
         m_backgroundContext->record(renderer, batch, *background, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* slice = std::get_if<ImgSlicePayload>(&batch.geometry)) {
-        if (!m_imgSliceContext) {
-          m_imgSliceContext = std::make_unique<ZVulkanImgSlicePipelineContext>(*this);
-        }
+        CHECK(m_imgSliceContext != nullptr) << "ImgSlice pipeline context missing";
         m_imgSliceContext->record(renderer, batch, *slice, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* font = std::get_if<FontPayload>(&batch.geometry)) {
-        if (!m_fontContext) {
-          m_fontContext = std::make_unique<ZVulkanFontPipelineContext>(*this);
-        }
+        CHECK(m_fontContext != nullptr) << "Font pipeline context missing";
         m_fontContext->record(renderer, batch, *font, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* textureCopy = std::get_if<TextureCopyPayload>(&batch.geometry)) {
-        if (!m_textureCopyContext) {
-          m_textureCopyContext = std::make_unique<ZVulkanTextureCopyPipelineContext>(*this);
-        }
+        CHECK(m_textureCopyContext != nullptr) << "TextureCopy pipeline context missing";
         m_textureCopyContext->record(renderer, batch, *textureCopy, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* textureBlend = std::get_if<TextureBlendPayload>(&batch.geometry)) {
-        if (!m_textureBlendContext) {
-          m_textureBlendContext = std::make_unique<ZVulkanTextureBlendPipelineContext>(*this);
-        }
+        CHECK(m_textureBlendContext != nullptr) << "TextureBlend pipeline context missing";
         m_textureBlendContext->record(renderer, batch, *textureBlend, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* textureGlow = std::get_if<TextureGlowPayload>(&batch.geometry)) {
-        if (!m_textureGlowContext) {
-          m_textureGlowContext = std::make_unique<ZVulkanTextureGlowPipelineContext>(*this);
-        }
+        CHECK(m_textureGlowContext != nullptr) << "TextureGlow pipeline context missing";
         m_textureGlowContext->record(renderer, batch, *textureGlow, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* dualPeel = std::get_if<TextureDualPeelPayload>(&batch.geometry)) {
-        if (!m_textureDualPeelContext) {
-          m_textureDualPeelContext = std::make_unique<ZVulkanTextureDualPeelPipelineContext>(*this);
-        }
+        CHECK(m_textureDualPeelContext != nullptr) << "TextureDualPeel pipeline context missing";
         m_textureDualPeelContext->record(renderer, batch, *dualPeel, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* weightedAverage = std::get_if<TextureWeightedAveragePayload>(&batch.geometry)) {
-        if (!m_textureWeightedAverageContext) {
-          m_textureWeightedAverageContext = std::make_unique<ZVulkanTextureWeightedAveragePipelineContext>(*this);
-        }
+        CHECK(m_textureWeightedAverageContext != nullptr) << "TextureWeightedAverage pipeline context missing";
         m_textureWeightedAverageContext->record(renderer, batch, *weightedAverage, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* weightedBlended = std::get_if<TextureWeightedBlendedPayload>(&batch.geometry)) {
-        if (!m_textureWeightedBlendedContext) {
-          m_textureWeightedBlendedContext = std::make_unique<ZVulkanTextureWeightedBlendedPipelineContext>(*this);
-        }
+        CHECK(m_textureWeightedBlendedContext != nullptr) << "TextureWeightedBlended pipeline context missing";
         m_textureWeightedBlendedContext->record(renderer, batch, *weightedBlended, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* ellipsoid = std::get_if<EllipsoidPayload>(&batch.geometry)) {
-        if (!m_ellipsoidContext) {
-          m_ellipsoidContext = std::make_unique<ZVulkanEllipsoidPipelineContext>(*this);
-        }
+        CHECK(m_ellipsoidContext != nullptr) << "Ellipsoid pipeline context missing";
         m_ellipsoidContext->record(renderer, batch, *ellipsoid, vkViewport, vkScissor, cmd);
         handled = true;
       }
     }
     if (!handled) {
       if (const auto* cone = std::get_if<ConePayload>(&batch.geometry)) {
-        if (!m_coneContext) {
-          m_coneContext = std::make_unique<ZVulkanConePipelineContext>(*this);
-        }
+        CHECK(m_coneContext != nullptr) << "Cone pipeline context missing";
         m_coneContext->record(renderer, batch, *cone, vkViewport, vkScissor, cmd);
         handled = true;
       }
@@ -1337,9 +1312,7 @@ void Z3DRendererVulkanBackend::processBatches(Z3DRendererBase& renderer, const R
     if (!handled) {
       if (const auto* raycaster = std::get_if<ImgRaycasterPayload>(&batch.geometry)) {
         if (raycaster->image) {
-          if (!m_imgRaycasterContext) {
-            m_imgRaycasterContext = std::make_unique<ZVulkanImgRaycasterPipelineContext>(*this);
-          }
+          CHECK(m_imgRaycasterContext != nullptr) << "ImgRaycaster pipeline context missing";
           m_imgRaycasterContext->record(renderer, batch, *raycaster, vkViewport, vkScissor, cmd);
           // If the raycaster just completed a progressive round, finalize it now.
           if (auto fin = m_imgRaycasterContext->takePendingFinalization()) {
@@ -1620,9 +1593,7 @@ const ZVulkanDevice& Z3DRendererVulkanBackend::device() const
 void Z3DRendererVulkanBackend::ensureDefaultPlaceholders()
 {
   ensureDevice();
-  if (!m_sharedDevice) {
-    return;
-  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureDefaultPlaceholders";
   if (!m_defaultPlaceholder2D) {
     // 1x1 RGBA8 white texture for placeholder sampling
     m_defaultPlaceholder2D =
@@ -1659,9 +1630,7 @@ vk::Sampler Z3DRendererVulkanBackend::nearestClampSampler()
 void Z3DRendererVulkanBackend::ensureSharedDescriptorLayouts()
 {
   ensureDevice();
-  if (!m_sharedDevice) {
-    return;
-  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureSharedDescriptorLayouts";
 
   auto& vkDevice = m_sharedDevice->context().device();
 
@@ -1792,9 +1761,7 @@ vk::DescriptorSetLayout Z3DRendererVulkanBackend::emptyDescriptorSetLayout()
 
 void Z3DRendererVulkanBackend::ensureSharedSamplers()
 {
-  if (!m_sharedDevice) {
-    return;
-  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureSharedSamplers";
   auto& vkDevice = m_sharedDevice->context().device();
   if (!m_defaultSampler) {
     vk::SamplerCreateInfo samplerInfo{.magFilter = vk::Filter::eLinear,
@@ -1821,10 +1788,11 @@ void Z3DRendererVulkanBackend::ensureSharedSamplers()
 Z3DRendererVulkanBackend::UploadSlice Z3DRendererVulkanBackend::suballocateUpload(size_t bytes, size_t alignment)
 {
   UploadSlice slice{};
-  if (!m_activeFrame || !m_sharedDevice) {
-    VLOG(2) << "suballocateUpload: inactive frame or device; returning null slice for " << bytes << " bytes";
+  if (!m_activeFrame) {
+    VLOG(2) << "suballocateUpload: inactive frame; returning null slice for " << bytes << " bytes";
     return slice;
   }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in suballocateUpload";
 
   auto& arena = m_activeFrame->uploadArena;
 
@@ -1903,9 +1871,10 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
   if (!FLAGS_vk_reserve_upload_slices) {
     return;
   }
-  if (!m_activeFrame || !m_sharedDevice) {
+  if (!m_activeFrame) {
     return;
   }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in reserveUploadSlices";
   auto& arena = m_activeFrame->uploadArena;
   size_t cursor = 0; // virtual block will handle placement; we just size the buffer
   for (const auto& s : slices) {
@@ -1951,9 +1920,7 @@ void Z3DRendererVulkanBackend::reserveUploadSlices(std::initializer_list<std::pa
 
 void Z3DRendererVulkanBackend::ensureStaticArenas()
 {
-  if (!m_sharedDevice) {
-    return;
-  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureStaticArenas";
   // Create on first use with conservative capacities. Grow policy can be
   // revisited; first cut avoids reallocation to keep slices stable.
   if (!m_staticArena.vb) {
@@ -1980,9 +1947,7 @@ void Z3DRendererVulkanBackend::ensureStaticArenas()
 
 void Z3DRendererVulkanBackend::ensureUniformArena(FrameResources& frame)
 {
-  if (!m_sharedDevice) {
-    return;
-  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureUniformArena";
   // Create if missing
   const size_t baseRequested = static_cast<size_t>(std::max(64, kUniformArenaBaseKiB)) * 1024ull;
   size_t requested = std::max(baseRequested, m_nextUniformMinCapacity);
@@ -2017,9 +1982,7 @@ void Z3DRendererVulkanBackend::ensureUniformArena(FrameResources& frame)
 
 void Z3DRendererVulkanBackend::ensureDDPGatingResources(FrameResources& frame)
 {
-  if (!m_sharedDevice) {
-    return;
-  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureDDPGatingResources";
   if (!frame.ddpChangedFlag) {
     frame.ddpChangedFlag =
       m_sharedDevice->createBuffer(4,
@@ -2050,9 +2013,7 @@ void Z3DRendererVulkanBackend::ensureDDPGatingResources(FrameResources& frame)
 
 void Z3DRendererVulkanBackend::ensureDDPComputePipeline()
 {
-  if (!m_sharedDevice) {
-    return;
-  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureDDPComputePipeline";
   if (m_ddpCountPipeline) {
     return;
   }
@@ -2295,9 +2256,7 @@ void Z3DRendererVulkanBackend::ddpOrchestrate(uint32_t maxPasses,
 
 size_t Z3DRendererVulkanBackend::uniformAlignment() const
 {
-  if (!m_sharedDevice) {
-    return 256; // conservative default
-  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in uniformAlignment";
   auto limits = m_sharedDevice->context().physicalDevice().getProperties().limits;
   size_t align = static_cast<size_t>(limits.minUniformBufferOffsetAlignment);
   return align ? align : 256;
@@ -2414,10 +2373,11 @@ void Z3DRendererVulkanBackend::stageCopy(vk::Buffer dst,
 std::unique_ptr<ZVulkanDescriptorSet>
 Z3DRendererVulkanBackend::allocateFrameDescriptorSet(vk::DescriptorSetLayout layout)
 {
-  if (!m_activeFrame || !m_sharedDevice) {
-    VLOG(1) << "allocateFrameDescriptorSet called with no active frame or device";
+  if (!m_activeFrame) {
+    VLOG(1) << "allocateFrameDescriptorSet called with no active frame";
     return {};
   }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in allocateFrameDescriptorSet";
   ensureArenaOnFrame(*m_activeFrame);
   if (!m_activeFrame->descriptorPool) {
     VLOG(1) << "Descriptor arena missing; allocation skipped";
@@ -2432,18 +2392,21 @@ Z3DRendererVulkanBackend::allocateFrameDescriptorSet(vk::DescriptorSetLayout lay
 
 ZVulkanDescriptorSet* Z3DRendererVulkanBackend::allocateOverrideDescriptorSet(vk::DescriptorSetLayout layout)
 {
-  auto set =
-    m_sharedDevice && m_activeFrame && m_activeFrame->descriptorPool
-      ? m_sharedDevice->createDescriptorSet(*m_activeFrame->descriptorPool, layout, /*isOverrideTransient*/ true)
-      : nullptr;
+  if (!m_activeFrame) {
+    return nullptr;
+  }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in allocateOverrideDescriptorSet";
+  ensureArenaOnFrame(*m_activeFrame);
+  if (!m_activeFrame->descriptorPool) {
+    return nullptr;
+  }
+  auto set = m_sharedDevice->createDescriptorSet(*m_activeFrame->descriptorPool, layout, /*isOverrideTransient*/ true);
   if (!set) {
     return nullptr;
   }
   ZVulkanDescriptorSet* raw = set.get();
-  if (m_activeFrame) {
-    m_activeFrame->transientOverrideSets.push_back(std::move(set));
-    m_activeFrame->overrideSetsAllocated++;
-  }
+  m_activeFrame->transientOverrideSets.push_back(std::move(set));
+  m_activeFrame->overrideSetsAllocated++;
   return raw;
 }
 
@@ -2534,9 +2497,7 @@ void Z3DRendererVulkanBackend::ensureDevice()
     }
   }
   // Keep local ring sizes aligned with the device executor setting.
-  if (m_sharedDevice) {
-    m_maxFramesInFlight = m_sharedDevice->frameExecutor().maxFramesInFlight();
-  }
+  m_maxFramesInFlight = m_sharedDevice->frameExecutor().maxFramesInFlight();
 }
 
 void Z3DRendererVulkanBackend::resetFrameResources()
@@ -2692,9 +2653,10 @@ void Z3DRendererVulkanBackend::ensureFullscreenQuad()
 
 void Z3DRendererVulkanBackend::ensureDummyVertexBuffer()
 {
-  if (m_dummyVertexBuffer || !m_sharedDevice) {
+  if (m_dummyVertexBuffer) {
     return;
   }
+  CHECK(m_sharedDevice != nullptr) << "Shared Vulkan device missing in ensureDummyVertexBuffer";
   struct Dummy
   {
     uint32_t x;

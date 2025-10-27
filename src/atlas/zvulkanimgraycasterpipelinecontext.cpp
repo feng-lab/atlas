@@ -368,10 +368,19 @@ vk::ImageAspectFlags depthReadBarrierAspect(const ZVulkanTexture& /*texture*/)
 
 ZVulkanImgRaycasterPipelineContext::ZVulkanImgRaycasterPipelineContext(Z3DRendererVulkanBackend& backend)
   : m_backend(backend)
-  , m_imageBlockUploader(std::make_unique<ZVulkanPagedImageBlockUploader>(backend.device()))
 {}
 
 ZVulkanImgRaycasterPipelineContext::~ZVulkanImgRaycasterPipelineContext() = default;
+
+void ZVulkanImgRaycasterPipelineContext::ensureUploader()
+{
+  if (m_imageBlockUploader) {
+    return;
+  }
+  // Construct the uploader with the active device. This must be called only
+  // after the backend has ensured the device via beginRender/ensureDevice.
+  m_imageBlockUploader = std::make_unique<ZVulkanPagedImageBlockUploader>(m_backend.device());
+}
 
 void ZVulkanImgRaycasterPipelineContext::resetFrame()
 {
@@ -417,6 +426,8 @@ void ZVulkanImgRaycasterPipelineContext::record(Z3DRendererBase& renderer,
                                                 const vk::Rect2D& scissor,
                                                 vk::raii::CommandBuffer& cmd)
 {
+  // Ensure uploader availability after beginRender() when device is valid.
+  ensureUploader();
   // Cooperative cancellation: mirror GL by polling UI events and
   // throwing when a cancel is requested.
   auto cancellationToken = Z3DRenderGlobalState::instance().currentCancellationToken();
@@ -2123,6 +2134,8 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
                                                                float zeToScreenPixelVoxelSize,
                                                                bool freshOverrideDescriptors)
 {
+  // Uploader must be available in progressive (paged) path
+  ensureUploader();
   // Always allocate/update a transient per-draw descriptor for dynamic textures (set=1).
   // If freshOverrideDescriptors (or global flag) is true, allocate a new override set even if one exists
   // to avoid updating a set that might still be bound earlier in this command buffer.
@@ -2131,12 +2144,9 @@ bool ZVulkanImgRaycasterPipelineContext::updatePageDescriptors(ChannelResources&
   }
   CHECK(resources.pagedDescriptor) << "Failed to allocate Vulkan raycaster paging descriptor set.";
 
-  auto* pageDirectory =
-    m_imageBlockUploader ? m_imageBlockUploader->pageDirectoryTexture(*payload.image, channelIndex) : nullptr;
-  auto* pageTable =
-    m_imageBlockUploader ? m_imageBlockUploader->pageTableTexture(*payload.image, channelIndex) : nullptr;
-  auto* imageCache =
-    m_imageBlockUploader ? m_imageBlockUploader->imageCacheTexture(*payload.image, channelIndex) : nullptr;
+  auto* pageDirectory = m_imageBlockUploader->pageDirectoryTexture(*payload.image, channelIndex);
+  auto* pageTable = m_imageBlockUploader->pageTableTexture(*payload.image, channelIndex);
+  auto* imageCache = m_imageBlockUploader->imageCacheTexture(*payload.image, channelIndex);
   CHECK(pageDirectory && pageTable && imageCache)
     << "Paging textures unavailable for Vulkan raycaster channel " << channelIndex;
 
