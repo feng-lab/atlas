@@ -142,3 +142,12 @@ conda build zimg-recipe
 conda remove zimg -y
 conda install zimg -c fenglab -y
 ```
+
+## CLI Utilities
+
+- Export 3D animation (headless): see docs/USER_GUIDE.md for details on `--run_export_3d_animation` flags.
+- Dump Animation3D JSON Schema:
+  ```bash
+  ./Atlas --run_dump_animation3d_schema --dump_animation3d_schema_output animation3d.schema.json -platform offscreen
+  # If no output path is given, writes ./animation3d.schema.json
+  ```

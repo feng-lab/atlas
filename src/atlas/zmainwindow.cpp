@@ -157,6 +157,23 @@ ZView* ZMainWindow::view()
   return m_view.get();
 }
 
+ZDoc* ZMainWindow::doc()
+{
+  return m_doc.get();
+}
+
+void ZMainWindow::ensure3DWindow()
+{
+  if (!m_3dWindow) {
+    open3DWindow();
+  } else {
+    // Bring existing window to front to ensure engine stays active
+    m_3dWindow->showNormal();
+    m_3dWindow->raise();
+    m_3dWindow->activateWindow();
+  }
+}
+
 void ZMainWindow::checkForUpdates()
 {
   QString updaterName("MaintenanceTool");

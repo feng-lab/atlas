@@ -16,6 +16,16 @@ public:
 
   void createNewAnimation(const QString& name = "");
 
+  // Convenience helpers for programmatic control
+  // Return IDs of all animations managed by this doc
+  [[nodiscard]] std::vector<size_t> animationIds() const;
+
+  // Return raw pointer to animation by id or nullptr if not found
+  [[nodiscard]] Z3DAnimation* animationPtr(size_t id);
+
+  // Create a new animation and return its id
+  size_t createNewAnimationAndReturnId(const QString& name = "");
+
   // return info of animation with id, animation mesh exist, otherwise crash
   Z3DAnimation& animation(size_t id)
   {

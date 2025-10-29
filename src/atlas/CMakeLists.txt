@@ -46,6 +46,7 @@ include(gRPCGenerateCPP)
 set(PROTOS
     ${CMAKE_CURRENT_SOURCE_DIR}/../protos/helloworld.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/../protos/imgprocess.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/../protos/scene.proto
 )
 set(PROTO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../protos)
 protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR} OUT_VAR PROTO_SRCS PROTOS ${PROTOS})
@@ -572,6 +573,7 @@ set(SOURCES
     zimgregioncache.cpp zimgregioncache.h
     zcheckbox.cpp zcheckbox.h
     zrunexport3danimation.cpp zrunexport3danimation.h
+    zrundumpanimation3dschema.cpp zrundumpanimation3dschema.h
     zrunneutucommand.cpp zrunneutucommand.h
     zprocess.cpp zprocess.h
     zvulkan.h
@@ -801,6 +803,11 @@ if (WIN32)
                      $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_validation.json
                      $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_validation.json
   )
+  # Generate schema/capabilities after resources copied (Windows: run offscreen)
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas
+                     COMMAND $<TARGET_FILE:${APP_NAME}> --run_dump_animation3d_schema --dump_output_dir $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas -platform offscreen)
 else (WIN32)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
@@ -895,6 +902,11 @@ else (WIN32)
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_validation.dylib
     )
+    # Generate schema/capabilities after resources copied, before codesign
+      add_custom_command(TARGET ${APP_NAME}
+                         POST_BUILD
+                         COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json/atlas
+                         COMMAND $<TARGET_FILE:${APP_NAME}> --run_dump_animation3d_schema --dump_output_dir $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json/atlas)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
                        COMMAND codesign --force --deep --sign - $<TARGET_BUNDLE_DIR:${APP_NAME}>)
@@ -951,6 +963,11 @@ else (WIN32)
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.so
                        $<TARGET_FILE_DIR:${APP_NAME}>/lib/libVkLayer_khronos_validation.so
     )
+    # Generate schema/capabilities after resources copied (Linux: run offscreen)
+      add_custom_command(TARGET ${APP_NAME}
+                         POST_BUILD
+                         COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas
+                         COMMAND $<TARGET_FILE:${APP_NAME}> --run_dump_animation3d_schema --dump_output_dir $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas -platform offscreen)
   endif ()
 endif (WIN32)
 

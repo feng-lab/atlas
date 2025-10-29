@@ -1,0 +1,208 @@
+syntax = "proto3";
+
+package atlas.rpc;
+
+import "google/protobuf/struct.proto";
+message Empty {}
+message Bool { bool ok = 1; }
+
+message PingRequest {}
+message PingResponse { bool ok = 1; }
+
+message FileList { repeated string files = 1; }
+
+message ObjectInfo {
+  uint64 id = 1;
+  string type = 2;
+  string name = 3;
+  string path = 4;
+  bool visible = 5;
+}
+
+message ListObjectsResponse { repeated ObjectInfo objects = 1; }
+
+message BBoxRequest { repeated uint64 ids = 1; bool after_clipping = 2; }
+message Vec3 { double x = 1; double y = 2; double z = 3; }
+message BBox { Vec3 min = 1; Vec3 max = 2; Vec3 size = 3; Vec3 center = 4; }
+message BBoxResponse { BBox bbox = 1; }
+
+message CapabilitiesRequest { repeated uint64 ids = 1; }
+message Parameter {
+  string json_key = 1;
+  string name = 2;
+  string type = 3;
+  bool supports_interpolation = 4;
+  // Optional: enumerated option display names for option parameters
+  repeated string option_names = 5;
+  // Optional: associated option data (stringified) aligned with option_names
+  repeated string option_data = 6;
+  // Optional numeric metadata (for scalar numeric types)
+  double number_min = 7;
+  double number_max = 8;
+  double number_step = 9;
+  int32 decimal = 10;
+  // Optional vector metadata (for Vec2/Vec3/Vec4 types)
+  repeated double vector_min = 11;
+  repeated double vector_max = 12;
+  // Optional span metadata (for FloatSpan/IntSpan types)
+  double span_min = 13;
+  double span_max = 14;
+  double span_step = 15;
+}
+message ParamList { repeated Parameter params = 1; }
+message CapabilitiesResponse {
+  repeated Parameter background = 1;
+  repeated Parameter axis = 2;
+  repeated Parameter global = 3;
+  map<string, ParamList> objects = 4;
+}
+
+message EnsureAnimationRequest {}
+message SetDurationRequest { double duration = 1; }
+
+message Scope {
+  oneof target {
+    bool camera = 1;
+    uint64 object = 2;
+    string group = 3;
+  }
+}
+
+message SetKeyRequest {
+  Scope scope = 1;
+  string json_key = 2;   // non-camera only
+  double time = 3;       // seconds
+  string easing = 4;     // e.g., "Linear", "InOutSine"
+  google.protobuf.Value value = 5; // typed JSON value payload (camera: object; params: number/bool/string/array)
+}
+
+// Query keys present in the current animation for a specific target
+message ListKeysRequest {
+  Scope scope = 1;        // camera or object/group
+  string json_key = 2;    // required for non-camera scope; ignored for camera
+  bool include_values = 3; // when true, include value_json for each key
+}
+
+message KeyInfo {
+  double time = 1;
+  string type = 2;        // parameter type, e.g., "Vec4", "3DCamera"
+  string value_json = 3;  // present when include_values=true; empty otherwise
+}
+
+message KeysResponse { repeated KeyInfo keys = 1; }
+
+service Scene {
+  rpc Ping (PingRequest) returns (PingResponse);
+  // Returns ok=true when the 3D rendering engine is initialized and ready.
+  rpc EngineReady (Empty) returns (Bool);
+  // Ensure a 3D window/canvas is open so the rendering engine can initialize.
+  rpc Ensure3DWindow (Empty) returns (Bool);
+  rpc LoadFiles (FileList) returns (ListObjectsResponse);
+  rpc ListObjects (Empty) returns (ListObjectsResponse);
+  rpc BBox (BBoxRequest) returns (BBoxResponse);
+  rpc Capabilities (CapabilitiesRequest) returns (CapabilitiesResponse);
+  rpc EnsureAnimation (EnsureAnimationRequest) returns (Bool);
+  rpc SetDuration (SetDurationRequest) returns (Bool);
+  rpc SetKey (SetKeyRequest) returns (Bool);
+  // Camera helpers
+  rpc CameraFit (CameraFitRequest) returns (CameraKeysResponse);
+  rpc CameraOrbitSuggest (CameraOrbitSuggestRequest) returns (CameraKeysResponse);
+  rpc CameraDollySuggest (CameraDollySuggestRequest) returns (CameraKeysResponse);
+  // Scene state helpers
+  rpc SetVisibility (VisibilityRequest) returns (Bool);
+  // Scene cuts (global axis-aligned box or plane set)
+  rpc CutSet (CutSetRequest) returns (Bool);
+  rpc CutClear (Empty) returns (Bool);
+  rpc CutSuggest (CutSuggestRequest) returns (CutSuggestion);
+  // Parameter enumeration for a target scope
+  rpc ListParams (ListParamsRequest) returns (ParamList);
+  // Timeline/keyframe ops
+  rpc ClearKeys (ClearKeysRequest) returns (Bool);
+  rpc RemoveKey (RemoveKeyRequest) returns (Bool);
+  rpc Batch (BatchRequest) returns (Bool);
+  // Playback controls
+  rpc SetTime (SetTimeRequest) returns (Bool);
+  rpc Play (PlayRequest) returns (Bool);
+  rpc Pause (PauseRequest) returns (Bool);
+  // Save/export
+  // Save current animation to .animation3d
+  rpc Save (SaveRequest) returns (Bool);
+  rpc SaveAnimation (SaveRequest) returns (Bool);
+  // Introspection
+  rpc ListKeys (ListKeysRequest) returns (KeysResponse);
+  rpc GetTime (Empty) returns (TimeStatus);
+}
+
+// Camera helper messages
+message CameraFitRequest {
+  repeated uint64 ids = 1; // empty → use all objects
+  bool all = 2;            // override ids and use all objects
+  bool after_clipping = 3; // derive bbox after clipping
+  double min_radius = 4;   // optional minimum radius constraint (world units)
+}
+
+message CameraKeysResponse { repeated google.protobuf.Value values = 1; }
+
+message CameraOrbitSuggestRequest {
+  repeated uint64 ids = 1; // targets to derive center/radius (or empty → all)
+  string axis = 2;         // one of: "x", "y", "z"
+  double angle_degrees = 3; // default 360
+}
+
+message CameraDollySuggestRequest {
+  repeated uint64 ids = 1; // targets to derive center
+  double start_dist = 2;   // distance from center at start
+  double end_dist = 3;     // distance from center at end
+}
+
+// Scene state
+message VisibilityRequest {
+  repeated uint64 ids = 1;
+  bool on = 2;
+}
+
+// Cuts
+message Plane { double a = 1; double b = 2; double c = 3; double d = 4; }
+message CutPlanes { repeated Plane planes = 1; }
+message CutSetRequest {
+  oneof cut {
+    BBox box = 1;       // axis-aligned world-space box
+    CutPlanes planes = 2; // plane equations ax+by+cz+d=0
+  }
+  bool refit_camera = 3;   // when true, re-fit camera after applying cuts
+}
+message CutSuggestRequest {
+  repeated uint64 ids = 1; // if empty, use all objects
+  string mode = 2;         // "box" (current implementation); reserved for future modes
+  double margin = 3;       // world-units to expand the suggested box
+  bool after_clipping = 4; // suggest using bbox after clipping
+}
+message CutSuggestion {
+  oneof cut {
+    BBox box = 1;
+    CutPlanes planes = 2;
+  }
+}
+
+// Parameter enumeration for a given scope
+message ListParamsRequest { Scope scope = 1; }
+
+// Keyframe ops
+message ClearKeysRequest { Scope scope = 1; string json_key = 2; }
+message RemoveKeyRequest { Scope scope = 1; string json_key = 2; double time = 3; }
+message BatchRequest {
+  repeated SetKeyRequest set_keys = 1;
+  repeated RemoveKeyRequest remove_keys = 2;
+  bool commit = 3;
+}
+
+// Playback controls
+message SetTimeRequest { double seconds = 1; bool cancel_rendering = 2; }
+message PlayRequest { double fps = 1; bool loop = 2; }
+message PauseRequest {}
+
+// Save
+message SaveRequest { string path = 1; }
+
+// Time status
+message TimeStatus { double seconds = 1; double duration = 2; }

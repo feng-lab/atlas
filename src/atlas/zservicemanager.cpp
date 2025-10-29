@@ -1,6 +1,7 @@
 #include "zservicemanager.h"
 
 #include "zrpcservice.h"
+#include "zdoc.h"
 #include "zlog.h"
 #include <QThread>
 #include <QThreadPool>

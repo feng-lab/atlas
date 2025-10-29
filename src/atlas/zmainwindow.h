@@ -49,6 +49,12 @@ public:
 
   ZView* view();
 
+  // Expose document to services
+  ZDoc* doc();
+
+  // Ensure the 3D view window exists and is shown. Safe to call repeatedly.
+  Q_INVOKABLE void ensure3DWindow();
+
   QAction* exitAction()
   {
     return m_exitAction;

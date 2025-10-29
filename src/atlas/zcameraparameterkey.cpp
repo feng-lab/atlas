@@ -35,12 +35,13 @@ bool ZCameraParameterKey::readValue(const json::value& value)
     return false;
   }
   const auto& obj = value.as_object();
-  m_posTension = json::value_to<float>(obj.at("posTension"));
-  m_posContinuity = json::value_to<float>(obj.at("posContinuity"));
-  m_posBias = json::value_to<float>(obj.at("posBias"));
-  m_rotTension = json::value_to<float>(obj.at("rotTension"));
-  m_rotContinuity = json::value_to<float>(obj.at("rotContinuity"));
-  m_rotBias = json::value_to<float>(obj.at("rotBias"));
+  // TCB fields are optional; when unspecified, keep current defaults (0).
+  if (auto it = obj.if_contains("posTension"); it) m_posTension = json::value_to<float>(*it);
+  if (auto it = obj.if_contains("posContinuity"); it) m_posContinuity = json::value_to<float>(*it);
+  if (auto it = obj.if_contains("posBias"); it) m_posBias = json::value_to<float>(*it);
+  if (auto it = obj.if_contains("rotTension"); it) m_rotTension = json::value_to<float>(*it);
+  if (auto it = obj.if_contains("rotContinuity"); it) m_rotContinuity = json::value_to<float>(*it);
+  if (auto it = obj.if_contains("rotBias"); it) m_rotBias = json::value_to<float>(*it);
   return true;
 }
 

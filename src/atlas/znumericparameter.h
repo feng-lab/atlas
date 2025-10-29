@@ -46,6 +46,10 @@ public:
     m_decimal = d;
   }
 
+  // For scalar numeric parameters, the step has the same type as T.
+  [[nodiscard]] T singleStep() const { return m_step; }
+  [[nodiscard]] int decimal() const { return m_decimal; }
+
   void setRange(T min, T max)
   {
     if (min != m_min || max != m_max) {
@@ -268,6 +272,9 @@ public:
   {
     m_decimal = d;
   }
+
+  [[nodiscard]] typename T::value_type singleStep() const { return m_step; }
+  [[nodiscard]] int decimal() const { return m_decimal; }
 
   // default is vertical
   void setWidgetOrientation(Qt::Orientation o)
@@ -693,6 +700,9 @@ public:
     m_decimal = d;
   }
 
+  [[nodiscard]] typename T::value_type singleStep() const { return m_step; }
+  [[nodiscard]] int decimal() const { return m_decimal; }
+
   // default is horizonal
   void setWidgetOrientation(Qt::Orientation o)
   {
@@ -739,6 +749,10 @@ public:
   {
     return T(m_min, m_max);
   }
+
+  // Convenience aliases for consistency with scalar/vector params
+  [[nodiscard]] typename T::value_type rangeMin() const { return m_min; }
+  [[nodiscard]] typename T::value_type rangeMax() const { return m_max; }
 
   [[nodiscard]] typename T::value_type lowerValue() const
   {

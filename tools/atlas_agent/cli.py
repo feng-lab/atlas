@@ -1,0 +1,45 @@
+import argparse
+import os
+import sys
+import logging
+from .chat_rpc_team import run_repl as run_team_repl
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="atlas-agent", description="Atlas animation agent (chat only): control Atlas GUI via RPC")
+    # Single entry; accept an optional first positional (e.g., 'chat' or 'chat-rpc')
+    parser.add_argument("cmd", nargs="?", help=argparse.SUPPRESS)
+    parser.add_argument("--address", default=os.environ.get("ATLAS_RPC_ADDR", "localhost:50051"))
+    parser.add_argument("--model", default=os.environ.get("ATLAS_LLM_MODEL", "gpt-4o"))
+    parser.add_argument("--temperature", type=float, default=float(os.environ.get("ATLAS_LLM_TEMPERATURE", "0.2")))
+    parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY"))
+    parser.add_argument(
+        "--atlas-dir",
+        default=None,
+        help="Atlas installation root (optional; used to derive exporter path)",
+    )
+    args = parser.parse_args(argv)
+    # Ignore deprecated positional subcommands like 'chat' or 'chat-rpc'
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    if args.cmd and args.cmd not in ("chat", "chat-rpc"):
+        logging.error(
+            "Unknown command; this CLI supports chat only. Usage: python -m tools.atlas_agent --address localhost:50051"
+        )
+        return 2
+    if not args.api_key:
+        logging.error("OPENAI_API_KEY is required (set --api-key).")
+        return 2
+    return int(
+        run_team_repl(
+            address=args.address,
+            api_key=args.api_key,
+            model=args.model,
+            temperature=args.temperature,
+            atlas_dir=args.atlas_dir,
+        )
+    )

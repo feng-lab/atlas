@@ -2,6 +2,7 @@
 
 #include "zdoc.h"
 #include "z3drenderingengine.h"
+#include "zrpcservice.h"
 #include "ztakescreenshotwidget.h"
 #include "zviewsettingwidget.h"
 #include "zobjdetailedinfowidget.h"
@@ -26,6 +27,7 @@
 #include <QProgressBar>
 #include <QApplication>
 #include <QDesktopServices>
+#include "zservicemanager.h"
 
 namespace nim {
 
@@ -567,6 +569,9 @@ void Z3DMainWindow::setCurrentFile(const QString& fileName)
 void Z3DMainWindow::onViewReady()
 {
   fillDockWindows();
+  if (nim::g_sm && nim::g_sm->rpcService()) {
+    nim::g_sm->rpcService()->setEngine(m_engine);
+  }
   Q_EMIT viewReady(m_engine);
 }
 

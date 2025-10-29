@@ -163,10 +163,20 @@ Z3DContext::Z3DContext() {
 
 Z3DContext::~Z3DContext()
 {
-  delete m_context;
+  if (m_context) {
+    // Ensure no context is current before destruction
+    m_context->doneCurrent();
+    delete m_context;
+    m_context = nullptr;
+  }
 #if defined(__linux__)
+  if (m_eglDisplay && m_eglContext) {
+    eglDestroyContext(m_eglDisplay, (EGLContext)m_eglContext);
+    m_eglContext = nullptr;
+  }
   if (m_eglDisplay) {
     eglTerminate(m_eglDisplay);
+    m_eglDisplay = nullptr;
   }
 #endif
 }

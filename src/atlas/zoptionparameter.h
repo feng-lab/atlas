@@ -61,6 +61,10 @@ public:
     }
   }
 
+  // Introspection helpers for schema/capabilities dumping
+  const std::vector<T>& options() const { return m_options; }
+  const std::vector<T2>& optionAssociatedData() const { return m_associatedDatas; }
+
   void clearOptions()
   {
     m_options.clear();

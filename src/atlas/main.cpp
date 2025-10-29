@@ -6,11 +6,13 @@
 #include "zlog.h"
 #include "zmainwindow.h"
 #include "zservicemanager.h"
+#include "zrpcservice.h"
 #include "zsysteminfo.h"
 #include "ztheme.h"
 
 #include "zrunexport3danimation.h"
 #include "zrunneutucommand.h"
+#include "zrundumpanimation3dschema.h"
 #include "zwindowsheader.h"
 
 #include <QSurfaceFormat>
@@ -22,6 +24,12 @@
 
 DECLARE_string(flagfile);
 DECLARE_bool(run_export_3d_animation);
+DECLARE_bool(run_dump_animation3d_schema);
+// Linux EGL headless switch for OpenGL context
+#if defined(__linux__)
+DECLARE_bool(__use_EGL);
+#endif
+DECLARE_bool(run_scene_server);
 
 #ifdef _WIN32
 extern "C" {
@@ -162,7 +170,7 @@ int main(int argc, char* argv[])
   gflags::SetVersionString(GIT_VERSION);
   gflags::ParseCommandLineFlags(&argc, &argv, false);
 
-  bool isGUIMode = !(FLAGS_run_export_3d_animation);
+  bool isGUIMode = !(FLAGS_run_export_3d_animation || FLAGS_run_dump_animation3d_schema);
 
   // init the logging mechanism
   QDir logDir = ZSystemInfo::logDir();
@@ -194,22 +202,31 @@ int main(int argc, char* argv[])
                        ZSystemInfo::jarsDirPath(),
                        true);
 
-    // ZServiceManager sm;
-
     if (!isGUIMode) {
       // start non-GUI version...
       LOG(INFO) << "console mode";
       if (FLAGS_run_export_3d_animation) {
         ZRunExport3DAnimation rea;
         return rea.run();
+      } else if (FLAGS_run_dump_animation3d_schema) {
+        nim::ZRunDumpAnimation3DSchema dumper;
+        return dumper.run();
       }
     } else {
       // start GUI version...
       LOG(INFO) << "GUI mode";
+      // Start RPC service manager only in GUI mode. Avoid spawning RPC threads
+      // for console utilities (export/schema dump) to ensure deterministic
+      // teardown without cross-thread shutdown requirements.
+      ZServiceManager sm;
       ZTheme::instance();
 
       // ZMainWindow has Qt::WA_DeleteOnClose attribute
       auto mainWin = new ZMainWindow(GIT_VERSION);
+      // Register doc with RPC service (engine will be registered on viewReady)
+      if (g_sm && g_sm->rpcService()) {
+        g_sm->rpcService()->setDoc(mainWin->doc());
+      }
       QObject::connect(&app, &ZApplication::fileOpenRequest, mainWin, &ZMainWindow::loadUrls);
       mainWin->show();
 

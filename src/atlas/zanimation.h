@@ -139,6 +139,9 @@ public:
 
   void export2DAnimation(const QString& fn, int framePerSecond, int startFrame, int endFrame);
 
+  // Introspection helper for RPC: last applied time
+  [[nodiscard]] double currentTime() const { return m_currentTime; }
+
 Q_SIGNALS:
   void durationChanged(double v);
 

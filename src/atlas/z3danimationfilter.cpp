@@ -29,7 +29,6 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   , m_cameraDirectionTimeInterval("Camera Direction Time Interval", .5, .1, 100)
 {
   setTransformEnabled(false);
-  // m_visible.set(false);
 
   m_colorMode.addOptions("Single Color", "Colormap Time");
   m_colorMode.select("Colormap Time");
@@ -113,7 +112,8 @@ void Z3DAnimationFilter::setData(Z3DAnimation* animation)
 
 bool Z3DAnimationFilter::isReady(Z3DEye eye) const
 {
-  return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_animation;
+  return false;
+  // return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_animation;
 }
 
 std::shared_ptr<ZWidgetsGroup> Z3DAnimationFilter::widgetsGroup()

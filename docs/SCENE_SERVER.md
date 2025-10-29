@@ -1,0 +1,82 @@
+Atlas Scene RPC (GUI live preview)
+
+Overview
+- Atlas hosts a gRPC service inside the GUI process so that an external agent (LLM) can load data, query the live scene, and set animation keyframes on the same Z3DRenderingEngine the user sees. Changes are reflected immediately; users can hit Play.
+- Headless export can be handled separately via the existing `--run_export_3d_animation` CLI; the RPC service focuses on building animations and keyframes, not long-running exports.
+
+Start (GUI)
+- Launch Atlas normally (macOS/Windows/Linux). The gRPC server listens on `0.0.0.0:50051`.
+
+Service and Methods (initial)
+- Health: `Ping() -> ok`
+- Files/objects:
+  - `LoadFiles(files) -> objects[]`
+  - `ListObjects() -> objects[]` (id, type, name, path, visible)
+- Geometry/capabilities:
+  - `BBox(ids, after_clipping) -> bbox {min, max, size, center}`
+  - `Capabilities(ids?) -> { Background[], Axis[], Global[], Objects{Type: ParamList} }`
+    - Parameter: `{ json_key, name, type, supports_interpolation }`
+- Timeline:
+  - `EnsureAnimation() -> ok` (create/bind a default 3D animation with a baseline t=0 frame)
+  - `SetDuration(seconds) -> ok`
+  - `SetKey(scope, json_key?, time, easing, value: google.protobuf.Value) -> ok`
+    - `scope`: `{ camera: true }` or `{ object: id }` or `{ group: "background"|"axis"|"global" }`
+    - `value`: typed JSON value (protobuf Value). For camera, pass an object; for numeric/bool/vector parameters, pass number/bool/array accordingly; for options, pass a string.
+
+Notes
+- RPC requests marshal onto the UI and render threads (single-GL-context invariant). All updates are visible in the 3D window and timeline.
+- Use the headless exporter (`--run_export_3d_animation`) for MP4 generation from completed `.animation3d` files; the Python app can run that CLI.
+
+gRPC Scene Service (GUI)
+- The Atlas GUI hosts a gRPC service `atlas.rpc.Scene` (listening on 0.0.0.0:50051) for live, low‑latency control from agents/tools. Use this when you want real‑time preview in the canvas.
+
+New endpoints (additions)
+- Camera helpers
+  - `CameraFit` `{ ids?: [uint64], all?: bool, after_clipping?: bool, min_radius?: double }` → `{ values: [google.protobuf.Value] }`
+    - Returns a typed camera value object that frames the targets. Feed into `SetKey` with `scope.camera=true`.
+  - `CameraOrbitSuggest` `{ ids?: [uint64], axis: "x"|"y"|"z", angle_degrees?: 360 }` → `{ values: [google.protobuf.Value, google.protobuf.Value] }`
+    - Returns start/end typed camera value objects for a simple orbit.
+  - `CameraDollySuggest` `{ ids?: [uint64], start_dist: double, end_dist: double }` → `{ values: [google.protobuf.Value, google.protobuf.Value] }`
+    - Returns start/end typed camera value objects where the camera distance to center is set to the given distances.
+
+- Scene state
+  - `SetVisibility` `{ ids: [uint64], on: bool }` → `{ ok: true }`
+
+- Parameter enumeration
+  - `ListParams` `{ scope }` → `ParamList`
+    - Mirrors `scene.capabilities` but for a specific `scope` (`camera|object|group("background"|"axis"|"global")`).
+
+- Timeline/keyframe ops
+  - `ClearKeys` `{ scope, json_key? }` → `{ ok }` (for `camera` scope, clears camera keys; otherwise clears keys for the specific parameter)
+  - `RemoveKey` `{ scope, json_key, time }` → `{ ok }`
+  - `Batch` `{ set_keys: [SetKeyRequest], remove_keys: [RemoveKeyRequest], commit?: bool }` → `{ ok }`
+    - Verification: use `ListKeys` to confirm that each requested key time exists after a batch. When `commit=true`, time 0 keys are applied immediately, but verification works regardless of `commit`.
+  - When `commit=true`, any keys at `time=0` are applied immediately (engine evaluates t=0) so the initial state is visible without a separate `SetTime` call. Non‑zero keys do not move the playhead; use `SetTime` to preview later moments.
+
+- Playback controls
+  - `SetTime` `{ seconds: double, cancel_rendering?: bool }` → `{ ok }`
+  - `Play` `{ fps?: double, loop?: bool }` → `{ ok }` (lightweight timer‑driven playback affecting canvas)
+  - `Pause` `{}` → `{ ok }`
+
+- Save/export
+  - `Save` `{ path: string }` → `{ ok }` (writes `.animation3d`)
+  - `SaveAnimation` `{ path: string }` → `{ ok }` (alias of `Save`)
+
+- Introspection
+  - `ListKeys` `{ scope, json_key?, include_values? }` → `{ keys: [{time, type, value_json?}] }`
+    - For camera scope, `json_key` is ignored. For object/group scopes, provide the parameter’s `json_key`.
+    - Note: for efficiency and compatibility, `ListKeys` returns stringified key values today. Use it for verification. `SetKey` uses typed `google.protobuf.Value`.
+  - `GetTime` `{}` → `{ seconds, duration }`
+
+Cuts (global)
+- `CutSet` `{ box?: {min,max}, planes?: [{a,b,c,d}], refit_camera?: bool }` → `{ ok }`
+  - Current implementation supports axis‑aligned box or axis‑aligned planes. Non‑axis‑aligned planes return an error.
+- `CutClear` `{}` → `{ ok }` (clears global cuts)
+- `CutSuggest` `{ ids?: [uint64], mode?: "box", margin?: double, after_clipping?: bool }` → `{ box | planes }`
+  - Returns a suggested cut (currently a box) derived from the selection or all objects.
+
+Usage notes
+- All requests are marshalled to the UI/rendering thread via `QMetaObject::invokeMethod` to respect single GL context and threading rules.
+- For camera suggestions, returned strings are the camera value JSON objects (not full key objects). Pass them to `SetKey` with `scope.camera=true`, your chosen `time`, and `easing`.
+- `Play/Pause` are minimal and independent of the UI’s `QTimeLine`; they drive live preview by stepping `setCurrentTime`.
+- For MP4 export, run the existing headless CLI `--run_export_3d_animation` from your Python app; keep long-running export tasks out of the GUI RPC.

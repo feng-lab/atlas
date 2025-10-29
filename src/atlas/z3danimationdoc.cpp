@@ -35,7 +35,45 @@ void Z3DAnimationDoc::createNewAnimation(const QString& name)
 {
   auto animation = new Z3DAnimation(m_doc, this);
   addAnimation(animation, "", name);
-  animation->addKeyFrame(0);
+  // Only add a default keyframe if a 3D view/engine is already bound.
+  // When created before the 3D window is opened, defer key creation until
+  // the engine exists to avoid touching rendering state off-thread.
+  if (m_view) {
+    animation->addKeyFrame(0);
+  } else {
+    VLOG(1) << "CreateNewAnimation: engine not ready; skipping default keyframe";
+  }
+}
+
+std::vector<size_t> Z3DAnimationDoc::animationIds() const
+{
+  std::vector<size_t> ids;
+  ids.reserve(m_idToAnimationPacks.size());
+  for (const auto& idPack : m_idToAnimationPacks) {
+    ids.push_back(idPack.first);
+  }
+  return ids;
+}
+
+Z3DAnimation* Z3DAnimationDoc::animationPtr(size_t id)
+{
+  auto it = m_idToAnimationPacks.find(id);
+  if (it == m_idToAnimationPacks.end()) {
+    return nullptr;
+  }
+  return it->second->animation.get();
+}
+
+size_t Z3DAnimationDoc::createNewAnimationAndReturnId(const QString& name)
+{
+  auto animation = new Z3DAnimation(m_doc, this);
+  size_t id = addAnimation(animation, "", name);
+  if (m_view) {
+    animation->addKeyFrame(0);
+  } else {
+    VLOG(1) << "CreateNewAnimationAndReturnId: engine not ready; skipping default keyframe";
+  }
+  return id;
 }
 
 bool Z3DAnimationDoc::save(size_t id)
