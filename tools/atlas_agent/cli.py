@@ -18,6 +18,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Atlas installation root (optional; used to derive exporter path)",
     )
+    parser.add_argument(
+        "--allow-screenshots",
+        action="store_true",
+        help="Enable preview screenshots for Inspector (sets ATLAS_AGENT_ALLOW_SCREENSHOTS=1)",
+    )
     args = parser.parse_args(argv)
     # Ignore deprecated positional subcommands like 'chat' or 'chat-rpc'
     if not logging.getLogger().handlers:
@@ -34,6 +39,10 @@ def main(argv: list[str] | None = None) -> int:
     if not args.api_key:
         logging.error("OPENAI_API_KEY is required (set --api-key).")
         return 2
+    # Set screenshot env gate from flag if requested
+    if args.allow_screenshots:
+        os.environ["ATLAS_AGENT_ALLOW_SCREENSHOTS"] = "1"
+
     return int(
         run_team_repl(
             address=args.address,

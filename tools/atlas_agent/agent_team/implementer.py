@@ -34,6 +34,7 @@ class Implementer:
     client: LLMClient
     scene: SceneClient
     temperature: float = 0.2
+    atlas_dir: str | None = None
 
     def run(self, *, user_text: str, selected_design: str, reviewer_feedback: str, shared_context: Optional[str] = None, memory_texts: Optional[List[str]] = None) -> tuple[List[AgentMessage], list[dict]]:
         logger = logging.getLogger("atlas_agent.agents")
@@ -42,7 +43,7 @@ class Implementer:
         logger.info("[Implementer] Reviewer feedback:\n%s", (reviewer_feedback or "")[:600])
         tools, dispatch = None, None
         from .tools import scene_tools_and_dispatcher
-        tools, dispatch = scene_tools_and_dispatcher(self.scene)
+        tools, dispatch = scene_tools_and_dispatcher(self.scene, atlas_dir=self.atlas_dir)
         # Wrap dispatch to capture a per-turn ledger of tool calls
         ledger: list[dict] = []
         import json as _json
@@ -106,6 +107,14 @@ class Implementer:
                 ledger.append({"tool": name, "args": args_json, "error": str(e)})
                 raise
         memo = memory_texts or []
+        # Load compact few-shot examples to ground tool usage (short, plan+facts)
+        try:
+            from .examples_loader import load_compact_examples
+            ex = load_compact_examples(max_count=2)
+            if ex:
+                memo.append("Few-shot examples:\n" + "\n\n".join(ex))
+        except Exception:
+            pass
         memo = [
             "Selected design:\n" + (selected_design or "(none)"),
             "Reviewer feedback:\n" + (reviewer_feedback or "(none)"),

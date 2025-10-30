@@ -1,0 +1,8 @@
+User: Make the mesh red and orbit for 8 seconds.
+Plan:
+  1) Set Mesh to Single Color red at t=0.
+  2) Fit camera and set orbit start/end at t=0/8.
+  3) Set duration=8.
+Tools: scene_list_objects → scene_list_params → scene_set_param_by_name('Color Mode','Single Color') → scene_set_param_by_name('Mesh Color',[1,0,0,1]) → scene_camera_fit(ids=[meshId]) → scene_camera_orbit(ids=[meshId],axis='y',angle=360) → scene_replace_key_camera(t=0, ...) → scene_replace_key_camera(t=8, ...) → scene_set_duration(8)
+Facts: camera=[0,8]; objects.{meshId}.Color Mode=[0]; objects.{meshId}.Mesh Color=[0]
+

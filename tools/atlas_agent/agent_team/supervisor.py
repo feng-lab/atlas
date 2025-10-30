@@ -15,6 +15,8 @@ from .implementer import Implementer
 from .describer import Describer
 from .agents_sdk import act_with_agents_sdk
 from ..scene_rpc import SceneClient
+import os
+import json as _json
 
 
 SUPERVISOR_SYSTEM = (
@@ -77,7 +79,7 @@ class Supervisor:
         idx, merged = arbiter.decide(user_text=user_text, scene_context=ctx, options=options, feedbacks=[fb1, fb2])
         selected = merged or (options[idx - 1] if options else "")
         logger.info("[Supervisor] Arbiter selected option %d", idx)
-        implementer = Implementer(client=self.client, scene=self.scene, temperature=self.temperature)
+        implementer = Implementer(client=self.client, scene=self.scene, temperature=self.temperature, atlas_dir=self.atlas_dir)
         inspector = Inspector(client=self.client, temperature=self.temperature)
         describer = Describer(client=self.client, temperature=self.temperature)
 
@@ -97,7 +99,34 @@ class Supervisor:
             changed = (pre != post)
             logger.info("[Supervisor] Snapshot changed=%s", changed)
             # Ask Inspector for decision with facts
-            satisfied, fb = inspector.decide(user_text=user_text, scene_context=ctx, plan_text=selected, facts=post)
+            # Optional single preview screenshot for qualitative checks
+            preview_path = None
+            try:
+                allow = (os.environ.get("ATLAS_AGENT_ALLOW_SCREENSHOTS", "").strip().lower() in ("1", "true", "yes"))
+                if allow:
+                    # Choose a preview time: current timeline seconds if available; otherwise first camera key or 0
+                    try:
+                        ts = self.scene.get_time()
+                        tsec = float(getattr(ts, "seconds", 0.0) or 0.0)
+                    except Exception:
+                        tsec = 0.0
+                    cam_times = (post.get("keys", {}).get("camera") or []) if isinstance(post, dict) else []
+                    if not tsec and cam_times:
+                        tsec = float(cam_times[len(cam_times)//2])
+                    # Invoke preview tool via dispatcher
+                    from .tools import scene_tools_and_dispatcher
+                    _tools, _dispatch = scene_tools_and_dispatcher(self.scene, atlas_dir=self.atlas_dir)
+                    res = _dispatch("scene_render_preview", _json.dumps({"time": tsec, "width": 512, "height": 512}))
+                    try:
+                        j = _json.loads(res or "{}")
+                        if j.get("ok") and j.get("path"):
+                            preview_path = str(j.get("path"))
+                    except Exception:
+                        preview_path = None
+            except Exception:
+                preview_path = None
+
+            satisfied, fb = inspector.decide(user_text=user_text, scene_context=ctx, plan_text=selected, facts=post, preview_image_path=preview_path)
             logger.info("[Supervisor] Inspector satisfied=%s", satisfied)
             if changed or satisfied:
                 break

@@ -84,6 +84,50 @@ class LLMClient:
         except Exception:
             return ""
 
+    def complete_with_image(
+        self,
+        *,
+        system_prompt: str,
+        user_text: str,
+        image_data_url: Optional[str] = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+    ) -> str:
+        """Multi‑modal completion with an optional inline image data URL (base64).
+
+        Falls back to text‑only when image_data_url is None or the model/provider rejects image content.
+        """
+        # Compose user content as a list of parts when an image is provided
+        if image_data_url:
+            user_content: Any = [
+                {"type": "text", "text": user_text},
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+            ]
+        else:
+            user_content = user_text
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+        client = self._ensure_client()
+        try:
+            resp = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                **({"max_tokens": max_tokens} if max_tokens is not None else {}),
+            )
+            return (resp.choices[0].message.content or "").strip()
+        except Exception:
+            # Fallback to text‑only if multimodal fails
+            return self.complete_text(
+                system_prompt=system_prompt,
+                user_text=user_text,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
 
 @dataclass
 class BaseAgent:

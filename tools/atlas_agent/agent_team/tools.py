@@ -25,6 +25,65 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         {
             "type": "function",
             "function": {
+                "name": "scene_recipe_orbit_focus",
+                "description": "Recipe: orbit around target ids. Fits camera, writes start/end camera keys, and sets duration.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ids": {"type": "array", "items": {"type": "integer"}},
+                        "axis": {"type": "string", "enum": ["x", "y", "z"], "default": "y"},
+                        "angle_degrees": {"type": "number", "default": 360.0},
+                        "duration": {"type": "number", "default": 8.0},
+                        "easing": {"type": "string", "default": "Linear"}
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_recipe_fade_emphasis",
+                "description": "Recipe: emphasize one id with a color and fade opacity from start to end; optionally dim others.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "color": {"anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 4}]},
+                        "start_opacity": {"type": "number", "default": 0.3},
+                        "end_opacity": {"type": "number", "default": 1.0},
+                        "t0": {"type": "number", "default": 0.0},
+                        "t1": {"type": "number", "default": 5.0},
+                        "dim_others": {"type": "boolean", "default": True},
+                        "easing": {"type": "string", "default": "Linear"}
+                    },
+                    "required": ["id"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_recipe_reveal_with_cut",
+                "description": "Recipe: suggest cut box for ids (or all), apply cut with optional refit, and set a camera key.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ids": {"type": "array", "items": {"type": "integer"}},
+                        "margin": {"type": "number", "default": 0.0},
+                        "refit_camera": {"type": "boolean", "default": True},
+                        "time": {"type": "number", "default": 0.0},
+                        "after_clipping": {"type": "boolean", "default": True},
+                        "easing": {"type": "string", "default": "Linear"}
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "scene_set_param_by_name",
                 "description": "Set a parameter by display name (case-insensitive) for an object or group. Resolves json_key via scene_list_params, then calls scene_set_key_param.",
                 "parameters": {
@@ -578,6 +637,23 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_render_preview",
+                "description": "Render a single preview frame by saving the current animation and invoking headless Atlas. Returns a path to the image in the OS temp directory.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "time": {"type": "number", "description": "Preview time in seconds", "default": 0.0},
+                        "fps": {"type": "number", "default": 30},
+                        "width": {"type": "integer", "default": 512},
+                        "height": {"type": "integer", "default": 512}
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        },
     ]
 
     def dispatch(name: str, args_json: str) -> str:
@@ -884,6 +960,100 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 resp = client.load_files(resolved)
                 loaded = len(resp.objects)
             return json.dumps({"loaded_objects": loaded, "resolved": resolved, "tried": tried})
+        if name == "scene_recipe_orbit_focus":
+            ids = args.get("ids") or []
+            axis = str(args.get("axis", "y"))
+            angle = float(args.get("angle_degrees", 360.0))
+            duration = float(args.get("duration", 8.0))
+            easing = str(args.get("easing", "Linear"))
+            # Derive ids if empty: try primary mesh; else all objects
+            if not ids:
+                try:
+                    g = json.loads(dispatch("scene_guess_primary_object", "{}"))
+                    if int(g.get("id", -1)) >= 0:
+                        ids = [int(g["id"])]
+                except Exception:
+                    ids = []
+            if not ids:
+                try:
+                    lo = client.list_objects()
+                    ids = [int(o.id) for o in lo.objects]
+                except Exception:
+                    ids = []
+            try:
+                # Suggest orbit cameras and write start/end keys
+                cams = client.camera_orbit(ids=ids or None, axis=axis, angle_degrees=angle)
+                if not cams:
+                    return json.dumps({"ok": False, "error": "no camera suggestions"})
+                start = cams[0]
+                end = cams[-1] if len(cams) > 1 else cams[0]
+                ok1 = client.set_key_camera(time=0.0, easing=easing, value=start)
+                ok2 = client.set_key_camera(time=duration, easing=easing, value=end)
+                okd = client.set_duration(duration)
+                return json.dumps({"ok": bool(ok1 and ok2 and okd), "ids": ids})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+        if name == "scene_recipe_fade_emphasis":
+            oid = int(args.get("id"))
+            color = args.get("color", "magenta")
+            t0 = float(args.get("t0", 0.0))
+            t1 = float(args.get("t1", 5.0))
+            easing = str(args.get("easing", "Linear"))
+            start_op = float(args.get("start_opacity", 0.3))
+            end_op = float(args.get("end_opacity", 1.0))
+            dim_others = bool(args.get("dim_others", True))
+            # Initialize emphasis at t0 (color + optional dim)
+            _ = json.loads(dispatch("scene_emphasize_object", json.dumps({
+                "id": oid, "time": t0, "color": color, "easing": easing, "dim_others": dim_others, "opacity": end_op
+            })))
+            # Find json_key for Opacity and write ramp
+            try:
+                pl = client.list_params(scope_object=oid)
+                jk_op = None
+                for p in pl.params:
+                    if p.name == "Opacity" and p.type == "Float":
+                        jk_op = p.json_key
+                        break
+                if jk_op is None:
+                    return json.dumps({"ok": False, "error": "Opacity parameter not found"})
+                r1 = json.loads(dispatch("scene_replace_key_param", json.dumps({
+                    "scope_object": oid, "json_key": jk_op, "time": t0, "easing": easing, "value": start_op
+                })))
+                r2 = json.loads(dispatch("scene_replace_key_param", json.dumps({
+                    "scope_object": oid, "json_key": jk_op, "time": t1, "easing": easing, "value": end_op
+                })))
+                return json.dumps({"ok": bool(r1.get("ok") and r2.get("ok"))})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+        if name == "scene_recipe_reveal_with_cut":
+            ids = args.get("ids") or []
+            margin = float(args.get("margin", 0.0))
+            refit = bool(args.get("refit_camera", True))
+            time_v = float(args.get("time", 0.0))
+            after_clip = bool(args.get("after_clipping", True))
+            easing = str(args.get("easing", "Linear"))
+            try:
+                # Suggest cut box
+                req = client._pb2.CutSuggestRequest(ids=ids, mode="box", margin=margin, after_clipping=after_clip)
+                resp = client._stub.CutSuggest(req)
+                box = resp.box
+                ok_cut = client.cut_set_box((box.min.x, box.min.y, box.min.z), (box.max.x, box.max.y, box.max.z), refit_camera=refit)
+                # Set a camera fit key after cut (best effort)
+                cams = client.camera_fit(ids=ids or None, all=not bool(ids), after_clipping=True)
+                if cams:
+                    client.set_key_camera(time=time_v, easing=easing, value=cams[0])
+                return json.dumps({"ok": bool(ok_cut)})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
         if name == "scene_list_objects":
             resp = client.list_objects()
             objs = [
@@ -1233,6 +1403,68 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 use_gpu_devices=args.get("use_gpu_devices"),
             )
             return json.dumps({"ok": rc == 0, "exit_code": rc})
+
+        if name == "scene_render_preview":
+            # Privacy/consent gate: disabled unless explicitly allowed by env
+            import os as _os
+            allow = (_os.environ.get("ATLAS_AGENT_ALLOW_SCREENSHOTS", "").strip().lower() in ("1", "true", "yes"))
+            if not allow:
+                return json.dumps({"ok": False, "error": "screenshots disabled; set ATLAS_AGENT_ALLOW_SCREENSHOTS=1 to enable"})
+            from pathlib import Path as _P
+            import tempfile as _tmp
+            import glob as _glob
+            from ..discovery import compute_paths_from_atlas_dir, default_install_dirs
+            from ..exporter import preview_frames as _preview_frames
+            fps = int(float(args.get("fps", 30)))
+            tsec = float(args.get("time", 0.0))
+            width = int(args.get("width", 512))
+            height = int(args.get("height", 512))
+            frame_idx = int(round(tsec * max(1, fps)))
+            # Resolve Atlas binary
+            atlas_bin = None
+            if atlas_dir:
+                try:
+                    ab, _ = compute_paths_from_atlas_dir(_P(atlas_dir))
+                    atlas_bin = ab
+                except Exception:
+                    atlas_bin = None
+            if atlas_bin is None:
+                for d in default_install_dirs():
+                    ab, _ = compute_paths_from_atlas_dir(d)
+                    if ab.exists():
+                        atlas_bin = ab
+                        break
+            if atlas_bin is None:
+                return json.dumps({"ok": False, "error": "Atlas binary not found; set atlas_dir or install Atlas"})
+            # Save animation to a temp file and render a single frame
+            tdir = _P(_tmp.mkdtemp(prefix="atlas_preview_"))
+            anim_path = tdir / "preview.animation3d"
+            ok_save = client.save_animation(anim_path)
+            if not ok_save:
+                return json.dumps({"ok": False, "error": "failed to save temporary animation"})
+            frames_dir = tdir / "frames"
+            frames_dir.mkdir(parents=True, exist_ok=True)
+            rc = _preview_frames(
+                atlas_bin=str(atlas_bin),
+                animation_path=anim_path,
+                out_dir=frames_dir,
+                fps=fps,
+                start=frame_idx,
+                end=frame_idx,
+                width=width,
+                height=height,
+                overwrite=True,
+                dummy_output=str(tdir / "dummy.mp4"),
+            )
+            if rc != 0:
+                return json.dumps({"ok": False, "exit_code": rc, "error": "preview renderer failed"})
+            # Find the produced image (exact naming depends on exporter; pick any image in frames_dir)
+            images = []
+            for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff"):
+                images.extend(sorted(_glob.glob(str(frames_dir / ext))))
+            if not images:
+                return json.dumps({"ok": False, "error": "no image produced"})
+            return json.dumps({"ok": True, "path": images[0]})
 
         if name == "scene_emphasize_object":
             oid = int(args.get("id"))

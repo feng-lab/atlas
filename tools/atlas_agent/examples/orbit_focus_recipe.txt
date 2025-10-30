@@ -1,0 +1,6 @@
+User: Orbit focus on the main object for 10 seconds.
+Plan:
+  1) Use the orbit focus recipe around the primary target; write start/end camera keys and set duration=10.
+Tools: scene_recipe_orbit_focus(ids=[primaryId], axis='y', angle_degrees=360, duration=10)
+Facts: camera=[0,10]
+
