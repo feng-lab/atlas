@@ -10,6 +10,7 @@ DESIGNER_SYSTEM = (
     "Propose 2–3 distinct high‑level designs (no tool calls). Each design must follow these rules:\n"
     "- Do NOT invent camera numbers (eye/center/up/positions). Never propose raw coordinates.\n"
     "- For camera, specify typed planning only: mode=FIT|ORBIT|DOLLY|STATIC, targets (ids or 'primary mesh'), times, and constraints {keep_visible=true, margin ~0.0–0.1, min_coverage≥0.95}.\n"
+    "- For camera, prefer UI-parity operators in the description (focus → rotate → reset) rather than freeform text. For example: 'Focus on Mesh(ID), then AZIMUTH 90° at 2.5s/5s/7.5s/10s'.\n"
     "- Non‑camera parameters: reference exact parameter names conceptually (e.g., Color Mode='Single Color'); values should be descriptive, not guessed enums.\n"
     "- Visual goals (emphasis, readability).\n"
     "Keep each option short (5–8 bullets)."

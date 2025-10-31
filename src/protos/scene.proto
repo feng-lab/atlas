@@ -108,6 +108,11 @@ service Scene {
   rpc CameraFit (CameraFitRequest) returns (CameraKeysResponse);
   rpc CameraOrbitSuggest (CameraOrbitSuggestRequest) returns (CameraKeysResponse);
   rpc CameraDollySuggest (CameraDollySuggestRequest) returns (CameraKeysResponse);
+  // Camera operator helpers (deterministic, UI-parity)
+  rpc CameraFocus (CameraFocusRequest) returns (CameraKeysResponse);
+  rpc CameraPointTo (CameraPointToRequest) returns (CameraKeysResponse);
+  rpc CameraRotate (CameraRotateRequest) returns (CameraKeysResponse);
+  rpc CameraResetView (CameraResetViewRequest) returns (CameraKeysResponse);
   // New typed camera planning and validation
   rpc CameraSolve (CameraSolveRequest) returns (CameraSolveResponse);
   rpc CameraValidate (CameraValidateRequest) returns (CameraValidateResponse);
@@ -157,6 +162,31 @@ message CameraDollySuggestRequest {
   repeated uint64 ids = 1; // targets to derive center
   double start_dist = 2;   // distance from center at start
   double end_dist = 3;     // distance from center at end
+}
+
+// Camera operator messages
+message CameraFocusRequest {
+  repeated uint64 ids = 1;     // targets to focus on (Animation3D filtered)
+  bool after_clipping = 2;     // when true, use bbox after clipping
+  double min_radius = 3;       // minimum radius (world units) for focus sphere (optional)
+}
+
+message CameraPointToRequest {
+  repeated uint64 ids = 1;     // targets to point to (Animation3D filtered)
+  bool after_clipping = 2;     // when true, use bbox after clipping
+}
+
+message CameraRotateRequest {
+  string op = 1;                // "AZIMUTH"|"ELEVATION"|"ROLL"|"YAW"|"PITCH"|"FLIP"
+  double degrees = 2;           // used for rotation ops (ignored for FLIP)
+  google.protobuf.Value base_value = 3; // optional: apply op to this camera value instead of current engine camera
+}
+
+message CameraResetViewRequest {
+  string mode = 1;              // "XY"|"XZ"|"YZ"|"RESET"
+  repeated uint64 ids = 2;      // optional subset to derive bbox (Animation3D filtered). Empty → all visual objects
+  bool after_clipping = 3;      // when true, use bbox after clipping
+  double min_radius = 4;        // optional minimum radius for RESET/XY
 }
 
 // Typed camera planning and validation

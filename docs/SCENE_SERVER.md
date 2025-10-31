@@ -84,9 +84,20 @@ Cuts (global)
 - `CutSuggest` `{ ids?: [uint64], mode?: "box", margin?: double, after_clipping?: bool }` → `{ box | planes }`
   - Returns a suggested cut (currently a box) derived from the selection or all objects.
 
+  - UI-parity camera operators (deterministic)
+    - `CameraFocus` `{ ids: [uint64], after_clipping?: bool, min_radius?: double }` → `{ values: [google.protobuf.Value] }`
+      - Returns a typed camera value that focuses on the targets (preserves current view vector). Excludes `Animation3D`.
+    - `CameraPointTo` `{ ids: [uint64], after_clipping?: bool }` → `{ values: [google.protobuf.Value] }`
+      - Returns a typed camera value where the camera center points to the target bbox center; eye is unchanged.
+    - `CameraRotate` `{ op: "AZIMUTH"|"ELEVATION"|"ROLL"|"YAW"|"PITCH"|"FLIP", degrees?: double, base_value?: Value }` → `{ values: [Value] }`
+      - Applies the operator to `base_value` (or current camera if omitted) and returns the resulting typed camera value.
+    - `CameraResetView` `{ mode: "XY"|"XZ"|"YZ"|"RESET", ids?: [uint64], after_clipping?: bool, min_radius?: double }` → `{ values: [Value] }`
+      - Resets camera orientation using scene (or provided ids) bbox and returns a typed camera value.
+
 Usage notes
 - All requests are marshalled to the UI/rendering thread via `QMetaObject::invokeMethod` to respect single GL context and threading rules.
 - For camera suggestions, returned strings are the camera value JSON objects (not full key objects). Pass them to `SetKey` with `scope.camera=true`, your chosen `time`, and `easing`.
 - For camera planning, prefer `FitCandidates` + `CameraSolve` to obtain typed values, and confirm with `CameraValidate` before writing to the timeline. Do not invent camera numbers in clients.
+- Operator workflows for animation (example: 360° orbit in 10s): Focus → Rotate(azimuth 90°) at 2.5s/5s/7.5s/10s. Use `scene_replace_key_camera` for each step and validate with `CameraValidate`.
 - `Play/Pause` are minimal and independent of the UI’s `QTimeLine`; they drive live preview by stepping `setCurrentTime`.
 - For MP4 export, run the existing headless CLI `--run_export_3d_animation` from your Python app; keep long-running export tasks out of the GUI RPC.

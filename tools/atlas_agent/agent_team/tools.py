@@ -92,6 +92,71 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         {
             "type": "function",
             "function": {
+                "name": "camera_focus",
+                "description": "Compute a camera that focuses on targets (preserve view vector). Returns a typed camera value.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ids": {"type": "array", "items": {"type": "integer"}},
+                        "after_clipping": {"type": "boolean", "default": True},
+                        "min_radius": {"type": "number", "default": 0.0}
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "camera_point_to",
+                "description": "Compute a camera that points to the targets (center moves, eye unchanged). Returns a typed camera value.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ids": {"type": "array", "items": {"type": "integer"}},
+                        "after_clipping": {"type": "boolean", "default": True}
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "camera_rotate",
+                "description": "Apply a camera operator to a base camera value: AZIMUTH/ELEVATION/ROLL/YAW/PITCH/FLIP. Returns a typed camera value.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "op": {"type": "string", "enum": ["AZIMUTH", "ELEVATION", "ROLL", "YAW", "PITCH", "FLIP"]},
+                        "degrees": {"type": "number", "default": 90.0},
+                        "base_value": {"type": "object"}
+                    },
+                    "required": ["op"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "camera_reset_view",
+                "description": "Reset camera to XY/XZ/YZ/RESET view using scene bbox (Animation3D excluded). Returns a typed camera value.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "mode": {"type": "string", "enum": ["XY", "XZ", "YZ", "RESET"], "default": "RESET"},
+                        "ids": {"type": "array", "items": {"type": "integer"}},
+                        "after_clipping": {"type": "boolean", "default": True},
+                        "min_radius": {"type": "number", "default": 0.0}
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "camera_solve",
                 "description": "Plan camera keys via server: never guess. mode=FIT|ORBIT|DOLLY|STATIC; returns [{time, value}].",
                 "parameters": {
@@ -968,6 +1033,58 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 policies = args.get("policies") or {}
                 res = client.camera_validate(ids=ids, times=times, values=values, constraints=constraints, policies=policies)
                 return json.dumps({"ok": bool(res.get("ok", False)), "results": res.get("results")})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+
+        if name == "camera_focus":
+            try:
+                ids = args.get("ids") or []
+                ac = bool(args.get("after_clipping", True))
+                mr = float(args.get("min_radius", 0.0))
+                val = client.camera_focus(ids=ids, after_clipping=ac, min_radius=mr)
+                return json.dumps({"ok": True, "value": val})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+
+        if name == "camera_point_to":
+            try:
+                ids = args.get("ids") or []
+                ac = bool(args.get("after_clipping", True))
+                val = client.camera_point_to(ids=ids, after_clipping=ac)
+                return json.dumps({"ok": True, "value": val})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+
+        if name == "camera_rotate":
+            try:
+                op = str(args.get("op"))
+                deg = float(args.get("degrees", 90.0))
+                base_value = args.get("base_value")
+                val = client.camera_rotate(op=op, degrees=deg, base_value=base_value)
+                return json.dumps({"ok": True, "value": val})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+
+        if name == "camera_reset_view":
+            try:
+                mode = str(args.get("mode", "RESET"))
+                ids = args.get("ids") or []
+                ac = bool(args.get("after_clipping", True))
+                mr = float(args.get("min_radius", 0.0))
+                val = client.camera_reset_view(mode=mode, ids=ids, after_clipping=ac, min_radius=mr)
+                return json.dumps({"ok": True, "value": val})
             except Exception as e:
                 msg = str(e)
                 try: msg = e.details()  # type: ignore[attr-defined]

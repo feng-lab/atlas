@@ -324,6 +324,66 @@ class SceneClient:
         self._log_rpc("CameraDollySuggest", req, resp)
         return [MessageToDict(v) for v in resp.values]
 
+    # Camera operators (UI parity)
+    def camera_focus(self, ids: Optional[list[int]] = None, after_clipping: bool = True, min_radius: float = 0.0) -> dict:
+        self.ensure_view()
+        req = self._pb2.CameraFocusRequest(ids=ids or [], after_clipping=bool(after_clipping), min_radius=float(min_radius))
+        resp = self._stub.CameraFocus(req)
+        self._log_rpc("CameraFocus", req, resp)
+        vals = [MessageToDict(v) for v in resp.values]
+        return vals[0] if vals else {}
+
+    def camera_point_to(self, ids: Optional[list[int]] = None, after_clipping: bool = True) -> dict:
+        self.ensure_view()
+        req = self._pb2.CameraPointToRequest(ids=ids or [], after_clipping=bool(after_clipping))
+        resp = self._stub.CameraPointTo(req)
+        self._log_rpc("CameraPointTo", req, resp)
+        vals = [MessageToDict(v) for v in resp.values]
+        return vals[0] if vals else {}
+
+    def camera_rotate(self, op: str, degrees: float = 90.0, base_value: Optional[dict] = None) -> dict:
+        self.ensure_view()
+        from google.protobuf import struct_pb2 as _spb
+        bv = None
+        if base_value is not None:
+            def _to_value(py: Any) -> _spb.Value:
+                v = _spb.Value()
+                if py is None:
+                    v.null_value = 0
+                elif isinstance(py, bool):
+                    v.bool_value = bool(py)
+                elif isinstance(py, (int, float)) and not isinstance(py, bool):
+                    v.number_value = float(py)
+                elif isinstance(py, str):
+                    v.string_value = py
+                elif isinstance(py, (list, tuple)):
+                    lv = _spb.ListValue()
+                    for item in py:
+                        lv.values.append(_to_value(item))
+                    v.list_value.CopyFrom(lv)
+                elif isinstance(py, dict):
+                    st = _spb.Struct()
+                    for k, val in py.items():
+                        st.fields[k].CopyFrom(_to_value(val))
+                    v.struct_value.CopyFrom(st)
+                else:
+                    v.string_value = str(py)
+                return v
+            bv = _to_value(base_value)
+        req = self._pb2.CameraRotateRequest(op=str(op), degrees=float(degrees), base_value=bv if bv is not None else None)
+        resp = self._stub.CameraRotate(req)
+        self._log_rpc("CameraRotate", req, resp)
+        vals = [MessageToDict(v) for v in resp.values]
+        return vals[0] if vals else {}
+
+    def camera_reset_view(self, mode: str = "RESET", ids: Optional[list[int]] = None, after_clipping: bool = True, min_radius: float = 0.0) -> dict:
+        self.ensure_view()
+        req = self._pb2.CameraResetViewRequest(mode=str(mode), ids=ids or [], after_clipping=bool(after_clipping), min_radius=float(min_radius))
+        resp = self._stub.CameraResetView(req)
+        self._log_rpc("CameraResetView", req, resp)
+        vals = [MessageToDict(v) for v in resp.values]
+        return vals[0] if vals else {}
+
     # Typed camera planning and validation
     def fit_candidates(self) -> list[int]:
         self.ensure_view()
