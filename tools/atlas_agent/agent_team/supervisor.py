@@ -15,16 +15,18 @@ from .implementer import Implementer
 from .describer import Describer
 from .agents_sdk import act_with_agents_sdk
 from ..scene_rpc import SceneClient
+import os
+import json as _json
 
 
 SUPERVISOR_SYSTEM = (
     "You are the Supervisor (orchestrator) for an Atlas animation multi‑agent team.\n"
     "Your job is to coordinate specialists — you do not call tools directly.\n\n"
     "Team protocol:\n"
-    "- Designer proposes 2–3 distinct high‑level designs based on the user request and scene context.\n"
-    "- Reviewer A and Reviewer B critique the options (feasibility, clarity, alignment).\n"
-    "- Arbiter selects the best option or blends two into a single merged plan.\n"
-    "- Implementer uses typed tools to implement the merged plan (no guessing): enumerate params, write SetKey, verify with scene_list_keys.\n"
+    "- Designer proposes 2–3 distinct high‑level designs based on the user request and scene context. Camera steps MUST be typed (mode/targets/constraints). No raw camera numbers.\n"
+    "- Reviewer A and Reviewer B critique options; reject any that include raw camera coordinates and suggest typed camera planning instead.\n"
+    "- Arbiter selects the best option or blends two into a single merged plan, ensuring camera steps are typed only.\n"
+    "- Implementer uses typed tools to implement the merged plan (no guessing): enumerate params, use camera_solve/validate, write SetKey, verify with scene_list_keys.\n"
     "- Inspector validates the result; if gaps remain, feed feedback back to Implementer and iterate until satisfied.\n"
     "- Describer produces a concise, facts‑only summary using the verified keys/times.\n\n"
     "Success criteria:\n"
@@ -77,7 +79,7 @@ class Supervisor:
         idx, merged = arbiter.decide(user_text=user_text, scene_context=ctx, options=options, feedbacks=[fb1, fb2])
         selected = merged or (options[idx - 1] if options else "")
         logger.info("[Supervisor] Arbiter selected option %d", idx)
-        implementer = Implementer(client=self.client, scene=self.scene, temperature=self.temperature)
+        implementer = Implementer(client=self.client, scene=self.scene, temperature=self.temperature, atlas_dir=self.atlas_dir)
         inspector = Inspector(client=self.client, temperature=self.temperature)
         describer = Describer(client=self.client, temperature=self.temperature)
 
@@ -128,7 +130,34 @@ class Supervisor:
                 except Exception:
                     pass
             # Ask Inspector for decision with facts
-            satisfied, fb = inspector.decide(user_text=user_text, scene_context=ctx, plan_text=selected, facts=post)
+            # Optional single preview screenshot for qualitative checks
+            preview_path = None
+            try:
+                allow = (os.environ.get("ATLAS_AGENT_ALLOW_SCREENSHOTS", "").strip().lower() in ("1", "true", "yes"))
+                if allow:
+                    # Choose a preview time: current timeline seconds if available; otherwise first camera key or 0
+                    try:
+                        ts = self.scene.get_time()
+                        tsec = float(getattr(ts, "seconds", 0.0) or 0.0)
+                    except Exception:
+                        tsec = 0.0
+                    cam_times = (post.get("keys", {}).get("camera") or []) if isinstance(post, dict) else []
+                    if not tsec and cam_times:
+                        tsec = float(cam_times[len(cam_times)//2])
+                    # Invoke preview tool via dispatcher
+                    from .tools import scene_tools_and_dispatcher
+                    _tools, _dispatch = scene_tools_and_dispatcher(self.scene, atlas_dir=self.atlas_dir)
+                    res = _dispatch("scene_render_preview", _json.dumps({"time": tsec, "width": 512, "height": 512}))
+                    try:
+                        j = _json.loads(res or "{}")
+                        if j.get("ok") and j.get("path"):
+                            preview_path = str(j.get("path"))
+                    except Exception:
+                        preview_path = None
+            except Exception:
+                preview_path = None
+
+            satisfied, fb = inspector.decide(user_text=user_text, scene_context=ctx, plan_text=selected, facts=post, preview_image_path=preview_path)
             # Hard gate: if camera validation failed, do not allow satisfied
             if cam_validation and not bool(cam_validation.get("ok", False)):
                 satisfied = False

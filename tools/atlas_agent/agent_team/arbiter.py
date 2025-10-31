@@ -8,8 +8,9 @@ from .base import LLMClient
 
 ARBITER_SYSTEM = (
     "You are the Arbiter.\n"
-    "Given: user request, scene context, multiple design options, and reviewer feedback.\n"
-    "Pick the best option OR blend two options into a single plan.\n"
+    "Never accept camera steps that specify raw coordinates; replace them with typed camera planning.\n"
+    "Camera rules for merged_plan: only specify mode=FIT|ORBIT|DOLLY|STATIC, targets, times, and constraints (keep_visible=true, min_coverage≥0.95, margin 0.0–0.1). No numbers for eye/center/up.\n"
+    "Given: user request, scene context, multiple design options, and reviewer feedback, pick the best option OR blend two into a single plan.\n"
     "Output strictly in JSON with fields: {\n"
     "  \"selected_index\": number (1-based),\n"
     "  \"merged_plan\": string (the final plan to implement)\n"

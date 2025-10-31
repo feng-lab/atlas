@@ -24,6 +24,24 @@ Testing (Linking Atlas Code)
 - Runtime resources (shaders/assets) remain app-packaged; unit tests around Vulkan/RAII pipeline contracts do not depend on runtime discovery.
 - GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.
 
+Agents: Preview Screenshots
+
+- The Python agent tools expose a headless preview renderer for 3D animation verification.
+- Tool: `scene_render_preview` (saves current animation to a temp file and renders one frame via the Atlas binary in offscreen mode).
+- Privacy/consent: Disabled by default. Enable explicitly by setting `ATLAS_AGENT_ALLOW_SCREENSHOTS=1` in the environment when launching the agent CLI.
+- Binary resolution: The tool uses `--atlas-dir` if provided to the agent CLI, or searches default install locations.
+- Typical usage via CLI environment:
+  - `ATLAS_AGENT_ALLOW_SCREENSHOTS=1 python -m tools.atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app`
+  - or pass the flag: `python -m tools.atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app --allow-screenshots`
+
+Agents: Animation Recipe Tools
+
+- New high‑level recipe tools are available to simplify common animation tasks:
+  - `scene_recipe_orbit_focus(ids?, axis='y', angle_degrees=360, duration=8, easing='Linear')` — fits camera, writes start/end orbit camera keys, sets duration.
+  - `scene_recipe_fade_emphasis(id, color, start_opacity=0.3, end_opacity=1.0, t0=0, t1=5, dim_others=true, easing='Linear')` — emphasizes a target with color and opacity ramp; optionally dims others.
+  - `scene_recipe_reveal_with_cut(ids?, margin=0.0, refit_camera=true, time=0, after_clipping=true, easing='Linear')` — suggests and applies a cut box, then writes a camera key.
+- These are composed from the lower‑level typed tools and can be called by the Implementer or used interactively via the dispatcher.
+
 Architecture Overview
 
 - Main window (`ZMainWindow`) — 2D UI; hosts object manager, docks, menus.

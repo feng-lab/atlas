@@ -896,9 +896,16 @@ public:
     auto results = invokeOnUi([&]() {
       std::vector<CameraValidateResult> out;
       if (!m_owner.engine()) return out;
-      // Collect targets and bbox
+      // Collect targets and bbox (default to all visual objects when ids is empty)
       std::vector<size_t> ids; ids.reserve(req->ids_size()); for (auto v : req->ids()) ids.push_back(static_cast<size_t>(v));
-      ids = filterVisualIds(m_owner, ids);
+      if (ids.empty()) {
+        if (m_owner.doc()) {
+          ids = m_owner.doc()->objs();
+          ids = filterVisualIds(m_owner, ids);
+        }
+      } else {
+        ids = filterVisualIds(m_owner, ids);
+      }
       ZBBox<glm::dvec3> bb = m_owner.engine()->boundBoxOfObjs(ids);
       if (!bb.empty() && margin > 0.0) bb = expandedByMarginFraction(bb, margin);
       const double R = bboxEnclosingSphereRadius(bb);

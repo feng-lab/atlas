@@ -7,8 +7,10 @@ from .base import LLMClient
 
 REVIEWER_SYSTEM = (
     "You are a Reviewer for Atlas animation designs.\n"
-    "Given multiple design options, critique clarity, feasibility, and user alignment.\n"
-    "Identify the best option and suggest small improvements (bullet points). Keep it concise."
+    "Strict camera rule: reject any option that proposes raw camera coordinates or positions.\n"
+    "Accept only typed camera planning: mode=FIT|ORBIT|DOLLY|STATIC with targets and constraints (keep_visible, margin, min_coverage≥0.95).\n"
+    "Given multiple options, critique clarity, feasibility, and user alignment; select the best valid option.\n"
+    "Suggest 2–3 concrete improvements (e.g., add margin=0.05, use ORBIT axis=y, ensure coverage≥0.95). Keep it concise."
 )
 
 

@@ -7,10 +7,11 @@ from .base import LLMClient
 
 DESIGNER_SYSTEM = (
     "You are the Designer for Atlas animation.\n"
-    "Propose 2–3 distinct high‑level designs (no tool calls). Each design should specify:\n"
-    "- Targets (objects/groups) and rationale\n"
-    "- Keyframes: which parameters/camera, their times, and intended values\n"
-    "- Visual goals (emphasis, readability)\n"
+    "Propose 2–3 distinct high‑level designs (no tool calls). Each design must follow these rules:\n"
+    "- Do NOT invent camera numbers (eye/center/up/positions). Never propose raw coordinates.\n"
+    "- For camera, specify typed planning only: mode=FIT|ORBIT|DOLLY|STATIC, targets (ids or 'primary mesh'), times, and constraints {keep_visible=true, margin ~0.0–0.1, min_coverage≥0.95}.\n"
+    "- Non‑camera parameters: reference exact parameter names conceptually (e.g., Color Mode='Single Color'); values should be descriptive, not guessed enums.\n"
+    "- Visual goals (emphasis, readability).\n"
     "Keep each option short (5–8 bullets)."
 )
 
@@ -23,9 +24,25 @@ class Designer:
     def propose(self, user_text: str, *, scene_context: str) -> list[str]:
         logger = logging.getLogger("atlas_agent.agents")
         logger.info("[Designer] Proposing designs for request: %s", (user_text or "").strip()[:200])
+        # Include compact examples as stylistic guidance (no tools, bullet style)
+        examples_text = ""
+        try:
+            from .examples_loader import load_compact_examples
+            ex = load_compact_examples(max_count=2)
+            if ex:
+                # Keep only the Plan lines to avoid tool bias in designer stage
+                def only_plan(s: str) -> str:
+                    keep = []
+                    for line in s.splitlines():
+                        if line.strip().startswith("Plan:") or line.strip().startswith("1)") or line.strip().startswith("- ") or line.strip().startswith("  "):
+                            keep.append(line)
+                    return "\n".join(keep) if keep else s
+                examples_text = "\n\nExamples (format only):\n" + "\n\n".join(only_plan(s) for s in ex)
+        except Exception:
+            pass
         prompt = (
             f"User request:\n{user_text}\n\nScene context:\n{scene_context}\n\n"
-            "Output 2–3 numbered design options; no prose, no tools."
+            "Output 2–3 numbered design options; no prose, no tools." + examples_text
         )
         text = self.client.complete_text(system_prompt=DESIGNER_SYSTEM, user_text=prompt, temperature=self.temperature)
         # Split on numbered headings as best‑effort
