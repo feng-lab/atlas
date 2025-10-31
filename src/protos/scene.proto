@@ -108,6 +108,10 @@ service Scene {
   rpc CameraFit (CameraFitRequest) returns (CameraKeysResponse);
   rpc CameraOrbitSuggest (CameraOrbitSuggestRequest) returns (CameraKeysResponse);
   rpc CameraDollySuggest (CameraDollySuggestRequest) returns (CameraKeysResponse);
+  // New typed camera planning and validation
+  rpc CameraSolve (CameraSolveRequest) returns (CameraSolveResponse);
+  rpc CameraValidate (CameraValidateRequest) returns (CameraValidateResponse);
+  rpc FitCandidates (Empty) returns (FitCandidatesResponse);
   // Scene state helpers
   rpc SetVisibility (VisibilityRequest) returns (Bool);
   // Scene cuts (global axis-aligned box or plane set)
@@ -154,6 +158,57 @@ message CameraDollySuggestRequest {
   double start_dist = 2;   // distance from center at start
   double end_dist = 3;     // distance from center at end
 }
+
+// Typed camera planning and validation
+message CameraConstraints {
+  bool keep_visible = 1;   // default true
+  double margin = 2;       // optional margin (fraction of bbox size); default 0.0
+  double min_coverage = 3; // default 0.95
+  string fov_policy = 4;   // "fixed" | "auto" (advisory)
+}
+
+// Solve camera keys for a mode and targets
+message CameraSolveRequest {
+  string mode = 1;           // "FIT" | "ORBIT" | "DOLLY" | "STATIC" (case-insensitive)
+  repeated uint64 ids = 2;   // targets; server filters non-visual by default
+  double t0 = 3;             // first key time
+  double t1 = 4;             // second key time (for ORBIT/DOLLY); ignored for FIT/STATIC
+  CameraConstraints constraints = 5;
+  google.protobuf.Struct params = 6; // per-mode params: ORBIT{axis,angle_degrees}, DOLLY{start_dist,end_dist}
+}
+
+message CameraSolveKey { double time = 1; google.protobuf.Value value = 2; }
+message CameraSolveResponse { repeated CameraSolveKey keys = 1; }
+
+message CameraPolicies {
+  bool adjust_fov = 1;       // allow updating fieldOfView
+  bool adjust_distance = 2;  // allow updating distance to center
+  bool adjust_clipping = 3;  // advisory (server may auto-fit near/far in validation)
+}
+
+message CameraValidateRequest {
+  repeated uint64 ids = 1;                 // targets; server filters non-visual by default
+  repeated double times = 2;               // times corresponding to values
+  repeated google.protobuf.Value values = 3; // typed camera values
+  CameraConstraints constraints = 4;
+  CameraPolicies policies = 5;
+}
+
+message CameraValidateResult {
+  double time = 1;
+  bool within_frame = 2;
+  double coverage = 3;
+  bool adjusted = 4;
+  google.protobuf.Value adjusted_value = 5; // present when adjusted=true
+  string reason = 6;                         // e.g., "too_close", "fov_too_small", "clipping"
+}
+
+message CameraValidateResponse {
+  repeated CameraValidateResult results = 1;
+  bool ok = 2; // all results within constraints
+}
+
+message FitCandidatesResponse { repeated uint64 ids = 1; }
 
 // Scene state
 message VisibilityRequest {

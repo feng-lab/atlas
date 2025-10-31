@@ -324,6 +324,144 @@ class SceneClient:
         self._log_rpc("CameraDollySuggest", req, resp)
         return [MessageToDict(v) for v in resp.values]
 
+    # Typed camera planning and validation
+    def fit_candidates(self) -> list[int]:
+        self.ensure_view()
+        resp = self._stub.FitCandidates(self._pb2.Empty())
+        self._log_rpc("FitCandidates", self._pb2.Empty(), resp)
+        return [int(v) for v in getattr(resp, "ids", [])]
+
+    def camera_solve(
+        self,
+        *,
+        mode: str,
+        ids: Optional[list[int]] = None,
+        t0: float = 0.0,
+        t1: float = 0.0,
+        constraints: Optional[dict] = None,
+        params: Optional[dict] = None,
+    ) -> list[dict]:
+        self.ensure_view()
+        # Build Structs for constraints/params
+        cons = None
+        if constraints:
+            cons = self._pb2.CameraConstraints(
+                keep_visible=bool(constraints.get("keep_visible", True)),
+                margin=float(constraints.get("margin", 0.0)),
+                min_coverage=float(constraints.get("min_coverage", 0.95)),
+                fov_policy=str(constraints.get("fov_policy", "fixed")),
+            )
+        st = None
+        if params:
+            from google.protobuf.struct_pb2 import Struct
+            st = Struct()
+            for k, v in params.items():
+                # Simple conversion using json roundtrip helper
+                from google.protobuf.json_format import ParseDict
+                # Use a temp Value then assign
+                # But Struct supports native assignment via dict
+                try:
+                    if isinstance(v, (dict, list)):
+                        from google.protobuf.json_format import MessageToDict as _m2d  # noqa: F401
+                    # fallback to string/number/bool
+                    st.fields[k].number_value = float(v) if isinstance(v, (int, float)) else 0.0
+                    if isinstance(v, str):
+                        st.fields[k].string_value = v
+                    elif isinstance(v, bool):
+                        st.fields[k].bool_value = v
+                    elif isinstance(v, (int, float)):
+                        st.fields[k].number_value = float(v)
+                except Exception:
+                    # best-effort: stringify
+                    st.fields[k].string_value = str(v)
+        req = self._pb2.CameraSolveRequest(
+            mode=str(mode), ids=ids or [], t0=float(t0), t1=float(t1),
+            constraints=cons if cons is not None else None,
+            params=st if st is not None else None,
+        )
+        resp = self._stub.CameraSolve(req)
+        self._log_rpc("CameraSolve", req, resp)
+        out: list[dict] = []
+        for k in getattr(resp, "keys", []):
+            out.append({"time": float(getattr(k, "time", 0.0)), "value": MessageToDict(getattr(k, "value"))})
+        return out
+
+    def camera_validate(
+        self,
+        *,
+        ids: Optional[list[int]] = None,
+        times: list[float],
+        values: list[dict],
+        constraints: Optional[dict] = None,
+        policies: Optional[dict] = None,
+    ) -> dict:
+        self.ensure_view()
+        cons = None
+        if constraints:
+            cons = self._pb2.CameraConstraints(
+                keep_visible=bool(constraints.get("keep_visible", True)),
+                margin=float(constraints.get("margin", 0.0)),
+                min_coverage=float(constraints.get("min_coverage", 0.95)),
+                fov_policy=str(constraints.get("fov_policy", "fixed")),
+            )
+        pol = None
+        if policies:
+            pol = self._pb2.CameraPolicies(
+                adjust_fov=bool(policies.get("adjust_fov", False)),
+                adjust_distance=bool(policies.get("adjust_distance", False)),
+                adjust_clipping=bool(policies.get("adjust_clipping", False)),
+            )
+        # Convert dicts to protobuf Values
+        from google.protobuf import struct_pb2 as _spb
+        def _to_value(py: Any) -> _spb.Value:
+            v = _spb.Value()
+            if py is None:
+                v.null_value = 0
+            elif isinstance(py, bool):
+                v.bool_value = bool(py)
+            elif isinstance(py, (int, float)) and not isinstance(py, bool):
+                v.number_value = float(py)
+            elif isinstance(py, str):
+                v.string_value = py
+            elif isinstance(py, (list, tuple)):
+                lv = _spb.ListValue()
+                for item in py:
+                    lv.values.append(_to_value(item))
+                v.list_value.CopyFrom(lv)
+            elif isinstance(py, dict):
+                st = _spb.Struct()
+                for k, val in py.items():
+                    st.fields[k].CopyFrom(_to_value(val))
+                v.struct_value.CopyFrom(st)
+            else:
+                v.string_value = str(py)
+            return v
+        req = self._pb2.CameraValidateRequest(
+            ids=ids or [],
+            times=[float(t) for t in times],
+            values=[_to_value(v) for v in values],
+            constraints=cons if cons is not None else None,
+            policies=pol if pol is not None else None,
+        )
+        resp = self._stub.CameraValidate(req)
+        self._log_rpc("CameraValidate", req, resp)
+        results: list[dict] = []
+        for r in getattr(resp, "results", []):
+            row: dict[str, Any] = {
+                "time": float(getattr(r, "time", 0.0)),
+                "within_frame": bool(getattr(r, "within_frame", False)),
+                "coverage": float(getattr(r, "coverage", 0.0)),
+                "adjusted": bool(getattr(r, "adjusted", False)),
+                "reason": str(getattr(r, "reason", "")),
+            }
+            try:
+                if getattr(r, "adjusted", False):
+                    row["adjusted_value"] = MessageToDict(getattr(r, "adjusted_value"))
+            except Exception:
+                pass
+            results.append(row)
+        return {"ok": bool(getattr(resp, "ok", False)), "results": results}
+
     # Keys
     def set_key_camera(self, time: float, easing: str, value: Any) -> bool:
         # Ensure engine/view exists before setting camera keys

@@ -39,6 +39,15 @@ New endpoints (additions)
   - `CameraDollySuggest` `{ ids?: [uint64], start_dist: double, end_dist: double }` → `{ values: [google.protobuf.Value, google.protobuf.Value] }`
     - Returns start/end typed camera value objects where the camera distance to center is set to the given distances.
 
+  - Typed camera planning and validation (no guessing)
+    - `FitCandidates` `{}` → `{ ids: [uint64] }`
+      - Returns visual object ids suitable for camera fit/orbit (excludes `Animation3D`).
+    - `CameraSolve` `{ mode: "FIT"|"ORBIT"|"DOLLY"|"STATIC", ids?: [uint64], t0: double, t1?: double, constraints?: { keep_visible?: bool, margin?: double, min_coverage?: double, fov_policy?: string }, params?: Struct }` → `{ keys: [{time, value}] }`
+      - Computes typed camera key(s) for the targets. `ORBIT` produces `[t0,t1]`; `DOLLY` produces `[t0,t1]`; `FIT`/`STATIC` produce a single key at `t0`.
+      - The server excludes `Animation3D` when deriving target bbox. `constraints.margin` expands the bbox fractionally; `min_coverage` defaults to `0.95`.
+    - `CameraValidate` `{ ids?: [uint64], times: [double], values: [Value], constraints?: {...}, policies?: { adjust_fov?: bool, adjust_distance?: bool, adjust_clipping?: bool } }` → `{ ok: bool, results: [{ time, within_frame, coverage, adjusted, adjusted_value?, reason }] }`
+      - Evaluates coverage against the target bbox and optional margin. If policies allow, returns an `adjusted_value` with updated `fieldOfView` or eye/center distance. `ok=true` when all entries meet `min_coverage`.
+
 - Scene state
   - `SetVisibility` `{ ids: [uint64], on: bool }` → `{ ok: true }`
 
@@ -78,5 +87,6 @@ Cuts (global)
 Usage notes
 - All requests are marshalled to the UI/rendering thread via `QMetaObject::invokeMethod` to respect single GL context and threading rules.
 - For camera suggestions, returned strings are the camera value JSON objects (not full key objects). Pass them to `SetKey` with `scope.camera=true`, your chosen `time`, and `easing`.
+- For camera planning, prefer `FitCandidates` + `CameraSolve` to obtain typed values, and confirm with `CameraValidate` before writing to the timeline. Do not invent camera numbers in clients.
 - `Play/Pause` are minimal and independent of the UI’s `QTimeLine`; they drive live preview by stepping `setCurrentTime`.
 - For MP4 export, run the existing headless CLI `--run_export_3d_animation` from your Python app; keep long-running export tasks out of the GUI RPC.

@@ -18,6 +18,7 @@ IMPLEMENTER_SYSTEM = (
     "- For numeric/Vec arrays, use correct shapes (e.g., Vec4=[r,g,b,a]).\n"
     "- Use 'Switch' easing for non‑interpolatable parameters.\n"
     "- Use typed writes only: scene_set_param_by_name/scene_set_key_param and scene_set_key_camera.\n"
+    "- For any camera work: never guess values. Use fit_candidates + camera_solve for planning, and camera_validate to adjust/verify before and after writing.\n"
     "- Use scene_batch only when you have concrete SetKey entries (non‑empty).\n"
     "- After each write (or batch), call scene_list_keys to verify the expected times exist.\n"
     "- If verification fails, diagnose (wrong json_key? wrong scope? type mismatch?) and retry.\n"

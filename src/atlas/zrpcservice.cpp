@@ -58,6 +58,15 @@ using atlas::rpc::CameraFitRequest;
 using atlas::rpc::CameraOrbitSuggestRequest;
 using atlas::rpc::CameraDollySuggestRequest;
 using atlas::rpc::CameraKeysResponse;
+using atlas::rpc::CameraSolveRequest;
+using atlas::rpc::CameraSolveResponse;
+using atlas::rpc::CameraSolveKey;
+using atlas::rpc::CameraConstraints;
+using atlas::rpc::CameraPolicies;
+using atlas::rpc::CameraValidateRequest;
+using atlas::rpc::CameraValidateResponse;
+using atlas::rpc::CameraValidateResult;
+using atlas::rpc::FitCandidatesResponse;
 using atlas::rpc::VisibilityRequest;
 using atlas::rpc::ListParamsRequest;
 using atlas::rpc::ClearKeysRequest;
@@ -209,6 +218,61 @@ public:
   QTimer timer; Z3DAnimation* anim = nullptr; int stepMs = 40; double current = 0.0;
 };
 static RPCPlayback* g_rpcPlayback = nullptr;
+
+// Helpers used by camera planning/validation
+static std::vector<size_t> filterVisualIds(ZRPCService& owner, const std::vector<size_t>& in)
+{
+  std::vector<size_t> out;
+  out.reserve(in.size());
+  for (auto id : in) {
+    if (owner.doc()) {
+      auto* od = owner.doc()->idToDoc(id);
+      if (od && od->typeName() == QStringLiteral("Animation3D")) continue;
+    }
+    out.push_back(id);
+  }
+  return out;
+}
+
+static ZBBox<glm::dvec3> expandedByMarginFraction(const ZBBox<glm::dvec3>& bb, double marginFrac)
+{
+  if (bb.empty() || marginFrac <= 0.0) return bb;
+  const glm::dvec3 half = (bb.maxCorner - bb.minCorner) * 0.5;
+  const glm::dvec3 grow = half * marginFrac;
+  ZBBox<glm::dvec3> out = bb;
+  out.expand(bb.minCorner - grow);
+  out.expand(bb.maxCorner + grow);
+  return out;
+}
+
+static double bboxEnclosingSphereRadius(const ZBBox<glm::dvec3>& bb)
+{
+  if (bb.empty()) return 0.0;
+  const glm::dvec3 sz = (bb.maxCorner - bb.minCorner);
+  return 0.5 * std::sqrt(sz.x * sz.x + sz.y * sz.y + sz.z * sz.z);
+}
+
+static double requiredCenterDistanceForCoverage(const Z3DCamera& cam, double radius)
+{
+  if (radius <= 0.0) return 0.0;
+  double angle = cam.fieldOfView();
+  // Match Z3DCamera::resetCamera logic: use horizontal angle when AR < 1
+  if (cam.aspectRatio() < 1.0f) {
+    angle = 2.0 * std::atan(std::tan(angle * 0.5) * cam.aspectRatio());
+  }
+  const double s = std::sin(angle * 0.5);
+  if (s <= 1e-6) return std::numeric_limits<double>::infinity();
+  return radius / s;
+}
+
+static void setCameraDistance(Z3DCameraParameter& cam, double centerDist)
+{
+  const glm::vec3 c = cam.get().center();
+  const glm::vec3 v = cam.get().viewVector();
+  const glm::vec3 eye = c - static_cast<float>(centerDist) * v;
+  const glm::vec3 up = cam.get().upVector();
+  cam.setCamera(eye, c, up);
+}
 } // namespace
 
 // Scene service bound to app UI context
@@ -732,6 +796,190 @@ public:
       return out;
     });
     for (const auto& jv : values) { *reply->add_values() = jsonToPb(jv); }
+    return Status::OK;
+  }
+
+  Status FitCandidates(ServerContext*, const Empty*, FitCandidatesResponse* reply) override
+  {
+    auto ids = invokeOnUi([&]() {
+      std::vector<uint64_t> out;
+      if (!m_owner.doc()) return out;
+      for (auto id : m_owner.doc()->objs()) {
+        auto* od = m_owner.doc()->idToDoc(id);
+        if (od && od->typeName() == QStringLiteral("Animation3D")) continue;
+        out.push_back(static_cast<uint64_t>(id));
+      }
+      return out;
+    });
+    for (auto id : ids) reply->add_ids(id);
+    return Status::OK;
+  }
+
+  Status CameraSolve(ServerContext*, const CameraSolveRequest* req, CameraSolveResponse* reply) override
+  {
+    if (!m_owner.engine()) return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    auto keys = invokeOnUi([&]() {
+      std::vector<CameraSolveKey> out;
+      if (!m_owner.engine()) return out;
+      // Collect and filter ids
+      std::vector<size_t> ids;
+      ids.reserve(req->ids_size());
+      for (auto v : req->ids()) ids.push_back(static_cast<size_t>(v));
+      ids = filterVisualIds(m_owner, ids);
+      // Compute bbox
+      ZBBox<glm::dvec3> bb = m_owner.engine()->boundBoxOfObjs(ids);
+      const double margin = req->has_constraints() ? req->constraints().margin() : 0.0;
+      if (!bb.empty() && margin > 0.0) bb = expandedByMarginFraction(bb, margin);
+      const auto mode = QString::fromStdString(req->mode()).toUpper();
+      const double t0 = req->t0();
+      const double t1 = req->t1();
+      Z3DCameraParameter base("Camera");
+      base.setValueSameAs(m_owner.engine()->camera());
+      if (mode == "FIT") {
+        if (bb.empty()) return out; // nothing to fit
+        Z3DCameraParameter cam("Camera");
+        cam.setValueSameAs(base);
+        cam.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
+        CameraSolveKey k; k.set_time(t0); *k.mutable_value() = jsonToPb(cam.jsonValue());
+        out.push_back(std::move(k));
+      } else if (mode == "STATIC") {
+        CameraSolveKey k; k.set_time(t0); *k.mutable_value() = jsonToPb(base.jsonValue());
+        out.push_back(std::move(k));
+      } else if (mode == "ORBIT") {
+        if (bb.empty()) return out;
+        const auto params = req->params();
+        std::string axis = "y";
+        double angle = 360.0;
+        auto itA = params.fields().find("axis");
+        if (itA != params.fields().end() && itA->second.kind_case() == google::protobuf::Value::kStringValue) axis = itA->second.string_value();
+        auto itAng = params.fields().find("angle_degrees");
+        if (itAng != params.fields().end() && itAng->second.kind_case() == google::protobuf::Value::kNumberValue) angle = itAng->second.number_value();
+        const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
+        glm::vec3 ax(0.f, 1.f, 0.f);
+        const auto axq = QString::fromStdString(axis).toLower();
+        if (axq == "x") ax = glm::vec3(1.f, 0.f, 0.f);
+        else if (axq == "y") ax = glm::vec3(0.f, 1.f, 0.f);
+        else if (axq == "z") ax = glm::vec3(0.f, 0.f, 1.f);
+        Z3DCameraParameter cam0("Camera"); cam0.setValueSameAs(base); cam0.resetCamera(bb, Z3DCamera::ResetOption::PreserveViewVector);
+        Z3DCameraParameter cam1("Camera"); cam1.setValueSameAs(cam0); cam1.rotate(static_cast<float>(angle), ax, center);
+        CameraSolveKey k0; k0.set_time(t0); *k0.mutable_value() = jsonToPb(cam0.jsonValue()); out.push_back(std::move(k0));
+        CameraSolveKey k1; k1.set_time(t1); *k1.mutable_value() = jsonToPb(cam1.jsonValue()); out.push_back(std::move(k1));
+      } else if (mode == "DOLLY") {
+        if (bb.empty()) return out;
+        const auto params = req->params();
+        double start_dist = 0.0, end_dist = 0.0;
+        auto itS = params.fields().find("start_dist");
+        if (itS != params.fields().end() && itS->second.kind_case() == google::protobuf::Value::kNumberValue) start_dist = itS->second.number_value();
+        auto itE = params.fields().find("end_dist");
+        if (itE != params.fields().end() && itE->second.kind_case() == google::protobuf::Value::kNumberValue) end_dist = itE->second.number_value();
+        const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
+        Z3DCameraParameter cam0("Camera"); cam0.setValueSameAs(base); cam0.setCenter(center); if (start_dist > 0.0) cam0.dollyToCenterDistance(static_cast<float>(start_dist));
+        Z3DCameraParameter cam1("Camera"); cam1.setValueSameAs(cam0); if (end_dist > 0.0) cam1.dollyToCenterDistance(static_cast<float>(end_dist));
+        CameraSolveKey k0; k0.set_time(t0); *k0.mutable_value() = jsonToPb(cam0.jsonValue()); out.push_back(std::move(k0));
+        CameraSolveKey k1; k1.set_time(t1); *k1.mutable_value() = jsonToPb(cam1.jsonValue()); out.push_back(std::move(k1));
+      }
+      return out;
+    });
+    for (auto& k : keys) { *reply->add_keys() = std::move(k); }
+    if (reply->keys_size() == 0) return Status(grpc::StatusCode::FAILED_PRECONDITION, "camera_solve failed or empty");
+    return Status::OK;
+  }
+
+  Status CameraValidate(ServerContext*, const CameraValidateRequest* req, CameraValidateResponse* reply) override
+  {
+    if (!m_owner.engine()) return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    std::string err;
+    const bool allowFov = req->has_policies() ? req->policies().adjust_fov() : false;
+    const bool allowDist = req->has_policies() ? req->policies().adjust_distance() : false;
+    const double minCov = req->has_constraints() ? (req->constraints().min_coverage() > 0.0 ? req->constraints().min_coverage() : 0.95) : 0.95;
+    const double margin = req->has_constraints() ? req->constraints().margin() : 0.0;
+    auto results = invokeOnUi([&]() {
+      std::vector<CameraValidateResult> out;
+      if (!m_owner.engine()) return out;
+      // Collect targets and bbox
+      std::vector<size_t> ids; ids.reserve(req->ids_size()); for (auto v : req->ids()) ids.push_back(static_cast<size_t>(v));
+      ids = filterVisualIds(m_owner, ids);
+      ZBBox<glm::dvec3> bb = m_owner.engine()->boundBoxOfObjs(ids);
+      if (!bb.empty() && margin > 0.0) bb = expandedByMarginFraction(bb, margin);
+      const double R = bboxEnclosingSphereRadius(bb);
+      // Base camera for aspect
+      Z3DCameraParameter base("Camera"); base.setValueSameAs(m_owner.engine()->camera());
+      // Validate each time/value
+      const int n = std::min(req->times_size(), req->values_size());
+      for (int i = 0; i < n; ++i) {
+        double t = req->times(i);
+        json::value jv = pbToJson(req->values(i));
+        CameraValidateResult r; r.set_time(t);
+        if (!jv.is_object()) {
+          r.set_within_frame(false); r.set_coverage(0.0); r.set_adjusted(false); r.set_reason("invalid_value");
+          out.push_back(std::move(r));
+          continue;
+        }
+        Z3DCameraParameter cam("Camera"); cam.setValueSameAs(base); cam.readValue(jv);
+        // Compute coverage heuristic
+        const double required = (R > 0.0) ? requiredCenterDistanceForCoverage(cam.get(), R) : 0.0;
+        const double current = static_cast<double>(cam.get().centerDist());
+        double cov = 1.0;
+        if (required > 1e-9) cov = std::min(1.0, current / required);
+        bool ok = (cov + 1e-6) >= minCov;
+        r.set_within_frame(ok);
+        r.set_coverage(cov);
+        // Adjustment policy
+        bool adjusted = false;
+        json::value adj = jv;
+        if (!ok && R > 0.0) {
+          if (allowDist && required > 0.0) {
+            setCameraDistance(cam, required);
+            adjusted = true;
+            adj = cam.jsonValue();
+            // Recompute coverage after adjustment
+            const double cur2 = static_cast<double>(cam.get().centerDist());
+            double cov2 = (required > 0.0) ? std::min(1.0, cur2 / required) : 1.0;
+            ok = (cov2 + 1e-6) >= minCov;
+            cov = cov2;
+          } else if (allowFov && current > 1e-9) {
+            // Solve desired FOV to achieve coverage with current distance
+            double angleUsed = 2.0 * std::asin(std::min(1.0, R / current));
+            double desiredFov = angleUsed;
+            if (cam.get().aspectRatio() < 1.0f) {
+              // angleUsed is horizontal; convert back to vertical FOV
+              desiredFov = 2.0 * std::atan(std::tan(angleUsed * 0.5) / cam.get().aspectRatio());
+            }
+            Z3DCameraParameter cam2("Camera"); cam2.setValueSameAs(cam); cam2.setFrustum(static_cast<float>(desiredFov), cam.get().aspectRatio(), cam.get().nearDist(), cam.get().farDist());
+            adjusted = true;
+            adj = cam2.jsonValue();
+            // Recompute coverage
+            const double req2 = requiredCenterDistanceForCoverage(cam2.get(), R);
+            const double cur2 = static_cast<double>(cam2.get().centerDist());
+            double cov2 = (req2 > 1e-9) ? std::min(1.0, cur2 / req2) : 1.0;
+            ok = (cov2 + 1e-6) >= minCov;
+            cov = cov2;
+          }
+        }
+        r.set_adjusted(adjusted);
+        if (adjusted) { *r.mutable_adjusted_value() = jsonToPb(adj); }
+        if (!ok) {
+          if (current < required) {
+            r.set_reason(allowDist ? "too_close" : (allowFov ? "fov_too_small" : "coverage_below_threshold"));
+          } else {
+            r.set_reason("coverage_below_threshold");
+          }
+        } else {
+          r.set_reason("");
+        }
+        out.push_back(std::move(r));
+      }
+      return out;
+    });
+    bool allOk = true;
+    for (auto& r : results) {
+      if (!r.within_frame() || (r.coverage() + 1e-6) < (req->has_constraints() ? (req->constraints().min_coverage() > 0.0 ? req->constraints().min_coverage() : 0.95) : 0.95)) {
+        allOk = false;
+      }
+      *reply->add_results() = std::move(r);
+    }
+    reply->set_ok(allOk);
+    if (!allOk) return Status::OK; // strict acceptance handled client-side via revalidate
     return Status::OK;
   }
 

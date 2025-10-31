@@ -25,6 +25,53 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         {
             "type": "function",
             "function": {
+                "name": "fit_candidates",
+                "description": "Return ids of visual objects suitable for camera fit/orbit (excludes Animation3D).",
+                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "camera_solve",
+                "description": "Plan camera keys via server: never guess. mode=FIT|ORBIT|DOLLY|STATIC; returns [{time, value}].",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "mode": {"type": "string", "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"]},
+                        "ids": {"type": "array", "items": {"type": "integer"}},
+                        "t0": {"type": "number"},
+                        "t1": {"type": "number"},
+                        "constraints": {"type": "object"},
+                        "params": {"type": "object"}
+                    },
+                    "required": ["mode", "t0"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "camera_validate",
+                "description": "Validate camera values for targets and constraints. Returns per-time coverage and optional adjusted values.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ids": {"type": "array", "items": {"type": "integer"}},
+                        "times": {"type": "array", "items": {"type": "number"}},
+                        "values": {"type": "array", "items": {"type": "object"}},
+                        "constraints": {"type": "object"},
+                        "policies": {"type": "object"}
+                    },
+                    "required": ["times", "values"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "scene_set_param_by_name",
                 "description": "Set a parameter by display name (case-insensitive) for an object or group. Resolves json_key via scene_list_params, then calls scene_set_key_param.",
                 "parameters": {
@@ -763,18 +810,83 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             value = args.get("value") or {}
             tol = float(args.get("tolerance", 1e-3))
             strict = bool(args.get("strict", False))
+            ids = args.get("ids") or []
+            constraints = args.get("constraints") or {"keep_visible": True, "min_coverage": 0.95}
+            # First pass policies allow adjustments
+            policies1 = {"adjust_fov": True, "adjust_distance": True, "adjust_clipping": True}
+            # Second pass: strict verification without adjustments
+            policies2 = {"adjust_fov": False, "adjust_distance": False, "adjust_clipping": False}
             try:
                 # Remove camera keys within tolerance
                 try:
                     lr = client.list_keys(scope_camera=True, include_values=False)
                     times = [k.time for k in getattr(lr, "keys", [])]
                     to_remove = [t for t in times if abs(t - time_v) <= tol]
+                    removed = 0
                     for t in to_remove:
-                        client.remove_key(json_key="", time=t)  # scope_camera handled in client.remove_key
+                        if client.remove_key(json_key="", time=t):
+                            removed += 1
+                except Exception:
+                    removed = 0
+                # Validate and accept adjusted value if provided
+                try:
+                    vr = client.camera_validate(ids=ids, times=[time_v], values=[value], constraints=constraints, policies=policies1)
+                    vals = vr.get("results") or []
+                    if vals and vals[0].get("adjusted") and vals[0].get("adjusted_value"):
+                        value = vals[0].get("adjusted_value")
                 except Exception:
                     pass
                 ok = client.set_key_camera(time=time_v, easing=easing, value=value)
-                return json.dumps({"ok": ok})
+                # Re-validate strictly
+                final_ok = ok
+                try:
+                    vr2 = client.camera_validate(ids=ids, times=[time_v], values=[value], constraints=constraints, policies=policies2)
+                    final_ok = bool(vr2.get("ok", False))
+                    reason = (vr2.get("results") or [{}])[0].get("reason")
+                except Exception:
+                    reason = None
+                return json.dumps({"ok": bool(final_ok and ok), "removed": removed, **({"reason": reason} if reason else {})})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+
+        if name == "fit_candidates":
+            try:
+                ids = client.fit_candidates()
+                return json.dumps({"ok": True, "ids": ids})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+
+        if name == "camera_solve":
+            try:
+                mode = str(args.get("mode"))
+                ids = args.get("ids") or []
+                t0 = float(args.get("t0", 0.0))
+                t1 = float(args.get("t1", 0.0))
+                constraints = args.get("constraints") or {}
+                params = args.get("params") or {}
+                keys = client.camera_solve(mode=mode, ids=ids, t0=t0, t1=t1, constraints=constraints, params=params)
+                return json.dumps({"ok": True, "keys": keys})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+
+        if name == "camera_validate":
+            try:
+                ids = args.get("ids") or []
+                times = args.get("times") or []
+                values = args.get("values") or []
+                constraints = args.get("constraints") or {}
+                policies = args.get("policies") or {}
+                res = client.camera_validate(ids=ids, times=times, values=values, constraints=constraints, policies=policies)
+                return json.dumps({"ok": bool(res.get("ok", False)), "results": res.get("results")})
             except Exception as e:
                 msg = str(e)
                 try: msg = e.details()  # type: ignore[attr-defined]

@@ -96,8 +96,42 @@ class Supervisor:
             post = self.scene.scene_facts()
             changed = (pre != post)
             logger.info("[Supervisor] Snapshot changed=%s", changed)
+            # If camera keys exist, run typed validation to gate satisfaction
+            camera_times = (post.get("keys", {}).get("camera") or []) if isinstance(post, dict) else []
+            cam_validation = None
+            if camera_times:
+                try:
+                    lr = self.scene.list_keys(scope_camera=True, include_values=True)
+                    # Build times/values lists (ensure matching order to server's expected input)
+                    times: list[float] = []
+                    values: list[dict] = []
+                    for k in getattr(lr, "keys", []):
+                        try:
+                            t = float(getattr(k, "time", 0.0))
+                            v = getattr(k, "value_json", "")
+                            import json as _json
+                            val = _json.loads(v) if v else {}
+                            times.append(t)
+                            values.append(val)
+                        except Exception:
+                            continue
+                    ids = []
+                    try:
+                        ids = self.scene.fit_candidates()
+                    except Exception:
+                        ids = []
+                    cam_validation = self.scene.camera_validate(ids=ids, times=times, values=values, constraints={"keep_visible": True, "min_coverage": 0.95}, policies={"adjust_fov": False, "adjust_distance": False, "adjust_clipping": False})
+                    # Attach summary into facts for downstream describer
+                    if isinstance(post, dict):
+                        post = dict(post)
+                        post["camera_validation"] = cam_validation
+                except Exception:
+                    pass
             # Ask Inspector for decision with facts
             satisfied, fb = inspector.decide(user_text=user_text, scene_context=ctx, plan_text=selected, facts=post)
+            # Hard gate: if camera validation failed, do not allow satisfied
+            if cam_validation and not bool(cam_validation.get("ok", False)):
+                satisfied = False
             logger.info("[Supervisor] Inspector satisfied=%s", satisfied)
             if changed or satisfied:
                 break
