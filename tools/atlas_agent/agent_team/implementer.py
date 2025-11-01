@@ -142,14 +142,7 @@ class Implementer:
                 ledger.append({"tool": name, "args": args_json, "error": str(e)})
                 raise
         memo = memory_texts or []
-        # Load compact few-shot examples to ground tool usage (short, plan+facts)
-        try:
-            from .examples_loader import load_compact_examples
-            ex = load_compact_examples(max_count=2)
-            if ex:
-                memo.append("Few-shot examples:\n" + "\n\n".join(ex))
-        except Exception:
-            pass
+        # No few-shot examples; rely on system prompt + live facts only
         memo = [
             "Selected design:\n" + (selected_design or "(none)"),
             "Reviewer feedback:\n" + (reviewer_feedback or "(none)"),
