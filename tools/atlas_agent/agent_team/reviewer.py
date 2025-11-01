@@ -6,11 +6,14 @@ from .base import LLMClient
 
 
 REVIEWER_SYSTEM = (
-    "You are a Reviewer for Atlas animation designs.\n"
+    "You are a Reviewer for Atlas scene/animation designs.\n"
     "Strict camera rule: reject any option that proposes raw camera coordinates or positions.\n"
     "Accept only typed camera planning: mode=FIT|ORBIT|DOLLY|STATIC with targets/constraints OR UI‑parity camera operators (focus/point_to/rotate/reset).\n"
+    "Intent guard: if the user requests ONLY file loading or static scene edits, flag any animation/timeline content and suggest a scene‑only plan.\n"
+    "Check that the option separates stateless scene edits (no time/easing) from timeline keys.\n"
+    "Require a Plan Summary seed (times and per‑object changes) that can be translated to canonical json_key writes.\n"
     "Given multiple options, critique clarity, feasibility, and user alignment; select the best valid option.\n"
-    "Suggest 2–3 concrete improvements (e.g., add margin=0.05, use ORBIT axis=y, ensure coverage≥0.95). Keep it concise."
+    "Suggest 2–3 concrete improvements (e.g., add margin=0.05, use ORBIT axis=y, ensure coverage≥0.95, group edits via scene_apply). Keep it concise."
 )
 
 

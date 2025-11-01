@@ -6,6 +6,7 @@
 #include "zlog.h"
 #include "zdoc.h"
 #include "zmainwindow.h"
+#include "zview.h"
 #include "../version/version.h"
 #include "z3drenderingengine.h"
 #include "z3danimationdoc.h"
@@ -17,10 +18,13 @@
 #include "z3dcameraparameter.h"
 #include "zoptionparameter.h"
 #include "znumericparameter.h"
+#include "z3dtransformparameter.h"
 #include <QThread>
 #include <QTimer>
 #include <QApplication>
 #include <QtCore/QDebug>
+#include <algorithm>
+#include <cmath>
 #include <grpcpp/grpcpp.h>
 #include <google/protobuf/struct.pb.h>
 
@@ -58,6 +62,10 @@ using atlas::rpc::CameraFitRequest;
 using atlas::rpc::CameraOrbitSuggestRequest;
 using atlas::rpc::CameraDollySuggestRequest;
 using atlas::rpc::CameraKeysResponse;
+using atlas::rpc::CameraFocusRequest;
+using atlas::rpc::CameraPointToRequest;
+using atlas::rpc::CameraRotateRequest;
+using atlas::rpc::CameraResetViewRequest;
 using atlas::rpc::CameraSolveRequest;
 using atlas::rpc::CameraSolveResponse;
 using atlas::rpc::CameraSolveKey;
@@ -69,6 +77,14 @@ using atlas::rpc::CameraValidateResult;
 using atlas::rpc::FitCandidatesResponse;
 using atlas::rpc::VisibilityRequest;
 using atlas::rpc::ListParamsRequest;
+using atlas::rpc::SetParam;
+using atlas::rpc::ApplySceneParamsRequest;
+using atlas::rpc::ValidateSceneParamsRequest;
+using atlas::rpc::ValidateSceneParamsResponse;
+using atlas::rpc::ValidateSceneParamResult;
+using atlas::rpc::GetParamValuesRequest;
+using atlas::rpc::GetParamValuesResponse;
+using atlas::rpc::SaveSceneRequest;
 using atlas::rpc::ClearKeysRequest;
 using atlas::rpc::RemoveKeyRequest;
 using atlas::rpc::BatchRequest;
@@ -273,6 +289,17 @@ static void setCameraDistance(Z3DCameraParameter& cam, double centerDist)
   const glm::vec3 up = cam.get().upVector();
   cam.setCamera(eye, c, up);
 }
+
+static bool hasVisualObjects(ZRPCService& owner)
+{
+  if (!owner.doc()) return false;
+  for (auto id : owner.doc()->objs()) {
+    auto* od = owner.doc()->idToDoc(id);
+    if (od && od->typeName() == QStringLiteral("Animation3D")) continue;
+    return true;
+  }
+  return false;
+}
 } // namespace
 
 // Scene service bound to app UI context
@@ -286,6 +313,250 @@ public:
   Status Ping(ServerContext*, const PingRequest*, PingResponse* reply) override
   {
     LOG(INFO) << "RPC Ping";
+    reply->set_ok(true);
+    return Status::OK;
+  }
+
+  Status GetParamValues(ServerContext*, const GetParamValuesRequest* req, GetParamValuesResponse* reply) override
+  {
+    if (!m_owner.engine()) return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    auto ok = invokeOnUi([&]() -> bool {
+      if (!m_owner.engine()) return false;
+      size_t boundId = 0;
+      if (req->scope().has_object()) {
+        boundId = static_cast<size_t>(req->scope().object());
+      } else if (req->scope().has_group()) {
+        const auto g = QString::fromStdString(req->scope().group()).toLower();
+        if (g == "background") boundId = 1; else if (g == "axis") boundId = 2; else if (g == "global") boundId = 3; else return false;
+      } else {
+        return false; // camera unsupported for scene params
+      }
+      const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
+      json::object j;
+      for (auto* p : params) {
+        if (p) p->write(j);
+      }
+      if (req->json_keys_size() == 0) {
+        for (const auto& [k, v] : j) {
+          (*reply->mutable_values())[std::string(k.data(), k.size())] = jsonToPb(v);
+        }
+      } else {
+        for (const auto& qk : req->json_keys()) {
+          if (auto* pv = j.if_contains(qk)) {
+            (*reply->mutable_values())[qk] = jsonToPb(*pv);
+          }
+        }
+      }
+      return true;
+    });
+    if (!ok) return Status(grpc::StatusCode::FAILED_PRECONDITION, "get_param_values failed");
+    return Status::OK;
+  }
+
+  Status ValidateSceneParams(ServerContext*, const ValidateSceneParamsRequest* req, ValidateSceneParamsResponse* reply) override
+  {
+    if (!m_owner.engine()) return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    bool allOk = true;
+    auto results = invokeOnUi([&]() {
+      std::vector<ValidateSceneParamResult> out;
+      if (!m_owner.engine()) return out;
+      auto validateOne = [&](const SetParam& sp, ValidateSceneParamResult& r) {
+        r.set_json_key(sp.json_key());
+        // Resolve scope
+        size_t boundId = 0;
+        if (sp.scope().has_object()) {
+          boundId = static_cast<size_t>(sp.scope().object());
+        } else if (sp.scope().has_group()) {
+          const auto g = QString::fromStdString(sp.scope().group()).toLower();
+          if (g == "background") boundId = 1; else if (g == "axis") boundId = 2; else if (g == "global") boundId = 3; else {
+            r.set_ok(false); r.set_reason("invalid_group"); return;
+          }
+        } else {
+          r.set_ok(false); r.set_reason("unsupported_scope"); return;
+        }
+        const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
+        const QString jsonKey = QString::fromStdString(sp.json_key());
+        ZParameter* target = nullptr;
+        for (auto* p : params) if (p && p->jsonKey() == jsonKey) { target = p; break; }
+        if (!target) { r.set_ok(false); r.set_reason("json_key_not_found"); return; }
+
+        // Convert to json and perform light type/range checks
+        json::value v = pbToJson(sp.value());
+        auto tstr = target->type();
+        auto okType = [&]() -> bool {
+          if (tstr == "Bool") return v.is_bool();
+          if (tstr == "Int") return v.is_number();
+          if (tstr == "Float" || tstr == "Double") return v.is_number();
+          if (tstr == "Vec2" || tstr == "DVec2") return v.is_array() && v.as_array().size() == 2;
+          if (tstr == "Vec3" || tstr == "DVec3") return v.is_array() && v.as_array().size() == 3;
+          if (tstr == "Vec4" || tstr == "DVec4") return v.is_array() && v.as_array().size() == 4;
+          // Option and other custom types: accept string/number/object; rely on target->read during apply
+          return true;
+        }();
+        if (!okType) { r.set_ok(false); r.set_reason("type_mismatch"); return; }
+
+        // Range clamp for numeric/vector when metadata is available
+        auto setNormalized = [&](const json::value& nv) { *r.mutable_normalized_value() = jsonToPb(nv); };
+        bool normalized = false;
+        if (auto dp = dynamic_cast<ZDoubleParameter*>(target)) {
+          if (v.is_number()) {
+            double x = v.as_double(); x = std::clamp(x, dp->rangeMin(), dp->rangeMax()); setNormalized(x); normalized = true;
+          }
+        } else if (auto fp = dynamic_cast<ZFloatParameter*>(target)) {
+          if (v.is_number()) {
+            double x = v.as_double(); x = std::clamp(x, static_cast<double>(fp->rangeMin()), static_cast<double>(fp->rangeMax())); setNormalized(x); normalized = true;
+          }
+        } else if (auto ip = dynamic_cast<ZIntParameter*>(target)) {
+          if (v.is_number()) {
+            double x = v.as_double(); x = std::clamp(x, static_cast<double>(ip->rangeMin()), static_cast<double>(ip->rangeMax())); setNormalized(std::floor(x + 0.5)); normalized = true;
+          }
+        } else if (auto v2 = dynamic_cast<ZVec2Parameter*>(target)) {
+          if (v.is_array() && v.as_array().size() == 2) {
+            auto mn = v2->rangeMin(); auto mx = v2->rangeMax();
+            json::array arr;
+            for (size_t i = 0; i < 2; ++i) {
+              double x = v.as_array()[i].is_number() ? v.as_array()[i].as_double() : 0.0;
+              x = std::clamp(x, static_cast<double>(mn[i]), static_cast<double>(mx[i]));
+              arr.emplace_back(x);
+            }
+            setNormalized(arr); normalized = true;
+          }
+        } else if (auto v3 = dynamic_cast<ZVec3Parameter*>(target)) {
+          if (v.is_array() && v.as_array().size() == 3) {
+            auto mn = v3->rangeMin(); auto mx = v3->rangeMax();
+            json::array arr; for (size_t i = 0; i < 3; ++i) { double x = v.as_array()[i].is_number() ? v.as_array()[i].as_double() : 0.0; x = std::clamp(x, static_cast<double>(mn[i]), static_cast<double>(mx[i])); arr.emplace_back(x);} setNormalized(arr); normalized = true;
+          }
+        } else if (auto v4 = dynamic_cast<ZVec4Parameter*>(target)) {
+          if (v.is_array() && v.as_array().size() == 4) {
+            auto mn = v4->rangeMin(); auto mx = v4->rangeMax();
+            json::array arr; for (size_t i = 0; i < 4; ++i) { double x = v.as_array()[i].is_number() ? v.as_array()[i].as_double() : 0.0; x = std::clamp(x, static_cast<double>(mn[i]), static_cast<double>(mx[i])); arr.emplace_back(x);} setNormalized(arr); normalized = true;
+          }
+        }
+        // Special handling for 3DTransform: accept plain field names and normalize to child jsonKeys
+        if (!normalized) {
+          if (auto tp = dynamic_cast<const Z3DTransformParameter*>(target)) {
+            if (v.is_object()) {
+              const auto& obj = v.as_object();
+              json::object out;
+              auto getVec = [&](const char* key1, const char* key2, size_t n) -> std::optional<json::array> {
+                const json::value* pv = nullptr;
+                if (auto it = obj.if_contains(key1)) pv = &*it; else if (auto it2 = obj.if_contains(key2)) pv = &*it2; else return std::nullopt;
+                if (!pv->is_array() || pv->as_array().size() != n) return std::nullopt;
+                json::array arr;
+                for (size_t i = 0; i < n; ++i) {
+                  const auto& el = pv->as_array()[i];
+                  if (!el.is_number()) return std::nullopt;
+                  arr.emplace_back(el.as_double());
+                }
+                return arr;
+              };
+              if (auto a = getVec("Scale", "Scale Vec3", 3)) out["Scale Vec3"] = *a;
+              if (auto a = getVec("Translation", "Translation Vec3", 3)) out["Translation Vec3"] = *a;
+              if (auto a = getVec("Rotation", "Rotation Vec4", 4)) out["Rotation Vec4"] = *a;
+              if (auto a = getVec("Center", "Center Vec3", 3)) out["Center Vec3"] = *a;
+              *r.mutable_normalized_value() = jsonToPb(out);
+            } else {
+              *r.mutable_normalized_value() = jsonToPb(v);
+            }
+          } else {
+            *r.mutable_normalized_value() = jsonToPb(v);
+          }
+        }
+        r.set_ok(true);
+      };
+
+      for (const auto& sp : req->set_params()) {
+        ValidateSceneParamResult r;
+        validateOne(sp, r);
+        if (!r.ok()) allOk = false;
+        out.push_back(std::move(r));
+      }
+      return out;
+    });
+    for (auto& r : results) { *reply->add_results() = std::move(r); }
+    reply->set_ok(allOk);
+    return Status::OK;
+  }
+
+  Status ApplySceneParams(ServerContext*, const ApplySceneParamsRequest* req, Bool* reply) override
+  {
+    if (!m_owner.engine()) return Status(grpc::StatusCode::FAILED_PRECONDITION, "engine not ready");
+    // Validate first to avoid partial apply
+    ValidateSceneParamsRequest vreq;
+    for (const auto& sp : req->set_params()) { *vreq.add_set_params() = sp; }
+    ValidateSceneParamsResponse vresp;
+    auto vst = ValidateSceneParams(nullptr, &vreq, &vresp);
+    if (vst.error_code() != grpc::StatusCode::OK || !vresp.ok()) {
+      // Build a compact reason string to aid diagnostics
+      int bad = 0;
+      std::string firstReason;
+      std::string firstKey;
+      for (const auto& r : vresp.results()) {
+        if (!r.ok()) {
+          ++bad;
+          if (firstReason.empty()) {
+            firstReason = r.reason();
+            firstKey = r.json_key();
+          }
+        }
+      }
+      std::ostringstream oss;
+      oss << "validate failed";
+      if (bad > 0) {
+        oss << ": bad=" << bad;
+        if (!firstReason.empty()) {
+          oss << ", first_reason=" << firstReason;
+        }
+        if (!firstKey.empty()) {
+          oss << ", first_key=" << firstKey;
+        }
+      }
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, oss.str());
+    }
+    bool ok = invokeOnUi([&]() -> bool {
+      if (!m_owner.engine()) return false;
+      for (const auto& sp : req->set_params()) {
+        size_t boundId = 0;
+        if (sp.scope().has_object()) {
+          boundId = static_cast<size_t>(sp.scope().object());
+        } else if (sp.scope().has_group()) {
+          const auto g = QString::fromStdString(sp.scope().group()).toLower();
+          if (g == "background") boundId = 1; else if (g == "axis") boundId = 2; else if (g == "global") boundId = 3; else return false;
+        } else {
+          return false; // unsupported scope
+        }
+        const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
+        const QString jsonKey = QString::fromStdString(sp.json_key());
+        ZParameter* target = nullptr;
+        for (auto* p : params) if (p && p->jsonKey() == jsonKey) { target = p; break; }
+        if (!target) return false;
+        // Prefer normalized value from validation when available
+        json::value v = pbToJson(sp.value());
+        // Apply with normalization for composite types
+        json::object j;
+        if (auto tp = dynamic_cast<const Z3DTransformParameter*>(target)) {
+          if (v.is_object()) {
+            const auto& obj = v.as_object();
+            json::object out;
+            auto mapField = [&](const char* key1, const char* key2) {
+              if (auto it = obj.if_contains(key1)) out[key2] = *it; else if (auto it2 = obj.if_contains(key2)) out[key2] = *it2;
+            };
+            mapField("Scale", "Scale Vec3");
+            mapField("Translation", "Translation Vec3");
+            mapField("Rotation", "Rotation Vec4");
+            mapField("Center", "Center Vec3");
+            j[sp.json_key()] = out;
+          } else {
+            j[sp.json_key()] = v;
+          }
+        } else {
+          j[sp.json_key()] = v;
+        }
+        target->read(j);
+      }
+      return true;
+    });
+    if (!ok) return Status(grpc::StatusCode::FAILED_PRECONDITION, "apply_scene_params failed");
     reply->set_ok(true);
     return Status::OK;
   }
@@ -336,6 +607,15 @@ public:
       QStringList qfiles;
       for (const auto& s : request->files()) qfiles << QString::fromStdString(s);
       m_owner.doc()->loadFileList(qfiles);
+      // If an animation already exists, rebind to include newly loaded objects
+      // so subsequent key writes/queries see the latest parameters.
+      auto& ad = m_owner.doc()->animation3DDoc();
+      auto ids = ad.animationIds();
+      if (!ids.empty()) {
+        if (auto* anim = ad.animationPtr(ids.front())) {
+          anim->rebindView();
+        }
+      }
       return true;
     });
     if (!ok) return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
@@ -477,10 +757,16 @@ public:
     auto ok = invokeOnUi([&]() -> bool {
       if (!m_owner.doc()) return false;
       auto& ad = m_owner.doc()->animation3DDoc();
-      if (ad.animationIds().empty()) ad.createNewAnimationAndReturnId("LLM Animation");
+      if (ad.animationIds().empty()) {
+        if (!hasVisualObjects(m_owner)) {
+          LOG(INFO) << "EnsureAnimation: skipped (no visual objects)";
+          return false;
+        }
+        ad.createNewAnimationAndReturnId("LLM Animation");
+      }
       return true;
     });
-    if (!ok) return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
+    if (!ok) return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready or no visual objects");
     reply->set_ok(true);
     return Status::OK;
   }
@@ -492,7 +778,10 @@ public:
       if (!m_owner.doc()) return false;
       auto& ad = m_owner.doc()->animation3DDoc();
       auto ids = ad.animationIds();
-      if (ids.empty()) ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
+      if (ids.empty()) {
+        if (!hasVisualObjects(m_owner)) return false;
+        ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
+      }
       if (auto* anim = ad.animationPtr(ids.front())) { anim->setDuration(req->duration()); return true; }
       return false;
     });
@@ -512,7 +801,10 @@ public:
       if (!m_owner.doc() || !m_owner.engine()) { errMsg = "engine/doc not ready"; return false; }
       auto& ad = m_owner.doc()->animation3DDoc();
       auto ids = ad.animationIds();
-      if (ids.empty()) ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
+      if (ids.empty()) {
+        if (!hasVisualObjects(m_owner)) { errMsg = "no visual objects loaded"; return false; }
+        ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
+      }
       auto* anim = ad.animationPtr(ids.front());
       if (!anim) { errMsg = "no animation available"; return false; }
       anim->rebindView();
@@ -1286,7 +1578,10 @@ public:
       if (!m_owner.doc() || !m_owner.engine()) return false;
       auto& ad = m_owner.doc()->animation3DDoc();
       auto ids = ad.animationIds();
-      if (ids.empty()) ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
+      if (ids.empty()) {
+        if (!hasVisualObjects(m_owner)) return false;
+        ids.push_back(ad.createNewAnimationAndReturnId("LLM Animation"));
+      }
       auto* anim = ad.animationPtr(ids.front());
       if (!anim) return false;
       anim->rebindView();
@@ -1451,6 +1746,7 @@ public:
     return Status::OK;
   }
 
+
   Status Save(ServerContext*, const SaveRequest* req, Bool* reply) override
   {
     LOG(INFO) << "RPC Save path=" << req->path();
@@ -1473,6 +1769,74 @@ public:
   {
     // Alias of Save for clarity in clients
     return Save(nullptr, req, reply);
+  }
+
+  Status SaveScene(ServerContext*, const SaveSceneRequest* req, Bool* reply) override
+  {
+    LOG(INFO) << "RPC SaveScene path=" << req->path();
+    auto ok = invokeOnUi([&]() -> bool {
+      // Find the main window and gather state similar to ZMainWindow::saveJsonSceneImpl
+      ZMainWindow* mainWin = nullptr;
+      for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (auto mw = qobject_cast<ZMainWindow*>(w)) { mainWin = mw; break; }
+      }
+      if (!mainWin) return false;
+      if (!m_owner.doc()) return false;
+      json::object sceneObj;
+      sceneObj["Version"] = 1.0;
+
+      // Doc
+      json::object docObj;
+      m_owner.doc()->write(docObj, true);
+      sceneObj["Doc"] = docObj;
+
+      // Per-object views
+      auto objs = m_owner.doc()->objs();
+      for (auto id : objs) {
+        json::object jObj;
+        json::object view2DObj;
+        if (auto* v = mainWin->view()) {
+          v->write(id, view2DObj);
+        }
+        jObj["View2D"] = view2DObj;
+
+        if (m_owner.engine()) {
+          json::object view3DObj;
+          auto* eng = m_owner.engine();
+          QMetaObject::invokeMethod(
+            eng,
+            [eng, id, &view3DObj]() {
+              eng->write(id, view3DObj);
+            },
+            Qt::BlockingQueuedConnection);
+          jObj["View3D"] = view3DObj;
+        }
+        sceneObj[QString("%1").arg(id).toStdString()] = jObj;
+      }
+
+      // General views
+      if (auto* v = mainWin->view()) {
+        json::object view2DGeneralObj; v->write(view2DGeneralObj); sceneObj["View2DGeneral"] = view2DGeneralObj;
+      }
+      if (m_owner.engine()) {
+        json::object view3DGeneralObj;
+        auto* eng = m_owner.engine();
+        QMetaObject::invokeMethod(
+          eng,
+          [eng, &view3DGeneralObj]() { eng->write(view3DGeneralObj); },
+          Qt::BlockingQueuedConnection);
+        sceneObj["View3DGeneral"] = view3DGeneralObj;
+      }
+
+      json::object saveObj; saveObj["Scene"] = sceneObj;
+      try {
+        saveJsonObject(saveObj, QString::fromStdString(req->path()));
+      } catch (const std::exception&) { return false; }
+      return true;
+    });
+    if (!ok) return Status(grpc::StatusCode::FAILED_PRECONDITION, "save_scene failed");
+    reply->set_ok(true);
+    return Status::OK;
   }
 
   Status CutSet(ServerContext*, const CutSetRequest* req, Bool* reply) override

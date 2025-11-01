@@ -16,6 +16,17 @@ Service and Methods (initial)
   - `BBox(ids, after_clipping) -> bbox {min, max, size, center}`
   - `Capabilities(ids?) -> { Background[], Axis[], Global[], Objects{Type: ParamList} }`
     - Parameter: `{ json_key, name, type, supports_interpolation }`
+
+Scene (stateless) operations
+- Use these when editing the scene/base state (no timeline/time/easing). They do not write keyframes.
+  - `GetParamValues { scope, json_keys? } -> { values: map<json_key, Value> }`
+    - `scope`: `{ object: id }` or `{ group: 'background'|'axis'|'global' }`. If `json_keys` omitted, returns all values for the scope.
+  - `ValidateSceneParams { set_params: [ { scope, json_key, value } ] } -> { ok, results[] }`
+    - Performs shape/range checks (and basic option checks) and returns `normalized_value` when clamping is applicable.
+  - `ApplySceneParams { set_params: [...] } -> { ok }`
+    - Applies the assignments atomically after validation. No time/easing. Marshalled to UI thread.
+  - `SaveScene { path } -> { ok }`
+    - Writes a `.scene` file, equivalent to the UI’s Save Scene (no timeline keys).
 - Timeline:
   - `EnsureAnimation() -> ok` (create/bind a default 3D animation with a baseline t=0 frame)
   - `SetDuration(seconds) -> ok`

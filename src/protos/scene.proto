@@ -101,6 +101,15 @@ service Scene {
   rpc ListObjects (Empty) returns (ListObjectsResponse);
   rpc BBox (BBoxRequest) returns (BBoxResponse);
   rpc Capabilities (CapabilitiesRequest) returns (CapabilitiesResponse);
+  // Scene (stateless) parameter operations
+  // Validate a list of scene parameter assignments without applying them.
+  rpc ValidateSceneParams (ValidateSceneParamsRequest) returns (ValidateSceneParamsResponse);
+  // Apply a list of scene parameter assignments atomically (no timeline/time/easing).
+  rpc ApplySceneParams (ApplySceneParamsRequest) returns (Bool);
+  // Read current parameter values for a target scope.
+  rpc GetParamValues (GetParamValuesRequest) returns (GetParamValuesResponse);
+  // Save current scene (.scene)
+  rpc SaveScene (SaveSceneRequest) returns (Bool);
   rpc EnsureAnimation (EnsureAnimationRequest) returns (Bool);
   rpc SetDuration (SetDurationRequest) returns (Bool);
   rpc SetKey (SetKeyRequest) returns (Bool);
@@ -141,6 +150,40 @@ service Scene {
   rpc ListKeys (ListKeysRequest) returns (KeysResponse);
   rpc GetTime (Empty) returns (TimeStatus);
 }
+
+// Scene (stateless) parameter messages
+message SetParam {
+  Scope scope = 1;                // object or group (camera not supported)
+  string json_key = 2;            // canonical parameter json key
+  google.protobuf.Value value = 3; // value to set (typed JSON)
+}
+
+message ApplySceneParamsRequest { repeated SetParam set_params = 1; }
+
+message ValidateSceneParamsRequest { repeated SetParam set_params = 1; }
+
+message ValidateSceneParamResult {
+  string json_key = 1;
+  bool ok = 2;                                  // assignment is acceptable
+  google.protobuf.Value normalized_value = 3;   // when ok=true, may contain clamped/normalized value
+  string reason = 4;                            // when ok=false, short reason (e.g., "json_key_not_found", "type_mismatch", "option_invalid")
+}
+
+message ValidateSceneParamsResponse {
+  repeated ValidateSceneParamResult results = 1;
+  bool ok = 2; // all assignments acceptable
+}
+
+message GetParamValuesRequest {
+  Scope scope = 1;               // object or group
+  repeated string json_keys = 2; // when empty, returns all values for the scope
+}
+
+message GetParamValuesResponse {
+  map<string, google.protobuf.Value> values = 1; // json_key -> value
+}
+
+message SaveSceneRequest { string path = 1; }
 
 // Camera helper messages
 message CameraFitRequest {

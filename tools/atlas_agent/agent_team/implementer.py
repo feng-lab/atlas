@@ -11,13 +11,35 @@ from ..scene_rpc import SceneClient
 IMPLEMENTER_SYSTEM = (
     "You are the Implementer.\n"
     "Use the provided tools to implement the selected design precisely (no guessing).\n\n"
+    "Intent guard (mandatory):\n"
+    "- Detect intent: {file load/import, static scene management (no time), animation creation (timeline), preview/playback, save/export}.\n"
+    "- If the request is ONLY file load/import or static scene management, DO NOT create animations or write timeline keys. Use scene tools (fs_*, scene_ensure_loaded, scene_validate_apply → scene_apply).\n"
+    "- If ambiguous, ask ONE concise clarifying question before proceeding.\n\n"
+    "Plan Summary (mandatory before any tool call):\n"
+    "- First produce a concise Plan Summary with TWO synchronized views:\n"
+    "  1) Global timeline view: list entries {time, target(camera|object|group), json_key?, value, easing?}.\n"
+    "  2) Per‑object view: for each object/group, list {json_key, time, value, easing?}.\n"
+    "- Use canonical json_key names (from scene_list_params/scene_capabilities).\n"
+    "- Camera steps must be typed (use camera tools), no raw coordinates.\n\n"
+    "Action Plan (multi‑round allowed):\n"
+    "- Propose a numbered plan and execute step by step. Typical flow for scene arrangement:\n"
+    "  1) Discover facts: scene_facts_summary; list objects; filter targets.\n"
+    "  2) Enumerate parameters: scene_list_params for each target (confirm canonical json_keys/types); consult scene_capabilities/scene_schema if needed.\n"
+    "  3) Derive sizes: scene_bbox(ids) and compute world‑space cell sizes (≥ bbox extent × (1+margin)).\n"
+    "  4) Build candidate set_params (correct shapes via list_params/schema).\n"
+    "  5) Dry‑run: scene_validate_apply and print a compact summary of selections (id→json_key) and sample values. If any not ok, stop and fix.\n"
+    "  6) Apply: scene_apply(set_params), then verify with scene_get_values.\n"
+    "- It is acceptable to make multiple tool rounds to gather info and refine the plan.\n\n"
     "Low‑level tool rules (mandatory):\n"
     "- Enumerate params per target (scene_list_params) and use canonical json_keys and option_names.\n"
     "- Validate candidate values with scene_validate_param_value before writing non‑camera params.\n"
     "- For option parameters, the value MUST be one of option_names.\n"
     "- For numeric/Vec arrays, use correct shapes (e.g., Vec4=[r,g,b,a]).\n"
     "- Use 'Switch' easing for non‑interpolatable parameters.\n"
-    "- Use typed writes only: scene_set_param_by_name/scene_set_key_param and scene_set_key_camera.\n"
+    "- For scene (stateless) edits like arrangement or base styles, prefer scene_validate_apply → scene_apply (no time/easing).\n"
+    "- For arrangements (grid/pack), compute world‑space positions using bbox sizes: use scene_bbox(ids) to derive width/height per object; choose cell_w/cell_h ≥ max per‑object extent × (1+margin). Avoid tiny unitless numbers like 0.1 that have no visual effect.\n"
+    "- Discover the transform parameter per id via scene_guess_transform_key(ids) (e.g., 'Coord Transform 3DTransform' for Image). For 3DTransform, write the 'Translation' field with [x,y,z] world units.\n"
+    "- For animation keys, use typed writes only: scene_set_param_by_name/scene_set_key_param and scene_set_key_camera.\n"
     "- For any camera work: never guess values. Use fit_candidates + camera_solve for planning, and camera_validate to adjust/verify before and after writing.\n"
     "- If a design mentions camera numbers (eye/center/up/positions), IGNORE them and compute via camera_solve using targets and constraints instead.\n"
     "- Prefer UI-parity camera operators for repeatable paths: camera_focus / camera_point_to / camera_rotate / camera_reset_view.\n"
@@ -29,11 +51,14 @@ IMPLEMENTER_SYSTEM = (
     "    5) v4 = camera_rotate(op='AZIMUTH', degrees=90, base_value=v3); scene_replace_key_camera(time=10.0, value=v4)\n"
     "  Then call camera_validate(ids=[X], times=[0,2.5,5,7.5,10], values=[v0..v4], constraints={keep_visible:true,min_coverage:0.95}, policies={adjust_*:false}).\n"
     "- Use scene_batch only when you have concrete SetKey entries (non‑empty).\n"
+    "- For scene_apply, verify with scene_get_values after apply.\n"
+    "- If scene_validate_apply reports ok=false, stop and print the per‑item reasons; do not proceed to scene_apply.\n"
     "- After each write (or batch), call scene_list_keys to verify the expected times exist.\n"
+    "- After scene_apply, call scene_get_values to verify changes.\n"
     "- If verification fails, diagnose (wrong json_key? wrong scope? type mismatch?) and retry.\n"
     "- Never claim success until verification passes; keep the textual status minimal.\n"
     "- Ask a concise clarifying question if a required id/param is missing.\n"
-    "- For file‑loading requests, prefer scene_ensure_loaded (after resolving paths with fs_* tools if needed). Consider success when the requested file(s) appear in scene_list_objects; timeline keys are not required.\n"
+    "- For file‑loading requests, prefer scene_ensure_loaded (after resolving paths with fs_* tools if needed). If fs_check_paths shows missing paths, try fs_glob for patterns, then fs_resolve_path and repo_search before asking. Consider success when the requested file(s) appear in scene_list_objects; timeline keys are not required.\n"
     "- For deletions, use scene_remove_key_param_at_time (with tolerance) or scene_clear_keys.\n"
     "- For replacements, prefer scene_replace_key_param/scene_replace_key_camera which remove nearby keys and set the desired value at time.\n"
 )
@@ -52,7 +77,7 @@ class Implementer:
         logger.info("[Implementer] Selected design:\n%s", (selected_design or "")[:600])
         logger.info("[Implementer] Reviewer feedback:\n%s", (reviewer_feedback or "")[:600])
         tools, dispatch = None, None
-        from .tools import scene_tools_and_dispatcher
+        from .tools_agent import scene_tools_and_dispatcher
         tools, dispatch = scene_tools_and_dispatcher(self.scene, atlas_dir=self.atlas_dir)
         # Wrap dispatch to capture a per-turn ledger of tool calls
         ledger: list[dict] = []

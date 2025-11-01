@@ -819,11 +819,13 @@ void Z3DRenderingEngine::init()
       auto meshView = new Z3DMeshView(*meshDoc, *this);
       connect(meshView, &Z3DMeshView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
       m_3dObjViews.emplace_back(meshView);
-    } else if (auto aniDoc = qobject_cast<Z3DAnimationDoc*>(objDoc)) {
-      auto aniView = new Z3DAnimationView(*aniDoc, *this);
-      connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
-      m_3dObjViews.emplace_back(aniView);
-    } else if (auto raDoc = qobject_cast<ZRegionAnnotationDoc*>(objDoc)) {
+    }
+    // else if (auto aniDoc = qobject_cast<Z3DAnimationDoc*>(objDoc)) {
+    //   auto aniView = new Z3DAnimationView(*aniDoc, *this);
+    //   connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
+    //   m_3dObjViews.emplace_back(aniView);
+    // } 
+    else if (auto raDoc = qobject_cast<ZRegionAnnotationDoc*>(objDoc)) {
       auto aniView = new Z3DRegionAnnotationView(*raDoc, *this);
       connect(aniView, &Z3DRegionAnnotationView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
       m_3dObjViews.emplace_back(aniView);

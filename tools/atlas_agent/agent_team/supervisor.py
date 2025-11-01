@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from .base import BaseAgent, LLMClient, AgentMessage
 import logging
-from .tools import scene_tools_and_dispatcher
+from .tools_agent import scene_tools_and_dispatcher
 from .planner import Planner
 from .inspector import Inspector
 from .designer import Designer
@@ -20,13 +20,22 @@ import json as _json
 
 
 SUPERVISOR_SYSTEM = (
-    "You are the Supervisor (orchestrator) for an Atlas animation multi‑agent team.\n"
+    "You are the Supervisor (orchestrator) for an Atlas scene/animation multi‑agent team.\n"
     "Your job is to coordinate specialists — you do not call tools directly.\n\n"
+    "Intent first (mandatory):\n"
+    "- Classify the user request into one or more of: {file load/import, static scene management (no time), animation creation (timeline), preview/playback, save/export, help/explain}.\n"
+    "- If the request is ONLY file load/import or static scene management, DO NOT create animations or write timeline keys. Use scene tools (fs_*, scene_ensure_loaded, scene_apply).\n"
+    "- If ambiguous, ask ONE concise clarifying question before any writes.\n\n"
+    "- If the user says 'next step' / 'proceed', infer continuity: re‑evaluate facts and complete the previous plan first (e.g., finish grid arrangement) before proposing new, unrelated edits.\n\n"
     "Team protocol:\n"
     "- Designer proposes 2–3 distinct high‑level designs based on the user request and scene context. Camera steps MUST be typed (mode/targets/constraints). No raw camera numbers.\n"
+    "- Before any key writes, require a Natural Language Plan Summary with TWO views (no extra formats):\n"
+    "    1) Global timeline view: list of {time, target(camera|object|group), json_key?, value/easing?}.\n"
+    "    2) Per‑object view: for each object/group, list its planned key changes {json_key, time, value, easing?}.\n"
+    "  The Plan Summary must be consistent, unambiguous (use canonical json_key names), and sufficient for direct translation to Atlas tools.\n"
     "- Reviewer A and Reviewer B critique options; reject any that include raw camera coordinates and suggest typed camera planning instead.\n"
     "- Arbiter selects the best option or blends two into a single merged plan, ensuring camera steps are typed only.\n"
-    "- Implementer uses typed tools to implement the merged plan (no guessing): enumerate params, use camera_solve/validate, write SetKey, verify with scene_list_keys.\n"
+    "- Implementer uses typed tools to implement the merged plan (no guessing): enumerate params, use camera_solve/validate, write SetKey or scene_apply (stateless), and verify with scene_list_keys or scene_get_values.\n"
     "- Inspector validates the result; if gaps remain, feed feedback back to Implementer and iterate until satisfied.\n"
     "- Describer produces a concise, facts‑only summary using the verified keys/times.\n\n"
     "Success criteria:\n"
@@ -145,7 +154,7 @@ class Supervisor:
                     if not tsec and cam_times:
                         tsec = float(cam_times[len(cam_times)//2])
                     # Invoke preview tool via dispatcher
-                    from .tools import scene_tools_and_dispatcher
+                    from .tools_agent import scene_tools_and_dispatcher
                     _tools, _dispatch = scene_tools_and_dispatcher(self.scene, atlas_dir=self.atlas_dir)
                     res = _dispatch("scene_render_preview", _json.dumps({"time": tsec, "width": 512, "height": 512}))
                     try:

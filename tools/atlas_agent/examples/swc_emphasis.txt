@@ -1,7 +1,0 @@
-User: Emphasize SWC 3 in magenta over 5 seconds, dim others.
-Plan:
-  1) SWC 3 → Color Mode=Single Color, Color=magenta at t=0.
-  2) Opacity ramp 0.3→1.0 from t=0→5; others set to 0.2 at t=0.
-Tools: scene_emphasize_object(id=3,color=magenta,opacity=1.0,dim_others=true,time=0) → scene_replace_key_param(json_key='Opacity',time=0,value=0.3) → scene_replace_key_param(json_key='Opacity',time=5,value=1.0)
-Facts: objects.3.Color Mode=[0]; objects.3.Color=[0]; objects.3.Opacity=[0,5]
-

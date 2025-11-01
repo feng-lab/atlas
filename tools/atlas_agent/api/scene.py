@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+"""Typed wrappers around SceneClient for Python scripts.
+
+These helpers raise exceptions on failure and return native Python types.
+"""
+
+from pathlib import Path
+from typing import Any, Optional
+
+from ..scene_rpc import SceneClient
+
+
+class SceneAPI:
+    def __init__(self, client: SceneClient):
+        self._c = client
+
+    # Load
+    def ensure_loaded(self, files: list[str]) -> dict:
+        return self._c.ensure_loaded(files)
+
+    def list_objects(self) -> list[dict]:
+        resp = self._c.list_objects()
+        out = []
+        for o in getattr(resp, "objects", []):
+            out.append({
+                "id": int(getattr(o, "id", 0)),
+                "type": getattr(o, "type", ""),
+                "name": getattr(o, "name", ""),
+                "path": getattr(o, "path", ""),
+                "visible": bool(getattr(o, "visible", False)),
+            })
+        return out
+
+    # Scene params (stateless)
+    def list_params(self, *, scope_object: Optional[int] = None, scope_group: Optional[str] = None):
+        return self._c.list_params(scope_object=scope_object, scope_group=scope_group)
+
+    def get_values(self, *, scope_object: Optional[int] = None, scope_group: Optional[str] = None, json_keys: Optional[list[str]] = None) -> dict:
+        return self._c.get_param_values(scope_object=scope_object, scope_group=scope_group, json_keys=json_keys)
+
+    def validate_apply(self, set_params: list[dict]) -> dict:
+        res = self._c.validate_apply(set_params)
+        if not res.get("ok", False):
+            return res
+        return res
+
+    def apply_params(self, set_params: list[dict]) -> None:
+        ok = self._c.apply_params(set_params)
+        if not ok:
+            raise RuntimeError("ApplySceneParams failed")
+
+    def save_scene(self, path: str | Path) -> None:
+        ok = self._c.save_scene(Path(path))
+        if not ok:
+            raise RuntimeError("SaveScene failed")
+
+    # Timeline (selected helpers)
+    def list_keys(self, **kwargs):
+        return self._c.list_keys(**kwargs)
+
+    def set_time(self, seconds: float, cancel_rendering: bool = False) -> None:
+        ok = self._c.set_time(seconds, cancel_rendering=cancel_rendering)
+        if not ok:
+            raise RuntimeError("SetTime failed")
+

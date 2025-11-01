@@ -45,6 +45,7 @@ def build_capabilities_prompt(schema_dir: Path, *, max_lines: int = 120) -> str:
     lines: List[str] = []
     lines.append("Atlas Capabilities Overview (condensed)")
     lines.append("Use tools to inspect live params: scene_list_params, scene_capabilities, list per object id.")
+    lines.append("Scene (stateless) edits: plan scene_validate_apply → scene_apply (no time/easing); verify via scene_get_values.")
     if not caps:
         # Minimal static knowledge
         lines += [
@@ -88,8 +89,10 @@ def build_capabilities_prompt(schema_dir: Path, *, max_lines: int = 120) -> str:
     lines += [
         "Camera: use CameraFit/Orbit/Dolly to derive camera values; write camera keys at start/end.",
         "Emphasis recipe: set Color Mode='Single Color', set Color=Vec4 RGBA, and adjust Opacity.",
-        "Batch: prefer scene_batch to atomically write multiple keys across scopes.",
+        "Batch: prefer scene_batch to atomically write multiple keys across scopes (for timeline).",
+        "Scene: for base arrangement/styling, use scene_apply (stateless).",
         "Cuts: suggest via scene_cut_suggest_box(ids, margin), then scene_cut_set_box(refit_camera=true).",
     ]
+    # Add type-specific tips when possible
+    lines.append("Tips: Image objects expose 'Coord Transform 3DTransform' — write Translation [x,y,z] in world units. Use scene_bbox(ids) to size grid cells; avoid tiny unitless translations.")
     return "\n".join(lines[:max_lines])
-

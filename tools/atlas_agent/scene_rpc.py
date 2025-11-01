@@ -70,7 +70,10 @@ class SceneClient:
                                      datefmt="%H:%M:%S")
             h.setFormatter(fmt)
             self._logger.addHandler(h)
-            self._logger.setLevel(logging.INFO)
+            # Default to WARNING to reduce noise; override via ATLAS_AGENT_LOG
+            lvl = os.environ.get("ATLAS_AGENT_LOG", "WARNING").upper()
+            level = getattr(logging, lvl, logging.WARNING)
+            self._logger.setLevel(level)
             self._logger.propagate = False
         repo_root = Path(__file__).resolve().parents[2]
         self._tmpdir, self._pb2, self._pb2_grpc = _load_stubs(repo_root)
@@ -100,10 +103,15 @@ class SceneClient:
                 return str(obj)
             except Exception:
                 return f"<{type(obj).__name__}>"
+        # Avoid spamming on frequent getters unless log level is DEBUG
+        noisy = {"EngineReady", "Ensure3DWindow", "ListParams", "ListKeys", "GetTime", "Ping"}
         if error is not None:
             self._logger.error("%s req=%s error=%s", name, _safe(req), error)
         else:
-            self._logger.info("%s req=%s resp=%s", name, _safe(req), _safe(resp))
+            if name in noisy and self._logger.level > logging.DEBUG:
+                self._logger.debug("%s ok", name)
+            else:
+                self._logger.info("%s req=%s resp=%s", name, _safe(req), _safe(resp))
 
     # Basic
     def ping(self) -> bool:
@@ -267,10 +275,24 @@ class SceneClient:
     def ensure_animation(self) -> bool:
         # Ensure the rendering engine exists (open 3D view if necessary)
         self.ensure_view()
+        # Only create animation when at least one visual object is loaded
+        try:
+            objs = self.list_objects()
+            has_visual = False
+            for o in getattr(objs, "objects", []):
+                t = (getattr(o, "type", "") or "").lower()
+                if t and "animation3d" not in t:
+                    has_visual = True
+                    break
+            if not has_visual:
+                self._logger.info("EnsureAnimation: skipped (no visual objects loaded yet)")
+                return False
+        except Exception:
+            pass
         req = self._pb2.EnsureAnimationRequest()
         resp = self._stub.EnsureAnimation(req)
         self._log_rpc("EnsureAnimation", req, resp)
-        return resp.ok
+        return bool(getattr(resp, "ok", False))
 
     def set_duration(self, seconds: float) -> bool:
         req = self._pb2.SetDurationRequest(duration=seconds)
@@ -745,13 +767,9 @@ class SceneClient:
         return bool(resp.ok)
 
     def list_keys(self, *, scope_camera: bool = False, scope_object: Optional[int] = None, scope_group: Optional[str] = None, json_key: Optional[str] = None, include_values: bool = False):
-        # Ensure engine/view and an animation exist before querying keys
+        # Ensure engine/view exists. Do not force-create animation here to avoid
+        # creating empty animations before objects are loaded.
         self.ensure_view()
-        try:
-            # Safe to call even if animation already exists
-            self.ensure_animation()
-        except Exception:
-            pass
         if scope_camera:
             sc = self._pb2.Scope(camera=True)
         elif scope_object is not None:
@@ -777,6 +795,126 @@ class SceneClient:
         resp = self._stub.SetVisibility(req)
         self._log_rpc("SetVisibility", req, resp)
         return resp.ok
+
+    # Placement roles removed by design: prefer list_params/capabilities/schema
+
+    # Scene (stateless) parameter ops
+    def get_param_values(self, *, scope_object: Optional[int] = None, scope_group: Optional[str] = None, json_keys: Optional[list[str]] = None) -> dict:
+        if scope_object is None and scope_group is None:
+            raise ValueError("get_param_values requires scope_object or scope_group")
+        if scope_object is not None:
+            sc = self._pb2.Scope(object=int(scope_object))
+        else:
+            sc = self._pb2.Scope(group=str(scope_group))
+        req = self._pb2.GetParamValuesRequest(scope=sc, json_keys=json_keys or [])
+        resp = self._stub.GetParamValues(req)
+        self._log_rpc("GetParamValues", req, resp)
+        # Convert Struct/Value map to native dict
+        out: dict[str, Any] = {}
+        for k, v in getattr(resp, "values", {}).items():
+            # Use protobuf json MessageToDict to convert google.protobuf.Value → python
+            out[k] = MessageToDict(v)
+        return out
+
+    def validate_apply(self, set_params: list[dict]) -> dict:
+        """Validate a batch of scene parameter assignments.
+
+        Each item: { scope: {object|group}, json_key: str, value: any }
+        Returns { ok: bool, results: [{json_key, ok, reason?, normalized_value?}] }
+        """
+        def _to_value(py: Any) -> struct_pb2.Value:
+            v = struct_pb2.Value()
+            if py is None:
+                v.null_value = 0
+            elif isinstance(py, bool):
+                v.bool_value = bool(py)
+            elif isinstance(py, (int, float)) and not isinstance(py, bool):
+                v.number_value = float(py)
+            elif isinstance(py, str):
+                v.string_value = py
+            elif isinstance(py, (list, tuple)):
+                lv = struct_pb2.ListValue();
+                for item in py:
+                    lv.values.append(_to_value(item))
+                v.list_value.CopyFrom(lv)
+            elif isinstance(py, dict):
+                st = struct_pb2.Struct()
+                for k, val in py.items():
+                    st.fields[k].CopyFrom(_to_value(val))
+                v.struct_value.CopyFrom(st)
+            else:
+                v.string_value = str(py)
+            return v
+        pb_items = []
+        for it in set_params:
+            scd = it.get("scope") or {}
+            if "object" in scd:
+                sc = self._pb2.Scope(object=int(scd["object"]))
+            elif "group" in scd:
+                sc = self._pb2.Scope(group=str(scd["group"]))
+            else:
+                raise ValueError("validate_apply: scope must include object or group")
+            pb_items.append(self._pb2.SetParam(scope=sc, json_key=str(it["json_key"]), value=_to_value(it.get("value"))))
+        req = self._pb2.ValidateSceneParamsRequest(set_params=pb_items)
+        resp = self._stub.ValidateSceneParams(req)
+        self._log_rpc("ValidateSceneParams", req, resp)
+        results: list[dict] = []
+        for r in getattr(resp, "results", []):
+            entry: dict[str, Any] = {"json_key": getattr(r, "json_key", ""), "ok": bool(getattr(r, "ok", False))}
+            reason = getattr(r, "reason", "")
+            if reason:
+                entry["reason"] = reason
+            nv = getattr(r, "normalized_value", None)
+            if nv is not None:
+                entry["normalized_value"] = MessageToDict(nv)
+            results.append(entry)
+        return {"ok": bool(getattr(resp, "ok", False)), "results": results}
+
+    def apply_params(self, set_params: list[dict]) -> bool:
+        """Apply a batch of scene parameter assignments atomically (no time/easing)."""
+        def _to_value(py: Any) -> struct_pb2.Value:
+            v = struct_pb2.Value()
+            if py is None:
+                v.null_value = 0
+            elif isinstance(py, bool):
+                v.bool_value = bool(py)
+            elif isinstance(py, (int, float)) and not isinstance(py, bool):
+                v.number_value = float(py)
+            elif isinstance(py, str):
+                v.string_value = py
+            elif isinstance(py, (list, tuple)):
+                lv = struct_pb2.ListValue();
+                for item in py:
+                    lv.values.append(_to_value(item))
+                v.list_value.CopyFrom(lv)
+            elif isinstance(py, dict):
+                st = struct_pb2.Struct()
+                for k, val in py.items():
+                    st.fields[k].CopyFrom(_to_value(val))
+                v.struct_value.CopyFrom(st)
+            else:
+                v.string_value = str(py)
+            return v
+        pb_items = []
+        for it in set_params:
+            scd = it.get("scope") or {}
+            if "object" in scd:
+                sc = self._pb2.Scope(object=int(scd["object"]))
+            elif "group" in scd:
+                sc = self._pb2.Scope(group=str(scd["group"]))
+            else:
+                raise ValueError("apply_params: scope must include object or group")
+            pb_items.append(self._pb2.SetParam(scope=sc, json_key=str(it["json_key"]), value=_to_value(it.get("value"))))
+        req = self._pb2.ApplySceneParamsRequest(set_params=pb_items)
+        resp = self._stub.ApplySceneParams(req)
+        self._log_rpc("ApplySceneParams", req, resp)
+        return bool(getattr(resp, "ok", False))
+
+    def save_scene(self, path: Path) -> bool:
+        req = self._pb2.SaveSceneRequest(path=str(path))
+        resp = self._stub.SaveScene(req)
+        self._log_rpc("SaveScene", req, resp)
+        return bool(getattr(resp, "ok", False))
 
     # Cuts
     def cut_set_box(self, min_xyz: tuple[float, float, float], max_xyz: tuple[float, float, float], refit_camera: bool = False) -> bool:

@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+"""LLM Agent Tooling: tool specs + dispatcher for function-calling.
+
+This module contains the curated tool list and dispatcher used by the
+multi-agent system. It is the stable entry point for LLM function-calling.
+"""
+
 import json
 from typing import Any, Dict, List, Tuple
+from pathlib import Path
+
+from ..discovery import discover_schema_dir
 
 from ..scene_rpc import SceneClient
+from ..capabilities_prompt import build_capabilities_prompt
 
 
 def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = None) -> Tuple[List[Dict[str, Any]], callable]:
@@ -20,6 +30,185 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "name": "scene_guess_primary_object",
                 "description": "Guess a primary target object id for simple commands. Returns the single Mesh id if exactly one Mesh exists; otherwise returns -1.",
                 "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_guess_transform_key",
+                "description": "Guess a canonical transform json_key (e.g., Position/Translation Vec3) for object ids. Returns the best match per id.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ids": {"type": "array", "items": {"type": "integer"}},
+                        "prefer": {"type": "array", "items": {"type": "string"}, "default": ["Position", "Translation", "Transform", "Center", "Offset"]},
+                        "type_like": {"type": "string", "default": "Vec3"}
+                    },
+                    "required": ["ids"],
+                    "additionalProperties": False
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_placement_roles",
+                "description": "Return canonical placement role (json_key, field_path, units, type) per id; no guessing.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"ids": {"type": "array", "items": {"type": "integer"}}},
+                    "required": ["ids"],
+                    "additionalProperties": False
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_capabilities_summary",
+                "description": "Return a condensed natural-language capabilities overview to ground planning.",
+                "parameters": {"type": "object", "properties": {"schema_dir": {"type": "string"}, "max_lines": {"type": "integer", "minimum": 20, "maximum": 400}}, "additionalProperties": False},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_params_handbook",
+                "description": "Generate a Markdown handbook of parameters per object type and groups from capabilities.json (json_key, type, interpolation, ranges).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "schema_dir": {"type": "string"},
+                        "include_groups": {"type": "boolean", "default": True},
+                        "max_types": {"type": "integer", "default": 50},
+                        "max_params_per_type": {"type": "integer", "default": 200}
+                    },
+                    "additionalProperties": False
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_facts_summary",
+                "description": "Return a concise natural-language summary of current objects, keyframes, and time; optionally include selected parameter values.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "sample_limit": {"type": "integer", "default": 6},
+                        "scope_object": {"type": "integer"},
+                        "json_keys": {"type": "array", "items": {"type": "string"}}
+                    },
+                    "additionalProperties": False
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_capabilities",
+                "description": "Return the full capabilities.json (parameter catalogs per object type and groups).",
+                "parameters": {"type": "object", "properties": {"schema_dir": {"type": "string"}}, "additionalProperties": False},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_schema",
+                "description": "Return the full Animation3D JSON Schema (animation3d.schema.json).",
+                "parameters": {"type": "object", "properties": {"schema_dir": {"type": "string"}}, "additionalProperties": False},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_get_values",
+                "description": "Return current values for json_keys at a scope (object or group). Empty json_keys returns all.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "scope_object": {"type": "integer"},
+                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
+                        "json_keys": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_validate_apply",
+                "description": "Validate a batch of scene parameter assignments (no time/easing).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "set_params": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "scope": {
+                                        "type": "object",
+                                        "properties": {
+                                            "object": {"type": "integer"},
+                                            "group": {"type": "string", "enum": ["background", "axis", "global"]}
+                                        },
+                                        "additionalProperties": False
+                                    },
+                                    "json_key": {"type": "string"},
+                                    "value": {}
+                                },
+                                "required": ["scope", "json_key", "value"],
+                                "additionalProperties": False
+                            }
+                        }
+                    },
+                    "required": ["set_params"],
+                    "additionalProperties": False
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_apply",
+                "description": "Apply a batch of scene parameter assignments atomically (no time/easing).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "set_params": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "scope": {
+                                        "type": "object",
+                                        "properties": {
+                                            "object": {"type": "integer"},
+                                            "group": {"type": "string", "enum": ["background", "axis", "global"]}
+                                        },
+                                        "additionalProperties": False
+                                    },
+                                    "json_key": {"type": "string"},
+                                    "value": {}
+                                },
+                                "required": ["scope", "json_key", "value"],
+                                "additionalProperties": False
+                            }
+                        }
+                    },
+                    "required": ["set_params"],
+                    "additionalProperties": False
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_save_scene",
+                "description": "Save current scene (.scene) to path.",
+                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"], "additionalProperties": False},
             },
         },
         {
@@ -296,6 +485,59 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "name": "fs_check_paths",
                 "description": "Check which of the given paths exist on the local filesystem. Returns {exists:[], missing:[]}.",
                 "parameters": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}}}, "required": ["paths"], "additionalProperties": False},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fs_resolve_path",
+                "description": "Resolve a possibly-typoed file/dir path using heuristics (expand ~, case-insensitive, pluralization, prefix match, repo search). Returns {ok,path?,candidates?,tried?}.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "kind": {"type": "string", "enum": ["file", "dir", "either"], "default": "either"},
+                        "base_dirs": {"type": "array", "items": {"type": "string"}},
+                        "max_candidates": {"type": "integer", "default": 10}
+                    },
+                    "required": ["path"],
+                    "additionalProperties": False
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "repo_search",
+                "description": "Search the repo for a file/dir name (basename fuzzy scoring). Returns likely matches with scores.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "type": {"type": "string", "enum": ["file", "dir", "either"], "default": "either"},
+                        "max_depth": {"type": "integer", "default": 6},
+                        "max_results": {"type": "integer", "default": 20}
+                    },
+                    "required": ["name"],
+                    "additionalProperties": False
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fs_glob",
+                "description": "List files matching a pattern inside a directory. Expands ~ and env vars. Example: dir='~/Documents/atlas_test/slice15', pattern='*.lsm'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "dir": {"type": "string"},
+                        "pattern": {"type": "string", "default": "*"},
+                        "recursive": {"type": "boolean", "default": False}
+                    },
+                    "required": ["dir"],
+                    "additionalProperties": False
+                },
             },
         },
         {
@@ -820,23 +1062,168 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 else:
                     missing.append(p)
             return json.dumps({"exists": exists, "missing": missing})
+        if name == "fs_resolve_path":
+            import os as _os
+            import difflib as _dif
+            from pathlib import Path as _Path
+            path_in = str(args.get("path") or "")
+            kind = str(args.get("kind")) if args.get("kind") else "either"
+            max_candidates = int(args.get("max_candidates", 10))
+            base_dirs = [str(p) for p in (args.get("base_dirs") or [])]
+            tried: list[str] = []
+            def _exists(p: str) -> bool:
+                if kind == "file":
+                    return _os.path.isfile(p)
+                if kind == "dir":
+                    return _os.path.isdir(p)
+                return _os.path.exists(p)
+            # Expand and normalize
+            p0 = _os.path.expanduser(_os.path.expandvars(path_in))
+            p0 = _os.path.normpath(p0)
+            tried.append(p0)
+            if _exists(p0):
+                return json.dumps({"ok": True, "path": _os.path.abspath(p0), "tried": tried})
+            # Heuristic 1: case-insensitive correction per segment
+            def _case_fix(p: str) -> str | None:
+                parts = _Path(p).parts
+                if not parts:
+                    return None
+                cur = _Path(parts[0])
+                for seg in parts[1:]:
+                    parent = cur
+                    if not parent.exists():
+                        break
+                    try:
+                        entries = {e.name.lower(): e.name for e in parent.iterdir()}
+                        name = entries.get(seg.lower())
+                        cur = parent / (name if name else seg)
+                    except Exception:
+                        cur = parent / seg
+                q = str(cur)
+                return q if _exists(q) else None
+            cf = _case_fix(p0)
+            if cf and cf not in tried:
+                tried.append(cf)
+                if _exists(cf):
+                    return json.dumps({"ok": True, "path": _os.path.abspath(cf), "tried": tried, "reason": "case-insensitive match"})
+            # Heuristic 2: pluralization/singularization on each segment (single change)
+            def _plural_variants(p: str):
+                parts = list(_Path(p).parts)
+                for i in range(len(parts)):
+                    alt = parts.copy()
+                    seg = alt[i]
+                    if seg.endswith("s"):
+                        alt[i] = seg[:-1]
+                    else:
+                        alt[i] = seg + "s"
+                    yield str(_Path(*alt))
+            for cand in _plural_variants(p0):
+                c2 = _os.path.normpath(cand)
+                if c2 not in tried:
+                    tried.append(c2)
+                    if _exists(c2):
+                        return json.dumps({"ok": True, "path": _os.path.abspath(c2), "tried": tried, "reason": "pluralization"})
+            # Heuristic 3: simple prefix match near failing leaf
+            try:
+                parent, leaf = _os.path.split(p0)
+                if parent and _os.path.isdir(parent) and leaf:
+                    for fname in _os.listdir(parent):
+                        if fname.lower().startswith(leaf.lower()):
+                            c3 = _os.path.join(parent, fname)
+                            if c3 not in tried:
+                                tried.append(c3)
+                                if _exists(c3):
+                                    return json.dumps({"ok": True, "path": _os.path.abspath(c3), "tried": tried, "reason": "prefix match"})
+            except Exception:
+                pass
+            # Fallback: repo/base dir search by basename with fuzzy scores
+            repo_root = _Path(__file__).resolve().parents[3]
+            search_roots = [str(repo_root)] + base_dirs
+            target = _Path(path_in).name
+            candidates: list[tuple[float, str]] = []
+            def _walk_with_depth(root: str, max_depth: int = 6):
+                root_p = _Path(root)
+                try:
+                    for cur, dirs, files in os.walk(root):
+                        rel = _Path(cur).relative_to(root_p)
+                        if len(rel.parts) > max_depth:
+                            dirs[:] = []
+                            continue
+                        for nm in dirs + files:
+                            full = _os.path.join(cur, nm)
+                            if kind == "file" and not _os.path.isfile(full):
+                                continue
+                            if kind == "dir" and not _os.path.isdir(full):
+                                continue
+                            score = _dif.SequenceMatcher(a=nm.lower(), b=target.lower()).ratio()
+                            if score >= 0.5:
+                                candidates.append((score, _os.path.abspath(full)))
+                except Exception:
+                    return
+            import os
+            for r in search_roots:
+                if _os.path.isdir(r):
+                    _walk_with_depth(r, 6)
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            out = [{"path": p, "score": float(s)} for (s, p) in candidates[:max_candidates]]
+            return json.dumps({"ok": False, "candidates": out, "tried": tried})
+        if name == "repo_search":
+            import os as _os
+            import difflib as _dif
+            from pathlib import Path as _Path
+            query = str(args.get("name") or "")
+            typ = str(args.get("type")) if args.get("type") else "either"
+            max_depth = int(args.get("max_depth", 6))
+            max_results = int(args.get("max_results", 20))
+            repo_root = _Path(__file__).resolve().parents[3]
+            target = query.lower()
+            hits: list[tuple[float, str]] = []
+            try:
+                for cur, dirs, files in os.walk(str(repo_root)):
+                    rel = _Path(cur).relative_to(repo_root)
+                    if len(rel.parts) > max_depth:
+                        dirs[:] = []
+                        continue
+                    def _consider(nm: str):
+                        full = _os.path.join(cur, nm)
+                        if typ == "file" and not _os.path.isfile(full):
+                            return
+                        if typ == "dir" and not _os.path.isdir(full):
+                            return
+                        score = _dif.SequenceMatcher(a=nm.lower(), b=target).ratio()
+                        if score >= 0.5:
+                            hits.append((score, _os.path.abspath(full)))
+                    for nm in dirs:
+                        _consider(nm)
+                    for nm in files:
+                        _consider(nm)
+            except Exception:
+                pass
+            hits.sort(key=lambda x: x[0], reverse=True)
+            out = [{"path": p, "score": float(s)} for (s, p) in hits[:max_results]]
+            return json.dumps({"ok": True, "results": out})
+        if name == "fs_glob":
+            import os as _os
+            import glob as _glob
+            d = str(args.get("dir") or "")
+            pattern = str(args.get("pattern") or "*")
+            rec = bool(args.get("recursive", False))
+            base = _os.path.expanduser(_os.path.expandvars(d))
+            if not _os.path.isdir(base):
+                return json.dumps({"ok": False, "error": f"not a directory: {base}"})
+            pat = _os.path.join(base, pattern)
+            matches = _glob.glob(pat, recursive=rec)
+            files = [ _os.path.abspath(m) for m in matches if _os.path.isfile(m) ]
+            return json.dumps({"ok": True, "files": files, "dir": base, "pattern": pattern})
 
         # Scene understanding / load
         if name == "scene_guess_primary_object":
-            objs = client.list_objects()
-            mesh_ids = [int(o.id) for o in objs.objects if getattr(o, "type", "").lower() == "mesh"]
-            oid = mesh_ids[0] if len(mesh_ids) == 1 else -1
-            return json.dumps({"id": oid, "count_mesh": len(mesh_ids)})
+            return json.dumps({"ok": False, "error": "disabled: require explicit scope_object/scope_group; use scene_list_objects to choose."})
         if name == "scene_set_param_by_name":
             scope_object = args.get("scope_object")
-            if scope_object is None:
-                # Try to guess a primary object
-                g = json.loads(dispatch("scene_guess_primary_object", "{}"))
-                if int(g.get("id", -1)) >= 0:
-                    scope_object = int(g["id"])
             scope_group = args.get("scope_group")
             if scope_object is None and scope_group is None:
-                return json.dumps({"ok": False, "error": "scope_object or scope_group required (or a unique Mesh must be present)"})
+                return json.dumps({"ok": False, "error": "scope_object or scope_group required"})
             name_str = str(args.get("name", ""))
             type_hint = args.get("type_hint")
             time_v = float(args.get("time", 0.0))
@@ -1200,20 +1587,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             angle = float(args.get("angle_degrees", 360.0))
             duration = float(args.get("duration", 8.0))
             easing = str(args.get("easing", "Linear"))
-            # Derive ids if empty: try primary mesh; else all objects
+            # Require explicit ids to avoid guessing; caller may use scene_list_objects to choose
             if not ids:
-                try:
-                    g = json.loads(dispatch("scene_guess_primary_object", "{}"))
-                    if int(g.get("id", -1)) >= 0:
-                        ids = [int(g["id"])]
-                except Exception:
-                    ids = []
-            if not ids:
-                try:
-                    lo = client.list_objects()
-                    ids = [int(o.id) for o in lo.objects]
-                except Exception:
-                    ids = []
+                return json.dumps({"ok": False, "error": "ids required for scene_recipe_orbit_focus"})
             try:
                 # Suggest orbit cameras and write start/end keys
                 cams = client.camera_orbit(ids=ids or None, axis=axis, angle_degrees=angle)
@@ -1409,6 +1785,173 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     pass
                 params.append(entry)
             return json.dumps({"params": params})
+        if name == "scene_capabilities":
+            schema_dir = args.get("schema_dir")
+            sd, searched = discover_schema_dir(schema_dir, atlas_dir)
+            if not sd:
+                return json.dumps({"ok": False, "error": "capabilities not found", "searched": searched})
+            try:
+                with open(Path(sd) / "capabilities.json", "r", encoding="utf-8") as f:
+                    caps = json.load(f)
+                return json.dumps({"ok": True, "capabilities": caps})
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e)})
+        if name == "scene_params_handbook":
+            schema_dir = args.get("schema_dir")
+            include_groups = bool(args.get("include_groups", True))
+            max_types = int(args.get("max_types", 50))
+            max_params_per_type = int(args.get("max_params_per_type", 200))
+            sd, searched = discover_schema_dir(schema_dir, atlas_dir)
+            if not sd:
+                return json.dumps({"ok": False, "error": "capabilities not found", "searched": searched})
+            try:
+                import json as _json
+                from pathlib import Path as _Path
+                caps = _json.loads((_Path(sd) / "capabilities.json").read_text(encoding="utf-8"))
+                lines: list[str] = []
+                lines.append("# Atlas Parameters Handbook (from capabilities.json)")
+                lines.append("")
+                if include_groups:
+                    globs = caps.get("globals") or {}
+                    for gname in ("Background", "Axis", "Global"):
+                        g = globs.get(gname) if isinstance(globs, dict) else None
+                        if not isinstance(g, dict):
+                            continue
+                        plist = g.get("parameters") or []
+                        lines.append(f"## Group: {gname}")
+                        for p in plist[:max_params_per_type]:
+                            lines.append(f"- `{p.get('jsonKey','')}` — {p.get('type','')} (interp={p.get('supportsInterpolation',False)})")
+                        lines.append("")
+                # Object types
+                objs = caps.get("objects") or {}
+                count_types = 0
+                for tname, obj in (objs.items() if isinstance(objs, dict) else []):
+                    if count_types >= max_types:
+                        break
+                    plist = []
+                    if isinstance(obj, dict):
+                        plist = obj.get("parameters") or obj.get("params") or []
+                    lines.append(f"## Type: {tname}")
+                    for p in plist[:max_params_per_type]:
+                        jk = p.get('jsonKey','') or p.get('json_key','')
+                        ty = p.get('type','')
+                        interp = p.get('supportsInterpolation', False)
+                        lines.append(f"- `{jk}` — {ty} (interp={interp})")
+                    lines.append("")
+                    count_types += 1
+                md = "\n".join(lines)
+                return json.dumps({"ok": True, "markdown": md})
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e)})
+        if name == "scene_schema":
+            schema_dir = args.get("schema_dir")
+            sd, searched = discover_schema_dir(schema_dir, atlas_dir)
+            if not sd:
+                return json.dumps({"ok": False, "error": "schema not found", "searched": searched})
+            try:
+                with open(Path(sd) / "animation3d.schema.json", "r", encoding="utf-8") as f:
+                    sch = json.load(f)
+                return json.dumps({"ok": True, "schema": sch})
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e)})
+        if name == "scene_get_values":
+            obj = args.get("scope_object")
+            try:
+                if obj is not None and int(obj) < 0:
+                    obj = None
+            except Exception:
+                obj = None
+            grp = args.get("scope_group")
+            vals = client.get_param_values(scope_object=obj, scope_group=grp, json_keys=args.get("json_keys"))
+            return json.dumps({"values": vals})
+        if name == "scene_guess_transform_key":
+            return json.dumps({"ok": False, "error": "disabled: use scene_list_params and capabilities/schema to select canonical json_keys."})
+        if name == "scene_placement_roles":
+            return json.dumps({"ok": False, "error": "disabled: use scene_list_params and capabilities/schema to select canonical json_keys."})
+        if name == "scene_capabilities_summary":
+            schema_dir = args.get("schema_dir")
+            max_lines = args.get("max_lines") or 140
+            sd, searched = discover_schema_dir(schema_dir, atlas_dir)
+            if not sd:
+                # Fall back to a generic summary without schema
+                text = build_capabilities_prompt(Path("/does/not/exist"), max_lines=max_lines)
+                return json.dumps({"ok": False, "summary": text, "searched": searched})
+            try:
+                text = build_capabilities_prompt(Path(sd), max_lines=max_lines)
+                return json.dumps({"ok": True, "summary": text})
+            except Exception as e:
+                # Return generic text on failure
+                text = build_capabilities_prompt(Path("/does/not/exist"), max_lines=max_lines)
+                return json.dumps({"ok": False, "summary": text, "error": str(e)})
+        if name == "scene_facts_summary":
+            limit = int(args.get("sample_limit", 6))
+            so = args.get("scope_object")
+            jks = args.get("json_keys") or []
+            facts = client.scene_facts()
+            lines: list[str] = []
+            # Objects summary
+            objs = facts.get("objects_list") or []
+            lines.append(f"Objects: {len(objs)} total")
+            for o in objs[:max(0, limit)]:
+                lines.append(f"  - {o.get('id')}:{o.get('type')}:{o.get('name')} visible={o.get('visible')}")
+            # Time status
+            try:
+                ts = client.get_time()
+                cur = float(getattr(ts, "seconds", 0.0) or 0.0)
+                dur = float(getattr(ts, "duration", 0.0) or 0.0)
+                lines.append(f"Time: t={cur:.3f}s / duration={dur:.3f}s")
+            except Exception:
+                pass
+            # Camera keys
+            try:
+                cams = facts.get("keys", {}).get("camera") or []
+                if cams:
+                    lines.append("Camera keys: " + ", ".join(str(float(t)) for t in cams))
+            except Exception:
+                pass
+            # Per-object keys (sample)
+            try:
+                obj_keys = facts.get("keys", {}).get("objects", {}) or {}
+                count = 0
+                for oid, mp in obj_keys.items():
+                    if count >= limit:
+                        break
+                    # summarize up to 2 params per object
+                    params = list(mp.items())[:2]
+                    for jk, times in params:
+                        lines.append(f"Keys {oid}:{jk}: times={list(times)}")
+                    count += 1
+            except Exception:
+                pass
+            # Optional current values
+            if so is not None and jks:
+                try:
+                    vals = client.get_param_values(scope_object=int(so), json_keys=[str(x) for x in jks])
+                    lines.append("Values:")
+                    for k, v in vals.items():
+                        try:
+                            vv = json.dumps(v)
+                        except Exception:
+                            vv = str(v)
+                        lines.append(f"  - {k} = {vv}")
+                except Exception:
+                    pass
+            return json.dumps({"ok": True, "summary": "\n".join(lines)})
+        if name == "scene_validate_apply":
+            set_params = args.get("set_params") or []
+            res = client.validate_apply(set_params)
+            return json.dumps(res)
+        if name == "scene_apply":
+            set_params = args.get("set_params") or []
+            # Always validate before apply to surface reasons
+            val = client.validate_apply(set_params)
+            if not bool(val.get("ok", False)):
+                return json.dumps({"ok": False, "validate": val})
+            ok = client.apply_params(set_params)
+            return json.dumps({"ok": bool(ok)})
+        if name == "scene_save_scene":
+            ok = client.save_scene(args.get("path"))
+            return json.dumps({"ok": bool(ok)})
         if name == "scene_validate_param_value":
             scope_object = args.get("scope_object")
             try:
@@ -1854,4 +2397,14 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
 
         return json.dumps({"error": f"unknown tool: {name}"})
 
-    return tools, dispatch
+    # Filter out deprecated/disabled tools from the advertised list
+    filtered = []
+    disabled = {"scene_guess_primary_object", "scene_guess_transform_key", "scene_placement_roles"}
+    for t in tools:
+        try:
+            nm = t.get("function", {}).get("name")
+            if nm not in disabled:
+                filtered.append(t)
+        except Exception:
+            filtered.append(t)
+    return filtered, dispatch
