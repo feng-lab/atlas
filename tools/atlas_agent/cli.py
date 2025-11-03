@@ -10,7 +10,10 @@ def main(argv: list[str] | None = None) -> int:
     # Single entry; accept an optional first positional (e.g., 'chat' or 'chat-rpc')
     parser.add_argument("cmd", nargs="?", help=argparse.SUPPRESS)
     parser.add_argument("--address", default=os.environ.get("ATLAS_RPC_ADDR", "localhost:50051"))
-    parser.add_argument("--model", default=os.environ.get("ATLAS_LLM_MODEL", "gpt-4o"))
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("ATLAS_LLM_MODEL", "deepseek-v3.1"),
+    )
     parser.add_argument("--temperature", type=float, default=float(os.environ.get("ATLAS_LLM_TEMPERATURE", "0.2")))
     parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY"))
     parser.add_argument(
@@ -22,6 +25,11 @@ def main(argv: list[str] | None = None) -> int:
         "--allow-screenshots",
         action="store_true",
         help="Enable preview screenshots for Inspector (sets ATLAS_AGENT_ALLOW_SCREENSHOTS=1)",
+    )
+    parser.add_argument(
+        "--enable-codegen",
+        action="store_true",
+        help="Enable code generation tools (sets ATLAS_AGENT_ENABLE_CODEGEN=1)",
     )
     args = parser.parse_args(argv)
     # Ignore deprecated positional subcommands like 'chat' or 'chat-rpc'
@@ -42,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
     # Set screenshot env gate from flag if requested
     if args.allow_screenshots:
         os.environ["ATLAS_AGENT_ALLOW_SCREENSHOTS"] = "1"
+    if args.enable_codegen:
+        os.environ["ATLAS_AGENT_ENABLE_CODEGEN"] = "1"
 
     return int(
         run_team_repl(

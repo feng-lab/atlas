@@ -152,3 +152,6 @@ conda install zimg -c fenglab -y
   ./Atlas --run_dump_animation3d_schema --dump_animation3d_schema_output animation3d.schema.json -platform offscreen
   # If no output path is given, writes ./animation3d.schema.json
   ```
+
+- Agents (LLM) codegen toggle:
+  - Code generation tools are disabled by default for safety. To enable them in the chat agent: `python -m tools.atlas_agent --enable-codegen ...` or set `ATLAS_AGENT_ENABLE_CODEGEN=1`.

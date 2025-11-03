@@ -83,13 +83,33 @@ class ChatTeam:
         except Exception:
             snap = None
         if snap:
-            # Compute a basic diff vs. last snapshot
+            # Compute a diff vs. last snapshot, including lightweight value digests so value changes at same times are visible.
             def _flatten(s):
                 flat = []
                 keys = (s.get("keys") or {})
+                # Per-object param times and value digests
                 for oid, mp in keys.get("objects", {}).items():
                     for jk, times in mp.items():
                         flat.append((f"key:{oid}:{jk}", tuple(times)))
+                        # Build a compact digest of values at those times (if available)
+                        try:
+                            lr = self.scene.list_keys(id=int(oid), json_key=jk, include_values=True)
+                            dig_items = []
+                            for k in getattr(lr, "keys", []):
+                                try:
+                                    t = float(getattr(k, "time", 0.0))
+                                    vj = getattr(k, "value_json", "")
+                                    # Truncate to keep logs compact
+                                    if isinstance(vj, str) and len(vj) > 96:
+                                        vj = vj[:96] + "…"
+                                    dig_items.append(f"{t:.6g}:{vj}")
+                                except Exception:
+                                    continue
+                            if dig_items:
+                                flat.append((f"keyval:{oid}:{jk}", tuple(dig_items)))
+                        except Exception:
+                            pass
+                # Camera times
                 if keys.get("camera"):
                     flat.append(("key:camera", tuple(keys.get("camera") or [])))
                 # Include objects list presence (ids+paths) for load operations
@@ -114,7 +134,7 @@ class ChatTeam:
                 facts_text = "Facts: no new keys compared to last snapshot."
                 guidance = (
                     "No changes were applied this turn. If you intended to modify the scene, "
-                    "please specify the target (object/group), parameter name, time, and value."
+                    "please specify the target id, parameter name, time, and value."
                 )
                 text = facts_text if not text else facts_text + "\n" + guidance
             self._last_snapshot = snap
@@ -190,6 +210,7 @@ def run_repl(address: str, api_key: str, model: str, temperature: float = 0.2, *
             rationale = team.turn(line, shared_context=None)
             logger.info("%s", rationale)
         except Exception as e:
-            logger.error("Agent error: %s", e)
+            # Log full traceback to prove error origin
+            logger.exception("Agent error: %s", e)
             continue
     return 0

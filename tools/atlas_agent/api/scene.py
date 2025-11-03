@@ -6,7 +6,7 @@ These helpers raise exceptions on failure and return native Python types.
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from ..scene_rpc import SceneClient
 
@@ -33,11 +33,11 @@ class SceneAPI:
         return out
 
     # Scene params (stateless)
-    def list_params(self, *, scope_object: Optional[int] = None, scope_group: Optional[str] = None):
-        return self._c.list_params(scope_object=scope_object, scope_group=scope_group)
+    def list_params(self, *, id: int):
+        return self._c.list_params(id=int(id))
 
-    def get_values(self, *, scope_object: Optional[int] = None, scope_group: Optional[str] = None, json_keys: Optional[list[str]] = None) -> dict:
-        return self._c.get_param_values(scope_object=scope_object, scope_group=scope_group, json_keys=json_keys)
+    def get_values(self, *, id: int, json_keys: list[str] | None = None) -> dict:
+        return self._c.get_param_values(id=int(id), json_keys=json_keys)
 
     def validate_apply(self, set_params: list[dict]) -> dict:
         res = self._c.validate_apply(set_params)
@@ -56,11 +56,10 @@ class SceneAPI:
             raise RuntimeError("SaveScene failed")
 
     # Timeline (selected helpers)
-    def list_keys(self, **kwargs):
-        return self._c.list_keys(**kwargs)
+    def list_keys(self, *, id: int, json_key: str | None = None, include_values: bool = False):
+        return self._c.list_keys(id=int(id), json_key=json_key, include_values=include_values)
 
     def set_time(self, seconds: float, cancel_rendering: bool = False) -> None:
         ok = self._c.set_time(seconds, cancel_rendering=cancel_rendering)
         if not ok:
             raise RuntimeError("SetTime failed")
-

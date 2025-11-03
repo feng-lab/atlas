@@ -27,20 +27,45 @@ Testing (Linking Atlas Code)
 Agents: Preview Screenshots
 
 - The Python agent tools expose a headless preview renderer for 3D animation verification.
-- Tool: `scene_render_preview` (saves current animation to a temp file and renders one frame via the Atlas binary in offscreen mode).
+- Tool: `animation_render_preview` (saves current animation to a temp file and renders one frame via the Atlas binary in offscreen mode).
 - Privacy/consent: Disabled by default. Enable explicitly by setting `ATLAS_AGENT_ALLOW_SCREENSHOTS=1` in the environment when launching the agent CLI.
 - Binary resolution: The tool uses `--atlas-dir` if provided to the agent CLI, or searches default install locations.
 - Typical usage via CLI environment:
   - `ATLAS_AGENT_ALLOW_SCREENSHOTS=1 python -m tools.atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app`
   - or pass the flag: `python -m tools.atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app --allow-screenshots`
 
-Agents: Animation Recipe Tools
+Agents: Camera Planning & Validation
 
-- New high‑level recipe tools are available to simplify common animation tasks:
-  - `scene_recipe_orbit_focus(ids?, axis='y', angle_degrees=360, duration=8, easing='Linear')` — fits camera, writes start/end orbit camera keys, sets duration.
-  - `scene_recipe_fade_emphasis(id, color, start_opacity=0.3, end_opacity=1.0, t0=0, t1=5, dim_others=true, easing='Linear')` — emphasizes a target with color and opacity ramp; optionally dims others.
-  - `scene_recipe_reveal_with_cut(ids?, margin=0.0, refit_camera=true, time=0, after_clipping=true, easing='Linear')` — suggests and applies a cut box, then writes a camera key.
-- These are composed from the lower‑level typed tools and can be called by the Implementer or used interactively via the dispatcher.
+- Essential tools (LLM function-calling):
+  - `fit_candidates` → choose ids to frame (excludes Animation3D).
+  - `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view` → deterministic operators (UI parity) for stateless camera value generation.
+  - `camera_solve` (modes FIT | ORBIT | DOLLY | STATIC) → returns typed camera keys [{time,value}] when needed.
+  - `camera_validate` → dry‑run with constraints/policies; prefer strict first, then allow adjustments if needed.
+  - `animation_batch` → write keys atomically (camera uses `id=0`); verify via `animation_list_keys(id,json_key)`.
+
+- Deprecated/removed: all camera "recipe" tools. Compose motions with the general tools above; do not rely on hardcoded recipes.
+
+Agents: Camera Planning & Validation (Example)
+
+- Example (“rotate around the mesh 360° in 10 seconds”):
+  1) Pick targets: `fit_candidates` or `scene_list_objects` → ids
+  2) Plan values: `camera_focus(ids)` to get v0; then build N intermediate values by repeatedly calling `camera_rotate(op='AZIMUTH', degrees=360/N, base_value=prev)`; set times t=[0, 10/N, 2⋅10/N, …, 10].
+  3) Validate: `camera_validate(ids, times, values, constraints={keep_visible:true,min_coverage:0.95}, policies={adjust_*:false})`. If not ok, retry with adjustments and adopt adjusted_value.
+  4) Apply: `animation_batch(set_keys=[{id:0,time:t[i],value:values[i]}...], commit:true)` and `animation_set_duration(10)`.
+  5) Verify: `animation_list_keys_camera(json_key="")` includes the expected times.
+
+Agents: Codegen Mode
+
+- When tasks require loops, randomness, or file parsing (e.g., “for each SWC, randomly translate within ranges”, or “read transforms from file and apply”), prefer codegen over raw tool chaining.
+- Workflow (multi‑step, iterative):
+ - Discover with tools: `scene_list_objects`, `scene_list_params(id)`, `scene_bbox`.
+ - Unified addressing across tools: use `id` only with reserved ids 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids. The legacy scope/object/group forms have been removed from Agent Tooling.
+  - Generate a small plan‑only Python script using `tools.atlas_agent.api` (SceneAPI/CameraAPI) to compute values (no writes). Run with `python_write_and_run` and print compact JSON.
+  - Validate with tools: `scene_validate_apply` or `camera_validate`; refine the script if invalid.
+  - Generate an apply script to write keys/params; run; then verify (`scene_get_values(id)`, `animation_list_keys(id,json_key)`).
+- Repair loop: On script errors (non‑zero exit), capture stdout/stderr, revise, and re‑run within guardrails (max attempts env `ATLAS_AGENT_CODEGEN_MAX_ATTEMPTS`, default 20; overall time budget). Stop early if errors repeat unchanged.
+- Scripts should be focused, short, and use stdlib. Avoid monolithic “one‑shot” scripts.
+
 
 Architecture Overview
 

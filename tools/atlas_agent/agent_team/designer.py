@@ -7,16 +7,14 @@ from .base import LLMClient
 
 DESIGNER_SYSTEM = (
     "You are the Designer for Atlas scene/animation.\n"
-    "Propose 2–3 distinct high‑level designs (no tool calls). Each design must follow these rules:\n"
-    "- Intent guard: if the user is ONLY asking for file loading or static scene edits, DO NOT include animation/timelines.\n"
-    "- Scene vs animation: clearly separate stateless scene edits (arrangement/styling, no time/easing) from timeline animation keys.\n"
-    "- Stay on topic: do not propose unrelated global styling (background/axis/fonts) unless the user asked.\n"
-    "- Do NOT invent camera numbers (eye/center/up/positions). Never propose raw coordinates.\n"
-    "- For camera, specify typed planning only: mode=FIT|ORBIT|DOLLY|STATIC, targets (ids or 'primary mesh'), times, and constraints {keep_visible=true, margin ~0.0–0.1, min_coverage≥0.95}.\n"
-    "- For camera, prefer UI‑parity operators in the description (focus → rotate → reset). E.g., 'Focus on Mesh(ID), then AZIMUTH 90° at 2.5s/5s/7.5s/10s'.\n"
-    "- Non‑camera parameters: refer to canonical parameter names conceptually (e.g., Color Mode='Single Color'); avoid guessing option strings if unknown.\n"
-    "- End each option with a short Plan Summary seed: a few key moments (times) and per‑object changes, using json_key names where known.\n"
-    "Keep each option short (5–8 bullets)."
+    "Propose 1–3 distinct high‑level designs (no tool calls). Focus on outcomes, not tool usage.\n"
+    "- Separate scene styling/arrangement (no time) from timeline animation.\n"
+    "- Do not invent camera coordinates; describe typed camera intent (e.g., FIT/ORBIT/DOLLY/STATIC) and targets. Include axis and duration window when relevant.\n"
+    "- Do not specify implementation details such as step sizes or base_value chaining.\n"
+    "- Use clear, canonical parameter names when known; avoid guessing option strings.\n"
+    "- Align with any 'TASK BRIEF:' provided in context.\n"
+    "- Do not include confirmation questions; if defaults are needed, state them under 'Assumptions'.\n"
+    "- End each option with a short Plan Summary seed (key moments and per‑object changes). Keep it concise.\n"
 )
 
 
@@ -31,7 +29,7 @@ class Designer:
         # No embedded examples; rely on the system prompt and scene context only
         examples_text = ""
         prompt = (
-            f"User request:\n{user_text}\n\nScene context:\n{scene_context}\n\n"
+            f"User request:\n{user_text}\n\nScene context + history:\n{scene_context}\n\n"
             "Output 2–3 numbered design options; no prose, no tools." + examples_text
         )
         text = self.client.complete_text(system_prompt=DESIGNER_SYSTEM, user_text=prompt, temperature=self.temperature)

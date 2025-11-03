@@ -14,6 +14,7 @@
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
 #include "z3dglobalparameters.h"
+#include "z3dtransformparameter.h"
 #include "zimg.h"
 #include <QTemporaryDir>
 #include <QFile>
@@ -341,6 +342,46 @@ static json::object makeNumberSchema(double minV, double maxV, bool isInteger)
 static json::object schemaForParameter(const ZParameter& p)
 {
   using namespace nim;
+  // 3D transform (object/world transform): expose structured subfields
+  if (auto tp = dynamic_cast<const Z3DTransformParameter*>(&p)) {
+    auto makeVecN = [](int n) {
+      json::object o;
+      o["type"] = "array";
+      o["minItems"] = n;
+      o["maxItems"] = n;
+      json::object item;
+      item["type"] = "number";
+      o["items"] = item;
+      return o;
+    };
+    json::object o;
+    o["type"] = "object";
+    json::object props;
+    // Canonical child jsonKeys (match engine serialization)
+    {
+      auto s = makeVecN(3);
+      s["description"] = "Uniform or non-uniform scale factors [sx, sy, sz]";
+      props["Scale Vec3"] = s;
+    }
+    {
+      auto t = makeVecN(3);
+      t["description"] = "Translation in world units [tx, ty, tz]";
+      props["Translation Vec3"] = t;
+    }
+    {
+      auto r = makeVecN(4);
+      r["description"] = "Rotation as [angle_degrees, axis_x, axis_y, axis_z]";
+      props["Rotation Vec4"] = r; // angle(deg), axis x,y,z
+    }
+    {
+      auto c = makeVecN(3);
+      c["description"] = "Rotation/pivot center [cx, cy, cz]";
+      props["Rotation Center Vec3"] = c;
+    }
+    o["properties"] = props;
+    o["additionalProperties"] = false;
+    return o;
+  }
   // Bool
   if (auto b = dynamic_cast<const ZBoolParameter*>(&p)) {
     json::object o;

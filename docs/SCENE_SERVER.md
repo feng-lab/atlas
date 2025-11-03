@@ -19,19 +19,25 @@ Service and Methods (initial)
 
 Scene (stateless) operations
 - Use these when editing the scene/base state (no timeline/time/easing). They do not write keyframes.
-  - `GetParamValues { scope, json_keys? } -> { values: map<json_key, Value> }`
-    - `scope`: `{ object: id }` or `{ group: 'background'|'axis'|'global' }`. If `json_keys` omitted, returns all values for the scope.
-  - `ValidateSceneParams { set_params: [ { scope, json_key, value } ] } -> { ok, results[] }`
-    - Performs shape/range checks (and basic option checks) and returns `normalized_value` when clamping is applicable.
+  - `GetParamValues { id, json_keys? } -> { values: map<json_key, Value> }`
+    - `id`: 0 returns camera scene value under `"Camera 3DCamera"`, 1 background, 2 axis, 3 global, ≥4 object ids. If `json_keys` omitted, returns all values for the id.
+  - `ValidateSceneParams { set_params: [ { id, json_key, value } ] } -> { ok, results[] }`
+    - Performs shape/range checks (and basic option checks) and returns `normalized_value` when clamping is applicable. For camera (id=0), accepts a `3DCamera` value object and returns a normalized camera value.
   - `ApplySceneParams { set_params: [...] } -> { ok }`
     - Applies the assignments atomically after validation. No time/easing. Marshalled to UI thread.
   - `SaveScene { path } -> { ok }`
     - Writes a `.scene` file, equivalent to the UI’s Save Scene (no timeline keys).
+
+Scene vs Timeline semantics (important)
+- `scene_apply` never creates or updates animation keys. It changes base scene state only.
+- During playback (and preview at nonzero times), keyframed values take precedence over base scene values.
+- If a parameter has timeline keys, changing the scene value will not alter the animated result; you must edit the keys.
+- Time‑based requests (e.g., “at 3s, use Only Wireframe”) must be implemented with SetKey/ReplaceKey at t=3.0 (use easing=Switch for non‑interpolatable params).
 - Timeline:
   - `EnsureAnimation() -> ok` (create/bind a default 3D animation with a baseline t=0 frame)
   - `SetDuration(seconds) -> ok`
-  - `SetKey(scope, json_key?, time, easing, value: google.protobuf.Value) -> ok`
-    - `scope`: `{ camera: true }` or `{ object: id }` or `{ group: "background"|"axis"|"global" }`
+  - `SetKey(id, json_key?, time, easing, value: google.protobuf.Value) -> ok`
+    - `id`: `0` for camera or `>=4` for objects.
     - `value`: typed JSON value (protobuf Value). For camera, pass an object; for numeric/bool/vector parameters, pass number/bool/array accordingly; for options, pass a string.
 
 Notes
@@ -44,7 +50,7 @@ gRPC Scene Service (GUI)
 New endpoints (additions)
 - Camera helpers
   - `CameraFit` `{ ids?: [uint64], all?: bool, after_clipping?: bool, min_radius?: double }` → `{ values: [google.protobuf.Value] }`
-    - Returns a typed camera value object that frames the targets. Feed into `SetKey` with `scope.camera=true`.
+    - Returns a typed camera value object that frames the targets. Feed into `SetKey` with `id=0`.
   - `CameraOrbitSuggest` `{ ids?: [uint64], axis: "x"|"y"|"z", angle_degrees?: 360 }` → `{ values: [google.protobuf.Value, google.protobuf.Value] }`
     - Returns start/end typed camera value objects for a simple orbit.
   - `CameraDollySuggest` `{ ids?: [uint64], start_dist: double, end_dist: double }` → `{ values: [google.protobuf.Value, google.protobuf.Value] }`
@@ -54,7 +60,7 @@ New endpoints (additions)
     - `FitCandidates` `{}` → `{ ids: [uint64] }`
       - Returns visual object ids suitable for camera fit/orbit (excludes `Animation3D`).
     - `CameraSolve` `{ mode: "FIT"|"ORBIT"|"DOLLY"|"STATIC", ids?: [uint64], t0: double, t1?: double, constraints?: { keep_visible?: bool, margin?: double, min_coverage?: double, fov_policy?: string }, params?: Struct }` → `{ keys: [{time, value}] }`
-      - Computes typed camera key(s) for the targets. `ORBIT` produces `[t0,t1]`; `DOLLY` produces `[t0,t1]`; `FIT`/`STATIC` produce a single key at `t0`.
+      - Computes typed camera key(s) for the targets. `ORBIT` and `DOLLY` produce segmented keys from `t0..t1` when needed (e.g., 360°) to avoid identical endpoints; `FIT`/`STATIC` produce a single key at `t0`.
       - The server excludes `Animation3D` when deriving target bbox. `constraints.margin` expands the bbox fractionally; `min_coverage` defaults to `0.95`.
     - `CameraValidate` `{ ids?: [uint64], times: [double], values: [Value], constraints?: {...}, policies?: { adjust_fov?: bool, adjust_distance?: bool, adjust_clipping?: bool } }` → `{ ok: bool, results: [{ time, within_frame, coverage, adjusted, adjusted_value?, reason }] }`
       - Evaluates coverage against the target bbox and optional margin. If policies allow, returns an `adjusted_value` with updated `fieldOfView` or eye/center distance. `ok=true` when all entries meet `min_coverage`.
@@ -63,12 +69,12 @@ New endpoints (additions)
   - `SetVisibility` `{ ids: [uint64], on: bool }` → `{ ok: true }`
 
 - Parameter enumeration
-  - `ListParams` `{ scope }` → `ParamList`
-    - Mirrors `scene.capabilities` but for a specific `scope` (`camera|object|group("background"|"axis"|"global")`).
+  - `ListParams` `{ id }` → `ParamList`
+    - Mirrors `scene.capabilities` but for a specific `id` (`0|1|2|3|≥4`).
 
 - Timeline/keyframe ops
-  - `ClearKeys` `{ scope, json_key? }` → `{ ok }` (for `camera` scope, clears camera keys; otherwise clears keys for the specific parameter)
-  - `RemoveKey` `{ scope, json_key, time }` → `{ ok }`
+  - `ClearKeys` `{ id, json_key? }` → `{ ok }` (for `id=0`, clears camera keys; otherwise clears keys for the specific parameter)
+  - `RemoveKey` `{ id, json_key, time }` → `{ ok }`
   - `Batch` `{ set_keys: [SetKeyRequest], remove_keys: [RemoveKeyRequest], commit?: bool }` → `{ ok }`
     - Verification: use `ListKeys` to confirm that each requested key time exists after a batch. When `commit=true`, time 0 keys are applied immediately, but verification works regardless of `commit`.
   - When `commit=true`, any keys at `time=0` are applied immediately (engine evaluates t=0) so the initial state is visible without a separate `SetTime` call. Non‑zero keys do not move the playhead; use `SetTime` to preview later moments.
@@ -83,8 +89,8 @@ New endpoints (additions)
   - `SaveAnimation` `{ path: string }` → `{ ok }` (alias of `Save`)
 
 - Introspection
-  - `ListKeys` `{ scope, json_key?, include_values? }` → `{ keys: [{time, type, value_json?}] }`
-    - For camera scope, `json_key` is ignored. For object/group scopes, provide the parameter’s `json_key`.
+  - `ListKeys` `{ id, json_key?, include_values? }` → `{ keys: [{time, type, value_json?}] }`
+    - For `id=0` (camera), `json_key` is ignored. For others, provide the parameter’s `json_key`.
     - Note: for efficiency and compatibility, `ListKeys` returns stringified key values today. Use it for verification. `SetKey` uses typed `google.protobuf.Value`.
   - `GetTime` `{}` → `{ seconds, duration }`
 
@@ -107,8 +113,8 @@ Cuts (global)
 
 Usage notes
 - All requests are marshalled to the UI/rendering thread via `QMetaObject::invokeMethod` to respect single GL context and threading rules.
-- For camera suggestions, returned strings are the camera value JSON objects (not full key objects). Pass them to `SetKey` with `scope.camera=true`, your chosen `time`, and `easing`.
+- For camera suggestions, returned strings are the camera value JSON objects (not full key objects). Pass them to `SetKey` with `id=0`, your chosen `time`, and `easing`.
 - For camera planning, prefer `FitCandidates` + `CameraSolve` to obtain typed values, and confirm with `CameraValidate` before writing to the timeline. Do not invent camera numbers in clients.
-- Operator workflows for animation (example: 360° orbit in 10s): Focus → Rotate(azimuth 90°) at 2.5s/5s/7.5s/10s. Use `scene_replace_key_camera` for each step and validate with `CameraValidate`.
+- Operator workflows for animation (example: 360° orbit in 10s): Focus → Rotate(azimuth 90°) at 2.5s/5s/7.5s/10s. Use `SetKey`/`Batch` with `id=0` for each step and validate with `CameraValidate`.
 - `Play/Pause` are minimal and independent of the UI’s `QTimeLine`; they drive live preview by stepping `setCurrentTime`.
 - For MP4 export, run the existing headless CLI `--run_export_3d_animation` from your Python app; keep long-running export tasks out of the GUI RPC.

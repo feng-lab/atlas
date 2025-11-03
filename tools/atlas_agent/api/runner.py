@@ -28,7 +28,7 @@ def run_plan(client: SceneClient, plan: Plan) -> dict:
     if plan.set_params:
         req = []
         for sp in plan.set_params:
-            req.append({"scope": sp.scope, "json_key": sp.json_key, "value": sp.value})
+            req.append({"id": int(sp.id), "json_key": sp.json_key, "value": sp.value})
         val = client.validate_apply(req)
         if not val.get("ok", False):
             raise RuntimeError(f"ValidateSceneParams failed: {val}")
@@ -40,14 +40,14 @@ def run_plan(client: SceneClient, plan: Plan) -> dict:
     if plan.set_keys or plan.remove_keys:
         set_keys_req = []
         for sk in plan.set_keys:
-            ent = {"scope": sk.scope, "time": float(sk.time), "easing": sk.easing, "value": sk.value}
-            if not sk.scope.get("camera"):
+            ent = {"id": int(sk.id), "time": float(sk.time), "easing": sk.easing, "value": sk.value}
+            if int(sk.id) != 0:
                 ent["json_key"] = str(sk.json_key or "")
             set_keys_req.append(ent)
         remove_req = []
         for rk in plan.remove_keys:
-            ent = {"scope": rk.scope, "time": float(rk.time)}
-            if not rk.scope.get("camera"):
+            ent = {"id": int(rk.id), "time": float(rk.time)}
+            if int(rk.id) != 0:
                 ent["json_key"] = str(rk.json_key or "")
             remove_req.append(ent)
         if not client.batch(set_keys=set_keys_req, remove_keys=remove_req, commit=bool(plan.commit)):
@@ -58,18 +58,13 @@ def run_plan(client: SceneClient, plan: Plan) -> dict:
         # Verify keys
         missing = []
         for sk in plan.set_keys:
-            sc = sk.scope
             want_t = float(sk.time)
-            if sc.get("camera"):
-                lr = client.list_keys(scope_camera=True)
+            if int(sk.id) == 0:
+                lr = client.list_keys(id=0)
             else:
-                if "object" in sc:
-                    lr = client.list_keys(scope_object=int(sc["object"]), json_key=str(sk.json_key or ""))
-                else:
-                    lr = client.list_keys(scope_group=str(sc.get("group", "")), json_key=str(sk.json_key or ""))
+                lr = client.list_keys(id=int(sk.id), json_key=str(sk.json_key or ""))
             times = [k.time for k in getattr(lr, "keys", [])]
             if not any(abs(want_t - t) < 1e-6 for t in times):
-                missing.append({"scope": sc, "json_key": sk.json_key, "time": want_t})
+                missing.append({"id": int(sk.id), "json_key": sk.json_key, "time": want_t})
         report["verify"]["missing_keys"] = missing
     return report
-

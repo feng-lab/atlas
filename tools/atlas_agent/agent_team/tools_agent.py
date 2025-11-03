@@ -14,6 +14,7 @@ from ..discovery import discover_schema_dir
 
 from ..scene_rpc import SceneClient
 from ..capabilities_prompt import build_capabilities_prompt
+from ..codegen_policy import is_codegen_enabled
 
 
 def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = None) -> Tuple[List[Dict[str, Any]], callable]:
@@ -27,64 +28,25 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         {
             "type": "function",
             "function": {
-                "name": "scene_guess_primary_object",
-                "description": "Guess a primary target object id for simple commands. Returns the single Mesh id if exactly one Mesh exists; otherwise returns -1.",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "scene_guess_transform_key",
-                "description": "Guess a canonical transform json_key (e.g., Position/Translation Vec3) for object ids. Returns the best match per id.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "prefer": {"type": "array", "items": {"type": "string"}, "default": ["Position", "Translation", "Transform", "Center", "Offset"]},
-                        "type_like": {"type": "string", "default": "Vec3"}
-                    },
-                    "required": ["ids"],
-                    "additionalProperties": False
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "scene_placement_roles",
-                "description": "Return canonical placement role (json_key, field_path, units, type) per id; no guessing.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"ids": {"type": "array", "items": {"type": "integer"}}},
-                    "required": ["ids"],
-                    "additionalProperties": False
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
                 "name": "scene_capabilities_summary",
-                "description": "Return a condensed natural-language capabilities overview to ground planning.",
-                "parameters": {"type": "object", "properties": {"schema_dir": {"type": "string"}, "max_lines": {"type": "integer", "minimum": 20, "maximum": 400}}, "additionalProperties": False},
+                "description": "Condensed capabilities overview. Background: Scene (.scene) is stateless current display state; Animation (.animation2d/.animation3d) adds timeline keys that override scene during playback.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "scene_animation_concepts",
+                "description": "Explain Atlas Scene vs Animation: Scene (.scene) captures current objects + display params (2D/3D). Animation (.animation2d/.animation3d) extends Scene with per-parameter timeline keys (easing: Switch/Linear/Exp/…). During playback, animation keys override scene values.",
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
             "type": "function",
             "function": {
                 "name": "scene_params_handbook",
-                "description": "Generate a Markdown handbook of parameters per object type and groups from capabilities.json (json_key, type, interpolation, ranges).",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "schema_dir": {"type": "string"},
-                        "include_groups": {"type": "boolean", "default": True},
-                        "max_types": {"type": "integer", "default": 50},
-                        "max_params_per_type": {"type": "integer", "default": 200}
-                    },
-                    "additionalProperties": False
-                },
+                "description": "Generate a Markdown handbook of parameters per object type and groups from capabilities.json (json_key, type, supports_interpolation, ranges).",
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
@@ -92,15 +54,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "scene_facts_summary",
                 "description": "Return a concise natural-language summary of current objects, keyframes, and time; optionally include selected parameter values.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "sample_limit": {"type": "integer", "default": 6},
-                        "scope_object": {"type": "integer"},
-                        "json_keys": {"type": "array", "items": {"type": "string"}}
-                    },
-                    "additionalProperties": False
-                },
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
@@ -108,7 +62,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "scene_capabilities",
                 "description": "Return the full capabilities.json (parameter catalogs per object type and groups).",
-                "parameters": {"type": "object", "properties": {"schema_dir": {"type": "string"}}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
@@ -116,22 +70,29 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "scene_schema",
                 "description": "Return the full Animation3D JSON Schema (animation3d.schema.json).",
-                "parameters": {"type": "object", "properties": {"schema_dir": {"type": "string"}}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "animation_describe_file",
+                "description": "Parse an .animation3d file and return a concise natural-language summary (uses capabilities.json for names).",
+                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
             },
         },
         {
             "type": "function",
             "function": {
                 "name": "scene_get_values",
-                "description": "Return current values for json_keys at a scope (object or group). Empty json_keys returns all.",
+                "description": "Scene (stateless): return current display values for json_keys by id. Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
-                        "json_keys": {"type": "array", "items": {"type": "string"}},
+                        "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "json_keys": {"type": "array", "items": {"type": "string"}, "description": "Param keys to read (empty = all)"}
                     },
-                    "additionalProperties": False,
+                    "required": ["id", "json_keys"]
                 },
             },
         },
@@ -139,7 +100,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "scene_validate_apply",
-                "description": "Validate a batch of scene parameter assignments (no time/easing).",
+                "description": "Scene (stateless): validate display parameter assignments (no time/easing). Note: timeline keys (if present) override these values during playback.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -148,24 +109,19 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "scope": {
-                                        "type": "object",
-                                        "properties": {
-                                            "object": {"type": "integer"},
-                                            "group": {"type": "string", "enum": ["background", "axis", "global"]}
-                                        },
-                                        "additionalProperties": False
-                                    },
+                                    "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
                                     "json_key": {"type": "string"},
-                                    "value": {}
+                                    "value": {"description": "Typed value. For 3DTransform, use an object with canonical subfields (e.g., {\"Translation Vec3\":[x,y,z],\"Rotation Vec4\":[ang,x,y,z],\"Scale Vec3\":[sx,sy,sz],\"Rotation Center Vec3\":[cx,cy,cz]}).",
+                                               "type": ["object", "array", "number", "string", "boolean", "null"],
+                                               "items": {"type": ["string", "number", "boolean", "null"]}}
                                 },
-                                "required": ["scope", "json_key", "value"],
-                                "additionalProperties": False
+                                "required": ["id", "json_key", "value"],
+                                
                             }
                         }
                     },
                     "required": ["set_params"],
-                    "additionalProperties": False
+                    
                 },
             },
         },
@@ -173,7 +129,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "scene_apply",
-                "description": "Apply a batch of scene parameter assignments atomically (no time/easing).",
+                "description": "Scene (stateless): apply display parameter assignments atomically (no time/easing). Accepts either canonical json_key or display name; resolves names via scene_list_params with caching. Targeting is by id (0=camera,1=background,2=axis,3=global,≥4=objects). Note: does not change animation; during playback, animation keys override scene values.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -182,24 +138,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "scope": {
-                                        "type": "object",
-                                        "properties": {
-                                            "object": {"type": "integer"},
-                                            "group": {"type": "string", "enum": ["background", "axis", "global"]}
-                                        },
-                                        "additionalProperties": False
-                                    },
-                                    "json_key": {"type": "string"},
-                                    "value": {}
+                                    "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                                    "json_key": {"type": "string", "description": "Canonical parameter key (preferred)"},
+                                    "name": {"type": "string", "description": "Display name; dispatcher resolves to json_key if provided"},
+                                    "value": {"description": "Typed value. For 3DTransform, use an object with canonical subfields (e.g., {\"Translation Vec3\":[x,y,z],\"Rotation Vec4\":[ang,x,y,z],\"Scale Vec3\":[sx,sy,sz],\"Rotation Center Vec3\":[cx,cy,cz]}).",
+                                               "type": ["object", "array", "number", "string", "boolean", "null"],
+                                               "items": {"type": ["string", "number", "boolean", "null"]}}
                                 },
-                                "required": ["scope", "json_key", "value"],
-                                "additionalProperties": False
+                                "required": ["id", "value"],
+                                
                             }
                         }
                     },
                     "required": ["set_params"],
-                    "additionalProperties": False
+                    
                 },
             },
         },
@@ -208,66 +160,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "scene_save_scene",
                 "description": "Save current scene (.scene) to path.",
-                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"], "additionalProperties": False},
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "scene_recipe_orbit_focus",
-                "description": "Recipe: orbit around target ids. Fits camera, writes start/end camera keys, and sets duration.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "axis": {"type": "string", "enum": ["x", "y", "z"], "default": "y"},
-                        "angle_degrees": {"type": "number", "default": 360.0},
-                        "duration": {"type": "number", "default": 8.0},
-                        "easing": {"type": "string", "default": "Linear"}
-                    },
-                    "additionalProperties": False,
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "scene_recipe_fade_emphasis",
-                "description": "Recipe: emphasize one id with a color and fade opacity from start to end; optionally dim others.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer"},
-                        "color": {"anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 4}]},
-                        "start_opacity": {"type": "number", "default": 0.3},
-                        "end_opacity": {"type": "number", "default": 1.0},
-                        "t0": {"type": "number", "default": 0.0},
-                        "t1": {"type": "number", "default": 5.0},
-                        "dim_others": {"type": "boolean", "default": True},
-                        "easing": {"type": "string", "default": "Linear"}
-                    },
-                    "required": ["id"],
-                    "additionalProperties": False,
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "scene_recipe_reveal_with_cut",
-                "description": "Recipe: suggest cut box for ids (or all), apply cut with optional refit, and set a camera key.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "margin": {"type": "number", "default": 0.0},
-                        "refit_camera": {"type": "boolean", "default": True},
-                        "time": {"type": "number", "default": 0.0},
-                        "after_clipping": {"type": "boolean", "default": True},
-                        "easing": {"type": "string", "default": "Linear"}
-                    },
-                    "additionalProperties": False,
-                },
+                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
             },
         },
         {
@@ -275,22 +168,22 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "fit_candidates",
                 "description": "Return ids of visual objects suitable for camera fit/orbit (excludes Animation3D).",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
             "type": "function",
             "function": {
                 "name": "camera_focus",
-                "description": "Compute a camera that focuses on targets (preserve view vector). Returns a typed camera value.",
+                "description": "Compute a camera that focuses on the given ids using the current scene bbox. Returns a typed camera value.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "after_clipping": {"type": "boolean", "default": True},
-                        "min_radius": {"type": "number", "default": 0.0}
+                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "List of target object ids to focus"},
+                        "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)"},
+                        "min_radius": {"type": "number", "default": 0.0, "description": "Minimum radius to avoid degenerate views"}
                     },
-                    "additionalProperties": False,
+                    "required": ["ids", "after_clipping", "min_radius"]
                 },
             },
         },
@@ -302,10 +195,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "after_clipping": {"type": "boolean", "default": True}
+                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "List of target object ids to point to"},
+                        "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)"}
                     },
-                    "additionalProperties": False,
+                    "required": ["ids", "after_clipping"]
                 },
             },
         },
@@ -313,16 +206,15 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "camera_rotate",
-                "description": "Apply a camera operator to a base camera value: AZIMUTH/ELEVATION/ROLL/YAW/PITCH/FLIP. Returns a typed camera value.",
+                "description": "Apply a camera operator to the current camera value: AZIMUTH/ELEVATION/ROLL/YAW/PITCH/FLIP. Returns a typed camera value. Angles >120° are segmented internally into ≤90° steps and chained from the previous value; prefer ≤90° inputs for clarity.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "op": {"type": "string", "enum": ["AZIMUTH", "ELEVATION", "ROLL", "YAW", "PITCH", "FLIP"]},
-                        "degrees": {"type": "number", "default": 90.0},
-                        "base_value": {"type": "object"}
+                        "degrees": {"type": "number", "default": 90.0}
                     },
-                    "required": ["op"],
-                    "additionalProperties": False,
+                    "required": ["op", "degrees"],
+                    
                 },
             },
         },
@@ -334,12 +226,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mode": {"type": "string", "enum": ["XY", "XZ", "YZ", "RESET"], "default": "RESET"},
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "after_clipping": {"type": "boolean", "default": True},
-                        "min_radius": {"type": "number", "default": 0.0}
+                        "mode": {"type": "string", "enum": ["XY", "XZ", "YZ", "RESET"], "default": "RESET", "description": "Preset view"},
+                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Candidate ids for sizing (optional for RESET)"},
+                        "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)"},
+                        "min_radius": {"type": "number", "default": 0.0, "description": "Minimum radius to avoid degenerate views"}
                     },
-                    "additionalProperties": False,
+                    "required": ["mode", "ids", "after_clipping", "min_radius"]
                 },
             },
         },
@@ -347,19 +239,18 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "camera_solve",
-                "description": "Plan camera keys via server: never guess. mode=FIT|ORBIT|DOLLY|STATIC; returns [{time, value}].",
+                "description": "Plan camera keys via server: mode=FIT|ORBIT|DOLLY|STATIC; returns [{time, value}]. Use camera_validate to enforce visibility/coverage constraints.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mode": {"type": "string", "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"]},
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "t0": {"type": "number"},
-                        "t1": {"type": "number"},
-                        "constraints": {"type": "object"},
-                        "params": {"type": "object"}
+                        "mode": {"type": "string", "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"], "description": "Camera solve mode"},
+                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids (may be empty for global)"},
+                        "t0": {"type": "number", "description": "Start time (s)"},
+                        "t1": {"type": "number", "description": "End time (s)"},
+                        "constraints": {"type": "object", "description": "Solve constraints (keep_visible, margin, min_coverage, fov_policy)"},
+                        "params": {"type": "object", "description": "Mode params (e.g., axis, angle_degrees for ORBIT)"}
                     },
-                    "required": ["mode", "t0"],
-                    "additionalProperties": False,
+                    "required": ["mode", "ids", "t0", "t1", "constraints", "params"]
                 },
             },
         },
@@ -371,83 +262,82 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "times": {"type": "array", "items": {"type": "number"}},
-                        "values": {"type": "array", "items": {"type": "object"}},
-                        "constraints": {"type": "object"},
-                        "policies": {"type": "object"}
+                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids; empty for global"},
+                        "times": {"type": "array", "items": {"type": "number"}, "description": "Times (s)"},
+                        "values": {"type": "array", "items": {"type": "object"}, "description": "Camera values (typed objects)"},
+                        "constraints": {"type": "object", "description": "Validation constraints (keep_visible, margin, min_coverage, fov_policy)"},
+                        "policies": {"type": "object", "description": "Adjustment policies (adjust_fov, adjust_distance, adjust_clipping)"}
                     },
-                    "required": ["times", "values"],
-                    "additionalProperties": False,
+                    "required": ["ids", "times", "values", "constraints", "policies"]
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_set_param_by_name",
-                "description": "Set a parameter by display name (case-insensitive) for an object or group. Resolves json_key via scene_list_params, then calls scene_set_key_param.",
+                "name": "animation_set_param_by_name",
+                "description": "Set a parameter by display name (case-insensitive) by id. Resolves json_key via scene_list_params, then calls animation_set_key_param. Id map: 1=background, 2=axis, 3=global, ≥4=objects.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
+                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
                         "name": {"type": "string"},
                         "type_hint": {"type": "string"},
                         "time": {"type": "number"},
                         "easing": {"type": "string", "default": "Linear"},
-                        "value": {"description": "Native JSON value (bool/number/string/array/object)"},
+                        "value": {"description": "Native JSON value. For composite params like 3DTransform, pass an object with canonical subfields (e.g., {\"Translation Vec3\":[x,y,z],\"Rotation Vec4\":[ang,x,y,z],\"Scale Vec3\":[sx,sy,sz],\"Rotation Center Vec3\":[cx,cy,cz]}).",
+                                   "type": ["object", "array", "number", "string", "boolean", "null"],
+                                   "items": {"type": ["string", "number", "boolean", "null"]}},
                     },
-                    "required": ["name", "time", "value"],
-                    "additionalProperties": False,
+                    "required": ["id", "name", "time", "value"],
+                    
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_remove_key_param_at_time",
-                "description": "Remove one or more keys near a time for a parameter by json_key (object or group scope). Uses a tolerance window to match existing keys.",
+                "name": "animation_remove_key_param_at_time",
+                "description": "Remove one or more keys near a time for a parameter by json_key and id. Uses a tolerance window to match existing keys.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
+                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
                         "json_key": {"type": "string"},
                         "time": {"type": "number"},
                         "tolerance": {"type": "number", "default": 1e-3}
                     },
-                    "required": ["json_key", "time"],
-                    "additionalProperties": False,
+                    "required": ["id", "json_key", "time"],
+                    
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_replace_key_param",
-                "description": "Replace (or set) a parameter key by json_key at time: remove any key within tolerance then set a new typed value.",
+                "name": "animation_replace_key_param",
+                "description": "Replace (or set) a parameter key by json_key at time by id: remove any key within tolerance then set a new typed value.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
+                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
                         "json_key": {"type": "string"},
                         "time": {"type": "number"},
                         "easing": {"type": "string", "default": "Linear"},
-                        "value": {"description": "Native JSON value (bool/number/string/array/object)"},
+                        "value": {"description": "Native JSON value (bool/number/string/array)",
+                                   "type": ["string", "number", "boolean", "null", "array"],
+                                   "items": {"type": ["string", "number", "boolean", "null"]}},
                         "tolerance": {"type": "number", "default": 1e-3},
                         "strict": {"type": "boolean", "default": False}
                     },
-                    "required": ["json_key", "time", "value"],
-                    "additionalProperties": False,
+                    "required": ["id", "json_key", "time", "value"],
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_replace_key_camera",
+                "name": "animation_replace_key_camera",
                 "description": "Replace (or set) a camera key at time: remove any camera key within tolerance then set a new camera value.",
                 "parameters": {
                     "type": "object",
@@ -459,16 +349,16 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         "strict": {"type": "boolean", "default": False}
                     },
                     "required": ["time", "value"],
-                    "additionalProperties": False,
-                },
-            },
+                    
+                }
+            }
         },
         {
             "type": "function",
             "function": {
                 "name": "system_info",
                 "description": "Return OS/platform info and common paths so the agent can reason about file locations.",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
@@ -476,7 +366,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "fs_expand_paths",
                 "description": "Expand ~ and env vars and normalize paths. Returns expanded absolute-like paths per entry (relative kept relative).",
-                "parameters": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}}}, "required": ["paths"], "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}, "description": "Input paths (may contain ~ or env vars)"}}, "required": ["paths"]},
             },
         },
         {
@@ -484,7 +374,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "fs_check_paths",
                 "description": "Check which of the given paths exist on the local filesystem. Returns {exists:[], missing:[]}.",
-                "parameters": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}}}, "required": ["paths"], "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}, "description": "Paths to check"}}, "required": ["paths"]},
             },
         },
         {
@@ -495,13 +385,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string"},
-                        "kind": {"type": "string", "enum": ["file", "dir", "either"], "default": "either"},
-                        "base_dirs": {"type": "array", "items": {"type": "string"}},
-                        "max_candidates": {"type": "integer", "default": 10}
+                        "path": {"type": "string", "description": "Possibly-typoed path to resolve"},
+                        "kind": {"type": "string", "enum": ["file", "dir", "either"], "default": "either", "description": "Expected kind"},
+                        "base_dirs": {"type": "array", "items": {"type": "string"}, "description": "Search bases"},
+                        "max_candidates": {"type": "integer", "default": 10, "description": "Max results"}
                     },
-                    "required": ["path"],
-                    "additionalProperties": False
+                    "required": ["path"]
                 },
             },
         },
@@ -513,13 +402,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string"},
-                        "type": {"type": "string", "enum": ["file", "dir", "either"], "default": "either"},
-                        "max_depth": {"type": "integer", "default": 6},
-                        "max_results": {"type": "integer", "default": 20}
+                        "name": {"type": "string", "description": "Basename to search for"},
+                        "type": {"type": "string", "enum": ["file", "dir", "either"], "default": "either", "description": "Kind to search"},
+                        "max_depth": {"type": "integer", "default": 6, "description": "Max directory depth"},
+                        "max_results": {"type": "integer", "default": 20, "description": "Max returned results"}
                     },
-                    "required": ["name"],
-                    "additionalProperties": False
+                    "required": ["name"]
                 },
             },
         },
@@ -531,46 +419,32 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "dir": {"type": "string"},
-                        "pattern": {"type": "string", "default": "*"},
-                        "recursive": {"type": "boolean", "default": False}
+                        "dir": {"type": "string", "description": "Directory to glob"},
+                        "pattern": {"type": "string", "default": "*", "description": "Glob pattern"},
+                        "recursive": {"type": "boolean", "default": False, "description": "Recurse into subdirs"}
                     },
-                    "required": ["dir"],
-                    "additionalProperties": False
+                    "required": ["dir"]
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_emphasize_object",
-                "description": "Emphasize an object by setting mode/color/opacity and optionally dimming others (atomic).",
+                "name": "python_write_and_run",
+                "description": "Write a Python script (string) to a temp file and run it with the repo root on PYTHONPATH. Returns stdout/stderr/exit_code, and optionally echoes the script.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer"},
-                        "mode": {"type": "string", "description": "Rendering mode hint; e.g., 'Sphere' for Swc"},
-                        "color": {
-                            "description": "Hex '#RRGGBB[AA]' or [r,g,b,a] floats",
-                            "anyOf": [
-                                {"type": "string"},
-                                {
-                                    "type": "array",
-                                    "items": {"type": "number"},
-                                    "minItems": 3,
-                                    "maxItems": 4
-                                }
-                            ]
-                        },
-                        "opacity": {"type": "number"},
-                        "dim_others": {"type": "boolean", "default": False},
-                        "time": {"type": "number", "default": 0.0},
-                        "easing": {"type": "string", "default": "Linear"},
+                        "script": {"type": "string", "description": "Python source code"},
+                        "filename": {"type": "string", "description": "Optional filename for the script (for logging)"},
+                        "args": {"type": "array", "items": {"type": "string"}, "default": [], "description": "argv to pass to the script"},
+                        "timeout_sec": {"type": "number", "default": 120.0, "description": "Execution timeout"},
+                        "echo_script": {"type": "boolean", "default": True, "description": "Include script echo in response"},
+                        "max_echo_chars": {"type": "integer", "default": 4000, "description": "Max script chars to echo"}
                     },
-                    "required": ["id"],
-                    "additionalProperties": False,
-                },
-            },
+                    "required": ["script"]
+                }
+            }
         },
         {
             "type": "function",
@@ -580,10 +454,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "files": {"type": "array", "items": {"type": "string"}},
+                        "files": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths to load"},
                     },
                     "required": ["files"],
-                    "additionalProperties": False,
                 },
             },
         },
@@ -595,10 +468,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "files": {"type": "array", "items": {"type": "string"}},
+                        "files": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths to load (idempotent)"},
                     },
                     "required": ["files"],
-                    "additionalProperties": False,
                 },
             },
         },
@@ -610,13 +482,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "names": {"type": "array", "items": {"type": "string"}},
-                        "dir_hints": {"type": "array", "items": {"type": "string"}},
-                        "extensions": {"type": "array", "items": {"type": "string"}, "default": [".msh", ".obj", ".ply", ".swc", ".nii", ".tif", ".tiff"]},
-                        "case_insensitive": {"type": "boolean", "default": True}
+                        "names": {"type": "array", "items": {"type": "string"}, "description": "Basenames to search"},
+                        "dir_hints": {"type": "array", "items": {"type": "string"}, "description": "Hint directories"},
+                        "extensions": {"type": "array", "items": {"type": "string"}, "default": [".msh", ".obj", ".ply", ".swc", ".nii", ".tif", ".tiff"], "description": "Allowed extensions"},
+                        "case_insensitive": {"type": "boolean", "default": True, "description": "Case-insensitive matching"}
                     },
                     "required": ["names"],
-                    "additionalProperties": False,
                 },
             },
         },
@@ -628,13 +499,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "dirs": {"type": "array", "items": {"type": "string"}},
-                        "names": {"type": "array", "items": {"type": "string"}},
-                        "extensions": {"type": "array", "items": {"type": "string"}, "default": [".msh", ".obj", ".ply", ".swc", ".nii", ".tif", ".tiff"]},
-                        "case_insensitive": {"type": "boolean", "default": True}
+                        "dirs": {"type": "array", "items": {"type": "string"}, "description": "Search directories"},
+                        "names": {"type": "array", "items": {"type": "string"}, "description": "Basenames to resolve"},
+                        "extensions": {"type": "array", "items": {"type": "string"}, "default": [".msh", ".obj", ".ply", ".swc", ".nii", ".tif", ".tiff"], "description": "Allowed extensions"},
+                        "case_insensitive": {"type": "boolean", "default": True, "description": "Case-insensitive matching"}
                     },
                     "required": ["dirs", "names"],
-                    "additionalProperties": False,
                 },
             },
         },
@@ -643,48 +513,47 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "scene_list_objects",
                 "description": "List all objects in the current scene (id, type, name, visible).",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
             "type": "function",
             "function": {
                 "name": "scene_bbox",
-                "description": "Get bounding box for a set of ids. Omitting ids means all objects.",
+                "description": "Get bounding box for a set of ids. Pass an empty list for all objects.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "after_clipping": {"type": "boolean", "default": False},
+                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids (empty = all)"},
+                        "after_clipping": {"type": "boolean", "default": False, "description": "Use clipped bbox (true) or full bbox (false)"}
                     },
-                    "additionalProperties": False,
+                    "required": ["ids", "after_clipping"]
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_list_keys",
-                "description": "List keys for a target scope (camera|object|group) and optional json_key.",
+                "name": "animation_list_keys",
+                "description": "List keys by id (0=camera, ≥4=objects). For camera, json_key is ignored.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_camera": {"type": "boolean", "default": False},
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
-                        "json_key": {"type": "string"},
-                        "include_values": {"type": "boolean", "default": False}
+                        "id": {"type": "integer", "description": "Target id: 0=camera, ≥4=object ids"},
+                        "json_key": {"type": "string", "description": "Parameter name or '' for all (ignored for camera)"},
+                        "include_values": {"type": "boolean", "description": "True to include value_json samples"}
                     },
-                    "additionalProperties": False,
+                    "required": ["id", "json_key", "include_values"]
                 },
             },
         },
+        
         {
             "type": "function",
             "function": {
-                "name": "scene_get_time",
-                "description": "Get current timeline seconds and duration.",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                "name": "animation_get_time",
+                "description": "Animation (timeline): get current playback seconds and duration.",
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
@@ -692,197 +561,180 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "scene_capabilities",
                 "description": "List parameter capabilities for background/axis/global and object types.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"ids": {"type": "array", "items": {"type": "integer"}}},
-                    "additionalProperties": False,
-                },
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
             "type": "function",
             "function": {
                 "name": "scene_list_params",
-                "description": "List parameters for a given scope (camera|object|group).",
+                "description": "List parameters by id. Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=objects.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_camera": {"type": "boolean", "default": False},
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
+                        "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}
                     },
-                    "additionalProperties": False,
-                },
+                    "required": ["id"]
+                }
             },
         },
         {
             "type": "function",
             "function": {
                 "name": "scene_validate_param_value",
-                "description": "Validate a candidate value against the live parameter metadata (type and option_names) for a given scope.",
+                "description": "Validate a candidate value against the live parameter metadata (type and option_names) for a given id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects).",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
+                        "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
                         "json_key": {"type": "string"},
-                        "value": {"description": "Candidate JSON value (native types)"},
+                        "value": {"description": "Candidate JSON value (native types)",
+                                   "type": ["string", "number", "boolean", "null", "array"],
+                                   "items": {"type": ["string", "number", "boolean", "null"]}},
                     },
-                    "required": ["json_key", "value"],
-                    "additionalProperties": False,
+                    "required": ["id", "json_key", "value"],
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_ensure_animation",
+                "name": "animation_ensure_animation",
                 "description": "Ensure a 3D animation exists in the GUI.",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_set_duration",
+                "name": "animation_set_duration",
                 "description": "Set animation duration in seconds.",
-                "parameters": {"type": "object", "properties": {"seconds": {"type": "number"}}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {"seconds": {"type": "number"}}},
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_camera_fit",
-                "description": "Suggest a camera value that frames selected objects.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "all": {"type": "boolean", "default": False},
-                        "after_clipping": {"type": "boolean", "default": False},
-                        "min_radius": {"type": "number", "default": 0.0},
-                    },
-                    "additionalProperties": False,
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "scene_camera_orbit",
-                "description": "Suggest start/end camera values to orbit around bbox center.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "axis": {"type": "string", "enum": ["x", "y", "z"], "default": "y"},
-                        "angle_degrees": {"type": "number", "default": 360.0},
-                    },
-                    "additionalProperties": False,
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "scene_camera_dolly",
-                "description": "Suggest start/end camera values to dolly to given distances.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}},
-                        "start_dist": {"type": "number", "default": 0.0},
-                        "end_dist": {"type": "number", "default": 0.0},
-                    },
-                    "additionalProperties": False,
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "scene_set_key_camera",
-                "description": "Add a camera key at a time with a given easing using a camera value JSON.",
+                "name": "animation_set_key_camera",
+                "description": "Add a camera key at a time with a given easing using a camera value JSON (optionally extend duration).",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "time": {"type": "number"},
                         "easing": {"type": "string", "default": "Linear"},
                         "value": {"description": "Native JSON camera value object", "type": "object"},
+                        "extend_duration": {"type": "boolean", "default": True}
                     },
                     "required": ["time", "value"],
-                    "additionalProperties": False,
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_set_key_param",
-                "description": "Add a parameter key for object/group by json_key with a native JSON value (bool/number/string/array/object).",
+                "name": "animation_set_key_param",
+                "description": "Add a parameter key by id (0=camera unsupported here, ≥4 objects; 1/2/3 groups) with json_key and a native JSON value (bool/number/string/array/object).",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
-                        "json_key": {"type": "string"},
+                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "json_key": {"type": "string", "description": "Canonical json_key; if omitted, 'name' is used to resolve."},
+                        "name": {"type": "string", "description": "Display name to resolve to json_key when json_key is not provided."},
                         "time": {"type": "number"},
                         "easing": {"type": "string", "default": "Linear"},
-                        "value": {"description": "Native JSON value (bool/number/string/array/object)"},
+                        "value": {"description": "Native JSON value (bool/number/string/array)",
+                                   "type": ["string", "number", "boolean", "null", "array"],
+                                   "items": {"type": ["string", "number", "boolean", "null"]}},
                     },
-                    "required": ["json_key", "time", "value"],
-                    "additionalProperties": False,
+                    "required": ["id", "time", "value"],
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_clear_keys",
-                "description": "Clear all keys for a parameter (or camera).",
+                "name": "animation_replace_key_param_last",
+                "description": "Replace the most recent existing key for a parameter by id. If multiple times exist, returns an error with the available times. Id map: 1=background, 2=axis, 3=global, ≥4=objects.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_camera": {"type": "boolean", "default": False},
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
+                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "json_key": {"type": "string"},
+                        "value": {"description": "Native JSON value",
+                                   "type": ["string", "number", "boolean", "null", "array"],
+                                   "items": {"type": ["string", "number", "boolean", "null"]}},
+                        "easing": {"type": "string", "default": "Linear"},
+                        "tolerance": {"type": "number", "default": 1e-3}
+                    },
+                    "required": ["id", "json_key", "value"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "animation_replace_key_param_at_times",
+                "description": "Replace keys at the specified times for a parameter by id (1=background,2=axis,3=global,≥4=objects).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "json_key": {"type": "string"},
+                        "times": {"type": "array", "items": {"type": "number"}},
+                        "value": {"description": "Native JSON value",
+                                   "type": ["string", "number", "boolean", "null", "array"],
+                                   "items": {"type": ["string", "number", "boolean", "null"]}},
+                        "easing": {"type": "string", "default": "Linear"},
+                        "tolerance": {"type": "number", "default": 1e-3}
+                    },
+                    "required": ["id", "json_key", "times", "value"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "animation_clear_keys",
+                "description": "Clear all keys for a parameter or camera by id (0=camera).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
                         "json_key": {"type": "string"},
                     },
-                    "additionalProperties": False,
+                    "required": ["id"]
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_remove_key",
-                "description": "Remove a key at a specific time for a parameter.",
+                "name": "animation_remove_key",
+                "description": "Remove a key at a specific time for a parameter by id.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "scope_object": {"type": "integer"},
-                        "scope_group": {"type": "string", "enum": ["background", "axis", "global"]},
+                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
                         "json_key": {"type": "string"},
                         "time": {"type": "number"},
                     },
-                    "required": ["json_key", "time"],
-                    "additionalProperties": False,
+                    "required": ["id", "json_key", "time"],
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_batch",
+                "name": "animation_batch",
                 "description": "Batch multiple SetKey and RemoveKey operations atomically.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "set_keys": {"type": "array", "items": {"type": "object"}},
-                        "remove_keys": {"type": "array", "items": {"type": "object"}},
-                        "commit": {"type": "boolean", "default": True},
+                        "set_keys": {"type": "array", "items": {"type": "object"}, "description": "List of SetKey operations"},
+                        "remove_keys": {"type": "array", "items": {"type": "object"}, "description": "List of RemoveKey operations"},
+                        "commit": {"type": "boolean", "default": True, "description": "Commit immediately if true"}
                     },
-                    "additionalProperties": False,
+                    "required": ["set_keys", "remove_keys", "commit"]
                 },
             },
         },
@@ -893,9 +745,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "description": "Toggle visibility of a list of object ids.",
                 "parameters": {
                     "type": "object",
-                    "properties": {"ids": {"type": "array", "items": {"type": "integer"}}, "on": {"type": "boolean"}},
-                    "required": ["ids", "on"],
-                    "additionalProperties": False,
+                    "properties": {
+                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids"},
+                        "on": {"type": "boolean", "description": "True to show, false to hide"}
+                    },
+                    "required": ["ids", "on"]
                 },
             },
         },
@@ -906,8 +760,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "description": "Suggest an axis-aligned cut box for given ids (or all).",
                 "parameters": {
                     "type": "object",
-                    "properties": {"ids": {"type": "array", "items": {"type": "integer"}}, "margin": {"type": "number", "default": 0.0}, "after_clipping": {"type": "boolean", "default": False}},
-                    "additionalProperties": False,
+                    "properties": {
+                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Ids to bound (empty = all)"},
+                        "margin": {"type": "number", "default": 0.0, "description": "Extra normalized margin to expand box"},
+                        "after_clipping": {"type": "boolean", "default": False, "description": "Use clipped bbox for computation"}
+                    },
+                    "required": ["ids", "margin", "after_clipping"]
                 },
             },
         },
@@ -919,12 +777,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "min": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
-                        "max": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
-                        "refit_camera": {"type": "boolean", "default": True},
+                        "min": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "Box min [x,y,z]"},
+                        "max": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "Box max [x,y,z]"},
+                        "refit_camera": {"type": "boolean", "default": True, "description": "Refit camera after applying cut"}
                     },
-                    "required": ["min", "max"],
-                    "additionalProperties": False,
+                    "required": ["min", "max", "refit_camera"]
                 },
             },
         },
@@ -933,90 +790,251 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "scene_cut_clear",
                 "description": "Clear global cuts.",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_set_time",
+                "name": "animation_set_time",
                 "description": "Set current timeline time (seconds).",
-                "parameters": {"type": "object", "properties": {"seconds": {"type": "number"}, "cancel": {"type": "boolean", "default": False}}, "required": ["seconds"], "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {"seconds": {"type": "number", "description": "Timeline seconds"}}, "required": ["seconds"]},
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_play",
+                "name": "animation_play",
                 "description": "Start playback in GUI at given fps.",
-                "parameters": {"type": "object", "properties": {"fps": {"type": "number", "default": 25.0}}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_pause",
+                "name": "animation_pause",
                 "description": "Pause playback in GUI.",
-                "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_save_animation",
+                "name": "animation_save_animation",
                 "description": "Save the current animation to a .animation3d path.",
-                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"], "additionalProperties": False},
+                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
             },
         },
         {
             "type": "function",
             "function": {
                 "name": "atlas_export_video",
-                "description": "Export an .animation3d to MP4 using the Atlas headless exporter. The agent chooses parameters (fps, size, range).",
+                "description": "Export an .animation3d to MP4 using the Atlas headless exporter.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "animation": {"type": "string", "description": "Path to .animation3d file"},
                         "out": {"type": "string", "description": "Output .mp4 path"},
-                        "fps": {"type": "number", "default": 30},
-                        "start": {"type": "integer", "default": 0},
-                        "end": {"type": "integer", "default": -1},
-                        "width": {"type": "integer", "default": 1920},
-                        "height": {"type": "integer", "default": 1080},
-                        "overwrite": {"type": "boolean", "default": True},
-                        "use_gpu_devices": {"type": "string", "description": "Linux only: comma-separated GPU ids e.g. '0,1'"},
+                        "fps": {"type": "number", "description": "Frames per second"},
+                        "start": {"type": "integer", "description": "Start frame (inclusive)"},
+                        "end": {"type": "integer", "description": "End frame (inclusive, -1 = duration)"},
+                        "width": {"type": "integer", "description": "Output width"},
+                        "height": {"type": "integer", "description": "Output height"},
+                        "overwrite": {"type": "boolean", "description": "Overwrite output if exists"},
+                        "use_gpu_devices": {"type": "string", "description": "Linux only: comma-separated GPU ids, e.g. '0,1'"}
                     },
-                    "required": ["animation", "out"],
-                    "additionalProperties": False,
+                    "required": ["animation", "out", "fps", "start", "end", "width", "height", "overwrite", "use_gpu_devices"]
                 },
             },
         },
         {
             "type": "function",
             "function": {
-                "name": "scene_render_preview",
+                "name": "animation_render_preview",
                 "description": "Render a single preview frame by saving the current animation and invoking headless Atlas. Returns a path to the image in the OS temp directory.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "time": {"type": "number", "description": "Preview time in seconds", "default": 0.0},
-                        "fps": {"type": "number", "default": 30},
-                        "width": {"type": "integer", "default": 512},
-                        "height": {"type": "integer", "default": 512}
+                        "time": {"type": "number", "description": "Preview time in seconds"},
+                        "fps": {"type": "number", "description": "Frames per second"},
+                        "width": {"type": "integer", "description": "Image width"},
+                        "height": {"type": "integer", "description": "Image height"}
                     },
-                    "additionalProperties": False,
+                    "required": ["time", "fps", "width", "height"]
                 },
             },
         },
     ]
 
+    # Conditionally expose codegen-related tools
+    if is_codegen_enabled():
+        tools.append({
+            "type": "function",
+            "function": {
+                "name": "codegen_allowed_imports",
+                "description": "Return the current codegen allowed import modules and whether each is importable in this environment.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        })
+    else:
+        # When disabled, ensure any lingering codegen tools are removed (defensive if list changes elsewhere)
+        tools = [
+            t for t in tools
+            if not (
+                isinstance(t, dict)
+                and isinstance(t.get("function"), dict)
+                and t["function"].get("name") in {"python_write_and_run", "codegen_allowed_imports"}
+            )
+        ]
+
+    # Per-dispatcher caches (persist during the Implementer run)
+    _param_catalog_cache: dict[tuple, list] = {}
+    _alias_cache: dict[tuple, dict[str, str]] = {}
+
+    def _list_params_cached(id: int):
+        id = int(id)
+        key = ("id", id)
+        if key in _param_catalog_cache:
+            return _param_catalog_cache[key]
+        pl = client.list_params(id=id)
+        params = list(getattr(pl, "params", []))
+        _param_catalog_cache[key] = params
+        return params
+
+    def _build_alias_map(params) -> dict[str, str]:
+        alias: dict[str, str] = {}
+        def norm(s: str) -> str:
+            return (s or "").strip().lower()
+        for p in params:
+            jk = getattr(p, "json_key", "") or ""
+            nm = getattr(p, "name", "") or ""
+            ty = getattr(p, "type", "") or ""
+            if jk:
+                alias[norm(jk)] = jk
+            if nm:
+                alias[norm(nm)] = jk
+            # If json_key is name + " " + type, expose the prefix as an alias as well
+            try:
+                if jk and ty and jk.endswith(" " + ty):
+                    alias[norm(jk[: -(len(ty) + 1)])] = jk
+            except Exception:
+                pass
+        return alias
+
+    def _resolve_json_key(id: int, candidate: str | None = None, name: str | None = None) -> str | None:
+        """Resolve to a canonical json_key using live params. Accepts either a candidate key or a display name.
+        Returns canonical json_key or None.
+        """
+        if (candidate is None or str(candidate).strip() == "") and (name is None or str(name).strip() == ""):
+            return None
+        cand = (str(candidate) if candidate is not None else str(name))
+        if not cand:
+            return None
+        cand_norm = cand.strip().lower()
+        # Cache alias map per id
+        key = ("id", int(id))
+        if key not in _alias_cache:
+            params = _list_params_cached(id=int(id))
+            _alias_cache[key] = _build_alias_map(params)
+        amap = _alias_cache.get(key, {})
+        # Direct match (canonical)
+        if cand_norm in amap:
+            return amap[cand_norm]
+        # Try to refresh aliases (avoid staleness)
+        try:
+            params = _list_params_cached(id=int(id))
+            _alias_cache[key] = _build_alias_map(params)
+            amap = _alias_cache.get(key, {})
+        except Exception:
+            pass
+        if cand_norm in amap:
+            return amap[cand_norm]
+        # Fuzzy: prefix match on names and keys
+        try:
+            import difflib
+            choices = list(amap.keys())
+            # Try best close matches
+            for m in difflib.get_close_matches(cand_norm, choices, n=1, cutoff=0.85):
+                return amap[m]
+            # Try relaxed prefix/contains
+            for k in choices:
+                if cand_norm in k or k in cand_norm:
+                    return amap[k]
+        except Exception:
+            pass
+        return None
+
     def dispatch(name: str, args_json: str) -> str:
+        # Helpers
+        def _param_to_dict(p) -> dict:
+            """Format a Parameter proto to a JSON-serializable dict using only proto-defined fields.
+            Includes optional enums and numeric/vector/span metadata when present.
+            """
+            entry = {
+                "json_key": getattr(p, "json_key", ""),
+                "name": getattr(p, "name", ""),
+                "type": getattr(p, "type", ""),
+                "supports_interpolation": getattr(p, "supports_interpolation", False),
+            }
+            # Option enums if provided by server
+            try:
+                if getattr(p, "option_names", None):
+                    entry["option_names"] = list(p.option_names)
+                if getattr(p, "option_data", None):
+                    entry["option_data"] = list(p.option_data)
+            except Exception:
+                pass
+            # Numeric metadata
+            try:
+                if hasattr(p, "number_min") and hasattr(p, "number_max"):
+                    entry["number_min"] = float(p.number_min)
+                    entry["number_max"] = float(p.number_max)
+                if hasattr(p, "number_step"):
+                    entry["number_step"] = float(p.number_step)
+                if hasattr(p, "decimal"):
+                    entry["decimal"] = int(p.decimal)
+                # Vectors
+                if getattr(p, "vector_min", None):
+                    entry["vector_min"] = list(p.vector_min)
+                if getattr(p, "vector_max", None):
+                    entry["vector_max"] = list(p.vector_max)
+                # Spans
+                if hasattr(p, "span_min") and hasattr(p, "span_max"):
+                    entry["span_min"] = float(p.span_min)
+                    entry["span_max"] = float(p.span_max)
+                if hasattr(p, "span_step"):
+                    entry["span_step"] = float(p.span_step)
+            except Exception:
+                pass
+            return entry
+
+        def _json_key_exists(id: int, json_key: str) -> bool:
+            try:
+                pl = client.list_params(id=int(id))
+                for p in pl.params:
+                    if getattr(p, "json_key", None) == json_key:
+                        return True
+            except Exception:
+                return False
+            return False
         try:
             args = json.loads(args_json or "{}")
         except Exception:
             args = {}
 
+        # Guard codegen execution pathway behind a feature flag
+        if name == "python_write_and_run" and not is_codegen_enabled():
+            return json.dumps({"ok": False, "error": "codegen disabled (enable with ATLAS_AGENT_ENABLE_CODEGEN=1)"})
+
         # System / FS helpers for LLM-driven resolution
+        if name == "scene_animation_concepts":
+            info = (
+                "Scene (.scene): current objects and their display parameters across 2D/3D. Saving a scene lets you restore the view/state.\n"
+                "Animation (.animation2d/.animation3d): extends the scene with a timeline. Each display parameter (and camera) has keys at specific times, with easing (e.g., Switch/Linear/Exp).\n"
+                "Playback rule: When the timeline plays, animation keys override scene values for the affected parameters. To change what plays, write/replace keys.\n"
+                "Scene tools (scene_*) are stateless (no time/easing); Animation tools (animation_*) manipulate keys on the timeline."
+            )
+            return json.dumps({"ok": True, "text": info})
         if name == "system_info":
             import os as _os
             try:
@@ -1217,20 +1235,15 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             return json.dumps({"ok": True, "files": files, "dir": base, "pattern": pattern})
 
         # Scene understanding / load
-        if name == "scene_guess_primary_object":
-            return json.dumps({"ok": False, "error": "disabled: require explicit scope_object/scope_group; use scene_list_objects to choose."})
-        if name == "scene_set_param_by_name":
-            scope_object = args.get("scope_object")
-            scope_group = args.get("scope_group")
-            if scope_object is None and scope_group is None:
-                return json.dumps({"ok": False, "error": "scope_object or scope_group required"})
+        if name == "animation_set_param_by_name":
+            id = int(args.get("id"))
             name_str = str(args.get("name", ""))
             type_hint = args.get("type_hint")
             time_v = float(args.get("time", 0.0))
             easing = str(args.get("easing", "Linear"))
             value_native = args.get("value")
             # Resolve param json_key by name and optional type
-            pl = client.list_params(scope_object=scope_object, scope_group=scope_group)
+            pl = client.list_params(id=id)
             target_jk = None
             target_type = None
             lname = name_str.lower().strip()
@@ -1250,7 +1263,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         target_type = p.type
                         break
             if target_jk is None:
-                return json.dumps({"ok": False, "error": f"parameter '{name_str}' not found in scope"})
+                return json.dumps({"ok": False, "error": f"parameter '{name_str}' not found for id={id}"})
             # Coerce common types
             t = (target_type or "").lower()
             if "bool" in t and isinstance(value_native, str):
@@ -1269,7 +1282,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     pass
             # Typed SetKey
             try:
-                ok = client.set_key_param(scope_object=scope_object, scope_group=scope_group, json_key=target_jk, time=time_v, easing=easing, value=value_native)
+                ok = client.set_key_param(id=id, json_key=target_jk, time=time_v, easing=easing, value=value_native)
                 return json.dumps({"ok": ok, "json_key": target_jk, "type": target_type})
             except Exception as e:
                 msg = str(e)
@@ -1277,25 +1290,23 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 except Exception: pass
                 return json.dumps({"ok": False, "error": msg, "json_key": target_jk, "type": target_type})
 
-        if name == "scene_remove_key_param_at_time":
-            scope_object = args.get("scope_object")
-            scope_group = args.get("scope_group")
+        if name == "animation_remove_key_param_at_time":
+            id = int(args.get("id"))
+            if id == 0:
+                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera"})
             json_key = str(args.get("json_key"))
             time_v = float(args.get("time", 0.0))
             tol = float(args.get("tolerance", 1e-3))
-            # Find existing keys near time and remove
+            # Verify parameter exists
+            if not _json_key_exists(id, json_key):
+                return json.dumps({"ok": False, "error": "json_key not found for id"})
             try:
-                if scope_object is not None:
-                    lr = client.list_keys(scope_object=int(scope_object), json_key=json_key, include_values=False)
-                elif scope_group is not None:
-                    lr = client.list_keys(scope_group=str(scope_group), json_key=json_key, include_values=False)
-                else:
-                    return json.dumps({"ok": False, "error": "scope_object or scope_group required"})
+                lr = client.list_keys(id=id, json_key=json_key, include_values=False)
                 times = [k.time for k in getattr(lr, "keys", [])]
                 to_remove = [t for t in times if abs(t - time_v) <= tol]
                 removed = 0
                 for t in to_remove:
-                    ok = client.remove_key(scope_object=scope_object, scope_group=scope_group, json_key=json_key, time=t)
+                    ok = client.remove_key(id=id, json_key=json_key, time=t)
                     if ok:
                         removed += 1
                 return json.dumps({"ok": True, "removed": removed})
@@ -1305,26 +1316,28 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 except Exception: pass
                 return json.dumps({"ok": False, "error": msg})
 
-        if name == "scene_replace_key_param":
-            scope_object = args.get("scope_object")
-            scope_group = args.get("scope_group")
+        if name == "animation_replace_key_param":
+            id = int(args.get("id"))
+            if id == 0:
+                return json.dumps({"ok": False, "error": "use animation_replace_key_camera for id=0"})
             json_key = str(args.get("json_key"))
             time_v = float(args.get("time", 0.0))
             easing = str(args.get("easing", "Linear"))
             value = args.get("value")
             tol = float(args.get("tolerance", 1e-3))
             strict = bool(args.get("strict", False))
+            # Verify parameter exists
+            if not _json_key_exists(id, json_key):
+                return json.dumps({"ok": False, "error": "json_key not found for id"})
             try:
                 # Remove keys within tolerance
-                rm = json.loads(dispatch("scene_remove_key_param_at_time", json.dumps({
-                    "scope_object": scope_object,
-                    "scope_group": scope_group,
+                rm = json.loads(dispatch("animation_remove_key_param_at_time", json.dumps({
+                    "id": id,
                     "json_key": json_key,
                     "time": time_v,
                     "tolerance": tol,
                 })))
-                # If strict and nothing removed while a key exists far, we still set new one
-                ok = client.set_key_param(scope_object=scope_object, scope_group=scope_group, json_key=json_key, time=time_v, easing=easing, value=value)
+                ok = client.set_key_param(id=id, json_key=json_key, time=time_v, easing=easing, value=value)
                 return json.dumps({"ok": ok, "removed": rm.get("removed", 0)})
             except Exception as e:
                 msg = str(e)
@@ -1332,7 +1345,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 except Exception: pass
                 return json.dumps({"ok": False, "error": msg})
 
-        if name == "scene_replace_key_camera":
+        if name == "animation_replace_key_camera":
             time_v = float(args.get("time", 0.0))
             easing = str(args.get("easing", "Linear"))
             value = args.get("value") or {}
@@ -1352,12 +1365,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             try:
                 # Remove camera keys within tolerance
                 try:
-                    lr = client.list_keys(scope_camera=True, include_values=False)
+                    lr = client.list_keys(id=0, include_values=False)
                     times = [k.time for k in getattr(lr, "keys", [])]
                     to_remove = [t for t in times if abs(t - time_v) <= tol]
                     removed = 0
                     for t in to_remove:
-                        if client.remove_key(json_key="", time=t):
+                        if client.remove_key(id=0, json_key="", time=t):
                             removed += 1
                 except Exception:
                     removed = 0
@@ -1401,9 +1414,22 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 ids = args.get("ids") or []
                 t0 = float(args.get("t0", 0.0))
                 t1 = float(args.get("t1", 0.0))
+                if not isinstance(ids, list) or any(not isinstance(i, (int, float)) for i in ids):
+                    return json.dumps({"ok": False, "error": "ids must be an array of numbers"})
+                mode_up = mode.strip().upper()
+                if mode_up not in ("FIT", "ORBIT", "DOLLY", "STATIC"):
+                    return json.dumps({"ok": False, "error": "mode must be one of FIT|ORBIT|DOLLY|STATIC"})
+                if mode_up in ("ORBIT", "DOLLY") and not (t1 > t0):
+                    return json.dumps({"ok": False, "error": "t1 must be > t0 for ORBIT/DOLLY"})
                 constraints = args.get("constraints") or {}
                 params = args.get("params") or {}
-                keys = client.camera_solve(mode=mode, ids=ids, t0=t0, t1=t1, constraints=constraints, params=params)
+                # Harden defaults: ensure explicit axis/angle for ORBIT so 360° requests are respected
+                if mode_up == "ORBIT":
+                    if "axis" not in params:
+                        params["axis"] = "y"
+                    if "angle_degrees" not in params:
+                        params["angle_degrees"] = 360.0
+                keys = client.camera_solve(mode=mode_up, ids=ids, t0=t0, t1=t1, constraints=constraints, params=params)
                 return json.dumps({"ok": True, "keys": keys})
             except Exception as e:
                 msg = str(e)
@@ -1416,6 +1442,8 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 ids = args.get("ids") or []
                 times = args.get("times") or []
                 values = args.get("values") or []
+                if not times or len(times) != len(values):
+                    return json.dumps({"ok": False, "error": "times and values must be non-empty and same length"})
                 constraints = args.get("constraints") or {}
                 policies = args.get("policies") or {}
                 res = client.camera_validate(ids=ids, times=times, values=values, constraints=constraints, policies=policies)
@@ -1493,30 +1521,49 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             files = args.get("files") or []
             summary = client.ensure_loaded(files)
             return json.dumps({"ok": True, **summary})
-        if name == "scene_list_keys":
-            try:
-                lr = client.list_keys(
-                    scope_camera=bool(args.get("scope_camera", False)),
-                    scope_object=args.get("scope_object"),
-                    scope_group=args.get("scope_group"),
-                    json_key=args.get("json_key"),
-                    include_values=bool(args.get("include_values", False)),
-                )
-                keys = []
-                for k in lr.keys:
-                    # Server returns stringified values for verification today
-                    keys.append({"time": k.time, "type": k.type, "value": getattr(k, "value_json", "")})
-                return json.dumps({"ok": True, "keys": keys})
-            except Exception as e:
-                msg = str(e)
-                try:
-                    msg = e.details()  # type: ignore[attr-defined]
-                except Exception:
-                    pass
-                return json.dumps({"ok": False, "error": msg})
-        if name == "scene_get_time":
+        if name == "animation_get_time":
             ts = client.get_time()
             return json.dumps({"seconds": getattr(ts, "seconds", 0.0), "duration": getattr(ts, "duration", 0.0)})
+        if name == "python_write_and_run":
+            import tempfile as _tmp, os as _os, subprocess as _sp, sys as _sys
+            from pathlib import Path as _P
+            script = args.get("script") or ""
+            fname = str(args.get("filename") or "agent_script.py")
+            tdir = _tmp.mkdtemp(prefix="atlas_codegen_")
+            pth = _os.path.join(tdir, fname)
+            # Ensure file ends with newline
+            if not script.endswith("\n"):
+                script += "\n"
+            with open(pth, "w", encoding="utf-8") as f:
+                f.write(script)
+            # Build env with repo root on PYTHONPATH
+            env = dict(_os.environ)
+            repo_root = str(_P(__file__).resolve().parents[2])
+            pp = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = (repo_root + (_os.pathsep + pp if pp else ""))
+            # Run
+            args_list = args.get("args") or []
+            timeout = float(args.get("timeout_sec", 120.0))
+            try:
+                cp = _sp.run([_sys.executable, pth, *args_list], capture_output=True, text=True, env=env, timeout=timeout)
+                out = cp.stdout or ""
+                err = cp.stderr or ""
+                # Truncate for transport safety
+                if len(out) > 8000: out = out[:8000] + "\n…[truncated]"
+                if len(err) > 8000: err = err[:8000] + "\n…[truncated]"
+                resp = {"ok": cp.returncode == 0, "exit_code": cp.returncode, "stdout": out, "stderr": err, "path": pth}
+                if bool(args.get("echo_script", True)):
+                    maxc = int(args.get("max_echo_chars", 4000))
+                    scr = script if len(script) <= maxc else (script[:maxc] + "\n…[truncated]")
+                    resp["script"] = scr
+                return json.dumps(resp)
+            except Exception as e:
+                resp = {"ok": False, "error": str(e), "path": pth}
+                if bool(args.get("echo_script", True)):
+                    maxc = int(args.get("max_echo_chars", 4000))
+                    scr = script if len(script) <= maxc else (script[:maxc] + "\n…[truncated]")
+                    resp["script"] = scr
+                return json.dumps(resp)
         if name == "scene_smart_load":
             import os as _os
             names = args.get("names") or []
@@ -1581,89 +1628,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 resp = client.load_files(resolved)
                 loaded = len(resp.objects)
             return json.dumps({"loaded_objects": loaded, "resolved": resolved, "tried": tried})
-        if name == "scene_recipe_orbit_focus":
-            ids = args.get("ids") or []
-            axis = str(args.get("axis", "y"))
-            angle = float(args.get("angle_degrees", 360.0))
-            duration = float(args.get("duration", 8.0))
-            easing = str(args.get("easing", "Linear"))
-            # Require explicit ids to avoid guessing; caller may use scene_list_objects to choose
-            if not ids:
-                return json.dumps({"ok": False, "error": "ids required for scene_recipe_orbit_focus"})
-            try:
-                # Suggest orbit cameras and write start/end keys
-                cams = client.camera_orbit(ids=ids or None, axis=axis, angle_degrees=angle)
-                if not cams:
-                    return json.dumps({"ok": False, "error": "no camera suggestions"})
-                start = cams[0]
-                end = cams[-1] if len(cams) > 1 else cams[0]
-                ok1 = client.set_key_camera(time=0.0, easing=easing, value=start)
-                ok2 = client.set_key_camera(time=duration, easing=easing, value=end)
-                okd = client.set_duration(duration)
-                return json.dumps({"ok": bool(ok1 and ok2 and okd), "ids": ids})
-            except Exception as e:
-                msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
-                return json.dumps({"ok": False, "error": msg})
-        if name == "scene_recipe_fade_emphasis":
-            oid = int(args.get("id"))
-            color = args.get("color", "magenta")
-            t0 = float(args.get("t0", 0.0))
-            t1 = float(args.get("t1", 5.0))
-            easing = str(args.get("easing", "Linear"))
-            start_op = float(args.get("start_opacity", 0.3))
-            end_op = float(args.get("end_opacity", 1.0))
-            dim_others = bool(args.get("dim_others", True))
-            # Initialize emphasis at t0 (color + optional dim)
-            _ = json.loads(dispatch("scene_emphasize_object", json.dumps({
-                "id": oid, "time": t0, "color": color, "easing": easing, "dim_others": dim_others, "opacity": end_op
-            })))
-            # Find json_key for Opacity and write ramp
-            try:
-                pl = client.list_params(scope_object=oid)
-                jk_op = None
-                for p in pl.params:
-                    if p.name == "Opacity" and p.type == "Float":
-                        jk_op = p.json_key
-                        break
-                if jk_op is None:
-                    return json.dumps({"ok": False, "error": "Opacity parameter not found"})
-                r1 = json.loads(dispatch("scene_replace_key_param", json.dumps({
-                    "scope_object": oid, "json_key": jk_op, "time": t0, "easing": easing, "value": start_op
-                })))
-                r2 = json.loads(dispatch("scene_replace_key_param", json.dumps({
-                    "scope_object": oid, "json_key": jk_op, "time": t1, "easing": easing, "value": end_op
-                })))
-                return json.dumps({"ok": bool(r1.get("ok") and r2.get("ok"))})
-            except Exception as e:
-                msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
-                return json.dumps({"ok": False, "error": msg})
-        if name == "scene_recipe_reveal_with_cut":
-            ids = args.get("ids") or []
-            margin = float(args.get("margin", 0.0))
-            refit = bool(args.get("refit_camera", True))
-            time_v = float(args.get("time", 0.0))
-            after_clip = bool(args.get("after_clipping", True))
-            easing = str(args.get("easing", "Linear"))
-            try:
-                # Suggest cut box
-                req = client._pb2.CutSuggestRequest(ids=ids, mode="box", margin=margin, after_clipping=after_clip)
-                resp = client._stub.CutSuggest(req)
-                box = resp.box
-                ok_cut = client.cut_set_box((box.min.x, box.min.y, box.min.z), (box.max.x, box.max.y, box.max.z), refit_camera=refit)
-                # Set a camera fit key after cut (best effort)
-                cams = client.camera_fit(ids=ids or None, all=not bool(ids), after_clipping=True)
-                if cams:
-                    client.set_key_camera(time=time_v, easing=easing, value=cams[0])
-                return json.dumps({"ok": bool(ok_cut)})
-            except Exception as e:
-                msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
-                return json.dumps({"ok": False, "error": msg})
+        
         if name == "scene_list_objects":
             resp = client.list_objects()
             objs = [
@@ -1714,6 +1679,26 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "center": [b.center.x, b.center.y, b.center.z],
                 "size": [b.size.x, b.size.y, b.size.z],
             })
+        if name == "scene_get_values":
+            id = int(args.get("id"))
+            jks = [str(x) for x in (args.get("json_keys") or [])]
+            vals = client.get_param_values(id=id, json_keys=jks)
+            return json.dumps({"ok": True, "values": vals})
+        if name == "scene_list_params":
+            id = int(args.get("id"))
+            pl = client.list_params(id=id)
+            params = [_param_to_dict(p) for p in pl.params]
+            return json.dumps({"ok": True, "params": params})
+
+        if name == "animation_list_keys":
+            id = int(args.get("id"))
+            json_key = args.get("json_key") or None
+            if isinstance(json_key, str) and json_key.strip() == "":
+                json_key = None
+            include_values = bool(args.get("include_values", False))
+            lr = client.list_keys(id=id, json_key=json_key, include_values=include_values)
+            keys = [{"time": k.time, "type": k.type, "value": getattr(k, "value_json", "")} for k in lr.keys]
+            return json.dumps({"ok": True, "keys": keys})
         if name == "scene_capabilities":
             ids = args.get("ids") or []
             resp = client._stub.Capabilities(client._pb2.CapabilitiesRequest(ids=ids))
@@ -1736,55 +1721,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "global": len(global_params),
                 "objects": obj_keys,
             })
-        if name == "scene_list_params":
-            obj = args.get("scope_object")
-            try:
-                if obj is not None and int(obj) < 0:
-                    obj = None
-            except Exception:
-                obj = None
-            resp = client.list_params(
-                scope_camera=bool(args.get("scope_camera")),
-                scope_object=obj,
-                scope_group=args.get("scope_group"),
-            )
-            params = []
-            for p in resp.params:
-                entry = {"json_key": p.json_key, "name": p.name, "type": p.type, "supports_interpolation": p.supports_interpolation}
-                # Option enums if provided by server
-                try:
-                    if getattr(p, "option_names", None):
-                        entry["option_names"] = list(p.option_names)
-                    if getattr(p, "option_data", None):
-                        entry["option_data"] = list(p.option_data)
-                except Exception:
-                    pass
-                # Numeric metadata
-                try:
-                    # Scalars
-                    if hasattr(p, "number_min") and hasattr(p, "number_max"):
-                        # protobuf default is 0; include only if range looks meaningful or type is numeric
-                        entry["number_min"] = float(p.number_min)
-                        entry["number_max"] = float(p.number_max)
-                    if hasattr(p, "number_step"):
-                        entry["number_step"] = float(p.number_step)
-                    if hasattr(p, "decimal"):
-                        entry["decimal"] = int(p.decimal)
-                    # Vectors
-                    if getattr(p, "vector_min", None):
-                        entry["vector_min"] = list(p.vector_min)
-                    if getattr(p, "vector_max", None):
-                        entry["vector_max"] = list(p.vector_max)
-                    # Spans
-                    if hasattr(p, "span_min") and hasattr(p, "span_max"):
-                        entry["span_min"] = float(p.span_min)
-                        entry["span_max"] = float(p.span_max)
-                    if hasattr(p, "span_step"):
-                        entry["span_step"] = float(p.span_step)
-                except Exception:
-                    pass
-                params.append(entry)
-            return json.dumps({"params": params})
+        # removed legacy scene_list_params variant with split args; use unified scene_list_params(id)
         if name == "scene_capabilities":
             schema_dir = args.get("schema_dir")
             sd, searched = discover_schema_dir(schema_dir, atlas_dir)
@@ -1854,20 +1791,24 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": True, "schema": sch})
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e)})
-        if name == "scene_get_values":
-            obj = args.get("scope_object")
+        if name == "animation_describe_file":
+            from ..describe import load_animation, load_capabilities, summarize_animation
+            schema_dir = args.get("schema_dir")
+            sd, searched = discover_schema_dir(schema_dir, atlas_dir)
             try:
-                if obj is not None and int(obj) < 0:
-                    obj = None
-            except Exception:
-                obj = None
-            grp = args.get("scope_group")
-            vals = client.get_param_values(scope_object=obj, scope_group=grp, json_keys=args.get("json_keys"))
-            return json.dumps({"values": vals})
-        if name == "scene_guess_transform_key":
-            return json.dumps({"ok": False, "error": "disabled: use scene_list_params and capabilities/schema to select canonical json_keys."})
-        if name == "scene_placement_roles":
-            return json.dumps({"ok": False, "error": "disabled: use scene_list_params and capabilities/schema to select canonical json_keys."})
+                anim = load_animation(Path(str(args.get("path"))))
+                caps = {}
+                if sd:
+                    try:
+                        caps = load_capabilities(Path(sd))
+                    except Exception:
+                        caps = {}
+                style = str(args.get("style", "short"))
+                text = summarize_animation(anim, caps, style=style)
+                return json.dumps({"ok": True, "summary": text, "schema_dir": str(sd) if sd else None})
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e), "searched": searched})
+        # removed legacy scene_get_values_* variants; use unified scene_get_values(id,json_keys)
         if name == "scene_capabilities_summary":
             schema_dir = args.get("schema_dir")
             max_lines = args.get("max_lines") or 140
@@ -1885,7 +1826,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": False, "summary": text, "error": str(e)})
         if name == "scene_facts_summary":
             limit = int(args.get("sample_limit", 6))
-            so = args.get("scope_object")
+            sid_opt = args.get("id")
             jks = args.get("json_keys") or []
             facts = client.scene_facts()
             lines: list[str] = []
@@ -1924,9 +1865,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             except Exception:
                 pass
             # Optional current values
-            if so is not None and jks:
+            if sid_opt is not None and jks:
                 try:
-                    vals = client.get_param_values(scope_object=int(so), json_keys=[str(x) for x in jks])
+                    vals = client.get_param_values(id=int(sid_opt), json_keys=[str(x) for x in jks])
                     lines.append("Values:")
                     for k, v in vals.items():
                         try:
@@ -1939,37 +1880,117 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             return json.dumps({"ok": True, "summary": "\n".join(lines)})
         if name == "scene_validate_apply":
             set_params = args.get("set_params") or []
-            res = client.validate_apply(set_params)
+            # Normalize and validate id shapes early to avoid malformed writes
+            norm_params: list[dict] = []
+            for it in set_params:
+                if not isinstance(it, dict):
+                    return json.dumps({"ok": False, "error": "each set_params item must be an object"})
+                jk = it.get("json_key")
+                if not isinstance(jk, str) or not jk:
+                    return json.dumps({"ok": False, "error": "each set_params item must include a non-empty 'json_key'"})
+                id = int(it.get("id"))
+                norm_params.append({"id": id, "json_key": jk, "value": it.get("value")})
+            res = client.validate_apply(norm_params)
             return json.dumps(res)
         if name == "scene_apply":
             set_params = args.get("set_params") or []
-            # Always validate before apply to surface reasons
-            val = client.validate_apply(set_params)
+            # Normalize, resolve names→json_keys, and pre-verify ids/keys
+            norm_params: list[dict] = []
+            notes: list[dict] = []
+            for it in set_params:
+                if not isinstance(it, dict):
+                    return json.dumps({"ok": False, "error": "each set_params item must be an object"})
+                id = int(it.get("id"))
+                jk_in = it.get("json_key")
+                name_in = it.get("name")
+                # Resolve json_key
+                if id == 0:
+                    if jk_in is not None and jk_in != "Camera 3DCamera":
+                        return json.dumps({"ok": False, "error": "json_key not found: expected 'Camera 3DCamera' for id=0"})
+                    jk = "Camera 3DCamera"
+                else:
+                    jk: str | None = None
+                    if isinstance(jk_in, str) and jk_in.strip():
+                        # If canonical exists, keep; else resolve aliases/names
+                        pl = client.list_params(id=id)
+                        jks = {getattr(p, "json_key", ""): True for p in getattr(pl, "params", [])}
+                        if jk_in in jks:
+                            jk = jk_in
+                        else:
+                            jk_resolved = _resolve_json_key(id, candidate=jk_in)
+                            if jk_resolved:
+                                jk = jk_resolved
+                                notes.append({"remapped_param": {"from": jk_in, "to": jk, "id": id}})
+                            else:
+                                if isinstance(name_in, str) and name_in.strip():
+                                    jk_name = _resolve_json_key(id, name=name_in)
+                                    if jk_name:
+                                        jk = jk_name
+                                        notes.append({"resolved_by_name": {"name": name_in, "to": jk, "id": id}})
+                                    else:
+                                        return json.dumps({"ok": False, "error": f"json_key not found: '{jk_in}'", "hint": "Use scene_list_params(id) or provide 'name'", "id": id})
+                                else:
+                                    return json.dumps({"ok": False, "error": f"json_key not found: '{jk_in}'", "hint": "Use scene_list_params(id) or provide 'name'", "id": id})
+                    else:
+                        if not isinstance(name_in, str) or not name_in.strip():
+                            return json.dumps({"ok": False, "error": "each set_params item must include 'json_key' or 'name'"})
+                        jk_name = _resolve_json_key(id, name=name_in)
+                        if not jk_name:
+                            return json.dumps({"ok": False, "error": f"could not resolve json_key for name='{name_in}'"})
+                        jk = jk_name
+                        notes.append({"resolved_by_name": {"name": name_in, "to": jk, "id": id}})
+                norm_params.append({"id": id, "json_key": jk, "value": it.get("value")})
+
+            # Validate before apply; if validation fails for types, return details
+            val = client.validate_apply(norm_params)
             if not bool(val.get("ok", False)):
-                return json.dumps({"ok": False, "validate": val})
-            ok = client.apply_params(set_params)
-            return json.dumps({"ok": bool(ok)})
+                return json.dumps({"ok": False, "validate": val, **({"notes": notes} if notes else {})})
+            # Warn when timeline keys exist for the same id/json_key (scene values overridden during playback)
+            overrides: list[dict] = []
+            try:
+                for p in norm_params:
+                    id2 = int(p.get("id", -1))
+                    jk2 = p.get("json_key")
+                    if id2 >= 0 and jk2:
+                        lr = client.list_keys(id=id2, json_key=jk2, include_values=False)
+                        times = [k.time for k in getattr(lr, "keys", [])]
+                        if times:
+                            overrides.append({"id": id2, "json_key": jk2, "key_times": times})
+            except Exception:
+                pass
+            ok = client.apply_params(norm_params)
+            resp = {"ok": bool(ok)}
+            if overrides:
+                resp["warning"] = "animation keys exist for some params; during playback those keys override scene values"
+                resp["overrides"] = overrides
+            if notes:
+                resp["notes"] = notes
+            return json.dumps(resp)
         if name == "scene_save_scene":
             ok = client.save_scene(args.get("path"))
             return json.dumps({"ok": bool(ok)})
-        if name == "scene_validate_param_value":
-            scope_object = args.get("scope_object")
+        if name == "codegen_allowed_imports":
             try:
-                if scope_object is not None and int(scope_object) < 0:
-                    scope_object = None
-            except Exception:
-                scope_object = None
-            scope_group = args.get("scope_group")
+                from ..codegen_policy import allowed_imports_status
+                names, status = allowed_imports_status()
+                installed = [s["name"] for s in status if s.get("ok")]
+                missing = [s["name"] for s in status if not s.get("ok")]
+                return json.dumps({"ok": True, "allowed": names, "installed": installed, "missing": missing, "status": status})
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e)})
+        # 'export_python_camera_segmented_orbit' tool has been removed by design; use python_write_and_run to handle codegen directly.
+        if name == "scene_validate_param_value":
+            id = int(args.get("id"))
             json_key = str(args.get("json_key"))
             value = args.get("value")
-            pl = client.list_params(scope_object=scope_object, scope_group=scope_group)
+            pl = client.list_params(id=id)
             meta = None
             for p in pl.params:
                 if p.json_key == json_key:
                     meta = p
                     break
             if meta is None:
-                return json.dumps({"ok": False, "error": "json_key not found in scope"})
+                return json.dumps({"ok": False, "error": "json_key not found for id"})
             t = (meta.type or "").lower()
             # Basic type checks
             def _is_number(x):
@@ -2010,23 +2031,24 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             return json.dumps({"ok": ok, "error": err})
 
         # Timeline / camera
-        if name == "scene_ensure_animation":
+        if name == "animation_ensure_animation":
             return json.dumps({"ok": client.ensure_animation()})
-        if name == "scene_set_duration":
+        if name == "animation_set_duration":
             seconds = float(args.get("seconds", 0.0))
             return json.dumps({"ok": client.set_duration(seconds)})
-        if name == "scene_camera_fit":
-            vals = client.camera_fit(ids=args.get("ids"), all=bool(args.get("all", False)), after_clipping=bool(args.get("after_clipping", False)), min_radius=float(args.get("min_radius", 0.0)))
-            return json.dumps({"values": vals})
-        if name == "scene_camera_orbit":
-            vals = client.camera_orbit(ids=args.get("ids"), axis=str(args.get("axis", "y")), angle_degrees=float(args.get("angle_degrees", 360.0)))
-            return json.dumps({"values": vals})
-        if name == "scene_camera_dolly":
-            vals = client.camera_dolly(ids=args.get("ids"), start_dist=float(args.get("start_dist", 0.0)), end_dist=float(args.get("end_dist", 0.0)))
-            return json.dumps({"values": vals})
-        if name == "scene_set_key_camera":
+        # removed obsolete camera suggest tools; use camera_solve/camera_rotate/camera_focus instead
+        if name == "animation_set_key_camera":
             try:
-                ok = client.set_key_camera(time=float(args.get("time", 0.0)), easing=str(args.get("easing", "Linear")), value=args.get("value") or {})
+                t = float(args.get("time", 0.0))
+                ok = client.set_key_camera(time=t, easing=str(args.get("easing", "Linear")), value=args.get("value") or {})
+                if ok and bool(args.get("extend_duration", True)):
+                    try:
+                        ts = client.get_time()
+                        cur_dur = float(getattr(ts, "duration", 0.0) or 0.0)
+                        if t > (cur_dur + 1e-6):
+                            client.set_duration(t)
+                    except Exception:
+                        pass
                 return json.dumps({"ok": ok})
             except Exception as e:
                 # Capture gRPC error details when available
@@ -2037,17 +2059,34 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 except Exception:
                     pass
                 return json.dumps({"ok": False, "error": msg})
-        if name == "scene_set_key_param":
-            # Expect native JSON value; coerce common mistakes (e.g., "true" -> true for Bool types).
-            scope_object = args.get("scope_object")
-            scope_group = args.get("scope_group")
-            json_key = str(args.get("json_key"))
+        if name == "animation_set_key_param":
+            # Expect native JSON value. Resolve json_key by name if needed; coerce common mistakes.
+            id = int(args.get("id"))
+            if id == 0:
+                return json.dumps({"ok": False, "error": "use animation_set_key_camera for id=0"})
+            json_key = args.get("json_key")
             time_v = float(args.get("time", 0.0))
             easing = str(args.get("easing", "Linear"))
             value_native = args.get("value")
-            # Look up param meta to coerce types sensibly
+            # Resolve json_key via list_params by display name
+            if not json_key:
+                name = str(args.get("name") or "").strip()
+                if not name:
+                    return json.dumps({"ok": False, "error": "json_key or name required"})
+                try:
+                    pl = client.list_params(id=id)
+                    for p in pl.params:
+                        if getattr(p, "name", None) == name:
+                            json_key = getattr(p, "json_key", None)
+                            break
+                except Exception:
+                    json_key = None
+                if not json_key:
+                    return json.dumps({"ok": False, "error": f"could not resolve json_key for name='{name}'"})
+            json_key = str(json_key)
+            # Look up param meta and verify existence
             try:
-                pl = client.list_params(scope_object=scope_object, scope_group=scope_group)
+                pl = client.list_params(id=id)
                 meta = None
                 for p in pl.params:
                     if p.json_key == json_key:
@@ -2055,6 +2094,25 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         break
             except Exception:
                 meta = None
+            # If not found, try assistive resolution (treat provided json_key as candidate/display name)
+            if meta is None and json_key:
+                try:
+                    jk2 = _resolve_json_key(id, candidate=json_key)
+                    if not jk2:
+                        # As a last attempt, allow passing same string as 'name'
+                        jk2 = _resolve_json_key(id, name=json_key)
+                    if jk2:
+                        json_key = jk2
+                        # refresh meta
+                        pl = client.list_params(id=id)
+                        for p in pl.params:
+                            if p.json_key == json_key:
+                                meta = p
+                                break
+                except Exception:
+                    pass
+            if meta is None:
+                return json.dumps({"ok": False, "error": "json_key not found for id"})
             # Coerce booleans if needed
             if meta is not None:
                 t = (getattr(meta, "type", "") or "").lower()
@@ -2067,17 +2125,8 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     value_native = [float(v) for v in value_native]
                 if t.endswith("vec3") and isinstance(value_native, list) and len(value_native) == 3:
                     value_native = [float(v) for v in value_native]
-            # Serialize
-            v_str = json.dumps(value_native)
             try:
-                ok = client.set_key_param(
-                    scope_object=scope_object,
-                    scope_group=scope_group,
-                    json_key=json_key,
-                    time=time_v,
-                    easing=easing,
-                    value=value_native,
-                )
+                ok = client.set_key_param(id=id, json_key=json_key, time=time_v, easing=easing, value=value_native)
                 return json.dumps({"ok": ok})
             except Exception as e:
                 msg = str(e)
@@ -2086,27 +2135,124 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 except Exception:
                     pass
                 return json.dumps({"ok": False, "error": msg})
-        if name == "scene_clear_keys":
-            ok = client.clear_keys(
-                scope_camera=bool(args.get("scope_camera", False)),
-                scope_object=args.get("scope_object"),
-                scope_group=args.get("scope_group"),
-                json_key=args.get("json_key"),
-            )
+        if name == "animation_replace_key_param_last":
+            id = int(args.get("id"))
+            if id == 0:
+                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera"})
+            json_key = str(args.get("json_key"))
+            value = args.get("value")
+            easing = str(args.get("easing", "Linear"))
+            tol = float(args.get("tolerance", 1e-3))
+            # Verify parameter exists
+            if not _json_key_exists(id, json_key):
+                return json.dumps({"ok": False, "error": "json_key not found for id"})
+            try:
+                lr = client.list_keys(id=id, json_key=json_key, include_values=False)
+                times = sorted([k.time for k in getattr(lr, "keys", [])])
+                if not times:
+                    return json.dumps({"ok": False, "error": "no existing keys for parameter"})
+                if len(times) > 1:
+                    return json.dumps({"ok": False, "error": "multiple keys exist; specify times", "times": times})
+                t = float(times[0])
+                # Remove near time then set
+                _ = json.loads(dispatch("animation_remove_key_param_at_time", json.dumps({
+                    "id": id,
+                    "json_key": json_key,
+                    "time": t,
+                    "tolerance": tol,
+                })))
+                res = json.loads(dispatch("animation_set_key_param", json.dumps({
+                    "id": id,
+                    "json_key": json_key,
+                    "time": t,
+                    "easing": easing,
+                    "value": value,
+                })))
+                return json.dumps({"ok": bool(res.get("ok", False)), "time": t})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+        if name == "animation_replace_key_param_at_times":
+            id = int(args.get("id"))
+            if id == 0:
+                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera"})
+            json_key = str(args.get("json_key"))
+            times = args.get("times") or []
+            value = args.get("value")
+            easing = str(args.get("easing", "Linear"))
+            tol = float(args.get("tolerance", 1e-3))
+            if not times:
+                return json.dumps({"ok": False, "error": "times required"})
+            # Verify parameter exists for id
+            if not _json_key_exists(id, json_key):
+                return json.dumps({"ok": False, "error": "json_key not found for id"})
+            try:
+                for t in times:
+                    _ = json.loads(dispatch("animation_remove_key_param_at_time", json.dumps({
+                        "id": id,
+                        "json_key": json_key,
+                        "time": t,
+                        "tolerance": tol
+                    })))
+                    _ = json.loads(dispatch("animation_set_key_param", json.dumps({
+                        "id": id,
+                        "json_key": json_key,
+                        "time": t,
+                        "easing": easing,
+                        "value": value
+                    })))
+                return json.dumps({"ok": True, "count": len(times)})
+            except Exception as e:
+                msg = str(e)
+                try: msg = e.details()  # type: ignore[attr-defined]
+                except Exception: pass
+                return json.dumps({"ok": False, "error": msg})
+        if name == "animation_clear_keys":
+            id = int(args.get("id"))
+            ok = client.clear_keys(id=id, json_key=args.get("json_key"))
             return json.dumps({"ok": ok})
-        if name == "scene_remove_key":
-            ok = client.remove_key(
-                scope_object=args.get("scope_object"),
-                scope_group=args.get("scope_group"),
-                json_key=str(args.get("json_key")),
-                time=float(args.get("time", 0.0)),
-            )
+        if name == "animation_remove_key":
+            id = int(args.get("id"))
+            if id == 0:
+                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera"})
+            json_key = str(args.get("json_key"))
+            time_v = float(args.get("time", 0.0))
+            # Verify parameter exists
+            if not _json_key_exists(id, json_key):
+                return json.dumps({"ok": False, "error": "json_key not found for id"})
+            ok = client.remove_key(id=id, json_key=json_key, time=time_v)
             return json.dumps({"ok": ok})
-        if name == "scene_batch":
+        if name == "animation_batch":
             set_keys = args.get("set_keys") or []
             remove_keys = args.get("remove_keys") or []
             if not set_keys and not remove_keys:
-                return json.dumps({"ok": False, "error": "scene_batch called with empty set/remove. Build concrete SetKey entries or use scene_emphasize_object/scene_set_key_param/scene_set_key_camera first."})
+                return json.dumps({"ok": False, "error": "animation_batch called with empty set/remove. Build concrete SetKey entries or use animation_set_key_param/animation_set_key_camera first."})
+            # Verify that each set_key references a valid json_key for its id (non-camera only)
+            invalid: list[dict] = []
+            params_cache: dict[int, set] = {}
+            try:
+                for sk in set_keys:
+                    id = int(sk.get("id", -1))
+                    if id == 0:
+                        continue
+                    jk = sk.get("json_key")
+                    if not jk:
+                        invalid.append({"reason": "missing json_key", "entry": sk})
+                        continue
+                    if id not in params_cache:
+                        try:
+                            pl = client.list_params(id=id)
+                            params_cache[id] = {getattr(p, "json_key", "") for p in pl.params}
+                        except Exception:
+                            params_cache[id] = set()
+                    if str(jk) not in params_cache[id]:
+                        invalid.append({"reason": "json_key not found for id", "json_key": jk, "id": id})
+            except Exception:
+                invalid = []
+            if invalid:
+                return json.dumps({"ok": False, "error": "validation failed for set_keys", "invalid": invalid})
             ok = client.batch(set_keys=set_keys, remove_keys=remove_keys, commit=bool(args.get("commit", True)))
             return json.dumps({"ok": ok})
 
@@ -2130,18 +2276,17 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             return json.dumps({"ok": client.cut_clear()})
 
         # Playback / save
-        if name == "scene_set_time":
+        if name == "animation_set_time":
             ok = client.set_time(float(args.get("seconds", 0.0)), cancel_rendering=bool(args.get("cancel", False)))
             return json.dumps({"ok": ok})
-        if name == "scene_play":
+        if name == "animation_play":
             ok = client.play(float(args.get("fps", 25.0)))
             return json.dumps({"ok": ok})
-        if name == "scene_pause":
+        if name == "animation_pause":
             return json.dumps({"ok": client.pause()})
-        if name == "scene_save_animation":
+        if name == "animation_save_animation":
             from pathlib import Path as _P
             return json.dumps({"ok": client.save_animation(_P(args.get("path")))})
-
         if name == "atlas_export_video":
             # Export .animation3d to MP4 by invoking headless Atlas
             from pathlib import Path as _P
@@ -2181,7 +2326,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             )
             return json.dumps({"ok": rc == 0, "exit_code": rc})
 
-        if name == "scene_render_preview":
+        if name == "animation_render_preview":
             # Privacy/consent gate: disabled unless explicitly allowed by env
             import os as _os
             allow = (_os.environ.get("ATLAS_AGENT_ALLOW_SCREENSHOTS", "").strip().lower() in ("1", "true", "yes"))
@@ -2243,163 +2388,13 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": False, "error": "no image produced"})
             return json.dumps({"ok": True, "path": images[0]})
 
-        if name == "scene_emphasize_object":
-            oid = int(args.get("id"))
-            time = float(args.get("time", 0.0))
-            easing = str(args.get("easing", "Linear"))
-            want_mode = args.get("mode")
-            want_color = args.get("color")
-            want_opacity = args.get("opacity")
-            dim_others = bool(args.get("dim_others", False))
-
-            # Resolve object type
-            objs = client.list_objects()
-            obj = None
-            others = []
-            for o in objs.objects:
-                if int(o.id) == oid:
-                    obj = o
-                else:
-                    others.append(o)
-            if obj is None:
-                return json.dumps({"error": f"object {oid} not found"})
-
-            # Helper to find param json_key by name and optional type
-            def find_key(scope_object: int, name: str, type_hint: str | None = None) -> str | None:
-                pl = client.list_params(scope_object=scope_object)
-                for p in pl.params:
-                    if p.name == name and (type_hint is None or p.type == type_hint):
-                        return p.json_key
-                # Try fallback by matching prefix
-                for p in pl.params:
-                    if p.name.lower().startswith(name.lower()):
-                        return p.json_key
-                return None
-
-            set_keys: list[dict] = []
-
-            # Mode
-            if want_mode and obj.type == "Swc":
-                jk = find_key(oid, "Rendering Mode", "StringIntOption")
-                if jk:
-                    set_keys.append({
-                        "scope": {"object": oid},
-                        "json_key": jk,
-                        "time": time,
-                        "easing": easing,
-                        "value": str(want_mode),
-                    })
-
-            # Color mapping
-            def to_rgba(v) -> list[float]:
-                if isinstance(v, str):
-                    s = v.strip().lower()
-                    named = {
-                        "red": (1.0, 0.0, 0.0, 1.0),
-                        "green": (0.0, 1.0, 0.0, 1.0),
-                        "blue": (0.0, 0.0, 1.0, 1.0),
-                        "white": (1.0, 1.0, 1.0, 1.0),
-                        "black": (0.0, 0.0, 0.0, 1.0),
-                        "yellow": (1.0, 1.0, 0.0, 1.0),
-                        "magenta": (1.0, 0.0, 1.0, 1.0),
-                        "cyan": (0.0, 1.0, 1.0, 1.0),
-                    }
-                    if s in named:
-                        return list(named[s])
-                    if s.startswith("#"):
-                        h = s[1:]
-                        if len(h) == 6:
-                            r = int(h[0:2], 16) / 255.0
-                            g = int(h[2:4], 16) / 255.0
-                            b = int(h[4:6], 16) / 255.0
-                            a = 1.0
-                            return [r, g, b, a]
-                        if len(h) == 8:
-                            r = int(h[0:2], 16) / 255.0
-                            g = int(h[2:4], 16) / 255.0
-                            b = int(h[4:6], 16) / 255.0
-                            a = int(h[6:8], 16) / 255.0
-                            return [r, g, b, a]
-                if isinstance(v, list) and len(v) >= 3:
-                    if len(v) == 3:
-                        return [float(v[0]), float(v[1]), float(v[2]), 1.0]
-                    return [float(v[0]), float(v[1]), float(v[2]), float(v[3])]
-                # default red
-                return [1.0, 0.0, 0.0, 1.0]
-
-            if want_color is not None:
-                rgba = to_rgba(want_color)
-                if obj.type == "Swc":
-                    jk_mode = find_key(oid, "Color Mode", "StringIntOption")
-                    jk_col = find_key(oid, "Color", "Vec4")
-                    if jk_mode and jk_col:
-                        set_keys.append({
-                            "scope": {"object": oid},
-                            "json_key": jk_mode,
-                            "time": time,
-                            "easing": easing,
-                            "value": "Single Color",
-                        })
-                        set_keys.append({
-                            "scope": {"object": oid},
-                            "json_key": jk_col,
-                            "time": time,
-                            "easing": easing,
-                            "value": rgba,
-                        })
-                elif obj.type == "Mesh":
-                    jk_mode = find_key(oid, "Color Mode", "StringIntOption")
-                    jk_col = find_key(oid, "Mesh Color", "Vec4")
-                    if jk_mode and jk_col:
-                        set_keys.append({
-                            "scope": {"object": oid},
-                            "json_key": jk_mode,
-                            "time": time,
-                            "easing": easing,
-                            "value": "Single Color",
-                        })
-                        set_keys.append({
-                            "scope": {"object": oid},
-                            "json_key": jk_col,
-                            "time": time,
-                            "easing": easing,
-                            "value": rgba,
-                        })
-
-            if want_opacity is not None:
-                jk_op = find_key(oid, "Opacity", "Float")
-                if jk_op:
-                    set_keys.append({
-                        "scope": {"object": oid},
-                        "json_key": jk_op,
-                        "time": time,
-                        "easing": easing,
-                        "value": float(want_opacity),
-                    })
-
-            # Dim others by lowering opacity
-            if dim_others and others:
-                for o in others:
-                    jk_op2 = find_key(int(o.id), "Opacity", "Float")
-                    if jk_op2:
-                        set_keys.append({
-                            "scope": {"object": int(o.id)},
-                            "json_key": jk_op2,
-                            "time": time,
-                            "easing": easing,
-                        "value": 0.2,
-                        })
-
-            if not set_keys:
-                return json.dumps({"ok": False, "note": "no changes"})
-            ok = client.batch(set_keys=set_keys, remove_keys=[], commit=True)
-            return json.dumps({"ok": ok, "changed": len(set_keys)})
+        
 
         return json.dumps({"error": f"unknown tool: {name}"})
 
     # Filter out deprecated/disabled tools from the advertised list
     filtered = []
-    disabled = {"scene_guess_primary_object", "scene_guess_transform_key", "scene_placement_roles"}
+    disabled = {}
     for t in tools:
         try:
             nm = t.get("function", {}).get("name")

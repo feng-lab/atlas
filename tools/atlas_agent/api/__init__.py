@@ -8,5 +8,6 @@ Key modules:
   - plan_types: dataclasses for scene/animation plans
   - fs: filesystem helpers (expand/check/glob/resolve/search)
   - scene: typed wrappers around SceneClient (raises exceptions)
+  - camera: typed camera planning/validation helpers
   - runner: validate → apply → verify execution helpers
 """

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Dict, List, Tuple
+from .codegen_policy import is_codegen_enabled
 
 
 def _load_capabilities(schema_dir: Path) -> dict | None:
@@ -14,85 +15,65 @@ def _load_capabilities(schema_dir: Path) -> dict | None:
         return None
 
 
-MAJOR_HINTS = {
-    "Swc": {"Rendering Mode", "Color Mode", "Color", "Opacity", "Size Scale"},
-    "Mesh": {"Color Mode", "Mesh Color", "Wireframe Option", "Wireframe Color", "Opacity"},
-    "Image": {"Opacity", "Size Scale"},
-}
-
-
-def _split_major_advanced(params: List[dict], type_name: str) -> Tuple[List[str], List[str]]:
+def _param_names(params: List[dict]) -> List[str]:
     names = [(p.get("name") or p.get("json_key") or "").strip() for p in params]
-    majors: List[str] = []
-    adv: List[str] = []
-    hints = MAJOR_HINTS.get(type_name, {"Opacity", "Color", "Color Mode", "Size Scale"})
+    # De-dup while preserving order
+    seen = set()
+    out: List[str] = []
     for n in names:
-        (majors if any(h.lower() in n.lower() for h in hints) else adv).append(n)
-    # De-dup and keep order
-    def dedup(xs: List[str]) -> List[str]:
-        seen = set()
-        out = []
-        for x in xs:
-            if x and x not in seen:
-                seen.add(x)
-                out.append(x)
-        return out
-    return dedup(majors), dedup(adv)
+        if n and n not in seen:
+            seen.add(n)
+            out.append(n)
+    return out
 
 
-def build_capabilities_prompt(schema_dir: Path, *, max_lines: int = 120) -> str:
+def build_capabilities_prompt(schema_dir: Path, *, max_lines: int | None = None) -> str:
     caps = _load_capabilities(schema_dir)
     lines: List[str] = []
     lines.append("Atlas Capabilities Overview (condensed)")
-    lines.append("Use tools to inspect live params: scene_list_params, scene_capabilities, list per object id.")
-    lines.append("Scene (stateless) edits: plan scene_validate_apply → scene_apply (no time/easing); verify via scene_get_values.")
+    lines.append("Use tools to inspect live params: scene_list_params(id); list keys via animation_list_keys(id,json_key).")
+    if is_codegen_enabled():
+        lines.append(
+            "Advanced: codegen is enabled. For complex calculations, small Python helpers can be run via the codegen tool; prefer plan→validate→apply with verification."
+        )
+    # Scene vs Timeline contract (high-signal guidance for LLMs)
+    lines.append(
+        "Scene vs Timeline: Scene (.scene) = current display state (no time); Animation (.animation2d/.animation3d) = timeline keys per parameter. Change scene parameters will not affect animation. During playback, animation keys override scene values."
+    )
     if not caps:
         # Minimal static knowledge
         lines += [
-            "Swc (neurite trees): major = Rendering Mode (Normal|Line|Sphere|Cylinder), Color Mode (Single|Branch|Topology|Colormap), Color (Vec4), Opacity, Size Scale.",
-            "Mesh: major = Color Mode (Single|Mesh Color), Mesh Color (Vec4), Wireframe Option (No/With/Only), Wireframe Color, Opacity.",
             "Groups: Background/Axis/Global have scene‑level parameters; Camera uses dedicated camera keys.",
-            "Tip: Use scene_batch to atomically set multiple keys; prefer 'Single Color' then set the Vec4 color.",
+            "Tip: Use animation_batch to atomically set multiple keys; prefer 'Single Color' then set the Vec4 color.",
         ]
-        return "\n".join(lines[:max_lines])
+        # Do not hard-truncate; callers can summarize with an LLM if needed
+        return "\n".join(lines)
 
-    # Try to summarize per object type
+    # Summarize per object type (flat list, no major/advanced split)
     objects = caps.get("objects") or {}
     if isinstance(objects, dict):
         for tname, obj in objects.items():
             plist = []
             if isinstance(obj, dict):
                 plist = obj.get("parameters") or obj.get("params") or []
-            majors, adv = _split_major_advanced(plist if isinstance(plist, list) else [], tname)
-            if majors or adv:
+            names = _param_names(plist if isinstance(plist, list) else [])
+            if names:
                 lines.append(f"{tname}:")
-            if majors:
-                lines.append("  Major: " + ", ".join(majors[:12]))
-            if adv:
-                lines.append("  Advanced: " + ", ".join(adv[:12]))
+                lines.append("  Parameters: " + ", ".join(names[:12]))
 
-    # Global groups if present
+    # Global groups if present (flat list)
     globs = caps.get("globals") or {}
     for gname in ("Background", "Axis", "Global"):
         g = globs.get(gname) if isinstance(globs, dict) else None
         if isinstance(g, dict):
             plist = g.get("parameters") or []
-            majors, adv = _split_major_advanced(plist if isinstance(plist, list) else [], gname)
-            if majors or adv:
+            names = _param_names(plist if isinstance(plist, list) else [])
+            if names:
                 lines.append(f"{gname}:")
-            if majors:
-                lines.append("  Major: " + ", ".join(majors[:12]))
-            if adv:
-                lines.append("  Advanced: " + ", ".join(adv[:12]))
+                lines.append("  Parameters: " + ", ".join(names[:12]))
 
-    # Best practices
-    lines += [
-        "Camera: use CameraFit/Orbit/Dolly to derive camera values; write camera keys at start/end.",
-        "Emphasis recipe: set Color Mode='Single Color', set Color=Vec4 RGBA, and adjust Opacity.",
-        "Batch: prefer scene_batch to atomically write multiple keys across scopes (for timeline).",
-        "Scene: for base arrangement/styling, use scene_apply (stateless).",
-        "Cuts: suggest via scene_cut_suggest_box(ids, margin), then scene_cut_set_box(refit_camera=true).",
-    ]
-    # Add type-specific tips when possible
-    lines.append("Tips: Image objects expose 'Coord Transform 3DTransform' — write Translation [x,y,z] in world units. Use scene_bbox(ids) to size grid cells; avoid tiny unitless translations.")
-    return "\n".join(lines[:max_lines])
+    # Keep best-practice section compact and neutral
+    lines.append("Best practices: camera_solve (FIT/ORBIT/DOLLY/STATIC) with camera_validate; animation_batch for atomic writes; prefer id-only addressing.")
+    # Return full content without hard line limits. If a shorter version is required,
+    # the caller should summarize via the LLM rather than truncating here.
+    return "\n".join(lines)

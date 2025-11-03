@@ -42,8 +42,8 @@ def _id_type_map(doc_map: Dict[str, Any]) -> Dict[str, str]:
     return m
 
 
-def _friendly_param_name(json_key: str, caps: dict, scope_type: Optional[str]) -> str:
-    # Search in globals if scope_type is Background/Axis/Global; else search per object type
+def _friendly_param_name(json_key: str, caps: dict, target_type: Optional[str]) -> str:
+    # Search in globals if target_type is Background/Axis/Global; else search per object type
     def find_in(lst):
         for p in lst:
             if p.get("jsonKey") == json_key:
@@ -52,13 +52,13 @@ def _friendly_param_name(json_key: str, caps: dict, scope_type: Optional[str]) -
                 return f"{nm} ({tp})"
         return json_key
 
-    if scope_type in {"Background", "Axis", "Global"}:
+    if target_type in {"Background", "Axis", "Global"}:
         g = caps.get("globals", {})
-        entry = g.get(scope_type)
+        entry = g.get(target_type)
         if entry and isinstance(entry, dict):
             return find_in(entry.get("parameters", []))
-    elif scope_type:
-        obj = caps.get("objects", {}).get(scope_type)
+    elif target_type:
+        obj = caps.get("objects", {}).get(target_type)
         if obj:
             return find_in(obj.get("parameters", []))
     return json_key

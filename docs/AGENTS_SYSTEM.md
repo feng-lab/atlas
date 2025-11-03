@@ -3,6 +3,10 @@ Atlas Agents System (Scene + Animation)
 Overview
 - Multi‑agent system that designs animations live in Atlas via gRPC, with preview in the GUI timeline.
 - Single entry point: a chat interface. The agent saves .animation3d via RPC and, when asked, exports MP4 by invoking Atlas headless in the background (no extra CLI commands for the user).
+ - Concepts:
+   - Scene (.scene): current objects and their display parameters across 2D/3D. Saving a scene restores the view/state.
+   - Animation (.animation2d/.animation3d): extends Scene with a timeline. Each display parameter (and camera) has keys with easing at specific times.
+   - Playback rule: During playback, animation keys override scene values for affected parameters. To change what plays, write/replace timeline keys (not scene_apply).
 
 Quickstart
 - Run chat (only command):
@@ -22,6 +26,9 @@ Headless Rendering
 Notes
 - Headless export uses the Atlas binary; set `--atlas-dir` or install Atlas to standard locations.
 - Requires the Agents SDK (pip package name `agents`) for multi‑agent chat. Install it to enable session management and future MCP tool support.
+
+Codegen Toggle
+- Code generation helpers are disabled by default and gated behind a flag. Enable with `--enable-codegen` or `ATLAS_AGENT_ENABLE_CODEGEN=1` when invoking the chat agent. When disabled, the `python_write_and_run` tool is hidden and calls are rejected.
 
 No Other CLI Commands
 - All actions happen through chat. Ask to load data, set keys, play/pause, save, or export and the agent will call the right tools under the hood.
@@ -48,26 +55,32 @@ Multi‑Agent (live)
 
 Natural Language Contract (Summary‑first)
 - Before any keys are written, require a concise Plan Summary with two synchronized views:
-  - Global timeline view: a list of changes `{ time, target(camera|object|group), json_key?, value, easing? }`.
-  - Per‑object view: for each object/group, list `{ json_key, time, value, easing? }`.
+- Global timeline view: a list of changes `{ time, target(id), json_key?, value, easing? }` where id=0 camera, ≥4 objects.
+- Per‑target view: for each id, list `{ json_key, time, value, easing? }`.
 - Rules:
-  - Use canonical `json_key` names discovered from `scene_list_params` (or `scene_capabilities`).
+- Use canonical `json_key` names discovered from `scene_list_params(id)` (or `scene_capabilities`). The dispatcher assists with resolution: when a tool call supplies a display name (e.g., "Coord Transform") or a non-canonical key that differs only by a type suffix (e.g., missing " 3DTransform"), it resolves to the canonical `json_key` using live `scene_list_params` metadata. The resolved mapping is cached per-id to make subsequent calls reliable.
+- Unified id addressing: All tools accept `id` as a single field. Reserved ids mirror engine special ids:
+  - 0=camera (exposed as a typed scene value via `"Camera 3DCamera"` and as timeline keys)
+  - 1=background, 2=axis, 3=global
+  - ≥4=object ids
+  Legacy scope addressing has been removed from the agent API in favor of id-only.
   - Camera steps must be typed via camera tools (Fit/Orbit/Dolly/Validate); do not invent raw camera numbers.
-  - For scene (stateless) edits, use `scene_apply` (no time/easing); for animations, use `Batch`/`SetKey` with verification.
-  - The Implementer translates the Plan Summary directly to tool calls and verifies with `scene_list_keys` and/or `scene_get_values`.
+  - Scene (stateless): use `scene_apply` (no time/easing). Animation (timeline): use `animation_*` to write/replace keys; during playback keys override scene values.
+- The Supervisor injects a Task Brief into the shared context. The Implementer must derive intent strictly from the Task Brief (do not reclassify), then translate the Plan Summary directly to tool calls and verify with `animation_list_keys` and/or `scene_get_values`.
 
 Grounding tools for summaries
-- `scene_capabilities_summary(schema_dir?, max_lines?)` → NL overview of parameter catalogs (groups + object types).
-- `scene_list_objects()` + `scene_list_params(scope)` + `scene_get_values(scope, json_keys?)` → facts snapshot used to enrich the Plan Summary.
+- `scene_capabilities_summary()` → overview of parameter catalogs (background/axis/global + object types).
+- `scene_list_objects()` + `scene_list_params(id)` + `scene_get_values(id,json_keys)` → facts snapshot used to enrich the Plan Summary.
  - `scene_params_handbook(schema_dir?, include_groups?, ...)` → generate a Markdown handbook of parameters from capabilities.json for quick reference (no code shortcuts).
 
 Parameter discovery and docs
 - Agents do not guess parameters. They must enumerate canonical json_keys via `scene_list_params` and consult `capabilities.json` / `animation3d.schema.json` when in doubt. 
 - Typical arrangement flow (stateless):
   - `scene_list_objects` → pick targets
-  - `scene_list_params(scope_object=ID)` → pick canonical transform json_key (correct type/shape)
+  - `scene_list_params(id=OBJECT_ID)` → pick canonical transform json_key (correct type/shape)
   - `scene_bbox(ids)` → compute world‑space cell sizes (≥ extents × (1+margin))
-  - Build `set_params` with correct value shapes; `scene_validate_apply` → `scene_apply`; verify with `scene_get_values`
+  - Build `set_params` with correct value shapes; `scene_validate_apply` → `scene_apply`; verify with `scene_get_values`. When in doubt about the key spelling, provide `name` instead of `json_key` and the dispatcher will resolve it.
+  - Prefer id addressing (0/1/2/3/≥4) to avoid object/group ambiguity.
 
 Agents Architecture and Guidelines
 - Two lanes, one plan:
@@ -78,9 +91,17 @@ Agents Architecture and Guidelines
 - Strong Python Script core: compute layouts/paths in Python; use the Script API for plan building, validation, and reliable execution. Agents orchestrate planning/execution.
 - Verification and safety: always verify keys/values after apply; keep changes atomic; avoid one‑off “arrange_xxx” RPCs — compute in Python and apply via general tools.
 
+Session Memory (ctx_with_history)
+- Only the Intent Resolver consumes full chat history to produce a self‑contained Task Brief for the current turn.
+- Downstream agents (Designer, Reviewers, Arbiter, Implementer, Inspector) receive a compact shared context: facts snapshot + Task Brief (no conversation history). This keeps turns explicit and reduces drift.
+
+Who Runs Python Codegen?
+- When enabled, the Implementer may use code generation for complex calculations. In that mode it runs short scripts that import `tools.atlas_agent.api` via the `python_write_and_run` tool.
+- Implementer follows a plan‑only → validate → apply → verify loop; scripts print compact JSON for machine parsing and are iterated on until success under guardrails.
+
 Agent Tooling vs Script API
 - Agent Tooling (LLM function-calling)
-  - Curated, safe, idempotent tools exposed to the Implementer (e.g., scene_apply, scene_validate_apply, scene_batch, camera_*). Tools return compact JSON and perform verification where applicable.
+  - Curated, safe, idempotent tools exposed to the Implementer (stateless: scene_*; timeline: animation_*). Tools return compact JSON and perform verification where applicable.
   - Located in `tools/atlas_agent/agent_team/tools_agent.py` (shim re-export of the stable entry point).
 - Script API (typed Python for programmatic control)
   - Developer-friendly modules for building and executing plans in code. Prefer these for compute-heavy orchestration and reproducibility.
@@ -90,3 +111,30 @@ Agent Tooling vs Script API
     - `tools.atlas_agent.api.scene` — typed wrappers around `SceneClient` (raise exceptions on failure).
     - `tools.atlas_agent.api.runner` — `run_plan()` helper (validate → apply → verify).
   - Philosophy: strict typing, exceptions on error, builders/utilities for larger workloads, fewer guardrails than the Agent Tooling.
+
+Task Brief (Intent Resolution)
+- The Intent Resolver consumes full chat history and the latest user turn, and emits a minimal Task Brief that consolidates context so downstream agents do not need history.
+- If the turn is ambiguous, it returns one concise clarifying question; otherwise it proceeds with defaults and lists them as Assumptions.
+- The Task Brief is intentionally high‑level — it classifies intent and highlights inputs/constraints, leaving design details to the Designer:
+  - Intent (scene | animation | mixed | playback | save | explain)
+  - Targets (ids/names if known) and Inputs (files/patterns)
+  - Assumptions (defaults due to ambiguity)
+  - Signals (e.g., “update scene”, “update animation”) and Duration when explicitly provided
+  - Verify (what success looks like), without prescribing steps or parameter names
+This keeps roles clean: Resolver merges context and sets direction; Designer plans the how.
+
+Camera Segmentation Rule (Chaining)
+- For segmented camera motions (e.g., 4×90° AZIMUTH for a 360° orbit), always chain: each `camera_rotate` call must use the previous camera value as `base_value`. Do not rotate from the initial camera repeatedly.
+- Typical pattern: `v0 = camera_focus(ids)` → write at `t0`; then `v1 = camera_rotate(op='AZIMUTH', degrees=Δ, base_value=v0)` at `t1`; `v2 = camera_rotate(..., base_value=v1)` at `t2`; … until `tn`.
+
+Duration Handling
+- When a user specifies a total duration, the Implementer must call `animation_set_duration(duration_seconds)` explicitly. Verify via `animation_get_time()`.
+
+Example: 360° in 10s (segmented)
+- ids = `fit_candidates()`
+- `v0 = camera_focus(ids)`; `t = [0, 2.5, 5.0, 7.5, 10.0]`
+- `v1 = camera_rotate('AZIMUTH', 90, base_value=v0)` at `t[1]`
+- `v2 = camera_rotate('AZIMUTH', 90, base_value=v1)` at `t[2]`
+- `v3 = camera_rotate('AZIMUTH', 90, base_value=v2)` at `t[3]`
+- `v4 = camera_rotate('AZIMUTH', 90, base_value=v3)` at `t[4]`
+- Validate with `camera_validate`; apply keys; then `animation_set_duration(10)` and verify times with `animation_list_keys_camera(json_key="")`.

@@ -60,16 +60,8 @@ message CapabilitiesResponse {
 message EnsureAnimationRequest {}
 message SetDurationRequest { double duration = 1; }
 
-message Scope {
-  oneof target {
-    bool camera = 1;
-    uint64 object = 2;
-    string group = 3;
-  }
-}
-
 message SetKeyRequest {
-  Scope scope = 1;
+  uint64 id = 1;           // 0=camera, 1=background, 2=axis, 3=global, >=4=object id
   string json_key = 2;   // non-camera only
   double time = 3;       // seconds
   string easing = 4;     // e.g., "Linear", "InOutSine"
@@ -78,7 +70,7 @@ message SetKeyRequest {
 
 // Query keys present in the current animation for a specific target
 message ListKeysRequest {
-  Scope scope = 1;        // camera or object/group
+  uint64 id = 1;          // 0=camera, >=4 object id
   string json_key = 2;    // required for non-camera scope; ignored for camera
   bool include_values = 3; // when true, include value_json for each key
 }
@@ -153,7 +145,7 @@ service Scene {
 
 // Scene (stateless) parameter messages
 message SetParam {
-  Scope scope = 1;                // object or group (camera not supported)
+  uint64 id = 1;                  // 0=camera, 1=background, 2=axis, 3=global, >=4=object id
   string json_key = 2;            // canonical parameter json key
   google.protobuf.Value value = 3; // value to set (typed JSON)
 }
@@ -175,7 +167,7 @@ message ValidateSceneParamsResponse {
 }
 
 message GetParamValuesRequest {
-  Scope scope = 1;               // object or group
+  uint64 id = 1;                 // 0=camera, 1=background, 2=axis, 3=global, >=4=object id
   repeated string json_keys = 2; // when empty, returns all values for the scope
 }
 
@@ -312,12 +304,12 @@ message CutSuggestion {
   }
 }
 
-// Parameter enumeration for a given scope
-message ListParamsRequest { Scope scope = 1; }
+// Parameter enumeration for a target id (0=camera,1=background,2=axis,3=global,≥4=object id)
+message ListParamsRequest { uint64 id = 1; }
 
 // Keyframe ops
-message ClearKeysRequest { Scope scope = 1; string json_key = 2; }
-message RemoveKeyRequest { Scope scope = 1; string json_key = 2; double time = 3; }
+message ClearKeysRequest { uint64 id = 1; string json_key = 2; }
+message RemoveKeyRequest { uint64 id = 1; string json_key = 2; double time = 3; }
 message BatchRequest {
   repeated SetKeyRequest set_keys = 1;
   repeated RemoveKeyRequest remove_keys = 2;

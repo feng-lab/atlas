@@ -18,11 +18,13 @@ class Describer:
     client: LLMClient
     temperature: float = 0.2
 
-    def describe(self, *, user_text: str, facts: Dict[str, Any]) -> str:
+    def describe(self, *, user_text: str, facts: Dict[str, Any], conversation: str | None = None) -> str:
         logger = logging.getLogger("atlas_agent.agents")
         import json
         prompt = (
-            f"User request:\n{user_text}\n\nFacts (JSON):\n{json.dumps(facts, indent=2)}\n\n"
+            f"User request:\n{user_text}\n\n" +
+            (f"Conversation history:\n{conversation}\n\n" if conversation else "") +
+            f"Facts (JSON):\n{json.dumps(facts, indent=2)}\n\n" +
             "Write a short factual summary (2–5 bullets) strictly based on the facts."
         )
         text = self.client.complete_text(system_prompt=DESCRIBER_SYSTEM, user_text=prompt, temperature=self.temperature)

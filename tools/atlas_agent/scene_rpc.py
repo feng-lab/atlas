@@ -233,7 +233,7 @@ class SceneClient:
                     "visible": bool(getattr(o, "visible", False)),
                 })
             # Camera keys
-            lr = self.list_keys(scope_camera=True)
+            lr = self.list_keys(id=0)
             cam_times = [k.time for k in getattr(lr, "keys", [])]
             if cam_times:
                 facts["keys"]["camera"] = sorted(cam_times)
@@ -244,7 +244,7 @@ class SceneClient:
             for o in facts["objects_list"]:
                 oid = int(o.get("id", 0))
                 try:
-                    pl = self.list_params(scope_object=oid)
+                    pl = self.list_params(id=oid)
                 except Exception:
                     continue
                 obj_map: dict[str, list[float]] = {}
@@ -253,7 +253,7 @@ class SceneClient:
                     if not jk:
                         continue
                     try:
-                        lr = self.list_keys(scope_object=oid, json_key=jk, include_values=False)
+                        lr = self.list_keys(id=oid, json_key=jk, include_values=False)
                         times = [k.time for k in getattr(lr, "keys", [])]
                         if times:
                             obj_map[jk] = sorted(times)
@@ -435,27 +435,34 @@ class SceneClient:
             )
         st = None
         if params:
+            from google.protobuf import struct_pb2 as _spb
+            def _to_value(py: Any) -> _spb.Value:
+                v = _spb.Value()
+                if py is None:
+                    v.null_value = 0
+                elif isinstance(py, bool):
+                    v.bool_value = bool(py)
+                elif isinstance(py, (int, float)) and not isinstance(py, bool):
+                    v.number_value = float(py)
+                elif isinstance(py, str):
+                    v.string_value = py
+                elif isinstance(py, (list, tuple)):
+                    lv = _spb.ListValue()
+                    for item in py:
+                        lv.values.append(_to_value(item))
+                    v.list_value.CopyFrom(lv)
+                elif isinstance(py, dict):
+                    st2 = _spb.Struct()
+                    for k2, val in py.items():
+                        st2.fields[k2].CopyFrom(_to_value(val))
+                    v.struct_value.CopyFrom(st2)
+                else:
+                    v.string_value = str(py)
+                return v
             from google.protobuf.struct_pb2 import Struct
             st = Struct()
             for k, v in params.items():
-                # Simple conversion using json roundtrip helper
-                from google.protobuf.json_format import ParseDict
-                # Use a temp Value then assign
-                # But Struct supports native assignment via dict
-                try:
-                    if isinstance(v, (dict, list)):
-                        from google.protobuf.json_format import MessageToDict as _m2d  # noqa: F401
-                    # fallback to string/number/bool
-                    st.fields[k].number_value = float(v) if isinstance(v, (int, float)) else 0.0
-                    if isinstance(v, str):
-                        st.fields[k].string_value = v
-                    elif isinstance(v, bool):
-                        st.fields[k].bool_value = v
-                    elif isinstance(v, (int, float)):
-                        st.fields[k].number_value = float(v)
-                except Exception:
-                    # best-effort: stringify
-                    st.fields[k].string_value = str(v)
+                st.fields[k].CopyFrom(_to_value(v))
         req = self._pb2.CameraSolveRequest(
             mode=str(mode), ids=ids or [], t0=float(t0), t1=float(t1),
             constraints=cons if cons is not None else None,
@@ -573,58 +580,28 @@ class SceneClient:
                 v.string_value = str(py)
             return v
         v = _to_value(py)
-        req = self._pb2.SetKeyRequest(scope=self._pb2.Scope(camera=True), time=time, easing=easing, value=v)
+        req = self._pb2.SetKeyRequest(id=0, time=time, easing=easing, value=v)
         resp = self._stub.SetKey(req)
         self._log_rpc("SetKey(camera)", req, resp)
         return resp.ok
 
-    def list_params(self, scope_camera: bool = False, scope_object: Optional[int] = None, scope_group: Optional[str] = None):
+    def list_params(self, *, id: int):
         # Ensure engine is ready (and open a 3D window if necessary)
         self.ensure_view()
-        scope = None
-        if scope_camera:
-            scope = self._pb2.Scope(camera=True)
-        else:
-            valid_obj = None
-            if scope_object is not None:
-                try:
-                    oi = int(scope_object)
-                    if oi >= 0:
-                        valid_obj = oi
-                except Exception:
-                    valid_obj = None
-            if valid_obj is not None:
-                scope = self._pb2.Scope(object=valid_obj)
-            elif scope_group is not None:
-                scope = self._pb2.Scope(group=str(scope_group))
-            else:
-                scope = self._pb2.Scope()
-        req = self._pb2.ListParamsRequest(scope=scope)
+        req = self._pb2.ListParamsRequest(id=int(id))
         resp = self._stub.ListParams(req)
         self._log_rpc("ListParams", req, resp)
         return resp
 
-    def clear_keys(self, scope_camera: bool = False, scope_object: Optional[int] = None, scope_group: Optional[str] = None, json_key: Optional[str] = None) -> bool:
+    def clear_keys(self, *, id: int, json_key: Optional[str] = None) -> bool:
         self.ensure_view()
-        scope = None
-        if scope_camera:
-            scope = self._pb2.Scope(camera=True)
-        elif scope_object is not None:
-            scope = self._pb2.Scope(object=int(scope_object))
-        elif scope_group is not None:
-            scope = self._pb2.Scope(group=str(scope_group))
-        else:
-            scope = self._pb2.Scope()
-        req = self._pb2.ClearKeysRequest(scope=scope, json_key=json_key or "")
+        req = self._pb2.ClearKeysRequest(id=int(id), json_key=json_key or "")
         resp = self._stub.ClearKeys(req)
         self._log_rpc("ClearKeys", req, resp)
         return resp.ok
 
-    # Non-camera parameter key operations
-    def set_key_param(self, *, scope_object: Optional[int] = None, scope_group: Optional[str] = None, json_key: str, time: float, easing: str = "Linear", value: Any) -> bool:
-        if scope_object is None and scope_group is None:
-            raise ValueError("set_key_param requires scope_object or scope_group")
-        scope = self._pb2.Scope(object=int(scope_object)) if scope_object is not None else self._pb2.Scope(group=str(scope_group))
+    # Non-camera parameter key operations (id-based)
+    def set_key_param(self, *, id: int, json_key: str, time: float, easing: str = "Linear", value: Any) -> bool:
         def _to_value(py: Any) -> struct_pb2.Value:
             v = struct_pb2.Value()
             if py is None:
@@ -649,17 +626,14 @@ class SceneClient:
                 v.string_value = str(py)
             return v
         v = _to_value(value)
-        req = self._pb2.SetKeyRequest(scope=scope, json_key=json_key, time=float(time), easing=easing, value=v)
+        req = self._pb2.SetKeyRequest(id=int(id), json_key=json_key, time=float(time), easing=easing, value=v)
         resp = self._stub.SetKey(req)
         self._log_rpc("SetKey(param)", req, resp)
         return resp.ok
 
-    def remove_key(self, *, scope_object: Optional[int] = None, scope_group: Optional[str] = None, json_key: str, time: float) -> bool:
+    def remove_key(self, *, id: int, json_key: str, time: float) -> bool:
         self.ensure_view()
-        if scope_object is None and scope_group is None:
-            raise ValueError("remove_key requires scope_object or scope_group")
-        scope = self._pb2.Scope(object=int(scope_object)) if scope_object is not None else self._pb2.Scope(group=str(scope_group))
-        req = self._pb2.RemoveKeyRequest(scope=scope, json_key=json_key, time=float(time))
+        req = self._pb2.RemoveKeyRequest(id=int(id), json_key=json_key, time=float(time))
         resp = self._stub.RemoveKey(req)
         self._log_rpc("RemoveKey", req, resp)
         return resp.ok
@@ -672,52 +646,48 @@ class SceneClient:
         if not set_keys and not remove_keys:
             self._logger.error("Batch: refusing to execute with empty set/remove")
             return False
-        # Construct protobuf requests
+        # Helper to convert native Python values to google.protobuf.Value
+        def _to_value(py: Any) -> struct_pb2.Value:
+            v = struct_pb2.Value()
+            if py is None:
+                v.null_value = 0
+            elif isinstance(py, bool):
+                v.bool_value = bool(py)
+            elif isinstance(py, (int, float)) and not isinstance(py, bool):
+                v.number_value = float(py)
+            elif isinstance(py, str):
+                v.string_value = py
+            elif isinstance(py, (list, tuple)):
+                lv = struct_pb2.ListValue()
+                for item in py:
+                    lv.values.append(_to_value(item))
+                v.list_value.CopyFrom(lv)
+            elif isinstance(py, dict):
+                st = struct_pb2.Struct()
+                for k, val in py.items():
+                    st.fields[k].CopyFrom(_to_value(val))
+                v.struct_value.CopyFrom(st)
+            else:
+                v.string_value = str(py)
+            return v
+        # Construct protobuf requests (id-only requests)
         pb_set = []
         for s in set_keys:
-            scope = s.get("scope") or {}
-            if scope.get("camera"):
-                sc = self._pb2.Scope(camera=True)
-                val = s.get("value")
-                def _to_value(py: Any) -> struct_pb2.Value:
-                    v = struct_pb2.Value()
-                    if py is None:
-                        v.null_value = 0
-                    elif isinstance(py, bool):
-                        v.bool_value = bool(py)
-                    elif isinstance(py, (int, float)) and not isinstance(py, bool):
-                        v.number_value = float(py)
-                    elif isinstance(py, str):
-                        v.string_value = py
-                    elif isinstance(py, (list, tuple)):
-                        lv = struct_pb2.ListValue()
-                        for item in py:
-                            lv.values.append(_to_value(item))
-                        v.list_value.CopyFrom(lv)
-                    elif isinstance(py, dict):
-                        st = struct_pb2.Struct()
-                        for k, val2 in py.items():
-                            st.fields[k].CopyFrom(_to_value(val2))
-                        v.struct_value.CopyFrom(st)
-                    else:
-                        v.string_value = str(py)
-                    return v
-                pb_set.append(self._pb2.SetKeyRequest(scope=sc, time=float(s["time"]), easing=str(s.get("easing", "Linear")), value=_to_value(val)))
+            id = int(s.get("id", -1))
+            val = s.get("value")
+            if id == 0:
+                pb_set.append(self._pb2.SetKeyRequest(id=id, time=float(s["time"]), easing=str(s.get("easing", "Linear")), value=_to_value(val)))
             else:
-                sc = self._pb2.Scope(object=int(scope["object"])) if "object" in scope else self._pb2.Scope(group=str(scope["group"]))
-                val = s.get("value")
-                pb_set.append(self._pb2.SetKeyRequest(scope=sc, json_key=str(s["json_key"]), time=float(s["time"]), easing=str(s.get("easing", "Linear")), value=_to_value(val)))
+                pb_set.append(self._pb2.SetKeyRequest(id=id, json_key=str(s["json_key"]), time=float(s["time"]), easing=str(s.get("easing", "Linear")), value=_to_value(val)))
         pb_rem = []
         for r in remove_keys:
-            scope = r.get("scope") or {}
-            sc = self._pb2.Scope(object=int(scope["object"])) if "object" in scope else self._pb2.Scope(group=str(scope["group"]))
-            pb_rem.append(self._pb2.RemoveKeyRequest(scope=sc, json_key=str(r["json_key"]), time=float(r["time"])) )
+            id = int(r.get("id", -1))
+            pb_rem.append(self._pb2.RemoveKeyRequest(id=id, json_key=str(r["json_key"]), time=float(r["time"])) )
         # Human-friendly payload log (sanitized)
         def _summarize_keys(keys: list[dict]):
             out: list[dict] = []
             for k in keys:
-                sc = k.get("scope") or {}
-                scope_str = "camera" if sc.get("camera") else (f"object:{sc.get('object')}" if "object" in sc else f"group:{sc.get('group')}")
+                id = int(k.get("id", -1))
                 jk = k.get("json_key")
                 t = float(k.get("time", 0.0))
                 ez = k.get("easing", "")
@@ -730,7 +700,7 @@ class SceneClient:
                 # truncate long payloads for logs
                 if isinstance(val, str) and len(val) > 160:
                     val = val[:160] + "…"
-                out.append({"scope": scope_str, "json_key": jk, "time": t, "easing": ez, "value": val})
+                out.append({"id": id, "json_key": jk, "time": t, "easing": ez, "value": val})
             return out
         self._logger.info("Batch(payload) %s", json.dumps({
             "commit": bool(commit),
@@ -745,19 +715,12 @@ class SceneClient:
         try:
             missing: list[dict] = []
             for s in set_keys:
-                sc = s.get("scope") or {}
-                target_times = []
-                if sc.get("camera"):
-                    lr = self.list_keys(scope_camera=True)
-                else:
-                    if "object" in sc:
-                        lr = self.list_keys(scope_object=int(sc["object"]), json_key=str(s.get("json_key", "")))
-                    else:
-                        lr = self.list_keys(scope_group=str(sc.get("group", "")), json_key=str(s.get("json_key", "")))
+                id = int(s.get("id", -1))
+                lr = self.list_keys(id=int(id), json_key=str(s.get("json_key", "")))
                 target_times = [k.time for k in getattr(lr, "keys", [])]
                 want_t = float(s.get("time", 0.0))
                 if not any(abs(want_t - t) < 1e-6 for t in target_times):
-                    missing.append({"scope": sc, "json_key": s.get("json_key"), "time": want_t})
+                    missing.append({"id": id, "json_key": s.get("json_key"), "time": want_t})
             if missing:
                 self._logger.warning("Batch verify: missing keys at times: %s", json.dumps(missing))
             else:
@@ -766,19 +729,11 @@ class SceneClient:
             self._log_rpc("BatchVerify", req, None, error=e)
         return bool(resp.ok)
 
-    def list_keys(self, *, scope_camera: bool = False, scope_object: Optional[int] = None, scope_group: Optional[str] = None, json_key: Optional[str] = None, include_values: bool = False):
+    def list_keys(self, *, id: int, json_key: Optional[str] = None, include_values: bool = False):
         # Ensure engine/view exists. Do not force-create animation here to avoid
         # creating empty animations before objects are loaded.
         self.ensure_view()
-        if scope_camera:
-            sc = self._pb2.Scope(camera=True)
-        elif scope_object is not None:
-            sc = self._pb2.Scope(object=int(scope_object))
-        elif scope_group is not None:
-            sc = self._pb2.Scope(group=str(scope_group))
-        else:
-            sc = self._pb2.Scope()
-        req = self._pb2.ListKeysRequest(scope=sc, json_key=json_key or "", include_values=bool(include_values))
+        req = self._pb2.ListKeysRequest(id=int(id), json_key=json_key or "", include_values=bool(include_values))
         resp = self._stub.ListKeys(req)
         self._log_rpc("ListKeys", req, resp)
         return resp
@@ -799,14 +754,8 @@ class SceneClient:
     # Placement roles removed by design: prefer list_params/capabilities/schema
 
     # Scene (stateless) parameter ops
-    def get_param_values(self, *, scope_object: Optional[int] = None, scope_group: Optional[str] = None, json_keys: Optional[list[str]] = None) -> dict:
-        if scope_object is None and scope_group is None:
-            raise ValueError("get_param_values requires scope_object or scope_group")
-        if scope_object is not None:
-            sc = self._pb2.Scope(object=int(scope_object))
-        else:
-            sc = self._pb2.Scope(group=str(scope_group))
-        req = self._pb2.GetParamValuesRequest(scope=sc, json_keys=json_keys or [])
+    def get_param_values(self, *, id: int, json_keys: Optional[list[str]] = None) -> dict:
+        req = self._pb2.GetParamValuesRequest(id=int(id), json_keys=json_keys or [])
         resp = self._stub.GetParamValues(req)
         self._log_rpc("GetParamValues", req, resp)
         # Convert Struct/Value map to native dict
@@ -819,7 +768,7 @@ class SceneClient:
     def validate_apply(self, set_params: list[dict]) -> dict:
         """Validate a batch of scene parameter assignments.
 
-        Each item: { scope: {object|group}, json_key: str, value: any }
+        Each item: { id: int, json_key: str, value: any }
         Returns { ok: bool, results: [{json_key, ok, reason?, normalized_value?}] }
         """
         def _to_value(py: Any) -> struct_pb2.Value:
@@ -847,14 +796,8 @@ class SceneClient:
             return v
         pb_items = []
         for it in set_params:
-            scd = it.get("scope") or {}
-            if "object" in scd:
-                sc = self._pb2.Scope(object=int(scd["object"]))
-            elif "group" in scd:
-                sc = self._pb2.Scope(group=str(scd["group"]))
-            else:
-                raise ValueError("validate_apply: scope must include object or group")
-            pb_items.append(self._pb2.SetParam(scope=sc, json_key=str(it["json_key"]), value=_to_value(it.get("value"))))
+            id = int(it.get("id"))
+            pb_items.append(self._pb2.SetParam(id=id, json_key=str(it["json_key"]), value=_to_value(it.get("value"))))
         req = self._pb2.ValidateSceneParamsRequest(set_params=pb_items)
         resp = self._stub.ValidateSceneParams(req)
         self._log_rpc("ValidateSceneParams", req, resp)
@@ -897,14 +840,8 @@ class SceneClient:
             return v
         pb_items = []
         for it in set_params:
-            scd = it.get("scope") or {}
-            if "object" in scd:
-                sc = self._pb2.Scope(object=int(scd["object"]))
-            elif "group" in scd:
-                sc = self._pb2.Scope(group=str(scd["group"]))
-            else:
-                raise ValueError("apply_params: scope must include object or group")
-            pb_items.append(self._pb2.SetParam(scope=sc, json_key=str(it["json_key"]), value=_to_value(it.get("value"))))
+            id = int(it.get("id"))
+            pb_items.append(self._pb2.SetParam(id=id, json_key=str(it["json_key"]), value=_to_value(it.get("value"))))
         req = self._pb2.ApplySceneParamsRequest(set_params=pb_items)
         resp = self._stub.ApplySceneParams(req)
         self._log_rpc("ApplySceneParams", req, resp)

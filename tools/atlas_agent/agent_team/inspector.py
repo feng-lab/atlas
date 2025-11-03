@@ -9,12 +9,11 @@ from .agents_sdk import act_with_agents_sdk
 
 INSPECTOR_SYSTEM = (
     "You are the Inspector for Atlas scene/animation design.\n"
-    "Strict camera rule: plans must not propose raw camera coordinates. Flag and request typed camera planning instead (mode, targets, constraints).\n"
-    "Require a Plan Summary with two views (global timeline + per‑object) that uses canonical json_keys and separates stateless scene edits from timeline keys.\n"
-    "Critique the proposed plan against the scene state. Identify risks (occlusion, confusing colors), missing details (key times, parameter names), and ask clarifying questions.\n"
-    "Suggest concrete adjustments (e.g., use scene_validate_apply for base edits; CameraSolve + CameraValidate with keep_visible=true; margin≈0.05; coverage≥0.95; dim non‑targets).\n"
-    "Intent guard: if the user request is ONLY file loading or static scene edits, flag any timeline/key usage and suggest a scene‑only revision.\n"
-    "Keep it brief and actionable."
+    "Review the proposed plan against the scene state and provide brief, actionable feedback.\n"
+    "- Prefer typed camera intent over raw coordinates.\n"
+    "- Expect a Plan Summary with two views (global timeline + per‑object) using canonical json_keys and separating scene vs timeline.\n"
+    "- For camera changes, look for validation coverage/visibility to match intent (e.g., keep_visible true, coverage≥requested). Do not require specific step sizes; focus on outcomes.\n"
+    "- Call out missing details or risks, and ask one clarifying question if needed.\n"
 )
 
 
@@ -32,7 +31,6 @@ class Inspector:
             shared_context=combined,
             tools=[],
             dispatch=lambda n, a: "{}",
-            memory_texts=[],
             temperature=self.temperature,
             agent_name="Inspector",
         )
@@ -45,16 +43,12 @@ class Inspector:
         """
         SYSTEM = (
             "You are the Inspector making a go/no‑go decision.\n"
-            "Given the user request, scene context, the plan text, and facts (objects list + verified keys/times), decide if the user request is fulfilled.\n"
-            "Camera policy: if any camera changes are part of the plan, satisfaction requires typed validation (camera_validate ok=true with coverage≥min_coverage) and no reliance on raw coordinates in the plan.\n"
-            "Guidance: For file‑loading requests, satisfaction is achieved if requested file(s) appear in objects_list. For animation/keyframe requests, satisfaction requires the expected keys/times to exist (and camera validation if applicable).\n"
-            "Respond with compact JSON only: {\n"
-            "  \"satisfied\": true|false,\n"
-            "  \"feedback\": \"short guidance if not satisfied (what to change next)\"\n"
-            "}."
+            "Given the user request, scene context, the plan text, and verified facts, decide if the request is fulfilled.\n"
+            "Prefer typed camera validation over raw coordinates when camera changes are involved. For 360°, require a validated continuous orbit over the stated duration (avoid trivial 2‑key tricks).\n"
+            "Respond with compact JSON only: {\"satisfied\": true|false, \"feedback\": short guidance if not satisfied}."
         )
         prompt = (
-            f"User request:\n{user_text}\n\nScene context:\n{scene_context}\n\n"
+            f"User request:\n{user_text}\n\nScene context + history:\n{scene_context}\n\n"
             f"Plan:\n{plan_text}\n\nFacts (JSON):\n{json.dumps(facts)}\n\nRespond with JSON only."
         )
         # Optional screenshot: when provided, include as multimodal input. Convert to data URL.

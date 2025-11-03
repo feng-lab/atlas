@@ -7,13 +7,13 @@ from .base import LLMClient
 
 REVIEWER_SYSTEM = (
     "You are a Reviewer for Atlas scene/animation designs.\n"
-    "Strict camera rule: reject any option that proposes raw camera coordinates or positions.\n"
-    "Accept only typed camera planning: mode=FIT|ORBIT|DOLLY|STATIC with targets/constraints OR UI‑parity camera operators (focus/point_to/rotate/reset).\n"
-    "Intent guard: if the user requests ONLY file loading or static scene edits, flag any animation/timeline content and suggest a scene‑only plan.\n"
-    "Check that the option separates stateless scene edits (no time/easing) from timeline keys.\n"
-    "Require a Plan Summary seed (times and per‑object changes) that can be translated to canonical json_key writes.\n"
-    "Given multiple options, critique clarity, feasibility, and user alignment; select the best valid option.\n"
-    "Suggest 2–3 concrete improvements (e.g., add margin=0.05, use ORBIT axis=y, ensure coverage≥0.95, group edits via scene_apply). Keep it concise."
+    "Evaluate options for clarity, feasibility, and alignment with the user’s request.\n"
+    "- Prefer typed camera intent (FIT/ORBIT/DOLLY/STATIC) over raw coordinates.\n"
+    "- Ensure scene edits (stateless) are separated from timeline animation.\n"
+    "- Look for a concise Plan Summary seed (key moments and per‑object changes).\n"
+    "- When a 'TASK BRIEF:' is present, check adherence and call out gaps.\n"
+    "- For camera motion, ensure the option states duration/targets/constraints clearly; do not prescribe step sizes — leave execution to Implementer.\n"
+    "Provide the best option number, a short rationale, and 2–3 concrete improvements (e.g., clarify axis/margin/coverage constraints, or specify validation). Do not request user confirmations; suggest assumptions instead."
 )
 
 
@@ -28,7 +28,7 @@ class Reviewer:
         logger.info("[%s] Reviewing %d option(s)", self.name, len(options))
         joined = "\n\n".join([f"Option {i+1}:\n{opt}" for i, opt in enumerate(options)])
         prompt = (
-            f"User request:\n{user_text}\n\nScene context:\n{scene_context}\n\n"
+            f"User request:\n{user_text}\n\nScene context + history:\n{scene_context}\n\n"
             f"Design options:\n{joined}\n\nRespond with: Best option #, why, and 2–3 improvements."
         )
         text = self.client.complete_text(system_prompt=REVIEWER_SYSTEM, user_text=prompt, temperature=self.temperature)

@@ -4,21 +4,21 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
 
-Scope = dict[str, Any]  # {"object": int} | {"group": str} | {"camera": True}
+Id = int  # Unified addressing: 0=camera, 1=background, 2=axis, 3=global, >=4 object ids
 
 
 @dataclass
 class SetParam:
     """Stateless scene parameter assignment (no time/easing)."""
-    scope: Scope
+    id: Id
     json_key: str
     value: Any
 
 
 @dataclass
 class SetKey:
-    """Timeline key for object/group or camera."""
-    scope: Scope  # {"camera": True} or {"object": int} or {"group": str}
+    """Timeline key for id target (camera/object)."""
+    id: Id  # 0=camera, >=4 objects; 1-3 reserved engine groups
     time: float
     value: Any
     easing: str = "Linear"
@@ -27,7 +27,7 @@ class SetKey:
 
 @dataclass
 class RemoveKey:
-    scope: Scope
+    id: Id
     time: float
     json_key: Optional[str] = None  # required for non-camera
 
@@ -44,4 +44,3 @@ class Plan:
     set_keys: list[SetKey] = field(default_factory=list)
     remove_keys: list[RemoveKey] = field(default_factory=list)
     commit: bool = True
-
