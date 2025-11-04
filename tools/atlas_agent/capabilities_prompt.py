@@ -40,14 +40,6 @@ def build_capabilities_prompt(schema_dir: Path, *, max_lines: int | None = None)
     lines.append(
         "Scene vs Timeline: Scene (.scene) = current display state (no time); Animation (.animation2d/.animation3d) = timeline keys per parameter. Change scene parameters will not affect animation. During playback, animation keys override scene values."
     )
-    if not caps:
-        # Minimal static knowledge
-        lines += [
-            "Groups: Background/Axis/Global have scene‑level parameters; Camera uses dedicated camera keys.",
-            "Tip: Use animation_batch to atomically set multiple keys; prefer 'Single Color' then set the Vec4 color.",
-        ]
-        # Do not hard-truncate; callers can summarize with an LLM if needed
-        return "\n".join(lines)
 
     # Summarize per object type (flat list, no major/advanced split)
     objects = caps.get("objects") or {}
@@ -72,8 +64,6 @@ def build_capabilities_prompt(schema_dir: Path, *, max_lines: int | None = None)
                 lines.append(f"{gname}:")
                 lines.append("  Parameters: " + ", ".join(names[:12]))
 
-    # Keep best-practice section compact and neutral
-    lines.append("Best practices: camera_solve (FIT/ORBIT/DOLLY/STATIC) with camera_validate; animation_batch for atomic writes; prefer id-only addressing.")
     # Return full content without hard line limits. If a shorter version is required,
     # the caller should summarize via the LLM rather than truncating here.
     return "\n".join(lines)

@@ -13,6 +13,7 @@ from .reviewer import Reviewer
 from .implementer import Implementer
 from .describer import Describer
 from .agents_sdk import act_with_agents_sdk
+from .digest import build_verification_digest
 from ..scene_rpc import SceneClient
 import os
 import json as _json
@@ -44,6 +45,9 @@ class Supervisor:
     def run_turn(self, user_text: str, *, shared_context: Optional[str] = None, max_steps: int = 24, recent_history: Optional[list[tuple[str, str]]] = None) -> List[AgentMessage]:
         logger = logging.getLogger("atlas_agent.agents")
         logger.info("[Supervisor] Turn start. user_text=%s", (user_text or "")[:200])
+        # Ensure a session TODO ledger exists (persists across Implementer retries and turns via ChatTeam)
+        if not hasattr(self, "_todo_ledger"):
+            self._todo_ledger: list[dict] = []
         # 0) Build a small scene context to ground planning
         ctx_parts = []
         try:
@@ -74,7 +78,20 @@ class Supervisor:
         except Exception:
             pass
         # Keep context simple and factual; avoid hard-coded lane assumptions
-        ctx = (shared_context + "\n" if shared_context else "") + "\n".join(ctx_parts)
+        # Include a compact TODO ledger summary in context to keep agents grounded across rounds
+        todo_lines: list[str] = []
+        try:
+            for i, item in enumerate(getattr(self, "_todo_ledger", []) or []):
+                try:
+                    st = item.get("status", "pending")
+                    txt = item.get("text", "")
+                    todo_lines.append(f"- [{'x' if st in ('applied','done','finished') else ' '}] {txt}")
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        todo_block = ("\nTODOs:\n" + "\n".join(todo_lines)) if todo_lines else ""
+        ctx = (shared_context + "\n" if shared_context else "") + "\n".join(ctx_parts) + ("\n" + todo_block if todo_block else "")
         # Attach full conversation history to context
         history_text = ""
         try:
@@ -124,6 +141,37 @@ class Supervisor:
         idx, merged = arbiter.decide(user_text=user_text, scene_context=ctx_for_agents, options=options, feedbacks=[fb1, fb2])
         selected = merged or (options[idx - 1] if options else "")
         logger.info("[Supervisor] Arbiter selected option %d", idx)
+        # Initialize/refresh TODO ledger from merged plan's TODO section (checkbox lines)
+        try:
+            def _parse_todos(text: str) -> list[dict]:
+                out: list[dict] = []
+                for ln in (text or "").splitlines():
+                    s = ln.strip()
+                    if s.startswith("- [") and "]" in s:
+                        # Patterns: - [ ] Task or - [x] Task
+                        mark = s[3]
+                        rest = s[s.find("]")+1:].strip()
+                        status = "applied" if mark.lower() == 'x' else "pending"
+                        if rest:
+                            out.append({"text": rest, "status": status})
+                return out
+            todos = _parse_todos(selected)
+            if todos:
+                # Merge without duplicating by text
+                existing = { (it.get("text") or "").strip(): it for it in (getattr(self, "_todo_ledger", []) or []) }
+                for t in todos:
+                    key = (t.get("text") or "").strip()
+                    if not key:
+                        continue
+                    if key in existing:
+                        # Update status only if moving forward
+                        if existing[key].get("status") != "applied" and t.get("status") == "applied":
+                            existing[key]["status"] = "applied"
+                    else:
+                        existing[key] = {"text": key, "status": t.get("status", "pending")}
+                self._todo_ledger = list(existing.values())
+        except Exception:
+            pass
         implementer = Implementer(client=self.client, scene=self.scene, temperature=self.temperature, atlas_dir=self.atlas_dir)
         inspector = Inspector(client=self.client, temperature=self.temperature)
         describer = Describer(client=self.client, temperature=self.temperature)
@@ -137,7 +185,12 @@ class Supervisor:
             loop += 1
             logger.info("[Supervisor] Implementer loop iteration %d", loop)
             pre = self.scene.scene_facts()
-            msgs, ledger = implementer.run(user_text=user_text, selected_design=selected, reviewer_feedback=(fb1 + "\n\n" + fb2), shared_context=ctx_for_agents)
+            # Downstream agents should not need reviewer prose; pass only the merged plan
+            msgs, ledger = implementer.run(
+                user_text=user_text,
+                selected_design=selected,
+                shared_context=ctx_for_agents,
+            )
             messages.extend(msgs)
             full_ledger.extend(ledger)
             post = self.scene.scene_facts()
@@ -231,7 +284,29 @@ class Supervisor:
             except Exception:
                 preview_path = None
 
-            satisfied, fb = inspector.decide(user_text=user_text, scene_context=ctx_for_agents, plan_text=selected, facts=post, preview_image_path=preview_path)
+            digest_text = build_verification_digest(scene=self.scene, ledger=ledger, include_values=True, validate_camera=True, max_chars=4000)
+
+            compact_facts = {"digest_text": digest_text}
+            satisfied, fb, todo_update_text = inspector.decide(user_text=user_text, scene_context=ctx_for_agents, plan_text=selected, facts=compact_facts, preview_image_path=preview_path)
+            # Merge Inspector-provided TODO updates (checkbox lines) into session ledger
+            try:
+                if isinstance(todo_update_text, str) and todo_update_text.strip():
+                    def _parse_todos(text: str) -> list[dict]:
+                        out: list[dict] = []
+                        for ln in (text or "").splitlines():
+                            s = ln.strip()
+                            if s.startswith("- [") and "]" in s:
+                                mark = s[3]
+                                rest = s[s.find("]")+1:].strip()
+                                status = "applied" if mark.lower() == 'x' else "pending"
+                                if rest:
+                                    out.append({"text": rest, "status": status})
+                        return out
+                    updated = _parse_todos(todo_update_text)
+                    if updated:
+                        self._todo_ledger = updated
+            except Exception:
+                pass
             # Hard gate: if camera validation failed, do not allow satisfied
             if cam_validation and not bool(cam_validation.get("ok", False)):
                 satisfied = False
@@ -249,9 +324,7 @@ class Supervisor:
                 "animation_replace_key_param",
                 "animation_remove_key_param_at_time",
                 "animation_replace_key_param_at_times",
-                "animation_replace_key_param_last",
                 "animation_remove_key",
-                "animation_set_key_camera",
                 "animation_replace_key_camera",
                 "animation_clear_keys",
                 "animation_set_duration",
@@ -272,15 +345,27 @@ class Supervisor:
                 break
             # No hard cap by default (can add external intervention if needed)
 
-        # 4) Description based on facts only
-        facts = self.scene.scene_facts()
-        desc = describer.describe(user_text=user_text, facts=facts, conversation=history_text)
+        # 4) Description using a compact digest to avoid large JSON in prompts
+        digest_text = build_verification_digest(scene=self.scene, ledger=full_ledger, include_values=False, validate_camera=False, max_chars=2000)
+        desc = describer.describe(user_text=user_text, facts={"digest_text": digest_text}, conversation=history_text)
         logger.info("[Supervisor] Turn complete. Facts camera=%s, objects=%d", facts.get("camera"), len(facts.get("objects", {})))
 
         messages.insert(0, AgentMessage(role="assistant", content="Design options:\n" + ("\n\n".join(options) or "(none)")))
         messages.insert(1, AgentMessage(role="assistant", content="Reviewer feedback A:\n" + (fb1 or "")))
         messages.insert(2, AgentMessage(role="assistant", content="Reviewer feedback B:\n" + (fb2 or "")))
         messages.append(AgentMessage(role="assistant", content="Description (facts‑based):\n" + (desc or "")))
+        # Append TODO ledger snapshot for transparency and cross‑turn memory
+        try:
+            todo_lines: list[str] = []
+            for it in getattr(self, "_todo_ledger", []) or []:
+                st = it.get("status", "pending")
+                mark = 'x' if st in ('applied','done','finished') else ' '
+                txt = it.get("text", "")
+                todo_lines.append(f"- [{mark}] {txt}")
+            if todo_lines:
+                messages.append(AgentMessage(role="assistant", content="TODO Ledger (session):\n" + "\n".join(todo_lines)))
+        except Exception:
+            pass
         # Append compact ledger for auditability
         import json as _json
         try:
@@ -318,3 +403,10 @@ class Supervisor:
         except Exception:
             pass
         return messages
+
+    # Expose TODO ledger for the ChatTeam to persist across turns
+    def get_todo_ledger(self) -> list[dict]:
+        try:
+            return list(getattr(self, "_todo_ledger", []) or [])
+        except Exception:
+            return []

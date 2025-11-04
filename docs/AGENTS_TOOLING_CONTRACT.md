@@ -15,7 +15,7 @@ Categories and current tools (non-exhaustive)
 - Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_apply`, `scene_apply`, `scene_save_scene`
 - Discovery: `scene_list_objects`, `scene_list_params(id)`, `scene_capabilities`, `scene_schema`, `scene_capabilities_summary`, `scene_facts_summary`
 - Timeline: `animation_list_keys(id,json_key,include_values)`, `animation_batch`, `animation_set_key_param`, `animation_replace_key_param`, `animation_set_duration`, `animation_set_time`, `animation_play`, `animation_pause`, `animation_save_animation`
-- Camera: `fit_candidates`, `camera_solve`, `camera_validate`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`
+- Camera: `fit_candidates`, `camera_solve_and_apply`, `camera_validate`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`
 - Geometry/Cuts: `scene_bbox`, `scene_cut_suggest`, `scene_cut_set`, `scene_cut_clear`
 
 Notes

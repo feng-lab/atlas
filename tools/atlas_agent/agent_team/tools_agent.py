@@ -235,22 +235,26 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 },
             },
         },
+        
         {
             "type": "function",
             "function": {
-                "name": "camera_solve",
-                "description": "Plan camera keys via server: mode=FIT|ORBIT|DOLLY|STATIC; returns [{time, value}]. Use camera_validate to enforce visibility/coverage constraints.",
+                "name": "camera_solve_and_apply",
+                "description": "Solve camera (FIT|ORBIT|DOLLY|STATIC) and immediately write validated keys. Clears existing camera keys in [t0,t1] by default (tolerance-aware) before applying. Do not wrap in animation_batch; camera keys are id=0 and are handled here. Returns {applied:[times...], total}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mode": {"type": "string", "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"], "description": "Camera solve mode"},
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids (may be empty for global)"},
-                        "t0": {"type": "number", "description": "Start time (s)"},
-                        "t1": {"type": "number", "description": "End time (s)"},
-                        "constraints": {"type": "object", "description": "Solve constraints (keep_visible, margin, min_coverage, fov_policy)"},
-                        "params": {"type": "object", "description": "Mode params (e.g., axis, angle_degrees for ORBIT)"}
+                        "mode": {"type": "string", "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"]},
+                        "ids": {"type": "array", "items": {"type": "integer"}},
+                        "t0": {"type": "number"},
+                        "t1": {"type": "number"},
+                        "constraints": {"type": "object"},
+                        "params": {"type": "object"},
+                        "tolerance": {"type": "number", "default": 1e-3},
+                        "easing": {"type": "string", "default": "Linear"},
+                        "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys"}
                     },
-                    "required": ["mode", "ids", "t0", "t1", "constraints", "params"]
+                    "required": ["mode", "ids", "t0", "t1"]
                 },
             },
         },
@@ -338,7 +342,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "animation_replace_key_camera",
-                "description": "Replace (or set) a camera key at time: remove any camera key within tolerance then set a new camera value.",
+                "description": "Replace (or set) a camera key at time: remove any camera key within tolerance then set a new camera value. Use for explicit single-time edits. If you already used camera_solve_and_apply for this segment, do NOT call this afterward to 'finalize' — keys are already written.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -615,23 +619,6 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         {
             "type": "function",
             "function": {
-                "name": "animation_set_key_camera",
-                "description": "Add a camera key at a time with a given easing using a camera value JSON (optionally extend duration).",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "time": {"type": "number"},
-                        "easing": {"type": "string", "default": "Linear"},
-                        "value": {"description": "Native JSON camera value object", "type": "object"},
-                        "extend_duration": {"type": "boolean", "default": True}
-                    },
-                    "required": ["time", "value"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
                 "name": "animation_set_key_param",
                 "description": "Add a parameter key by id (0=camera unsupported here, ≥4 objects; 1/2/3 groups) with json_key and a native JSON value (bool/number/string/array/object).",
                 "parameters": {
@@ -649,26 +636,6 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     "required": ["id", "time", "value"],
                 },
             },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "animation_replace_key_param_last",
-                "description": "Replace the most recent existing key for a parameter by id. If multiple times exist, returns an error with the available times. Id map: 1=background, 2=axis, 3=global, ≥4=objects.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
-                        "json_key": {"type": "string"},
-                        "value": {"description": "Native JSON value",
-                                   "type": ["string", "number", "boolean", "null", "array"],
-                                   "items": {"type": ["string", "number", "boolean", "null"]}},
-                        "easing": {"type": "string", "default": "Linear"},
-                        "tolerance": {"type": "number", "default": 1e-3}
-                    },
-                    "required": ["id", "json_key", "value"]
-                }
-            }
         },
         {
             "type": "function",
@@ -726,7 +693,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "animation_batch",
-                "description": "Batch multiple SetKey and RemoveKey operations atomically.",
+                "description": "Batch multiple SetKey and RemoveKey operations atomically. Non-camera only (ids ≥ 1); do not include camera (id=0) keys here. For camera motion, use camera_solve_and_apply.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -1408,7 +1375,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 except Exception: pass
                 return json.dumps({"ok": False, "error": msg})
 
-        if name == "camera_solve":
+        # camera_solve is not exposed via tool list; use camera_solve_and_apply for writes, or script API for planning
+
+        if name == "camera_solve_and_apply":
             try:
                 mode = str(args.get("mode"))
                 ids = args.get("ids") or []
@@ -1421,16 +1390,61 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     return json.dumps({"ok": False, "error": "mode must be one of FIT|ORBIT|DOLLY|STATIC"})
                 if mode_up in ("ORBIT", "DOLLY") and not (t1 > t0):
                     return json.dumps({"ok": False, "error": "t1 must be > t0 for ORBIT/DOLLY"})
-                constraints = args.get("constraints") or {}
+                constraints = args.get("constraints") or {"keep_visible": True, "min_coverage": 0.95}
                 params = args.get("params") or {}
-                # Harden defaults: ensure explicit axis/angle for ORBIT so 360° requests are respected
+                # Defaults for ORBIT
                 if mode_up == "ORBIT":
-                    if "axis" not in params:
-                        params["axis"] = "y"
-                    if "angle_degrees" not in params:
-                        params["angle_degrees"] = 360.0
+                    params.setdefault("axis", "y")
+                    params.setdefault("angle_degrees", 360.0)
+                tol = float(args.get("tolerance", 1e-3))
+                easing = str(args.get("easing", "Linear"))
+                clear_range = bool(args.get("clear_range", True))
                 keys = client.camera_solve(mode=mode_up, ids=ids, t0=t0, t1=t1, constraints=constraints, params=params)
-                return json.dumps({"ok": True, "keys": keys})
+                # Optionally clear existing keys in [t0, t1] (with tolerance), excluding solver times
+                if clear_range:
+                    try:
+                        lr = client.list_keys(id=0, include_values=False)
+                        existing = [float(k.time) for k in getattr(lr, "keys", [])]
+                    except Exception:
+                        existing = []
+                    tmin, tmax = (t0, t1) if t0 <= t1 else (t1, t0)
+                    # Build set of solver times for matching
+                    solved_times = [float(k.get("time", 0.0)) for k in (keys or [])]
+                    def _near_any(x: float, arr: list[float], eps: float) -> bool:
+                        for v in arr:
+                            if abs(x - v) <= eps:
+                                return True
+                        return False
+                    for old_t in existing:
+                        if old_t + tol < tmin or old_t - tol > tmax:
+                            continue
+                        if _near_any(old_t, solved_times, tol):
+                            continue
+                        try:
+                            client.remove_key(id=0, json_key="", time=old_t)
+                        except Exception:
+                            pass
+                applied: list[float] = []
+                for k in keys or []:
+                    try:
+                        tv = float(k.get("time", 0.0))
+                        vv = k.get("value") or {}
+                        # Use replace to remove near times and validate; pass ids for validation inside the function
+                        payload = {
+                            "time": tv,
+                            "easing": easing,
+                            "value": vv,
+                            "tolerance": tol,
+                            "strict": False,
+                            "ids": ids,
+                            "constraints": constraints,
+                        }
+                        rr = json.loads(dispatch("animation_replace_key_camera", json.dumps(payload)) or "{}")
+                        if rr.get("ok"):
+                            applied.append(tv)
+                    except Exception:
+                        continue
+                return json.dumps({"ok": True, "applied": sorted(applied), "total": len(applied)})
             except Exception as e:
                 msg = str(e)
                 try: msg = e.details()  # type: ignore[attr-defined]
@@ -2036,34 +2050,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         if name == "animation_set_duration":
             seconds = float(args.get("seconds", 0.0))
             return json.dumps({"ok": client.set_duration(seconds)})
-        # removed obsolete camera suggest tools; use camera_solve/camera_rotate/camera_focus instead
-        if name == "animation_set_key_camera":
-            try:
-                t = float(args.get("time", 0.0))
-                ok = client.set_key_camera(time=t, easing=str(args.get("easing", "Linear")), value=args.get("value") or {})
-                if ok and bool(args.get("extend_duration", True)):
-                    try:
-                        ts = client.get_time()
-                        cur_dur = float(getattr(ts, "duration", 0.0) or 0.0)
-                        if t > (cur_dur + 1e-6):
-                            client.set_duration(t)
-                    except Exception:
-                        pass
-                return json.dumps({"ok": ok})
-            except Exception as e:
-                # Capture gRPC error details when available
-                msg = str(e)
-                try:
-                    # grpc.RpcError has .details()
-                    msg = e.details()  # type: ignore[attr-defined]
-                except Exception:
-                    pass
-                return json.dumps({"ok": False, "error": msg})
+        # direct camera set tool removed; prefer solve_and_apply or replace_key_camera
         if name == "animation_set_key_param":
             # Expect native JSON value. Resolve json_key by name if needed; coerce common mistakes.
             id = int(args.get("id"))
             if id == 0:
-                return json.dumps({"ok": False, "error": "use animation_set_key_camera for id=0"})
+                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera or camera_solve_and_apply"})
             json_key = args.get("json_key")
             time_v = float(args.get("time", 0.0))
             easing = str(args.get("easing", "Linear"))
@@ -2135,45 +2127,6 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 except Exception:
                     pass
                 return json.dumps({"ok": False, "error": msg})
-        if name == "animation_replace_key_param_last":
-            id = int(args.get("id"))
-            if id == 0:
-                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera"})
-            json_key = str(args.get("json_key"))
-            value = args.get("value")
-            easing = str(args.get("easing", "Linear"))
-            tol = float(args.get("tolerance", 1e-3))
-            # Verify parameter exists
-            if not _json_key_exists(id, json_key):
-                return json.dumps({"ok": False, "error": "json_key not found for id"})
-            try:
-                lr = client.list_keys(id=id, json_key=json_key, include_values=False)
-                times = sorted([k.time for k in getattr(lr, "keys", [])])
-                if not times:
-                    return json.dumps({"ok": False, "error": "no existing keys for parameter"})
-                if len(times) > 1:
-                    return json.dumps({"ok": False, "error": "multiple keys exist; specify times", "times": times})
-                t = float(times[0])
-                # Remove near time then set
-                _ = json.loads(dispatch("animation_remove_key_param_at_time", json.dumps({
-                    "id": id,
-                    "json_key": json_key,
-                    "time": t,
-                    "tolerance": tol,
-                })))
-                res = json.loads(dispatch("animation_set_key_param", json.dumps({
-                    "id": id,
-                    "json_key": json_key,
-                    "time": t,
-                    "easing": easing,
-                    "value": value,
-                })))
-                return json.dumps({"ok": bool(res.get("ok", False)), "time": t})
-            except Exception as e:
-                msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
-                return json.dumps({"ok": False, "error": msg})
         if name == "animation_replace_key_param_at_times":
             id = int(args.get("id"))
             if id == 0:
@@ -2228,7 +2181,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             set_keys = args.get("set_keys") or []
             remove_keys = args.get("remove_keys") or []
             if not set_keys and not remove_keys:
-                return json.dumps({"ok": False, "error": "animation_batch called with empty set/remove. Build concrete SetKey entries or use animation_set_key_param/animation_set_key_camera first."})
+                return json.dumps({"ok": False, "error": "animation_batch called with empty set/remove. Build concrete SetKey entries or use animation_replace_key_param/animation_replace_key_camera (or camera_solve_and_apply)."})
             # Verify that each set_key references a valid json_key for its id (non-camera only)
             invalid: list[dict] = []
             params_cache: dict[int, set] = {}

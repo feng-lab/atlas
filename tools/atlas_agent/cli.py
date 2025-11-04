@@ -12,7 +12,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--address", default=os.environ.get("ATLAS_RPC_ADDR", "localhost:50051"))
     parser.add_argument(
         "--model",
-        default=os.environ.get("ATLAS_LLM_MODEL", "deepseek-v3.1"),
+        default=os.environ.get("ATLAS_LLM_MODEL", "gpt-5-mini"),
     )
     parser.add_argument("--temperature", type=float, default=float(os.environ.get("ATLAS_LLM_TEMPERATURE", "0.2")))
     parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY"))

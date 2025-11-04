@@ -12,6 +12,7 @@ DESIGNER_SYSTEM = (
     "- Do not invent camera coordinates; describe typed camera intent (e.g., FIT/ORBIT/DOLLY/STATIC) and targets. Include axis and duration window when relevant.\n"
     "- Do not specify implementation details such as step sizes or base_value chaining.\n"
     "- Use clear, canonical parameter names when known; avoid guessing option strings.\n"
+    "- Minimal mutation policy: propose ONLY the parameter changes strictly necessary to fulfill the user’s intent. Do NOT add unrelated tweaks unless explicitly requested in the Task Brief.\n"
     "- Align with any 'TASK BRIEF:' provided in context.\n"
     "- Do not include confirmation questions; if defaults are needed, state them under 'Assumptions'.\n"
     "- End each option with a short Plan Summary seed (key moments and per‑object changes). Keep it concise.\n"

@@ -8,8 +8,8 @@ Camera
 - camera_point_to — Required: ids(array<int>), after_clipping(bool). Point center to targets.
 - camera_rotate — Required: op(enum: AZIMUTH|ELEVATION|ROLL|YAW|PITCH|FLIP), degrees(number). Segmented ≤90°; chaining handled internally.
 - camera_reset_view — Required: mode(enum: XY|XZ|YZ|RESET), ids(array<int>), after_clipping(bool), min_radius(number). Reset to preset view.
-- camera_solve — Required: mode(enum), ids(array<int>), t0(number), t1(number), constraints(object), params(object). Plan typed camera keys.
 - camera_validate — Required: ids(array<int>), times(array<number>), values(array<object>), constraints(object), policies(object). Validate coverage/visibility.
+- camera_solve_and_apply — Required: mode(enum), ids(array<int>), t0(number), t1(number). Solve keys and apply with validation; clears existing keys in [t0,t1] by default. Do not wrap in `animation_batch` and do not follow with `animation_replace_key_camera` — this tool already commits the keys.
 
 Scene (stateless)
 - scene_list_objects — Required: none. List id/type/name/visible. Reserved ids unified across tools: 0=camera (virtual), 1=background, 2=axis, 3=global, ≥4=object ids.
@@ -21,11 +21,10 @@ Scene (stateless)
 - scene_save_scene — Required: path(string). Save .scene.
 
 Timeline (animation)
-- animation_set_key_camera — Required: time(number), value(object). Write camera key.
+- camera_solve_and_apply — Required: mode(enum), ids(array<int>), t0(number), t1(number). Solve keys and apply with validation.
 - animation_replace_key_camera — Required: time(number), value(object). Replace camera key near time.
 - animation_set_key_param — Required: id(int), json_key(string)|name(string), time(number), value(JSON scalar|array). Write param key (json_key/name resolved via live params with caching).
 - animation_replace_key_param — Required: id(int), json_key(string), time(number), value(JSON scalar|array). Replace param key near time.
-- animation_replace_key_param_last — Required: id(int), json_key(string), value(JSON scalar|array). Replace most recent key.
 - animation_replace_key_param_at_times — Required: id(int), json_key(string), times(array<number>), value(JSON scalar|array). Replace at times.
 - animation_clear_keys — Required: id(int). Clear keys for id (id=0 clears camera keys).
 - animation_remove_key — Required: id(int), json_key(string), time(number). Remove a key at time.
@@ -64,3 +63,4 @@ Export & Preview
 Notes
 - All scene_* tools are stateless (no time/easing). Playback uses animation_* keys.
 - Keys override scene values at playback. To change what plays, write/replace keys.
+- Prefer camera_solve_and_apply (or camera_solve + animation_replace_key_camera) for camera motion.

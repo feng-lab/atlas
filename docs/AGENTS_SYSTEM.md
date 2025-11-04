@@ -51,7 +51,7 @@ Multi‑Agent (live)
 - The agents (Supervisor, Planner, Inspector) will:
   - Query scene state (objects, bbox, params) via tools
   - Propose ≥2 plans, critique, ask clarifying questions if inputs are ambiguous
-  - Execute with atomic key updates, adjust, and explain rationale concisely
+  - Execute against a simple TODO list (see below): agents act on the listed tasks; adjust iteratively and explain rationale concisely
 
 Natural Language Contract (Summary‑first)
 - Before any keys are written, require a concise Plan Summary with two synchronized views:
@@ -66,7 +66,19 @@ Natural Language Contract (Summary‑first)
   Legacy scope addressing has been removed from the agent API in favor of id-only.
   - Camera steps must be typed via camera tools (Fit/Orbit/Dolly/Validate); do not invent raw camera numbers.
   - Scene (stateless): use `scene_apply` (no time/easing). Animation (timeline): use `animation_*` to write/replace keys; during playback keys override scene values.
-- The Supervisor injects a Task Brief into the shared context. The Implementer must derive intent strictly from the Task Brief (do not reclassify), then translate the Plan Summary directly to tool calls and verify with `animation_list_keys` and/or `scene_get_values`.
+- The Supervisor injects a Task Brief into the shared context. The Implementer must derive intent strictly from the Task Brief (do not reclassify).
+- Arbiter appends a TODO section (checkboxes) to the merged plan with human‑readable, minimal steps. Implementer focuses on these tasks; avoid extra work.
+
+TODO List (Plan → Execute)
+- Minimal, human‑readable list of steps for the current turn using checkboxes (e.g., `- [ ] Load files`, `- [x] Fit camera`).
+- Authored/updated by Arbiter; Implementer executes against it; Inspector verifies results and may suggest adjustments.
+- Inspector updates TODO status after verification:
+  - Implementer reads TODOs and executes; Inspector returns an updated checkbox list (if present), which Supervisor merges into the session ledger.
+
+- Session TODO Ledger
+- Supervisor maintains an explicit TODO ledger based on the TODO section (checkboxes), with statuses mapped to [ ] → pending, [x] → applied.
+- The ledger is included in context each round and summarized in responses, providing continuity across rework rounds and user turns.
+- Agents do not invent TODOs; items originate from the manifest or user instructions.
 
 Grounding tools for summaries
 - `scene_capabilities_summary()` → overview of parameter catalogs (background/axis/global + object types).
@@ -93,7 +105,9 @@ Agents Architecture and Guidelines
 
 Session Memory (ctx_with_history)
 - Only the Intent Resolver consumes full chat history to produce a self‑contained Task Brief for the current turn.
-- Downstream agents (Designer, Reviewers, Arbiter, Implementer, Inspector) receive a compact shared context: facts snapshot + Task Brief (no conversation history). This keeps turns explicit and reduces drift.
+- Downstream agents receive compact context: facts snapshot + Task Brief (no conversation history).
+- Implementer and Inspector additionally receive only the merged plan text (and the TODO ledger snapshot), not the original options or reviewer feedback. This reduces redundancy and keeps execution grounded to the chosen plan.
+ - Additionally, a compact TODO ledger snapshot is included to avoid repeating work across rework rounds.
 
 Who Runs Python Codegen?
 - When enabled, the Implementer may use code generation for complex calculations. In that mode it runs short scripts that import `tools.atlas_agent.api` via the `python_write_and_run` tool.

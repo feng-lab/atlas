@@ -37,6 +37,8 @@ class ChatTeam:
         self._history: list[tuple[str, str]] = []
         # Optional: keep last timeline snapshot to produce a diff fact table
         self._last_snapshot: dict | None = None
+        # Persist a session TODO ledger across turns
+        self._todo_ledger: list[dict] = []
         # Configure a shared agents logger if not already configured
         agents_logger = logging.getLogger("atlas_agent.agents")
         if not agents_logger.handlers:
@@ -56,6 +58,11 @@ class ChatTeam:
     def turn(self, user_text: str, *, shared_context: Optional[str] = None) -> str:
         ctx = shared_context or self._context
         # Pass full conversation history to the Supervisor for this session
+        # Synchronize current session TODOs to Supervisor
+        try:
+            setattr(self.supervisor, "_todo_ledger", list(self._todo_ledger))
+        except Exception:
+            pass
         msgs = self.supervisor.run_turn(user_text, shared_context=ctx, recent_history=self._history)
         # Prefer the facts-based description if present; otherwise fall back to the latest assistant content
         text = ""
@@ -144,6 +151,11 @@ class ChatTeam:
             self._history.append(("user", user_text))
         if text:
             self._history.append(("assistant", text))
+        # Persist updated TODO ledger state for next turn
+        try:
+            self._todo_ledger = list(self.supervisor.get_todo_ledger())
+        except Exception:
+            pass
         return text or "(no response)"
 
 

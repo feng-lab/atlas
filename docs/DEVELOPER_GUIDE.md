@@ -39,9 +39,9 @@ Agents: Camera Planning & Validation
 - Essential tools (LLM function-calling):
   - `fit_candidates` → choose ids to frame (excludes Animation3D).
   - `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view` → deterministic operators (UI parity) for stateless camera value generation.
-  - `camera_solve` (modes FIT | ORBIT | DOLLY | STATIC) → returns typed camera keys [{time,value}] when needed.
+  - `camera_solve_and_apply` (modes FIT | ORBIT | DOLLY | STATIC) → solves and writes validated camera keys; clears existing keys in the time range by default.
   - `camera_validate` → dry‑run with constraints/policies; prefer strict first, then allow adjustments if needed.
-  - `animation_batch` → write keys atomically (camera uses `id=0`); verify via `animation_list_keys(id,json_key)`.
+  - `animation_batch` → write non‑camera parameter keys atomically. Camera keys are written by `camera_solve_and_apply` (do not wrap in batch).
 
 - Deprecated/removed: all camera "recipe" tools. Compose motions with the general tools above; do not rely on hardcoded recipes.
 
@@ -49,10 +49,10 @@ Agents: Camera Planning & Validation (Example)
 
 - Example (“rotate around the mesh 360° in 10 seconds”):
   1) Pick targets: `fit_candidates` or `scene_list_objects` → ids
-  2) Plan values: `camera_focus(ids)` to get v0; then build N intermediate values by repeatedly calling `camera_rotate(op='AZIMUTH', degrees=360/N, base_value=prev)`; set times t=[0, 10/N, 2⋅10/N, …, 10].
-  3) Validate: `camera_validate(ids, times, values, constraints={keep_visible:true,min_coverage:0.95}, policies={adjust_*:false})`. If not ok, retry with adjustments and adopt adjusted_value.
-  4) Apply: `animation_batch(set_keys=[{id:0,time:t[i],value:values[i]}...], commit:true)` and `animation_set_duration(10)`.
-  5) Verify: `animation_list_keys_camera(json_key="")` includes the expected times.
+  2) Solve + write: `camera_solve_and_apply(mode='ORBIT', ids=ids, t0=0, t1=10, params={axis:'y', angle_degrees:360}, constraints={keep_visible:true, min_coverage:0.95})`. This clears existing keys in [0,10] and writes validated keys.
+  3) Set duration: `animation_set_duration(10)`.
+  4) Optional validate: `camera_validate(ids, times, values, constraints={keep_visible:true,min_coverage:0.95}, policies={adjust_*:false})` using the written keys.
+  5) Preview (optional): `animation_render_preview(time=5)` for a mid‑orbit frame.
 
 Agents: Codegen Mode
 
