@@ -27,6 +27,7 @@
 #include <QProgressBar>
 #include <QApplication>
 #include <QDesktopServices>
+#include <QFile>
 #include "zservicemanager.h"
 
 namespace nim {
@@ -358,6 +359,9 @@ void Z3DMainWindow::createMenus()
   m_helpMenu->addAction(m_2dWindow.aboutAction());
   m_helpMenu->addAction(m_2dWindow.aboutQtAction());
   m_helpMenu->addAction(m_2dWindow.checkForUpdatesAction());
+  // Share doc actions with 2D window
+  m_helpMenu->addAction(m_2dWindow.userGuideAction());
+  m_helpMenu->addAction(m_2dWindow.developerGuideAction());
   m_helpMenu->addAction(m_helpAction);
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_2dWindow.openLogFolderAction());
@@ -657,5 +661,7 @@ void Z3DMainWindow::cancelRendering()
 {
   m_engine->cancelLongRendering();
 }
+
+// 3D window uses shared actions from 2D; no local doc loader needed.
 
 } // namespace nim

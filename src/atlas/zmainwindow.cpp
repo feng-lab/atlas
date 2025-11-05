@@ -38,6 +38,14 @@
 #include <QToolButton>
 #include <QStatusBar>
 #include <QDesktopServices>
+#include <QDialog>
+#include <QVBoxLayout>
+#include <QTextBrowser>
+#include <QFile>
+#include <QTextStream>
+#include <QFileInfo>
+#include <QDir>
+#include <QCoreApplication>
 #include <QProcess>
 #include <QSignalSpy>
 #include <utility>
@@ -317,6 +325,60 @@ void ZMainWindow::openHelpPanel()
     m_helpDockWidget->show();
   }
   m_helpDockWidget->raise();
+}
+
+void ZMainWindow::openDocMd(const QString& name)
+{
+#ifdef Q_OS_MAC
+  const QString docsRoot = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("../Resources/docs/"));
+#else
+  const QString docsRoot = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("Resources/docs/"));
+#endif
+  QWidget* parent = QApplication::activeWindow() ? static_cast<QWidget*>(QApplication::activeWindow()) : this;
+  // Support optional fragment in name (e.g., DEVELOPER_GUIDE.md#section)
+  QString fileName = name;
+  QString frag;
+  const int hashIdx = name.indexOf('#');
+  if (hashIdx > 0) {
+    fileName = name.left(hashIdx);
+    frag = name.mid(hashIdx + 1);
+  }
+  const QString path = QDir(docsRoot).filePath(fileName);
+  if (!QFileInfo::exists(path)) {
+    QMessageBox::critical(parent, tr("Open documentation"), tr("Could not open %1").arg(path));
+    return;
+  }
+  auto* dlg = new QDialog(parent);
+  dlg->setAttribute(Qt::WA_DeleteOnClose);
+  dlg->setWindowTitle(name);
+  auto* layout = new QVBoxLayout(dlg);
+  auto* view = new QTextBrowser(dlg);
+  // Back/Forward toolbar wired to browser history
+  auto* tb = new QToolBar(dlg);
+  QAction* actBack = tb->addAction(tr("Back"));
+  actBack->setEnabled(false);
+  QObject::connect(actBack, &QAction::triggered, view, &QTextBrowser::backward);
+  QAction* actFwd = tb->addAction(tr("Forward"));
+  actFwd->setEnabled(false);
+  QObject::connect(actFwd, &QAction::triggered, view, &QTextBrowser::forward);
+  QObject::connect(view, &QTextBrowser::backwardAvailable, actBack, &QAction::setEnabled);
+  QObject::connect(view, &QTextBrowser::forwardAvailable, actFwd, &QAction::setEnabled);
+  view->setOpenExternalLinks(true);
+  QUrl start = QUrl::fromLocalFile(path);
+  if (!frag.isEmpty()) {
+    start.setFragment(frag);
+  }
+  view->setSource(start);
+  // Home action to return to the starting document
+  QAction* actHome = tb->addAction(tr("Home"));
+  QObject::connect(actHome, &QAction::triggered, view, [view, start]() {
+    view->setSource(start);
+  });
+
+  layout->addWidget(tb);
+  layout->addWidget(view);
+  dlg->resize(900, 700);
+  dlg->show();
 }
 
 void ZMainWindow::raiseViewSettingDockWidget()
@@ -674,6 +736,17 @@ void ZMainWindow::createMenus()
   m_helpMenu->addAction(m_aboutAction);
   m_helpMenu->addAction(m_aboutQtAction);
   m_helpMenu->addAction(m_checkForUpdatesAction);
+  // In-app documentation (Markdown)
+  m_userGuideAction = new QAction(tr("User Guide"), this);
+  connect(m_userGuideAction, &QAction::triggered, this, [this]() {
+    openDocMd(QStringLiteral("USER_GUIDE.md"));
+  });
+  m_helpMenu->addAction(m_userGuideAction);
+  m_devGuideAction = new QAction(tr("Developer Guide"), this);
+  connect(m_devGuideAction, &QAction::triggered, this, [this]() {
+    openDocMd(QStringLiteral("DEVELOPER_GUIDE.md"));
+  });
+  m_helpMenu->addAction(m_devGuideAction);
   m_helpMenu->addAction(m_helpAction);
 #ifdef Q_OS_LINUX
   m_helpMenu->addAction(m_createDesktopEntryAction);

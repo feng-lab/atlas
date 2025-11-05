@@ -10,6 +10,11 @@ Build, Run, and Layout
   - `docs/` — documentation
   - `util/` — build scripts
 
+Key References
+
+- Image Paging & Progressive Rendering: [Atlas_Image_Paging_and_Progressive_Rendering.md](Atlas_Image_Paging_and_Progressive_Rendering.md)
+- Agents Overview and Tools: [AGENTS_GUIDE.md](AGENTS_GUIDE.md)
+
 Testing (Linking Atlas Code)
 
 - Atlas is still a Qt GUI app. Common code now builds as three static libraries to keep Windows COFF archives well under 4GB with LTCG enabled, while maintaining clean backend boundaries:

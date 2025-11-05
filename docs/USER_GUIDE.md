@@ -503,7 +503,7 @@ Steps to load and manage images via `ZImgDoc`:
 ### 7.3 Troubleshooting Scene Loads
 
 - **Missing files** – Atlas reports missing resources in a message box and continues loading remaining data. Use the Object Detailed Info dock to inspect paths.
-- **Errors** – messages such as “Can not load scene <file>: <error>” appear when JSON parsing or object restoration fails. Check logs for stack traces.
+- **Errors** – messages such as `Can not load scene <file>: <error>` appear when JSON parsing or object restoration fails. Check logs for stack traces.
 - **Partial 3D apply** – enable `--atlas_block_scene_3d_apply` for deterministic apply when scripts depend on fully realized scenes.
 
 ---

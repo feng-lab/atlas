@@ -8,7 +8,7 @@
 
 - User Guide: [Atlas User Guide](docs/USER_GUIDE.md)
 - Developer Guide: [Atlas Developer Guide](docs/DEVELOPER_GUIDE.md)
-- Agents System: [Atlas Agents (Scene + Animation)](docs/AGENTS_SYSTEM.md)
+- Agents Guide: [Atlas Agents (Unified)](docs/AGENTS_GUIDE.md)
 
 ## Installation
 ### All: install python3 for build scripts and for building the zimg conda package

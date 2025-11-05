@@ -85,6 +85,16 @@ public:
     return m_openConfigFolderAction;
   }
 
+  QAction* userGuideAction()
+  {
+    return m_userGuideAction;
+  }
+
+  QAction* developerGuideAction()
+  {
+    return m_devGuideAction;
+  }
+
 Q_SIGNALS:
   void window3DReady();
 
@@ -170,6 +180,9 @@ private:
 
   static void checkForUpdates();
 
+  // Open a Markdown doc from bundled Resources/docs
+  void openDocMd(const QString& name);
+
 private:
   QMenu* m_fileMenu = nullptr;
   QMenu* m_editMenu = nullptr;
@@ -212,6 +225,9 @@ private:
   QAction* m_open3DViewAction = nullptr;
   QAction* m_screenShotAction = nullptr;
   QAction* m_helpAction = nullptr;
+
+  QAction* m_userGuideAction = nullptr;
+  QAction* m_devGuideAction = nullptr;
 
   QAction* m_openNewInstanceAction = nullptr;
 

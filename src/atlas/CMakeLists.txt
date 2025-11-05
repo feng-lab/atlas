@@ -803,11 +803,20 @@ if (WIN32)
                      $ENV{VULKAN_SDK}/Bin/VkLayer_khronos_validation.json
                      $<TARGET_FILE_DIR:${APP_NAME}>/vulkan/VkLayer_khronos_validation.json
   )
-  # Generate schema/capabilities after resources copied (Windows: run offscreen)
+  # Copy pre-generated agent schema/capabilities from repo (if present)
+  if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas")
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory
+                               "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas")
+  endif ()
+  # Copy Markdown docs into bundle for in-app help
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas
-                     COMMAND $<TARGET_FILE:${APP_NAME}> --run_dump_animation3d_schema --dump_output_dir $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas -platform offscreen)
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory
+                             "${CMAKE_CURRENT_SOURCE_DIR}/../../docs"
+                             "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs")
 else (WIN32)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
@@ -902,11 +911,20 @@ else (WIN32)
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.dylib
                        $<TARGET_FILE_DIR:${APP_NAME}>/../lib/libVkLayer_khronos_validation.dylib
     )
-    # Generate schema/capabilities after resources copied, before codesign
+    # Copy pre-generated agent schema/capabilities from repo (if present)
+    if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas")
       add_custom_command(TARGET ${APP_NAME}
                          POST_BUILD
-                         COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json/atlas
-                         COMMAND $<TARGET_FILE:${APP_NAME}> --run_dump_animation3d_schema --dump_output_dir $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json/atlas)
+                         COMMAND ${CMAKE_COMMAND} -E copy_directory
+                                 "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas"
+                                 "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json/atlas")
+    endif ()
+    # Copy Markdown docs into .app bundle
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory
+                               "${CMAKE_CURRENT_SOURCE_DIR}/../../docs"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/../Resources/docs")
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
                        COMMAND codesign --force --deep --sign - $<TARGET_BUNDLE_DIR:${APP_NAME}>)
@@ -963,11 +981,20 @@ else (WIN32)
                        $ENV{VULKAN_SDK}/lib/libVkLayer_khronos_validation.so
                        $<TARGET_FILE_DIR:${APP_NAME}>/lib/libVkLayer_khronos_validation.so
     )
-    # Generate schema/capabilities after resources copied (Linux: run offscreen)
+    # Copy pre-generated agent schema/capabilities from repo (if present)
+    if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas")
       add_custom_command(TARGET ${APP_NAME}
                          POST_BUILD
-                         COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas
-                         COMMAND $<TARGET_FILE:${APP_NAME}> --run_dump_animation3d_schema --dump_output_dir $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas -platform offscreen)
+                         COMMAND ${CMAKE_COMMAND} -E copy_directory
+                                 "${CMAKE_CURRENT_SOURCE_DIR}/Resources/json/atlas"
+                                 "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/json/atlas")
+    endif ()
+    # Copy Markdown docs into bundle
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory
+                               "${CMAKE_CURRENT_SOURCE_DIR}/../../docs"
+                               "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/docs")
   endif ()
 endif (WIN32)
 

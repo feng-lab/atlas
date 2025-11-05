@@ -124,6 +124,8 @@ private:
 
   void cancelRendering();
 
+  // Doc menu actions are shared from the 2D main window.
+
 private:
   QMenu* m_fileMenu = nullptr;
   QMenu* m_editMenu = nullptr;

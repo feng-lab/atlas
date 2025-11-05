@@ -221,4 +221,7 @@ src/neurolabi/python/QMakeParser.pyc
 # Vulkan compiled SPIR-V outputs (built by CMake)
 src/atlas/Resources/shader/vulkan/spv/
 
+# Generated LLM docs (schema/capabilities/agent files) — repo root fallback
+/Resources/json/atlas/
+
 .gradle/

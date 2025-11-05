@@ -1,0 +1,9 @@
+# Auto-generated LLM docs and schema — do not commit
+animation3d.schema.json
+capabilities.json
+agent_kb.jsonl
+agent_tools.manifest.json
+agent_facts.json
+
+# Allow keeping the folder itself in Git, but ignore outputs
+!.gitignore
