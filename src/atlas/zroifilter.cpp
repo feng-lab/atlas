@@ -516,6 +516,18 @@ ZROIFilter::ZROIFilter(ZView& view, const RegionNode* regionNode)
 {
   m_outlineColor.setStyle("COLOR");
   m_regionColor.setStyle("COLOR");
+  m_showControlPoints.setDescription(QStringLiteral(
+    "Show control points for editable ROI shapes."));
+  m_fixedControlPointsSize.setDescription(QStringLiteral(
+    "Keep control point markers a fixed screen size regardless of zoom."));
+  m_outlineColor.setDescription(QStringLiteral(
+    "Color of the ROI outline."));
+  m_regionColor.setDescription(QStringLiteral(
+    "Fill color used for ROI regions (when applicable)."));
+  m_opacity.setDescription(QStringLiteral(
+    "Opacity of ROI fill (0..1)."));
+  m_highlightRegionOnMouseHover.setDescription(QStringLiteral(
+    "Emphasize region when the mouse hovers over it."));
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZROIFilter::visibleChanged);
   connect(&m_showControlPoints, &ZBoolParameter::valueChanged, this, &ZROIFilter::showControlPointsChanged);
   connect(&m_fixedControlPointsSize, &ZBoolParameter::valueChanged, this, &ZROIFilter::fixedControlPointsSizeChanged);

@@ -275,6 +275,8 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   m_rightReadyLocalBuffer = &m_localColorBuffer2;
 
   addParameter(m_showBackground);
+  m_showBackground.setDescription(QStringLiteral(
+    "Toggle rendering of the background (uniform or gradient fill)."));
 
   addPort(m_gPPort);
   addPort(m_vPPort);
@@ -287,6 +289,9 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
     std::make_pair(enumToQString(BackgroundMode::Uniform), static_cast<int>(BackgroundMode::Uniform)),
     std::make_pair(enumToQString(BackgroundMode::Gradient), static_cast<int>(BackgroundMode::Gradient)));
   m_backgroundMode.select(enumToQString(BackgroundMode::Gradient));
+  m_backgroundMode.setDescription(QStringLiteral(
+    "Background fill mode: 'Uniform' uses 'First Color'; 'Gradient' blends 'First Color' to 'Second Color'"
+    " in the selected 'Gradient Orientation'."));
   m_backgroundGradientOrientation.clearOptions();
   m_backgroundGradientOrientation.addOptionsWithData(
     std::make_pair(enumToQString(BackgroundGradientOrientation::LeftToRight),
@@ -302,6 +307,10 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_backgroundFirstColor);
   addParameter(m_backgroundSecondColor);
   addParameter(m_backgroundGradientOrientation);
+  m_backgroundFirstColor.setDescription(QStringLiteral("Primary background color (start of gradient or uniform fill)."));
+  m_backgroundSecondColor.setDescription(QStringLiteral("Secondary color used at the end of the gradient."));
+  m_backgroundGradientOrientation.setDescription(QStringLiteral(
+    "Direction of the gradient when 'Background Mode' is set to 'Gradient'."));
 
   updateBackgroundFirstColor();
   updateBackgroundSecondColor();
@@ -349,6 +358,7 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   m_axisFontOutlineColor.setStyle("COLOR");
   m_axisFontShadowColor.setStyle("COLOR");
   addParameter(m_showAxis);
+  m_showAxis.setDescription(QStringLiteral("Show 3D axes overlay with labels (X,Y,Z)."));
   addParameter(m_XAxisColor);
   addParameter(m_YAxisColor);
   addParameter(m_ZAxisColor);
@@ -362,6 +372,23 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_axisFontOutlineColor);
   addParameter(m_axisShowFontShadow);
   addParameter(m_axisFontShadowColor);
+  m_XAxisColor.setDescription(QStringLiteral("Color of the X axis and its label."));
+  m_YAxisColor.setDescription(QStringLiteral("Color of the Y axis and its label."));
+  m_ZAxisColor.setDescription(QStringLiteral("Color of the Z axis and its label."));
+  m_axisRegionRatio.setDescription(QStringLiteral(
+    "Fraction of the viewport reserved for the axis overlay (0.1–1.0)."));
+  m_axisMode.setDescription(QStringLiteral(
+    "Axis rendering style: 'Arrow' draws arrowheads; 'Line' draws simple lines."));
+  m_axisFontName.setDescription(QStringLiteral("Font face used for axis labels (if available on system)."));
+  m_axisFontSize.setDescription(QStringLiteral("Axis label font size in pixels."));
+  m_axisFontSoftEdgeScale.setDescription(QStringLiteral(
+    "Soft-edge distance for signed-distance-field (SDF) font rendering; increases edge smoothing."));
+  m_axisShowFontOutline.setDescription(QStringLiteral("Draw an outline around axis label glyphs."));
+  m_axisFontOutlineMode.setDescription(QStringLiteral(
+    "Outline effect used when outlines are enabled (e.g., Glow)."));
+  m_axisFontOutlineColor.setDescription(QStringLiteral("Color of the font outline."));
+  m_axisShowFontShadow.setDescription(QStringLiteral("Draw a shadow behind axis label glyphs."));
+  m_axisFontShadowColor.setDescription(QStringLiteral("Color of the font shadow."));
 
   if (!m_fontRenderer.fontNames().isEmpty()) {
     int idx = 0;

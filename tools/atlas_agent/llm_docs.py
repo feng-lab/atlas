@@ -128,57 +128,23 @@ def build_kb_cards(paths: Iterable[Path]) -> List[Dict[str, Any]]:
     return cards
 
 
-_TOOL_LINE_RE = re.compile(r"^\s*-\s*([a-zA-Z0-9_]+)\s+\u2014\s+Required:\s*(.+?)\.(.*)$")
-
-
-def _parse_tools(md: str) -> Dict[str, Any]:
-    manifest: Dict[str, Any] = {"tools": []}
-    category = None
-    for ln in md.splitlines():
-        if ln and not ln.startswith(" ") and not ln.startswith("-") and not ln.startswith("#"):
-            category = ln.strip()
-            continue
-        m = _TOOL_LINE_RE.match(ln)
-        if not m:
-            continue
-        name, required_str, rest = m.groups()
-        req_fields: List[Dict[str, str]] = []
-        for part in required_str.split(","):
-            part = part.strip()
-            if not part or part.lower() == "none":
-                continue
-            mm = re.match(r"([a-zA-Z0-9_]+)\((.+)\)", part)
-            if mm:
-                req_fields.append({"name": mm.group(1), "type": mm.group(2)})
-            else:
-                req_fields.append({"name": part, "type": ""})
-        manifest["tools"].append({
-            "name": name,
-            "category": category or "",
-            "required": req_fields,
-            "notes": rest.strip(),
-        })
-    return manifest
-
-
-def build_tools_manifest(reference_md_path: Path) -> Dict[str, Any]:
-    if not reference_md_path.exists():
-        return {"tools": []}
-    md = _read_text(reference_md_path)
-    return _parse_tools(md)
+# Deprecated: building a manifest by parsing docs is removed. The canonical
+# tool schemas live in code (tools_agent.scene_tools_and_dispatcher) and are
+# provided to LLMs at runtime via the tools parameter.
 
 
 def build_agent_facts() -> Dict[str, Any]:
     return {
-        "ids": {"camera": 0, "background": 1, "axis": 2, "global": 3, "objects_start": 4},
-        "contracts": {
-            "scene_vs_timeline": "Scene (.scene) is stateless (no time/easing). Animation (.animation2d/.animation3d) holds keys. During playback, keys override scene values.",
-            "camera_segment_rule": "For chained rotations (e.g., 360°), segment ≤90° steps and always base each step on the previous camera value.",
-            "stateless_scene_apply": "scene_apply accepts set_params with id/json_key/value only; never include time/easing.",
+        "ids": {
+            "camera": 0,
+            "background": 1,
+            "axis": 2,
+            "global": 3,
+            "objects_start": 4,
         },
-        "paths": {
-            "schema_dir_relative": "Resources/json/atlas",
-            "capabilities": "Resources/json/atlas/capabilities.json",
+        "contracts": {
+            "scene_vs_animation": "Scene (.scene) is stateless (no time/easing). Animation (.animation2d/.animation3d) holds keys. During playback, keys override scene values.",
+            "stateless_scene_apply": "scene_apply accepts set_params with id/json_key/value only; never include time/easing.",
         },
     }
 
@@ -197,7 +163,6 @@ def _dump_schema_with_atlas(atlas_dir: Path, out_dir: Path) -> None:
 REQUIRED_FILES = [
     "animation3d.schema.json",
     "capabilities.json",
-    "agent_tools.manifest.json",
     "agent_facts.json",
     "agent_kb.jsonl",
 ]
@@ -217,10 +182,10 @@ def ensure_llm_docs(repo_root: Path, *, atlas_dir: Optional[str] = None, out_dir
         if atlas_dir:
             _dump_schema_with_atlas(Path(atlas_dir), out)
 
-    # Tools manifest (unified guide)
-    ref_path = repo_root / "docs/AGENTS_GUIDE.md"
-    manifest = build_tools_manifest(ref_path)
-    (out / "agent_tools.manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    # Tools manifest generation removed. The canonical tool schemas are defined in
+    # tools_agent.scene_tools_and_dispatcher() and exposed to LLMs at runtime via
+    # the "tools" parameter. Keeping a second, static JSON manifest created from
+    # docs was redundant and risked drift.
 
     # High-signal facts
     (out / "agent_facts.json").write_text(json.dumps(build_agent_facts(), indent=2, ensure_ascii=False), encoding="utf-8")

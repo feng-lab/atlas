@@ -46,6 +46,12 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   // Color Mode
   m_colorMode.addOptions("Single Color", "Random Color", "Original Point Color", "Colormap Score");
   m_colorMode.select("Single Color");
+  m_colorMode.setDescription(QStringLiteral(
+    "Controls how puncta are colored:\n"
+    "- 'Single Color' uses the 'Puncta Color' parameter below.\n"
+    "- 'Random Color' assigns a random color per punctum.\n"
+    "- 'Original Point Color' uses colors stored in the source file (if present).\n"
+    "- 'Colormap Score' maps the 'score' attribute through the 'Score Color Map'."));
 
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DPunctaFilter::adjustWidgets);
@@ -55,13 +61,25 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   addParameter(m_colorMode);
 
   addParameter(m_singleColorForAllPuncta);
+  m_singleColorForAllPuncta.setDescription(QStringLiteral(
+    "Solid RGBA color used when 'Color Mode' is set to 'Single Color'."));
   addParameter(m_colorMapScore);
+  m_colorMapScore.setDescription(QStringLiteral(
+    "Color map used to visualize puncta 'score' values (min..max)."));
   addParameter(m_colorMapMeanIntensity);
+  m_colorMapMeanIntensity.setDescription(QStringLiteral(
+    "Color map used to visualize puncta 'mean intensity' values."));
   addParameter(m_colorMapMaxIntensity);
+  m_colorMapMaxIntensity.setDescription(QStringLiteral(
+    "Color map used to visualize puncta 'max intensity' values."));
 
   addParameter(m_useSameSizeForAllPuncta);
+  m_useSameSizeForAllPuncta.setDescription(QStringLiteral(
+    "Render all puncta with the same size, ignoring per-point radii when enabled."));
 
   addParameter(m_useDynamicMaterial);
+  m_useDynamicMaterial.setDescription(QStringLiteral(
+    "When enabled, derive shading properties from intensity (specular/shine)."));
   connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, [this]() {
     m_sphereRenderer.setUseDynamicMaterial(m_useDynamicMaterial.get());
   });

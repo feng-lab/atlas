@@ -39,6 +39,11 @@ public:
 
   bool saveAs(size_t id) override;
 
+  // Programmatic save to a specific path (no UI). Mirrors UI behavior:
+  // writes the file, updates pack path/name/tooltip, clears unsaved flag,
+  // and updates doc info so UI reflects the new name.
+  bool saveToPath(size_t id, const QString& path);
+
   [[nodiscard]] QString typeName() const override
   {
     return "Animation3D";

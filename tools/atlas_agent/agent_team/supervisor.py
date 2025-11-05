@@ -13,7 +13,6 @@ from .reviewer import Reviewer
 from .implementer import Implementer
 from .describer import Describer
 from .agents_sdk import act_with_agents_sdk
-from .digest import build_verification_digest
 from ..scene_rpc import SceneClient
 import os
 import json as _json
@@ -26,8 +25,8 @@ SUPERVISOR_SYSTEM = (
     "Intent first:\n"
     "- Classify the request (file load, scene-only, animation, playback, save/export, help). Ask one clarifying question if ambiguous.\n\n"
     "Team protocol:\n"
-    "- The Designer proposes 2–3 high‑level options; they should describe typed camera intent, not raw coordinates.\n"
-    "- Before any writes, require a Plan Summary with two views (global timeline and per‑object) using canonical json_key names.\n"
+    "- The Designer proposes 2–3 high‑level options; they should describe typed camera intent, not raw coordinates. The Designer must not assert exact parameter json_keys or option labels.\n"
+    "- Before any writes, require a Plan Summary with two views (global timeline and per‑object). Keep it semantic (what changes when); the Implementer resolves canonical json_key names and option labels via live discovery.\n"
     "- Reviewers critique; Arbiter selects or blends into one plan; Implementer executes with verification.\n"
     "- Tool-call arguments must be strict JSON (double‑quoted keys/strings; lowercase true/false/null).\n"
     "- Inspector validates results; Describer summarizes verified facts.\n\n"
@@ -179,12 +178,13 @@ class Supervisor:
         # Iterate until Inspector is satisfied, or break after repeated no‑progress rounds
         messages: List[AgentMessage] = []
         loop = 0
+        give_up_reason: str | None = None
         full_ledger: list[dict] = []
         no_change_rounds = 0
         while True:
             loop += 1
             logger.info("[Supervisor] Implementer loop iteration %d", loop)
-            pre = self.scene.scene_facts()
+            pre = self.scene.scene_facts(include_values=True, include_scene_values=True)
             # Downstream agents should not need reviewer prose; pass only the merged plan
             msgs, ledger = implementer.run(
                 user_text=user_text,
@@ -193,38 +193,30 @@ class Supervisor:
             )
             messages.extend(msgs)
             full_ledger.extend(ledger)
-            post = self.scene.scene_facts()
-            # Enrich facts with lightweight value samples for object keys so Inspector can validate value changes (not just times)
-            try:
-                values_map: dict[str, dict[str, list[dict]]] = {}
-                obj_keys = (post.get("keys", {}).get("objects", {}) if isinstance(post, dict) else {})
-                for oid_str, mp in obj_keys.items():
-                    try:
-                        oid = int(oid_str)
-                    except Exception:
-                        continue
-                    values_map.setdefault(oid_str, {})
-                    for jk, times in (mp.items() if isinstance(mp, dict) else []):
-                        try:
-                            lr = self.scene.list_keys(id=oid, json_key=jk, include_values=True)
-                            items: list[dict] = []
-                            for k in getattr(lr, "keys", []):
-                                t = float(getattr(k, "time", 0.0))
-                                vj = getattr(k, "value_json", "")
-                                # Truncate to keep small
-                                if isinstance(vj, str) and len(vj) > 256:
-                                    vj = vj[:256] + "…"
-                                items.append({"time": t, "value_json": vj})
-                            values_map[oid_str][jk] = items
-                        except Exception:
-                            continue
-                if values_map:
-                    if isinstance(post, dict):
-                        post["values"] = {"objects": values_map}
-            except Exception:
-                pass
+            post = self.scene.scene_facts(include_values=True, include_scene_values=True)
             changed = (pre != post)
             logger.info("[Supervisor] Snapshot changed=%s", changed)
+            # If Implementer reported a blocked reason, record it for the final outcome message
+            blocked_text = None
+            try:
+                for e in ledger:
+                    if e.get("tool") == "report_blocked":
+                        try:
+                            res = e.get("result") or {}
+                            r = res.get("reason") or (e.get("args") or {}).get("reason")
+                            d = res.get("details") or (e.get("args") or {}).get("details")
+                            s = res.get("suggestion") or (e.get("args") or {}).get("suggestion")
+                            msg = (r or "blocked")
+                            if d:
+                                msg += f": {d}"
+                            if s:
+                                msg += f" | suggestion: {s}"
+                            blocked_text = msg
+                        except Exception:
+                            blocked_text = "blocked"
+                        break
+            except Exception:
+                blocked_text = None
             # If camera keys exist, run typed validation to gate satisfaction
             camera_times = (post.get("keys", {}).get("camera") or []) if isinstance(post, dict) else []
             cam_validation = None
@@ -284,10 +276,31 @@ class Supervisor:
             except Exception:
                 preview_path = None
 
-            digest_text = build_verification_digest(scene=self.scene, ledger=ledger, include_values=True, validate_camera=True, max_chars=4000)
+            # No digest logging; Inspector will use full facts below
 
-            compact_facts = {"digest_text": digest_text}
-            satisfied, fb, todo_update_text = inspector.decide(user_text=user_text, scene_context=ctx_for_agents, plan_text=selected, facts=compact_facts, preview_image_path=preview_path)
+            # Prefer read-only live facts over brittle digests for verification
+            facts_for_inspector = post if isinstance(post, dict) else {}
+            satisfied, fb, todo_update_text = inspector.decide(
+                user_text=user_text,
+                scene_context=ctx_for_agents,
+                plan_text=selected,
+                facts=facts_for_inspector,
+                preview_image_path=preview_path,
+            )
+            # If something was blocked, avoid infinite retries: exit this loop after surfacing results once
+            if blocked_text:
+                logger.info("[Supervisor] Blocked info present; exiting after current iteration")
+                satisfied = True
+            if not satisfied:
+                try:
+                    import json as _json
+
+                    logger.info(
+                        "[Inspector] Not satisfied; dumping facts: %s",
+                        _json.dumps(facts_for_inspector),
+                    )
+                except Exception:
+                    pass
             # Merge Inspector-provided TODO updates (checkbox lines) into session ledger
             try:
                 if isinstance(todo_update_text, str) and todo_update_text.strip():
@@ -341,14 +354,49 @@ class Supervisor:
             else:
                 no_change_rounds = 0
             if no_change_rounds >= 4:
+                give_up_reason = (
+                    "No effective timeline/scene changes after repeated attempts. "
+                    "Likely missing capability, invalid parameter/option, or plan requires unavailable tools."
+                )
                 logger.info("[Supervisor] Breaking loop: no changes after %d rounds", no_change_rounds)
                 break
             # No hard cap by default (can add external intervention if needed)
 
-        # 4) Description using a compact digest to avoid large JSON in prompts
-        digest_text = build_verification_digest(scene=self.scene, ledger=full_ledger, include_values=False, validate_camera=False, max_chars=2000)
-        desc = describer.describe(user_text=user_text, facts={"digest_text": digest_text}, conversation=history_text)
-        logger.info("[Supervisor] Turn complete. Facts camera=%s, objects=%d", facts.get("camera"), len(facts.get("objects", {})))
+        # 4) Description using full scene facts so Describer can summarize comprehensively
+        try:
+            full_facts = self.scene.scene_facts(
+                include_values=True, include_scene_values=True
+            )
+        except Exception:
+            full_facts = {}
+        # If we gave up due to no progress, surface a concise outcome message to the user
+        if give_up_reason or blocked_text:
+            try:
+                # Extract top 2 error hints from ledger
+                hints: list[str] = []
+                for e in full_ledger[-30:]:
+                    try:
+                        if isinstance(e.get("result"), dict) and not e["result"].get("ok", True):
+                            err = e["result"].get("error") or e["result"].get("reason")
+                            if err:
+                                hints.append(f"{e.get('tool')}: {err}")
+                        elif e.get("error"):
+                            hints.append(f"{e.get('tool')}: {e.get('error')}")
+                    except Exception:
+                        continue
+                hints = hints[:2]
+                reason_base = give_up_reason if give_up_reason else ""
+                if blocked_text:
+                    reason_base = (reason_base + ("; " if reason_base else "") + f"Blocked: {blocked_text}")
+                outcome = reason_base + (" Hints: " + "; ".join(hints) if hints else "")
+                messages.append(AgentMessage(role="assistant", content="Outcome: " + outcome))
+            except Exception:
+                pass
+
+        desc = describer.describe(
+            user_text=user_text, facts=full_facts, conversation=history_text
+        )
+        logger.info("[Supervisor] Turn complete. desc=%s", desc)
 
         messages.insert(0, AgentMessage(role="assistant", content="Design options:\n" + ("\n\n".join(options) or "(none)")))
         messages.insert(1, AgentMessage(role="assistant", content="Reviewer feedback A:\n" + (fb1 or "")))

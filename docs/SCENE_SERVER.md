@@ -14,8 +14,9 @@ Service and Methods (initial)
   - `ListObjects() -> objects[]` (id, type, name, path, visible)
 - Geometry/capabilities:
   - `BBox(ids, after_clipping) -> bbox {min, max, size, center}`
-  - `Capabilities(ids?) -> { Background[], Axis[], Global[], Objects{Type: ParamList} }`
-    - Parameter: `{ json_key, name, type, supports_interpolation }`
+- `Capabilities(ids?) -> { Background[], Axis[], Global[], Objects{Type: ParamList} }`
+    - Parameter: `{ json_key, name, type, supports_interpolation, description? }`
+      - `description` is an optional human‑readable string supplied by the engine to clarify semantics (e.g., what an option like "Mesh Color" means).
 
 Scene (stateless) operations
 - Use these when editing the scene/base state (no timeline/time/easing). They do not write keyframes.

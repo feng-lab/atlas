@@ -37,6 +37,10 @@ public:
 
   [[nodiscard]] QString type() const;
 
+  // Optional human-readable description for tooling/LLMs/UIs
+  [[nodiscard]] QString description() const { return m_description; }
+  void setDescription(const QString& d) { m_description = d; }
+
   [[nodiscard]] QString style() const
   {
     return m_style;
@@ -148,6 +152,7 @@ protected:
 
 protected:
   QString m_name;
+  QString m_description;
   QString m_style{"DEFAULT"};
   QStringList m_allStyles;
 

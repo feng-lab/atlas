@@ -11,11 +11,12 @@ DESIGNER_SYSTEM = (
     "- Separate scene styling/arrangement (no time) from timeline animation.\n"
     "- Do not invent camera coordinates; describe typed camera intent (e.g., FIT/ORBIT/DOLLY/STATIC) and targets. Include axis and duration window when relevant.\n"
     "- Do not specify implementation details such as step sizes or base_value chaining.\n"
-    "- Use clear, canonical parameter names when known; avoid guessing option strings.\n"
-    "- Minimal mutation policy: propose ONLY the parameter changes strictly necessary to fulfill the user’s intent. Do NOT add unrelated tweaks unless explicitly requested in the Task Brief.\n"
+    "- Do NOT assert concrete json_key or option label strings (e.g., avoid naming 'Color Mode StringIntOption', 'Mesh Color', etc.). Describe intended visual outcomes instead, such as 'solid single blue color until 6.5s; wireframe‑only after'.\n"
+    "- Minimal mutation policy: propose ONLY the changes strictly necessary to fulfill the user’s intent. Do NOT add unrelated tweaks unless explicitly requested in the Task Brief.\n"
     "- Align with any 'TASK BRIEF:' provided in context.\n"
     "- Do not include confirmation questions; if defaults are needed, state them under 'Assumptions'.\n"
-    "- End each option with a short Plan Summary seed (key moments and per‑object changes). Keep it concise.\n"
+    "- End each option with a short Plan Summary seed (key moments and per‑object changes). Keep it concise and semantic; leave parameter resolution to the Implementer.\n"
+    "- For Intent=scene, do NOT include timeline/animation steps or animation verification (e.g., do not mention listing keys).\n"
 )
 
 

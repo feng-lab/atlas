@@ -70,27 +70,10 @@ Natural Language Contract (Summary‑first)
   - 0=camera (exposed as a typed scene value via `"Camera 3DCamera"` and as timeline keys)
   - 1=background, 2=axis, 3=global
   - ≥4=object ids
-  Legacy scope addressing has been removed from the agent API in favor of id-only.
   - Camera steps must be typed via camera tools (Fit/Orbit/Dolly/Validate); do not invent raw camera numbers.
   - Scene (stateless): use `scene_apply` (no time/easing). Animation (timeline): use `animation_*` to write/replace keys; during playback keys override scene values.
 - The Supervisor injects a Task Brief into the shared context. The Implementer must derive intent strictly from the Task Brief (do not reclassify).
 - Arbiter appends a TODO section (checkboxes) to the merged plan with human‑readable, minimal steps. Implementer focuses on these tasks; avoid extra work.
-
-Camera Segmentation Rule (Chaining)
-- For segmented camera motions (e.g., 4×90° AZIMUTH for a 360° orbit), always chain: each `camera_rotate` call must use the previous camera value as `base_value`. Do not rotate from the initial camera repeatedly.
-- Typical pattern: `v0 = camera_focus(ids)` → write at `t0`; then `v1 = camera_rotate(op='AZIMUTH', degrees=Δ, base_value=v0)` at `t1`; `v2 = camera_rotate(..., base_value=v1)` at `t2`; … until `tn`.
-
-Duration Handling
-- When a user specifies a total duration, the Implementer must call `animation_set_duration(duration_seconds)` explicitly. Verify via `animation_get_time()`.
-
-Example: 360° in 10s (segmented)
-- ids = `fit_candidates()`
-- `v0 = camera_focus(ids)`; `t = [0, 2.5, 5.0, 7.5, 10.0]`
-- `v1 = camera_rotate('AZIMUTH', 90, base_value=v0)` at `t[1]`
-- `v2 = camera_rotate('AZIMUTH', 90, base_value=v1)` at `t[2]`
-- `v3 = camera_rotate('AZIMUTH', 90, base_value=v2)` at `t[3]`
-- `v4 = camera_rotate('AZIMUTH', 90, base_value=v3)` at `t[4]`
-- Validate with `camera_validate`; apply keys; then `animation_set_duration(10)` and verify times with `animation_list_keys_camera(json_key="")`.
 
 ---
 
@@ -111,7 +94,7 @@ Categories and current tools (non-exhaustive)
 - Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_apply`, `scene_apply`, `scene_save_scene`
 - Discovery: `scene_list_objects`, `scene_list_params(id)`, `scene_capabilities`, `scene_schema`, `scene_capabilities_summary`, `scene_facts_summary`
 - Timeline: `animation_list_keys(id,json_key,include_values)`, `animation_batch`, `animation_set_key_param`, `animation_replace_key_param`, `animation_set_duration`, `animation_set_time`, `animation_play`, `animation_pause`, `animation_save_animation`
-- Camera: `fit_candidates`, `camera_solve_and_apply`, `camera_validate`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`
+- Camera: producers (typed values) — `fit_candidates`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`; scene apply — `scene_camera_fit`, `scene_camera_apply`; animation (timeline) — `animation_camera_solve_and_apply`, `animation_camera_validate`
 - Geometry/Cuts: `scene_bbox`, `scene_cut_suggest`, `scene_cut_set`, `scene_cut_clear`
 
 Notes
@@ -126,69 +109,48 @@ Scene vs Timeline contract (for LLMs)
 
 ---
 
-Atlas Agent Tooling Reference (Strict Inputs)
+Agent Tools (Discovery — no duplication)
 
-This sheet lists the agent tools, their required inputs, and a short description. All parameters listed under Required must be provided.
+Source of truth
+- Tools are defined in code and surfaced to LLMs at runtime via the tools parameter. Do not mirror schemas in docs.
+- Location: `tools/atlas_agent/agent_team/tools_agent.py:scene_tools_and_dispatcher`.
 
-Camera
-- fit_candidates — Required: none. Return ids suitable for fit/orbit.
-- camera_focus — Required: ids(`array<int>`), after_clipping(bool), min_radius(number). Focus on targets.
-- camera_point_to — Required: ids(`array<int>`), after_clipping(bool). Point center to targets.
-- camera_rotate — Required: op(enum: AZIMUTH|ELEVATION|ROLL|YAW|PITCH|FLIP), degrees(number). Segmented ≤90°; chaining handled internally.
-- camera_reset_view — Required: mode(enum: XY|XZ|YZ|RESET), ids(`array<int>`), after_clipping(bool), min_radius(number). Reset to preset view.
-- camera_validate — Required: ids(`array<int>`), times(`array<number>`), values(`array<object>`), constraints(object), policies(object). Validate coverage/visibility.
-- camera_solve_and_apply — Required: mode(enum), ids(`array<int>`), t0(number), t1(number). Solve keys and apply with validation; clears existing keys in [t0,t1] by default. Do not wrap in `animation_batch` and do not follow with `animation_replace_key_camera` — this tool already commits the keys.
+Discover at runtime
+- Print the live tool list (names + JSONSchemas) from a Python shell:
+  ```bash
+  python - <<'PY'
+  from tools.atlas_agent.scene_rpc import SceneClient
+  from tools.atlas_agent.agent_team.tools_agent import scene_tools_and_dispatcher
+  import json
+  sc = SceneClient(address='localhost:50051')
+  tools, _ = scene_tools_and_dispatcher(sc)
+  print(json.dumps(tools, indent=2, ensure_ascii=False))
+  PY
+  ```
 
-Scene (stateless)
-- scene_list_objects — Required: none. List id/type/name/visible. Reserved ids unified across tools: 0=camera (virtual), 1=background, 2=axis, 3=global, ≥4=object ids.
-- scene_bbox — Required: ids(`array<int>`), after_clipping(bool). Get bbox.
-- scene_list_params — Required: id(int). List params for id (0=camera,1=background,2=axis,3=global,≥4=objects).
-- scene_get_values — Required: id(int), json_keys(`array<string>`). Return values (empty array lists all). Camera (id=0) returns a single "Camera 3DCamera" value.
-- scene_validate_apply — Required: set_params(`array<object{id, json_key, value}>`). Validate scene assignments (no time/easing).
-- scene_apply — Required: set_params(`array<object{id, json_key|string name, value}>`). Apply scene edits atomically. If a display name is provided, the dispatcher resolves it to the canonical json_key using `scene_list_params` (case-insensitive, cached, light fuzzy).
-- scene_save_scene — Required: path(string). Save .scene.
+Guidance
+- Use `scene_list_params(id)` and `capabilities.json` for parameter metadata (types, option_names, ranges); avoid hardcoding.
+- Validate before applying: `scene_validate_apply` (scene) and `animation_camera_validate` (timeline camera). Handle soft errors (`type_mismatch`, `option_invalid`, etc.).
 
-Timeline (animation)
-- camera_solve_and_apply — Required: mode(enum), ids(`array<int>`), t0(number), t1(number). Solve keys and apply with validation.
-- animation_replace_key_camera — Required: time(number), value(object). Replace camera key near time.
-- animation_set_key_param — Required: id(int), json_key(string)|name(string), time(number), value(`JSON scalar|array`). Write param key (json_key/name resolved via live params with caching).
-- animation_replace_key_param — Required: id(int), json_key(string), time(number), value(`JSON scalar|array`). Replace param key near time.
-- animation_replace_key_param_at_times — Required: id(int), json_key(string), times(`array<number>`), value(`JSON scalar|array`). Replace at times.
-- animation_clear_keys — Required: id(int). Clear keys for id (id=0 clears camera keys).
-- animation_remove_key — Required: id(int), json_key(string), time(number). Remove a key at time.
-- animation_batch — Required: set_keys(`array<object>`), remove_keys(`array<object>`), commit(bool). Apply multiple operations atomically.
-- animation_set_duration — Required: seconds(number). Set animation duration.
-- animation_set_time — Required: seconds(number). Set current time.
-- animation_play — Required: none. Start playback.
-- animation_pause — Required: none. Pause playback.
-- animation_save_animation — Required: path(string). Save .animation3d.
+## Camera Usage (Produce → Apply)
 
-Filesystem / System
-- system_info — Required: none. OS and common dirs.
-- fs_expand_paths — Required: paths(`array<string>`). Expand ~ and env vars; normalize.
-- fs_check_paths — Required: paths(`array<string>`). Return exists/missing.
-- fs_resolve_path — Required: path(string). Heuristic resolution; optional: kind, base_dirs, max_candidates.
-- repo_search — Required: name(string). Optional: type, max_depth, max_results.
-- fs_glob — Required: dir(string). Optional: pattern, recursive.
+Producers (no side effects)
+- `camera_focus(ids?, after_clipping=true, min_radius=0.0)` → returns a typed camera value.
+- `camera_point_to(ids?, after_clipping=true)` → returns a typed camera value.
+- `camera_reset_view(mode, ids?, after_clipping=true, min_radius=0.0)` → returns a typed camera value.
+- `camera_rotate(op, degrees, base_value?)` → returns a typed camera value.
+ - Read current scene camera: `scene_get_values(id=0, json_keys=["Camera 3DCamera"])` (or pass empty `json_keys` to retrieve it among all values).
 
-Loading
-- scene_load_files — Required: files(`array<string>`). Load into GUI scene.
-- scene_ensure_loaded — Required: files(`array<string>`). Idempotent load.
-- scene_smart_load — Required: names(`array<string>`). Optional: dir_hints, extensions, case_insensitive.
-- fs_find_candidates — Required: dirs(`array<string>`), names(`array<string>`). Optional: extensions, case_insensitive.
+Scene-only (stateless) apply
+- Apply a typed camera to the scene camera (no keys): `scene_camera_apply({value})` or `scene_apply([{id:0, json_key:"Camera 3DCamera", value}])`.
+- One-shot fit and apply: `scene_camera_fit(ids?, after_clipping=true, min_radius=0.0)` (internally uses CameraFit and applies the result).
 
-Docs / Info
-- scene_capabilities — Required: none. Return full capabilities.
-- scene_schema — Required: none. Return JSON schema.
-- scene_capabilities_summary — Required: none. Condensed overview.
-- scene_facts_summary — Required: none. Concise facts (objects/keys/time).
-- animation_describe_file — Required: path(string). Summarize .animation3d.
-
-Export & Preview
-- atlas_export_video — Required: animation(string), out(string), fps(number), start(int), end(int), width(int), height(int), overwrite(bool), use_gpu_devices(string).
-- animation_render_preview — Required: time(number), fps(number), width(int), height(int). Render a single frame.
+Animation (timeline) authoring
+- Solve and write keys: `animation_camera_solve_and_apply(mode, ids, t0, t1, constraints?, params?, …)`.
+- Validate typed key sequences: `animation_camera_validate(ids, times, values, constraints?, policies?)`.
+- Single-time explicit write: `animation_replace_key_camera(time, value, easing?)`.
 
 Notes
-- All scene_* tools are stateless (no time/easing). Playback uses animation_* keys.
-- Keys override scene values at playback. To change what plays, write/replace keys.
-- Prefer camera_solve_and_apply (or camera_solve + animation_replace_key_camera) for camera motion.
+- Prefer “produce → apply” for clarity: use `camera_*` producers to compute a typed camera, then choose scene vs. animation by the apply tool.
+- The previous names `camera_solve_and_apply` and `camera_validate` are removed; use `animation_camera_*` for timeline operations. For scene‑only verification, do not call `animation_list_keys`; read the current camera via `scene_get_values(id=0, 'Camera 3DCamera')` or use `scene_camera_fit/scene_camera_apply`.
+- Respect the Scene vs Timeline contract above; do not include time/easing in scene operations.

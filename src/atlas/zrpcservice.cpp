@@ -468,6 +468,61 @@ public:
         // Convert to json and perform light type/range checks
         json::value v = pbToJson(sp.value());
         auto tstr = target->type();
+
+        // Strict validation for option parameters (system boundary: reject early with a soft error)
+        if (auto optSI = dynamic_cast<const ZStringIntOptionParameter*>(target)) {
+          if (!v.is_string()) {
+            r.set_ok(false);
+            r.set_reason("type_mismatch"); // expected string label
+            return;
+          }
+          const auto& bs = v.as_string();
+          const QString label = QString::fromUtf8(bs.data(), bs.size());
+          if (!optSI->hasOption(label)) {
+            r.set_ok(false);
+            r.set_reason("option_invalid");
+            return;
+          }
+          *r.mutable_normalized_value() = jsonToPb(json::value_from(label));
+          r.set_ok(true);
+          return;
+        }
+        if (auto optSS = dynamic_cast<const ZStringStringOptionParameter*>(target)) {
+          if (!v.is_string()) {
+            r.set_ok(false);
+            r.set_reason("type_mismatch"); // expected string label
+            return;
+          }
+          const auto& bs = v.as_string();
+          const QString label = QString::fromUtf8(bs.data(), bs.size());
+          if (!optSS->hasOption(label)) {
+            r.set_ok(false);
+            r.set_reason("option_invalid");
+            return;
+          }
+          *r.mutable_normalized_value() = jsonToPb(json::value_from(label));
+          r.set_ok(true);
+          return;
+        }
+        if (auto optII = dynamic_cast<const ZIntIntOptionParameter*>(target)) {
+          if (!v.is_number()) {
+            r.set_ok(false);
+            r.set_reason("type_mismatch"); // expected integer option
+            return;
+          }
+          // Treat numeric JSON as integer option (clamp to nearest int)
+          const int ival = static_cast<int>(std::floor(v.as_double() + 0.5));
+          if (!optII->hasOption(ival)) {
+            r.set_ok(false);
+            r.set_reason("option_invalid");
+            return;
+          }
+          *r.mutable_normalized_value() = jsonToPb(json::value_from(ival));
+          r.set_ok(true);
+          return;
+        }
+
+        // Non-option types
         auto okType = [&]() -> bool {
           if (tstr == "Bool") {
             return v.is_bool();
@@ -487,7 +542,7 @@ public:
           if (tstr == "Vec4" || tstr == "DVec4") {
             return v.is_array() && v.as_array().size() == 4;
           }
-          // Option and other custom types: accept string/number/object; rely on target->read during apply
+          // Other custom types: accept and defer to target->read during apply
           return true;
         }();
         if (!okType) {
@@ -898,6 +953,9 @@ public:
           meta.set_json_key(p->jsonKey().toStdString());
           meta.set_name(p->name().toStdString());
           meta.set_type(p->type().toStdString());
+          if (!p->description().isEmpty()) {
+            meta.set_description(p->description().toStdString());
+          }
           meta.set_supports_interpolation(p->supportInterpolation());
           if (auto opt = dynamic_cast<const ZStringIntOptionParameter*>(p)) {
             for (const auto& s : opt->options()) {
@@ -2013,6 +2071,8 @@ public:
         p.set_json_key("Camera 3DCamera");
         p.set_name("Camera");
         p.set_type("3DCamera");
+        p.set_description(
+          "3D camera bundle with fields: 'Eye Position Vec3', 'Center Position Vec3', 'Up Vector Vec3', 'Field of View Float', 'Projection Type StringIntOption', and others. Use as a single struct to set or keyframe the camera.");
         p.set_supports_interpolation(true);
         out.push_back(std::move(p));
         return out;
@@ -2030,6 +2090,9 @@ public:
         meta.set_json_key(p->jsonKey().toStdString());
         meta.set_name(p->name().toStdString());
         meta.set_type(p->type().toStdString());
+        if (!p->description().isEmpty()) {
+          meta.set_description(p->description().toStdString());
+        }
         meta.set_supports_interpolation(p->supportInterpolation());
         if (auto opt = dynamic_cast<const ZStringIntOptionParameter*>(p)) {
           for (const auto& s : opt->options()) {
@@ -2183,26 +2246,51 @@ public:
         cpa->emitKeysChangedSignal();
         return true;
       }
-      // Non-camera: use id directly
+      // Non-camera: resolve the object's uniqueId, then operate on its parameter animations
       size_t boundId = static_cast<size_t>(req->id());
       const QString jsonKey = QString::fromStdString(req->json_key());
+      size_t uniqueId = 0;
       for (const auto& pack : anim->displayPacks()) {
-        if (pack.type == ZAnimationDisplayPack::Type::ObjectPara && pack.boundId == boundId && pack.paraAnimation) {
-          if (pack.paraAnimation->jsonKey() == jsonKey) {
+        if (pack.type == ZAnimationDisplayPack::Type::Object && pack.boundId == boundId) {
+          uniqueId = pack.id;
+          break;
+        }
+      }
+      bool clearedAny = false;
+      if (uniqueId != 0) {
+        const auto& pas = anim->paraAnimationList(uniqueId);
+        for (const auto& paPtr : pas) {
+          if (!paPtr) {
+            continue;
+          }
+          auto* pa = paPtr.get();
+          if (jsonKey.isEmpty() || pa->jsonKey() == jsonKey) {
             std::vector<ZParameterKey*> keys;
-            keys.reserve(pack.paraAnimation->keys().size());
-            for (const auto& k : pack.paraAnimation->keys()) {
+            keys.reserve(pa->keys().size());
+            for (const auto& k : pa->keys()) {
               keys.push_back(k.get());
             }
             for (auto* k : keys) {
-              pack.paraAnimation->deleteKey(k);
+              pa->deleteKey(k);
             }
-            pack.paraAnimation->emitKeysChangedSignal();
-            return true;
+            pa->emitKeysChangedSignal();
+            clearedAny = true;
+            if (!jsonKey.isEmpty()) {
+              // When a specific param was requested, stop after clearing its keys
+              break;
+            }
           }
         }
       }
-      return false;
+      // Benign no-op: if no keys existed for the target, report success to simplify client logic
+      if (!clearedAny) {
+        if (jsonKey.isEmpty()) {
+          LOG(INFO) << "RPC ClearKeys: no param tracks for id=" << boundId << "; nothing to clear";
+        } else {
+          LOG(INFO) << "RPC ClearKeys: no matching track for id=" << boundId << " json_key=" << req->json_key();
+        }
+      }
+      return true;
     });
     if (!ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "clear_keys failed");
@@ -2439,24 +2527,39 @@ public:
         }
         return true;
       }
-      // Non-camera: require json_key
+      // Non-camera: resolve uniqueId for the object, then fetch parameter animation by json_key
       const QString jsonKey = QString::fromStdString(req->json_key());
-      size_t boundId = static_cast<size_t>(req->id());
+      const size_t boundId = static_cast<size_t>(req->id());
+      size_t uniqueId = 0;
       for (const auto& pack : anim->displayPacks()) {
-        if (pack.type == ZAnimationDisplayPack::Type::ObjectPara && pack.boundId == boundId && pack.paraAnimation &&
-            pack.paraAnimation->jsonKey() == jsonKey) {
-          for (const auto& k : pack.paraAnimation->keys()) {
+        if (pack.type == ZAnimationDisplayPack::Type::Object && pack.boundId == boundId) {
+          uniqueId = pack.id;
+          break;
+        }
+      }
+      if (uniqueId == 0) {
+        // Object not bound; return empty list
+        return true;
+      }
+      const auto& pas = anim->paraAnimationList(uniqueId);
+      for (const auto& paPtr : pas) {
+        if (!paPtr) {
+          continue;
+        }
+        auto* pa = paPtr.get();
+        if (pa->jsonKey() == jsonKey) {
+          for (const auto& k : pa->keys()) {
             KeyInfo* ki = reply->add_keys();
             ki->set_time(k->time());
-            ki->set_type(pack.paraAnimation->type().toStdString());
+            ki->set_type(pa->type().toStdString());
             if (includeValues) {
               ki->set_value_json(jsonToString(k->jsonValue()));
             }
           }
-          return true;
+          break;
         }
       }
-      return true; // no matching param; return empty list
+      return true; // return empty when no matching param track
     });
     if (!ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "list_keys failed");
@@ -2502,12 +2605,9 @@ public:
       if (ids.empty()) {
         return false;
       }
-      auto* anim = ad.animationPtr(ids.front());
-      if (!anim) {
-        return false;
-      }
-      anim->save(QString::fromStdString(req->path()));
-      return true;
+      // Mirror UI behavior: use Z3DAnimationDoc save to update name/path state
+      const QString qpath = QString::fromStdString(req->path());
+      return ad.saveToPath(ids.front(), qpath);
     });
     if (!ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "save failed");

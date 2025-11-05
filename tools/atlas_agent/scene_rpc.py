@@ -208,16 +208,17 @@ class SceneClient:
         """Deprecated in favor of scene_facts(). Left for backward compatibility."""
         return self.scene_facts().get("keys", {})
 
-    def scene_facts(self) -> dict:
-        """Return a structured snapshot of the scene for verification.
+    def scene_facts(self, *, include_values: bool = False, include_scene_values: bool = True) -> dict:
+        """Return a structured snapshot of the scene for verification/description.
 
         Shape:
           {
             "objects_list": [{id, type, name, path, visible}, ...],
             "keys": {
               "camera": [times...],
-              "objects": { id: { json_key: [times...] } }
-            }
+              "objects": { id: { json_key: ([times...] | [ {time, value}? ]) } }
+            },
+            "scene_values?": { id: { json_key: value, ... }, ... }
           }
         """
         facts: dict[str, Any] = {"objects_list": [], "keys": {"camera": [], "objects": {}}}
@@ -253,16 +254,44 @@ class SceneClient:
                     if not jk:
                         continue
                     try:
-                        lr = self.list_keys(id=oid, json_key=jk, include_values=False)
-                        times = [k.time for k in getattr(lr, "keys", [])]
-                        if times:
-                            obj_map[jk] = sorted(times)
+                        lr = self.list_keys(id=oid, json_key=jk, include_values=bool(include_values))
+                        if include_values:
+                            entries = []
+                            for k in getattr(lr, "keys", []) or []:
+                                try:
+                                    vj = getattr(k, "value_json", "") or ""
+                                    val = __import__("json").loads(vj) if vj else None
+                                except Exception:
+                                    val = None
+                                entries.append({"time": float(getattr(k, "time", 0.0)), **({"value": val} if val is not None else {})})
+                            if entries:
+                                # Sort by time
+                                obj_map[jk] = sorted(entries, key=lambda e: e.get("time", 0.0))
+                        else:
+                            times = [k.time for k in getattr(lr, "keys", [])]
+                            if times:
+                                obj_map[jk] = sorted(times)
                     except Exception:
                         continue
                 if obj_map:
                     facts["keys"]["objects"][str(oid)] = obj_map
         except Exception:
             pass
+        # Optional: include current scene values for each object (all params)
+        if include_scene_values:
+            try:
+                sv: dict[str, dict[str, Any]] = {}
+                for o in facts.get("objects_list", []) or []:
+                    oid = int(o.get("id", 0))
+                    try:
+                        # When json_keys omitted, GetParamValues returns all values for the id
+                        vals = self.get_param_values(id=oid, json_keys=[])
+                        sv[str(oid)] = vals
+                    except Exception:
+                        continue
+                facts["scene_values"] = sv
+            except Exception:
+                pass
         return facts
 
     def list_objects(self):

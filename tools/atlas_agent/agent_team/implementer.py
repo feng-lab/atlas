@@ -16,16 +16,17 @@ IMPLEMENTER_SYSTEM = (
     "Principles:\n"
     "- Do NOT self-detect intent. Use the Task Brief provided by the Supervisor (via shared context) to determine intent: scene, animation, playback, or save/export.\n"
     "- Prefer live discovery for keys/types/options (scene_list_params and scene_get_values); consult scene_animation_concepts, scene_capabilities_summary, or scene_params_handbook on demand when semantics are unclear.\n"
-    "- Complete the requested intent in this run. If intent is scene, DO NOT create animations — resolve paths, ensure load, apply scene params, then verify. If intent is animation, ensure animation, set duration, write object keys, plan/write camera keys, then verify. Treat any soft 'confirmation' lines in the plan as non‑blocking assumptions and proceed unless information is truly missing.\n"
+    "- Complete the requested intent in this run. If intent is scene, DO NOT create animations — resolve paths, ensure load, apply scene params, then verify. In scene‑only flows, do NOT call animation_* tools (including animation_list_keys); 'no timeline keys' is satisfied by not writing keys (optionally confirm there's no Animation3D in scene_list_objects). If intent is animation, ensure animation, set duration, write object keys, plan/write camera keys, then verify. Treat any soft 'confirmation' lines in the plan as non‑blocking assumptions and proceed unless information is truly missing.\n"
     "- Use canonical parameter names discovered from the scene; do not invent option strings.\n"
     "- Camera changes must use typed operators/planning, not raw coordinates. Prefer camera_solve_and_apply (or camera_solve + animation_replace_key_camera). Do not manually segment long motions; the solver returns appropriately sampled keys and we validate visibility.\n"
-    "- Validate before applying; verify afterward with key/value listings (scene_get_values / animation_list_keys_* / camera_validate). Keep changes minimal and atomic.\n"
+    "- Validate before applying; verify afterward with key/value listings. For scene, use scene_get_values and facts; for animation, use animation_list_keys_* and animation_camera_validate. Keep changes minimal and atomic.\n"
     "- Use the TODO list (checkbox section in context) as task reference for this turn.\n"
     "- Inspector updates TODO status based on verified outcomes; focus on executing the TODOs.\n"
     "- Success criteria (verify explicitly):\n"
     "  • Scene‑only: object(s) present/visible; scene params match the plan.\n"
     "  • Animation: object keys exist at intended times; camera keys span the intended window; camera_validate meets coverage constraints.\n"
     "  • If any check fails, diagnose (id/json_key/time/value) and retry within this run.\n"
+    "- If some requested steps are not feasible with available tools/capabilities (e.g., json_key_not_found, option_invalid, tool_missing), first complete all feasible steps, then call report_blocked(reason, details?, suggestion?) exactly once with a precise reason and details.\n"
 )
 
 @dataclass
@@ -135,31 +136,7 @@ class Implementer:
                         pass
                 # (removed camera direct set tool references)
 
-                # Optional pre-verification notes (accumulate fields on a single note dict)
-                if name == "animation_batch":
-                    try:
-                        set_keys = (args.get("set_keys") or []) if isinstance(args, dict) else []
-                        cache: dict[int, set] = {}
-                        verify: list[dict] = []
-                        for sk in set_keys:
-                            idv = int(sk.get("id", -1))
-                            if idv == 0:
-                                verify.append({"id": 0, "ok": True})
-                                continue
-                            jk = sk.get("json_key")
-                            if idv not in cache:
-                                try:
-                                    pl = self.scene.list_params(id=idv)
-                                    cache[idv] = {getattr(p, "json_key", "") for p in pl.params}
-                                except Exception:
-                                    cache[idv] = set()
-                            exists = (str(jk) in cache[idv]) if jk else False
-                            verify.append({"id": idv, "json_key": jk, "ok": exists})
-                        if 'precheck_note' not in locals() or precheck_note is None:
-                            precheck_note = {}
-                        precheck_note["param_verification"] = verify
-                    except Exception:
-                        pass
+                # (no batch pre-verification)
 
                 result = dispatch(name, args_json)
                 entry = {

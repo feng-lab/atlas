@@ -20,10 +20,14 @@ Z3DBoundedFilter::RendererParameters::RendererParameters()
   , materialSpecular("Material Specular", glm::vec4(1.f, 1.f, 1.f, 1.f))
   , materialShininess("Material Shininess", 100.f, 1.f, 200.f)
 {
+  coordTransform.setDescription(QStringLiteral(
+    "Object transform bundle with fields: 'Scale Vec3', 'Rotation Vec4' (axis-angle), 'Rotation Center Vec3', and 'Translation Vec3'."));
   sizeScale.setSingleStep(0.001);
   sizeScale.setDecimal(3);
   sizeScale.setStyle("SPINBOX");
+  sizeScale.setDescription(QStringLiteral("Uniform scale factor applied to the object (multiplicative)."));
 
+  opacity.setDescription(QStringLiteral("Overall surface opacity (1.0=opaque, 0.0=fully transparent)."));
   materialAmbient.setStyle("COLOR");
   materialSpecular.setStyle("COLOR");
 }
@@ -69,13 +73,18 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_manipulatorSize.setDecimal(0);
   m_manipulatorSize.setSingleStep(10);
   connect(&m_manipulatorSize, &ZFloatParameter::valueChanged, this, &Z3DBoundedFilter::invalidateHandle);
+  m_manipulatorSize.setDescription(QStringLiteral("Size of transform/selection handles in pixels."));
 
   connect(&m_globalParameters.camera, &Z3DCameraParameter::valueChanged, this, &Z3DBoundedFilter::invalidateHandle);
 
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DBoundedFilter::objVisibleChanged);
+  m_visible.setDescription(QStringLiteral("Toggle object visibility in the 3D view."));
   m_xCut.setSingleStep(1);
   m_yCut.setSingleStep(1);
   m_zCut.setSingleStep(1);
+  m_xCut.setDescription(QStringLiteral("Local clipping interval along the X axis (world units)."));
+  m_yCut.setDescription(QStringLiteral("Local clipping interval along the Y axis (world units)."));
+  m_zCut.setDescription(QStringLiteral("Local clipping interval along the Z axis (world units)."));
   connect(&m_xCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_yCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_zCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
@@ -83,14 +92,19 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   connect(&m_globalParameters.globalYCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_globalParameters.globalZCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_boundBoxMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBoundedFilter::onBoundBoxModeChanged);
+  m_boundBoxMode.setDescription(QStringLiteral("Bounding box overlay mode (None / Object Box / Axis-Aligned Box)."));
   m_boundBoxLineColor.setStyle("COLOR");
   // m_boundBoxLineColor.get().reset(0., 1., QColor(133,163,240,255), QColor(248,60,35,255));
   // m_boundBoxLineColor.get().addKey(ZColorMapKey(.1, QColor(233,239,235,255)));
   // m_boundBoxLineColor.get().addKey(ZColorMapKey(.2, QColor(240,241,237,255)));
   // m_boundBoxLineColor.get().addKey(ZColorMapKey(.3, QColor(248,205,165,255)));
   connect(&m_boundBoxLineColor, &ZVec4Parameter::valueChanged, this, &Z3DBoundedFilter::updateBoundBoxLineColors);
+  m_boundBoxLineWidth.setDescription(QStringLiteral("Line width (pixels) for the bounding box overlay."));
+  m_boundBoxLineColor.setDescription(QStringLiteral("Bounding box line color (RGBA)."));
   m_selectionLineColor.setStyle("COLOR");
   connect(&m_selectionLineColor, &ZVec4Parameter::valueChanged, this, &Z3DBoundedFilter::updateSelectionLineColors);
+  m_selectionLineWidth.setDescription(QStringLiteral("Line width (pixels) for selection highlight."));
+  m_selectionLineColor.setDescription(QStringLiteral("Selection highlight line color (RGBA)."));
 
   addParameter(m_visible);
   addParameter(m_xCut);

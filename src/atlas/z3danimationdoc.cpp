@@ -119,6 +119,24 @@ bool Z3DAnimationDoc::saveAs(size_t id)
   return false;
 }
 
+bool Z3DAnimationDoc::saveToPath(size_t id, const QString& filePath)
+{
+  try {
+    auto& pack = m_idToAnimationPacks.at(id);
+    QString err;
+    if (saveAnimation(pack.get(), filePath, err)) {
+      m_doc.updateObjInfo(id);
+      return true;
+    }
+    LOG(ERROR) << "saveToPath failed: " << err;
+    return false;
+  }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "saveToPath exception: " << e.what();
+    return false;
+  }
+}
+
 bool Z3DAnimationDoc::canReadFile(const QString& fileName) const
 {
   return fileName.endsWith(".animation3d", Qt::CaseInsensitive);

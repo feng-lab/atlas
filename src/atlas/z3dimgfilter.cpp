@@ -82,6 +82,9 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
     std::make_pair(QStringLiteral("ISO Surface"), static_cast<int>(ImgCompositingMode::IsoSurface)),
     std::make_pair(QStringLiteral("X Ray"), static_cast<int>(ImgCompositingMode::XRay)));
   m_raycasterCompositingMode.select(QStringLiteral("MIP Opaque"));
+  m_raycasterCompositingMode.setDescription(QStringLiteral(
+    "Volume compositing mode. ISO Surface uses 'ISO Value'; MIP/Local MIP emphasize bright voxels;"
+    " Direct Volume Rendering integrates color/opacity; X-Ray is a fast approximant."));
 
   updateRaycasterCompositingMode();
   connect(&m_raycasterCompositingMode,
@@ -90,7 +93,11 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
           &Z3DImgFilter::updateRaycasterCompositingMode);
 
   addParameter(m_stayOnTop);
+  m_stayOnTop.setDescription(QStringLiteral(
+    "Render this volume layer on top of other geometry."));
   addParameter(m_fullResolutionRendering);
+  m_fullResolutionRendering.setDescription(QStringLiteral(
+    "Render at full resolution instead of adaptive downsampling (higher quality, slower)."));
   connect(this, &Z3DBoundedFilter::rendererCoordTransformChanged, this, &Z3DImgFilter::changeCoordTransform);
   //  connect(&m_globalParameters.interactionHandler,
   //          &Z3DTrackballInteractionHandler::enterInteractionMode,
@@ -118,23 +125,41 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   // addParameter(m_useFRVolumeSlice);
   addParameter(m_showXSlice);
+  m_showXSlice.setDescription(QStringLiteral("Toggle orthogonal X slice visibility."));
   addParameter(m_xSlicePosition);
+  m_xSlicePosition.setDescription(QStringLiteral("Normalized X slice position (0..1)."));
   addParameter(m_showYSlice);
+  m_showYSlice.setDescription(QStringLiteral("Toggle orthogonal Y slice visibility."));
   addParameter(m_ySlicePosition);
+  m_ySlicePosition.setDescription(QStringLiteral("Normalized Y slice position (0..1)."));
   addParameter(m_showZSlice);
+  m_showZSlice.setDescription(QStringLiteral("Toggle orthogonal Z slice visibility."));
   addParameter(m_zSlicePosition);
+  m_zSlicePosition.setDescription(QStringLiteral("Normalized Z slice position (0..1)."));
   addParameter(m_showObliqueSlice);
+  m_showObliqueSlice.setDescription(QStringLiteral("Toggle an arbitrary oblique slice plane."));
   addParameter(m_obliqueSliceNormal);
+  m_obliqueSliceNormal.setDescription(QStringLiteral("Oblique slice plane normal (unit vector)."));
   addParameter(m_obliqueSliceDistanceToOrigin);
+  m_obliqueSliceDistanceToOrigin.setDescription(QStringLiteral("Signed distance from origin for oblique slice plane."));
   addParameter(m_showObliqueSlice2);
+  m_showObliqueSlice2.setDescription(QStringLiteral("Toggle a second oblique slice plane."));
   addParameter(m_obliqueSlice2Normal);
+  m_obliqueSlice2Normal.setDescription(QStringLiteral("Second oblique slice plane normal (unit vector)."));
   addParameter(m_obliqueSlice2DistanceToOrigin);
+  m_obliqueSlice2DistanceToOrigin.setDescription(QStringLiteral("Signed distance from origin for second oblique slice plane."));
   addParameter(m_showXSlice2);
+  m_showXSlice2.setDescription(QStringLiteral("Toggle second X slice visibility."));
   addParameter(m_xSlice2Position);
+  m_xSlice2Position.setDescription(QStringLiteral("Normalized second X slice position (0..1)."));
   addParameter(m_showYSlice2);
+  m_showYSlice2.setDescription(QStringLiteral("Toggle second Y slice visibility."));
   addParameter(m_ySlice2Position);
+  m_ySlice2Position.setDescription(QStringLiteral("Normalized second Y slice position (0..1)."));
   addParameter(m_showZSlice2);
+  m_showZSlice2.setDescription(QStringLiteral("Toggle second Z slice visibility."));
   addParameter(m_zSlice2Position);
+  m_zSlice2Position.setDescription(QStringLiteral("Normalized second Z slice position (0..1)."));
 
   connect(&m_showXSlice, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
   connect(&m_showYSlice, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
@@ -174,6 +199,8 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_raycasterIsoValue);
   addParameter(m_raycasterLocalMIPThreshold);
   addParameter(m_raycasterSamplingRate);
+  m_raycasterSamplingRate.setDescription(QStringLiteral(
+    "Raymarching step size multiplier. Smaller values improve quality and cost more."));
 
   m_imgRaycasterRenderer.setFastRendering(!m_fullResolutionRendering.get());
   m_imgSliceRenderer.setFastRendering(!m_fullResolutionRendering.get());

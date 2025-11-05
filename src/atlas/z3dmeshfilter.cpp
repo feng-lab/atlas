@@ -38,6 +38,11 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
   // Color Mode
   m_colorMode.addOptions("Mesh Color", "Single Color");
   m_colorMode.select("Single Color");
+  m_colorMode.setDescription(QStringLiteral(
+    "Controls how mesh surface colors are chosen:\n"
+    "- 'Single Color' uses the 'Mesh Color' parameter below to render a solid color.\n"
+    "- 'Mesh Color' uses color attributes embedded in the mesh file (per-vertex/face).\n"
+    "  If the mesh does not contain colors, the appearance may fallback (often grayscale)."));
 
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::prepareColor);
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::adjustWidgets);
@@ -56,9 +61,15 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
   addParameter(m_colorMode);
 
   addParameter(m_singleColorForAllMesh);
+  m_singleColorForAllMesh.setDescription(QStringLiteral(
+    "Solid RGBA color used when 'Color Mode' is set to 'Single Color'."));
 
   addParameter(m_wireframeMode);
   addParameter(m_wireframeColor);
+  m_wireframeMode.setDescription(QStringLiteral(
+    "Render meshes with or without a wireframe overlay."));
+  m_wireframeColor.setDescription(QStringLiteral(
+    "Wireframe line color (applies when wireframe is visible)."));
 
   connect(&m_glow, &ZBoolParameter::valueChanged, this, &Z3DMeshFilter::adjustWidgets);
   addParameter(m_glow);
@@ -75,6 +86,11 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
   addParameter(m_glowBlurRadius);
   addParameter(m_glowBlurScale);
   addParameter(m_glowBlurStrength);
+  m_glow.setDescription(QStringLiteral("Enable a post-processing glow around bright surfaces."));
+  m_glowMode.setDescription(QStringLiteral("Blend mode for the glow pass."));
+  m_glowBlurRadius.setDescription(QStringLiteral("Radius of the glow blur kernel (pixels)."));
+  m_glowBlurScale.setDescription(QStringLiteral("Scale factor applied to the glow blur radius."));
+  m_glowBlurStrength.setDescription(QStringLiteral("Opacity applied when compositing the glow."));
 
   m_selectMeshEvent.listenTo("select mesh", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
   m_selectMeshEvent.listenTo("select mesh", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);

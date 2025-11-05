@@ -32,6 +32,8 @@ message Parameter {
   string name = 2;
   string type = 3;
   bool supports_interpolation = 4;
+  // Optional: human-readable description for LLMs/UIs
+  string description = 16;
   // Optional: enumerated option display names for option parameters
   repeated string option_names = 5;
   // Optional: associated option data (stringified) aligned with option_names

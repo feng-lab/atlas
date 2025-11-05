@@ -17,10 +17,15 @@ ZSwcColorParameters::ZSwcColorParameters(QObject* parent)
   );
 
   colorMode.select("Branch Type");
+  colorMode.setDescription(QStringLiteral(
+    "Color assignment strategy for SWC. 'Single Color' uses 'Color'; 'Branch Type' assigns per-type colors;"
+    " 'Topology' uses root/branch/leaf/other colors; 'Colormap Branch Type' maps type IDs via the color map."));
 
   connect(&colorMode, &ZStringIntOptionParameter::valueChanged, this, &ZSwcColorParameters::adjustWidgets);
 
   swcTreeColor.setStyle("COLOR");
+  swcTreeColor.setDescription(QStringLiteral(
+    "Solid color used when 'Color Mode' is set to 'Single Color'."));
 
   adjustWidgets();
 }
@@ -43,6 +48,8 @@ void ZSwcColorParameters::setData(ZSwcPack* swcPack)
   }
 
   adjustWidgets();
+  colorMapBranchType.setDescription(QStringLiteral(
+    "Colormap used to map branch type IDs to colors when in 'Colormap Branch Type' mode."));
 }
 
 void ZSwcColorParameters::initTopologyColor()

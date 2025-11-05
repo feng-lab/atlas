@@ -34,6 +34,8 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     std::make_pair(enumToQString(RenderBackend::OpenGL), static_cast<int>(RenderBackend::OpenGL)),
     std::make_pair(enumToQString(RenderBackend::Vulkan), static_cast<int>(RenderBackend::Vulkan)));
   renderBackend.select(enumToQString(RenderBackend::OpenGL));
+  renderBackend.setDescription(QStringLiteral(
+    "Rendering backend selection. OpenGL is the primary path today; Vulkan is experimental."));
   // addParameter(renderBackend);
 
   geometriesMultisampleMode.clearOptions();
@@ -41,6 +43,8 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     std::make_pair(QStringLiteral("None"), static_cast<int>(GeometryMSAAMode::None)),
     std::make_pair(QStringLiteral("2x2"), static_cast<int>(GeometryMSAAMode::MSAA2x2)));
   geometriesMultisampleMode.select(QStringLiteral("2x2"));
+  geometriesMultisampleMode.setDescription(QStringLiteral(
+    "Geometry supersampling for crisper edges. '2x2' improves quality at higher cost; 'None' is faster."));
   addParameter(geometriesMultisampleMode);
 
   transparencyMethod.clearOptions();
@@ -51,6 +55,10 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     std::make_pair(QStringLiteral("Weighted Blended"), static_cast<int>(TransparencyMode::WeightedBlended)),
     std::make_pair(QStringLiteral("Dual Depth Peeling"), static_cast<int>(TransparencyMode::DualDepthPeeling)));
   transparencyMethod.select(QStringLiteral("Weighted Average"));
+  transparencyMethod.setDescription(QStringLiteral(
+    "Transparency compositing method. Weighted Average (default) is fast and stable;"
+    " Weighted Blended reduces bleed-through with 'Weighted Blended Depth Scale';"
+    " Dual Depth Peeling is more accurate but heavier."));
   // weightedBlendedDepthScale.setStyle("SPINBOX");
 
   //  if (Z3DGpuInfoInstance.isLinkedListSupported())
@@ -58,9 +66,14 @@ Z3DGlobalParameters::Z3DGlobalParameters()
 
   addParameter(transparencyMethod);
   addParameter(weightedBlendedDepthScale);
+  weightedBlendedDepthScale.setDescription(QStringLiteral(
+    "Tuning scalar for Weighted Blended transparency. Increase to reduce bleed-through;"
+    " affects only 'Weighted Blended' mode."));
 
   m_cameraParameterIndex = m_parameters.size();
   addParameter(camera);
+  camera.setDescription(QStringLiteral(
+    "Typed 3D camera value (position, center, up, frustum)."));
 
   globalXCut.setSingleStep(1);
   globalYCut.setSingleStep(1);
@@ -68,6 +81,9 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   addParameter(globalXCut);
   addParameter(globalYCut);
   addParameter(globalZCut);
+  globalXCut.setDescription(QStringLiteral("Global clipping interval along the X axis (world units)."));
+  globalYCut.setDescription(QStringLiteral("Global clipping interval along the Y axis (world units)."));
+  globalZCut.setDescription(QStringLiteral("Global clipping interval along the Z axis (world units)."));
 
   connect(&camera, &Z3DCameraParameter::valueChanged, this, &Z3DGlobalParameters::markGlobalViewStateDirty);
   connect(&sceneAmbient, &ZVec4Parameter::valueChanged, this, &Z3DGlobalParameters::markGlobalSceneStateDirty);
@@ -217,6 +233,7 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     std::make_unique<ZVec3Parameter>(name, glm::vec3(0.9397f, 0.f, 0.3420f), glm::vec3(-1.f), glm::vec3(1.f)));
 
   addParameter(lightCount);
+  lightCount.setDescription(QStringLiteral("Number of active lights used for shading (1–5)."));
 
   for (size_t i = 0; i < lightPositions.size(); ++i) {
     lightAmbients[i]->setStyle("COLOR");
@@ -242,6 +259,7 @@ Z3DGlobalParameters::Z3DGlobalParameters()
 
   sceneAmbient.setStyle("COLOR");
   addParameter(sceneAmbient);
+  sceneAmbient.setDescription(QStringLiteral("Ambient scene color applied globally."));
 
   // fog
   fogMode.clearOptions();
@@ -251,6 +269,7 @@ Z3DGlobalParameters::Z3DGlobalParameters()
     std::make_pair(QStringLiteral("Exponential"), static_cast<int>(FogMode::Exponential)),
     std::make_pair(QStringLiteral("Squared Exponential"), static_cast<int>(FogMode::ExponentialSquared)));
   fogMode.select(QStringLiteral("None"));
+  fogMode.setDescription(QStringLiteral("Fog model applied in the scene: None, Linear, or Exponential."));
   addParameter(fogMode);
   fogTopColor.setStyle("COLOR");
   fogBottomColor.setStyle("COLOR");
@@ -261,11 +280,17 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   addParameter(fogBottomColor);
   addParameter(fogRange);
   addParameter(fogDensity);
+  fogTopColor.setDescription(QStringLiteral("Top color of vertical fog gradient (when fog is enabled)."));
+  fogBottomColor.setDescription(QStringLiteral("Bottom color of vertical fog gradient (when fog is enabled)."));
+  fogRange.setDescription(QStringLiteral("Near/Far depth range where fog is applied."));
+  fogDensity.setDescription(QStringLiteral("Fog density factor (used by exponential modes)."));
 
   markGlobalSceneStateDirty();
   markGlobalViewStateDirty();
 
   devicePixelRatio.setEnabled(false);
+  devicePixelRatio.setDescription(QStringLiteral(
+    "Detected display scale (read-only); used to auto-tune anti-aliasing."));
 
   pickingManager.setDevicePixelRatio(devicePixelRatio.get());
 }

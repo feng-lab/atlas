@@ -109,6 +109,7 @@ void ZParameter::setSameAs(const ZParameter& rhs)
 {
   m_allStyles = rhs.m_allStyles;
   setName(rhs.m_name);
+  m_description = rhs.m_description;
   setStyle(rhs.m_style);
   setEnabled(rhs.m_isWidgetsEnabled);
   setVisible(rhs.m_isWidgetsVisible);
