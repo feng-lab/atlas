@@ -192,7 +192,7 @@ message CameraKeysResponse { repeated google.protobuf.Value values = 1; }
 message CameraOrbitSuggestRequest {
   repeated uint64 ids = 1; // targets to derive center/radius (or empty → all)
   string axis = 2;         // one of: "x", "y", "z"
-  double angle_degrees = 3; // default 360
+  double degrees = 3;      // default 360
 }
 
 message CameraDollySuggestRequest {
@@ -241,7 +241,7 @@ message CameraSolveRequest {
   double t0 = 3;             // first key time
   double t1 = 4;             // second key time (for ORBIT/DOLLY); ignored for FIT/STATIC
   CameraConstraints constraints = 5;
-  google.protobuf.Struct params = 6; // per-mode params: ORBIT{axis,angle_degrees}, DOLLY{start_dist,end_dist}
+  google.protobuf.Struct params = 6; // per-mode params: ORBIT{axis,degrees}, DOLLY{start_dist,end_dist}
 }
 
 message CameraSolveKey { double time = 1; google.protobuf.Value value = 2; }

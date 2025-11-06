@@ -296,15 +296,8 @@ void Z3DRenderingEngine::updateBoundBox()
   m_numObjsBefore = m_doc.numObjs();
 
   VLOG(2) << json::value_from(m_boundBox);
-  // update global cut
-  m_globalParas->globalXCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.x) - 1,
-                                                 std::ceil(m_boundBox.maxCorner.x) + 1);
-
-  m_globalParas->globalYCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.y) - 1,
-                                                 std::ceil(m_boundBox.maxCorner.y) + 1);
-
-  m_globalParas->globalZCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.z) - 1,
-                                                 std::ceil(m_boundBox.maxCorner.z) + 1);
+  // Update global cuts using explicit binding modes
+  m_globalParas->applyBoundsForCuts(m_boundBox);
 }
 
 void Z3DRenderingEngine::read(size_t id, const json::object& json)

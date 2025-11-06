@@ -44,9 +44,9 @@ Agents: Camera Planning & Validation
 - Essential tools (LLM function-calling):
   - `fit_candidates` → choose ids to frame (excludes Animation3D).
   - `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view` → deterministic operators (UI parity) for stateless camera value generation.
-  - `camera_solve_and_apply` (modes FIT | ORBIT | DOLLY | STATIC) → solves and writes validated camera keys; clears existing keys in the time range by default.
+  - `animation_camera_solve_and_apply` (modes FIT | ORBIT | DOLLY | STATIC) → solves and writes validated camera keys; clears existing keys in the time range by default.
   - `camera_validate` → dry‑run with constraints/policies; prefer strict first, then allow adjustments if needed.
-  - `animation_batch` → write non‑camera parameter keys atomically. Camera keys are written by `camera_solve_and_apply` (do not wrap in batch).
+  - `animation_batch` → write non‑camera parameter keys atomically. Camera keys are written by `animation_camera_solve_and_apply` (do not wrap in batch).
 
 - Deprecated/removed: all camera "recipe" tools. Compose motions with the general tools above; do not rely on hardcoded recipes.
 
@@ -54,9 +54,9 @@ Agents: Camera Planning & Validation (Example)
 
 - Example (“rotate around the mesh 360° in 10 seconds”):
   1) Pick targets: `fit_candidates` or `scene_list_objects` → ids
-  2) Solve + write: `camera_solve_and_apply(mode='ORBIT', ids=ids, t0=0, t1=10, params={axis:'y', angle_degrees:360}, constraints={keep_visible:true, min_coverage:0.95})`. This clears existing keys in [0,10] and writes validated keys.
+  2) Solve + write: `animation_camera_solve_and_apply(mode='ORBIT', ids=ids, t0=0, t1=10, degrees=360, params={axis:'y'}, constraints={keep_visible:true, min_coverage:0.95})`. This clears existing keys in [0,10] and writes validated keys.
   3) Set duration: `animation_set_duration(10)`.
-  4) Optional validate: `camera_validate(ids, times, values, constraints={keep_visible:true,min_coverage:0.95}, policies={adjust_*:false})` using the written keys.
+  4) Optional validate: `animation_camera_validate(ids, times, values, constraints={keep_visible:true,min_coverage:0.95}, policies={adjust_*:false})` using the written keys.
   5) Preview (optional): `animation_render_preview(time=5)` for a mid‑orbit frame.
 
 Agents: Codegen Mode
@@ -181,6 +181,23 @@ Compositor and Rendering
 - `Z3DCompositor` orchestrates geometry/image filters and render targets; supports transparency methods and axis/background.
 - `Z3DNetworkEvaluator` executes the filter graph and drives progressive updates.
 - `Z3DGlobalParameters` holds camera, lights, fog, global cuts, device pixel ratio, and scratch resource pool.
+
+Global Cut Mode (Binding)
+
+- The global X/Y/Z cuts no longer infer intent from equality with min/max. Each axis has an explicit mode parameter (UI label: “Global X/Y/Z Cut Mode”) stored in `Z3DGlobalParameters`:
+  - Absolute: hold absolute values; clamp to new bounds.
+    - newLower = clamp(oldLower, min, max)
+    - newUpper = clamp(oldUpper, min, max)
+  - Track Edges: pin lower/upper edge independently via booleans (UI: “Global X/Y/Z Cut Pin Lower/Pin Upper”).
+    - newLower = (PinLower ? min : clamp(oldLower, min, max))
+    - newUpper = (PinUpper ? max : clamp(oldUpper, min, max))
+  - Normalized [0..1]: store fractional endpoints f0,f1 and recompute.
+    - newLower = min + (max − min) · f0
+    - newUpper = min + (max − min) · f1
+- Engine path: `Z3DRenderingEngine::updateBoundBox()` calls `Z3DGlobalParameters::applyBoundsForCuts(...)` to re-evaluate cuts deterministically when the scene bounds change.
+- Defaults: Track Edges ON for both endpoints, which follows min/max and shows full range.
+- Serialization: binding mode, toggles, and normalized spans persist with scenes.
+- Invariants: Bounds are validated upstream; span parameters handle clamping and ordering.
 
 Vulkan Notes
 

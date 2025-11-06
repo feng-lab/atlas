@@ -36,7 +36,9 @@ class CameraAPI:
         return self.client.camera_reset_view(mode=mode, ids=ids, after_clipping=after_clipping, min_radius=min_radius)
 
     def solve(self, *, mode: str, ids: Optional[list[int]] = None, t0: float = 0.0, t1: float = 0.0, constraints: Optional[dict] = None, params: Optional[dict] = None) -> list[dict]:
-        keys = self.client.camera_solve(mode=mode, ids=ids, t0=t0, t1=t1, constraints=constraints or {"keep_visible": True, "min_coverage": 0.95}, params=params)
+        # Pass-through; ORBIT expects params { axis, degrees }
+        p = dict(params or {})
+        keys = self.client.camera_solve(mode=mode, ids=ids, t0=t0, t1=t1, constraints=constraints or {"keep_visible": True, "min_coverage": 0.95}, params=p)
         if not keys:
             raise RuntimeError("camera_solve returned no keys")
         return keys

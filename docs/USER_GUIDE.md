@@ -461,6 +461,16 @@ Steps to load and manage images via `ZImgDoc`:
 3. **Lighting** – toggle global lighting, adjust intensities.
 4. **Fog and transparency** – choose a transparency method (Blend No Depth Mask, Blend Delayed, Dual Depth Peeling, Weighted Average, Weighted Blended). Use Weighted methods for large translucent scenes.
 5. **Global cuts** – X/Y/Z plane sliders clip data globally; oblique cuts reveal interior structures.
+   - Global Cut Mode (per axis) determines how the two endpoints are recalculated when dataset bounds change:
+     - Absolute: hold values in world units; clamp to the new range.
+       - newLower = clamp(oldLower, min, max); newUpper = clamp(oldUpper, min, max)
+     - Track Edges: pin each endpoint independently to the moving min/max using “Pin Lower/Pin Upper”. If a toggle is OFF, that endpoint holds its absolute value (clamped).
+       - newLower = (PinLower ? min : clamp(oldLower, min, max))
+       - newUpper = (PinUpper ? max : clamp(oldUpper, min, max))
+     - Normalized [0..1]: store fractional endpoints f0,f1; recompute by linear interpolation on each bounds change.
+       - newLower = min + (max−min)·f0; newUpper = min + (max−min)·f1
+   - Defaults: Track Edges with both toggles ON (shows full range and follows edges).
+   - Tips: Track Edges to keep “show all” or pin sides while the other stays fixed; Absolute to lock a fixed window; Normalized to keep a proportional window (e.g., 0.1→0.9).
 
 ### 6.5 Background, Axis, and Help Panels
 

@@ -361,9 +361,9 @@ class SceneClient:
         self._log_rpc("CameraFit", req, resp)
         return [MessageToDict(v) for v in resp.values]
 
-    def camera_orbit(self, ids: Optional[list[int]] = None, axis: str = "y", angle_degrees: float = 360.0) -> list[dict]:
+    def camera_orbit(self, ids: Optional[list[int]] = None, axis: str = "y", degrees: float = 360.0) -> list[dict]:
         self.ensure_view()
-        req = self._pb2.CameraOrbitSuggestRequest(ids=ids or [], axis=axis, angle_degrees=angle_degrees)
+        req = self._pb2.CameraOrbitSuggestRequest(ids=ids or [], axis=axis, degrees=float(degrees))
         resp = self._stub.CameraOrbitSuggest(req)
         self._log_rpc("CameraOrbitSuggest", req, resp)
         return [MessageToDict(v) for v in resp.values]

@@ -370,7 +370,7 @@ static json::object schemaForParameter(const ZParameter& p)
     }
     {
       auto r = makeVecN(4);
-      r["description"] = "Rotation as [angle_degrees, axis_x, axis_y, axis_z]";
+      r["description"] = "Rotation as [degrees, axis_x, axis_y, axis_z]";
       props["Rotation Vec4"] = r; // angle(deg), axis x,y,z
     }
     {

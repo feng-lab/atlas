@@ -1455,7 +1455,7 @@ public:
         return out;
       }
       const glm::vec3 center = glm::vec3((bb.minCorner + bb.maxCorner) * 0.5);
-      const double angle = (req->angle_degrees() == 0.0 ? 360.0 : req->angle_degrees());
+      const double angle = (req->degrees() == 0.0 ? 360.0 : req->degrees());
       // Axis
       glm::vec3 axis(0.f, 1.f, 0.f);
       const auto ax = QString::fromStdString(req->axis()).toLower();
@@ -1804,7 +1804,7 @@ public:
         if (itA != params.fields().end() && itA->second.kind_case() == google::protobuf::Value::kStringValue) {
           axis = itA->second.string_value();
         }
-        auto itAng = params.fields().find("angle_degrees");
+        auto itAng = params.fields().find("degrees");
         if (itAng != params.fields().end() && itAng->second.kind_case() == google::protobuf::Value::kNumberValue) {
           angle = itAng->second.number_value();
         }

@@ -108,6 +108,25 @@ public:
   ZFloatSpanParameter globalYCut;
   ZFloatSpanParameter globalZCut;
 
+  // Explicit binding controls for global XYZ cuts
+  // Mode per axis: 0=Absolute (hold absolute values), 1=TrackEdges (track min/max with toggles), 2=Normalized (store [0..1])
+  ZStringIntOptionParameter globalXCutMode;
+  ZStringIntOptionParameter globalYCutMode;
+  ZStringIntOptionParameter globalZCutMode;
+
+  // Edge-tracking toggles (effective only when mode == TrackEdges)
+  ZBoolParameter globalXCutPinLower;
+  ZBoolParameter globalXCutPinUpper;
+  ZBoolParameter globalYCutPinLower;
+  ZBoolParameter globalYCutPinUpper;
+  ZBoolParameter globalZCutPinLower;
+  ZBoolParameter globalZCutPinUpper;
+
+  // Normalized [0,1] spans for each axis (effective only when mode == Normalized)
+  ZDoubleSpanParameter globalXCutNormalized;
+  ZDoubleSpanParameter globalYCutNormalized;
+  ZDoubleSpanParameter globalZCutNormalized;
+
   ZFloatParameter devicePixelRatio;
 
   std::mutex targetSwitchMutex;
@@ -120,6 +139,15 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGrpNoCamera;
 
   size_t m_cameraParameterIndex = 0;
+
+public:
+  // Recompute cut spans in response to new scene bounds based on binding modes.
+  void applyBoundsForCuts(const ZBBox<glm::dvec3>& bound);
+
+private:
+  enum class CutBindingMode { Absolute = 0, TrackEdges = 1, Normalized = 2 };
+  void updateCutUiEnabling();
+  void onAbsoluteCutEditedUpdateNormalized();
 };
 
 } // namespace nim

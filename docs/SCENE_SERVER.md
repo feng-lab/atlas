@@ -52,7 +52,7 @@ New endpoints (additions)
 - Camera helpers
   - `CameraFit` `{ ids?: [uint64], all?: bool, after_clipping?: bool, min_radius?: double }` → `{ values: [google.protobuf.Value] }`
     - Returns a typed camera value object that frames the targets. Feed into `SetKey` with `id=0`.
-  - `CameraOrbitSuggest` `{ ids?: [uint64], axis: "x"|"y"|"z", angle_degrees?: 360 }` → `{ values: [google.protobuf.Value, google.protobuf.Value] }`
+  - `CameraOrbitSuggest` `{ ids?: [uint64], axis: "x"|"y"|"z", degrees?: 360 }` → `{ values: [google.protobuf.Value, google.protobuf.Value] }`
     - Returns start/end typed camera value objects for a simple orbit.
   - `CameraDollySuggest` `{ ids?: [uint64], start_dist: double, end_dist: double }` → `{ values: [google.protobuf.Value, google.protobuf.Value] }`
     - Returns start/end typed camera value objects where the camera distance to center is set to the given distances.
@@ -61,7 +61,7 @@ New endpoints (additions)
     - `FitCandidates` `{}` → `{ ids: [uint64] }`
       - Returns visual object ids suitable for camera fit/orbit (excludes `Animation3D`).
     - `CameraSolve` `{ mode: "FIT"|"ORBIT"|"DOLLY"|"STATIC", ids?: [uint64], t0: double, t1?: double, constraints?: { keep_visible?: bool, margin?: double, min_coverage?: double, fov_policy?: string }, params?: Struct }` → `{ keys: [{time, value}] }`
-      - Computes typed camera key(s) for the targets. `ORBIT` and `DOLLY` produce segmented keys from `t0..t1` when needed (e.g., 360°) to avoid identical endpoints; `FIT`/`STATIC` produce a single key at `t0`.
+      - Computes typed camera key(s) for the targets. For `ORBIT`, `params={ axis: "x"|"y"|"z", degrees: double }` (degrees defaults to 360). `ORBIT` and `DOLLY` produce segmented keys from `t0..t1` when needed to avoid identical endpoints; `FIT`/`STATIC` produce a single key at `t0`.
       - The server excludes `Animation3D` when deriving target bbox. `constraints.margin` expands the bbox fractionally; `min_coverage` defaults to `0.95`.
     - `CameraValidate` `{ ids?: [uint64], times: [double], values: [Value], constraints?: {...}, policies?: { adjust_fov?: bool, adjust_distance?: bool, adjust_clipping?: bool } }` → `{ ok: bool, results: [{ time, within_frame, coverage, adjusted, adjusted_value?, reason }] }`
       - Evaluates coverage against the target bbox and optional margin. If policies allow, returns an `adjusted_value` with updated `fieldOfView` or eye/center distance. `ok=true` when all entries meet `min_coverage`.

@@ -265,7 +265,8 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         "t0": {"type": "number", "description": "Start time (seconds) of the write window."},
                         "t1": {"type": "number", "description": "End time (seconds) of the write window."},
                         "constraints": {"type": "object", "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, fov policy)."},
-                        "params": {"type": "object", "description": "Mode-specific parameters (e.g., axis or angle for ORBIT)."},
+                        "params": {"type": "object", "description": "Mode-specific parameters (e.g., axis for ORBIT)."},
+                        "degrees": {"type": "number", "description": "ORBIT: total rotation in degrees (default 360)."},
                         "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
                         "easing": {"type": "string", "default": "Linear", "description": "Easing to assign to written keys."},
                         "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys."}
@@ -388,7 +389,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "animation_replace_key_camera",
-                "description": "Replace (or set) a camera key at time: remove any camera key within tolerance then set a new camera value. Use for explicit single-time edits. If you already used camera_solve_and_apply for this segment, do NOT call this afterward to 'finalize' — keys are already written.",
+                "description": "Replace (or set) a camera key at time: remove any camera key within tolerance then set a new camera value. Use for explicit single-time edits. If you already used animation_camera_solve_and_apply for this segment, do NOT call this afterward to 'finalize' — keys are already written.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -769,7 +770,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "animation_batch",
-                "description": "Batch multiple SetKey and RemoveKey operations atomically. Non-camera only (ids ≥ 1); do not include camera (id=0) keys here. For camera motion, use camera_solve_and_apply.",
+                "description": "Batch multiple SetKey and RemoveKey operations atomically. Non-camera only (ids ≥ 1); do not include camera (id=0) keys here. For camera motion, use animation_camera_solve_and_apply.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -1493,7 +1494,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 # Defaults for ORBIT
                 if mode_up == "ORBIT":
                     params.setdefault("axis", "y")
-                    params.setdefault("angle_degrees", 360.0)
+                    # Top-level degrees is the single agent-facing knob; backend expects 'degrees'
+                    try:
+                        deg = float(args.get("degrees", 360.0))
+                    except Exception:
+                        deg = 360.0
+                    params["degrees"] = deg
                 tol = float(args.get("tolerance", 1e-3))
                 easing = str(args.get("easing", "Linear"))
                 clear_range = bool(args.get("clear_range", True))
@@ -2179,7 +2185,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             # Expect native JSON value. Resolve json_key by name if needed; coerce common mistakes.
             id = int(args.get("id"))
             if id == 0:
-                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera or camera_solve_and_apply"})
+                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera or animation_camera_solve_and_apply"})
             json_key = args.get("json_key")
             time_v = float(args.get("time", 0.0))
             easing = str(args.get("easing", "Linear"))
@@ -2305,7 +2311,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             set_keys = args.get("set_keys") or []
             remove_keys = args.get("remove_keys") or []
             if not set_keys and not remove_keys:
-                return json.dumps({"ok": False, "error": "animation_batch called with empty set/remove. Build concrete SetKey entries or use animation_replace_key_param/animation_replace_key_camera (or camera_solve_and_apply)."})
+                return json.dumps({"ok": False, "error": "animation_batch called with empty set/remove. Build concrete SetKey entries or use animation_replace_key_param/animation_replace_key_camera (or animation_camera_solve_and_apply)."})
             # Verify that each set_key references a valid json_key for its id (non-camera only)
             invalid: list[dict] = []
             params_cache: dict[int, set] = {}

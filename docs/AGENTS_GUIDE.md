@@ -146,7 +146,8 @@ Scene-only (stateless) apply
 - One-shot fit and apply: `scene_camera_fit(ids?, after_clipping=true, min_radius=0.0)` (internally uses CameraFit and applies the result).
 
 Animation (timeline) authoring
-- Solve and write keys: `animation_camera_solve_and_apply(mode, ids, t0, t1, constraints?, params?, …)`.
+- Solve and write keys: `animation_camera_solve_and_apply(mode, ids, t0, t1, constraints?, params?, degrees?, …)`.
+  - Tip: for ORBIT, use `degrees` (default 360). The agent maps this to the backend as needed. Use `params.axis` (default `"y"`).
 - Validate typed key sequences: `animation_camera_validate(ids, times, values, constraints?, policies?)`.
 - Single-time explicit write: `animation_replace_key_camera(time, value, easing?)`.
 
