@@ -110,7 +110,7 @@ void Z3DAnimationFilter::setData(Z3DAnimation* animation)
   updateData();
 }
 
-bool Z3DAnimationFilter::isReady(Z3DEye eye) const
+bool Z3DAnimationFilter::isReady(Z3DEye) const
 {
   return false;
   // return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_animation;

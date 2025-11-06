@@ -479,6 +479,7 @@ set(SOURCES
     zpunctafilter.h zpunctafilter.cpp
     zpunctaview.h zpunctaview.cpp
     znumericparameter.h znumericparameter.cpp
+    zcutspanparameter.h zcutspanparameter.cpp
     zoptionparameter.h zoptionparameter.cpp
     zparameter.h zparameter.cpp
     zcombobox.h zcombobox.cpp
