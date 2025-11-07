@@ -60,6 +60,13 @@ Multi‑Agent (live)
   - Propose ≥2 plans, critique, ask clarifying questions if inputs are ambiguous
   - Execute against a simple TODO list (see below): agents act on the listed tasks; adjust iteratively and explain rationale concisely
 
+Inspector Behavior (Verification‑only)
+- No tools: The Inspector never calls tools or reads files. It judges only from the merged plan, scene context, verified Facts JSON, and an optional preview image.
+- No out‑of‑band requests: It must not ask users to paste/upload logs or run shell commands. Filesystem/network access is out of scope for the Inspector.
+- Facts‑first: Treat Facts as authoritative. If something is not present in Facts, do not assume it is missing in the scene.
+- Pass when uncertain: Approve by default when evidence is insufficient. Only fail when Facts clearly contradict the core intent (e.g., required keys/values are missing or wrong, wrong objects changed, or camera_validation.ok=false).
+- Feedback is advisory: Use the feedback field for non‑blocking notes (limitations, qualitative comments). Use TODO updates only as checkbox lines when helpful; do not block solely on naming or unverifiable external inputs.
+
 Natural Language Contract (Summary‑first)
 - Before any keys are written, require a concise Plan Summary with two synchronized views:
 - Global timeline view: a list of changes `{ time, target(id), json_key?, value, easing? }` where id=0 camera, ≥4 objects.

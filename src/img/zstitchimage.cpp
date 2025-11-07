@@ -480,7 +480,7 @@ void ZStitchImage::doWork()
       throw ZException("Need at least two images to do stitching.");
     }
   } else {
-    if (nStacks == static_cast<size_t>(m_inputFilenames.size())) {
+    if (nStacks <= static_cast<size_t>(m_inputFilenames.size())) {
       // perfect
       for (const auto& filename : m_inputFilenames) {
         inputStackSources.emplace_back(filename, ZImgRegion(), m_scene);
@@ -726,6 +726,35 @@ void ZStitchImage::doWork()
     //                       QString::number(f + 1),
     //                       QString::number(m + 1));
     // }
+    // Derive a readable label for each source: absolute path + region (if split)
+    auto tileLabel = [&](size_t idx) -> QString {
+      const auto& src = inputStackSources[idx];
+      QString base;
+      if (!src.filenames.isEmpty()) {
+        QFileInfo fi(src.filenames.front());
+        base = fi.absoluteFilePath();
+      } else {
+        base = QString::number(idx + 1);
+      }
+      const auto& r = src.region;
+      if (!r.isDefault()) {
+        auto fmtRange = [](index_t s, index_t e) -> QString {
+          if (e < 0) {
+            return QString("%1:end").arg(static_cast<long long>(s));
+          } else {
+            return QString("%1:%2").arg(static_cast<long long>(s)).arg(static_cast<long long>(e));
+          }
+        };
+        return base + QString(" [x=%1, y=%2, z=%3, c=%4, t=%5]")
+                        .arg(fmtRange(r.start.x, r.end.x))
+                        .arg(fmtRange(r.start.y, r.end.y))
+                        .arg(fmtRange(r.start.z, r.end.z))
+                        .arg(fmtRange(r.start.c, r.end.c))
+                        .arg(fmtRange(r.start.t, r.end.t));
+      }
+      return base;
+    };
+
     offsets.cvisit_all([&](const auto& fixedMovingOffsetCost) {
       size_t f = fixedMovingOffsetCost.first.first;
       size_t m = fixedMovingOffsetCost.first.second;
@@ -733,8 +762,8 @@ void ZStitchImage::doWork()
                           imgs[m],
                           fixedMovingOffsetCost.second.first,
                           -(fixedMovingOffsetCost.second.second),
-                          QString::number(f + 1),
-                          QString::number(m + 1));
+                          tileLabel(f),
+                          tileLabel(m));
     });
 
     imgMerge.setMergeMode(m_mergeMode);
@@ -1081,6 +1110,35 @@ void ZStitchImage::doRestitch()
     //                       QString::number(f + 1),
     //                       QString::number(m + 1));
     // }
+    // Derive a readable label for each source: absolute path + region (if split)
+    auto tileLabel = [&](size_t idx) -> QString {
+      const auto& src = inputStackSources[idx];
+      QString base;
+      if (!src.filenames.isEmpty()) {
+        QFileInfo fi(src.filenames.front());
+        base = fi.absoluteFilePath();
+      } else {
+        base = QString::number(idx + 1);
+      }
+      const auto& r = src.region;
+      if (!r.isDefault()) {
+        auto fmtRange = [](index_t s, index_t e) -> QString {
+          if (e < 0) {
+            return QString("%1:end").arg(static_cast<long long>(s));
+          } else {
+            return QString("%1:%2").arg(static_cast<long long>(s)).arg(static_cast<long long>(e));
+          }
+        };
+        return base + QString(" [x=%1, y=%2, z=%3, c=%4, t=%5]")
+                        .arg(fmtRange(r.start.x, r.end.x))
+                        .arg(fmtRange(r.start.y, r.end.y))
+                        .arg(fmtRange(r.start.z, r.end.z))
+                        .arg(fmtRange(r.start.c, r.end.c))
+                        .arg(fmtRange(r.start.t, r.end.t));
+      }
+      return base;
+    };
+
     offsets.cvisit_all([&](const auto& fixedMovingOffsetCost) {
       size_t f = fixedMovingOffsetCost.first.first;
       size_t m = fixedMovingOffsetCost.first.second;
@@ -1088,8 +1146,8 @@ void ZStitchImage::doRestitch()
                           imgs[m],
                           fixedMovingOffsetCost.second.first,
                           -(fixedMovingOffsetCost.second.second),
-                          QString::number(f + 1),
-                          QString::number(m + 1));
+                          tileLabel(f),
+                          tileLabel(m));
     });
 
     imgMerge.setMergeMode(m_mergeMode);

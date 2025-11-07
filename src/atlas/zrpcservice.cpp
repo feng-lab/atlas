@@ -7,7 +7,6 @@
 #include "zdoc.h"
 #include "zmainwindow.h"
 #include "zview.h"
-#include "../version/version.h"
 #include "z3drenderingengine.h"
 #include "z3danimationdoc.h"
 #include "z3danimation.h"
