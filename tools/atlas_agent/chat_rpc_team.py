@@ -187,8 +187,6 @@ def run_repl(address: str, api_key: str, model: str, temperature: float = 0.2, *
                     "Commands:\n"
                     ":help                This help\n"
                     ":save <path>        Save current animation\n"
-                    ":play [fps]         Play animation\n"
-                    ":pause              Pause animation\n"
                     ":time <seconds>     Set current time\n"
                     ":objects            List objects"
                 )
@@ -196,13 +194,6 @@ def run_repl(address: str, api_key: str, model: str, temperature: float = 0.2, *
             if cmd == "save" and rest:
                 ok = team.scene.save_animation(rest[0])
                 logger.info("%s", "ok" if ok else "fail")
-                continue
-            if cmd == "play":
-                fps = float(rest[0]) if rest else 25.0
-                logger.info("%s", "ok" if team.scene.play(fps=fps) else "fail")
-                continue
-            if cmd == "pause":
-                logger.info("%s", "ok" if team.scene.pause() else "fail")
                 continue
             if cmd == "time" and rest:
                 logger.info("%s", "ok" if team.scene.set_time(float(rest[0])) else "fail")

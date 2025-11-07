@@ -335,18 +335,6 @@ class SceneClient:
         self._log_rpc("SetTime", req, resp)
         return resp.ok
 
-    def play(self, fps: float = 25.0, loop: bool = True) -> bool:
-        req = self._pb2.PlayRequest(fps=fps, loop=loop)
-        resp = self._stub.Play(req)
-        self._log_rpc("Play", req, resp)
-        return resp.ok
-
-    def pause(self) -> bool:
-        req = self._pb2.PauseRequest()
-        resp = self._stub.Pause(req)
-        self._log_rpc("Pause", req, resp)
-        return resp.ok
-
     def save_animation(self, path: Path) -> bool:
         req = self._pb2.SaveRequest(path=str(path))
         resp = self._stub.SaveAnimation(req)

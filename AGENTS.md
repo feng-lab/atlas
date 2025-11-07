@@ -11,6 +11,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 - High-performance 2D/3D visualization built in modern C++20 with Qt, OpenGL, and emerging Vulkan support.
 - Preserve progressive rendering, deterministic invalidation, and RAII-managed GPU resources.
 - Respect SOLID/KISS/YAGNI, but never at the expense of correctness or portability.
+- Correctness first: do not introduce arbitrary caps/limits that truncate, drop, or otherwise change behavior. When memory or latency matters, use streaming or block-wise processing that preserves full correctness. If a hard limit is unavoidable (e.g., user-specified), fail fast with a clear error instead of silently truncating.
 - Optimize for post-change clarity: prefer designs that are simplest to read, reason about, and maintain after the refactor, even if they require a larger one-time change. Avoid partial measures or stateful gaps that trade clarity for smaller diffs.
 - Follow Atlas naming conventions (`Z3D*` for shared/OpenGL 3D code, `ZVulkan*` for Vulkan-only). Do not introduce alternate prefixes such as `ZGL*`; keep files feature-scoped.
 - Security/privacy: no unexpected telemetry, no leaking user data in logs.

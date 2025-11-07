@@ -1,6 +1,5 @@
 #include "zrundumpanimation3dschema.h"
 
-#include "../version/version.h"
 #include "zjson.h"
 #include "zlog.h"
 #include "zdoc.h"
@@ -116,7 +115,8 @@ json::object buildSchema(const json::object& paramSchemas, const json::object& c
 
   json::object root;
   root["$schema"] = "https://json-schema.org/draft/2020-12/schema";
-  root["title"] = std::string("Atlas Animation3D Schema (") + GIT_VERSION + ")";
+  // Use a fixed schema title version for now.
+  root["title"] = std::string("Atlas Animation3D Schema (") + "1.0" + ")";
   root["type"] = "object";
 
   // $defs
@@ -480,7 +480,8 @@ int ZRunDumpAnimation3DSchema::run()
     json::object paramSchemas; // jsonKey -> schema
     json::object patternSchemas; // regex pattern -> value schema (for digit-indexed keys)
     json::object capabilities;
-    capabilities["version"] = std::string(GIT_VERSION);
+    // Fixed capabilities version; decoupled from build-time GIT_VERSION.
+    capabilities["version"] = std::string("1.0");
     json::object globals;
     auto collect = [&](const std::vector<nim::ZParameter*>& params,
                        json::array& keyList,

@@ -453,7 +453,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "fs_tail_lines",
-                "description": "Return exactly the last N lines of a UTF-8 text file (BOM-aware). Minimal, robust, no extra params.",
+                "description": "Return exactly the last N lines of a text file. BOM-aware (UTF-8/UTF-16/UTF-32). Minimal, robust, no extra params.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -468,7 +468,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "fs_tail_bytes",
-                "description": "Return the last K bytes of a text file, decoded as UTF-8 (BOM-aware).",
+                "description": "Return the last K bytes of a text file, decoded with BOM-aware detection (UTF-8/UTF-16/UTF-32).",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -482,13 +482,32 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         {
             "type": "function",
             "function": {
-                "name": "fs_read_json",
-                "description": "Read and parse a JSON file from disk. Returns {ok,data}. Pass max_bytes<=0 to read full file (no cap).",
+                "name": "fs_search_text",
+                "description": "Search a text file for a regex and return matches with byte offsets and surrounding line numbers. Correctness-first: searches the requested window (default entire file) without arbitrary caps. For large files, this may be expensive; specify start/length to constrain the window if desired.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Path to a JSON file (supports ~ and env var expansion)"},
-                        "max_bytes": {"type": "integer", "default": 268435456, "description": "Max bytes to read; <=0 reads full file. Default 256 MiB."}
+                        "path": {"type": "string", "description": "Path to file (supports ~ and env var expansion)"},
+                        "regex": {"type": "string", "description": "Regular expression to search. Interpreted on encoded bytes; use case_sensitive=false for ASCII-insensitive search."},
+                        "start": {"type": ["integer","null"], "description": "Start byte offset to begin searching (default 0)."},
+                        "length": {"type": ["integer","null"], "description": "Number of bytes to search from start (default: to EOF)."},
+                        "case_sensitive": {"type": "boolean", "default": true, "description": "ASCII-insensitive match when false (bytes mode)."},
+                        "encoding": {"type": ["string","null"], "description": "Optional known encoding; otherwise detect BOM then default to utf-8 for pattern encoding only."},
+                        "max_matches": {"type": "integer", "default": 0, "description": "0=unlimited (correctness-first). If >0, stops after this many matches and sets limit_reached=true."}
+                    },
+                    "required": ["path", "regex"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fs_read_json",
+                "description": "Read and parse a JSON file from disk. Returns {ok,data}. Always reads the full file.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string", "description": "Path to a JSON file (supports ~ and env var expansion)"}
                     },
                     "required": ["path"],
                 },
@@ -1181,57 +1200,51 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     })
                 # Resolve byte window using seek/tell when possible so tail refers to current EOF
                 rb_start: int = 0
-                rb_len: _Optional[int] = None
                 size: _Optional[int] = None
                 data: bytes
-                tail_lines_mode = False
                 with open(q, "rb") as f:
-                    # Try to get current size from file descriptor
+                    # Try to get current size from file descriptor (may fail for special files)
                     try:
                         size = _os.fstat(f.fileno()).st_size
                     except Exception:
                         size = None
-                    # Decide window
-                    # Range/default using start/length semantics
+                    # Determine absolute start; negative means from EOF
+                    if start is None:
+                        rb_start = 0
                     else:
-                        # Range/default using start/length semantics
-                        # Determine absolute start; negative means from EOF
-                        if start is None:
-                            rb_start = 0
+                        if start >= 0:
+                            rb_start = min(start, size if isinstance(size, int) else start)
                         else:
-                            if start >= 0:
-                                rb_start = min(start, size if (isinstance(size, int) and size is not None) else start)
-                            else:
-                                # Negative start: offset from end
-                                try:
-                                    f.seek(0, _io.SEEK_END)
-                                    endpos = f.tell()
-                                    size = endpos
-                                except Exception:
-                                    endpos = None
-                                rb_start = max(0, (size if isinstance(size, int) else 0) + start)
-                        # Position the stream (seek or stream-skip)
-                        try:
-                            f.seek(rb_start)
-                        except Exception:
-                            remaining = rb_start
-                            while remaining > 0:
-                                chunk = f.read(min(block_size, remaining))
-                                if not chunk:
-                                    break
-                                remaining -= len(chunk)
-                        # Decide bytes to read
-                        if isinstance(length, int) and length >= 0:
-                            to_read = length
+                            # Negative start: offset from end
+                            try:
+                                f.seek(0, _io.SEEK_END)
+                                endpos = f.tell()
+                                size = endpos
+                            except Exception:
+                                endpos = None
+                            rb_start = max(0, (size if isinstance(size, int) else 0) + start)
+                    # Position the stream (seek or stream-skip)
+                    try:
+                        f.seek(rb_start)
+                    except Exception:
+                        remaining = rb_start
+                        while remaining > 0:
+                            chunk = f.read(min(block_size, remaining))
+                            if not chunk:
+                                break
+                            remaining -= len(chunk)
+                    # Decide bytes to read
+                    if isinstance(length, int) and length >= 0:
+                        to_read = length
+                        data = f.read(max(0, to_read))
+                    else:
+                        if isinstance(size, int) and size >= 0:
+                            to_read = max(0, size - rb_start)
                             data = f.read(max(0, to_read))
                         else:
-                            if isinstance(size, int) and size >= 0:
-                                to_read = max(0, size - rb_start)
-                                data = f.read(max(0, to_read))
-                            else:
-                                # Unknown size: read to EOF
-                                data = f.read()
-                                to_read = len(data)
+                            # Unknown size: read to EOF
+                            data = f.read()
+                            to_read = len(data)
                 # Simple encoding detection: BOM, then utf-8 fallback
                 enc = None
                 if isinstance(force_enc, str) and force_enc:
@@ -1279,21 +1292,17 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     except Exception:
                         lines = text.splitlines()
                 truncated = False
-                # Determine truncation based on requested window and caps
-                # If no explicit window and read less than file size, or if rb_len limited by caps, mark truncated
+                # Determine truncation based on requested window
+                # If no explicit window and read less than file size (i.e., did not read the full window), mark truncated
                 read_from = rb_start
                 read_to = rb_start + len(data)
                 if isinstance(size, int) and size is not None and size >= 0:
-                    if tail_lines_mode:
-                        # No truncation in correctness-first tail_lines
-                        pass
+                    if isinstance(length, int) and length is not None and length >= 0:
+                        window = length
                     else:
-                        if isinstance(length, int) and length is not None and length >= 0:
-                            window = length
-                        else:
-                            window = (size - rb_start)
-                        if window is not None and len(data) < max(0, window):
-                            truncated = True
+                        window = (size - rb_start)
+                    if window is not None and len(data) < max(0, window):
+                        truncated = True
                 else:
                     # Unknown size: cannot assert truncation
                     pass
@@ -1326,6 +1335,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             try:
                 q = _os.path.expanduser(_os.path.expandvars(p))
                 with open(q, "rb") as f:
+                    # Detect BOM/encoding from file start (not tail buffer)
+                    try:
+                        f.seek(0, _io.SEEK_SET)
+                        _hdr = f.read(4)
+                    except Exception:
+                        _hdr = b""
+                    if _hdr.startswith(b"\xef\xbb\xbf"):
+                        enc = "utf-8-sig"
+                    elif _hdr.startswith(b"\xff\xfe\x00\x00") or _hdr.startswith(b"\x00\x00\xfe\xff"):
+                        enc = "utf-32"
+                    elif _hdr.startswith(b"\xfe\xff") or _hdr.startswith(b"\xff\xfe"):
+                        enc = "utf-16"
+                    else:
+                        enc = "utf-8"
                     try:
                         size = _os.fstat(f.fileno()).st_size
                     except Exception:
@@ -1349,14 +1372,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         lines_found = buf.count(b"\n")
                     rb_start = endpos - len(buf)
                     data = bytes(buf)
-                # Decode (BOM-aware), then take last N lines exactly
-                enc = None
-                if data.startswith(b"\xef\xbb\xbf"):
-                    enc = "utf-8-sig"
-                elif data.startswith(b"\xfe\xff") or data.startswith(b"\xff\xfe"):
-                    enc = "utf-16"
-                else:
-                    enc = "utf-8"
+                # Decode using detected BOM-aware encoding, then take last N lines exactly
                 text = data.decode(enc, errors="replace")
                 lines_all = text.splitlines()
                 lines_out = lines_all[-n:] if len(lines_all) > n else lines_all
@@ -1383,18 +1399,25 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             try:
                 q = _os.path.expanduser(_os.path.expandvars(p))
                 with open(q, "rb") as f:
+                    # Detect BOM/encoding from file start
+                    try:
+                        f.seek(0, _io.SEEK_SET)
+                        _hdr = f.read(4)
+                    except Exception:
+                        _hdr = b""
+                    if _hdr.startswith(b"\xef\xbb\xbf"):
+                        enc = "utf-8-sig"
+                    elif _hdr.startswith(b"\xff\xfe\x00\x00") or _hdr.startswith(b"\x00\x00\xfe\xff"):
+                        enc = "utf-32"
+                    elif _hdr.startswith(b"\xfe\xff") or _hdr.startswith(b"\xff\xfe"):
+                        enc = "utf-16"
+                    else:
+                        enc = "utf-8"
                     f.seek(0, _io.SEEK_END)
                     endpos = f.tell()
                     start = max(0, endpos - k)
                     f.seek(start)
                     data = f.read(endpos - start)
-                enc = None
-                if data.startswith(b"\xef\xbb\xbf"):
-                    enc = "utf-8-sig"
-                elif data.startswith(b"\xfe\xff") or data.startswith(b"\xff\xfe"):
-                    enc = "utf-16"
-                else:
-                    enc = "utf-8"
                 text = data.decode(enc, errors="replace")
                 return json.dumps({
                     "ok": True,
@@ -1407,11 +1430,154 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 })
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e)})
+        if name == "fs_search_text":
+            import os as _os, io as _io, re as _re
+            p = str(args.get("path") or "")
+            pattern = str(args.get("regex") or "")
+            start_raw = args.get("start")
+            try:
+                start = int(start_raw) if start_raw is not None else 0
+            except Exception:
+                start = 0
+            length_raw = args.get("length")
+            try:
+                length = int(length_raw) if length_raw is not None else None
+            except Exception:
+                length = None
+            case_sensitive = bool(args.get("case_sensitive", True))
+            force_enc = args.get("encoding")
+            max_matches = int(args.get("max_matches", 0))
+            if max_matches < 0:
+                max_matches = 0
+            try:
+                q = _os.path.expanduser(_os.path.expandvars(p))
+                with open(q, "rb") as f:
+                    # Determine file size
+                    try:
+                        size = _os.fstat(f.fileno()).st_size
+                    except Exception:
+                        size = None
+                    # Detect BOM/encoding from file start for pattern encoding only
+                    try:
+                        f.seek(0, _io.SEEK_SET)
+                        _hdr = f.read(4)
+                    except Exception:
+                        _hdr = b""
+                    if isinstance(force_enc, str) and force_enc:
+                        enc = force_enc
+                    elif _hdr.startswith(b"\xef\xbb\xbf"):
+                        enc = "utf-8-sig"
+                    elif _hdr.startswith(b"\xff\xfe\x00\x00") or _hdr.startswith(b"\x00\x00\xfe\xff"):
+                        enc = "utf-32"
+                    elif _hdr.startswith(b"\xfe\xff") or _hdr.startswith(b"\xff\xfe"):
+                        enc = "utf-16"
+                    else:
+                        enc = "utf-8"
+                    # Compute search window
+                    if not isinstance(size, int):
+                        # Unknown size: read to EOF from start, ignoring length if provided
+                        if start < 0:
+                            # Seek to end to compute absolute start from EOF
+                            try:
+                                f.seek(0, _io.SEEK_END)
+                                endpos = f.tell()
+                            except Exception:
+                                endpos = 0
+                            scan_start = max(0, endpos + start)
+                        else:
+                            scan_start = max(0, start)
+                        f.seek(scan_start)
+                        buf = f.read()  # correctness-first
+                        scan_end = scan_start + len(buf)
+                        size_val = None
+                    else:
+                        size_val = size
+                        if start is None:
+                            scan_start = 0
+                        else:
+                            if start >= 0:
+                                scan_start = min(start, size)
+                            else:
+                                scan_start = max(0, size + start)
+                        if isinstance(length, int) and length >= 0:
+                            scan_end = min(size, scan_start + length)
+                        else:
+                            scan_end = size
+                        f.seek(scan_start)
+                        buf = f.read(max(0, scan_end - scan_start))
+                # Prepare regex on bytes. Encode pattern with detected encoding.
+                try:
+                    pat_b = pattern.encode(enc)
+                except Exception as _e:
+                    return json.dumps({"ok": False, "error": f"pattern_encoding_error: {str(_e)}"})
+                flags = 0
+                if not case_sensitive:
+                    flags |= _re.IGNORECASE
+                rx = _re.compile(pat_b, flags)
+                # Precompute newline byte positions in the window for line number math
+                nl_positions = []
+                try:
+                    # Fast scan for '\n' bytes
+                    idx = buf.find(b"\n")
+                    while idx != -1:
+                        nl_positions.append(idx)
+                        idx = buf.find(b"\n", idx + 1)
+                except Exception:
+                    nl_positions = []
+                # Base line number: count '\n' from BOF to scan_start in streaming fashion
+                base_line = 0
+                try:
+                    with open(q, "rb") as f2:
+                        remaining = scan_start
+                        block = 1 << 20  # 1 MiB blocks
+                        while remaining > 0:
+                            step = min(block, remaining)
+                            chunk = f2.read(step)
+                            if not chunk:
+                                break
+                            base_line += chunk.count(b"\n")
+                            remaining -= len(chunk)
+                except Exception:
+                    base_line = 0
+                # Find matches
+                matches = []
+                limit_reached = False
+                for m in rx.finditer(buf):
+                    b0 = scan_start + m.start()
+                    b1 = scan_start + m.end()
+                    # Start/end line numbers within window via binary search on nl_positions
+                    # Count of newlines strictly before m.start()
+                    import bisect as _bis
+                    nl_before_start = _bis.bisect_left(nl_positions, m.start())
+                    nl_before_end = _bis.bisect_left(nl_positions, m.end())
+                    s_line = base_line + nl_before_start
+                    e_line = base_line + nl_before_end
+                    matches.append({
+                        "byte_start": int(b0),
+                        "byte_end": int(b1),
+                        "start_line": int(s_line),
+                        "end_line": int(e_line),
+                    })
+                    if max_matches > 0 and len(matches) >= max_matches:
+                        limit_reached = True
+                        break
+                out = {
+                    "ok": True,
+                    "path": q,
+                    "encoding": enc,
+                    "size_bytes": (size_val if isinstance(size_val, int) else None),
+                    "search_from": scan_start,
+                    "search_to": scan_end,
+                    "matches": matches,
+                }
+                if max_matches > 0:
+                    out["limit_reached"] = bool(limit_reached)
+                return json.dumps(out)
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e)})
         if name == "fs_read_json":
             import os as _os, json as _json
             p = str(args.get("path") or "")
-            # Correctness-first: default is full read; only limit when caller explicitly passes max_bytes>0
-            maxb = args.get("max_bytes")
             try:
                 q = _os.path.expanduser(_os.path.expandvars(p))
                 size = None
@@ -1419,20 +1585,8 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     size = _os.stat(q).st_size
                 except Exception:
                     size = None
-                # If a cap is requested and file is larger, refuse to parse truncated content
-                if isinstance(maxb, int) and maxb > 0 and isinstance(size, int) and size > maxb:
-                    return json.dumps({
-                        "ok": False,
-                        "error": "would_truncate",
-                        "reason": "file larger than max_bytes; increase max_bytes or omit to read fully",
-                        "size_bytes": int(size),
-                        "max_bytes": int(maxb),
-                    })
                 with open(q, "rb") as f:
-                    if isinstance(maxb, int) and maxb > 0:
-                        data = f.read(maxb)
-                    else:
-                        data = f.read()
+                    data = f.read()
                 # BOM-aware UTF-8 decoding for JSON
                 if data.startswith(b"\xef\xbb\xbf"):
                     text = data.decode("utf-8-sig", errors="strict")

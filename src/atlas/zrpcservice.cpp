@@ -87,8 +87,6 @@ using atlas::rpc::ClearKeysRequest;
 using atlas::rpc::RemoveKeyRequest;
 using atlas::rpc::BatchRequest;
 using atlas::rpc::SetTimeRequest;
-using atlas::rpc::PlayRequest;
-using atlas::rpc::PauseRequest;
 using atlas::rpc::SaveRequest;
 using atlas::rpc::CutSetRequest;
 using atlas::rpc::CutSuggestRequest;
@@ -233,44 +231,6 @@ static google::protobuf::Value jsonToPb(const json::value& jv)
 } // namespace
 
 namespace {
-// Simple RPC-driven playback controller owned on the UI thread
-struct RPCPlayback : QObject
-{
-public:
-  explicit RPCPlayback(Z3DAnimation* a, double fps, QObject* parent = nullptr)
-    : QObject(parent)
-    , anim(a)
-  {
-    stepMs = static_cast<int>(1000.0 / std::max(1.0, fps));
-    timer.setInterval(stepMs);
-    QObject::connect(&timer, &QTimer::timeout, this, [this]() {
-      if (!anim) {
-        return;
-      }
-      double t = current;
-      t += stepMs / 1000.0;
-      if (t > anim->duration()) {
-        t = 0.0;
-      }
-      anim->setCurrentTime(t);
-      current = t;
-    });
-  }
-  void start(double start)
-  {
-    current = start;
-    timer.start();
-  }
-  void stop()
-  {
-    timer.stop();
-  }
-  QTimer timer;
-  Z3DAnimation* anim = nullptr;
-  int stepMs = 40;
-  double current = 0.0;
-};
-static RPCPlayback* g_rpcPlayback = nullptr;
 
 // Helpers used by camera planning/validation
 static std::vector<size_t> filterVisualIds(ZRPCService& owner, const std::vector<size_t>& in)
@@ -2232,51 +2192,6 @@ public:
     if (!ok) {
       return Status(grpc::StatusCode::FAILED_PRECONDITION, "set_time failed");
     }
-    reply->set_ok(true);
-    return Status::OK;
-  }
-
-  Status Play(ServerContext*, const PlayRequest* req, Bool* reply) override
-  {
-    auto ok = invokeOnUi([&]() -> bool {
-      if (!m_owner.doc()) {
-        return false;
-      }
-      auto& ad = m_owner.doc()->animation3DDoc();
-      auto ids = ad.animationIds();
-      if (ids.empty()) {
-        return false;
-      }
-      auto* anim = ad.animationPtr(ids.front());
-      if (!anim) {
-        return false;
-      }
-      if (g_rpcPlayback) {
-        g_rpcPlayback->stop();
-        g_rpcPlayback->deleteLater();
-        g_rpcPlayback = nullptr;
-      }
-      g_rpcPlayback = new RPCPlayback(anim, req->fps() <= 0.0 ? 25.0 : req->fps());
-      g_rpcPlayback->start(0.0);
-      return true;
-    });
-    if (!ok) {
-      return Status(grpc::StatusCode::FAILED_PRECONDITION, "play failed");
-    }
-    reply->set_ok(true);
-    return Status::OK;
-  }
-
-  Status Pause(ServerContext*, const PauseRequest*, Bool* reply) override
-  {
-    invokeOnUi([&]() -> bool {
-      if (g_rpcPlayback) {
-        g_rpcPlayback->stop();
-        g_rpcPlayback->deleteLater();
-        g_rpcPlayback = nullptr;
-      }
-      return true;
-    });
     reply->set_ok(true);
     return Status::OK;
   }

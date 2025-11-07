@@ -119,10 +119,7 @@ service Scene {
   rpc ClearKeys (ClearKeysRequest) returns (Bool);
   rpc RemoveKey (RemoveKeyRequest) returns (Bool);
   rpc Batch (BatchRequest) returns (Bool);
-  // Playback controls
   rpc SetTime (SetTimeRequest) returns (Bool);
-  rpc Play (PlayRequest) returns (Bool);
-  rpc Pause (PauseRequest) returns (Bool);
   // Save/export
   // Save current animation to .animation3d
   rpc Save (SaveRequest) returns (Bool);
@@ -307,8 +304,6 @@ message BatchRequest {
 
 // Playback controls
 message SetTimeRequest { double seconds = 1; bool cancel_rendering = 2; }
-message PlayRequest { double fps = 1; bool loop = 2; }
-message PauseRequest {}
 
 // Save
 message SaveRequest { string path = 1; }
