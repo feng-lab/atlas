@@ -75,6 +75,12 @@ def main(argv: list[str] | None = None) -> int:
     if not args.api_key:
         logging.error("OPENAI_API_KEY is required (set --api-key).")
         return 2
+    # Require jsonschema for schema validation; fail early if missing
+    try:
+        import jsonschema  # type: ignore
+    except Exception:
+        logging.error("Missing dependency: jsonschema. Please `pip install jsonschema`.")
+        return 2
     # Set screenshot env gate from flag if requested
     if args.allow_screenshots:
         os.environ["ATLAS_AGENT_ALLOW_SCREENSHOTS"] = "1"

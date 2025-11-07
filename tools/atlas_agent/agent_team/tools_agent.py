@@ -432,16 +432,52 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "fs_read_text",
-                "description": "Read a UTF‑8 text file from disk. Returns {ok,text,bytes,encoding}. Pass max_bytes<=0 to read full file (no cap).",
+                "description": "Advanced text read with byte ranges and optional line extraction/filtering. Prefer fs_tail_lines/fs_tail_bytes for simple tails. If both byte and line windows are provided (start/length together with start_line/line_count), the byte window is read first and the line slice is applied within that decoded window. This combination is allowed but discouraged — avoid mixing byte and line windows unless you explicitly want that behavior.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "path": {"type": "string", "description": "Path to a text file (supports ~ and env var expansion)"},
-                        "max_bytes": {"type": "integer", "default": 268435456, "description": "Max bytes to read; <=0 reads full file. Default 256 MiB."}
+                        "start_line": {"type": ["integer","null"], "description": "Line index (0-based). Negative means offset from end (last line = -1). When combined with start/length, slicing applies within the byte window (discouraged unless intentional)."},
+                        "line_count": {"type": ["integer","null"], "description": "Number of lines to return from start_line. Omit/null to read to the end. Requires start_line; to tail last N lines use start_line=-N."},
+                        "regex": {"type": ["string","null"], "description": "If set, filter returned lines by this regex (applied after slicing). Implies line mode. Discouraged to combine with byte windows unless intentional."},
+                        "start": {"type": ["integer","null"], "description": "Start byte offset. Negative values mean offset from end (EOF + start). When combined with start_line/line_count, the line slice is applied to this byte window (discouraged unless intentional)."},
+                        "length": {"type": ["integer","null"], "description": "Number of bytes to read from start. Omit/null to read to EOF."},
+                        "encoding": {"type": ["string","null"], "description": "Force a specific text encoding (default: auto-detect BOM then utf-8)."},
+                        "errors": {"type": "string", "enum": ["strict","ignore","replace"], "default": "replace", "description": "Decode error policy."}
                     },
                     "required": ["path"],
                 },
             },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fs_tail_lines",
+                "description": "Return exactly the last N lines of a UTF-8 text file (BOM-aware). Minimal, robust, no extra params.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "n": {"type": "integer", "default": 200}
+                    },
+                    "required": ["path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fs_tail_bytes",
+                "description": "Return the last K bytes of a text file, decoded as UTF-8 (BOM-aware).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "bytes": {"type": "integer", "default": 4096}
+                    },
+                    "required": ["path"]
+                }
+            }
         },
         {
             "type": "function",
@@ -468,8 +504,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     "properties": {
                         "path": {"type": "string", "description": "Possibly-typoed path to resolve"},
                         "kind": {"type": "string", "enum": ["file", "dir", "either"], "default": "either", "description": "Expected kind"},
-                        "base_dirs": {"type": "array", "items": {"type": "string"}, "description": "Search bases"},
-                        "max_candidates": {"type": "integer", "default": 10, "description": "Max results"}
+                        "base_dirs": {"type": "array", "items": {"type": "string"}, "description": "Optional extra search bases"},
+                        "max_results": {"type": "integer", "default": 10, "description": "Max candidate results"},
+                        "max_depth": {"type": "integer", "default": 6, "description": "Max recursive depth when searching anchors"}
                     },
                     "required": ["path"]
                 },
@@ -478,19 +515,21 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         {
             "type": "function",
             "function": {
-                "name": "repo_search",
-                "description": "Search the repo for a file/dir name (basename fuzzy scoring). Returns likely matches with scores.",
+                "name": "fs_hint_resolve",
+                "description": "Resolve a user hint (natural language) to likely file/dir paths. Anchors search in common user dirs (Documents/Downloads/Desktop) plus optional base_dirs, scans hinted subfolders (e.g., 'atlas_test'), and ranks candidates by basename similarity.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string", "description": "Basename to search for"},
-                        "type": {"type": "string", "enum": ["file", "dir", "either"], "default": "either", "description": "Kind to search"},
-                        "max_depth": {"type": "integer", "default": 6, "description": "Max directory depth"},
-                        "max_results": {"type": "integer", "default": 20, "description": "Max returned results"}
+                        "hint_text": {"type": "string", "description": "Natural language hint, e.g., 'load file foo.txt from atlas_test in my Documents'"},
+                        "expected_name": {"type": ["string","null"], "description": "Optional exact basename when known (e.g., foo.txt)"},
+                        "kind": {"type": "string", "enum": ["file", "dir", "either"], "default": "file"},
+                        "base_dirs": {"type": "array", "items": {"type": "string"}, "description": "Optional extra search bases (absolute or ~ expanded)"},
+                        "max_results": {"type": "integer", "default": 12},
+                        "max_depth": {"type": "integer", "default": 6}
                     },
-                    "required": ["name"]
-                },
-            },
+                    "required": ["hint_text"]
+                }
+            }
         },
         {
             "type": "function",
@@ -649,7 +688,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "scene_list_params",
-                "description": "List parameters by id. Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=objects.",
+                "description": "List parameters by id (includes value_schema). Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=objects.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -663,7 +702,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "type": "function",
             "function": {
                 "name": "scene_validate_param_value",
-                "description": "Validate a candidate value against the live parameter metadata (type and option_names) for a given id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects).",
+                "description": "Validate a candidate value against the live value_schema for a given id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects).",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -918,6 +957,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
     # Per-dispatcher caches (persist during the Implementer run)
     _param_catalog_cache: dict[tuple, list] = {}
     _alias_cache: dict[tuple, dict[str, str]] = {}
+    _schema_validator_cache: dict[str, object] = {}
 
     def _list_params_cached(id: int):
         id = int(id)
@@ -995,8 +1035,8 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
     def dispatch(name: str, args_json: str) -> str:
         # Helpers
         def _param_to_dict(p) -> dict:
-            """Format a Parameter proto to a JSON-serializable dict using only proto-defined fields.
-            Includes optional enums and numeric/vector/span metadata when present.
+            """Format a Parameter proto to a JSON-serializable dict using proto-defined fields.
+            Includes description and value_schema (JSON Schema) when provided by the server.
             """
             entry = {
                 "json_key": getattr(p, "json_key", ""),
@@ -1004,34 +1044,18 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "type": getattr(p, "type", ""),
                 "supports_interpolation": getattr(p, "supports_interpolation", False),
             }
-            # Option enums if provided by server
+            # Optional human-readable description provided by the server (C++ ZParameter::description)
             try:
-                if getattr(p, "option_names", None):
-                    entry["option_names"] = list(p.option_names)
-                if getattr(p, "option_data", None):
-                    entry["option_data"] = list(p.option_data)
+                desc = getattr(p, "description", "")
+                if isinstance(desc, str) and desc.strip() != "":
+                    entry["description"] = desc
             except Exception:
                 pass
-            # Numeric metadata
+            # Include canonical JSON Schema emitted by server when available
             try:
-                if hasattr(p, "number_min") and hasattr(p, "number_max"):
-                    entry["number_min"] = float(p.number_min)
-                    entry["number_max"] = float(p.number_max)
-                if hasattr(p, "number_step"):
-                    entry["number_step"] = float(p.number_step)
-                if hasattr(p, "decimal"):
-                    entry["decimal"] = int(p.decimal)
-                # Vectors
-                if getattr(p, "vector_min", None):
-                    entry["vector_min"] = list(p.vector_min)
-                if getattr(p, "vector_max", None):
-                    entry["vector_max"] = list(p.vector_max)
-                # Spans
-                if hasattr(p, "span_min") and hasattr(p, "span_max"):
-                    entry["span_min"] = float(p.span_min)
-                    entry["span_max"] = float(p.span_max)
-                if hasattr(p, "span_step"):
-                    entry["span_step"] = float(p.span_step)
+                from google.protobuf.json_format import MessageToDict as _pb2dict  # type: ignore
+                if hasattr(p, "HasField") and p.HasField("value_schema"):
+                    entry["value_schema"] = _pb2dict(getattr(p, "value_schema"))
             except Exception:
                 pass
             return entry
@@ -1119,42 +1143,315 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     missing.append(p)
             return json.dumps({"exists": exists, "missing": missing})
         if name == "fs_read_text":
-            import os as _os
+            import os as _os, re as _re, io as _io
+            from typing import Optional as _Optional
             p = str(args.get("path") or "")
-            maxb = int(args.get("max_bytes", 268435456))
+            # Helpers to coerce numeric args
+            def _as_pos_int(v, default=None):
+                try:
+                    i = int(v)
+                    return i if i >= 0 else default
+                except Exception:
+                    return default
+            start_raw = args.get("start")
+            try:
+                start = int(start_raw) if start_raw is not None else None
+            except Exception:
+                start = None
+            length = _as_pos_int(args.get("length"), None)
+            # New unified line options
+            try:
+                start_line = int(args.get("start_line")) if args.get("start_line") is not None else None
+            except Exception:
+                start_line = None
+            line_count = _as_pos_int(args.get("line_count"), None)
+            regex = args.get("regex") or args.get("filter_regex")
+            force_enc = args.get("encoding")
+            errors = str(args.get("errors", "replace"))
+            # Internal streaming chunk size (not user-configurable)
+            block_size = 65536
+            try:
+                q = _os.path.expanduser(_os.path.expandvars(p))
+                # Enforce symmetry: line_count requires start_line (use negative start_line for tail)
+                if (line_count is not None) and (start_line is None):
+                    return json.dumps({
+                        "ok": False,
+                        "error": "line_count_requires_start_line",
+                        "hint": "Provide start_line (use negative for tail) or use fs_tail_lines",
+                    })
+                # Resolve byte window using seek/tell when possible so tail refers to current EOF
+                rb_start: int = 0
+                rb_len: _Optional[int] = None
+                size: _Optional[int] = None
+                data: bytes
+                tail_lines_mode = False
+                with open(q, "rb") as f:
+                    # Try to get current size from file descriptor
+                    try:
+                        size = _os.fstat(f.fileno()).st_size
+                    except Exception:
+                        size = None
+                    # Decide window
+                    # Range/default using start/length semantics
+                    else:
+                        # Range/default using start/length semantics
+                        # Determine absolute start; negative means from EOF
+                        if start is None:
+                            rb_start = 0
+                        else:
+                            if start >= 0:
+                                rb_start = min(start, size if (isinstance(size, int) and size is not None) else start)
+                            else:
+                                # Negative start: offset from end
+                                try:
+                                    f.seek(0, _io.SEEK_END)
+                                    endpos = f.tell()
+                                    size = endpos
+                                except Exception:
+                                    endpos = None
+                                rb_start = max(0, (size if isinstance(size, int) else 0) + start)
+                        # Position the stream (seek or stream-skip)
+                        try:
+                            f.seek(rb_start)
+                        except Exception:
+                            remaining = rb_start
+                            while remaining > 0:
+                                chunk = f.read(min(block_size, remaining))
+                                if not chunk:
+                                    break
+                                remaining -= len(chunk)
+                        # Decide bytes to read
+                        if isinstance(length, int) and length >= 0:
+                            to_read = length
+                            data = f.read(max(0, to_read))
+                        else:
+                            if isinstance(size, int) and size >= 0:
+                                to_read = max(0, size - rb_start)
+                                data = f.read(max(0, to_read))
+                            else:
+                                # Unknown size: read to EOF
+                                data = f.read()
+                                to_read = len(data)
+                # Simple encoding detection: BOM, then utf-8 fallback
+                enc = None
+                if isinstance(force_enc, str) and force_enc:
+                    enc = force_enc
+                else:
+                    if data.startswith(b"\xef\xbb\xbf"):
+                        enc = "utf-8-sig"
+                    elif data.startswith(b"\xfe\xff") or data.startswith(b"\xff\xfe"):
+                        enc = "utf-16"
+                    else:
+                        # Try utf-8 strict, then fallback to utf-8 replace
+                        try:
+                            _ = data.decode("utf-8", errors="strict")
+                            enc = "utf-8"
+                        except Exception:
+                            enc = "utf-8"
+                # Binary heuristic
+                sample = data[:4096]
+                is_binary = (b"\x00" in sample)
+                text = data.decode(enc or "utf-8", errors=errors if errors in ("strict","ignore","replace") else "replace")
+                lines = None
+                want_lines = bool((start_line is not None) or (line_count is not None) or (isinstance(regex, str) and regex))
+                if want_lines:
+                    try:
+                        all_lines = text.splitlines()
+                        # Compute slice by start_line/line_count on the current window
+                        if start_line is not None:
+                            idx0 = start_line if start_line >= 0 else max(0, len(all_lines) + start_line)
+                        else:
+                            idx0 = 0
+                        if line_count is not None and line_count >= 0:
+                            idx1 = min(len(all_lines), idx0 + line_count)
+                        else:
+                            idx1 = len(all_lines)
+                        sliced = all_lines[idx0:idx1]
+                        # Apply regex after slicing (if provided)
+                        regex_error = None
+                        if isinstance(regex, str) and regex:
+                            try:
+                                rx = _re.compile(regex)
+                                sliced = [ln for ln in sliced if rx.search(ln)]
+                            except Exception as _e:
+                                regex_error = str(_e)
+                        lines = sliced
+                    except Exception:
+                        lines = text.splitlines()
+                truncated = False
+                # Determine truncation based on requested window and caps
+                # If no explicit window and read less than file size, or if rb_len limited by caps, mark truncated
+                read_from = rb_start
+                read_to = rb_start + len(data)
+                if isinstance(size, int) and size is not None and size >= 0:
+                    if tail_lines_mode:
+                        # No truncation in correctness-first tail_lines
+                        pass
+                    else:
+                        if isinstance(length, int) and length is not None and length >= 0:
+                            window = length
+                        else:
+                            window = (size - rb_start)
+                        if window is not None and len(data) < max(0, window):
+                            truncated = True
+                else:
+                    # Unknown size: cannot assert truncation
+                    pass
+                out = {
+                    "ok": True,
+                    "path": q,
+                    "encoding": enc or "utf-8",
+                    "size_bytes": (size if isinstance(size, int) and size >= 0 else None),
+                    "bytes": len(data),
+                    "read_from": read_from,
+                    "read_to": read_to,
+                    "truncated": bool(truncated),
+                    "is_binary": bool(is_binary),
+                }
+                if want_lines:
+                    out["lines"] = lines or []
+                    if 'regex_error' in locals() and regex_error:
+                        out["regex_error"] = regex_error
+                else:
+                    out["text"] = text
+                return json.dumps(out)
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e)})
+        if name == "fs_tail_lines":
+            import os as _os, io as _io
+            p = str(args.get("path") or "")
+            n = int(args.get("n", 200))
+            if n <= 0:
+                n = 1
             try:
                 q = _os.path.expanduser(_os.path.expandvars(p))
                 with open(q, "rb") as f:
-                    if maxb is not None and maxb > 0:
-                        data = f.read(maxb)
-                    else:
-                        data = f.read()
-                text = data.decode("utf-8", errors="replace")
-                return json.dumps({"ok": True, "text": text, "bytes": len(data), "encoding": "utf-8"})
+                    try:
+                        size = _os.fstat(f.fileno()).st_size
+                    except Exception:
+                        size = None
+                    # Scan from EOF until we have N+1 newlines or reach BOF (no arbitrary caps)
+                    f.seek(0, _io.SEEK_END)
+                    endpos = f.tell()
+                    pos = endpos
+                    block_size = 65536
+                    buf = bytearray()
+                    lines_found = 0
+                    while pos > 0 and lines_found < (n + 1):
+                        step = min(block_size, pos)
+                        new_start = pos - step
+                        f.seek(new_start)
+                        chunk = f.read(step)
+                        if not chunk:
+                            break
+                        buf[:0] = chunk
+                        pos = new_start
+                        lines_found = buf.count(b"\n")
+                    rb_start = endpos - len(buf)
+                    data = bytes(buf)
+                # Decode (BOM-aware), then take last N lines exactly
+                enc = None
+                if data.startswith(b"\xef\xbb\xbf"):
+                    enc = "utf-8-sig"
+                elif data.startswith(b"\xfe\xff") or data.startswith(b"\xff\xfe"):
+                    enc = "utf-16"
+                else:
+                    enc = "utf-8"
+                text = data.decode(enc, errors="replace")
+                lines_all = text.splitlines()
+                lines_out = lines_all[-n:] if len(lines_all) > n else lines_all
+                # No truncation in correctness-first mode: we scan to BOF or until N lines are found
+                return json.dumps({
+                    "ok": True,
+                    "path": q,
+                    "encoding": enc,
+                    "size_bytes": (size if isinstance(size, int) and size >= 0 else None),
+                    "bytes": len(data),
+                    "read_from": rb_start,
+                    "read_to": endpos,
+                    "truncated": False,
+                    "lines": lines_out,
+                })
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e)})
+        if name == "fs_tail_bytes":
+            import os as _os, io as _io
+            p = str(args.get("path") or "")
+            k = int(args.get("bytes", 4096))
+            if k <= 0:
+                k = 1
+            try:
+                q = _os.path.expanduser(_os.path.expandvars(p))
+                with open(q, "rb") as f:
+                    f.seek(0, _io.SEEK_END)
+                    endpos = f.tell()
+                    start = max(0, endpos - k)
+                    f.seek(start)
+                    data = f.read(endpos - start)
+                enc = None
+                if data.startswith(b"\xef\xbb\xbf"):
+                    enc = "utf-8-sig"
+                elif data.startswith(b"\xfe\xff") or data.startswith(b"\xff\xfe"):
+                    enc = "utf-16"
+                else:
+                    enc = "utf-8"
+                text = data.decode(enc, errors="replace")
+                return json.dumps({
+                    "ok": True,
+                    "path": q,
+                    "encoding": enc,
+                    "bytes": len(data),
+                    "read_from": start,
+                    "read_to": endpos,
+                    "text": text,
+                })
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e)})
         if name == "fs_read_json":
             import os as _os, json as _json
             p = str(args.get("path") or "")
-            maxb = int(args.get("max_bytes", 268435456))
+            # Correctness-first: default is full read; only limit when caller explicitly passes max_bytes>0
+            maxb = args.get("max_bytes")
             try:
                 q = _os.path.expanduser(_os.path.expandvars(p))
+                size = None
+                try:
+                    size = _os.stat(q).st_size
+                except Exception:
+                    size = None
+                # If a cap is requested and file is larger, refuse to parse truncated content
+                if isinstance(maxb, int) and maxb > 0 and isinstance(size, int) and size > maxb:
+                    return json.dumps({
+                        "ok": False,
+                        "error": "would_truncate",
+                        "reason": "file larger than max_bytes; increase max_bytes or omit to read fully",
+                        "size_bytes": int(size),
+                        "max_bytes": int(maxb),
+                    })
                 with open(q, "rb") as f:
-                    if maxb is not None and maxb > 0:
+                    if isinstance(maxb, int) and maxb > 0:
                         data = f.read(maxb)
                     else:
                         data = f.read()
-                obj = _json.loads(data.decode("utf-8", errors="strict"))
-                return json.dumps({"ok": True, "data": obj})
+                # BOM-aware UTF-8 decoding for JSON
+                if data.startswith(b"\xef\xbb\xbf"):
+                    text = data.decode("utf-8-sig", errors="strict")
+                else:
+                    text = data.decode("utf-8", errors="strict")
+                obj = _json.loads(text)
+                return json.dumps({"ok": True, "data": obj, "size_bytes": (size if isinstance(size, int) else None)})
             except Exception as e:
-                return json.dumps({"ok": False, "error": str(e)})
+                # Surface JSON errors clearly
+                msg = str(e)
+                return json.dumps({"ok": False, "error": msg})
         if name == "fs_resolve_path":
             import os as _os
             import difflib as _dif
             from pathlib import Path as _Path
             path_in = str(args.get("path") or "")
             kind = str(args.get("kind")) if args.get("kind") else "either"
-            max_candidates = int(args.get("max_candidates", 10))
+            max_results = int(args.get("max_results", 10))
+            max_depth = int(args.get("max_depth", 6))
             base_dirs = [str(p) for p in (args.get("base_dirs") or [])]
             tried: list[str] = []
             def _exists(p: str) -> bool:
@@ -1222,12 +1519,49 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                                     return json.dumps({"ok": True, "path": _os.path.abspath(c3), "tried": tried, "reason": "prefix match"})
             except Exception:
                 pass
-            # Fallback: repo/base dir search by basename with fuzzy scores
+            # Fallback: anchored search around nearest existing ancestor + common user dirs + optional bases
             repo_root = _Path(__file__).resolve().parents[3]
-            search_roots = [str(repo_root)] + base_dirs
+            # Find nearest existing ancestor directory of p0
+            anc = _Path(p0)
+            while anc and not anc.exists():
+                anc = anc.parent
+            anchor_dirs: list[str] = []
+            if anc and anc.exists():
+                # Avoid scanning the home directory root; only add ancestor if it is not the home root
+                try:
+                    _home = _Path(_os.path.expanduser("~")).resolve()
+                except Exception:
+                    _home = None
+                anc_dir = (anc if anc.is_dir() else anc.parent)
+                if not (_home and anc_dir.resolve() == _home):
+                    anchor_dirs.append(str(anc_dir))
+            # Common user dirs
+            home = _os.path.expanduser("~")
+            docs = _os.path.join(home, "Documents")
+            dlds = _os.path.join(home, "Downloads")
+            desk = _os.path.join(home, "Desktop")
+            for d in (docs, dlds, desk):
+                if _os.path.isdir(d):
+                    anchor_dirs.append(d)
+            # If the path mentions a subfolder (e.g., atlas_test), try doc/subfolder
+            segs = [s for s in _Path(p0).parts if s not in ("/", "\\")]
+            for s in segs:
+                cand = _os.path.join(docs, s)
+                if _os.path.isdir(cand):
+                    anchor_dirs.append(cand)
+            # Add optional bases and repo last
+            anchor_dirs.extend(base_dirs)
+            anchor_dirs.append(str(repo_root))
+            # De-dupe while preserving order
+            seen = set()
+            search_roots = []
+            for r in anchor_dirs:
+                if r and r not in seen and _os.path.isdir(r):
+                    seen.add(r)
+                    search_roots.append(r)
             target = _Path(path_in).name
             candidates: list[tuple[float, str]] = []
-            def _walk_with_depth(root: str, max_depth: int = 6):
+            def _walk_with_depth(root: str, max_depth: int):
                 root_p = _Path(root)
                 try:
                     for cur, dirs, files in os.walk(root):
@@ -1235,7 +1569,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         if len(rel.parts) > max_depth:
                             dirs[:] = []
                             continue
-                        for nm in dirs + files:
+                        for nm in files if kind != "dir" else dirs:
                             full = _os.path.join(cur, nm)
                             if kind == "file" and not _os.path.isfile(full):
                                 continue
@@ -1247,11 +1581,108 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 except Exception:
                     return
             import os
+            # Normalize and filter invalid roots
+            search_roots = [r for r in search_roots if r and _os.path.isdir(r)]
             for r in search_roots:
-                if _os.path.isdir(r):
-                    _walk_with_depth(r, 6)
+                _walk_with_depth(r, max_depth)
+                tried.append(r)
             candidates.sort(key=lambda x: x[0], reverse=True)
-            out = [{"path": p, "score": float(s)} for (s, p) in candidates[:max_candidates]]
+            out = [{"path": p, "score": float(s)} for (s, p) in candidates[:max_results]]
+            return json.dumps({"ok": False, "candidates": out, "tried": tried})
+        if name == "fs_hint_resolve":
+            import os as _os
+            import difflib as _dif
+            import re as _re
+            from pathlib import Path as _Path
+            hint = str(args.get("hint_text") or "")
+            expected_name = str(args.get("expected_name") or "").strip() or None
+            kind = str(args.get("kind") or "file")
+            max_results = int(args.get("max_results", 12))
+            max_depth = int(args.get("max_depth", 6))
+            base_dirs = [str(p) for p in (args.get("base_dirs") or [])]
+            # 1) Build anchor roots: common user dirs + optional bases
+            home = _os.path.expanduser("~")
+            anchors = []
+            # Do NOT scan the home directory root to avoid permission prompts; restrict to common user subdirs
+            for d in (_os.path.join(home, "Documents"), _os.path.join(home, "Downloads"), _os.path.join(home, "Desktop")):
+                if _os.path.isdir(d):
+                    anchors.append(d)
+            for b in base_dirs:
+                b2 = _os.path.expanduser(_os.path.expandvars(b))
+                if _os.path.isdir(b2):
+                    anchors.append(_os.path.normpath(b2))
+            # 2) Mine hint for subfolder clues and explicit basenames
+            toks = _re.split(r"[\s,'\"]+", hint)
+            toks = [t for t in toks if t]
+            # Detect candidate name if not provided (has dot)
+            if not expected_name:
+                for t in reversed(toks):
+                    if "." in t and not any(ch in t for ch in ("/", "\\")):
+                        expected_name = t
+                        break
+            subdirs = []
+            for t in toks:
+                if t.lower() in {"documents","downloads","desktop","home"}:
+                    continue
+                # Treat simple tokens as potential subfolders (atlas_test, slice15)
+                if all(ch.isalnum() or ch in ("_","-",".") for ch in t) and not ("." in t and t == expected_name):
+                    subdirs.append(t)
+                # Handle path-like tokens
+                if "/" in t or "\\" in t:
+                    subdirs.extend([seg for seg in _re.split(r"[\\/]+", t) if seg])
+            # De-duplicate but preserve order
+            seen = set(); subdirs_u = []
+            for s in subdirs:
+                if s not in seen:
+                    seen.add(s); subdirs_u.append(s)
+            # 3) Compose search roots: anchors + anchors/subdir (for known subdir hints)
+            search_roots = list(anchors)
+            for a in anchors:
+                for s in subdirs_u[:3]:  # limit depth of hinted stack
+                    cand = _os.path.join(a, s)
+                    if _os.path.isdir(cand):
+                        search_roots.append(cand)
+            # 4) Scan within bounded depth and rank candidates
+            target = (expected_name or "").lower()
+            candidates: list[tuple[float, str]] = []
+            def _walk_with_depth(root: str, max_depth: int):
+                root_p = _Path(root)
+                try:
+                    for cur, dirs, files in os.walk(root):
+                        rel = _Path(cur).relative_to(root_p)
+                        if len(rel.parts) > max_depth:
+                            dirs[:] = []
+                            continue
+                        names = files if kind != "dir" else dirs
+                        for nm in names:
+                            full = _os.path.join(cur, nm)
+                            if kind == "file" and not _os.path.isfile(full):
+                                continue
+                            if kind == "dir" and not _os.path.isdir(full):
+                                continue
+                            score = 1.0 if (target and nm.lower() == target) else _dif.SequenceMatcher(a=nm.lower(), b=(target or nm.lower())).ratio()
+                            if target and score < 0.5:
+                                continue
+                            candidates.append((score, _os.path.abspath(full)))
+                except Exception:
+                    return
+            import os
+            tried = []
+            # Normalize and filter invalid roots to avoid os.walk errors
+            search_roots = [r for r in search_roots if r and _os.path.isdir(r)]
+            try:
+                for r in search_roots:
+                    _walk_with_depth(r, max_depth)
+                    tried.append(r)
+            except Exception as e:
+                return json.dumps({"ok": False, "error": str(e), "candidates": [], "tried": tried})
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            out = [{"path": p, "score": float(s)} for (s, p) in candidates[:max_results]]
+            # If we found an exact match, return ok=true with first path
+            if out:
+                best = out[0]
+                if expected_name and _os.path.basename(best["path"]).lower() == expected_name.lower():
+                    return json.dumps({"ok": True, "path": best["path"], "candidates": out, "tried": tried})
             return json.dumps({"ok": False, "candidates": out, "tried": tried})
         if name == "repo_search":
             import os as _os
@@ -2131,44 +2562,35 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     break
             if meta is None:
                 return json.dumps({"ok": False, "error": "json_key not found for id"})
-            t = (meta.type or "").lower()
-            # Basic type checks
-            def _is_number(x):
-                return isinstance(x, (int, float)) and not isinstance(x, bool)
-            ok = True
-            err = ""
-            if "stringintoption" in t or "stringstringoption" in t or "intintoption" in t:
-                if not isinstance(value, str):
-                    ok, err = False, "option value must be string"
-                else:
-                    try:
-                        opts = list(meta.option_names)
-                        if opts and value not in opts:
-                            ok, err = False, f"value '{value}' not in option_names"
-                    except Exception:
-                        pass
-            elif t.endswith("vec4"):
-                ok = isinstance(value, list) and len(value) == 4 and all(_is_number(v) for v in value)
-                if not ok:
-                    err = "Vec4 requires [n,n,n,n]"
-            elif t.endswith("vec3"):
-                ok = isinstance(value, list) and len(value) == 3 and all(_is_number(v) for v in value)
-                if not ok:
-                    err = "Vec3 requires [n,n,n]"
-            elif t in ("float", "double"):
-                ok = _is_number(value)
-                if not ok:
-                    err = "number required"
-            elif t == "int":
-                ok = isinstance(value, int) and not isinstance(value, bool)
-                if not ok:
-                    err = "integer required"
-            elif t == "bool":
-                ok = isinstance(value, bool)
-                if not ok:
-                    err = "bool required"
-            # else: unknown types pass (e.g., 3DTransform)
-            return json.dumps({"ok": ok, "error": err})
+            # Prefer schema-based validation
+            from google.protobuf.json_format import MessageToDict as _pb2dict  # type: ignore
+            schema = {}
+            try:
+                if hasattr(meta, "HasField") and meta.HasField("value_schema"):
+                    schema = _pb2dict(getattr(meta, "value_schema")) or {}
+            except Exception:
+                schema = {}
+            # Require jsonschema at runtime; fail if missing.
+            import json as _json
+            import hashlib as _hashlib
+            try:
+                from jsonschema import Draft202012Validator as _Validator  # type: ignore
+            except Exception:
+                from jsonschema import Draft7Validator as _Validator  # type: ignore
+            # Cache compiled validator by (id, json_key, schema digest)
+            digest = _hashlib.sha256(_json.dumps(schema, sort_keys=True).encode("utf-8")).hexdigest() if schema else ""
+            cache_key = f"{id}:{json_key}:{digest}"
+            validator = _schema_validator_cache.get(cache_key)
+            if validator is None:
+                validator = _Validator(schema or {})
+                _schema_validator_cache[cache_key] = validator
+            errors = list(validator.iter_errors(value))
+            if errors:
+                e = errors[0]
+                loc = "".join([f"[{repr(p)}]" if isinstance(p, int) else f".{p}" for p in e.path])
+                msg = f"{loc}: {e.message}" if loc else e.message
+                return json.dumps({"ok": False, "error": msg})
+            return json.dumps({"ok": True})
 
         # Timeline / camera
         if name == "animation_ensure_animation":

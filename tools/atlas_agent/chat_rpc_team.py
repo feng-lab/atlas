@@ -67,19 +67,17 @@ class ChatTeam:
         # Prefer the facts-based description if present; otherwise fall back to the latest assistant content
         text = ""
         description = None
-        ledger_block = None
         for m in msgs:
             if m.role == "assistant" and m.content:
                 c = m.content
                 if c.strip().lower().startswith("description (facts-based):"):
                     description = c
-                if c.strip().lower().startswith("ledger (tools invoked this turn):"):
-                    ledger_block = c
+        # Choose assistant text to return; never append ledger into it
         if description:
             text = description
-            if ledger_block:
-                text = text + "\n\n" + ledger_block
         else:
+            # Pick the last assistant message
+            text = ""
             for m in reversed(msgs):
                 if m.role == "assistant" and m.content:
                     text = m.content

@@ -67,6 +67,19 @@ Inspector Behavior (Verification‑only)
 - Pass when uncertain: Approve by default when evidence is insufficient. Only fail when Facts clearly contradict the core intent (e.g., required keys/values are missing or wrong, wrong objects changed, or camera_validation.ok=false).
 - Feedback is advisory: Use the feedback field for non‑blocking notes (limitations, qualitative comments). Use TODO updates only as checkbox lines when helpful; do not block solely on naming or unverifiable external inputs.
 
+Filesystem Tools (Best Practices)
+- Path resolution: Use `fs_hint_resolve` to turn natural language hints into candidate paths (anchors on ~/Documents, ~/Downloads, ~/Desktop, plus optional bases). Prefer this over guessing full paths.
+- Logs (simple, robust):
+  - `fs_tail_lines`: last N lines (UTF‑8, BOM‑aware). Minimal params: `path`, `n`.
+  - `fs_tail_bytes`: last K bytes (UTF‑8, BOM‑aware). Minimal params: `path`, `bytes`.
+- Advanced reads (rare):
+  - `fs_read_text` supports byte windows via `start`/`length` and line windows via `start_line`/`line_count` (regex optional). Semantics are symmetric:
+    - `start` < 0 and `start_line` < 0 count from end.
+    - Omitting `length` reads to end; omitting `line_count` reads to end. `line_count` requires `start_line` (use negative `start_line` to tail last N lines).
+    - Provide both fields to read exact windows; no other special cases.
+    - Avoid mixing byte and line windows in one call. If both are provided, fs_read_text reads the byte window first and then applies the line slice within that window (allowed but discouraged).
+- Prefer these tools over custom file ops. `repo_search` is not exposed to the LLM; `fs_hint_resolve` is the recommended entry.
+
 Natural Language Contract (Summary‑first)
 - Before any keys are written, require a concise Plan Summary with two synchronized views:
 - Global timeline view: a list of changes `{ time, target(id), json_key?, value, easing? }` where id=0 camera, ≥4 objects.

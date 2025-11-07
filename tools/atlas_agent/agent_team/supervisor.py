@@ -414,7 +414,7 @@ class Supervisor:
                 messages.append(AgentMessage(role="assistant", content="TODO Ledger (session):\n" + "\n".join(todo_lines)))
         except Exception:
             pass
-        # Append compact ledger for auditability
+        # Log compact ledger for auditability (do not append into assistant chat content)
         import json as _json
         try:
             flat_lines: list[str] = []
@@ -423,13 +423,11 @@ class Supervisor:
                 if 'result' in e:
                     line = f"- {tool}: args={_json.dumps(e.get('args'))} result={_json.dumps(e.get('result'))}"
                 else:
-                    # Error-form entries (e.g., dispatcher exceptions or provider error records)
                     parts = [f"- {tool}:"]
                     if e.get('args') is not None:
                         parts.append(f"args={_json.dumps(e.get('args'))}")
                     if e.get('error') is not None:
                         parts.append(f"error={_json.dumps(e.get('error'))}")
-                    # If agent_input snapshot is available, include a concise summary
                     ai = e.get('agent_input') or {}
                     if isinstance(ai, dict) and ai:
                         try:
@@ -437,17 +435,15 @@ class Supervisor:
                             sp = (ai.get('system_prompt_excerpt') or '')
                             sc = (ai.get('shared_context_excerpt') or '')
                             tools_list = ai.get('tools') or []
-                            # Truncate to keep ledger readable
                             def trunc(s):
                                 return (s[:200] + '…') if isinstance(s, str) and len(s) > 200 else s
                             parts.append(f"agent_input={{user_text={_json.dumps(trunc(ui))}, system_excerpt={_json.dumps(trunc(sp))}, context_excerpt={_json.dumps(trunc(sc))}, tools={_json.dumps(tools_list)} }}")
                         except Exception:
-                            # Fallback to raw agent_input
                             parts.append(f"agent_input={_json.dumps(ai)}")
                     line = " ".join(parts)
                 flat_lines.append(line)
             if flat_lines:
-                messages.append(AgentMessage(role="assistant", content="Ledger (tools invoked this turn):\n" + "\n".join(flat_lines)))
+                logger.info("[Supervisor] %s", "Ledger (tools invoked this turn):\n" + "\n".join(flat_lines))
         except Exception:
             pass
         return messages

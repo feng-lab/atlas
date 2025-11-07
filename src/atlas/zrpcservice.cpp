@@ -119,6 +119,13 @@ ZRPCService::~ZRPCService() = default;
 
 namespace {
 
+// RPC scope ids for view-setting/parameter operations.
+// 0 = camera; 1 = background; 2 = axis; 3 = global/lighting; >=4 = object id
+static constexpr uint64_t kScopeCamera = 0;
+[[maybe_unused]] static constexpr uint64_t kScopeBackground = 1;
+[[maybe_unused]] static constexpr uint64_t kScopeAxis = 2;
+[[maybe_unused]] static constexpr uint64_t kScopeGlobal = 3;
+
 template<class Func>
 auto invokeOnUi(Func&& f)
 {
@@ -372,7 +379,7 @@ public:
       }
       size_t boundId = 0;
       // id=0 → camera; 1/2/3 → background/axis/global; ≥4 object id
-      if (req->id() == 0) {
+      if (req->id() == kScopeCamera) {
         json::object j;
         j["Camera 3DCamera"] = m_owner.engine()->camera().jsonValue();
         if (req->json_keys_size() == 0) {
@@ -448,7 +455,7 @@ public:
           *r.mutable_normalized_value() = jsonToPb(cam.jsonValue());
           r.set_ok(true);
           return;
-        } 
+        }
         const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
         const QString jsonKey = QString::fromStdString(sp.json_key());
         ZParameter* target = nullptr;
@@ -956,115 +963,11 @@ public:
             meta.set_description(p->description().toStdString());
           }
           meta.set_supports_interpolation(p->supportInterpolation());
-          if (auto opt = dynamic_cast<const ZStringIntOptionParameter*>(p)) {
-            for (const auto& s : opt->options()) {
-              meta.add_option_names(s.toStdString());
-            }
-            for (const auto& d : opt->optionAssociatedData()) {
-              meta.add_option_data(QString::number(d).toStdString());
-            }
-          } else if (auto opt2 = dynamic_cast<const ZStringStringOptionParameter*>(p)) {
-            for (const auto& s : opt2->options()) {
-              meta.add_option_names(s.toStdString());
-            }
-            for (const auto& d : opt2->optionAssociatedData()) {
-              meta.add_option_data(d.toStdString());
-            }
-          } else if (auto opt3 = dynamic_cast<const ZIntIntOptionParameter*>(p)) {
-            for (const auto& s : opt3->options()) {
-              meta.add_option_names(QString::number(s).toStdString());
-            }
-            for (const auto& d : opt3->optionAssociatedData()) {
-              meta.add_option_data(QString::number(d).toStdString());
-            }
-          } else if (auto sp = dynamic_cast<const ZDoubleParameter*>(p)) {
-            meta.set_number_min(sp->rangeMin());
-            meta.set_number_max(sp->rangeMax());
-            meta.set_number_step(sp->singleStep());
-            meta.set_decimal(sp->decimal());
-          } else if (auto spf = dynamic_cast<const ZFloatParameter*>(p)) {
-            meta.set_number_min(spf->rangeMin());
-            meta.set_number_max(spf->rangeMax());
-            meta.set_number_step(spf->singleStep());
-            meta.set_decimal(spf->decimal());
-          } else if (auto spi = dynamic_cast<const ZIntParameter*>(p)) {
-            meta.set_number_min(static_cast<double>(spi->rangeMin()));
-            meta.set_number_max(static_cast<double>(spi->rangeMax()));
-            meta.set_number_step(static_cast<double>(spi->singleStep()));
-            meta.set_decimal(spi->decimal());
-          } else if (auto v2 = dynamic_cast<const ZVec2Parameter*>(p)) {
-            auto mn = v2->rangeMin();
-            auto mx = v2->rangeMax();
-            meta.add_vector_min(mn[0]);
-            meta.add_vector_min(mn[1]);
-            meta.add_vector_max(mx[0]);
-            meta.add_vector_max(mx[1]);
-            meta.set_decimal(v2->decimal());
-          } else if (auto v3 = dynamic_cast<const ZVec3Parameter*>(p)) {
-            auto mn = v3->rangeMin();
-            auto mx = v3->rangeMax();
-            meta.add_vector_min(mn[0]);
-            meta.add_vector_min(mn[1]);
-            meta.add_vector_min(mn[2]);
-            meta.add_vector_max(mx[0]);
-            meta.add_vector_max(mx[1]);
-            meta.add_vector_max(mx[2]);
-            meta.set_decimal(v3->decimal());
-          } else if (auto v4 = dynamic_cast<const ZVec4Parameter*>(p)) {
-            auto mn = v4->rangeMin();
-            auto mx = v4->rangeMax();
-            meta.add_vector_min(mn[0]);
-            meta.add_vector_min(mn[1]);
-            meta.add_vector_min(mn[2]);
-            meta.add_vector_min(mn[3]);
-            meta.add_vector_max(mx[0]);
-            meta.add_vector_max(mx[1]);
-            meta.add_vector_max(mx[2]);
-            meta.add_vector_max(mx[3]);
-            meta.set_decimal(v4->decimal());
-          } else if (auto dv4 = dynamic_cast<const ZDVec4Parameter*>(p)) {
-            auto mn = dv4->rangeMin();
-            auto mx = dv4->rangeMax();
-            meta.add_vector_min(mn[0]);
-            meta.add_vector_min(mn[1]);
-            meta.add_vector_min(mn[2]);
-            meta.add_vector_min(mn[3]);
-            meta.add_vector_max(mx[0]);
-            meta.add_vector_max(mx[1]);
-            meta.add_vector_max(mx[2]);
-            meta.add_vector_max(mx[3]);
-            meta.set_decimal(dv4->decimal());
-          } else if (auto iv3 = dynamic_cast<const ZIVec3Parameter*>(p)) {
-            auto mn = iv3->rangeMin();
-            auto mx = iv3->rangeMax();
-            meta.add_vector_min(mn[0]);
-            meta.add_vector_min(mn[1]);
-            meta.add_vector_min(mn[2]);
-            meta.add_vector_max(mx[0]);
-            meta.add_vector_max(mx[1]);
-            meta.add_vector_max(mx[2]);
-            meta.set_decimal(iv3->decimal());
-          } else if (auto spn = dynamic_cast<const ZDoubleSpanParameter*>(p)) {
-            auto mn = spn->rangeMin();
-            auto mx = spn->rangeMax();
-            meta.set_span_min(mn);
-            meta.set_span_max(mx);
-            meta.set_span_step(spn->singleStep());
-            meta.set_decimal(spn->decimal());
-          } else if (auto spnf = dynamic_cast<const ZFloatSpanParameter*>(p)) {
-            auto mn = spnf->rangeMin();
-            auto mx = spnf->rangeMax();
-            meta.set_span_min(mn);
-            meta.set_span_max(mx);
-            meta.set_span_step(spnf->singleStep());
-            meta.set_decimal(spnf->decimal());
-          } else if (auto spni = dynamic_cast<const ZIntSpanParameter*>(p)) {
-            auto mn = spni->rangeMin();
-            auto mx = spni->rangeMax();
-            meta.set_span_min(static_cast<double>(mn));
-            meta.set_span_max(static_cast<double>(mx));
-            meta.set_span_step(static_cast<double>(spni->singleStep()));
-            meta.set_decimal(spni->decimal());
+          // Enumerated options represented in value_schema via enum; no separate fields.
+          // Attach canonical value schema from parameter
+          {
+            const json::object schema = p->valueSchema();
+            meta.mutable_value_schema()->CopyFrom(jsonToPb(schema).struct_value());
           }
           dst.push_back(std::move(meta));
         }
@@ -1189,7 +1092,7 @@ public:
       const double tm = req->time();
       const QString easing = QString::fromStdString(req->easing());
       // Camera (id=0)
-      if (req->id() == 0) {
+      if (req->id() == kScopeCamera) {
         // Convert typed protobuf Value to boost::json object
         json::value jv = pbToJson(req->value());
         if (!jv.is_object()) {
@@ -2064,22 +1967,7 @@ public:
       if (!m_owner.engine()) {
         return out;
       }
-      // Camera: surface a synthetic entry (id=0; SetKey ignores json_key for camera)
-      if (req->id() == 0) {
-        Parameter p;
-        p.set_json_key("Camera 3DCamera");
-        p.set_name("Camera");
-        p.set_type("3DCamera");
-        p.set_description(
-          "3D camera bundle with fields: 'Eye Position Vec3', 'Center Position Vec3', 'Up Vector Vec3', 'Field of View Float', 'Projection Type StringIntOption', and others. Use as a single struct to set or keyframe the camera.");
-        p.set_supports_interpolation(true);
-        out.push_back(std::move(p));
-        return out;
-      }
       size_t boundId = static_cast<size_t>(req->id());
-      if (boundId == 0) {
-        return out;
-      }
       const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
       for (auto* p : params) {
         if (!p) {
@@ -2093,115 +1981,11 @@ public:
           meta.set_description(p->description().toStdString());
         }
         meta.set_supports_interpolation(p->supportInterpolation());
-        if (auto opt = dynamic_cast<const ZStringIntOptionParameter*>(p)) {
-          for (const auto& s : opt->options()) {
-            meta.add_option_names(s.toStdString());
-          }
-          for (const auto& d : opt->optionAssociatedData()) {
-            meta.add_option_data(QString::number(d).toStdString());
-          }
-        } else if (auto opt2 = dynamic_cast<const ZStringStringOptionParameter*>(p)) {
-          for (const auto& s : opt2->options()) {
-            meta.add_option_names(s.toStdString());
-          }
-          for (const auto& d : opt2->optionAssociatedData()) {
-            meta.add_option_data(d.toStdString());
-          }
-        } else if (auto opt3 = dynamic_cast<const ZIntIntOptionParameter*>(p)) {
-          for (const auto& s : opt3->options()) {
-            meta.add_option_names(QString::number(s).toStdString());
-          }
-          for (const auto& d : opt3->optionAssociatedData()) {
-            meta.add_option_data(QString::number(d).toStdString());
-          }
-        } else if (auto sp = dynamic_cast<const ZDoubleParameter*>(p)) {
-          meta.set_number_min(sp->rangeMin());
-          meta.set_number_max(sp->rangeMax());
-          meta.set_number_step(sp->singleStep());
-          meta.set_decimal(sp->decimal());
-        } else if (auto spf = dynamic_cast<const ZFloatParameter*>(p)) {
-          meta.set_number_min(spf->rangeMin());
-          meta.set_number_max(spf->rangeMax());
-          meta.set_number_step(spf->singleStep());
-          meta.set_decimal(spf->decimal());
-        } else if (auto spi = dynamic_cast<const ZIntParameter*>(p)) {
-          meta.set_number_min(static_cast<double>(spi->rangeMin()));
-          meta.set_number_max(static_cast<double>(spi->rangeMax()));
-          meta.set_number_step(static_cast<double>(spi->singleStep()));
-          meta.set_decimal(spi->decimal());
-        } else if (auto v2 = dynamic_cast<const ZVec2Parameter*>(p)) {
-          auto mn = v2->rangeMin();
-          auto mx = v2->rangeMax();
-          meta.add_vector_min(mn[0]);
-          meta.add_vector_min(mn[1]);
-          meta.add_vector_max(mx[0]);
-          meta.add_vector_max(mx[1]);
-          meta.set_decimal(v2->decimal());
-        } else if (auto v3 = dynamic_cast<const ZVec3Parameter*>(p)) {
-          auto mn = v3->rangeMin();
-          auto mx = v3->rangeMax();
-          meta.add_vector_min(mn[0]);
-          meta.add_vector_min(mn[1]);
-          meta.add_vector_min(mn[2]);
-          meta.add_vector_max(mx[0]);
-          meta.add_vector_max(mx[1]);
-          meta.add_vector_max(mx[2]);
-          meta.set_decimal(v3->decimal());
-        } else if (auto v4 = dynamic_cast<const ZVec4Parameter*>(p)) {
-          auto mn = v4->rangeMin();
-          auto mx = v4->rangeMax();
-          meta.add_vector_min(mn[0]);
-          meta.add_vector_min(mn[1]);
-          meta.add_vector_min(mn[2]);
-          meta.add_vector_min(mn[3]);
-          meta.add_vector_max(mx[0]);
-          meta.add_vector_max(mx[1]);
-          meta.add_vector_max(mx[2]);
-          meta.add_vector_max(mx[3]);
-          meta.set_decimal(v4->decimal());
-        } else if (auto dv4 = dynamic_cast<const ZDVec4Parameter*>(p)) {
-          auto mn = dv4->rangeMin();
-          auto mx = dv4->rangeMax();
-          meta.add_vector_min(mn[0]);
-          meta.add_vector_min(mn[1]);
-          meta.add_vector_min(mn[2]);
-          meta.add_vector_min(mn[3]);
-          meta.add_vector_max(mx[0]);
-          meta.add_vector_max(mx[1]);
-          meta.add_vector_max(mx[2]);
-          meta.add_vector_max(mx[3]);
-          meta.set_decimal(dv4->decimal());
-        } else if (auto iv3 = dynamic_cast<const ZIVec3Parameter*>(p)) {
-          auto mn = iv3->rangeMin();
-          auto mx = iv3->rangeMax();
-          meta.add_vector_min(mn[0]);
-          meta.add_vector_min(mn[1]);
-          meta.add_vector_min(mn[2]);
-          meta.add_vector_max(mx[0]);
-          meta.add_vector_max(mx[1]);
-          meta.add_vector_max(mx[2]);
-          meta.set_decimal(iv3->decimal());
-        } else if (auto spn = dynamic_cast<const ZDoubleSpanParameter*>(p)) {
-          auto mn = spn->rangeMin();
-          auto mx = spn->rangeMax();
-          meta.set_span_min(mn);
-          meta.set_span_max(mx);
-          meta.set_span_step(spn->singleStep());
-          meta.set_decimal(spn->decimal());
-        } else if (auto spnf = dynamic_cast<const ZFloatSpanParameter*>(p)) {
-          auto mn = spnf->rangeMin();
-          auto mx = spnf->rangeMax();
-          meta.set_span_min(mn);
-          meta.set_span_max(mx);
-          meta.set_span_step(spnf->singleStep());
-          meta.set_decimal(spnf->decimal());
-        } else if (auto spni = dynamic_cast<const ZIntSpanParameter*>(p)) {
-          auto mn = spni->rangeMin();
-          auto mx = spni->rangeMax();
-          meta.set_span_min(static_cast<double>(mn));
-          meta.set_span_max(static_cast<double>(mx));
-          meta.set_span_step(static_cast<double>(spni->singleStep()));
-          meta.set_decimal(spni->decimal());
+        // Enumerated options represented in value_schema via enum; no separate fields.
+        // Value schema from parameter (fail-fast if invariant breaks)
+        {
+          const json::object schema = p->valueSchema();
+          meta.mutable_value_schema()->CopyFrom(jsonToPb(schema).struct_value());
         }
         out.push_back(std::move(meta));
       }
@@ -2231,7 +2015,7 @@ public:
       }
       anim->rebindView();
       // Camera (id=0): clear all camera keys
-      if (req->id() == 0) {
+      if (req->id() == kScopeCamera) {
         ZParameterAnimation* cpa = anim->cameraParameterAnimation();
         // delete keys one by one
         std::vector<ZParameterKey*> keys;
@@ -2317,7 +2101,7 @@ public:
       }
       anim->rebindView();
       // Camera (id=0)
-      if (req->id() == 0) {
+      if (req->id() == kScopeCamera) {
         ZParameterAnimation* cpa = anim->cameraParameterAnimation();
         for (const auto& k : cpa->keys()) {
           if (std::abs(k->time() - req->time()) < 1e-6) {

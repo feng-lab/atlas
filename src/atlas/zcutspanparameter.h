@@ -69,14 +69,8 @@ public:
       {"type", "boolean"}
     };
     props[m_normalized.jsonKey().toStdString()] = m_normalized.valueSchema();
-    // Absolute range row is stored under this literal key
-    json::object span;
-    span["type"] = "array";
-    span["minItems"] = 2;
-    span["maxItems"] = 2;
-    span["items"] = json::object{
-      {"type", "number"}
-    };
+    // Absolute range row is stored under this literal key; reuse base span schema (with min/max)
+    json::object span = ZFloatSpanParameter::valueSchema();
     props["Range FloatSpan"] = span;
     obj["properties"] = props;
     obj["additionalProperties"] = false;

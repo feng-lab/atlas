@@ -714,3 +714,27 @@ Vulkan async readback (offscreen only)
 - The compositor requests an end-of-frame GPU copy of the final color attachment into a host-visible staging buffer. The CPU reads the mapped memory after the frame fence signals (default 1-frame latency) and updates the BGRA8 local buffer for UI consumption.
 - Flags:
 - VLOG(1) includes `readback_bytes_copied` and `readback_slots_in_flight` to track throughput.
+### RPC: Parameter metadata (ListParams/Capabilities)
+
+- Parameter proto now carries a single authoritative `value_schema` (google.protobuf.Struct) describing the parameter value using JSON Schema conventions.
+- Legacy numeric/vector/span fields have been removed: `number_min`, `number_max`, `number_step`, `decimal`, `vector_min`, `vector_max`, `span_min`, `span_max`, `span_step`.
+- Legacy option fields have been removed: `option_names`, `option_data`. Enumerations should be represented via `enum` inside `value_schema`.
+- Enumerated options remain (`option_names`, `option_data`), but enums should also appear in `value_schema` when applicable.
+- The server populates `value_schema` via `ZParameter::valueSchema()` for all parameter types. Composite types (e.g., `3DTransform`, Camera) expose an object schema with canonical subfield names.
+- Client guidance: consume `value_schema` for validation, UI hints (ranges/steps), and LLM guidance. Do not infer constraints from type strings.
+
+Agent tooling dependency
+- The Python agent validates parameter values with `jsonschema` (Draft 2020‑12 or Draft‑7). The CLI enforces this dependency and exits if it is missing. Install via `pip install jsonschema`.
+### RPC Scope IDs and Animation Binding
+
+- Scope IDs used by RPC parameter/timeline operations:
+  - 0 = Camera
+  - 1 = Background
+  - 2 = Axis
+  - 3 = Global/Lighting
+  - ≥4 = Scene object ids
+- Implementation notes:
+  - These ids are defined in `src/atlas/zrpcservice.cpp` as constants (`kScopeCamera`, `kScopeBackground`, `kScopeAxis`, `kScopeGlobal`). Avoid magic numbers.
+  - Camera is treated as a parameter scope (id=0) for RPC and live introspection. It is NOT represented as an `AnimationObj` entry; camera keys live in the dedicated camera track (`m_globalParaAnimations`).
+  - In the animation model, `AnimationObj.boundId == 0` remains a sentinel for “unbound/non‑scene” and is unrelated to the camera scope.
+  - Do not add an `AnimationObj` for id=0; timeline ops for camera continue to use the camera track APIs.

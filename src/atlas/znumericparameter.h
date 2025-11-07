@@ -93,7 +93,10 @@ public:
     } else {
       o["type"] = "number";
     }
-    return o; // omit min/max; often data-dependent
+    // Include current parameter bounds so clients can validate and clamp correctly
+    o["minimum"] = m_min;
+    o["maximum"] = m_max;
+    return o;
   }
 
   // ZParameter interface
@@ -400,13 +403,20 @@ public:
     const int n = static_cast<int>(this->m_value.length());
     o["minItems"] = n;
     o["maxItems"] = n;
-    json::object item;
-    if (std::numeric_limits<typename T::value_type>::is_integer) {
-      item["type"] = "integer";
-    } else {
-      item["type"] = "number";
+    // Tuple validation with per-component bounds
+    json::array items;
+    for (int i = 0; i < n; ++i) {
+      json::object it;
+      if (std::numeric_limits<typename T::value_type>::is_integer) {
+        it["type"] = "integer";
+      } else {
+        it["type"] = "number";
+      }
+      it["minimum"] = m_min[i];
+      it["maximum"] = m_max[i];
+      items.emplace_back(it);
     }
-    o["items"] = item;
+    o["items"] = items;
     return o;
   }
 
@@ -890,13 +900,21 @@ public:
     o["type"] = "array";
     o["minItems"] = 2;
     o["maxItems"] = 2;
-    json::object item;
+    // Tuple validation for [low, high] with per-element bounds from [m_min, m_max]
+    json::object item0;
+    json::object item1;
     if (std::numeric_limits<typename T::value_type>::is_integer) {
-      item["type"] = "integer";
+      item0["type"] = "integer";
+      item1["type"] = "integer";
     } else {
-      item["type"] = "number";
+      item0["type"] = "number";
+      item1["type"] = "number";
     }
-    o["items"] = json::array{item, item};
+    item0["minimum"] = m_min;
+    item0["maximum"] = m_max;
+    item1["minimum"] = m_min;
+    item1["maximum"] = m_max;
+    o["items"] = json::array{item0, item1};
     return o;
   }
 

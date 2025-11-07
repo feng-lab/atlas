@@ -72,7 +72,8 @@ Z3DGlobalParameters::Z3DGlobalParameters()
 
   m_cameraParameterIndex = m_parameters.size();
   addParameter(camera);
-  camera.setDescription(QStringLiteral("Typed 3D camera value (position, center, up, frustum)."));
+  camera.setDescription(QStringLiteral(
+    "3D camera bundle with fields: 'Eye Position Vec3', 'Center Position Vec3', 'Up Vector Vec3', 'Field of View Float', 'Projection Type StringIntOption'."));
 
   globalXCut.setSingleStep(1);
   globalYCut.setSingleStep(1);

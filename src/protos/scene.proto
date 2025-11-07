@@ -34,22 +34,9 @@ message Parameter {
   bool supports_interpolation = 4;
   // Optional: human-readable description for LLMs/UIs
   string description = 16;
-  // Optional: enumerated option display names for option parameters
-  repeated string option_names = 5;
-  // Optional: associated option data (stringified) aligned with option_names
-  repeated string option_data = 6;
-  // Optional numeric metadata (for scalar numeric types)
-  double number_min = 7;
-  double number_max = 8;
-  double number_step = 9;
-  int32 decimal = 10;
-  // Optional vector metadata (for Vec2/Vec3/Vec4 types)
-  repeated double vector_min = 11;
-  repeated double vector_max = 12;
-  // Optional span metadata (for FloatSpan/IntSpan types)
-  double span_min = 13;
-  double span_max = 14;
-  double span_step = 15;
+  // Canonical JSON Schema for the parameter's value shape and constraints.
+  // Populated from ZParameter::valueSchema().
+  google.protobuf.Struct value_schema = 17;
 }
 message ParamList { repeated Parameter params = 1; }
 message CapabilitiesResponse {

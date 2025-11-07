@@ -1003,7 +1003,11 @@ std::vector<ZParameter*> Z3DRenderingEngine::parametersOfViewSetting(size_t id)
     }
   };
 
-  if (id == 1) {
+  if (id == 0) {
+    // Expose camera as a view-setting parameter group for id=0
+    res.push_back(&m_globalParas->camera);
+    return res;
+  } else if (id == 1) {
     auto wg = m_compositor->backgroundWidgetsGroup();
     installWatcher(wg);
     return wg->getParameterList();
