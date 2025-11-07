@@ -47,8 +47,14 @@ public:
   }
 
   // For scalar numeric parameters, the step has the same type as T.
-  [[nodiscard]] T singleStep() const { return m_step; }
-  [[nodiscard]] int decimal() const { return m_decimal; }
+  [[nodiscard]] T singleStep() const
+  {
+    return m_step;
+  }
+  [[nodiscard]] int decimal() const
+  {
+    return m_decimal;
+  }
 
   void setRange(T min, T max)
   {
@@ -77,6 +83,17 @@ public:
   [[nodiscard]] T rangeMax() const
   {
     return m_max;
+  }
+
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    json::object o;
+    if (std::numeric_limits<T>::is_integer) {
+      o["type"] = "integer";
+    } else {
+      o["type"] = "number";
+    }
+    return o; // omit min/max; often data-dependent
   }
 
   // ZParameter interface
@@ -162,9 +179,9 @@ Q_SIGNALS:
   void rangeChanged(int min, int max);
 
 protected:
-  void beforeChange(int& value) override;
+  void beforeChange(const int& value) override;
 
-  void afterChange(int& value) override;
+  void afterChange(const int& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
@@ -190,9 +207,9 @@ Q_SIGNALS:
   void rangeChanged(double min, double max);
 
 protected:
-  void beforeChange(double& value) override;
+  void beforeChange(const double& value) override;
 
-  void afterChange(double& value) override;
+  void afterChange(const double& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
@@ -218,9 +235,9 @@ Q_SIGNALS:
   void rangeChanged(double min, double max);
 
 protected:
-  void beforeChange(float& value) override;
+  void beforeChange(const float& value) override;
 
-  void afterChange(float& value) override;
+  void afterChange(const float& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
@@ -273,8 +290,14 @@ public:
     m_decimal = d;
   }
 
-  [[nodiscard]] typename T::value_type singleStep() const { return m_step; }
-  [[nodiscard]] int decimal() const { return m_decimal; }
+  [[nodiscard]] typename T::value_type singleStep() const
+  {
+    return m_step;
+  }
+  [[nodiscard]] int decimal() const
+  {
+    return m_decimal;
+  }
 
   // default is vertical
   void setWidgetOrientation(Qt::Orientation o)
@@ -370,6 +393,23 @@ public:
     this->set(v);
   }
 
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    json::object o;
+    o["type"] = "array";
+    const int n = static_cast<int>(this->m_value.length());
+    o["minItems"] = n;
+    o["maxItems"] = n;
+    json::object item;
+    if (std::numeric_limits<typename T::value_type>::is_integer) {
+      item["type"] = "integer";
+    } else {
+      item["type"] = "number";
+    }
+    o["items"] = item;
+    return o;
+  }
+
 protected:
   void makeValid(T& value) const override
   {
@@ -420,7 +460,7 @@ Q_SIGNALS:
   void value2WillChange(double);
 
 protected:
-  void beforeChange(glm::vec2& value) override;
+  void beforeChange(const glm::vec2& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };
@@ -458,7 +498,7 @@ Q_SIGNALS:
   void range3Changed(double min, double max);
 
 protected:
-  void beforeChange(glm::vec3& value) override;
+  void beforeChange(const glm::vec3& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
@@ -496,7 +536,7 @@ Q_SIGNALS:
   void value4WillChange(double);
 
 protected:
-  void beforeChange(glm::vec4& value) override;
+  void beforeChange(const glm::vec4& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };
@@ -524,7 +564,7 @@ Q_SIGNALS:
   void value2WillChange(double);
 
 protected:
-  void beforeChange(glm::dvec2& value) override;
+  void beforeChange(const glm::dvec2& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };
@@ -556,7 +596,7 @@ Q_SIGNALS:
   void value3WillChange(double);
 
 protected:
-  void beforeChange(glm::dvec3& value) override;
+  void beforeChange(const glm::dvec3& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };
@@ -592,7 +632,7 @@ Q_SIGNALS:
   void value4WillChange(double);
 
 protected:
-  void beforeChange(glm::dvec4& value) override;
+  void beforeChange(const glm::dvec4& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };
@@ -616,7 +656,7 @@ Q_SIGNALS:
   void value2WillChange(int);
 
 protected:
-  void beforeChange(glm::ivec2& value) override;
+  void beforeChange(const glm::ivec2& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };
@@ -644,7 +684,7 @@ Q_SIGNALS:
   void value3WillChange(int);
 
 protected:
-  void beforeChange(glm::ivec3& value) override;
+  void beforeChange(const glm::ivec3& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };
@@ -700,8 +740,14 @@ public:
     m_decimal = d;
   }
 
-  [[nodiscard]] typename T::value_type singleStep() const { return m_step; }
-  [[nodiscard]] int decimal() const { return m_decimal; }
+  [[nodiscard]] typename T::value_type singleStep() const
+  {
+    return m_step;
+  }
+  [[nodiscard]] int decimal() const
+  {
+    return m_decimal;
+  }
 
   // default is horizonal
   void setWidgetOrientation(Qt::Orientation o)
@@ -751,8 +797,14 @@ public:
   }
 
   // Convenience aliases for consistency with scalar/vector params
-  [[nodiscard]] typename T::value_type rangeMin() const { return m_min; }
-  [[nodiscard]] typename T::value_type rangeMax() const { return m_max; }
+  [[nodiscard]] typename T::value_type rangeMin() const
+  {
+    return m_min;
+  }
+  [[nodiscard]] typename T::value_type rangeMax() const
+  {
+    return m_max;
+  }
 
   [[nodiscard]] typename T::value_type lowerValue() const
   {
@@ -832,6 +884,22 @@ public:
     this->set(v);
   }
 
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    json::object o;
+    o["type"] = "array";
+    o["minItems"] = 2;
+    o["maxItems"] = 2;
+    json::object item;
+    if (std::numeric_limits<typename T::value_type>::is_integer) {
+      item["type"] = "integer";
+    } else {
+      item["type"] = "number";
+    }
+    o["items"] = json::array{item, item};
+    return o;
+  }
+
 protected:
   void makeValid(T& value) const override
   {
@@ -887,7 +955,7 @@ Q_SIGNALS:
   void rangeChanged(int min, int max);
 
 protected:
-  void beforeChange(glm::ivec2& value) override;
+  void beforeChange(const glm::ivec2& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
@@ -915,7 +983,7 @@ Q_SIGNALS:
   void rangeChanged(double min, double max);
 
 protected:
-  void beforeChange(glm::vec2& value) override;
+  void beforeChange(const glm::vec2& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
@@ -943,7 +1011,7 @@ Q_SIGNALS:
   void rangeChanged(double min, double max);
 
 protected:
-  void beforeChange(glm::dvec2& value) override;
+  void beforeChange(const glm::dvec2& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 

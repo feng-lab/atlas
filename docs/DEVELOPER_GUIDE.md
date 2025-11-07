@@ -78,6 +78,9 @@ Architecture Overview
 - 3D window (`Z3DMainWindow`) — spawns a rendering thread and owns a `Z3DRenderingEngine` (moved to the rendering thread), and a `Z3DCanvas` on the UI thread.
 - Rendering engine (`Z3DRenderingEngine`) — owns the offscreen GL context, global parameters, compositor, network evaluator, and per-object 3D views.
 - Parameter system (`ZParameter` + subclasses) — typed, QObject-based, with signals/slots and JSON (de)serialization.
+  - Each parameter can now describe its own value JSON Schema via `ZParameter::valueSchema()`.
+    - Default is permissive (any JSON). Subclasses override for precision (numeric scalars/vectors/spans, options, transforms, camera).
+    - The Animation3D schema dumper queries `valueSchema()` and attaches `description()` when present.
 
 Lookup Tables (LUTs)
 

@@ -156,12 +156,14 @@ void ZBoolParameter::setValue(bool v)
   set(v);
 }
 
-void ZBoolParameter::beforeChange(bool& value)
+// Read-only: announce upcoming change; do not mutate 'value'.
+void ZBoolParameter::beforeChange(const bool& value)
 {
   Q_EMIT valueWillChange(value);
 }
 
-void ZBoolParameter::afterChange(bool&)
+// Read-only: emit typed change after commit.
+void ZBoolParameter::afterChange(const bool&)
 {
   Q_EMIT boolChanged(m_value);
 }
@@ -190,6 +192,13 @@ json::value ZBoolParameter::jsonValue() const
 void ZBoolParameter::readValue(const json::value& jsonValue)
 {
   set(jsonValue.as_bool());
+}
+
+json::object ZBoolParameter::valueSchema() const
+{
+  json::object o;
+  o["type"] = "boolean";
+  return o;
 }
 
 } // namespace nim

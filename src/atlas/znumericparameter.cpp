@@ -30,12 +30,14 @@ void ZIntParameter::setValue(int v)
   set(v);
 }
 
-void ZIntParameter::beforeChange(int& value)
+// Read-only hook: emit willChange; never mutate 'value'.
+void ZIntParameter::beforeChange(const int& value)
 {
   Q_EMIT valueWillChange(value);
 }
 
-void ZIntParameter::afterChange(int& value)
+// Read-only hook: emit typed changed after commit.
+void ZIntParameter::afterChange(const int& value)
 {
   Q_EMIT intChanged(value);
 }
@@ -95,12 +97,14 @@ void ZDoubleParameter::setValue(double v)
   set(v);
 }
 
-void ZDoubleParameter::beforeChange(double& value)
+// Read-only hook: emit willChange; never mutate 'value'.
+void ZDoubleParameter::beforeChange(const double& value)
 {
   Q_EMIT valueWillChange(value);
 }
 
-void ZDoubleParameter::afterChange(double& value)
+// Read-only hook: emit typed changed after commit.
+void ZDoubleParameter::afterChange(const double& value)
 {
   Q_EMIT doubleChanged(value);
 }
@@ -151,12 +155,14 @@ void ZFloatParameter::setValue(double v)
   set(static_cast<float>(v));
 }
 
-void ZFloatParameter::beforeChange(float& value)
+// Read-only hook: emit willChange; never mutate 'value'.
+void ZFloatParameter::beforeChange(const float& value)
 {
   Q_EMIT valueWillChange(value);
 }
 
-void ZFloatParameter::afterChange(float& value)
+// Read-only hook: emit typed changed after commit.
+void ZFloatParameter::afterChange(const float& value)
 {
   Q_EMIT floatChanged(static_cast<double>(value));
 }
@@ -218,7 +224,8 @@ void ZVec2Parameter::setValue2(double v)
   set(glm::vec2(m_value[0], static_cast<float>(v)));
 }
 
-void ZVec2Parameter::beforeChange(glm::vec2& value)
+// Read-only hook: emit per-component willChange; never mutate 'value'.
+void ZVec2Parameter::beforeChange(const glm::vec2& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
@@ -398,7 +405,8 @@ void ZVec3Parameter::setValue3(double v)
   set(glm::vec3(m_value[0], m_value[1], static_cast<float>(v)));
 }
 
-void ZVec3Parameter::beforeChange(glm::vec3& value)
+// Read-only hook: emit per-component willChange; never mutate 'value'.
+void ZVec3Parameter::beforeChange(const glm::vec3& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
@@ -659,7 +667,8 @@ void ZVec4Parameter::setValue4(double v)
   set(glm::vec4(m_value[0], m_value[1], m_value[2], static_cast<float>(v)));
 }
 
-void ZVec4Parameter::beforeChange(glm::vec4& value)
+// Read-only hook: emit per-component willChange; never mutate 'value'.
+void ZVec4Parameter::beforeChange(const glm::vec4& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
@@ -954,7 +963,8 @@ void ZDVec2Parameter::setValue2(double v)
   set(glm::dvec2(m_value[0], v));
 }
 
-void ZDVec2Parameter::beforeChange(glm::dvec2& value)
+// Read-only hook: emit per-component willChange; never mutate 'value'.
+void ZDVec2Parameter::beforeChange(const glm::dvec2& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
@@ -1134,7 +1144,8 @@ void ZDVec3Parameter::setValue3(double v)
   set(glm::dvec3(m_value[0], m_value[1], v));
 }
 
-void ZDVec3Parameter::beforeChange(glm::dvec3& value)
+// Read-only hook: emit per-component willChange; never mutate 'value'.
+void ZDVec3Parameter::beforeChange(const glm::dvec3& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
@@ -1382,7 +1393,8 @@ void ZDVec4Parameter::setValue4(double v)
   set(glm::dvec4(m_value[0], m_value[1], m_value[2], v));
 }
 
-void ZDVec4Parameter::beforeChange(glm::dvec4& value)
+// Read-only hook: emit per-component willChange; never mutate 'value'.
+void ZDVec4Parameter::beforeChange(const glm::dvec4& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
@@ -1677,7 +1689,8 @@ void ZIVec2Parameter::setValue2(int v)
   set(glm::ivec2(m_value[0], v));
 }
 
-void ZIVec2Parameter::beforeChange(glm::ivec2& value)
+// Read-only hook: emit per-component willChange; never mutate 'value'.
+void ZIVec2Parameter::beforeChange(const glm::ivec2& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
@@ -1839,7 +1852,8 @@ void ZIVec3Parameter::setValue3(int v)
   set(glm::ivec3(m_value[0], m_value[1], v));
 }
 
-void ZIVec3Parameter::beforeChange(glm::ivec3& value)
+// Read-only hook: emit per-component willChange; never mutate 'value'.
+void ZIVec3Parameter::beforeChange(const glm::ivec3& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
@@ -2051,7 +2065,8 @@ void ZIntSpanParameter::setUpperValue(int v)
   }
 }
 
-void ZIntSpanParameter::beforeChange(glm::ivec2& value)
+// Read-only hook: emit per-endpoint willChange; never mutate 'value'.
+void ZIntSpanParameter::beforeChange(const glm::ivec2& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT lowerValueWillChange(value[0]);
@@ -2182,7 +2197,8 @@ void ZFloatSpanParameter::setUpperValue(double v)
   }
 }
 
-void ZFloatSpanParameter::beforeChange(glm::vec2& value)
+// Read-only hook: emit per-endpoint willChange; never mutate 'value'.
+void ZFloatSpanParameter::beforeChange(const glm::vec2& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT lowerValueWillChange(value[0]);
@@ -2323,7 +2339,8 @@ void ZDoubleSpanParameter::setUpperValue(double v)
   }
 }
 
-void ZDoubleSpanParameter::beforeChange(glm::dvec2& value)
+// Read-only hook: emit per-endpoint willChange; never mutate 'value'.
+void ZDoubleSpanParameter::beforeChange(const glm::dvec2& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT lowerValueWillChange(value[0]);

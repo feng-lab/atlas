@@ -129,7 +129,7 @@ Discover at runtime
   ```
 
 Guidance
-- Use `scene_list_params(id)` and `capabilities.json` for parameter metadata (types, option_names, ranges); avoid hardcoding.
+- Use `scene_list_params(id)` and `capabilities.json` for parameter metadata (types, option_names, descriptions); avoid hardcoding.
 - Validate before applying: `scene_validate_apply` (scene) and `animation_camera_validate` (timeline camera). Handle soft errors (`type_mismatch`, `option_invalid`, etc.).
 
 ## Camera Usage (Produce → Apply)

@@ -27,7 +27,8 @@ QWidget* ZStringParameter::actualCreateWidget(QWidget* parent)
   return le;
 }
 
-void ZStringParameter::afterChange(QString&)
+// Read-only hook: emit typed changed after commit.
+void ZStringParameter::afterChange(const QString&)
 {
   Q_EMIT stringChanged(m_value);
 }

@@ -587,6 +587,37 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    // Array of keys: { intensity:number, colorL: color, colorR: color, split:boolean }
+    auto makeColor = []() {
+      json::object colorArraySchema;
+      colorArraySchema["type"] = "array";
+      json::object item; item["type"] = "number";
+      colorArraySchema["items"] = item;
+      colorArraySchema["minItems"] = 4;
+      colorArraySchema["maxItems"] = 4;
+      json::object asString; asString["type"] = "string";
+      json::object any; json::array arr; arr.emplace_back(asString); arr.emplace_back(colorArraySchema); any["anyOf"] = arr;
+      return any;
+    };
+    json::object keyObj;
+    json::object props;
+    props["intensity"] = json::object{{"type", "number"}};
+    props["colorL"] = makeColor();
+    props["colorR"] = makeColor();
+    props["split"] = json::object{{"type", "boolean"}};
+    keyObj["type"] = "object";
+    keyObj["properties"] = props;
+    json::array req; req.emplace_back("intensity"); req.emplace_back("colorL"); req.emplace_back("colorR"); req.emplace_back("split");
+    keyObj["required"] = req;
+    keyObj["additionalProperties"] = false;
+    json::object arr;
+    arr["type"] = "array";
+    arr["items"] = keyObj;
+    return arr;
+  }
+
 protected:
   QWidget* actualCreateWidget(QWidget* parent) override;
 };

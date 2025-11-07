@@ -203,6 +203,24 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    // Schema mirrors nested parameters written in jsonValue/readValue
+    json::object o;
+    o["type"] = "object";
+    json::object props;
+    props[m_projectionType.jsonKey().toStdString()] = m_projectionType.valueSchema();
+    props[m_eye.jsonKey().toStdString()] = m_eye.valueSchema();
+    props[m_center.jsonKey().toStdString()] = m_center.valueSchema();
+    props[m_upVector.jsonKey().toStdString()] = m_upVector.valueSchema();
+    props[m_eyeSeparationAngle.jsonKey().toStdString()] = m_eyeSeparationAngle.valueSchema();
+    props[m_fieldOfView.jsonKey().toStdString()] = m_fieldOfView.valueSchema();
+    // m_nearDist / m_farDist are not currently serialized
+    o["properties"] = props;
+    o["additionalProperties"] = false;
+    return o;
+  }
+
 Q_SIGNALS:
   void windowsAspectRatioChanged(float r);
 
@@ -227,9 +245,9 @@ protected:
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
-  void beforeChange(Z3DCamera& value) override;
+  void beforeChange(const Z3DCamera& value) override;
 
-  void updateWidget(Z3DCamera& value);
+  void updateWidget(const Z3DCamera& value);
 
   void updatePara()
   {

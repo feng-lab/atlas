@@ -165,14 +165,42 @@ void ZCutSpanParameter::readValue(const json::value& jsonValue)
     this->set(json::value_to<glm::vec2>(obj.at("Range FloatSpan")));
   }
 
-  // Apply to main value and reconcile according to current binding
-  glm::vec2 v = this->get();
-  beforeChange(v);
-  this->set(v);
+  // Setting the value triggers makeValid() and beforeChange() to reconcile according to binding
+  this->set(this->get());
 }
 
-void ZCutSpanParameter::beforeChange(glm::vec2& value)
+void ZCutSpanParameter::interpolate(const ZParameter& prev, double progress, ZParameter& dest)
 {
+  CHECK(this->isSameType(prev) && this->isSameType(dest));
+  const auto& prevPara = static_cast<const ZCutSpanParameter&>(prev);
+  auto& desPara = static_cast<ZCutSpanParameter&>(dest);
+
+  // Discrete fields first: choose prev until fully transitioned
+  if (progress >= 1.0) {
+    desPara.m_mode.forceSetValueSameAs(this->m_mode);
+    desPara.m_pinLower.setValueSameAs(this->m_pinLower);
+    desPara.m_pinUpper.setValueSameAs(this->m_pinUpper);
+  } else {
+    desPara.m_mode.forceSetValueSameAs(prevPara.m_mode);
+    desPara.m_pinLower.setValueSameAs(prevPara.m_pinLower);
+    desPara.m_pinUpper.setValueSameAs(prevPara.m_pinUpper);
+  }
+
+  // Normalized fractions: interpolate when both sides use Normalized; otherwise step
+  if (prevPara.mode() == Mode::Normalized && mode() == Mode::Normalized) {
+    desPara.m_normalized.set(glm::mix(prevPara.m_normalized.get(), m_normalized.get(), static_cast<float>(progress)));
+  } else {
+    desPara.m_normalized.set(progress >= 1.0 ? m_normalized.get() : prevPara.m_normalized.get());
+  }
+
+  // Interpolate absolute span; set() will clamp and run beforeChange() to honor binding
+  desPara.set(glm::mix(prevPara.get(), this->get(), static_cast<float>(progress)));
+}
+
+void ZCutSpanParameter::makeValid(glm::vec2& value) const
+{
+  // First let the base clamp/order
+  ZNumericSpanParameter<glm::vec2>::makeValid(value);
   const double mn = this->minimum();
   const double mx = this->maximum();
   const auto clampd = [](double v, double lo, double hi) {

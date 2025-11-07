@@ -60,7 +60,8 @@ void ZQuatParameter::setValue4(double v)
   set(glm::quat(static_cast<float>(v), m_value.x, m_value.y, m_value.z));
 }
 
-void ZQuatParameter::beforeChange(glm::quat& value)
+// Read-only hook: emit per-component willChange; never mutate 'value'.
+void ZQuatParameter::beforeChange(const glm::quat& value)
 {
   if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);

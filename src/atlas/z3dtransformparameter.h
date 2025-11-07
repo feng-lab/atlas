@@ -100,6 +100,20 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    json::object o;
+    o["type"] = "object";
+    json::object props;
+    props[m_scale.jsonKey().toStdString()] = m_scale.valueSchema();
+    props[m_translation.jsonKey().toStdString()] = m_translation.valueSchema();
+    props[m_rotation.jsonKey().toStdString()] = m_rotation.valueSchema();
+    props[m_center.jsonKey().toStdString()] = m_center.valueSchema();
+    o["properties"] = props;
+    o["additionalProperties"] = false;
+    return o;
+  }
+
 protected:
   void updateMatrix();
 
@@ -107,7 +121,7 @@ protected:
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
-  void beforeChange(glm::mat4& value) override;
+  void beforeChange(const glm::mat4& value) override;
 
   void updateWidget(const glm::mat4& value);
 

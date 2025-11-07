@@ -272,12 +272,15 @@ QWidget* Z3DCameraParameter::actualCreateWidget(QWidget* parent)
   return groupBox;
 }
 
-void Z3DCameraParameter::beforeChange(Z3DCamera& value)
+// Read-only hook: sync nested parameters to reflect 'value'; never mutate.
+void Z3DCameraParameter::beforeChange(const Z3DCamera& value)
 {
   updateWidget(value);
 }
 
-void Z3DCameraParameter::updateWidget(Z3DCamera& value)
+// Helper used by beforeChange and setSameAs to mirror camera fields into
+// child parameters; guarded to prevent feedback loops.
+void Z3DCameraParameter::updateWidget(const Z3DCamera& value)
 {
   QScopedValueRollback<bool> guard(m_blockSubParameterSignals, true);
 

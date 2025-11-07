@@ -11,10 +11,7 @@
 #include "zpunctadoc.h"
 #include "zsvgdoc.h"
 #include "zregionannotationdoc.h"
-#include "znumericparameter.h"
-#include "zoptionparameter.h"
 #include "z3dglobalparameters.h"
-#include "z3dtransformparameter.h"
 #include "zimg.h"
 #include <QTemporaryDir>
 #include <QFile>
@@ -23,6 +20,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <gflags/gflags.h>
+#include <cctype>
 
 DEFINE_bool(run_dump_animation3d_schema, false, "Dump Animation3D JSON Schema + capabilities and exit");
 DEFINE_string(dump_output_dir,
@@ -37,6 +35,54 @@ DECLARE_bool(__use_EGL);
 namespace nim {
 
 namespace {
+
+// Whitelist-only patternization for channelized keys. Return a regex
+// pattern only for known families; otherwise return empty.
+static std::string keyToWhitelistedChannelPattern(const std::string& key)
+{
+  struct Family
+  {
+    const char* prefix;
+    const char* suffix;
+  };
+  static const Family kFamilies[] = {
+    {"Show Channel ",      " Bool"                    },
+    {"Channel ",           " Display Range DoubleSpan"},
+    {"Transfer Function ", " 3DTransferFunction"      },
+    {"Slice Channel ",     " Colormap ColorMap"       },
+  };
+  auto starts_with = [](const std::string& s, const char* pre) {
+    size_t n = std::strlen(pre);
+    return s.size() >= n && s.compare(0, n, pre) == 0;
+  };
+  auto ends_with = [](const std::string& s, const char* suf) {
+    size_t n = std::strlen(suf);
+    return s.size() >= n && s.compare(s.size() - n, n, suf) == 0;
+  };
+  auto is_digits = [](const std::string& s) {
+    if (s.empty()) {
+      return false;
+    }
+    for (unsigned char c : s) {
+      if (!std::isdigit(c)) {
+        return false;
+      }
+    }
+    return true;
+  };
+  for (const auto& f : kFamilies) {
+    if (starts_with(key, f.prefix) && ends_with(key, f.suffix)) {
+      size_t preLen = std::strlen(f.prefix);
+      size_t sufLen = std::strlen(f.suffix);
+      std::string mid = key.substr(preLen, key.size() - preLen - sufLen);
+      if (is_digits(mid)) {
+        // Compose '^<prefix>\d+<suffix>$' (prefix/suffix contain only letters/spaces)
+        return std::string("^") + f.prefix + "\\d+" + f.suffix + "$";
+      }
+    }
+  }
+  return std::string();
+}
 
 // Helper to construct a permissive schema for color values: either string or [r,g,b,a]
 json::value makeColorSchema()
@@ -328,185 +374,6 @@ json::object buildSchema(const json::object& paramSchemas, const json::object& c
 
 } // namespace
 
-// Helpers to convert common parameter types to a JSON Schema for their value field
-static json::object makeNumberSchema(double minV, double maxV, bool isInteger)
-{
-  json::object o;
-  o["type"] = isInteger ? json::value_from("integer") : json::value_from("number");
-  // Hints only to remain permissive: loader clamps/ranges; do not enforce limits in schema
-  o["x-minimum"] = minV;
-  o["x-maximum"] = maxV;
-  return o;
-}
-
-static json::object schemaForParameter(const ZParameter& p)
-{
-  using namespace nim;
-  // 3D transform (object/world transform): expose structured subfields
-  if (auto tp = dynamic_cast<const Z3DTransformParameter*>(&p)) {
-    auto makeVecN = [](int n) {
-      json::object o;
-      o["type"] = "array";
-      o["minItems"] = n;
-      o["maxItems"] = n;
-      json::object item;
-      item["type"] = "number";
-      o["items"] = item;
-      return o;
-    };
-    json::object o;
-    o["type"] = "object";
-    json::object props;
-    // Canonical child jsonKeys (match engine serialization)
-    {
-      auto s = makeVecN(3);
-      s["description"] = "Uniform or non-uniform scale factors [sx, sy, sz]";
-      props["Scale Vec3"] = s;
-    }
-    {
-      auto t = makeVecN(3);
-      t["description"] = "Translation in world units [tx, ty, tz]";
-      props["Translation Vec3"] = t;
-    }
-    {
-      auto r = makeVecN(4);
-      r["description"] = "Rotation as [degrees, axis_x, axis_y, axis_z]";
-      props["Rotation Vec4"] = r; // angle(deg), axis x,y,z
-    }
-    {
-      auto c = makeVecN(3);
-      c["description"] = "Rotation/pivot center [cx, cy, cz]";
-      props["Rotation Center Vec3"] = c;
-    }
-    o["properties"] = props;
-    o["additionalProperties"] = false;
-    return o;
-  }
-  // Bool
-  if (auto b = dynamic_cast<const ZBoolParameter*>(&p)) {
-    json::object o;
-    o["type"] = "boolean";
-    return o;
-  }
-  // Scalars
-  if (auto ip = dynamic_cast<const ZIntParameter*>(&p)) {
-    return makeNumberSchema(ip->rangeMin(), ip->rangeMax(), true);
-  }
-  if (auto fp = dynamic_cast<const ZFloatParameter*>(&p)) {
-    return makeNumberSchema(fp->rangeMin(), fp->rangeMax(), false);
-  }
-  if (auto dp = dynamic_cast<const ZDoubleParameter*>(&p)) {
-    return makeNumberSchema(dp->rangeMin(), dp->rangeMax(), false);
-  }
-  // Spans
-  if (auto isp = dynamic_cast<const ZIntSpanParameter*>(&p)) {
-    json::object o;
-    o["type"] = "array";
-    o["minItems"] = 2;
-    o["maxItems"] = 2;
-    json::array items;
-    items.emplace_back(makeNumberSchema(isp->minimum(), isp->maximum(), true));
-    items.emplace_back(makeNumberSchema(isp->minimum(), isp->maximum(), true));
-    o["items"] = items;
-    return o;
-  }
-  if (auto fsp = dynamic_cast<const ZFloatSpanParameter*>(&p)) {
-    json::object o;
-    o["type"] = "array";
-    o["minItems"] = 2;
-    o["maxItems"] = 2;
-    json::array items;
-    items.emplace_back(makeNumberSchema(fsp->minimum(), fsp->maximum(), false));
-    items.emplace_back(makeNumberSchema(fsp->minimum(), fsp->maximum(), false));
-    o["items"] = items;
-    return o;
-  }
-  if (auto dsp = dynamic_cast<const ZDoubleSpanParameter*>(&p)) {
-    json::object o;
-    o["type"] = "array";
-    o["minItems"] = 2;
-    o["maxItems"] = 2;
-    json::array items;
-    items.emplace_back(makeNumberSchema(dsp->minimum(), dsp->maximum(), false));
-    items.emplace_back(makeNumberSchema(dsp->minimum(), dsp->maximum(), false));
-    o["items"] = items;
-    return o;
-  }
-  // Vector types
-  if (auto v2 = dynamic_cast<const ZVec2Parameter*>(&p)) {
-    json::object o;
-    o["type"] = "array";
-    o["minItems"] = 2;
-    o["maxItems"] = 2;
-    auto minV = v2->rangeMin();
-    auto maxV = v2->rangeMax();
-    json::array items;
-    for (int i = 0; i < 2; ++i) {
-      items.emplace_back(makeNumberSchema(minV[i], maxV[i], false));
-    }
-    o["items"] = items;
-    return o;
-  }
-  if (auto v3 = dynamic_cast<const ZVec3Parameter*>(&p)) {
-    json::object o;
-    o["type"] = "array";
-    o["minItems"] = 3;
-    o["maxItems"] = 3;
-    auto minV = v3->rangeMin();
-    auto maxV = v3->rangeMax();
-    json::array items;
-    for (int i = 0; i < 3; ++i) {
-      items.emplace_back(makeNumberSchema(minV[i], maxV[i], false));
-    }
-    o["items"] = items;
-    return o;
-  }
-  if (auto v4 = dynamic_cast<const ZVec4Parameter*>(&p)) {
-    json::object o;
-    o["type"] = "array";
-    o["minItems"] = 4;
-    o["maxItems"] = 4;
-    auto minV = v4->rangeMin();
-    auto maxV = v4->rangeMax();
-    json::array items;
-    for (int i = 0; i < 4; ++i) {
-      items.emplace_back(makeNumberSchema(minV[i], maxV[i], false));
-    }
-    o["items"] = items;
-    return o;
-  }
-  // Options
-  if (auto opt = dynamic_cast<const ZStringIntOptionParameter*>(&p)) {
-    // anyOf: known enums OR any string (permissive)
-    json::object o;
-    json::array any;
-    json::object enumObj;
-    enumObj["type"] = "string";
-    json::array enums;
-    for (const auto& s : opt->options()) {
-      enums.emplace_back(s.toStdString());
-    }
-    enumObj["enum"] = enums;
-    any.emplace_back(enumObj);
-    json::object anyStr;
-    anyStr["type"] = "string";
-    any.emplace_back(anyStr);
-    o["anyOf"] = any;
-    return o;
-  }
-  // Fallback: allow any JSON
-  json::object any;
-  json::array anyTypes;
-  anyTypes.emplace_back("object");
-  anyTypes.emplace_back("array");
-  anyTypes.emplace_back("number");
-  anyTypes.emplace_back("integer");
-  anyTypes.emplace_back("string");
-  anyTypes.emplace_back("boolean");
-  any["type"] = anyTypes;
-  return any;
-}
-
 static QString writeTextFile(const QString& path, const QString& content)
 {
   QFile f(path);
@@ -611,10 +478,15 @@ int ZRunDumpAnimation3DSchema::run()
 
     // Collect capabilities and parameter schemas
     json::object paramSchemas; // jsonKey -> schema
+    json::object patternSchemas; // regex pattern -> value schema (for digit-indexed keys)
     json::object capabilities;
     capabilities["version"] = std::string(GIT_VERSION);
     json::object globals;
-    auto collect = [&](const std::vector<nim::ZParameter*>& params, json::array& keyList, json::array* fullList) {
+    auto collect = [&](const std::vector<nim::ZParameter*>& params,
+                       json::array& keyList,
+                       json::array* fullList,
+                       json::array* keyPatterns,
+                       std::map<std::string, json::object>* patternMetas) {
       for (auto* p : params) {
         if (!p) {
           continue;
@@ -624,8 +496,39 @@ int ZRunDumpAnimation3DSchema::run()
         // Insert schema if first time
         auto k = key.toStdString();
         if (!paramSchemas.contains(k)) {
-          json::object ps = schemaForParameter(*p);
+          json::object ps = p->valueSchema();
           paramSchemas[k] = ps;
+        }
+        // Detect digit-indexed patterns (e.g., per-channel params) and record pattern schema/meta
+        std::string pat = keyToWhitelistedChannelPattern(k);
+        if (!pat.empty()) {
+          if (!patternSchemas.contains(pat)) {
+            patternSchemas[pat] = paramSchemas[k];
+          }
+          if (keyPatterns) {
+            bool exists = false;
+            for (const auto& v : *keyPatterns) {
+              if (v.is_string() && v.as_string() == pat) {
+                exists = true;
+                break;
+              }
+            }
+            if (!exists) {
+              keyPatterns->emplace_back(pat);
+            }
+          }
+          if (patternMetas && patternMetas->find(pat) == patternMetas->end()) {
+            json::object meta;
+            meta["jsonKeyPattern"] = pat;
+            meta["name"] = p->name().toStdString();
+            meta["type"] = p->type().toStdString();
+            meta["supportsInterpolation"] = p->supportInterpolation();
+            meta["valueSchema"] = paramSchemas[k];
+            if (!p->description().isEmpty()) {
+              meta["description"] = p->description().toStdString();
+            }
+            (*patternMetas)[pat] = meta;
+          }
         }
         if (fullList) {
           json::object meta;
@@ -634,6 +537,10 @@ int ZRunDumpAnimation3DSchema::run()
           meta["type"] = p->type().toStdString();
           meta["supportsInterpolation"] = p->supportInterpolation();
           meta["valueSchema"] = paramSchemas[k];
+          // Optional natural language description for LLMs/UIs (set at creation sites)
+          if (!p->description().isEmpty()) {
+            meta["description"] = p->description().toStdString();
+          }
           fullList->emplace_back(meta);
         }
       }
@@ -643,25 +550,51 @@ int ZRunDumpAnimation3DSchema::run()
     {
       json::array bgKeys, axisKeys, globalKeys;
       json::array bgFull, axisFull, globalFull;
-      collect(engine.parametersOfViewSetting(1), bgKeys, &bgFull);
-      collect(engine.parametersOfViewSetting(2), axisKeys, &axisFull);
-      collect(engine.parametersOfViewSetting(3), globalKeys, &globalFull);
+      json::array bgPatterns, axisPatterns, globalPatterns;
+      std::map<std::string, json::object> bgPatternMetas, axisPatternMetas, globalPatternMetas;
+      collect(engine.parametersOfViewSetting(1), bgKeys, &bgFull, &bgPatterns, &bgPatternMetas);
+      collect(engine.parametersOfViewSetting(2), axisKeys, &axisFull, &axisPatterns, &axisPatternMetas);
+      collect(engine.parametersOfViewSetting(3), globalKeys, &globalFull, &globalPatterns, &globalPatternMetas);
       {
         json::object o;
         o["keys"] = bgKeys;
         o["parameters"] = bgFull;
+        o["keyPatterns"] = bgPatterns;
+        if (!bgPatternMetas.empty()) {
+          json::array arr;
+          for (auto& [pk, meta] : bgPatternMetas) {
+            arr.emplace_back(meta);
+          }
+          o["parameterPatterns"] = arr;
+        }
         globals["Background"] = o;
       }
       {
         json::object o;
         o["keys"] = axisKeys;
         o["parameters"] = axisFull;
+        o["keyPatterns"] = axisPatterns;
+        if (!axisPatternMetas.empty()) {
+          json::array arr;
+          for (auto& [pk, meta] : axisPatternMetas) {
+            arr.emplace_back(meta);
+          }
+          o["parameterPatterns"] = arr;
+        }
         globals["Axis"] = o;
       }
       {
         json::object o;
         o["keys"] = globalKeys;
         o["parameters"] = globalFull;
+        o["keyPatterns"] = globalPatterns;
+        if (!globalPatternMetas.empty()) {
+          json::array arr;
+          for (auto& [pk, meta] : globalPatternMetas) {
+            arr.emplace_back(meta);
+          }
+          o["parameterPatterns"] = arr;
+        }
         globals["Global"] = o;
       }
     }
@@ -678,11 +611,21 @@ int ZRunDumpAnimation3DSchema::run()
     }
     for (const auto& [tn, id] : typeToId) {
       json::array keyList, fullList;
-      collect(engine.parametersOfViewSetting(id), keyList, &fullList);
+      json::array keyPatterns;
+      std::map<std::string, json::object> patternMetas;
+      collect(engine.parametersOfViewSetting(id), keyList, &fullList, &keyPatterns, &patternMetas);
       {
         json::object o;
         o["keys"] = keyList;
         o["parameters"] = fullList;
+        o["keyPatterns"] = keyPatterns;
+        if (!patternMetas.empty()) {
+          json::array arr;
+          for (auto& [pk, meta] : patternMetas) {
+            arr.emplace_back(meta);
+          }
+          o["parameterPatterns"] = arr;
+        }
         objects[tn.toStdString()] = o;
       }
     }
@@ -700,15 +643,36 @@ int ZRunDumpAnimation3DSchema::run()
     gi["Axis"] = globals.at("Axis").as_object().at("keys");
     gi["Global"] = globals.at("Global").as_object().at("keys");
     capsIndex["globals"] = gi;
+    json::object giPat;
+    if (globals.at("Background").as_object().contains("keyPatterns")) {
+      giPat["Background"] = globals.at("Background").as_object().at("keyPatterns");
+    }
+    if (globals.at("Axis").as_object().contains("keyPatterns")) {
+      giPat["Axis"] = globals.at("Axis").as_object().at("keyPatterns");
+    }
+    if (globals.at("Global").as_object().contains("keyPatterns")) {
+      giPat["Global"] = globals.at("Global").as_object().at("keyPatterns");
+    }
+    capsIndex["globals_patterns"] = giPat;
     json::object oi;
     for (auto& [k, v] : objects) {
       oi[k] = v.as_object().at("keys");
     }
     capsIndex["objects"] = oi;
+    json::object oiPat;
+    for (auto& [k, v] : objects) {
+      if (v.as_object().contains("keyPatterns")) {
+        oiPat[k] = v.as_object().at("keyPatterns");
+      }
+    }
+    capsIndex["objects_patterns"] = oiPat;
 
     // Dump the schema with precise parameter value schemas and capability index under $defs
     LOG(INFO) << "Dumping Animation3D schema to " << schemaOut;
     auto schema = buildSchema(paramSchemas, capsIndex);
+    // Expose pattern schemas for dynamic, digit-indexed keys (e.g., image channels)
+    schema["$defs"].as_object()["ParameterSchemaPatterns"] = patternSchemas;
+    schema["defs"].as_object()["ParameterSchemaPatterns"] = patternSchemas;
     saveJsonObject(schema, schemaOut);
     LOG(INFO) << "Schema and capabilities saved.";
     return 0;

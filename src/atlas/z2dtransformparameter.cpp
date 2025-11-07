@@ -233,7 +233,8 @@ QWidget* Z2DTransformParameter::actualCreateWidget(QWidget* parent)
   return groupBox;
 }
 
-void Z2DTransformParameter::beforeChange(glm::dmat3& value)
+// Read-only hook: sync nested parameters to reflect 'value'; never mutate.
+void Z2DTransformParameter::beforeChange(const glm::dmat3& value)
 {
   updateWidget(value);
 }

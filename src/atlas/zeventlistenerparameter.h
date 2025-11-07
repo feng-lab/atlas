@@ -67,6 +67,14 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    // Serialized as an empty string currently; accept string.
+    json::object o;
+    o["type"] = "string";
+    return o;
+  }
+
 Q_SIGNALS:
   void eventTriggered(QEvent* e, int w, int h);
 

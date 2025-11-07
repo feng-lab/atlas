@@ -60,6 +60,12 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   addParameter(m_colorMode);
   addParameter(m_color);
   addParameter(m_colorMap);
+  m_color.setDescription(QStringLiteral(
+    "Solid RGBA color used when 'Color Mode' is set to 'Single Color'."));
+  m_upDirectionColor.setDescription(QStringLiteral(
+    "RGBA color of the up-direction arrow; channels in [0,1]."));
+  m_viewDirectionColor.setDescription(QStringLiteral(
+    "RGBA color of the view-direction arrow; channels in [0,1]."));
   addParameter(m_timeInterval);
   addParameter(m_cameraSize);
   addParameter(m_showCameraDirection);

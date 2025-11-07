@@ -3,8 +3,14 @@
 #include "zcombobox.h"
 #include "zglmutils.h"
 #include "zparameter.h"
+#include <type_traits>
 
 namespace nim {
+
+// Helper for static_assert in dependent contexts
+template<typename>
+struct dependent_false : std::false_type
+{};
 
 // One of many options parameter. T is the description type, which should be
 // convertible to QString if create widget. T2 is data type associated with T.
@@ -62,8 +68,14 @@ public:
   }
 
   // Introspection helpers for schema/capabilities dumping
-  const std::vector<T>& options() const { return m_options; }
-  const std::vector<T2>& optionAssociatedData() const { return m_associatedDatas; }
+  const std::vector<T>& options() const
+  {
+    return m_options;
+  }
+  const std::vector<T2>& optionAssociatedData() const
+  {
+    return m_associatedDatas;
+  }
 
   void clearOptions()
   {
@@ -234,12 +246,41 @@ public:
 
   void forceSetValueSameAs(const ZParameter& rhs) override;
 
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    json::object o;
+    if constexpr (std::is_same_v<T, QString>) {
+      o["type"] = "string";
+      if (!m_options.empty()) {
+        json::array enums;
+        for (const auto& s : m_options) {
+          enums.emplace_back(s.toStdString());
+        }
+        o["enum"] = enums;
+      }
+    } else if constexpr (std::is_same_v<T, int>) {
+      o["type"] = "integer";
+      if (!m_options.empty()) {
+        json::array enums;
+        for (const auto& v : m_options) {
+          enums.emplace_back(v);
+        }
+        o["enum"] = enums;
+      }
+    } else {
+      static_assert(dependent_false<T>::value,
+                    "ZOptionParameter::valueSchema: unsupported option value type T."
+                    " Add a specialization/branch for this type.");
+    }
+    return o;
+  }
+
 protected:
   void reservedIntSlot1(int v) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
-  void beforeChange(T& value) override;
+  void beforeChange(const T& value) override;
 
   void makeValid(T& value) const override;
 

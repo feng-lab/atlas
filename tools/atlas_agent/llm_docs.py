@@ -133,22 +133,6 @@ def build_kb_cards(paths: Iterable[Path]) -> List[Dict[str, Any]]:
 # provided to LLMs at runtime via the tools parameter.
 
 
-def build_agent_facts() -> Dict[str, Any]:
-    return {
-        "ids": {
-            "camera": 0,
-            "background": 1,
-            "axis": 2,
-            "global": 3,
-            "objects_start": 4,
-        },
-        "contracts": {
-            "scene_vs_animation": "Scene (.scene) is stateless (no time/easing). Animation (.animation2d/.animation3d) holds keys. During playback, keys override scene values.",
-            "stateless_scene_apply": "scene_apply accepts set_params with id/json_key/value only; never include time/easing.",
-        },
-    }
-
-
 def _dump_schema_with_atlas(atlas_dir: Path, out_dir: Path) -> None:
     atlas_bin, _ = compute_paths_from_atlas_dir(atlas_dir)
     args = [str(atlas_bin), "--run_dump_animation3d_schema", "--dump_output_dir", str(out_dir)]
@@ -163,7 +147,6 @@ def _dump_schema_with_atlas(atlas_dir: Path, out_dir: Path) -> None:
 REQUIRED_FILES = [
     "animation3d.schema.json",
     "capabilities.json",
-    "agent_facts.json",
     "agent_kb.jsonl",
 ]
 
@@ -186,9 +169,6 @@ def ensure_llm_docs(repo_root: Path, *, atlas_dir: Optional[str] = None, out_dir
     # tools_agent.scene_tools_and_dispatcher() and exposed to LLMs at runtime via
     # the "tools" parameter. Keeping a second, static JSON manifest created from
     # docs was redundant and risked drift.
-
-    # High-signal facts
-    (out / "agent_facts.json").write_text(json.dumps(build_agent_facts(), indent=2, ensure_ascii=False), encoding="utf-8")
 
     # Knowledge cards
     cards = build_kb_cards(docs_inputs(repo_root))

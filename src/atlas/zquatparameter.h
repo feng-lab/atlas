@@ -31,7 +31,7 @@ protected:
 
   void setValue4(double v);
 
-  void beforeChange(glm::quat& value) override;
+  void beforeChange(const glm::quat& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };

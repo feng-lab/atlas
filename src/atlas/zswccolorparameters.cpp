@@ -65,6 +65,7 @@ void ZSwcColorParameters::initTopologyColor()
     std::make_unique<ZVec4Parameter>("Other", glm::vec4(255 / 255.f, 0 / 255.f, 0 / 255.f, 1.f)));
   for (const auto& color : colorsForDifferentTopology) {
     color->setStyle("COLOR");
+    color->setDescription(QStringLiteral("RGBA color in [0,1] for this topology class."));
   }
 }
 
@@ -154,6 +155,7 @@ void ZSwcColorParameters::initTypeColor()
 
   for (const auto& color : colorsForDifferentType) {
     color->setStyle("COLOR");
+    color->setDescription(QStringLiteral("RGBA color in [0,1] for this SWC type."));
   }
 }
 
@@ -193,6 +195,7 @@ void ZSwcColorParameters::initSubclassTypeColor()
     std::make_unique<ZVec4Parameter>(name, glm::vec4(0xcc / 255.f, 0xcc / 255.f, 0xcc / 255.f, 1.f)));
   for (const auto& color : colorsForSubclassType) {
     color->setStyle("COLOR");
+    color->setDescription(QStringLiteral("RGBA color in [0,1] for this subclass type."));
   }
 }
 

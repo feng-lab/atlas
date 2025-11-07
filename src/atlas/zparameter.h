@@ -38,8 +38,14 @@ public:
   [[nodiscard]] QString type() const;
 
   // Optional human-readable description for tooling/LLMs/UIs
-  [[nodiscard]] QString description() const { return m_description; }
-  void setDescription(const QString& d) { m_description = d; }
+  [[nodiscard]] QString description() const
+  {
+    return m_description;
+  }
+  void setDescription(const QString& d)
+  {
+    m_description = d;
+  }
 
   [[nodiscard]] QString style() const
   {
@@ -73,6 +79,10 @@ public:
   void read(const json::object& json);
 
   void write(json::object& json) const;
+
+  // JSON Schema for the parameter's VALUE shape (not the surrounding
+  // animation key object). Every subclass must implement this.
+  [[nodiscard]] virtual json::object valueSchema() const = 0;
 
   // set everything same as
   virtual void setSameAs(const ZParameter& rhs) = 0;
@@ -195,16 +205,18 @@ public:
   }
 
 protected:
-  // subclass can use this function to change input value to a valid value
-  // default implement do nothing
+  // Produce the canonical value before hooks run. Subclasses may adjust
+  // the incoming value here; set() calls this before any signals.
+  // Default: no-op.
   virtual void makeValid(T& value) const;
 
-  // subclass can use this function to Q_EMIT customized signal before m_value
-  // is changed or do other update, input is new value
-  virtual void beforeChange(T& value);
+  // Read-only hook: emit "will change" signals or sync dependent UI/state
+  // based on the new value about to be committed. Never mutate 'value'.
+  virtual void beforeChange(const T& value);
 
-  //
-  virtual void afterChange(T& value);
+  // Read-only hook: emit typed changed signals or perform side effects
+  // after commit. Never mutate 'value'.
+  virtual void afterChange(const T& value);
 
 protected:
   T m_value;
@@ -252,11 +264,11 @@ void ZSingleValueParameter<T>::makeValid(T& /*value*/) const
 {}
 
 template<class T>
-void ZSingleValueParameter<T>::beforeChange(T& /*value*/)
+void ZSingleValueParameter<T>::beforeChange(const T& /*value*/)
 {}
 
 template<class T>
-void ZSingleValueParameter<T>::afterChange(T& /*value*/)
+void ZSingleValueParameter<T>::afterChange(const T& /*value*/)
 {}
 
 //-----------------------------------------------------------------------------------------------
@@ -284,6 +296,8 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
+  [[nodiscard]] json::object valueSchema() const override;
+
   void setValue(bool v);
 
 Q_SIGNALS:
@@ -292,9 +306,9 @@ Q_SIGNALS:
   void boolChanged(bool);
 
 protected:
-  void beforeChange(bool& value) override;
+  void beforeChange(const bool& value) override;
 
-  void afterChange(bool& value) override;
+  void afterChange(const bool& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };

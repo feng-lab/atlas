@@ -1957,10 +1957,6 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             schema_dir = args.get("schema_dir")
             max_lines = args.get("max_lines") or 140
             sd, searched = discover_schema_dir(schema_dir, atlas_dir)
-            if not sd:
-                # Fall back to a generic summary without schema
-                text = build_capabilities_prompt(Path("/does/not/exist"), max_lines=max_lines)
-                return json.dumps({"ok": False, "summary": text, "searched": searched})
             try:
                 text = build_capabilities_prompt(Path(sd), max_lines=max_lines)
                 return json.dumps({"ok": True, "summary": text})

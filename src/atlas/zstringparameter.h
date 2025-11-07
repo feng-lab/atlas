@@ -29,6 +29,13 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    json::object o;
+    o["type"] = "string";
+    return o;
+  }
+
 Q_SIGNALS:
   void stringChanged(QString str);
 
@@ -37,7 +44,7 @@ protected:
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 
-  void afterChange(QString& value) override;
+  void afterChange(const QString& value) override;
 };
 
 } // namespace nim

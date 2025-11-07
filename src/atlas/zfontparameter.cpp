@@ -18,7 +18,8 @@ void ZFontParameter::setValue(const QFont& v)
   set(v);
 }
 
-void ZFontParameter::beforeChange(QFont& value)
+// Read-only hook: emit willChange; never mutate 'value'.
+void ZFontParameter::beforeChange(const QFont& value)
 {
   Q_EMIT valueWillChange(value);
 }

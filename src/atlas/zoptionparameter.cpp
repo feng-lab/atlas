@@ -106,8 +106,9 @@ QString ZOptionParameter<T, T2>::comboBoxItemString(const T& value) const
   return QString("%1%2%3").arg(m_prefix).arg(value).arg(m_suffix);
 }
 
+// Read-only hook: select associated data index; never mutate 'value'.
 template<class T, class T2>
-void ZOptionParameter<T, T2>::beforeChange(T& value)
+void ZOptionParameter<T, T2>::beforeChange(const T& value)
 {
   auto index = indexOf(m_options, value);
   m_associatedData = m_associatedDatas[index];

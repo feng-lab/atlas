@@ -54,10 +54,39 @@ public:
 public:
   [[nodiscard]] json::value jsonValue() const override;
   void readValue(const json::value& jsonValue) override;
+  void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
+
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    json::object obj;
+    obj["type"] = "object";
+    json::object props;
+    props[m_mode.jsonKey().toStdString()] = m_mode.valueSchema();
+    props[m_pinLower.jsonKey().toStdString()] = json::object{
+      {"type", "boolean"}
+    };
+    props[m_pinUpper.jsonKey().toStdString()] = json::object{
+      {"type", "boolean"}
+    };
+    props[m_normalized.jsonKey().toStdString()] = m_normalized.valueSchema();
+    // Absolute range row is stored under this literal key
+    json::object span;
+    span["type"] = "array";
+    span["minItems"] = 2;
+    span["maxItems"] = 2;
+    span["items"] = json::object{
+      {"type", "number"}
+    };
+    props["Range FloatSpan"] = span;
+    obj["properties"] = props;
+    obj["additionalProperties"] = false;
+    return obj;
+  }
 
 protected:
   // Reconcile absolute span on every set based on mode and current bounds.
-  void beforeChange(glm::vec2& value) override;
+  // Use makeValid to reconcile bindings; no beforeChange mutation
+  void makeValid(glm::vec2& value) const override;
   // On range change, re-evaluate absolute span according to the binding.
   void changeRange() override;
   QWidget* actualCreateWidget(QWidget* parent) override;

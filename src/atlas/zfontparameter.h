@@ -29,13 +29,20 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
+  [[nodiscard]] json::object valueSchema() const override
+  {
+    json::object o;
+    o["type"] = "string"; // serialized via QFont::toString()
+    return o;
+  }
+
 Q_SIGNALS:
   void valueWillChange(QFont);
 
 protected:
   void setValue(const QFont& v);
 
-  void beforeChange(QFont& value) override;
+  void beforeChange(const QFont& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
 };
