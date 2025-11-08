@@ -9,7 +9,7 @@ namespace nim {
 // A self-contained cut span parameter with binding behavior.
 // Encapsulates: absolute span, binding mode, pin-lower/upper, and normalized fractions.
 // Inherits the absolute value shape from ZFloatSpanParameter so existing users
-// can read the span directly; updates are reconciled via beforeChange/changeRange.
+// can read the span directly; updates are reconciled via makeValid/changeRange.
 class ZCutSpanParameter : public ZFloatSpanParameter
 {
   Q_OBJECT
@@ -23,6 +23,12 @@ public:
   };
 
   explicit ZCutSpanParameter(const QString& name, glm::vec2 value, float min, float max, QObject* parent = nullptr);
+
+  // Convenience: factory-friendly ctor so ZParameterFactory can instantiate a
+  // default instance and then copy-bind via setSameAs/forceSetValueSameAs.
+  explicit ZCutSpanParameter(const QString& name, QObject* parent = nullptr)
+    : ZCutSpanParameter(name, glm::vec2(0.f, 0.f), 0.f, 0.f, parent)
+  {}
 
   Mode mode() const
   {
@@ -79,7 +85,7 @@ public:
 
 protected:
   // Reconcile absolute span on every set based on mode and current bounds.
-  // Use makeValid to reconcile bindings; no beforeChange mutation
+  // Use makeValid to reconcile bindings
   void makeValid(glm::vec2& value) const override;
   // On range change, re-evaluate absolute span according to the binding.
   void changeRange() override;

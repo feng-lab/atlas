@@ -56,29 +56,21 @@ ZCutSpanParameter::ZCutSpanParameter(const QString& name, glm::vec2 value, float
   connect(&m_mode, &ZStringIntOptionParameter::valueChanged, this, [this]() {
     updateUiEnabling();
     // Range might already be valid; re-apply binding to the current span
-    glm::vec2 v = this->get();
-    beforeChange(v);
-    this->set(v);
+    this->set(this->get());
   });
   connect(&m_pinLower, &ZBoolParameter::valueChanged, this, [this]() {
     if (mode() == Mode::TrackEdges) {
-      glm::vec2 v = this->get();
-      beforeChange(v);
-      this->set(v);
+      this->set(this->get());
     }
   });
   connect(&m_pinUpper, &ZBoolParameter::valueChanged, this, [this]() {
     if (mode() == Mode::TrackEdges) {
-      glm::vec2 v = this->get();
-      beforeChange(v);
-      this->set(v);
+      this->set(this->get());
     }
   });
   connect(&m_normalized, &ZDoubleSpanParameter::valueChanged, this, [this]() {
     if (mode() == Mode::Normalized) {
-      glm::vec2 v = this->get();
-      beforeChange(v);
-      this->set(v);
+      this->set(this->get());
     }
   });
 
@@ -132,9 +124,7 @@ void ZCutSpanParameter::applyBounds(double min, double max)
 {
   // Adjust range, then recompute absolute based on binding
   ZFloatSpanParameter::setRange(static_cast<float>(min), static_cast<float>(max));
-  glm::vec2 v = this->get();
-  beforeChange(v);
-  this->set(v);
+  this->set(this->get());
 }
 
 json::value ZCutSpanParameter::jsonValue() const
@@ -165,7 +155,7 @@ void ZCutSpanParameter::readValue(const json::value& jsonValue)
     this->set(json::value_to<glm::vec2>(obj.at("Range FloatSpan")));
   }
 
-  // Setting the value triggers makeValid() and beforeChange() to reconcile according to binding
+  // Setting the value triggers makeValid() to reconcile according to binding
   this->set(this->get());
 }
 
@@ -193,7 +183,7 @@ void ZCutSpanParameter::interpolate(const ZParameter& prev, double progress, ZPa
     desPara.m_normalized.set(progress >= 1.0 ? m_normalized.get() : prevPara.m_normalized.get());
   }
 
-  // Interpolate absolute span; set() will clamp and run beforeChange() to honor binding
+  // Interpolate absolute span; set() will clamp and run makeValid() to honor binding
   desPara.set(glm::mix(prevPara.get(), this->get(), static_cast<float>(progress)));
 }
 
@@ -239,12 +229,9 @@ void ZCutSpanParameter::makeValid(glm::vec2& value) const
 
 void ZCutSpanParameter::changeRange()
 {
-  // When range changes, re-evaluate absolute from mode/pins/normalized
-  glm::vec2 v = this->get();
-  beforeChange(v);
   // Call base to emit rangeChanged first
   ZFloatSpanParameter::changeRange();
-  this->set(v);
+  this->set(this->get());
 }
 
 QWidget* ZCutSpanParameter::actualCreateWidget(QWidget* parent)

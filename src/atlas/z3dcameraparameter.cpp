@@ -69,10 +69,6 @@ Z3DCameraParameter::Z3DCameraParameter(const QString& name, QObject* parent)
   m_farDist.setStyle("SPINBOX");
   m_farDist.setRange(m_value.nearDist(), std::numeric_limits<float>::max());
   connect(&m_farDist, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateFarDist);
-
-  // Provide a rich, LLM/UI-friendly description similar to Coord Transform
-  setDescription(QStringLiteral(
-    "3D camera bundle with fields: 'Eye Position Vec3', 'Center Position Vec3', 'Up Vector Vec3', 'Field of View Float', 'Projection Type StringIntOption'."));
 }
 
 Z3DCameraParameter::Z3DCameraParameter(const QString& name, const Z3DCamera& value, QObject* parent)
@@ -136,10 +132,6 @@ Z3DCameraParameter::Z3DCameraParameter(const QString& name, const Z3DCamera& val
   m_farDist.setStyle("SPINBOX");
   m_farDist.setRange(m_value.nearDist(), std::numeric_limits<float>::max());
   connect(&m_farDist, &ZFloatParameter::valueChanged, this, &Z3DCameraParameter::updateFarDist);
-
-  // Provide a rich, LLM/UI-friendly description similar to Coord Transform
-  setDescription(QStringLiteral(
-    "3D camera bundle with fields: 'Eye Position Vec3', 'Center Position Vec3', 'Up Vector Vec3', 'Field of View Float', 'Projection Type StringIntOption'."));
 }
 
 void Z3DCameraParameter::flipViewDirection()

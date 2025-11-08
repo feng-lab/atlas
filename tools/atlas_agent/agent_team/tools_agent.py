@@ -17,7 +17,9 @@ from ..capabilities_prompt import build_capabilities_prompt
 from ..codegen_policy import is_codegen_enabled
 
 
-def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = None) -> Tuple[List[Dict[str, Any]], callable]:
+def scene_tools_and_dispatcher(
+    client: SceneClient, *, atlas_dir: str | None = None
+) -> Tuple[List[Dict[str, Any]], callable]:
     """Return (tool_specs, dispatcher) for OpenAI tool-calling.
 
     The dispatcher signature: (name: str, args_json: str) -> str
@@ -33,11 +35,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "reason": {"type": "string", "description": "Short reason (e.g., json_key_not_found, option_invalid, tool_missing)"},
-                        "details": {"type": "string", "description": "Specifics: id/json_key/value/time or missing option/label names"},
-                        "suggestion": {"type": "string", "description": "Optional next step suggestion for the user"}
+                        "reason": {
+                            "type": "string",
+                            "description": "Short reason (e.g., json_key_not_found, option_invalid, tool_missing)",
+                        },
+                        "details": {
+                            "type": "string",
+                            "description": "Specifics: id/json_key/value/time or missing option/label names",
+                        },
+                        "suggestion": {
+                            "type": "string",
+                            "description": "Optional next step suggestion for the user",
+                        },
                     },
-                    "required": ["reason"]
+                    "required": ["reason"],
                 },
             },
         },
@@ -94,7 +105,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "animation_describe_file",
                 "description": "Parse an .animation3d file and return a concise natural-language summary (uses capabilities.json for names).",
-                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+                "parameters": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                },
             },
         },
         {
@@ -105,10 +120,17 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
-                        "json_keys": {"type": "array", "items": {"type": "string"}, "description": "Param keys to read (empty = all)"}
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
+                        "json_keys": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Param keys to read (empty = all)",
+                        },
                     },
-                    "required": ["id", "json_keys"]
+                    "required": ["id", "json_keys"],
                 },
             },
         },
@@ -125,19 +147,36 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                                    "id": {
+                                        "type": "integer",
+                                        "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                                    },
                                     "json_key": {"type": "string"},
-                                    "value": {"description": "Typed value. For 3DTransform, use an object with canonical subfields (e.g., {\"Translation Vec3\":[x,y,z],\"Rotation Vec4\":[ang,x,y,z],\"Scale Vec3\":[sx,sy,sz],\"Rotation Center Vec3\":[cx,cy,cz]}).",
-                                               "type": ["object", "array", "number", "string", "boolean", "null"],
-                                               "items": {"type": ["string", "number", "boolean", "null"]}}
+                                    "value": {
+                                        "description": 'Typed value. For 3DTransform, use an object with canonical subfields (e.g., {"Translation Vec3":[x,y,z],"Rotation Vec4":[ang,x,y,z],"Scale Vec3":[sx,sy,sz],"Rotation Center Vec3":[cx,cy,cz]}).',
+                                        "type": [
+                                            "object",
+                                            "array",
+                                            "number",
+                                            "string",
+                                            "boolean",
+                                            "null",
+                                        ],
+                                        "items": {
+                                            "type": [
+                                                "string",
+                                                "number",
+                                                "boolean",
+                                                "null",
+                                            ]
+                                        },
+                                    },
                                 },
                                 "required": ["id", "json_key", "value"],
-                                
-                            }
+                            },
                         }
                     },
                     "required": ["set_params"],
-                    
                 },
             },
         },
@@ -154,20 +193,43 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
-                                    "json_key": {"type": "string", "description": "Canonical parameter key (preferred)"},
-                                    "name": {"type": "string", "description": "Display name; dispatcher resolves to json_key if provided"},
-                                    "value": {"description": "Typed value. For 3DTransform, use an object with canonical subfields (e.g., {\"Translation Vec3\":[x,y,z],\"Rotation Vec4\":[ang,x,y,z],\"Scale Vec3\":[sx,sy,sz],\"Rotation Center Vec3\":[cx,cy,cz]}).",
-                                               "type": ["object", "array", "number", "string", "boolean", "null"],
-                                               "items": {"type": ["string", "number", "boolean", "null"]}}
+                                    "id": {
+                                        "type": "integer",
+                                        "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                                    },
+                                    "json_key": {
+                                        "type": "string",
+                                        "description": "Canonical parameter key (preferred)",
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Display name; dispatcher resolves to json_key if provided",
+                                    },
+                                    "value": {
+                                        "description": 'Typed value. For 3DTransform, use an object with canonical subfields (e.g., {"Translation Vec3":[x,y,z],"Rotation Vec4":[ang,x,y,z],"Scale Vec3":[sx,sy,sz],"Rotation Center Vec3":[cx,cy,cz]}).',
+                                        "type": [
+                                            "object",
+                                            "array",
+                                            "number",
+                                            "string",
+                                            "boolean",
+                                            "null",
+                                        ],
+                                        "items": {
+                                            "type": [
+                                                "string",
+                                                "number",
+                                                "boolean",
+                                                "null",
+                                            ]
+                                        },
+                                    },
                                 },
                                 "required": ["id", "value"],
-                                
-                            }
+                            },
                         }
                     },
                     "required": ["set_params"],
-                    
                 },
             },
         },
@@ -176,7 +238,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "scene_save_scene",
                 "description": "Save current scene (.scene) to path.",
-                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+                "parameters": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                },
             },
         },
         {
@@ -195,11 +261,23 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "List of target object ids to focus"},
-                        "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)"},
-                        "min_radius": {"type": "number", "default": 0.0, "description": "Minimum radius to avoid degenerate views"}
+                        "ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "List of target object ids to focus",
+                        },
+                        "after_clipping": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Use clipped bbox (true) or full bbox (false)",
+                        },
+                        "min_radius": {
+                            "type": "number",
+                            "default": 0.0,
+                            "description": "Minimum radius to avoid degenerate views",
+                        },
                     },
-                    "required": ["ids", "after_clipping", "min_radius"]
+                    "required": ["ids", "after_clipping", "min_radius"],
                 },
             },
         },
@@ -211,10 +289,18 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "List of target object ids to point to"},
-                        "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)"}
+                        "ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "List of target object ids to point to",
+                        },
+                        "after_clipping": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Use clipped bbox (true) or full bbox (false)",
+                        },
                     },
-                    "required": ["ids", "after_clipping"]
+                    "required": ["ids", "after_clipping"],
                 },
             },
         },
@@ -226,11 +312,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "op": {"type": "string", "enum": ["AZIMUTH", "ELEVATION", "ROLL", "YAW", "PITCH", "FLIP"]},
-                        "degrees": {"type": "number", "default": 90.0}
+                        "op": {
+                            "type": "string",
+                            "enum": [
+                                "AZIMUTH",
+                                "ELEVATION",
+                                "ROLL",
+                                "YAW",
+                                "PITCH",
+                                "FLIP",
+                            ],
+                        },
+                        "degrees": {"type": "number", "default": 90.0},
                     },
                     "required": ["op", "degrees"],
-                    
                 },
             },
         },
@@ -242,16 +337,32 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mode": {"type": "string", "enum": ["XY", "XZ", "YZ", "RESET"], "default": "RESET", "description": "Preset view"},
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Candidate ids for sizing (optional for RESET)"},
-                        "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)"},
-                        "min_radius": {"type": "number", "default": 0.0, "description": "Minimum radius to avoid degenerate views"}
+                        "mode": {
+                            "type": "string",
+                            "enum": ["XY", "XZ", "YZ", "RESET"],
+                            "default": "RESET",
+                            "description": "Preset view",
+                        },
+                        "ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "Candidate ids for sizing (optional for RESET)",
+                        },
+                        "after_clipping": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Use clipped bbox (true) or full bbox (false)",
+                        },
+                        "min_radius": {
+                            "type": "number",
+                            "default": 0.0,
+                            "description": "Minimum radius to avoid degenerate views",
+                        },
                     },
-                    "required": ["mode", "ids", "after_clipping", "min_radius"]
+                    "required": ["mode", "ids", "after_clipping", "min_radius"],
                 },
             },
         },
-        
         {
             "type": "function",
             "function": {
@@ -260,18 +371,53 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "mode": {"type": "string", "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"], "description": "Solve mode for generating camera keys."},
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids; empty uses fit_candidates()."},
-                        "t0": {"type": "number", "description": "Start time (seconds) of the write window."},
-                        "t1": {"type": "number", "description": "End time (seconds) of the write window."},
-                        "constraints": {"type": "object", "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, fov policy)."},
-                        "params": {"type": "object", "description": "Mode-specific parameters (e.g., axis for ORBIT)."},
-                        "degrees": {"type": "number", "description": "ORBIT: total rotation in degrees (default 360)."},
-                        "tolerance": {"type": "number", "default": 1e-3, "description": "Time tolerance used when clearing/replacing keys."},
-                        "easing": {"type": "string", "default": "Linear", "description": "Easing to assign to written keys."},
-                        "clear_range": {"type": "boolean", "default": True, "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys."}
+                        "mode": {
+                            "type": "string",
+                            "enum": ["FIT", "ORBIT", "DOLLY", "STATIC"],
+                            "description": "Solve mode for generating camera keys.",
+                        },
+                        "ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "Target ids; empty uses fit_candidates().",
+                        },
+                        "t0": {
+                            "type": "number",
+                            "description": "Start time (seconds) of the write window.",
+                        },
+                        "t1": {
+                            "type": "number",
+                            "description": "End time (seconds) of the write window.",
+                        },
+                        "constraints": {
+                            "type": "object",
+                            "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, fov policy).",
+                        },
+                        "params": {
+                            "type": "object",
+                            "description": "Mode-specific parameters (e.g., axis for ORBIT).",
+                        },
+                        "degrees": {
+                            "type": "number",
+                            "description": "ORBIT: total rotation in degrees (default 360).",
+                        },
+                        "tolerance": {
+                            "type": "number",
+                            "default": 1e-3,
+                            "description": "Time tolerance used when clearing/replacing keys.",
+                        },
+                        "easing": {
+                            "type": "string",
+                            "default": "Linear",
+                            "description": "Easing to assign to written keys.",
+                        },
+                        "clear_range": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Remove existing camera keys inside [t0,t1] (within tolerance) before applying new keys.",
+                        },
                     },
-                    "required": ["mode", "ids", "t0", "t1"]
+                    "required": ["mode", "ids", "t0", "t1"],
                 },
             },
         },
@@ -283,17 +429,34 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Target ids to validate against (typically fit_candidates)."},
-                        "times": {"type": "array", "items": {"type": "number"}, "description": "Times (seconds) for each camera key."},
-                        "values": {"type": "array", "items": {"type": "object"}, "description": "Typed camera values aligned with times."},
-                        "constraints": {"type": "object", "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, etc.)."},
-                        "policies": {"type": "object", "description": "Adjustment policies (adjust_fov, adjust_distance, adjust_clipping)."}
+                        "ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "Target ids to validate against (typically fit_candidates).",
+                        },
+                        "times": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "description": "Times (seconds) for each camera key.",
+                        },
+                        "values": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                            "description": "Typed camera values aligned with times.",
+                        },
+                        "constraints": {
+                            "type": "object",
+                            "description": "Visibility/coverage constraints (keep_visible, margin, min_coverage, etc.).",
+                        },
+                        "policies": {
+                            "type": "object",
+                            "description": "Adjustment policies (adjust_fov, adjust_distance, adjust_clipping).",
+                        },
                     },
-                    "required": ["ids", "times", "values"]
+                    "required": ["ids", "times", "values"],
                 },
             },
         },
-
         {
             "type": "function",
             "function": {
@@ -302,10 +465,22 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional target ids; when omitted uses fit_candidates()."},
-                        "after_clipping": {"type": "boolean", "default": True, "description": "Use clipped bbox (true) or full bbox (false)."},
-                        "min_radius": {"type": "number", "default": 0.0, "description": "Minimum radius (world units) for the fit sphere; 0 disables."}
-                    }
+                        "ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "Optional target ids; when omitted uses fit_candidates().",
+                        },
+                        "after_clipping": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Use clipped bbox (true) or full bbox (false).",
+                        },
+                        "min_radius": {
+                            "type": "number",
+                            "default": 0.0,
+                            "description": "Minimum radius (world units) for the fit sphere; 0 disables.",
+                        },
+                    },
                 },
             },
         },
@@ -317,9 +492,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "value": {"type": "object", "description": "Typed camera value (object with camera fields)."}
+                        "value": {
+                            "type": "object",
+                            "description": "Typed camera value (object with camera fields).",
+                        }
                     },
-                    "required": ["value"]
+                    "required": ["value"],
                 },
             },
         },
@@ -331,17 +509,28 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
                         "name": {"type": "string"},
                         "type_hint": {"type": "string"},
                         "time": {"type": "number"},
                         "easing": {"type": "string", "default": "Linear"},
-                        "value": {"description": "Native JSON value. For composite params like 3DTransform, pass an object with canonical subfields (e.g., {\"Translation Vec3\":[x,y,z],\"Rotation Vec4\":[ang,x,y,z],\"Scale Vec3\":[sx,sy,sz],\"Rotation Center Vec3\":[cx,cy,cz]}).",
-                                   "type": ["object", "array", "number", "string", "boolean", "null"],
-                                   "items": {"type": ["string", "number", "boolean", "null"]}},
+                        "value": {
+                            "description": 'Native JSON value. For composite params like 3DTransform, pass an object with canonical subfields (e.g., {"Translation Vec3":[x,y,z],"Rotation Vec4":[ang,x,y,z],"Scale Vec3":[sx,sy,sz],"Rotation Center Vec3":[cx,cy,cz]}).',
+                            "type": [
+                                "object",
+                                "array",
+                                "number",
+                                "string",
+                                "boolean",
+                                "null",
+                            ],
+                            "items": {"type": ["string", "number", "boolean", "null"]},
+                        },
                     },
                     "required": ["id", "name", "time", "value"],
-                    
                 },
             },
         },
@@ -353,13 +542,15 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
                         "json_key": {"type": "string"},
                         "time": {"type": "number"},
-                        "tolerance": {"type": "number", "default": 1e-3}
+                        "tolerance": {"type": "number", "default": 1e-3},
                     },
                     "required": ["id", "json_key", "time"],
-                    
                 },
             },
         },
@@ -371,15 +562,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
                         "json_key": {"type": "string"},
                         "time": {"type": "number"},
                         "easing": {"type": "string", "default": "Linear"},
-                        "value": {"description": "Native JSON value (bool/number/string/array)",
-                                   "type": ["string", "number", "boolean", "null", "array"],
-                                   "items": {"type": ["string", "number", "boolean", "null"]}},
+                        "value": {
+                            "description": "Native JSON value (bool/number/string/array)",
+                            "type": ["string", "number", "boolean", "null", "array"],
+                            "items": {"type": ["string", "number", "boolean", "null"]},
+                        },
                         "tolerance": {"type": "number", "default": 1e-3},
-                        "strict": {"type": "boolean", "default": False}
+                        "strict": {"type": "boolean", "default": False},
                     },
                     "required": ["id", "json_key", "time", "value"],
                 },
@@ -397,12 +593,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         "easing": {"type": "string", "default": "Linear"},
                         "value": {"type": "object"},
                         "tolerance": {"type": "number", "default": 1e-3},
-                        "strict": {"type": "boolean", "default": False}
+                        "strict": {"type": "boolean", "default": False},
                     },
                     "required": ["time", "value"],
-                    
-                }
-            }
+                },
+            },
         },
         {
             "type": "function",
@@ -417,7 +612,17 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "fs_expand_paths",
                 "description": "Expand ~ and env vars and normalize paths. Returns expanded absolute-like paths per entry (relative kept relative).",
-                "parameters": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}, "description": "Input paths (may contain ~ or env vars)"}}, "required": ["paths"]},
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "paths": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Input paths (may contain ~ or env vars)",
+                        }
+                    },
+                    "required": ["paths"],
+                },
             },
         },
         {
@@ -425,7 +630,17 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "fs_check_paths",
                 "description": "Check which of the given paths exist on the local filesystem. Returns {exists:[], missing:[]}.",
-                "parameters": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}, "description": "Paths to check"}}, "required": ["paths"]},
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "paths": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Paths to check",
+                        }
+                    },
+                    "required": ["paths"],
+                },
             },
         },
         {
@@ -436,14 +651,40 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Path to a text file (supports ~ and env var expansion)"},
-                        "start_line": {"type": ["integer","null"], "description": "Line index (0-based). Negative means offset from end (last line = -1). When combined with start/length, slicing applies within the byte window (discouraged unless intentional)."},
-                        "line_count": {"type": ["integer","null"], "description": "Number of lines to return from start_line. Omit/null to read to the end. Requires start_line; to tail last N lines use start_line=-N."},
-                        "regex": {"type": ["string","null"], "description": "If set, filter returned lines by this regex (applied after slicing). Implies line mode. Discouraged to combine with byte windows unless intentional."},
-                        "start": {"type": ["integer","null"], "description": "Start byte offset. Negative values mean offset from end (EOF + start). When combined with start_line/line_count, the line slice is applied to this byte window (discouraged unless intentional)."},
-                        "length": {"type": ["integer","null"], "description": "Number of bytes to read from start. Omit/null to read to EOF."},
-                        "encoding": {"type": ["string","null"], "description": "Force a specific text encoding (default: auto-detect BOM then utf-8)."},
-                        "errors": {"type": "string", "enum": ["strict","ignore","replace"], "default": "replace", "description": "Decode error policy."}
+                        "path": {
+                            "type": "string",
+                            "description": "Path to a text file (supports ~ and env var expansion)",
+                        },
+                        "start_line": {
+                            "type": ["integer", "null"],
+                            "description": "Line index (0-based). Negative means offset from end (last line = -1). When combined with start/length, slicing applies within the byte window (discouraged unless intentional).",
+                        },
+                        "line_count": {
+                            "type": ["integer", "null"],
+                            "description": "Number of lines to return from start_line. Omit/null to read to the end. Requires start_line; to tail last N lines use start_line=-N.",
+                        },
+                        "regex": {
+                            "type": ["string", "null"],
+                            "description": "If set, filter returned lines by this regex (applied after slicing). Implies line mode. Discouraged to combine with byte windows unless intentional.",
+                        },
+                        "start": {
+                            "type": ["integer", "null"],
+                            "description": "Start byte offset. Negative values mean offset from end (EOF + start). When combined with start_line/line_count, the line slice is applied to this byte window (discouraged unless intentional).",
+                        },
+                        "length": {
+                            "type": ["integer", "null"],
+                            "description": "Number of bytes to read from start. Omit/null to read to EOF.",
+                        },
+                        "encoding": {
+                            "type": ["string", "null"],
+                            "description": "Force a specific text encoding (default: auto-detect BOM then utf-8).",
+                        },
+                        "errors": {
+                            "type": "string",
+                            "enum": ["strict", "ignore", "replace"],
+                            "default": "replace",
+                            "description": "Decode error policy.",
+                        },
                     },
                     "required": ["path"],
                 },
@@ -458,11 +699,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     "type": "object",
                     "properties": {
                         "path": {"type": "string"},
-                        "n": {"type": "integer", "default": 200}
+                        "n": {"type": "integer", "default": 200},
                     },
-                    "required": ["path"]
-                }
-            }
+                    "required": ["path"],
+                },
+            },
         },
         {
             "type": "function",
@@ -473,11 +714,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     "type": "object",
                     "properties": {
                         "path": {"type": "string"},
-                        "bytes": {"type": "integer", "default": 4096}
+                        "bytes": {"type": "integer", "default": 4096},
                     },
-                    "required": ["path"]
-                }
-            }
+                    "required": ["path"],
+                },
+            },
         },
         {
             "type": "function",
@@ -487,13 +728,36 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Path to file (supports ~ and env var expansion)"},
-                        "regex": {"type": "string", "description": "Regular expression to search. Interpreted on encoded bytes; use case_sensitive=false for ASCII-insensitive search."},
-                        "start": {"type": ["integer","null"], "description": "Start byte offset to begin searching (default 0)."},
-                        "length": {"type": ["integer","null"], "description": "Number of bytes to search from start (default: to EOF)."},
-                        "case_sensitive": {"type": "boolean", "default": true, "description": "ASCII-insensitive match when false (bytes mode)."},
-                        "encoding": {"type": ["string","null"], "description": "Optional known encoding; otherwise detect BOM then default to utf-8 for pattern encoding only."},
-                        "max_matches": {"type": "integer", "default": 0, "description": "0=unlimited (correctness-first). If >0, stops after this many matches and sets limit_reached=true."}
+                        "path": {
+                            "type": "string",
+                            "description": "Path to file (supports ~ and env var expansion)",
+                        },
+                        "regex": {
+                            "type": "string",
+                            "description": "Regular expression to search. Interpreted on encoded bytes; use case_sensitive=false for ASCII-insensitive search.",
+                        },
+                        "start": {
+                            "type": ["integer", "null"],
+                            "description": "Start byte offset to begin searching (default 0).",
+                        },
+                        "length": {
+                            "type": ["integer", "null"],
+                            "description": "Number of bytes to search from start (default: to EOF).",
+                        },
+                        "case_sensitive": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "ASCII-insensitive match when false (bytes mode).",
+                        },
+                        "encoding": {
+                            "type": ["string", "null"],
+                            "description": "Optional known encoding; otherwise detect BOM then default to utf-8 for pattern encoding only.",
+                        },
+                        "max_matches": {
+                            "type": "integer",
+                            "default": 0,
+                            "description": "0=unlimited (correctness-first). If >0, stops after this many matches and sets limit_reached=true.",
+                        },
                     },
                     "required": ["path", "regex"],
                 },
@@ -507,7 +771,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Path to a JSON file (supports ~ and env var expansion)"}
+                        "path": {
+                            "type": "string",
+                            "description": "Path to a JSON file (supports ~ and env var expansion)",
+                        }
                     },
                     "required": ["path"],
                 },
@@ -521,13 +788,33 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "path": {"type": "string", "description": "Possibly-typoed path to resolve"},
-                        "kind": {"type": "string", "enum": ["file", "dir", "either"], "default": "either", "description": "Expected kind"},
-                        "base_dirs": {"type": "array", "items": {"type": "string"}, "description": "Optional extra search bases"},
-                        "max_results": {"type": "integer", "default": 10, "description": "Max candidate results"},
-                        "max_depth": {"type": "integer", "default": 6, "description": "Max recursive depth when searching anchors"}
+                        "path": {
+                            "type": "string",
+                            "description": "Possibly-typoed path to resolve",
+                        },
+                        "kind": {
+                            "type": "string",
+                            "enum": ["file", "dir", "either"],
+                            "default": "either",
+                            "description": "Expected kind",
+                        },
+                        "base_dirs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Optional extra search bases",
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "default": 10,
+                            "description": "Max candidate results",
+                        },
+                        "max_depth": {
+                            "type": "integer",
+                            "default": 6,
+                            "description": "Max recursive depth when searching anchors",
+                        },
                     },
-                    "required": ["path"]
+                    "required": ["path"],
                 },
             },
         },
@@ -539,16 +826,30 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "hint_text": {"type": "string", "description": "Natural language hint, e.g., 'load file foo.txt from atlas_test in my Documents'"},
-                        "expected_name": {"type": ["string","null"], "description": "Optional exact basename when known (e.g., foo.txt)"},
-                        "kind": {"type": "string", "enum": ["file", "dir", "either"], "default": "file"},
-                        "base_dirs": {"type": "array", "items": {"type": "string"}, "description": "Optional extra search bases (absolute or ~ expanded)"},
+                        "hint_text": {
+                            "type": "string",
+                            "description": "Natural language hint, e.g., 'load file foo.txt from atlas_test in my Documents'",
+                        },
+                        "expected_name": {
+                            "type": ["string", "null"],
+                            "description": "Optional exact basename when known (e.g., foo.txt)",
+                        },
+                        "kind": {
+                            "type": "string",
+                            "enum": ["file", "dir", "either"],
+                            "default": "file",
+                        },
+                        "base_dirs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Optional extra search bases (absolute or ~ expanded)",
+                        },
                         "max_results": {"type": "integer", "default": 12},
-                        "max_depth": {"type": "integer", "default": 6}
+                        "max_depth": {"type": "integer", "default": 6},
                     },
-                    "required": ["hint_text"]
-                }
-            }
+                    "required": ["hint_text"],
+                },
+            },
         },
         {
             "type": "function",
@@ -559,10 +860,18 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     "type": "object",
                     "properties": {
                         "dir": {"type": "string", "description": "Directory to glob"},
-                        "pattern": {"type": "string", "default": "*", "description": "Glob pattern"},
-                        "recursive": {"type": "boolean", "default": False, "description": "Recurse into subdirs"}
+                        "pattern": {
+                            "type": "string",
+                            "default": "*",
+                            "description": "Glob pattern",
+                        },
+                        "recursive": {
+                            "type": "boolean",
+                            "default": False,
+                            "description": "Recurse into subdirs",
+                        },
                     },
-                    "required": ["dir"]
+                    "required": ["dir"],
                 },
             },
         },
@@ -574,16 +883,39 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "script": {"type": "string", "description": "Python source code"},
-                        "filename": {"type": "string", "description": "Optional filename for the script (for logging)"},
-                        "args": {"type": "array", "items": {"type": "string"}, "default": [], "description": "argv to pass to the script"},
-                        "timeout_sec": {"type": "number", "default": 120.0, "description": "Execution timeout"},
-                        "echo_script": {"type": "boolean", "default": True, "description": "Include script echo in response"},
-                        "max_echo_chars": {"type": "integer", "default": 4000, "description": "Max script chars to echo"}
+                        "script": {
+                            "type": "string",
+                            "description": "Python source code",
+                        },
+                        "filename": {
+                            "type": "string",
+                            "description": "Optional filename for the script (for logging)",
+                        },
+                        "args": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "default": [],
+                            "description": "argv to pass to the script",
+                        },
+                        "timeout_sec": {
+                            "type": "number",
+                            "default": 120.0,
+                            "description": "Execution timeout",
+                        },
+                        "echo_script": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Include script echo in response",
+                        },
+                        "max_echo_chars": {
+                            "type": "integer",
+                            "default": 4000,
+                            "description": "Max script chars to echo",
+                        },
                     },
-                    "required": ["script"]
-                }
-            }
+                    "required": ["script"],
+                },
+            },
         },
         {
             "type": "function",
@@ -593,7 +925,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "files": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths to load"},
+                        "files": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Absolute paths to load",
+                        },
                     },
                     "required": ["files"],
                 },
@@ -607,7 +943,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "files": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths to load (idempotent)"},
+                        "files": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Absolute paths to load (idempotent)",
+                        },
                     },
                     "required": ["files"],
                 },
@@ -621,10 +961,35 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "names": {"type": "array", "items": {"type": "string"}, "description": "Basenames to search"},
-                        "dir_hints": {"type": "array", "items": {"type": "string"}, "description": "Hint directories"},
-                        "extensions": {"type": "array", "items": {"type": "string"}, "default": [".msh", ".obj", ".ply", ".swc", ".nii", ".tif", ".tiff"], "description": "Allowed extensions"},
-                        "case_insensitive": {"type": "boolean", "default": True, "description": "Case-insensitive matching"}
+                        "names": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Basenames to search",
+                        },
+                        "dir_hints": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Hint directories",
+                        },
+                        "extensions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "default": [
+                                ".msh",
+                                ".obj",
+                                ".ply",
+                                ".swc",
+                                ".nii",
+                                ".tif",
+                                ".tiff",
+                            ],
+                            "description": "Allowed extensions",
+                        },
+                        "case_insensitive": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Case-insensitive matching",
+                        },
                     },
                     "required": ["names"],
                 },
@@ -638,10 +1003,35 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "dirs": {"type": "array", "items": {"type": "string"}, "description": "Search directories"},
-                        "names": {"type": "array", "items": {"type": "string"}, "description": "Basenames to resolve"},
-                        "extensions": {"type": "array", "items": {"type": "string"}, "default": [".msh", ".obj", ".ply", ".swc", ".nii", ".tif", ".tiff"], "description": "Allowed extensions"},
-                        "case_insensitive": {"type": "boolean", "default": True, "description": "Case-insensitive matching"}
+                        "dirs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Search directories",
+                        },
+                        "names": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Basenames to resolve",
+                        },
+                        "extensions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "default": [
+                                ".msh",
+                                ".obj",
+                                ".ply",
+                                ".swc",
+                                ".nii",
+                                ".tif",
+                                ".tiff",
+                            ],
+                            "description": "Allowed extensions",
+                        },
+                        "case_insensitive": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Case-insensitive matching",
+                        },
                     },
                     "required": ["dirs", "names"],
                 },
@@ -663,10 +1053,18 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids (empty = all)"},
-                        "after_clipping": {"type": "boolean", "default": False, "description": "Use clipped bbox (true) or full bbox (false)"}
+                        "ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "Object ids (empty = all)",
+                        },
+                        "after_clipping": {
+                            "type": "boolean",
+                            "default": False,
+                            "description": "Use clipped bbox (true) or full bbox (false)",
+                        },
                     },
-                    "required": ["ids", "after_clipping"]
+                    "required": ["ids", "after_clipping"],
                 },
             },
         },
@@ -678,15 +1076,23 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
-                        "json_key": {"type": "string", "description": "Parameter json_key (ignored for camera); use canonical names from scene_list_params(id)"},
-                        "include_values": {"type": "boolean", "description": "True to include value_json samples for each key"}
+                        "id": {
+                            "type": "integer",
+                            "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
+                        "json_key": {
+                            "type": "string",
+                            "description": "Parameter json_key (ignored for camera); use canonical names from scene_list_params(id)",
+                        },
+                        "include_values": {
+                            "type": "boolean",
+                            "description": "True to include value_json samples for each key",
+                        },
                     },
-                    "required": ["id", "json_key", "include_values"]
+                    "required": ["id", "json_key", "include_values"],
                 },
             },
         },
-        
         {
             "type": "function",
             "function": {
@@ -711,10 +1117,13 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"}
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                        }
                     },
-                    "required": ["id"]
-                }
+                    "required": ["id"],
+                },
             },
         },
         {
@@ -725,11 +1134,16 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
                         "json_key": {"type": "string"},
-                        "value": {"description": "Candidate JSON value (native types)",
-                                   "type": ["string", "number", "boolean", "null", "array"],
-                                   "items": {"type": ["string", "number", "boolean", "null"]}},
+                        "value": {
+                            "description": "Candidate JSON value (native types)",
+                            "type": ["string", "number", "boolean", "null", "array"],
+                            "items": {"type": ["string", "number", "boolean", "null"]},
+                        },
                     },
                     "required": ["id", "json_key", "value"],
                 },
@@ -748,7 +1162,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "animation_set_duration",
                 "description": "Set animation duration in seconds.",
-                "parameters": {"type": "object", "properties": {"seconds": {"type": "number"}}},
+                "parameters": {
+                    "type": "object",
+                    "properties": {"seconds": {"type": "number"}},
+                },
             },
         },
         {
@@ -759,14 +1176,25 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
-                        "json_key": {"type": "string", "description": "Canonical json_key; if omitted, 'name' is used to resolve."},
-                        "name": {"type": "string", "description": "Display name to resolve to json_key when json_key is not provided."},
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
+                        "json_key": {
+                            "type": "string",
+                            "description": "Canonical json_key; if omitted, 'name' is used to resolve.",
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Display name to resolve to json_key when json_key is not provided.",
+                        },
                         "time": {"type": "number"},
                         "easing": {"type": "string", "default": "Linear"},
-                        "value": {"description": "Native JSON value (bool/number/string/array)",
-                                   "type": ["string", "number", "boolean", "null", "array"],
-                                   "items": {"type": ["string", "number", "boolean", "null"]}},
+                        "value": {
+                            "description": "Native JSON value (bool/number/string/array)",
+                            "type": ["string", "number", "boolean", "null", "array"],
+                            "items": {"type": ["string", "number", "boolean", "null"]},
+                        },
                     },
                     "required": ["id", "time", "value"],
                 },
@@ -780,18 +1208,23 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
                         "json_key": {"type": "string"},
                         "times": {"type": "array", "items": {"type": "number"}},
-                        "value": {"description": "Native JSON value",
-                                   "type": ["string", "number", "boolean", "null", "array"],
-                                   "items": {"type": ["string", "number", "boolean", "null"]}},
+                        "value": {
+                            "description": "Native JSON value",
+                            "type": ["string", "number", "boolean", "null", "array"],
+                            "items": {"type": ["string", "number", "boolean", "null"]},
+                        },
                         "easing": {"type": "string", "default": "Linear"},
-                        "tolerance": {"type": "number", "default": 1e-3}
+                        "tolerance": {"type": "number", "default": 1e-3},
                     },
-                    "required": ["id", "json_key", "times", "value"]
-                }
-            }
+                    "required": ["id", "json_key", "times", "value"],
+                },
+            },
         },
         {
             "type": "function",
@@ -801,10 +1234,13 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
                         "json_key": {"type": "string"},
                     },
-                    "required": ["id"]
+                    "required": ["id"],
                 },
             },
         },
@@ -816,7 +1252,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "id": {"type": "integer", "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids"},
+                        "id": {
+                            "type": "integer",
+                            "description": "Target id: 1=background, 2=axis, 3=global, ≥4=object ids",
+                        },
                         "json_key": {"type": "string"},
                         "time": {"type": "number"},
                     },
@@ -832,11 +1271,23 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "set_keys": {"type": "array", "items": {"type": "object"}, "description": "List of SetKey operations"},
-                        "remove_keys": {"type": "array", "items": {"type": "object"}, "description": "List of RemoveKey operations"},
-                        "commit": {"type": "boolean", "default": True, "description": "Commit immediately if true"}
+                        "set_keys": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                            "description": "List of SetKey operations",
+                        },
+                        "remove_keys": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                            "description": "List of RemoveKey operations",
+                        },
+                        "commit": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Commit immediately if true",
+                        },
                     },
-                    "required": ["set_keys", "remove_keys", "commit"]
+                    "required": ["set_keys", "remove_keys", "commit"],
                 },
             },
         },
@@ -848,10 +1299,17 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Object ids"},
-                        "on": {"type": "boolean", "description": "True to show, false to hide"}
+                        "ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "Object ids",
+                        },
+                        "on": {
+                            "type": "boolean",
+                            "description": "True to show, false to hide",
+                        },
                     },
-                    "required": ["ids", "on"]
+                    "required": ["ids", "on"],
                 },
             },
         },
@@ -863,11 +1321,23 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "ids": {"type": "array", "items": {"type": "integer"}, "description": "Ids to bound (empty = all)"},
-                        "margin": {"type": "number", "default": 0.0, "description": "Extra normalized margin to expand box"},
-                        "after_clipping": {"type": "boolean", "default": False, "description": "Use clipped bbox for computation"}
+                        "ids": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "Ids to bound (empty = all)",
+                        },
+                        "margin": {
+                            "type": "number",
+                            "default": 0.0,
+                            "description": "Extra normalized margin to expand box",
+                        },
+                        "after_clipping": {
+                            "type": "boolean",
+                            "default": False,
+                            "description": "Use clipped bbox for computation",
+                        },
                     },
-                    "required": ["ids", "margin", "after_clipping"]
+                    "required": ["ids", "margin", "after_clipping"],
                 },
             },
         },
@@ -879,11 +1349,27 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "min": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "Box min [x,y,z]"},
-                        "max": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3, "description": "Box max [x,y,z]"},
-                        "refit_camera": {"type": "boolean", "default": True, "description": "Refit camera after applying cut"}
+                        "min": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "description": "Box min [x,y,z]",
+                        },
+                        "max": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "description": "Box max [x,y,z]",
+                        },
+                        "refit_camera": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Refit camera after applying cut",
+                        },
                     },
-                    "required": ["min", "max", "refit_camera"]
+                    "required": ["min", "max", "refit_camera"],
                 },
             },
         },
@@ -900,7 +1386,13 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "animation_set_time",
                 "description": "Set current timeline time (seconds).",
-                "parameters": {"type": "object", "properties": {"seconds": {"type": "number", "description": "Timeline seconds"}}, "required": ["seconds"]},
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "seconds": {"type": "number", "description": "Timeline seconds"}
+                    },
+                    "required": ["seconds"],
+                },
             },
         },
         {
@@ -908,7 +1400,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             "function": {
                 "name": "animation_save_animation",
                 "description": "Save the current animation to a .animation3d path.",
-                "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+                "parameters": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                },
             },
         },
         {
@@ -919,17 +1415,42 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "animation": {"type": "string", "description": "Path to .animation3d file"},
+                        "animation": {
+                            "type": "string",
+                            "description": "Path to .animation3d file",
+                        },
                         "out": {"type": "string", "description": "Output .mp4 path"},
                         "fps": {"type": "number", "description": "Frames per second"},
-                        "start": {"type": "integer", "description": "Start frame (inclusive)"},
-                        "end": {"type": "integer", "description": "End frame (inclusive, -1 = duration)"},
+                        "start": {
+                            "type": "integer",
+                            "description": "Start frame (inclusive)",
+                        },
+                        "end": {
+                            "type": "integer",
+                            "description": "End frame (inclusive, -1 = duration)",
+                        },
                         "width": {"type": "integer", "description": "Output width"},
                         "height": {"type": "integer", "description": "Output height"},
-                        "overwrite": {"type": "boolean", "description": "Overwrite output if exists"},
-                        "use_gpu_devices": {"type": "string", "description": "Linux only: comma-separated GPU ids, e.g. '0,1'"}
+                        "overwrite": {
+                            "type": "boolean",
+                            "description": "Overwrite output if exists",
+                        },
+                        "use_gpu_devices": {
+                            "type": "string",
+                            "description": "Linux only: comma-separated GPU ids, e.g. '0,1'",
+                        },
                     },
-                    "required": ["animation", "out", "fps", "start", "end", "width", "height", "overwrite", "use_gpu_devices"]
+                    "required": [
+                        "animation",
+                        "out",
+                        "fps",
+                        "start",
+                        "end",
+                        "width",
+                        "height",
+                        "overwrite",
+                        "use_gpu_devices",
+                    ],
                 },
             },
         },
@@ -941,12 +1462,15 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "time": {"type": "number", "description": "Preview time in seconds"},
+                        "time": {
+                            "type": "number",
+                            "description": "Preview time in seconds",
+                        },
                         "fps": {"type": "number", "description": "Frames per second"},
                         "width": {"type": "integer", "description": "Image width"},
-                        "height": {"type": "integer", "description": "Image height"}
+                        "height": {"type": "integer", "description": "Image height"},
                     },
-                    "required": ["time", "fps", "width", "height"]
+                    "required": ["time", "fps", "width", "height"],
                 },
             },
         },
@@ -954,22 +1478,26 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
 
     # Conditionally expose codegen-related tools
     if is_codegen_enabled():
-        tools.append({
-            "type": "function",
-            "function": {
-                "name": "codegen_allowed_imports",
-                "description": "Return the current codegen allowed import modules and whether each is importable in this environment.",
-                "parameters": {"type": "object", "properties": {}},
-            },
-        })
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "codegen_allowed_imports",
+                    "description": "Return the current codegen allowed import modules and whether each is importable in this environment.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        )
     else:
         # When disabled, ensure any lingering codegen tools are removed (defensive if list changes elsewhere)
         tools = [
-            t for t in tools
+            t
+            for t in tools
             if not (
                 isinstance(t, dict)
                 and isinstance(t.get("function"), dict)
-                and t["function"].get("name") in {"python_write_and_run", "codegen_allowed_imports"}
+                and t["function"].get("name")
+                in {"python_write_and_run", "codegen_allowed_imports"}
             )
         ]
 
@@ -990,8 +1518,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
 
     def _build_alias_map(params) -> dict[str, str]:
         alias: dict[str, str] = {}
+
         def norm(s: str) -> str:
             return (s or "").strip().lower()
+
         for p in params:
             jk = getattr(p, "json_key", "") or ""
             nm = getattr(p, "name", "") or ""
@@ -1008,13 +1538,17 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 pass
         return alias
 
-    def _resolve_json_key(id: int, candidate: str | None = None, name: str | None = None) -> str | None:
+    def _resolve_json_key(
+        id: int, candidate: str | None = None, name: str | None = None
+    ) -> str | None:
         """Resolve to a canonical json_key using live params. Accepts either a candidate key or a display name.
         Returns canonical json_key or None.
         """
-        if (candidate is None or str(candidate).strip() == "") and (name is None or str(name).strip() == ""):
+        if (candidate is None or str(candidate).strip() == "") and (
+            name is None or str(name).strip() == ""
+        ):
             return None
-        cand = (str(candidate) if candidate is not None else str(name))
+        cand = str(candidate) if candidate is not None else str(name)
         if not cand:
             return None
         cand_norm = cand.strip().lower()
@@ -1039,6 +1573,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         # Fuzzy: prefix match on names and keys
         try:
             import difflib
+
             choices = list(amap.keys())
             # Try best close matches
             for m in difflib.get_close_matches(cand_norm, choices, n=1, cutoff=0.85):
@@ -1073,6 +1608,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             # Include canonical JSON Schema emitted by server when available
             try:
                 from google.protobuf.json_format import MessageToDict as _pb2dict  # type: ignore
+
                 if hasattr(p, "HasField") and p.HasField("value_schema"):
                     entry["value_schema"] = _pb2dict(getattr(p, "value_schema"))
             except Exception:
@@ -1088,6 +1624,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             except Exception:
                 return False
             return False
+
         try:
             args = json.loads(args_json or "{}")
         except Exception:
@@ -1105,7 +1642,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
 
         # Guard codegen execution pathway behind a feature flag
         if name == "python_write_and_run" and not is_codegen_enabled():
-            return json.dumps({"ok": False, "error": "codegen disabled (enable with ATLAS_AGENT_ENABLE_CODEGEN=1)"})
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "codegen disabled (enable with ATLAS_AGENT_ENABLE_CODEGEN=1)",
+                }
+            )
 
         # System / FS helpers for LLM-driven resolution
         if name == "scene_animation_concepts":
@@ -1118,8 +1660,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             return json.dumps({"ok": True, "text": info})
         if name == "system_info":
             import os as _os
+
             try:
                 import platform as _plat
+
                 system = _plat.system()
                 release = _plat.release()
             except Exception:
@@ -1142,6 +1686,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             return json.dumps(info)
         if name == "fs_expand_paths":
             import os as _os
+
             paths = [str(p) for p in (args.get("paths") or [])]
             out: list[str] = []
             for p in paths:
@@ -1152,6 +1697,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             return json.dumps({"paths": out})
         if name == "fs_check_paths":
             import os as _os
+
             paths = [str(p) for p in (args.get("paths") or [])]
             exists: list[str] = []
             missing: list[str] = []
@@ -1164,7 +1710,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         if name == "fs_read_text":
             import os as _os, re as _re, io as _io
             from typing import Optional as _Optional
+
             p = str(args.get("path") or "")
+
             # Helpers to coerce numeric args
             def _as_pos_int(v, default=None):
                 try:
@@ -1172,6 +1720,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     return i if i >= 0 else default
                 except Exception:
                     return default
+
             start_raw = args.get("start")
             try:
                 start = int(start_raw) if start_raw is not None else None
@@ -1180,7 +1729,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             length = _as_pos_int(args.get("length"), None)
             # New unified line options
             try:
-                start_line = int(args.get("start_line")) if args.get("start_line") is not None else None
+                start_line = (
+                    int(args.get("start_line"))
+                    if args.get("start_line") is not None
+                    else None
+                )
             except Exception:
                 start_line = None
             line_count = _as_pos_int(args.get("line_count"), None)
@@ -1193,11 +1746,13 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 q = _os.path.expanduser(_os.path.expandvars(p))
                 # Enforce symmetry: line_count requires start_line (use negative start_line for tail)
                 if (line_count is not None) and (start_line is None):
-                    return json.dumps({
-                        "ok": False,
-                        "error": "line_count_requires_start_line",
-                        "hint": "Provide start_line (use negative for tail) or use fs_tail_lines",
-                    })
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "line_count_requires_start_line",
+                            "hint": "Provide start_line (use negative for tail) or use fs_tail_lines",
+                        }
+                    )
                 # Resolve byte window using seek/tell when possible so tail refers to current EOF
                 rb_start: int = 0
                 size: _Optional[int] = None
@@ -1213,7 +1768,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         rb_start = 0
                     else:
                         if start >= 0:
-                            rb_start = min(start, size if isinstance(size, int) else start)
+                            rb_start = min(
+                                start, size if isinstance(size, int) else start
+                            )
                         else:
                             # Negative start: offset from end
                             try:
@@ -1222,7 +1779,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                                 size = endpos
                             except Exception:
                                 endpos = None
-                            rb_start = max(0, (size if isinstance(size, int) else 0) + start)
+                            rb_start = max(
+                                0, (size if isinstance(size, int) else 0) + start
+                            )
                     # Position the stream (seek or stream-skip)
                     try:
                         f.seek(rb_start)
@@ -1263,16 +1822,31 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                             enc = "utf-8"
                 # Binary heuristic
                 sample = data[:4096]
-                is_binary = (b"\x00" in sample)
-                text = data.decode(enc or "utf-8", errors=errors if errors in ("strict","ignore","replace") else "replace")
+                is_binary = b"\x00" in sample
+                text = data.decode(
+                    enc or "utf-8",
+                    errors=(
+                        errors
+                        if errors in ("strict", "ignore", "replace")
+                        else "replace"
+                    ),
+                )
                 lines = None
-                want_lines = bool((start_line is not None) or (line_count is not None) or (isinstance(regex, str) and regex))
+                want_lines = bool(
+                    (start_line is not None)
+                    or (line_count is not None)
+                    or (isinstance(regex, str) and regex)
+                )
                 if want_lines:
                     try:
                         all_lines = text.splitlines()
                         # Compute slice by start_line/line_count on the current window
                         if start_line is not None:
-                            idx0 = start_line if start_line >= 0 else max(0, len(all_lines) + start_line)
+                            idx0 = (
+                                start_line
+                                if start_line >= 0
+                                else max(0, len(all_lines) + start_line)
+                            )
                         else:
                             idx0 = 0
                         if line_count is not None and line_count >= 0:
@@ -1300,7 +1874,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     if isinstance(length, int) and length is not None and length >= 0:
                         window = length
                     else:
-                        window = (size - rb_start)
+                        window = size - rb_start
                     if window is not None and len(data) < max(0, window):
                         truncated = True
                 else:
@@ -1310,7 +1884,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     "ok": True,
                     "path": q,
                     "encoding": enc or "utf-8",
-                    "size_bytes": (size if isinstance(size, int) and size >= 0 else None),
+                    "size_bytes": (
+                        size if isinstance(size, int) and size >= 0 else None
+                    ),
                     "bytes": len(data),
                     "read_from": read_from,
                     "read_to": read_to,
@@ -1319,7 +1895,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 }
                 if want_lines:
                     out["lines"] = lines or []
-                    if 'regex_error' in locals() and regex_error:
+                    if "regex_error" in locals() and regex_error:
                         out["regex_error"] = regex_error
                 else:
                     out["text"] = text
@@ -1328,6 +1904,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": False, "error": str(e)})
         if name == "fs_tail_lines":
             import os as _os, io as _io
+
             p = str(args.get("path") or "")
             n = int(args.get("n", 200))
             if n <= 0:
@@ -1343,7 +1920,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         _hdr = b""
                     if _hdr.startswith(b"\xef\xbb\xbf"):
                         enc = "utf-8-sig"
-                    elif _hdr.startswith(b"\xff\xfe\x00\x00") or _hdr.startswith(b"\x00\x00\xfe\xff"):
+                    elif _hdr.startswith(b"\xff\xfe\x00\x00") or _hdr.startswith(
+                        b"\x00\x00\xfe\xff"
+                    ):
                         enc = "utf-32"
                     elif _hdr.startswith(b"\xfe\xff") or _hdr.startswith(b"\xff\xfe"):
                         enc = "utf-16"
@@ -1377,21 +1956,26 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 lines_all = text.splitlines()
                 lines_out = lines_all[-n:] if len(lines_all) > n else lines_all
                 # No truncation in correctness-first mode: we scan to BOF or until N lines are found
-                return json.dumps({
-                    "ok": True,
-                    "path": q,
-                    "encoding": enc,
-                    "size_bytes": (size if isinstance(size, int) and size >= 0 else None),
-                    "bytes": len(data),
-                    "read_from": rb_start,
-                    "read_to": endpos,
-                    "truncated": False,
-                    "lines": lines_out,
-                })
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "path": q,
+                        "encoding": enc,
+                        "size_bytes": (
+                            size if isinstance(size, int) and size >= 0 else None
+                        ),
+                        "bytes": len(data),
+                        "read_from": rb_start,
+                        "read_to": endpos,
+                        "truncated": False,
+                        "lines": lines_out,
+                    }
+                )
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e)})
         if name == "fs_tail_bytes":
             import os as _os, io as _io
+
             p = str(args.get("path") or "")
             k = int(args.get("bytes", 4096))
             if k <= 0:
@@ -1407,7 +1991,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         _hdr = b""
                     if _hdr.startswith(b"\xef\xbb\xbf"):
                         enc = "utf-8-sig"
-                    elif _hdr.startswith(b"\xff\xfe\x00\x00") or _hdr.startswith(b"\x00\x00\xfe\xff"):
+                    elif _hdr.startswith(b"\xff\xfe\x00\x00") or _hdr.startswith(
+                        b"\x00\x00\xfe\xff"
+                    ):
                         enc = "utf-32"
                     elif _hdr.startswith(b"\xfe\xff") or _hdr.startswith(b"\xff\xfe"):
                         enc = "utf-16"
@@ -1419,19 +2005,22 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     f.seek(start)
                     data = f.read(endpos - start)
                 text = data.decode(enc, errors="replace")
-                return json.dumps({
-                    "ok": True,
-                    "path": q,
-                    "encoding": enc,
-                    "bytes": len(data),
-                    "read_from": start,
-                    "read_to": endpos,
-                    "text": text,
-                })
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "path": q,
+                        "encoding": enc,
+                        "bytes": len(data),
+                        "read_from": start,
+                        "read_to": endpos,
+                        "text": text,
+                    }
+                )
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e)})
         if name == "fs_search_text":
             import os as _os, io as _io, re as _re
+
             p = str(args.get("path") or "")
             pattern = str(args.get("regex") or "")
             start_raw = args.get("start")
@@ -1467,7 +2056,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         enc = force_enc
                     elif _hdr.startswith(b"\xef\xbb\xbf"):
                         enc = "utf-8-sig"
-                    elif _hdr.startswith(b"\xff\xfe\x00\x00") or _hdr.startswith(b"\x00\x00\xfe\xff"):
+                    elif _hdr.startswith(b"\xff\xfe\x00\x00") or _hdr.startswith(
+                        b"\x00\x00\xfe\xff"
+                    ):
                         enc = "utf-32"
                     elif _hdr.startswith(b"\xfe\xff") or _hdr.startswith(b"\xff\xfe"):
                         enc = "utf-16"
@@ -1509,7 +2100,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 try:
                     pat_b = pattern.encode(enc)
                 except Exception as _e:
-                    return json.dumps({"ok": False, "error": f"pattern_encoding_error: {str(_e)}"})
+                    return json.dumps(
+                        {"ok": False, "error": f"pattern_encoding_error: {str(_e)}"}
+                    )
                 flags = 0
                 if not case_sensitive:
                     flags |= _re.IGNORECASE
@@ -1548,16 +2141,19 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     # Start/end line numbers within window via binary search on nl_positions
                     # Count of newlines strictly before m.start()
                     import bisect as _bis
+
                     nl_before_start = _bis.bisect_left(nl_positions, m.start())
                     nl_before_end = _bis.bisect_left(nl_positions, m.end())
                     s_line = base_line + nl_before_start
                     e_line = base_line + nl_before_end
-                    matches.append({
-                        "byte_start": int(b0),
-                        "byte_end": int(b1),
-                        "start_line": int(s_line),
-                        "end_line": int(e_line),
-                    })
+                    matches.append(
+                        {
+                            "byte_start": int(b0),
+                            "byte_end": int(b1),
+                            "start_line": int(s_line),
+                            "end_line": int(e_line),
+                        }
+                    )
                     if max_matches > 0 and len(matches) >= max_matches:
                         limit_reached = True
                         break
@@ -1577,6 +2173,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": False, "error": str(e)})
         if name == "fs_read_json":
             import os as _os, json as _json
+
             p = str(args.get("path") or "")
             try:
                 q = _os.path.expanduser(_os.path.expandvars(p))
@@ -1593,7 +2190,13 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 else:
                     text = data.decode("utf-8", errors="strict")
                 obj = _json.loads(text)
-                return json.dumps({"ok": True, "data": obj, "size_bytes": (size if isinstance(size, int) else None)})
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "data": obj,
+                        "size_bytes": (size if isinstance(size, int) else None),
+                    }
+                )
             except Exception as e:
                 # Surface JSON errors clearly
                 msg = str(e)
@@ -1602,24 +2205,30 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             import os as _os
             import difflib as _dif
             from pathlib import Path as _Path
+
             path_in = str(args.get("path") or "")
             kind = str(args.get("kind")) if args.get("kind") else "either"
             max_results = int(args.get("max_results", 10))
             max_depth = int(args.get("max_depth", 6))
             base_dirs = [str(p) for p in (args.get("base_dirs") or [])]
             tried: list[str] = []
+
             def _exists(p: str) -> bool:
                 if kind == "file":
                     return _os.path.isfile(p)
                 if kind == "dir":
                     return _os.path.isdir(p)
                 return _os.path.exists(p)
+
             # Expand and normalize
             p0 = _os.path.expanduser(_os.path.expandvars(path_in))
             p0 = _os.path.normpath(p0)
             tried.append(p0)
             if _exists(p0):
-                return json.dumps({"ok": True, "path": _os.path.abspath(p0), "tried": tried})
+                return json.dumps(
+                    {"ok": True, "path": _os.path.abspath(p0), "tried": tried}
+                )
+
             # Heuristic 1: case-insensitive correction per segment
             def _case_fix(p: str) -> str | None:
                 parts = _Path(p).parts
@@ -1638,11 +2247,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         cur = parent / seg
                 q = str(cur)
                 return q if _exists(q) else None
+
             cf = _case_fix(p0)
             if cf and cf not in tried:
                 tried.append(cf)
                 if _exists(cf):
-                    return json.dumps({"ok": True, "path": _os.path.abspath(cf), "tried": tried, "reason": "case-insensitive match"})
+                    return json.dumps(
+                        {
+                            "ok": True,
+                            "path": _os.path.abspath(cf),
+                            "tried": tried,
+                            "reason": "case-insensitive match",
+                        }
+                    )
+
             # Heuristic 2: pluralization/singularization on each segment (single change)
             def _plural_variants(p: str):
                 parts = list(_Path(p).parts)
@@ -1654,12 +2272,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     else:
                         alt[i] = seg + "s"
                     yield str(_Path(*alt))
+
             for cand in _plural_variants(p0):
                 c2 = _os.path.normpath(cand)
                 if c2 not in tried:
                     tried.append(c2)
                     if _exists(c2):
-                        return json.dumps({"ok": True, "path": _os.path.abspath(c2), "tried": tried, "reason": "pluralization"})
+                        return json.dumps(
+                            {
+                                "ok": True,
+                                "path": _os.path.abspath(c2),
+                                "tried": tried,
+                                "reason": "pluralization",
+                            }
+                        )
             # Heuristic 3: simple prefix match near failing leaf
             try:
                 parent, leaf = _os.path.split(p0)
@@ -1670,7 +2296,14 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                             if c3 not in tried:
                                 tried.append(c3)
                                 if _exists(c3):
-                                    return json.dumps({"ok": True, "path": _os.path.abspath(c3), "tried": tried, "reason": "prefix match"})
+                                    return json.dumps(
+                                        {
+                                            "ok": True,
+                                            "path": _os.path.abspath(c3),
+                                            "tried": tried,
+                                            "reason": "prefix match",
+                                        }
+                                    )
             except Exception:
                 pass
             # Fallback: anchored search around nearest existing ancestor + common user dirs + optional bases
@@ -1686,7 +2319,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     _home = _Path(_os.path.expanduser("~")).resolve()
                 except Exception:
                     _home = None
-                anc_dir = (anc if anc.is_dir() else anc.parent)
+                anc_dir = anc if anc.is_dir() else anc.parent
                 if not (_home and anc_dir.resolve() == _home):
                     anchor_dirs.append(str(anc_dir))
             # Common user dirs
@@ -1715,6 +2348,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     search_roots.append(r)
             target = _Path(path_in).name
             candidates: list[tuple[float, str]] = []
+
             def _walk_with_depth(root: str, max_depth: int):
                 root_p = _Path(root)
                 try:
@@ -1729,25 +2363,32 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                                 continue
                             if kind == "dir" and not _os.path.isdir(full):
                                 continue
-                            score = _dif.SequenceMatcher(a=nm.lower(), b=target.lower()).ratio()
+                            score = _dif.SequenceMatcher(
+                                a=nm.lower(), b=target.lower()
+                            ).ratio()
                             if score >= 0.5:
                                 candidates.append((score, _os.path.abspath(full)))
                 except Exception:
                     return
+
             import os
+
             # Normalize and filter invalid roots
             search_roots = [r for r in search_roots if r and _os.path.isdir(r)]
             for r in search_roots:
                 _walk_with_depth(r, max_depth)
                 tried.append(r)
             candidates.sort(key=lambda x: x[0], reverse=True)
-            out = [{"path": p, "score": float(s)} for (s, p) in candidates[:max_results]]
+            out = [
+                {"path": p, "score": float(s)} for (s, p) in candidates[:max_results]
+            ]
             return json.dumps({"ok": False, "candidates": out, "tried": tried})
         if name == "fs_hint_resolve":
             import os as _os
             import difflib as _dif
             import re as _re
             from pathlib import Path as _Path
+
             hint = str(args.get("hint_text") or "")
             expected_name = str(args.get("expected_name") or "").strip() or None
             kind = str(args.get("kind") or "file")
@@ -1758,7 +2399,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             home = _os.path.expanduser("~")
             anchors = []
             # Do NOT scan the home directory root to avoid permission prompts; restrict to common user subdirs
-            for d in (_os.path.join(home, "Documents"), _os.path.join(home, "Downloads"), _os.path.join(home, "Desktop")):
+            for d in (
+                _os.path.join(home, "Documents"),
+                _os.path.join(home, "Downloads"),
+                _os.path.join(home, "Desktop"),
+            ):
                 if _os.path.isdir(d):
                     anchors.append(d)
             for b in base_dirs:
@@ -1776,19 +2421,23 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         break
             subdirs = []
             for t in toks:
-                if t.lower() in {"documents","downloads","desktop","home"}:
+                if t.lower() in {"documents", "downloads", "desktop", "home"}:
                     continue
                 # Treat simple tokens as potential subfolders (atlas_test, slice15)
-                if all(ch.isalnum() or ch in ("_","-",".") for ch in t) and not ("." in t and t == expected_name):
+                if all(ch.isalnum() or ch in ("_", "-", ".") for ch in t) and not (
+                    "." in t and t == expected_name
+                ):
                     subdirs.append(t)
                 # Handle path-like tokens
                 if "/" in t or "\\" in t:
                     subdirs.extend([seg for seg in _re.split(r"[\\/]+", t) if seg])
             # De-duplicate but preserve order
-            seen = set(); subdirs_u = []
+            seen = set()
+            subdirs_u = []
             for s in subdirs:
                 if s not in seen:
-                    seen.add(s); subdirs_u.append(s)
+                    seen.add(s)
+                    subdirs_u.append(s)
             # 3) Compose search roots: anchors + anchors/subdir (for known subdir hints)
             search_roots = list(anchors)
             for a in anchors:
@@ -1799,6 +2448,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             # 4) Scan within bounded depth and rank candidates
             target = (expected_name or "").lower()
             candidates: list[tuple[float, str]] = []
+
             def _walk_with_depth(root: str, max_depth: int):
                 root_p = _Path(root)
                 try:
@@ -1814,13 +2464,21 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                                 continue
                             if kind == "dir" and not _os.path.isdir(full):
                                 continue
-                            score = 1.0 if (target and nm.lower() == target) else _dif.SequenceMatcher(a=nm.lower(), b=(target or nm.lower())).ratio()
+                            score = (
+                                1.0
+                                if (target and nm.lower() == target)
+                                else _dif.SequenceMatcher(
+                                    a=nm.lower(), b=(target or nm.lower())
+                                ).ratio()
+                            )
                             if target and score < 0.5:
                                 continue
                             candidates.append((score, _os.path.abspath(full)))
                 except Exception:
                     return
+
             import os
+
             tried = []
             # Normalize and filter invalid roots to avoid os.walk errors
             search_roots = [r for r in search_roots if r and _os.path.isdir(r)]
@@ -1829,19 +2487,34 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     _walk_with_depth(r, max_depth)
                     tried.append(r)
             except Exception as e:
-                return json.dumps({"ok": False, "error": str(e), "candidates": [], "tried": tried})
+                return json.dumps(
+                    {"ok": False, "error": str(e), "candidates": [], "tried": tried}
+                )
             candidates.sort(key=lambda x: x[0], reverse=True)
-            out = [{"path": p, "score": float(s)} for (s, p) in candidates[:max_results]]
+            out = [
+                {"path": p, "score": float(s)} for (s, p) in candidates[:max_results]
+            ]
             # If we found an exact match, return ok=true with first path
             if out:
                 best = out[0]
-                if expected_name and _os.path.basename(best["path"]).lower() == expected_name.lower():
-                    return json.dumps({"ok": True, "path": best["path"], "candidates": out, "tried": tried})
+                if (
+                    expected_name
+                    and _os.path.basename(best["path"]).lower() == expected_name.lower()
+                ):
+                    return json.dumps(
+                        {
+                            "ok": True,
+                            "path": best["path"],
+                            "candidates": out,
+                            "tried": tried,
+                        }
+                    )
             return json.dumps({"ok": False, "candidates": out, "tried": tried})
         if name == "repo_search":
             import os as _os
             import difflib as _dif
             from pathlib import Path as _Path
+
             query = str(args.get("name") or "")
             typ = str(args.get("type")) if args.get("type") else "either"
             max_depth = int(args.get("max_depth", 6))
@@ -1855,6 +2528,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     if len(rel.parts) > max_depth:
                         dirs[:] = []
                         continue
+
                     def _consider(nm: str):
                         full = _os.path.join(cur, nm)
                         if typ == "file" and not _os.path.isfile(full):
@@ -1864,6 +2538,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         score = _dif.SequenceMatcher(a=nm.lower(), b=target).ratio()
                         if score >= 0.5:
                             hits.append((score, _os.path.abspath(full)))
+
                     for nm in dirs:
                         _consider(nm)
                     for nm in files:
@@ -1876,6 +2551,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         if name == "fs_glob":
             import os as _os
             import glob as _glob
+
             d = str(args.get("dir") or "")
             pattern = str(args.get("pattern") or "*")
             rec = bool(args.get("recursive", False))
@@ -1884,8 +2560,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": False, "error": f"not a directory: {base}"})
             pat = _os.path.join(base, pattern)
             matches = _glob.glob(pat, recursive=rec)
-            files = [ _os.path.abspath(m) for m in matches if _os.path.isfile(m) ]
-            return json.dumps({"ok": True, "files": files, "dir": base, "pattern": pattern})
+            files = [_os.path.abspath(m) for m in matches if _os.path.isfile(m)]
+            return json.dumps(
+                {"ok": True, "files": files, "dir": base, "pattern": pattern}
+            )
 
         # Scene understanding / load
         if name == "animation_set_param_by_name":
@@ -1900,9 +2578,11 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             target_jk = None
             target_type = None
             lname = name_str.lower().strip()
+
             def match(pname: str) -> bool:
                 ps = (pname or "").lower().strip()
                 return ps == lname or ps.startswith(lname)
+
             for p in pl.params:
                 if match(p.name) and (type_hint is None or p.type == type_hint):
                     target_jk = p.json_key
@@ -1916,16 +2596,28 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         target_type = p.type
                         break
             if target_jk is None:
-                return json.dumps({"ok": False, "error": f"parameter '{name_str}' not found for id={id}"})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": f"parameter '{name_str}' not found for id={id}",
+                    }
+                )
             # Coerce common types
             t = (target_type or "").lower()
             if "bool" in t and isinstance(value_native, str):
                 s = value_native.strip().lower()
-                if s in ("true", "1", "yes", "on"): value_native = True
-                elif s in ("false", "0", "no", "off"): value_native = False
+                if s in ("true", "1", "yes", "on"):
+                    value_native = True
+                elif s in ("false", "0", "no", "off"):
+                    value_native = False
             if t.endswith("vec4") and isinstance(value_native, list):
                 if len(value_native) == 3:
-                    value_native = [float(value_native[0]), float(value_native[1]), float(value_native[2]), 1.0]
+                    value_native = [
+                        float(value_native[0]),
+                        float(value_native[1]),
+                        float(value_native[2]),
+                        1.0,
+                    ]
                 elif len(value_native) == 4:
                     value_native = [float(x) for x in value_native]
             if (t == "float" or t == "double") and isinstance(value_native, str):
@@ -1935,18 +2627,40 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     pass
             # Typed SetKey
             try:
-                ok = client.set_key_param(id=id, json_key=target_jk, time=time_v, easing=easing, value=value_native)
-                return json.dumps({"ok": ok, "json_key": target_jk, "type": target_type})
+                ok = client.set_key_param(
+                    id=id,
+                    json_key=target_jk,
+                    time=time_v,
+                    easing=easing,
+                    value=value_native,
+                )
+                return json.dumps(
+                    {"ok": ok, "json_key": target_jk, "type": target_type}
+                )
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
-                return json.dumps({"ok": False, "error": msg, "json_key": target_jk, "type": target_type})
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": msg,
+                        "json_key": target_jk,
+                        "type": target_type,
+                    }
+                )
 
         if name == "animation_remove_key_param_at_time":
             id = int(args.get("id"))
             if id == 0:
-                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera"})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "camera uses camera tools; use animation_replace_key_camera",
+                    }
+                )
             json_key = str(args.get("json_key"))
             time_v = float(args.get("time", 0.0))
             tol = float(args.get("tolerance", 1e-3))
@@ -1965,14 +2679,18 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": True, "removed": removed})
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
 
         if name == "animation_replace_key_param":
             id = int(args.get("id"))
             if id == 0:
-                return json.dumps({"ok": False, "error": "use animation_replace_key_camera for id=0"})
+                return json.dumps(
+                    {"ok": False, "error": "use animation_replace_key_camera for id=0"}
+                )
             json_key = str(args.get("json_key"))
             time_v = float(args.get("time", 0.0))
             easing = str(args.get("easing", "Linear"))
@@ -1984,18 +2702,29 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": False, "error": "json_key not found for id"})
             try:
                 # Remove keys within tolerance
-                rm = json.loads(dispatch("animation_remove_key_param_at_time", json.dumps({
-                    "id": id,
-                    "json_key": json_key,
-                    "time": time_v,
-                    "tolerance": tol,
-                })))
-                ok = client.set_key_param(id=id, json_key=json_key, time=time_v, easing=easing, value=value)
+                rm = json.loads(
+                    dispatch(
+                        "animation_remove_key_param_at_time",
+                        json.dumps(
+                            {
+                                "id": id,
+                                "json_key": json_key,
+                                "time": time_v,
+                                "tolerance": tol,
+                            }
+                        ),
+                    )
+                )
+                ok = client.set_key_param(
+                    id=id, json_key=json_key, time=time_v, easing=easing, value=value
+                )
                 return json.dumps({"ok": ok, "removed": rm.get("removed", 0)})
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
 
         if name == "animation_replace_key_camera":
@@ -2010,11 +2739,22 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     ids = client.fit_candidates()
                 except Exception:
                     ids = []
-            constraints = args.get("constraints") or {"keep_visible": True, "min_coverage": 0.95}
+            constraints = args.get("constraints") or {
+                "keep_visible": True,
+                "min_coverage": 0.95,
+            }
             # First pass policies allow adjustments
-            policies1 = {"adjust_fov": True, "adjust_distance": True, "adjust_clipping": True}
+            policies1 = {
+                "adjust_fov": True,
+                "adjust_distance": True,
+                "adjust_clipping": True,
+            }
             # Second pass: strict verification without adjustments
-            policies2 = {"adjust_fov": False, "adjust_distance": False, "adjust_clipping": False}
+            policies2 = {
+                "adjust_fov": False,
+                "adjust_distance": False,
+                "adjust_clipping": False,
+            }
             try:
                 # Remove camera keys within tolerance
                 try:
@@ -2029,9 +2769,19 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     removed = 0
                 # Validate and accept adjusted value if provided
                 try:
-                    vr = client.camera_validate(ids=ids, times=[time_v], values=[value], constraints=constraints, policies=policies1)
+                    vr = client.camera_validate(
+                        ids=ids,
+                        times=[time_v],
+                        values=[value],
+                        constraints=constraints,
+                        policies=policies1,
+                    )
                     vals = vr.get("results") or []
-                    if vals and vals[0].get("adjusted") and vals[0].get("adjusted_value"):
+                    if (
+                        vals
+                        and vals[0].get("adjusted")
+                        and vals[0].get("adjusted_value")
+                    ):
                         value = vals[0].get("adjusted_value")
                 except Exception:
                     pass
@@ -2039,16 +2789,30 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 # Re-validate strictly
                 final_ok = ok
                 try:
-                    vr2 = client.camera_validate(ids=ids, times=[time_v], values=[value], constraints=constraints, policies=policies2)
+                    vr2 = client.camera_validate(
+                        ids=ids,
+                        times=[time_v],
+                        values=[value],
+                        constraints=constraints,
+                        policies=policies2,
+                    )
                     final_ok = bool(vr2.get("ok", False))
                     reason = (vr2.get("results") or [{}])[0].get("reason")
                 except Exception:
                     reason = None
-                return json.dumps({"ok": bool(final_ok and ok), "removed": removed, **({"reason": reason} if reason else {})})
+                return json.dumps(
+                    {
+                        "ok": bool(final_ok and ok),
+                        "removed": removed,
+                        **({"reason": reason} if reason else {}),
+                    }
+                )
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
 
         if name == "fit_candidates":
@@ -2057,8 +2821,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": True, "ids": ids})
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
 
         if name == "animation_camera_solve_and_apply":
@@ -2067,14 +2833,28 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 ids = args.get("ids") or []
                 t0 = float(args.get("t0", 0.0))
                 t1 = float(args.get("t1", 0.0))
-                if not isinstance(ids, list) or any(not isinstance(i, (int, float)) for i in ids):
-                    return json.dumps({"ok": False, "error": "ids must be an array of numbers"})
+                if not isinstance(ids, list) or any(
+                    not isinstance(i, (int, float)) for i in ids
+                ):
+                    return json.dumps(
+                        {"ok": False, "error": "ids must be an array of numbers"}
+                    )
                 mode_up = mode.strip().upper()
                 if mode_up not in ("FIT", "ORBIT", "DOLLY", "STATIC"):
-                    return json.dumps({"ok": False, "error": "mode must be one of FIT|ORBIT|DOLLY|STATIC"})
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "mode must be one of FIT|ORBIT|DOLLY|STATIC",
+                        }
+                    )
                 if mode_up in ("ORBIT", "DOLLY") and not (t1 > t0):
-                    return json.dumps({"ok": False, "error": "t1 must be > t0 for ORBIT/DOLLY"})
-                constraints = args.get("constraints") or {"keep_visible": True, "min_coverage": 0.95}
+                    return json.dumps(
+                        {"ok": False, "error": "t1 must be > t0 for ORBIT/DOLLY"}
+                    )
+                constraints = args.get("constraints") or {
+                    "keep_visible": True,
+                    "min_coverage": 0.95,
+                }
                 params = args.get("params") or {}
                 # Defaults for ORBIT
                 if mode_up == "ORBIT":
@@ -2088,7 +2868,14 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 tol = float(args.get("tolerance", 1e-3))
                 easing = str(args.get("easing", "Linear"))
                 clear_range = bool(args.get("clear_range", True))
-                keys = client.camera_solve(mode=mode_up, ids=ids, t0=t0, t1=t1, constraints=constraints, params=params)
+                keys = client.camera_solve(
+                    mode=mode_up,
+                    ids=ids,
+                    t0=t0,
+                    t1=t1,
+                    constraints=constraints,
+                    params=params,
+                )
                 # Optionally clear existing keys in [t0, t1] (with tolerance), excluding solver times
                 if clear_range:
                     try:
@@ -2099,11 +2886,13 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     tmin, tmax = (t0, t1) if t0 <= t1 else (t1, t0)
                     # Build set of solver times for matching
                     solved_times = [float(k.get("time", 0.0)) for k in (keys or [])]
+
                     def _near_any(x: float, arr: list[float], eps: float) -> bool:
                         for v in arr:
                             if abs(x - v) <= eps:
                                 return True
                         return False
+
                     for old_t in existing:
                         if old_t + tol < tmin or old_t - tol > tmax:
                             continue
@@ -2128,16 +2917,25 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                             "ids": ids,
                             "constraints": constraints,
                         }
-                        rr = json.loads(dispatch("animation_replace_key_camera", json.dumps(payload)) or "{}")
+                        rr = json.loads(
+                            dispatch(
+                                "animation_replace_key_camera", json.dumps(payload)
+                            )
+                            or "{}"
+                        )
                         if rr.get("ok"):
                             applied.append(tv)
                     except Exception:
                         continue
-                return json.dumps({"ok": True, "applied": sorted(applied), "total": len(applied)})
+                return json.dumps(
+                    {"ok": True, "applied": sorted(applied), "total": len(applied)}
+                )
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
 
         if name == "animation_camera_validate":
@@ -2146,15 +2944,30 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 times = args.get("times") or []
                 values = args.get("values") or []
                 if not times or len(times) != len(values):
-                    return json.dumps({"ok": False, "error": "times and values must be non-empty and same length"})
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "times and values must be non-empty and same length",
+                        }
+                    )
                 constraints = args.get("constraints") or {}
                 policies = args.get("policies") or {}
-                res = client.camera_validate(ids=ids, times=times, values=values, constraints=constraints, policies=policies)
-                return json.dumps({"ok": bool(res.get("ok", False)), "results": res.get("results")})
+                res = client.camera_validate(
+                    ids=ids,
+                    times=times,
+                    values=values,
+                    constraints=constraints,
+                    policies=policies,
+                )
+                return json.dumps(
+                    {"ok": bool(res.get("ok", False)), "results": res.get("results")}
+                )
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
 
         if name == "camera_focus":
@@ -2166,8 +2979,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": True, "value": val})
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
 
         if name == "camera_point_to":
@@ -2178,8 +2993,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": True, "value": val})
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
 
         if name == "camera_rotate":
@@ -2191,8 +3008,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": True, "value": val})
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
 
         if name == "camera_reset_view":
@@ -2201,12 +3020,16 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 ids = args.get("ids") or []
                 ac = bool(args.get("after_clipping", True))
                 mr = float(args.get("min_radius", 0.0))
-                val = client.camera_reset_view(mode=mode, ids=ids, after_clipping=ac, min_radius=mr)
+                val = client.camera_reset_view(
+                    mode=mode, ids=ids, after_clipping=ac, min_radius=mr
+                )
                 return json.dumps({"ok": True, "value": val})
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
         if name == "scene_camera_fit":
             # Use CameraFit (planning) and apply the first typed value to the scene camera (id=0)
@@ -2219,11 +3042,17 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         ids = client.fit_candidates()
                     except Exception:
                         ids = []
-                vals = client.camera_fit(ids=ids, all=False, after_clipping=after, min_radius=minr)
+                vals = client.camera_fit(
+                    ids=ids, all=False, after_clipping=after, min_radius=minr
+                )
                 cam = vals[0] if vals else None
                 if not cam:
-                    return json.dumps({"ok": False, "error": "camera_fit returned no value"})
-                ok = client.apply_params([{"id": 0, "json_key": "Camera 3DCamera", "value": cam}])
+                    return json.dumps(
+                        {"ok": False, "error": "camera_fit returned no value"}
+                    )
+                ok = client.apply_params(
+                    [{"id": 0, "json_key": "Camera 3DCamera", "value": cam}]
+                )
                 return json.dumps({"ok": bool(ok)})
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e)})
@@ -2231,8 +3060,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             try:
                 cam = args.get("value")
                 if not cam or not isinstance(cam, dict):
-                    return json.dumps({"ok": False, "error": "value must be a typed camera object"})
-                ok = client.apply_params([{"id": 0, "json_key": "Camera 3DCamera", "value": cam}])
+                    return json.dumps(
+                        {"ok": False, "error": "value must be a typed camera object"}
+                    )
+                ok = client.apply_params(
+                    [{"id": 0, "json_key": "Camera 3DCamera", "value": cam}]
+                )
                 return json.dumps({"ok": bool(ok)})
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e)})
@@ -2247,17 +3080,29 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": True, "objects": objs, "paths": files})
             except FileNotFoundError as e:
                 # Hint the agent to use scene_smart_load next
-                return json.dumps({"ok": False, "error": str(e), "hint": "Use scene_smart_load to resolve names in common dirs (Documents/Downloads/Desktop/cwd)."})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": str(e),
+                        "hint": "Use scene_smart_load to resolve names in common dirs (Documents/Downloads/Desktop/cwd).",
+                    }
+                )
         if name == "scene_ensure_loaded":
             files = args.get("files") or []
             summary = client.ensure_loaded(files)
             return json.dumps({"ok": True, **summary})
         if name == "animation_get_time":
             ts = client.get_time()
-            return json.dumps({"seconds": getattr(ts, "seconds", 0.0), "duration": getattr(ts, "duration", 0.0)})
+            return json.dumps(
+                {
+                    "seconds": getattr(ts, "seconds", 0.0),
+                    "duration": getattr(ts, "duration", 0.0),
+                }
+            )
         if name == "python_write_and_run":
             import tempfile as _tmp, os as _os, subprocess as _sp, sys as _sys
             from pathlib import Path as _P
+
             script = args.get("script") or ""
             fname = str(args.get("filename") or "agent_script.py")
             tdir = _tmp.mkdtemp(prefix="atlas_codegen_")
@@ -2271,32 +3116,55 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             env = dict(_os.environ)
             repo_root = str(_P(__file__).resolve().parents[2])
             pp = env.get("PYTHONPATH", "")
-            env["PYTHONPATH"] = (repo_root + (_os.pathsep + pp if pp else ""))
+            env["PYTHONPATH"] = repo_root + (_os.pathsep + pp if pp else "")
             # Run
             args_list = args.get("args") or []
             timeout = float(args.get("timeout_sec", 120.0))
             try:
-                cp = _sp.run([_sys.executable, pth, *args_list], capture_output=True, text=True, env=env, timeout=timeout)
+                cp = _sp.run(
+                    [_sys.executable, pth, *args_list],
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                    timeout=timeout,
+                )
                 out = cp.stdout or ""
                 err = cp.stderr or ""
                 # Truncate for transport safety
-                if len(out) > 8000: out = out[:8000] + "\n…[truncated]"
-                if len(err) > 8000: err = err[:8000] + "\n…[truncated]"
-                resp = {"ok": cp.returncode == 0, "exit_code": cp.returncode, "stdout": out, "stderr": err, "path": pth}
+                if len(out) > 8000:
+                    out = out[:8000] + "\n…[truncated]"
+                if len(err) > 8000:
+                    err = err[:8000] + "\n…[truncated]"
+                resp = {
+                    "ok": cp.returncode == 0,
+                    "exit_code": cp.returncode,
+                    "stdout": out,
+                    "stderr": err,
+                    "path": pth,
+                }
                 if bool(args.get("echo_script", True)):
                     maxc = int(args.get("max_echo_chars", 4000))
-                    scr = script if len(script) <= maxc else (script[:maxc] + "\n…[truncated]")
+                    scr = (
+                        script
+                        if len(script) <= maxc
+                        else (script[:maxc] + "\n…[truncated]")
+                    )
                     resp["script"] = scr
                 return json.dumps(resp)
             except Exception as e:
                 resp = {"ok": False, "error": str(e), "path": pth}
                 if bool(args.get("echo_script", True)):
                     maxc = int(args.get("max_echo_chars", 4000))
-                    scr = script if len(script) <= maxc else (script[:maxc] + "\n…[truncated]")
+                    scr = (
+                        script
+                        if len(script) <= maxc
+                        else (script[:maxc] + "\n…[truncated]")
+                    )
                     resp["script"] = scr
                 return json.dumps(resp)
         if name == "scene_smart_load":
             import os as _os
+
             names = args.get("names") or []
             dir_hints = args.get("dir_hints") or []
             exts = args.get("extensions") or []
@@ -2307,6 +3175,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 dirs: list[str] = []
                 try:
                     import platform as _plat
+
                     system = _plat.system()
                 except Exception:
                     system = ""
@@ -2326,12 +3195,14 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 # Always include cwd last
                 dirs.append(_os.getcwd())
                 dir_hints = dirs
+
             def variants(nm: str) -> list[str]:
                 base, ext = _os.path.splitext(nm)
                 cand = [nm]
                 if not ext:
                     cand.extend([base + e for e in exts])
                 return cand
+
             resolved: list[str] = []
             tried: list[str] = []
             for d in dir_hints:
@@ -2349,8 +3220,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                             try:
                                 target = cand.lower()
                                 for fname in _os.listdir(d2):
-                                    if fname.lower() == target and _os.path.exists(_os.path.join(d2, fname)):
-                                        resolved.append(_os.path.abspath(_os.path.join(d2, fname)))
+                                    if fname.lower() == target and _os.path.exists(
+                                        _os.path.join(d2, fname)
+                                    ):
+                                        resolved.append(
+                                            _os.path.abspath(_os.path.join(d2, fname))
+                                        )
                                         break
                             except Exception:
                                 pass
@@ -2358,8 +3233,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             if resolved:
                 resp = client.load_files(resolved)
                 loaded = len(resp.objects)
-            return json.dumps({"loaded_objects": loaded, "resolved": resolved, "tried": tried})
-        
+            return json.dumps(
+                {"loaded_objects": loaded, "resolved": resolved, "tried": tried}
+            )
+
         if name == "scene_list_objects":
             resp = client.list_objects()
             objs = [
@@ -2369,17 +3246,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             return json.dumps({"objects": objs})
         if name == "fs_find_candidates":
             import os as _os
+
             dirs = args.get("dirs") or []
             names = args.get("names") or []
             exts = args.get("extensions") or []
             ci = bool(args.get("case_insensitive", True))
             out: list[str] = []
+
             def variants(nm: str) -> list[str]:
                 base, ext = _os.path.splitext(nm)
                 cand = [nm]
                 if not ext:
                     cand.extend([base + e for e in exts])
                 return cand
+
             for d in dirs:
                 d2 = _os.path.expanduser(_os.path.expandvars(str(d)))
                 for nm in names:
@@ -2392,8 +3272,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                             try:
                                 target = cand.lower()
                                 for fname in _os.listdir(d2):
-                                    if fname.lower() == target and _os.path.exists(_os.path.join(d2, fname)):
-                                        out.append(_os.path.abspath(_os.path.join(d2, fname)))
+                                    if fname.lower() == target and _os.path.exists(
+                                        _os.path.join(d2, fname)
+                                    ):
+                                        out.append(
+                                            _os.path.abspath(_os.path.join(d2, fname))
+                                        )
                                         break
                             except Exception:
                                 pass
@@ -2404,12 +3288,14 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             req = client._pb2.BBoxRequest(ids=ids, after_clipping=after)
             resp = client._stub.BBox(req)
             b = resp.bbox
-            return json.dumps({
-                "min": [b.min.x, b.min.y, b.min.z],
-                "max": [b.max.x, b.max.y, b.max.z],
-                "center": [b.center.x, b.center.y, b.center.z],
-                "size": [b.size.x, b.size.y, b.size.z],
-            })
+            return json.dumps(
+                {
+                    "min": [b.min.x, b.min.y, b.min.z],
+                    "max": [b.max.x, b.max.y, b.max.z],
+                    "center": [b.center.x, b.center.y, b.center.z],
+                    "size": [b.size.x, b.size.y, b.size.z],
+                }
+            )
         if name == "scene_get_values":
             id = int(args.get("id"))
             jks = [str(x) for x in (args.get("json_keys") or [])]
@@ -2427,8 +3313,13 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             if isinstance(json_key, str) and json_key.strip() == "":
                 json_key = None
             include_values = bool(args.get("include_values", False))
-            lr = client.list_keys(id=id, json_key=json_key, include_values=include_values)
-            keys = [{"time": k.time, "type": k.type, "value": getattr(k, "value_json", "")} for k in lr.keys]
+            lr = client.list_keys(
+                id=id, json_key=json_key, include_values=include_values
+            )
+            keys = [
+                {"time": k.time, "type": k.type, "value": getattr(k, "value_json", "")}
+                for k in lr.keys
+            ]
             return json.dumps({"ok": True, "keys": keys})
         if name == "scene_capabilities":
             ids = args.get("ids") or []
@@ -2446,17 +3337,25 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             except Exception:
                 # Map fields sometimes need explicit cast
                 obj_keys = list(dict(resp.objects).keys())
-            return json.dumps({
-                "background": len(resp.background),
-                "axis": len(resp.axis),
-                "global": len(global_params),
-                "objects": obj_keys,
-            })
+            return json.dumps(
+                {
+                    "background": len(resp.background),
+                    "axis": len(resp.axis),
+                    "global": len(global_params),
+                    "objects": obj_keys,
+                }
+            )
         if name == "scene_capabilities":
             schema_dir = args.get("schema_dir")
             sd, searched = discover_schema_dir(schema_dir, atlas_dir)
             if not sd:
-                return json.dumps({"ok": False, "error": "capabilities not found", "searched": searched})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "capabilities not found",
+                        "searched": searched,
+                    }
+                )
             try:
                 with open(Path(sd) / "capabilities.json", "r", encoding="utf-8") as f:
                     caps = json.load(f)
@@ -2470,11 +3369,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             max_params_per_type = int(args.get("max_params_per_type", 200))
             sd, searched = discover_schema_dir(schema_dir, atlas_dir)
             if not sd:
-                return json.dumps({"ok": False, "error": "capabilities not found", "searched": searched})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "capabilities not found",
+                        "searched": searched,
+                    }
+                )
             try:
                 import json as _json
                 from pathlib import Path as _Path
-                caps = _json.loads((_Path(sd) / "capabilities.json").read_text(encoding="utf-8"))
+
+                caps = _json.loads(
+                    (_Path(sd) / "capabilities.json").read_text(encoding="utf-8")
+                )
                 lines: list[str] = []
                 lines.append("# Atlas Parameters Handbook (from capabilities.json)")
                 lines.append("")
@@ -2487,12 +3395,14 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         plist = g.get("parameters") or []
                         lines.append(f"## Group: {gname}")
                         for p in plist[:max_params_per_type]:
-                            lines.append(f"- `{p.get('jsonKey','')}` — {p.get('type','')} (interp={p.get('supportsInterpolation',False)})")
+                            lines.append(
+                                f"- `{p.get('jsonKey','')}` — {p.get('type','')} (interp={p.get('supportsInterpolation',False)})"
+                            )
                         lines.append("")
                 # Object types
                 objs = caps.get("objects") or {}
                 count_types = 0
-                for tname, obj in (objs.items() if isinstance(objs, dict) else []):
+                for tname, obj in objs.items() if isinstance(objs, dict) else []:
                     if count_types >= max_types:
                         break
                     plist = []
@@ -2500,9 +3410,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         plist = obj.get("parameters") or obj.get("params") or []
                     lines.append(f"## Type: {tname}")
                     for p in plist[:max_params_per_type]:
-                        jk = p.get('jsonKey','') or p.get('json_key','')
-                        ty = p.get('type','')
-                        interp = p.get('supportsInterpolation', False)
+                        jk = p.get("jsonKey", "") or p.get("json_key", "")
+                        ty = p.get("type", "")
+                        interp = p.get("supportsInterpolation", False)
                         lines.append(f"- `{jk}` — {ty} (interp={interp})")
                     lines.append("")
                     count_types += 1
@@ -2514,15 +3424,24 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             schema_dir = args.get("schema_dir")
             sd, searched = discover_schema_dir(schema_dir, atlas_dir)
             if not sd:
-                return json.dumps({"ok": False, "error": "schema not found", "searched": searched})
+                return json.dumps(
+                    {"ok": False, "error": "schema not found", "searched": searched}
+                )
             try:
-                with open(Path(sd) / "animation3d.schema.json", "r", encoding="utf-8") as f:
+                with open(
+                    Path(sd) / "animation3d.schema.json", "r", encoding="utf-8"
+                ) as f:
                     sch = json.load(f)
                 return json.dumps({"ok": True, "schema": sch})
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e)})
         if name == "animation_describe_file":
-            from ..describe import load_animation, load_capabilities, summarize_animation
+            from ..describe import (
+                load_animation,
+                load_capabilities,
+                summarize_animation,
+            )
+
             schema_dir = args.get("schema_dir")
             sd, searched = discover_schema_dir(schema_dir, atlas_dir)
             try:
@@ -2535,7 +3454,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         caps = {}
                 style = str(args.get("style", "short"))
                 text = summarize_animation(anim, caps, style=style)
-                return json.dumps({"ok": True, "summary": text, "schema_dir": str(sd) if sd else None})
+                return json.dumps(
+                    {"ok": True, "summary": text, "schema_dir": str(sd) if sd else None}
+                )
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e), "searched": searched})
         if name == "scene_capabilities_summary":
@@ -2547,7 +3468,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": True, "summary": text})
             except Exception as e:
                 # Return generic text on failure
-                text = build_capabilities_prompt(Path("/does/not/exist"), max_lines=max_lines)
+                text = build_capabilities_prompt(
+                    Path("/does/not/exist"), max_lines=max_lines
+                )
                 return json.dumps({"ok": False, "summary": text, "error": str(e)})
         if name == "scene_facts_summary":
             limit = int(args.get("sample_limit", 6))
@@ -2558,8 +3481,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             # Objects summary
             objs = facts.get("objects_list") or []
             lines.append(f"Objects: {len(objs)} total")
-            for o in objs[:max(0, limit)]:
-                lines.append(f"  - {o.get('id')}:{o.get('type')}:{o.get('name')} visible={o.get('visible')}")
+            for o in objs[: max(0, limit)]:
+                lines.append(
+                    f"  - {o.get('id')}:{o.get('type')}:{o.get('name')} visible={o.get('visible')}"
+                )
             # Time status
             try:
                 ts = client.get_time()
@@ -2572,7 +3497,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             try:
                 cams = facts.get("keys", {}).get("camera") or []
                 if cams:
-                    lines.append("Camera keys: " + ", ".join(str(float(t)) for t in cams))
+                    lines.append(
+                        "Camera keys: " + ", ".join(str(float(t)) for t in cams)
+                    )
             except Exception:
                 pass
             # Per-object keys (sample)
@@ -2592,7 +3519,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             # Optional current values
             if sid_opt is not None and jks:
                 try:
-                    vals = client.get_param_values(id=int(sid_opt), json_keys=[str(x) for x in jks])
+                    vals = client.get_param_values(
+                        id=int(sid_opt), json_keys=[str(x) for x in jks]
+                    )
                     lines.append("Values:")
                     for k, v in vals.items():
                         try:
@@ -2609,10 +3538,17 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             norm_params: list[dict] = []
             for it in set_params:
                 if not isinstance(it, dict):
-                    return json.dumps({"ok": False, "error": "each set_params item must be an object"})
+                    return json.dumps(
+                        {"ok": False, "error": "each set_params item must be an object"}
+                    )
                 jk = it.get("json_key")
                 if not isinstance(jk, str) or not jk:
-                    return json.dumps({"ok": False, "error": "each set_params item must include a non-empty 'json_key'"})
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "each set_params item must include a non-empty 'json_key'",
+                        }
+                    )
                 id = int(it.get("id"))
                 norm_params.append({"id": id, "json_key": jk, "value": it.get("value")})
             res = client.validate_apply(norm_params)
@@ -2624,52 +3560,110 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             notes: list[dict] = []
             for it in set_params:
                 if not isinstance(it, dict):
-                    return json.dumps({"ok": False, "error": "each set_params item must be an object"})
+                    return json.dumps(
+                        {"ok": False, "error": "each set_params item must be an object"}
+                    )
                 id = int(it.get("id"))
                 jk_in = it.get("json_key")
                 name_in = it.get("name")
                 # Resolve json_key
                 if id == 0:
                     if jk_in is not None and jk_in != "Camera 3DCamera":
-                        return json.dumps({"ok": False, "error": "json_key not found: expected 'Camera 3DCamera' for id=0"})
+                        return json.dumps(
+                            {
+                                "ok": False,
+                                "error": "json_key not found: expected 'Camera 3DCamera' for id=0",
+                            }
+                        )
                     jk = "Camera 3DCamera"
                 else:
                     jk: str | None = None
                     if isinstance(jk_in, str) and jk_in.strip():
                         # If canonical exists, keep; else resolve aliases/names
                         pl = client.list_params(id=id)
-                        jks = {getattr(p, "json_key", ""): True for p in getattr(pl, "params", [])}
+                        jks = {
+                            getattr(p, "json_key", ""): True
+                            for p in getattr(pl, "params", [])
+                        }
                         if jk_in in jks:
                             jk = jk_in
                         else:
                             jk_resolved = _resolve_json_key(id, candidate=jk_in)
                             if jk_resolved:
                                 jk = jk_resolved
-                                notes.append({"remapped_param": {"from": jk_in, "to": jk, "id": id}})
+                                notes.append(
+                                    {
+                                        "remapped_param": {
+                                            "from": jk_in,
+                                            "to": jk,
+                                            "id": id,
+                                        }
+                                    }
+                                )
                             else:
                                 if isinstance(name_in, str) and name_in.strip():
                                     jk_name = _resolve_json_key(id, name=name_in)
                                     if jk_name:
                                         jk = jk_name
-                                        notes.append({"resolved_by_name": {"name": name_in, "to": jk, "id": id}})
+                                        notes.append(
+                                            {
+                                                "resolved_by_name": {
+                                                    "name": name_in,
+                                                    "to": jk,
+                                                    "id": id,
+                                                }
+                                            }
+                                        )
                                     else:
-                                        return json.dumps({"ok": False, "error": f"json_key not found: '{jk_in}'", "hint": "Use scene_list_params(id) or provide 'name'", "id": id})
+                                        return json.dumps(
+                                            {
+                                                "ok": False,
+                                                "error": f"json_key not found: '{jk_in}'",
+                                                "hint": "Use scene_list_params(id) or provide 'name'",
+                                                "id": id,
+                                            }
+                                        )
                                 else:
-                                    return json.dumps({"ok": False, "error": f"json_key not found: '{jk_in}'", "hint": "Use scene_list_params(id) or provide 'name'", "id": id})
+                                    return json.dumps(
+                                        {
+                                            "ok": False,
+                                            "error": f"json_key not found: '{jk_in}'",
+                                            "hint": "Use scene_list_params(id) or provide 'name'",
+                                            "id": id,
+                                        }
+                                    )
                     else:
                         if not isinstance(name_in, str) or not name_in.strip():
-                            return json.dumps({"ok": False, "error": "each set_params item must include 'json_key' or 'name'"})
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": "each set_params item must include 'json_key' or 'name'",
+                                }
+                            )
                         jk_name = _resolve_json_key(id, name=name_in)
                         if not jk_name:
-                            return json.dumps({"ok": False, "error": f"could not resolve json_key for name='{name_in}'"})
+                            return json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": f"could not resolve json_key for name='{name_in}'",
+                                }
+                            )
                         jk = jk_name
-                        notes.append({"resolved_by_name": {"name": name_in, "to": jk, "id": id}})
+                        notes.append(
+                            {"resolved_by_name": {"name": name_in, "to": jk, "id": id}}
+                        )
                 norm_params.append({"id": id, "json_key": jk, "value": it.get("value")})
 
             # Validate before apply; if validation fails for types, return details
             val = client.validate_apply(norm_params)
             if not bool(val.get("ok", False)):
-                return json.dumps({"ok": False, "validate": val, **({"notes": notes} if notes else {})})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "validate": val,
+                        **({"notes": notes} if notes else {}),
+                    }
+                )
             # Warn when timeline keys exist for the same id/json_key (scene values overridden during playback)
             overrides: list[dict] = []
             try:
@@ -2677,16 +3671,22 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     id2 = int(p.get("id", -1))
                     jk2 = p.get("json_key")
                     if id2 >= 0 and jk2:
-                        lr = client.list_keys(id=id2, json_key=jk2, include_values=False)
+                        lr = client.list_keys(
+                            id=id2, json_key=jk2, include_values=False
+                        )
                         times = [k.time for k in getattr(lr, "keys", [])]
                         if times:
-                            overrides.append({"id": id2, "json_key": jk2, "key_times": times})
+                            overrides.append(
+                                {"id": id2, "json_key": jk2, "key_times": times}
+                            )
             except Exception:
                 pass
             ok = client.apply_params(norm_params)
             resp = {"ok": bool(ok)}
             if overrides:
-                resp["warning"] = "animation keys exist for some params; during playback those keys override scene values"
+                resp["warning"] = (
+                    "animation keys exist for some params; during playback those keys override scene values"
+                )
                 resp["overrides"] = overrides
             if notes:
                 resp["notes"] = notes
@@ -2697,10 +3697,19 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         if name == "codegen_allowed_imports":
             try:
                 from ..codegen_policy import allowed_imports_status
+
                 names, status = allowed_imports_status()
                 installed = [s["name"] for s in status if s.get("ok")]
                 missing = [s["name"] for s in status if not s.get("ok")]
-                return json.dumps({"ok": True, "allowed": names, "installed": installed, "missing": missing, "status": status})
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "allowed": names,
+                        "installed": installed,
+                        "missing": missing,
+                        "status": status,
+                    }
+                )
             except Exception as e:
                 return json.dumps({"ok": False, "error": str(e)})
         # 'export_python_camera_segmented_orbit' tool has been removed by design; use python_write_and_run to handle codegen directly.
@@ -2718,6 +3727,7 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": False, "error": "json_key not found for id"})
             # Prefer schema-based validation
             from google.protobuf.json_format import MessageToDict as _pb2dict  # type: ignore
+
             schema = {}
             try:
                 if hasattr(meta, "HasField") and meta.HasField("value_schema"):
@@ -2727,12 +3737,19 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             # Require jsonschema at runtime; fail if missing.
             import json as _json
             import hashlib as _hashlib
+
             try:
                 from jsonschema import Draft202012Validator as _Validator  # type: ignore
             except Exception:
                 from jsonschema import Draft7Validator as _Validator  # type: ignore
             # Cache compiled validator by (id, json_key, schema digest)
-            digest = _hashlib.sha256(_json.dumps(schema, sort_keys=True).encode("utf-8")).hexdigest() if schema else ""
+            digest = (
+                _hashlib.sha256(
+                    _json.dumps(schema, sort_keys=True).encode("utf-8")
+                ).hexdigest()
+                if schema
+                else ""
+            )
             cache_key = f"{id}:{json_key}:{digest}"
             validator = _schema_validator_cache.get(cache_key)
             if validator is None:
@@ -2741,7 +3758,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             errors = list(validator.iter_errors(value))
             if errors:
                 e = errors[0]
-                loc = "".join([f"[{repr(p)}]" if isinstance(p, int) else f".{p}" for p in e.path])
+                loc = "".join(
+                    [f"[{repr(p)}]" if isinstance(p, int) else f".{p}" for p in e.path]
+                )
                 msg = f"{loc}: {e.message}" if loc else e.message
                 return json.dumps({"ok": False, "error": msg})
             return json.dumps({"ok": True})
@@ -2757,7 +3776,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             # Expect native JSON value. Resolve json_key by name if needed; coerce common mistakes.
             id = int(args.get("id"))
             if id == 0:
-                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera or animation_camera_solve_and_apply"})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "camera uses camera tools; use animation_replace_key_camera or animation_camera_solve_and_apply",
+                    }
+                )
             json_key = args.get("json_key")
             time_v = float(args.get("time", 0.0))
             easing = str(args.get("easing", "Linear"))
@@ -2766,7 +3790,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             if not json_key:
                 name = str(args.get("name") or "").strip()
                 if not name:
-                    return json.dumps({"ok": False, "error": "json_key or name required"})
+                    return json.dumps(
+                        {"ok": False, "error": "json_key or name required"}
+                    )
                 try:
                     pl = client.list_params(id=id)
                     for p in pl.params:
@@ -2776,7 +3802,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 except Exception:
                     json_key = None
                 if not json_key:
-                    return json.dumps({"ok": False, "error": f"could not resolve json_key for name='{name}'"})
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": f"could not resolve json_key for name='{name}'",
+                        }
+                    )
             json_key = str(json_key)
             # Look up param meta and verify existence
             try:
@@ -2812,15 +3843,31 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 t = (getattr(meta, "type", "") or "").lower()
                 if "bool" in t and isinstance(value_native, str):
                     s = value_native.strip().lower()
-                    if s in ("true", "1", "yes", "on"): value_native = True
-                    elif s in ("false", "0", "no", "off"): value_native = False
+                    if s in ("true", "1", "yes", "on"):
+                        value_native = True
+                    elif s in ("false", "0", "no", "off"):
+                        value_native = False
                 # Normalize numeric vectors by length if Vec3/Vec4
-                if t.endswith("vec4") and isinstance(value_native, list) and len(value_native) == 4:
+                if (
+                    t.endswith("vec4")
+                    and isinstance(value_native, list)
+                    and len(value_native) == 4
+                ):
                     value_native = [float(v) for v in value_native]
-                if t.endswith("vec3") and isinstance(value_native, list) and len(value_native) == 3:
+                if (
+                    t.endswith("vec3")
+                    and isinstance(value_native, list)
+                    and len(value_native) == 3
+                ):
                     value_native = [float(v) for v in value_native]
             try:
-                ok = client.set_key_param(id=id, json_key=json_key, time=time_v, easing=easing, value=value_native)
+                ok = client.set_key_param(
+                    id=id,
+                    json_key=json_key,
+                    time=time_v,
+                    easing=easing,
+                    value=value_native,
+                )
                 return json.dumps({"ok": ok})
             except Exception as e:
                 msg = str(e)
@@ -2832,7 +3879,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         if name == "animation_replace_key_param_at_times":
             id = int(args.get("id"))
             if id == 0:
-                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera"})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "camera uses camera tools; use animation_replace_key_camera",
+                    }
+                )
             json_key = str(args.get("json_key"))
             times = args.get("times") or []
             value = args.get("value")
@@ -2845,24 +3897,40 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 return json.dumps({"ok": False, "error": "json_key not found for id"})
             try:
                 for t in times:
-                    _ = json.loads(dispatch("animation_remove_key_param_at_time", json.dumps({
-                        "id": id,
-                        "json_key": json_key,
-                        "time": t,
-                        "tolerance": tol
-                    })))
-                    _ = json.loads(dispatch("animation_set_key_param", json.dumps({
-                        "id": id,
-                        "json_key": json_key,
-                        "time": t,
-                        "easing": easing,
-                        "value": value
-                    })))
+                    _ = json.loads(
+                        dispatch(
+                            "animation_remove_key_param_at_time",
+                            json.dumps(
+                                {
+                                    "id": id,
+                                    "json_key": json_key,
+                                    "time": t,
+                                    "tolerance": tol,
+                                }
+                            ),
+                        )
+                    )
+                    _ = json.loads(
+                        dispatch(
+                            "animation_set_key_param",
+                            json.dumps(
+                                {
+                                    "id": id,
+                                    "json_key": json_key,
+                                    "time": t,
+                                    "easing": easing,
+                                    "value": value,
+                                }
+                            ),
+                        )
+                    )
                 return json.dumps({"ok": True, "count": len(times)})
             except Exception as e:
                 msg = str(e)
-                try: msg = e.details()  # type: ignore[attr-defined]
-                except Exception: pass
+                try:
+                    msg = e.details()  # type: ignore[attr-defined]
+                except Exception:
+                    pass
                 return json.dumps({"ok": False, "error": msg})
         if name == "animation_clear_keys":
             id = int(args.get("id"))
@@ -2871,7 +3939,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         if name == "animation_remove_key":
             id = int(args.get("id"))
             if id == 0:
-                return json.dumps({"ok": False, "error": "camera uses camera tools; use animation_replace_key_camera"})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "camera uses camera tools; use animation_replace_key_camera",
+                    }
+                )
             json_key = str(args.get("json_key"))
             time_v = float(args.get("time", 0.0))
             # Verify parameter exists
@@ -2883,7 +3956,12 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             set_keys = args.get("set_keys") or []
             remove_keys = args.get("remove_keys") or []
             if not set_keys and not remove_keys:
-                return json.dumps({"ok": False, "error": "animation_batch called with empty set/remove. Build concrete SetKey entries or use animation_replace_key_param/animation_replace_key_camera (or animation_camera_solve_and_apply)."})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "animation_batch called with empty set/remove. Build concrete SetKey entries or use animation_replace_key_param/animation_replace_key_camera (or animation_camera_solve_and_apply).",
+                    }
+                )
             # Verify that each set_key references a valid json_key for its id (non-camera only)
             invalid: list[dict] = []
             params_cache: dict[int, set] = {}
@@ -2899,16 +3977,34 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                     if id not in params_cache:
                         try:
                             pl = client.list_params(id=id)
-                            params_cache[id] = {getattr(p, "json_key", "") for p in pl.params}
+                            params_cache[id] = {
+                                getattr(p, "json_key", "") for p in pl.params
+                            }
                         except Exception:
                             params_cache[id] = set()
                     if str(jk) not in params_cache[id]:
-                        invalid.append({"reason": "json_key not found for id", "json_key": jk, "id": id})
+                        invalid.append(
+                            {
+                                "reason": "json_key not found for id",
+                                "json_key": jk,
+                                "id": id,
+                            }
+                        )
             except Exception:
                 invalid = []
             if invalid:
-                return json.dumps({"ok": False, "error": "validation failed for set_keys", "invalid": invalid})
-            ok = client.batch(set_keys=set_keys, remove_keys=remove_keys, commit=bool(args.get("commit", True)))
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "validation failed for set_keys",
+                        "invalid": invalid,
+                    }
+                )
+            ok = client.batch(
+                set_keys=set_keys,
+                remove_keys=remove_keys,
+                commit=bool(args.get("commit", True)),
+            )
             return json.dumps({"ok": ok})
 
         # Visibility / cuts
@@ -2918,34 +4014,54 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             ok = client.set_visibility(ids, on)
             return json.dumps({"ok": ok})
         if name == "scene_cut_suggest_box":
-            req = client._pb2.CutSuggestRequest(ids=args.get("ids") or [], margin=float(args.get("margin", 0.0)), after_clipping=bool(args.get("after_clipping", False)))
+            req = client._pb2.CutSuggestRequest(
+                ids=args.get("ids") or [],
+                margin=float(args.get("margin", 0.0)),
+                after_clipping=bool(args.get("after_clipping", False)),
+            )
             resp = client._stub.CutSuggest(req)
             box = resp.box
-            return json.dumps({"min": [box.min.x, box.min.y, box.min.z], "max": [box.max.x, box.max.y, box.max.z]})
+            return json.dumps(
+                {
+                    "min": [box.min.x, box.min.y, box.min.z],
+                    "max": [box.max.x, box.max.y, box.max.z],
+                }
+            )
         if name == "scene_cut_set_box":
             minv = args.get("min") or [0, 0, 0]
             maxv = args.get("max") or [0, 0, 0]
-            ok = client.cut_set_box((minv[0], minv[1], minv[2]), (maxv[0], maxv[1], maxv[2]), refit_camera=bool(args.get("refit_camera", True)))
+            ok = client.cut_set_box(
+                (minv[0], minv[1], minv[2]),
+                (maxv[0], maxv[1], maxv[2]),
+                refit_camera=bool(args.get("refit_camera", True)),
+            )
             return json.dumps({"ok": ok})
         if name == "scene_cut_clear":
             return json.dumps({"ok": client.cut_clear()})
 
         # Playback / save
         if name == "animation_set_time":
-            ok = client.set_time(float(args.get("seconds", 0.0)), cancel_rendering=bool(args.get("cancel", False)))
+            ok = client.set_time(
+                float(args.get("seconds", 0.0)),
+                cancel_rendering=bool(args.get("cancel", False)),
+            )
             return json.dumps({"ok": ok})
         if name == "animation_save_animation":
             from pathlib import Path as _P
+
             return json.dumps({"ok": client.save_animation(_P(args.get("path")))})
         if name == "atlas_export_video":
             # Export .animation3d to MP4 by invoking headless Atlas
             from pathlib import Path as _P
             from ..discovery import compute_paths_from_atlas_dir, default_install_dirs
             from ..exporter import export_video as _export_video
+
             anim = args.get("animation")
             out = args.get("out")
             if not anim or not out:
-                return json.dumps({"ok": False, "error": "animation and out are required"})
+                return json.dumps(
+                    {"ok": False, "error": "animation and out are required"}
+                )
             # Resolve Atlas binary
             atlas_bin = None
             if atlas_dir:
@@ -2961,7 +4077,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         atlas_bin = ab
                         break
             if atlas_bin is None:
-                return json.dumps({"ok": False, "error": "Atlas binary not found; set atlas_dir"})
+                return json.dumps(
+                    {"ok": False, "error": "Atlas binary not found; set atlas_dir"}
+                )
             rc = _export_video(
                 atlas_bin=str(atlas_bin),
                 animation_path=_P(anim),
@@ -2979,14 +4097,23 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
         if name == "animation_render_preview":
             # Privacy/consent gate: disabled unless explicitly allowed by env
             import os as _os
-            allow = (_os.environ.get("ATLAS_AGENT_ALLOW_SCREENSHOTS", "").strip().lower() in ("1", "true", "yes"))
+
+            allow = _os.environ.get(
+                "ATLAS_AGENT_ALLOW_SCREENSHOTS", ""
+            ).strip().lower() in ("1", "true", "yes")
             if not allow:
-                return json.dumps({"ok": False, "error": "screenshots disabled; set ATLAS_AGENT_ALLOW_SCREENSHOTS=1 to enable"})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "screenshots disabled; set ATLAS_AGENT_ALLOW_SCREENSHOTS=1 to enable",
+                    }
+                )
             from pathlib import Path as _P
             import tempfile as _tmp
             import glob as _glob
             from ..discovery import compute_paths_from_atlas_dir, default_install_dirs
             from ..exporter import preview_frames as _preview_frames
+
             fps = int(float(args.get("fps", 30)))
             tsec = float(args.get("time", 0.0))
             width = int(args.get("width", 512))
@@ -3007,13 +4134,20 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                         atlas_bin = ab
                         break
             if atlas_bin is None:
-                return json.dumps({"ok": False, "error": "Atlas binary not found; set atlas_dir or install Atlas"})
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "Atlas binary not found; set atlas_dir or install Atlas",
+                    }
+                )
             # Save animation to a temp file and render a single frame
             tdir = _P(_tmp.mkdtemp(prefix="atlas_preview_"))
             anim_path = tdir / "preview.animation3d"
             ok_save = client.save_animation(anim_path)
             if not ok_save:
-                return json.dumps({"ok": False, "error": "failed to save temporary animation"})
+                return json.dumps(
+                    {"ok": False, "error": "failed to save temporary animation"}
+                )
             frames_dir = tdir / "frames"
             frames_dir.mkdir(parents=True, exist_ok=True)
             rc = _preview_frames(
@@ -3029,7 +4163,9 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
                 dummy_output=str(tdir / "dummy.mp4"),
             )
             if rc != 0:
-                return json.dumps({"ok": False, "exit_code": rc, "error": "preview renderer failed"})
+                return json.dumps(
+                    {"ok": False, "exit_code": rc, "error": "preview renderer failed"}
+                )
             # Find the produced image (exact naming depends on exporter; pick any image in frames_dir)
             images = []
             for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff"):
@@ -3037,8 +4173,6 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
             if not images:
                 return json.dumps({"ok": False, "error": "no image produced"})
             return json.dumps({"ok": True, "path": images[0]})
-
-        
 
         return json.dumps({"error": f"unknown tool: {name}"})
 
@@ -3048,7 +4182,10 @@ def scene_tools_and_dispatcher(client: SceneClient, *, atlas_dir: str | None = N
     # Environment-gated tools
     try:
         import os as _os
-        allow_screenshots = (_os.environ.get("ATLAS_AGENT_ALLOW_SCREENSHOTS", "").strip().lower() in ("1", "true", "yes"))
+
+        allow_screenshots = _os.environ.get(
+            "ATLAS_AGENT_ALLOW_SCREENSHOTS", ""
+        ).strip().lower() in ("1", "true", "yes")
     except Exception:
         allow_screenshots = False
     for t in tools:

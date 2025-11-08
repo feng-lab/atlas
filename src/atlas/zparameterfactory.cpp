@@ -9,6 +9,7 @@
 #include "zoptionparameter.h"
 #include "zstringparameter.h"
 #include "zfontparameter.h"
+#include "zcutspanparameter.h"
 #include "zlog.h"
 
 namespace nim {
@@ -43,6 +44,7 @@ ZParameterFactory::ZParameterFactory()
   registerMaker("DoubleSpan", new ZParameterMaker<ZDoubleSpanParameter>());
   registerMaker("FloatSpan", new ZParameterMaker<ZFloatSpanParameter>());
   registerMaker("IntSpan", new ZParameterMaker<ZIntSpanParameter>());
+  registerMaker("CutSpan", new ZParameterMaker<ZCutSpanParameter>());
   registerMaker("DVec2", new ZParameterMaker<ZDVec2Parameter>());
   registerMaker("DVec3", new ZParameterMaker<ZDVec3Parameter>());
   registerMaker("DVec4", new ZParameterMaker<ZDVec4Parameter>());
@@ -66,9 +68,9 @@ bool ZParameterFactory::isTypeValid(const QString& type)
 ZParameter* ZParameterFactory::create(const QString& name, const QString& type, QObject* parent) const
 {
   auto it = m_makers.find(type);
-  if (it == m_makers.end()) {
-    return nullptr;
-  }
+  // Invariant: all engine parameter types must be registered.
+  // Returning nullptr hides bugs and leads to crashes later. Fail fast.
+  CHECK(it != m_makers.end()) << "Unknown parameter type '" << type << "' for name '" << name << "'";
   return it->second->create(name, parent);
 }
 

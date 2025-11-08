@@ -137,6 +137,7 @@ void ZAnimation::addKeyFrame(double time)
       objs.push_back(3); // lighting
     }
     for (auto id : objs) {
+      // VLOG(2) << "Processing obj id " << id;
       QString objTypeName;
       json::value objJsonValue;
       if (id == 1) {
@@ -154,6 +155,7 @@ void ZAnimation::addKeyFrame(double time)
         continue;
       }
       std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
+      CHECK(wg);
       const std::vector<ZParameter*>& paraList = wg->getParameterList();
 
       AnimationObj* aniObj = findBoundId(id);
@@ -169,10 +171,11 @@ void ZAnimation::addKeyFrame(double time)
 
       for (size_t i = 0; i < paraList.size(); ++i) {
         bool found = false;
-        // VLOG(1) << paraList[i]->name();
+        // VLOG(2) << paraList[i]->name();
         for (size_t j = 0; j < paraAnimationList.size(); ++j) {
           if (paraList[i] == paraAnimationList[j]->boundParameter()) {
             found = true;
+            // VLOG(2) << "Adding key to existing parameter animation " << paraList[i]->name();
             paraAnimationList[j]->addKey(std::make_unique<ZParameterKey>(time, *paraList[i]), false);
             if (j != i) {
               std::swap(paraAnimationList[i], paraAnimationList[j]);
@@ -182,6 +185,7 @@ void ZAnimation::addKeyFrame(double time)
           }
         }
         if (!found) {
+          // VLOG(2) << "Adding new parameter animation for " << paraList[i]->name();
           objChange = true;
           auto paraAnimation = std::make_unique<ZParameterAnimation>(paraList[i]->name(), paraList[i]->type());
           paraAnimation->setParent(this);
@@ -189,9 +193,12 @@ void ZAnimation::addKeyFrame(double time)
           paraAnimation->addKey(std::make_unique<ZParameterKey>(time, *paraList[i]), false);
           paraAnimationList.insert(paraAnimationList.begin() + i, std::move(paraAnimation));
         }
+        // VLOG(2) << "Finished parameter " << paraList[i]->name();
       }
+      // VLOG(2) << "Finished obj id " << id;
     }
   }
+  // VLOG(2) << "Added all keys at time " << time;
 
   if (objChange) {
     updateObjAnimation();
@@ -201,6 +208,7 @@ void ZAnimation::addKeyFrame(double time)
   } else {
     Q_EMIT keysChanged();
   }
+  LOG(INFO) << "Added key frame at time " << time;
 }
 
 void ZAnimation::setExpanded(size_t id, bool v)
