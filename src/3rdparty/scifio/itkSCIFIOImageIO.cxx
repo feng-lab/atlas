@@ -332,9 +332,9 @@ SCIFIOImageIO::SCIFIOImageIO()
   m_Args.emplace_back("waitForInput");
 
   // output the full Java command line, for debugging
-  VLOG(2) << "-- JAVA COMMAND --";
+  VLOG(3) << "-- JAVA COMMAND --";
   for (auto& m_Arg : m_Args) {
-    VLOG(2) << "\t" << m_Arg;
+    VLOG(3) << "\t" << m_Arg;
   }
 
   // convert to something usable by itksys
