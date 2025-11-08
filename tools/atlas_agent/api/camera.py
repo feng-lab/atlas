@@ -43,8 +43,9 @@ class CameraAPI:
             raise RuntimeError("camera_solve returned no keys")
         return keys
 
-    def validate(self, *, ids: list[int], times: list[float], values: list[dict], constraints: Optional[dict] = None, policies: Optional[dict] = None) -> dict:
-        res = self.client.camera_validate(ids=ids, times=times, values=values, constraints=constraints or {"keep_visible": True, "min_coverage": 0.95}, policies=policies or {"adjust_fov": False, "adjust_distance": False, "adjust_clipping": False})
+    def validate(self, *, ids: list[int], times: list[float], values: Optional[list[dict]] = None, constraints: Optional[dict] = None, policies: Optional[dict] = None) -> dict:
+        # values may be omitted; server fills by sampling current animation at times
+        res = self.client.camera_validate(ids=ids, times=times, values=values or [], constraints=constraints or {"keep_visible": True, "min_coverage": 0.95}, policies=policies or {"adjust_fov": False, "adjust_distance": False, "adjust_clipping": False})
         return res
 
     def write_keys(self, *, keys: list[dict], easing: str = "Linear", commit: bool = True) -> None:

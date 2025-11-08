@@ -104,7 +104,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "animation_camera_validate",
-            "description": "Animation timeline: validate typed camera values against visibility/coverage constraints.",
+            "description": "Animation timeline: validate camera values against visibility/coverage constraints. Values are optional; when omitted, the server samples the current animation camera at the given times.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -116,12 +116,12 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "times": {
                         "type": "array",
                         "items": {"type": "number"},
-                        "description": "Times (seconds) for each camera key.",
+                        "description": "Times (seconds) to validate.",
                     },
                     "values": {
                         "type": "array",
                         "items": {"type": "object"},
-                        "description": "Typed camera values aligned with times.",
+                        "description": "Optional: typed camera values aligned with times. If omitted or shorter than times, the server fills by sampling.",
                     },
                     "constraints": {
                         "type": "object",
@@ -132,7 +132,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                         "description": "Adjustment policies (adjust_fov, adjust_distance, adjust_clipping).",
                     },
                 },
-                "required": ["ids", "times", "values"],
+                "required": ["ids", "times"],
             },
         },
     },
@@ -870,14 +870,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         try:
             ids = args.get("ids") or []
             times = args.get("times") or []
+            # Values are optional; the server can sample from animation when omitted.
             values = args.get("values") or []
-            if not times or len(times) != len(values):
-                return json.dumps(
-                    {
-                        "ok": False,
-                        "error": "times and values must be non-empty and same length",
-                    }
-                )
+            if not times:
+                return json.dumps({"ok": False, "error": "times must be non-empty"})
             constraints = args.get("constraints") or {}
             policies = args.get("policies") or {}
             res = client.camera_validate(

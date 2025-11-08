@@ -722,7 +722,10 @@ Vulkan async readback (offscreen only)
 - Enumerated options remain (`option_names`, `option_data`), but enums should also appear in `value_schema` when applicable.
 - The server populates `value_schema` via `ZParameter::valueSchema()` for all parameter types. Composite types (e.g., `3DTransform`, Camera) expose an object schema with canonical subfield names.
 - Client guidance: consume `value_schema` for validation, UI hints (ranges/steps), and LLM guidance. Do not infer constraints from type strings.
- - Scene.Capabilities now includes a `camera` field that lists the camera (id=0) parameters alongside `background`, `axis`, and `global` so clients/agents can discover camera schema via the same endpoint.
+- Scene.Capabilities now includes a `camera` field that lists the camera (id=0) parameters alongside `background`, `axis`, and `global` so clients/agents can discover camera schema via the same endpoint.
+ - Camera validation API: `CameraValidate` accepts either:
+   - paired `times[]` and `values[]` (lengths may differ; pairs are matched up to `min(len(times), len(values))`), or
+   - only `times[]` with an empty `values[]`, in which case the server samples camera values from the current animation’s camera track at those times (falls back to the current camera when no animation exists).
 
 Agent tooling dependency
 - The Python agent validates parameter values with `jsonschema` (Draft 2020‑12 or Draft‑7). The CLI enforces this dependency and exits if it is missing. Install via `pip install jsonschema`.

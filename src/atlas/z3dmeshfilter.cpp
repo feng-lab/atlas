@@ -40,9 +40,9 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
   m_colorMode.select("Single Color");
   m_colorMode.setDescription(QStringLiteral(
     "Controls how mesh surface colors are chosen:\n"
-    "- 'Single Color' uses the 'Mesh Color' parameter below to render a solid color.\n"
-    "- 'Mesh Color' uses color attributes embedded in the mesh file (per-vertex/face).\n"
-    "  If the mesh does not contain colors, the appearance may fallback (often grayscale)."));
+    "- 'Single Color' (recommended when you want to control color) applies the 'Mesh Color' parameter below as a solid color for the whole mesh.\n"
+    "- 'Mesh Color' reads color attributes embedded in the mesh file (per‑vertex/face). In this mode you cannot override the color with parameters;\n"
+    "  if the mesh lacks embedded colors, the fill color falls back to the contained/default color (often black). Choose 'Single Color' to force a specific color."));
 
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::prepareColor);
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DMeshFilter::adjustWidgets);
@@ -61,15 +61,13 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
   addParameter(m_colorMode);
 
   addParameter(m_singleColorForAllMesh);
-  m_singleColorForAllMesh.setDescription(QStringLiteral(
-    "Solid RGBA color used when 'Color Mode' is set to 'Single Color'."));
+  m_singleColorForAllMesh.setDescription(
+    QStringLiteral("Solid RGBA color used when 'Color Mode' is set to 'Single Color'."));
 
   addParameter(m_wireframeMode);
   addParameter(m_wireframeColor);
-  m_wireframeMode.setDescription(QStringLiteral(
-    "Render meshes with or without a wireframe overlay."));
-  m_wireframeColor.setDescription(QStringLiteral(
-    "Wireframe line color (applies when wireframe is visible)."));
+  m_wireframeMode.setDescription(QStringLiteral("Render meshes with or without a wireframe overlay."));
+  m_wireframeColor.setDescription(QStringLiteral("Wireframe line color (applies when wireframe is visible)."));
 
   connect(&m_glow, &ZBoolParameter::valueChanged, this, &Z3DMeshFilter::adjustWidgets);
   addParameter(m_glow);

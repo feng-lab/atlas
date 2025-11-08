@@ -168,7 +168,7 @@ Scene-only (stateless) apply
 Animation (timeline) authoring
 - Solve and write keys: `animation_camera_solve_and_apply(mode, ids, t0, t1, constraints?, params?, degrees?, …)`.
   - Tip: for ORBIT, use `degrees` (default 360). The agent maps this to the backend as needed. Use `params.axis` (default `"y"`).
-- Validate typed key sequences: `animation_camera_validate(ids, times, values, constraints?, policies?)`.
+- Validate camera key sequences: `animation_camera_validate(ids, times, values?, constraints?, policies?)` (values optional; when omitted, the server samples from the current animation at those times).
 - Single-time explicit write: `animation_replace_key_camera(time, value, easing?)`.
 
 Notes

@@ -1714,11 +1714,53 @@ public:
       // Base camera for aspect
       Z3DCameraParameter base("Camera");
       base.setValueSameAs(m_owner.engine()->camera());
-      // Validate each time/value
-      const int n = std::min(req->times_size(), req->values_size());
+      // Prepare times and values pairs. Be permissive:
+      // - If values are missing (size==0) but times are provided, sample values from the current animation camera track.
+      // - If counts mismatch, pair up to times.size(); fill missing values by sampling, and ignore extras.
+      std::vector<double> times;
+      times.reserve(req->times_size());
+      for (int i = 0; i < req->times_size(); ++i) {
+        times.push_back(req->times(i));
+      }
+      std::vector<json::value> values;
+      values.reserve(req->values_size());
+      for (int i = 0; i < req->values_size(); ++i) {
+        values.push_back(pbToJson(req->values(i)));
+      }
+      auto sampleCameraAt = [&](double t) -> json::value {
+        // Default to base camera value when no animation
+        if (!m_owner.doc()) {
+          return base.jsonValue();
+        }
+        auto& ad = m_owner.doc()->animation3DDoc();
+        auto aIds = ad.animationIds();
+        if (aIds.empty()) {
+          return base.jsonValue();
+        }
+        auto* anim = ad.animationPtr(aIds.front());
+        if (!anim) {
+          return base.jsonValue();
+        }
+        ZCameraParameterAnimation* cpa = anim->cameraParameterAnimation();
+        if (!cpa) {
+          return base.jsonValue();
+        }
+        Z3DCameraParameter tmp("Camera");
+        // Seed with base for stable projection/ar fields; updateParaToTime writes necessary fields
+        tmp.setValueSameAs(base);
+        cpa->updateParaToTime(t, &tmp);
+        return tmp.jsonValue();
+      };
+      if (!times.empty()) {
+        // Ensure values.size() >= times.size() by sampling animation for missing entries
+        for (size_t i = values.size(); i < times.size(); ++i) {
+          values.push_back(sampleCameraAt(times[i]));
+        }
+      }
+      const int n = static_cast<int>(std::min(times.size(), values.size()));
       for (int i = 0; i < n; ++i) {
-        double t = req->times(i);
-        json::value jv = pbToJson(req->values(i));
+        double t = times[i];
+        json::value jv = values[i];
         CameraValidateResult r;
         r.set_time(t);
         if (!jv.is_object()) {
