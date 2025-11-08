@@ -722,6 +722,7 @@ Vulkan async readback (offscreen only)
 - Enumerated options remain (`option_names`, `option_data`), but enums should also appear in `value_schema` when applicable.
 - The server populates `value_schema` via `ZParameter::valueSchema()` for all parameter types. Composite types (e.g., `3DTransform`, Camera) expose an object schema with canonical subfield names.
 - Client guidance: consume `value_schema` for validation, UI hints (ranges/steps), and LLM guidance. Do not infer constraints from type strings.
+ - Scene.Capabilities now includes a `camera` field that lists the camera (id=0) parameters alongside `background`, `axis`, and `global` so clients/agents can discover camera schema via the same endpoint.
 
 Agent tooling dependency
 - The Python agent validates parameter values with `jsonschema` (Draft 2020‑12 or Draft‑7). The CLI enforces this dependency and exits if it is missing. Install via `pip install jsonschema`.
@@ -736,5 +737,6 @@ Agent tooling dependency
 - Implementation notes:
   - These ids are defined in `src/atlas/zrpcservice.cpp` as constants (`kScopeCamera`, `kScopeBackground`, `kScopeAxis`, `kScopeGlobal`). Avoid magic numbers.
   - Camera is treated as a parameter scope (id=0) for RPC and live introspection. It is NOT represented as an `AnimationObj` entry; camera keys live in the dedicated camera track (`m_globalParaAnimations`).
+  - Compatibility: `ValidateSceneParams` and `ApplySceneParams` accept an empty `json_key` for id=0; the server maps it to the canonical camera parameter key (e.g., `"Camera 3DCamera"`). For all other ids, `json_key` must be specified.
   - In the animation model, `AnimationObj.boundId == 0` remains a sentinel for “unbound/non‑scene” and is unrelated to the camera scope.
   - Do not add an `AnimationObj` for id=0; timeline ops for camera continue to use the camera track APIs.

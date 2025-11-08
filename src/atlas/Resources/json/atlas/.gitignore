@@ -4,6 +4,7 @@ capabilities.json
 agent_kb.jsonl
 agent_tools.manifest.json
 agent_facts.json
+supported_file_formats.json
 
 # Allow keeping the folder itself in Git, but ignore outputs
 !.gitignore

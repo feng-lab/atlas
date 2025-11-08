@@ -17,6 +17,7 @@
 #include "zimgleica.h"
 #include "zioutils.h"
 #include "zcancellation.h"
+#include <algorithm>
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <folly/coro/Collect.h>
 #include <folly/coro/BlockingWait.h>
@@ -1061,6 +1062,36 @@ void ZImgIO::getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& 
   all += lst.join(" ");
   all += ")";
   filters.prepend(all);
+}
+
+QStringList ZImgIO::readExtensions() const
+{
+  QStringList extensions;
+  for (const auto& fmt : m_ioFormats) {
+    if (!fmt.second || !fmt.second->supportRead()) {
+      continue;
+    }
+    for (const QString& ext : fmt.second->extensions()) {
+      const QString trimmed = ext.trimmed();
+      if (trimmed.isEmpty()) {
+        continue;
+      }
+      bool exists = false;
+      for (const auto& existing : extensions) {
+        if (existing.compare(trimmed, Qt::CaseInsensitive) == 0) {
+          exists = true;
+          break;
+        }
+      }
+      if (!exists) {
+        extensions.push_back(trimmed);
+      }
+    }
+  }
+  std::sort(extensions.begin(), extensions.end(), [](const QString& a, const QString& b) {
+    return a.compare(b, Qt::CaseInsensitive) < 0;
+  });
+  return extensions;
 }
 
 void ZImgIO::getQtWriteNameFilter(QStringList& filters,

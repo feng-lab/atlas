@@ -337,25 +337,8 @@ public:
       if (!m_owner.engine()) {
         return false;
       }
-      size_t boundId = 0;
-      // id=0 → camera; 1/2/3 → background/axis/global; ≥4 object id
-      if (req->id() == kScopeCamera) {
-        json::object j;
-        j["Camera 3DCamera"] = m_owner.engine()->camera().jsonValue();
-        if (req->json_keys_size() == 0) {
-          for (const auto& [k, v] : j) {
-            (*reply->mutable_values())[std::string(k.data(), k.size())] = jsonToPb(v);
-          }
-        } else {
-          for (const auto& qk : req->json_keys()) {
-            if (auto* pv = j.if_contains(qk)) {
-              (*reply->mutable_values())[qk] = jsonToPb(*pv);
-            }
-          }
-        }
-        return true;
-      }
-      boundId = static_cast<size_t>(req->id());
+      // Use unified parameter access for all scopes, including camera (id=0)
+      const size_t boundId = static_cast<size_t>(req->id());
       const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
       json::object j;
       for (auto* p : params) {
@@ -397,27 +380,16 @@ public:
       }
       auto validateOne = [&](const SetParam& sp, ValidateSceneParamResult& r) {
         r.set_json_key(sp.json_key());
-        // Resolve scope
-        size_t boundId = static_cast<size_t>(sp.id());
-        if (boundId == 0) {
-          // Camera validation: accept 3DCamera object and normalize via Z3DCameraParameter
-          if (!sp.json_key().empty() && sp.json_key() != std::string("Camera 3DCamera")) {
-            r.set_ok(false);
-            r.set_reason("json_key_not_found");
-            return;
-          }
-          Z3DCameraParameter cam("Camera");
-          cam.setValueSameAs(m_owner.engine()->camera());
-          json::value v = pbToJson(sp.value());
-          if (v.is_object()) {
-            cam.readValue(v);
-          }
-          *r.mutable_normalized_value() = jsonToPb(cam.jsonValue());
-          r.set_ok(true);
-          return;
-        }
+        // Resolve scope via unified parameter list (id=0 => camera)
+        const size_t boundId = static_cast<size_t>(sp.id());
         const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
-        const QString jsonKey = QString::fromStdString(sp.json_key());
+        // Compatibility: allow empty json_key for camera scope (id=0) and map to the single camera parameter key
+        QString jsonKey = QString::fromStdString(sp.json_key());
+        if (boundId == kScopeCamera && jsonKey.isEmpty()) {
+          if (!params.empty() && params.front()) {
+            jsonKey = params.front()->jsonKey();
+          }
+        }
         ZParameter* target = nullptr;
         for (auto* p : params) {
           if (p && p->jsonKey() == jsonKey) {
@@ -698,20 +670,16 @@ public:
         return false;
       }
       for (const auto& sp : req->set_params()) {
-        size_t boundId = static_cast<size_t>(sp.id());
-        if (boundId == 0) {
-          // Apply camera (stateless)
-          json::value v = pbToJson(sp.value());
-          auto& cam = m_owner.engine()->camera();
-          if (v.is_object()) {
-            cam.readValue(v);
-          } else {
-            return false;
-          }
-          continue;
-        }
+        const size_t boundId = static_cast<size_t>(sp.id());
+        // Apply using unified parameter list (id=0 => camera)
         const auto params = m_owner.engine()->parametersOfViewSetting(boundId);
-        const QString jsonKey = QString::fromStdString(sp.json_key());
+        // Compatibility for camera: empty json_key maps to the camera parameter jsonKey
+        QString jsonKey = QString::fromStdString(sp.json_key());
+        if (boundId == kScopeCamera && jsonKey.isEmpty()) {
+          if (!params.empty() && params.front()) {
+            jsonKey = params.front()->jsonKey();
+          }
+        }
         ZParameter* target = nullptr;
         for (auto* p : params) {
           if (p && p->jsonKey() == jsonKey) {
@@ -868,16 +836,9 @@ public:
       std::vector<size_t> ids;
       ids.reserve(req->ids_size());
       for (auto v : req->ids()) {
-        size_t id = static_cast<size_t>(v);
-        // Filter out Animation3D objects from bbox calculations to avoid skewing camera fitting
-        if (m_owner.doc()) {
-          auto* od = m_owner.doc()->idToDoc(id);
-          if (od && od->typeName() == QStringLiteral("Animation3D")) {
-            continue;
-          }
-        }
-        ids.push_back(id);
+        ids.push_back(static_cast<size_t>(v));
       }
+      ids = filterVisualIds(m_owner, ids);
       if (req->after_clipping()) {
         return m_owner.engine()->boundBoxOfObjsAfterClipping(ids);
       }
@@ -908,7 +869,7 @@ public:
     auto res = invokeOnUi([&]() {
       struct CapOut
       {
-        std::vector<Parameter> bg, ax, gl;
+        std::vector<Parameter> cam, bg, ax, gl;
         std::map<QString, std::vector<Parameter>> objs;
       };
       CapOut out;
@@ -932,6 +893,8 @@ public:
           dst.push_back(std::move(meta));
         }
       };
+      // Include camera (id=0) to let clients discover its schema
+      collect(0, out.cam);
       collect(1, out.bg);
       collect(2, out.ax);
       collect(3, out.gl);
@@ -953,6 +916,9 @@ public:
       }
       return out;
     });
+    for (auto& p : res.cam) {
+      *reply->add_camera() = std::move(p);
+    }
     for (auto& p : res.bg) {
       *reply->add_background() = std::move(p);
     }
@@ -1216,35 +1182,18 @@ public:
       if (!m_owner.engine()) {
         return out;
       }
-      // Gather ids
+      // Gather and filter ids
       std::vector<size_t> ids;
       if (req->all() || req->ids_size() == 0) {
         if (m_owner.doc()) {
-          ids = m_owner.doc()->objs();
-          // Filter out Animation3D
-          std::vector<size_t> filtered;
-          filtered.reserve(ids.size());
-          for (auto id : ids) {
-            auto* od = m_owner.doc()->idToDoc(id);
-            if (od && od->typeName() == QStringLiteral("Animation3D")) {
-              continue;
-            }
-            filtered.push_back(id);
-          }
-          ids.swap(filtered);
+          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
         }
       } else {
         ids.reserve(req->ids_size());
         for (auto v : req->ids()) {
-          size_t id = static_cast<size_t>(v);
-          if (m_owner.doc()) {
-            auto* od = m_owner.doc()->idToDoc(id);
-            if (od && od->typeName() == QStringLiteral("Animation3D")) {
-              continue;
-            }
-          }
-          ids.push_back(id);
+          ids.push_back(static_cast<size_t>(v));
         }
+        ids = filterVisualIds(m_owner, ids);
       }
       // Compute bbox
       ZBBox<glm::dvec3> bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids)
@@ -1287,30 +1236,14 @@ public:
       std::vector<size_t> ids;
       if (req->ids_size() == 0) {
         if (m_owner.doc()) {
-          ids = m_owner.doc()->objs();
-          std::vector<size_t> filtered;
-          filtered.reserve(ids.size());
-          for (auto id : ids) {
-            auto* od = m_owner.doc()->idToDoc(id);
-            if (od && od->typeName() == QStringLiteral("Animation3D")) {
-              continue;
-            }
-            filtered.push_back(id);
-          }
-          ids.swap(filtered);
+          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
         }
       } else {
         ids.reserve(req->ids_size());
         for (auto v : req->ids()) {
-          size_t id = static_cast<size_t>(v);
-          if (m_owner.doc()) {
-            auto* od = m_owner.doc()->idToDoc(id);
-            if (od && od->typeName() == QStringLiteral("Animation3D")) {
-              continue;
-            }
-          }
-          ids.push_back(id);
+          ids.push_back(static_cast<size_t>(v));
         }
+        ids = filterVisualIds(m_owner, ids);
       }
       ZBBox<glm::dvec3> bb = m_owner.engine()->boundBoxOfObjs(ids);
       if (bb.empty()) {
@@ -1363,30 +1296,14 @@ public:
       std::vector<size_t> ids;
       if (req->ids_size() == 0) {
         if (m_owner.doc()) {
-          ids = m_owner.doc()->objs();
-          std::vector<size_t> filtered;
-          filtered.reserve(ids.size());
-          for (auto id : ids) {
-            auto* od = m_owner.doc()->idToDoc(id);
-            if (od && od->typeName() == QStringLiteral("Animation3D")) {
-              continue;
-            }
-            filtered.push_back(id);
-          }
-          ids.swap(filtered);
+          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
         }
       } else {
         ids.reserve(req->ids_size());
         for (auto v : req->ids()) {
-          size_t id = static_cast<size_t>(v);
-          if (m_owner.doc()) {
-            auto* od = m_owner.doc()->idToDoc(id);
-            if (od && od->typeName() == QStringLiteral("Animation3D")) {
-              continue;
-            }
-          }
-          ids.push_back(id);
+          ids.push_back(static_cast<size_t>(v));
         }
+        ids = filterVisualIds(m_owner, ids);
       }
       ZBBox<glm::dvec3> bb = m_owner.engine()->boundBoxOfObjs(ids);
       if (bb.empty()) {
@@ -1596,11 +1513,9 @@ public:
       if (!m_owner.doc()) {
         return out;
       }
-      for (auto id : m_owner.doc()->objs()) {
-        auto* od = m_owner.doc()->idToDoc(id);
-        if (od && od->typeName() == QStringLiteral("Animation3D")) {
-          continue;
-        }
+      auto filtered = filterVisualIds(m_owner, m_owner.doc()->objs());
+      out.reserve(filtered.size());
+      for (auto id : filtered) {
         out.push_back(static_cast<uint64_t>(id));
       }
       return out;
@@ -2518,13 +2433,14 @@ public:
       std::vector<size_t> ids;
       if (req->ids_size() == 0) {
         if (m_owner.doc()) {
-          ids = m_owner.doc()->objs();
+          ids = filterVisualIds(m_owner, m_owner.doc()->objs());
         }
       } else {
         ids.reserve(req->ids_size());
         for (auto v : req->ids()) {
           ids.push_back(static_cast<size_t>(v));
         }
+        ids = filterVisualIds(m_owner, ids);
       }
       bb = req->after_clipping() ? m_owner.engine()->boundBoxOfObjsAfterClipping(ids)
                                  : m_owner.engine()->boundBoxOfObjs(ids);

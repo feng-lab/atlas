@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List
 from .context import ToolDispatchContext
+from .file_formats import get_supported_extensions, SCENE_LOAD_CATEGORIES
 
 HANDLED_TOOLS = (
     "fs_expand_paths",
@@ -310,6 +311,10 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "Allowed extensions",
+                    },
+                    "schema_dir": {
+                        "type": "string",
+                        "description": "Optional schema directory override for extension catalogs",
                     },
                     "case_insensitive": {
                         "type": "boolean",
@@ -1217,8 +1222,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
         dirs = args.get("dirs") or []
         names = args.get("names") or []
+        schema_dir_override = args.get("schema_dir")
         exts_arg = args.get("extensions") or []
         exts = [str(e) for e in exts_arg if isinstance(e, str) and e]
+        if not exts:
+            exts = get_supported_extensions(schema_dir_override, atlas_dir, categories=SCENE_LOAD_CATEGORIES)
         ci = bool(args.get("case_insensitive", True))
         out: list[str] = []
 

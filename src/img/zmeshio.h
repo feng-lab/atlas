@@ -24,6 +24,8 @@ public:
     return m_readFilter;
   }
 
+  [[nodiscard]] QStringList readExtensions() const;
+
   void getQtWriteNameFilter(QStringList& filters, std::vector<std::string>& formats);
 
   static void load(const QString& filename, ZMesh& mesh);

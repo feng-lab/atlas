@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from ...discovery import discover_schema_dir
 from ...capabilities_prompt import build_capabilities_prompt
 from .context import ToolDispatchContext
+from .file_formats import get_supported_extensions, SCENE_LOAD_CATEGORIES
 
 HANDLED_TOOLS = (
     "scene_capabilities_summary",
@@ -313,6 +314,10 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                         "items": {"type": "string"},
                         "description": "Hint directories",
                     },
+                    "schema_dir": {
+                        "type": "string",
+                        "description": "Optional schema directory override for extension catalogs",
+                    },
                     "extensions": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -547,8 +552,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
         names = args.get("names") or []
         dir_hints = args.get("dir_hints") or []
+        schema_dir_override = args.get("schema_dir")
         exts_arg = args.get("extensions") or []
         exts = [str(e) for e in exts_arg if isinstance(e, str) and e]
+        if not exts:
+            exts = get_supported_extensions(
+                schema_dir_override, atlas_dir, categories=SCENE_LOAD_CATEGORIES
+            )
         ci = bool(args.get("case_insensitive", True))
         if not dir_hints:
             home = _os.path.expanduser("~")

@@ -40,6 +40,8 @@ message Parameter {
 }
 message ParamList { repeated Parameter params = 1; }
 message CapabilitiesResponse {
+  // Camera (id=0) parameter schema
+  repeated Parameter camera = 5;
   repeated Parameter background = 1;
   repeated Parameter axis = 2;
   repeated Parameter global = 3;

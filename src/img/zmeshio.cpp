@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <memory>
+#include <algorithm>
 
 namespace {
 
@@ -182,6 +183,16 @@ void ZMeshIO::getQtWriteNameFilter(QStringList& filters, std::vector<std::string
 {
   filters = m_writeFilters;
   formats = m_writeFormats;
+}
+
+QStringList ZMeshIO::readExtensions() const
+{
+  QStringList exts = m_readExts;
+  exts.removeDuplicates();
+  std::sort(exts.begin(), exts.end(), [](const QString& a, const QString& b) {
+    return a.compare(b, Qt::CaseInsensitive) < 0;
+  });
+  return exts;
 }
 
 void ZMeshIO::load(const QString& filename, ZMesh& mesh)

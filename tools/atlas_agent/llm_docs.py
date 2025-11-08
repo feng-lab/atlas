@@ -41,6 +41,7 @@ def docs_inputs(repo_root: Path) -> List[Path]:
 
 # ---------- KB build helpers ----------
 
+
 def _read_text(p: Path) -> str:
     return p.read_text(encoding="utf-8", errors="ignore")
 
@@ -93,7 +94,7 @@ def _chunk_text(text: str, *, max_chars: int = 1800) -> List[str]:
     cur = []
     size = 0
     for p in paras:
-        p2 = (p + "\n\n")
+        p2 = p + "\n\n"
         if size + len(p2) > max_chars and cur:
             out.append("".join(cur).strip())
             cur = [p2]
@@ -135,7 +136,12 @@ def build_kb_cards(paths: Iterable[Path]) -> List[Dict[str, Any]]:
 
 def _dump_schema_with_atlas(atlas_dir: Path, out_dir: Path) -> None:
     atlas_bin, _ = compute_paths_from_atlas_dir(atlas_dir)
-    args = [str(atlas_bin), "--run_dump_animation3d_schema", "--dump_output_dir", str(out_dir)]
+    args = [
+        str(atlas_bin),
+        "--run_dump_animation3d_schema",
+        "--dump_output_dir",
+        str(out_dir),
+    ]
     if platform.system() in {"Windows", "Linux"}:
         args += ["-platform", "offscreen"]
     try:
@@ -147,6 +153,7 @@ def _dump_schema_with_atlas(atlas_dir: Path, out_dir: Path) -> None:
 REQUIRED_FILES = [
     "animation3d.schema.json",
     "capabilities.json",
+    "supported_file_formats.json",
     "agent_kb.jsonl",
 ]
 
@@ -155,13 +162,22 @@ def missing_llm_docs(out_dir: Path) -> List[str]:
     return [name for name in REQUIRED_FILES if not (out_dir / name).exists()]
 
 
-def ensure_llm_docs(repo_root: Path, *, atlas_dir: Optional[str] = None, out_dir: Optional[Path] = None, force_schema_dump: bool = False) -> Path:
-    out = (out_dir or repo_schema_dir(repo_root))
+def ensure_llm_docs(
+    repo_root: Path,
+    *,
+    atlas_dir: Optional[str] = None,
+    out_dir: Optional[Path] = None,
+    force_schema_dump: bool = False,
+) -> Path:
+    out = out_dir or repo_schema_dir(repo_root)
     out.mkdir(parents=True, exist_ok=True)
 
     # Dump schema/caps if missing
     missing = set(missing_llm_docs(out))
-    if force_schema_dump or ({"animation3d.schema.json", "capabilities.json"} & missing):
+    if force_schema_dump or (
+        {"animation3d.schema.json", "capabilities.json", "supported_file_formats.json"}
+        & missing
+    ):
         if atlas_dir:
             _dump_schema_with_atlas(Path(atlas_dir), out)
 

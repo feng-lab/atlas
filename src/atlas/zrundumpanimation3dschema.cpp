@@ -12,6 +12,9 @@
 #include "zregionannotationdoc.h"
 #include "z3dglobalparameters.h"
 #include "zimg.h"
+#include "zimgio.h"
+#include "zmeshio.h"
+#include "zpunctaio.h"
 #include <QTemporaryDir>
 #include <QFile>
 #include <QTextStream>
@@ -20,6 +23,7 @@
 #include <QDir>
 #include <gflags/gflags.h>
 #include <cctype>
+#include <set>
 
 DEFINE_bool(run_dump_animation3d_schema, false, "Dump Animation3D JSON Schema + capabilities and exit");
 DEFINE_string(dump_output_dir,
@@ -432,6 +436,44 @@ static void makeSampleAssets(const QDir& dir,
                 "</svg>\n");
 }
 
+static json::array toJsonExtensionArray(const QStringList& extensions)
+{
+  std::set<std::string> uniq;
+  for (QString ext : extensions) {
+    QString trimmed = ext.trimmed();
+    if (trimmed.isEmpty()) {
+      continue;
+    }
+    if (!trimmed.startsWith('.')) {
+      trimmed.prepend('.');
+    }
+    uniq.insert(trimmed.toLower().toStdString());
+  }
+  json::array arr;
+  for (const auto& val : uniq) {
+    arr.emplace_back(val);
+  }
+  return arr;
+}
+
+static void addFormatCategory(json::object& categories,
+                              const char* key,
+                              const char* label,
+                              const QStringList& extensions,
+                              const char* notes = nullptr)
+{
+  if (!key || !label) {
+    return;
+  }
+  json::object entry;
+  entry["label"] = label;
+  entry["extensions"] = toJsonExtensionArray(extensions);
+  if (notes && notes[0] != '\0') {
+    entry["notes"] = notes;
+  }
+  categories[key] = entry;
+}
+
 int ZRunDumpAnimation3DSchema::run()
 {
   try {
@@ -453,6 +495,7 @@ int ZRunDumpAnimation3DSchema::run()
     }
     const QString schemaOut = outDir.filePath("animation3d.schema.json");
     const QString capsOut = outDir.filePath("capabilities.json");
+    const QString formatsOut = outDir.filePath("supported_file_formats.json");
 
     // Build capability catalog by introspecting parameters from live engine/views
     nim::ZDoc doc;
@@ -675,6 +718,44 @@ int ZRunDumpAnimation3DSchema::run()
     schema["$defs"].as_object()["ParameterSchemaPatterns"] = patternSchemas;
     schema["defs"].as_object()["ParameterSchemaPatterns"] = patternSchemas;
     saveJsonObject(schema, schemaOut);
+
+    LOG(INFO) << "Dumping supported file formats to " << formatsOut;
+    json::object formatsRoot;
+    formatsRoot["version"] = std::string("1.0");
+    json::object categories;
+    addFormatCategory(categories,
+                      "images",
+                      "Images / Volumes",
+                      ZImgIO::instance().readExtensions(),
+                      "Generated from ZImgIO readers (TIFF/OME/LSM/RAW/etc.)");
+    addFormatCategory(categories,
+                      "meshes",
+                      "Meshes",
+                      ZMeshIO::instance().readExtensions(),
+                      "Assimp-supported mesh formats plus Atlas custom readers");
+    addFormatCategory(categories,
+                      "swc",
+                      "SWC Skeletons",
+                      QStringList({"swc"}),
+                      "SWC/eSWC neuron skeletons");
+    addFormatCategory(categories,
+                      "puncta",
+                      "Puncta / Markers",
+                      ZPunctaIO::instance().readExtensions(),
+                      "Marker catalogs (nimp/apo/marker/txt/xyz)");
+    addFormatCategory(categories,
+                      "roi",
+                      "ROI / Region annotations",
+                      QStringList({"nimroi", "reganno"}),
+                      "Atlas ROI packs and region annotations");
+    addFormatCategory(categories, "svg", "SVG Overlays", QStringList({"svg"}));
+    addFormatCategory(categories,
+                      "animations",
+                      "Animations",
+                      QStringList({"animation2d", "animation3d"}),
+                      "Timeline files");
+    formatsRoot["categories"] = categories;
+    saveJsonObject(formatsRoot, formatsOut);
     LOG(INFO) << "Schema and capabilities saved.";
     return 0;
   }

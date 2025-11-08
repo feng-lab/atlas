@@ -22,6 +22,8 @@ public:
     return m_readFilter;
   }
 
+  [[nodiscard]] QStringList readExtensions() const;
+
   void getQtWriteNameFilter(QStringList& filters, QStringList& formats);
 
   void load(const QString& filename, ZPuncta& puncta) const;

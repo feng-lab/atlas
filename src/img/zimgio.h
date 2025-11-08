@@ -114,6 +114,8 @@ public:
   // qt style name filter for image open dialog
   void getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& formats) const;
 
+  [[nodiscard]] QStringList readExtensions() const;
+
   // write filter
   void
   getQtWriteNameFilter(QStringList& filters, std::vector<FileFormat>& formats, std::vector<Compression>& comps) const;

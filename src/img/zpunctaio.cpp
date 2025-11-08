@@ -8,6 +8,7 @@
 #include "zstringutils.h"
 #include <H5Cpp.h>
 #include <QFile>
+#include <algorithm>
 
 namespace nim {
 
@@ -55,6 +56,16 @@ void ZPunctaIO::getQtWriteNameFilter(QStringList& filters, QStringList& formats)
 {
   filters = m_writeFilters;
   formats = m_writeFormats;
+}
+
+QStringList ZPunctaIO::readExtensions() const
+{
+  QStringList exts = m_readExts;
+  exts.removeDuplicates();
+  std::sort(exts.begin(), exts.end(), [](const QString& a, const QString& b) {
+    return a.compare(b, Qt::CaseInsensitive) < 0;
+  });
+  return exts;
 }
 
 void ZPunctaIO::load(const QString& filename, ZPuncta& puncta) const
