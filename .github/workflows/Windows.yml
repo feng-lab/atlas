@@ -132,7 +132,6 @@ jobs:
 #          cd ~/atlas
 #          python util/build_ext_libs.py all
 #          conda config --set anaconda_upload yes
-#          conda-build --token $Env:ANACONDA_API_TOKEN --user fenglab conda-opencv-recipe
 #
 #      - name: setup ssh key
 #        shell: bash -l {0}

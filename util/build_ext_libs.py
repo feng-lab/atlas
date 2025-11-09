@@ -273,7 +273,7 @@ def get_common_build_flags(cpp_standard: int = cpp_standard(), with_optimization
                               f'-mavx' + optimization
     elif is_windows():
         optimization = ' /O2' if with_optimization else ''
-        res['CFLAGS'] = f'/utf-8' + optimization
+        res["CFLAGS"] = "/utf-8" + optimization
         res['CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS ' \
                           f'/DNOMINMAX /arch:AVX' + optimization
     return res
@@ -2883,9 +2883,12 @@ def build_proxygen(src_dir: str, install_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         if is_windows():
-            cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={get_gperf_dir()};{os.path.dirname(sys.executable)}',
-                             f'-DBUILD_SAMPLES:BOOL=OFF',
-                             ])
+            cmakecmd.extend(
+                [
+                    f"-DCMAKE_PROGRAM_PATH={get_gperf_dir()};{os.path.dirname(sys.executable)}",
+                    "-DBUILD_SAMPLES:BOOL=OFF",
+                ]
+            )
         else:
             cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={os.path.dirname(sys.executable)}',
                              ])
@@ -3439,11 +3442,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(atlas_src_dir(), 'python')
             build_conda_zimg(src_dir, ext_conda_build_dir())
 
-        if lib_name == 'conda-opencv':
-            src_dir = os.path.join(ext_dir(), 'opencv')
-            src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
-            build_opencv(src_dir, src_contrib_dir, ext_conda_build_dir(), conda_build=True)
-
         if lib_name == 'ospray':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ospray*'))
             src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
@@ -3476,19 +3474,76 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
 
 def parse_inputs(argv: list):
-    lib_list = ['cmake', 'ninja', 'curl', 'gperf', 'ffmpeg', 'java', 'qt', 'make-cmake-pathlist', 'fast_float',
-                'zlib', 'boost', 'tbb', 'eigen', 'pocketfft', 'reflect', 'simde', 'pybind11', 'glm', 'googletest',
-                'cpuinfo', 'gflags', 'glog', 'benchmark', 'openssl', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt',
-                'libevent', 'snappy', 'bzip2', 'libsodium', 'folly', 'suitesparse', 'grpc', 'ceres-solver',
-                'glbinding', 'libjpeg', 'libpng', 'openjpeg',
-                'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk', 'opencv',
-                'neuTube', 'rocksdb', 'llfio', 'jansson', 'pcre', 'fizz', 'mvfst', 'wangle', 'proxygen',
-                'conda-zimg', 'conda-opencv', 'ospray', 'ants', 'skia', 'or-tools'
-                ]
+    lib_list = [
+        "cmake",
+        "ninja",
+        "curl",
+        "gperf",
+        "ffmpeg",
+        "java",
+        "qt",
+        "make-cmake-pathlist",
+        "fast_float",
+        "zlib",
+        "boost",
+        "tbb",
+        "eigen",
+        "pocketfft",
+        "reflect",
+        "simde",
+        "pybind11",
+        "glm",
+        "googletest",
+        "cpuinfo",
+        "gflags",
+        "glog",
+        "benchmark",
+        "openssl",
+        "double-conversion",
+        "lz4",
+        "xz",
+        "zstd",
+        "fmt",
+        "libevent",
+        "snappy",
+        "bzip2",
+        "libsodium",
+        "folly",
+        "suitesparse",
+        "grpc",
+        "ceres-solver",
+        "glbinding",
+        "libjpeg",
+        "libpng",
+        "openjpeg",
+        "libwebp",
+        "jxrlib",
+        "geometrictools",
+        "assimp",
+        "hdf5",
+        "freeimage",
+        "itk",
+        "vtk",
+        "opencv",
+        "neuTube",
+        "rocksdb",
+        "llfio",
+        "jansson",
+        "pcre",
+        "fizz",
+        "mvfst",
+        "wangle",
+        "proxygen",
+        "conda-zimg",
+        "ospray",
+        "ants",
+        "skia",
+        "or-tools",
+    ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
     # not used now
-    lib_skip_list = ['ospray', 'ants', 'skia', 'rocksdb', 'llfio', 'conda-opencv', 'or-tools']
+    lib_skip_list = ["ospray", "ants", "skia", "rocksdb", "llfio", "or-tools"]
 
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
@@ -3524,7 +3579,7 @@ def parse_inputs(argv: list):
     logger.info(f'current interpreter: {sys.executable}')
 
     parser = argparse.ArgumentParser(
-        epilog=f"""
+        epilog="""
 Examples:
 
 python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-from] [lib] [--use-asan]
