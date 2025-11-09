@@ -15,6 +15,11 @@ namespace nim {
 class ZImgMerge : public ZImgBlockProvider
 {
 public:
+  ZImgMerge() = default;
+  ZImgMerge(const ZImgMerge&) = delete;
+  ZImgMerge& operator=(const ZImgMerge&) = delete;
+  ZImgMerge(ZImgMerge&&) = default;
+  ZImgMerge& operator=(ZImgMerge&&) = default;
   ~ZImgMerge() override = default;
 
   // img has absolute location, if img already exist, update its location

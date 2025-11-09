@@ -8,6 +8,11 @@ namespace nim {
 class ZImgBlockProvider
 {
 public:
+  ZImgBlockProvider() = default;
+  ZImgBlockProvider(const ZImgBlockProvider&) = delete;
+  ZImgBlockProvider& operator=(const ZImgBlockProvider&) = delete;
+  ZImgBlockProvider(ZImgBlockProvider&&) = default;
+  ZImgBlockProvider& operator=(ZImgBlockProvider&&) = default;
   virtual ~ZImgBlockProvider() = default;
 
   [[nodiscard]] virtual ZImgInfo imgInfo() const = 0;

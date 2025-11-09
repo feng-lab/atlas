@@ -1,5 +1,6 @@
 #include "../version/version.h"
 #include "typecast.h"
+#include "ndarray_utils.h"
 #include "zimg.h"
 #include "zpuncta.h"
 #include "zimginit.h"
@@ -15,137 +16,87 @@
 #include "zimgautothreshold.h"
 #include "zswc.h"
 #include "zmesh.h"
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/numpy.h>
-#include <pybind11/eigen.h>
-#include <pybind11/operators.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
+#include <nanobind/stl/shared_ptr.h>
+#include <nanobind/ndarray.h>
+#include <nanobind/eigen/dense.h>
+#include <nanobind/operators.h>
+#include <nanobind/trampoline.h>
+#include <cstring>
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 using namespace nim;
 
-using namespace pybind11::literals;
+using namespace nb::literals;
 
 namespace {
 
-std::string getFormatDesc(const ZImg& img)
+nanobind::dlpack::dtype getDType(const ZImg& img)
 {
   if (img.voxelFormat() == VoxelFormat::Unsigned) {
     switch (img.bytesPerVoxel()) {
       case 1:
-        return py::format_descriptor<uint8_t>::format();
+        return nanobind::dtype<uint8_t>();
       case 2:
-        return py::format_descriptor<uint16_t>::format();
+        return nanobind::dtype<uint16_t>();
       case 4:
-        return py::format_descriptor<uint32_t>::format();
+        return nanobind::dtype<uint32_t>();
       case 8:
-        return py::format_descriptor<uint64_t>::format();
+        return nanobind::dtype<uint64_t>();
       default:
         throw ZException("Incorrect Img Info");
     }
   } else if (img.voxelFormat() == VoxelFormat::Float) {
     switch (img.bytesPerVoxel()) {
       case 4:
-        return py::format_descriptor<float>::format();
+        return nanobind::dtype<float>();
       case 8:
-        return py::format_descriptor<double>::format();
+        return nanobind::dtype<double>();
       default:
         throw ZException("Incorrect Img Info");
     }
   } else {
     switch (img.bytesPerVoxel()) {
       case 1:
-        return py::format_descriptor<int8_t>::format();
+        return nanobind::dtype<int8_t>();
       case 2:
-        return py::format_descriptor<int16_t>::format();
+        return nanobind::dtype<int16_t>();
       case 4:
-        return py::format_descriptor<int32_t>::format();
+        return nanobind::dtype<int32_t>();
       case 8:
-        return py::format_descriptor<int64_t>::format();
+        return nanobind::dtype<int64_t>();
       default:
         throw ZException("Incorrect Img Info");
     }
   }
 }
 
-py::dtype getDType(const ZImg& img)
+ZImgInfo getImgInfoFromNdarray(const nb::ndarray<>& arr, const ZImgInfo& info_in, const std::string& layout)
 {
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {
-    switch (img.bytesPerVoxel()) {
-      case 1:
-        return py::dtype::of<uint8_t>();
-      case 2:
-        return py::dtype::of<uint16_t>();
-      case 4:
-        return py::dtype::of<uint32_t>();
-      case 8:
-        return py::dtype::of<uint64_t>();
-      default:
-        throw ZException("Incorrect Img Info");
-    }
-  } else if (img.voxelFormat() == VoxelFormat::Float) {
-    switch (img.bytesPerVoxel()) {
-      case 4:
-        return py::dtype::of<float>();
-      case 8:
-        return py::dtype::of<double>();
-      default:
-        throw ZException("Incorrect Img Info");
-    }
-  } else {
-    switch (img.bytesPerVoxel()) {
-      case 1:
-        return py::dtype::of<int8_t>();
-      case 2:
-        return py::dtype::of<int16_t>();
-      case 4:
-        return py::dtype::of<int32_t>();
-      case 8:
-        return py::dtype::of<int64_t>();
-      default:
-        throw ZException("Incorrect Img Info");
-    }
-  }
-}
-
-ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
-{
-  if (arr.ndim() != 4) {
-    throw ZException("Only support 4d array: channel x depth x height x width");
-  }
   if (arr.size() <= 0) {
     throw ZException("Empty ndarray");
   }
   ZImgInfo res = info_in;
+  auto lm = zpy::parseLayout(layout, (int)arr.ndim());
+  auto [c, z, y, x] = zpy::dimsFromLayout(arr, lm);
   res.numTimes = 1;
-  res.numChannels = arr.shape(0);
-  res.depth = arr.shape(1);
-  res.height = arr.shape(2);
-  res.width = arr.shape(3);
+  res.numChannels = c;
+  res.depth = z;
+  res.height = y;
+  res.width = x;
   res.bytesPerVoxel = arr.itemsize();
 
-  if (res.numChannels > 1 && static_cast<py::ssize_t>(res.channelByteNumber()) != arr.strides(0)) {
-    throw ZException("ndarray is not C_CONTIGUOUS");
-  }
-  if (res.depth > 1 && static_cast<py::ssize_t>(res.planeByteNumber()) != arr.strides(1)) {
-    throw ZException("ndarray is not C_CONTIGUOUS");
-  }
-  if (res.height > 1 && static_cast<py::ssize_t>(res.rowByteNumber()) != arr.strides(2)) {
-    throw ZException("ndarray is not C_CONTIGUOUS");
-  }
-  if (res.width > 1 && static_cast<py::ssize_t>(res.voxelByteNumber()) != arr.strides(3)) {
-    throw ZException("ndarray is not C_CONTIGUOUS");
-  }
-
-  switch (arr.dtype().kind()) {
-    case 'i':
+  switch (static_cast<nanobind::dlpack::dtype_code>(arr.dtype().code)) {
+    case nanobind::dlpack::dtype_code::Int:
       res.voxelFormat = VoxelFormat::Signed;
       break;
-    case 'u':
+    case nanobind::dlpack::dtype_code::UInt:
       res.voxelFormat = VoxelFormat::Unsigned;
       break;
-    case 'f':
+    case nanobind::dlpack::dtype_code::Float:
       res.voxelFormat = VoxelFormat::Float;
       break;
     default:
@@ -160,93 +111,90 @@ template<class ZImgSubBlockBase = ZImgSubBlock>
 class PyZImgSubBlock : public ZImgSubBlockBase
 {
 public:
-  using ZImgSubBlockBase::ZImgSubBlockBase; // Inherit constructors
+  NB_TRAMPOLINE(ZImgSubBlockBase, 2);
   std::shared_ptr<ZImg> read() const override
   {
-    PYBIND11_OVERRIDE_PURE(std::shared_ptr<ZImg>, ZImgSubBlockBase, read, );
+    NB_OVERRIDE_PURE(read);
   }
   ZImgInfo readInfo() const override
   {
-    PYBIND11_OVERRIDE_PURE(ZImgInfo, ZImgSubBlockBase, readInfo, );
+    NB_OVERRIDE_PURE(readInfo);
   }
 };
 template<class ZImgTileSubBlockBase = ZImgTileSubBlock>
-class PyZImgTileSubBlock : public PyZImgSubBlock<ZImgTileSubBlockBase>
+class PyZImgTileSubBlock : public ZImgTileSubBlockBase
 {
 public:
-  using PyZImgSubBlock<ZImgTileSubBlockBase>::PyZImgSubBlock; // Inherit constructors (via PyA_Tpl's inherited
-                                                              // constructors)
+  NB_TRAMPOLINE(ZImgTileSubBlockBase, 2);
   std::shared_ptr<ZImg> read() const override
   {
-    PYBIND11_OVERRIDE(std::shared_ptr<ZImg>, ZImgTileSubBlockBase, read, );
+    NB_OVERRIDE(read);
   }
   ZImgInfo readInfo() const override
   {
-    PYBIND11_OVERRIDE(ZImgInfo, ZImgTileSubBlockBase, readInfo, );
+    NB_OVERRIDE(readInfo);
   }
 };
 
 class PyZImgSliceProvider : public ZImgSliceProvider
 {
 public:
-  /* Inherit the constructors */
-  using ZImgSliceProvider::ZImgSliceProvider;
+  NB_TRAMPOLINE(ZImgSliceProvider, 4);
 
   ZImgInfo imgInfo() const override
   {
-    PYBIND11_OVERRIDE_PURE(ZImgInfo, ZImgSliceProvider, imgInfo, );
+    NB_OVERRIDE_PURE(imgInfo);
   }
 
   ZImg slice(size_t z, size_t t) const override
   {
-    PYBIND11_OVERRIDE_PURE(ZImg, ZImgSliceProvider, slice, z, t);
+    NB_OVERRIDE_PURE(slice, z, t);
   }
 
   ZImg allSlices(size_t t) const override
   {
-    PYBIND11_OVERRIDE(ZImg, ZImgSliceProvider, allSlices, t);
+    NB_OVERRIDE(allSlices, t);
   }
 
   ZImg wholeImg() const override
   {
-    PYBIND11_OVERRIDE(ZImg, ZImgSliceProvider, wholeImg, );
+    NB_OVERRIDE(wholeImg);
   }
 };
 
 class PyZImgBlockProvider : public ZImgBlockProvider
 {
 public:
-  /* Inherit the constructors */
-  using ZImgBlockProvider::ZImgBlockProvider;
+  NB_TRAMPOLINE(ZImgBlockProvider, 5);
 
   ZImgInfo imgInfo() const override
   {
-    PYBIND11_OVERRIDE_PURE(ZImgInfo, ZImgBlockProvider, imgInfo, );
+    NB_OVERRIDE_PURE(imgInfo);
   }
 
   size_t numBlocks() const override
   {
-    PYBIND11_OVERRIDE_PURE(size_t, ZImgBlockProvider, numBlocks, );
+    NB_OVERRIDE_PURE(numBlocks);
   }
 
   ZImg block(size_t blockIdx) const override
   {
-    PYBIND11_OVERRIDE_PURE(ZImg, ZImgBlockProvider, block, blockIdx);
+    NB_OVERRIDE_PURE(block, blockIdx);
   }
 
   ZVoxelCoordinate blockCoord(size_t blockIdx) const override
   {
-    PYBIND11_OVERRIDE_PURE(ZVoxelCoordinate, ZImgBlockProvider, blockCoord, blockIdx);
+    NB_OVERRIDE_PURE(blockCoord, blockIdx);
   }
 
   ZImg wholeImg() const override
   {
-    PYBIND11_OVERRIDE(ZImg, ZImgBlockProvider, wholeImg, );
+    NB_OVERRIDE(wholeImg);
   }
 };
 
 template<size_t L, typename T>
-std::vector<glm::vec<L, T>> arrayToVecVec(const py::array_t<T, py::array::c_style | py::array::forcecast>& array)
+std::vector<glm::vec<L, T>> arrayToVecVec(const nb::ndarray<T>& array)
 {
   if (array.ndim() != 2 || array.shape(1) != L) {
     throw ZException(fmt::format("input array shape does not match output glm::vec{}", L));
@@ -254,20 +202,31 @@ std::vector<glm::vec<L, T>> arrayToVecVec(const py::array_t<T, py::array::c_styl
   std::vector<glm::vec<L, T>> res;
   if (array.shape(0) > 0) {
     res.resize(array.shape(0));
-    std::memcpy(res.data(), array.data(), sizeof(T) * L * res.size());
+    auto* data = array.data();
+    int64_t s0 = array.stride(0);
+    int64_t s1 = array.stride(1);
+    if (s1 == 1 && s0 == (int64_t)L) {
+      std::memcpy(res.data(), data, sizeof(T) * L * res.size());
+    } else {
+      for (size_t i = 0; i < res.size(); ++i) {
+        for (size_t j = 0; j < L; ++j) {
+          res[i][j] = *(data + i * s0 + j * s1);
+        }
+      }
+    }
   }
   return res;
 }
 
 template<size_t L, typename T>
-py::array_t<T, py::array::c_style | py::array::forcecast> vecVecToArray(const std::vector<glm::vec<L, T>>& v)
+nb::ndarray<nanobind::numpy, const T> vecVecToArray(const std::vector<glm::vec<L, T>>& v)
 {
-  return v.empty() ? py::array_t<T, py::array::c_style | py::array::forcecast>()
-                   : py::array_t<T, py::array::c_style | py::array::forcecast>({v.size(), L}, &v[0].x);
+  return v.empty() ? nb::ndarray<nanobind::numpy, const T>()
+                   : nb::ndarray<nanobind::numpy, const T>(&v[0].x, {v.size(), L});
 }
 
 template<typename T>
-std::vector<T> arrayToVector(const py::array_t<T, py::array::c_style | py::array::forcecast>& array)
+std::vector<T> arrayToVector(const nb::ndarray<T>& array)
 {
   if (array.ndim() != 1) {
     throw ZException(fmt::format("input array shape does not match output"));
@@ -275,21 +234,29 @@ std::vector<T> arrayToVector(const py::array_t<T, py::array::c_style | py::array
   std::vector<T> res;
   if (array.shape(0) > 0) {
     res.resize(array.shape(0));
-    std::memcpy(res.data(), array.data(), sizeof(T) * res.size());
+    auto* data = array.data();
+    int64_t s0 = array.stride(0);
+    if (s0 == 1) {
+      std::memcpy(res.data(), data, sizeof(T) * res.size());
+    } else {
+      for (size_t i = 0; i < res.size(); ++i) {
+        res[i] = *(data + i * s0);
+      }
+    }
   }
   return res;
 }
 
 template<typename T>
-py::array_t<T, py::array::c_style | py::array::forcecast> vectorToArray(const std::vector<T>& v)
+nb::ndarray<nanobind::numpy, const T> vectorToArray(const std::vector<T>& v)
 {
-  return v.empty() ? py::array_t<T, py::array::c_style | py::array::forcecast>()
-                   : py::array_t<T, py::array::c_style | py::array::forcecast>(v.size(), v.data());
+  return v.empty() ? nb::ndarray<nanobind::numpy, const T>()
+                   : nb::ndarray<nanobind::numpy, const T>(v.data(), {v.size()});
 }
 
 } // namespace
 
-PYBIND11_MODULE(_imgpy, m)
+NB_MODULE(_imgpy, m)
 {
   ZLogInit::instance("zimg"s);
   ZImgInit::instance(qgetenv("Resources_DIR"), "", qgetenv("ZIMG_JARS_DIR"), false);
@@ -298,12 +265,12 @@ PYBIND11_MODULE(_imgpy, m)
         Python interface to img lib.
     )pbdoc";
 
-  py::enum_<VoxelFormat>(m, "VoxelFormat", py::arithmetic())
+  nb::enum_<VoxelFormat>(m, "VoxelFormat", nb::is_arithmetic())
     .value("Unsigned", VoxelFormat::Unsigned)
     .value("Signed", VoxelFormat::Signed)
     .value("Float", VoxelFormat::Float);
 
-  py::enum_<VoxelSizeUnit>(m, "VoxelSizeUnit", py::arithmetic())
+  nb::enum_<VoxelSizeUnit>(m, "VoxelSizeUnit", nb::is_arithmetic())
     .value("none", VoxelSizeUnit::none)
     .value("inch", VoxelSizeUnit::inch)
     .value("cm", VoxelSizeUnit::cm)
@@ -314,21 +281,21 @@ PYBIND11_MODULE(_imgpy, m)
     .value("hm", VoxelSizeUnit::hm)
     .value("km", VoxelSizeUnit::km);
 
-  py::enum_<Interpolant>(m, "Interpolant", py::arithmetic())
+  nb::enum_<Interpolant>(m, "Interpolant", nb::is_arithmetic())
     .value("Nearest", Interpolant::Nearest)
     .value("Linear", Interpolant::Linear)
     .value("Cubic", Interpolant::Cubic)
     .value("Lanczos2", Interpolant::Lanczos2)
     .value("Lanczos3", Interpolant::Lanczos3);
 
-  py::enum_<Dimension>(m, "Dimension", py::arithmetic())
+  nb::enum_<Dimension>(m, "Dimension", nb::is_arithmetic())
     .value("X", Dimension::X)
     .value("Y", Dimension::Y)
     .value("Z", Dimension::Z)
     .value("C", Dimension::C)
     .value("T", Dimension::T);
 
-  py::enum_<ImgMergeMode>(m, "ImgMergeMode")
+  nb::enum_<ImgMergeMode>(m, "ImgMergeMode")
     .value("Max", ImgMergeMode::Max)
     .value("Min", ImgMergeMode::Min)
     .value("Mean", ImgMergeMode::Mean)
@@ -336,7 +303,7 @@ PYBIND11_MODULE(_imgpy, m)
     .value("First", ImgMergeMode::First)
     .value("Interpolation", ImgMergeMode::Interpolation);
 
-  py::enum_<FileFormat>(m, "FileFormat", py::arithmetic())
+  nb::enum_<FileFormat>(m, "FileFormat", nb::is_arithmetic())
     .value("Unknown", FileFormat::Unknown)
     .value("HDF5Img", FileFormat::HDF5Img)
     .value("OmeTiff", FileFormat::OmeTiff)
@@ -352,7 +319,7 @@ PYBIND11_MODULE(_imgpy, m)
     .value("ITKImage", FileFormat::ITKImage)
     .value("Leica", FileFormat::Leica);
 
-  py::enum_<Compression>(m, "Compression", py::arithmetic())
+  nb::enum_<Compression>(m, "Compression", nb::is_arithmetic())
     .value("AUTO", Compression::AUTO)
     .value("NONE", Compression::NONE)
     .value("LZW", Compression::LZW)
@@ -369,30 +336,31 @@ PYBIND11_MODULE(_imgpy, m)
     .value("WEBP", Compression::WEBP)
     .value("JPEGXR", Compression::JPEGXR);
 
-  py::class_<col4>(m,
+  nb::class_<col4>(m,
                    "col4",
                    "This class represents a color in RGBA format where each channel is an 8-bit unsigned integer.")
-    .def(py::init<>(), "Default constructor that initializes the color to black with full opacity.")
-    .def(py::init<uint8_t, uint8_t, uint8_t, uint8_t>(),
+    .def(nb::init<>(), "Default constructor that initializes the color to black with full opacity.")
+    .def(nb::init<uint8_t, uint8_t, uint8_t, uint8_t>(),
          "Constructor that initializes the color with given RGBA values.",
          "r"_a,
          "g"_a,
          "b"_a,
-         "a"_a = 255_u8)
-    .def_readwrite("r", &col4::r, "Red channel value of the color. It ranges from 0 to 255.")
-    .def_readwrite("g", &col4::g, "Green channel value of the color. It ranges from 0 to 255.")
-    .def_readwrite("b", &col4::b, "Blue channel value of the color. It ranges from 0 to 255.")
-    .def_readwrite(
+         "a"_a = 255)
+    .def_rw("r", &col4::r, "Red channel value of the color. It ranges from 0 to 255.")
+    .def_rw("g", &col4::g, "Green channel value of the color. It ranges from 0 to 255.")
+    .def_rw("b", &col4::b, "Blue channel value of the color. It ranges from 0 to 255.")
+    .def_rw(
       "a",
       &col4::a,
       "Alpha channel value of the color. It represents opacity and ranges from 0 (fully transparent) to 255 (fully opaque).")
     .def(
       "__init__",
-      [](col4& self, py::tuple t) {
-        if (py::len(t) != 4) {
+      [](col4& self, nb::tuple t) {
+        if (nb::len(t) != 4) {
           throw ZException("col4 needs tuple with 4 values");
         }
-        new (&self) col4{t[0].cast<uint8_t>(), t[1].cast<uint8_t>(), t[2].cast<uint8_t>(), t[3].cast<uint8_t>()};
+        new (&self)
+          col4{nb::cast<uint8_t>(t[0]), nb::cast<uint8_t>(t[1]), nb::cast<uint8_t>(t[2]), nb::cast<uint8_t>(t[3])};
       },
       "Constructor that initializes the color with a tuple of four 8-bit unsigned integers representing RGBA color channels respectively.")
     .def(
@@ -401,45 +369,45 @@ PYBIND11_MODULE(_imgpy, m)
         return fmt::format("<_imgpy.col4 rgba:{}>", v);
       },
       "Returns a string representation of the color.");
-  py::implicitly_convertible<py::tuple, col4>();
+  nb::implicitly_convertible<nb::tuple, col4>();
 
-  py::register_exception<ZCancellationException>(m, "ZCancellationException");
-  py::register_exception<ZException>(m, "ZException");
+  nb::exception<ZCancellationException>(m, "ZCancellationException");
+  nb::exception<ZException>(m, "ZException");
 
-  py::class_<ZImgWriteParameters>(m,
+  nb::class_<ZImgWriteParameters>(m,
                                   "ZImgWriteParameters",
                                   "This class holds different parameters for configuring image compression.")
-    .def(py::init<>(), "Default constructor. Initializes the parameters with their respective default values.")
-    .def_readwrite("compression",
-                   &ZImgWriteParameters::compression,
-                   "Specifies the compression algorithm to use, default to Compression.Auto.")
-    .def_readwrite(
+    .def(nb::init<>(), "Default constructor. Initializes the parameters with their respective default values.")
+    .def_rw("compression",
+            &ZImgWriteParameters::compression,
+            "Specifies the compression algorithm to use, default to Compression.Auto.")
+    .def_rw(
       "zlibCompressionLevel",
       &ZImgWriteParameters::zlibCompressionLevel,
       "Specifies the compression level for the zlib algorithm. Ranges from 1 (fastest compression) to 9 (best compression), default to 6.")
-    .def_readwrite(
+    .def_rw(
       "jpegQuality",
       &ZImgWriteParameters::jpegQuality,
       "Specifies the quality factor for the JPEG compression. Ranges from 0 (lowest quality) to 100 (highest quality), default to 95.")
-    .def_readwrite("jpegProgressive",
-                   &ZImgWriteParameters::jpegProgressive,
-                   "If set to True (default), creates a progressive JPEG file. If False, creates a baseline JPEG file.")
-    .def_readwrite(
+    .def_rw("jpegProgressive",
+            &ZImgWriteParameters::jpegProgressive,
+            "If set to True (default), creates a progressive JPEG file. If False, creates a baseline JPEG file.")
+    .def_rw(
       "jpegAccurateDCT",
       &ZImgWriteParameters::jpegAccurateDCT,
       "If set to True (default), uses the accurate Discrete Cosine Transform (DCT) method. If False, uses the fast DCT method.")
-    .def_readwrite(
+    .def_rw(
       "jpegChrominanceSubsampling",
       &ZImgWriteParameters::jpegChrominanceSubsampling,
       "Specifies the chrominance subsampling scheme to use for the JPEG compression, 444 (default, no subsampling) or 422 or 420, only apply to RGB")
-    .def_readwrite(
+    .def_rw(
       "jpegXRQuality",
       &ZImgWriteParameters::jpegXRQuality,
       "Specifies the quality factor for the JPEG XR compression. Ranges [0.0 - 1.0], 1.0 is lossless, default to 0.8.");
 
-  py::class_<ZImgInfo>(m, "ZImgInfo", "This class holds the metadata for a multidimensional image.")
-    .def(py::init<>(), "Default constructor that initializes the image information with default values.")
-    .def(py::init<size_t, size_t, size_t, size_t, size_t, size_t, VoxelFormat>(),
+  nb::class_<ZImgInfo>(m, "ZImgInfo", "This class holds the metadata for a multidimensional image.")
+    .def(nb::init<>(), "Default constructor that initializes the image information with default values.")
+    .def(nb::init<size_t, size_t, size_t, size_t, size_t, size_t, VoxelFormat>(),
          "Constructor that initializes the image information with given values.",
          "width"_a,
          "height"_a,
@@ -448,25 +416,25 @@ PYBIND11_MODULE(_imgpy, m)
          "numTimes"_a = 1,
          "bytePerVox"_a = 1,
          "voxelFormat"_a = VoxelFormat::Unsigned)
-    .def_readwrite("width", &ZImgInfo::width, "Width of the image.")
-    .def_readwrite("height", &ZImgInfo::height, "Height of the image.")
-    .def_readwrite("depth", &ZImgInfo::depth, "Depth of the image.")
-    .def_readwrite("numChannels", &ZImgInfo::numChannels, "Number of color channels in the image.")
-    .def_readwrite("numTimes", &ZImgInfo::numTimes, "Number of time points in the image sequence.")
-    .def_readwrite("bytesPerVoxel", &ZImgInfo::bytesPerVoxel, "Size of each voxel in bytes.")
-    .def_readwrite("voxelFormat", &ZImgInfo::voxelFormat, "Format of the voxels.")
-    .def_readwrite("validBitCount", &ZImgInfo::validBitCount, "Number of valid bits in each voxel.")
-    .def_readwrite("voxelSizeUnit", &ZImgInfo::voxelSizeUnit, "Unit of the voxel size.")
-    .def_readwrite("voxelSizeX", &ZImgInfo::voxelSizeX, "Size of the voxel in the x dimension.")
-    .def_readwrite("voxelSizeY", &ZImgInfo::voxelSizeY, "Size of the voxel in the y dimension.")
-    .def_readwrite("voxelSizeZ", &ZImgInfo::voxelSizeZ, "Size of the voxel in the z dimension.")
-    .def_readwrite("timeStamps", &ZImgInfo::timeStamps, "Timestamps for each frame in the image sequence.")
-    .def_readwrite("channelNames", &ZImgInfo::channelNames, "Names of the color channels.")
-    .def_readwrite("channelColors", &ZImgInfo::channelColors, "Color of each channel.")
-    .def_readwrite("position", &ZImgInfo::position, "Position of the image in a larger sequence or collection.")
-    .def_readwrite("lastChannelIsAlphaChannel",
-                   &ZImgInfo::lastChannelIsAlphaChannel,
-                   "Boolean value indicating if the last channel is the alpha channel.")
+    .def_rw("width", &ZImgInfo::width, "Width of the image.")
+    .def_rw("height", &ZImgInfo::height, "Height of the image.")
+    .def_rw("depth", &ZImgInfo::depth, "Depth of the image.")
+    .def_rw("numChannels", &ZImgInfo::numChannels, "Number of color channels in the image.")
+    .def_rw("numTimes", &ZImgInfo::numTimes, "Number of time points in the image sequence.")
+    .def_rw("bytesPerVoxel", &ZImgInfo::bytesPerVoxel, "Size of each voxel in bytes.")
+    .def_rw("voxelFormat", &ZImgInfo::voxelFormat, "Format of the voxels.")
+    .def_rw("validBitCount", &ZImgInfo::validBitCount, "Number of valid bits in each voxel.")
+    .def_rw("voxelSizeUnit", &ZImgInfo::voxelSizeUnit, "Unit of the voxel size.")
+    .def_rw("voxelSizeX", &ZImgInfo::voxelSizeX, "Size of the voxel in the x dimension.")
+    .def_rw("voxelSizeY", &ZImgInfo::voxelSizeY, "Size of the voxel in the y dimension.")
+    .def_rw("voxelSizeZ", &ZImgInfo::voxelSizeZ, "Size of the voxel in the z dimension.")
+    .def_rw("timeStamps", &ZImgInfo::timeStamps, "Timestamps for each frame in the image sequence.")
+    .def_rw("channelNames", &ZImgInfo::channelNames, "Names of the color channels.")
+    .def_rw("channelColors", &ZImgInfo::channelColors, "Color of each channel.")
+    .def_rw("position", &ZImgInfo::position, "Position of the image in a larger sequence or collection.")
+    .def_rw("lastChannelIsAlphaChannel",
+            &ZImgInfo::lastChannelIsAlphaChannel,
+            "Boolean value indicating if the last channel is the alpha channel.")
     .def("voxelSizeXInUm",
          &ZImgInfo::voxelSizeXInUm,
          "Returns the size of the voxel in the x dimension in micrometers.")
@@ -484,11 +452,11 @@ PYBIND11_MODULE(_imgpy, m)
       },
       "Returns a string representation of the image information.");
 
-  py::class_<ZVoxelCoordinate>(m,
+  nb::class_<ZVoxelCoordinate>(m,
                                "ZVoxelCoordinate",
                                "This class represents the 5D coordinates of a voxel in an image.")
-    .def(py::init<>(), "Default constructor that initializes the voxel coordinates to zero.")
-    .def(py::init<ZVoxelCoordinate::value_type,
+    .def(nb::init<>(), "Default constructor that initializes the voxel coordinates to zero.")
+    .def(nb::init<ZVoxelCoordinate::value_type,
                   ZVoxelCoordinate::value_type,
                   ZVoxelCoordinate::value_type,
                   ZVoxelCoordinate::value_type,
@@ -499,22 +467,22 @@ PYBIND11_MODULE(_imgpy, m)
          "z"_a = 0,
          "c"_a = 0,
          "t"_a = 0)
-    .def_readwrite("x", &ZVoxelCoordinate::x, "x-coordinate of the voxel.")
-    .def_readwrite("y", &ZVoxelCoordinate::y, "y-coordinate of the voxel.")
-    .def_readwrite("z", &ZVoxelCoordinate::z, "z-coordinate of the voxel.")
-    .def_readwrite("c", &ZVoxelCoordinate::c, "c-coordinate of the voxel.")
-    .def_readwrite("t", &ZVoxelCoordinate::t, "t-coordinate of the voxel.")
+    .def_rw("x", &ZVoxelCoordinate::x, "x-coordinate of the voxel.")
+    .def_rw("y", &ZVoxelCoordinate::y, "y-coordinate of the voxel.")
+    .def_rw("z", &ZVoxelCoordinate::z, "z-coordinate of the voxel.")
+    .def_rw("c", &ZVoxelCoordinate::c, "c-coordinate of the voxel.")
+    .def_rw("t", &ZVoxelCoordinate::t, "t-coordinate of the voxel.")
     .def(
       "__init__",
-      [](ZVoxelCoordinate& self, py::tuple t) {
-        if (py::len(t) != 5) {
+      [](ZVoxelCoordinate& self, nb::tuple t) {
+        if (nb::len(t) != 5) {
           throw ZException("ZVoxelCoordinate needs tuple with 5 values");
         }
-        new (&self) ZVoxelCoordinate(t[0].cast<ZVoxelCoordinate::value_type>(),
-                                     t[1].cast<ZVoxelCoordinate::value_type>(),
-                                     t[2].cast<ZVoxelCoordinate::value_type>(),
-                                     t[3].cast<ZVoxelCoordinate::value_type>(),
-                                     t[4].cast<ZVoxelCoordinate::value_type>());
+        new (&self) ZVoxelCoordinate(nb::cast<ZVoxelCoordinate::value_type>(t[0]),
+                                     nb::cast<ZVoxelCoordinate::value_type>(t[1]),
+                                     nb::cast<ZVoxelCoordinate::value_type>(t[2]),
+                                     nb::cast<ZVoxelCoordinate::value_type>(t[3]),
+                                     nb::cast<ZVoxelCoordinate::value_type>(t[4]));
       },
       "Constructor that initializes the voxel coordinates from a tuple of 5 values.")
     .def(
@@ -523,21 +491,21 @@ PYBIND11_MODULE(_imgpy, m)
         return fmt::format("<_imgpy.ZVoxelCoordinate xyzct:{}>", v);
       },
       "Returns a string representation of the voxel coordinates.");
-  py::implicitly_convertible<py::tuple, ZVoxelCoordinate>();
+  nb::implicitly_convertible<nb::tuple, ZVoxelCoordinate>();
 
-  py::class_<ZImgRegion>(
+  nb::class_<ZImgRegion>(
     m,
     "ZImgRegion",
     "This class represents a region in an image defined by start and end (not included) voxel coordinates.")
     .def(
-      py::init<>(),
+      nb::init<>(),
       "Default constructor that initializes the start voxel coordinates to zero, and end voxel coordinates to -1, which means to the end of that dimension.")
-    .def(py::init<ZVoxelCoordinate, ZVoxelCoordinate>(),
+    .def(nb::init<ZVoxelCoordinate, ZVoxelCoordinate>(),
          "Constructor that initializes the region with the provided start and end (not included) voxel coordinates.",
          "start"_a,
          "end"_a)
-    .def_readwrite("start", &ZImgRegion::start, "Start voxel coordinate of the image region.")
-    .def_readwrite("end", &ZImgRegion::end, "End (not included) voxel coordinate of the image region.")
+    .def_rw("start", &ZImgRegion::start, "Start voxel coordinate of the image region.")
+    .def_rw("end", &ZImgRegion::end, "End (not included) voxel coordinate of the image region.")
     .def(
       "__repr__",
       [](const ZImgRegion& v) {
@@ -545,15 +513,15 @@ PYBIND11_MODULE(_imgpy, m)
       },
       "Returns a string representation of the image region.");
 
-  py::class_<ZImgSource>(m, "ZImgSource", "This class represents the source of an image or a collection of images.")
-    .def(py::init<>(), "Default constructor that initializes an empty image source.")
-    .def(py::init<const QString&, const ZImgRegion&, size_t, FileFormat>(),
+  nb::class_<ZImgSource>(m, "ZImgSource", "This class represents the source of an image or a collection of images.")
+    .def(nb::init<>(), "Default constructor that initializes an empty image source.")
+    .def(nb::init<const QString&, const ZImgRegion&, size_t, FileFormat>(),
          "Constructor that initializes the image source with a single file.",
          "filename"_a,
          "region"_a = ZImgRegion(),
          "scene"_a = 0,
          "format"_a = FileFormat::Unknown)
-    .def(py::init<const QStringList&, Dimension, bool, const ZImgRegion&, size_t, FileFormat, bool, bool>(),
+    .def(nb::init<const QStringList&, Dimension, bool, const ZImgRegion&, size_t, FileFormat, bool, bool>(),
          "Constructor that initializes the image source with multiple files.",
          "filenames"_a,
          "catDim"_a,
@@ -563,17 +531,17 @@ PYBIND11_MODULE(_imgpy, m)
          "format"_a = FileFormat::Unknown,
          "expandXY"_a = true,
          "expandWithMaxValue"_a = false)
-    .def_readwrite("filenames", &ZImgSource::filenames, "List of filenames in the image source.")
-    .def_readwrite("catDim", &ZImgSource::catDim, "Dimension to concatenate when multiple files are given.")
-    .def_readwrite("region", &ZImgSource::region, "Region of interest in the image.")
-    .def_readwrite("scene", &ZImgSource::scene, "Scene index for formats that support multiple scenes.")
-    .def_readwrite("format", &ZImgSource::format, "Format of the image file(s).")
-    .def_readwrite("expandXY", &ZImgSource::expandXY, "Flag to indicate if the XY dimensions should be expanded.")
-    .def_readwrite("expandWithMaxValue",
-                   &ZImgSource::expandWithMaxValue,
-                   "Flag to indicate if expansion should be done with max value.")
-    .def_readwrite("totalFileSize", &ZImgSource::totalFileSize, "Total file size of the image source.")
-    .def_readwrite("catScenes", &ZImgSource::catScenes, "Flag to indicate if scenes should be concatenated.")
+    .def_rw("filenames", &ZImgSource::filenames, "List of filenames in the image source.")
+    .def_rw("catDim", &ZImgSource::catDim, "Dimension to concatenate when multiple files are given.")
+    .def_rw("region", &ZImgSource::region, "Region of interest in the image.")
+    .def_rw("scene", &ZImgSource::scene, "Scene index for formats that support multiple scenes.")
+    .def_rw("format", &ZImgSource::format, "Format of the image file(s).")
+    .def_rw("expandXY", &ZImgSource::expandXY, "Flag to indicate if the XY dimensions should be expanded.")
+    .def_rw("expandWithMaxValue",
+            &ZImgSource::expandWithMaxValue,
+            "Flag to indicate if expansion should be done with max value.")
+    .def_rw("totalFileSize", &ZImgSource::totalFileSize, "Total file size of the image source.")
+    .def_rw("catScenes", &ZImgSource::catScenes, "Flag to indicate if scenes should be concatenated.")
     .def(
       "__repr__",
       [](const ZImgSource& v) {
@@ -581,74 +549,33 @@ PYBIND11_MODULE(_imgpy, m)
       },
       "Returns a string representation of the image source.");
 
-  py::class_<ZImg>(m, "ZImg", R"mydelimiter(
-ZImg is a class for reading and processing multidimensional images.
+  nb::class_<ZImg>(m, "ZImg", R"doc(
+ZImg — multidimensional image container with fast CPU array interop.
 
-Constructors:
+Overview
+- Read/process 2D/3D/CT images from single files, file lists, or ZImgSource.
+- CPU array interop via nb::ndarray: wrap (zero‑copy) or copy depending on
+  layout/contiguity and the 'copy_if_needed' flag in ndarray constructors.
+- Returned arrays keep the parent alive (reference_internal). Zero‑copy inputs
+  keep original owners attached to the instance.
 
-    ZImg() -> Default constructor. Creates an empty ZImg object.
+Array interop summary
+- Zero‑copy when layout='CZYX' and the array is CPU C‑contiguous; otherwise
+  copies unless copy_if_needed=False (then raises).
+- to_arrays(framework='auto') returns CPU‑backed arrays in 'numpy', 'torch',
+  'tensorflow', 'jax', 'array_api', or 'memview'. 'auto' mirrors the input
+  framework if created zero‑copy; otherwise returns NumPy.
+- Inputs/outputs are CPU‑backed only.
 
-    ZImg(const ZImgInfo&) -> Creates a ZImg object with provided image information.
-
-    ZImg(const QString&, ZImgRegion, size_t, size_t, size_t, size_t, FileFormat) -> Creates a ZImg object by reading an image file.
-
-    ZImg(const QStringList&, Dimension, bool, ZImgRegion, size_t, size_t, size_t, size_t, FileFormat, bool, bool) -> Creates a ZImg object by reading a list of image files.
-
-    ZImg(const ZImgSource&, size_t, size_t, size_t) -> Creates a ZImg object from a ZImgSource object.
-
-    ZImg(const py::array&, const ZImgInfo&) -> Creates a ZImg object from a numpy ndarray and image information.
-
-    ZImg(const std::vector<py::array>&, const ZImgInfo&) -> Creates a ZImg object from a list of numpy ndarrays and image information.
-
-Class Methods:
-
-    readImgInfos(const QString&, FileFormat) -> Reads the image information from a file.
-
-    readImgInfos(const QStringList&, Dimension, bool, FileFormat, bool) -> Reads the image information from a list of files.
-
-    readImgInfo(const ZImgSource&) -> Reads the image information from a ZImgSource object.
-
-    readSubBlockLists(const QString&, FileFormat) -> Reads a list of sub-blocks from an image file.
-
-    readSubBlockLists(const QStringList&, Dimension, bool, FileFormat, bool) -> Reads a list of sub-blocks from a list of image files.
-
-    readSubBlock(const QString&, size_t, size_t, FileFormat) -> Reads a specific sub-block from an image file.
-
-    readSubBlock(const QStringList&, Dimension, bool, size_t, size_t, FileFormat, bool) -> Reads a specific sub-block from a list of image files.
-
-    getInternalSubRegions(const QString&, FileFormat) -> Retrieves the internal sub-regions of an image file.
-
-    save(const QString&, FileFormat, ZImgWriteParameters) -> Saves the current ZImg object to a file.
-
-    writeImg(const QString&, const ZImgSliceProvider&, FileFormat, const ZImgWriteParameters&) -> Writes an image from a provided ZImgSliceProvider.
-
-    writeImg(const QString&, const ZImgBlockProvider&, FileFormat, const ZImgWriteParameters&) -> Writes an image from a provided ZImgBlockProvider.
-
-Instance Methods:
-
-    isEmpty() -> Checks if the ZImg object is empty.
-
-    resize(size_t, size_t, size_t, Interpolant, bool, bool, bool) -> Resizes the image.
-
-    zoom(double, double, double, Interpolant, bool, bool) -> Zooms the image by specified factors.
-
-    blockDownsample(size_t, size_t, size_t, MergeMode) -> Performs block downsampling on the image.
-
-    secureDivideBy(const ZImg&) -> Performs secure division by another ZImg object.
-
-Properties:
-
-    info -> Gets or sets the ZImgInfo for this ZImg object.
-
-    data -> Gets the data of this ZImg object as a list of numpy ndarrays.
-
-Overloaded Operators:
-
-    +, +=, -, -=, *, *=, /, /= -> Arithmetic operations between ZImg objects or between a ZImg object and a number.
-)mydelimiter")
-    .def(py::init<>())
-    .def(py::init<const ZImgInfo&>())
-    .def(py::init<const QString&, ZImgRegion, size_t, size_t, size_t, size_t, FileFormat>(),
+See also
+- __init__(ndarray, info=..., copy_if_needed=True, layout='CZYX')
+- __init__(list[ndarray], info=..., copy_if_needed=True, layout='CZYX')
+- data, to_arrays(framework='auto')
+- readImgInfos(), readImgInfo(), readSubBlockLists(), readSubBlock(), save(), writeImg()
+)doc")
+    .def(nb::init<>())
+    .def(nb::init<const ZImgInfo&>())
+    .def(nb::init<const QString&, ZImgRegion, size_t, size_t, size_t, size_t, FileFormat>(),
          "filename"_a,
          "region"_a = ZImgRegion(),
          "scene"_a = 0,
@@ -656,29 +583,17 @@ Overloaded Operators:
          "yRatio"_a = 1,
          "zRatio"_a = 1,
          "format"_a = FileFormat::Unknown)
-    .def(py::init<>([](const QStringList& fileList,
-                       Dimension catDim,
-                       bool catScenes,
-                       const ZImgRegion& region,
-                       size_t scene,
-                       size_t xRatio,
-                       size_t yRatio,
-                       size_t zRatio,
-                       FileFormat format,
-                       bool expandXY,
-                       bool expandWithMaxValue) {
-           return new ZImg(fileList,
-                           catDim,
-                           catScenes,
-                           region,
-                           scene,
-                           xRatio,
-                           yRatio,
-                           zRatio,
-                           format,
-                           expandXY,
-                           expandWithMaxValue);
-         }),
+    .def(nb::init<const QStringList&,
+                  Dimension,
+                  bool,
+                  const ZImgRegion&,
+                  size_t,
+                  size_t,
+                  size_t,
+                  size_t,
+                  FileFormat,
+                  bool,
+                  bool>(),
          "filenames"_a,
          "catDim"_a,
          "catScenes"_a,
@@ -690,47 +605,143 @@ Overloaded Operators:
          "format"_a = FileFormat::Unknown,
          "expandXY"_a = true,
          "expandWithMaxValue"_a = false)
-    .def(py::init<const ZImgSource&, size_t, size_t, size_t>(),
+    .def(nb::init<const ZImgSource&, size_t, size_t, size_t>(),
          "imgSource"_a,
          "xRatio"_a = 1,
          "yRatio"_a = 1,
          "zRatio"_a = 1)
-    .def(py::init<>([](const py::array& arr, const ZImgInfo& info_in) {
-           auto img = new ZImg();
-           auto info = getImgInfoFromNdarray(arr, info_in);
-           img->wrapData(const_cast<void*>(arr.data()), info);
-           return img;
-         }),
-         "ndarray"_a,
-         "imgInfo"_a = ZImgInfo())
-    .def(py::init<>([](const std::vector<py::array>& arrs, const ZImgInfo& info_in) {
-           auto img = new ZImg();
-           std::vector<void*> data;
-           if (!arrs.empty()) {
-             auto info = getImgInfoFromNdarray(arrs[0], info_in);
-             data.push_back(const_cast<void*>(arrs[0].data()));
-             for (size_t t = 1; t < arrs.size(); ++t) {
-               auto tmpinfo = getImgInfoFromNdarray(arrs[t], info_in);
-               if (!tmpinfo.isSameType(info) || !tmpinfo.isSameSize(info)) {
-                 throw ZException("ndarrays in the list are not compatible");
-               }
-               data.push_back(const_cast<void*>(arrs[t].data()));
-             }
-
-             info.numTimes = arrs.size();
-             img->wrapData(data, info);
-           }
-           return img;
-         }),
-         "listOfndarray"_a,
-         "imgInfo"_a = ZImgInfo())
+    .def(
+      "__init__",
+      [](nb::pointer_and_handle<ZImg> v,
+         const nb::ndarray<>& arr,
+         const ZImgInfo& info_in,
+         bool copy_if_needed,
+         std::string layout) {
+        if (!zpy::isCPU(arr)) {
+          throw ZException("GPU-backed nb::ndarray is not supported; please move data to CPU or pass a CPU array");
+        }
+        auto info = getImgInfoFromNdarray(arr, info_in, layout);
+        if (layout != "CZYX" || !zpy::isCPU(arr) || !zpy::isContiguousC(arr)) {
+          if (!copy_if_needed) {
+            throw ZException("Input ndarray not CPU C-contiguous in CZYX; set copy_if_needed=True or adjust layout");
+          }
+          // Allocate and copy into ZImg-owned storage
+          new ((void*)v.p) ZImg(info);
+          auto item = arr.itemsize();
+          // Strides in bytes for source
+          auto lm = zpy::parseLayout(layout, (int)arr.ndim());
+          auto [sc, sz, sy, sx] = zpy::stridesFromLayout(arr, lm);
+          auto* base = (const uint8_t*)arr.data();
+          for (size_t cc = 0; cc < info.numChannels; ++cc) {
+            for (size_t zz = 0; zz < info.depth; ++zz) {
+              for (size_t yy = 0; yy < info.height; ++yy) {
+                for (size_t xx = 0; xx < info.width; ++xx) {
+                  const uint8_t* sp = base + (lm.c >= 0 ? (int64_t)cc * sc : 0) + (lm.z >= 0 ? (int64_t)zz * sz : 0) +
+                                      (int64_t)yy * sy + (int64_t)xx * sx;
+                  uint8_t* dp = (uint8_t*)v.p->timeData(0) + cc * (int64_t)info.channelByteNumber() +
+                                zz * (int64_t)info.planeByteNumber() + yy * (int64_t)info.rowByteNumber() +
+                                xx * (int64_t)info.voxelByteNumber();
+                  std::memcpy(dp, sp, item);
+                }
+              }
+            }
+          }
+        } else {
+          // Zero-copy, keep owner alive on the Python object
+          new ((void*)v.p) ZImg();
+          v.p->wrapData(const_cast<void*>(static_cast<const void*>(arr.data())), info);
+          nb::list owners;
+          owners.append(arr);
+          v.h.attr("_owners") = owners;
+        }
+      },
+      "ndarray"_a,
+      "imgInfo"_a = ZImgInfo(),
+      "copy_if_needed"_a = true,
+      "layout"_a = std::string("CZYX"))
+    .def(
+      "__init__",
+      [](nb::pointer_and_handle<ZImg> v,
+         const std::vector<nb::ndarray<>>& arrs,
+         const ZImgInfo& info_in,
+         bool copy_if_needed,
+         std::string layout) {
+        if (arrs.empty()) {
+          new ((void*)v.p) ZImg();
+          return;
+        }
+        for (auto& a : arrs) {
+          if (!zpy::isCPU(a)) {
+            throw ZException("GPU-backed nb::ndarray is not supported; please move data to CPU or pass CPU arrays");
+          }
+        }
+        auto info = getImgInfoFromNdarray(arrs[0], info_in, layout);
+        // Validate all arrays compatible
+        for (size_t t = 1; t < arrs.size(); ++t) {
+          auto tmp = getImgInfoFromNdarray(arrs[t], info_in, layout);
+          if (!tmp.isSameType(info) || !tmp.isSameSize(info)) {
+            throw ZException("ndarrays in the list are not compatible");
+          }
+        }
+        info.numTimes = arrs.size();
+        bool zerocopy = (layout == "CZYX");
+        for (auto& a : arrs) {
+          zerocopy = zerocopy && zpy::isCPU(a) && zpy::isContiguousC(a);
+        }
+        if (!zerocopy) {
+          if (!copy_if_needed) {
+            throw ZException("Input arrays not CPU C-contiguous in CZYX; set copy_if_needed=True or adjust layout");
+          }
+          // Allocate and copy into ZImg-owned storage
+          new ((void*)v.p) ZImg(info);
+          auto item = arrs[0].itemsize();
+          for (size_t t = 0; t < arrs.size(); ++t) {
+            auto& arr = arrs[t];
+            auto lm = zpy::parseLayout(layout, (int)arr.ndim());
+            auto [sc, sz, sy, sx] = zpy::stridesFromLayout(arr, lm);
+            auto* base = (const uint8_t*)arr.data();
+            for (size_t cc = 0; cc < info.numChannels; ++cc) {
+              for (size_t zz = 0; zz < info.depth; ++zz) {
+                for (size_t yy = 0; yy < info.height; ++yy) {
+                  for (size_t xx = 0; xx < info.width; ++xx) {
+                    const uint8_t* sp = base + (lm.c >= 0 ? (int64_t)cc * sc : 0) + (lm.z >= 0 ? (int64_t)zz * sz : 0) +
+                                        (int64_t)yy * sy + (int64_t)xx * sx;
+                    uint8_t* dp = (uint8_t*)v.p->timeData(t) + cc * (int64_t)info.channelByteNumber() +
+                                  zz * (int64_t)info.planeByteNumber() + yy * (int64_t)info.rowByteNumber() +
+                                  xx * (int64_t)info.voxelByteNumber();
+                    std::memcpy(dp, sp, item);
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // Zero-copy: wrap pointers and keep owners
+          new ((void*)v.p) ZImg();
+          std::vector<void*> data;
+          for (auto& a : arrs) {
+            data.push_back(const_cast<void*>(static_cast<const void*>(a.data())));
+          }
+          v.p->wrapData(data, info);
+          nb::list owners;
+          for (auto& a : arrs) {
+            owners.append(a);
+          }
+          v.h.attr("_owners") = owners;
+        }
+      },
+      "listOfndarray"_a,
+      "imgInfo"_a = ZImgInfo(),
+      "copy_if_needed"_a = true,
+      "layout"_a = std::string("CZYX"))
     .def_static(
       "readImgInfos",
       [](const QString& filename, FileFormat format) {
         return ZImg::readImgInfos(filename, nullptr, format);
       },
       "filename"_a,
-      "format"_a = FileFormat::Unknown)
+      "format"_a = FileFormat::Unknown,
+      "Read image info from a single file. Optionally specify the file format.")
     .def_static(
       "readImgInfos",
       [](const QStringList& fileList, Dimension catDim, bool catScenes, FileFormat format, bool expandXY) {
@@ -740,11 +751,16 @@ Overloaded Operators:
       "catDim"_a,
       "catScenes"_a,
       "format"_a = FileFormat::Unknown,
-      "expandXY"_a = true)
-    .def_static("readImgInfo",
-                [](const ZImgSource& imgSource) {
-                  return ZImg::readImgInfo(imgSource);
-                })
+      "expandXY"_a = true,
+      "Read image info from a list of files, concatenating along 'catDim'."
+      " If 'catScenes' is true, scenes are concatenated as well. 'expandXY'"
+      " controls expansion of XY dimensions where needed.")
+    .def_static(
+      "readImgInfo",
+      [](const ZImgSource& imgSource) {
+        return ZImg::readImgInfo(imgSource);
+      },
+      "Read image info from a ZImgSource descriptor.")
     .def_static(
       "readSubBlockLists",
       [](const QString& filename, FileFormat format) {
@@ -772,7 +788,8 @@ Overloaded Operators:
         return res;
       },
       "filename"_a,
-      "format"_a = FileFormat::Unknown)
+      "format"_a = FileFormat::Unknown,
+      "Read sub-block lists from a single file. Returns a list of (t, x, y, z, width, height, depth, xRatio, yRatio, zRatio) per scene.")
     .def_static(
       "readSubBlockLists",
       [](const QStringList& fileList, Dimension catDim, bool catScenes, FileFormat format, bool expandXY) {
@@ -803,7 +820,8 @@ Overloaded Operators:
       "catDim"_a,
       "catScenes"_a,
       "format"_a = FileFormat::Unknown,
-      "expandXY"_a = true)
+      "expandXY"_a = true,
+      "Read sub-block lists from a list of files with concatenation options. Return format matches the single-file variant.")
     .def_static(
       "readSubBlock",
       [](const QString& filename, size_t scene, size_t blockIndex, FileFormat format) {
@@ -812,7 +830,8 @@ Overloaded Operators:
       "filename"_a,
       "scene"_a,
       "blockIndex"_a,
-      "format"_a = FileFormat::Unknown)
+      "format"_a = FileFormat::Unknown,
+      "Read an individual sub-block from a single file by scene and block index.")
     .def_static(
       "readSubBlock",
       [](const QStringList& fileList,
@@ -830,31 +849,41 @@ Overloaded Operators:
       "scene"_a,
       "blockIndex"_a,
       "format"_a = FileFormat::Unknown,
-      "expandXY"_a = true)
+      "expandXY"_a = true,
+      "Read an individual sub-block from a list of files with concatenation options.")
     .def_static(
       "getInternalSubRegions",
       [](const QString& filename, FileFormat format) {
         return ZImg::getInternalSubRegions(filename, format);
       },
       "filename"_a,
-      "format"_a = FileFormat::Unknown)
+      "format"_a = FileFormat::Unknown,
+      "Return a list of internal sub-regions described by the file (if any).")
     .def("isEmpty", &ZImg::isEmpty)
     .def("save", &ZImg::save, "filename"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
+    .def("save",
+         &ZImg::save,
+         "filename"_a,
+         "format"_a = FileFormat::Unknown,
+         "paras"_a = ZImgWriteParameters(),
+         "Save this image to 'filename' in the specified format using the given write parameters.")
     .def_static("writeImg",
-                py::overload_cast<const QString&, const ZImgSliceProvider&, FileFormat, const ZImgWriteParameters&>(
+                nb::overload_cast<const QString&, const ZImgSliceProvider&, FileFormat, const ZImgWriteParameters&>(
                   &ZImg::writeImg),
                 "filename"_a,
                 "sliceProvider"_a,
                 "format"_a = FileFormat::Unknown,
-                "paras"_a = ZImgWriteParameters())
+                "paras"_a = ZImgWriteParameters(),
+                "Write an image to 'filename' using a ZImgSliceProvider (slice-by-slice).")
     .def_static("writeImg",
-                py::overload_cast<const QString&, const ZImgBlockProvider&, FileFormat, const ZImgWriteParameters&>(
+                nb::overload_cast<const QString&, const ZImgBlockProvider&, FileFormat, const ZImgWriteParameters&>(
                   &ZImg::writeImg),
                 "filename"_a,
                 "blockProvider"_a,
                 "format"_a = FileFormat::Unknown,
-                "paras"_a = ZImgWriteParameters())
-    .def_property(
+                "paras"_a = ZImgWriteParameters(),
+                "Write an image to 'filename' using a ZImgBlockProvider (block-by-block).")
+    .def_prop_rw(
       "info",
       [](const ZImg& v) {
         return v.info();
@@ -862,21 +891,92 @@ Overloaded Operators:
       [](ZImg& v, const ZImgInfo& info) {
         v.infoRef() = info;
       })
-    .def_property_readonly(
-      "data",
-      [](ZImg& v) {
-        std::vector<py::array> arrs;
-        if (!v.isEmpty()) {
-          auto formatdesc = getFormatDesc(v);
-          for (size_t t = 0; t < v.numTimes(); ++t) {
-            auto capsule = py::capsule(v.timeData(t), [](void*) {});
-            // use do nothing capsule so array does not copy or delete data, data still owned by v
-            arrs.push_back(
-              py::array(getDType(v), {v.numChannels(), v.depth(), v.height(), v.width()}, v.timeData(t), capsule));
+    .def_prop_ro("data",
+                 [](ZImg& v) {
+                   nb::list out;
+                   if (!v.isEmpty()) {
+                     auto dtype = getDType(v);
+                     nb::object self = nb::cast(v, nb::rv_policy::reference);
+                     for (size_t t = 0; t < v.numTimes(); ++t) {
+                       nb::ndarray<nb::numpy> arr(v.timeData(t),
+                                                  {v.numChannels(), v.depth(), v.height(), v.width()},
+                                                  nb::handle(),
+                                                  {},
+                                                  dtype);
+                       out.append(arr.cast(nb::rv_policy::reference_internal, self));
+                     }
+                   }
+                   return out;
+                 })
+    .def(
+      "to_arrays",
+      [](ZImg& v, std::string framework) {
+        nb::list out;
+        if (v.isEmpty()) {
+          return out;
+        }
+        auto dtype = getDType(v);
+        auto shape = std::initializer_list<size_t>{v.numChannels(), v.depth(), v.height(), v.width()};
+        nb::object self = nb::cast(v, nb::rv_policy::reference);
+        if (framework == "auto") {
+          try {
+            nb::object owners = self.attr("_owners");
+            if (owners.is_valid() && nb::len(owners) > 0) {
+              nb::object o0 = owners[0];
+              std::string mod = nb::cast<std::string>(o0.attr("__class__").attr("__module__"));
+              if (mod.find("torch") != std::string::npos) {
+                framework = "torch";
+              } else if (mod.find("tensorflow") != std::string::npos) {
+                framework = "tensorflow";
+              } else if (mod.find("jax") != std::string::npos) {
+                framework = "jax";
+              } else {
+                framework = "numpy";
+              }
+            } else {
+              framework = "numpy";
+            }
+          }
+          catch (...) {
+            framework = "numpy";
           }
         }
-        return arrs;
-      })
+        for (size_t t = 0; t < v.numTimes(); ++t) {
+          void* data = v.timeData(t);
+          if (framework == "numpy") {
+            nb::ndarray<nb::numpy> arr(data, shape, nb::handle(), {}, dtype);
+            out.append(arr.cast(nb::rv_policy::reference_internal, self));
+          } else if (framework == "torch" || framework == "pytorch") {
+            nb::ndarray<nb::pytorch> arr(data, shape, nb::handle(), {}, dtype);
+            out.append(arr.cast(nb::rv_policy::reference_internal, self));
+          } else if (framework == "tensorflow" || framework == "tf") {
+            nb::ndarray<nb::tensorflow> arr(data, shape, nb::handle(), {}, dtype);
+            out.append(arr.cast(nb::rv_policy::reference_internal, self));
+          } else if (framework == "jax") {
+            nb::ndarray<nb::jax> arr(data, shape, nb::handle(), {}, dtype);
+            out.append(arr.cast(nb::rv_policy::reference_internal, self));
+          } else if (framework == "array_api") {
+            nb::ndarray<nb::array_api> arr(data, shape, nb::handle(), {}, dtype);
+            out.append(arr.cast(nb::rv_policy::reference_internal, self));
+          } else if (framework == "memview") {
+            nb::ndarray<nb::memview> arr(data, shape, nb::handle(), {}, dtype);
+            out.append(arr.cast(nb::rv_policy::reference_internal, self));
+          } else {
+            throw ZException("Unknown framework: " + framework +
+                             ". Use one of: numpy, torch, tensorflow, jax, array_api, memview.");
+          }
+        }
+        return out;
+      },
+      "framework"_a = std::string("auto"),
+      "Return image data as a list of arrays in the requested framework.\n\n"
+      "Args:\n"
+      "  framework (str): One of 'auto', 'numpy', 'torch', 'tensorflow', 'jax',\n"
+      "    'array_api', or 'memview'. 'auto' mirrors the input framework when the\n"
+      "    image was created zero-copy from arrays, otherwise returns NumPy.\n\n"
+      "Returns:\n"
+      "  list[ndarray]: CPU-backed arrays that reference ZImg buffers and keep\n"
+      "  the parent ZImg alive (reference_internal).\n")
     .def("resize",
          &ZImg::resize,
          "desWidth"_a,
@@ -885,7 +985,9 @@ Overloaded Operators:
          "interpolant"_a = Interpolant::Cubic,
          "antialiasing"_a = true,
          "antialiasingForNearest"_a = false,
-         "useMultithreading"_a = true)
+         "useMultithreading"_a = true,
+         "Resize the image to the specified (width, height, depth) using the chosen interpolant.\n"
+         "Antialiasing is applied where applicable; set 'useMultithreading' to control threading.")
     .def("zoom",
          &ZImg::zoom,
          "scaleX"_a,
@@ -893,97 +995,107 @@ Overloaded Operators:
          "scaleZ"_a = 1.0,
          "interpolant"_a = Interpolant::Cubic,
          "antialiasing"_a = true,
-         "antialiasingForNearest"_a = false)
-    .def("blockDownsample", &ZImg::blockDownsample, "blockWidth"_a, "blockHeight"_a, "blockDepth"_a, "mergeMode"_a)
-    .def("secureDivideBy", &ZImg::secureDivideBy, "rhs"_a)
-    .def(py::self + py::self)
-    .def(py::self += py::self)
-    .def(py::self - py::self)
+         "antialiasingForNearest"_a = false,
+         "Zoom the image by (scaleX, scaleY, scaleZ) using the specified interpolant.")
+    .def("blockDownsample",
+         &ZImg::blockDownsample,
+         "blockWidth"_a,
+         "blockHeight"_a,
+         "blockDepth"_a,
+         "mergeMode"_a,
+         "Downsample the image using non-overlapping blocks and the given merge mode.")
+    .def("secureDivideBy",
+         &ZImg::secureDivideBy,
+         "rhs"_a,
+         "Safely divide this image by another image 'rhs' (elementwise), guarding against division pitfalls.")
+    .def(nb::self + nb::self)
+    .def(nb::self += nb::self)
+    .def(nb::self - nb::self)
 #ifdef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wself-assign-overloaded"
 #endif
-    .def(py::self -= py::self)
+    .def(nb::self -= nb::self)
 #ifdef __clang__
 #pragma GCC diagnostic pop
 #endif
-    .def(py::self * py::self)
-    .def(py::self *= py::self)
-    .def(py::self / py::self)
+    .def(nb::self * nb::self)
+    .def(nb::self *= nb::self)
+    .def(nb::self / nb::self)
 #ifdef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wself-assign-overloaded"
 #endif
-    .def(py::self /= py::self)
+    .def(nb::self /= nb::self)
 #ifdef __clang__
 #pragma GCC diagnostic pop
 #endif
-    .def(py::self + double())
-    .def(py::self += double())
-    .def(py::self - double())
-    .def(py::self -= double())
-    .def(py::self * double())
-    .def(py::self *= double())
-    .def(py::self / double())
-    .def(py::self /= double())
-    .def(py::self + int32_t())
-    .def(py::self += int32_t())
-    .def(py::self - int32_t())
-    .def(py::self -= int32_t())
-    .def(py::self * int32_t())
-    .def(py::self *= int32_t())
-    .def(py::self / int32_t())
-    .def(py::self /= int32_t())
-    .def(py::self + uint32_t())
-    .def(py::self += uint32_t())
-    .def(py::self - uint32_t())
-    .def(py::self -= uint32_t())
-    .def(py::self * uint32_t())
-    .def(py::self *= uint32_t())
-    .def(py::self / uint32_t())
-    .def(py::self /= uint32_t())
-    .def(py::self + int64_t())
-    .def(py::self += int64_t())
-    .def(py::self - int64_t())
-    .def(py::self -= int64_t())
-    .def(py::self * int64_t())
-    .def(py::self *= int64_t())
-    .def(py::self / int64_t())
-    .def(py::self /= int64_t())
-    .def(py::self + uint64_t())
-    .def(py::self += uint64_t())
-    .def(py::self - uint64_t())
-    .def(py::self -= uint64_t())
-    .def(py::self * uint64_t())
-    .def(py::self *= uint64_t())
-    .def(py::self / uint64_t())
-    .def(py::self /= uint64_t())
+    .def(nb::self + double())
+    .def(nb::self += double())
+    .def(nb::self - double())
+    .def(nb::self -= double())
+    .def(nb::self * double())
+    .def(nb::self *= double())
+    .def(nb::self / double())
+    .def(nb::self /= double())
+    .def(nb::self + int32_t())
+    .def(nb::self += int32_t())
+    .def(nb::self - int32_t())
+    .def(nb::self -= int32_t())
+    .def(nb::self * int32_t())
+    .def(nb::self *= int32_t())
+    .def(nb::self / int32_t())
+    .def(nb::self /= int32_t())
+    .def(nb::self + uint32_t())
+    .def(nb::self += uint32_t())
+    .def(nb::self - uint32_t())
+    .def(nb::self -= uint32_t())
+    .def(nb::self * uint32_t())
+    .def(nb::self *= uint32_t())
+    .def(nb::self / uint32_t())
+    .def(nb::self /= uint32_t())
+    .def(nb::self + int64_t())
+    .def(nb::self += int64_t())
+    .def(nb::self - int64_t())
+    .def(nb::self -= int64_t())
+    .def(nb::self * int64_t())
+    .def(nb::self *= int64_t())
+    .def(nb::self / int64_t())
+    .def(nb::self /= int64_t())
+    .def(nb::self + uint64_t())
+    .def(nb::self += uint64_t())
+    .def(nb::self - uint64_t())
+    .def(nb::self -= uint64_t())
+    .def(nb::self * uint64_t())
+    .def(nb::self *= uint64_t())
+    .def(nb::self / uint64_t())
+    .def(nb::self /= uint64_t())
     .def("__repr__", [](const ZImg& v) {
       return fmt::format("<_imgpy.ZImg {}>", v.info().toString());
     });
 
-  py::class_<ZPunctum>(m, "ZPunctum")
-    .def(py::init<>())
-    .def(py::init<double, double, double, double>(), "x"_a, "y"_a, "z"_a, "r"_a)
-    .def(py::init<const Eigen::MatrixXi&, const Eigen::VectorXd&>(), "voxelLocations"_a, "voxelIntensities"_a)
-    .def_readwrite("name", &ZPunctum::name)
-    .def_readwrite("comment", &ZPunctum::comment)
-    .def_property("x", &ZPunctum::x, &ZPunctum::setX)
-    .def_property("y", &ZPunctum::y, &ZPunctum::setY)
-    .def_property("z", &ZPunctum::z, &ZPunctum::setZ)
-    .def_property("maxIntensity", &ZPunctum::maxIntensity, &ZPunctum::setMaxIntensity)
-    .def_property("meanIntensity", &ZPunctum::meanIntensity, &ZPunctum::setMeanIntensity)
-    .def_property("sDevOfIntensity", &ZPunctum::sDevOfIntensity, &ZPunctum::setSDevOfIntensity)
-    .def_property("volSize", &ZPunctum::volSize, &ZPunctum::setVolSize)
-    .def_property("mass", &ZPunctum::mass, &ZPunctum::setMass)
-    .def_property("radius", &ZPunctum::radius, &ZPunctum::setRadius)
-    .def_readwrite("property1", &ZPunctum::property1)
-    .def_readwrite("property2", &ZPunctum::property2)
-    .def_readwrite("property3", &ZPunctum::property3)
-    .def_property("color", &ZPunctum::color, &ZPunctum::setColor)
-    .def_property("score", &ZPunctum::score, &ZPunctum::setScore)
-    .def_property("voxelLocations", &ZPunctum::voxelLocations, &ZPunctum::setVoxelLocations)
-    .def_property("voxelIntensities", &ZPunctum::voxelIntensities, &ZPunctum::setVoxelIntensities)
+  nb::class_<ZPunctum>(m, "ZPunctum")
+    .def(nb::init<>())
+    .def(nb::init<double, double, double, double>(), "x"_a, "y"_a, "z"_a, "r"_a)
+    .def(nb::init<const Eigen::MatrixXi&, const Eigen::VectorXd&>(), "voxelLocations"_a, "voxelIntensities"_a)
+    .def_rw("name", &ZPunctum::name)
+    .def_rw("comment", &ZPunctum::comment)
+    .def_prop_rw("x", &ZPunctum::x, &ZPunctum::setX)
+    .def_prop_rw("y", &ZPunctum::y, &ZPunctum::setY)
+    .def_prop_rw("z", &ZPunctum::z, &ZPunctum::setZ)
+    .def_prop_rw("maxIntensity", &ZPunctum::maxIntensity, &ZPunctum::setMaxIntensity)
+    .def_prop_rw("meanIntensity", &ZPunctum::meanIntensity, &ZPunctum::setMeanIntensity)
+    .def_prop_rw("sDevOfIntensity", &ZPunctum::sDevOfIntensity, &ZPunctum::setSDevOfIntensity)
+    .def_prop_rw("volSize", &ZPunctum::volSize, &ZPunctum::setVolSize)
+    .def_prop_rw("mass", &ZPunctum::mass, &ZPunctum::setMass)
+    .def_prop_rw("radius", &ZPunctum::radius, &ZPunctum::setRadius)
+    .def_rw("property1", &ZPunctum::property1)
+    .def_rw("property2", &ZPunctum::property2)
+    .def_rw("property3", &ZPunctum::property3)
+    .def_prop_rw("color", &ZPunctum::color, &ZPunctum::setColor)
+    .def_prop_rw("score", &ZPunctum::score, &ZPunctum::setScore)
+    .def_prop_rw("voxelLocations", &ZPunctum::voxelLocations, &ZPunctum::setVoxelLocations)
+    .def_prop_rw("voxelIntensities", &ZPunctum::voxelIntensities, &ZPunctum::setVoxelIntensities)
     .def("updateFromVoxelsList", &ZPunctum::updateFromVoxelsList, "conf"_a = 0.95)
     .def("containsSignal", &ZPunctum::containsSignal)
     .def("mergeWith", &ZPunctum::mergeWith, "otherPunctum"_a, "conf"_a = 0.95)
@@ -999,18 +1111,18 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZPunctum {}>", v.toString());
     });
 
-  py::class_<ZPuncta>(m, "ZPuncta")
-    .def(py::init<>())
-    .def(py::init<const std::list<ZPunctum>&>())
-    .def(py::init<const QString&>(), "filename"_a)
-    .def_readwrite("data", &ZPuncta::data)
+  nb::class_<ZPuncta>(m, "ZPuncta")
+    .def(nb::init<>())
+    .def(nb::init<const std::list<ZPunctum>&>())
+    .def(nb::init<const QString&>(), "filename"_a)
+    .def_rw("data", &ZPuncta::data)
     .def("save", &ZPuncta::save, "filename"_a, "format"_a = QString())
     .def("__repr__", [](const ZPuncta& v) {
       return fmt::format("<_imgpy.ZPuncta {}>", v.toString());
     });
 
-  py::class_<ZStitchImage>(m, "ZStitchImage")
-    .def(py::init<>())
+  nb::class_<ZStitchImage>(m, "ZStitchImage")
+    .def(nb::init<>())
     .def("setInputFilenames", &ZStitchImage::setInputFilenames, "filenames"_a, "scene"_a = 0)
     .def("setResultFilename", &ZStitchImage::setResultFilename, "filename"_a)
     .def("setUseChannels", &ZStitchImage::setUseChannels, "channels"_a = std::vector<size_t>())
@@ -1051,14 +1163,14 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZStitchImage {}>", v.toString());
     });
 
-  py::class_<ZPunctaDetection>(m, "ZPunctaDetection")
-    .def(py::init<>())
-    .def(py::init<const QString&, size_t, size_t, size_t>(),
+  nb::class_<ZPunctaDetection>(m, "ZPunctaDetection")
+    .def(nb::init<>())
+    .def(nb::init<const QString&, size_t, size_t, size_t>(),
          "filename"_a,
          "punctaChannel"_a = 0,
          "t"_a = 0,
          "scene"_a = 0)
-    .def(py::init<const QString&, const ZImgInfo&, size_t, size_t, size_t>(),
+    .def(nb::init<const QString&, const ZImgInfo&, size_t, size_t, size_t>(),
          "filename"_a,
          "imgInfo"_a,
          "punctaChannel"_a = 0,
@@ -1099,8 +1211,8 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZPunctaDetection {}>", v.toString());
     });
 
-  py::class_<ZSectionsRegistration>(m, "ZSectionsRegistration")
-    .def(py::init<>())
+  nb::class_<ZSectionsRegistration>(m, "ZSectionsRegistration")
+    .def(nb::init<>())
     .def("setInputOutput", &ZSectionsRegistration::setInputOutput, "inputFiles"_a, "resultFile"_a, "fixedSliceIndex"_a)
     .def("setReferenceChannel", &ZSectionsRegistration::setReferenceChannel, "refChannel"_a)
     .def("setRemoveBackground", &ZSectionsRegistration::setRemoveBackground, "v"_a)
@@ -1121,8 +1233,8 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZSectionsRegistration {}>", v.toString());
     });
 
-  py::class_<ZChromaticShiftCorrection>(m, "ZChromaticShiftCorrection")
-    .def(py::init<>())
+  nb::class_<ZChromaticShiftCorrection>(m, "ZChromaticShiftCorrection")
+    .def(nb::init<>())
     .def("setInputOutput", &ZChromaticShiftCorrection::setInputOutput, "inputFile"_a, "resultFile"_a)
     .def("setReferenceChannel", &ZChromaticShiftCorrection::setReferenceChannel, "refChannel"_a)
     .def("setTargetChannel", &ZChromaticShiftCorrection::setTargetChannel, "targetChannel"_a)
@@ -1143,8 +1255,8 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZChromaticShiftCorrection {}>", v.toString());
     });
 
-  py::class_<ZImgNCCMatch>(m, "ZImgNCCMatch")
-    .def(py::init<const ZImg&, const ZImg&, size_t, size_t>(),
+  nb::class_<ZImgNCCMatch>(m, "ZImgNCCMatch")
+    .def(nb::init<const ZImg&, const ZImg&, size_t, size_t>(),
          "fixedImg"_a,
          "movingImg"_a,
          "fixedT"_a = 0,
@@ -1181,7 +1293,7 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZImgNCCMatch>");
     });
 
-  py::class_<ZROIUtils>(m, "ZROIUtils")
+  nb::class_<ZROIUtils>(m, "ZROIUtils")
     .def_static("splineToMask", &ZROIUtils::splineToMask, "spline"_a.noconvert())
     .def_static("rectToMask", &ZROIUtils::rectToMask, "rect"_a.noconvert())
     .def_static("ellipseToMask", &ZROIUtils::ellipseToMask, "ellipse"_a.noconvert())
@@ -1191,8 +1303,8 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZROIUtils>");
     });
 
-  py::class_<ZImgSubBlock, PyZImgSubBlock<>>(m, "ZImgSubBlock")
-    .def(py::init<size_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, size_t, size_t, size_t>(),
+  nb::class_<ZImgSubBlock, PyZImgSubBlock<>>(m, "ZImgSubBlock")
+    .def(nb::init<index_t, index_t, index_t, index_t, size_t, size_t, size_t, size_t, size_t, size_t>(),
          "t"_a,
          "x"_a,
          "y"_a,
@@ -1208,8 +1320,8 @@ Overloaded Operators:
     .def("__repr__", [](const ZImgSubBlock&) {
       return fmt::format("<_imgpy.ZImgSubBlock>");
     });
-  py::class_<ZImgTileSubBlock, ZImgSubBlock, PyZImgTileSubBlock<>>(m, "ZImgTileSubBlock")
-    .def(py::init<const ZImgSource&, size_t, size_t, size_t, ImgMergeMode>(),
+  nb::class_<ZImgTileSubBlock, ZImgSubBlock, PyZImgTileSubBlock<>>(m, "ZImgTileSubBlock")
+    .def(nb::init<const ZImgSource&, size_t, size_t, size_t, ImgMergeMode>(),
          "source"_a,
          "xRatio"_a = 1,
          "yRatio"_a = 1,
@@ -1219,8 +1331,8 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZImgTileSubBlock>");
     });
 
-  py::class_<ZImgSliceProvider, PyZImgSliceProvider>(m, "ZImgSliceProvider")
-    .def(py::init<>())
+  nb::class_<ZImgSliceProvider, PyZImgSliceProvider>(m, "ZImgSliceProvider")
+    .def(nb::init<>())
     .def("imgInfo", &ZImgSliceProvider::imgInfo)
     .def("slice", &ZImgSliceProvider::slice, "z"_a, "t"_a)
     .def("allSlices", &ZImgSliceProvider::allSlices, "t"_a)
@@ -1229,8 +1341,8 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZImgSliceProvider>");
     });
 
-  py::class_<ZImgBlockProvider, PyZImgBlockProvider>(m, "ZImgBlockProvider")
-    .def(py::init<>())
+  nb::class_<ZImgBlockProvider, PyZImgBlockProvider>(m, "ZImgBlockProvider")
+    .def(nb::init<>())
     .def("imgInfo", &ZImgBlockProvider::imgInfo)
     .def("numBlocks", &ZImgBlockProvider::numBlocks)
     .def("block", &ZImgBlockProvider::block, "blockIdx"_a)
@@ -1240,8 +1352,8 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZImgBlockProvider>");
     });
 
-  py::class_<ZImgMerge>(m, "ZImgMerge")
-    .def(py::init<>())
+  nb::class_<ZImgMerge>(m, "ZImgMerge")
+    .def(nb::init<>())
     .def("addImg", &ZImgMerge::addImg, "img"_a, "loc"_a, "imgName"_a = QString(""))
     .def("addImgPair",
          &ZImgMerge::addImgPair,
@@ -1258,8 +1370,8 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZImgMerge>");
     });
 
-  py::class_<ZImgAutoThreshold<false>>(m, "ZImgAutoThreshold")
-    .def(py::init<>())
+  nb::class_<ZImgAutoThreshold<false>>(m, "ZImgAutoThreshold")
+    .def(nb::init<>())
     .def("u8TriangleThre",
          &ZImgAutoThreshold<false>::u8TriangleThre,
          "filename"_a,
@@ -1273,8 +1385,8 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZImgAutoThreshold>");
     });
 
-  py::class_<SwcNode>(m, "SwcNode")
-    .def(py::init<int64_t, int64_t, double, double, double, double, int64_t>(),
+  nb::class_<SwcNode>(m, "SwcNode")
+    .def(nb::init<int64_t, int64_t, double, double, double, double, int64_t>(),
          "id"_a = -1,
          "type"_a = -1,
          "x"_a = 0.,
@@ -1282,21 +1394,21 @@ Overloaded Operators:
          "z"_a = 0.,
          "radius"_a = -1.,
          "parentID"_a = -2)
-    .def_readwrite("id", &SwcNode::id)
-    .def_readwrite("type", &SwcNode::type)
-    .def_readwrite("x", &SwcNode::x)
-    .def_readwrite("y", &SwcNode::y)
-    .def_readwrite("z", &SwcNode::z)
-    .def_readwrite("radius", &SwcNode::radius)
-    .def_readwrite("parentID", &SwcNode::parentID)
-    .def_readwrite("label", &SwcNode::label)
+    .def_rw("id", &SwcNode::id)
+    .def_rw("type", &SwcNode::type)
+    .def_rw("x", &SwcNode::x)
+    .def_rw("y", &SwcNode::y)
+    .def_rw("z", &SwcNode::z)
+    .def_rw("radius", &SwcNode::radius)
+    .def_rw("parentID", &SwcNode::parentID)
+    .def_rw("label", &SwcNode::label)
     .def("__repr__", [](const SwcNode& v) {
       return fmt::format("<_imgpy.SwcNode {}>", v.toString());
     });
 
-  py::class_<ZSwc>(m, "ZSwc")
-    .def(py::init<>())
-    .def(py::init<const QString&>(), "filename"_a)
+  nb::class_<ZSwc>(m, "ZSwc")
+    .def(nb::init<>())
+    .def(nb::init<const QString&>(), "filename"_a)
     .def("load", &ZSwc::load, "filename"_a)
     .def("save", &ZSwc::save, "filename"_a)
     .def("labelSomaAndOthers", &ZSwc::labelSomaAndOthers, "radiusThre"_a = 0., "somaType"_a = 1, "otherType"_a = 2)
@@ -1306,17 +1418,17 @@ Overloaded Operators:
       return fmt::format("<_imgpy.ZSwc {}>", v.toString());
     });
 
-  py::enum_<ZMesh::Type>(m, "ZMeshType")
+  nb::enum_<ZMesh::Type>(m, "ZMeshType")
     .value("TRIANGLES", ZMesh::Type::TRIANGLES)
     .value("TRIANGLE_STRIP", ZMesh::Type::TRIANGLE_STRIP)
     .value("TRIANGLE_FAN", ZMesh::Type::TRIANGLE_FAN);
 
-  py::class_<ZMesh>(m, "ZMesh")
-    .def(py::init<ZMesh::Type>(), "type"_a = ZMesh::Type::TRIANGLES)
-    .def(py::init<const QString&>(), "filename"_a)
-    .def("load", py::overload_cast<const QString&>(&ZMesh::load), "filename"_a)
+  nb::class_<ZMesh>(m, "ZMesh")
+    .def(nb::init<ZMesh::Type>(), "type"_a = ZMesh::Type::TRIANGLES)
+    .def(nb::init<const QString&>(), "filename"_a)
+    .def("load", nb::overload_cast<const QString&>(&ZMesh::load), "filename"_a)
     .def("save",
-         py::overload_cast<const QString&, const std::string&>(&ZMesh::save, py::const_),
+         nb::overload_cast<const QString&, const std::string&>(&ZMesh::save, nb::const_),
          "filename"_a,
          "format"_a = std::string())
     .def("toLabelImg",
@@ -1326,7 +1438,7 @@ Overloaded Operators:
          "depth"_a = 0,
          "tfmat"_a = glm::mat4(1.f),
          "tolerance"_a = 1e-6)
-    .def_property("type", &ZMesh::type, &ZMesh::setType)
+    .def_prop_rw("type", &ZMesh::type, &ZMesh::setType)
     .def_static(
       "createPunctaMesh",
       [](const ZPuncta& puncta, int resolution, const glm::mat4& tfmat) {
@@ -1347,60 +1459,81 @@ Overloaded Operators:
       "swc"_a,
       "somaType"_a = 1,
       "tfmat"_a = glm::mat4(1.f))
-    .def_property(
+    .def_prop_rw(
       "vertices",
       [](const ZMesh& v) {
         return vecVecToArray(v.vertices());
       },
-      [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+      [](ZMesh& v, const nb::ndarray<float>& array) {
+        if (!zpy::isCPU(array)) {
+          throw ZException("vertices ndarray must be CPU-backed");
+        }
         v.setVertices(arrayToVecVec<3>(array));
       })
-    .def_property(
+    .def_prop_rw(
       "normals",
       [](const ZMesh& v) {
         return vecVecToArray(v.normals());
       },
-      [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+      [](ZMesh& v, const nb::ndarray<float>& array) {
+        if (!zpy::isCPU(array)) {
+          throw ZException("normals ndarray must be CPU-backed");
+        }
         v.setNormals(arrayToVecVec<3>(array));
       })
-    .def_property(
+    .def_prop_rw(
       "colors",
       [](const ZMesh& v) {
         return vecVecToArray(v.colors());
       },
-      [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+      [](ZMesh& v, const nb::ndarray<float>& array) {
+        if (!zpy::isCPU(array)) {
+          throw ZException("colors ndarray must be CPU-backed");
+        }
         v.setColors(arrayToVecVec<4>(array));
       })
-    .def_property(
+    .def_prop_rw(
       "indices",
       [](const ZMesh& v) {
         return vectorToArray(v.indices());
       },
-      [](ZMesh& v, const py::array_t<uint32_t, py::array::c_style | py::array::forcecast>& array) {
+      [](ZMesh& v, const nb::ndarray<uint32_t>& array) {
+        if (!zpy::isCPU(array)) {
+          throw ZException("indices ndarray must be CPU-backed");
+        }
         v.setIndices(arrayToVector(array));
       })
-    .def_property(
+    .def_prop_rw(
       "textureCoordinates1D",
       [](const ZMesh& v) {
         return vectorToArray(v.textureCoordinates1D());
       },
-      [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+      [](ZMesh& v, const nb::ndarray<float>& array) {
+        if (!zpy::isCPU(array)) {
+          throw ZException("textureCoordinates1D ndarray must be CPU-backed");
+        }
         v.setTextureCoordinates(arrayToVector(array));
       })
-    .def_property(
+    .def_prop_rw(
       "textureCoordinates2D",
       [](const ZMesh& v) {
         return vecVecToArray(v.textureCoordinates2D());
       },
-      [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+      [](ZMesh& v, const nb::ndarray<float>& array) {
+        if (!zpy::isCPU(array)) {
+          throw ZException("textureCoordinates2D ndarray must be CPU-backed");
+        }
         v.setTextureCoordinates(arrayToVecVec<2>(array));
       })
-    .def_property(
+    .def_prop_rw(
       "textureCoordinates3D",
       [](const ZMesh& v) {
         return vecVecToArray(v.textureCoordinates3D());
       },
-      [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+      [](ZMesh& v, const nb::ndarray<float>& array) {
+        if (!zpy::isCPU(array)) {
+          throw ZException("textureCoordinates3D ndarray must be CPU-backed");
+        }
         v.setTextureCoordinates(arrayToVecVec<3>(array));
       })
     .def("__repr__", [](const ZMesh& v) {

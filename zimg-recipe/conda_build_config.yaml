@@ -1,2 +1,3 @@
+# Build against Python 3.12 to produce a stable-ABI extension usable by >=3.12
 python:
   - 3.12

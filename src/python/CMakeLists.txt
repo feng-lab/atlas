@@ -88,12 +88,40 @@ include(LibsForImg)
 # subprojects
 add_subdirectory(../img condaimg)
 
-# pybind11
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/pybind11 pybind11)
+# nanobind
+# Try to locate the Python interpreter and development headers before nanobind
+find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module OPTIONAL_COMPONENTS Development.SABIModule)
+
+# Fallback: on some CMake/Python combinations, Python_INCLUDE_DIRS is only
+# partially populated when requesting Development.Module. Pull from the target.
+if (NOT Python_INCLUDE_DIRS AND TARGET Python::Module)
+  get_target_property(_PY_INC Python::Module INTERFACE_INCLUDE_DIRECTORIES)
+  if (_PY_INC)
+    set(Python_INCLUDE_DIRS ${_PY_INC})
+  endif ()
+endif ()
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/nanobind nanobind)
 
 # build python extensions
 set(module_name _imgpy)
-pybind11_add_module(${module_name} imgpy.cpp)
+
+# ABI toggles: regular (default), stable ABI, and free-threaded
+option(IMG_PY_STABLE_ABI "Build the Python module with CPython's Stable ABI (requires CPython>=3.12)" ON)
+option(IMG_PY_FREE_THREADED "Build free-threaded (nogil) module; requires a free-threaded Python interpreter" OFF)
+
+set(NB_ARGS NOMINSIZE)
+if (IMG_PY_STABLE_ABI AND IMG_PY_FREE_THREADED)
+  message(WARNING "IMG_PY_STABLE_ABI and IMG_PY_FREE_THREADED are mutually exclusive. The stable ABI will be disabled for free-threaded builds.")
+endif ()
+if (IMG_PY_STABLE_ABI)
+  list(APPEND NB_ARGS STABLE_ABI)
+endif ()
+if (IMG_PY_FREE_THREADED)
+  list(APPEND NB_ARGS FREE_THREADED)
+endif ()
+
+nanobind_add_module(${module_name} ${NB_ARGS} imgpy.cpp)
 target_link_libraries(${module_name} PRIVATE condaimg)
 
 if (APPLE)

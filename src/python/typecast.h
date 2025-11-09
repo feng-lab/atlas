@@ -2,39 +2,38 @@
 
 #pragma once
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/numpy.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/list.h>
+#include <nanobind/ndarray.h>
 #include <QString>
 #include <QStringList>
 #include <QPolygonF>
 #include "zglmutils.h"
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
-namespace pybind11 {
+namespace nanobind {
 namespace detail {
 
 // QString
 template<> struct type_caster<QString>
 {
-  PYBIND11_TYPE_CASTER(QString, _("str[QString]"));
-private:
+  NB_TYPE_CASTER(QString, const_name("QString"));
   using str_caster_t = make_caster<std::string>;
-  str_caster_t str_caster;
-public:
-  bool load(handle src, bool convert)
+
+  bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept
   {
-    if (str_caster.load(src, convert)) {
-      value = QString::fromStdString(str_caster);
-      return true;
-    }
-    return false;
+    str_caster_t sc;
+    if (!sc.from_python(src, flags, cleanup))
+      return false;
+    value = QString::fromStdString(sc.operator cast_t<std::string>());
+    return true;
   }
 
-  static handle cast(const QString& s, return_value_policy policy, handle parent)
+  static handle from_cpp(const QString& s, rv_policy policy, cleanup_list* cleanup) noexcept
   {
-    return str_caster_t::cast(s.toStdString(), policy, parent);
+    return str_caster_t::from_cpp(s.toStdString(), policy, cleanup);
   }
 };
 
@@ -46,31 +45,29 @@ template<size_t L, typename T, glm::qualifier Q>
 struct type_caster<glm::vec<L, T, Q>>
 {
   using vec_type = glm::vec<L, T, Q>;
-  PYBIND11_TYPE_CASTER(vec_type, _("np.ndarray[glm::vec<") + npy_format_descriptor_name<T>::name + _<L>() + _(">]"));
-  bool load(handle src, bool convert)
+  NB_TYPE_CASTER(vec_type, const_name("glm_vec"));
+  bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept
   {
-    // If we're in no-convert mode, only load if given an array of the correct type
-    if (!convert && !isinstance<array_t<T>>(src)) return false;
-
-    // Coerce into an array, but don't do type conversion yet; the copy below handles it.
-    auto buf = array_t<T>::ensure(src);
-
-    if (!buf) return false;
-
-    auto dims = buf.ndim();
-    if (dims != 1 || buf.shape(0) != L) return false;
-
-    // Allocate the new type, then build a numpy reference into it
+    using Arr = nb::ndarray<nb::numpy, T>;
+    make_caster<Arr> ac;
+    if (!ac.from_python(src, flags_for_local_caster<Arr>(flags), cleanup)) {
+      return false;
+    }
+    auto buf = ac.operator cast_t<Arr>();
+    if (buf.ndim() != 1 || buf.shape(0) != L)
+      return false;
     value = vec_type();
+    auto* data = buf.data();
+    int64_t s0 = buf.stride(0);
     for (size_t i = 0; i < L; ++i) {
-      value[i] = *buf.data(i);
+      value[i] = *(data + i * s0);
     }
     return true;
   }
 
-  static handle cast(const vec_type& v, return_value_policy, handle)
+  static handle from_cpp(const vec_type& v, rv_policy, cleanup_list*) noexcept
   {
-    return array(L, glm::value_ptr(v)).release();
+    return nb::cast(nb::ndarray<nb::numpy, const T>(glm::value_ptr(v), {L})).release();
   }
 };
 
@@ -78,34 +75,29 @@ template<size_t C, size_t R, typename T, glm::qualifier Q>
 struct type_caster<glm::mat<C, R, T, Q>>
 {
   using mat_type = glm::mat<C, R, T, Q>;
-  PYBIND11_TYPE_CASTER(mat_type, _("np.ndarray[glm::mat<") + npy_format_descriptor_name<T>::name + _<R>() + _("x") + _<C>() + _(">]"));
-  bool load(handle src, bool convert)
+  NB_TYPE_CASTER(mat_type, const_name("glm_mat"));
+  bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept
   {
-    // If we're in no-convert mode, only load if given an array of the correct type
-    if (!convert && !isinstance<array_t<T>>(src)) return false;
-
-    // Coerce into an array, but don't do type conversion yet; the copy below handles it.
-    auto buf = array_t<T>::ensure(src);
-
-    if (!buf) return false;
-
-    auto dims = buf.ndim();
-    if (dims != 2 || buf.shape(0) != R || buf.shape(1) != C) return false;
-
-    // Allocate the new type, then build a numpy reference into it
-    value = mat_type();
-    auto b = buf.template unchecked<2>(); // x must have ndim = 2; can be non-writeable
-    for (size_t r = 0; r < R; ++r) {
-      for (size_t c = 0; c < C; ++c) {
-        value[c][r] = b(r, c);
-      }
+    using Arr = nb::ndarray<nb::numpy, T>;
+    make_caster<Arr> ac;
+    if (!ac.from_python(src, flags_for_local_caster<Arr>(flags), cleanup)) {
+      return false;
     }
+    auto buf = ac.operator cast_t<Arr>();
+    if (buf.ndim() != 2 || buf.shape(0) != R || buf.shape(1) != C) return false;
+    value = mat_type();
+    auto* data = buf.data();
+    int64_t s0 = buf.stride(0), s1 = buf.stride(1);
+    for (size_t r = 0; r < R; ++r)
+      for (size_t c = 0; c < C; ++c) {
+        value[c][r] = *(data + r * s0 + c * s1);
+      }
     return true;
   }
 
-  static handle cast(const mat_type& v, return_value_policy, handle)
+  static handle from_cpp(const mat_type& v, rv_policy, cleanup_list*) noexcept
   {
-    return array({R, C}, {}, glm::value_ptr(glm::transpose(v))).release();
+    return nb::cast(nb::ndarray<nb::numpy, const T>(glm::value_ptr(glm::transpose(v)), {R, C})).release();
   }
 };
 
@@ -113,75 +105,65 @@ template<typename T, glm::qualifier Q>
 struct type_caster<glm::tquat<T, Q>>
 {
   using quat_type = glm::tquat<T, Q>;
-  PYBIND11_TYPE_CASTER(quat_type, _("np.ndarray[glm::tquat<") + npy_format_descriptor_name<T>::name + _(">]"));
-  bool load(handle src, bool convert)
+  NB_TYPE_CASTER(quat_type, const_name("glm_quat"));
+  bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept
   {
-    // If we're in no-convert mode, only load if given an array of the correct type
-    if (!convert && !isinstance<array_t<T>>(src)) return false;
-
-    // Coerce into an array, but don't do type conversion yet; the copy below handles it.
-    auto buf = array_t<T>::ensure(src);
-
-    if (!buf) return false;
-
-    auto dims = buf.ndim();
-    if (dims != 1 || buf.shape(0) != 4) return false;
-
-    // Allocate the new type, then build a numpy reference into it
+    using Arr = nb::ndarray<nb::numpy, T>;
+    make_caster<Arr> ac;
+    if (!ac.from_python(src, flags_for_local_caster<Arr>(flags), cleanup)) {
+      return false;
+    }
+    auto buf = ac.operator cast_t<Arr>();
+    if (buf.ndim() != 1 || buf.shape(0) != 4) return false;
     value = quat_type();
+    auto* data = buf.data();
+    int64_t s0 = buf.stride(0);
     for (size_t i = 0; i < 4; ++i) {
-      value[i] = *buf.data(i);
+      value[i] = *(data + i * s0);
     }
     return true;
   }
 
-  static handle cast(const quat_type& v, return_value_policy, handle)
+  static handle from_cpp(const quat_type& v, rv_policy, cleanup_list*) noexcept
   {
-    return array(4, glm::value_ptr(v)).release();
+    return nb::cast(nb::ndarray<nb::numpy, const T>(glm::value_ptr(v), {4})).release();
   }
 };
 
 template<> struct type_caster<QPolygonF>
 {
-  PYBIND11_TYPE_CASTER(QPolygonF, _("np.ndarray[QPointF float64 nx2]"));
+  NB_TYPE_CASTER(QPolygonF, const_name("QPolygonF"));
 
   static_assert(std::is_standard_layout_v<QPolygonF::value_type> && sizeof(QPolygonF::value_type) == 2 * sizeof(double), "need simple layout");
 
-  bool load(handle src, bool convert)
+  bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept
   {
-    // If we're in no-convert mode, only load if given an array of the correct type
-    if (!convert && !isinstance<array_t<double>>(src)) return false;
-
-    // Coerce into an array, but don't do type conversion yet; the copy below handles it.
-    auto buf = array_t<double>::ensure(src);
-
-    if (!buf) return false;
-
-    auto dims = buf.ndim();
-    if (dims != 2 || buf.shape(1) != 2) return false;
-
-    // Allocate the new type, then build a numpy reference into it
+    using Arr = nb::ndarray<nb::numpy, double>;
+    make_caster<Arr> ac;
+    if (!ac.from_python(src, flags_for_local_caster<Arr>(flags), cleanup)) {
+      return false;
+    }
+    auto buf = ac.operator cast_t<Arr>();
+    if (buf.ndim() != 2 || buf.shape(1) != 2) return false;
     value = QPolygonF();
     value.resize(buf.shape(0));
-    if (buf.flags() & array::c_style) {
-      std::memcpy(value.data(), buf.data(), value.size() * sizeof(QPolygonF::value_type));
-    } else {
-      auto b = buf.template unchecked<2>(); // x must have ndim = 2; can be non-writeable
-      for (ssize_t r = 0; r < buf.shape(0); ++r) {
-        value[r].setX(b(r, 0));
-        value[r].setY(b(r, 1));
-      }
+    auto* data = buf.data();
+    int64_t s0 = buf.stride(0), s1 = buf.stride(1);
+    for (ssize_t r = 0; r < (ssize_t) buf.shape(0); ++r) {
+      value[r].setX(*(data + r * s0 + 0 * s1));
+      value[r].setY(*(data + r * s0 + 1 * s1));
     }
     return true;
   }
 
-  static handle cast(const QPolygonF& v, return_value_policy, handle)
+  static handle from_cpp(const QPolygonF& v, rv_policy, cleanup_list*) noexcept
   {
-    return v.empty() ? array().release() : array(dtype::of<double>(), array::ShapeContainer({v.size(), 2}), v.data()).release();
+    if (v.empty())
+      return nb::cast(nb::ndarray<nb::numpy, const double>(nullptr, {(size_t)0, (size_t)2})).release();
+    auto ptr = reinterpret_cast<const double*>(v.data());
+    return nb::cast(nb::ndarray<nb::numpy, const double>(ptr, {(size_t)v.size(), (size_t)2})).release();
   }
 };
 
 } // namespace
 } // namespace
-
-

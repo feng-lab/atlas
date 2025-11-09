@@ -7,6 +7,9 @@ source:
 
 build:
   number: 0
+  # We ship a stable-ABI extension; avoid pinning to a specific Python minor
+  ignore_run_exports:
+    - python
 
 requirements:
   build:
@@ -15,10 +18,10 @@ requirements:
 #    - ninja
 
   host:
-    - python x.x
+    - python >=3.12
 
   run:
-    - python
+    - python >=3.12
 
 test:
 

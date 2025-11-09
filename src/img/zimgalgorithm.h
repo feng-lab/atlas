@@ -117,6 +117,11 @@ protected:
 class ZImgAlgorithmBase
 {
 public:
+  ZImgAlgorithmBase() = default;
+  ZImgAlgorithmBase(const ZImgAlgorithmBase&) = delete;
+  ZImgAlgorithmBase& operator=(const ZImgAlgorithmBase&) = delete;
+  ZImgAlgorithmBase(ZImgAlgorithmBase&&) = default;
+  ZImgAlgorithmBase& operator=(ZImgAlgorithmBase&&) = default;
 
 protected:
   virtual ~ZImgAlgorithmBase() = default;
