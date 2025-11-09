@@ -17,7 +17,7 @@ Overview
 
 Quickstart
 - Run chat (only command):
-  - `python -m tools.atlas_agent chat-rpc --address localhost:50051 --model o4`
+  - `python -m atlas_agent chat-rpc --address localhost:50051 --model o4`
 
 Schema Discovery
 - Preferred: pass `--atlas-dir` (installation root). The tool derives both the Atlas binary and the schema under it.
@@ -54,7 +54,7 @@ Natural Language Examples
   - "Color of file soma.ply from red to blue during time 5-8 seconds"
 
 Multi‑Agent (live)
-- Start: `python -m tools.atlas_agent chat-rpc --address localhost:50051 --model o4`
+- Start: `python -m atlas_agent chat-rpc --address localhost:50051 --model o4`
 - The agents (Supervisor, Planner, Inspector) will:
   - Query scene state (objects, bbox, params) via tools
   - Propose ≥2 plans, critique, ask clarifying questions if inputs are ambiguous
@@ -118,7 +118,7 @@ Categories and current tools (non-exhaustive)
 - Geometry/Cuts: `scene_bbox`, `scene_cut_suggest`, `scene_cut_set`, `scene_cut_clear`
 
 Notes
-- The Script API (`tools.atlas_agent.api.*`) may add helpers (plan builders, layouts) without changing the Agent Tooling.
+- The Script API (`atlas_agent.api.*`) may add helpers (plan builders, layouts) without changing the Agent Tooling.
 - When the Script API adds a capability that belongs in Agent Tooling, introduce it via a new tool function and document it here.
 
 Scene vs Timeline contract (for LLMs)
@@ -139,8 +139,8 @@ Discover at runtime
 - Print the live tool list (names + JSONSchemas) from a Python shell:
   ```bash
   python - <<'PY'
-  from tools.atlas_agent.scene_rpc import SceneClient
-  from tools.atlas_agent.agent_team.tools_agent import scene_tools_and_dispatcher
+  from atlas_agent.scene_rpc import SceneClient
+  from atlas_agent.agent_team.tools_agent import scene_tools_and_dispatcher
   import json
   sc = SceneClient(address='localhost:50051')
   tools, _ = scene_tools_and_dispatcher(sc)

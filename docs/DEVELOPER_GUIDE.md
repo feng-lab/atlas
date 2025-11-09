@@ -36,8 +36,8 @@ Agents: Preview Screenshots
 - Privacy/consent: Disabled by default. Enable explicitly by setting `ATLAS_AGENT_ALLOW_SCREENSHOTS=1` in the environment when launching the agent CLI.
 - Binary resolution: The tool uses `--atlas-dir` if provided to the agent CLI, or searches default install locations.
 - Typical usage via CLI environment:
-  - `ATLAS_AGENT_ALLOW_SCREENSHOTS=1 python -m tools.atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app`
-  - or pass the flag: `python -m tools.atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app --allow-screenshots`
+  - `ATLAS_AGENT_ALLOW_SCREENSHOTS=1 python -m atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app`
+  - or pass the flag: `python -m atlas_agent --address localhost:50051 --atlas-dir /Applications/fenglab/Atlas.app --allow-screenshots`
 
 Agents: Camera Planning & Validation
 
@@ -65,7 +65,7 @@ Agents: Codegen Mode
 - Workflow (multi‑step, iterative):
  - Discover with tools: `scene_list_objects`, `scene_list_params(id)`, `scene_bbox`.
  - Unified addressing across tools: use `id` only with reserved ids 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids. The legacy scope/object/group forms have been removed from Agent Tooling.
-  - Generate a small plan‑only Python script using `tools.atlas_agent.api` (SceneAPI/CameraAPI) to compute values (no writes). Run with `python_write_and_run` and print compact JSON.
+  - Generate a small plan‑only Python script using `atlas_agent.api` (SceneAPI/CameraAPI) to compute values (no writes). Run with `python_write_and_run` and print compact JSON.
   - Validate with tools: `scene_validate_apply` or `camera_validate`; refine the script if invalid.
   - Generate an apply script to write keys/params; run; then verify (`scene_get_values(id)`, `animation_list_keys(id,json_key)`).
 - Repair loop: On script errors (non‑zero exit), capture stdout/stderr, revise, and re‑run within guardrails (max attempts env `ATLAS_AGENT_CODEGEN_MAX_ATTEMPTS`, default 20; overall time budget). Stop early if errors repeat unchanged.

@@ -84,7 +84,7 @@ def build_atlas_package(is_debug_version: bool = False):
         repo_llm_dir = os.path.join(repo_root, 'src', 'atlas', 'Resources', 'json', 'atlas')
         os.makedirs(repo_llm_dir, exist_ok=True)
         # Generate missing docs using the agent CLI; use deploy .app as --atlas-dir
-        subprocess.run([sys.executable, '-m', 'tools.atlas_agent', '--prepare-llm-docs-only',
+        subprocess.run([sys.executable, '-m', 'atlas_agent', '--prepare-llm-docs-only',
                         '--atlas-dir', os.path.join(common_dirs.deploy_target_dir(), app_name)],
                        cwd=repo_root, shell=False, check=False)
         # Copy repo docs into the deployed app
@@ -108,7 +108,7 @@ def build_atlas_package(is_debug_version: bool = False):
             repo_root = common_dirs.atlas_repository_dir()
             repo_llm_dir = os.path.join(repo_root, 'src', 'atlas', 'Resources', 'json', 'atlas')
             os.makedirs(repo_llm_dir, exist_ok=True)
-            subprocess.run([sys.executable, '-m', 'tools.atlas_agent', '--prepare-llm-docs-only',
+            subprocess.run([sys.executable, '-m', 'atlas_agent', '--prepare-llm-docs-only',
                             '--atlas-dir', os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir')],
                            cwd=repo_root, shell=False, check=False)
             target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Resources', 'json', 'atlas')
@@ -156,7 +156,7 @@ def build_atlas_package(is_debug_version: bool = False):
             repo_root = common_dirs.atlas_repository_dir()
             repo_llm_dir = os.path.join(repo_root, 'src', 'atlas', 'Resources', 'json', 'atlas')
             os.makedirs(repo_llm_dir, exist_ok=True)
-            subprocess.run([sys.executable, '-m', 'tools.atlas_agent', '--prepare-llm-docs-only',
+            subprocess.run([sys.executable, '-m', 'atlas_agent', '--prepare-llm-docs-only',
                             '--atlas-dir', os.path.join(common_dirs.deploy_target_dir(), 'Atlas')],
                            cwd=repo_root, shell=False, check=False)
             target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Resources', 'json', 'atlas')

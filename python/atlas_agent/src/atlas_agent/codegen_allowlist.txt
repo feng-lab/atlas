@@ -1,0 +1,5 @@
+# Third-party Python modules allowed for codegen scripts (single source of truth)
+# One importable module name per line. Comments start with '#'.
+# Example entries: numpy, pandas, yaml, pyquaternion
+
+numpy

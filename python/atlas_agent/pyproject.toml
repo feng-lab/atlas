@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas-agent"
+description = "Multi-agent CLI to operate Atlas via gRPC, with LLM-powered planning and tooling."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Proprietary"}
+authors = [
+  { name = "Feng Lab" }
+]
+keywords = ["atlas", "grpc", "llm", "agent", "animation", "visualization"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "License :: Other/Proprietary License",
+  "Operating System :: OS Independent",
+]
+dependencies = [
+  "openai>=1.0.0",
+  "openai-agents>=0.4.0",
+  "grpcio>=1.56.0",
+  "grpcio-tools>=1.56.0",
+  "protobuf>=4.24.0",
+  "jsonschema>=4.18.0",
+]
+version = "0.1.0"
+
+[project.urls]
+Homepage = "https://github.com/feng-lab/atlas"
+
+[project.scripts]
+"atlas-agent" = "atlas_agent.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = [
+  "atlas_agent",
+  "atlas_agent.*",
+]
+
+[tool.setuptools.package-data]
+"atlas_agent" = [
+  "codegen_allowlist.txt",
+]
+
+ 

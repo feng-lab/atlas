@@ -144,6 +144,14 @@ conda remove zimg -y
 conda install zimg -c fenglab -y
 ```
 
+Pip (optional, scikit-build)
+```bash
+# Build/install zimg from this repo without conda
+pip install -U pip build
+pip install -e python/atlas_agent          # CLI (dev mode)
+pip install python/zimg                     # builds C++ extension via scikit-build-core
+```
+
 ## CLI Utilities
 
 - Export 3D animation (headless): see docs/USER_GUIDE.md for details on `--run_export_3d_animation` flags.
@@ -154,4 +162,4 @@ conda install zimg -c fenglab -y
   ```
 
 - Agents (LLM) codegen toggle:
-  - Code generation tools are disabled by default for safety. To enable them in the chat agent: `python -m tools.atlas_agent --enable-codegen ...` or set `ATLAS_AGENT_ENABLE_CODEGEN=1`.
+  - Code generation tools are disabled by default for safety. To enable them in the chat agent: `python -m atlas_agent --enable-codegen ...` or set `ATLAS_AGENT_ENABLE_CODEGEN=1`.

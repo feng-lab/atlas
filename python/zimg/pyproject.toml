@@ -1,0 +1,32 @@
+[build-system]
+requires = [
+  "scikit-build-core>=0.8",
+  "pybind11>=2.10",
+  "cmake>=3.24",
+  "ninja>=1.11",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "zimg"
+version = "0.0.0"
+description = "Python bindings for Atlas zimg (pybind11)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Proprietary"}
+authors = [{name = "Feng Lab"}]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: C++",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/feng-lab/atlas"
+
+[tool.scikit-build]
+wheel.packages = ["src/zimg"]
+cmake.verbose = true
+cmake.minimum-version = "3.24"
+
