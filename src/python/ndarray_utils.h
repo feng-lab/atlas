@@ -59,7 +59,7 @@ inline LayoutMap parseLayout(const std::string& layout_in, int ndim)
 }
 
 // Return true if array is row-major contiguous in its provided axis order.
-template <typename... Args>
+template<typename... Args>
 inline bool isContiguousC(const nb::ndarray<Args...>& arr)
 {
   size_t ndim = arr.ndim();
@@ -77,7 +77,7 @@ inline bool isContiguousC(const nb::ndarray<Args...>& arr)
   return true;
 }
 
-template <typename... Args>
+template<typename... Args>
 inline bool isCPU(const nb::ndarray<Args...>& arr)
 {
   return arr.device_type() == kDLCPU;
@@ -108,7 +108,7 @@ inline std::pair<int, int> mapDType(const nb::ndarray<>& arr)
 }
 
 // Compute (c,z,y,x) sizes from layout map and ndarray shape.
-template <typename... Args>
+template<typename... Args>
 inline std::tuple<size_t, size_t, size_t, size_t> dimsFromLayout(const nb::ndarray<Args...>& arr, const LayoutMap& lm)
 {
   auto idx = [&](int axis) -> int64_t {
@@ -122,8 +122,9 @@ inline std::tuple<size_t, size_t, size_t, size_t> dimsFromLayout(const nb::ndarr
 }
 
 // Compute byte strides for each logical axis given a layout.
-template <typename... Args>
-inline std::tuple<int64_t, int64_t, int64_t, int64_t> stridesFromLayout(const nb::ndarray<Args...>& arr, const LayoutMap& lm)
+template<typename... Args>
+inline std::tuple<int64_t, int64_t, int64_t, int64_t> stridesFromLayout(const nb::ndarray<Args...>& arr,
+                                                                        const LayoutMap& lm)
 {
   auto sidx = [&](int axis) -> int64_t {
     return axis >= 0 ? arr.stride((size_t)axis) : 0;
