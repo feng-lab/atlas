@@ -1,17 +1,16 @@
-from __future__ import annotations
-
 """Typed filesystem helpers used by Python scripts.
 
 These mirror the LLM Agent Tooling equivalents but return Python values and
 raise exceptions for error conditions.
 """
 
-import os
-import glob
 import difflib
+import glob
+import os
 from pathlib import Path
-from ..llm_docs import find_repo_root
 from typing import Iterable
+
+from ..llm_docs import find_repo_root
 
 
 def expand_paths(paths: Iterable[str]) -> list[str]:

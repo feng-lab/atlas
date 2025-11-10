@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
-from .base import LLMClient
 
+from .base import LLMClient
 
 INTENT_RESOLVER_SYSTEM = (
     "You are the Intent Resolver for Atlas multi‑agent orchestration.\n"

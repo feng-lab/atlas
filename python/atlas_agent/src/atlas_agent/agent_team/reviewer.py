@@ -1,9 +1,7 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
 import logging
-from .base import LLMClient
+from dataclasses import dataclass
 
+from .base import LLMClient
 
 REVIEWER_SYSTEM = (
     "You are a Reviewer for Atlas scene/animation designs.\n"

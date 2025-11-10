@@ -1,23 +1,19 @@
-from __future__ import annotations
-
 import json
+import logging
+import os
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .base import BaseAgent, LLMClient, AgentMessage
-import logging
-from .tools_agent import scene_tools_and_dispatcher
-from .inspector import Inspector
-from .designer import Designer
-from .reviewer import Reviewer
-from .implementer import Implementer
-from .describer import Describer
-from .agents_sdk import act_with_agents_sdk
 from ..scene_rpc import SceneClient
-import os
-import json as _json
+from .arbiter import Arbiter
+from .base import AgentMessage, LLMClient
+from .describer import Describer
+from .designer import Designer
+from .implementer import Implementer
+from .inspector import Inspector
 from .intent_resolver import IntentResolver
-
+from .reviewer import Reviewer
+from .tools_agent import scene_tools_and_dispatcher
 
 SUPERVISOR_SYSTEM = (
     "You are the Supervisor (orchestrator) for an Atlas scene/animation multi‑agent team.\n"
@@ -133,7 +129,6 @@ class Supervisor:
         logger.info("[Supervisor] Reviewers completed feedback")
 
         # 4) Arbiter: choose/blend options based on reviewer feedback
-        from .arbiter import Arbiter
         arbiter = Arbiter(client=self.client, temperature=min(0.4, self.temperature + 0.1))
         idx, merged = arbiter.decide(user_text=user_text, scene_context=ctx_for_agents, options=options, feedbacks=[fb1, fb2])
         selected = merged or (options[idx - 1] if options else "")
@@ -228,8 +223,7 @@ class Supervisor:
                         try:
                             t = float(getattr(k, "time", 0.0))
                             v = getattr(k, "value_json", "")
-                            import json as _json
-                            val = _json.loads(v) if v else {}
+                            val = json.loads(v) if v else {}
                             times.append(t)
                             values.append(val)
                         except Exception:
@@ -262,11 +256,13 @@ class Supervisor:
                     if not tsec and cam_times:
                         tsec = float(cam_times[len(cam_times)//2])
                     # Invoke preview tool via dispatcher
-                    from .tools_agent import scene_tools_and_dispatcher
                     _tools, _dispatch = scene_tools_and_dispatcher(self.scene, atlas_dir=self.atlas_dir)
-                    res = _dispatch("animation_render_preview", _json.dumps({"time": tsec, "width": 512, "height": 512}))
+                    res = _dispatch(
+                        "animation_render_preview",
+                        json.dumps({"time": tsec, "width": 512, "height": 512}),
+                    )
                     try:
-                        j = _json.loads(res or "{}")
+                        j = json.loads(res or "{}")
                         if j.get("ok") and j.get("path"):
                             preview_path = str(j.get("path"))
                     except Exception:
@@ -291,11 +287,9 @@ class Supervisor:
                 satisfied = True
             if not satisfied:
                 try:
-                    import json as _json
-
                     logger.info(
                         "[Inspector] Not satisfied; dumping facts: %s",
-                        _json.dumps(facts_for_inspector),
+                        json.dumps(facts_for_inspector),
                     )
                 except Exception:
                     pass
@@ -418,19 +412,18 @@ class Supervisor:
         except Exception:
             pass
         # Log compact ledger for auditability (do not append into assistant chat content)
-        import json as _json
         try:
             flat_lines: list[str] = []
             for e in full_ledger:
                 tool = e.get('tool')
                 if 'result' in e:
-                    line = f"- {tool}: args={_json.dumps(e.get('args'))} result={_json.dumps(e.get('result'))}"
+                    line = f"- {tool}: args={json.dumps(e.get('args'))} result={json.dumps(e.get('result'))}"
                 else:
                     parts = [f"- {tool}:"]
                     if e.get('args') is not None:
-                        parts.append(f"args={_json.dumps(e.get('args'))}")
+                        parts.append(f"args={json.dumps(e.get('args'))}")
                     if e.get('error') is not None:
-                        parts.append(f"error={_json.dumps(e.get('error'))}")
+                        parts.append(f"error={json.dumps(e.get('error'))}")
                     ai = e.get('agent_input') or {}
                     if isinstance(ai, dict) and ai:
                         try:
@@ -440,9 +433,12 @@ class Supervisor:
                             tools_list = ai.get('tools') or []
                             def trunc(s):
                                 return s
-                            parts.append(f"agent_input={{user_text={_json.dumps(trunc(ui))}, system_excerpt={_json.dumps(trunc(sp))}, context_excerpt={_json.dumps(trunc(sc))}, tools={_json.dumps(tools_list)} }}")
+
+                            parts.append(
+                                f"agent_input={{user_text={json.dumps(trunc(ui))}, system_excerpt={json.dumps(trunc(sp))}, context_excerpt={json.dumps(trunc(sc))}, tools={json.dumps(tools_list)} }}"
+                            )
                         except Exception:
-                            parts.append(f"agent_input={_json.dumps(ai)}")
+                            parts.append(f"agent_input={json.dumps(ai)}")
                     line = " ".join(parts)
                 flat_lines.append(line)
             if flat_lines:

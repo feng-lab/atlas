@@ -1,8 +1,5 @@
-from __future__ import annotations
-
 from dataclasses import dataclass, field
-from typing import Any, Literal, Optional
-
+from typing import Any, Optional
 
 Id = int  # Unified addressing: 0=camera, 1=background, 2=axis, 3=global, >=4 object ids
 

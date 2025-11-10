@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import os
 import time
@@ -8,6 +6,8 @@ from typing import Any, Dict, List
 # No provider-specific schema adaptation; pass canonical schemas to the SDK
 # Require Agents SDK; no fallback path
 import agents as openai_agents  # type: ignore
+from agents import set_default_openai_api  # type: ignore
+from agents.models.openai_provider import OpenAIProvider  # type: ignore
 
 from .base import AgentMessage, LLMClient
 
@@ -94,7 +94,6 @@ def act_with_agents_sdk(
         model_arg: Any = client.model
         if getattr(client, "base_url", None) is not None or client.api_key:
             try:
-                from agents.models.openai_provider import OpenAIProvider  # type: ignore
                 provider = OpenAIProvider(api_key=client.api_key, base_url=getattr(client, "base_url", None))
                 model_arg = provider.get_model(client.model)
             except Exception:
@@ -107,8 +106,6 @@ def act_with_agents_sdk(
 
     # Force Agents SDK to use Chat Completions backend (avoid Responses API)
     try:
-        from agents import set_default_openai_api  # type: ignore
-
         set_default_openai_api("chat_completions")
         logging.getLogger("atlas_agent.agents").info(
             "[SDK] Default API set to chat_completions"

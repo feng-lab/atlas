@@ -1,10 +1,10 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
+import json
 import logging
+import re
+from dataclasses import dataclass
 from typing import List, Tuple
-from .base import LLMClient
 
+from .base import LLMClient
 
 ARBITER_SYSTEM = (
     "You are the Arbiter.\n"
@@ -27,7 +27,6 @@ class Arbiter:
     def decide(self, *, user_text: str, scene_context: str, options: List[str], feedbacks: List[str]) -> Tuple[int, str]:
         logger = logging.getLogger("atlas_agent.agents")
         logger.info("[Arbiter] Deciding among %d option(s)", len(options))
-        import json
         joined_opts = "\n\n".join([f"Option {i+1}:\n{opt}" for i, opt in enumerate(options)])
         joined_fb = "\n\n".join([f"Feedback {i+1}:\n{fb}" for i, fb in enumerate(feedbacks) if fb])
         prompt = (
@@ -47,7 +46,6 @@ class Arbiter:
             return idx, merged
         except Exception:
             # Robust fallback: infer index from reviewer feedbacks (look for 'Best Option: Option X' or 'Selected Option')
-            import re
             idx_guess = None
             for fb in feedbacks:
                 if not fb:

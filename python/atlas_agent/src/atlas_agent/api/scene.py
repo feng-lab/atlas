@@ -1,12 +1,9 @@
-from __future__ import annotations
-
 """Typed wrappers around SceneClient for Python scripts.
 
 These helpers raise exceptions on failure and return native Python types.
 """
 
 from pathlib import Path
-from typing import Any
 
 from ..scene_rpc import SceneClient
 

@@ -1,10 +1,9 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
+import json
 import logging
+from dataclasses import dataclass
 from typing import Any, Dict
-from .base import LLMClient
 
+from .base import LLMClient
 
 DESCRIBER_SYSTEM = (
     "You are the Describer.\n"
@@ -24,7 +23,6 @@ class Describer:
         digest_text = ""
         if isinstance(facts, dict):
             try:
-                import json as _json
                 lines: list[str] = []
                 objs = (facts.get("objects_list") or [])
                 lines.append(f"Objects ({len(objs)}):")
@@ -60,7 +58,7 @@ class Describer:
                                     t = it.get("time")
                                     v = it.get("value", None)
                                     try:
-                                        vtxt = _json.dumps(v, ensure_ascii=False)
+                                        vtxt = json.dumps(v, ensure_ascii=False)
                                     except Exception:
                                         vtxt = str(v)
                                     lines.append(f"    - time={t} value={vtxt}")
@@ -77,7 +75,7 @@ class Describer:
                             # Show all key/value pairs
                             for jk, v in (mp.items() if isinstance(mp, dict) else []):
                                 try:
-                                    vtxt = _json.dumps(v, ensure_ascii=False)
+                                    vtxt = json.dumps(v, ensure_ascii=False)
                                 except Exception:
                                     vtxt = str(v)
                                 lines.append(f"    - {jk} = {vtxt}")

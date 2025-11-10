@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Tool schema adapters for different providers.
 
 Transforms our tool specs (as produced in tools_agent.py) into provider‑specific
@@ -18,7 +16,6 @@ separation, while emitting the strict subset that providers demand.
 
 from copy import deepcopy
 from typing import Any, Dict, List
-
 
 Json = Dict[str, Any]
 

@@ -1,9 +1,8 @@
-from __future__ import annotations
-
-import json
+import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-import os
+
+from openai import OpenAI  # type: ignore
 
 
 @dataclass
@@ -30,12 +29,6 @@ class LLMClient:
 
     def _ensure_client(self):
         if self._client is None:
-            try:
-                from openai import OpenAI  # type: ignore
-            except Exception as e:
-                raise RuntimeError(
-                    "OpenAI Python package not installed. Please `pip install openai>=1.0.0`. "
-                ) from e
             # Respect explicit base_url if provided; otherwise read from env
             kwargs = {"api_key": self.api_key}
             base = self.base_url or os.environ.get("OPENAI_BASE_URL")

@@ -1,8 +1,17 @@
-from __future__ import annotations
-
+import hashlib
 import json
+import os
+import platform
 from pathlib import Path
 from typing import Any, Dict, List
+
+# Fail-fast required third-party imports
+from google.protobuf.json_format import MessageToDict
+
+try:
+    from jsonschema import Draft202012Validator as JsonSchemaValidator  # type: ignore
+except Exception:
+    from jsonschema import Draft7Validator as JsonSchemaValidator  # type: ignore
 
 from ...capabilities_prompt import build_capabilities_prompt
 from ...discovery import discover_schema_dir
@@ -549,7 +558,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps({"ok": True, **summary})
 
     if name == "scene_smart_load":
-        import os as _os
 
         names = args.get("names") or []
         dir_hints = args.get("dir_hints") or []
@@ -562,34 +570,32 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             )
         ci = bool(args.get("case_insensitive", True))
         if not dir_hints:
-            home = _os.path.expanduser("~")
+            home = os.path.expanduser("~")
             # OS-specific common locations
             dirs: list[str] = []
             try:
-                import platform as _plat
-
-                system = _plat.system()
+                system = platform.system()
             except Exception:
                 system = ""
             if system == "Windows":
-                user = _os.environ.get("USERPROFILE") or home
+                user = os.environ.get("USERPROFILE") or home
                 for base in ["Documents", "Downloads", "Desktop"]:
-                    dirs.append(_os.path.join(user, base))
+                    dirs.append(os.path.join(user, base))
             elif system == "Darwin":
                 for base in ["Documents", "Downloads", "Desktop"]:
-                    dirs.append(_os.path.join(home, base))
+                    dirs.append(os.path.join(home, base))
             else:
                 # Linux/Unix
                 for base in ["Documents", "Downloads", "Desktop"]:
-                    dirs.append(_os.path.join(home, base))
+                    dirs.append(os.path.join(home, base))
                 # Common data mount points
                 dirs += ["/data", "/mnt/data", "/srv/data"]
             # Always include cwd last
-            dirs.append(_os.getcwd())
+            dirs.append(os.getcwd())
             dir_hints = dirs
 
         def variants(nm: str) -> list[str]:
-            base, ext = _os.path.splitext(nm)
+            base, ext = os.path.splitext(nm)
             cand = [nm]
             if not ext:
                 cand.extend([base + e for e in exts])
@@ -598,25 +604,25 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         resolved: list[str] = []
         tried: list[str] = []
         for d in dir_hints:
-            d2 = _os.path.expanduser(_os.path.expandvars(str(d)))
-            if not _os.path.isdir(d2):
+            d2 = os.path.expanduser(os.path.expandvars(str(d)))
+            if not os.path.isdir(d2):
                 continue
             for nm in names:
                 for cand in variants(nm):
-                    p = _os.path.join(d2, cand)
+                    p = os.path.join(d2, cand)
                     tried.append(p)
-                    if _os.path.exists(p):
-                        resolved.append(_os.path.abspath(p))
+                    if os.path.exists(p):
+                        resolved.append(os.path.abspath(p))
                         continue
                     if ci:
                         try:
                             target = cand.lower()
-                            for fname in _os.listdir(d2):
-                                if fname.lower() == target and _os.path.exists(
-                                    _os.path.join(d2, fname)
+                            for fname in os.listdir(d2):
+                                if fname.lower() == target and os.path.exists(
+                                    os.path.join(d2, fname)
                                 ):
                                     resolved.append(
-                                        _os.path.abspath(_os.path.join(d2, fname))
+                                        os.path.abspath(os.path.join(d2, fname))
                                     )
                                     break
                         except Exception:
@@ -722,11 +728,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         try:
-            import json as _json
-            from pathlib import Path as _Path
-
-            caps = _json.loads(
-                (_Path(sd) / "capabilities.json").read_text(encoding="utf-8")
+            caps = json.loads(
+                (Path(sd) / "capabilities.json").read_text(encoding="utf-8")
             )
             lines: list[str] = []
             lines.append("# Atlas Parameters Handbook (from capabilities.json)")
@@ -1067,29 +1070,17 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 break
         if meta is None:
             return json.dumps({"ok": False, "error": "json_key not found for id"})
-        # Prefer schema-based validation
-        from google.protobuf.json_format import (
-            MessageToDict as _pb2dict,  # type: ignore
-        )
-
+        # Prefer schema-based validation (protobuf -> dict)
         schema = {}
         try:
             if hasattr(meta, "HasField") and meta.HasField("value_schema"):
-                schema = _pb2dict(getattr(meta, "value_schema")) or {}
+                schema = MessageToDict(getattr(meta, "value_schema")) or {}
         except Exception:
             schema = {}
-        # Require jsonschema at runtime; fail if missing.
-        import hashlib as _hashlib
-        import json as _json
-
-        try:
-            from jsonschema import Draft202012Validator as _Validator  # type: ignore
-        except Exception:
-            from jsonschema import Draft7Validator as _Validator  # type: ignore
         # Cache compiled validator by (id, json_key, schema digest)
         digest = (
-            _hashlib.sha256(
-                _json.dumps(schema, sort_keys=True).encode("utf-8")
+            hashlib.sha256(
+                json.dumps(schema, sort_keys=True).encode("utf-8")
             ).hexdigest()
             if schema
             else ""
@@ -1097,7 +1088,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         cache_key = f"{id}:{json_key}:{digest}"
         validator = _schema_validator_cache.get(cache_key)
         if validator is None:
-            validator = _Validator(schema or {})
+            validator = JsonSchemaValidator(schema or {})
             _schema_validator_cache[cache_key] = validator
         errors = list(validator.iter_errors(value))
         if errors:

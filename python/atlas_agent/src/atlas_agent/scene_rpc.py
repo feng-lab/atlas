@@ -1,31 +1,27 @@
-from __future__ import annotations
-
+import json
+import logging
+import os
+import sys
 import tempfile
 from dataclasses import dataclass
-import os
-import logging
 from pathlib import Path
 from typing import Any, Iterable, Optional
-import json
 
 import grpc  # type: ignore
+import pkg_resources  # type: ignore
 from google.protobuf import struct_pb2  # type: ignore
 from google.protobuf.json_format import MessageToDict  # type: ignore
+from grpc_tools import protoc  # type: ignore
+
+from .llm_docs import find_repo_root  # type: ignore
 
 
 def _compile_proto(proto_path: Path, out_dir: Path) -> None:
+    # Standard well-known types (e.g., google/protobuf/struct.proto) live here
     try:
-        from grpc_tools import protoc  # type: ignore
-        # Standard well-known types (e.g., google/protobuf/struct.proto) live here
-        try:
-            import pkg_resources  # type: ignore
-            std_include = pkg_resources.resource_filename("grpc_tools", "_proto")
-        except Exception:
-            std_include = None
-    except Exception as e:
-        raise RuntimeError(
-            "grpcio-tools not installed. Please `pip install grpcio grpcio-tools protobuf`."
-        ) from e
+        std_include = pkg_resources.resource_filename("grpc_tools", "_proto")
+    except Exception:
+        std_include = None
     args = [
         "protoc",
         f"-I{proto_path.parent}",
@@ -45,7 +41,6 @@ def _load_stubs(repo_root: Path):
     td = tempfile.TemporaryDirectory()
     out_dir = Path(td.name)
     _compile_proto(proto, out_dir)
-    import sys
     sys.path.insert(0, str(out_dir))
     scene_pb2 = __import__("scene_pb2")
     scene_pb2_grpc = __import__("scene_pb2_grpc")
@@ -76,11 +71,7 @@ class SceneClient:
             self._logger.setLevel(level)
             self._logger.propagate = False
         # Discover repo root by sentinels to avoid path-depth assumptions
-        try:
-            from .llm_docs import find_repo_root  # type: ignore
-            repo_root = find_repo_root() or Path.cwd()
-        except Exception:
-            repo_root = Path.cwd()
+        repo_root = find_repo_root() or Path.cwd()
         self._tmpdir, self._pb2, self._pb2_grpc = _load_stubs(repo_root)
         self._channel = grpc.insecure_channel(self.address)
         self._stub = self._pb2_grpc.SceneStub(self._channel)
@@ -126,7 +117,6 @@ class SceneClient:
         return bool(resp.ok)
 
     def load_files(self, files: Iterable[str]):
-        import os
         exp: list[str] = []
         missing: list[str] = []
         for s in files:
@@ -156,7 +146,6 @@ class SceneClient:
         """Idempotently ensure files are loaded: skip any that are already present.
         Returns a dict: {loaded: [...], skipped: [...], objects: [...]}.
         """
-        import os
         # Snapshot current objects and build a set of normalized existing paths
         objs = self.list_objects()
         existing_paths = set()
@@ -387,11 +376,11 @@ class SceneClient:
 
     def camera_rotate(self, op: str, degrees: float = 90.0, base_value: Optional[dict] = None) -> dict:
         self.ensure_view()
-        from google.protobuf import struct_pb2 as _spb
         bv = None
         if base_value is not None:
-            def _to_value(py: Any) -> _spb.Value:
-                v = _spb.Value()
+
+            def _to_value(py: Any) -> struct_pb2.Value:
+                v = struct_pb2.Value()
                 if py is None:
                     v.null_value = 0
                 elif isinstance(py, bool):
@@ -401,12 +390,12 @@ class SceneClient:
                 elif isinstance(py, str):
                     v.string_value = py
                 elif isinstance(py, (list, tuple)):
-                    lv = _spb.ListValue()
+                    lv = struct_pb2.ListValue()
                     for item in py:
                         lv.values.append(_to_value(item))
                     v.list_value.CopyFrom(lv)
                 elif isinstance(py, dict):
-                    st = _spb.Struct()
+                    st = struct_pb2.Struct()
                     for k, val in py.items():
                         st.fields[k].CopyFrom(_to_value(val))
                     v.struct_value.CopyFrom(st)
@@ -457,9 +446,9 @@ class SceneClient:
             )
         st = None
         if params:
-            from google.protobuf import struct_pb2 as _spb
-            def _to_value(py: Any) -> _spb.Value:
-                v = _spb.Value()
+
+            def _to_value(py: Any) -> struct_pb2.Value:
+                v = struct_pb2.Value()
                 if py is None:
                     v.null_value = 0
                 elif isinstance(py, bool):
@@ -469,20 +458,20 @@ class SceneClient:
                 elif isinstance(py, str):
                     v.string_value = py
                 elif isinstance(py, (list, tuple)):
-                    lv = _spb.ListValue()
+                    lv = struct_pb2.ListValue()
                     for item in py:
                         lv.values.append(_to_value(item))
                     v.list_value.CopyFrom(lv)
                 elif isinstance(py, dict):
-                    st2 = _spb.Struct()
+                    st2 = struct_pb2.Struct()
                     for k2, val in py.items():
                         st2.fields[k2].CopyFrom(_to_value(val))
                     v.struct_value.CopyFrom(st2)
                 else:
                     v.string_value = str(py)
                 return v
-            from google.protobuf.struct_pb2 import Struct
-            st = Struct()
+
+            st = struct_pb2.Struct()
             for k, v in params.items():
                 st.fields[k].CopyFrom(_to_value(v))
         req = self._pb2.CameraSolveRequest(
@@ -523,9 +512,8 @@ class SceneClient:
                 adjust_clipping=bool(policies.get("adjust_clipping", False)),
             )
         # Convert dicts to protobuf Values
-        from google.protobuf import struct_pb2 as _spb
-        def _to_value(py: Any) -> _spb.Value:
-            v = _spb.Value()
+        def _to_value(py: Any) -> struct_pb2.Value:
+            v = struct_pb2.Value()
             if py is None:
                 v.null_value = 0
             elif isinstance(py, bool):
@@ -535,12 +523,12 @@ class SceneClient:
             elif isinstance(py, str):
                 v.string_value = py
             elif isinstance(py, (list, tuple)):
-                lv = _spb.ListValue()
+                lv = struct_pb2.ListValue()
                 for item in py:
                     lv.values.append(_to_value(item))
                 v.list_value.CopyFrom(lv)
             elif isinstance(py, dict):
-                st = _spb.Struct()
+                st = struct_pb2.Struct()
                 for k, val in py.items():
                     st.fields[k].CopyFrom(_to_value(val))
                 v.struct_value.CopyFrom(st)
@@ -802,7 +790,7 @@ class SceneClient:
             elif isinstance(py, str):
                 v.string_value = py
             elif isinstance(py, (list, tuple)):
-                lv = struct_pb2.ListValue();
+                lv = struct_pb2.ListValue()
                 for item in py:
                     lv.values.append(_to_value(item))
                 v.list_value.CopyFrom(lv)
@@ -846,7 +834,7 @@ class SceneClient:
             elif isinstance(py, str):
                 v.string_value = py
             elif isinstance(py, (list, tuple)):
-                lv = struct_pb2.ListValue();
+                lv = struct_pb2.ListValue()
                 for item in py:
                     lv.values.append(_to_value(item))
                 v.list_value.CopyFrom(lv)

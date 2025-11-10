@@ -1,9 +1,17 @@
-from __future__ import annotations
-
+import bisect
+import difflib
+import glob
+import io
 import json
-from typing import Any, Dict, List
+import os
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+# Required internal helper; fail fast if missing
+from ...llm_docs import find_repo_root  # type: ignore
 from .context import ToolDispatchContext
-from .file_formats import get_supported_extensions, SCENE_LOAD_CATEGORIES
+from .file_formats import SCENE_LOAD_CATEGORIES, get_supported_extensions
 
 HANDLED_TOOLS = (
     "fs_expand_paths",
@@ -339,33 +347,27 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
     _schema_validator_cache = ctx.schema_validator_cache
 
     if name == "fs_expand_paths":
-        import os as _os
-
         paths = [str(p) for p in (args.get("paths") or [])]
         out: list[str] = []
         for p in paths:
-            t = _os.path.expanduser(_os.path.expandvars(p))
+            t = os.path.expanduser(os.path.expandvars(p))
             # Normalize separators for current OS
-            t = _os.path.normpath(t)
+            t = os.path.normpath(t)
             out.append(t)
         return json.dumps({"paths": out})
 
     if name == "fs_check_paths":
-        import os as _os
-
         paths = [str(p) for p in (args.get("paths") or [])]
         exists: list[str] = []
         missing: list[str] = []
         for p in paths:
-            if _os.path.exists(p):
+            if os.path.exists(p):
                 exists.append(p)
             else:
                 missing.append(p)
         return json.dumps({"exists": exists, "missing": missing})
 
     if name == "fs_read_text":
-        import os as _os, re as _re, io as _io
-        from typing import Optional as _Optional
 
         p = str(args.get("path") or "")
 
@@ -399,7 +401,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         # Internal streaming chunk size (not user-configurable)
         block_size = 65536
         try:
-            q = _os.path.expanduser(_os.path.expandvars(p))
+            q = os.path.expanduser(os.path.expandvars(p))
             # Enforce symmetry: line_count requires start_line (use negative start_line for tail)
             if (line_count is not None) and (start_line is None):
                 return json.dumps(
@@ -411,12 +413,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 )
             # Resolve byte window using seek/tell when possible so tail refers to current EOF
             rb_start: int = 0
-            size: _Optional[int] = None
+            size: Optional[int] = None
             data: bytes
             with open(q, "rb") as f:
                 # Try to get current size from file descriptor (may fail for special files)
                 try:
-                    size = _os.fstat(f.fileno()).st_size
+                    size = os.fstat(f.fileno()).st_size
                 except Exception:
                     size = None
                 # Determine absolute start; negative means from EOF
@@ -428,7 +430,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     else:
                         # Negative start: offset from end
                         try:
-                            f.seek(0, _io.SEEK_END)
+                            f.seek(0, io.SEEK_END)
                             endpos = f.tell()
                             size = endpos
                         except Exception:
@@ -511,7 +513,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     regex_error = None
                     if isinstance(regex, str) and regex:
                         try:
-                            rx = _re.compile(regex)
+                            rx = re.compile(regex)
                             sliced = [ln for ln in sliced if rx.search(ln)]
                         except Exception as _e:
                             regex_error = str(_e)
@@ -555,18 +557,17 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": str(e)})
 
     if name == "fs_tail_lines":
-        import os as _os, io as _io
 
         p = str(args.get("path") or "")
         n = int(args.get("n", 200))
         if n <= 0:
             n = 1
         try:
-            q = _os.path.expanduser(_os.path.expandvars(p))
+            q = os.path.expanduser(os.path.expandvars(p))
             with open(q, "rb") as f:
                 # Detect BOM/encoding from file start (not tail buffer)
                 try:
-                    f.seek(0, _io.SEEK_SET)
+                    f.seek(0, io.SEEK_SET)
                     _hdr = f.read(4)
                 except Exception:
                     _hdr = b""
@@ -581,11 +582,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 else:
                     enc = "utf-8"
                 try:
-                    size = _os.fstat(f.fileno()).st_size
+                    size = os.fstat(f.fileno()).st_size
                 except Exception:
                     size = None
                 # Scan from EOF until we have N+1 newlines or reach BOF (no arbitrary caps)
-                f.seek(0, _io.SEEK_END)
+                f.seek(0, io.SEEK_END)
                 endpos = f.tell()
                 pos = endpos
                 block_size = 65536
@@ -627,18 +628,17 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": str(e)})
 
     if name == "fs_tail_bytes":
-        import os as _os, io as _io
 
         p = str(args.get("path") or "")
         k = int(args.get("bytes", 4096))
         if k <= 0:
             k = 1
         try:
-            q = _os.path.expanduser(_os.path.expandvars(p))
+            q = os.path.expanduser(os.path.expandvars(p))
             with open(q, "rb") as f:
                 # Detect BOM/encoding from file start
                 try:
-                    f.seek(0, _io.SEEK_SET)
+                    f.seek(0, io.SEEK_SET)
                     _hdr = f.read(4)
                 except Exception:
                     _hdr = b""
@@ -652,7 +652,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     enc = "utf-16"
                 else:
                     enc = "utf-8"
-                f.seek(0, _io.SEEK_END)
+                f.seek(0, io.SEEK_END)
                 endpos = f.tell()
                 start = max(0, endpos - k)
                 f.seek(start)
@@ -673,7 +673,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": str(e)})
 
     if name == "fs_search_text":
-        import os as _os, io as _io, re as _re
 
         p = str(args.get("path") or "")
         pattern = str(args.get("regex") or "")
@@ -693,16 +692,16 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         if max_matches < 0:
             max_matches = 0
         try:
-            q = _os.path.expanduser(_os.path.expandvars(p))
+            q = os.path.expanduser(os.path.expandvars(p))
             with open(q, "rb") as f:
                 # Determine file size
                 try:
-                    size = _os.fstat(f.fileno()).st_size
+                    size = os.fstat(f.fileno()).st_size
                 except Exception:
                     size = None
                 # Detect BOM/encoding from file start for pattern encoding only
                 try:
-                    f.seek(0, _io.SEEK_SET)
+                    f.seek(0, io.SEEK_SET)
                     _hdr = f.read(4)
                 except Exception:
                     _hdr = b""
@@ -724,7 +723,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     if start < 0:
                         # Seek to end to compute absolute start from EOF
                         try:
-                            f.seek(0, _io.SEEK_END)
+                            f.seek(0, io.SEEK_END)
                             endpos = f.tell()
                         except Exception:
                             endpos = 0
@@ -759,8 +758,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 )
             flags = 0
             if not case_sensitive:
-                flags |= _re.IGNORECASE
-            rx = _re.compile(pat_b, flags)
+                flags |= re.IGNORECASE
+            rx = re.compile(pat_b, flags)
             # Precompute newline byte positions in the window for line number math
             nl_positions = []
             try:
@@ -794,10 +793,8 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 b1 = scan_start + m.end()
                 # Start/end line numbers within window via binary search on nl_positions
                 # Count of newlines strictly before m.start()
-                import bisect as _bis
-
-                nl_before_start = _bis.bisect_left(nl_positions, m.start())
-                nl_before_end = _bis.bisect_left(nl_positions, m.end())
+                nl_before_start = bisect.bisect_left(nl_positions, m.start())
+                nl_before_end = bisect.bisect_left(nl_positions, m.end())
                 s_line = base_line + nl_before_start
                 e_line = base_line + nl_before_end
                 matches.append(
@@ -827,14 +824,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": str(e)})
 
     if name == "fs_read_json":
-        import os as _os, json as _json
-
         p = str(args.get("path") or "")
         try:
-            q = _os.path.expanduser(_os.path.expandvars(p))
+            q = os.path.expanduser(os.path.expandvars(p))
             size = None
             try:
-                size = _os.stat(q).st_size
+                size = os.stat(q).st_size
             except Exception:
                 size = None
             with open(q, "rb") as f:
@@ -844,7 +839,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 text = data.decode("utf-8-sig", errors="strict")
             else:
                 text = data.decode("utf-8", errors="strict")
-            obj = _json.loads(text)
+            obj = json.loads(text)
             return json.dumps(
                 {
                     "ok": True,
@@ -858,9 +853,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps({"ok": False, "error": msg})
 
     if name == "fs_resolve_path":
-        import os as _os
-        import difflib as _dif
-        from pathlib import Path as _Path
 
         path_in = str(args.get("path") or "")
         kind = str(args.get("kind")) if args.get("kind") else "either"
@@ -871,26 +863,24 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
         def _exists(p: str) -> bool:
             if kind == "file":
-                return _os.path.isfile(p)
+                return os.path.isfile(p)
             if kind == "dir":
-                return _os.path.isdir(p)
-            return _os.path.exists(p)
+                return os.path.isdir(p)
+            return os.path.exists(p)
 
         # Expand and normalize
-        p0 = _os.path.expanduser(_os.path.expandvars(path_in))
-        p0 = _os.path.normpath(p0)
+        p0 = os.path.expanduser(os.path.expandvars(path_in))
+        p0 = os.path.normpath(p0)
         tried.append(p0)
         if _exists(p0):
-            return json.dumps(
-                {"ok": True, "path": _os.path.abspath(p0), "tried": tried}
-            )
+            return json.dumps({"ok": True, "path": os.path.abspath(p0), "tried": tried})
 
         # Heuristic 1: case-insensitive correction per segment
         def _case_fix(p: str) -> str | None:
-            parts = _Path(p).parts
+            parts = Path(p).parts
             if not parts:
                 return None
-            cur = _Path(parts[0])
+            cur = Path(parts[0])
             for seg in parts[1:]:
                 parent = cur
                 if not parent.exists():
@@ -911,7 +901,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 return json.dumps(
                     {
                         "ok": True,
-                        "path": _os.path.abspath(cf),
+                        "path": os.path.abspath(cf),
                         "tried": tried,
                         "reason": "case-insensitive match",
                     }
@@ -919,7 +909,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
         # Heuristic 2: pluralization/singularization on each segment (single change)
         def _plural_variants(p: str):
-            parts = list(_Path(p).parts)
+            parts = list(Path(p).parts)
             for i in range(len(parts)):
                 alt = parts.copy()
                 seg = alt[i]
@@ -927,35 +917,35 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     alt[i] = seg[:-1]
                 else:
                     alt[i] = seg + "s"
-                yield str(_Path(*alt))
+                yield str(Path(*alt))
 
         for cand in _plural_variants(p0):
-            c2 = _os.path.normpath(cand)
+            c2 = os.path.normpath(cand)
             if c2 not in tried:
                 tried.append(c2)
                 if _exists(c2):
                     return json.dumps(
                         {
                             "ok": True,
-                            "path": _os.path.abspath(c2),
+                            "path": os.path.abspath(c2),
                             "tried": tried,
                             "reason": "pluralization",
                         }
                     )
         # Heuristic 3: simple prefix match near failing leaf
         try:
-            parent, leaf = _os.path.split(p0)
-            if parent and _os.path.isdir(parent) and leaf:
-                for fname in _os.listdir(parent):
+            parent, leaf = os.path.split(p0)
+            if parent and os.path.isdir(parent) and leaf:
+                for fname in os.listdir(parent):
                     if fname.lower().startswith(leaf.lower()):
-                        c3 = _os.path.join(parent, fname)
+                        c3 = os.path.join(parent, fname)
                         if c3 not in tried:
                             tried.append(c3)
                             if _exists(c3):
                                 return json.dumps(
                                     {
                                         "ok": True,
-                                        "path": _os.path.abspath(c3),
+                                        "path": os.path.abspath(c3),
                                         "tried": tried,
                                         "reason": "prefix match",
                                     }
@@ -963,38 +953,34 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         except Exception:
             pass
         # Fallback: anchored search around nearest existing ancestor + common user dirs + optional bases
-        try:
-            from ...llm_docs import find_repo_root as _find_repo_root  # type: ignore
-        except Exception:
-            _find_repo_root = None
-        repo_root = _find_repo_root() if _find_repo_root else None
+        repo_root = find_repo_root()
         # Find nearest existing ancestor directory of p0
-        anc = _Path(p0)
+        anc = Path(p0)
         while anc and not anc.exists():
             anc = anc.parent
         anchor_dirs: list[str] = []
         if anc and anc.exists():
             # Avoid scanning the home directory root; only add ancestor if it is not the home root
             try:
-                _home = _Path(_os.path.expanduser("~")).resolve()
+                _home = Path(os.path.expanduser("~")).resolve()
             except Exception:
                 _home = None
             anc_dir = anc if anc.is_dir() else anc.parent
             if not (_home and anc_dir.resolve() == _home):
                 anchor_dirs.append(str(anc_dir))
         # Common user dirs
-        home = _os.path.expanduser("~")
-        docs = _os.path.join(home, "Documents")
-        dlds = _os.path.join(home, "Downloads")
-        desk = _os.path.join(home, "Desktop")
+        home = os.path.expanduser("~")
+        docs = os.path.join(home, "Documents")
+        dlds = os.path.join(home, "Downloads")
+        desk = os.path.join(home, "Desktop")
         for d in (docs, dlds, desk):
-            if _os.path.isdir(d):
+            if os.path.isdir(d):
                 anchor_dirs.append(d)
         # If the path mentions a subfolder (e.g., atlas_test), try doc/subfolder
-        segs = [s for s in _Path(p0).parts if s not in ("/", "\\")]
+        segs = [s for s in Path(p0).parts if s not in ("/", "\\")]
         for s in segs:
-            cand = _os.path.join(docs, s)
-            if _os.path.isdir(cand):
+            cand = os.path.join(docs, s)
+            if os.path.isdir(cand):
                 anchor_dirs.append(cand)
         # Add optional bases and repo last
         anchor_dirs.extend(base_dirs)
@@ -1004,38 +990,35 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         seen = set()
         search_roots = []
         for r in anchor_dirs:
-            if r and r not in seen and _os.path.isdir(r):
+            if r and r not in seen and os.path.isdir(r):
                 seen.add(r)
                 search_roots.append(r)
-        target = _Path(path_in).name
+        target = Path(path_in).name
         candidates: list[tuple[float, str]] = []
 
         def _walk_with_depth(root: str, max_depth: int):
-            root_p = _Path(root)
+            root_p = Path(root)
             try:
                 for cur, dirs, files in os.walk(root):
-                    rel = _Path(cur).relative_to(root_p)
+                    rel = Path(cur).relative_to(root_p)
                     if len(rel.parts) > max_depth:
                         dirs[:] = []
                         continue
                     for nm in files if kind != "dir" else dirs:
-                        full = _os.path.join(cur, nm)
-                        if kind == "file" and not _os.path.isfile(full):
+                        full = os.path.join(cur, nm)
+                        if kind == "file" and not os.path.isfile(full):
                             continue
-                        if kind == "dir" and not _os.path.isdir(full):
+                        if kind == "dir" and not os.path.isdir(full):
                             continue
-                        score = _dif.SequenceMatcher(
+                        score = difflib.SequenceMatcher(
                             a=nm.lower(), b=target.lower()
                         ).ratio()
                         if score >= 0.5:
-                            candidates.append((score, _os.path.abspath(full)))
+                            candidates.append((score, os.path.abspath(full)))
             except Exception:
                 return
-
-        import os
-
         # Normalize and filter invalid roots
-        search_roots = [r for r in search_roots if r and _os.path.isdir(r)]
+        search_roots = [r for r in search_roots if r and os.path.isdir(r)]
         for r in search_roots:
             _walk_with_depth(r, max_depth)
             tried.append(r)
@@ -1044,10 +1027,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps({"ok": False, "candidates": out, "tried": tried})
 
     if name == "fs_hint_resolve":
-        import os as _os
-        import difflib as _dif
-        import re as _re
-        from pathlib import Path as _Path
 
         hint = str(args.get("hint_text") or "")
         expected_name = str(args.get("expected_name") or "").strip() or None
@@ -1056,22 +1035,22 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         max_depth = int(args.get("max_depth", 6))
         base_dirs = [str(p) for p in (args.get("base_dirs") or [])]
         # 1) Build anchor roots: common user dirs + optional bases
-        home = _os.path.expanduser("~")
+        home = os.path.expanduser("~")
         anchors = []
         # Do NOT scan the home directory root to avoid permission prompts; restrict to common user subdirs
         for d in (
-            _os.path.join(home, "Documents"),
-            _os.path.join(home, "Downloads"),
-            _os.path.join(home, "Desktop"),
+            os.path.join(home, "Documents"),
+            os.path.join(home, "Downloads"),
+            os.path.join(home, "Desktop"),
         ):
-            if _os.path.isdir(d):
+            if os.path.isdir(d):
                 anchors.append(d)
         for b in base_dirs:
-            b2 = _os.path.expanduser(_os.path.expandvars(b))
-            if _os.path.isdir(b2):
-                anchors.append(_os.path.normpath(b2))
+            b2 = os.path.expanduser(os.path.expandvars(b))
+            if os.path.isdir(b2):
+                anchors.append(os.path.normpath(b2))
         # 2) Mine hint for subfolder clues and explicit basenames
-        toks = _re.split(r"[\s,'\"]+", hint)
+        toks = re.split(r"[\s,'\"]+", hint)
         toks = [t for t in toks if t]
         # Detect candidate name if not provided (has dot)
         if not expected_name:
@@ -1090,7 +1069,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 subdirs.append(t)
             # Handle path-like tokens
             if "/" in t or "\\" in t:
-                subdirs.extend([seg for seg in _re.split(r"[\\/]+", t) if seg])
+                subdirs.extend([seg for seg in re.split(r"[\\/]+", t) if seg])
         # De-duplicate but preserve order
         seen = set()
         subdirs_u = []
@@ -1103,46 +1082,44 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         for a in anchors:
             HINT_SUBDIRS_MAX = int(os.environ.get("ATLAS_AGENT_HINT_SUBDIRS_MAX", "3"))
             for s in subdirs_u[:HINT_SUBDIRS_MAX]:  # limit depth of hinted stack
-                cand = _os.path.join(a, s)
-                if _os.path.isdir(cand):
+                cand = os.path.join(a, s)
+                if os.path.isdir(cand):
                     search_roots.append(cand)
         # 4) Scan within bounded depth and rank candidates
         target = (expected_name or "").lower()
         candidates: list[tuple[float, str]] = []
 
         def _walk_with_depth(root: str, max_depth: int):
-            root_p = _Path(root)
+            root_p = Path(root)
             try:
                 for cur, dirs, files in os.walk(root):
-                    rel = _Path(cur).relative_to(root_p)
+                    rel = Path(cur).relative_to(root_p)
                     if len(rel.parts) > max_depth:
                         dirs[:] = []
                         continue
                     names = files if kind != "dir" else dirs
                     for nm in names:
-                        full = _os.path.join(cur, nm)
-                        if kind == "file" and not _os.path.isfile(full):
+                        full = os.path.join(cur, nm)
+                        if kind == "file" and not os.path.isfile(full):
                             continue
-                        if kind == "dir" and not _os.path.isdir(full):
+                        if kind == "dir" and not os.path.isdir(full):
                             continue
                         score = (
                             1.0
                             if (target and nm.lower() == target)
-                            else _dif.SequenceMatcher(
+                            else difflib.SequenceMatcher(
                                 a=nm.lower(), b=(target or nm.lower())
                             ).ratio()
                         )
                         if target and score < 0.5:
                             continue
-                        candidates.append((score, _os.path.abspath(full)))
+                        candidates.append((score, os.path.abspath(full)))
             except Exception:
                 return
 
-        import os
-
         tried = []
         # Normalize and filter invalid roots to avoid os.walk errors
-        search_roots = [r for r in search_roots if r and _os.path.isdir(r)]
+        search_roots = [r for r in search_roots if r and os.path.isdir(r)]
         try:
             for r in search_roots:
                 _walk_with_depth(r, max_depth)
@@ -1158,7 +1135,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             best = out[0]
             if (
                 expected_name
-                and _os.path.basename(best["path"]).lower() == expected_name.lower()
+                and os.path.basename(best["path"]).lower() == expected_name.lower()
             ):
                 return json.dumps(
                     {
@@ -1171,42 +1148,35 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps({"ok": False, "candidates": out, "tried": tried})
 
     if name == "repo_search":
-        import os as _os
-        import difflib as _dif
-        from pathlib import Path as _Path
 
         query = str(args.get("name") or "")
         typ = str(args.get("type")) if args.get("type") else "either"
         max_depth = int(args.get("max_depth", 6))
         max_results = int(args.get("max_results", 20))
-        try:
-            from ...llm_docs import find_repo_root as _find_repo_root  # type: ignore
-        except Exception:
-            _find_repo_root = None
-        repo_root = _find_repo_root() if _find_repo_root else None
+        repo_root = find_repo_root()
         if not repo_root:
             try:
-                repo_root = _Path.cwd()
+                repo_root = Path.cwd()
             except Exception:
-                repo_root = _Path('.')
+                repo_root = Path(".")
         target = query.lower()
         hits: list[tuple[float, str]] = []
         try:
             for cur, dirs, files in os.walk(str(repo_root)):
-                rel = _Path(cur).relative_to(repo_root)
+                rel = Path(cur).relative_to(repo_root)
                 if len(rel.parts) > max_depth:
                     dirs[:] = []
                     continue
 
                 def _consider(nm: str):
-                    full = _os.path.join(cur, nm)
-                    if typ == "file" and not _os.path.isfile(full):
+                    full = os.path.join(cur, nm)
+                    if typ == "file" and not os.path.isfile(full):
                         return
-                    if typ == "dir" and not _os.path.isdir(full):
+                    if typ == "dir" and not os.path.isdir(full):
                         return
-                    score = _dif.SequenceMatcher(a=nm.lower(), b=target).ratio()
+                    score = difflib.SequenceMatcher(a=nm.lower(), b=target).ratio()
                     if score >= 0.5:
-                        hits.append((score, _os.path.abspath(full)))
+                        hits.append((score, os.path.abspath(full)))
 
                 for nm in dirs:
                     _consider(nm)
@@ -1219,22 +1189,19 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps({"ok": True, "results": out})
 
     if name == "fs_glob":
-        import os as _os
-        import glob as _glob
 
         d = str(args.get("dir") or "")
         pattern = str(args.get("pattern") or "*")
         rec = bool(args.get("recursive", False))
-        base = _os.path.expanduser(_os.path.expandvars(d))
-        if not _os.path.isdir(base):
+        base = os.path.expanduser(os.path.expandvars(d))
+        if not os.path.isdir(base):
             return json.dumps({"ok": False, "error": f"not a directory: {base}"})
-        pat = _os.path.join(base, pattern)
-        matches = _glob.glob(pat, recursive=rec)
-        files = [_os.path.abspath(m) for m in matches if _os.path.isfile(m)]
+        pat = os.path.join(base, pattern)
+        matches = glob.glob(pat, recursive=rec)
+        files = [os.path.abspath(m) for m in matches if os.path.isfile(m)]
         return json.dumps({"ok": True, "files": files, "dir": base, "pattern": pattern})
 
     if name == "fs_find_candidates":
-        import os as _os
 
         dirs = args.get("dirs") or []
         names = args.get("names") or []
@@ -1247,30 +1214,28 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         out: list[str] = []
 
         def variants(nm: str) -> list[str]:
-            base, ext = _os.path.splitext(nm)
+            base, ext = os.path.splitext(nm)
             cand = [nm]
             if not ext:
                 cand.extend([base + e for e in exts])
             return cand
 
         for d in dirs:
-            d2 = _os.path.expanduser(_os.path.expandvars(str(d)))
+            d2 = os.path.expanduser(os.path.expandvars(str(d)))
             for nm in names:
                 for cand in variants(nm):
-                    p = _os.path.join(d2, cand)
-                    if _os.path.exists(p):
-                        out.append(_os.path.abspath(p))
+                    p = os.path.join(d2, cand)
+                    if os.path.exists(p):
+                        out.append(os.path.abspath(p))
                     elif ci:
                         # Try case-insensitive match by scanning directory
                         try:
                             target = cand.lower()
-                            for fname in _os.listdir(d2):
-                                if fname.lower() == target and _os.path.exists(
-                                    _os.path.join(d2, fname)
+                            for fname in os.listdir(d2):
+                                if fname.lower() == target and os.path.exists(
+                                    os.path.join(d2, fname)
                                 ):
-                                    out.append(
-                                        _os.path.abspath(_os.path.join(d2, fname))
-                                    )
+                                    out.append(os.path.abspath(os.path.join(d2, fname)))
                                     break
                         except Exception:
                             pass

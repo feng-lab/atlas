@@ -1,14 +1,13 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
+import json
 import logging
+from dataclasses import dataclass
 from typing import List, Optional
-from .base import LLMClient, AgentMessage
-from .agents_sdk import act_with_agents_sdk
-import os
+
 from ..codegen_policy import allowed_imports_text, is_codegen_enabled
 from ..scene_rpc import SceneClient
-
+from .agents_sdk import act_with_agents_sdk
+from .base import AgentMessage, LLMClient
+from .tools_agent import scene_tools_and_dispatcher
 
 IMPLEMENTER_SYSTEM = (
     "You are the Implementer.\n"
@@ -38,6 +37,7 @@ IMPLEMENTER_SYSTEM = (
     "- If some requested steps are not feasible with available tools/capabilities (e.g., json_key_not_found, option_invalid, tool_missing), first complete all feasible steps, then call report_blocked(reason, details?, suggestion?) exactly once with a precise reason and details.\n"
 )
 
+
 @dataclass
 class Implementer:
     client: LLMClient
@@ -45,32 +45,40 @@ class Implementer:
     temperature: float = 0.2
     atlas_dir: str | None = None
 
-    def run(self, *, user_text: str, selected_design: str, shared_context: Optional[str] = None) -> tuple[List[AgentMessage], list[dict]]:
+    def run(
+        self,
+        *,
+        user_text: str,
+        selected_design: str,
+        shared_context: Optional[str] = None,
+    ) -> tuple[List[AgentMessage], list[dict]]:
         logger = logging.getLogger("atlas_agent.agents")
         logger.info("[Implementer] Start. user_text=%s", (user_text or ""))
         logger.info("[Implementer] Selected design:\n%s", (selected_design or ""))
         tools, dispatch = None, None
-        from .tools_agent import scene_tools_and_dispatcher
-        tools, dispatch = scene_tools_and_dispatcher(self.scene, atlas_dir=self.atlas_dir)
+        tools, dispatch = scene_tools_and_dispatcher(
+            self.scene, atlas_dir=self.atlas_dir
+        )
         # Wrap dispatch to capture a per-turn ledger of tool calls
         ledger: list[dict] = []
-        import json as _json
         # Keep last planned camera value to enable implicit chaining when the model omits base_value.
         last_camera_value: dict | None = None
 
         def _dispatch_with_ledger(name: str, args_json: str) -> str:
             try:
                 # Idempotency guard for key writes: skip if a key at the same time already exists
-                import json as _json
+
                 # Parse args to inspect id/time
                 try:
-                    args = _json.loads(args_json or "{}")
+                    args = json.loads(args_json or "{}")
                 except Exception:
                     args = {}
                 nonlocal last_camera_value
                 def _deny(reason: str) -> str:
-                    _res = _json.dumps({"ok": False, "error": f"contract_violation: {reason}"})
-                    entry = {"tool": name, "args": args, "result": _json.loads(_res)}
+                    _res = json.dumps(
+                        {"ok": False, "error": f"contract_violation: {reason}"}
+                    )
+                    entry = {"tool": name, "args": args, "result": json.loads(_res)}
                     ledger.append(entry)
                     return _res
                 precheck_note = None
@@ -85,7 +93,7 @@ class Implementer:
                         bv = args.get("base_value")
                         if (bv is None or bv == {}) and last_camera_value is not None:
                             args["base_value"] = last_camera_value
-                            args_json = _json.dumps(args)
+                            args_json = json.dumps(args)
                     except Exception:
                         pass
                     # Segment rotations with magnitude > 120° into <= 90° steps for predictable interpolation
@@ -109,11 +117,11 @@ class Implementer:
                                     step_args["base_value"] = last_camera_value
                             except Exception:
                                 pass
-                            step_json = _json.dumps(step_args)
+                            step_json = json.dumps(step_args)
                             step_result_raw = dispatch(name, step_json)
                             step_entry = {"tool": name, "args": step_args, "result": None}
                             try:
-                                step_result = _json.loads(step_result_raw or "{}")
+                                step_result = json.loads(step_result_raw or "{}")
                             except Exception:
                                 step_result = {"raw": step_result_raw}
                             step_entry["result"] = step_result
@@ -126,7 +134,12 @@ class Implementer:
                             except Exception:
                                 pass
                         # Return the final segmented call result (already logged)
-                        return final_result or _json.dumps({"ok": False, "error": "camera_rotate segmentation produced no result"})
+                        return final_result or json.dumps(
+                            {
+                                "ok": False,
+                                "error": "camera_rotate segmentation produced no result",
+                            }
+                        )
                 # Intercept animation_set_key_param
                 if name == "animation_set_key_param":
                     idv = args.get("id")
@@ -137,8 +150,14 @@ class Implementer:
                             lr = self.scene.list_keys(id=int(idv), json_key=str(json_key), include_values=False)
                             times = [k.time for k in getattr(lr, "keys", [])]
                             if any(abs(time_v - t) < 1e-6 for t in times):
-                                _res = _json.dumps({"ok": True, "skipped": "duplicate_time"})
-                                entry = {"tool": name, "args": args, "result": _json.loads(_res)}
+                                _res = json.dumps(
+                                    {"ok": True, "skipped": "duplicate_time"}
+                                )
+                                entry = {
+                                    "tool": name,
+                                    "args": args,
+                                    "result": json.loads(_res),
+                                }
                                 ledger.append(entry)
                                 return _res
                     except Exception:
@@ -154,8 +173,10 @@ class Implementer:
                     "result": None,
                 }
                 entry["args"] = args if isinstance(args, dict) else {"raw": args_json}
-                try: entry["result"] = _json.loads(result or "{}")
-                except Exception: entry["result"] = {"raw": result}
+                try:
+                    entry["result"] = json.loads(result or "{}")
+                except Exception:
+                    entry["result"] = {"raw": result}
                 if precheck_note is not None:
                     entry["note"] = precheck_note
                 ledger.append(entry)

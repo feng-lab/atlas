@@ -1,9 +1,9 @@
-from __future__ import annotations
-
 import logging
 import os
 from dataclasses import dataclass
 from typing import Optional
+
+from agents.tracing import set_tracing_disabled  # type: ignore
 
 from .agent_team.base import LLMClient
 from .agent_team.supervisor import Supervisor
@@ -22,11 +22,7 @@ class ChatTeam:
 
     def __post_init__(self):
         # Disable Agents SDK tracing to avoid network calls to default OpenAI tracing backend.
-        try:
-            from agents.tracing import set_tracing_disabled  # type: ignore
-            set_tracing_disabled(True)
-        except Exception:
-            pass
+        set_tracing_disabled(True)
         self.scene = SceneClient(address=self.address)
         # LLMClient is the sole owner of base_url configuration
         self.llm = LLMClient(api_key=self.api_key, model=self.model)

@@ -1,9 +1,7 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
 import logging
-from .base import LLMClient
+from dataclasses import dataclass
 
+from .base import LLMClient
 
 DESIGNER_SYSTEM = (
     "You are the Designer for Atlas scene/animation.\n"

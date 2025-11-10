@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Plan runner for Python scripts (validate → apply → verify).
 
 This module provides a simple helper to execute a mixed Plan of stateless
@@ -10,8 +8,8 @@ their own logic deterministically).
 
 from typing import Any
 
-from .plan_types import Plan, SetParam, SetKey, RemoveKey
 from ..scene_rpc import SceneClient
+from .plan_types import Plan
 
 
 def run_plan(client: SceneClient, plan: Plan) -> dict:

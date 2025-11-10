@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Codegen policy helpers (allowed imports and feature gating).
 
 This module centralizes the allowlist of Python modules that codegen scripts
@@ -10,9 +8,9 @@ Enable/disable the codegen pathway with ATLAS_AGENT_ENABLE_CODEGEN=1.
 """
 
 import os
-from typing import List, Tuple, Dict, Any
 from importlib.util import find_spec
 from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 
 def _read_allowlist_from_package() -> List[str]:
@@ -67,4 +65,3 @@ def is_codegen_enabled() -> bool:
     """
     val = os.environ.get("ATLAS_AGENT_ENABLE_CODEGEN", "").strip().lower()
     return val in ("1", "true", "yes", "on")
-

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Typed camera helpers for Python scripts.
 
 These wrappers prefer the typed planning/validation flow:
@@ -11,7 +9,7 @@ They raise exceptions on failure and return Python-native dicts.
 """
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Optional
 
 from ..scene_rpc import SceneClient
 

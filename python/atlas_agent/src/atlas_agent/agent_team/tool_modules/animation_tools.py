@@ -1,9 +1,19 @@
-from __future__ import annotations
-
+import glob
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
-from ...discovery import discover_schema_dir
+
+from ...describe import load_animation, load_capabilities, summarize_animation
+from ...discovery import (
+    compute_paths_from_atlas_dir,
+    default_install_dirs,
+    discover_schema_dir,
+)
+
+# Fail-fast for internal exporter helpers
+from ...exporter import export_video, preview_frames
 from .context import ToolDispatchContext
 
 HANDLED_TOOLS = (
@@ -917,12 +927,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps({"ok": True, "keys": keys})
 
     if name == "animation_describe_file":
-        from ...describe import (
-            load_animation,
-            load_capabilities,
-            summarize_animation,
-        )
-
         schema_dir = args.get("schema_dir")
         sd, searched = discover_schema_dir(schema_dir, atlas_dir)
         try:
@@ -1193,15 +1197,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps({"ok": ok})
 
     if name == "animation_save_animation":
-        from pathlib import Path as _P
-
-        return json.dumps({"ok": client.save_animation(_P(args.get("path")))})
+        return json.dumps({"ok": client.save_animation(Path(args.get("path")))})
 
     if name == "animation_export_video":
         # Export .animation3d to MP4 by invoking headless Atlas
-        from pathlib import Path as _P
-        from ...discovery import compute_paths_from_atlas_dir, default_install_dirs
-        from ...exporter import export_video as _export_video
+        
 
         anim = args.get("animation")
         out = args.get("out")
@@ -1211,7 +1211,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         atlas_bin = None
         if atlas_dir:
             try:
-                ab, _ = compute_paths_from_atlas_dir(_P(atlas_dir))
+                ab, _ = compute_paths_from_atlas_dir(Path(atlas_dir))
                 atlas_bin = ab
             except Exception:
                 atlas_bin = None
@@ -1225,10 +1225,10 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             return json.dumps(
                 {"ok": False, "error": "Atlas binary not found; set atlas_dir"}
             )
-        rc = _export_video(
+        rc = export_video(
             atlas_bin=str(atlas_bin),
-            animation_path=_P(anim),
-            output_video=_P(out),
+            animation_path=Path(anim),
+            output_video=Path(out),
             fps=int(args.get("fps", 30)),
             start=int(args.get("start", 0)),
             end=int(args.get("end", -1)),
@@ -1241,11 +1241,11 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
     if name == "animation_render_preview":
         # Privacy/consent gate: disabled unless explicitly allowed by env
-        import os as _os
-
-        allow = _os.environ.get(
-            "ATLAS_AGENT_ALLOW_SCREENSHOTS", ""
-        ).strip().lower() in ("1", "true", "yes")
+        allow = os.environ.get("ATLAS_AGENT_ALLOW_SCREENSHOTS", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
         if not allow:
             return json.dumps(
                 {
@@ -1253,11 +1253,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                     "error": "screenshots disabled; set ATLAS_AGENT_ALLOW_SCREENSHOTS=1 to enable",
                 }
             )
-        from pathlib import Path as _P
-        import tempfile as _tmp
-        import glob as _glob
-        from ...discovery import compute_paths_from_atlas_dir, default_install_dirs
-        from ...exporter import preview_frames as _preview_frames
+        
 
         fps = int(float(args.get("fps", 30)))
         tsec = float(args.get("time", 0.0))
@@ -1268,7 +1264,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         atlas_bin = None
         if atlas_dir:
             try:
-                ab, _ = compute_paths_from_atlas_dir(_P(atlas_dir))
+                ab, _ = compute_paths_from_atlas_dir(Path(atlas_dir))
                 atlas_bin = ab
             except Exception:
                 atlas_bin = None
@@ -1286,7 +1282,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 }
             )
         # Save animation to a temp file and render a single frame
-        tdir = _P(_tmp.mkdtemp(prefix="atlas_preview_"))
+        tdir = Path(tempfile.mkdtemp(prefix="atlas_preview_"))
         anim_path = tdir / "preview.animation3d"
         ok_save = client.save_animation(anim_path)
         if not ok_save:
@@ -1295,7 +1291,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             )
         frames_dir = tdir / "frames"
         frames_dir.mkdir(parents=True, exist_ok=True)
-        rc = _preview_frames(
+        rc = preview_frames(
             atlas_bin=str(atlas_bin),
             animation_path=anim_path,
             out_dir=frames_dir,
@@ -1314,7 +1310,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         # Find the produced image (exact naming depends on exporter; pick any image in frames_dir)
         images = []
         for ext in ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff"):
-            images.extend(sorted(_glob.glob(str(frames_dir / ext))))
+            images.extend(sorted(glob.glob(str(frames_dir / ext))))
         if not images:
             return json.dumps({"ok": False, "error": "no image produced"})
         return json.dumps({"ok": True, "path": images[0]})

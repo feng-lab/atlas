@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Build a compact, factual capabilities summary for grounding the agent.
 
 This is a light cleanup of the prior implementation with the same behavior,

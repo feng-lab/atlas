@@ -1,14 +1,11 @@
-from __future__ import annotations
-
 import json
 import platform
 import re
 import subprocess
 from pathlib import Path
-from typing import Iterable, List, Dict, Any, Tuple, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .discovery import compute_paths_from_atlas_dir
-
 
 # ---------- Repo detection ----------
 

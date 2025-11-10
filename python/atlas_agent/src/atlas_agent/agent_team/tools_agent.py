@@ -1,16 +1,18 @@
-from __future__ import annotations
-
 """LLM Agent Tooling: tool specs + dispatcher for function-calling.
 
 This module contains the curated tool list and dispatcher used by the
 multi-agent system. It is the stable entry point for LLM function-calling.
 """
 
+import difflib
 import json
+import os
 from typing import Any, Dict, List, Tuple
 
-from ..scene_rpc import SceneClient
+from google.protobuf.json_format import MessageToDict  # type: ignore
+
 from ..codegen_policy import is_codegen_enabled
+from ..scene_rpc import SceneClient
 from .tool_modules import TOOL_TO_MODULE, build_tool_list, general_tools
 from .tool_modules.context import ToolDispatchContext
 
@@ -113,8 +115,6 @@ def scene_tools_and_dispatcher(
             return amap[cand_norm]
         # Fuzzy: prefix match on names and keys
         try:
-            import difflib
-
             choices = list(amap.keys())
             # Try best close matches
             for m in difflib.get_close_matches(cand_norm, choices, n=1, cutoff=0.85):
@@ -148,10 +148,8 @@ def scene_tools_and_dispatcher(
                 pass
             # Include canonical JSON Schema emitted by server when available
             try:
-                from google.protobuf.json_format import MessageToDict as _pb2dict  # type: ignore
-
                 if hasattr(p, "HasField") and p.HasField("value_schema"):
-                    entry["value_schema"] = _pb2dict(getattr(p, "value_schema"))
+                    entry["value_schema"] = MessageToDict(getattr(p, "value_schema"))
             except Exception:
                 pass
             return entry
@@ -194,9 +192,7 @@ def scene_tools_and_dispatcher(
     disabled = {}
     # Environment-gated tools
     try:
-        import os as _os
-
-        allow_screenshots = _os.environ.get(
+        allow_screenshots = os.environ.get(
             "ATLAS_AGENT_ALLOW_SCREENSHOTS", ""
         ).strip().lower() in ("1", "true", "yes")
     except Exception:

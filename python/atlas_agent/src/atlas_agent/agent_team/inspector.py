@@ -1,8 +1,9 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Tuple, Optional
+import base64
 import json
+import mimetypes
+from dataclasses import dataclass
+from typing import Optional, Tuple
+
 from .base import LLMClient
 
 
@@ -56,7 +57,6 @@ class Inspector:
         data_url: Optional[str] = None
         if preview_image_path:
             try:
-                import base64, mimetypes
                 mime, _ = mimetypes.guess_type(preview_image_path)
                 mime = mime or "image/png"
                 with open(preview_image_path, "rb") as f:
