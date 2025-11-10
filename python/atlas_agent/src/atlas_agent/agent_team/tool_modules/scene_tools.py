@@ -3,6 +3,7 @@ import json
 import os
 import platform
 from pathlib import Path
+import logging
 from typing import Any, Dict, List
 
 # Fail-fast required third-party imports
@@ -1077,6 +1078,33 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 schema = MessageToDict(getattr(meta, "value_schema")) or {}
         except Exception:
             schema = {}
+        # Guard against unexpected non-mapping schemas from server (e.g., list)
+        # jsonschema expects a mapping (or bool) at the root; otherwise validator will crash
+        if not isinstance(schema, (dict, bool)):
+            # Log full context for diagnosis and return a clear error
+            try:
+                logger = logging.getLogger("atlas_agent.tools")
+                logger.error(
+                    "invalid value_schema for id=%s json_key=%s: type=%s schema=%s",
+                    id,
+                    json_key,
+                    type(schema).__name__,
+                    schema,
+                )
+            except Exception:
+                pass
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "invalid_value_schema",
+                    "details": {
+                        "id": id,
+                        "json_key": json_key,
+                        "got_type": type(schema).__name__,
+                        "schema": schema,
+                    },
+                }
+            )
         # Cache compiled validator by (id, json_key, schema digest)
         digest = (
             hashlib.sha256(

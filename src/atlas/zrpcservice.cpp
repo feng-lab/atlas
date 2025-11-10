@@ -888,6 +888,16 @@ public:
           // Attach canonical value schema from parameter
           {
             const json::object schema = p->valueSchema();
+            // Dev guard: ensure schema has a recognizable 'type' for easier diagnostics
+            try {
+              auto it = schema.if_contains("type");
+              if (!it || !it->is_string()) {
+                LOG(WARNING) << "valueSchema missing/invalid 'type' for jsonKey=" << p->jsonKey().toStdString()
+                             << ", type=" << p->type().toStdString();
+              }
+            }
+            catch (...) {
+            }
             meta.mutable_value_schema()->CopyFrom(jsonToPb(schema).struct_value());
           }
           dst.push_back(std::move(meta));
@@ -1902,6 +1912,16 @@ public:
         // Value schema from parameter (fail-fast if invariant breaks)
         {
           const json::object schema = p->valueSchema();
+          // Dev guard: ensure schema has a recognizable 'type'
+          try {
+            auto it = schema.if_contains("type");
+            if (!it || !it->is_string()) {
+              LOG(WARNING) << "valueSchema missing/invalid 'type' for jsonKey=" << p->jsonKey().toStdString()
+                           << ", type=" << p->type().toStdString();
+            }
+          }
+          catch (...) {
+          }
           meta.mutable_value_schema()->CopyFrom(jsonToPb(schema).struct_value());
         }
         out.push_back(std::move(meta));

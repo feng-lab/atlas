@@ -1,22 +1,40 @@
-import argparse
-import os
 import sys
+
+# Enforce minimum Python version early (fail-fast at import)
+if sys.version_info < (3, 12):
+    raise SystemExit(
+        f"Atlas Agent requires Python 3.12+ (detected {sys.version.split()[0]}). "
+        "Please upgrade your Python interpreter."
+    )
+
+import argparse
 import logging
-from .chat_rpc_team import run_repl as run_team_repl
+import os
 from pathlib import Path
-from .llm_docs import find_repo_root, ensure_llm_docs, repo_schema_dir, missing_llm_docs
+
+from .chat_rpc_team import run_repl as run_team_repl
+from .llm_docs import ensure_llm_docs, find_repo_root, missing_llm_docs, repo_schema_dir
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="atlas-agent", description="Atlas animation agent (chat only): control Atlas GUI via RPC")
+    parser = argparse.ArgumentParser(
+        prog="atlas-agent",
+        description="Atlas animation agent (chat only): control Atlas GUI via RPC",
+    )
     # Single entry; accept an optional first positional (e.g., 'chat' or 'chat-rpc')
     parser.add_argument("cmd", nargs="?", help=argparse.SUPPRESS)
-    parser.add_argument("--address", default=os.environ.get("ATLAS_RPC_ADDR", "localhost:50051"))
+    parser.add_argument(
+        "--address", default=os.environ.get("ATLAS_RPC_ADDR", "localhost:50051")
+    )
     parser.add_argument(
         "--model",
         default=os.environ.get("ATLAS_LLM_MODEL", "gpt-5-mini"),
     )
-    parser.add_argument("--temperature", type=float, default=float(os.environ.get("ATLAS_LLM_TEMPERATURE", "0.2")))
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=float(os.environ.get("ATLAS_LLM_TEMPERATURE", "0.2")),
+    )
     parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY"))
     parser.add_argument(
         "--atlas-dir",
@@ -67,20 +85,19 @@ def main(argv: list[str] | None = None) -> int:
         if not repo:
             logging.error("Not in an Atlas repo (missing sentinels).")
             return 2
-        out_dir = Path(args.llm_docs_dir) if args.llm_docs_dir else repo_schema_dir(repo)
-        ensure_llm_docs(repo, atlas_dir=args.atlas_dir, out_dir=out_dir, force_schema_dump=True)
+        out_dir = (
+            Path(args.llm_docs_dir) if args.llm_docs_dir else repo_schema_dir(repo)
+        )
+        ensure_llm_docs(
+            repo, atlas_dir=args.atlas_dir, out_dir=out_dir, force_schema_dump=True
+        )
         logging.info("LLM docs prepared at %s", out_dir)
         return 0
 
     if not args.api_key:
         logging.error("OPENAI_API_KEY is required (set --api-key).")
         return 2
-    # Require jsonschema for schema validation; fail early if missing
-    try:
-        import jsonschema  # type: ignore
-    except Exception:
-        logging.error("Missing dependency: jsonschema. Please `pip install jsonschema`.")
-        return 2
+
     # Set screenshot env gate from flag if requested
     if args.allow_screenshots:
         os.environ["ATLAS_AGENT_ALLOW_SCREENSHOTS"] = "1"
@@ -92,12 +109,16 @@ def main(argv: list[str] | None = None) -> int:
     # - If --prepare-llm-docs is set, force a refresh when missing.
     repo = find_repo_root()
     if repo:
-        out_dir = Path(args.llm_docs_dir) if args.llm_docs_dir else repo_schema_dir(repo)
+        out_dir = (
+            Path(args.llm_docs_dir) if args.llm_docs_dir else repo_schema_dir(repo)
+        )
         missing = missing_llm_docs(out_dir)
         if missing or args.prepare_llm_docs:
             if missing:
                 logging.info("Preparing LLM docs (missing: %s)", ", ".join(missing))
-            ensure_llm_docs(repo, atlas_dir=args.atlas_dir, out_dir=out_dir, force_schema_dump=False)
+            ensure_llm_docs(
+                repo, atlas_dir=args.atlas_dir, out_dir=out_dir, force_schema_dump=False
+            )
 
     return int(
         run_team_repl(
