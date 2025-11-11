@@ -1,16 +1,16 @@
-import os
 import argparse
-import sys
+import datetime
+import logging
+import os
 import shutil
 import subprocess
+import sys
 import xml.etree.ElementTree as eTree
-import datetime
 import zipfile
-import logging
 
+import build_ext_libs
 import common_dirs
 import linuxdeployqt
-import build_ext_libs
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -84,9 +84,19 @@ def build_atlas_package(is_debug_version: bool = False):
         repo_llm_dir = os.path.join(repo_root, 'src', 'atlas', 'Resources', 'json', 'atlas')
         os.makedirs(repo_llm_dir, exist_ok=True)
         # Generate missing docs using the agent CLI; use deploy .app as --atlas-dir
-        subprocess.run([sys.executable, '-m', 'python.atlas_agent.src.atlas_agent', '--prepare-llm-docs-only',
-                        '--atlas-dir', os.path.join(common_dirs.deploy_target_dir(), app_name)],
-                       cwd=repo_root, shell=False, check=False)
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "python.atlas_agent.src.atlas_agent",
+                "--prepare-llm-docs-only",
+                "--atlas-dir",
+                os.path.join(common_dirs.deploy_target_dir(), app_name),
+            ],
+            cwd=repo_root,
+            shell=False,
+            check=True,
+        )
         # Copy repo docs into the deployed app
         target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'Resources', 'json', 'atlas')
         os.makedirs(target_llm_dir, exist_ok=True)
@@ -108,9 +118,19 @@ def build_atlas_package(is_debug_version: bool = False):
             repo_root = common_dirs.atlas_repository_dir()
             repo_llm_dir = os.path.join(repo_root, 'src', 'atlas', 'Resources', 'json', 'atlas')
             os.makedirs(repo_llm_dir, exist_ok=True)
-            subprocess.run([sys.executable, '-m', 'python.atlas_agent.src.atlas_agent', '--prepare-llm-docs-only',
-                            '--atlas-dir', os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir')],
-                           cwd=repo_root, shell=False, check=False)
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "python.atlas_agent.src.atlas_agent",
+                    "--prepare-llm-docs-only",
+                    "--atlas-dir",
+                    os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir"),
+                ],
+                cwd=repo_root,
+                shell=False,
+                check=True,
+            )
             target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Resources', 'json', 'atlas')
             os.makedirs(target_llm_dir, exist_ok=True)
             shutil.copytree(repo_llm_dir, target_llm_dir, dirs_exist_ok=True)
@@ -156,9 +176,19 @@ def build_atlas_package(is_debug_version: bool = False):
             repo_root = common_dirs.atlas_repository_dir()
             repo_llm_dir = os.path.join(repo_root, 'src', 'atlas', 'Resources', 'json', 'atlas')
             os.makedirs(repo_llm_dir, exist_ok=True)
-            subprocess.run([sys.executable, '-m', 'python.atlas_agent.src.atlas_agent', '--prepare-llm-docs-only',
-                            '--atlas-dir', os.path.join(common_dirs.deploy_target_dir(), 'Atlas')],
-                           cwd=repo_root, shell=False, check=False)
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "python.atlas_agent.src.atlas_agent",
+                    "--prepare-llm-docs-only",
+                    "--atlas-dir",
+                    os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
+                ],
+                cwd=repo_root,
+                shell=False,
+                check=True,
+            )
             target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Resources', 'json', 'atlas')
             os.makedirs(target_llm_dir, exist_ok=True)
             shutil.copytree(repo_llm_dir, target_llm_dir, dirs_exist_ok=True)
@@ -326,7 +356,7 @@ if __name__ == "__main__":
     logger = setup_logger()
 
     parser = argparse.ArgumentParser(
-        epilog=f"""
+        epilog="""
 Examples:
 
 python deploy_atlas.py [--debug-version]
