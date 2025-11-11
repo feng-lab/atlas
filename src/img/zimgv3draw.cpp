@@ -85,7 +85,7 @@ void ZImgV3DRaw::readInfo(const QString& filename,
   infos[0].createDefaultDescriptions();
 
   LOG(INFO) << infos[0];
-  createDefaultSubBlocks(filename, infos, subBlocks);
+  createTiledSubBlocks(filename, infos, subBlocks);
 }
 
 void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata& /*meta*/, size_t scene)

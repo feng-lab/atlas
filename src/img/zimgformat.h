@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zimg.h"
+#include <span>
 
 // don't use ZImgFormat and derived class directly, use ZImgIO::instance() instead
 
@@ -100,9 +101,10 @@ protected:
                   const ZImgRegion& region,
                   size_t timeStride = 0);
 
+  // Canonical API: accept strides as a span (expects 5 elements in XYZCT order).
   ZImg readRawImg(const QString& filename,
                   const ZImgInfo& imgInfo,
-                  const std::vector<size_t>& dimensionStrides,
+                  std::span<const size_t> dimensionStrides,
                   size_t dataOffset,
                   const ZImgRegion& region);
 
@@ -112,6 +114,14 @@ protected:
 
   static void createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
                                    std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
+
+  // Create XY-tiled sub-blocks (e.g., 512x512) for every Z and T slice.
+  // Useful for formats that support efficient random-access region reads.
+  static void createTiledSubBlocks(const QString& filename,
+                                   const std::vector<ZImgInfo>& infos,
+                                   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                                   size_t tileWidth = 512,
+                                   size_t tileHeight = 512);
 };
 
 } // namespace nim

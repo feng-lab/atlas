@@ -4,6 +4,7 @@
 #include "zimgsliceprovider.h"
 #include "zimgblockprovider.h"
 #include "zlog.h"
+#include <algorithm>
 
 namespace nim {
 
@@ -182,7 +183,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
 
 ZImg ZImgFormat::readRawImg(const QString& filename,
                             const ZImgInfo& imgInfo,
-                            const std::vector<size_t>& dimensionStrides,
+                            std::span<const size_t> dimensionStrides,
                             size_t dataOffset,
                             const ZImgRegion& region)
 {
@@ -210,7 +211,8 @@ ZImg ZImgFormat::readRawImg(const QString& filename,
     dimensionOrder[uint(i)] = dimensionOrderIn[uint(idx)];
   }
   packedStrides[4] = dimensionStrides[4]; // time dimenstion does not need to be packed
-  bool packed = packedStrides == dimensionStrides;
+  bool packed =
+    std::equal(packedStrides.begin(), packedStrides.end(), dimensionStrides.begin(), dimensionStrides.end());
   // VLOG(1) << dimensionStrides << " " << dimensionOrder << " Packed: " << packed << " " << imgInfo;
   if (packed && (dimensionOrder == "XYZCT" || dimensionOrder == "XYCZT" || dimensionOrder == "CXYZT")) {
     res = readRawImg(filename, imgInfo, dimensionOrder, dataOffset, region, dimensionStrides[4]);
@@ -590,6 +592,38 @@ void ZImgFormat::createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
     return;
   }
   subBlocks->resize(infos.size());
+}
+
+void ZImgFormat::createTiledSubBlocks(const QString& filename,
+                                      const std::vector<ZImgInfo>& infos,
+                                      std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
+                                      size_t tileWidth,
+                                      size_t tileHeight)
+{
+  if (!subBlocks) {
+    return;
+  }
+  subBlocks->resize(infos.size());
+  for (size_t s = 0; s < infos.size(); ++s) {
+    const auto& inf = infos[s];
+    const size_t tw = std::max<size_t>(1, tileWidth);
+    const size_t th = std::max<size_t>(1, tileHeight);
+    for (size_t t = 0; t < inf.numTimes; ++t) {
+      for (size_t z = 0; z < inf.depth; ++z) {
+        for (size_t y = 0; y < inf.height; y += th) {
+          const size_t yEnd = std::min(inf.height, y + th);
+          for (size_t x = 0; x < inf.width; x += tw) {
+            const size_t xEnd = std::min(inf.width, x + tw);
+            (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(ZImgSource(
+              filename,
+              ZImgRegion(ZVoxelCoordinate(int(x), int(y), int(z), 0, int(t)),
+                         ZVoxelCoordinate(int(xEnd), int(yEnd), int(z + 1), int(inf.numChannels), int(t + 1))),
+              s)));
+          }
+        }
+      }
+    }
+  }
 }
 
 } // namespace nim

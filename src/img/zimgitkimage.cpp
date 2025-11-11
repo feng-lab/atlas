@@ -15,11 +15,475 @@
 #endif
 
 #include <QFile>
+#include <QFileInfo>
 #include <QStringList>
 #include <QDir>
 #include <boost/regex.hpp>
+#include <fstream>
+#include <cctype>
+#include <cstring>
+#include <sstream>
+#include <algorithm>
+#include <array>
 
 namespace nim {
+
+namespace {
+
+struct NrrdRawSpec
+{
+  QString dataFilePath;
+  uint64_t dataOffset{0};
+  bool needByteSwap{false};
+  uint32_t bytesPerVoxel{0};
+  uint32_t numComponents{1};
+  bool componentsFastest{true};
+  uint64_t width{0};
+  uint64_t height{0};
+  uint64_t depth{0};
+  uint64_t numTimes{1};
+};
+
+inline bool isLittleEndianHost()
+{
+  const uint16_t x = 1;
+  return *reinterpret_cast<const uint8_t*>(&x) == 1;
+}
+
+inline std::string toLowerString(std::string s)
+{
+  for (auto& ch : s) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  return s;
+}
+
+static bool
+parseNrrdHeaderForRaw(const QString& filename, const itk::ImageIOBase* imageIO, const ZImgInfo& info, NrrdRawSpec& out)
+{
+  if (!(info.bytesPerVoxel == 1 || info.bytesPerVoxel == 2 || info.bytesPerVoxel == 4 || info.bytesPerVoxel == 8)) {
+    return false;
+  }
+
+  std::ifstream in(QFile::encodeName(filename).constData(), std::ios::in | std::ios::binary);
+  if (!in) {
+    return false;
+  }
+
+  char magic[4];
+  in.read(magic, 4);
+  if (!in || std::strncmp(magic, "NRRD", 4) != 0) {
+    return false;
+  }
+  std::string line;
+  std::getline(in, line);
+
+  bool hasEncoding = false;
+  bool encodingIsRaw = false;
+  bool hasDataFile = false;
+  QString dataFilePath;
+  int64_t byteSkip = 0;
+  bool hasByteSkip = false;
+  bool sawKinds = false;
+  bool componentsFastest = false;
+
+  std::streampos dataStartPos = std::streampos(0);
+  while (std::getline(in, line)) {
+    if (line.empty()) {
+      dataStartPos = in.tellg();
+      break;
+    }
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+    }
+    if (!line.empty() && line[0] == '#') {
+      continue;
+    }
+    auto colonPos = line.find(':');
+    if (colonPos == std::string::npos) {
+      continue;
+    }
+    std::string key = line.substr(0, colonPos);
+    std::string value = line.substr(colonPos + 1);
+    size_t i = 0;
+    while (i < value.size() && std::isspace(static_cast<unsigned char>(value[i]))) {
+      ++i;
+    }
+    value.erase(0, i);
+    key = toLowerString(key);
+
+    if (key == "encoding") {
+      hasEncoding = true;
+      auto v = toLowerString(value);
+      encodingIsRaw = (v.find("raw") != std::string::npos);
+    } else if (key == "data file") {
+      hasDataFile = true;
+      auto v = toLowerString(value);
+      if (v.find("list") != std::string::npos) {
+        return false;
+      }
+      if (!value.empty() && (value.front() == '"' || value.front() == '\'')) {
+        value.erase(0, 1);
+      }
+      if (!value.empty() && (value.back() == '"' || value.back() == '\'')) {
+        value.pop_back();
+      }
+      dataFilePath = QString::fromStdString(value);
+    } else if (key == "byte skip") {
+      try {
+        long long v = std::stoll(value);
+        byteSkip = v;
+        hasByteSkip = true;
+      }
+      catch (...) {
+        return false;
+      }
+    } else if (key == "kinds") {
+      sawKinds = true;
+      std::vector<std::string> tokens;
+      std::string cur;
+      std::istringstream iss(value);
+      while (iss >> cur) {
+        // tokens like RGB-color, RGBA-color, vector, complex, domain, time, space
+        tokens.push_back(toLowerString(cur));
+      }
+      if (!tokens.empty()) {
+        const std::string& t0 = tokens[0];
+        auto isRange = [](const std::string& t) {
+          return t.find("vector") != std::string::npos || t.find("color") != std::string::npos ||
+                 t.find("complex") != std::string::npos || t.find("matrix") != std::string::npos ||
+                 t.find("tensor") != std::string::npos;
+        };
+        componentsFastest = isRange(t0);
+      }
+    }
+  }
+
+  if (!hasEncoding || !encodingIsRaw) {
+    return false;
+  }
+
+  if (hasDataFile) {
+    QDir dir = QFileInfo(filename).dir();
+    QString df = QDir::cleanPath(dir.filePath(dataFilePath));
+    out.dataFilePath = df;
+    if (!QFile::exists(out.dataFilePath)) {
+      return false;
+    }
+    if (hasByteSkip && byteSkip < 0) {
+      return false;
+    }
+    out.dataOffset = static_cast<uint64_t>(std::max<int64_t>(0, byteSkip));
+  } else {
+    if (dataStartPos <= 0) {
+      return false;
+    }
+    out.dataFilePath = filename;
+    uint64_t extraSkip = 0;
+    if (hasByteSkip) {
+      if (byteSkip == -1) {
+        extraSkip = 0;
+      } else if (byteSkip >= 0) {
+        extraSkip = static_cast<uint64_t>(byteSkip);
+      } else {
+        return false;
+      }
+    }
+    out.dataOffset = static_cast<uint64_t>(dataStartPos) + extraSkip;
+  }
+
+  out.width = info.width;
+  out.height = info.height;
+  out.depth = info.depth;
+  out.numTimes = info.numTimes;
+  out.bytesPerVoxel = static_cast<uint32_t>(info.bytesPerVoxel);
+  out.numComponents = static_cast<uint32_t>(info.numChannels);
+
+  if (out.numComponents > 1) {
+    if (sawKinds) {
+      if (!componentsFastest) {
+        return false; // only support C as fastest axis for now
+      }
+    } else {
+      // Without 'kinds', we cannot reliably infer axis order; be conservative
+      return false;
+    }
+    out.componentsFastest = true;
+  }
+
+  bool hostLittle = isLittleEndianHost();
+  bool fileLittle = true;
+  switch (imageIO->GetByteOrder()) {
+    case itk::IOByteOrderEnum::LittleEndian:
+      fileLittle = true;
+      break;
+    case itk::IOByteOrderEnum::BigEndian:
+      fileLittle = false;
+      break;
+    case itk::IOByteOrderEnum::OrderNotApplicable:
+    default:
+      fileLittle = hostLittle;
+      break;
+  }
+  out.needByteSwap = (out.bytesPerVoxel > 1) && (hostLittle != fileLittle);
+
+  return true;
+}
+
+// Parse sizes and kinds to compute file-dimension byte strides for X,Y,Z,C,T in file layout.
+// Returns true if a consistent mapping is found. This enables handling of common axis orders
+// beyond just C-fastest (e.g., XYCZT, XYZCT). We match spatial axes by size against
+// width/height/depth from info; for channels/time, we use kinds or unique size matches.
+static bool
+computeNrrdDimensionStrides(const QString& filename, const ZImgInfo& info, std::array<size_t, 5>& dimStrides)
+{
+  std::ifstream in(QFile::encodeName(filename).constData(), std::ios::in | std::ios::binary);
+  if (!in) {
+    return false;
+  }
+  // Skip magic and first line
+  char magic[4];
+  in.read(magic, 4);
+  if (!in || std::strncmp(magic, "NRRD", 4) != 0) {
+    return false;
+  }
+  std::string line;
+  std::getline(in, line);
+
+  std::vector<uint64_t> sizes;
+  std::vector<std::string> kinds;
+
+  while (std::getline(in, line)) {
+    if (line.empty()) {
+      break;
+    }
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+    }
+    if (!line.empty() && line[0] == '#') {
+      continue;
+    }
+    auto colonPos = line.find(':');
+    if (colonPos == std::string::npos) {
+      continue;
+    }
+    std::string key = toLowerString(line.substr(0, colonPos));
+    std::string value = line.substr(colonPos + 1);
+    size_t i = 0;
+    while (i < value.size() && std::isspace(static_cast<unsigned char>(value[i]))) {
+      ++i;
+    }
+    value.erase(0, i);
+    if (key == "sizes") {
+      sizes.clear();
+      std::istringstream iss(value);
+      uint64_t v{};
+      while (iss >> v) {
+        sizes.push_back(v);
+      }
+    } else if (key == "kinds") {
+      kinds.clear();
+      std::istringstream iss(value);
+      std::string tok;
+      while (iss >> tok) {
+        kinds.push_back(toLowerString(tok));
+      }
+    }
+  }
+
+  if (sizes.empty()) {
+    return false;
+  }
+  const size_t nd = sizes.size();
+  if (!kinds.empty() && kinds.size() != nd) {
+    // inconsistent header
+    return false;
+  }
+
+  auto isRange = [](const std::string& t) {
+    return t.find("vector") != std::string::npos || t.find("color") != std::string::npos ||
+           t.find("complex") != std::string::npos || t.find("matrix") != std::string::npos ||
+           t.find("tensor") != std::string::npos;
+  };
+
+  int idxC = -1;
+  int idxT = -1;
+  std::vector<int> spatIdx;
+  spatIdx.reserve(3);
+
+  if (!kinds.empty()) {
+    for (size_t iAxis = 0; iAxis < nd; ++iAxis) {
+      const auto& k = kinds[iAxis];
+      if (k.find("time") != std::string::npos) {
+        idxT = static_cast<int>(iAxis);
+      } else if (isRange(k)) {
+        idxC = static_cast<int>(iAxis);
+      } else {
+        // treat others as spatial/domain axes
+        spatIdx.push_back(static_cast<int>(iAxis));
+      }
+    }
+  }
+
+  // Deduce missing axes by size uniqueness when safe.
+  if (idxC < 0 && info.numChannels > 1) {
+    int found = -1;
+    for (size_t iAxis = 0; iAxis < nd; ++iAxis) {
+      if (sizes[iAxis] == info.numChannels) {
+        if (found >= 0) {
+          found = -2; // ambiguous
+          break;
+        }
+        found = static_cast<int>(iAxis);
+      }
+    }
+    if (found >= 0) {
+      idxC = found;
+    } else if (found == -2) {
+      return false; // ambiguous
+    }
+  }
+  if (idxT < 0 && info.numTimes > 1) {
+    int found = -1;
+    for (size_t iAxis = 0; iAxis < nd; ++iAxis) {
+      if (sizes[iAxis] == info.numTimes) {
+        if (found >= 0) {
+          found = -2;
+          break;
+        }
+        found = static_cast<int>(iAxis);
+      }
+    }
+    if (found >= 0) {
+      idxT = found;
+    } else if (found == -2) {
+      return false;
+    }
+  }
+
+  // Build spatial axis candidates (exclude C/T)
+  std::vector<int> spatialAxes;
+  for (size_t iAxis = 0; iAxis < nd; ++iAxis) {
+    if (static_cast<int>(iAxis) == idxC || static_cast<int>(iAxis) == idxT) {
+      continue;
+    }
+    spatialAxes.push_back(static_cast<int>(iAxis));
+  }
+  // Map to X,Y,Z by matching sizes. Require exact match and uniqueness.
+  auto pickAxisBySize = [&](uint64_t target) -> int {
+    int chosen = -1;
+    for (int ax : spatialAxes) {
+      if (sizes[ax] == target) {
+        if (chosen != -1) {
+          return -2; // ambiguous
+        }
+        chosen = ax;
+      }
+    }
+    // Remove chosen
+    if (chosen >= 0) {
+      spatialAxes.erase(std::remove(spatialAxes.begin(), spatialAxes.end(), chosen), spatialAxes.end());
+    }
+    return chosen;
+  };
+
+  int idxX = pickAxisBySize(info.width);
+  if (idxX < 0) {
+    return false;
+  }
+  int idxY = pickAxisBySize(info.height);
+  if (idxY < 0) {
+    return false;
+  }
+  int idxZ = -1;
+  if (info.depth > 1) {
+    idxZ = pickAxisBySize(info.depth);
+    if (idxZ < 0) {
+      return false;
+    }
+  } else {
+    // if depth == 1, allow absence of Z axis (2D image)
+    // pick remaining spatial if any size==1 as Z
+    for (int ax : spatialAxes) {
+      if (sizes[ax] == 1) {
+        idxZ = ax;
+        break;
+      }
+    }
+    if (idxZ < 0) {
+      // Keep a placeholder index even if not present; strides won't be used when depth==1.
+      idxZ = 0;
+    }
+  }
+
+  // Compute per-axis byte strides in file order
+  std::vector<size_t> fileStride(nd, 0);
+  size_t stride = static_cast<size_t>(info.bytesPerVoxel);
+  for (size_t iAxis = 0; iAxis < nd; ++iAxis) {
+    fileStride[iAxis] = stride;
+    stride *= static_cast<size_t>(sizes[iAxis]);
+  }
+
+  // Map to XYZCT
+  dimStrides[0] = fileStride[idxX];
+  dimStrides[1] = fileStride[idxY];
+  // For 2D images (depth == 1), assign the packed plane stride even if no explicit Z axis exists
+  dimStrides[2] = (info.depth > 1) ? fileStride[idxZ] : static_cast<size_t>(info.planeByteNumber());
+  // Channel stride: if no explicit component axis, use per-channel byte size (full volume)
+  dimStrides[3] = (idxC >= 0) ? fileStride[idxC] : static_cast<size_t>(info.channelByteNumber());
+  // Time stride: if absent, use bytes per time frame (full volume × channels)
+  dimStrides[4] = (idxT >= 0) ? fileStride[idxT] : static_cast<size_t>(info.timeByteNumber());
+
+  return true;
+}
+
+inline void bswapInPlace(void* data, size_t elemCount, size_t elemSize)
+{
+  auto* p = static_cast<uint8_t*>(data);
+  switch (elemSize) {
+    case 2:
+      for (size_t i = 0; i < elemCount; ++i) {
+        std::swap(p[0], p[1]);
+        p += 2;
+      }
+      break;
+    case 4:
+      for (size_t i = 0; i < elemCount; ++i) {
+        std::swap(p[0], p[3]);
+        std::swap(p[1], p[2]);
+        p += 4;
+      }
+      break;
+    case 8:
+      for (size_t i = 0; i < elemCount; ++i) {
+        std::swap(p[0], p[7]);
+        std::swap(p[1], p[6]);
+        std::swap(p[2], p[5]);
+        std::swap(p[3], p[4]);
+        p += 8;
+      }
+      break;
+    default:
+      break; // 1-byte or unsupported sizes: no-op
+  }
+}
+
+inline void byteSwapZImgInPlace(ZImg& img)
+{
+  const size_t elemSize = img.voxelByteNumber();
+  if (elemSize <= 1) {
+    return;
+  }
+  for (size_t t = 0; t < img.numTimes(); ++t) {
+    for (size_t c = 0; c < img.numChannels(); ++c) {
+      uint8_t* buf = img.channelData<uint8_t>(c, t);
+      const size_t elemCount = img.channelVoxelNumber();
+      bswapInPlace(buf, elemCount, elemSize);
+    }
+  }
+}
+
+} // namespace
 
 ZImgITKImage::ZImgITKImage()
 {
@@ -102,7 +566,19 @@ void ZImgITKImage::readInfo(const QString& filename,
     parseInfo(imageIO.GetPointer(), infos[0], isNd2);
 
     if (isNrrd) {
-      createEmptySubBlocks(infos, subBlocks);
+      // If this NRRD supports efficient raw region reads, advertise tiled subblocks
+      NrrdRawSpec spec;
+      if (parseNrrdHeaderForRaw(filename, imageIO.GetPointer(), infos[0], spec)) {
+        std::array<size_t, 5> dimStrides{};
+        if (computeNrrdDimensionStrides(filename, infos[0], dimStrides)) {
+          createTiledSubBlocks(filename, infos, subBlocks);
+        } else {
+          createEmptySubBlocks(infos, subBlocks);
+        }
+      } else {
+        // fall back: avoid per-slice tiles that would trigger repeated full-file reads
+        createEmptySubBlocks(infos, subBlocks);
+      }
     } else {
       createDefaultSubBlocks(filename, infos, subBlocks);
     }
@@ -227,77 +703,100 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
           img.pasteImg(tmpScImg.createView(bestChannel, -1), ZVoxelCoordinate(0, 0, 0, ch, 0));
         }
       }
-    } else if (region.containsWholeImg(imgInfo) || isNrrd) {
-      img = ZImg(imgInfo);
-      itk::ImageIORegion ioRegion(4);
-      ioRegion.SetIndex(0, 0);
-      ioRegion.SetIndex(1, 0);
-      ioRegion.SetIndex(2, 0);
-      ioRegion.SetIndex(3, 0);
-      ioRegion.SetSize(0, img.width());
-      ioRegion.SetSize(1, img.height());
-      ioRegion.SetSize(2, img.depth());
-      ioRegion.SetSize(3, img.numTimes());
-      imageIO->SetIORegion(ioRegion);
-      if (imgInfo.numTimes > 1) {
-        auto buf = std::make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
-        imageIO->Read(buf.get());
-        fixDimensionOrder(buf.get(), "CXYZT", img);
-      } else {
-        imageIO->Read(img.channelData(0));
-        if (imgInfo.numChannels > 1) {
-          ZImg tpImg(imgInfo);
-          CXYZtoXYZC(img, tpImg);
-          img.swap(tpImg);
-        }
-      }
-
-      if (isNrrd && !region.containsWholeImg(imgInfo)) {
-        img = img.crop(region);
-      }
     } else {
+      const bool wantsWhole = region.containsWholeImg(imgInfo);
+      // Attempt NRRD fast-path only for partial requests
       ZImgRegion rgn = region;
       rgn.resolveRegionEnd(imgInfo);
-
-      bool clipChannel = rgn.start.c != 0 || rgn.end.c != int(imgInfo.numChannels);
-      if (clipChannel) {
-        rgn.start.c = 0;
-        rgn.end.c = imgInfo.numChannels;
-      }
-
-      ZImgInfo clipInfo = rgn.clip(imgInfo);
-      ZImg tmpImg(clipInfo);
-
-      itk::ImageIORegion ioRegion(4);
-      ioRegion.SetIndex(0, rgn.start.x);
-      ioRegion.SetIndex(1, rgn.start.y);
-      ioRegion.SetIndex(2, rgn.start.z);
-      ioRegion.SetIndex(3, rgn.start.t);
-      ioRegion.SetSize(0, rgn.end.x - rgn.start.x);
-      ioRegion.SetSize(1, rgn.end.y - rgn.start.y);
-      ioRegion.SetSize(2, rgn.end.z - rgn.start.z);
-      ioRegion.SetSize(3, rgn.end.t - rgn.start.t);
-      imageIO->SetIORegion(ioRegion);
-      if (clipInfo.numTimes > 1) {
-        auto buf = std::make_unique_for_overwrite<uint8_t[]>(tmpImg.byteNumber());
-        imageIO->Read(buf.get());
-        fixDimensionOrder(buf.get(), "CXYZT", tmpImg);
-      } else {
-        imageIO->Read(tmpImg.channelData(0));
-        if (clipInfo.numChannels > 1) {
-          ZImg tpImg(clipInfo);
-          CXYZtoXYZC(tmpImg, tpImg);
-          tmpImg.swap(tpImg);
+      bool triedFastPath = false;
+      if (isNrrd && !wantsWhole) {
+        NrrdRawSpec spec;
+        if (parseNrrdHeaderForRaw(filename, imageIO.GetPointer(), imgInfo, spec)) {
+          std::array<size_t, 5> dimStrides{};
+          if (computeNrrdDimensionStrides(filename, imgInfo, dimStrides)) {
+            img = readRawImg(spec.dataFilePath, imgInfo, dimStrides, static_cast<size_t>(spec.dataOffset), rgn);
+            if (spec.needByteSwap) {
+              byteSwapZImgInPlace(img);
+            }
+            triedFastPath = true;
+          }
         }
       }
 
-      if (clipChannel) {
-        ZImgRegion crgn;
-        crgn.start.c = region.start.c;
-        crgn.end.c = region.end.c;
-        img = tmpImg.crop(crgn);
+      if (triedFastPath) {
+        // Done
+      } else if (wantsWhole || isNrrd) {
+        // Full read then optional crop (for NRRD partial when fast-path unavailable)
+        img = ZImg(imgInfo);
+        itk::ImageIORegion ioRegion(4);
+        ioRegion.SetIndex(0, 0);
+        ioRegion.SetIndex(1, 0);
+        ioRegion.SetIndex(2, 0);
+        ioRegion.SetIndex(3, 0);
+        ioRegion.SetSize(0, img.width());
+        ioRegion.SetSize(1, img.height());
+        ioRegion.SetSize(2, img.depth());
+        ioRegion.SetSize(3, img.numTimes());
+        imageIO->SetIORegion(ioRegion);
+        if (imgInfo.numTimes > 1) {
+          auto buf = std::make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
+          imageIO->Read(buf.get());
+          fixDimensionOrder(buf.get(), "CXYZT", img);
+        } else {
+          imageIO->Read(img.channelData(0));
+          if (imgInfo.numChannels > 1) {
+            ZImg tpImg(imgInfo);
+            CXYZtoXYZC(img, tpImg);
+            img.swap(tpImg);
+          }
+        }
+        if (!wantsWhole && isNrrd) {
+          img = img.crop(region);
+        }
       } else {
-        img.swap(tmpImg);
+        rgn = region;
+        rgn.resolveRegionEnd(imgInfo);
+
+        bool clipChannel = rgn.start.c != 0 || rgn.end.c != int(imgInfo.numChannels);
+        if (clipChannel) {
+          rgn.start.c = 0;
+          rgn.end.c = imgInfo.numChannels;
+        }
+
+        ZImgInfo clipInfo = rgn.clip(imgInfo);
+        ZImg tmpImg(clipInfo);
+
+        itk::ImageIORegion ioRegion(4);
+        ioRegion.SetIndex(0, rgn.start.x);
+        ioRegion.SetIndex(1, rgn.start.y);
+        ioRegion.SetIndex(2, rgn.start.z);
+        ioRegion.SetIndex(3, rgn.start.t);
+        ioRegion.SetSize(0, rgn.end.x - rgn.start.x);
+        ioRegion.SetSize(1, rgn.end.y - rgn.start.y);
+        ioRegion.SetSize(2, rgn.end.z - rgn.start.z);
+        ioRegion.SetSize(3, rgn.end.t - rgn.start.t);
+        imageIO->SetIORegion(ioRegion);
+        if (clipInfo.numTimes > 1) {
+          auto buf = std::make_unique_for_overwrite<uint8_t[]>(tmpImg.byteNumber());
+          imageIO->Read(buf.get());
+          fixDimensionOrder(buf.get(), "CXYZT", tmpImg);
+        } else {
+          imageIO->Read(tmpImg.channelData(0));
+          if (clipInfo.numChannels > 1) {
+            ZImg tpImg(clipInfo);
+            CXYZtoXYZC(tmpImg, tpImg);
+            tmpImg.swap(tpImg);
+          }
+        }
+
+        if (clipChannel) {
+          ZImgRegion crgn;
+          crgn.start.c = region.start.c;
+          crgn.end.c = region.end.c;
+          img = tmpImg.crop(crgn);
+        } else {
+          img.swap(tmpImg);
+        }
       }
     }
 
