@@ -7,6 +7,7 @@ Atlas User Manual
 <p align="center">
   <img src="./images/version.png" alt="label_region" width="200">
 </p>
+
 ## Table of Contents
 - [1. Introduction](#1-introduction)
   - [1.1 What Atlas Does](#11-what-atlas-does)
