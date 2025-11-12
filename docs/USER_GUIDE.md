@@ -1,8 +1,12 @@
 Atlas User Manual
 =================
+<!-- 这是一段被注释掉的文字 -->
 
-> 📸 **Screenshot to add:** Application splash or title screen that introduces Atlas. Include version number in the window title.
+<!-- > 📸 **Screenshot to add:** Application splash or title screen that introduces Atlas. Include version number in the window title.-->
 
+<p align="center">
+  <img src="./images/version.png" alt="label_region" width="200">
+</p>
 ## Table of Contents
 - [1. Introduction](#1-introduction)
   - [1.1 What Atlas Does](#11-what-atlas-does)
@@ -114,7 +118,7 @@ Atlas organizes data into documents. Each document type contributes load actions
 | `Z2DAnimationDoc` | `.animation2d` | Timeline for 2D view parameters. |
 | `Z3DAnimationDoc` | `.animation3d` | Timeline for 3D parameters and camera paths. |
 
-> 📸 **Screenshot to add:** A collage showing different supported object types loaded into the Objects Manager.
+<!-- > 📸 **Screenshot to add:** A collage showing different supported object types loaded into the Objects Manager.-->
 <p align="center">
   <img src="./images/zuhe.png" alt="label_region" width="800">
 </p>
@@ -159,15 +163,17 @@ Atlas keeps runtime files in a few key locations:
 - **Scene files** (`*.scene`): stored wherever you save them; contain serialized document state and view settings.
 - **Animation files** (`*.animation3d`, `*.animation2d`): saved alongside your data or in project folders.
 
-> 📸 **Screenshot to add:** Finder/Explorer window showing config and log directories after first launch.
-
+<!-- > 📸 **Screenshot to add:** Finder/Explorer window showing config and log directories after first launch. -->
+<p align="center">
+  <img src="./images/logfolder.png" alt="label_region" width="300">
+</p>
 ---
 
 ## 3. Guided Tour of the Interface
 
 ### 3.1 2D Main Window at a Glance
 
-> 📸 **Screenshot to add:** The main window with each labeled region (Menus, Toolbars, Objects Manager, 2D View, Docks).
+<!-- > 📸 **Screenshot to add:** The main window with each labeled region (Menus, Toolbars, Objects Manager, 2D View, Docks). -->
 <p align="center">
   <img src="./images/labeled_region.png" alt="label_region" width="800">
 </p>
@@ -253,7 +259,7 @@ Dock widgets provide specialized interfaces. You can anchor them to any side, ta
 - **Help** – static reminder of navigation shortcuts; can float for quick reference.
 - **Edit and Output** (`ZObjEditWidget`) – hosts a tab per active editor (ROI editor, animation timeline, puncta detection). Also contains a persistent “Log Output” tab for system logs.
 
-> 📸 **Screenshot to add:** Objects Manager context menu showing Show/Hide, Lock/Unlock, Save, Save As, Make Alias.
+<!-- > 📸 **Screenshot to add:** Objects Manager context menu showing Show/Hide, Lock/Unlock, Save, Save As, Make Alias.-->
 <p align="center">
   <img src="./images/Objects_Manager _context_menu.png" alt="Objects_Manager _context_menu" width="200">
 </p>
@@ -303,7 +309,7 @@ Steps to load and manage images via `ZImgDoc`:
    - **Align Sections...** – align serial sections.
    - **Correct Chromatic Shift...** – adjust channel misalignment.
 
-> 📸 **Screenshot to add:** Object View Setting dock for an image showing channel controls.
+<!-- > 📸 **Screenshot to add:** Object View Setting dock for an image showing channel controls.-->
 <p align="center">
   <img src="./images/channel_control.png" alt="channel_control" width="400">
 </p>
@@ -496,7 +502,7 @@ Steps to load and manage images via `ZImgDoc`:
 2. **Cancel Rendering** – stop the current job without exiting the application.
 3. Check logs for “waiting for 3D scene apply to finish” messages when using blocking options.
 
-> 📸 **Screenshot to add:** 3D window with Progress toolbar visible during a render.
+<!-- > 📸 **Screenshot to add:** 3D window with Progress toolbar visible during a render.-->
 <p align="center">
   <img src="./images/Progress_toolbar.png" alt="Progress_toolbar" width="800">
 </p>
@@ -547,7 +553,7 @@ Steps to load and manage images via `ZImgDoc`:
 5. Click **Capture**.
 6. 2D captures emit the signal `take2DScreenShot` or `takeFixedSize2DScreenShot`, writing PNG images.
 
-> 📸 **Screenshot to add:** 2D Capture dock with annotations of important controls.
+<!-- > 📸 **Screenshot to add:** 2D Capture dock with annotations of important controls.-->
 <p align="center">
   <img src="./images/2DCapture.png" alt="2DCapture" width="400">
 </p>
@@ -828,4 +834,7 @@ Always consult log output for unsupported file types; Atlas reports when a docum
 
 ---
 
-> 📸 **Screenshot to add:** Closing image showing a completed workspace with 2D and 3D windows side-by-side, annotated with key features referenced in this manual.
+<!-- > 📸 **Screenshot to add:** Closing image showing a completed workspace with 2D and 3D windows side-by-side, annotated with key features referenced in this manual.-->
+<p align="center">
+  <img src="./images/workspace.png" alt="workspace" width="800">
+</p>
