@@ -134,7 +134,7 @@ def _dump_schema_with_atlas(atlas_dir: Path, out_dir: Path) -> None:
         "--dump_output_dir",
         str(out_dir),
     ]
-    if platform.system() in {"Windows", "Linux"}:
+    if platform.system() in {"Linux"}:
         args += ["-platform", "offscreen"]
     try:
         subprocess.run(args, check=False)
