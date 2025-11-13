@@ -1,7 +1,7 @@
 """Python package for the zimg bindings.
 
 This module exposes the compiled extension `_imgpy` built by the repository’s
-pybind11 project (src/python/imgpy.cpp).
+nanobind project (src/python/imgpy.cpp).
 """
 
 try:

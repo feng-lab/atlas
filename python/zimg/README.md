@@ -1,11 +1,11 @@
 zimg (Python bindings)
 
 This package builds and installs the `zimg` Python module backed by the repo’s
-pybind11 extension under `src/python`.
+nanobind extension under `src/python`.
 
 Requirements
 - A working C++ toolchain and dependencies used by the main Atlas build
-- CMake >= 3.24, Ninja, pybind11 headers
+- CMake >= 3.24, Ninja
 
 Build
 - `pip install .` from this directory, or `pip wheel .`

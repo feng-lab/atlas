@@ -28,12 +28,17 @@ def use_clang_in_linux() -> bool:
     return is_linux()
 
 
+def _clang_major_env() -> str:
+    # Allow CI to control clang version; default to 18 for backward compat
+    return os.environ.get('ATLAS_CLANG_MAJOR') or os.environ.get('LLVM_VERSION') or '18'
+
+
 def get_clang_in_linux() -> str:
-    return 'clang-18'
+    return f'clang-{_clang_major_env()}'
 
 
 def get_clangplus_in_linux() -> str:
-    return 'clang++-18'
+    return f'clang++-{_clang_major_env()}'
 
 
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):

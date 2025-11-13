@@ -10,120 +10,166 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, Linux, X64]   #  ubuntu-20.04
+    runs-on: ubuntu-22.04
+    env:
+      # Pin a Vulkan SDK version that is known-good
+      VULKAN_SDK_VERSION: 1.4.328.1
+      # Choose LLVM/Clang major version; mirrored in build scripts via ATLAS_CLANG_MAJOR
+      CLANG_MAJOR: "19"
+      # Bump to invalidate 3rdparty/extlibs cache keys
+      CACHE_VERSION: v1
+      # Centralize Qt version to make upgrades easy
+      QT_VERSION: "6.9.2"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 1
-          submodules: 'recursive'
+          submodules: recursive
 
-      - name: check envs and install packages
+      - name: Install base packages
         shell: bash -l {0}
         run: |
-          sudo apt -y update
-          sudo apt -y install curl nasm libgl1-mesa-dev libxkbcommon-x11-0 libxrender-dev p7zip-full zip unzip rsync libfreetype-dev libfontconfig-dev
+          sudo apt-get -y update
+          sudo apt-get -y install \
+            curl ca-certificates gnupg lsb-release software-properties-common \
+            build-essential git zip unzip rsync p7zip-full \
+            libgl1-mesa-dev libxkbcommon-x11-0 libxrender-dev \
+            libfreetype6-dev libfontconfig1-dev nasm
           g++ --version
-          env
-          cd ~
-          du -h --max-depth=1 . | sort -h
           df -h
 
-      - name: Cleanup disk
-        uses: curoky/cleanup-disk-action@v2.0
-
-      - name: check envs
+      - name: Install LLVM clang
         shell: bash -l {0}
         run: |
-          df -h
+          curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh ${CLANG_MAJOR}
+          sudo apt-get -y install clang-${CLANG_MAJOR} lld-${CLANG_MAJOR}
+          clang-${CLANG_MAJOR} --version
 
-      - uses: conda-incubator/setup-miniconda@v2
+      - name: Install Intel oneAPI MKL/TBB (apt)
+        shell: bash -l {0}
+        run: |
+          sudo mkdir -p /usr/share/keyrings
+          curl -fsSL https://apt.repos.intel.com/keys/intel-gpg-keys.gpg | \
+            sudo gpg --dearmor -o /usr/share/keyrings/oneapi-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | \
+            sudo tee /etc/apt/sources.list.d/oneAPI.list
+          sudo apt-get update
+          sudo apt-get -y install intel-oneapi-mkl-devel intel-oneapi-tbb-devel
+          ls -la /opt/intel/oneapi || true
+
+      - name: Install Vulkan SDK (LunarG)
+        shell: bash -l {0}
+        run: |
+          mkdir -p "$HOME/VulkanSDK"
+          cd "$HOME/VulkanSDK"
+          if [ -d "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" ]; then echo "Vulkan SDK cached"; else \
+            SDK_TAR="vulkansdk-linux-x86_64-${VULKAN_SDK_VERSION}.tar.xz"; \
+            curl -fL "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/linux/${SDK_TAR}?Human=true" -o "${SDK_TAR}"; \
+            tar -xJf "${SDK_TAR}"; \
+            rm -f "${SDK_TAR}"; \
+          fi
+          ls -la "$HOME/VulkanSDK"
+
+      - name: Cache Vulkan SDK (installed)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
+          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: 3.8
+          python-version: "3.12"
+          activate-environment: atlas-ci
           miniconda-version: "latest"
-          activate-environment: test
 
-      - name: install conda packages
+      - name: Show Python version
+        shell: bash -l {0}
+        run: |
+          python -V
+          which python
+          pip --version
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.12
+
+      - name: Cache conda pkgs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CONDA }}/pkgs
+            ~/.conda/pkgs
+          key: ${{ runner.os }}-condapkgs-3.12
+
+      - name: Install conda tooling
         shell: bash -l {0}
         run: |
           conda info
           conda update --all -y
-          conda install tbb-devel mkl-devel qt numpy python anaconda-client conda-build conda-verify
-          conda list
+          conda install -y anaconda-client conda-build pip
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir aqtinstall requests packaging
           conda clean --all -y
 
-      - name: download Qt
+      - name: Install Qt 6 (aqt)
         shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
         run: |
-          conda info
-          cd ~
-          pwd
-          curl -L -O $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-Qt-2021-01-18.zip
-          unzip -q dep-Qt-2021-01-18.zip
-          rm dep-Qt-2021-01-18.zip
+          # Match readme.md recommendation for Linux
+          mkdir -p "$HOME/Qt"
+          if [ -d "$HOME/Qt/${QT_VERSION}/gcc_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" linux desktop ${QT_VERSION} linux_gcc_64; fi
+          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" linux desktop tools_ifw qt.tools.ifw.47; fi
+          ls -la "$HOME/Qt" || true
 
-      - name: download intel
-        shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-        run: |
-          conda info
-          cd ~
-          pwd
-          curl -L -O $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-intel-2021-01-18.zip
-          unzip -q dep-intel-2021-01-18.zip
-          rm dep-intel-2021-01-18.zip
+      - name: Cache Qt (installed)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Qt/${{ env.QT_VERSION }}
+            ~/Qt/Tools/QtInstallerFramework
+          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
 
-      - name: check if build cache exists
-        shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-        id: build-cache-exists
-        run: |
-          if ( curl -o/dev/null -sfI $CI_DOWNLOAD_SERVER/cache/build-cache-${{ runner.os }}.zip ); then
-            echo "::set-output name=cache-hit::true"
-          else
-            echo "::set-output name=cache-hit::false"
-          fi
-
-      - name: download build cache
-        if: steps.build-cache-exists.outputs.cache-hit == 'true'
-        shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-        run: |
-          cd $GITHUB_WORKSPACE/src/3rdparty
-          curl -L -O $CI_DOWNLOAD_SERVER/cache/build-cache-${{ runner.os }}.zip
-          unzip -q build-cache-${{ runner.os }}.zip
-          rm build-cache-${{ runner.os }}.zip
-
-      - name: download deps
-        if: steps.build-cache-exists.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-        run: |
-          conda info
-          cd ~
-          pwd
-          curl -L -O $CI_DOWNLOAD_SERVER/common/atlas-deps-2021-01-21.zip
-          unzip -q atlas-deps-2021-01-21.zip
-          rm atlas-deps-2021-01-21.zip
-
-      - name: build deps
-        if: steps.build-cache-exists.outputs.cache-hit != 'true'
+      - name: Build external deps
         shell: bash -l {0}
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+          ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
-          conda info
-          cd $GITHUB_WORKSPACE
-          pwd
+          cd "$GITHUB_WORKSPACE"
           python util/build_ext_libs.py all
 
-      - name: setup ssh key
+      - name: Cache 3rdparty build and downloaded deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+            src/3rdparty/build
+          key: ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-${{ hashFiles('util/build_ext_libs.py','src/cmake/LibsForImg.cmake') }}
+          restore-keys: |
+            ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
+
+      - name: Build Atlas
+        shell: bash -l {0}
+        env:
+          ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/build_atlas.py
+
+      - name: Package and smoke test
+        shell: bash -l {0}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/deploy_atlas.py
+
+      - name: Setup SSH key
         shell: bash -l {0}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -131,52 +177,10 @@ jobs:
         run: |
           mkdir -p ~/.ssh/
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
-          sudo chmod 600 ~/.ssh/private.key
+          chmod 600 ~/.ssh/private.key
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      - name: upload build cache
-        if: steps.build-cache-exists.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        env:
-          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
-        run: |
-          cd $GITHUB_WORKSPACE/src/3rdparty
-          zip --quiet --recurse-paths --symlinks build-cache-${{ runner.os }}.zip build
-          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $CI_CACHE_PATH/build-cache-${{ runner.os }}.zip"
-          scp -P $SSH_PORT -i ~/.ssh/private.key build-cache-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$CI_CACHE_PATH/
-
-      - name: build
-        shell: bash -l {0}
-        run: |
-          conda info
-          cd $GITHUB_WORKSPACE
-          pwd
-          python util/build_atlas.py
-
-      - name: download test data
-        shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-        run: |
-          conda info
-          cd ~
-          pwd
-          curl -L -O $CI_DOWNLOAD_SERVER/common/atlas-test-data-2021-01-18.zip
-          unzip -q atlas-test-data-2021-01-18.zip
-          rm atlas-test-data-2021-01-18.zip
-
-      - name: test
-        shell: bash -l {0}
-        run: |
-          conda info
-          cd $GITHUB_WORKSPACE
-          pwd
-          python util/deploy_atlas.py
-
-      - name: deploy
+      - name: Deploy artifacts
         shell: bash -l {0}
         env:
           SSH_SERVER: ${{ secrets.SSH_SERVER }}
@@ -184,19 +188,15 @@ jobs:
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
           SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
         run: |
-          cd $GITHUB_WORKSPACE/deploy
-          pwd
+          cd "$GITHUB_WORKSPACE/deploy"
           rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
           rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
 
-      - name: build and upload conda zimg
+      - name: Build and upload conda zimg
         shell: bash -l {0}
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
         run: |
-          conda info
-          cd $GITHUB_WORKSPACE
-          pwd
-          python util/build_ext_libs.py conda-zimg
+          cd "$GITHUB_WORKSPACE"
           conda config --set anaconda_upload yes
           conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
