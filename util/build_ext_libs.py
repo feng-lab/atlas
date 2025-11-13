@@ -3011,6 +3011,8 @@ def build_or_tools(src_dir: str, install_dir: str):
 
 def build_libs(libs: OrderedDict, use_asan: bool):
     logger.info(f'extDIR: {ext_dir()}')
+
+    download_atlas_deps()
     logger.info(f'srcPackageDIR: {src_package_dir()}')
 
     remove_path_contains('miniconda')
@@ -3021,8 +3023,6 @@ def build_libs(libs: OrderedDict, use_asan: bool):
         os.environ['HOME'] = os.path.expanduser("~")
 
     logger.info(f'HOME: {os.environ['HOME']}')
-
-    download_atlas_deps()
 
     for lib_name, build_lib in libs.items():
         if not build_lib:

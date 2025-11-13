@@ -50,7 +50,7 @@ jobs:
       - name: Install Intel oneAPI MKL/TBB (apt)
         shell: bash -l {0}
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           sudo mkdir -p /usr/share/keyrings
           # Follow Intel's official instructions to fetch and dearmor the key
           wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
@@ -58,8 +58,10 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | \
             sudo tee /etc/apt/sources.list.d/oneAPI.list
           sudo apt-get update -o Acquire::Retries=3
-          sudo apt-get -y install intel-oneapi-mkl-devel intel-oneapi-tbb-devel
-          ls -la /opt/intel/oneapi || true
+          sudo apt-get -y install intel-oneapi-mkl-devel intel-oneapi-tbb-devel || { echo "oneAPI apt install failed" >&2; exit 1; }
+          # Hard fail if expected directories are missing so the job stops here
+          test -d /opt/intel/oneapi || { echo "/opt/intel/oneapi not found" >&2; exit 1; }
+          test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
 
       - name: Install Vulkan SDK (LunarG)
         shell: bash -l {0}
