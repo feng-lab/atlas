@@ -1,9 +1,9 @@
-import os
 import logging
+import os
 
 import common_dirs
-from download_utils import sync_files
 from atlas_test_data_filelist import files_to_download
+from download_utils import sync_files
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)

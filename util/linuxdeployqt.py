@@ -1,9 +1,9 @@
+import glob
+import logging
 import os
 import shutil
 import subprocess
 import tempfile
-import glob
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -390,9 +390,9 @@ def linux_deploy_deps_to_lib_dir(binary_name: str, lib_dir: str):
 
         if details['type'] == 'lib':
             src = details['realpath']
-            if details['so'].startswith('libstdc++.so') or details['so'].startswith('libgcc_s.so') or \
-                    details['so'].startswith('libatomic.so') or \
-                    (not src.startswith('/usr/lib/') and not src.startswith('/lib/')):
+            if details["so"].startswith("libatomic.so") or (
+                not src.startswith("/usr/lib/") and not src.startswith("/lib/")
+            ):
                 dst = lib_dir + os.sep + dep
                 logger.debug("Copying library " + dep + ": " + src + ' -> ' + dst)
                 shutil.copyfile(src, dst)  # overrides dest no questions asked

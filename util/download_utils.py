@@ -1,14 +1,14 @@
-import os
-import sys
 import hashlib
-import requests
-import urllib.request
-import random
-import time
-from functools import wraps
 import logging
+import os
+import random
+import sys
+import time
+import urllib.request
+from functools import wraps
 
 import common_dirs
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +21,10 @@ def retry_with_backoff(retries=5, backoff_in_seconds=1):
             while True:
                 try:
                     return func(*args, **kwargs)
-                except Exception as e:
+                except Exception:
                     if x == retries:
                         raise
-                    sleep = (backoff_in_seconds * 2 ** x + random.uniform(0, 1))
+                    sleep = backoff_in_seconds * 2**x + random.uniform(0, 1)
                     time.sleep(sleep)
                     x += 1
                     logger.info(f"Retrying {func.__name__}... (attempt {x + 1})")
@@ -121,7 +121,9 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
 
             # If we get a 406 or 416 error, try again without range header
             if response.status_code in [406, 416]:
-                logger.info(f"Range request not supported or invalid. Downloading entire file.")
+                logger.info(
+                    "Range request not supported or invalid. Downloading entire file."
+                )
                 headers.pop('Range', None)
                 response = requests.get(current_url, stream=True, proxies=proxies, headers=headers)
                 current_size = 0  # Reset current_size as we're downloading from the beginning
@@ -150,19 +152,21 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
             logger.info('')  # New line after download completes
 
             if os.path.getsize(target_path) != expected_size:
-                logger.warning(f"Downloaded file size does not match expected size. Trying next URL.")
+                logger.warning(
+                    "Downloaded file size does not match expected size. Trying next URL."
+                )
                 continue
 
             if validate_checksum(target_path, expected_sha256):
                 logger.info(f"File downloaded successfully: {target_path}")
                 return True
             else:
-                logger.warning(f"Checksum validation failed. Trying next URL.")
+                logger.warning("Checksum validation failed. Trying next URL.")
                 os.remove(target_path)
         except requests.RequestException as e:
             logger.error(f"Error downloading from {current_url}: {e}")
 
-    logger.error(f"Failed to download file from all URLs.")
+    logger.error("Failed to download file from all URLs.")
     return False
 
 

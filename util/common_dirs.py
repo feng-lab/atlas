@@ -1,13 +1,14 @@
-import os
-import sys
-import shutil
+import errno
 import glob
-import tarfile
-import zipfile
+import logging
+import os
+import shutil
 import stat
 import subprocess
-import errno
-import logging
+import sys
+import tarfile
+import zipfile
+
 from packaging import version
 
 logger = logging.getLogger(__name__)

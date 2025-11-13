@@ -114,6 +114,8 @@ jobs:
           python-version: "3.12"
           activate-environment: atlas-ci
           miniconda-version: "latest"
+          channels: defaults
+          auto-activate: false
 
       - name: Show Python version
         shell: bash -l {0}
@@ -144,7 +146,7 @@ jobs:
           conda update --all -y
           conda install -y anaconda-client conda-build pip
           python -m pip install --upgrade pip
-          python -m pip install --no-cache-dir aqtinstall requests packaging
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
           conda clean --all -y
 
       - name: Cache Qt (installed)
@@ -181,7 +183,7 @@ jobs:
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
           cd "$GITHUB_WORKSPACE"
-          python util/build_ext_libs.py all
+          python util/build_ext_libs.py all --exclude-libs conda-zimg
 
       - name: Build Atlas
         shell: bash -l {0}
@@ -226,5 +228,6 @@ jobs:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
         run: |
           cd "$GITHUB_WORKSPACE"
+          python util/build_ext_libs.py conda-zimg
           conda config --set anaconda_upload yes
           conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe

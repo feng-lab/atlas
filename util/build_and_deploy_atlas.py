@@ -1,15 +1,15 @@
 import argparse
 
 import build_atlas
-import deploy_atlas
 import common_dirs
+import deploy_atlas
 from logger import setup_logger
 
 if __name__ == "__main__":
     logger = setup_logger()
 
     parser = argparse.ArgumentParser(
-        epilog=f"""
+        epilog="""
 Examples:
 
 python build_and_deploy_atlas.py [--use-asan] [--skip-test] [--debug-version]

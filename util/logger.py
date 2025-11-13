@@ -1,12 +1,11 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 import functools
+import io
 import logging
-import traceback
 import os
 import sys
-import io
-from typing import Literal
-from typing import Any, Iterable
+import traceback
+from typing import Iterable, Literal
 
 __all__ = ["setup_logger"]
 

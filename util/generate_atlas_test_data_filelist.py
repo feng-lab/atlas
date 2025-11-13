@@ -1,7 +1,7 @@
 import os
 
-from generate_atlas_deps_filelist import generate_atlas_deps_filelist, process_files
 import common_dirs
+from generate_atlas_deps_filelist import generate_atlas_deps_filelist, process_files
 
 if __name__ == "__main__":
     base_url = "https://neutracing.com/static/atlas_test_data"
