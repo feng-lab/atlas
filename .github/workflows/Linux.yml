@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get -y update
           sudo apt-get -y install \
-            curl ca-certificates gnupg lsb-release software-properties-common \
+            curl wget ca-certificates gnupg lsb-release software-properties-common \
             build-essential git zip unzip rsync p7zip-full \
             libgl1-mesa-dev libxkbcommon-x11-0 libxrender-dev \
             libfreetype6-dev libfontconfig1-dev nasm
@@ -50,12 +50,14 @@ jobs:
       - name: Install Intel oneAPI MKL/TBB (apt)
         shell: bash -l {0}
         run: |
+          set -euxo pipefail
           sudo mkdir -p /usr/share/keyrings
-          curl -fsSL https://apt.repos.intel.com/keys/intel-gpg-keys.gpg | \
-            sudo gpg --dearmor -o /usr/share/keyrings/oneapi-archive-keyring.gpg
+          # Follow Intel's official instructions to fetch and dearmor the key
+          wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
+            | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
           echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | \
             sudo tee /etc/apt/sources.list.d/oneAPI.list
-          sudo apt-get update
+          sudo apt-get update -o Acquire::Retries=3
           sudo apt-get -y install intel-oneapi-mkl-devel intel-oneapi-tbb-devel
           ls -la /opt/intel/oneapi || true
 
