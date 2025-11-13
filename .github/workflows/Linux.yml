@@ -3,10 +3,11 @@ name: Linux
 on:
   push:
     branches:
-      - main
-  # pull_request:
-  #   branches:
-  #     - master
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,20 +22,45 @@ jobs:
       # Centralize Qt version to make upgrades easy
       QT_VERSION: "6.9.2"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 1
           submodules: recursive
 
+      - name: Free disk space
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          # Remove large preinstalled stacks we don't use
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          sudo rm -rf /opt/hostedtoolcache/go || true
+          sudo rm -rf /opt/hostedtoolcache/node || true
+          # Docker images and apt caches
+          docker system prune -af || true
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          echo "Disk usage after cleanup:" && df -h || true
+
       - name: Install base packages
         shell: bash -l {0}
         run: |
+          df -h
           sudo apt-get -y update
           sudo apt-get -y install \
             curl wget ca-certificates gnupg lsb-release software-properties-common \
-            build-essential git zip unzip rsync p7zip-full \
-            libgl1-mesa-dev libxkbcommon-x11-0 libxrender-dev \
-            libfreetype6-dev libfontconfig1-dev nasm
+            zsh build-essential git zip unzip rsync p7zip-full \
+            nasm gperf patchelf \
+            libgl1-mesa-dev libxrender-dev libxcursor-dev libglfw3-dev \
+            libfreetype6-dev libfontconfig1-dev \
+            libxkbcommon0 libxkbcommon-x11-0 \
+            libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xkb1 \
+            unrar \
+            golang-go
           g++ --version
           df -h
 
@@ -63,6 +89,13 @@ jobs:
           test -d /opt/intel/oneapi || { echo "/opt/intel/oneapi not found" >&2; exit 1; }
           test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
 
+      - name: Cache Vulkan SDK (installed)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
+          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
+
       - name: Install Vulkan SDK (LunarG)
         shell: bash -l {0}
         run: |
@@ -75,13 +108,6 @@ jobs:
             rm -f "${SDK_TAR}"; \
           fi
           ls -la "$HOME/VulkanSDK"
-
-      - name: Cache Vulkan SDK (installed)
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
-          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
@@ -123,15 +149,6 @@ jobs:
           python -m pip install --no-cache-dir aqtinstall requests packaging
           conda clean --all -y
 
-      - name: Install Qt 6 (aqt)
-        shell: bash -l {0}
-        run: |
-          # Match readme.md recommendation for Linux
-          mkdir -p "$HOME/Qt"
-          if [ -d "$HOME/Qt/${QT_VERSION}/gcc_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" linux desktop ${QT_VERSION} linux_gcc_64; fi
-          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" linux desktop tools_ifw qt.tools.ifw.47; fi
-          ls -la "$HOME/Qt" || true
-
       - name: Cache Qt (installed)
         uses: actions/cache@v4
         with:
@@ -140,14 +157,14 @@ jobs:
             ~/Qt/Tools/QtInstallerFramework
           key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
 
-      - name: Build external deps
+      - name: Install Qt 6 (aqt)
         shell: bash -l {0}
-        env:
-          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
-          ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
-          cd "$GITHUB_WORKSPACE"
-          python util/build_ext_libs.py all
+          # Match readme.md recommendation for Linux
+          mkdir -p "$HOME/Qt"
+          if [ -d "$HOME/Qt/${QT_VERSION}/gcc_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" linux desktop ${QT_VERSION} linux_gcc_64; fi
+          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" linux desktop tools_ifw qt.tools.ifw.47; fi
+          ls -la "$HOME/Qt" || true
 
       - name: Cache 3rdparty build and downloaded deps
         uses: actions/cache@v4
@@ -158,6 +175,15 @@ jobs:
           key: ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-${{ hashFiles('util/build_ext_libs.py','src/cmake/LibsForImg.cmake') }}
           restore-keys: |
             ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
+
+      - name: Build external deps
+        shell: bash -l {0}
+        env:
+          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+          ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/build_ext_libs.py all
 
       - name: Build Atlas
         shell: bash -l {0}
