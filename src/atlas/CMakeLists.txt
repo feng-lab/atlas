@@ -825,6 +825,11 @@ else (WIN32)
     target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 
+  # Use LLVM lld for the main Atlas binary on Linux+Clang when available.
+  if (UNIX AND NOT APPLE AND ATLAS_USE_LLD_LINKER AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND DEFINED ATLAS_LLD_FLAG)
+    target_link_options(${APP_NAME} PRIVATE ${ATLAS_LLD_FLAG})
+  endif ()
+
   if (ATLAS_SANITIZE_ADDRESS)
     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
       target_compile_options(${APP_NAME} PUBLIC -fsanitize=address,undefined,integer,nullability -fno-omit-frame-pointer -fno-sanitize=unsigned-integer-overflow)

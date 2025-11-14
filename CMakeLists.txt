@@ -64,13 +64,10 @@ if (UNIX AND NOT APPLE AND ATLAS_USE_LLD_LINKER AND CMAKE_CXX_COMPILER_ID STREQU
   endif ()
   find_program(ATLAS_LLD_EXECUTABLE NAMES ${_ATLAS_LLD_CANDIDATES})
   if (ATLAS_LLD_EXECUTABLE)
-    # Pass the concrete lld path via -fuse-ld=… so Clang drives lld instead
-    # of the system linker (typically ld.bfd).
-    set(_ATLAS_LLD_FLAG "-fuse-ld=${ATLAS_LLD_EXECUTABLE}")
-    message(STATUS "Atlas: enabling lld linker: ${ATLAS_LLD_EXECUTABLE}")
-    set(CMAKE_EXE_LINKER_FLAGS   "${CMAKE_EXE_LINKER_FLAGS} ${_ATLAS_LLD_FLAG}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_ATLAS_LLD_FLAG}")
-    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${_ATLAS_LLD_FLAG}")
+    # Record the resolved lld path; individual targets can opt-in via
+    # target_link_options without perturbing CMake's feature detection.
+    set(ATLAS_LLD_FLAG "-fuse-ld=${ATLAS_LLD_EXECUTABLE}" CACHE STRING "Linker flag for using LLVM lld" FORCE)
+    message(STATUS "Atlas: lld linker available: ${ATLAS_LLD_EXECUTABLE}")
   else ()
     message(STATUS "Atlas: ATLAS_USE_LLD_LINKER=ON but no lld binary found; using system linker")
   endif ()
