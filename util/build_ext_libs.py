@@ -41,6 +41,39 @@ def get_clangplus_in_linux() -> str:
     return f'clang++-{_clang_major_env()}'
 
 
+def _lld_linker_flag_linux() -> str:
+    """
+    Prefer LLVM lld when building external libs with Clang on Linux.
+
+    This mirrors the top-level CMake behavior that uses lld for Linux+Clang
+    builds so that LLVM LTO/bitcode archives link correctly. If no suitable
+    lld binary is found, we fall back to the system linker.
+    """
+    if not use_clang_in_linux():
+        return ''
+
+    # Allow opt-out via env to keep behavior controllable from CI or developers.
+    use_lld_env = os.environ.get('ATLAS_USE_LLD_LINKER')
+    if use_lld_env is not None and use_lld_env.strip().lower() in ('0', 'off', 'false', 'no'):
+        logger.info('ATLAS_USE_LLD_LINKER disabled; not using lld for external libs')
+        return ''
+
+    clang_major = _clang_major_env()
+    candidates = []
+    if clang_major:
+        candidates.extend([f'ld.lld-{clang_major}', f'lld-{clang_major}'])
+    candidates.extend(['ld.lld', 'lld'])
+
+    for name in candidates:
+        path = shutil.which(name)
+        if path:
+            logger.info(f'Using lld linker for external libs: {path}')
+            return f' -fuse-ld={path}'
+
+    logger.info('No lld linker found on PATH; using system linker for external libs')
+    return ''
+
+
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
         logger.info(f'git pull {Path(repository_folder).name}')
@@ -265,12 +298,18 @@ def get_common_build_flags(cpp_standard: int = cpp_standard(), with_optimization
         res['ASMFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}'
     elif is_linux():
         if use_clang_in_linux():
+            lld_flag = _lld_linker_flag_linux()
             res['CC'] = get_clang_in_linux()
             res['CFLAGS'] = f'-fPIC {"" if no_hidden_visibility else "-fvisibility=hidden"} -mavx' + optimization
+            if lld_flag:
+                res['CFLAGS'] += lld_flag
             res['CXX'] = get_clangplus_in_linux()
             res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC ' \
                               f'{"" if no_hidden_visibility else "-fvisibility=hidden -fvisibility-inlines-hidden"} ' \
                               f'-mavx' + optimization
+            if lld_flag:
+                res['CXXFLAGS'] += lld_flag
+                res['LDFLAGS'] = lld_flag.strip()
         else:
             res['CFLAGS'] = f'-fPIC {"" if no_hidden_visibility else "-fvisibility=hidden"} -mavx' + optimization
             res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC ' \
@@ -308,6 +347,8 @@ def get_env_for_config_make(cpp_standard: int = cpp_standard(),
             env['CFLAGS'] = cbf['CFLAGS']
             env['CXX'] = cbf['CXX']
             env['CXXFLAGS'] = cbf['CXXFLAGS']
+            if 'LDFLAGS' in cbf:
+                env['LDFLAGS'] = cbf['LDFLAGS']
         else:
             env['CFLAGS'] = cbf['CFLAGS']
             env['CXXFLAGS'] = cbf['CXXFLAGS']

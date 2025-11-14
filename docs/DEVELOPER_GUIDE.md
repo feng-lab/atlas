@@ -758,6 +758,7 @@ LLVM/Clang versioning
 
 - Linux builds use Clang by default. The version can be overridden with env `ATLAS_CLANG_MAJOR` (e.g., `19`).
 - CI currently uses `clang-19` as a safe, modern default for C++20.
+- On Linux with Clang, Atlas prefers LLVM `lld` for linking when available (`ATLAS_USE_LLD_LINKER=ON`, default). Install a matching `lld` package (e.g., `lld-19`, `lld-20`), or set `-DATLAS_USE_LLD_LINKER=OFF` at configure time to fall back to the system linker.
 
 Python versioning
 
