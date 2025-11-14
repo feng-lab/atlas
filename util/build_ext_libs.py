@@ -3058,12 +3058,12 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
     remove_path_contains('miniconda')
     remove_path_contains('anaconda')
-    logger.info(f'PATH: {os.environ['PATH']}')
+    logger.info(f"PATH: {os.environ['PATH']}")
 
     if is_windows():
         os.environ['HOME'] = os.path.expanduser("~")
 
-    logger.info(f'HOME: {os.environ['HOME']}')
+    logger.info(f"HOME: {os.environ['HOME']}")
 
     for lib_name, build_lib in libs.items():
         if not build_lib:
@@ -3643,6 +3643,9 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
     # parse arguments
     args = parser.parse_args(args=None if argv[1:] else ['--help'])
 
+    # Track if user explicitly requested "all"; used to decide cleanup
+    requested_all = any(lib.lower() == "all" for lib in args.libs)
+
     for lib in args.libs:
         if lib.lower() == "all":
             for vlib in libs:
@@ -3674,7 +3677,10 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
     for lib in libs:
         if lib not in lib_skip_list:
             build_all = build_all and libs[lib]
-    if build_all:
+    # Clean when building everything, or when the user explicitly asked for
+    # "all" (even with exclusions). Avoid cleaning when using --start-from
+    # because that flag implies continuing from an existing build.
+    if build_all or (requested_all and args.start_from is None):
         shutil.rmtree(ext_build_dir(), ignore_errors=True)
 
     return libs, args.use_asan

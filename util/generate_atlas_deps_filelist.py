@@ -1,9 +1,9 @@
-from ftplib import FTP
 import logging
 import os
+from ftplib import FTP
 
-import download_utils
 import common_dirs
+import download_utils
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -96,13 +96,13 @@ def generate_atlas_deps_filelist(files_info, output_file):
     with open(output_file, 'w') as f:
         f.write("files_to_download = [\n")
         for file_info in files_info:
-            f.write(f"    {{\n")
+            f.write("    {\n")
             f.write(f"        'url': '{file_info['url']}',\n")
             f.write(f"        'backup_url': '{file_info['backup_url']}',\n")
             f.write(f"        'expected_size': {file_info['size']},\n")
             f.write(f"        'expected_sha256': '{file_info['checksum']}',\n")
             f.write(f"        'filename': '{file_info['filename']}',\n")
-            f.write(f"    }},\n")
+            f.write("    },\n")
         f.write("]\n")
 
 

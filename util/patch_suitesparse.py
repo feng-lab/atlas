@@ -1,8 +1,8 @@
 import difflib
-import re
+import glob
 import logging
 import os
-import glob
+import re
 
 import common_dirs
 from logger import setup_logger

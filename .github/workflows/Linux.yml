@@ -6,8 +6,202 @@ on:
       - main
 
 jobs:
+  build-env:
+    runs-on: ubuntu-22.04
+    env:
+      # Pin a Vulkan SDK version that is known-good
+      VULKAN_SDK_VERSION: 1.4.328.1
+      # Choose LLVM/Clang major version; mirrored in build scripts via ATLAS_CLANG_MAJOR
+      CLANG_MAJOR: "20"
+      # Bump to invalidate 3rdparty/extlibs cache keys
+      CACHE_VERSION: v1
+      # Centralize Qt version to make upgrades easy
+      QT_VERSION: "6.9.2"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          submodules: recursive
+          
+      - name: Cache 3rdparty build and downloaded deps
+        id: cache-extlibs
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+            src/3rdparty/build
+          key: ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-${{ hashFiles('util/build_ext_libs.py','src/cmake/LibsForImg.cmake') }}
+          restore-keys: |
+            ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
+
+      - name: Free disk space
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          # Remove large preinstalled stacks we don't use
+          sudo rm -rf /usr/lib/jvm
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /usr/local/julia*
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache
+          # Docker images and apt caches
+          docker system prune -af || true
+          docker builder prune -af || true
+          echo "Disk usage after cleanup:" && df -h || true
+
+      - name: Install base packages
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          df -h
+          sudo apt-get -y update
+          sudo apt-get -y install \
+            curl wget ca-certificates gnupg lsb-release software-properties-common \
+            zsh build-essential git zip unzip rsync p7zip-full \
+            nasm gperf patchelf \
+            libgl1-mesa-dev libxrender-dev libxcursor-dev libglfw3-dev \
+            libfreetype6-dev libfontconfig1-dev \
+            libxkbcommon0 libxkbcommon-x11-0 \
+            libxcb-xinerama0 libxcb-icccm4 libxcb-keysyms1 libxcb-image0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xkb1 \
+            unrar \
+            golang-go
+          g++ --version
+          df -h
+
+      - name: Install LLVM clang
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh ${CLANG_MAJOR}
+          sudo apt-get -y install clang-${CLANG_MAJOR} lld-${CLANG_MAJOR} clang-tools-${CLANG_MAJOR}
+          clang-${CLANG_MAJOR} --version
+
+      - name: Install Intel oneAPI MKL/TBB (apt)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /usr/share/keyrings
+          # Follow Intel's official instructions to fetch and dearmor the key
+          wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
+            | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | \
+            sudo tee /etc/apt/sources.list.d/oneAPI.list
+          sudo apt-get update -o Acquire::Retries=3
+          sudo apt-get -y install intel-oneapi-mkl-devel intel-oneapi-tbb-devel || { echo "oneAPI apt install failed" >&2; exit 1; }
+          # Hard fail if expected directories are missing so the job stops here
+          test -d /opt/intel/oneapi || { echo "/opt/intel/oneapi not found" >&2; exit 1; }
+          test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
+
+      - name: Cache Vulkan SDK (installed)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
+          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
+
+      - name: Install Vulkan SDK (LunarG)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          mkdir -p "$HOME/VulkanSDK"
+          cd "$HOME/VulkanSDK"
+          if [ -d "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" ]; then echo "Vulkan SDK cached"; else \
+            SDK_TAR="vulkansdk-linux-x86_64-${VULKAN_SDK_VERSION}.tar.xz"; \
+            curl -fL "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/linux/${SDK_TAR}?Human=true" -o "${SDK_TAR}"; \
+            tar -xJf "${SDK_TAR}"; \
+            rm -f "${SDK_TAR}"; \
+          fi
+          ls -la "$HOME/VulkanSDK"
+
+      - name: Setup Miniconda
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: "3.12"
+          activate-environment: atlas-ci
+          miniconda-version: "latest"
+          channels: defaults
+
+      - name: Show Python version
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          python -V
+          which python
+          pip --version
+
+      - name: Cache pip
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.12
+
+      - name: Cache conda pkgs
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CONDA }}/pkgs
+            ~/.conda/pkgs
+          key: ${{ runner.os }}-condapkgs-3.12
+
+      - name: Install conda tooling
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          conda info
+          conda update --all -y
+          conda install -y anaconda-client conda-build pip
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          conda clean --all -y
+
+      - name: Cache Qt (installed)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Qt/${{ env.QT_VERSION }}
+            ~/Qt/Tools/QtInstallerFramework
+          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
+
+      - name: Install Qt 6 (aqt)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          # Match readme.md recommendation for Linux
+          mkdir -p "$HOME/Qt"
+          if [ -d "$HOME/Qt/${QT_VERSION}/gcc_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" linux desktop ${QT_VERSION} linux_gcc_64; fi
+          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" linux desktop tools_ifw qt.tools.ifw.47; fi
+          ls -la "$HOME/Qt" || true
+
+      - name: Build external deps
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        env:
+          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+          ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/build_ext_libs.py all --exclude-libs conda-zimg
+
   build:
     runs-on: ubuntu-22.04
+    needs: build-env
     env:
       # Pin a Vulkan SDK version that is known-good
       VULKAN_SDK_VERSION: 1.4.328.1
@@ -114,6 +308,7 @@ jobs:
           python-version: "3.12"
           activate-environment: atlas-ci
           miniconda-version: "latest"
+          channels: defaults
 
       - name: Show Python version
         shell: bash -l {0}
@@ -144,7 +339,7 @@ jobs:
           conda update --all -y
           conda install -y anaconda-client conda-build pip
           python -m pip install --upgrade pip
-          python -m pip install --no-cache-dir aqtinstall requests packaging
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
           conda clean --all -y
 
       - name: Cache Qt (installed)
@@ -176,15 +371,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
             ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
-
-      - name: Build external deps
-        shell: bash -l {0}
-        env:
-          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
-          ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          python util/build_ext_libs.py all
 
       - name: Build Atlas
         shell: bash -l {0}
@@ -227,7 +413,9 @@ jobs:
         shell: bash -l {0}
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+          ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
           cd "$GITHUB_WORKSPACE"
+          python util/build_ext_libs.py conda-zimg
           conda config --set anaconda_upload yes
           conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
