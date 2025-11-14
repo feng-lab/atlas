@@ -30,8 +30,11 @@ jobs:
           path: |
             atlas_deps
             src/3rdparty/build
-          key: ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-${{ hashFiles('util/build_ext_libs.py','src/cmake/LibsForImg.cmake') }}
+          key: >
+            ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
+            ${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
           restore-keys: |
+            ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
             ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
 
       - name: Free disk space
