@@ -826,8 +826,8 @@ else (WIN32)
   endif ()
 
   # Use LLVM lld for the main Atlas binary on Linux+Clang when available.
-  if (UNIX AND NOT APPLE AND ATLAS_USE_LLD_LINKER AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND DEFINED ATLAS_LLD_FLAG)
-    target_link_options(${APP_NAME} PRIVATE ${ATLAS_LLD_FLAG})
+  if (UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_link_options(${APP_NAME} PRIVATE -fuse-ld=lld)
   endif ()
 
   if (ATLAS_SANITIZE_ADDRESS)

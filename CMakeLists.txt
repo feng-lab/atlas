@@ -51,28 +51,6 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
-# Prefer LLVM lld on Linux when using Clang so that Link Time Optimization
-# (LTO) works reliably with LLVM bitcode archives.
-option(ATLAS_USE_LLD_LINKER "Use LLVM lld linker on Linux+Clang builds" ON)
-if (UNIX AND NOT APPLE AND ATLAS_USE_LLD_LINKER AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  set(_ATLAS_LLD_CANDIDATES ld.lld lld)
-  if (DEFINED ENV{ATLAS_CLANG_MAJOR})
-    # Try versioned lld binaries first (e.g., ld.lld-20, lld-20) to match the
-    # selected Clang toolchain when available.
-    list(INSERT _ATLAS_LLD_CANDIDATES 0 "ld.lld-$ENV{ATLAS_CLANG_MAJOR}")
-    list(INSERT _ATLAS_LLD_CANDIDATES 0 "lld-$ENV{ATLAS_CLANG_MAJOR}")
-  endif ()
-  find_program(ATLAS_LLD_EXECUTABLE NAMES ${_ATLAS_LLD_CANDIDATES})
-  if (ATLAS_LLD_EXECUTABLE)
-    # Record the resolved lld path; individual targets can opt-in via
-    # target_link_options without perturbing CMake's feature detection.
-    set(ATLAS_LLD_FLAG "-fuse-ld=${ATLAS_LLD_EXECUTABLE}" CACHE STRING "Linker flag for using LLVM lld" FORCE)
-    message(STATUS "Atlas: lld linker available: ${ATLAS_LLD_EXECUTABLE}")
-  else ()
-    message(STATUS "Atlas: ATLAS_USE_LLD_LINKER=ON but no lld binary found; using system linker")
-  endif ()
-endif ()
-
 # generate a version string from git tag-hash and current build time
 include(GetGitRevisionDescription)
 git_describe(GIT_VERSION)
