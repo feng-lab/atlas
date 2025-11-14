@@ -48,7 +48,7 @@ jobs:
           fi
 
       - name: Free disk space
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         shell: bash -l {0}
         run: |
           set -euo pipefail
@@ -69,7 +69,7 @@ jobs:
           echo "Disk usage after cleanup:" && df -h || true
 
       - name: Install base packages
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         shell: bash -l {0}
         run: |
           df -h
@@ -89,7 +89,7 @@ jobs:
           df -h
 
       - name: Install LLVM clang
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         shell: bash -l {0}
         run: |
           curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
@@ -99,7 +99,7 @@ jobs:
           clang-${CLANG_MAJOR} --version
 
       - name: Install Intel oneAPI MKL/TBB (apt)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         shell: bash -l {0}
         run: |
           set -euo pipefail
@@ -116,7 +116,7 @@ jobs:
           test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
 
       - name: Cache Vulkan SDK (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -124,7 +124,7 @@ jobs:
           key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
 
       - name: Install Vulkan SDK (LunarG)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         shell: bash -l {0}
         run: |
           mkdir -p "$HOME/VulkanSDK"
@@ -138,7 +138,7 @@ jobs:
           ls -la "$HOME/VulkanSDK"
 
       - name: Setup Miniconda
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
@@ -148,7 +148,7 @@ jobs:
           channels: defaults
 
       - name: Show Python version
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         shell: bash -l {0}
         run: |
           python -V
@@ -156,7 +156,7 @@ jobs:
           pip --version
 
       - name: Cache pip
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -164,7 +164,7 @@ jobs:
           key: ${{ runner.os }}-pip-3.12
 
       - name: Cache conda pkgs
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -173,7 +173,7 @@ jobs:
           key: ${{ runner.os }}-condapkgs-3.12
 
       - name: Install conda tooling
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         shell: bash -l {0}
         run: |
           conda info
@@ -184,7 +184,7 @@ jobs:
           conda clean --all -y
 
       - name: Cache Qt (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -193,7 +193,7 @@ jobs:
           key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
 
       - name: Install Qt 6 (aqt)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         shell: bash -l {0}
         run: |
           # Match readme.md recommendation for Linux
