@@ -37,6 +37,16 @@ jobs:
             ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
             ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
 
+      - name: Check atlas_deps directory
+        id: atlas-deps-dir
+        shell: bash -l {0}
+        run: |
+          if [ -d "atlas_deps" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Free disk space
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
@@ -193,7 +203,9 @@ jobs:
           ls -la "$HOME/Qt" || true
 
       - name: Build external deps
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        # Only rebuild external deps when we did not get an exact cache hit
+        # AND the atlas_deps directory is missing.
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
         shell: bash -l {0}
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
