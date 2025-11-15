@@ -3,7 +3,7 @@ name: Windows
 on:
   push:
     branches:
-      - mainXX
+      - main
   create:
     # Runs when a branch or tag is created; we gate to tags in job steps
   workflow_dispatch:
@@ -373,14 +373,12 @@ jobs:
           python util/build_atlas.py
 
       - name: Package and smoke test
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         run: |
           cd "$GITHUB_WORKSPACE"
           python util/deploy_atlas.py
 
       - name: Setup SSH key
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -417,7 +415,6 @@ jobs:
           gh release upload "$TAG" "${files[@]}" --clobber
 
       - name: Deploy artifacts (SSH)
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         env:
           SSH_SERVER: ${{ secrets.SSH_SERVER }}
@@ -433,7 +430,6 @@ jobs:
           scp -P "$SSH_PORT" -i ~/.ssh/private.key deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/"
 
       - name: Build and upload conda zimg
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}

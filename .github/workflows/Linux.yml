@@ -398,7 +398,6 @@ jobs:
           python util/build_atlas.py
 
       - name: Package and smoke test
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         run: |
           cd "$GITHUB_WORKSPACE"
@@ -441,7 +440,6 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Deploy artifacts
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         env:
           SSH_SERVER: ${{ secrets.SSH_SERVER }}
@@ -454,7 +452,6 @@ jobs:
           rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
 
       - name: Build and upload conda zimg
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
