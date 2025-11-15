@@ -25,8 +25,6 @@ jobs:
       VULKAN_SDK_VERSION: 1.4.328.1
       # Choose LLVM/Clang major version; mirrored in build scripts via ATLAS_CLANG_MAJOR
       CLANG_MAJOR: "20"
-      # Bump to invalidate 3rdparty/extlibs cache keys
-      CACHE_VERSION: v1
       # Centralize Qt version to make upgrades easy
       QT_VERSION: "6.9.2"
     steps:
@@ -44,32 +42,19 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
-          restore-keys: |
-            ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
-            ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
+          key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
 
       - name: Cache atlas_deps (download archives)
         uses: actions/cache@v4
         with:
           path: |
             atlas_deps
-          key: ${{ format('atlasdeps-{0}-{1}', env.CACHE_VERSION, hashFiles('util/atlas_deps_filelist.py')) }}
-          restore-keys: |
-            atlasdeps-${{ env.CACHE_VERSION }}-
-
-      - name: Check atlas_deps directory
-        id: atlas-deps-dir
-        shell: bash -l {0}
-        run: |
-          if [ -d "atlas_deps" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
+        restore-keys: |
+            atlasdeps-
 
       - name: Free disk space
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           set -euo pipefail
@@ -90,7 +75,7 @@ jobs:
           echo "Disk usage after cleanup:" && df -h || true
 
       - name: Install base packages
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           df -h
@@ -110,7 +95,7 @@ jobs:
           df -h
 
       - name: Install LLVM clang
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           curl -fsSL https://apt.llvm.org/llvm.sh -o /tmp/llvm.sh
@@ -120,7 +105,7 @@ jobs:
           clang-${CLANG_MAJOR} --version
 
       - name: Install Intel oneAPI MKL/TBB (apt)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           set -euo pipefail
@@ -137,7 +122,7 @@ jobs:
           test -d /opt/intel/oneapi/tbb/latest/lib/cmake/tbb || { echo "TBB CMake config missing" >&2; exit 1; }
 
       - name: Cache Vulkan SDK (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -145,7 +130,7 @@ jobs:
           key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
 
       - name: Install Vulkan SDK (LunarG)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           mkdir -p "$HOME/VulkanSDK"
@@ -159,7 +144,7 @@ jobs:
           ls -la "$HOME/VulkanSDK"
 
       - name: Setup Miniconda
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
@@ -169,7 +154,7 @@ jobs:
           channels: defaults
 
       - name: Show Python version
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           python -V
@@ -177,7 +162,7 @@ jobs:
           pip --version
 
       - name: Cache pip
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -185,7 +170,7 @@ jobs:
           key: ${{ runner.os }}-pip-3.12
 
       - name: Cache conda pkgs
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -194,7 +179,7 @@ jobs:
           key: ${{ runner.os }}-condapkgs-3.12
 
       - name: Install conda tooling
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           conda info
@@ -205,7 +190,7 @@ jobs:
           conda clean --all -y
 
       - name: Cache Qt (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -214,7 +199,7 @@ jobs:
           key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
 
       - name: Install Qt 6 (aqt)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           # Match readme.md recommendation for Linux
@@ -225,8 +210,7 @@ jobs:
 
       - name: Build external deps
         # Only rebuild external deps when we did not get an exact cache hit
-        # AND the atlas_deps directory is missing.
-        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.atlas-deps-dir.outputs.exists != 'true'
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
@@ -245,8 +229,6 @@ jobs:
       VULKAN_SDK_VERSION: 1.4.328.1
       # Choose LLVM/Clang major version; mirrored in build scripts via ATLAS_CLANG_MAJOR
       CLANG_MAJOR: "20"
-      # Bump to invalidate 3rdparty/extlibs cache keys
-      CACHE_VERSION: v1
       # Centralize Qt version to make upgrades easy
       QT_VERSION: "6.9.2"
     steps:
@@ -405,28 +387,25 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
-          restore-keys: |
-            ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
-            ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
+          key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
 
       - name: Cache atlas_deps (download archives)
         uses: actions/cache@v4
         with:
           path: |
             atlas_deps
-          key: ${{ format('atlasdeps-{0}-{1}', env.CACHE_VERSION, hashFiles('util/atlas_deps_filelist.py')) }}
-          restore-keys: |
-            atlasdeps-${{ env.CACHE_VERSION }}-
+          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
+        restore-keys: |
+            atlasdeps-
 
       - name: Cache atlas test data
         uses: actions/cache@v4
         with:
           path: |
             atlas_test_data
-          key: ${{ format('testdata-{0}-{1}', env.CACHE_VERSION, hashFiles('util/atlas_test_data_filelist.py')) }}
-          restore-keys: |
-            testdata-${{ env.CACHE_VERSION }}-
+          key: ${{ format('testdata-{0}', hashFiles('util/atlas_test_data_filelist.py')) }}
+        restore-keys: |
+            testdata-
 
       - name: Build Atlas
         shell: bash -l {0}

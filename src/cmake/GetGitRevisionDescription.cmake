@@ -113,6 +113,7 @@ function(git_describe _var)
 	execute_process(COMMAND
 		"${GIT_EXECUTABLE}"
 		describe
+		--tags
 		${hash}
 		${ARGN}
 		WORKING_DIRECTORY
@@ -124,7 +125,13 @@ function(git_describe _var)
 		ERROR_QUIET
 		OUTPUT_STRIP_TRAILING_WHITESPACE)
 	if(NOT res EQUAL 0)
-		set(out "${out}-${res}-NOTFOUND")
+		# Fallback to a short commit hash to avoid noisy "-128-NOTFOUND" strings
+		if(hash AND NOT hash MATCHES "NOTFOUND")
+			string(SUBSTRING "${hash}" 0 8 _short)
+			set(out "g${_short}")
+		else()
+			set(out "${out}-${res}-NOTFOUND")
+		endif()
 	endif()
 
 	set(${_var} "${out}" PARENT_SCOPE)
