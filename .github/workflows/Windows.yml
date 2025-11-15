@@ -3,212 +3,442 @@ name: Windows
 on:
   push:
     branches:
-      - master
-  pull_request:
-    branches:
-      - master
+      - mainXX
+  create:
+    # Runs when a branch or tag is created; we gate to tags in job steps
+  workflow_dispatch:
+
+concurrency:
+  # Cancel any in-progress run for the same ref (branch or tag),
+  # regardless of commit SHA. For create tag events, use the tag ref.
+  group: atlas-${{ github.workflow }}-${{ github.event_name == 'create' && format('refs/tags/{0}', github.event.ref) || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    runs-on: windows-latest
+  build-env:
+    runs-on: windows-2022
+    env:
+      # Centralize Qt version to make upgrades easy
+      QT_VERSION: "6.9.2"
+      # Pin a Vulkan SDK version if installing (optional)
+      VULKAN_SDK_VERSION: 1.4.328.1
     steps:
-      - name: check envs
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Cache 3rdparty build
+        id: cache-extlibs
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/3rdparty/build
+          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+
+      - name: Cache atlas_deps (download archives)
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
+          restore-keys: |
+            atlasdeps-
+
+      - name: Free disk space
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Write-Host 'Before:'; fsutil volume diskfree C:
+          choco feature enable -n=allowGlobalConfirmation
+          choco clean --yes
+          # Remove hosted toolcache
+          $toolcache = 'C:\hostedtoolcache\windows'
+          if (Test-Path $toolcache) {
+            Get-ChildItem $toolcache -Force | ForEach-Object {
+              Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+          if (Test-Path 'C:\hostedtoolcache') {
+            Get-ChildItem 'C:\hostedtoolcache' -Force | Where-Object { $_.Name -ne 'windows' } | ForEach-Object {
+              Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+          # Remove Node (toolcache + Program Files + user npm caches)
+          if (Test-Path 'C:\hostedtoolcache\windows\node') { Remove-Item 'C:\hostedtoolcache\windows\node' -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path 'C:\Program Files\nodejs') { Remove-Item 'C:\Program Files\nodejs' -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:USERPROFILE\AppData\Roaming\npm") { Remove-Item "$env:USERPROFILE\AppData\Roaming\npm" -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:LocalAppData\npm-cache") { Remove-Item "$env:LocalAppData\npm-cache" -Recurse -Force -ErrorAction SilentlyContinue }
+          # Remove Go caches and toolcache (keep standard Go under Program Files)
+          if (Test-Path 'C:\hostedtoolcache\windows\go') { Remove-Item 'C:\hostedtoolcache\windows\go' -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:USERPROFILE\go") { Remove-Item "$env:USERPROFILE\go" -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:LocalAppData\go-build") { Remove-Item "$env:LocalAppData\go-build" -Recurse -Force -ErrorAction SilentlyContinue }
+          # Remove .NET SDKs
+          if (Test-Path 'C:\Program Files\dotnet') {
+            Remove-Item 'C:\Program Files\dotnet' -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          # Clear NuGet cache
+          if (Test-Path "$env:USERPROFILE\.nuget\packages") {
+            Remove-Item "$env:USERPROFILE\.nuget\packages" -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          # Clear temp folders
+          if (Test-Path "$env:TEMP") { Remove-Item "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:LocalAppData\Temp") { Remove-Item "$env:LocalAppData\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue }
+          # Remove Android SDK if present
+          if (Test-Path 'C:\Android') { Remove-Item 'C:\Android' -Recurse -Force -ErrorAction SilentlyContinue }
+          # Remove preinstalled CMake (we use our vendored toolchain)
+          if (Test-Path 'C:\Program Files\CMake') { Remove-Item 'C:\Program Files\CMake' -Recurse -Force -ErrorAction SilentlyContinue }
+          Write-Host 'After:'; fsutil volume diskfree C:
+
+      - name: Ensure Perl
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command perl -ErrorAction SilentlyContinue)) {
+            choco feature enable -n=allowGlobalConfirmation
+            choco install strawberryperl
+          }
+          perl -v
+          where perl
+
+      - name: Install Intel oneAPI BaseKit (winget)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          winget install -e --id Intel.oneAPI.BaseKit --accept-package-agreements --accept-source-agreements --silent
+          # Verify expected directories exist
+          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb")) { Write-Error "oneAPI TBB CMake config missing" }
+          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) { Write-Error "oneAPI MKL missing" }
+
+      - name: Cache Vulkan SDK (installed)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        id: cache-vulkan-build
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\VulkanSDK\${{ env.VULKAN_SDK_VERSION }}
+          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
+
+      - name: Install Vulkan SDK (LunarG via winget)
+        if: steps.cache-vulkan-build.outputs.cache-hit != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          winget install -e --id LunarG.VulkanSDK --version $env:VULKAN_SDK_VERSION `
+            --accept-package-agreements --accept-source-agreements --silent
+          if (-not (Test-Path "C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin\glslc.exe")) {
+            Write-Error "Vulkan SDK not found at expected path: C:\VulkanSDK\$env:VULKAN_SDK_VERSION"
+          }
+
+      - name: Setup Miniconda
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: "3.12"
+          activate-environment: atlas-ci
+          miniconda-version: "latest"
+          channels: defaults
+
+      - name: Show Python version
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
-          env
-          cd ~
-          du -h --max-depth=1 . | sort -h
-          df -h
+          python -V
+          which python || where python
+          pip --version
 
-#      - name: install some exes
-#        shell: pwsh
-#        run: |
-#          choco install zip
-#
-#      - uses: actions/checkout@v2
-#        with:
-#          fetch-depth: 1
-#          submodules: 'recursive'
-#
-#      - name: check envs
-#        shell: bash -l {0}
-#        run: |
-#          env
-#          cd ~
-#          du -h --max-depth=1 . | sort -h
-#          df -h
-#
-#      - name: use C
-#        shell: bash -l {0}
-#        run: |
-#          cp -r $GITHUB_WORKSPACE ~/
-#          cd ~
-#          ls -la
-#
-#      - uses: conda-incubator/setup-miniconda@v2
-#        with:
-#          auto-update-conda: true
-#          python-version: 3.8
-#          miniconda-version: "latest"
-#          activate-environment: test
-#
-#      - name: install conda packages
-#        shell: bash -l {0}
-#        run: |
-#          conda info
-#          conda update --all -y
-#          conda install tbb-devel mkl-devel qt numpy python anaconda-client conda-build conda-verify
-#          conda list
-#          conda clean --all -y
-#
-#      - name: download Qt
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          conda info
-#          cd ~
-#          pwd
-#          curl -L -O $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-Qt-2021-01-18.zip
-#          unzip -q dep-Qt-2021-01-18.zip
-#          rm dep-Qt-2021-01-18.zip
-#
-#      - name: download intel
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          conda info
-#          cd ~
-#          pwd
-#          curl -L -O $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-intel-2021-01-18.zip
-#          unzip -q dep-intel-2021-01-18.zip
-#          rm dep-intel-2021-01-18.zip
-#          mv windows intel
-#
-#      - name: check if build cache exists
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        id: build-cache-exists
-#        run: |
-#          if ( curl -o/dev/null -sfI $CI_DOWNLOAD_SERVER/cache/build-cache-${{ runner.os }}.zip ); then
-#            echo "::set-output name=cache-hit::true"
-#          else
-#            echo "::set-output name=cache-hit::false"
-#          fi
-#
-#      - name: download build cache
-#        if: steps.build-cache-exists.outputs.cache-hit == 'true'
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          cd ~/atlas/src/3rdparty
-#          curl -L -O $CI_DOWNLOAD_SERVER/cache/build-cache-${{ runner.os }}.zip
-#          unzip -q build-cache-${{ runner.os }}.zip
-#          rm build-cache-${{ runner.os }}.zip
-#
-#      - name: download deps
-#        if: steps.build-cache-exists.outputs.cache-hit != 'true'
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          conda info
-#          cd ~
-#          pwd
-#          curl -L -O $CI_DOWNLOAD_SERVER/common/atlas-deps-2021-01-21.zip
-#          unzip -q atlas-deps-2021-01-21.zip
-#          rm atlas-deps-2021-01-21.zip
-#
-#      - name: build deps
-#        if: steps.build-cache-exists.outputs.cache-hit != 'true'
-#        shell: pwsh  # the perl from git bash causes error while building openssl
-#        env:
-#          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
-#        run: |
-#          conda info
-#          cd ~/atlas
-#          python util/build_ext_libs.py all
-#          conda config --set anaconda_upload yes
-#
-#      - name: setup ssh key
-#        shell: bash -l {0}
-#        env:
-#          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-#          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-#        run: |
-#          mkdir -p ~/.ssh/
-#          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
-#          sudo chmod 600 ~/.ssh/private.key
-#          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-#
-#      - name: upload build cache
-#        if: steps.build-cache-exists.outputs.cache-hit != 'true'
-#        shell: bash -l {0}
-#        env:
-#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-#          SSH_PORT: ${{ secrets.SSH_PORT }}
-#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-#          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
-#        run: |
-#          cd ~/atlas/src/3rdparty
-#          zip --quiet --recurse-paths --symlinks build-cache-${{ runner.os }}.zip build
-#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $CI_CACHE_PATH/build-cache-${{ runner.os }}.zip"
-#          scp -P $SSH_PORT -i ~/.ssh/private.key build-cache-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$CI_CACHE_PATH/
-#
-#      - name: build
-#        shell: bash -l {0}
-#        run: |
-#          conda info
-#          cd ~/atlas
-#          pwd
-#          python util/build_atlas.py
-#
-#      - name: download test data
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          conda info
-#          cd ~
-#          pwd
-#          curl -L -O $CI_DOWNLOAD_SERVER/common/atlas-test-data-2021-01-18.zip
-#          unzip -q atlas-test-data-2021-01-18.zip
-#          rm atlas-test-data-2021-01-18.zip
-#
-#      - name: test
-#        shell: bash -l {0}
-#        run: |
-#          conda info
-#          cd ~/atlas
-#          pwd
-#          python util/deploy_atlas.py
-#
-#      - name: deploy
-#        shell: bash -l {0}
-#        env:
-#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-#          SSH_PORT: ${{ secrets.SSH_PORT }}
-#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-#          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
-#        run: |
-#          cd ~/atlas/deploy
-#          pwd
-#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -rf $SSH_DEPLOY_PATH/packages/${{ runner.os }}"
-#          scp -P $SSH_PORT -i ~/.ssh/private.key -r ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
-#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $SSH_DEPLOY_PATH/installers/AtlasInstaller-${{ runner.os }}.zip"
-#          scp -P $SSH_PORT -i ~/.ssh/private.key AtlasInstaller-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
-#
-#      - name: build and upload conda zimg
-#        shell: bash -l {0}
-#        env:
-#          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
-#        run: |
-#          conda info
-#          cd ~/atlas
-#          pwd
-#          python util/build_ext_libs.py conda-zimg
-#          conda config --set anaconda_upload yes
-#          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
+      - name: Cache conda pkgs
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CONDA }}/pkgs
+            ~/.conda/pkgs
+          key: ${{ runner.os }}-condapkgs-3.12
+
+      - name: Install conda tooling and Python deps
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          conda info
+          conda update --all -y
+          conda install -y anaconda-client conda-build pip
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          conda clean --all -y
+
+      - name: Cache Qt (installed)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Qt/${{ env.QT_VERSION }}
+            ~/Qt/Tools/QtInstallerFramework
+          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
+
+      - name: Install Qt 6 (aqt)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          mkdir -p "$HOME/Qt"
+          if [ -d "$HOME/Qt/${QT_VERSION}/msvc2022_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" windows desktop ${QT_VERSION} win64_msvc2022_64; fi
+          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" windows desktop tools_ifw qt.tools.ifw.47; fi
+          ls -la "$HOME/Qt" || true
+
+      - name: Build external deps
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/build_ext_libs.py all --exclude-libs conda-zimg
+
+  build:
+    runs-on: windows-2022
+    needs: build-env
+    permissions:
+      contents: write
+    env:
+      QT_VERSION: "6.9.2"
+      VULKAN_SDK_VERSION: 1.4.328.1
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Fetch full history and tags so git_describe works
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Free disk space
+        shell: pwsh
+        run: |
+          Write-Host 'Before:'; fsutil volume diskfree C:
+          choco feature enable -n=allowGlobalConfirmation
+          choco clean --yes
+          # Remove hosted toolcache
+          $toolcache = 'C:\hostedtoolcache\windows'
+          if (Test-Path $toolcache) {
+            Get-ChildItem $toolcache -Force | ForEach-Object {
+              Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+          if (Test-Path 'C:\hostedtoolcache') {
+            Get-ChildItem 'C:\hostedtoolcache' -Force | Where-Object { $_.Name -ne 'windows' } | ForEach-Object {
+              Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+          # Remove Node (toolcache + Program Files + user npm caches)
+          if (Test-Path 'C:\hostedtoolcache\windows\node') { Remove-Item 'C:\hostedtoolcache\windows\node' -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path 'C:\Program Files\nodejs') { Remove-Item 'C:\Program Files\nodejs' -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:USERPROFILE\AppData\Roaming\npm") { Remove-Item "$env:USERPROFILE\AppData\Roaming\npm" -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:LocalAppData\npm-cache") { Remove-Item "$env:LocalAppData\npm-cache" -Recurse -Force -ErrorAction SilentlyContinue }
+          # Remove Go caches and toolcache (keep standard Go under Program Files)
+          if (Test-Path 'C:\hostedtoolcache\windows\go') { Remove-Item 'C:\hostedtoolcache\windows\go' -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:USERPROFILE\go") { Remove-Item "$env:USERPROFILE\go" -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:LocalAppData\go-build") { Remove-Item "$env:LocalAppData\go-build" -Recurse -Force -ErrorAction SilentlyContinue }
+          # Remove .NET SDKs
+          if (Test-Path 'C:\Program Files\dotnet') {
+            Remove-Item 'C:\Program Files\dotnet' -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          # Clear NuGet cache
+          if (Test-Path "$env:USERPROFILE\.nuget\packages") {
+            Remove-Item "$env:USERPROFILE\.nuget\packages" -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          # Clear temp folders
+          if (Test-Path "$env:TEMP") { Remove-Item "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path "$env:LocalAppData\Temp") { Remove-Item "$env:LocalAppData\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue }
+          # Remove Android SDK if present
+          if (Test-Path 'C:\Android') { Remove-Item 'C:\Android' -Recurse -Force -ErrorAction SilentlyContinue }
+          # Remove preinstalled CMake (we use our vendored toolchain)
+          if (Test-Path 'C:\Program Files\CMake') { Remove-Item 'C:\Program Files\CMake' -Recurse -Force -ErrorAction SilentlyContinue }
+          Write-Host 'After:'; fsutil volume diskfree C:
+
+      - name: Ensure Perl
+        shell: pwsh
+        run: |
+          if (-not (Get-Command perl -ErrorAction SilentlyContinue)) {
+            choco feature enable -n=allowGlobalConfirmation
+            choco install strawberryperl
+          }
+          perl -v
+          where perl
+
+      - name: Install Intel oneAPI BaseKit (winget)
+        shell: pwsh
+        run: |
+          winget install -e --id Intel.oneAPI.BaseKit --accept-package-agreements --accept-source-agreements --silent
+          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb")) { Write-Error "oneAPI TBB CMake config missing" }
+          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) { Write-Error "oneAPI MKL missing" }
+
+      - name: Cache Vulkan SDK (installed)
+        id: cache-vulkan
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\VulkanSDK\${{ env.VULKAN_SDK_VERSION }}
+          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
+
+      - name: Install Vulkan SDK (LunarG via winget)
+        if: steps.cache-vulkan.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # Install specific Vulkan SDK version
+          winget install -e --id LunarG.VulkanSDK --version $env:VULKAN_SDK_VERSION `
+            --accept-package-agreements --accept-source-agreements --silent
+          if (-not (Test-Path "C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin\glslc.exe")) {
+            Write-Error "Vulkan SDK not found at expected path: C:\VulkanSDK\$env:VULKAN_SDK_VERSION"
+          }
+          Get-ChildItem -Force "C:\VulkanSDK\$env:VULKAN_SDK_VERSION" | Select-Object FullName
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: "3.12"
+          activate-environment: atlas-ci
+          miniconda-version: "latest"
+          channels: defaults
+
+      - name: Show Python version
+        shell: bash -l {0}
+        run: |
+          python -V
+          which python || where python
+          pip --version
+
+      - name: Cache conda pkgs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CONDA }}/pkgs
+            ~/.conda/pkgs
+          key: ${{ runner.os }}-condapkgs-3.12
+
+      - name: Install conda tooling
+        shell: bash -l {0}
+        run: |
+          conda info
+          conda install -y anaconda-client conda-build pip
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+
+      - name: Cache Qt (installed)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Qt/${{ env.QT_VERSION }}
+            ~/Qt/Tools/QtInstallerFramework
+          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
+
+      - name: Install Qt 6 (aqt)
+        shell: bash -l {0}
+        run: |
+          mkdir -p "$HOME/Qt"
+          if [ -d "$HOME/Qt/${QT_VERSION}/msvc2022_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" windows desktop ${QT_VERSION} win64_msvc2022_64; fi
+          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" windows desktop tools_ifw qt.tools.ifw.47; fi
+          ls -la "$HOME/Qt" || true
+
+      - name: Cache 3rdparty build
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/3rdparty/build
+          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+
+      - name: Cache atlas_deps (download archives)
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
+          restore-keys: |
+            atlasdeps-
+
+      - name: Cache atlas test data
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_test_data
+          key: ${{ format('testdata-{0}', hashFiles('util/atlas_test_data_filelist.py')) }}
+          restore-keys: |
+            testdata-
+
+      - name: Build Atlas
+        shell: bash -l {0}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/build_atlas.py
+
+      - name: Package and smoke test
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+        shell: bash -l {0}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/deploy_atlas.py
+
+      - name: Setup SSH key
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+        shell: bash -l {0}
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
+          chmod 600 ~/.ssh/private.key
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Create or update release and upload assets (gh CLI)
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.event.ref }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          TAG="${TAG_NAME:-${GITHUB_REF#refs/tags/}}"
+          echo "Creating/updating release for tag: $TAG"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists"
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes
+          fi
+          shopt -s nullglob
+          files=(deploy/AtlasInstaller*.zip deploy/atlas-*.zip)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release zip files found under deploy/" >&2
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+      - name: Deploy artifacts (SSH)
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+        shell: bash -l {0}
+        env:
+          SSH_SERVER: ${{ secrets.SSH_SERVER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          # Ensure remote paths exist and replace the Windows package folder
+          ssh -p "$SSH_PORT" -i ~/.ssh/private.key "$SSH_USERNAME@$SSH_SERVER" \
+            "mkdir -p '$SSH_DEPLOY_PATH/packages' '$SSH_DEPLOY_PATH/installers' && rm -rf '$SSH_DEPLOY_PATH/packages/Windows'"
+          scp -P "$SSH_PORT" -i ~/.ssh/private.key -r "deploy/Windows" "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/"
+          scp -P "$SSH_PORT" -i ~/.ssh/private.key deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/"
+
+      - name: Build and upload conda zimg
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+        shell: bash -l {0}
+        env:
+          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/build_ext_libs.py conda-zimg
+          conda config --set anaconda_upload yes
+          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe

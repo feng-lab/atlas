@@ -284,7 +284,6 @@ def pack_atlas_package():
 
 
 def build_atlas_installer():
-    version_token = get_version_token_for_filename()
 
     if common_dirs.is_mac():
         suffix = 'macOS'
@@ -294,7 +293,7 @@ def build_atlas_installer():
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.app'
-        installer_zip_name = f"AtlasInstaller-{suffix}-{version_token}.zip"
+        installer_zip_name = f"AtlasInstaller-{suffix}.zip"
     elif common_dirs.is_linux():
         suffix = 'Linux'
         app_name = 'Atlas.AppDir'
@@ -303,7 +302,7 @@ def build_atlas_installer():
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller'
-        installer_zip_name = f"AtlasInstaller-{suffix}-{version_token}.zip"
+        installer_zip_name = f"AtlasInstaller-{suffix}.zip"
     else:
         suffix = 'Windows'
         app_name = 'Atlas'
@@ -312,27 +311,16 @@ def build_atlas_installer():
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.exe'
-        installer_zip_name = f"AtlasInstaller-{suffix}-{version_token}.zip"
+        installer_zip_name = f"AtlasInstaller-{suffix}.zip"
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), repo_package_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), repo_package_name))
     shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=True)
-    # Clean old installer zips for this suffix
-    try:
-        for fname in os.listdir(common_dirs.deploy_target_dir()):
-            if fname.startswith(f"AtlasInstaller-{suffix}-") and fname.endswith(".zip"):
-                try:
-                    os.remove(os.path.join(common_dirs.deploy_target_dir(), fname))
-                except Exception:
-                    pass
-            # Also remove legacy name without version
-            if fname == f"AtlasInstaller-{suffix}.zip":
-                try:
-                    os.remove(os.path.join(common_dirs.deploy_target_dir(), fname))
-                except Exception:
-                    pass
-    except FileNotFoundError:
-        os.makedirs(common_dirs.deploy_target_dir(), exist_ok=True)
+    if os.path.exists(
+        os.path.join(common_dirs.deploy_target_dir(), installer_zip_name)
+    ):
+        os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name))
+
     if common_dirs.is_mac():
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=True)
     elif os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_app_name)):

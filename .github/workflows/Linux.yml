@@ -30,10 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # Fetch full history and tags so git_describe works
           ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
-          fetch-depth: 0
-          fetch-tags: true
+          fetch-depth: 1
           submodules: recursive
           
       - name: Cache 3rdparty build
@@ -161,14 +159,6 @@ jobs:
           which python
           pip --version
 
-      - name: Cache pip
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.12
-
       - name: Cache conda pkgs
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: actions/cache@v4
@@ -237,7 +227,6 @@ jobs:
           # Fetch full history and tags so git_describe works
           ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
           fetch-depth: 0
-          fetch-tags: true
           submodules: recursive
 
       - name: Free disk space
@@ -339,13 +328,6 @@ jobs:
           python -V
           which python
           pip --version
-
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.12
 
       - name: Cache conda pkgs
         uses: actions/cache@v4
