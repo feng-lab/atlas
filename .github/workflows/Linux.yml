@@ -44,9 +44,7 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: >
-            ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
-            ${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
           restore-keys: |
             ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
             ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
@@ -56,9 +54,7 @@ jobs:
         with:
           path: |
             atlas_deps
-          key: >
-            atlasdeps-${{ env.CACHE_VERSION }}-
-            ${{ hashFiles('util/atlas_deps_filelist.py') }}
+          key: ${{ format('atlasdeps-{0}-{1}', env.CACHE_VERSION, hashFiles('util/atlas_deps_filelist.py')) }}
           restore-keys: |
             atlasdeps-${{ env.CACHE_VERSION }}-
 
@@ -409,9 +405,7 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: >
-            ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
-            ${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
           restore-keys: |
             ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
             ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
@@ -421,9 +415,7 @@ jobs:
         with:
           path: |
             atlas_deps
-          key: >
-            atlasdeps-${{ env.CACHE_VERSION }}-
-            ${{ hashFiles('util/atlas_deps_filelist.py') }}
+          key: ${{ format('atlasdeps-{0}-{1}', env.CACHE_VERSION, hashFiles('util/atlas_deps_filelist.py')) }}
           restore-keys: |
             atlasdeps-${{ env.CACHE_VERSION }}-
 
@@ -432,9 +424,7 @@ jobs:
         with:
           path: |
             atlas_test_data
-          key: >
-            testdata-${{ env.CACHE_VERSION }}-
-            ${{ hashFiles('util/atlas_test_data_filelist.py') }}
+          key: ${{ format('testdata-{0}-{1}', env.CACHE_VERSION, hashFiles('util/atlas_test_data_filelist.py')) }}
           restore-keys: |
             testdata-${{ env.CACHE_VERSION }}-
 
