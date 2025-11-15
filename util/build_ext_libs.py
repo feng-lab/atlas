@@ -95,7 +95,7 @@ def create_build_dir(src_dir: str):
     if src_dir.endswith('ITK'):
         build_dir = os.path.normpath(os.path.join(ext_build_dir(), '_I'))  # ITK windows build dir length limit
     if os.path.exists(build_dir):
-        shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
+        shutil.rmtree(build_dir, ignore_errors=False, onexc=handleRemoveReadonly)
     os.mkdir(build_dir)
     logger.info(f'created build dir: {build_dir}')
     return build_dir
@@ -104,7 +104,7 @@ def create_build_dir(src_dir: str):
 def create_arm64_install_dir(src_dir: str):
     install_dir = os.path.normpath(os.path.join(ext_build_dir(), '__arm64_' + Path(src_dir).name))
     if os.path.exists(install_dir):
-        shutil.rmtree(install_dir, ignore_errors=False, onerror=handleRemoveReadonly)
+        shutil.rmtree(install_dir, ignore_errors=False, onexc=handleRemoveReadonly)
     os.mkdir(install_dir)
     return install_dir
 
@@ -2629,7 +2629,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
             finally:
                 shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
-        shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
+        shutil.rmtree(build_dir, ignore_errors=False, onexc=handleRemoveReadonly)
         patch_manager.restore_files()
         os.rename(os.path.join(src_dir, 'cmake', 'modules', '__FindTBB.cmake'),
                   os.path.join(src_dir, 'cmake', 'modules', 'FindTBB.cmake'))
@@ -2655,7 +2655,7 @@ def build_llfio(src_dir: str, install_dir: str):
                             os.path.join(ext_build_dir()),
                             dirs_exist_ok=True)
     finally:
-        shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
+        shutil.rmtree(build_dir, ignore_errors=False, onexc=handleRemoveReadonly)
 
 
 def build_jansson(src_dir: str, install_dir: str):

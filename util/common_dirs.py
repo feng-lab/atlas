@@ -587,13 +587,19 @@ def get_gperf_dir() -> str:
         assert False
 
 
-def handleRemoveReadonly(func, path, exc):
-    excvalue = exc[1]
-    if func in (os.rmdir, os.unlink, os.remove) and excvalue.errno == errno.EACCES:
+def handleRemoveReadonly(func, path, excinfo):
+    """
+    Helper for shutil.rmtree error handling on Python 3.12+ using the
+    ``onexc`` callback (func, path, excinfo).
+
+    Clears readonly bits when the failure is a permissions error, then
+    retries the removal once; otherwise re-raises the original exception.
+    """
+    if func in (os.rmdir, os.unlink, os.remove) and getattr(excinfo, "errno", None) == errno.EACCES:
         os.chmod(path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # 0777
         func(path)
     else:
-        raise
+        raise excinfo
 
 
 if __name__ == "__main__":

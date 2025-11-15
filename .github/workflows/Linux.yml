@@ -4,6 +4,18 @@ on:
   push:
     branches:
       - main
+  create:
+    # Runs when a branch or tag is created; we gate to tags in job steps
+  workflow_dispatch:
+
+concurrency:
+  # Cancel any in-progress run for the same ref (branch or tag),
+  # regardless of commit SHA. For create tag events, use the tag ref.
+  group: atlas-${{ github.workflow }}-${{ github.event_name == 'create' && format('refs/tags/{0}', github.event.ref) || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build-env:
@@ -20,15 +32,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          # Fetch full history and tags so git_describe works
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
           submodules: recursive
           
-      - name: Cache 3rdparty build and downloaded deps
+      - name: Cache 3rdparty build
         id: cache-extlibs
         uses: actions/cache@v4
         with:
           path: |
-            atlas_deps
             src/3rdparty/build
           key: >
             ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
@@ -36,6 +50,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
             ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
+
+      - name: Cache atlas_deps (download archives)
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+          key: >
+            atlasdeps-${{ env.CACHE_VERSION }}-
+            ${{ hashFiles('util/atlas_deps_filelist.py') }}
+          restore-keys: |
+            atlasdeps-${{ env.CACHE_VERSION }}-
 
       - name: Check atlas_deps directory
         id: atlas-deps-dir
@@ -217,6 +242,8 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     needs: build-env
+    permissions:
+      contents: write
     env:
       # Pin a Vulkan SDK version that is known-good
       VULKAN_SDK_VERSION: 1.4.328.1
@@ -229,7 +256,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          # Fetch full history and tags so git_describe works
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
           submodules: recursive
 
       - name: Free disk space
@@ -374,11 +404,10 @@ jobs:
           if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" linux desktop tools_ifw qt.tools.ifw.47; fi
           ls -la "$HOME/Qt" || true
 
-      - name: Cache 3rdparty build and downloaded deps
+      - name: Cache 3rdparty build
         uses: actions/cache@v4
         with:
           path: |
-            atlas_deps
             src/3rdparty/build
           key: >
             ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
@@ -386,6 +415,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ext-${{ env.CACHE_VERSION }}-${{ env.CLANG_MAJOR }}-
             ${{ runner.os }}-extlibs-clang${{ env.CLANG_MAJOR }}-qt${{ env.QT_VERSION }}-vk${{ env.VULKAN_SDK_VERSION }}-${{ env.CACHE_VERSION }}-
+
+      - name: Cache atlas_deps (download archives)
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+          key: >
+            atlasdeps-${{ env.CACHE_VERSION }}-
+            ${{ hashFiles('util/atlas_deps_filelist.py') }}
+          restore-keys: |
+            atlasdeps-${{ env.CACHE_VERSION }}-
+
+      - name: Cache atlas test data
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_test_data
+          key: >
+            testdata-${{ env.CACHE_VERSION }}-
+            ${{ hashFiles('util/atlas_test_data_filelist.py') }}
+          restore-keys: |
+            testdata-${{ env.CACHE_VERSION }}-
 
       - name: Build Atlas
         shell: bash -l {0}
@@ -396,10 +447,36 @@ jobs:
           python util/build_atlas.py
 
       - name: Package and smoke test
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         run: |
           cd "$GITHUB_WORKSPACE"
           python util/deploy_atlas.py
+
+      - name: Create or update release and upload assets (gh CLI)
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.event.ref }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          TAG="${TAG_NAME:-${GITHUB_REF#refs/tags/}}"
+          echo "Creating/updating release for tag: $TAG"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists"
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes
+          fi
+          shopt -s nullglob
+          files=(deploy/AtlasInstaller*.zip deploy/atlas-*.zip)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release zip files found under deploy/" >&2
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
 
       - name: Setup SSH key
         shell: bash -l {0}
@@ -413,6 +490,7 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Deploy artifacts
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         env:
           SSH_SERVER: ${{ secrets.SSH_SERVER }}
@@ -425,6 +503,7 @@ jobs:
           rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
 
       - name: Build and upload conda zimg
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}

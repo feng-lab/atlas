@@ -749,10 +749,10 @@ CI / Automation
 - Dependencies are installed directly on the runner (no CI_DOWNLOAD_SERVER):
   - Qt via `aqtinstall` into `~/Qt` (tools_ifw included for packaging). CI controls the version with `QT_VERSION`.
   - Intel oneAPI MKL/TBB via Intel’s apt repo into `/opt/intel/oneapi`.
-  - Vulkan SDK (LunarG) unpacked into `~/VulkanSDK/<ver>`; `VULKAN_SDK` is exported by `PathList.cmake`. CI pins `1.4.328.1`.
+- Vulkan SDK (LunarG) unpacked into `~/VulkanSDK/<ver>`; `VULKAN_SDK` is exported by `PathList.cmake`. CI pins `1.4.328.1`.
 - External libs/tooling (CMake, Ninja, ffmpeg, etc.) are fetched by `util/build_ext_libs.py`.
 - Test data is pulled by `util/build_atlas.py` using `util/download_atlas_test_data.py`.
-  - Caching: `src/3rdparty/build` and `atlas_deps` are cached in CI with a version knob `CACHE_VERSION` defined in the workflow env; bump it to invalidate.
+  - Caching: `src/3rdparty/build`, `atlas_deps`, and `atlas_test_data` are cached in CI with a version knob `CACHE_VERSION` defined in the workflow env; bump it to invalidate.
 
 LLVM/Clang versioning
 

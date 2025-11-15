@@ -16,6 +16,50 @@ from logger import setup_logger
 logger = logging.getLogger(__name__)
 
 
+def _read_git_version_from_header() -> str:
+    """Read GIT_VERSION from generated src/version/version.h.
+
+    Returns the raw C string content without surrounding quotes.
+    Raises RuntimeError if the header is missing or malformed.
+    """
+    repo_root = common_dirs.atlas_repository_dir()
+    vh_path = os.path.join(repo_root, "src", "version", "version.h")
+    if not os.path.exists(vh_path):
+        raise RuntimeError(f"version.h not found: {vh_path}")
+    try:
+        with open(vh_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#define GIT_VERSION"):
+                    # line format: #define GIT_VERSION "..."
+                    start = line.find('"')
+                    end = line.rfind('"')
+                    if start != -1 and end != -1 and end > start:
+                        return line[start + 1 : end]
+        raise RuntimeError("GIT_VERSION define not found in version.h")
+    except Exception as e:
+        raise RuntimeError(f"Failed reading version.h: {e}")
+
+
+def get_version_token_for_filename() -> str:
+    """Return a filesystem-friendly version token for filenames.
+
+    Uses the git-describe part of GIT_VERSION from version.h (before " build ").
+    """
+    raw = _read_git_version_from_header()
+
+    # Strip the trailing build timestamp appended by CMake if present
+    # e.g., "v0.9.0-1342-g5fecdae3 build 2025-11-15T04:34:33GMT"
+    parts = raw.split(" build ", 1)
+    token = parts[0].strip()
+
+    # Replace spaces/slashes if any remain (defensive)
+    token = token.replace(" ", "_").replace("/", "-")
+    if not token:
+        raise RuntimeError("Empty version token derived from GIT_VERSION")
+    return token
+
+
 def get_bak_file_name(orig_file: str):
     return orig_file + '.bak'
 
@@ -197,38 +241,51 @@ def build_atlas_package(is_debug_version: bool = False):
 
 
 def pack_atlas_package():
+    version_token = get_version_token_for_filename()
+
     if common_dirs.is_mac():
         app_name = 'Atlas.app'
-        zip_name = 'atlas-macOS.zip'
-
-        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
-            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
-
-        subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
-                       cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+        suffix = "macOS"
     elif common_dirs.is_linux():
         app_name = "Atlas.AppDir"
-        zip_name = "atlas-Linux.zip"
-
-        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
-            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
-
-        subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
-                       cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+        suffix = "Linux"
     else:
         app_name = 'Atlas'
-        zip_name = 'atlas-Windows.zip'
+        suffix = "Windows"
 
-        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
-            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
+    zip_name = f"atlas-{suffix}-{version_token}.zip"
 
-        shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_name[0:-4]),
-                            'zip',
-                            root_dir=common_dirs.deploy_target_dir(),
-                            base_dir=app_name)
+    # Remove any previous atlas-{suffix}-*.zip to keep deploy dir tidy
+    deploy_dir = common_dirs.deploy_target_dir()
+    try:
+        for fname in os.listdir(deploy_dir):
+            if fname.startswith(f"atlas-{suffix}-") and fname.endswith(".zip"):
+                try:
+                    os.remove(os.path.join(deploy_dir, fname))
+                except Exception:
+                    pass
+    except FileNotFoundError:
+        os.makedirs(deploy_dir, exist_ok=True)
+
+    if common_dirs.is_windows():
+        shutil.make_archive(
+            os.path.join(deploy_dir, zip_name[:-4]),
+            "zip",
+            root_dir=deploy_dir,
+            base_dir=app_name,
+        )
+    else:
+        subprocess.run(
+            ["zip", "--quiet", "--recurse-paths", "--symlinks", zip_name, app_name],
+            cwd=deploy_dir,
+            shell=False,
+            check=True,
+        )
 
 
 def build_atlas_installer():
+    version_token = get_version_token_for_filename()
+
     if common_dirs.is_mac():
         suffix = 'macOS'
         app_name = 'Atlas.app'
@@ -237,7 +294,7 @@ def build_atlas_installer():
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.app'
-        installer_zip_name = f'AtlasInstaller-{suffix}.zip'
+        installer_zip_name = f"AtlasInstaller-{suffix}-{version_token}.zip"
     elif common_dirs.is_linux():
         suffix = 'Linux'
         app_name = 'Atlas.AppDir'
@@ -246,7 +303,7 @@ def build_atlas_installer():
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller'
-        installer_zip_name = f'AtlasInstaller-{suffix}.zip'
+        installer_zip_name = f"AtlasInstaller-{suffix}-{version_token}.zip"
     else:
         suffix = 'Windows'
         app_name = 'Atlas'
@@ -255,13 +312,27 @@ def build_atlas_installer():
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.exe'
-        installer_zip_name = f'AtlasInstaller-{suffix}.zip'
+        installer_zip_name = f"AtlasInstaller-{suffix}-{version_token}.zip"
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), repo_package_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), repo_package_name))
     shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=True)
-    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name)):
-        os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name))
+    # Clean old installer zips for this suffix
+    try:
+        for fname in os.listdir(common_dirs.deploy_target_dir()):
+            if fname.startswith(f"AtlasInstaller-{suffix}-") and fname.endswith(".zip"):
+                try:
+                    os.remove(os.path.join(common_dirs.deploy_target_dir(), fname))
+                except Exception:
+                    pass
+            # Also remove legacy name without version
+            if fname == f"AtlasInstaller-{suffix}.zip":
+                try:
+                    os.remove(os.path.join(common_dirs.deploy_target_dir(), fname))
+                except Exception:
+                    pass
+    except FileNotFoundError:
+        os.makedirs(common_dirs.deploy_target_dir(), exist_ok=True)
     if common_dirs.is_mac():
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=True)
     elif os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_app_name)):
@@ -269,7 +340,7 @@ def build_atlas_installer():
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube')):
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'),
-                      ignore_errors=False, onerror=common_dirs.handleRemoveReadonly)
+                      ignore_errors=False, onexc=common_dirs.handleRemoveReadonly)
     shutil.copytree(os.path.join(common_dirs.ext_build_dir(), 'packages-' + suffix, 'fenglab.neutube'),
                     os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'))
 
@@ -341,7 +412,7 @@ def build_atlas_installer():
             target_folder = os.path.join(out_folder, 'packages')
             if os.path.exists(os.path.join(target_folder, suffix)):
                 shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False,
-                              onerror=common_dirs.handleRemoveReadonly)
+                              onexc=common_dirs.handleRemoveReadonly)
             shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
 
 
