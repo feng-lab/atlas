@@ -50,7 +50,7 @@ jobs:
           path: |
             atlas_deps
           key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
-        restore-keys: |
+          restore-keys: |
             atlasdeps-
 
       - name: Free disk space
@@ -395,7 +395,7 @@ jobs:
           path: |
             atlas_deps
           key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
-        restore-keys: |
+          restore-keys: |
             atlasdeps-
 
       - name: Cache atlas test data
@@ -404,7 +404,7 @@ jobs:
           path: |
             atlas_test_data
           key: ${{ format('testdata-{0}', hashFiles('util/atlas_test_data_filelist.py')) }}
-        restore-keys: |
+          restore-keys: |
             testdata-
 
       - name: Build Atlas
