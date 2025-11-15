@@ -42,15 +42,6 @@ jobs:
             src/3rdparty/build
           key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
 
-      - name: Cache atlas_deps (download archives)
-        uses: actions/cache@v4
-        with:
-          path: |
-            atlas_deps
-          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
-          restore-keys: |
-            atlasdeps-
-
       - name: Free disk space
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
@@ -197,6 +188,16 @@ jobs:
           if [ -d "$HOME/Qt/${QT_VERSION}/gcc_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" linux desktop ${QT_VERSION} linux_gcc_64; fi
           if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" linux desktop tools_ifw qt.tools.ifw.47; fi
           ls -la "$HOME/Qt" || true
+
+      - name: Cache atlas_deps (download archives)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
+          restore-keys: |
+            atlasdeps-
 
       - name: Build external deps
         # Only rebuild external deps when we did not get an exact cache hit

@@ -40,60 +40,6 @@ jobs:
             src/3rdparty/build
           key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
 
-      - name: Cache atlas_deps (download archives)
-        uses: actions/cache@v4
-        with:
-          path: |
-            atlas_deps
-          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
-          restore-keys: |
-            atlasdeps-
-
-      - name: Free disk space
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          Write-Host 'Before:'; fsutil volume diskfree C:
-          choco feature enable -n=allowGlobalConfirmation
-          choco clean --yes
-          # Remove hosted toolcache
-          $toolcache = 'C:\hostedtoolcache\windows'
-          if (Test-Path $toolcache) {
-            Get-ChildItem $toolcache -Force | ForEach-Object {
-              Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
-            }
-          }
-          if (Test-Path 'C:\hostedtoolcache') {
-            Get-ChildItem 'C:\hostedtoolcache' -Force | Where-Object { $_.Name -ne 'windows' } | ForEach-Object {
-              Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
-            }
-          }
-          # Remove Node (toolcache + Program Files + user npm caches)
-          if (Test-Path 'C:\hostedtoolcache\windows\node') { Remove-Item 'C:\hostedtoolcache\windows\node' -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path 'C:\Program Files\nodejs') { Remove-Item 'C:\Program Files\nodejs' -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:USERPROFILE\AppData\Roaming\npm") { Remove-Item "$env:USERPROFILE\AppData\Roaming\npm" -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:LocalAppData\npm-cache") { Remove-Item "$env:LocalAppData\npm-cache" -Recurse -Force -ErrorAction SilentlyContinue }
-          # Remove Go caches and toolcache (keep standard Go under Program Files)
-          if (Test-Path 'C:\hostedtoolcache\windows\go') { Remove-Item 'C:\hostedtoolcache\windows\go' -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:USERPROFILE\go") { Remove-Item "$env:USERPROFILE\go" -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:LocalAppData\go-build") { Remove-Item "$env:LocalAppData\go-build" -Recurse -Force -ErrorAction SilentlyContinue }
-          # Remove .NET SDKs
-          if (Test-Path 'C:\Program Files\dotnet') {
-            Remove-Item 'C:\Program Files\dotnet' -Recurse -Force -ErrorAction SilentlyContinue
-          }
-          # Clear NuGet cache
-          if (Test-Path "$env:USERPROFILE\.nuget\packages") {
-            Remove-Item "$env:USERPROFILE\.nuget\packages" -Recurse -Force -ErrorAction SilentlyContinue
-          }
-          # Clear temp folders
-          if (Test-Path "$env:TEMP") { Remove-Item "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:LocalAppData\Temp") { Remove-Item "$env:LocalAppData\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue }
-          # Remove Android SDK if present
-          if (Test-Path 'C:\Android') { Remove-Item 'C:\Android' -Recurse -Force -ErrorAction SilentlyContinue }
-          # Remove preinstalled CMake (we use our vendored toolchain)
-          if (Test-Path 'C:\Program Files\CMake') { Remove-Item 'C:\Program Files\CMake' -Recurse -Force -ErrorAction SilentlyContinue }
-          Write-Host 'After:'; fsutil volume diskfree C:
-
       - name: Ensure Perl
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: pwsh
@@ -189,6 +135,16 @@ jobs:
           if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" windows desktop tools_ifw qt.tools.ifw.47; fi
           ls -la "$HOME/Qt" || true
 
+      - name: Cache atlas_deps (download archives)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
+          restore-keys: |
+            atlasdeps-
+
       - name: Build external deps
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
@@ -211,50 +167,6 @@ jobs:
           ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
           fetch-depth: 0
           submodules: recursive
-
-      - name: Free disk space
-        shell: pwsh
-        run: |
-          Write-Host 'Before:'; fsutil volume diskfree C:
-          choco feature enable -n=allowGlobalConfirmation
-          choco clean --yes
-          # Remove hosted toolcache
-          $toolcache = 'C:\hostedtoolcache\windows'
-          if (Test-Path $toolcache) {
-            Get-ChildItem $toolcache -Force | ForEach-Object {
-              Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
-            }
-          }
-          if (Test-Path 'C:\hostedtoolcache') {
-            Get-ChildItem 'C:\hostedtoolcache' -Force | Where-Object { $_.Name -ne 'windows' } | ForEach-Object {
-              Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
-            }
-          }
-          # Remove Node (toolcache + Program Files + user npm caches)
-          if (Test-Path 'C:\hostedtoolcache\windows\node') { Remove-Item 'C:\hostedtoolcache\windows\node' -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path 'C:\Program Files\nodejs') { Remove-Item 'C:\Program Files\nodejs' -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:USERPROFILE\AppData\Roaming\npm") { Remove-Item "$env:USERPROFILE\AppData\Roaming\npm" -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:LocalAppData\npm-cache") { Remove-Item "$env:LocalAppData\npm-cache" -Recurse -Force -ErrorAction SilentlyContinue }
-          # Remove Go caches and toolcache (keep standard Go under Program Files)
-          if (Test-Path 'C:\hostedtoolcache\windows\go') { Remove-Item 'C:\hostedtoolcache\windows\go' -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:USERPROFILE\go") { Remove-Item "$env:USERPROFILE\go" -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:LocalAppData\go-build") { Remove-Item "$env:LocalAppData\go-build" -Recurse -Force -ErrorAction SilentlyContinue }
-          # Remove .NET SDKs
-          if (Test-Path 'C:\Program Files\dotnet') {
-            Remove-Item 'C:\Program Files\dotnet' -Recurse -Force -ErrorAction SilentlyContinue
-          }
-          # Clear NuGet cache
-          if (Test-Path "$env:USERPROFILE\.nuget\packages") {
-            Remove-Item "$env:USERPROFILE\.nuget\packages" -Recurse -Force -ErrorAction SilentlyContinue
-          }
-          # Clear temp folders
-          if (Test-Path "$env:TEMP") { Remove-Item "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue }
-          if (Test-Path "$env:LocalAppData\Temp") { Remove-Item "$env:LocalAppData\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue }
-          # Remove Android SDK if present
-          if (Test-Path 'C:\Android') { Remove-Item 'C:\Android' -Recurse -Force -ErrorAction SilentlyContinue }
-          # Remove preinstalled CMake (we use our vendored toolchain)
-          if (Test-Path 'C:\Program Files\CMake') { Remove-Item 'C:\Program Files\CMake' -Recurse -Force -ErrorAction SilentlyContinue }
-          Write-Host 'After:'; fsutil volume diskfree C:
 
       - name: Ensure Perl
         shell: pwsh
