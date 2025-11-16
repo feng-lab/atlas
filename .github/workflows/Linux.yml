@@ -394,19 +394,13 @@ jobs:
           restore-keys: |
             testdata-
 
-      - name: Build Atlas
+      - name: Build and deploy Atlas
         shell: bash -l {0}
         env:
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
           cd "$GITHUB_WORKSPACE"
-          python util/build_atlas.py
-
-      - name: Package and smoke test
-        shell: bash -l {0}
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          python util/deploy_atlas.py
+          python util/build_and_deploy_atlas.py
 
       - name: Create or update release and upload assets (gh CLI)
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')

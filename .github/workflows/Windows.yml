@@ -3,7 +3,7 @@ name: Windows
 on:
   push:
     branches:
-      - main
+      - mainXX
   create:
     # Runs when a branch or tag is created; we gate to tags in job steps
   workflow_dispatch:
@@ -25,10 +25,33 @@ env:
   QT_VERSION: "6.9.2"
   # Pin a Vulkan SDK version
   VULKAN_SDK_VERSION: 1.4.328.1
+  # Split point for 3rdparty build; job1 stops before this lib, job2 starts from this lib
+  EXT_SPLIT_LIB: vtk
 
 jobs:
-  build-env:
+  ext-cache-probe:
     runs-on: windows-2022
+    outputs:
+      p2-hit: ${{ steps.cache-extlibs-probe.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 1
+
+      - name: Probe 3rdparty build cache (final p2)
+        id: cache-extlibs-probe
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            src/3rdparty/build
+          key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          lookup-only: true
+
+  build-env-1:
+    runs-on: windows-2022
+    needs: ext-cache-probe
+    if: needs.ext-cache-probe.outputs.p2-hit != 'true'
     steps:
       - name: Disable Git autocrlf
         shell: pwsh
@@ -41,16 +64,16 @@ jobs:
           fetch-depth: 1
           submodules: recursive
 
-      - name: Cache 3rdparty build
-        id: cache-extlibs
+      - name: Cache 3rdparty build (part 1)
+        id: cache-extlibs-p1
         uses: actions/cache@v4
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-p1-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
 
       - name: Ensure Perl
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           if (-not (Get-Command perl -ErrorAction SilentlyContinue)) {
@@ -61,7 +84,7 @@ jobs:
           where perl
 
       - name: Restore Intel oneAPI cache
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         id: cache-oneapi-restore-buildenv
         uses: actions/cache/restore@v4
         with:
@@ -70,7 +93,7 @@ jobs:
           key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
       - name: Install Intel oneAPI BaseKit (installer)
-        if: steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           if (Test-Path "C:\Program Files (x86)\Intel\oneAPI") {
@@ -86,7 +109,7 @@ jobs:
           if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI")) { Write-Error "Intel oneAPI root missing" }
 
       - name: Always save Intel oneAPI cache
-        if: always() && steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: always() && steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -94,7 +117,7 @@ jobs:
           key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
       - name: Cache Vulkan SDK (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         id: cache-vulkan-build
         uses: actions/cache@v4
         with:
@@ -103,7 +126,7 @@ jobs:
           key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
 
       - name: Install Vulkan SDK (LunarG installer)
-        if: steps.cache-vulkan-build.outputs.cache-hit != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-vulkan-build.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -124,7 +147,7 @@ jobs:
           }
 
       - name: Setup Miniconda
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
@@ -134,7 +157,7 @@ jobs:
           channels: defaults
 
       - name: Show Python version
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           python -V
@@ -142,7 +165,7 @@ jobs:
           pip --version
 
       - name: Cache conda pkgs
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -151,7 +174,7 @@ jobs:
           key: ${{ runner.os }}-condapkgs-3.12
 
       - name: Install conda tooling and Python deps
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           conda info
@@ -162,7 +185,7 @@ jobs:
           conda clean --all -y
 
       - name: Cache Qt (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -171,7 +194,7 @@ jobs:
           key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
 
       - name: Install Qt 6 (aqt)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
           mkdir -p "$HOME/Qt"
@@ -180,7 +203,7 @@ jobs:
           ls -la "$HOME/Qt" || true
 
       - name: Cache atlas_deps (download archives)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -190,17 +213,97 @@ jobs:
             ${{ runner.os }}-atlasdeps-
 
       - name: Build external deps
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        shell: pwsh # the perl from git bash causes error while building openssl
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
-          conda info
           $ErrorActionPreference = 'Stop'
           cd "$env:GITHUB_WORKSPACE"
-          python util/build_ext_libs.py all --exclude-libs conda-zimg
+          conda info
+          python util/build_ext_libs.py all --exclude-libs conda-zimg --stop-before $env:EXT_SPLIT_LIB
+
+  build-env-2:
+    runs-on: windows-2022
+    needs: [ext-cache-probe, build-env-1]
+    if: needs.ext-cache-probe.outputs.p2-hit != 'true'
+    steps:
+      - name: Disable Git autocrlf
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Ensure Perl
+        shell: pwsh
+        run: |
+          if (-not (Get-Command perl -ErrorAction SilentlyContinue)) {
+            choco feature enable -n=allowGlobalConfirmation
+            choco install strawberryperl
+          }
+          perl -v
+          where perl
+
+      - name: Restore Intel oneAPI cache
+        id: cache-oneapi-restore-buildenv2
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            C:\\Program Files (x86)\\Intel\\oneAPI
+          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: "3.12"
+          activate-environment: atlas-ci
+          miniconda-version: "latest"
+          channels: defaults
+
+      - name: Cache conda pkgs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CONDA }}/pkgs
+            ~/.conda/pkgs
+          key: ${{ runner.os }}-condapkgs-3.12
+
+      - name: Cache atlas_deps (download archives)
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
+          restore-keys: |
+            ${{ runner.os }}-atlasdeps-
+
+      - name: Cache 3rdparty build (part 2)
+        id: cache-extlibs-p2
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/3rdparty/build
+          key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          restore-keys: |
+            ${{ runner.os }}-ext-p1-
+
+      - name: Build external deps
+        if: steps.cache-extlibs-p2.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cd "$env:GITHUB_WORKSPACE"
+          conda info
+          python util/build_ext_libs.py all --exclude-libs conda-zimg --start-from $env:EXT_SPLIT_LIB
 
   build:
     runs-on: windows-2022
-    needs: build-env
+    needs: [ext-cache-probe, build-env-2]
+    if: ${{ needs.ext-cache-probe.outputs.p2-hit == 'true' || needs.build-env-2.result == 'success' }}
     permissions:
       contents: write
     steps:
@@ -336,12 +439,12 @@ jobs:
           if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" windows desktop tools_ifw qt.tools.ifw.47; fi
           ls -la "$HOME/Qt" || true
 
-      - name: Cache 3rdparty build
+      - name: Cache 3rdparty build (final)
         uses: actions/cache@v4
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
 
       - name: Cache atlas_deps (download archives)
         uses: actions/cache@v4
@@ -361,17 +464,11 @@ jobs:
           restore-keys: |
             testdata-
 
-      - name: Build Atlas
+      - name: Build and deploy Atlas
         shell: bash -l {0}
         run: |
           cd "$GITHUB_WORKSPACE"
-          python util/build_atlas.py
-
-      - name: Package and smoke test
-        shell: bash -l {0}
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          python util/deploy_atlas.py
+          python util/build_and_deploy_atlas.py
 
       - name: Setup SSH key
         shell: bash -l {0}

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from ftplib import FTP
@@ -93,17 +94,26 @@ def process_files(folder_path, base_url, backup_base_url):
 
 
 def generate_atlas_deps_filelist(files_info, output_file):
-    with open(output_file, 'w') as f:
-        f.write("files_to_download = [\n")
-        for file_info in files_info:
-            f.write("    {\n")
-            f.write(f"        'url': '{file_info['url']}',\n")
-            f.write(f"        'backup_url': '{file_info['backup_url']}',\n")
-            f.write(f"        'expected_size': {file_info['size']},\n")
-            f.write(f"        'expected_sha256': '{file_info['checksum']}',\n")
-            f.write(f"        'filename': '{file_info['filename']}',\n")
-            f.write("    },\n")
-        f.write("]\n")
+    """Write a Python file defining files_to_download using double-quoted strings.
+
+    The emitted structure is valid Python (also valid JSON) with only strings and numbers,
+    ensuring consistent quoting across platforms/tools.
+    """
+    out = []
+    for fi in files_info:
+        out.append(
+            {
+                "url": fi["url"],
+                "backup_url": fi["backup_url"],
+                "expected_size": fi["size"],
+                "expected_sha256": fi["checksum"],
+                "filename": fi["filename"],
+            }
+        )
+    with open(output_file, "w", newline="\n") as f:
+        f.write("files_to_download = ")
+        json.dump(out, f, indent=4)
+        f.write("\n")
 
 
 if __name__ == "__main__":

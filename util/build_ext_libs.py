@@ -3602,6 +3602,8 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
                         help="a list of libs to exclude from building", )
     parser.add_argument("--start-from", choices=list(libs.keys()),
                         help="skip libs before the specified lib")
+    parser.add_argument("--stop-before", choices=list(libs.keys()),
+                        help="stop building before the specified lib (exclusive)")
     parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
 
     # parse arguments
@@ -3622,6 +3624,7 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
         for lib in args.exclude_libs:
             libs[lib] = False
 
+    # Expand to reverse dependents
     for lib, rev_dep in libs_reverse_depends.items():
         if libs[lib]:
             for dlib in rev_dep:
@@ -3635,6 +3638,14 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
                 break
             started = args.start_from.lower() == lib.lower()
             if not started:
+                libs[lib] = False
+
+    if args.stop_before is not None:
+        stopping = False
+        for lib in libs:
+            if not stopping and args.stop_before.lower() == lib.lower():
+                stopping = True
+            if stopping:
                 libs[lib] = False
 
     build_all = True
