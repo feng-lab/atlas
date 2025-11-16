@@ -55,17 +55,17 @@ jobs:
           perl -v
           where perl
 
-      - name: Cache Intel oneAPI (installed)
+      - name: Restore Intel oneAPI cache
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        id: cache-oneapi-buildenv
-        uses: actions/cache@v4
+        id: cache-oneapi-restore-buildenv
+        uses: actions/cache/restore@v4
         with:
           path: |
             C:\\Program Files (x86)\\Intel\\oneAPI
           key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
       - name: Install Intel oneAPI BaseKit (installer)
-        if: steps.cache-oneapi-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           if (Test-Path "C:\Program Files (x86)\Intel\oneAPI") {
@@ -79,6 +79,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "oneAPI installer exit code: $LASTEXITCODE" }
           # Validate install paths
           if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI")) { Write-Error "Intel oneAPI root missing" }
+
+      - name: Always save Intel oneAPI cache
+        if: always() && steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            C:\\Program Files (x86)\\Intel\\oneAPI
+          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
       - name: Cache Vulkan SDK (installed)
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
@@ -206,16 +214,16 @@ jobs:
           perl -v
           where perl
 
-      - name: Cache Intel oneAPI (installed)
-        id: cache-oneapi-build
-        uses: actions/cache@v4
+      - name: Restore Intel oneAPI cache
+        id: cache-oneapi-restore-build
+        uses: actions/cache/restore@v4
         with:
           path: |
             C:\\Program Files (x86)\\Intel\\oneAPI
           key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
       - name: Install Intel oneAPI BaseKit (installer)
-        if: steps.cache-oneapi-build.outputs.cache-hit != 'true'
+        if: steps.cache-oneapi-restore-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           if (Test-Path "C:\Program Files (x86)\Intel\oneAPI") {
@@ -229,6 +237,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "oneAPI installer exit code: $LASTEXITCODE" }
           # Validate install paths
           if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI")) { Write-Error "Intel oneAPI root missing" }
+
+      - name: Always save Intel oneAPI cache
+        if: always() && steps.cache-oneapi-restore-build.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            C:\\Program Files (x86)\\Intel\\oneAPI
+          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
       - name: Cache Vulkan SDK (installed)
         id: cache-vulkan
