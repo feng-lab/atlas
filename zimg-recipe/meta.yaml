@@ -7,9 +7,10 @@ source:
 
 build:
   number: 0
-  # We ship a stable-ABI extension; avoid pinning to a specific Python minor
-  ignore_run_exports:
-    - python
+  # Mark as Python-version independent (ABI3). Requires recent conda-build.
+  python_version_independent: true
+  # Do not attempt to build for unsupported Python versions
+  skip: true  # [py != 3.12]
 
 requirements:
   build:
@@ -17,13 +18,17 @@ requirements:
 #    - cmake
 #    - ninja
 
+  # Pin the build/host to the exact variant python (from conda_build_config.yaml)
   host:
-    - python >=3.12
+    - python {{ python }}
 
+  # Runtime: only require Python >=3.12 (ABI3-compatible)
   run:
     - python >=3.12
 
 test:
+  imports:
+    - zimg
 
 outputs:
 

@@ -17,6 +17,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Official Intel oneAPI BaseKit offline installer URL (mirrors oneapi-ci)
+  # Used to install MKL + oneTBB components silently on Windows runners.
+  ONEAPI_BASEKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f18901e-877d-469d-a41a-a10f11b39336/intel-oneapi-base-toolkit-2025.3.0.372_offline.exe
+
 jobs:
   build-env:
     runs-on: windows-2022
@@ -51,12 +56,42 @@ jobs:
           perl -v
           where perl
 
-      - name: Install Intel oneAPI BaseKit (winget)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+      - name: Install Intel oneAPI BaseKit (installer)
         shell: pwsh
         run: |
-          winget install -e --id Intel.oneAPI.BaseKit --accept-package-agreements --accept-source-agreements --silent
-          # Verify expected directories exist
+          if ((Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb") -and (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) {
+            Write-Host 'Intel oneAPI already installed; skipping.'
+            exit 0
+          }
+          if (-not $env:ONEAPI_BASEKIT_URL) { Write-Error "ONEAPI_BASEKIT_URL is not set." }
+          $ErrorActionPreference = 'Stop'
+          $components = 'intel.oneapi.win.mkl.devel,intel.oneapi.win.tbb.devel'
+          $webimage = Join-Path $env:TEMP 'webimage.exe'
+          Write-Host "Downloading oneAPI BaseKit from: $env:ONEAPI_BASEKIT_URL"
+          & curl.exe --output "$webimage" --url "$env:ONEAPI_BASEKIT_URL" --retry 5 --retry-delay 5
+          if (-not (Test-Path $webimage)) { Write-Error "Download failed: $webimage not found" }
+          Write-Host "Extracting oneAPI installer payload..."
+          $extractArgs = @('-s','-x','-f','webimage_extracted','--log','extract.log')
+          $p = Start-Process -FilePath $webimage -ArgumentList $extractArgs -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "Extraction failed: exit code $($p.ExitCode)" }
+          Remove-Item -Force $webimage
+          Write-Host "Installing Intel oneAPI BaseKit components: $components"
+          $bootstrapper = Join-Path (Join-Path (Get-Location) 'webimage_extracted') 'bootstrapper.exe'
+          if (-not (Test-Path $bootstrapper)) { Write-Error "bootstrapper.exe not found after extraction" }
+          $installArgs = @(
+            '-s','--action','install',
+            '--components', $components,
+            '--eula','accept',
+            '-p','NEED_VS2017_INTEGRATION=0',
+            '-p','NEED_VS2019_INTEGRATION=0',
+            '-p','NEED_VS2022_INTEGRATION=0',
+            '--log-dir','.'
+          )
+          $p = Start-Process -FilePath $bootstrapper -ArgumentList $installArgs -Wait -PassThru
+          $code = $p.ExitCode
+          Remove-Item -Recurse -Force 'webimage_extracted' -ErrorAction SilentlyContinue
+          if ($code -ne 0) { Write-Error "Intel oneAPI BaseKit installer exit code: $code" }
+          # Validate install paths
           if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb")) { Write-Error "oneAPI TBB CMake config missing" }
           if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) { Write-Error "oneAPI MKL missing" }
 
@@ -69,14 +104,24 @@ jobs:
             C:\VulkanSDK\${{ env.VULKAN_SDK_VERSION }}
           key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
 
-      - name: Install Vulkan SDK (LunarG via winget)
+      - name: Install Vulkan SDK (LunarG installer)
         if: steps.cache-vulkan-build.outputs.cache-hit != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          winget install -e --id LunarG.VulkanSDK --version $env:VULKAN_SDK_VERSION `
-            --accept-package-agreements --accept-source-agreements --silent
+          $ErrorActionPreference = 'Stop'
+          $ver = $env:VULKAN_SDK_VERSION
+          $cliName = "vulkansdk-windows-X64-$ver.exe"
+          $cliPath = Join-Path $env:TEMP $cliName
+          $url = "https://sdk.lunarg.com/sdk/download/$ver/windows/$cliName?Human=true"
+          Write-Host "Downloading Vulkan SDK CLI $ver from: $url"
+          Invoke-WebRequest -Uri $url -OutFile $cliPath -UseBasicParsing
+          if (-not (Test-Path $cliPath)) { Write-Error "Download failed: $cliPath not found" }
+          Write-Host "Installing Vulkan SDK components: core + VMA"
+          $args = @('--accept-licenses','--default-answer','--confirm-command','install','com.lunarg.vulkan.core','com.lunarg.vulkan.vma')
+          $p = Start-Process -FilePath $cliPath -ArgumentList $args -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "Vulkan SDK CLI exit code: $($p.ExitCode)" }
           if (-not (Test-Path "C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin\glslc.exe")) {
-            Write-Error "Vulkan SDK not found at expected path: C:\VulkanSDK\$env:VULKAN_SDK_VERSION"
+            Write-Error "glslc not found under C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin — core tools missing"
           }
 
       - name: Setup Miniconda
@@ -178,10 +223,42 @@ jobs:
           perl -v
           where perl
 
-      - name: Install Intel oneAPI BaseKit (winget)
+      - name: Install Intel oneAPI BaseKit (installer)
         shell: pwsh
         run: |
-          winget install -e --id Intel.oneAPI.BaseKit --accept-package-agreements --accept-source-agreements --silent
+          if ((Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb") -and (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) {
+            Write-Host 'Intel oneAPI already installed; skipping.'
+            exit 0
+          }
+          if (-not $env:ONEAPI_BASEKIT_URL) { Write-Error "ONEAPI_BASEKIT_URL is not set." }
+          $ErrorActionPreference = 'Stop'
+          $components = 'intel.oneapi.win.mkl.devel,intel.oneapi.win.tbb.devel'
+          $webimage = Join-Path $env:TEMP 'webimage.exe'
+          Write-Host "Downloading oneAPI BaseKit from: $env:ONEAPI_BASEKIT_URL"
+          & curl.exe --output "$webimage" --url "$env:ONEAPI_BASEKIT_URL" --retry 5 --retry-delay 5
+          if (-not (Test-Path $webimage)) { Write-Error "Download failed: $webimage not found" }
+          Write-Host "Extracting oneAPI installer payload..."
+          $extractArgs = @('-s','-x','-f','webimage_extracted','--log','extract.log')
+          $p = Start-Process -FilePath $webimage -ArgumentList $extractArgs -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "Extraction failed: exit code $($p.ExitCode)" }
+          Remove-Item -Force $webimage
+          Write-Host "Installing Intel oneAPI BaseKit components: $components"
+          $bootstrapper = Join-Path (Join-Path (Get-Location) 'webimage_extracted') 'bootstrapper.exe'
+          if (-not (Test-Path $bootstrapper)) { Write-Error "bootstrapper.exe not found after extraction" }
+          $installArgs = @(
+            '-s','--action','install',
+            '--components', $components,
+            '--eula','accept',
+            '-p','NEED_VS2017_INTEGRATION=0',
+            '-p','NEED_VS2019_INTEGRATION=0',
+            '-p','NEED_VS2022_INTEGRATION=0',
+            '--log-dir','.'
+          )
+          $p = Start-Process -FilePath $bootstrapper -ArgumentList $installArgs -Wait -PassThru
+          $code = $p.ExitCode
+          Remove-Item -Recurse -Force 'webimage_extracted' -ErrorAction SilentlyContinue
+          if ($code -ne 0) { Write-Error "Intel oneAPI BaseKit installer exit code: $code" }
+          # Validate install paths
           if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb")) { Write-Error "oneAPI TBB CMake config missing" }
           if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) { Write-Error "oneAPI MKL missing" }
 
@@ -193,15 +270,24 @@ jobs:
             C:\VulkanSDK\${{ env.VULKAN_SDK_VERSION }}
           key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
 
-      - name: Install Vulkan SDK (LunarG via winget)
+      - name: Install Vulkan SDK (LunarG installer)
         if: steps.cache-vulkan.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          # Install specific Vulkan SDK version
-          winget install -e --id LunarG.VulkanSDK --version $env:VULKAN_SDK_VERSION `
-            --accept-package-agreements --accept-source-agreements --silent
+          $ErrorActionPreference = 'Stop'
+          $ver = $env:VULKAN_SDK_VERSION
+          $cliName = "vulkansdk-windows-X64-$ver.exe"
+          $cliPath = Join-Path $env:TEMP $cliName
+          $url = "https://sdk.lunarg.com/sdk/download/$ver/windows/$cliName?Human=true"
+          Write-Host "Downloading Vulkan SDK CLI $ver from: $url"
+          Invoke-WebRequest -Uri $url -OutFile $cliPath -UseBasicParsing
+          if (-not (Test-Path $cliPath)) { Write-Error "Download failed: $cliPath not found" }
+          Write-Host "Installing Vulkan SDK components: core + VMA"
+          $args = @('--accept-licenses','--default-answer','--confirm-command','install','com.lunarg.vulkan.core','com.lunarg.vulkan.vma')
+          $p = Start-Process -FilePath $cliPath -ArgumentList $args -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error "Vulkan SDK CLI exit code: $($p.ExitCode)" }
           if (-not (Test-Path "C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin\glslc.exe")) {
-            Write-Error "Vulkan SDK not found at expected path: C:\VulkanSDK\$env:VULKAN_SDK_VERSION"
+            Write-Error "glslc not found under C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin — core tools missing"
           }
           Get-ChildItem -Force "C:\VulkanSDK\$env:VULKAN_SDK_VERSION" | Select-Object FullName
 
