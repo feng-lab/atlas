@@ -65,7 +65,7 @@ jobs:
           }
           if (-not $env:ONEAPI_BASEKIT_URL) { Write-Error "ONEAPI_BASEKIT_URL is not set." }
           $ErrorActionPreference = 'Stop'
-          $components = 'intel.oneapi.win.mkl.devel,intel.oneapi.win.tbb.devel'
+          $components = 'intel.oneapi.win.mkl.devel:intel.oneapi.win.tbb.devel'
           $webimage = Join-Path $env:TEMP 'webimage.exe'
           Write-Host "Downloading oneAPI BaseKit from: $env:ONEAPI_BASEKIT_URL"
           & curl.exe --output "$webimage" --url "$env:ONEAPI_BASEKIT_URL" --retry 5 --retry-delay 5
@@ -232,7 +232,7 @@ jobs:
           }
           if (-not $env:ONEAPI_BASEKIT_URL) { Write-Error "ONEAPI_BASEKIT_URL is not set." }
           $ErrorActionPreference = 'Stop'
-          $components = 'intel.oneapi.win.mkl.devel,intel.oneapi.win.tbb.devel'
+          $components = 'intel.oneapi.win.mkl.devel:intel.oneapi.win.tbb.devel'
           $webimage = Join-Path $env:TEMP 'webimage.exe'
           Write-Host "Downloading oneAPI BaseKit from: $env:ONEAPI_BASEKIT_URL"
           & curl.exe --output "$webimage" --url "$env:ONEAPI_BASEKIT_URL" --retry 5 --retry-delay 5
