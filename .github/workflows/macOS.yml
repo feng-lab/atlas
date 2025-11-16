@@ -22,16 +22,13 @@ env:
   VULKAN_SDK_VERSION: 1.4.328.1
   # Centralize Qt version to keep parity with Linux/Windows CI
   QT_VERSION: "6.9.2"
-  # Default runner label for macOS CI. For a self-hosted macOS runner,
-  # change this to your runner label (e.g., "self-hosted").
-  # MACOS_RUNNER_LABEL: macos-15
-  MACOS_RUNNER_LABEL: self-hosted
   # Optional: when set to "true", run extra cleanup for self-hosted runners at the end of the build job.
   MACOS_SELF_HOSTED_CLEANUP: "true"
 
 jobs:
   build-env:
-    runs-on: ${{ env.MACOS_RUNNER_LABEL }}
+    # runs-on: macos-15
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v5
         with:
@@ -202,7 +199,8 @@ jobs:
           python util/build_ext_libs.py all --exclude-libs conda-zimg
 
   build:
-    runs-on: ${{ env.MACOS_RUNNER_LABEL }}
+    # runs-on: macos-15
+    runs-on: self-hosted
     needs: build-env
     permissions:
       contents: write
