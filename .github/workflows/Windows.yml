@@ -191,9 +191,11 @@ jobs:
 
       - name: Build external deps
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        shell: bash -l {0}
+        shell: pwsh # the perl from git bash causes error while building openssl
         run: |
-          cd "$GITHUB_WORKSPACE"
+          conda info
+          $ErrorActionPreference = 'Stop'
+          cd "$env:GITHUB_WORKSPACE"
           python util/build_ext_libs.py all --exclude-libs conda-zimg
 
   build:
