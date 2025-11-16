@@ -181,14 +181,22 @@ def sync_files(files_to_download, target_directory: str, check_os: bool = True):
     os.makedirs(target_directory, exist_ok=True)
 
     # Keep track of files that should be in the directory
+    # Normalize paths for comparison across OSes
+    def _normalize_rel(p: str) -> str:
+        # Use OS-native separators, and lower-case on Windows for case-insensitive FS
+        np = os.path.normpath(p)
+        return np.lower() if common_dirs.is_windows() else np
+
     expected_files = set()
 
     # Download or update files
     for file_info in files_to_download:
         if check_os and not is_correct_platform(file_info['filename']):
             continue
-        target_path = os.path.join(target_directory, file_info['filename'])
-        expected_files.add(file_info['filename'])
+        # Store normalized relative path for comparison during cleanup
+        rel = file_info['filename']
+        target_path = os.path.join(target_directory, rel)
+        expected_files.add(_normalize_rel(rel))
 
         # Create subdirectories if necessary
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -211,7 +219,7 @@ def sync_files(files_to_download, target_directory: str, check_os: bool = True):
         for file in files:
             file_path = os.path.join(root, file)
             relative_path = os.path.relpath(file_path, target_directory)
-            if relative_path not in expected_files:
+            if _normalize_rel(relative_path) not in expected_files:
                 logger.info(f"Removing file not in download list: {relative_path}")
                 os.remove(file_path)
 

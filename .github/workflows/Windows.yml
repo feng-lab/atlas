@@ -30,6 +30,11 @@ jobs:
   build-env:
     runs-on: windows-2022
     steps:
+      - name: Disable Git autocrlf
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
@@ -180,9 +185,9 @@ jobs:
         with:
           path: |
             atlas_deps
-          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
+          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
           restore-keys: |
-            atlasdeps-
+            ${{ runner.os }}-atlasdeps-
 
       - name: Build external deps
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
@@ -197,6 +202,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Disable Git autocrlf
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+
       - uses: actions/checkout@v5
         with:
           # Fetch full history and tags so git_describe works
@@ -336,9 +346,9 @@ jobs:
         with:
           path: |
             atlas_deps
-          key: ${{ format('atlasdeps-{0}', hashFiles('util/atlas_deps_filelist.py')) }}
+          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
           restore-keys: |
-            atlasdeps-
+            ${{ runner.os }}-atlasdeps-
 
       - name: Cache atlas test data
         uses: actions/cache@v4
