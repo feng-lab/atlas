@@ -18,7 +18,7 @@
 conda env remove -n pt12 -y
 conda create -n pt12 -y python=3.12
 conda activate pt12
-conda install numpy python conda-build ninja
+conda install numpy python conda-build anaconda-client pip
 ```
 
 ### macOS:
