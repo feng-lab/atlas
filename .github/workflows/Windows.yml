@@ -97,7 +97,8 @@ jobs:
           $ver = $env:VULKAN_SDK_VERSION
           $cliName = "vulkansdk-windows-X64-$ver.exe"
           $cliPath = Join-Path $env:TEMP $cliName
-          $url = "https://sdk.lunarg.com/sdk/download/$ver/windows/$cliName?Human=true"
+          # Use $() to avoid parsing ambiguity before query string
+          $url = "https://sdk.lunarg.com/sdk/download/$ver/windows/$($cliName)?Human=true"
           Write-Host "Downloading Vulkan SDK CLI $ver from: $url"
           Invoke-WebRequest -Uri $url -OutFile $cliPath -UseBasicParsing
           if (-not (Test-Path $cliPath)) { Write-Error "Download failed: $cliPath not found" }
@@ -245,7 +246,8 @@ jobs:
           $ver = $env:VULKAN_SDK_VERSION
           $cliName = "vulkansdk-windows-X64-$ver.exe"
           $cliPath = Join-Path $env:TEMP $cliName
-          $url = "https://sdk.lunarg.com/sdk/download/$ver/windows/$cliName?Human=true"
+          # Use $() to avoid parsing ambiguity before query string
+          $url = "https://sdk.lunarg.com/sdk/download/$ver/windows/$($cliName)?Human=true"
           Write-Host "Downloading Vulkan SDK CLI $ver from: $url"
           Invoke-WebRequest -Uri $url -OutFile $cliPath -UseBasicParsing
           if (-not (Test-Path $cliPath)) { Write-Error "Download failed: $cliPath not found" }

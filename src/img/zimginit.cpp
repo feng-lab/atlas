@@ -59,7 +59,7 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
     }
 
     if (!javahome.isEmpty()) {
-      if (!jreD.exists() || !jreD.exists("release") || !jreD.exists("bin")) {
+      if (!jreD.exists() || !jreD.exists("bin")) {
         throw ZException(fmt::format("invalid jreDIR: {}", jreD.absolutePath()));
       }
 #ifdef _WIN32
