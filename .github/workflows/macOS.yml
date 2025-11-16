@@ -3,191 +3,397 @@ name: macOS
 on:
   push:
     branches:
-      - master
-  pull_request:
-    branches:
-      - master
+      - main
+  create:
+    # Runs when a branch or tag is created; we gate to tags in job steps
+  workflow_dispatch:
 
-#env:
-  # DEVELOPER_DIR: /Applications/Xcode_12.3.app/Contents/Developer
+concurrency:
+  # Cancel any in-progress run for the same ref (branch or tag),
+  # regardless of commit SHA. For create tag events, use the tag ref.
+  group: atlas-${{ github.workflow }}-${{ github.event_name == 'create' && format('refs/tags/{0}', github.event.ref) || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Pin a Vulkan SDK version for the ~/VulkanSDK layout
+  VULKAN_SDK_VERSION: 1.4.328.1
+  # Centralize Qt version to keep parity with Linux/Windows CI
+  QT_VERSION: "6.9.2"
+  # Default runner label for macOS CI. For a self-hosted macOS runner,
+  # change this to your runner label (e.g., "self-hosted").
+  # MACOS_RUNNER_LABEL: macos-15
+  MACOS_RUNNER_LABEL: self-hosted
+  # Optional: when set to "true", run extra cleanup for self-hosted runners at the end of the build job.
+  MACOS_SELF_HOSTED_CLEANUP: "true"
 
 jobs:
-  build:
-    runs-on: macos-latest  #  [self-hosted, macOS, X64]  # macos-latest
+  build-env:
+    runs-on: ${{ env.MACOS_RUNNER_LABEL }}
     steps:
-      - name: check envs
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Cache 3rdparty build
+        id: cache-extlibs
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/3rdparty/build
+          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+
+      - name: Install base packages (Homebrew)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
-          ls -n /Applications/ | grep Xcode*
-          env
+          set -euo pipefail
+          brew update
+          # Core tools and build prerequisites for macOS (see readme.md)
+          brew install unrar p7zip git golang autoconf || true
 
-#      - uses: actions/checkout@v2
-#        with:
-#          fetch-depth: 1
-#          submodules: 'recursive'
-#
-#      - uses: conda-incubator/setup-miniconda@v2
-#        with:
-#          auto-update-conda: true
-#          python-version: 3.8
-#          miniconda-version: "latest"
-#          activate-environment: test
-#
-#      - name: install conda packages
-#        shell: bash -l {0}
-#        run: |
-#          conda info
-#          conda update --all -y
-#          conda install tbb-devel mkl-devel qt numpy python anaconda-client conda-build conda-verify
-#          conda list
-#          conda clean --all -y
-#
-#      - name: download Qt
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          conda info
-#          cd ~
-#          pwd
-#          curl -L -O $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-Qt-2021-01-17.zip
-#          unzip -q dep-Qt-2021-01-17.zip
-#          rm dep-Qt-2021-01-17.zip
-#
-#      - name: download intel
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          conda info
-#          cd ~
-#          pwd
-#          curl -L -O $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-intel-2021-01-17.zip
-#          unzip -q dep-intel-2021-01-17.zip
-#          rm dep-intel-2021-01-17.zip
-#
-#      - name: check if build cache exists
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        id: build-cache-exists
-#        run: |
-#          if ( curl -o/dev/null -sfI $CI_DOWNLOAD_SERVER/cache/build-cache-${{ runner.os }}.zip ); then
-#            echo "::set-output name=cache-hit::true"
-#          else
-#            echo "::set-output name=cache-hit::false"
-#          fi
-#
-#      - name: download build cache
-#        if: steps.build-cache-exists.outputs.cache-hit == 'true'
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          cd $GITHUB_WORKSPACE/src/3rdparty
-#          curl -L -O $CI_DOWNLOAD_SERVER/cache/build-cache-${{ runner.os }}.zip
-#          unzip -q build-cache-${{ runner.os }}.zip
-#          rm build-cache-${{ runner.os }}.zip
-#
-#      - name: download deps
-#        if: steps.build-cache-exists.outputs.cache-hit != 'true'
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          conda info
-#          cd ~
-#          pwd
-#          curl -L -O $CI_DOWNLOAD_SERVER/common/atlas-deps-2021-01-21.zip
-#          unzip -q atlas-deps-2021-01-21.zip
-#          rm atlas-deps-2021-01-21.zip
-#
-#      - name: build deps
-#        if: steps.build-cache-exists.outputs.cache-hit != 'true'
-#        shell: bash -l {0}
-#        env:
-#          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
-#        run: |
-#          conda info
-#          cd $GITHUB_WORKSPACE
-#          pwd
-#          python util/build_ext_libs.py all
-#          conda config --set anaconda_upload yes
-#
-#      - name: setup ssh key
-#        shell: bash -l {0}
-#        env:
-#          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-#          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-#        run: |
-#          mkdir -p ~/.ssh/
-#          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
-#          sudo chmod 600 ~/.ssh/private.key
-#          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-#
-#      - name: upload build cache
-#        if: steps.build-cache-exists.outputs.cache-hit != 'true'
-#        shell: bash -l {0}
-#        env:
-#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-#          SSH_PORT: ${{ secrets.SSH_PORT }}
-#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-#          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
-#        run: |
-#          cd $GITHUB_WORKSPACE/src/3rdparty
-#          zip --quiet --recurse-paths --symlinks build-cache-${{ runner.os }}.zip build
-#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $CI_CACHE_PATH/build-cache-${{ runner.os }}.zip"
-#          scp -P $SSH_PORT -i ~/.ssh/private.key build-cache-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$CI_CACHE_PATH/
-#
-#      - name: build
-#        shell: bash -l {0}
-#        run: |
-#          conda info
-#          cd $GITHUB_WORKSPACE
-#          pwd
-#          python util/build_atlas.py
-#
-#      - name: download test data
-#        shell: bash -l {0}
-#        env:
-#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-#        run: |
-#          conda info
-#          cd ~
-#          pwd
-#          curl -L -O $CI_DOWNLOAD_SERVER/common/atlas-test-data-2021-01-18.zip
-#          unzip -q atlas-test-data-2021-01-18.zip
-#          rm atlas-test-data-2021-01-18.zip
-#
-#      - name: test
-#        shell: bash -l {0}
-#        run: |
-#          conda info
-#          cd $GITHUB_WORKSPACE
-#          pwd
-#          python util/deploy_atlas.py
-#
-#      - name: deploy
-#        shell: bash -l {0}
-#        env:
-#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-#          SSH_PORT: ${{ secrets.SSH_PORT }}
-#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-#          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
-#        run: |
-#          cd $GITHUB_WORKSPACE/deploy
-#          pwd
-#          rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
-#          rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
-#
-#      - name: build and upload conda zimg
-#        shell: bash -l {0}
-#        env:
-#          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
-#        run: |
-#          conda info
-#          cd $GITHUB_WORKSPACE
-#          pwd
-#          python util/build_ext_libs.py conda-zimg
-#          conda config --set anaconda_upload yes
-#          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
+      - name: Cache Vulkan SDK (installed)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
+          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
+
+      - name: Install Vulkan SDK (LunarG macOS CLI)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        env:
+          VULKAN_SDK_VERSION: ${{ env.VULKAN_SDK_VERSION }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$HOME/VulkanSDK"
+          if [ -d "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" ]; then
+            echo "Vulkan SDK already present under \$HOME/VulkanSDK/${VULKAN_SDK_VERSION}"
+            ls -R "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" || true
+            exit 0
+          fi
+
+          VULKAN_SDK_MAC_URL="https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/mac/vulkansdk-macos-${VULKAN_SDK_VERSION}.zip"
+          ZIP="/tmp/vulkansdk-macos-${VULKAN_SDK_VERSION}.zip"
+          echo "Downloading Vulkan SDK from: ${VULKAN_SDK_MAC_URL}"
+          /usr/bin/curl -fL "${VULKAN_SDK_MAC_URL}" -o "${ZIP}"
+
+          UNPACK_DIR="/tmp/vulkansdk-macos-${VULKAN_SDK_VERSION}"
+          rm -rf "${UNPACK_DIR}"
+          mkdir -p "${UNPACK_DIR}"
+          /usr/bin/unzip -q "${ZIP}" -d "${UNPACK_DIR}"
+
+          APP_PATH="${UNPACK_DIR}/vulkansdk-macOS-${VULKAN_SDK_VERSION}.app"
+          if [ ! -d "${APP_PATH}" ]; then
+            echo "Expected app bundle not found at ${APP_PATH}" >&2
+            exit 1
+          fi
+
+          APP_BIN="${APP_PATH}/Contents/MacOS/vulkansdk-macOS-${VULKAN_SDK_VERSION}"
+          if [ ! -x "${APP_BIN}" ]; then
+            echo "Vulkan SDK installer binary not executable at ${APP_BIN}" >&2
+            exit 1
+          fi
+
+          INSTALL_ROOT="$HOME/VulkanSDK/${VULKAN_SDK_VERSION}"
+          mkdir -p "${INSTALL_ROOT}"
+
+          echo "Running Vulkan SDK installer CLI (user-level install under \$HOME):"
+          echo "  ${APP_BIN} --root \"${INSTALL_ROOT}\" --accept-licenses --default-answer --confirm-command install com.lunarg.vulkan.core com.lunarg.vulkan.vma"
+
+          "${APP_BIN}" \
+            --root "${INSTALL_ROOT}" \
+            --accept-licenses \
+            --default-answer \
+            --confirm-command \
+            install com.lunarg.vulkan.core com.lunarg.vulkan.vma
+
+          # Remove temporary installer payloads from /tmp to avoid buildup on self-hosted runners
+          rm -rf "${UNPACK_DIR}" "${ZIP}" || true
+
+          ls -R "${INSTALL_ROOT}" || true
+
+      - name: Setup Miniconda
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: "3.12"
+          activate-environment: atlas-ci
+          miniconda-version: "latest"
+          channels: defaults
+
+      - name: Show Python version
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          python -V
+          which python
+          pip --version
+
+      - name: Cache conda pkgs
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CONDA }}/pkgs
+            ~/.conda/pkgs
+          key: ${{ runner.os }}-condapkgs-3.12
+
+      - name: Install conda tooling
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          conda info
+          conda update --all -y
+          conda install -y anaconda-client conda-build pip
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          conda clean --all -y
+
+      - name: Cache Qt (installed)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Qt/${{ env.QT_VERSION }}
+            ~/Qt/Tools/QtInstallerFramework
+          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
+
+      - name: Install Qt 6 (aqt)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          mkdir -p "$HOME/Qt"
+          if [ -d "$HOME/Qt/${QT_VERSION}/macos" ]; then
+            echo "Qt already cached"
+          else
+            python -m aqt install-qt --outputdir "$HOME/Qt" mac desktop ${QT_VERSION} clang_64
+          fi
+          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then
+            echo "Qt IFW cached"
+          else
+            python -m aqt install-tool --outputdir "$HOME/Qt" mac desktop tools_ifw qt.tools.ifw.47
+          fi
+          ls -la "$HOME/Qt" || true
+
+      - name: Cache atlas_deps (download archives)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
+          restore-keys: |
+            ${{ runner.os }}-atlasdeps-
+
+      - name: Build external deps
+        # Only rebuild external deps when we did not get an exact cache hit
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/build_ext_libs.py all --exclude-libs conda-zimg
+
+  build:
+    runs-on: ${{ env.MACOS_RUNNER_LABEL }}
+    needs: build-env
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Fetch full history and tags so git_describe works
+          ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install base packages (Homebrew)
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          brew update
+          brew install unrar p7zip git golang autoconf || true
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: "3.12"
+          activate-environment: atlas-ci
+          miniconda-version: "latest"
+          channels: defaults
+
+      - name: Show Python version
+        shell: bash -l {0}
+        run: |
+          python -V
+          which python
+          pip --version
+
+      - name: Cache conda pkgs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.CONDA }}/pkgs
+            ~/.conda/pkgs
+          key: ${{ runner.os }}-condapkgs-3.12
+
+      - name: Install conda tooling
+        shell: bash -l {0}
+        run: |
+          conda info
+          conda update --all -y
+          conda install -y anaconda-client conda-build pip
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          conda clean --all -y
+
+      - name: Cache Qt (installed)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Qt/${{ env.QT_VERSION }}
+            ~/Qt/Tools/QtInstallerFramework
+          key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
+
+      - name: Install Qt 6 (aqt)
+        shell: bash -l {0}
+        run: |
+          mkdir -p "$HOME/Qt"
+          if [ -d "$HOME/Qt/${QT_VERSION}/macos" ]; then
+            echo "Qt already cached"
+          else
+            python -m aqt install-qt --outputdir "$HOME/Qt" mac desktop ${QT_VERSION} clang_64
+          fi
+          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then
+            echo "Qt IFW cached"
+          else
+            python -m aqt install-tool --outputdir "$HOME/Qt" mac desktop tools_ifw qt.tools.ifw.47
+          fi
+          ls -la "$HOME/Qt" || true
+
+      - name: Cache 3rdparty build
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/3rdparty/build
+          key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+
+      - name: Cache atlas_deps (download archives)
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_deps
+          key: ${{ runner.os }}-atlasdeps-${{ hashFiles('util/atlas_deps_filelist.py') }}
+          restore-keys: |
+            ${{ runner.os }}-atlasdeps-
+
+      - name: Cache atlas test data
+        uses: actions/cache@v4
+        with:
+          path: |
+            atlas_test_data
+          key: ${{ format('testdata-{0}', hashFiles('util/atlas_test_data_filelist.py')) }}
+          restore-keys: |
+            testdata-
+
+      - name: Cache Vulkan SDK (installed)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/VulkanSDK/${{ env.VULKAN_SDK_VERSION }}
+          key: ${{ runner.os }}-vulkan-${{ env.VULKAN_SDK_VERSION }}
+
+      - name: Validate Vulkan SDK layout
+        shell: bash -l {0}
+        env:
+          VULKAN_SDK_VERSION: ${{ env.VULKAN_SDK_VERSION }}
+        run: |
+          set -euo pipefail
+          if [ ! -d "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" ]; then
+            echo "Vulkan SDK directory \$HOME/VulkanSDK/${VULKAN_SDK_VERSION} is missing." >&2
+            echo "Ensure the build-env job installed the SDK successfully, then re-run CI." >&2
+            exit 1
+          fi
+          ls -R "$HOME/VulkanSDK/${VULKAN_SDK_VERSION}" || true
+
+      - name: Build and deploy Atlas
+        shell: bash -l {0}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/build_and_deploy_atlas.py
+
+      - name: Create or update release and upload assets (gh CLI)
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.event.ref }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          TAG="${TAG_NAME:-${GITHUB_REF#refs/tags/}}"
+          echo "Creating/updating release for tag: $TAG"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists"
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes
+          fi
+          shopt -s nullglob
+          files=(deploy/AtlasInstaller*.zip deploy/atlas-*.zip)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release zip files found under deploy/" >&2
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+      - name: Setup SSH key
+        shell: bash -l {0}
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
+          chmod 600 ~/.ssh/private.key
+          # Append CI known_hosts entries; do not clobber existing user configuration
+          if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          fi
+
+      - name: Deploy artifacts
+        shell: bash -l {0}
+        env:
+          SSH_SERVER: ${{ secrets.SSH_SERVER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
+        run: |
+          cd "$GITHUB_WORKSPACE/deploy"
+          rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
+          rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+
+      - name: Build and upload conda zimg
+        shell: bash -l {0}
+        env:
+          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          python util/build_ext_libs.py conda-zimg
+          conda config --set anaconda_upload yes
+          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
+
+      - name: Self-hosted cleanup (optional)
+        if: env.MACOS_SELF_HOSTED_CLEANUP == 'true'
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          rm -rf "$GITHUB_WORKSPACE" && mkdir -p "$GITHUB_WORKSPACE"

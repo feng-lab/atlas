@@ -479,7 +479,10 @@ jobs:
           mkdir -p ~/.ssh/
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
           chmod 600 ~/.ssh/private.key
-          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # Append CI known_hosts entries; do not clobber existing user configuration
+          if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          fi
 
       - name: Create or update release and upload assets (gh CLI)
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')

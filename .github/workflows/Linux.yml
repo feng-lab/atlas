@@ -210,7 +210,6 @@ jobs:
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         env:
-          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
           cd "$GITHUB_WORKSPACE"
@@ -436,7 +435,10 @@ jobs:
           mkdir -p ~/.ssh/
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
           chmod 600 ~/.ssh/private.key
-          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # Append CI known_hosts entries; do not clobber existing user configuration
+          if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          fi
 
       - name: Deploy artifacts
         shell: bash -l {0}

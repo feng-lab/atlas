@@ -743,23 +743,7 @@ Agent tooling dependency
   - Compatibility: `ValidateSceneParams` and `ApplySceneParams` accept an empty `json_key` for id=0; the server maps it to the canonical camera parameter key (e.g., `"Camera 3DCamera"`). For all other ids, `json_key` must be specified.
   - In the animation model, `AnimationObj.boundId == 0` remains a sentinel for “unbound/non‑scene” and is unrelated to the camera scope.
   - Do not add an `AnimationObj` for id=0; timeline ops for camera continue to use the camera track APIs.
-CI / Automation
-
-- Linux GitHub Actions now runs on `ubuntu-22.04` GitHub-hosted runners.
-- Dependencies are installed directly on the runner (no CI_DOWNLOAD_SERVER):
-  - Qt via `aqtinstall` into `~/Qt` (tools_ifw included for packaging). CI controls the version with `QT_VERSION`.
-  - Intel oneAPI MKL/TBB via Intel’s apt repo into `/opt/intel/oneapi`.
-- Vulkan SDK (LunarG) unpacked into `~/VulkanSDK/<ver>`; `VULKAN_SDK` is exported by `PathList.cmake`. CI pins `1.4.328.1`.
-- External libs/tooling (CMake, Ninja, ffmpeg, etc.) are fetched by `util/build_ext_libs.py`.
-- Test data is pulled by `util/build_atlas.py` using `util/download_atlas_test_data.py`.
-  - Caching: `src/3rdparty/build`, `atlas_deps`, and `atlas_test_data` are cached in CI with a version knob `CACHE_VERSION` defined in the workflow env; bump it to invalidate.
 
 LLVM/Clang versioning
 
 - Linux builds use Clang by default. The version can be overridden with env `ATLAS_CLANG_MAJOR` (e.g., `20`).
-
-Python versioning
-
-- CI uses Python 3.12 via Miniconda (`conda-incubator/setup-miniconda@v3`).
-- Build scripts and packaging run inside the `atlas-ci` conda environment; Python deps (aqtinstall, requests, packaging) are installed via pip.
-- Conda channels: defaults only (no conda-forge).
