@@ -21,15 +21,14 @@ env:
   # Official Intel oneAPI BaseKit offline installer URL (mirrors oneapi-ci)
   # Used to install MKL + oneTBB components silently on Windows runners.
   ONEAPI_BASEKIT_URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/1f18901e-877d-469d-a41a-a10f11b39336/intel-oneapi-base-toolkit-2025.3.0.372_offline.exe
+  # Centralize Qt version to make upgrades easy
+  QT_VERSION: "6.9.2"
+  # Pin a Vulkan SDK version
+  VULKAN_SDK_VERSION: 1.4.328.1
 
 jobs:
   build-env:
     runs-on: windows-2022
-    env:
-      # Centralize Qt version to make upgrades easy
-      QT_VERSION: "6.9.2"
-      # Pin a Vulkan SDK version if installing (optional)
-      VULKAN_SDK_VERSION: 1.4.328.1
     steps:
       - uses: actions/checkout@v5
         with:
@@ -56,44 +55,30 @@ jobs:
           perl -v
           where perl
 
+      - name: Cache Intel oneAPI (installed)
+        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        id: cache-oneapi-buildenv
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\\Program Files (x86)\\Intel\\oneAPI
+          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
+
       - name: Install Intel oneAPI BaseKit (installer)
+        if: steps.cache-oneapi-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          if ((Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb") -and (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) {
+          if (Test-Path "C:\Program Files (x86)\Intel\oneAPI") {
             Write-Host 'Intel oneAPI already installed; skipping.'
             exit 0
           }
           if (-not $env:ONEAPI_BASEKIT_URL) { Write-Error "ONEAPI_BASEKIT_URL is not set." }
-          $ErrorActionPreference = 'Stop'
           $components = 'intel.oneapi.win.mkl.devel:intel.oneapi.win.tbb.devel'
-          $webimage = Join-Path $env:TEMP 'webimage.exe'
-          Write-Host "Downloading oneAPI BaseKit from: $env:ONEAPI_BASEKIT_URL"
-          & curl.exe --output "$webimage" --url "$env:ONEAPI_BASEKIT_URL" --retry 5 --retry-delay 5
-          if (-not (Test-Path $webimage)) { Write-Error "Download failed: $webimage not found" }
-          Write-Host "Extracting oneAPI installer payload..."
-          $extractArgs = @('-s','-x','-f','webimage_extracted','--log','extract.log')
-          $p = Start-Process -FilePath $webimage -ArgumentList $extractArgs -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Write-Error "Extraction failed: exit code $($p.ExitCode)" }
-          Remove-Item -Force $webimage
-          Write-Host "Installing Intel oneAPI BaseKit components: $components"
-          $bootstrapper = Join-Path (Join-Path (Get-Location) 'webimage_extracted') 'bootstrapper.exe'
-          if (-not (Test-Path $bootstrapper)) { Write-Error "bootstrapper.exe not found after extraction" }
-          $installArgs = @(
-            '-s','--action','install',
-            '--components', $components,
-            '--eula','accept',
-            '-p','NEED_VS2017_INTEGRATION=0',
-            '-p','NEED_VS2019_INTEGRATION=0',
-            '-p','NEED_VS2022_INTEGRATION=0',
-            '--log-dir','.'
-          )
-          $p = Start-Process -FilePath $bootstrapper -ArgumentList $installArgs -Wait -PassThru
-          $code = $p.ExitCode
-          Remove-Item -Recurse -Force 'webimage_extracted' -ErrorAction SilentlyContinue
-          if ($code -ne 0) { Write-Error "Intel oneAPI BaseKit installer exit code: $code" }
+          Write-Host "Installing Intel oneAPI BaseKit via util\\install_windows.bat..."
+          cmd.exe /c "util\\install_windows.bat $env:ONEAPI_BASEKIT_URL $components"
+          if ($LASTEXITCODE -ne 0) { Write-Error "oneAPI installer exit code: $LASTEXITCODE" }
           # Validate install paths
-          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb")) { Write-Error "oneAPI TBB CMake config missing" }
-          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) { Write-Error "oneAPI MKL missing" }
+          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI")) { Write-Error "Intel oneAPI root missing" }
 
       - name: Cache Vulkan SDK (installed)
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
@@ -202,9 +187,6 @@ jobs:
     needs: build-env
     permissions:
       contents: write
-    env:
-      QT_VERSION: "6.9.2"
-      VULKAN_SDK_VERSION: 1.4.328.1
     steps:
       - uses: actions/checkout@v5
         with:
@@ -223,44 +205,29 @@ jobs:
           perl -v
           where perl
 
+      - name: Cache Intel oneAPI (installed)
+        id: cache-oneapi-build
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\\Program Files (x86)\\Intel\\oneAPI
+          key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
+
       - name: Install Intel oneAPI BaseKit (installer)
+        if: steps.cache-oneapi-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          if ((Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb") -and (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) {
+          if (Test-Path "C:\Program Files (x86)\Intel\oneAPI") {
             Write-Host 'Intel oneAPI already installed; skipping.'
             exit 0
           }
           if (-not $env:ONEAPI_BASEKIT_URL) { Write-Error "ONEAPI_BASEKIT_URL is not set." }
-          $ErrorActionPreference = 'Stop'
           $components = 'intel.oneapi.win.mkl.devel:intel.oneapi.win.tbb.devel'
-          $webimage = Join-Path $env:TEMP 'webimage.exe'
-          Write-Host "Downloading oneAPI BaseKit from: $env:ONEAPI_BASEKIT_URL"
-          & curl.exe --output "$webimage" --url "$env:ONEAPI_BASEKIT_URL" --retry 5 --retry-delay 5
-          if (-not (Test-Path $webimage)) { Write-Error "Download failed: $webimage not found" }
-          Write-Host "Extracting oneAPI installer payload..."
-          $extractArgs = @('-s','-x','-f','webimage_extracted','--log','extract.log')
-          $p = Start-Process -FilePath $webimage -ArgumentList $extractArgs -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Write-Error "Extraction failed: exit code $($p.ExitCode)" }
-          Remove-Item -Force $webimage
-          Write-Host "Installing Intel oneAPI BaseKit components: $components"
-          $bootstrapper = Join-Path (Join-Path (Get-Location) 'webimage_extracted') 'bootstrapper.exe'
-          if (-not (Test-Path $bootstrapper)) { Write-Error "bootstrapper.exe not found after extraction" }
-          $installArgs = @(
-            '-s','--action','install',
-            '--components', $components,
-            '--eula','accept',
-            '-p','NEED_VS2017_INTEGRATION=0',
-            '-p','NEED_VS2019_INTEGRATION=0',
-            '-p','NEED_VS2022_INTEGRATION=0',
-            '--log-dir','.'
-          )
-          $p = Start-Process -FilePath $bootstrapper -ArgumentList $installArgs -Wait -PassThru
-          $code = $p.ExitCode
-          Remove-Item -Recurse -Force 'webimage_extracted' -ErrorAction SilentlyContinue
-          if ($code -ne 0) { Write-Error "Intel oneAPI BaseKit installer exit code: $code" }
+          Write-Host "Installing Intel oneAPI BaseKit via util\\install_windows.bat..."
+          cmd.exe /c "util\\install_windows.bat $env:ONEAPI_BASEKIT_URL $components"
+          if ($LASTEXITCODE -ne 0) { Write-Error "oneAPI installer exit code: $LASTEXITCODE" }
           # Validate install paths
-          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\tbb\latest\lib\cmake\tbb")) { Write-Error "oneAPI TBB CMake config missing" }
-          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI\mkl")) { Write-Error "oneAPI MKL missing" }
+          if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI")) { Write-Error "Intel oneAPI root missing" }
 
       - name: Cache Vulkan SDK (installed)
         id: cache-vulkan

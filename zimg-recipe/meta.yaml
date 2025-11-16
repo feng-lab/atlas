@@ -9,8 +9,6 @@ build:
   number: 0
   # Mark as Python-version independent (ABI3). Requires recent conda-build.
   python_version_independent: true
-  # Do not attempt to build for unsupported Python versions
-  skip: true  # [py != 3.12]
 
 requirements:
   build:

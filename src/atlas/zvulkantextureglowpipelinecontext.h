@@ -125,7 +125,6 @@ private:
   BlurIntermediate m_blurIntermediate1;
 
   std::unique_ptr<ZVulkanBuffer> m_vertexBuffer;
-  size_t m_vertexCapacity = 0;
   size_t m_vertexCount = 0;
 
   void ensureDescriptorLayouts();

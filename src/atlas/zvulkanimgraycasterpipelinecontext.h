@@ -289,7 +289,6 @@ private:
   std::optional<vk::raii::Pipeline> m_blockIdCompactPipelineBufferAppend;
   std::unique_ptr<ZVulkanBuffer> m_blockIdPixelBuffer; // device-local, TRANSFER_DST | STORAGE_BUFFER
   size_t m_blockIdPixelBufferCapacity = 0;
-  ZVulkanDescriptorSet* m_blockIdCompactDescriptor = nullptr; // per-draw override (backend-owned)
   std::unique_ptr<ZVulkanBuffer> m_blockIdCompactOutput; // host-visible, compacted result
   size_t m_blockIdCompactCapacity = 0; // bytes
   // Per-attachment snapshot of append counts (host-visible), used to detect
