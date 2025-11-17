@@ -2874,6 +2874,24 @@ def build_proxygen(src_dir: str, install_dir: str):
             patch_condition=is_windows,
         ),
         FilePatcher(
+            orig_file=os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt'),
+            from_texts=[
+                r"""    COMMAND
+        ${CMAKE_CURRENT_SOURCE_DIR}/http/gen_HTTPCommonHeaders.sh""",
+                r"""    COMMAND
+        ${CMAKE_CURRENT_SOURCE_DIR}/stats/gen_StatsWrapper.sh""",
+            ],
+            to_texts=[
+                r"""    COMMAND
+        bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/http/gen_HTTPCommonHeaders.sh""",
+                r"""    COMMAND
+        bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/stats/gen_StatsWrapper.sh""",
+            ],
+            patch_condition=is_windows,
+        ),
+        FilePatcher(
             orig_file=os.path.join(src_dir, 'proxygen', 'lib', 'services', 'RequestWorkerThread.cpp'),
             from_texts=[
                 r'sigset_t ss;',

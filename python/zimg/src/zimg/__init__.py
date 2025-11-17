@@ -1,14 +1,29 @@
 """Python package for the zimg bindings.
 
-This module exposes the compiled extension `_imgpy` built by the repository’s
-nanobind project (src/python/imgpy.cpp).
+This module exposes the compiled nanobind extension ``_imgpy`` built from the
+repository’s C++ sources in ``src/python/imgpy.cpp``.
 """
 
+import os
+import sys
+
+# Enforce supported Python versions early and fail with an import error.
+if sys.version_info < (3, 12):
+    raise ImportError("zimg requires Python >= 3.12")
+
+# Configure resource locations for the native library. These match the
+# expectations in ``src/python/__init__.py`` so that both the conda and PyPI
+# layouts behave consistently.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+os.environ["Resources_DIR"] = current_dir
+os.environ["ZIMG_JARS_DIR"] = os.path.join(current_dir, "jars")
+
 try:
-    from ._imgpy import *  # noqa: F401,F403
-except Exception as e:
+    from ._imgpy import *  # type: ignore[import-not-found]  # noqa: F401,F403
+except Exception as exc:
     raise ImportError(
-        "zimg extension not found. Ensure you built/install via scikit-build-core, "
-        "or that your environment includes the compiled extension (_imgpy)."
-    ) from e
+        "zimg extension '_imgpy' not found. Ensure you built and installed "
+        "the package via scikit-build-core and that all native dependencies "
+        "for Atlas zimg are available."
+    ) from exc
 
