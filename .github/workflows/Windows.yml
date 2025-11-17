@@ -562,26 +562,26 @@ jobs:
           echo "Detected tag: $TAG -> zimg version: $VERSION"
           export VERSION="$VERSION"
           python - << 'PY'
-import os
-import re
-from pathlib import Path
+          import os
+          import re
+          from pathlib import Path
 
-version = os.environ.get("VERSION")
-if not version:
-    raise SystemExit("VERSION environment variable is not set")
+          version = os.environ.get("VERSION")
+          if not version:
+              raise SystemExit("VERSION environment variable is not set")
 
-pyproject = Path("pyproject.toml")
-text = pyproject.read_text(encoding="utf-8")
-new_text, count = re.subn(
-    r'(?m)^version\\s*=\\s*\"[^\"]*\"',
-    f'version = "{version}"',
-    text,
-)
-if count == 0:
-    raise SystemExit("Failed to update version in pyproject.toml")
-pyproject.write_text(new_text, encoding="utf-8")
-print(f"Updated pyproject.toml to version {version}")
-PY
+          pyproject = Path("pyproject.toml")
+          text = pyproject.read_text(encoding="utf-8")
+          new_text, count = re.subn(
+              r'(?m)^version\\s*=\\s*\"[^\"]*\"',
+              f'version = "{version}"',
+              text,
+          )
+          if count == 0:
+              raise SystemExit("Failed to update version in pyproject.toml")
+          pyproject.write_text(new_text, encoding="utf-8")
+          print(f"Updated pyproject.toml to version {version}")
+          PY
           python -m pip install --upgrade pip
           # Ensure build backend is available (redundant if Install conda tooling ran in this job)
           python -m pip install --no-cache-dir build twine
