@@ -138,37 +138,39 @@ jobs:
           fi
           ls -la "$HOME/VulkanSDK"
 
-      - name: Setup Miniconda
+      - name: Detect existing conda
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        id: detect-conda-linux-be
+        shell: bash
+        run: |
+          if command -v conda >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Miniconda
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.detect-conda-linux-be.outputs.found != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.12"
-          activate-environment: atlas-ci
           miniconda-version: "latest"
           channels: defaults
 
-      - name: Show Python version
+      - name: Create/Reset atlas-ci conda env
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
-          python -V
-          which python
-          pip --version
-
-      - name: Cache conda pkgs
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CONDA }}/pkgs
-            ~/.conda/pkgs
-          key: ${{ runner.os }}-condapkgs-3.12
+          conda info || true
+          conda env remove -n atlas-ci -y || true
+          conda create -n atlas-ci -y python=3.12
 
       - name: Install conda tooling
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
+          conda activate atlas-ci
           conda info
           conda update --all -y
           conda install -y anaconda-client conda-build pip
@@ -189,6 +191,7 @@ jobs:
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
+          conda activate atlas-ci
           # Match readme.md recommendation for Linux
           mkdir -p "$HOME/Qt"
           if [ -d "$HOME/Qt/${QT_VERSION}/gcc_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" linux desktop ${QT_VERSION} linux_gcc_64; fi
@@ -212,6 +215,8 @@ jobs:
         env:
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
+          set -euo pipefail
+          conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_ext_libs.py all --exclude-libs conda-zimg
 
@@ -317,33 +322,36 @@ jobs:
           fi
           ls -la "$HOME/VulkanSDK"
 
+      - name: Detect existing conda
+        id: detect-conda-linux
+        shell: bash
+        run: |
+          if command -v conda >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Miniconda
+        if: steps.detect-conda-linux.outputs.found != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.12"
-          activate-environment: atlas-ci
           miniconda-version: "latest"
           channels: defaults
 
-      - name: Show Python version
+      - name: Create/Reset atlas-ci conda env
         shell: bash -l {0}
         run: |
-          python -V
-          which python
-          pip --version
-
-      - name: Cache conda pkgs
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CONDA }}/pkgs
-            ~/.conda/pkgs
-          key: ${{ runner.os }}-condapkgs-3.12
+          conda info || true
+          conda env remove -n atlas-ci -y || true
+          conda create -n atlas-ci -y python=3.12
 
       - name: Install conda tooling
         shell: bash -l {0}
         run: |
+          conda activate atlas-ci
           conda info
           conda update --all -y
           conda install -y anaconda-client conda-build pip
@@ -362,6 +370,7 @@ jobs:
       - name: Install Qt 6 (aqt)
         shell: bash -l {0}
         run: |
+          conda activate atlas-ci
           # Match readme.md recommendation for Linux
           mkdir -p "$HOME/Qt"
           if [ -d "$HOME/Qt/${QT_VERSION}/gcc_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" linux desktop ${QT_VERSION} linux_gcc_64; fi
@@ -399,6 +408,7 @@ jobs:
         env:
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
+          conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_and_deploy_atlas.py
 
@@ -459,6 +469,7 @@ jobs:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
+          conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_ext_libs.py conda-zimg
           conda config --set anaconda_upload yes
@@ -469,6 +480,7 @@ jobs:
         shell: bash -l {0}
         working-directory: python/zimg
         run: |
+          conda activate atlas-ci
           set -euo pipefail
           TAG="${GITHUB_REF#refs/tags/}"
           VERSION="${TAG#v}"
@@ -510,5 +522,6 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
+          conda activate atlas-ci
           set -euo pipefail
           python -m twine upload dist/*

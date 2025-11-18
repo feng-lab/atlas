@@ -3,7 +3,7 @@ name: Windows
 on:
   push:
     branches:
-      - main
+      - mainXX
   create:
     # Runs when a branch or tag is created; we gate to tags in job steps
   workflow_dispatch:
@@ -146,42 +146,49 @@ jobs:
             Write-Error "glslc not found under C:\VulkanSDK\$env:VULKAN_SDK_VERSION\Bin — core tools missing"
           }
 
-      - name: Setup Miniconda
+      - name: Detect existing conda
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
+        id: detect-conda-be1
+        shell: pwsh
+        run: |
+          if (Get-Command conda -ErrorAction SilentlyContinue) {
+            "found=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+            "found=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
+
+      - name: Setup Miniconda
+        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true' && steps.detect-conda-be1.outputs.found != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.12"
-          activate-environment: atlas-ci
           miniconda-version: "latest"
           channels: defaults
 
-      - name: Show Python version
+      - name: Create/Reset atlas-ci conda env
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        shell: bash -l {0}
+        shell: pwsh
         run: |
-          python -V
-          which python || where python
-          pip --version
-
-      - name: Cache conda pkgs
-        if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CONDA }}/pkgs
-            ~/.conda/pkgs
-          key: ${{ runner.os }}-condapkgs-3.12
+          $ErrorActionPreference = 'Stop'
+          conda info
+          conda env remove -n atlas-ci -y
+          if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
+          conda create -n atlas-ci -y python=3.12
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
 
       - name: Install conda tooling and Python deps
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        shell: bash -l {0}
+        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           conda info
-          conda update --all -y
-          conda install -y anaconda-client conda-build pip
-          python -m pip install --upgrade pip
-          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          conda install -n atlas-ci -y anaconda-client conda-build pip
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
+          conda run -n atlas-ci python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
+          conda run -n atlas-ci python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
           conda clean --all -y
 
       - name: Cache Qt (installed)
@@ -195,12 +202,27 @@ jobs:
 
       - name: Install Qt 6 (aqt)
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
-        shell: bash -l {0}
+        shell: pwsh
         run: |
-          mkdir -p "$HOME/Qt"
-          if [ -d "$HOME/Qt/${QT_VERSION}/msvc2022_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" windows desktop ${QT_VERSION} win64_msvc2022_64; fi
-          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" windows desktop tools_ifw qt.tools.ifw.47; fi
-          ls -la "$HOME/Qt" || true
+          $ErrorActionPreference = 'Stop'
+          $qtRoot = Join-Path $HOME 'Qt'
+          New-Item -ItemType Directory -Force -Path $qtRoot | Out-Null
+          $qtVer = $env:QT_VERSION
+          $qtMSVC = Join-Path (Join-Path $qtRoot $qtVer) 'msvc2022_64'
+          if (Test-Path $qtMSVC) {
+            Write-Host 'Qt already cached'
+          } else {
+            conda run -n atlas-ci python -m aqt install-qt --outputdir "$qtRoot" windows desktop $qtVer win64_msvc2022_64
+            if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-qt failed"; exit $LASTEXITCODE }
+          }
+          $ifwDir = Join-Path (Join-Path $qtRoot 'Tools') 'QtInstallerFramework'
+          if (Test-Path $ifwDir) {
+            Write-Host 'Qt IFW cached'
+          } else {
+            conda run -n atlas-ci python -m aqt install-tool --outputdir "$qtRoot" windows desktop tools_ifw qt.tools.ifw.47
+            if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-tool failed"; exit $LASTEXITCODE }
+          }
+          Get-ChildItem -Force $qtRoot | Select-Object FullName
 
       - name: Cache atlas_deps (download archives)
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
@@ -219,7 +241,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           cd "$env:GITHUB_WORKSPACE"
           conda info
-          python util/build_ext_libs.py all --exclude-libs conda-zimg --stop-before $env:EXT_SPLIT_LIB
+          conda run -n atlas-ci python util/build_ext_libs.py all --exclude-libs conda-zimg --stop-before $env:EXT_SPLIT_LIB
+          if ($LASTEXITCODE -ne 0) { Write-Error "External deps build (part 1) failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
   build-env-2:
     runs-on: windows-2022
@@ -255,38 +278,46 @@ jobs:
             C:\\Program Files (x86)\\Intel\\oneAPI
           key: ${{ runner.os }}-oneapi-${{ env.ONEAPI_BASEKIT_URL }}
 
+      - name: Detect existing conda
+        id: detect-conda-be2
+        shell: pwsh
+        run: |
+          if (Get-Command conda -ErrorAction SilentlyContinue) {
+            "found=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+            "found=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
+
       - name: Setup Miniconda
+        if: steps.detect-conda-be2.outputs.found != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.12"
-          activate-environment: atlas-ci
           miniconda-version: "latest"
           channels: defaults
       
-      - name: Show Python version
-        shell: bash -l {0}
+      - name: Create/Reset atlas-ci conda env
+        shell: pwsh
         run: |
-          python -V
-          which python || where python
-          pip --version
-
-      - name: Cache conda pkgs
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CONDA }}/pkgs
-            ~/.conda/pkgs
-          key: ${{ runner.os }}-condapkgs-3.12
-
-      - name: Install conda tooling and Python deps
-        shell: bash -l {0}
-        run: |
+          $ErrorActionPreference = 'Stop'
           conda info
-          conda update --all -y
-          conda install -y anaconda-client conda-build pip
-          python -m pip install --upgrade pip
-          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          conda env remove -n atlas-ci -y
+          if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
+          conda create -n atlas-ci -y python=3.12
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
+      
+      - name: Install conda tooling and Python deps
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          conda info
+          conda install -n atlas-ci -y anaconda-client conda-build pip
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
+          conda run -n atlas-ci python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
+          conda run -n atlas-ci python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
           conda clean --all -y
 
       - name: Cache atlas_deps (download archives)
@@ -315,7 +346,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           cd "$env:GITHUB_WORKSPACE"
           conda info
-          python util/build_ext_libs.py all --exclude-libs conda-zimg --start-from $env:EXT_SPLIT_LIB
+          conda run -n atlas-ci python util/build_ext_libs.py all --exclude-libs conda-zimg --start-from $env:EXT_SPLIT_LIB
+          if ($LASTEXITCODE -ne 0) { Write-Error "External deps build (part 2) failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
   build:
     runs-on: windows-2022
@@ -408,37 +440,46 @@ jobs:
           }
           Get-ChildItem -Force "C:\VulkanSDK\$env:VULKAN_SDK_VERSION" | Select-Object FullName
 
+      - name: Detect existing conda
+        id: detect-conda-build
+        shell: pwsh
+        run: |
+          if (Get-Command conda -ErrorAction SilentlyContinue) {
+            "found=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+            "found=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
+
       - name: Setup Miniconda
+        if: steps.detect-conda-build.outputs.found != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.12"
-          activate-environment: atlas-ci
           miniconda-version: "latest"
           channels: defaults
 
-      - name: Show Python version
-        shell: bash -l {0}
+      - name: Create/Reset atlas-ci conda env
+        shell: pwsh
         run: |
-          python -V
-          which python || where python
-          pip --version
-
-      - name: Cache conda pkgs
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CONDA }}/pkgs
-            ~/.conda/pkgs
-          key: ${{ runner.os }}-condapkgs-3.12
+          $ErrorActionPreference = 'Stop'
+          conda info
+          conda env remove -n atlas-ci -y
+          if ($LASTEXITCODE -ne 0) { Write-Host "No existing atlas-ci env to remove (ok)" }
+          conda create -n atlas-ci -y python=3.12
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to create atlas-ci env"; exit $LASTEXITCODE }
 
       - name: Install conda tooling
-        shell: bash -l {0}
+        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           conda info
-          conda install -y anaconda-client conda-build pip
-          python -m pip install --upgrade pip
-          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema build twine
+          conda install -n atlas-ci -y anaconda-client conda-build pip
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
+          conda run -n atlas-ci python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
+          conda run -n atlas-ci python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema build twine
+          if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
 
       - name: Cache Qt (installed)
         uses: actions/cache@v4
@@ -449,12 +490,27 @@ jobs:
           key: ${{ runner.os }}-qt-${{ env.QT_VERSION }}
 
       - name: Install Qt 6 (aqt)
-        shell: bash -l {0}
+        shell: pwsh
         run: |
-          mkdir -p "$HOME/Qt"
-          if [ -d "$HOME/Qt/${QT_VERSION}/msvc2022_64" ]; then echo "Qt already cached"; else python -m aqt install-qt --outputdir "$HOME/Qt" windows desktop ${QT_VERSION} win64_msvc2022_64; fi
-          if [ -d "$HOME/Qt/Tools/QtInstallerFramework" ]; then echo "Qt IFW cached"; else python -m aqt install-tool --outputdir "$HOME/Qt" windows desktop tools_ifw qt.tools.ifw.47; fi
-          ls -la "$HOME/Qt" || true
+          $ErrorActionPreference = 'Stop'
+          $qtRoot = Join-Path $HOME 'Qt'
+          New-Item -ItemType Directory -Force -Path $qtRoot | Out-Null
+          $qtVer = $env:QT_VERSION
+          $qtMSVC = Join-Path (Join-Path $qtRoot $qtVer) 'msvc2022_64'
+          if (Test-Path $qtMSVC) {
+            Write-Host 'Qt already cached'
+          } else {
+            conda run -n atlas-ci python -m aqt install-qt --outputdir "$qtRoot" windows desktop $qtVer win64_msvc2022_64
+            if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-qt failed"; exit $LASTEXITCODE }
+          }
+          $ifwDir = Join-Path (Join-Path $qtRoot 'Tools') 'QtInstallerFramework'
+          if (Test-Path $ifwDir) {
+            Write-Host 'Qt IFW cached'
+          } else {
+            conda run -n atlas-ci python -m aqt install-tool --outputdir "$qtRoot" windows desktop tools_ifw qt.tools.ifw.47
+            if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-tool failed"; exit $LASTEXITCODE }
+          }
+          Get-ChildItem -Force $qtRoot | Select-Object FullName
 
       - name: Cache 3rdparty build (final)
         uses: actions/cache@v4
@@ -483,10 +539,12 @@ jobs:
             testdata-
 
       - name: Build and deploy Atlas
-        shell: bash -l {0}
+        shell: pwsh
         run: |
-          cd "$GITHUB_WORKSPACE"
-          python util/build_and_deploy_atlas.py
+          $ErrorActionPreference = 'Stop'
+          cd "$env:GITHUB_WORKSPACE"
+          conda run -n atlas-ci python util/build_and_deploy_atlas.py
+          if ($LASTEXITCODE -ne 0) { Write-Error "build_and_deploy_atlas failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
       - name: Setup SSH key
         shell: bash -l {0}
@@ -543,25 +601,28 @@ jobs:
           scp -P "$SSH_PORT" -i ~/.ssh/private.key deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/"
 
       - name: Build and upload conda zimg
-        shell: bash -l {0}
+        shell: pwsh
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
         run: |
-          cd "$GITHUB_WORKSPACE"
-          python util/build_ext_libs.py conda-zimg
+          $ErrorActionPreference = 'Stop'
+          cd "$env:GITHUB_WORKSPACE"
+          conda run -n atlas-ci python util/build_ext_libs.py conda-zimg
+          if ($LASTEXITCODE -ne 0) { Write-Error "build_ext_libs.py conda-zimg failed"; exit $LASTEXITCODE }
           conda config --set anaconda_upload yes
-          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
+          conda run -n atlas-ci conda-build --token $env:ANACONDA_API_TOKEN --user fenglab zimg-recipe
+          if ($LASTEXITCODE -ne 0) { Write-Error "conda-build failed"; exit $LASTEXITCODE }
 
       - name: Build zimg PyPI artifacts (wheel + sdist)
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
-        shell: bash -l {0}
+        shell: pwsh
         working-directory: python/zimg
         run: |
-          set -euo pipefail
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
-          echo "Detected tag: $TAG -> zimg version: $VERSION"
-          export VERSION="$VERSION"
+          $ErrorActionPreference = 'Stop'
+          $TAG = "$env:GITHUB_REF".Replace('refs/tags/','')
+          $VERSION = $TAG.TrimStart('v')
+          Write-Host "Detected tag: $TAG -> zimg version: $VERSION"
+          $env:VERSION = $VERSION
           python - << 'PY'
           import os
           import re
@@ -574,7 +635,7 @@ jobs:
           pyproject = Path("pyproject.toml")
           text = pyproject.read_text(encoding="utf-8")
           new_text, count = re.subn(
-              r'(?m)^version\\s*=\\s*\"[^\"]*\"',
+              r'(?m)^version\s*=\s*\"[^\"]*\"',
               f'version = "{version}"',
               text,
           )
@@ -583,20 +644,23 @@ jobs:
           pyproject.write_text(new_text, encoding="utf-8")
           print(f"Updated pyproject.toml to version {version}")
           PY
-          python -m pip install --upgrade pip
-          # Ensure build backend is available (redundant if Install conda tooling ran in this job)
-          python -m pip install --no-cache-dir build twine
-          rm -rf dist
-          python -m build
-          ls -R dist
+          conda run -n atlas-ci python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { Write-Error "pip upgrade failed"; exit $LASTEXITCODE }
+          conda run -n atlas-ci python -m pip install --no-cache-dir build twine
+          if ($LASTEXITCODE -ne 0) { Write-Error "pip install build twine failed"; exit $LASTEXITCODE }
+          Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
+          conda run -n atlas-ci python -m build
+          if ($LASTEXITCODE -ne 0) { Write-Error "python -m build failed"; exit $LASTEXITCODE }
+          Get-ChildItem -Recurse dist | Select-Object FullName
 
       - name: Upload zimg to PyPI
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
-        shell: bash -l {0}
+        shell: pwsh
         working-directory: python/zimg
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          set -euo pipefail
-          python -m twine upload dist/*
+          $ErrorActionPreference = 'Stop'
+          conda run -n atlas-ci python -m twine upload dist/*
+          if ($LASTEXITCODE -ne 0) { Write-Error "twine upload failed"; exit $LASTEXITCODE }

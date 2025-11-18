@@ -3,7 +3,7 @@ name: macOS
 on:
   push:
     branches:
-      - mainXX
+      - main
   create:
     # Runs when a branch or tag is created; we gate to tags in job steps
   workflow_dispatch:
@@ -116,37 +116,39 @@ jobs:
 
           ls -R "${INSTALL_ROOT}" || true
 
-      - name: Setup Miniconda
+      - name: Detect existing conda
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        id: detect-conda-macos-be
+        shell: bash
+        run: |
+          if command -v conda >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Miniconda
+        if: steps.cache-extlibs.outputs.cache-hit != 'true' && steps.detect-conda-macos-be.outputs.found != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.12"
-          activate-environment: atlas-ci
           miniconda-version: "latest"
           channels: defaults
 
-      - name: Show Python version
+      - name: Create/Reset atlas-ci conda env
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
-          python -V
-          which python
-          pip --version
-
-      - name: Cache conda pkgs
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CONDA }}/pkgs
-            ~/.conda/pkgs
-          key: ${{ runner.os }}-condapkgs-3.12
+          conda info || true
+          conda env remove -n atlas-ci -y || true
+          conda create -n atlas-ci -y python=3.12
 
       - name: Install conda tooling
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
+          conda activate atlas-ci
           conda info
           conda update --all -y
           conda install -y anaconda-client conda-build pip
@@ -167,6 +169,7 @@ jobs:
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
+          conda activate atlas-ci
           mkdir -p "$HOME/Qt"
           if [ -d "$HOME/Qt/${QT_VERSION}/macos" ]; then
             echo "Qt already cached"
@@ -195,6 +198,8 @@ jobs:
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
+          set -euo pipefail
+          conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_ext_libs.py all --exclude-libs conda-zimg
 
@@ -219,33 +224,36 @@ jobs:
           brew update
           brew install unrar p7zip git golang autoconf || true
 
+      - name: Detect existing conda
+        id: detect-conda-macos
+        shell: bash
+        run: |
+          if command -v conda >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Miniconda
+        if: steps.detect-conda-macos.outputs.found != 'true'
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: "3.12"
-          activate-environment: atlas-ci
           miniconda-version: "latest"
           channels: defaults
 
-      - name: Show Python version
+      - name: Create/Reset atlas-ci conda env
         shell: bash -l {0}
         run: |
-          python -V
-          which python
-          pip --version
-
-      - name: Cache conda pkgs
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.CONDA }}/pkgs
-            ~/.conda/pkgs
-          key: ${{ runner.os }}-condapkgs-3.12
+          conda info || true
+          conda env remove -n atlas-ci -y || true
+          conda create -n atlas-ci -y python=3.12
 
       - name: Install conda tooling
         shell: bash -l {0}
         run: |
+          conda activate atlas-ci
           conda info
           conda update --all -y
           conda install -y anaconda-client conda-build pip
@@ -264,6 +272,7 @@ jobs:
       - name: Install Qt 6 (aqt)
         shell: bash -l {0}
         run: |
+          conda activate atlas-ci
           mkdir -p "$HOME/Qt"
           if [ -d "$HOME/Qt/${QT_VERSION}/macos" ]; then
             echo "Qt already cached"
@@ -326,6 +335,7 @@ jobs:
       - name: Build and deploy Atlas
         shell: bash -l {0}
         run: |
+          conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_and_deploy_atlas.py
 
@@ -385,6 +395,7 @@ jobs:
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
         run: |
+          conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_ext_libs.py conda-zimg
           conda config --set anaconda_upload yes
@@ -395,6 +406,7 @@ jobs:
         shell: bash -l {0}
         working-directory: python/zimg
         run: |
+          conda activate atlas-ci
           set -euo pipefail
           TAG="${GITHUB_REF#refs/tags/}"
           VERSION="${TAG#v}"
@@ -436,6 +448,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
+          conda activate atlas-ci
           set -euo pipefail
           python -m twine upload dist/*
 
