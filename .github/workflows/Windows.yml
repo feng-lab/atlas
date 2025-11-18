@@ -320,7 +320,7 @@ jobs:
   build:
     runs-on: windows-2022
     needs: [ext-cache-probe, build-env-2]
-    if: ${{ needs.ext-cache-probe.outputs.p2-hit == 'true' || needs.build-env-2.result == 'success' }}
+    if: ${{ always() && (needs.ext-cache-probe.outputs.p2-hit == 'true' || needs.build-env-2.result == 'success') }}
     permissions:
       contents: write
     steps:
