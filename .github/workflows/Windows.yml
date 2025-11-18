@@ -475,6 +475,7 @@ jobs:
       - name: Cache atlas test data
         uses: actions/cache@v4
         with:
+          enableCrossOsArchive: true
           path: |
             atlas_test_data
           key: ${{ format('testdata-{0}', hashFiles('util/atlas_test_data_filelist.py')) }}

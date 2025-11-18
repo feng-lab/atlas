@@ -140,7 +140,12 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
                         file.write(chunk)
                         downloaded_size += len(chunk)
                         elapsed_time = time.time() - start_time
-                        speed = downloaded_size / (1024 * 1024 * elapsed_time)  # MB/s
+                        # Avoid division by zero if the first chunk arrives too quickly or
+                        # if the clock resolution reports a zero/negative elapsed time.
+                        if elapsed_time > 0:
+                            speed = downloaded_size / (1024 * 1024 * elapsed_time)  # MB/s
+                        else:
+                            speed = 0.0
                         progress = (downloaded_size / expected_size) * 100
 
                         # Clear the current line
