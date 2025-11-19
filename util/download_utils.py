@@ -12,6 +12,10 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# Progress reporting policy for non-interactive environments (e.g., CI)
+PROGRESS_LOG_INTERVAL_SEC = 5   # minimum seconds between progress log lines
+PROGRESS_LOG_PERCENT_STEP = 10  # log on each additional N% completion
+
 
 def retry_with_backoff(retries=5, backoff_in_seconds=1):
     def decorator(func):
@@ -131,6 +135,12 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
             response.raise_for_status()
 
             start_time = time.time()
+            # Determine whether we have an interactive terminal. In CI (e.g., GitHub Actions),
+            # stdout is not a TTY, and carriage-return updates will spam the log. Fall back to
+            # rate-limited logger updates in that case.
+            interactive = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+            last_log_time = start_time
+            last_logged_pct = -1  # integer percent last logged in non-interactive mode
             # Append to file if resuming, otherwise write new file
             mode = 'ab' if current_size > 0 else 'wb'
             with open(target_path, mode) as file:
@@ -148,13 +158,29 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
                             speed = 0.0
                         progress = (downloaded_size / expected_size) * 100
 
-                        # Clear the current line
-                        sys.stdout.write('\033[K')
-                        # Print progress and speed
-                        sys.stdout.write(f"\rProgress: {progress:.2f}% | Speed: {speed:.2f} MB/s")
-                        sys.stdout.flush()
+                        if interactive:
+                            # Update in-place on a single terminal line
+                            sys.stdout.write('\033[K')  # clear to end of line
+                            sys.stdout.write(f"\rProgress: {progress:.2f}% | Speed: {speed:.2f} MB/s")
+                            sys.stdout.flush()
+                        else:
+                            # Non-interactive (CI): log infrequently to avoid flooding logs
+                            now = time.time()
+                            pct_int = int(progress)
+                            if ((now - last_log_time) >= PROGRESS_LOG_INTERVAL_SEC) or \
+                               (pct_int >= last_logged_pct + PROGRESS_LOG_PERCENT_STEP) or \
+                               (pct_int == 100):
+                                logger.info(f"Progress: {progress:.1f}% | Speed: {speed:.2f} MB/s")
+                                last_log_time = now
+                                last_logged_pct = pct_int
 
-            logger.info('')  # New line after download completes
+            if interactive:
+                # Ensure a newline after the in-place progress line
+                sys.stdout.write('\n')
+                sys.stdout.flush()
+            else:
+                # Keep a blank line separation minimal in logs
+                logger.info('')
 
             if os.path.getsize(target_path) != expected_size:
                 logger.warning(

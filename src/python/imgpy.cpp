@@ -1008,6 +1008,17 @@ See also
          &ZImg::secureDivideBy,
          "rhs"_a,
          "Safely divide this image by another image 'rhs' (elementwise), guarding against division pitfalls.")
+    // MSVC (cl) emits spurious C4686 warnings for nanobind's operator
+    // placeholders (nb::self ...), which are implemented via templated
+    // helper UDTs in nanobind::detail. The warning complains about a
+    // possible change in behavior due to UDT return calling convention,
+    // but there is no actual ABI or behavioral issue here; it's a false
+    // positive triggered by the placeholder expression templates.
+    // Suppress it narrowly for this block on MSVC only.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable : 4686)
+#endif
     .def(nb::self + nb::self)
     .def(nb::self += nb::self)
     .def(nb::self - nb::self)
@@ -1070,6 +1081,9 @@ See also
     .def(nb::self *= uint64_t())
     .def(nb::self / uint64_t())
     .def(nb::self /= uint64_t())
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
     .def("__repr__", [](const ZImg& v) {
       return fmt::format("<_imgpy.ZImg {}>", v.info().toString());
     });

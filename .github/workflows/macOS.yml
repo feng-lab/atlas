@@ -37,6 +37,7 @@ jobs:
           submodules: recursive
 
       - name: Cache 3rdparty build
+        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true'
         id: cache-extlibs
         uses: actions/cache@v4
         with:
@@ -54,7 +55,7 @@ jobs:
           brew install unrar p7zip git golang autoconf || true
 
       - name: Cache Vulkan SDK (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -157,7 +158,7 @@ jobs:
           conda clean --all -y
 
       - name: Cache Qt (installed)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -184,7 +185,7 @@ jobs:
           ls -la "$HOME/Qt" || true
 
       - name: Cache atlas_deps (download archives)
-        if: steps.cache-extlibs.outputs.cache-hit != 'true'
+        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true' && steps.cache-extlibs.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -262,6 +263,7 @@ jobs:
           conda clean --all -y
 
       - name: Cache Qt (installed)
+        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -287,6 +289,7 @@ jobs:
           ls -la "$HOME/Qt" || true
 
       - name: Cache 3rdparty build
+        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -294,6 +297,7 @@ jobs:
           key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
 
       - name: Cache atlas_deps (download archives)
+        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -303,6 +307,7 @@ jobs:
             ${{ runner.os }}-atlasdeps-
 
       - name: Cache atlas test data
+        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true'
         uses: actions/cache@v4
         with:
           enableCrossOsArchive: true
@@ -313,6 +318,7 @@ jobs:
             testdata-
 
       - name: Cache Vulkan SDK (installed)
+        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true'
         uses: actions/cache@v4
         with:
           path: |
