@@ -653,7 +653,7 @@ def build_boost(src_dir: str, install_dir: str):
                                cwd=src_dir, shell=False, check=True, env=env)
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                rm_tree(arm64_install_dir)
         else:
             cbf = get_common_build_flags(with_optimization=True)
             env = get_env_for_config_make()
@@ -879,7 +879,7 @@ def build_cpuinfo(src_dir: str, install_dir: str):
             create_universal_binaries(arm64_install_dir, install_dir)
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+            rm_tree(arm64_install_dir)
 
 
 def build_gflags(src_dir: str, install_dir: str):
@@ -1020,7 +1020,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
 
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                rm_tree(arm64_install_dir)
         elif is_windows():
             env = get_env_for_config_make(remove_scoop_from_path=False)
             env['PATH'] = f'{env["PATH"]};{nasm_dir}'
@@ -1109,7 +1109,7 @@ def build_xz(src_dir: str, install_dir: str):
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                rm_tree(arm64_install_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
@@ -1228,7 +1228,7 @@ def build_snappy(src_dir: str, install_dir: str):
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                rm_tree(arm64_install_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
@@ -1315,7 +1315,7 @@ def build_libsodium(src_dir: str, install_dir: str):
 
                     create_universal_binaries(arm64_install_dir, install_dir)
                 finally:
-                    shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                    rm_tree(arm64_install_dir)
     finally:
         logger.info('done')
 
@@ -1461,7 +1461,7 @@ install(
         #         build_and_install_cmakecmd(cmakecmd, build_dir)
         #         create_universal_binaries(arm64_install_dir, install_dir)
         #     finally:
-        #         shutil.rmtree(arm64_install_dir, ignore_errors=False)
+        #         rm_tree(arm64_install_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
@@ -1525,7 +1525,7 @@ include(libs)""",
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                rm_tree(arm64_install_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
@@ -1609,7 +1609,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                rm_tree(arm64_install_dir)
 
         # on linux, cmake complains about could not find the fake target SuiteSparse::Partition
         orig_file3 = os.path.join(install_dir, 'lib', 'cmake', 'Ceres', 'CeresTargets.cmake')
@@ -1719,7 +1719,7 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
             create_universal_binaries(arm64_install_dir=arm64_install_dir, final_install_dir=install_dir)
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+            rm_tree(arm64_install_dir)
 
 
 def build_libpng(src_dir: str, install_dir: str):
@@ -1767,7 +1767,7 @@ def build_libpng(src_dir: str, install_dir: str):
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                rm_tree(arm64_install_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
@@ -1839,7 +1839,7 @@ def build_libwebp(src_dir: str, install_dir: str):
             create_universal_binaries(arm64_install_dir, install_dir)
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+            rm_tree(arm64_install_dir)
 
     orig_file = os.path.join(install_dir, 'share', 'WebP', 'cmake', 'WebPConfig.cmake')
     patch_file(orig_file,
@@ -2293,7 +2293,7 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL=' + ('OFF' if is_windows() else 'ON'),
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_lz4:BOOL=ON',
-                         '-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=' + ('OFF' if is_windows() else 'ON'),
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_png:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON',
                          '-DVTK_LEGACY_REMOVE:BOOL=ON',
@@ -2532,7 +2532,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                rm_tree(arm64_install_dir)
 
         if not conda_build:
             if is_windows():
@@ -2627,7 +2627,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
-                shutil.rmtree(arm64_install_dir, ignore_errors=False)
+                rm_tree(arm64_install_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onexc=handleRemoveReadonly)
         patch_manager.restore_files()

@@ -7,6 +7,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import time
 import zipfile
 
 from packaging import version
@@ -600,6 +601,26 @@ def handleRemoveReadonly(func, path, excinfo):
         func(path)
     else:
         raise excinfo
+
+
+def _chmod_and_retry(func, p, exc):
+    try:
+        os.chmod(p, stat.S_IWUSR)
+    except OSError:
+        pass
+    func(p)
+
+
+def rm_tree(path: str, attempts: int = 3):
+    if not os.path.exists(path):
+        return
+    for _ in range(attempts):
+        try:
+            shutil.rmtree(path, onerror=_chmod_and_retry)
+            return
+        except OSError:
+            time.sleep(0.5)
+    shutil.rmtree(path, ignore_errors=True)
 
 
 if __name__ == "__main__":
