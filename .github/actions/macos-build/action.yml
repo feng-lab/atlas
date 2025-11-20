@@ -1,0 +1,131 @@
+name: macOS Build and Publish
+description: Build Atlas, publish artifacts, and optionally clean up on self-hosted runners.
+runs:
+  using: composite
+  steps:
+    - name: Build and deploy Atlas
+      shell: bash -l {0}
+      run: |
+        conda activate atlas-ci
+        cd "$GITHUB_WORKSPACE"
+        python util/build_and_deploy_atlas.py
+
+    - name: Create or update release and upload assets (gh CLI)
+      if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG_NAME: ${{ github.event.ref }}
+      shell: bash -l {0}
+      run: |
+        set -euo pipefail
+        TAG="${TAG_NAME:-${GITHUB_REF#refs/tags/}}"
+        echo "Creating/updating release for tag: $TAG"
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "Release $TAG already exists"
+        else
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes
+        fi
+        shopt -s nullglob
+        files=(deploy/AtlasInstaller*.zip deploy/atlas-*.zip)
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "No release zip files found under deploy/" >&2
+          exit 1
+        fi
+        gh release upload "$TAG" "${files[@]}" --clobber
+
+    - name: Setup SSH key
+      shell: bash -l {0}
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+      run: |
+        mkdir -p ~/.ssh/
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
+        chmod 600 ~/.ssh/private.key
+        # Append CI known_hosts entries; do not clobber existing user configuration
+        if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+          printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+        fi
+
+    - name: Deploy artifacts
+      shell: bash -l {0}
+      env:
+        SSH_SERVER: ${{ secrets.SSH_SERVER }}
+        SSH_PORT: ${{ secrets.SSH_PORT }}
+        SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+        SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
+      run: |
+        cd "$GITHUB_WORKSPACE/deploy"
+        rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
+        rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+
+    - name: Build and upload conda zimg
+      shell: bash -l {0}
+      env:
+        ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+      run: |
+        conda activate atlas-ci
+        cd "$GITHUB_WORKSPACE"
+        python util/build_ext_libs.py conda-zimg
+        conda config --set anaconda_upload yes
+        conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
+
+    - name: Build zimg PyPI artifacts (wheel + sdist)
+      if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+      shell: bash -l {0}
+      working-directory: python/zimg
+      run: |
+        conda activate atlas-ci
+        set -euo pipefail
+        TAG="${GITHUB_REF#refs/tags/}"
+        VERSION="${TAG#v}"
+        echo "Detected tag: $TAG -> zimg version: $VERSION"
+        export VERSION="$VERSION"
+        python - << 'PY'
+        import os
+        import re
+        from pathlib import Path
+
+        version = os.environ.get("VERSION")
+        if not version:
+            raise SystemExit("VERSION environment variable is not set")
+
+        pyproject = Path("pyproject.toml")
+        text = pyproject.read_text(encoding="utf-8")
+        new_text, count = re.subn(
+            r'(?m)^version\\s*=\\s*\"[^\"]*\"',
+            f'version = "{version}"',
+            text,
+        )
+        if count == 0:
+            raise SystemExit("Failed to update version in pyproject.toml")
+        pyproject.write_text(new_text, encoding="utf-8")
+        print(f"Updated pyproject.toml to version {version}")
+        PY
+        python -m pip install --upgrade pip
+        # Ensure build backend is available (redundant if conda tooling already installed)
+        python -m pip install --no-cache-dir build twine
+        rm -rf dist
+        python -m build
+        ls -R dist
+
+    - name: Upload zimg to PyPI
+      if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+      shell: bash -l {0}
+      working-directory: python/zimg
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        conda activate atlas-ci
+        set -euo pipefail
+        python -m twine upload dist/*
+
+    - name: Self-hosted cleanup (optional)
+      if: env.MACOS_SELF_HOSTED_CLEANUP == 'true'
+      shell: bash -l {0}
+      run: |
+        set -euo pipefail
+        rm -rf "$GITHUB_WORKSPACE" && mkdir -p "$GITHUB_WORKSPACE"
