@@ -37,7 +37,6 @@ jobs:
           submodules: recursive
 
       - name: Cache 3rdparty build
-        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true'
         id: cache-extlibs
         uses: actions/cache@v4
         with:
@@ -289,7 +288,6 @@ jobs:
           ls -la "$HOME/Qt" || true
 
       - name: Cache 3rdparty build
-        if: env.MACOS_SELF_HOSTED_CLEANUP != 'true'
         uses: actions/cache@v4
         with:
           path: |
