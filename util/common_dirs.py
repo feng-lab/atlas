@@ -596,19 +596,19 @@ def handleRemoveReadonly(func, path, excinfo):
     Clears readonly bits when the failure is a permissions error, then
     retries the removal once; otherwise re-raises the original exception.
     """
-    if func in (os.rmdir, os.unlink, os.remove) and getattr(excinfo, "errno", None) == errno.EACCES:
+    if isinstance(excinfo, OSError) and excinfo.errno in (errno.EACCES, errno.EPERM):
         os.chmod(path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # 0777
-        func(path)
-    else:
-        raise excinfo
+        if func is os.open:
+            fd = os.open(path, os.O_RDONLY)
+            os.close(fd)
+        elif func is os.scandir:
+            with os.scandir(path) as it:
+                list(it)
+        else:
+            func(path)
+        return
 
-
-def _chmod_and_retry(func, p, exc):
-    try:
-        os.chmod(p, stat.S_IWUSR)
-    except OSError:
-        pass
-    func(p)
+    raise excinfo
 
 
 def rm_tree(path: str, attempts: int = 3):
@@ -616,7 +616,7 @@ def rm_tree(path: str, attempts: int = 3):
         return
     for _ in range(attempts):
         try:
-            shutil.rmtree(path, onerror=_chmod_and_retry)
+            shutil.rmtree(path, onexc=handleRemoveReadonly)
             return
         except OSError:
             time.sleep(0.5)
