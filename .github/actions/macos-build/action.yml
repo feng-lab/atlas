@@ -1,5 +1,30 @@
 name: macOS Build and Publish
 description: Build Atlas, publish artifacts, and optionally clean up on self-hosted runners.
+inputs:
+  ssh-private-key:
+    description: SSH private key used for artifact deployment.
+    required: true
+  ssh-known-hosts:
+    description: Known hosts entries for SSH.
+    required: true
+  ssh-server:
+    description: SSH server hostname for deployment.
+    required: true
+  ssh-port:
+    description: SSH server port for deployment.
+    required: true
+  ssh-username:
+    description: SSH username for deployment.
+    required: true
+  ssh-deploy-path:
+    description: Target path on the SSH server for deployment.
+    required: true
+  anaconda-api-token:
+    description: Token for uploading to Anaconda.
+    required: true
+  pypi-api-token:
+    description: Token for uploading to PyPI.
+    required: true
 runs:
   using: composite
   steps:
@@ -38,8 +63,8 @@ runs:
     - name: Setup SSH key
       shell: bash -l {0}
       env:
-        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        SSH_KNOWN_HOSTS: ${{ inputs.ssh-known-hosts }}
       run: |
         mkdir -p ~/.ssh/
         echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
@@ -52,10 +77,10 @@ runs:
     - name: Deploy artifacts
       shell: bash -l {0}
       env:
-        SSH_SERVER: ${{ secrets.SSH_SERVER }}
-        SSH_PORT: ${{ secrets.SSH_PORT }}
-        SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-        SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
+        SSH_SERVER: ${{ inputs.ssh-server }}
+        SSH_PORT: ${{ inputs.ssh-port }}
+        SSH_USERNAME: ${{ inputs.ssh-username }}
+        SSH_DEPLOY_PATH: ${{ inputs.ssh-deploy-path }}
       run: |
         cd "$GITHUB_WORKSPACE/deploy"
         rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
@@ -64,7 +89,7 @@ runs:
     - name: Build and upload conda zimg
       shell: bash -l {0}
       env:
-        ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+        ANACONDA_API_TOKEN: ${{ inputs.anaconda-api-token }}
       run: |
         conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
@@ -117,7 +142,7 @@ runs:
       working-directory: python/zimg
       env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        TWINE_PASSWORD: ${{ inputs.pypi-api-token }}
       run: |
         conda activate atlas-ci
         set -euo pipefail

@@ -65,6 +65,15 @@ jobs:
 
       - name: Build and publish
         uses: ./.github/actions/macos-build
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          ssh-server: ${{ secrets.SSH_SERVER }}
+          ssh-port: ${{ secrets.SSH_PORT }}
+          ssh-username: ${{ secrets.SSH_USERNAME }}
+          ssh-deploy-path: ${{ secrets.SSH_DEPLOY_PATH }}
+          anaconda-api-token: ${{ secrets.ANACONDA_API_TOKEN }}
+          pypi-api-token: ${{ secrets.PYPI_API_TOKEN }}
         env:
           MACOS_SELF_HOSTED_CLEANUP: "true"
 
@@ -117,3 +126,12 @@ jobs:
 
       - name: Build and publish
         uses: ./.github/actions/macos-build
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          ssh-server: ${{ secrets.SSH_SERVER }}
+          ssh-port: ${{ secrets.SSH_PORT }}
+          ssh-username: ${{ secrets.SSH_USERNAME }}
+          ssh-deploy-path: ${{ secrets.SSH_DEPLOY_PATH }}
+          anaconda-api-token: ${{ secrets.ANACONDA_API_TOKEN }}
+          pypi-api-token: ${{ secrets.PYPI_API_TOKEN }}
