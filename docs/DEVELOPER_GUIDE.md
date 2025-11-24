@@ -66,7 +66,7 @@ Agents: Codegen Mode
  - Discover with tools: `scene_list_objects`, `scene_list_params(id)`, `scene_bbox`.
  - Unified addressing across tools: use `id` only with reserved ids 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids. The legacy scope/object/group forms have been removed from Agent Tooling.
   - Generate a small plan‑only Python script using `atlas_agent.api` (SceneAPI/CameraAPI) to compute values (no writes). Run with `python_write_and_run` and print compact JSON.
-  - Validate with tools: `scene_validate_apply` or `camera_validate`; refine the script if invalid.
+  - Validate with tools: `scene_validate_params` or `camera_validate`; refine the script if invalid.
   - Generate an apply script to write keys/params; run; then verify (`scene_get_values(id)`, `animation_list_keys(id,json_key)`).
 - Repair loop: On script errors (non‑zero exit), capture stdout/stderr, revise, and re‑run within guardrails (max attempts env `ATLAS_AGENT_CODEGEN_MAX_ATTEMPTS`, default 20; overall time budget). Stop early if errors repeat unchanged.
 - Scripts should be focused, short, and use stdlib. Avoid monolithic “one‑shot” scripts.

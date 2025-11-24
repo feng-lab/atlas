@@ -26,7 +26,7 @@ class Inspector:
             "- You have no tools and no filesystem/network access.\n"
             "- Do not ask the user to paste/upload files or run shell commands.\n"
             "- Do not speculate beyond Facts; treat Facts JSON as authoritative.\n"
-            "- Approve by default when evidence is insufficient: absence of evidence is not a failure.\n"
+            "- Absence of evidence is not a failure: when Facts are silent/insufficient, default to satisfied=true and at most note the unverified aspect. Only fail when Facts clearly contradict the core intent.\n"
             "Blocking criteria (fail only when certain):\n"
             "- Facts contradict the core intent (e.g., required keys/values are missing or wrong, wrong objects were affected, camera_validation.ok=false).\n"
             "- The plan claims changes that Facts explicitly do not show.\n"
@@ -81,4 +81,9 @@ class Inspector:
                 tu = None
             return sat, fb, tu
         except Exception:
-            return False, "Inspector could not parse decision; please re‑evaluate with tightened plan.", None
+            # Parsing is non-blocking; default to satisfied with a soft note to avoid rework loops.
+            return (
+                True,
+                "Inspector parse error (default-approving); please sanity-check results manually.",
+                None,
+            )

@@ -147,10 +147,3 @@ runs:
         conda activate atlas-ci
         set -euo pipefail
         python -m twine upload dist/*
-
-    - name: Self-hosted cleanup (optional)
-      if: env.MACOS_SELF_HOSTED_CLEANUP == 'true'
-      shell: bash -l {0}
-      run: |
-        set -euo pipefail
-        rm -rf "$GITHUB_WORKSPACE" && mkdir -p "$GITHUB_WORKSPACE"

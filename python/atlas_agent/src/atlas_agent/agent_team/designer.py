@@ -10,6 +10,7 @@ DESIGNER_SYSTEM = (
     "- Do not invent camera coordinates; describe typed camera intent (e.g., FIT/ORBIT/DOLLY/STATIC) and targets. Include axis and duration window when relevant.\n"
     "- Do not specify implementation details such as step sizes or base_value chaining.\n"
     "- Do NOT assert concrete json_key or option label strings (e.g., avoid naming 'Color Mode StringIntOption', 'Mesh Color', etc.). Describe intended visual outcomes instead, such as 'solid single blue color until 6.5s; wireframe‑only after'.\n"
+    "- Treat user-mentioned file/folder names as hints only; do not expand or guess exact paths. Leave path resolution/verification to Implementer tools.\n"
     "- Minimal mutation policy: propose ONLY the changes strictly necessary to fulfill the user’s intent. Do NOT add unrelated tweaks unless explicitly requested in the Task Brief.\n"
     "- Align with any 'TASK BRIEF:' provided in context.\n"
     "- Do not include confirmation questions; if defaults are needed, state them under 'Assumptions'.\n"

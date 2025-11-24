@@ -74,8 +74,6 @@ jobs:
           ssh-deploy-path: ${{ secrets.SSH_DEPLOY_PATH }}
           anaconda-api-token: ${{ secrets.ANACONDA_API_TOKEN }}
           pypi-api-token: ${{ secrets.PYPI_API_TOKEN }}
-        env:
-          MACOS_SELF_HOSTED_CLEANUP: "true"
 
   build-env:
     needs: determine-mode

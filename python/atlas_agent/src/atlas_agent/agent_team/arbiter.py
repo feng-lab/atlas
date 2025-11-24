@@ -12,6 +12,7 @@ ARBITER_SYSTEM = (
     "Prefer typed camera intent (FIT/ORBIT/DOLLY/STATIC) over raw coordinates. Do not prescribe implementation details (step sizes, chaining) — leave execution to the Implementer. Keep the merged plan concise and implementable.\n"
     "Apply a minimal mutation filter: remove any unrelated parameter edits not required by the Task Brief unless explicitly requested.\n"
     "Do NOT assert exact parameter json_keys or option label strings in the merged plan. Keep descriptions semantic (e.g., 'solid single blue', 'wireframe-only at 6.5s'). Parameter/option resolution is Implementer-only.\n"
+    "Treat user-mentioned file/folder names as hints only; do not expand or guess exact paths. Leave path resolution/verification to the Implementer tools.\n"
     "Do not include any requests to confirm/ask the user in the plan. Convert such text into plain 'Assumptions' with reasonable defaults so the plan is immediately executable.\n"
     "End the merged plan with a TODO section using checkboxes (human-readable, minimal steps). Example:\n"
     "TODO:\n- [ ] Step A…\n- [ ] Step B…\n"

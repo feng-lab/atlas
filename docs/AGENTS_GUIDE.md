@@ -111,7 +111,7 @@ Stability rules
 Categories and current tools (non-exhaustive)
 - File/FS: `system_info`, `fs_expand_paths`, `fs_check_paths`, `fs_glob`, `fs_resolve_path`, `repo_search`
 - Load: `scene_load_files`, `scene_ensure_loaded`, `scene_smart_load`
-- Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_apply`, `scene_apply`, `scene_save_scene`
+- Scene (stateless): `scene_get_values(id,json_keys)`, `scene_validate_params`, `scene_apply`, `scene_save_scene`
 - Discovery: `scene_list_objects`, `scene_list_params(id)`, `scene_capabilities`, `scene_schema`, `scene_capabilities_summary`, `scene_facts_summary`
 - Timeline: `animation_list_keys(id,json_key,include_values)`, `animation_batch`, `animation_set_key_param`, `animation_replace_key_param`, `animation_set_duration`, `animation_set_time`, `animation_play`, `animation_pause`, `animation_save_animation`
 - Camera: producers (typed values) — `fit_candidates`, `camera_focus`, `camera_point_to`, `camera_rotate`, `camera_reset_view`; scene apply — `scene_camera_fit`, `scene_camera_apply`; animation (timeline) — `animation_camera_solve_and_apply`, `animation_camera_validate`
@@ -122,7 +122,7 @@ Notes
 - When the Script API adds a capability that belongs in Agent Tooling, introduce it via a new tool function and document it here.
 
 Scene vs Timeline contract (for LLMs)
-- Scene (stateless): `scene_validate_apply` → `scene_apply` edits base scene only. It never writes keys and must not include times/easing.
+- Scene (stateless): `scene_validate_params` → `scene_apply` edits base scene only. Validation returns `{ok, results:[{json_key, ok, reason?, normalized_value?}]}` and performs no writes. It never writes keys and must not include times/easing.
 - Timeline (animated): use `animation_set_key_param`/`animation_replace_key_param`/`animation_batch` (and camera equivalents) to write keys at times with easing. Keys override scene values at playback.
 - Any mention of time (e.g., “at 6.5s”) implies timeline, not scene_apply. Use the `animation_*` tools.
 - To change an existing animated moment, replace the key at that time (use easing=Switch for non‑interpolatable params like StringIntOption).
@@ -150,7 +150,7 @@ Discover at runtime
 
 Guidance
 - Use `scene_list_params(id)` and `capabilities.json` for parameter metadata (types, option_names, descriptions); avoid hardcoding.
-- Validate before applying: `scene_validate_apply` (scene) and `animation_camera_validate` (timeline camera). Handle soft errors (`type_mismatch`, `option_invalid`, etc.).
+- Validate before applying: `scene_validate_params` for scene values and `animation_camera_validate` for timeline camera. Handle soft errors (`type_mismatch`, `option_invalid`, etc.).
 
 ## Camera Usage (Produce → Apply)
 

@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--model",
-        default=os.environ.get("ATLAS_LLM_MODEL", "gpt-5-mini"),
+        default=os.environ.get("ATLAS_LLM_MODEL", "gpt-5.1"),
     )
     parser.add_argument(
         "--temperature",

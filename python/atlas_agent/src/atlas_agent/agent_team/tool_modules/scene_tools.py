@@ -1,9 +1,9 @@
 import hashlib
 import json
+import logging
 import os
 import platform
 from pathlib import Path
-import logging
 from typing import Any, Dict, List
 
 # Fail-fast required third-party imports
@@ -27,7 +27,7 @@ HANDLED_TOOLS = (
     "scene_capabilities",
     "scene_schema",
     "scene_get_values",
-    "scene_validate_apply",
+    "scene_validate_params",
     "scene_apply",
     "scene_save_scene",
     "scene_camera_fit",
@@ -44,6 +44,39 @@ HANDLED_TOOLS = (
     "scene_cut_set_box",
     "scene_cut_clear",
 )
+
+SCENE_SET_PARAMS_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "set_params": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                    },
+                    "json_key": {"type": "string"},
+                    "value": {
+                        "description": 'Typed value. For 3DTransform, use an object with canonical subfields (e.g., {"Translation Vec3":[x,y,z],"Rotation Vec4":[ang,x,y,z],"Scale Vec3":[sx,sy,sz],"Rotation Center Vec3":[cx,cy,cz]}).',
+                        "type": [
+                            "object",
+                            "array",
+                            "number",
+                            "string",
+                            "boolean",
+                            "null",
+                        ],
+                        "items": {"type": ["string", "number", "boolean", "null"]},
+                    },
+                },
+                "required": ["id", "json_key", "value"],
+            },
+        }
+    },
+    "required": ["set_params"],
+}
 
 TOOL_SPECS: List[Dict[str, Any]] = [
     {
@@ -163,47 +196,9 @@ TOOL_SPECS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "scene_validate_apply",
-            "description": "Scene (stateless): validate display parameter assignments (no time/easing). Note: timeline keys (if present) override these values during playback.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "set_params": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "id": {
-                                    "type": "integer",
-                                    "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
-                                },
-                                "json_key": {"type": "string"},
-                                "value": {
-                                    "description": 'Typed value. For 3DTransform, use an object with canonical subfields (e.g., {"Translation Vec3":[x,y,z],"Rotation Vec4":[ang,x,y,z],"Scale Vec3":[sx,sy,sz],"Rotation Center Vec3":[cx,cy,cz]}).',
-                                    "type": [
-                                        "object",
-                                        "array",
-                                        "number",
-                                        "string",
-                                        "boolean",
-                                        "null",
-                                    ],
-                                    "items": {
-                                        "type": [
-                                            "string",
-                                            "number",
-                                            "boolean",
-                                            "null",
-                                        ]
-                                    },
-                                },
-                            },
-                            "required": ["id", "json_key", "value"],
-                        },
-                    }
-                },
-                "required": ["set_params"],
-            },
+            "name": "scene_validate_params",
+            "description": "Scene (validate-only, no write): preflight display parameter assignments. Returns {ok:bool, results:[{json_key, ok, reason?, normalized_value?}]}. Use before scene_apply; during playback, timeline keys still override scene values.",
+            "parameters": SCENE_SET_PARAMS_SCHEMA,
         },
     },
     {
@@ -856,7 +851,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 pass
         return json.dumps({"ok": True, "summary": "\n".join(lines)})
 
-    if name == "scene_validate_apply":
+    if name == "scene_validate_params":
         set_params = args.get("set_params") or []
         # Normalize and validate id shapes early to avoid malformed writes
         norm_params: list[dict] = []
