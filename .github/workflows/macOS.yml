@@ -3,7 +3,7 @@ name: macOS
 on:
   push:
     branches:
-      - mainXX
+      - main
   create:
     # Runs when a branch or tag is created; we gate to tags in job steps
   workflow_dispatch:
