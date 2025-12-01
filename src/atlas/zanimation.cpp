@@ -155,7 +155,7 @@ void ZAnimation::addKeyFrame(double time)
         continue;
       }
       std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
-      CHECK(wg);
+      CHECK(wg) << "Can not find view setting widgets group for obj id " << id;
       const std::vector<ZParameter*>& paraList = wg->getParameterList();
 
       AnimationObj* aniObj = findBoundId(id);
