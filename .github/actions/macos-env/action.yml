@@ -139,6 +139,7 @@ runs:
       if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
       shell: bash -l {0}
       run: |
+        eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         conda info
         conda update --all -y
@@ -162,6 +163,7 @@ runs:
       env:
         QT_VERSION: ${{ inputs.qt-version }}
       run: |
+        eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         mkdir -p "$HOME/Qt"
         if [ -d "$HOME/Qt/${QT_VERSION}/macos" ]; then
@@ -203,6 +205,7 @@ runs:
       shell: bash -l {0}
       run: |
         set -euo pipefail
+        eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
         python util/build_ext_libs.py all --exclude-libs conda-zimg

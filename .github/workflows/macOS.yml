@@ -63,6 +63,20 @@ jobs:
           build-extlibs: "true"
           python-version: "3.12"
 
+      - name: Ensure GitHub CLI
+        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+        shell: bash -l {0}
+        run: |
+          if ! command -v gh >/dev/null 2>&1; then
+            if command -v brew >/dev/null 2>&1; then
+              brew install gh
+            else
+              echo "Error: gh CLI is required but Homebrew is not available on this self-hosted runner." >&2
+              echo "Please install GitHub CLI from https://cli.github.com/ and ensure it is on PATH." >&2
+              exit 1
+            fi
+          fi
+
       - name: Build and publish
         uses: ./.github/actions/macos-build
         with:

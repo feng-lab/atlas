@@ -182,12 +182,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           conda info
-          conda install -n atlas-ci -y anaconda-client conda-build pip
+          conda install -y anaconda-client conda-build pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
-          conda run -n atlas-ci python -m pip install --upgrade pip
+          python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
-          conda run -n atlas-ci python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
           conda clean --all -y
 
@@ -205,6 +208,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           $qtRoot = Join-Path $HOME 'Qt'
           New-Item -ItemType Directory -Force -Path $qtRoot | Out-Null
           $qtVer = $env:QT_VERSION
@@ -212,14 +218,14 @@ jobs:
           if (Test-Path $qtMSVC) {
             Write-Host 'Qt already cached'
           } else {
-            conda run -n atlas-ci python -m aqt install-qt --outputdir "$qtRoot" windows desktop $qtVer win64_msvc2022_64
+            python -m aqt install-qt --outputdir "$qtRoot" windows desktop $qtVer win64_msvc2022_64
             if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-qt failed"; exit $LASTEXITCODE }
           }
           $ifwDir = Join-Path (Join-Path $qtRoot 'Tools') 'QtInstallerFramework'
           if (Test-Path $ifwDir) {
             Write-Host 'Qt IFW cached'
           } else {
-            conda run -n atlas-ci python -m aqt install-tool --outputdir "$qtRoot" windows desktop tools_ifw qt.tools.ifw.47
+            python -m aqt install-tool --outputdir "$qtRoot" windows desktop tools_ifw qt.tools.ifw.47
             if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-tool failed"; exit $LASTEXITCODE }
           }
           Get-ChildItem -Force $qtRoot | Select-Object FullName
@@ -239,9 +245,12 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           cd "$env:GITHUB_WORKSPACE"
           conda info
-          conda run -n atlas-ci python util/build_ext_libs.py all --exclude-libs conda-zimg --stop-before $env:EXT_SPLIT_LIB
+          python util/build_ext_libs.py all --exclude-libs conda-zimg --stop-before $env:EXT_SPLIT_LIB
           if ($LASTEXITCODE -ne 0) { Write-Error "External deps build (part 1) failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
   build-env-2:
@@ -311,12 +320,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           conda info
-          conda install -n atlas-ci -y anaconda-client conda-build pip
+          conda install -y anaconda-client conda-build pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
-          conda run -n atlas-ci python -m pip install --upgrade pip
+          python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
-          conda run -n atlas-ci python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
           conda clean --all -y
 
@@ -344,9 +356,12 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           cd "$env:GITHUB_WORKSPACE"
           conda info
-          conda run -n atlas-ci python util/build_ext_libs.py all --exclude-libs conda-zimg --start-from $env:EXT_SPLIT_LIB
+          python util/build_ext_libs.py all --exclude-libs conda-zimg --start-from $env:EXT_SPLIT_LIB
           if ($LASTEXITCODE -ne 0) { Write-Error "External deps build (part 2) failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
   build:
@@ -473,12 +488,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           conda info
-          conda install -n atlas-ci -y anaconda-client conda-build pip
+          conda install -y anaconda-client conda-build pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install conda packages into atlas-ci"; exit $LASTEXITCODE }
-          conda run -n atlas-ci python -m pip install --upgrade pip
+          python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to upgrade pip in atlas-ci"; exit $LASTEXITCODE }
-          conda run -n atlas-ci python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema build twine
+          python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema build twine
           if ($LASTEXITCODE -ne 0) { Write-Error "Failed to install Python deps in atlas-ci"; exit $LASTEXITCODE }
 
       - name: Cache Qt (installed)
@@ -493,6 +511,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           $qtRoot = Join-Path $HOME 'Qt'
           New-Item -ItemType Directory -Force -Path $qtRoot | Out-Null
           $qtVer = $env:QT_VERSION
@@ -500,14 +521,14 @@ jobs:
           if (Test-Path $qtMSVC) {
             Write-Host 'Qt already cached'
           } else {
-            conda run -n atlas-ci python -m aqt install-qt --outputdir "$qtRoot" windows desktop $qtVer win64_msvc2022_64
+            python -m aqt install-qt --outputdir "$qtRoot" windows desktop $qtVer win64_msvc2022_64
             if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-qt failed"; exit $LASTEXITCODE }
           }
           $ifwDir = Join-Path (Join-Path $qtRoot 'Tools') 'QtInstallerFramework'
           if (Test-Path $ifwDir) {
             Write-Host 'Qt IFW cached'
           } else {
-            conda run -n atlas-ci python -m aqt install-tool --outputdir "$qtRoot" windows desktop tools_ifw qt.tools.ifw.47
+            python -m aqt install-tool --outputdir "$qtRoot" windows desktop tools_ifw qt.tools.ifw.47
             if ($LASTEXITCODE -ne 0) { Write-Error "aqt install-tool failed"; exit $LASTEXITCODE }
           }
           Get-ChildItem -Force $qtRoot | Select-Object FullName
@@ -542,8 +563,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           cd "$env:GITHUB_WORKSPACE"
-          conda run -n atlas-ci python util/build_and_deploy_atlas.py
+          python util/build_and_deploy_atlas.py
           if ($LASTEXITCODE -ne 0) { Write-Error "build_and_deploy_atlas failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
       - name: Setup SSH key
@@ -606,11 +630,14 @@ jobs:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           cd "$env:GITHUB_WORKSPACE"
-          conda run -n atlas-ci python util/build_ext_libs.py conda-zimg
+          python util/build_ext_libs.py conda-zimg
           if ($LASTEXITCODE -ne 0) { Write-Error "build_ext_libs.py conda-zimg failed"; exit $LASTEXITCODE }
           conda config --set anaconda_upload yes
-          conda run -n atlas-ci conda-build --token $env:ANACONDA_API_TOKEN --user fenglab zimg-recipe
+          conda-build --token $env:ANACONDA_API_TOKEN --user fenglab zimg-recipe
           if ($LASTEXITCODE -ne 0) { Write-Error "conda-build failed"; exit $LASTEXITCODE }
 
       - name: Build zimg PyPI artifacts (wheel + sdist)
@@ -619,6 +646,9 @@ jobs:
         working-directory: python/zimg
         run: |
           $ErrorActionPreference = 'Stop'
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
           $TAG = "$env:GITHUB_REF".Replace('refs/tags/','')
           $VERSION = $TAG.TrimStart('v')
           Write-Host "Detected tag: $TAG -> zimg version: $VERSION"
@@ -644,12 +674,12 @@ jobs:
           pyproject.write_text(new_text, encoding="utf-8")
           print(f"Updated pyproject.toml to version {version}")
           PY
-          conda run -n atlas-ci python -m pip install --upgrade pip
+          python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "pip upgrade failed"; exit $LASTEXITCODE }
-          conda run -n atlas-ci python -m pip install --no-cache-dir build twine
+          python -m pip install --no-cache-dir build twine
           if ($LASTEXITCODE -ne 0) { Write-Error "pip install build twine failed"; exit $LASTEXITCODE }
           Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
-          conda run -n atlas-ci python -m build
+          python -m build
           if ($LASTEXITCODE -ne 0) { Write-Error "python -m build failed"; exit $LASTEXITCODE }
           Get-ChildItem -Recurse dist | Select-Object FullName
 
@@ -662,5 +692,8 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           $ErrorActionPreference = 'Stop'
-          conda run -n atlas-ci python -m twine upload dist/*
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
+          python -m twine upload dist/*
           if ($LASTEXITCODE -ne 0) { Write-Error "twine upload failed"; exit $LASTEXITCODE }

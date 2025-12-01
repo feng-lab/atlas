@@ -31,6 +31,7 @@ runs:
     - name: Build and deploy Atlas
       shell: bash -l {0}
       run: |
+        eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
         python util/build_and_deploy_atlas.py
@@ -91,6 +92,7 @@ runs:
       env:
         ANACONDA_API_TOKEN: ${{ inputs.anaconda-api-token }}
       run: |
+        eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
         python util/build_ext_libs.py conda-zimg
@@ -102,6 +104,7 @@ runs:
       shell: bash -l {0}
       working-directory: python/zimg
       run: |
+        eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         set -euo pipefail
         TAG="${GITHUB_REF#refs/tags/}"
@@ -144,6 +147,7 @@ runs:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ inputs.pypi-api-token }}
       run: |
+        eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         set -euo pipefail
         python -m twine upload dist/*

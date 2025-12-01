@@ -170,6 +170,7 @@ jobs:
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           conda info
           conda update --all -y
@@ -191,6 +192,7 @@ jobs:
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
         shell: bash -l {0}
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           # Match readme.md recommendation for Linux
           mkdir -p "$HOME/Qt"
@@ -216,6 +218,7 @@ jobs:
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
           set -euo pipefail
+          eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_ext_libs.py all --exclude-libs conda-zimg
@@ -351,6 +354,7 @@ jobs:
       - name: Install conda tooling
         shell: bash -l {0}
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           conda info
           conda update --all -y
@@ -370,6 +374,7 @@ jobs:
       - name: Install Qt 6 (aqt)
         shell: bash -l {0}
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           # Match readme.md recommendation for Linux
           mkdir -p "$HOME/Qt"
@@ -408,6 +413,7 @@ jobs:
         env:
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_and_deploy_atlas.py
@@ -469,6 +475,7 @@ jobs:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
           python util/build_ext_libs.py conda-zimg
@@ -480,6 +487,7 @@ jobs:
         shell: bash -l {0}
         working-directory: python/zimg
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           set -euo pipefail
           TAG="${GITHUB_REF#refs/tags/}"
@@ -522,6 +530,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           set -euo pipefail
           python -m twine upload dist/*
