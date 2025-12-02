@@ -109,7 +109,7 @@ jobs:
           if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI")) { Write-Error "Intel oneAPI root missing" }
 
       - name: Always save Intel oneAPI cache
-        if: always() && steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true'
+        if: ${{ !cancelled() && steps.cache-oneapi-restore-buildenv.outputs.cache-hit != 'true' && steps.cache-extlibs-p1.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |
@@ -367,7 +367,7 @@ jobs:
   build:
     runs-on: windows-2022
     needs: [ext-cache-probe, build-env-2]
-    if: ${{ always() && (needs.ext-cache-probe.outputs.p2-hit == 'true' || needs.build-env-2.result == 'success') }}
+    if: ${{ !cancelled() && (needs.ext-cache-probe.outputs.p2-hit == 'true' || needs.build-env-2.result == 'success') }}
     permissions:
       contents: write
     steps:
@@ -418,7 +418,7 @@ jobs:
           if (-not (Test-Path "C:\Program Files (x86)\Intel\oneAPI")) { Write-Error "Intel oneAPI root missing" }
 
       - name: Always save Intel oneAPI cache
-        if: always() && steps.cache-oneapi-restore-build.outputs.cache-hit != 'true'
+        if: ${{ !cancelled() && steps.cache-oneapi-restore-build.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |
