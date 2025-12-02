@@ -625,6 +625,8 @@ jobs:
           scp -P "$SSH_PORT" -i ~/.ssh/private.key deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/"
 
       - name: Build and upload conda zimg
+        # Skip this when publishing a PyPI release (tags starting with "v")
+        if: github.event_name != 'create' || github.ref_type != 'tag' || !startsWith(github.event.ref, 'v')
         shell: pwsh
         env:
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
@@ -653,27 +655,22 @@ jobs:
           $VERSION = $TAG.TrimStart('v')
           Write-Host "Detected tag: $TAG -> zimg version: $VERSION"
           $env:VERSION = $VERSION
-          python - << 'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          version = os.environ.get("VERSION")
-          if not version:
-              raise SystemExit("VERSION environment variable is not set")
-
-          pyproject = Path("pyproject.toml")
-          text = pyproject.read_text(encoding="utf-8")
-          new_text, count = re.subn(
-              r'(?m)^\s*version\s*=\s*"[^"]*"',
-              f'version = "{version}"',
-              text,
-          )
-          if count == 0:
-              raise SystemExit("Failed to update version in pyproject.toml")
-          pyproject.write_text(new_text, encoding="utf-8")
-          print(f"Updated pyproject.toml to version {version}")
-          PY
+          $version = $env:VERSION
+          if (-not $version) {
+            Write-Error "VERSION environment variable is not set"
+            exit 1
+          }
+          $pyproject = "pyproject.toml"
+          $text = Get-Content $pyproject -Raw -Encoding UTF8
+          $pattern = '(?m)^\s*version\s*=\s*"[^"]*"'
+          $replacement = 'version = "{0}"' -f $version
+          $newText = [regex]::Replace($text, $pattern, $replacement, 1)
+          if ($newText -eq $text) {
+            Write-Error "Failed to update version in pyproject.toml"
+            exit 1
+          }
+          Set-Content -Path $pyproject -Value $newText -Encoding UTF8
+          Write-Host "Updated pyproject.toml to version $version"
           python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "pip upgrade failed"; exit $LASTEXITCODE }
           python -m pip install --no-cache-dir build twine
