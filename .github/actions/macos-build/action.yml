@@ -19,6 +19,18 @@ inputs:
   ssh-deploy-path:
     description: Target path on the SSH server for deployment.
     required: true
+  ssh-server2:
+    description: SSH server hostname for secondary deployment.
+    required: false
+  ssh-port2:
+    description: SSH server port for secondary deployment.
+    required: false
+  ssh-username2:
+    description: SSH username for secondary deployment.
+    required: false
+  ssh-deploy-path2:
+    description: Target path on the secondary SSH server for deployment.
+    required: false
   anaconda-api-token:
     description: Token for uploading to Anaconda.
     required: true
@@ -83,6 +95,22 @@ runs:
         SSH_USERNAME: ${{ inputs.ssh-username }}
         SSH_DEPLOY_PATH: ${{ inputs.ssh-deploy-path }}
       run: |
+        cd "$GITHUB_WORKSPACE/deploy"
+        rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
+        rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+
+    - name: Deploy artifacts (secondary target)
+      shell: bash -l {0}
+      env:
+        SSH_SERVER: ${{ inputs.ssh-server2 }}
+        SSH_PORT: ${{ inputs.ssh-port2 }}
+        SSH_USERNAME: ${{ inputs.ssh-username2 }}
+        SSH_DEPLOY_PATH: ${{ inputs.ssh-deploy-path2 }}
+      run: |
+        if [ -z "${SSH_SERVER:-}" ] || [ -z "${SSH_PORT:-}" ] || [ -z "${SSH_USERNAME:-}" ] || [ -z "${SSH_DEPLOY_PATH:-}" ]; then
+          echo "Secondary SSH deploy target not fully configured; skipping."
+          exit 0
+        fi
         cd "$GITHUB_WORKSPACE/deploy"
         rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
         rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/

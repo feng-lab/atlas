@@ -624,6 +624,21 @@ jobs:
           scp -P "$SSH_PORT" -i ~/.ssh/private.key -r "deploy/Windows" "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/"
           scp -P "$SSH_PORT" -i ~/.ssh/private.key deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/"
 
+      - name: Deploy artifacts (SSH, secondary target)
+        shell: bash -l {0}
+        env:
+          SSH_SERVER: ${{ secrets.SSH_SERVER2 }}
+          SSH_PORT: ${{ secrets.SSH_PORT2 }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME2 }}
+          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH2 }}
+        run: |
+          set -euo pipefail
+          # Ensure remote paths exist and replace the Windows package folder
+          ssh -p "$SSH_PORT" -i ~/.ssh/private.key "$SSH_USERNAME@$SSH_SERVER" \
+            "mkdir -p '$SSH_DEPLOY_PATH/packages' '$SSH_DEPLOY_PATH/installers' && rm -rf '$SSH_DEPLOY_PATH/packages/Windows'"
+          scp -P "$SSH_PORT" -i ~/.ssh/private.key -r "deploy/Windows" "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/"
+          scp -P "$SSH_PORT" -i ~/.ssh/private.key deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/"
+
       - name: Build and upload conda zimg
         # Skip this when publishing a PyPI release (tags starting with "v")
         if: github.event_name != 'create' || github.ref_type != 'tag' || !startsWith(github.event.ref, 'v')
