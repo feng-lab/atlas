@@ -166,7 +166,10 @@ runs:
         # Ensure build backend is available (redundant if conda tooling already installed)
         python -m pip install --no-cache-dir build twine
         rm -rf dist
-        python -m build
+        # Build wheel only; we depend on the full atlas repo (src + src/3rdparty)
+        # via ZIMG_SRC_DIR instead of a self-contained sdist.
+        export ZIMG_SRC_DIR="$GITHUB_WORKSPACE/src/python"
+        python -m build --wheel --no-sdist
         ls -R dist
 
     - name: Upload zimg to PyPI

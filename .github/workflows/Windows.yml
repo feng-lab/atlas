@@ -691,8 +691,11 @@ jobs:
           python -m pip install --no-cache-dir build twine
           if ($LASTEXITCODE -ne 0) { Write-Error "pip install build twine failed"; exit $LASTEXITCODE }
           Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
-          python -m build
-          if ($LASTEXITCODE -ne 0) { Write-Error "python -m build failed"; exit $LASTEXITCODE }
+          # Build wheel only; we depend on the full atlas repo (src + src/3rdparty)
+          # via ZIMG_SRC_DIR instead of a self-contained sdist.
+          $env:ZIMG_SRC_DIR = Join-Path $env:GITHUB_WORKSPACE 'src/python'
+          python -m build --wheel --no-sdist
+          if ($LASTEXITCODE -ne 0) { Write-Error "python -m build --wheel --no-sdist failed"; exit $LASTEXITCODE }
           Get-ChildItem -Recurse dist | Select-Object FullName
 
       - name: Upload zimg to PyPI
