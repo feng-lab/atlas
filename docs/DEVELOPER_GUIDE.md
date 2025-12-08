@@ -602,7 +602,7 @@ Notes
 User-Facing Behavior (summary)
 
 - Toggling full-res on a downsampled volume triggers a quick preview followed by progressive refinement. Disabling full-res reverts to fast rendering.
-- Aliases of the same image share memory but keep independent view settings and transforms.
+- Aliases of the same image share memory but keep independent view settings and transforms. The Atlas agent can create aliases via the Scene RPC `MakeAlias` (tool: `scene_make_alias`) to stage multiple alternative views of the same backing data.
 
 Invalidation and Progressive Reset Policy
 

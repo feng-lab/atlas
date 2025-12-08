@@ -52,6 +52,13 @@ class SceneAPI:
         if not ok:
             raise RuntimeError("SaveScene failed")
 
+    def make_alias(self, ids: list[int]) -> dict:
+        """Create alias objects for the given source ids using the live scene.
+
+        Returns a dict {"ok": bool, "aliases": [{"src_id", "alias_id"}], "error"?: str}.
+        """
+        return self._c.make_alias(ids)
+
     # Timeline (selected helpers)
     def list_keys(self, *, id: int, json_key: str | None = None, include_values: bool = False):
         return self._c.list_keys(id=int(id), json_key=json_key, include_values=include_values)

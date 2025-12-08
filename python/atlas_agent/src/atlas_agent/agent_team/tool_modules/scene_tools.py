@@ -40,6 +40,7 @@ HANDLED_TOOLS = (
     "scene_list_params",
     "scene_validate_param_value",
     "scene_set_visibility",
+    "scene_make_alias",
     "scene_cut_suggest_box",
     "scene_cut_set_box",
     "scene_cut_clear",
@@ -437,6 +438,24 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     },
                 },
                 "required": ["ids", "on"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "scene_make_alias",
+            "description": "Create alias objects for given ids (shared backing data with independent view params).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Object ids to alias; each produces a new alias id.",
+                    }
+                },
+                "required": ["ids"],
             },
         },
     },
@@ -1128,6 +1147,16 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         on = bool(args.get("on", True))
         ok = client.set_visibility(ids, on)
         return json.dumps({"ok": ok})
+
+    if name == "scene_make_alias":
+        ids = [int(i) for i in (args.get("ids") or [])]
+        if not ids:
+            return json.dumps({"ok": False, "error": "ids must be a non-empty list"})
+        try:
+            res = client.make_alias(ids)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+        return json.dumps(res)
 
     if name == "scene_cut_suggest_box":
         req = client._pb2.CutSuggestRequest(

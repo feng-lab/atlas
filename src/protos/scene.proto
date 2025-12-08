@@ -111,6 +111,8 @@ service Scene {
   rpc FitCandidates (Empty) returns (FitCandidatesResponse);
   // Scene state helpers
   rpc SetVisibility (VisibilityRequest) returns (Bool);
+  // Create aliases for existing objects (shared backing data, independent view params)
+  rpc MakeAlias (MakeAliasRequest) returns (MakeAliasResponse);
   // Scene cuts (global axis-aligned box or plane set)
   rpc CutSet (CutSetRequest) returns (Bool);
   rpc CutClear (Empty) returns (Bool);
@@ -267,6 +269,25 @@ message FitCandidatesResponse { repeated uint64 ids = 1; }
 message VisibilityRequest {
   repeated uint64 ids = 1;
   bool on = 2;
+}
+
+// Aliases (per-object)
+message MakeAliasRequest {
+  // Source object ids to alias. Each id that supports aliasing will produce a new alias id.
+  repeated uint64 ids = 1;
+}
+
+message MakeAliasResult {
+  uint64 src_id = 1;   // original object id
+  uint64 alias_id = 2; // newly created alias id
+}
+
+message MakeAliasResponse {
+  bool ok = 1;
+  // One entry per successfully created alias.
+  repeated MakeAliasResult aliases = 2;
+  // Optional summary when ok=false (e.g., invalid ids or unsupported types).
+  string error = 3;
 }
 
 // Cuts

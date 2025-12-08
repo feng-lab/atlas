@@ -77,6 +77,9 @@ using atlas::rpc::VisibilityRequest;
 using atlas::rpc::ListParamsRequest;
 using atlas::rpc::SetParam;
 using atlas::rpc::ApplySceneParamsRequest;
+using atlas::rpc::MakeAliasRequest;
+using atlas::rpc::MakeAliasResponse;
+using atlas::rpc::MakeAliasResult;
 using atlas::rpc::ValidateSceneParamsRequest;
 using atlas::rpc::ValidateSceneParamsResponse;
 using atlas::rpc::ValidateSceneParamResult;
@@ -944,6 +947,54 @@ public:
         *lst.add_params() = std::move(p);
       }
       (*reply->mutable_objects())[tn.toStdString()] = std::move(lst);
+    }
+    return Status::OK;
+  }
+
+  Status MakeAlias(ServerContext*, const MakeAliasRequest* req, MakeAliasResponse* reply) override
+  {
+    if (!m_owner.doc()) {
+      return Status(grpc::StatusCode::FAILED_PRECONDITION, "doc not ready");
+    }
+    bool hadInvalidId = false;
+    bool hadUnsupported = false;
+    auto pairs = invokeOnUi([&]() {
+      std::vector<std::pair<uint64_t, uint64_t>> out;
+      if (!m_owner.doc()) {
+        hadInvalidId = true;
+        return out;
+      }
+      for (auto srcId64 : req->ids()) {
+        const size_t srcId = static_cast<size_t>(srcId64);
+        ZObjDoc* od = m_owner.doc()->idToDoc(srcId);
+        if (!od) {
+          // System boundary: record invalid id and continue.
+          hadInvalidId = true;
+          continue;
+        }
+        const size_t aliasId = od->makeAlias(srcId);
+        if (aliasId == 0) {
+          // Type does not support aliasing or alias creation failed.
+          hadUnsupported = true;
+          continue;
+        }
+        out.emplace_back(srcId64, static_cast<uint64_t>(aliasId));
+      }
+      return out;
+    });
+    for (const auto& p : pairs) {
+      MakeAliasResult* r = reply->add_aliases();
+      r->set_src_id(p.first);
+      r->set_alias_id(p.second);
+    }
+    const bool ok = !pairs.empty() && !hadInvalidId && !hadUnsupported;
+    reply->set_ok(ok);
+    if (!ok) {
+      if (hadInvalidId) {
+        reply->set_error("one or more ids were not found in the current document");
+      } else if (hadUnsupported) {
+        reply->set_error("one or more ids do not support aliasing");
+      }
     }
     return Status::OK;
   }

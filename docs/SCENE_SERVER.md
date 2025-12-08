@@ -68,6 +68,8 @@ New endpoints (additions)
 
 - Scene state
   - `SetVisibility` `{ ids: [uint64], on: bool }` → `{ ok: true }`
+  - `MakeAlias` `{ ids: [uint64] }` → `{ ok: bool, aliases: [{src_id, alias_id}], error?: string }`
+    - Creates alias objects for each valid id that supports aliasing. Aliases share backing data with the source object but have independent view/display parameters, matching the UI’s “Make Alias” behavior.
 
 - Parameter enumeration
   - `ListParams` `{ id }` → `ParamList`

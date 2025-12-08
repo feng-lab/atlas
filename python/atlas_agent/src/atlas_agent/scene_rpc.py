@@ -759,6 +759,34 @@ class SceneClient:
         self._log_rpc("SetVisibility", req, resp)
         return resp.ok
 
+    def make_alias(self, ids: list[int]) -> dict:
+        """Create alias objects for the given source ids.
+
+        Returns: {"ok": bool, "aliases": [{"src_id", "alias_id"}], "error"?: str}
+        """
+        self.ensure_view()
+        req = self._pb2.MakeAliasRequest(ids=[int(i) for i in ids or []])
+        resp = self._stub.MakeAlias(req)
+        self._log_rpc("MakeAlias", req, resp)
+        aliases: list[dict[str, int]] = []
+        for r in getattr(resp, "aliases", []):
+            aliases.append(
+                {
+                    "src_id": int(getattr(r, "src_id", 0)),
+                    "alias_id": int(getattr(r, "alias_id", 0)),
+                }
+            )
+        error = ""
+        try:
+            error = str(getattr(resp, "error", "") or "")
+        except Exception:
+            error = ""
+        ok = bool(getattr(resp, "ok", bool(aliases)))
+        out: dict[str, Any] = {"ok": ok, "aliases": aliases}
+        if not ok and error:
+            out["error"] = error
+        return out
+
     # Placement roles removed by design: prefer list_params/capabilities/schema
 
     # Scene (stateless) parameter ops
