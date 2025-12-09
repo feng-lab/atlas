@@ -4,11 +4,9 @@ namespace nim {
 
 Z3DGeometryFilter::Z3DGeometryFilter(Z3DGlobalParameters& globalPara, QObject* parent)
   : Z3DBoundedFilter(globalPara, parent)
-  , m_outPort("GeometryFilter", this)
   , m_stayOnTop("Stay On Top", false)
   , m_pickingObjectsRegistered(false)
 {
-  addPort(m_outPort);
   addParameter(m_stayOnTop);
 }
 

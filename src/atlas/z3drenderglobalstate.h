@@ -57,8 +57,9 @@ public:
   // Performance aggregation helpers
   // ---------------------------------------------------------------------------
   // A monotonically increasing token that identifies a user‑visible "real frame".
-  // Emitted once per Z3DNetworkEvaluator::process() call and propagated to the
-  // Vulkan backend so multiple submissions can be aggregated.
+  // Emitted once per engine-driven rendering pass (one filter pipeline
+  // evaluation) and propagated to the Vulkan backend so multiple submissions
+  // can be aggregated.
   uint64_t currentPerfFrameToken() const
   {
     return m_currentPerfFrameToken;

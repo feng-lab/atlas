@@ -43,11 +43,16 @@ Z3DTransferFunction::Z3DTransferFunction(double min,
                                          QObject* parent)
   : ZColorMap(min, max, minColor, maxColor, parent)
   , m_dimensions(width, 1, 1)
-{}
+{
+  captureDefaultFromCurrent();
+}
 
 Z3DTransferFunction::Z3DTransferFunction(const Z3DTransferFunction& tf)
   : ZColorMap(tf)
   , m_dimensions(tf.m_dimensions)
+  , m_defaultDomain(tf.m_defaultDomain)
+  , m_defaultMinColor(tf.m_defaultMinColor)
+  , m_defaultMaxColor(tf.m_defaultMaxColor)
 {}
 
 Z3DTransferFunction::Z3DTransferFunction(Z3DTransferFunction&& tf) noexcept
@@ -59,6 +64,9 @@ void Z3DTransferFunction::swap(Z3DTransferFunction& other) noexcept
 {
   ZColorMap::swap(other);
   std::swap(m_dimensions, other.m_dimensions);
+  std::swap(m_defaultDomain, other.m_defaultDomain);
+  std::swap(m_defaultMinColor, other.m_defaultMinColor);
+  std::swap(m_defaultMaxColor, other.m_defaultMaxColor);
 }
 
 bool Z3DTransferFunction::operator==(const Z3DTransferFunction& tf) const
@@ -75,8 +83,24 @@ bool Z3DTransferFunction::operator==(const Z3DTransferFunction& tf) const
 
 void Z3DTransferFunction::resetToDefault()
 {
-  reset(0., 1., glm::col4(0, 0, 0, 0), glm::col4(255, 255, 255, 255));
+  reset(m_defaultDomain.x, m_defaultDomain.y, m_defaultMinColor, m_defaultMaxColor);
   Q_EMIT changed();
+}
+
+void Z3DTransferFunction::captureDefaultFromCurrent()
+{
+  m_defaultDomain = glm::dvec2(domainMin(), domainMax());
+
+  if (numKeys() >= 2) {
+    m_defaultMinColor = keyColorL(0);
+    m_defaultMaxColor = keyColorR(numKeys() - 1);
+  } else if (numKeys() == 1) {
+    m_defaultMinColor = keyColorL(0);
+    m_defaultMaxColor = keyColorR(0);
+  } else {
+    m_defaultMinColor = glm::col4(0, 0, 0, 0);
+    m_defaultMaxColor = glm::col4(255, 255, 255, 255);
+  }
 }
 
 QString Z3DTransferFunction::samplerType() const

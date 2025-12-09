@@ -19,7 +19,7 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
+      connect(viewControl, &Z3DFilter::invalidated, &m_engine.compositor(), &Z3DCompositor::invalidateResult);
       connect(viewControl, &Z3DMeshFilter::boundBoxChanged, this, &Z3DMeshView::updateBoundBox);
       connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
       connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
@@ -28,7 +28,7 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
-      m_engine.networkEvaluator().updateNetwork();
+      m_engine.updatePipeline();
       m_engine.updateBoundBox();
 
       for (auto id : objs) {
@@ -52,7 +52,7 @@ void Z3DMeshView::docMeshAdded(size_t id)
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
+    connect(viewControl, &Z3DFilter::invalidated, &m_engine.compositor(), &Z3DCompositor::invalidateResult);
     connect(viewControl, &Z3DMeshFilter::boundBoxChanged, this, &Z3DMeshView::updateBoundBox);
     connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
     connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
@@ -60,7 +60,7 @@ void Z3DMeshView::docMeshAdded(size_t id)
     connect(viewControl, &Z3DMeshFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
     m_engine.addEventListenerToBack(*viewControl);
 
-    m_engine.networkEvaluator().updateNetwork();
+    m_engine.updatePipeline();
     m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);

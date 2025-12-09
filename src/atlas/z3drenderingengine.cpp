@@ -3,7 +3,6 @@
 #include "z3dcanvas.h"
 #include "z3dcompositor.h"
 #include "z3dcameraparameter.h"
-#include "z3dnetworkevaluator.h"
 #include "zwidgetsgroup.h"
 #include "zimgdoc.h"
 #include "z3dimgview.h"
@@ -25,6 +24,10 @@
 #include "zvulkan.h"
 #include "z3dshadermanager.h"
 #include "z3dgpuinfo.h"
+#include "z3dgl.h"
+#include "z3dfilter.h"
+#include "zcancellation.h"
+#include "z3dperfcollector.h"
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
@@ -176,6 +179,131 @@ int numDigits(int32_t x)
 } // namespace
 
 namespace nim {
+
+void Z3DRenderingEngine::CheckOpenGLStateFilterWrapper::afterFilterProcess(const Z3DFilter* p)
+{
+  checkState(p);
+}
+
+void Z3DRenderingEngine::CheckOpenGLStateFilterWrapper::beforeNetworkProcess()
+{
+  checkState(nullptr);
+}
+
+void Z3DRenderingEngine::CheckOpenGLStateFilterWrapper::checkState(const Z3DFilter* p)
+{
+  if (!checkGLState(GL_BLEND, false)) {
+    glDisable(GL_BLEND);
+    warn(p, "GL_BLEND was enabled");
+  }
+
+  if (!checkGLState(GL_BLEND_SRC, GL_ONE) || !checkGLState(GL_BLEND_DST, GL_ZERO)) {
+    glBlendFunc(GL_ONE, GL_ZERO);
+    warn(p, "Modified BlendFunc");
+  }
+
+  if (!checkGLState(GL_DEPTH_TEST, false)) {
+    glDisable(GL_DEPTH_TEST);
+    warn(p, "GL_DEPTH_TEST was enabled");
+  }
+
+  if (!checkGLState(GL_CULL_FACE, false)) {
+    glDisable(GL_CULL_FACE);
+    warn(p, "GL_CULL_FACE was enabled");
+  }
+
+  if (!checkGLState(GL_COLOR_CLEAR_VALUE, glm::vec4(0.f))) {
+    glClearColor(0.f, 0.f, 0.f, 0.f);
+    warn(p, "glClearColor() was not set to all zeroes");
+  }
+
+  if (!checkGLState(GL_DEPTH_CLEAR_VALUE, 1.f)) {
+    glClearDepth(1.0);
+    warn(p, "glClearDepth() was not set to 1.0");
+  }
+
+  if (!checkGLState(GL_LINE_WIDTH, 1.f)) {
+    glLineWidth(1.f);
+    warn(p, "glLineWidth() was not set to 1.0");
+  }
+
+  if (!checkGLState(GL_ACTIVE_TEXTURE, GL_TEXTURE0)) {
+    glActiveTexture(GL_TEXTURE0);
+    warn(p, "glActiveTexture was not set to GL_TEXTURE0");
+  }
+
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+  if (!checkGLState(GL_MATRIX_MODE, GL_MODELVIEW)) {
+    glMatrixMode(GL_MODELVIEW);
+    warn(p, "glMatrixMode was not set to GL_MODELVIEW");
+  }
+
+  if (!checkGLState(GL_TEXTURE_1D, false)) {
+    glDisable(GL_TEXTURE_1D);
+    warn(p, "GL_TEXTURE_1D was enabled");
+  }
+
+  if (!checkGLState(GL_TEXTURE_2D, false)) {
+    glDisable(GL_TEXTURE_2D);
+    warn(p, "GL_TEXTURE_2D was enabled");
+  }
+
+  if (!checkGLState(GL_TEXTURE_3D, false)) {
+    glDisable(GL_TEXTURE_3D);
+    warn(p, "GL_TEXTURE_3D was enabled");
+  }
+#endif
+
+  GLint id;
+  glGetIntegerv(GL_CURRENT_PROGRAM, &id);
+  if (id != 0) {
+    glUseProgram(0);
+    warn(p, "A shader was active");
+  }
+
+  // can not check this as we are drawing to QOpenglWidget's (Qt5) fbo which is not 0
+#if 0
+  if (Z3DRenderTarget::currentBoundDrawFBO() != 0) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    warn(p, "A render target was bound (releaseTarget() missing?)");
+  }
+#endif
+
+  if (!checkGLState(GL_DEPTH_FUNC, GL_LESS)) {
+    glDepthFunc(GL_LESS);
+    warn(p, "glDepthFunc was not set to GL_LESS");
+  }
+
+  if (!checkGLState(GL_CULL_FACE_MODE, GL_BACK)) {
+    glCullFace(GL_BACK);
+    warn(p, "glCullFace was not set to GL_BACK");
+  }
+}
+
+void Z3DRenderingEngine::CheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p, const char* message)
+{
+  if (p) {
+    LOG(WARNING) << "Invalid OpenGL state after processing " << p->className() << " : " << message;
+  } else {
+    LOG(WARNING) << "Invalid OpenGL state before network processing: " << message;
+  }
+}
+
+void Z3DRenderingEngine::ProfileFilterWrapper::afterFilterProcess(const Z3DFilter* p)
+{
+  m_benchTimer.recordEvent(p->className().toStdString());
+}
+
+void Z3DRenderingEngine::ProfileFilterWrapper::beforeNetworkProcess()
+{
+  const uint64_t token = Z3DRenderGlobalState::instance().currentPerfFrameToken();
+  m_benchTimer.resetAndStart(fmt::format("Network [frame#{}]", token));
+}
+
+void Z3DRenderingEngine::ProfileFilterWrapper::afterNetworkProcess()
+{
+  STOP_AND_LOG(m_benchTimer)
+}
 
 void Z3DRenderingEngine::ScratchPoolDeleter::operator()(Z3DScratchResourcePool* pool) const
 {
@@ -785,8 +913,10 @@ void Z3DRenderingEngine::init()
   connect(m_compositor.get(), &Z3DCompositor::sceneParaUpdated, this, &Z3DRenderingEngine::sceneParaUpdated);
   connect(m_compositor.get(), &Z3DCompositor::renderingFinished, this, &Z3DRenderingEngine::renderingFinished);
 
-  // build network and connect to canvas
-  m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_compositor);
+  // Initialize pipeline helpers (GL state checker + profiler).
+  m_filterWrappers.clear();
+  m_filterWrappers.emplace_back(std::make_unique<CheckOpenGLStateFilterWrapper>());
+  m_filterWrappers.emplace_back(std::make_unique<ProfileFilterWrapper>());
 
   Q_EMIT progressChanged(20);
 
@@ -817,7 +947,7 @@ void Z3DRenderingEngine::init()
     //   auto aniView = new Z3DAnimationView(*aniDoc, *this);
     //   connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
     //   m_3dObjViews.emplace_back(aniView);
-    // } 
+    // }
     else if (auto raDoc = qobject_cast<ZRegionAnnotationDoc*>(objDoc)) {
       auto aniView = new Z3DRegionAnnotationView(*raDoc, *this);
       connect(aniView, &Z3DRegionAnnotationView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
@@ -826,6 +956,9 @@ void Z3DRenderingEngine::init()
   }
 
   updateBoundBox();
+
+  // Build initial filter pipeline now that views and compositor are wired.
+  updatePipeline();
 
   Q_EMIT progressChanged(60);
 
@@ -895,13 +1028,167 @@ void Z3DRenderingEngine::detachCanvas()
 
 glm::uvec2 Z3DRenderingEngine::outputSize() const
 {
-  return m_compositor->outputSize();
+  return m_outputSize;
 }
 
 void Z3DRenderingEngine::setOutputSize(const glm::uvec2& size)
 {
+  if (m_outputSize == size) {
+    return;
+  }
+
+  CHECK_GT(size.x, 0u);
+  CHECK_GT(size.y, 0u);
+
   getGLFocus();
-  m_compositor->setOutputSize(size);
+  m_outputSize = size;
+  m_globalParas->camera.viewportChanged(size);
+  updateAllFilterSizes();
+}
+
+void Z3DRenderingEngine::updatePipeline()
+{
+  m_pipeline.clear();
+  std::vector<Z3DGeometryFilter*> geometryFilters;
+  std::vector<Z3DImgFilter*> volumeFilters;
+
+  // Collect filters from all object views.
+  for (const auto& objView : m_3dObjViews) {
+    const auto filters = objView->filters();
+    for (auto* filter : filters) {
+      if (!filter) {
+        continue;
+      }
+      m_pipeline.push_back(filter);
+      if (auto* img = dynamic_cast<Z3DImgFilter*>(filter)) {
+        volumeFilters.push_back(img);
+      } else if (auto* geom = dynamic_cast<Z3DGeometryFilter*>(filter)) {
+        geometryFilters.push_back(geom);
+      }
+    }
+  }
+  // Compositor must be the last filter in the pipeline.
+  CHECK(m_compositor);
+  m_pipeline.push_back(m_compositor.get());
+
+  // Keep compositor geometry/volume lists in sync with the current pipeline.
+  m_compositor->setGeometryFilters(geometryFilters);
+  m_compositor->setVolumeFilters(volumeFilters);
+
+  updateAllFilterSizes();
+}
+
+void Z3DRenderingEngine::updateAllFilterSizes()
+{
+  const glm::uvec2 targetSize = m_outputSize;
+  for (auto it = m_pipeline.rbegin(); it != m_pipeline.rend(); ++it) {
+    (*it)->updateSize(targetSize);
+  }
+}
+
+double Z3DRenderingEngine::processFrame(bool stereo,
+                                        bool progressiveRendering,
+                                        const folly::CancellationToken* cancellationToken)
+{
+  if (m_pipeline.empty()) {
+    return 1.0;
+  }
+
+  const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
+  const bool glMode = (backend == RenderBackend::OpenGL);
+
+  getGLFocus();
+
+  // Mark the start of a new user-visible frame for perf aggregation.
+  Z3DRenderGlobalState::instance().beginNewPerfFrameToken();
+  auto& renderState = Z3DRenderGlobalState::instance();
+
+  // Notify filter wrappers (now that token is available for tagging).
+  for (auto& wrapper : m_filterWrappers) {
+    if (!glMode && dynamic_cast<CheckOpenGLStateFilterWrapper*>(wrapper.get()) != nullptr) {
+      continue;
+    }
+    wrapper->beforeNetworkProcess();
+  }
+  if (glMode) {
+    CHECK_GL_ERROR
+  }
+
+  double currentProgress = 0.0;
+  double totalProgress = 0.0;
+
+  for (auto* filter : m_pipeline) {
+    if (cancellationToken) {
+      maybeCancel(*cancellationToken);
+    }
+
+    filter->setProgressiveRenderingMode(progressiveRendering);
+
+    const Z3DEye primaryEye = stereo ? LeftEye : MonoEye;
+
+    auto processEye = [&](Z3DEye eye) {
+      if (filter->isValid(eye) || !filter->isReady(eye)) {
+        return;
+      }
+
+      for (auto& wrapper : m_filterWrappers) {
+        if (!glMode && dynamic_cast<CheckOpenGLStateFilterWrapper*>(wrapper.get()) != nullptr) {
+          continue;
+        }
+        wrapper->beforeFilterProcess(filter);
+      }
+      if (glMode) {
+        CHECK_GL_ERROR
+      }
+
+      double progress = filter->process(eye);
+      if (progress == 1.0) {
+        if (filter == m_compositor.get()) {
+          if (totalProgress == currentProgress) {
+            filter->setValid(eye);
+          }
+        } else {
+          filter->setValid(eye);
+        }
+      }
+      currentProgress += progress;
+      totalProgress += 1.0;
+      if (glMode) {
+        CHECK_GL_ERROR
+      }
+
+      for (auto& wrapper : m_filterWrappers) {
+        if (!glMode && dynamic_cast<CheckOpenGLStateFilterWrapper*>(wrapper.get()) != nullptr) {
+          continue;
+        }
+        wrapper->afterFilterProcess(filter);
+      }
+      if (glMode) {
+        CHECK_GL_ERROR
+      }
+    };
+
+    processEye(primaryEye);
+    if (stereo) {
+      processEye(RightEye);
+    }
+  }
+
+  for (auto& wrapper : m_filterWrappers) {
+    wrapper->afterNetworkProcess();
+  }
+  if (glMode) {
+    CHECK_GL_ERROR
+  }
+
+  // Mark the current perf frame token as closed for aggregation. Actual flush
+  // occurs after submission results are ingested (typically on the next frame).
+  nim::Z3DPerfCollector::instance().markClosed(renderState.currentPerfFrameToken());
+
+  if (!progressiveRendering) {
+    CHECK(currentProgress == totalProgress) << currentProgress << " " << totalProgress;
+  }
+  return totalProgress > 0.0 ? currentProgress / totalProgress : 1.0;
 }
 
 ZImg Z3DRenderingEngine::localColorBufferToRGBAImg(const Z3DLocalColorBuffer& buffer)
@@ -1197,7 +1484,7 @@ bool Z3DRenderingEngine::event(QEvent* e)
       e->accept();
       return true;
     }
-    auto outputSize = m_compositor->outputSize();
+    auto outputSize = m_outputSize;
     int w = outputSize.x;
     int h = outputSize.y;
     if (m_canvas) {
@@ -1243,8 +1530,7 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   auto renderingGuard = folly::makeGuard([this]() {
     m_isRendering = false;
   });
-  getGLFocus();
-  m_progress = m_networkEvaluator->process(stereo, true);
+  m_progress = processFrame(stereo, true);
   Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
   if (m_progress < 1.) {
     QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
@@ -1259,11 +1545,11 @@ void Z3DRenderingEngine::render(bool stereo)
   CHECK(!Z3DRenderGlobalState::instance().hasCancellationSource());
 
   VLOG(1) << "render";
-  getGLFocus();
   try {
     auto& cancellationSource = Z3DRenderGlobalState::instance().ensureCancellationSource();
     while (m_progress < 1.0) {
-      m_progress = m_networkEvaluator->process(stereo, true, cancellationSource.getToken());
+      auto token = cancellationSource.getToken();
+      m_progress = processFrame(stereo, true, &token);
       Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
     }
   }
@@ -1302,9 +1588,6 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
   auto renderingGuard = folly::makeGuard([this]() {
     m_isRendering = false;
   });
-
-  getGLFocus();
-
   const int tileSize = 7680; // 2048;
   const int tileBorder = 128;
 
@@ -1347,10 +1630,9 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
         // set camera frustum
         m_globalParas->camera.setTileFrustum(nLeft, nRight, nBottom, nTop);
         m_compositor->setRenderingRegion(nLeft, nRight, nBottom, nTop);
-        // VLOG(1) << globalCameraPara().get().left() << globalCameraPara().get().right() <<
-        // globalCameraPara().get().top() << globalCameraPara().get().bottom();
 
-        m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
+        // Evaluate the filter pipeline for this tile.
+        processFrame(sst != Z3DScreenShotType::MonoView, false);
 
         if (sst == Z3DScreenShotType::MonoView) {
           img.pasteImg(localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion),
@@ -1418,7 +1700,6 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   CHECK(tileSize > 0);
   CHECK(width > tileSize || height > tileSize);
   tileBorder = std::max(tileBorder, 16);
-  getGLFocus();
 
   int left = tileStartX;
   int right = std::min(tileStartX + tileSize, width);
@@ -1440,10 +1721,8 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
     m_globalParas->camera.setTileFrustum();
     m_compositor->setRenderingRegion();
   });
-  // VLOG(1) << globalCameraPara().get().nLeft() << globalCameraPara().get().nRight() <<
-  // globalCameraPara().get().nTop() << globalCameraPara().get().nBottom();
-
-  m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
+  // Evaluate the filter pipeline for this tile.
+  processFrame(sst != Z3DScreenShotType::MonoView, false);
 
   if (sst == Z3DScreenShotType::MonoView) {
     localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer()).crop(validRegion).save(filename);
@@ -1487,9 +1766,7 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
   });
 
   const auto backend = static_cast<RenderBackend>(m_globalParas->renderBackend.associatedData());
-
-  getGLFocus();
-  m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
+  processFrame(sst != Z3DScreenShotType::MonoView, false);
 
   if (sst == Z3DScreenShotType::MonoView) {
     auto img = localColorBufferToRGBAImg(*m_compositor->monoReadyLocalBuffer());
@@ -1686,8 +1963,23 @@ void Z3DRenderingEngine::applyBackendSwitch()
   }
 
   // Switch renderer backends for compositor + connected filters (this will idle Vulkan via preBackendSwitch)
-  VLOG(1) << "Switching compositor and connected filters to new backend";
+  VLOG(1) << "Switching compositor and pipeline filters to new backend";
   m_compositor->switchBackend(backend);
+
+  // Propagate backend change to all filters in the current pipeline. The
+  // compositor is already switched above, so skip it here.
+  std::unordered_set<Z3DBoundedFilter*> seen;
+  for (auto* filter : m_pipeline) {
+    if (!filter || filter == m_compositor.get()) {
+      continue;
+    }
+    if (auto* bounded = dynamic_cast<Z3DBoundedFilter*>(filter)) {
+      if (seen.insert(bounded).second) {
+        VLOG(1) << fmt::format("Propagating backend to filter {}", static_cast<const void*>(bounded));
+        bounded->switchRendererBackend(backend);
+      }
+    }
+  }
 
   // Set the pool default backend so subsequent allocations use the new API
   VLOG(1) << "Resetting scratch pool state after backend switch";

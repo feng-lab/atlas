@@ -58,7 +58,7 @@ Scope: Required instructions for anyone (human or automated agent) changing this
 ## Architecture Highlights
 - **UI Thread**: owns `ZMainWindow`, `Z3DCanvas`, menus, docks. No direct renderer mutations.
 - **Rendering Thread**: `Z3DRenderingEngine` + `Z3DCompositor`; holds global parameters (`Z3DGlobalParameters`) and scratch pool.
-- **Network Evaluator**: `Z3DNetworkEvaluator` processes filter graphs and progressive invalidation.
+- **Engine Scheduler**: `Z3DRenderingEngine` owns the filter pipeline and drives progressive invalidation for all object filters feeding the compositor.
 - **Scratch Pool**: lease-based reuse of BlockID, entry/exit, layer arrays, temp 2D RTs. Slots grow but only shrink on `trim()`.
 - **Transparency Modes**: Blend-delayed, dual depth peeling, weighted average, weighted blended. Ensure new passes request the correct pooled resources and restore GL state.
 - **Alias model**: Documents own data; aliases share packs but have independent filters/render states.

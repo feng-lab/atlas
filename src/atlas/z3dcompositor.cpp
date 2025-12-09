@@ -230,9 +230,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_backgroundFirstColor("First Color", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f))
   , m_backgroundSecondColor("Second Color", glm::vec4(0.2f, 0.2f, 0.2f, 1.0f))
   , m_backgroundGradientOrientation("Gradient Orientation")
-  //, m_renderGeometries("Render Geometries", true)
-  , m_gPPort("GeometryFilters", true, this)
-  , m_vPPort("VolumeFilters", true, this)
   , m_ddpBlendShader()
   , m_ddpFinalShader()
   , m_waFinalShader()
@@ -277,9 +274,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_showBackground);
   m_showBackground.setDescription(QStringLiteral(
     "Toggle rendering of the background (uniform or gradient fill)."));
-
-  addPort(m_gPPort);
-  addPort(m_vPPort);
 
   m_textureCopyRenderer.setDiscardTransparent(true);
   m_backgroundFirstColor.setStyle("COLOR");
@@ -663,30 +657,6 @@ void Z3DCompositor::setRenderingRegion(double left, double right, double bottom,
   m_region = glm::vec4(left, right - left, bottom, top - bottom);
 }
 
-void Z3DCompositor::setOutputSize(const glm::uvec2& size)
-{
-  if (size == m_outputSize) {
-    return;
-  }
-
-  CHECK_GT(size.x, 0u);
-  CHECK_GT(size.y, 0u);
-
-  m_outputSize = size;
-  ensureOutputTargets(m_outputSize);
-
-  if (size != m_vPPort.expectedSize()) {
-    m_vPPort.setExpectedSize(size);
-    m_globalParameters.camera.viewportChanged(size);
-    Q_EMIT requestUpstreamSizeChange(this);
-  }
-}
-
-glm::uvec2 Z3DCompositor::outputSize() const
-{
-  return m_outputSize;
-}
-
 void Z3DCompositor::invalidate(State inv)
 {
   // VLOG(1) << "1";
@@ -717,8 +687,8 @@ double Z3DCompositor::processGL(Z3DEye eye)
 {
   syncRendererState();
 
-  std::vector<Z3DGeometryFilter*> filters = m_gPPort.connectedFilters();
-  std::vector<Z3DImgFilter*> vFilters = m_vPPort.connectedFilters();
+  const auto& filters = m_geometryFilters;
+  const auto& vFilters = m_volumeFilters;
   // VLOG(1) << filters.size() << " " << vFilters.size();
   std::vector<Z3DBoundedFilter*> onTopOpaqueFilters;
   std::vector<Z3DBoundedFilter*> onTopTransparentFilters;
@@ -811,7 +781,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
           renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, temp1Lease, eye);
         }
 
-        // copy to outport
+        // copy to out
         currentOutRenderTarget.bind();
         currentOutRenderTarget.clear();
         setViewport(currentOutRenderTarget.size());
@@ -887,7 +857,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
       // Only collect non-opaque image layers; opaque ones were rendered via the opaque pass
       auto nonOpaqueLayers = collectNonOpaqueImageLayers(eye);
       CHECK(!nonOpaqueLayers.empty()) << "should have images";
-      if (numNormalFilters == 0 && numOnTopFilters == 0) { // directly copy inport image to outport
+      if (numNormalFilters == 0 && numOnTopFilters == 0) { // directly copy image to out
         const Z3DTexture* colorTex = nullptr;
         const Z3DTexture* depthTex = nullptr;
         mergeImageLayers(nonOpaqueLayers, eye, *currentOutLease, colorTex, depthTex);
@@ -977,7 +947,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
         currentOutRenderTarget.release();
       } else { // render normal geometries into tempport, then blend inport and tempport into tempport2, then render on
                // top geometries into tempport, then
-        // blend temport and temport2 into outport
+        // blend into out
         auto tempSize2 = multisample2x2 ? (currentOutRenderTarget.size() * 2_u32) : currentOutRenderTarget.size();
         Z3DScratchResourcePool::RenderTargetLease temp1LeaseA =
           Z3DRenderGlobalState::instance().scratchPool().acquireTempRenderTarget2D(tempSize2);
@@ -1006,7 +976,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
         // render on top geometries into tempport
         renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, temp1LeaseA, eye);
 
-        // blend temport and temport2 into outport
+        // blend into out
         currentOutRenderTarget.bind();
         currentOutRenderTarget.clear();
         setViewport(currentOutRenderTarget.size());
@@ -1059,7 +1029,7 @@ double Z3DCompositor::processGL(Z3DEye eye)
         renderGeometries(onTopOpaqueFilters, onTopTransparentFilters, temp1Lease, eye);
       }
 
-      // copy to outport
+      // copy to out
       currentOutRenderTarget.bind();
       currentOutRenderTarget.clear();
       setViewport(currentOutRenderTarget.size());
@@ -1304,8 +1274,8 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   syncRendererState();
 
   // Build basic opaque/transparent lists similar to GL path (no overlays yet)
-  std::vector<Z3DGeometryFilter*> gFilters = m_gPPort.connectedFilters();
-  std::vector<Z3DImgFilter*> vFilters = m_vPPort.connectedFilters();
+  const auto& gFilters = m_geometryFilters;
+  const auto& vFilters = m_volumeFilters;
   std::vector<Z3DBoundedFilter*> opaqueFilters;
   std::vector<Z3DBoundedFilter*> transparentFilters;
   std::vector<Z3DBoundedFilter*> onTopOpaqueFilters;
@@ -2033,7 +2003,7 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
         }
         // Restrict image layers to stay-on-top volumes
         std::vector<Z3DCompositorImageLayer> onTopImageLayers;
-        for (auto* vf : m_vPPort.connectedFilters()) {
+        for (auto* vf : m_volumeFilters) {
           if (!vf || !vf->isStayOnTop() || !vf->isReady(eye) || !vf->hasTransparent(eye)) {
             continue;
           }
@@ -2710,12 +2680,18 @@ double Z3DCompositor::processVulkan(Z3DEye eye)
   return 1.0;
 }
 
-void Z3DCompositor::updateSize()
+void Z3DCompositor::updateSize(const glm::uvec2& targetSize)
 {
-  for (auto port : m_inputPorts) {
-    port->setExpectedSize(outputSize());
+  if (targetSize == m_outputSize) {
+    invalidate(State::AllResultInvalid);
+    return;
   }
 
+  CHECK_GT(targetSize.x, 0u);
+  CHECK_GT(targetSize.y, 0u);
+
+  m_outputSize = targetSize;
+  ensureOutputTargets(m_outputSize);
   invalidate(State::AllResultInvalid);
 }
 
@@ -3032,27 +3008,6 @@ void Z3DCompositor::switchBackend(RenderBackend backendRequest)
     m_wbFinalShader->loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
   }
 
-  std::unordered_set<Z3DBoundedFilter*> seen;
-  auto registerFilter = [&](Z3DBoundedFilter* filter) {
-    if (filter && seen.insert(filter).second) {
-      VLOG(1) << fmt::format("Propagating backend to filter {}", static_cast<const void*>(filter));
-      filter->switchRendererBackend(backendRequest);
-    }
-  };
-
-  const auto geometryFilters = m_gPPort.connectedFilters();
-  const auto volumeFilters = m_vPPort.connectedFilters();
-  VLOG(1) << fmt::format("Notifying {} geometry filters and {} volume filters of backend change",
-                         geometryFilters.size(),
-                         volumeFilters.size());
-
-  for (auto* filter : geometryFilters) {
-    registerFilter(filter);
-  }
-  for (auto* filter : volumeFilters) {
-    registerFilter(filter);
-  }
-
   VLOG(1) << "Updating axis camera for new backend";
   setupAxisCamera();
 
@@ -3342,7 +3297,6 @@ void Z3DCompositor::renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueF
     // VLOG(1) << "lease acquired";
     dispatchTransparent(leaseTrans, leaseOpaque.renderTarget->depthTexture());
 
-    // blend temport3 and temport4 into outport
     glTarget->bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     setViewport(glTarget->size());
@@ -4746,8 +4700,7 @@ std::vector<Z3DCompositorImageLayer> Z3DCompositor::collectNonOpaqueImageLayers(
   std::vector<Z3DCompositorImageLayer> layers;
   const bool useVulkan = m_rendererBase.activeBackend() == RenderBackend::Vulkan;
 
-  auto vFilters = m_vPPort.connectedFilters();
-  for (auto* vf : vFilters) {
+  for (auto* vf : m_volumeFilters) {
     if (!vf || !vf->isReady(eye) || !vf->hasTransparent(eye)) {
       continue;
     }

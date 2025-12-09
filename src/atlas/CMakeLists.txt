@@ -443,11 +443,9 @@ set(SOURCES
     z3dperfcollector.h z3dperfcollector.cpp
     z3dprimitiverenderer.h z3dprimitiverenderer.cpp
     z3dcanvaspainter.h z3dcanvaspainter.cpp
-    z3dnetworkevaluator.h z3dnetworkevaluator.cpp
     z3dcanvas.h z3dcanvas.cpp
     z3dscene.h z3dscene.cpp
     z3dshadergroup.h z3dshadergroup.cpp
-    z3dport.h z3dport.cpp
     z3dglobalparameters.h z3dglobalparameters.cpp
     z3dscratchresourcepool.h z3dscratchresourcepool.cpp
     z3dshaderprogram.h z3dshaderprogram.cpp

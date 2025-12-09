@@ -19,7 +19,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
+      connect(viewControl, &Z3DFilter::invalidated, &m_engine.compositor(), &Z3DCompositor::invalidateResult);
       connect(viewControl, &Z3DRegionAnnotationFilter::boundBoxChanged, this, &Z3DRegionAnnotationView::updateBoundBox);
       connect(viewControl,
               &Z3DRegionAnnotationFilter::objDeselected,
@@ -37,7 +37,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
-      m_engine.networkEvaluator().updateNetwork();
+      m_engine.updatePipeline();
       m_engine.updateBoundBox();
 
       for (auto id : objs) {
@@ -61,7 +61,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
+    connect(viewControl, &Z3DFilter::invalidated, &m_engine.compositor(), &Z3DCompositor::invalidateResult);
     connect(viewControl, &Z3DRegionAnnotationFilter::boundBoxChanged, this, &Z3DRegionAnnotationView::updateBoundBox);
     connect(viewControl,
             &Z3DRegionAnnotationFilter::objDeselected,
@@ -78,7 +78,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
     connect(viewControl, &Z3DRegionAnnotationFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
     m_engine.addEventListenerToBack(*viewControl);
 
-    m_engine.networkEvaluator().updateNetwork();
+    m_engine.updatePipeline();
     m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);

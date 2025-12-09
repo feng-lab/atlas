@@ -182,7 +182,7 @@ Animation System
 Compositor and Rendering
 
 - `Z3DCompositor` orchestrates geometry/image filters and render targets; supports transparency methods and axis/background.
-- `Z3DNetworkEvaluator` executes the filter graph and drives progressive updates.
+- `Z3DRenderingEngine` owns a linear filter pipeline (object filters feeding the compositor) and drives progressive updates each frame.
 - `Z3DGlobalParameters` holds camera, lights, fog, global cuts, device pixel ratio, and scratch resource pool.
 
 Global Cut Mode (Binding)
@@ -221,7 +221,7 @@ Vulkan Pipeline Invariants
 
 Performance Instrumentation
 
-- Aggregated frame timing: the rendering engine emits a monotonically increasing token per user‑visible frame (one `Z3DNetworkEvaluator::process()` call). The Vulkan backend tags each submission with this token and a submission index.
+- Aggregated frame timing: the rendering engine emits a monotonically increasing token per user‑visible frame (one engine‑driven filter pipeline evaluation). The Vulkan backend tags each submission with this token and a submission index.
 - Per‑submission CPU and GPU scopes are ingested and a single summary is logged once a token is safe to flush (typically on the next submission, after fences signal). Summaries appear at `VLOG(1)`.
 - Modes (gflags):
   - `--atlas_perf_mode=off|light|full` (default `light`). `full` adds nested per‑filter GPU scopes inside compositor passes.
@@ -413,18 +413,17 @@ Guidelines
 
 Invalidation & Progressive Rendering
 
-- A `Z3DFilter` tracks invalidation bits (mono/left/right). When a bit is set, the network evaluator knows that eye needs processing.
+- A `Z3DFilter` tracks invalidation bits (mono/left/right). When a bit is set, the engine knows that eye needs processing.
 - Causes of invalidation:
   - Parameter changes (wired in `Z3DFilter::addParameter`)
-  - Upstream port invalidations (output → connected inputs)
-  - Global camera/viewport changes
-  - `updateSize()` (propagates sizes, then invalidates all results)
+  - Global camera/viewport changes and engine output-size changes
+  - Per-filter `updateSize(targetSize)` calls (size handling, then invalidates all results)
 - Image filters request cancellation on invalidate and defer renderer resets to the next `process()` to avoid mutating state mid-pass.
 
 Debug reason plumbing (debug builds only)
 
 - `Z3DFilter` exposes `debugSetInvalidateReason` and `debugTakeInvalidateReason` (no-ops in release).
-- `addParameter` tags a human-readable reason with a JSON snapshot; ports tag their own reasons on propagation.
+- `addParameter` tags a human-readable reason with a JSON snapshot.
 - `Z3DImgFilter::invalidate` prints reasons (with `inv` and current `m_state`) and suppresses duplicate messages for the same state.
 - For analysis only, `Z3DImgFilter` also skips global-cut invalidations that don’t change the effective cut against the image AABB (epsilon-based).
 
@@ -444,7 +443,7 @@ Logging
 - Notable info logs:
   - “3D scene parameters applied” — deferred scene apply queue drained.
   - “3D animation parameters bound” — first animation binding completed.
-  - In debug builds (`ATLAS_DEBUG_VERSION`), you’ll also see: “image filter invalidate: …” with parameter/global/port reasons and state bits.
+  - In debug builds (`ATLAS_DEBUG_VERSION`), you’ll also see: “image filter invalidate: …” with parameter/global reasons and state bits.
 - Vulkan logging hygiene:
   - No-op sampled-read transitions are suppressed: `ensureSampledReadable` only logs when a layout change occurs.
   - Dynamic rendering ‘begin’ logs always carry a non-empty label; empty pass labels fall back to `<unnamed>`.
@@ -514,7 +513,7 @@ Adding a New 3D Object View
 
 1) Create a `Z3DObjView` subclass (e.g., `Z3DNewTypeView`) for your document type; implement `hasObj`, `boundBoxOfObj`, `read/write(view JSON)`, and `viewSettingWidgetsGroupOf`.
 2) Instantiate it in `Z3DRenderingEngine::init()` (or similar factory) and connect its signals to engine (`objViewReady`).
-3) Connect view outputs to compositor input ports.
+3) Ensure the view registers its filters with the engine (via `Z3DFilterView::filters()`/`updatePipeline()`), so the compositor sees them in its geometry/volume lists.
 4) Ensure the view respects visibility/selection and updates the engine bound box.
 5) Extend scene (de)serialization in the view for per-object 3D JSON.
 
@@ -555,7 +554,8 @@ Notes
   - 3D images are rendered via `Z3DImgFilter`, which hosts two renderer paths:
     - `Z3DImgRaycasterRenderer` for volumes and 2D images (depth==1) with transfer functions.
     - `Z3DImgSliceRenderer` for explicit plane slices with colormaps.
-  - The filter outputs multiple ports (`Image`, `OpaqueImage`, stereo variants) consumed by the compositor.
+  - The filter outputs multiple renderings (`Image`, `OpaqueImage`, stereo variants) consumed by the compositor.
+  - Internally, the compositor consumes image filters via engine-managed `Z3DImgFilter*` lists.
 
 - Fast vs Full-Resolution
   - On load, large volumes are downsampled to fit GPU constraints. `Z3DImg::isVolumeDownsampled()` indicates this.
@@ -604,11 +604,11 @@ User-Facing Behavior (summary)
 - Toggling full-res on a downsampled volume triggers a quick preview followed by progressive refinement. Disabling full-res reverts to fast rendering.
 - Aliases of the same image share memory but keep independent view settings and transforms. The Atlas agent can create aliases via the Scene RPC `MakeAlias` (tool: `scene_make_alias`) to stage multiple alternative views of the same backing data.
 
-Invalidation and Progressive Reset Policy
+- Invalidation and Progressive Reset Policy
 
-- Invalidation: Filters are invalidated by upstream changes (ports/parameters) and by global camera/viewport changes.
+- Invalidation: Filters are invalidated by parameter changes, by global camera/viewport changes, and when the engine applies a new compositor output size.
   - `Z3DBoundedFilter` connects camera changes (see `z3dboundedfilter.cpp`) and calls `invalidateResult()` which marks outputs invalid.
-  - `updateSize()` on any filter propagates expected sizes and ends with `invalidate(AllResultInvalid)`.
+  - `updateSize(targetSize)` on any filter is called by the engine when the compositor output size changes and ends with `invalidate(AllResultInvalid)` by default. Filters that need explicit sizing (e.g., `Z3DImgFilter`) override this to use `targetSize` as their desired render resolution.
 - Cancellation-first policy (centralized in `Z3DImgFilter::invalidate`):
   - On invalidation, the image filter requests cancellation via `globalParas().cancellationSource->requestCancellation()` if a render is in progress.
   - Each `Z3DImgFilter` also sets a small internal flag so it can ask its renderers to reset at the start of the next `process()` call (a safe point). Renderers expose reset as an internal operation (friend access) — it is not part of the public API.
@@ -642,9 +642,10 @@ OpenGL Context and Shaders
 - Context: offscreen `QOffscreenSurface` + `Z3DContext`; `glbinding` used for function resolution and optional debug callbacks.
 - Shader headers: `Z3DRendererBase::generateHeader()` injects `#version`, fog, clip planes, light count; renderers add feature defines (NUM_VOLUMES, MAX_PROJ_MERGE, ISO, etc.).
 
-Ports and Parameters
+Filter Wiring and Parameters
 
-- Ports: `Z3DInputPortBase`/`Z3DOutputPortBase` connect filters; invalidation propagates downstream from outputs to connected inputs.
+- Pipeline: `Z3DRenderingEngine` owns a linear pipeline of filters and a single `Z3DCompositor` at the end; it also tracks the current geometry and volume filters and exposes them to the compositor.
+- Invalidation: filters emit `Z3DFilter::invalidated()` when their state changes; 3D views connect this signal directly to `Z3DCompositor::invalidateResult()` so only the compositor is invalidated, not other filters.
 - Parameters: `ZParameter` subclasses emit `valueChanged`; `Z3DFilter::addParameter` wires them to `invalidateResult()` by default.
 - WidgetsGroup: `ZWidgetsGroup` trees drive UI construction and change notifications; engine watches these groups to emit view-setting change signals.
 

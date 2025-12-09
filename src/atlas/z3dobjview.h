@@ -3,13 +3,15 @@
 #include "z3drenderingengine.h"
 #include "zwidgetsgroup.h"
 #include "z3dcanvas.h"
-#include "z3dnetworkevaluator.h"
 #include "z3dcompositor.h"
 #include "zobjdoc.h"
 #include "zexception.h"
 #include <QObject>
+#include <vector>
 
 namespace nim {
+
+class Z3DFilter;
 
 class Z3DObjView : public QObject
 {
@@ -35,6 +37,13 @@ public:
   virtual void read(size_t id, const json::object& json) = 0;
 
   virtual void write(size_t id, json::object& json) const = 0;
+
+  // Return all filters owned by this view that participate in the rendering
+  // pipeline. The default implementation returns an empty list.
+  [[nodiscard]] virtual std::vector<Z3DFilter*> filters() const
+  {
+    return {};
+  }
 
   // get view setting widget group of obj id, default return nullptr
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);

@@ -31,7 +31,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_numParas(0)
   //, m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   //, m_smoothInteraction("Smooth Interaction", true)
-  , m_vPPort("VolumeFilter", this)
   //, m_FRVolumeSlices(m_maxNumOfFullResolutionVolumeSlice)
   //, m_FRVolumeSlicesValidState(m_maxNumOfFullResolutionVolumeSlice, false)
   //, m_useFRVolumeSlice("Use Full Resolution Volume Slice", true)
@@ -115,8 +114,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   // layer, block-id, and progressive render targets are now owned by renderers
 
-  // port exposing this filter to the compositor network
-  addPort(m_vPPort);
   markTargetsInvalid();
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DImgFilter::onVisibilityChanged);
 
@@ -367,6 +364,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
                                        m_3dImg->channelColor(c).g / 255.,
                                        m_3dImg->channelColor(c).b / 255.,
                                        1.f));
+      transferFunction.captureDefaultFromCurrent();
       if (false) {
         transferFunction.addKey(ZColorMapKey(0.001, glm::vec4(0.01f, 0.01f, 0.01f, 0.0f)));
         transferFunction.addKey(ZColorMapKey(0.01, glm::vec4(0.01f, 0.01f, 0.01f, 1.0f)));
@@ -715,18 +713,17 @@ void Z3DImgFilter::invalidate(State inv)
   m_resetProgressPending = true;
 }
 
-void Z3DImgFilter::updateSize()
+void Z3DImgFilter::updateSize(const glm::uvec2& targetSize)
 {
-  Z3DBoundedFilter::updateSize();
+  Z3DBoundedFilter::updateSize(targetSize);
   updateBlockIDTarget();
 
-  const glm::uvec2 requestedSize = m_vPPort.size();
-  if (requestedSize.x == 0 || requestedSize.y == 0) {
+  if (targetSize.x == 0 || targetSize.y == 0) {
     return;
   }
 
-  if (m_outputSize != requestedSize) {
-    m_outputSize = requestedSize;
+  if (m_outputSize != targetSize) {
+    m_outputSize = targetSize;
     releaseAllRenderTargets();
     setViewport(m_outputSize);
   }

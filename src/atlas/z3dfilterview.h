@@ -71,6 +71,16 @@ public:
     return {};
   }
 
+  [[nodiscard]] std::vector<Z3DFilter*> filters() const override
+  {
+    std::vector<Z3DFilter*> filters;
+    filters.reserve(m_idToFilter.size());
+    for (const auto& idFilter : m_idToFilter) {
+      filters.push_back(idFilter.second.get());
+    }
+    return filters;
+  }
+
   const std::map<size_t, std::unique_ptr<FilterType>>& idToFilter()
   {
     return m_idToFilter;
@@ -98,7 +108,7 @@ protected:
     m_engine.removeEventListener(*viewControl);
     // m_engine.canvas().getGLFocus();
     m_idToFilter.erase(it);
-    m_engine.networkEvaluator().updateNetwork();
+    m_engine.updatePipeline();
     updateBoundBox();
   }
 

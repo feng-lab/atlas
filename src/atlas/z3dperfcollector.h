@@ -67,7 +67,8 @@ public:
                      std::vector<Scope> cpuScopes,
                      Stats stats);
 
-  // Mark a token closed at the end of Z3DNetworkEvaluator::process().
+  // Mark a token closed at the end of a rendering pass (one engine-driven
+  // filter pipeline evaluation).
   // Actual flush happens once the last submission has been ingested (typically
   // on the first begin of the next token).
   void markClosed(uint64_t token);

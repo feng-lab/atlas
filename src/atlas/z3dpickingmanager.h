@@ -7,7 +7,6 @@
 #include <cstring>
 #include <vector>
 #include <boost/unordered/unordered_flat_map.hpp>
-#include <glog/logging.h>
 
 namespace nim {
 

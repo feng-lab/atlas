@@ -1,7 +1,6 @@
 #pragma once
 
 #include "z3dboundedfilter.h"
-#include "z3dport.h"
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
 #include "z3dimg.h"
@@ -85,7 +84,7 @@ protected:
       m_3dImg->rebuildGLPagingResources();
     }
   }
-  void updateSize() override;
+  void updateSize(const glm::uvec2& targetSize) override;
 
   void changeCoordTransform();
 
@@ -190,7 +189,6 @@ private:
   // ZBoolParameter m_smoothInteraction;
 
   std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_transparentTargets;
-  Z3DFilterOutputPort<Z3DImgFilter> m_vPPort;
   std::array<Z3DScratchResourcePool::RenderTargetLease, 3> m_opaqueTargets;
   std::array<bool, 3> m_transparentValid{};
   std::array<bool, 3> m_opaqueValid{};

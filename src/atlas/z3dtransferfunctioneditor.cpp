@@ -4,26 +4,44 @@
 #include "zclickablelabel.h"
 #include "zimg.h"
 #include "zlog.h"
+
+#include <QApplication>
+#include <QCheckBox>
+#include <QColorDialog>
+#include <QDoubleSpinBox>
+#include <QHBoxLayout>
+#include <QInputDialog>
+#include <QKeyEvent>
+#include <QLabel>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QPen>
-#include <QToolTip>
-#include <QColorDialog>
-#include <QInputDialog>
-#include <QHBoxLayout>
-#include <QDoubleSpinBox>
 #include <QPushButton>
-#include <QCheckBox>
-#include <QMessageBox>
-#include <QApplication>
 #include <QThread>
+#include <QToolTip>
+#include <QVBoxLayout>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <memory>
-#include <utility>
 
 namespace nim {
+
+namespace {
+
+double normalizeIntensity(double value, int bitsStored)
+{
+  if (bitsStored > 0 && bitsStored <= 16) {
+    const double maxCode = static_cast<double>((1u << bitsStored) - 1u);
+    if (maxCode > 0.0) {
+      return value / maxCode;
+    }
+  }
+  return value;
+}
+
+} // namespace
 
 class ZImgHistogramThread : public QThread
 {
@@ -67,8 +85,17 @@ protected:
     m_minValue = minRaw;
     m_maxValue = maxRaw;
 
-    const size_t binCount = histogramBinCount();
-    m_histogram = m_image->histogram(binCount);
+    size_t binCount = 0;
+    if (m_bitsStored > 0 && m_bitsStored <= 16) {
+      binCount = static_cast<size_t>(1) << m_bitsStored;
+    }
+
+    if (binCount == 0) {
+      m_histogram = m_image->histogram();
+    } else {
+      m_histogram = m_image->histogram(binCount);
+    }
+
     if (!m_histogram.empty()) {
       m_maxCount = *std::max_element(m_histogram.begin(), m_histogram.end());
     } else {
@@ -77,15 +104,6 @@ protected:
   }
 
 private:
-  size_t histogramBinCount() const
-  {
-    if (m_bitsStored <= 0) {
-      return 256;
-    }
-    const int clamped = std::clamp(m_bitsStored, 1, 16);
-    return static_cast<size_t>(1) << clamped;
-  }
-
   std::shared_ptr<const ZImg> m_image;
   int m_bitsStored;
   std::vector<size_t> m_histogram;
@@ -94,16 +112,9 @@ private:
   double m_maxValue = 0.0;
 };
 
-double normalizeIntensity(double value, int bits)
-{
-  if (bits > 0 && bits <= 16) {
-    const double denominator = static_cast<double>((1u << bits) - 1u);
-    if (denominator > 0.0) {
-      return value / denominator;
-    }
-  }
-  return value;
-}
+// -----------------------------------------------------------------------------//
+// Z3DTransferFunctionWidget
+// -----------------------------------------------------------------------------//
 
 Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParameter* tf,
                                                      bool showHistogram,
@@ -113,28 +124,31 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
                                                      QWidget* parent)
   : QWidget(parent)
   , m_transferFunction(tf)
-  , m_xRange(0., 1.)
-  , m_yRange(0., 1.)
+  , m_histogramCache()
+  , m_selectedLeftPart(true)
+  , m_dragging(false)
+  , m_padding(36)
+  , m_splitFactor(1.2)
+  , m_keyCircleRadius(5)
+  , m_xRange(0.0, 1.0)
+  , m_yRange(0.0, 1.0)
   , m_xAxisText(std::move(xAxisText))
   , m_yAxisText(std::move(yAxisText))
+  , m_keyContextMenu(this)
+  , m_noKeyContextMenu(this)
+  , m_deleteKeyAction(nullptr)
+  , m_changeIntensityAction(nullptr)
+  , m_changeOpacityAction(nullptr)
   , m_showHistogram(showHistogram)
   , m_histogramNormalizeMethod(std::move(histogramNormalizeMethod))
 {
-  m_padding = 36;
-  m_keyCircleRadius = 5;
-  m_selectedLeftPart = true;
-  m_splitFactor = 1.2;
-  m_dragging = false;
-
   setObjectName("TransFuncMappingCanvas");
   setMouseTracking(true);
   setFocusPolicy(Qt::StrongFocus);
 
-  setFocus();
-
-  auto* cc = new QAction(tr("Change Color"), this);
-  m_keyContextMenu.addAction(cc);
-  connect(cc, &QAction::triggered, this, &Z3DTransferFunctionWidget::changeCurrentColor);
+  auto* changeColorAction = new QAction(tr("Change Color"), this);
+  m_keyContextMenu.addAction(changeColorAction);
+  connect(changeColorAction, &QAction::triggered, this, &Z3DTransferFunctionWidget::changeCurrentColor);
 
   m_changeOpacityAction = new QAction(tr("Change Opacity"), this);
   m_keyContextMenu.addAction(m_changeOpacityAction);
@@ -144,7 +158,7 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
   m_keyContextMenu.addAction(m_changeIntensityAction);
   connect(m_changeIntensityAction, &QAction::triggered, this, &Z3DTransferFunctionWidget::changeCurrentIntensity);
 
-  m_deleteKeyAction = new QAction(tr("Delete This Key"), this);
+  m_deleteKeyAction = new QAction(tr("Delete Key"), this);
   m_keyContextMenu.addAction(m_deleteKeyAction);
   connect(m_deleteKeyAction, &QAction::triggered, this, &Z3DTransferFunctionWidget::deleteKey);
 
@@ -154,6 +168,330 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
           qOverload<>(&Z3DTransferFunctionWidget::update));
 
   setSizePolicy(QSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding));
+}
+
+QRectF Z3DTransferFunctionWidget::plotRect() const
+{
+  const int left = m_padding;
+  const int right = width() - m_padding;
+  const int top = m_padding;
+  const int bottom = height() - m_padding;
+  return QRectF(QPointF(left, top), QPointF(right, bottom));
+}
+
+glm::dvec2 Z3DTransferFunctionWidget::relativeToPixelCoordinates(const glm::dvec2& r) const
+{
+  const QRectF rect = plotRect();
+  const double nx = (r.x - m_xRange[0]) / (m_xRange[1] - m_xRange[0]);
+  const double ny = (r.y - m_yRange[0]) / (m_yRange[1] - m_yRange[0]);
+
+  const double px = rect.left() + nx * rect.width();
+  const double py = rect.bottom() - ny * rect.height();
+  return glm::dvec2(px, py);
+}
+
+glm::dvec2 Z3DTransferFunctionWidget::pixelToRelativeCoordinates(const glm::dvec2& p) const
+{
+  const QRectF rect = plotRect();
+  if (rect.width() <= 0.0 || rect.height() <= 0.0) {
+    return glm::dvec2(0.0, 0.0);
+  }
+
+  const double nx = (p.x - rect.left()) / rect.width();
+  const double ny = (rect.bottom() - p.y) / rect.height();
+
+  const double rx = m_xRange[0] + nx * (m_xRange[1] - m_xRange[0]);
+  const double ry = m_yRange[0] + ny * (m_yRange[1] - m_yRange[0]);
+  return glm::dvec2(rx, ry);
+}
+
+void Z3DTransferFunctionWidget::updateHistogram()
+{
+  if (!m_showHistogram || m_histogramPending) {
+    m_histogramCache.reset();
+    return;
+  }
+
+  if (m_histogramBins.empty() || m_histogramMaxCount == 0) {
+    m_histogramCache.reset();
+    return;
+  }
+
+  if (m_histogramCache && m_histogramCache->size() == size()) {
+    return;
+  }
+
+  m_histogramCache = std::make_unique<QPixmap>(size());
+  m_histogramCache->fill(Qt::transparent);
+
+  QPainter painter(m_histogramCache.get());
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(QColor(0, 40, 160, 120));
+
+  const QRectF rect = plotRect();
+  const size_t binCount = m_histogramBins.size();
+  if (binCount == 0 || rect.width() <= 0.0 || rect.height() <= 0.0) {
+    return;
+  }
+
+  for (size_t i = 0; i < binCount; ++i) {
+    double value = 0.0;
+    if (m_histogramMaxCount > 0) {
+      const double bin = static_cast<double>(m_histogramBins[i]);
+      const double maxBin = static_cast<double>(m_histogramMaxCount);
+      if (m_histogramNormalizeMethod == "Log") {
+        value = std::log(bin + 1.0) / std::log(maxBin + 1.0);
+      } else {
+        value = bin / maxBin;
+      }
+    }
+    value = std::clamp(value, 0.0, 1.0);
+    if (value <= 0.0) {
+      continue;
+    }
+
+    const double x0f = static_cast<double>(i) / binCount;
+    const double x1f = static_cast<double>(i + 1) / binCount;
+
+    const glm::dvec2 topRel(m_xRange[0] + x0f * (m_xRange[1] - m_xRange[0]),
+                            m_yRange[0] + value * (m_yRange[1] - m_yRange[0]));
+    const glm::dvec2 bottomRel(m_xRange[0] + x1f * (m_xRange[1] - m_xRange[0]), m_yRange[0]);
+
+    const glm::dvec2 p1 = relativeToPixelCoordinates(topRel);
+    const glm::dvec2 p2 = relativeToPixelCoordinates(bottomRel);
+    QRectF bar(QPointF(p1.x, p1.y), QPointF(p2.x, p2.y));
+    painter.drawRect(bar.normalized());
+  }
+}
+
+void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
+{
+  if (!m_transferFunction) {
+    return;
+  }
+
+  event->accept();
+
+  auto& tf = m_transferFunction->get();
+  m_xRange = glm::dvec2(tf.domainMin(), tf.domainMax());
+  m_yRange = glm::dvec2(0.0, 1.0);
+
+  QPainter painter(this);
+  painter.setRenderHint(QPainter::Antialiasing, false);
+  painter.fillRect(rect(), Qt::white);
+
+  if (m_showHistogram) {
+    updateHistogram();
+    if (m_histogramCache) {
+      painter.drawPixmap(0, 0, *m_histogramCache);
+    }
+  }
+
+  // grid
+  painter.setPen(QColor(220, 220, 220));
+  const QRectF plot = plotRect();
+
+  const int gridLines = 10;
+  for (int i = 0; i <= gridLines; ++i) {
+    const double fx = static_cast<double>(i) / gridLines;
+    const double fy = static_cast<double>(i) / gridLines;
+
+    const double x = plot.left() + fx * plot.width();
+    const double y = plot.bottom() - fy * plot.height();
+
+    painter.drawLine(QPointF(x, plot.top()), QPointF(x, plot.bottom()));
+    painter.drawLine(QPointF(plot.left(), y), QPointF(plot.right(), y));
+  }
+
+  // axes and labels
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  painter.setPen(Qt::gray);
+  painter.setBrush(Qt::NoBrush);
+  painter.drawRect(plot);
+
+  painter.setPen(Qt::gray);
+
+  // x-axis label
+  painter.drawText(QRectF(plot.left(),
+                          plot.bottom() + 4.0,
+                          plot.width(),
+                          static_cast<double>(m_padding) * 0.6),
+                   Qt::AlignHCenter | Qt::AlignVCenter,
+                   m_xAxisText);
+
+  // y-axis label and tick labels (0,1).
+  painter.save();
+  const double yAxisCenterY = plot.center().y();
+  const double yAxisLabelX = plot.left() - 0.7 * m_padding;
+  const double yLabelWidth = static_cast<double>(m_padding) * 4.0;
+  const double yLabelHeight = static_cast<double>(m_padding) * 0.6;
+  painter.translate(yAxisLabelX, yAxisCenterY);
+  painter.rotate(-90.0);
+  painter.drawText(QRectF(-yLabelWidth / 2.0,
+                          -yLabelHeight / 2.0,
+                          yLabelWidth,
+                          yLabelHeight),
+                   Qt::AlignHCenter | Qt::AlignVCenter,
+                   m_yAxisText);
+  painter.restore();
+
+  painter.drawText(QRectF(0.0,
+                          plot.top() - 2.0,
+                          m_padding * 0.8,
+                          m_padding * 0.6),
+                   Qt::AlignRight | Qt::AlignTop,
+                   QStringLiteral("1.0"));
+  painter.drawText(QRectF(0.0,
+                          plot.bottom() - 14.0,
+                          m_padding * 0.8,
+                          m_padding * 0.6),
+                   Qt::AlignRight | Qt::AlignBottom,
+                   QStringLiteral("0.0"));
+
+  const double minIntensity = m_transferFunction->minIntensity();
+  const double maxIntensity = m_transferFunction->maxIntensity();
+
+  painter.drawText(QRectF(plot.left(),
+                          height() - m_padding * 0.8,
+                          m_padding * 3.0,
+                          m_padding * 0.6),
+                   Qt::AlignLeft | Qt::AlignTop,
+                   QString::number(minIntensity, 'g', QLocale::FloatingPointShortest));
+  painter.drawText(QRectF(plot.right() - m_padding * 3.0,
+                          height() - m_padding * 0.8,
+                          m_padding * 3.0,
+                          m_padding * 0.6),
+                   Qt::AlignRight | Qt::AlignTop,
+                   QString::number(maxIntensity, 'g', QLocale::FloatingPointShortest));
+
+  // mapping curve
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  QPen curvePen(Qt::darkRed);
+  curvePen.setWidthF(1.5);
+  painter.setPen(curvePen);
+
+  if (tf.numKeys() > 0) {
+    glm::dvec2 prevPoint(0.0);
+    bool hasPrev = false;
+
+    for (size_t i = 0; i < tf.numKeys(); ++i) {
+      const double intensity = tf.keyIntensity(i);
+      const double alphaL = tf.keyFloatAlphaL(i);
+      const glm::dvec2 point = relativeToPixelCoordinates(glm::dvec2(intensity, alphaL));
+
+      if (hasPrev) {
+        painter.drawLine(QPointF(prevPoint.x, prevPoint.y), QPointF(point.x, point.y));
+      }
+      prevPoint = point;
+      hasPrev = true;
+
+      if (tf.isKeySplit(i)) {
+        const double alphaR = tf.keyFloatAlphaR(i);
+        prevPoint = relativeToPixelCoordinates(glm::dvec2(intensity, alphaR));
+      }
+    }
+  }
+
+  paintKeys(painter);
+
+  // outer border
+  painter.setRenderHint(QPainter::Antialiasing, false);
+  painter.setPen(Qt::lightGray);
+  painter.setBrush(Qt::NoBrush);
+  painter.drawRect(rect().adjusted(0, 0, -1, -1));
+}
+
+void Z3DTransferFunctionWidget::paintKeys(QPainter& painter)
+{
+  m_keyHandles.clear();
+
+  if (!m_transferFunction) {
+    return;
+  }
+
+  auto& tf = m_transferFunction->get();
+  const size_t keyCount = tf.numKeys();
+  if (keyCount == 0) {
+    return;
+  }
+
+  const double radius = static_cast<double>(m_keyCircleRadius);
+
+  for (size_t i = 0; i < keyCount; ++i) {
+    const bool isSplit = tf.isKeySplit(i);
+    const bool isSelected = tf.isKeySelected(i);
+
+    // left or single part
+    {
+      const double alphaL = tf.keyFloatAlphaL(i);
+      const glm::dvec2 rel(tf.keyIntensity(i), alphaL);
+      const glm::dvec2 pos = relativeToPixelCoordinates(rel);
+
+      QPen pen(Qt::darkGray);
+      double radiusScale = 1.0;
+      if (isSelected && (!isSplit || m_selectedLeftPart)) {
+        pen.setWidth(3);
+        pen.setColor(Qt::black);
+        radiusScale = 1.3;
+      }
+      painter.setPen(pen);
+
+      QColor color = tf.keyQColorL(i);
+      color.setAlpha(255);
+      painter.setBrush(color);
+
+      if (isSplit) {
+        const double width = m_splitFactor * radius * radiusScale * 2.0;
+        QRectF rect(QPointF(pos.x - width * 0.5, pos.y - radius * radiusScale),
+                    QSizeF(width, radius * radiusScale * 2.0));
+        painter.drawPie(rect, 90 * 16, 180 * 16);
+        m_keyHandles.push_back({i, true, rect});
+      } else {
+        QRectF rect(QPointF(pos.x - radius * radiusScale, pos.y - radius * radiusScale),
+                    QSizeF(radius * radiusScale * 2.0, radius * radiusScale * 2.0));
+        painter.drawEllipse(rect);
+        m_keyHandles.push_back({i, false, rect});
+      }
+    }
+
+    if (isSplit) {
+      const double alphaR = tf.keyFloatAlphaR(i);
+      const glm::dvec2 rel(tf.keyIntensity(i), alphaR);
+      const glm::dvec2 pos = relativeToPixelCoordinates(rel);
+
+      QPen pen(Qt::darkGray);
+      double radiusScale = 1.0;
+      if (isSelected && !m_selectedLeftPart) {
+        pen.setWidth(3);
+        pen.setColor(Qt::black);
+        radiusScale = 1.3;
+      }
+      painter.setPen(pen);
+
+      QColor color = tf.keyQColorR(i);
+      color.setAlpha(255);
+      painter.setBrush(color);
+
+      const double width = m_splitFactor * radius * radiusScale * 2.0;
+      QRectF rect(QPointF(pos.x - width * 0.5, pos.y - radius * radiusScale),
+                  QSizeF(width, radius * radiusScale * 2.0));
+      painter.drawPie(rect, 270 * 16, 180 * 16);
+      m_keyHandles.push_back({i, false, rect});
+    }
+  }
+}
+
+bool Z3DTransferFunctionWidget::findkey(const QPoint& pos, size_t& index, bool& isLeftPart)
+{
+  for (const auto& handle : m_keyHandles) {
+    if (handle.rect.contains(pos)) {
+      index = handle.keyIndex;
+      isLeftPart = handle.isLeftPart;
+      return true;
+    }
+  }
+  return false;
 }
 
 void Z3DTransferFunctionWidget::showNoKeyContextMenu(QMouseEvent* event)
@@ -167,8 +505,8 @@ void Z3DTransferFunctionWidget::showKeyContextMenu(QMouseEvent* event, size_t se
     return;
   }
 
-  if (selectedKeyIndex == 0 || selectedKeyIndex == m_transferFunction->get().numKeys() - 1) {
-    // first or last key, can not delete, can not change intensity
+  auto& tf = m_transferFunction->get();
+  if (selectedKeyIndex == 0 || selectedKeyIndex == tf.numKeys() - 1) {
     m_deleteKeyAction->setEnabled(false);
     m_changeIntensityAction->setEnabled(false);
   } else {
@@ -179,285 +517,95 @@ void Z3DTransferFunctionWidget::showKeyContextMenu(QMouseEvent* event, size_t se
   m_keyContextMenu.popup(event->globalPosition().toPoint());
 }
 
-void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
+void Z3DTransferFunctionWidget::mousePressEvent(QMouseEvent* event)
 {
+  event->accept();
+
   if (!m_transferFunction) {
     return;
   }
 
-  event->accept();
+  auto& tf = m_transferFunction->get();
+  tf.deselectAllKeys();
 
-  QPainter paint(this);
-
-  paint.setRenderHint(QPainter::Antialiasing, false);
-  paint.setPen(Qt::NoPen);
-  paint.setBrush(Qt::white);
-  paint.drawRect(0, 0, width() - 1, height() - 1);
-
-  if (m_showHistogram) {
-    if (!m_histogramCache || m_histogramCache->rect() != rect()) {
-      m_histogramCache.reset();
-      if (!m_histogramBins.empty() && m_histogramMaxCount > 0) {
-        m_histogramCache = std::make_unique<QPixmap>(rect().size());
-        m_histogramCache->fill(Qt::transparent);
-
-        QPainter cachePaint(m_histogramCache.get());
-        // draw histogram
-        cachePaint.setPen(Qt::NoPen);
-        cachePaint.setBrush(QColor(0, 40, 160, 120));
-        cachePaint.setRenderHint(QPainter::Antialiasing, true);
-
-        const size_t histogramWidth = m_histogramBins.size();
-        if (histogramWidth > 1) {
-          const double barWidth = 1.0 / (histogramWidth - 1.0);
-
-          for (size_t x = 0; x < histogramWidth; ++x) {
-            double sxpos = x / (histogramWidth - 1.0);
-            double expos = sxpos + 0.5 * barWidth;
-            sxpos -= 0.5 * barWidth;
-            if (x == 0) {
-              sxpos += 0.5 * barWidth;
-            }
-            if (x == histogramWidth - 1) {
-              expos -= 0.5 * barWidth;
-            }
-
-            double value = 0.0;
-            if (m_histogramMaxCount > 0) {
-              if (m_histogramNormalizeMethod == "Log") {
-                value = std::log(static_cast<double>(m_histogramBins[x]) + 1.0) /
-                        std::log(static_cast<double>(m_histogramMaxCount) + 1.0);
-              } else {
-                value = static_cast<double>(m_histogramBins[x]) /
-                        static_cast<double>(m_histogramMaxCount);
-              }
-            }
-            value = std::clamp(value, 0.0, 1.0);
-            glm::dvec2 p1 =
-              relativeToPixelCoordinates(glm::dvec2(sxpos, value * (m_yRange[1] - m_yRange[0]) + m_yRange[0]));
-            glm::dvec2 p2 = relativeToPixelCoordinates(glm::dvec2(expos, m_yRange[0]));
-            cachePaint.drawRect(QRectF(QPointF(p1.x, p1.y), QPointF(p2.x, p2.y)));
-          }
-        }
-      }
-    }
-
-    if (m_histogramCache) {
-      paint.drawPixmap(0, 0, *m_histogramCache);
-    }
+  size_t selectedKeyIndex = 0;
+  bool isLeftPart = true;
+  const bool hasKey = findkey(event->pos(), selectedKeyIndex, isLeftPart);
+  if (hasKey) {
+    tf.setKeySelected(selectedKeyIndex, true);
+    m_selectedLeftPart = isLeftPart;
   }
 
-  // ----------------------------------------------
-
-  // draw grid
-  paint.setPen(QColor(220, 220, 220));
-  paint.setRenderHint(QPainter::Antialiasing, false);
-
-  glm::dvec2 pmin = glm::dvec2(0., 0.);
-  glm::dvec2 pmax = glm::dvec2(1., 1.);
-
-  glm::dvec2 gridSpacing(.1, .1);
-  for (double f = pmin.x; f < pmax.x + gridSpacing.x * 0.5; f += gridSpacing.x) {
-    glm::dvec2 p = relativeToPixelCoordinates(glm::dvec2(f, 0.));
-    glm::dvec2 a = relativeToPixelCoordinates(glm::dvec2(0., 0.));
-    glm::dvec2 b = relativeToPixelCoordinates(glm::dvec2(0., 1.));
-    paint.drawLine(QPointF(p.x, a.y), QPointF(p.x, b.y));
-  }
-
-  for (double f = pmin.y; f < pmax.y + gridSpacing.y * 0.5; f += gridSpacing.y) {
-    glm::dvec2 p = relativeToPixelCoordinates(glm::dvec2(0., f));
-    glm::dvec2 a = relativeToPixelCoordinates(glm::dvec2(0., 0.));
-    glm::dvec2 b = relativeToPixelCoordinates(glm::dvec2(1., 0.));
-    paint.drawLine(QPointF(a.x, p.y), QPointF(b.x, p.y));
-  }
-
-  // draw x and y axes
-  paint.setRenderHint(QPainter::Antialiasing, true);
-  paint.setPen(Qt::gray);
-  paint.setBrush(Qt::gray);
-
-  // draw axes independently of visible range
-  double oldx0 = m_xRange[0];
-  double oldx1 = m_xRange[1];
-  m_xRange[0] = 0.;
-  m_xRange[1] = 1.;
-
-  glm::dvec2 origin = relativeToPixelCoordinates(glm::dvec2(0., 0.));
-  origin.x = floor(origin.x) + 0.5;
-  origin.y = floor(origin.y) + 0.5;
-
-  paint.setRenderHint(QPainter::Antialiasing, true);
-
-  paint.drawLine(QPointF(m_padding, origin.y), QPointF(width() - m_padding, origin.y));
-
-  paint.drawLine(QPointF(origin.x, m_padding), QPointF(origin.x, height() - m_padding));
-
-  paint.drawText(static_cast<int>(width() / 2.0 - 6.2 * m_padding),
-                 static_cast<int>(origin.y + 0.2 * m_padding),
-                 static_cast<int>(6.2 * 2 * m_padding),
-                 static_cast<int>(0.6 * m_padding),
-                 Qt::AlignHCenter | Qt::AlignVCenter,
-                 m_xAxisText);
-  paint.drawText(static_cast<int>(0.15 * m_padding),
-                 static_cast<int>(m_padding - 2.0),
-                 static_cast<int>(0.7 * m_padding),
-                 static_cast<int>(7.0 * 2),
-                 Qt::AlignRight | Qt::AlignTop,
-                 "1.0");
-  paint.drawText(static_cast<int>(0.15 * m_padding),
-                 static_cast<int>(height() - m_padding - 9.0),
-                 static_cast<int>(0.7 * m_padding),
-                 static_cast<int>(14.0),
-                 Qt::AlignRight | Qt::AlignBottom,
-                 "0.0");
-
-  paint.drawText(static_cast<int>(origin.x - 3),
-                 static_cast<int>(height() - m_padding * 0.85),
-                 static_cast<int>(m_padding * 2),
-                 static_cast<int>(0.7 * m_padding),
-                 Qt::AlignLeft | Qt::AlignTop,
-                 QString::number(m_transferFunction->minIntensity(), 'g', QLocale::FloatingPointShortest));
-  paint.drawText(static_cast<int>(width() - m_padding * 3.0),
-                 static_cast<int>(height() - m_padding * 0.85),
-                 static_cast<int>(m_padding * 2.0 + 3),
-                 static_cast<int>(0.7 * m_padding),
-                 Qt::AlignRight | Qt::AlignTop,
-                 QString::number(m_transferFunction->maxIntensity(), 'g', QLocale::FloatingPointShortest));
-
-  paint.save();
-  paint.translate(0.2 * m_padding, height() / 2.0 + 6.2 * m_padding);
-  paint.rotate(270.);
-  paint.drawText(0,
-                 0,
-                 static_cast<int>(6.2 * 2 * m_padding),
-                 static_cast<int>(0.6 * m_padding),
-                 Qt::AlignHCenter | Qt::AlignVCenter,
-                 m_yAxisText);
-  paint.restore();
-
-  m_xRange[0] = oldx0;
-  m_xRange[1] = oldx1;
-
-  // ----------------------------------------------
-
-  // draw mapping function
-  QPen pen = QPen(Qt::darkRed);
-  pen.setWidthF(1.5);
-  paint.setPen(pen);
-
-  // origin = relativeToPixelCoordinates(glm::dvec2(0.));
-
-  glm::dvec2 old(0.0);
-  for (size_t i = 0; i < m_transferFunction->get().numKeys(); ++i) {
-    ZColorMapKey& key = m_transferFunction->get().key(i);
-    glm::dvec2 p = relativeToPixelCoordinates(glm::dvec2(key.intensity(), key.floatAlphaL()));
-    if (i == 0) {
-      if (m_transferFunction->get().keyIntensity(0) > 0.) {
-        paint.drawLine(QPointF(relativeToPixelCoordinates(glm::dvec2(0., 0.)).x, p.y), QPointF(p.x - 1., p.y));
-      }
-    } else {
-      paint.drawLine(QPointF(old.x + 1., old.y), QPointF(p.x - 1., p.y));
-    }
-    old = p;
-    if (key.isSplit()) {
-      old = relativeToPixelCoordinates(glm::dvec2(key.intensity(), key.floatAlphaR()));
-    }
-  }
-  if (m_transferFunction->get().keyIntensity(m_transferFunction->get().numKeys() - 1) < 1.) {
-    paint.drawLine(QPointF(old.x + 1., old.y), QPointF(relativeToPixelCoordinates(glm::dvec2(1., 0.)).x, old.y));
-  }
-
-  if (m_xRange[1] != m_xRange[0]) {
-    paintKeys(paint);
-  }
-
-  // ----------------------------------------------
-
-  paint.setRenderHint(QPainter::Antialiasing, false);
-
-  paint.setPen(Qt::lightGray);
-  paint.setBrush(Qt::NoBrush);
-  paint.drawRect(0, 0, width() - 1, height() - 1);
-}
-
-void Z3DTransferFunctionWidget::mousePressEvent(QMouseEvent* event)
-{
-  event->accept();
-  m_transferFunction->get().deselectAllKeys();
-
-  size_t selectedKeyIndex;
-  bool selectedKey = findkey(event->pos(), selectedKeyIndex, m_selectedLeftPart);
-  if (selectedKey) {
-    m_transferFunction->get().setKeySelected(selectedKeyIndex, true);
-  }
-
-  glm::dvec2 sHit = glm::dvec2(event->position().x(), event->position().y());
-  glm::dvec2 hit = pixelToRelativeCoordinates(sHit);
+  const glm::dvec2 hit = pixelToRelativeCoordinates(glm::dvec2(event->position().x(), event->position().y()));
 
   if (event->button() == Qt::RightButton) {
-    if (!selectedKey) {
-      showNoKeyContextMenu(event);
-    } else {
+    if (hasKey) {
       showKeyContextMenu(event, selectedKeyIndex);
+    } else {
+      showNoKeyContextMenu(event);
     }
     return;
   }
 
-  if (selectedKey && event->button() == Qt::LeftButton) {
-    m_dragging = true;
-    // keep values within valid range
-    hit = glm::clamp(hit, 0., 1.);
-    showKeyInfo(event->pos(), hit);
+  if (event->button() != Qt::LeftButton) {
     return;
   }
 
-  // no key was selected -> insert new key
-  if (hit.x >= 0. && hit.x <= 1. && hit.y >= 0. && hit.y <= 1. && event->button() == Qt::LeftButton) {
-    insertNewKey(hit);
+  glm::dvec2 clamped = hit;
+  clamped.x = std::clamp(clamped.x, m_xRange[0], m_xRange[1]);
+  clamped.y = std::clamp(clamped.y, m_yRange[0], m_yRange[1]);
+
+  if (hasKey) {
     m_dragging = true;
-    showKeyInfo(event->pos(), hit);
+    showKeyInfo(event->pos(), clamped);
+    return;
   }
+
+  // No key hit: insert a new one.
+  insertNewKey(clamped);
+  m_dragging = true;
+  showKeyInfo(event->pos(), clamped);
 }
 
 void Z3DTransferFunctionWidget::mouseMoveEvent(QMouseEvent* event)
 {
   event->accept();
 
-  glm::dvec2 sHit = glm::dvec2(event->position().x(), event->position().y());
-  glm::dvec2 hit = pixelToRelativeCoordinates(sHit);
-
-  // return when no key was inserted or selected
-  if (!m_dragging) {
+  if (!m_dragging || !m_transferFunction) {
     return;
   }
 
-  // keep location within valid texture coord range
-  hit = glm::clamp(hit, 0., 1.);
-
-  std::vector<size_t> allSelected = m_transferFunction->get().selectedKeyIndexes();
-
-  if (allSelected.size() == 1) {
-    size_t selectedIdx = allSelected[0];
-    if (selectedIdx != 0 && selectedIdx != m_transferFunction->get().numKeys() - 1) {
-      if (hit.x <= m_transferFunction->get().keyIntensity(selectedIdx - 1)) {
-        hit.x = m_transferFunction->get().keyIntensity(selectedIdx - 1) + 1e-7;
-      }
-      if (hit.x >= m_transferFunction->get().keyIntensity(selectedIdx + 1)) {
-        hit.x = m_transferFunction->get().keyIntensity(selectedIdx + 1) - 1e-7;
-      }
-      m_transferFunction->get().setKeyIntensity(selectedIdx, hit.x);
-    }
-    if (m_transferFunction->get().isKeySplit(selectedIdx)) {
-      if (m_selectedLeftPart) {
-        m_transferFunction->get().setKeyFloatAlphaL(selectedIdx, hit.y);
-      } else {
-        m_transferFunction->get().setKeyFloatAlphaR(selectedIdx, hit.y);
-      }
-    } else {
-      m_transferFunction->get().setKeyFloatAlphaL(selectedIdx, hit.y);
-    }
-    showKeyInfo(event->pos(), hit);
+  auto& tf = m_transferFunction->get();
+  auto selected = tf.selectedKeyIndexes();
+  if (selected.size() != 1) {
+    return;
   }
+
+  size_t idx = selected[0];
+
+  glm::dvec2 hit = pixelToRelativeCoordinates(glm::dvec2(event->position().x(), event->position().y()));
+  hit.x = std::clamp(hit.x, m_xRange[0], m_xRange[1]);
+  hit.y = std::clamp(hit.y, m_yRange[0], m_yRange[1]);
+
+  if (idx != 0 && idx + 1 != tf.numKeys()) {
+    const double eps = 1e-7;
+    const double leftBound = tf.keyIntensity(idx - 1) + eps;
+    const double rightBound = tf.keyIntensity(idx + 1) - eps;
+    hit.x = std::clamp(hit.x, leftBound, rightBound);
+    tf.setKeyIntensity(idx, hit.x);
+  }
+
+  if (tf.isKeySplit(idx)) {
+    if (m_selectedLeftPart) {
+      tf.setKeyFloatAlphaL(idx, hit.y);
+    } else {
+      tf.setKeyFloatAlphaR(idx, hit.y);
+    }
+  } else {
+    tf.setKeyFloatAlphaL(idx, hit.y);
+  }
+
+  showKeyInfo(event->pos(), hit);
 }
 
 void Z3DTransferFunctionWidget::mouseReleaseEvent(QMouseEvent* event)
@@ -494,332 +642,61 @@ void Z3DTransferFunctionWidget::keyReleaseEvent(QKeyEvent* event)
 bool Z3DTransferFunctionWidget::event(QEvent* e)
 {
   if (e->type() == QEvent::ToolTip) {
-    size_t index;
-    bool isLeftPart;
     auto* helpEvent = static_cast<QHelpEvent*>(e);
+    size_t index = 0;
+    bool isLeft = true;
     QRect tipRect;
     QString tipText;
-    if (findkey(helpEvent->pos(), index, isLeftPart)) {
-      glm::dvec2 p = relativeToPixelCoordinates(
-        glm::dvec2(m_transferFunction->get().keyIntensity(index), m_transferFunction->get().keyFloatAlphaL(index)));
+
+    if (findkey(helpEvent->pos(), index, isLeft) && m_transferFunction) {
+      auto& tf = m_transferFunction->get();
+      const double keyInten = tf.keyIntensity(index);
+      const double realInten = keyIntensityToRealIntensity(keyInten);
+
+      const glm::dvec2 rel(tf.keyIntensity(index), tf.keyFloatAlphaL(index));
+      const glm::dvec2 pos = relativeToPixelCoordinates(rel);
+      tipRect = QRect(static_cast<int>(pos.x - m_keyCircleRadius),
+                      static_cast<int>(pos.y - m_keyCircleRadius),
+                      m_keyCircleRadius * 2,
+                      m_keyCircleRadius * 2);
+
+      QColor color;
+      double opacity = 0.0;
       if (m_transferFunction->get().isKeySplit(index)) {
-        tipRect = QRect(p.x - m_splitFactor * m_keyCircleRadius,
-                        p.y - m_keyCircleRadius,
-                        m_splitFactor * m_keyCircleRadius * 2,
-                        m_keyCircleRadius * 2);
-        if (isLeftPart) {
-          tipText = QString("Key %1 Left\nIntensity: %2\nColor: %3\nOpacity: %4")
+        if (isLeft) {
+          color = tf.keyQColorL(index);
+          opacity = tf.keyFloatAlphaL(index);
+          tipText = QStringLiteral("Key %1 Left\nIntensity: %2\nColor: %3\nOpacity: %4")
                       .arg(index + 1)
-                      .arg(keyIntensityToRealIntensity(m_transferFunction->get().keyIntensity(index)))
-                      .arg(m_transferFunction->get().keyQColorL(index).name())
-                      .arg(m_transferFunction->get().keyFloatAlphaL(index));
+                      .arg(realInten)
+                      .arg(color.name())
+                      .arg(opacity);
         } else {
-          tipText = QString("Key %1 Right\nIntensity: %2\nColor: %3\nOpacity: %4")
+          color = tf.keyQColorR(index);
+          opacity = tf.keyFloatAlphaR(index);
+          tipText = QStringLiteral("Key %1 Right\nIntensity: %2\nColor: %3\nOpacity: %4")
                       .arg(index + 1)
-                      .arg(keyIntensityToRealIntensity(m_transferFunction->get().keyIntensity(index)))
-                      .arg(m_transferFunction->get().keyQColorR(index).name())
-                      .arg(m_transferFunction->get().keyFloatAlphaR(index));
+                      .arg(realInten)
+                      .arg(color.name())
+                      .arg(opacity);
         }
       } else {
-        tipRect = QRect(p.x - m_keyCircleRadius, p.y - m_keyCircleRadius, m_keyCircleRadius * 2, m_keyCircleRadius * 2);
-        tipText = QString("Key %1\nIntensity: %2\nColor: %3\nOpacity: %4")
+        color = tf.keyQColorL(index);
+        opacity = tf.keyFloatAlphaL(index);
+        tipText = QStringLiteral("Key %1\nIntensity: %2\nColor: %3\nOpacity: %4")
                     .arg(index + 1)
-                    .arg(keyIntensityToRealIntensity(m_transferFunction->get().keyIntensity(index)))
-                    .arg(m_transferFunction->get().keyQColorR(index).name())
-                    .arg(m_transferFunction->get().keyFloatAlphaR(index));
+                    .arg(realInten)
+                    .arg(color.name())
+                    .arg(opacity);
       }
+
       QToolTip::showText(helpEvent->globalPos(), tipText, this, tipRect);
     } else {
       QToolTip::hideText();
     }
+    return true;
   }
   return QWidget::event(e);
-}
-
-bool Z3DTransferFunctionWidget::findkey(const QPoint& pos, size_t& index, bool& isLeftPart)
-{
-  glm::dvec2 sHit = glm::dvec2(pos.x(), pos.y());
-
-  double tol = 1.5;
-
-  // see if a key was selected
-  int selectedKeyIndex = -1;
-  for (size_t i = 1; i < m_transferFunction->get().numKeys(); ++i) {
-    glm::dvec2 sp = relativeToPixelCoordinates(
-      glm::dvec2(m_transferFunction->get().keyIntensity(i), m_transferFunction->get().keyFloatAlphaL(i)));
-    glm::dvec2 spr = relativeToPixelCoordinates(
-      glm::dvec2(m_transferFunction->get().keyIntensity(i), m_transferFunction->get().keyFloatAlphaR(i)));
-    if (m_transferFunction->get().isKeySplit(i)) {
-      if (sHit.x > sp.x - m_splitFactor * m_keyCircleRadius * tol && sHit.x <= sp.x &&
-          sHit.y > sp.y - m_keyCircleRadius * tol && sHit.y < sp.y + m_keyCircleRadius * tol) {
-        index = i;
-        selectedKeyIndex = static_cast<int>(i);
-        isLeftPart = true;
-        break;
-      }
-      if (sHit.x >= spr.x && sHit.x < spr.x + m_splitFactor * m_keyCircleRadius * tol &&
-          sHit.y > spr.y - m_keyCircleRadius * tol && sHit.y < spr.y + m_keyCircleRadius * tol) {
-        index = i;
-        selectedKeyIndex = static_cast<int>(i);
-        isLeftPart = false;
-        break;
-      }
-    } else {
-      if (sHit.x > sp.x - m_keyCircleRadius * tol && sHit.x < sp.x + m_keyCircleRadius * tol &&
-          sHit.y > sp.y - m_keyCircleRadius * tol && sHit.y < sp.y + m_keyCircleRadius * tol) {
-        index = i;
-        selectedKeyIndex = static_cast<int>(i);
-        isLeftPart = false;
-        break;
-      }
-    }
-  }
-  // check first key
-  if (selectedKeyIndex == -1) {
-    glm::dvec2 sp = relativeToPixelCoordinates(
-      glm::dvec2(m_transferFunction->get().keyIntensity(0), m_transferFunction->get().keyFloatAlphaL(0)));
-    glm::dvec2 spr = relativeToPixelCoordinates(
-      glm::dvec2(m_transferFunction->get().keyIntensity(0), m_transferFunction->get().keyFloatAlphaR(0)));
-    if (m_transferFunction->get().isKeySplit(0)) {
-      if (sHit.x > sp.x - m_splitFactor * m_keyCircleRadius * tol && sHit.x <= sp.x &&
-          sHit.y > sp.y - m_keyCircleRadius * tol && sHit.y < sp.y + m_keyCircleRadius * tol) {
-        index = 0;
-        selectedKeyIndex = 0;
-        isLeftPart = true;
-      }
-      if (sHit.x >= spr.x && sHit.x < spr.x + m_splitFactor * m_keyCircleRadius * tol &&
-          sHit.y > spr.y - m_keyCircleRadius * tol && sHit.y < spr.y + m_keyCircleRadius * tol) {
-        index = 0;
-        selectedKeyIndex = 0;
-        isLeftPart = false;
-      }
-    } else {
-      if (sHit.x > sp.x - m_keyCircleRadius * tol && sHit.x < sp.x + m_keyCircleRadius * tol &&
-          sHit.y > sp.y - m_keyCircleRadius * tol && sHit.y < sp.y + m_keyCircleRadius * tol) {
-        index = 0;
-        selectedKeyIndex = 0;
-        isLeftPart = false;
-      }
-    }
-  }
-  return selectedKeyIndex != -1;
-}
-
-void Z3DTransferFunctionWidget::setHistogramNormalizeMethod(const QString& method)
-{
-  if (m_histogramNormalizeMethod != method) {
-    m_histogramNormalizeMethod = method;
-    m_histogramCache.reset();
-    update();
-  }
-}
-
-void Z3DTransferFunctionWidget::setHistogramVisible(bool v)
-{
-  if (v != m_showHistogram) {
-    m_showHistogram = v;
-    update();
-  }
-}
-
-void Z3DTransferFunctionWidget::deleteKey()
-{
-  if (!m_transferFunction || m_transferFunction->get().numKeys() < 3) {
-    return;
-  }
-  std::vector<size_t> allSelected = m_transferFunction->get().selectedKeyIndexes();
-  if (allSelected.size() != 1) {
-    return;
-  }
-  if (allSelected[0] == 0 || allSelected[0] == m_transferFunction->get().numKeys() - 1) {
-    return;
-  }
-
-  m_transferFunction->get().removeSelectedKeys();
-}
-
-void Z3DTransferFunctionWidget::changeCurrentColor()
-{
-  std::vector<size_t> allSelected = m_transferFunction->get().selectedKeyIndexes();
-  if (allSelected.size() != 1) {
-    return;
-  }
-
-  size_t selectedIdx = allSelected[0];
-
-  QColor oldColor;
-  if (m_transferFunction->get().isKeySplit(selectedIdx) && !m_selectedLeftPart) {
-    oldColor = m_transferFunction->get().keyQColorR(selectedIdx);
-  } else {
-    oldColor = m_transferFunction->get().keyQColorL(selectedIdx);
-  }
-
-  QColor newColor = QColorDialog::getColor(oldColor, QApplication::activeWindow());
-  if (newColor.isValid() && oldColor != newColor) {
-    if (m_transferFunction->get().isKeySplit(selectedIdx) && !m_selectedLeftPart) {
-      newColor.setAlpha(m_transferFunction->get().keyAlphaR(selectedIdx));
-      m_transferFunction->get().setKeyColorR(selectedIdx, newColor);
-    } else {
-      newColor.setAlpha(m_transferFunction->get().keyAlphaL(selectedIdx));
-      m_transferFunction->get().setKeyColorL(selectedIdx, newColor);
-    }
-  }
-}
-
-void Z3DTransferFunctionWidget::changeCurrentIntensity()
-{
-  std::vector<size_t> allSelected = m_transferFunction->get().selectedKeyIndexes();
-  if (allSelected.size() != 1) {
-    return;
-  }
-
-  size_t index = allSelected[0];
-
-  bool ok;
-  double newI = QInputDialog::getDouble(this,
-                                        QString("Key %1").arg(index + 1),
-                                        "Intensity:",
-                                        keyIntensityToRealIntensity(m_transferFunction->get().keyIntensity(index)),
-                                        keyIntensityToRealIntensity(m_transferFunction->get().domainMin() + 0.001),
-                                        keyIntensityToRealIntensity(m_transferFunction->get().domainMax() - 0.001),
-                                        3,
-                                        &ok);
-  if (ok) {
-    m_transferFunction->get().setKeyIntensity(index, realIntensityToKeyIntensity(newI));
-  }
-}
-
-void Z3DTransferFunctionWidget::changeCurrentOpacity()
-{
-  std::vector<size_t> allSelected = m_transferFunction->get().selectedKeyIndexes();
-  if (allSelected.size() != 1) {
-    return;
-  }
-
-  size_t index = allSelected[0];
-
-  double oldOpacity;
-  if (m_transferFunction->get().isKeySplit(index) && !m_selectedLeftPart) {
-    oldOpacity = m_transferFunction->get().keyFloatAlphaR(index);
-  } else {
-    oldOpacity = m_transferFunction->get().keyFloatAlphaL(index);
-  }
-
-  bool ok;
-  double newO =
-    QInputDialog::getDouble(this, QString("Key %1").arg(index + 1), "Opacity:", oldOpacity, 0.0, 1.0, 3, &ok);
-  if (ok) {
-    if (m_transferFunction->get().isKeySplit(index) && !m_selectedLeftPart) {
-      m_transferFunction->get().setKeyFloatAlphaR(index, newO);
-    } else {
-      m_transferFunction->get().setKeyFloatAlphaL(index, newO);
-    }
-  }
-}
-
-void Z3DTransferFunctionWidget::insertNewKey(glm::dvec2& hit)
-{
-  if (!m_transferFunction) {
-    return;
-  }
-
-  hit = glm::clamp(hit, 0., 1.);
-
-  m_transferFunction->get().deselectAllKeys();
-  m_transferFunction->get().addKeyAtIntensity(hit.x, hit.y, true);
-}
-
-void Z3DTransferFunctionWidget::paintKeys(QPainter& paint)
-{
-  if (!m_transferFunction) {
-    return;
-  }
-
-  for (size_t i = 0; i < m_transferFunction->get().numKeys(); ++i) {
-    glm::dvec2 p = relativeToPixelCoordinates(
-      glm::dvec2(m_transferFunction->get().keyIntensity(i), m_transferFunction->get().keyFloatAlphaL(i)));
-    QPen pen(QBrush(Qt::darkGray), Qt::SolidLine);
-    double radiusScale = 1.0;
-
-    if (m_transferFunction->get().isKeySplit(i)) {
-      // left
-      if (m_transferFunction->get().isKeySelected(i) && m_selectedLeftPart) {
-        pen.setWidth(3);
-        pen.setColor(Qt::black);
-        radiusScale = 1.3;
-      }
-      paint.setPen(pen);
-      QColor color = m_transferFunction->get().keyQColorL(i);
-      color.setAlpha(255);
-      paint.setBrush(color);
-
-      paint.drawPie(QRectF(p.x - m_splitFactor * m_keyCircleRadius * radiusScale,
-                           p.y - m_keyCircleRadius * radiusScale,
-                           m_splitFactor * m_keyCircleRadius * radiusScale * 2,
-                           m_keyCircleRadius * radiusScale * 2),
-                    90 * 16,
-                    180 * 16);
-
-      // right
-      p = relativeToPixelCoordinates(
-        glm::dvec2(m_transferFunction->get().keyIntensity(i), m_transferFunction->get().keyFloatAlphaR(i)));
-      if (m_transferFunction->get().isKeySelected(i) && !m_selectedLeftPart) {
-        pen.setWidth(3);
-        pen.setColor(Qt::black);
-        radiusScale = 1.3;
-      } else {
-        pen.setWidth(1);
-        pen.setColor(Qt::darkGray);
-        radiusScale = 1.0;
-      }
-      paint.setPen(pen);
-      color = m_transferFunction->get().keyQColorR(i);
-      color.setAlpha(255);
-      paint.setBrush(color);
-
-      paint.drawPie(QRectF(p.x - m_splitFactor * m_keyCircleRadius * radiusScale,
-                           p.y - m_keyCircleRadius * radiusScale,
-                           m_splitFactor * m_keyCircleRadius * radiusScale * 2,
-                           m_keyCircleRadius * radiusScale * 2),
-                    270 * 16,
-                    180 * 16);
-    } else {
-      if (m_transferFunction->get().isKeySelected(i)) {
-        pen.setWidth(3);
-        pen.setColor(Qt::black);
-        radiusScale = 1.3;
-      }
-      paint.setPen(pen);
-      QColor color = m_transferFunction->get().keyQColorL(i);
-      color.setAlpha(255);
-      paint.setBrush(color);
-
-      paint.drawEllipse(QRectF(p.x - m_keyCircleRadius * radiusScale,
-                               p.y - m_keyCircleRadius * radiusScale,
-                               m_keyCircleRadius * radiusScale * 2,
-                               m_keyCircleRadius * radiusScale * 2));
-    }
-  }
-}
-
-glm::dvec2 Z3DTransferFunctionWidget::relativeToPixelCoordinates(const glm::dvec2& r)
-{
-  double px =
-    (r.x - m_xRange[0]) / (m_xRange[1] - m_xRange[0]) * (static_cast<double>(width()) - 2 * m_padding) + m_padding;
-  double py =
-    height() -
-    ((r.y - m_yRange[0]) / (m_yRange[1] - m_yRange[0]) * (static_cast<double>(height()) - 2 * m_padding) + m_padding);
-  return glm::dvec2(px, py);
-}
-
-glm::dvec2 Z3DTransferFunctionWidget::pixelToRelativeCoordinates(const glm::dvec2& p)
-{
-  double rx =
-    (p.x - m_padding) / (static_cast<double>(width()) - 2 * m_padding) * (m_xRange[1] - m_xRange[0]) + m_xRange[0];
-  double ry =
-    (height() - p.y - m_padding) / (static_cast<double>(height()) - 2 * m_padding) * (m_yRange[1] - m_yRange[0]) +
-    m_yRange[0];
-  return glm::dvec2(rx, ry);
 }
 
 QSize Z3DTransferFunctionWidget::minimumSizeHint() const
@@ -837,10 +714,11 @@ void Z3DTransferFunctionWidget::hideKeyInfo()
   QToolTip::hideText();
 }
 
-void Z3DTransferFunctionWidget::showKeyInfo(QPoint pos, const glm::dvec2& values)
+void Z3DTransferFunctionWidget::showKeyInfo(const QPoint& pos, const glm::dvec2& values)
 {
+  const double realIntensity = keyIntensityToRealIntensity(values.x);
   QToolTip::showText(mapToGlobal(pos),
-                     QString("Intensity: %1 \nOpacity: %2").arg(keyIntensityToRealIntensity(values.x)).arg(values.y));
+                     QStringLiteral("Intensity: %1\nOpacity: %2").arg(realIntensity).arg(values.y));
 }
 
 void Z3DTransferFunctionWidget::setHistogramData(std::vector<size_t> bins, size_t maxCount)
@@ -883,39 +761,217 @@ void Z3DTransferFunctionWidget::setTransFunc(Z3DTransferFunctionParameter* tf)
 
 double Z3DTransferFunctionWidget::keyIntensityToRealIntensity(double keyInten) const
 {
-  double dmin = m_transferFunction->get().domainMin();
-  double dmax = m_transferFunction->get().domainMax();
-  double minInten = m_transferFunction->minIntensity();
-  double maxInten = m_transferFunction->maxIntensity();
+  const double dmin = m_transferFunction->get().domainMin();
+  const double dmax = m_transferFunction->get().domainMax();
+  const double minInten = m_transferFunction->minIntensity();
+  const double maxInten = m_transferFunction->maxIntensity();
   return minInten + (keyInten - dmin) / (dmax - dmin) * (maxInten - minInten);
 }
 
 double Z3DTransferFunctionWidget::realIntensityToKeyIntensity(double realInten) const
 {
-  double dmin = m_transferFunction->get().domainMin();
-  double dmax = m_transferFunction->get().domainMax();
-  double minInten = m_transferFunction->minIntensity();
-  double maxInten = m_transferFunction->maxIntensity();
+  const double dmin = m_transferFunction->get().domainMin();
+  const double dmax = m_transferFunction->get().domainMax();
+  const double minInten = m_transferFunction->minIntensity();
+  const double maxInten = m_transferFunction->maxIntensity();
   return dmin + (realInten - minInten) / (maxInten - minInten) * (dmax - dmin);
 }
 
-//----------------------------------------------------------------------------------------------------------------
+void Z3DTransferFunctionWidget::setHistogramNormalizeMethod(const QString& method)
+{
+  if (m_histogramNormalizeMethod != method) {
+    m_histogramNormalizeMethod = method;
+    m_histogramCache.reset();
+    update();
+  }
+}
+
+void Z3DTransferFunctionWidget::setHistogramVisible(bool v)
+{
+  if (v != m_showHistogram) {
+    m_showHistogram = v;
+    update();
+  }
+}
+
+void Z3DTransferFunctionWidget::deleteKey()
+{
+  if (!m_transferFunction) {
+    return;
+  }
+
+  auto& tf = m_transferFunction->get();
+  if (tf.numKeys() < 3) {
+    return;
+  }
+
+  const std::vector<size_t> selected = tf.selectedKeyIndexes();
+  if (selected.size() != 1) {
+    return;
+  }
+
+  const size_t idx = selected.front();
+  if (idx == 0 || idx == tf.numKeys() - 1) {
+    return;
+  }
+
+  tf.removeSelectedKeys();
+}
+
+void Z3DTransferFunctionWidget::changeCurrentColor()
+{
+  if (!m_transferFunction) {
+    return;
+  }
+
+  auto& tf = m_transferFunction->get();
+  const std::vector<size_t> selected = tf.selectedKeyIndexes();
+  if (selected.size() != 1) {
+    return;
+  }
+
+  const size_t idx = selected.front();
+
+  const bool isSplit = tf.isKeySplit(idx);
+  QColor currentColor = isSplit && !m_selectedLeftPart ? tf.keyQColorR(idx) : tf.keyQColorL(idx);
+
+  QColor newColor = QColorDialog::getColor(currentColor, QApplication::activeWindow());
+  if (!newColor.isValid()) {
+    return;
+  }
+
+  // Preserve opacity: color changes should not move the key vertically.
+  if (isSplit) {
+    if (m_selectedLeftPart) {
+      newColor.setAlpha(tf.keyAlphaL(idx));
+      tf.setKeyColorL(idx, newColor);
+    } else {
+      newColor.setAlpha(tf.keyAlphaR(idx));
+      tf.setKeyColorR(idx, newColor);
+    }
+  } else {
+    newColor.setAlpha(tf.keyAlphaL(idx));
+    tf.setKeyColorL(idx, newColor);
+  }
+}
+
+void Z3DTransferFunctionWidget::changeCurrentIntensity()
+{
+  if (!m_transferFunction) {
+    return;
+  }
+
+  auto& tf = m_transferFunction->get();
+  const std::vector<size_t> selected = tf.selectedKeyIndexes();
+  if (selected.size() != 1) {
+    return;
+  }
+
+  const size_t idx = selected.front();
+  if (idx == 0 || idx == tf.numKeys() - 1) {
+    return;
+  }
+
+  const double current = tf.keyIntensity(idx);
+  const double minAllowed = tf.keyIntensity(idx - 1);
+  const double maxAllowed = tf.keyIntensity(idx + 1);
+
+  bool ok = false;
+  const double newVal = QInputDialog::getDouble(this,
+                                                tr("Change Intensity"),
+                                                tr("Intensity in [0, 1]"),
+                                                current,
+                                                minAllowed,
+                                                maxAllowed,
+                                                4,
+                                                &ok);
+  if (!ok) {
+    return;
+  }
+
+  const double eps = 1e-7;
+  const double clamped = std::clamp(newVal, minAllowed + eps, maxAllowed - eps);
+  tf.setKeyIntensity(idx, clamped);
+}
+
+void Z3DTransferFunctionWidget::changeCurrentOpacity()
+{
+  if (!m_transferFunction) {
+    return;
+  }
+
+  auto& tf = m_transferFunction->get();
+  const std::vector<size_t> selected = tf.selectedKeyIndexes();
+  if (selected.size() != 1) {
+    return;
+  }
+
+  const size_t idx = selected.front();
+  const bool isSplit = tf.isKeySplit(idx);
+
+  double currentOpacity = tf.keyFloatAlphaL(idx);
+  if (isSplit && !m_selectedLeftPart) {
+    currentOpacity = tf.keyFloatAlphaR(idx);
+  }
+
+  bool ok = false;
+  const double newOpacity = QInputDialog::getDouble(this,
+                                                    tr("Change Opacity"),
+                                                    tr("Opacity in [0, 1]"),
+                                                    currentOpacity,
+                                                    0.0,
+                                                    1.0,
+                                                    3,
+                                                    &ok);
+  if (!ok) {
+    return;
+  }
+
+  const double clamped = std::clamp(newOpacity, 0.0, 1.0);
+  if (isSplit) {
+    if (m_selectedLeftPart) {
+      tf.setKeyFloatAlphaL(idx, clamped);
+    } else {
+      tf.setKeyFloatAlphaR(idx, clamped);
+    }
+  } else {
+    tf.setKeyFloatAlphaL(idx, clamped);
+  }
+}
+
+void Z3DTransferFunctionWidget::insertNewKey(const glm::dvec2& hit)
+{
+  if (!m_transferFunction) {
+    return;
+  }
+
+  auto& tf = m_transferFunction->get();
+  const double x = std::clamp(hit.x, m_xRange[0], m_xRange[1]);
+  const double y = std::clamp(hit.y, m_yRange[0], m_yRange[1]);
+
+  tf.addKeyAtIntensity(x, y, true);
+}
+
+// -----------------------------------------------------------------------------//
+// Z3DTransferFunctionEditor
+// -----------------------------------------------------------------------------//
 
 Z3DTransferFunctionEditor::Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent)
   : QWidget(parent)
   , m_transferFunction(para)
-  , m_transferFunctionWidget(nullptr)
-  , m_transferFunctionTexture(nullptr)
   , m_showHistogram("Show Histogram: ", true)
   , m_histogramNormalizeMethod("Histogram Normalize Method: ")
-
 {
+  CHECK(m_transferFunction);
+
   setWindowFlag(Qt::Window, true);
+
   m_histogramNormalizeMethod.addOptions("Linear", "Log");
   m_histogramNormalizeMethod.select("Log");
+
   createWidgets();
-  updateFromTransferFunction();
   createConnections();
+  updateFromTransferFunction();
 }
 
 Z3DTransferFunctionEditor::~Z3DTransferFunctionEditor()
@@ -926,101 +982,98 @@ Z3DTransferFunctionEditor::~Z3DTransferFunctionEditor()
 QLayout* Z3DTransferFunctionEditor::createMappingLayout()
 {
   m_transferFunctionWidget =
-    new Z3DTransferFunctionWidget(m_transferFunction, m_showHistogram.get(), m_histogramNormalizeMethod.get());
+    new Z3DTransferFunctionWidget(m_transferFunction, m_showHistogram.get(), m_histogramNormalizeMethod.get(), tr("Intensity"), tr("Opacity"));
   m_transferFunctionWidget->setMinimumWidth(140);
 
-  auto additionalSpace = new QWidget();
-  additionalSpace->setMinimumHeight(2);
-
-  // histogram
-  auto hboxHist = new QHBoxLayout();
-  hboxHist->addWidget(m_showHistogram.createNameLabel());
-  hboxHist->addWidget(m_showHistogram.createWidget());
-  hboxHist->addStretch();
-  hboxHist->addWidget(m_histogramNormalizeMethod.createNameLabel());
-  hboxHist->addWidget(m_histogramNormalizeMethod.createWidget());
+  // histogram controls
+  auto* histogramRow = new QHBoxLayout();
+  histogramRow->addWidget(m_showHistogram.createNameLabel());
+  histogramRow->addWidget(m_showHistogram.createWidget());
+  histogramRow->addStretch();
+  histogramRow->addWidget(m_histogramNormalizeMethod.createNameLabel());
+  histogramRow->addWidget(m_histogramNormalizeMethod.createWidget());
 
   // data bounds
-  auto hboxData = new QHBoxLayout();
-  m_dataMinNameLabel = new QLabel("Data Min: ", this);
+  auto* dataRow = new QHBoxLayout();
+  m_dataMinNameLabel = new QLabel(tr("Data Min: "), this);
   m_dataMinNameLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-  m_dataMaxNameLabel = new QLabel("Data Max: ", this);
+  m_dataMaxNameLabel = new QLabel(tr("Data Max: "), this);
   m_dataMaxNameLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-  m_dataMinValueLabel = new QLabel();
-  m_dataMaxValueLabel = new QLabel();
+  m_dataMinValueLabel = new QLabel(this);
+  m_dataMaxValueLabel = new QLabel(this);
   m_dataMinValueLabel->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
   m_dataMaxValueLabel->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
-  hboxData->addSpacing(6);
-  hboxData->addWidget(m_dataMinNameLabel);
-  hboxData->addWidget(m_dataMinValueLabel);
-  hboxData->addStretch();
-  hboxData->addWidget(m_dataMaxNameLabel);
-  hboxData->addWidget(m_dataMaxValueLabel);
-  hboxData->addStretch();
-  hboxData->addSpacing(21);
 
-  // domain settings:
-  auto hboxDomain = new QHBoxLayout();
-  m_domainMinSpinBox = new QDoubleSpinBox();
-  m_domainMaxSpinBox = new QDoubleSpinBox();
-  m_domainMaxSpinBox->setRange(0.001, 1.0);
-  m_domainMaxSpinBox->setSingleStep(.001);
-  m_domainMaxSpinBox->setDecimals(3);
-  m_domainMaxSpinBox->setKeyboardTracking(false);
-  m_domainMinSpinBox->setRange(0., 0.999);
-  m_domainMinSpinBox->setSingleStep(.001);
+  dataRow->addSpacing(6);
+  dataRow->addWidget(m_dataMinNameLabel);
+  dataRow->addWidget(m_dataMinValueLabel);
+  dataRow->addStretch();
+  dataRow->addWidget(m_dataMaxNameLabel);
+  dataRow->addWidget(m_dataMaxValueLabel);
+  dataRow->addStretch();
+  dataRow->addSpacing(21);
+
+  // domain settings (normalized [0,1] range).
+  auto* domainRow = new QHBoxLayout();
+  m_domainMinSpinBox = new QDoubleSpinBox(this);
+  m_domainMaxSpinBox = new QDoubleSpinBox(this);
+
+  m_domainMinSpinBox->setRange(0.0, 0.999);
+  m_domainMinSpinBox->setSingleStep(0.001);
   m_domainMinSpinBox->setDecimals(3);
   m_domainMinSpinBox->setKeyboardTracking(false);
 
-  m_fitDomainToDataButton = new QPushButton();
-  m_fitDomainToDataButton->setText("Fit to Data");
+  m_domainMaxSpinBox->setRange(0.001, 1.0);
+  m_domainMaxSpinBox->setSingleStep(0.001);
+  m_domainMaxSpinBox->setDecimals(3);
+  m_domainMaxSpinBox->setKeyboardTracking(false);
 
-  m_domainMinNameLabel = new QLabel("TF Start: ", this);
-  m_domainMaxNameLabel = new QLabel("TF End: ", this);
+  m_fitDomainToDataButton = new QPushButton(tr("Fit to Data"), this);
+
+  m_domainMinNameLabel = new QLabel(tr("TF Start: "), this);
+  m_domainMaxNameLabel = new QLabel(tr("TF End: "), this);
   m_domainMinNameLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
   m_domainMaxNameLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
-  m_rescaleKeys = new QCheckBox("Rescale Keys", this);
-  m_rescaleKeys->setToolTip(
-    "If set, reserve all keys (by rescaling) while changing the domain. Otherwise out of domain keys will be deleted.");
+  m_rescaleKeys = new QCheckBox(tr("Rescale Keys"), this);
+  m_rescaleKeys->setToolTip(tr("If enabled, keys are rescaled when the domain changes. "
+                               "Otherwise, keys outside the new domain are removed."));
   m_rescaleKeys->setChecked(false);
 
-  hboxDomain->addWidget(m_domainMinNameLabel);
-  hboxDomain->addWidget(m_domainMinSpinBox);
-  hboxDomain->addWidget(m_domainMaxNameLabel);
-  hboxDomain->addWidget(m_domainMaxSpinBox);
-  hboxDomain->addWidget(m_fitDomainToDataButton);
-  hboxDomain->addWidget(m_rescaleKeys);
+  domainRow->addWidget(m_domainMinNameLabel);
+  domainRow->addWidget(m_domainMinSpinBox);
+  domainRow->addWidget(m_domainMaxNameLabel);
+  domainRow->addWidget(m_domainMaxSpinBox);
+  domainRow->addWidget(m_fitDomainToDataButton);
+  domainRow->addWidget(m_rescaleKeys);
 
-  auto resetButton = new QPushButton("Reset", this);
+  // preview + reset row
+  auto* bottomRow = new QHBoxLayout();
+  m_transferFunctionTexture = new ZClickableTransferFunctionLabel(m_transferFunction, this);
+  auto* resetButton = new QPushButton(tr("Reset"), this);
   connect(resetButton, &QPushButton::clicked, this, &Z3DTransferFunctionEditor::reset);
 
-  m_transferFunctionTexture = new ZClickableTransferFunctionLabel(m_transferFunction);
+  bottomRow->addWidget(m_transferFunctionTexture, 1);
+  bottomRow->addStretch();
+  bottomRow->addWidget(resetButton);
 
-  // put widgets in layout
-  auto vBox = new QVBoxLayout();
-  vBox->setContentsMargins(0, 0, 0, 0);
-  vBox->setSpacing(1);
-  vBox->addStretch();
-  vBox->addWidget(m_transferFunctionWidget, 1);
-  vBox->addWidget(additionalSpace);
-  vBox->addLayout(hboxHist);
-  vBox->addLayout(hboxData);
-  vBox->addLayout(hboxDomain);
-  vBox->addSpacing(1);
-  vBox->addWidget(resetButton);
-  vBox->addSpacing(2);
-  vBox->addWidget(m_transferFunctionTexture);
+  auto* mainLayout = new QVBoxLayout();
+  mainLayout->setContentsMargins(0, 0, 0, 0);
+  mainLayout->setSpacing(4);
+  mainLayout->addWidget(m_transferFunctionWidget, 1);
+  mainLayout->addLayout(histogramRow);
+  mainLayout->addLayout(dataRow);
+  mainLayout->addLayout(domainRow);
+  mainLayout->addLayout(bottomRow);
 
-  return vBox;
+  return mainLayout;
 }
 
 void Z3DTransferFunctionEditor::createWidgets()
 {
-  QLayout* mappingLayout = createMappingLayout();
-
-  mappingLayout->setContentsMargins(5, 5, 5, 5);
-  setLayout(mappingLayout);
+  QLayout* layout = createMappingLayout();
+  layout->setContentsMargins(5, 5, 5, 5);
+  setLayout(layout);
 }
 
 void Z3DTransferFunctionEditor::createConnections()
@@ -1038,6 +1091,7 @@ void Z3DTransferFunctionEditor::createConnections()
           qOverload<double>(&QDoubleSpinBox::valueChanged),
           this,
           &Z3DTransferFunctionEditor::domainMaxSpinBoxChanged);
+
   connect(m_fitDomainToDataButton, &QPushButton::clicked, this, &Z3DTransferFunctionEditor::fitDomainToData);
   connect(&m_showHistogram,
           &ZBoolParameter::boolChanged,
@@ -1058,14 +1112,12 @@ void Z3DTransferFunctionEditor::updateFromTransferFunction()
 {
   CHECK(m_transferFunction);
 
-  // check whether the image associated with the TransFuncProperty has changed
   auto newImage = m_transferFunction->image();
   if (newImage != m_image) {
     m_image = std::move(newImage);
     imageChanged();
   }
 
-  // update treshold widgets from tf
   m_domainMinSpinBox->setValue(m_transferFunction->get().domainMin());
   m_domainMaxSpinBox->setValue(m_transferFunction->get().domainMax());
 }
@@ -1073,9 +1125,9 @@ void Z3DTransferFunctionEditor::updateFromTransferFunction()
 void Z3DTransferFunctionEditor::fitDomainToData()
 {
   if (m_hasDataMinMax && m_dataMaxValue > m_dataMinValue) {
-    m_transferFunction->get().setDomain(glm::dvec2(m_dataMinValue,
-                                                   std::max(m_dataMaxValue, m_dataMinValue + 0.001)),
-                                        m_rescaleKeys->isChecked());
+    const double minVal = m_dataMinValue;
+    const double maxVal = std::max(m_dataMaxValue, m_dataMinValue + 0.001);
+    m_transferFunction->get().setDomain(glm::dvec2(minVal, maxVal), m_rescaleKeys->isChecked());
   }
 }
 
@@ -1091,7 +1143,7 @@ void Z3DTransferFunctionEditor::domainMinSpinBoxChanged(double min)
   if (m_transferFunction->get().isValidDomainMin(min)) {
     m_transferFunction->get().setDomainMin(min, m_rescaleKeys->isChecked());
   } else {
-    QMessageBox::critical(this, QApplication::applicationName(), "invalid transfer function range start");
+    QMessageBox::critical(this, QApplication::applicationName(), tr("Invalid transfer function range start"));
     m_domainMinSpinBox->setValue(m_transferFunction->get().domainMin());
   }
 }
@@ -1101,7 +1153,7 @@ void Z3DTransferFunctionEditor::domainMaxSpinBoxChanged(double max)
   if (m_transferFunction->get().isValidDomainMax(max)) {
     m_transferFunction->get().setDomainMax(max, m_rescaleKeys->isChecked());
   } else {
-    QMessageBox::critical(this, QApplication::applicationName(), "invalid transfer function range end");
+    QMessageBox::critical(this, QApplication::applicationName(), tr("Invalid transfer function range end"));
     m_domainMaxSpinBox->setValue(m_transferFunction->get().domainMax());
   }
 }
@@ -1122,8 +1174,8 @@ void Z3DTransferFunctionEditor::imageChanged()
   stopHistogramThread();
 
   if (!m_image) {
-    m_dataMinValueLabel->setText("-");
-    m_dataMaxValueLabel->setText("-");
+    m_dataMinValueLabel->setText(QStringLiteral("-"));
+    m_dataMaxValueLabel->setText(QStringLiteral("-"));
     m_transferFunctionWidget->clearHistogram();
     m_hasDataMinMax = false;
     return;
@@ -1133,6 +1185,7 @@ void Z3DTransferFunctionEditor::imageChanged()
   double minRaw = 0.0;
   double maxRaw = 0.0;
   m_image->computeMinMax(minRaw, maxRaw);
+
   m_dataMinValue = normalizeIntensity(minRaw, bits);
   m_dataMaxValue = normalizeIntensity(maxRaw, bits);
   m_hasDataMinMax = std::isfinite(m_dataMinValue) && std::isfinite(m_dataMaxValue);
@@ -1141,14 +1194,17 @@ void Z3DTransferFunctionEditor::imageChanged()
     m_dataMinValueLabel->setText(QString::number(m_dataMinValue));
     m_dataMaxValueLabel->setText(QString::number(m_dataMaxValue));
   } else {
-    m_dataMinValueLabel->setText("-");
-    m_dataMaxValueLabel->setText("-");
+    m_dataMinValueLabel->setText(QStringLiteral("-"));
+    m_dataMaxValueLabel->setText(QStringLiteral("-"));
   }
 
   m_transferFunctionWidget->setHistogramPending(true);
 
   m_histogramThread = std::make_unique<ZImgHistogramThread>(m_image, bits, this);
-  connect(m_histogramThread.get(), &QThread::finished, this, &Z3DTransferFunctionEditor::histogramComputationFinished);
+  connect(m_histogramThread.get(),
+          &QThread::finished,
+          this,
+          &Z3DTransferFunctionEditor::histogramComputationFinished);
   m_histogramThread->start();
 }
 

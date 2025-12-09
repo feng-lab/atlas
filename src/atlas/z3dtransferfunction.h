@@ -39,6 +39,10 @@ public:
 
   void resetToDefault();
 
+  // Capture the current domain and end-point colors as the default
+  // state used by resetToDefault().
+  void captureDefaultFromCurrent();
+
   QString samplerType() const;
 
   glm::uvec3 dimensions() const
@@ -59,6 +63,9 @@ private:
 
 protected:
   glm::uvec3 m_dimensions;
+  glm::dvec2 m_defaultDomain{0.0, 1.0};
+  glm::col4 m_defaultMinColor{0, 0, 0, 0};
+  glm::col4 m_defaultMaxColor{255, 255, 255, 255};
 };
 
 class Z3DTransferFunctionParameter : public ZSingleValueParameter<Z3DTransferFunction>

@@ -21,7 +21,7 @@ void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
+      connect(viewControl, &Z3DFilter::invalidated, &m_engine.compositor(), &Z3DCompositor::invalidateResult);
       connect(viewControl, &Z3DSwcFilter::boundBoxChanged, this, &Z3DSwcView::updateBoundBox);
       connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
       connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
@@ -30,7 +30,7 @@ void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
-      m_engine.networkEvaluator().updateNetwork();
+      m_engine.updatePipeline();
       m_engine.updateBoundBox();
 
       for (auto id : objs) {
@@ -54,7 +54,7 @@ void Z3DSwcView::docSwcAdded(size_t id)
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
+    connect(viewControl, &Z3DFilter::invalidated, &m_engine.compositor(), &Z3DCompositor::invalidateResult);
     connect(viewControl, &Z3DSwcFilter::boundBoxChanged, this, &Z3DSwcView::updateBoundBox);
     connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
     connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
@@ -62,7 +62,7 @@ void Z3DSwcView::docSwcAdded(size_t id)
     connect(viewControl, &Z3DSwcFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
     m_engine.addEventListenerToBack(*viewControl);
 
-    m_engine.networkEvaluator().updateNetwork();
+    m_engine.updatePipeline();
     m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);

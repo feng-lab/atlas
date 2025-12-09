@@ -4,16 +4,13 @@
 #include "z3dcanvaseventlistener.h"
 #include "zflags.h"
 #include "zjson.h"
+#include "zglmutils.h"
 #include <QObject>
 #include <map>
 #include <set>
 #include <vector>
 
 namespace nim {
-
-class Z3DInputPortBase;
-
-class Z3DOutputPortBase;
 
 class Z3DInteractionHandler;
 
@@ -27,11 +24,13 @@ class Z3DFilter
 {
   Q_OBJECT
 
-  friend class Z3DNetworkEvaluator;
+  // The rendering engine drives the filter pipeline and needs access to
+  // internal validity and size propagation hooks.
+  friend class Z3DRenderingEngine;
 
 public:
   // specifies the invalidation status of the filter.
-  // The networkEvaluator use this value to mark filters that has to be executed
+  // The rendering engine uses this value to mark filters that have to be executed.
   enum class State
   {
     Valid = 0,
@@ -77,22 +76,6 @@ public:
 
   virtual void setProgressiveRenderingMode(bool /*v*/) {}
 
-  // returns the port with the given name, or nullptr if such a port does not exist.
-  [[nodiscard]] Z3DInputPortBase* inputPort(const QString& name) const;
-
-  [[nodiscard]] Z3DOutputPortBase* outputPort(const QString& name) const;
-
-  // return all inputports or outputports as vector
-  [[nodiscard]] const std::vector<Z3DInputPortBase*>& inputPorts() const
-  {
-    return m_inputPorts;
-  }
-
-  [[nodiscard]] const std::vector<Z3DOutputPortBase*>& outputPorts() const
-  {
-    return m_outputPorts;
-  }
-
   void onEvent(QEvent* e, int w, int h) override;
 
   [[nodiscard]] const std::vector<ZEventListenerParameter*>& eventListeners() const
@@ -105,9 +88,6 @@ public:
     return m_interactionHandlers;
   }
 
-  // removes all port connections
-  void disconnectAllPorts();
-
   void read(const json::object& json);
 
   void write(json::object& json) const;
@@ -118,13 +98,11 @@ public:
   }
 
   // returns true if filter is ready to do rendering
-  // The default implementation checks, whether the filter has been initialized and
-  // all input ports and output ports are ready. This is not always necessary since not all
-  // input or output ports are needed depending on rendering context.
+  // The default implementation return true
   [[nodiscard]] virtual bool isReady(Z3DEye eye) const;
 
   // Debugging aid: record a short reason before calling invalidate.
-  // Set by parameter-change hooks or port invalidations.
+  // Set by parameter-change hooks or invalidations.
 #ifdef NO // ATLAS_DEBUG_VERSION
   void debugSetInvalidateReason(const QString& reason)
   {
@@ -141,35 +119,27 @@ public:
 #endif
 
 Q_SIGNALS:
-  // Q_EMIT this only if resize starts from current filter.
-  void requestUpstreamSizeChange(Z3DFilter*);
-
   void renderingError(const QString& error) const;
+
+  // Emitted when this filter's outputs become invalid for any reason.
+  void invalidated();
 
 protected:
   // mark that the output of current filter for certain eye is valid.
   // if process function (e.g. prepare data) is not related to stereo view or mono view, you should rewrite this
   // function in subclass and set the invalidstate to VALID to avoid being executed again for
-  // a different eye parameter
-  // this function will be called by networkevaluator after process(eye) is called
+  // a different eye parameter.
+  // This function is called by the engine after process(eye) is called.
   virtual void setValid(Z3DEye eye);
 
   // return true if the output of current filter for certain eye is valid.
-  // will be used by networkevalutor to decide whether is neccessary to call process(eye)
+  // Used by the engine to decide whether it is necessary to call process(eye).
   [[nodiscard]] virtual bool isValid(Z3DEye eye) const;
 
   // this is the place to do rendering related work
-  // the networkevaluator will set its invalidation level to VALID after calling this
+  // the engine will set its invalidation level to VALID after calling this
   // input is current camera (eye), can be left or right in stereo case
   virtual double process(Z3DEye eye) = 0;
-
-  void addPort(Z3DInputPortBase& port);
-
-  void addPort(Z3DOutputPortBase& port);
-
-  void removePort(Z3DInputPortBase& port);
-
-  void removePort(Z3DOutputPortBase& port);
 
   void addParameter(ZParameter& para, State inv = State::AllResultInvalid);
 
@@ -185,19 +155,13 @@ protected:
 
   virtual void exitInteractionMode() {}
 
-  // 1. for each outport, get all expected size from all connected inports, and use the maximum one
-  //    as the new size of the outport
-  // 2. update private port size
-  // 3. Once we get the newsize of all outports, we calculate a expected size for each inport and set it.
-  //    default choice for inport expected size is the maximum new outport size
-  // reimplement this if you want different behavior
-  virtual void updateSize();
+  // NOTE: Atlas' simplified engine pipeline now treats the target render size as a global contract
+  // (driven by the compositor output size). The default implementation ignores targetSize and only
+  // invalidates results; filters that need explicit sizing should override and
+  // use targetSize as the desired output resolution.
+  virtual void updateSize(const glm::uvec2& targetSize);
 
 protected:
-  // used for the detection of duplicate port names.
-  std::map<QString, Z3DInputPortBase*> m_inputPortMap;
-  std::map<QString, Z3DOutputPortBase*> m_outputPortMap;
-
   State m_state;
 
   QString m_name;
@@ -206,16 +170,8 @@ protected:
   std::vector<ZParameter*> m_parameters;
   std::set<QString> m_parameterNames;
 
-  // input the filter expects.
-  std::vector<Z3DInputPortBase*> m_inputPorts;
-  // output the filter generates.
-  std::vector<Z3DOutputPortBase*> m_outputPorts;
-
   std::vector<ZEventListenerParameter*> m_eventListeners;
   std::vector<Z3DInteractionHandler*> m_interactionHandlers;
-
-  // used for cycle prevention during invalidation propagation
-  bool m_invalidationVisited;
 
   // Debug: last invalidate reason string (optional)
 #ifdef ATLAS_DEBUG_VERSION

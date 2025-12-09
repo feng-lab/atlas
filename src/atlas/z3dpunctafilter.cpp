@@ -28,15 +28,6 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_deleteSelectedPunctaEvent("Delete Selected Puncta", true)
   , m_contextMenuEvent("Context Menu", false)
 {
-  //  addPrivateRenderPort(m_monoEyeOutport);
-  //  addPrivateRenderPort(m_leftEyeOutRenderTarget1);
-  //  addPrivateRenderPort(m_rightEyeOutRenderTarget1);
-  //  addPrivateRenderPort(m_monoEyeOutport2);
-  //  addPrivateRenderPort(m_leftEyeOutport2);
-  //  addPrivateRenderPort(m_rightEyeOutport2);
-
-  // m_textureCopyRenderer.setDiscardTransparent(true);
-
   m_singleColorForAllPuncta.setStyle("COLOR");
   connect(&m_singleColorForAllPuncta, &ZVec4Parameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
   connect(&m_colorMapScore, &ZColorMapParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
@@ -131,59 +122,6 @@ double Z3DPunctaFilter::process(Z3DEye)
   if (m_dataIsInvalid) {
     prepareData();
   }
-  //  if (m_randomGlow.get()) {
-  //    m_pointAndRadiusGlow.clear();
-  //    m_specularAndShininessGlow.clear();
-  //    m_pointColorsGlow.clear();
-  //    m_pointAndRadiusNormal.clear();
-  //    m_specularAndShininessNormal.clear();
-  //    m_pointColorsNormal.clear();
-
-  //    for (size_t i=0; i<m_punctaList.size(); ++i) {
-  //      if (ZRandomInstance.randReal<float>() < m_glowPercentage.get()) {
-  //        m_pointAndRadiusGlow.push_back(m_pointAndRadius[i]);
-  //        m_specularAndShininessGlow.push_back(m_specularAndShininess[i]);
-  //        m_pointColorsGlow.push_back(m_pointColors[i]);
-  //      } else {
-  //        m_pointAndRadiusNormal.push_back(m_pointAndRadius[i]);
-  //        m_specularAndShininessNormal.push_back(m_specularAndShininess[i]);
-  //        m_pointColorsNormal.push_back(m_pointColors[i]);
-  //      }
-  //    }
-  //    m_sphereRenderer.setData(&m_pointAndRadiusNormal, &m_specularAndShininessNormal);
-  //    m_sphereRenderer.setDataColors(&m_pointColorsNormal);
-  //    m_glowSphereRenderer.setData(&m_pointAndRadiusGlow, &m_specularAndShininessGlow);
-  //    m_glowSphereRenderer.setDataColors(&m_pointColorsGlow);
-
-  //    glEnable(GL_DEPTH_TEST);
-  //    glEnable(GL_BLEND);
-  //    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
-
-  //    Z3DRenderOutputPort &currentOutport = (eye == Mono) ?
-  //          m_monoEyeOutport : (eye == Left) ? m_leftEyeOutRenderTarget1 : m_rightEyeOutRenderTarget1;
-
-  //    currentOutport.bindTarget();
-  //    currentOutport.clearTarget();
-  //    m_rendererBase.setViewport(currentOutport.size());
-  //    m_rendererBase.render(eye, m_glowSphereRenderer);
-  //    CHECK_GL_ERROR
-  //    currentOutport.releaseTarget();
-
-  //    Z3DRenderOutputPort &currentOutport2 = (eye == Mono) ?
-  //          m_monoEyeOutport2 : (eye == Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
-  //    currentOutport2.bindTarget();
-  //    currentOutport2.clearTarget();
-  //    m_rendererBase.setViewport(currentOutport2.size());
-  //    m_textureGlowRenderer.setColorTexture(currentOutport.colorTexture());
-  //    m_textureGlowRenderer.setDepthTexture(currentOutport.depthTexture());
-  //    m_rendererBase.render(eye, m_textureGlowRenderer);
-  //    CHECK_GL_ERROR
-  //    currentOutport2.releaseTarget();
-
-  //    glBlendFunc(GL_ONE,GL_ZERO);
-  //    glDisable(GL_BLEND);
-  //    glDisable(GL_DEPTH_TEST);
-  //  }
 
   return 1.;
 }
@@ -264,14 +202,6 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
 
 void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
 {
-  //  if (m_randomGlow.get()) {
-  //    Z3DRenderOutputPort &currentOutport2 = (eye == Mono) ?
-  //          m_monoEyeOutport2 : (eye == Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
-  //    m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());
-  //    m_textureCopyRenderer.setDepthTexture(currentOutport2.depthTexture());
-  //    m_rendererBase.render(eye, m_textureCopyRenderer);
-  //    renderBoundBox(eye);
-  //  }
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
     m_rendererBase.renderVulkan(eye, m_sphereRenderer);
   } else {
@@ -283,16 +213,6 @@ void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
 
 void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
 {
-  //  if (m_randomGlow.get()) {
-  //    Z3DRenderOutputPort &currentOutport = (eye == Mono) ?
-  //          m_monoEyeOutport : (eye == Left) ? m_leftEyeOutRenderTarget1 : m_rightEyeOutRenderTarget1;
-  //    Z3DRenderOutputPort &currentOutport2 = (eye == Mono) ?
-  //          m_monoEyeOutport2 : (eye == Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
-  //    m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());
-  //    m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
-  //    m_rendererBase.render(eye, m_textureCopyRenderer);
-  //    renderBoundBox(eye);
-  //  }
   if (m_rendererBase.activeBackend() == RenderBackend::Vulkan) {
     m_rendererBase.renderVulkan(eye, m_sphereRenderer);
   } else {

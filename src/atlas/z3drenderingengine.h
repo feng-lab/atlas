@@ -10,13 +10,21 @@
 #include <QEvent>
 #include <QPointer>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include "zbenchtimer.h"
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 class QOffscreenSurface;
 
+namespace folly {
+class CancellationToken;
+}
+
 namespace nim {
+
+class Z3DFilter;
 
 class Z3DCanvas;
 
@@ -25,8 +33,6 @@ class ZDoc;
 class Z3DObjView;
 
 class Z3DCompositor;
-
-class Z3DNetworkEvaluator;
 
 class Z3DCanvasEventListener;
 
@@ -66,11 +72,6 @@ public:
   Z3DCompositor& compositor()
   {
     return *m_compositor;
-  }
-
-  Z3DNetworkEvaluator& networkEvaluator()
-  {
-    return *m_networkEvaluator;
   }
 
   Z3DGlobalParameters& globalParas()
@@ -251,6 +252,10 @@ public:
     Q_EMIT renderingError("cancelled");
   }
 
+  // Rebuild the filter pipeline used for rendering based on the current
+  // object views and compositor connections.
+  void updatePipeline();
+
   // Scene apply helpers (run on engine thread)
   void beginScene3DApply();
 
@@ -354,6 +359,16 @@ private:
   void handleRenderBackendChanged();
   void applyBackendSwitch();
 
+  // Execute one pass over the current filter pipeline. If cancellationToken
+  // is provided, this will check for cancellation between filters.
+  double processFrame(bool stereo,
+                      bool progressiveRendering,
+                      const folly::CancellationToken* cancellationToken = nullptr);
+
+  // Update sizes for all filters in the pipeline, walking from sinks back
+  // towards sources, using the engine's output size as the global target.
+  void updateAllFilterSizes();
+
 private:
   struct ScratchPoolDeleter
   {
@@ -381,8 +396,43 @@ private:
   std::unique_ptr<Z3DScratchResourcePool, ScratchPoolDeleter> m_scratchPool;
   std::unique_ptr<Z3DCompositor> m_compositor;
   std::vector<std::unique_ptr<Z3DObjView>> m_3dObjViews;
-  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
   // Vulkan compositor bridge deferred
+
+  // Linearized filter execution order: all object filters, then compositor.
+  std::vector<Z3DFilter*> m_pipeline;
+
+  // Global render target size for the 3D pipeline (canvas/screenshot size).
+  glm::uvec2 m_outputSize{32u, 32u};
+
+  struct FilterWrapper
+  {
+    virtual ~FilterWrapper() = default;
+    virtual void beforeFilterProcess(const Z3DFilter*) {}
+    virtual void afterFilterProcess(const Z3DFilter*) {}
+    virtual void beforeNetworkProcess() {}
+    virtual void afterNetworkProcess() {}
+  };
+
+  struct CheckOpenGLStateFilterWrapper : FilterWrapper
+  {
+    void afterFilterProcess(const Z3DFilter* p) override;
+    void beforeNetworkProcess() override;
+
+  private:
+    void checkState(const Z3DFilter* p);
+    static void warn(const Z3DFilter* p, const char* message);
+  };
+
+  struct ProfileFilterWrapper : FilterWrapper
+  {
+    ZBenchTimer m_benchTimer{"Network"};
+
+    void afterFilterProcess(const Z3DFilter* p) override;
+    void beforeNetworkProcess() override;
+    void afterNetworkProcess() override;
+  };
+
+  std::vector<std::unique_ptr<FilterWrapper>> m_filterWrappers;
 
   ZBBox<glm::dvec3> m_boundBox;
   size_t m_numObjsBefore;

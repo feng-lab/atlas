@@ -2,7 +2,6 @@
 
 #include "z3dboundedfilter.h"
 #include "z3dpickingmanager.h"
-#include "z3dport.h"
 #include "z3drendererbase.h"
 
 namespace nim {
@@ -70,8 +69,6 @@ protected:
   virtual void registerPickingObjects() {}
 
 protected:
-  Z3DFilterOutputPort<Z3DGeometryFilter> m_outPort;
-
   ZBoolParameter m_stayOnTop;
 
   Z3DPickingManager* m_pickingManager = nullptr;

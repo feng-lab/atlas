@@ -2,7 +2,6 @@
 
 #include "zlog.h"
 #include "zsysteminfo.h"
-#include "z3dport.h"
 #include "z3dinteractionhandler.h"
 #include "zeventlistenerparameter.h"
 #include "zparameter.h"
@@ -12,7 +11,6 @@ namespace nim {
 Z3DFilter::Z3DFilter(QObject* parent)
   : QObject(parent)
   , m_state(State::AllResultInvalid)
-  , m_invalidationVisited(false)
 {}
 
 ZParameter* Z3DFilter::parameter(const QString& name) const
@@ -35,38 +33,7 @@ void Z3DFilter::invalidate(State inv)
   // VLOG(1) << className() << " 2";
 
   setFlag(m_state, inv);
-
-  if (!m_invalidationVisited) {
-    m_invalidationVisited = true;
-
-    for (auto port : m_outputPorts) {
-      port->invalidate();
-    }
-
-    m_invalidationVisited = false;
-  }
-}
-
-Z3DInputPortBase* Z3DFilter::inputPort(const QString& name) const
-{
-  for (auto port : m_inputPorts) {
-    if (port->name() == name) {
-      return port;
-    }
-  }
-
-  return nullptr;
-}
-
-Z3DOutputPortBase* Z3DFilter::outputPort(const QString& name) const
-{
-  for (auto port : m_outputPorts) {
-    if (port->name() == name) {
-      return port;
-    }
-  }
-
-  return nullptr;
+  Q_EMIT invalidated();
 }
 
 void Z3DFilter::onEvent(QEvent* e, int w, int h)
@@ -82,17 +49,6 @@ void Z3DFilter::onEvent(QEvent* e, int w, int h)
   // propagate to event listeners
   for (size_t i = 0; (i < m_eventListeners.size()) && !e->isAccepted(); ++i) {
     m_eventListeners[i]->sendEvent(e, w, h);
-  }
-}
-
-void Z3DFilter::disconnectAllPorts()
-{
-  for (auto port : m_inputPorts) {
-    port->disconnectAll();
-  }
-
-  for (auto port : m_outputPorts) {
-    port->disconnectAll();
   }
 }
 
@@ -135,53 +91,8 @@ bool Z3DFilter::isValid(Z3DEye eye) const
 
 bool Z3DFilter::isReady(Z3DEye) const
 {
-  bool isReady = std::ranges::all_of(m_inputPorts, [](auto port) {
-    return port->isReady();
-  });
-  if (isReady) {
-    isReady = std::ranges::all_of(m_outputPorts, [](auto port) {
-      return port->isReady();
-    });
-  }
-  return isReady;
-}
-
-void Z3DFilter::addPort(Z3DInputPortBase& port)
-{
-  if (m_inputPortMap.count(port.name())) {
-    LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
-  } else {
-    m_inputPortMap.emplace(port.name(), &port);
-    m_inputPorts.push_back(&port);
-  }
-}
-
-void Z3DFilter::addPort(Z3DOutputPortBase& port)
-{
-  if (m_outputPortMap.count(port.name())) {
-    LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
-  } else {
-    m_outputPortMap.emplace(port.name(), &port);
-    m_outputPorts.push_back(&port);
-  }
-}
-
-void Z3DFilter::removePort(Z3DInputPortBase& port)
-{
-  std::erase(m_inputPorts, &port);
-
-  if (m_inputPortMap.erase(port.name()) == 0) {
-    LOG(FATAL) << className() << " port " << port.name() << " was not found!";
-  }
-}
-
-void Z3DFilter::removePort(Z3DOutputPortBase& port)
-{
-  std::erase(m_outputPorts, &port);
-
-  if (m_outputPortMap.erase(port.name()) == 0) {
-    LOG(FATAL) << className() << " port " << port.name() << " was not found!";
-  }
+  // Readiness is driven by per-filter overrides (visibility, data presence)
+  return true;
 }
 
 void Z3DFilter::addParameter(ZParameter& para, State inv)
@@ -231,35 +142,8 @@ void Z3DFilter::addInteractionHandler(Z3DInteractionHandler& handler)
   m_interactionHandlers.push_back(&handler);
 }
 
-// Note: GL helper renderScreenQuad has been removed from filter base.
-
-void Z3DFilter::updateSize()
+void Z3DFilter::updateSize(const glm::uvec2& /*targetSize*/)
 {
-  // 1. update outport size
-  glm::uvec2 maxOutportSize(0, 0);
-  for (auto port : m_outputPorts) {
-    // VLOG(1) << className() << " " << port->expectedSize() << " " << port->size() << " " << port->name();
-    glm::uvec2 outportSize = port->expectedSize();
-    if (outportSize.x > 0 && outportSize != port->size()) {
-      port->resize(outportSize);
-      // VLOG(1) << className() << " " << outportSize;
-    }
-
-    maxOutportSize = glm::max(maxOutportSize, port->size());
-  }
-
-  // 2. update private ports
-  //  for (auto port : m_privateRenderPorts) {
-  //    port->resize(maxOutportSize);
-  //  }
-  //  for (auto target : m_privateRenderTargets) {
-  //    target->resize(maxOutportSize);
-  //  }
-
-  // 2. update inport expected size
-  for (auto port : m_inputPorts) {
-    port->setExpectedSize(maxOutportSize);
-  }
   // Provide a reason so downstream logs can attribute this invalidation.
 #ifdef NO // ATLAS_DEBUG_VERSION
   debugSetInvalidateReason("updateSize");

@@ -35,6 +35,19 @@ public:
 
   void savePickingBufferToImage(const QString& filename);
 
+  // Configure the current geometry and volume filters that participate in
+  // compositing. The rendering engine owns the linear pipeline and keeps
+  // these lists in sync when the scene changes.
+  void setGeometryFilters(const std::vector<Z3DGeometryFilter*>& filters)
+  {
+    m_geometryFilters = filters;
+  }
+
+  void setVolumeFilters(const std::vector<Z3DImgFilter*>& filters)
+  {
+    m_volumeFilters = filters;
+  }
+
   // Debug helpers: save the current output attachments directly to disk.
   // For Vulkan, downloads from the current ready lease attachments.
   // For OpenGL, uses the GL texture save helpers.
@@ -42,10 +55,6 @@ public:
   void saveOutputDepthToImage(const QString& filename, Z3DEye eye = MonoEye);
 
   void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
-
-  void setOutputSize(const glm::uvec2& size);
-
-  glm::uvec2 outputSize() const;
 
   Z3DRenderTarget* monoReadyTarget() const
   {
@@ -91,7 +100,7 @@ Q_SIGNALS:
 protected:
   double process(Z3DEye eye) override;
 
-  void updateSize() override;
+  void updateSize(const glm::uvec2& targetSize) override;
 
 private:
   // Stage 3 (Vulkan): pass-graph style driver for background + geometry
@@ -235,8 +244,9 @@ private:
 
   // ZBoolParameter m_renderGeometries;
 
-  Z3DFilterInputPort<Z3DGeometryFilter> m_gPPort;
-  Z3DFilterInputPort<Z3DImgFilter> m_vPPort;
+  // Current geometry and volume filters in the engine pipeline.
+  std::vector<Z3DGeometryFilter*> m_geometryFilters;
+  std::vector<Z3DImgFilter*> m_volumeFilters;
 
   Z3DScratchResourcePool::RenderTargetLease m_outRenderTarget1;
   Z3DScratchResourcePool::RenderTargetLease m_leftEyeOutRenderTarget1;

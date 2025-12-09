@@ -19,7 +19,7 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("VolumeFilter")->connect(m_engine.compositor().inputPort("VolumeFilters"));
+      connect(viewControl, &Z3DFilter::invalidated, &m_engine.compositor(), &Z3DCompositor::invalidateResult);
       connect(viewControl, &Z3DImgFilter::boundBoxChanged, this, &Z3DImgView::updateBoundBox);
       connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
       connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
@@ -28,7 +28,7 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
-      m_engine.networkEvaluator().updateNetwork();
+      m_engine.updatePipeline();
       m_engine.updateBoundBox();
 
       for (auto id : objs) {
@@ -52,7 +52,7 @@ void Z3DImgView::docImgAdded(size_t id)
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("VolumeFilter")->connect(m_engine.compositor().inputPort("VolumeFilters"));
+    connect(viewControl, &Z3DFilter::invalidated, &m_engine.compositor(), &Z3DCompositor::invalidateResult);
     connect(viewControl, &Z3DImgFilter::boundBoxChanged, this, &Z3DImgView::updateBoundBox);
     connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
     connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
@@ -60,7 +60,7 @@ void Z3DImgView::docImgAdded(size_t id)
     connect(viewControl, &Z3DImgFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
     m_engine.addEventListenerToBack(*viewControl);
 
-    m_engine.networkEvaluator().updateNetwork();
+    m_engine.updatePipeline();
     m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);
