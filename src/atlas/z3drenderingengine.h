@@ -5,12 +5,12 @@
 #include "z3drenderglobalstate.h"
 #include "zviewsettinginterface.h"
 #include "zbbox.h"
+#include "zbenchtimer.h"
 #include <QDir>
 #include <QObject>
 #include <QEvent>
 #include <QPointer>
 #include <boost/unordered/unordered_flat_set.hpp>
-#include "zbenchtimer.h"
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
