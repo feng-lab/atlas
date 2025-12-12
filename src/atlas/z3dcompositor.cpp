@@ -3574,11 +3574,14 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
 
   waRT.bind();
   glDrawBuffers(2, g_drawBuffers);
-  glClearColor(0, 0, 0, 0);
-  glClear(GL_COLOR_BUFFER_BIT);
+  float clearColorZero[4] = {0.f, 0.f, 0.f, 0.f};
+  glClearBufferfv(GL_COLOR, 0, clearColorZero);
+  glClearBufferfv(GL_COLOR, 1, clearColorZero);
 
-  glBlendFunc(GL_ONE, GL_ONE);
   glEnable(GL_BLEND);
+  glBlendEquation(GL_FUNC_ADD);
+  glBlendFunci(0, GL_ONE, GL_ONE);
+  glBlendFunci(1, GL_ONE, GL_ONE);
 
   for (auto filter : filters) {
     filter->setViewport(waRT.size());

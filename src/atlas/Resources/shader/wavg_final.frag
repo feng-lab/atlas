@@ -43,19 +43,21 @@ void main(void)
 	vec2 nandd = texture(ColorTex1, gl_FragCoord.xy * screen_dim_RCP).xy;
 	#endif
 
-	float n = nandd.x;
+		float n = nandd.x;
 
-	if (n == 0.0) {
-		discard;
+		if (n <= 0.0) {
+			discard;
+		}
+
+	        float sumAlpha = SumColor.a;
+	        float invSumAlpha = 1.0 / max(sumAlpha, 1e-6);
+	        vec3 AvgColor = SumColor.rgb * invSumAlpha;
+	        float AvgAlpha = sumAlpha / n;
+	        AvgAlpha = clamp(AvgAlpha, 0.0, 1.0);
+
+		float oneMinusAlpha = clamp(1.0 - AvgAlpha, 0.0, 1.0);
+		float T = pow(oneMinusAlpha, n);
+		FragData0.a = 1.0 - T;
+		FragData0.rgb = AvgColor * FragData0.a;
+		gl_FragDepth = nandd.y / n;
 	}
-
-        float sumAlpha = SumColor.a;
-        float invSumAlpha = 1.0 / max(sumAlpha, 1e-6);
-        vec3 AvgColor = SumColor.rgb * invSumAlpha;
-        float AvgAlpha = sumAlpha / n;
-
-	float T = pow(1.0-AvgAlpha, n);
-	FragData0.a = 1 - T;
-	FragData0.rgb = AvgColor * FragData0.a;
-	gl_FragDepth = nandd.y / n;
-}
