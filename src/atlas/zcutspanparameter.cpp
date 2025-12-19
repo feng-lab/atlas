@@ -56,21 +56,21 @@ ZCutSpanParameter::ZCutSpanParameter(const QString& name, glm::vec2 value, float
   connect(&m_mode, &ZStringIntOptionParameter::valueChanged, this, [this]() {
     updateUiEnabling();
     // Range might already be valid; re-apply binding to the current span
-    this->set(this->get());
+    reapplyBinding();
   });
   connect(&m_pinLower, &ZBoolParameter::valueChanged, this, [this]() {
     if (mode() == Mode::TrackEdges) {
-      this->set(this->get());
+      reapplyBinding();
     }
   });
   connect(&m_pinUpper, &ZBoolParameter::valueChanged, this, [this]() {
     if (mode() == Mode::TrackEdges) {
-      this->set(this->get());
+      reapplyBinding();
     }
   });
   connect(&m_normalized, &ZDoubleSpanParameter::valueChanged, this, [this]() {
     if (mode() == Mode::Normalized) {
-      this->set(this->get());
+      reapplyBinding();
     }
   });
 
@@ -124,7 +124,7 @@ void ZCutSpanParameter::applyBounds(double min, double max)
 {
   // Adjust range, then recompute absolute based on binding
   ZFloatSpanParameter::setRange(static_cast<float>(min), static_cast<float>(max));
-  this->set(this->get());
+  reapplyBinding();
 }
 
 json::value ZCutSpanParameter::jsonValue() const
@@ -155,8 +155,8 @@ void ZCutSpanParameter::readValue(const json::value& jsonValue)
     this->set(json::value_to<glm::vec2>(obj.at("Range FloatSpan")));
   }
 
-  // Setting the value triggers makeValid() to reconcile according to binding
-  this->set(this->get());
+  // Reconcile according to binding after nested parameters are applied
+  reapplyBinding();
 }
 
 void ZCutSpanParameter::interpolate(const ZParameter& prev, double progress, ZParameter& dest)
@@ -231,7 +231,14 @@ void ZCutSpanParameter::changeRange()
 {
   // Call base to emit rangeChanged first
   ZFloatSpanParameter::changeRange();
-  this->set(this->get());
+  reapplyBinding();
+}
+
+void ZCutSpanParameter::reapplyBinding()
+{
+  glm::vec2 value = this->get();
+  makeValid(value);
+  this->set(value);
 }
 
 QWidget* ZCutSpanParameter::actualCreateWidget(QWidget* parent)

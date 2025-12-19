@@ -84,6 +84,7 @@ public:
   }
 
 protected:
+  void reapplyBinding();
   // Reconcile absolute span on every set based on mode and current bounds.
   // Use makeValid to reconcile bindings
   void makeValid(glm::vec2& value) const override;
