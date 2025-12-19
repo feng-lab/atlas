@@ -445,6 +445,13 @@ class Supervisor:
                 logger.info("[Supervisor] %s", "Ledger (tools invoked this turn):\n" + "\n".join(flat_lines))
         except Exception:
             pass
+        # Expose the raw tool ledger for the chat layer to make informed
+        # post-turn verification/guard decisions (e.g., only warn about
+        # "no changes" when a write was actually attempted).
+        try:
+            self._last_ledger = list(full_ledger)
+        except Exception:
+            self._last_ledger = []
         return messages
 
     # Expose TODO ledger for the ChatTeam to persist across turns

@@ -91,6 +91,10 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                         ],
                     },
                     "degrees": {"type": "number", "default": 90.0},
+                    "base_value": {
+                        "type": "object",
+                        "description": "Optional typed camera value to apply the operator to (defaults to current engine camera).",
+                    },
                 },
                 "required": ["op", "degrees"],
             },

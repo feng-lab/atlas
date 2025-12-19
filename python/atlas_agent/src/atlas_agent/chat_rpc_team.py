@@ -1,5 +1,6 @@
+import hashlib
+import json
 import logging
-import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -31,8 +32,8 @@ class ChatTeam:
         self._context: Optional[str] = None
         # Maintain full-session chat history (list of (role, content)) for grounding future turns
         self._history: list[tuple[str, str]] = []
-        # Optional: keep last timeline snapshot to produce a diff fact table
-        self._last_snapshot: dict | None = None
+        # Optional: keep a lightweight last facts projection for post-turn diffs
+        self._last_snapshot_flat: dict | None = None
         # Persist a session TODO ledger across turns
         self._todo_ledger: list[dict] = []
         # Configure a shared agents logger if not already configured
@@ -78,77 +79,253 @@ class ChatTeam:
                 if m.role == "assistant" and m.content:
                     text = m.content
                     break
-        # Post-execution fact guard: append a fact table snapshot (and diff) to the final message
+        # Post-execution fact guard: append a facts diff, but never overwrite the agent's response.
+        # This avoids masking CLARIFY/help/explain answers while still preventing false "success" claims.
+        def _is_clarify(s: str) -> bool:
+            return (s or "").lstrip().lower().startswith("clarify:")
+
+        def _json_digest(value: object) -> str:
+            try:
+                payload = json.dumps(
+                    value,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+            except Exception:
+                try:
+                    payload = str(value)
+                except Exception:
+                    payload = f"<{type(value).__name__}>"
+            return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+        def _project_facts(facts: dict) -> dict:
+            # Keep only stable, comparable signals (no full value dumps):
+            # - objects (id/type/name/path/visible)
+            # - camera key times
+            # - per-param key series (time + value digest)
+            # - scene param value digests
+            proj: dict[str, object] = {}
+            # Objects
+            objs_by_id: dict[str, dict] = {}
+            for o in (facts.get("objects_list") or []) if isinstance(facts, dict) else []:
+                try:
+                    oid = str(o.get("id"))
+                    objs_by_id[oid] = {
+                        "type": str(o.get("type", "")),
+                        "name": str(o.get("name", "")),
+                        "path": str(o.get("path", "")),
+                        "visible": bool(o.get("visible", False)),
+                    }
+                except Exception:
+                    continue
+            proj["objects_by_id"] = objs_by_id
+            # Camera key times
+            cam_times = []
+            try:
+                cam_times = (facts.get("keys", {}).get("camera") or [])
+            except Exception:
+                cam_times = []
+            proj["camera_key_times"] = tuple(float(t) for t in cam_times)
+            # Timeline keys (objects/groups only; camera values omitted)
+            series: dict[str, tuple] = {}
+            try:
+                obj_keys = (facts.get("keys", {}).get("objects") or {})
+                if isinstance(obj_keys, dict):
+                    for oid, mp in obj_keys.items():
+                        if not isinstance(mp, dict):
+                            continue
+                        for jk, entry in mp.items():
+                            # entry is either [times...] or [{time,value}...]
+                            ser = []
+                            if isinstance(entry, list) and entry and isinstance(entry[0], dict):
+                                for it in entry:
+                                    try:
+                                        t = float(it.get("time", 0.0))
+                                        v = it.get("value", None)
+                                        ser.append((t, _json_digest(v)))
+                                    except Exception:
+                                        continue
+                            else:
+                                # times-only fallback
+                                for t in entry or []:
+                                    try:
+                                        ser.append((float(t), ""))
+                                    except Exception:
+                                        continue
+                            ser.sort(key=lambda x: x[0])
+                            series[f"{oid}:{jk}"] = tuple(ser)
+            except Exception:
+                pass
+            proj["key_series"] = series
+            # Scene values (digests only)
+            sv_digests: dict[str, str] = {}
+            try:
+                sv = facts.get("scene_values") or {}
+                if isinstance(sv, dict):
+                    for sid, mp in sv.items():
+                        if not isinstance(mp, dict):
+                            continue
+                        for jk, v in mp.items():
+                            sv_digests[f"{sid}:{jk}"] = _json_digest(v)
+            except Exception:
+                pass
+            proj["scene_value_digests"] = sv_digests
+            return proj
+
+        def _diff_facts(prev: dict | None, cur: dict) -> list[str]:
+            if not prev:
+                return []
+            lines: list[str] = []
+            prev_objs = (prev.get("objects_by_id") or {}) if isinstance(prev, dict) else {}
+            cur_objs = (cur.get("objects_by_id") or {}) if isinstance(cur, dict) else {}
+            if isinstance(prev_objs, dict) and isinstance(cur_objs, dict):
+                prev_ids = set(prev_objs.keys())
+                cur_ids = set(cur_objs.keys())
+                added = sorted(cur_ids - prev_ids)
+                removed = sorted(prev_ids - cur_ids)
+                changed = sorted(
+                    i for i in (prev_ids & cur_ids) if prev_objs.get(i) != cur_objs.get(i)
+                )
+                for oid in added:
+                    o = cur_objs.get(oid) or {}
+                    lines.append(
+                        f"- object_added id={oid} type={o.get('type','')} name={o.get('name','')}"
+                    )
+                for oid in removed:
+                    o = prev_objs.get(oid) or {}
+                    lines.append(
+                        f"- object_removed id={oid} type={o.get('type','')} name={o.get('name','')}"
+                    )
+                for oid in changed:
+                    before = prev_objs.get(oid) or {}
+                    after = cur_objs.get(oid) or {}
+                    lines.append(
+                        " - ".join(
+                            [
+                                f"- object_updated id={oid}",
+                                f"visible {before.get('visible')}→{after.get('visible')}",
+                                f"path {before.get('path','')}→{after.get('path','')}",
+                            ]
+                        )
+                    )
+            # Camera key times
+            prev_cam = tuple(prev.get("camera_key_times") or ()) if isinstance(prev, dict) else ()
+            cur_cam = tuple(cur.get("camera_key_times") or ()) if isinstance(cur, dict) else ()
+            if prev_cam != cur_cam:
+                lines.append(f"- camera_keys times={list(cur_cam)}")
+            # Timeline key series
+            prev_series = (prev.get("key_series") or {}) if isinstance(prev, dict) else {}
+            cur_series = (cur.get("key_series") or {}) if isinstance(cur, dict) else {}
+            if isinstance(prev_series, dict) and isinstance(cur_series, dict):
+                keys = sorted(set(prev_series.keys()) | set(cur_series.keys()))
+                for k in keys:
+                    a = prev_series.get(k)
+                    b = cur_series.get(k)
+                    if a == b:
+                        continue
+                    if a is None:
+                        times = [t for (t, _d) in (b or [])]
+                        lines.append(f"- keys_added {k} times={times}")
+                        continue
+                    if b is None:
+                        lines.append(f"- keys_removed {k}")
+                        continue
+                    prev_times = [t for (t, _d) in (a or [])]
+                    cur_times = [t for (t, _d) in (b or [])]
+                    if prev_times != cur_times:
+                        lines.append(f"- keys_times_changed {k} times={cur_times}")
+                    else:
+                        lines.append(f"- keys_values_changed {k} times={cur_times}")
+            # Scene values
+            prev_sv = (prev.get("scene_value_digests") or {}) if isinstance(prev, dict) else {}
+            cur_sv = (cur.get("scene_value_digests") or {}) if isinstance(cur, dict) else {}
+            if isinstance(prev_sv, dict) and isinstance(cur_sv, dict):
+                sv_keys = sorted(set(prev_sv.keys()) | set(cur_sv.keys()))
+                for k in sv_keys:
+                    if prev_sv.get(k) != cur_sv.get(k):
+                        lines.append(f"- scene_value_changed {k} (digest)")
+            return lines
+
         try:
-            snap = self.scene.scene_facts()
+            snap = self.scene.scene_facts(
+                include_values=True, include_scene_values=True
+            )
         except Exception:
             snap = None
-        if snap:
-            # Compute a diff vs. last snapshot, including lightweight value digests so value changes at same times are visible.
-            def _flatten(s):
-                flat = []
-                keys = (s.get("keys") or {})
-                # Per-object param times and value digests
-                for oid, mp in keys.get("objects", {}).items():
-                    for jk, times in mp.items():
-                        flat.append((f"key:{oid}:{jk}", tuple(times)))
-                        # Build a compact digest of values at those times (if available)
-                        try:
-                            lr = self.scene.list_keys(id=int(oid), json_key=jk, include_values=True)
-                            dig_items = []
-                            for k in getattr(lr, "keys", []):
-                                try:
-                                    t = float(getattr(k, "time", 0.0))
-                                    vj = getattr(k, "value_json", "")
-                                    # Truncate to keep logs compact
-                                    LOG_VALUE_DIGEST_PREVIEW_CHARS = int(
-                                        os.environ.get(
-                                            "ATLAS_AGENT_VALUE_DIGEST_PREVIEW_CHARS",
-                                            "96",
-                                        )
-                                    )
-                                    if (
-                                        isinstance(vj, str)
-                                        and LOG_VALUE_DIGEST_PREVIEW_CHARS >= 0
-                                        and len(vj) > LOG_VALUE_DIGEST_PREVIEW_CHARS
-                                    ):
-                                        vj = vj[:LOG_VALUE_DIGEST_PREVIEW_CHARS] + "…"
-                                    dig_items.append(f"{t:.6g}:{vj}")
-                                except Exception:
-                                    continue
-                            if dig_items:
-                                flat.append((f"keyval:{oid}:{jk}", tuple(dig_items)))
-                        except Exception:
-                            pass
-                # Camera times
-                if keys.get("camera"):
-                    flat.append(("key:camera", tuple(keys.get("camera") or [])))
-                # Include objects list presence (ids+paths) for load operations
-                objs = s.get("objects_list") or []
-                ids_paths = tuple(sorted([f"{o.get('id')}:{o.get('path')}" for o in objs]))
-                flat.append(("objects_list", ids_paths))
-                return dict(flat)
-            prev = _flatten(self._last_snapshot) if self._last_snapshot else {}
-            cur = _flatten(snap)
-            changes = []
-            for k, v in cur.items():
-                if prev.get(k) != v:
-                    changes.append((k, list(v)))
-            if changes:
-                facts_lines = ["Facts (updated this turn):"]
-                for k, times in changes:
-                    facts_lines.append(f"- {k} times={times}")
-                facts_text = "\n".join(facts_lines)
-                text = (text + "\n\n" + facts_text) if text else facts_text
-            else:
-                # Override any success claims when no changes were applied
-                facts_text = "Facts: no new keys compared to last snapshot."
-                guidance = (
-                    "No changes were applied this turn. If you intended to modify the scene, "
-                    "please specify the target id, parameter name, time, and value."
-                )
-                text = facts_text if not text else facts_text + "\n" + guidance
-            self._last_snapshot = snap
+
+        if snap and isinstance(snap, dict):
+            prev = self._last_snapshot_flat
+            cur = _project_facts(snap)
+            diffs = _diff_facts(prev, cur)
+            self._last_snapshot_flat = cur
+
+            if prev is not None and not _is_clarify(text):
+                if diffs:
+                    facts_text = "\n".join(
+                        [
+                            "Facts (changed since last turn):",
+                            *diffs,
+                            "Note: timeline/scene values are compared via JSON digests; use scene_get_values or animation_list_keys(include_values=true) for full values.",
+                        ]
+                    )
+                    text = (text + "\n\n" + facts_text) if text else facts_text
+                else:
+                    # Only warn about "no changes" when the system actually attempted a write.
+                    write_tools = {
+                        "scene_apply",
+                        "scene_ensure_loaded",
+                        "scene_load_files",
+                        "scene_smart_load",
+                        "scene_set_visibility",
+                        "scene_make_alias",
+                        "scene_cut_set_box",
+                        "scene_cut_clear",
+                        "animation_ensure_animation",
+                        "animation_set_duration",
+                        "animation_set_key_param",
+                        "animation_replace_key_param",
+                        "animation_remove_key_param_at_time",
+                        "animation_replace_key_param_at_times",
+                        "animation_remove_key",
+                        "animation_replace_key_camera",
+                        "animation_clear_keys",
+                        "animation_batch",
+                    }
+                    ledger = getattr(self.supervisor, "_last_ledger", None)
+                    write_entries = [
+                        e
+                        for e in (ledger or [])
+                        if isinstance(e, dict) and e.get("tool") in write_tools
+                    ]
+                    write_attempted = bool(write_entries)
+                    write_failed = any(
+                        isinstance(e.get("result"), dict)
+                        and not bool(e["result"].get("ok", True))
+                        for e in write_entries
+                    )
+                    write_all_skipped = bool(write_entries) and all(
+                        isinstance(e.get("result"), dict) and ("skipped" in e["result"])
+                        for e in write_entries
+                    )
+                    if (
+                        write_attempted
+                        and not write_all_skipped
+                    ):
+                        suffix = (
+                            " Some write calls failed; check the tool errors."
+                            if write_failed
+                            else ""
+                        )
+                        note = (
+                            "Facts: no scene/timeline changes detected this turn."
+                            + suffix
+                        )
+                        guidance = (
+                            "If you intended to modify the scene, specify target id, parameter name/json_key, time (for animation), and value."
+                        )
+                        extra = note + "\n" + guidance
+                        text = (text + "\n\n" + extra) if text else extra
 
         # Update history (append the exact content returned to the user)
         if user_text:

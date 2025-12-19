@@ -36,8 +36,10 @@ HANDLED_TOOLS = (
     "scene_ensure_loaded",
     "scene_smart_load",
     "scene_list_objects",
+    "scene_find_objects",
     "scene_bbox",
     "scene_list_params",
+    "scene_param_info",
     "scene_validate_param_value",
     "scene_set_visibility",
     "scene_make_alias",
@@ -160,8 +162,16 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "scene_capabilities",
-            "description": "Return the full capabilities.json (parameter catalogs per object type and groups).",
-            "parameters": {"type": "object", "properties": {}},
+            "description": "Return the full capabilities.json (parameter catalogs per object type and groups) from the discovered schema directory.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "schema_dir": {
+                        "type": ["string", "null"],
+                        "description": "Optional schema directory override (defaults to discovery via atlas_dir/env).",
+                    }
+                },
+            },
         },
     },
     {
@@ -344,8 +354,51 @@ TOOL_SPECS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "scene_list_objects",
-            "description": "List all objects in the current scene (id, type, name, visible).",
+            "description": "List all objects in the current scene (id, type, name, path, visible).",
             "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "scene_find_objects",
+            "description": "Find objects by substring filters over (type, name, path) with optional paging. If limit is omitted, returns all matches (no silent truncation).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Case-insensitive substring match over type/name/path/id.",
+                    },
+                    "type_contains": {
+                        "type": "string",
+                        "description": "Case-insensitive substring match over object type.",
+                    },
+                    "name_contains": {
+                        "type": "string",
+                        "description": "Case-insensitive substring match over object name.",
+                    },
+                    "path_contains": {
+                        "type": "string",
+                        "description": "Case-insensitive substring match over object path.",
+                    },
+                    "visible": {
+                        "type": "boolean",
+                        "description": "Optional visibility filter; when omitted, includes both visible and hidden objects.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Optional page size. When omitted, returns all results.",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0,
+                        "description": "Paging offset (0-based).",
+                    },
+                },
+            },
         },
     },
     {
@@ -374,14 +427,6 @@ TOOL_SPECS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "scene_capabilities",
-            "description": "List parameter capabilities for background/axis/global and object types.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "scene_list_params",
             "description": "List parameters by id (includes value_schema). Id map: 0=camera, 1=background, 2=axis, 3=global, ≥4=objects.",
             "parameters": {
@@ -391,6 +436,35 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                         "type": "integer",
                         "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
                     }
+                },
+                "required": ["id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "scene_param_info",
+            "description": "Get one parameter's metadata by id (0=camera, 1=background, 2=axis, 3=global, ≥4=objects). Resolves json_key from either json_key or display name.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "Target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Either a canonical json_key or a display name (case-insensitive).",
+                    },
+                    "json_key": {
+                        "type": "string",
+                        "description": "Canonical json_key (preferred when known).",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Display name to resolve to json_key (case-insensitive).",
+                    },
                 },
                 "required": ["id"],
             },
@@ -411,8 +485,8 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "json_key": {"type": "string"},
                     "value": {
                         "description": "Candidate JSON value (native types)",
-                        "type": ["string", "number", "boolean", "null", "array"],
-                        "items": {"type": ["string", "number", "boolean", "null"]},
+                        "type": ["object", "array", "number", "string", "boolean", "null"],
+                        "items": {"type": ["object", "array", "number", "string", "boolean", "null"]},
                     },
                 },
                 "required": ["id", "json_key", "value"],
@@ -643,35 +717,144 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                         except Exception:
                             pass
         loaded = 0
-        if resolved:
-            resp = client.load_files(resolved)
-            loaded = len(resp.objects)
-        return json.dumps(
-            {"loaded_objects": loaded, "resolved": resolved, "tried": tried}
-        )
+        try:
+            if resolved:
+                resp = client.load_files(resolved)
+                loaded = len(resp.objects)
+            return json.dumps(
+                {
+                    "ok": True,
+                    "loaded_objects": loaded,
+                    "resolved": resolved,
+                    "tried": tried,
+                }
+            )
+        except Exception as e:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": str(e),
+                    "resolved": resolved,
+                    "tried": tried,
+                }
+            )
 
     if name == "scene_list_objects":
-        resp = client.list_objects()
-        objs = [
-            {"id": o.id, "type": o.type, "name": o.name, "visible": o.visible}
-            for o in resp.objects
-        ]
-        return json.dumps({"objects": objs})
+        try:
+            resp = client.list_objects()
+            objs = [
+                {"id": o.id, "type": o.type, "name": o.name, "path": o.path, "visible": o.visible}
+                for o in resp.objects
+            ]
+            return json.dumps({"ok": True, "objects": objs})
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+
+    if name == "scene_find_objects":
+        try:
+            query = args.get("query")
+            type_contains = args.get("type_contains")
+            name_contains = args.get("name_contains")
+            path_contains = args.get("path_contains")
+            visible_filter = args.get("visible")
+            limit = args.get("limit")
+            offset = args.get("offset", 0)
+
+            if limit is not None:
+                try:
+                    limit = int(limit)
+                except Exception:
+                    return json.dumps({"ok": False, "error": "limit must be an integer"})
+                if limit < 1:
+                    return json.dumps(
+                        {"ok": False, "error": "limit must be >= 1 when provided"}
+                    )
+            try:
+                offset = int(offset)
+            except Exception:
+                return json.dumps({"ok": False, "error": "offset must be an integer"})
+            if offset < 0:
+                return json.dumps({"ok": False, "error": "offset must be >= 0"})
+
+            def norm(s: Any) -> str:
+                return (str(s) if s is not None else "").lower()
+
+            q = norm(query).strip()
+            tc = norm(type_contains).strip()
+            nc = norm(name_contains).strip()
+            pc = norm(path_contains).strip()
+
+            resp = client.list_objects()
+            matches: list[dict[str, Any]] = []
+            for o in getattr(resp, "objects", []) or []:
+                entry = {
+                    "id": int(getattr(o, "id", 0)),
+                    "type": str(getattr(o, "type", "")),
+                    "name": str(getattr(o, "name", "")),
+                    "path": str(getattr(o, "path", "")),
+                    "visible": bool(getattr(o, "visible", False)),
+                }
+                if isinstance(visible_filter, bool) and entry["visible"] != visible_filter:
+                    continue
+                if tc and tc not in entry["type"].lower():
+                    continue
+                if nc and nc not in entry["name"].lower():
+                    continue
+                if pc and pc not in entry["path"].lower():
+                    continue
+                if q:
+                    hay = (
+                        f'{entry["id"]} {entry["type"]} {entry["name"]} {entry["path"]}'
+                    ).lower()
+                    if q not in hay:
+                        continue
+                matches.append(entry)
+
+            total = len(matches)
+            if limit is None:
+                return json.dumps(
+                    {
+                        "ok": True,
+                        "total": total,
+                        "offset": int(offset),
+                        "limit": None,
+                        "next_offset": None,
+                        "results": matches,
+                    }
+                )
+            results = matches[offset : offset + limit]
+            next_offset = offset + limit if (offset + limit) < total else None
+            return json.dumps(
+                {
+                    "ok": True,
+                    "total": total,
+                    "offset": int(offset),
+                    "limit": int(limit),
+                    "next_offset": next_offset,
+                    "results": results,
+                }
+            )
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
 
     if name == "scene_bbox":
-        ids = args.get("ids") or []
-        after = bool(args.get("after_clipping", False))
-        req = client._pb2.BBoxRequest(ids=ids, after_clipping=after)
-        resp = client._stub.BBox(req)
-        b = resp.bbox
-        return json.dumps(
-            {
-                "min": [b.min.x, b.min.y, b.min.z],
-                "max": [b.max.x, b.max.y, b.max.z],
-                "center": [b.center.x, b.center.y, b.center.z],
-                "size": [b.size.x, b.size.y, b.size.z],
-            }
-        )
+        try:
+            ids = args.get("ids") or []
+            after = bool(args.get("after_clipping", False))
+            req = client._pb2.BBoxRequest(ids=ids, after_clipping=after)
+            resp = client._stub.BBox(req)
+            b = resp.bbox
+            return json.dumps(
+                {
+                    "ok": True,
+                    "min": [b.min.x, b.min.y, b.min.z],
+                    "max": [b.max.x, b.max.y, b.max.z],
+                    "center": [b.center.x, b.center.y, b.center.z],
+                    "size": [b.size.x, b.size.y, b.size.z],
+                }
+            )
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
 
     if name == "scene_get_values":
         id = int(args.get("id"))
@@ -685,28 +868,88 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         params = [_param_to_dict(p) for p in pl.params]
         return json.dumps({"ok": True, "params": params})
 
-    if name == "scene_capabilities":
-        ids = args.get("ids") or []
-        resp = client._stub.Capabilities(client._pb2.CapabilitiesRequest(ids=ids))
-        # In Python protobuf, field named "global" becomes attribute "global_"
-        global_params = getattr(resp, "global_", None)
-        if global_params is None:
-            try:
-                global_params = getattr(resp, "global")
-            except Exception:
-                global_params = []
-        # Return sizes only for brevity
+    if name == "scene_param_info":
+        id = int(args.get("id"))
+        query = args.get("query")
+        json_key_in = args.get("json_key")
+        name_in = args.get("name")
+        candidate = (
+            str(json_key_in).strip()
+            if json_key_in is not None and str(json_key_in).strip() != ""
+            else (str(query).strip() if query is not None else None)
+        )
+        name_str = (
+            str(name_in).strip()
+            if name_in is not None and str(name_in).strip() != ""
+            else (str(query).strip() if query is not None else None)
+        )
+        if (candidate is None or candidate == "") and (name_str is None or name_str == ""):
+            return json.dumps({"ok": False, "error": "query, json_key, or name required"})
         try:
-            obj_keys = list(resp.objects.keys())
+            jk = _resolve_json_key(id, candidate=candidate) if candidate else None
+            if not jk and name_str:
+                jk = _resolve_json_key(id, name=name_str)
+            if not jk and candidate:
+                jk = _resolve_json_key(id, name=candidate)
         except Exception:
-            # Map fields sometimes need explicit cast
-            obj_keys = list(dict(resp.objects).keys())
+            jk = None
+        if not jk:
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "could not resolve parameter",
+                    "id": int(id),
+                    **({"query": str(query)} if query is not None else {}),
+                    **({"json_key": str(json_key_in)} if json_key_in is not None else {}),
+                    **({"name": str(name_in)} if name_in is not None else {}),
+                }
+            )
+        try:
+            pl = client.list_params(id=id)
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
+        target = None
+        for p in getattr(pl, "params", []) or []:
+            if getattr(p, "json_key", None) == jk:
+                target = p
+                break
+        if target is None:
+            return json.dumps(
+                {"ok": False, "error": "parameter not found for id", "id": int(id), "json_key": jk}
+            )
+        info = _param_to_dict(target)
+
+        def schema_summary(schema: Any) -> dict[str, Any]:
+            if not isinstance(schema, dict):
+                return {}
+            out: dict[str, Any] = {}
+            for k in ("type", "title", "description", "default", "minItems", "maxItems", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"):
+                if k in schema:
+                    out[k] = schema.get(k)
+            if "enum" in schema and isinstance(schema.get("enum"), list):
+                out["enum"] = schema.get("enum")
+            if "const" in schema:
+                out["const"] = schema.get("const")
+            if "properties" in schema and isinstance(schema.get("properties"), dict):
+                out["properties"] = sorted([str(k) for k in schema.get("properties", {}).keys()])
+            if "required" in schema and isinstance(schema.get("required"), list):
+                out["required"] = [str(x) for x in schema.get("required") if isinstance(x, str)]
+            if "oneOf" in schema and isinstance(schema.get("oneOf"), list):
+                out["oneOf_count"] = len(schema.get("oneOf") or [])
+            if "anyOf" in schema and isinstance(schema.get("anyOf"), list):
+                out["anyOf_count"] = len(schema.get("anyOf") or [])
+            if "allOf" in schema and isinstance(schema.get("allOf"), list):
+                out["allOf_count"] = len(schema.get("allOf") or [])
+            return out
+
+        summary = schema_summary(info.get("value_schema"))
         return json.dumps(
             {
-                "background": len(resp.background),
-                "axis": len(resp.axis),
-                "global": len(global_params),
-                "objects": obj_keys,
+                "ok": True,
+                "id": int(id),
+                "json_key": jk,
+                "param": info,
+                **({"value_schema_summary": summary} if summary else {}),
             }
         )
 
@@ -724,7 +967,13 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         try:
             with open(Path(sd) / "capabilities.json", "r", encoding="utf-8") as f:
                 caps = json.load(f)
-            return json.dumps({"ok": True, "capabilities": caps})
+            return json.dumps(
+                {
+                    "ok": True,
+                    "schema_dir": str(sd),
+                    "capabilities": caps,
+                }
+            )
         except Exception as e:
             return json.dumps({"ok": False, "error": str(e)})
 
@@ -1159,19 +1408,23 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         return json.dumps(res)
 
     if name == "scene_cut_suggest_box":
-        req = client._pb2.CutSuggestRequest(
-            ids=args.get("ids") or [],
-            margin=float(args.get("margin", 0.0)),
-            after_clipping=bool(args.get("after_clipping", False)),
-        )
-        resp = client._stub.CutSuggest(req)
-        box = resp.box
-        return json.dumps(
-            {
-                "min": [box.min.x, box.min.y, box.min.z],
-                "max": [box.max.x, box.max.y, box.max.z],
-            }
-        )
+        try:
+            req = client._pb2.CutSuggestRequest(
+                ids=args.get("ids") or [],
+                margin=float(args.get("margin", 0.0)),
+                after_clipping=bool(args.get("after_clipping", False)),
+            )
+            resp = client._stub.CutSuggest(req)
+            box = resp.box
+            return json.dumps(
+                {
+                    "ok": True,
+                    "min": [box.min.x, box.min.y, box.min.z],
+                    "max": [box.max.x, box.max.y, box.max.z],
+                }
+            )
+        except Exception as e:
+            return json.dumps({"ok": False, "error": str(e)})
 
     if name == "scene_cut_set_box":
         minv = args.get("min") or [0, 0, 0]

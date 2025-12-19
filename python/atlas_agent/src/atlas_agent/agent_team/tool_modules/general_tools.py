@@ -142,6 +142,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         home = os.path.expanduser("~")
         cwd = os.getcwd()
         info = {
+            "ok": True,
             "system": system,
             "release": release,
             "os_name": os.name,

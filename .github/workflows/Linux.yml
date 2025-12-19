@@ -496,7 +496,7 @@ jobs:
           conda config --set anaconda_upload yes
           conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
 
-      - name: Build zimg PyPI artifacts (wheel + sdist)
+      - name: Build zimg PyPI wheel
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         working-directory: python/zimg
@@ -536,7 +536,7 @@ jobs:
           # Build wheel only; we depend on the full atlas repo (src + src/3rdparty)
           # via ZIMG_SRC_DIR instead of a self-contained sdist.
           export ZIMG_SRC_DIR="$GITHUB_WORKSPACE/src/python"
-          python -m build --wheel --no-sdist
+          python -m build --wheel
           ls -R dist
 
       - name: Upload zimg to PyPI

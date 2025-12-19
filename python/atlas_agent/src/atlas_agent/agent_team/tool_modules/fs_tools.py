@@ -354,7 +354,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             # Normalize separators for current OS
             t = os.path.normpath(t)
             out.append(t)
-        return json.dumps({"paths": out})
+        return json.dumps({"ok": True, "paths": out})
 
     if name == "fs_check_paths":
         paths = [str(p) for p in (args.get("paths") or [])]
@@ -365,7 +365,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                 exists.append(p)
             else:
                 missing.append(p)
-        return json.dumps({"exists": exists, "missing": missing})
+        return json.dumps({"ok": True, "exists": exists, "missing": missing})
 
     if name == "fs_read_text":
 
@@ -1239,6 +1239,6 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
                                     break
                         except Exception:
                             pass
-        return json.dumps({"candidates": out})
+        return json.dumps({"ok": True, "candidates": out})
 
     return None

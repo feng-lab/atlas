@@ -16,6 +16,12 @@ from ...discovery import (
 from ...exporter import export_video, preview_frames
 from .context import ToolDispatchContext
 
+JSON_VALUE_SCHEMA: Dict[str, Any] = {
+    "description": "Native JSON value (supports object/array/scalars; nested structures allowed).",
+    "type": ["object", "array", "number", "string", "boolean", "null"],
+    "items": {"type": ["object", "array", "number", "string", "boolean", "null"]},
+}
+
 HANDLED_TOOLS = (
     "animation_set_param_by_name",
     "animation_remove_key_param_at_time",
@@ -25,6 +31,10 @@ HANDLED_TOOLS = (
     "animation_camera_validate",
     "animation_get_time",
     "animation_list_keys",
+    "animation_clear_keys_range",
+    "animation_shift_keys_range",
+    "animation_scale_keys_range",
+    "animation_duplicate_keys_range",
     "animation_describe_file",
     "animation_ensure_animation",
     "animation_set_duration",
@@ -214,11 +224,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     "json_key": {"type": "string"},
                     "time": {"type": "number"},
                     "easing": {"type": "string", "default": "Linear"},
-                    "value": {
-                        "description": "Native JSON value (bool/number/string/array)",
-                        "type": ["string", "number", "boolean", "null", "array"],
-                        "items": {"type": ["string", "number", "boolean", "null"]},
-                    },
+                    "value": JSON_VALUE_SCHEMA,
                     "tolerance": {"type": "number", "default": 1e-3},
                     "strict": {"type": "boolean", "default": False},
                 },
@@ -272,6 +278,184 @@ TOOL_SPECS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "animation_clear_keys_range",
+            "description": "Remove keys within [t0,t1] (inclusive, tolerance-aware) for a specific track. Camera uses id=0 and ignores json_key. Non-camera uses (id,json_key) and requires an existing Animation3D.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                    },
+                    "json_key": {
+                        "type": "string",
+                        "description": "Canonical json_key (ignored for camera).",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
+                    },
+                    "t0": {"type": "number", "description": "Range start time (seconds)."},
+                    "t1": {"type": "number", "description": "Range end time (seconds)."},
+                    "tolerance": {
+                        "type": "number",
+                        "default": 1e-3,
+                        "description": "Time tolerance used for range boundary inclusion and conflict matching.",
+                    },
+                    "include_times": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, include the full list of removed key times (no truncation).",
+                    },
+                },
+                "required": ["id", "t0", "t1"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "animation_shift_keys_range",
+            "description": "Shift keys within [t0,t1] by delta seconds (preserves value and easing). Uses a saved .animation3d snapshot to preserve easing. Conflict policy: error|overwrite|skip.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                    },
+                    "json_key": {
+                        "type": "string",
+                        "description": "Canonical json_key (ignored for camera).",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
+                    },
+                    "t0": {"type": "number", "description": "Range start time (seconds)."},
+                    "t1": {"type": "number", "description": "Range end time (seconds)."},
+                    "delta": {"type": "number", "description": "Time shift in seconds (can be negative)."},
+                    "tolerance": {
+                        "type": "number",
+                        "default": 1e-3,
+                        "description": "Time tolerance used for range boundary inclusion and conflict matching.",
+                    },
+                    "on_conflict": {
+                        "type": "string",
+                        "enum": ["error", "overwrite", "skip"],
+                        "default": "error",
+                        "description": "If shifted keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved).",
+                    },
+                    "include_times": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, include the full list of moved/skipped mappings (no truncation).",
+                    },
+                },
+                "required": ["id", "t0", "t1", "delta"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "animation_scale_keys_range",
+            "description": "Scale key times within [t0,t1] around an anchor (t0|center). Preserves value and easing via a saved .animation3d snapshot. Conflict policy: error|overwrite|skip.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                    },
+                    "json_key": {
+                        "type": "string",
+                        "description": "Canonical json_key (ignored for camera).",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
+                    },
+                    "t0": {"type": "number", "description": "Range start time (seconds)."},
+                    "t1": {"type": "number", "description": "Range end time (seconds)."},
+                    "scale": {"type": "number", "description": "Scale factor (>0)."},
+                    "anchor": {
+                        "type": "string",
+                        "enum": ["t0", "center"],
+                        "default": "t0",
+                        "description": "Anchor mode for scaling: t0 uses the range start; center uses (t0+t1)/2.",
+                    },
+                    "tolerance": {
+                        "type": "number",
+                        "default": 1e-3,
+                        "description": "Time tolerance used for range boundary inclusion and conflict matching.",
+                    },
+                    "on_conflict": {
+                        "type": "string",
+                        "enum": ["error", "overwrite", "skip"],
+                        "default": "error",
+                        "description": "If scaled keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (leave conflicting keys unmoved).",
+                    },
+                    "include_times": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, include the full list of moved/skipped mappings (no truncation).",
+                    },
+                },
+                "required": ["id", "t0", "t1", "scale"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "animation_duplicate_keys_range",
+            "description": "Duplicate/copy keys within [t0,t1] so they reappear starting at dest_t0 (preserves relative offsets, value, and easing). Uses a saved .animation3d snapshot to preserve easing. Conflict policy: error|overwrite|skip.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "Timeline target id: 0=camera, 1=background, 2=axis, 3=global, ≥4=object ids",
+                    },
+                    "json_key": {
+                        "type": "string",
+                        "description": "Canonical json_key (ignored for camera).",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Optional display name to resolve to json_key when json_key is not provided (ignored for camera).",
+                    },
+                    "t0": {"type": "number", "description": "Source range start time (seconds)."},
+                    "t1": {"type": "number", "description": "Source range end time (seconds)."},
+                    "dest_t0": {
+                        "type": "number",
+                        "description": "Destination start time (seconds). Keys keep their relative offsets from the source range start.",
+                    },
+                    "tolerance": {
+                        "type": "number",
+                        "default": 1e-3,
+                        "description": "Time tolerance used for range boundary inclusion and conflict matching.",
+                    },
+                    "on_conflict": {
+                        "type": "string",
+                        "enum": ["error", "overwrite", "skip"],
+                        "default": "error",
+                        "description": "If duplicated keys land on existing key times: error (abort), overwrite (remove existing keys), or skip (do not create conflicting duplicates).",
+                    },
+                    "include_times": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "When true, include the full list of duplicated/skipped mappings (no truncation).",
+                    },
+                },
+                "required": ["id", "t0", "t1", "dest_t0"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "animation_get_time",
             "description": "Animation (timeline): get current playback seconds and duration.",
             "parameters": {"type": "object", "properties": {}},
@@ -318,11 +502,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     },
                     "time": {"type": "number"},
                     "easing": {"type": "string", "default": "Linear"},
-                    "value": {
-                        "description": "Native JSON value (bool/number/string/array)",
-                        "type": ["string", "number", "boolean", "null", "array"],
-                        "items": {"type": ["string", "number", "boolean", "null"]},
-                    },
+                    "value": JSON_VALUE_SCHEMA,
                 },
                 "required": ["id", "time", "value"],
             },
@@ -342,11 +522,7 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                     },
                     "json_key": {"type": "string"},
                     "times": {"type": "array", "items": {"type": "number"}},
-                    "value": {
-                        "description": "Native JSON value",
-                        "type": ["string", "number", "boolean", "null", "array"],
-                        "items": {"type": ["string", "number", "boolean", "null"]},
-                    },
+                    "value": JSON_VALUE_SCHEMA,
                     "easing": {"type": "string", "default": "Linear"},
                     "tolerance": {"type": "number", "default": 1e-3},
                 },
@@ -504,15 +680,101 @@ TOOL_SPECS: List[Dict[str, Any]] = [
                         "type": "number",
                         "description": "Preview time in seconds",
                     },
-                    "fps": {"type": "number", "description": "Frames per second"},
+                    "fps": {"type": "number", "default": 30, "description": "Frames per second"},
                     "width": {"type": "integer", "description": "Image width"},
                     "height": {"type": "integer", "description": "Image height"},
                 },
-                "required": ["time", "fps", "width", "height"],
+                "required": ["time", "width", "height"],
             },
         },
     },
 ]
+
+_GROUP_ID_TO_NAME = {1: "Background", 2: "Axis", 3: "Global"}
+
+
+def _coerce_conflict_policy(v: Any) -> str:
+    s = str(v or "error").strip().lower()
+    if s in ("error", "overwrite", "skip"):
+        return s
+    return "error"
+
+
+def _resolve_track_json_key(
+    *,
+    id: int,
+    json_key: Any,
+    name: Any,
+    _resolve_json_key,
+) -> str | None:
+    if int(id) == 0:
+        return ""
+    cand = str(json_key).strip() if json_key is not None else ""
+    nm = str(name).strip() if name is not None else ""
+    if not cand and not nm:
+        return None
+    if cand:
+        try:
+            jk = _resolve_json_key(int(id), candidate=cand)
+            if not jk:
+                jk = _resolve_json_key(int(id), name=cand)
+            if jk:
+                return jk
+        except Exception:
+            pass
+    if nm:
+        try:
+            jk = _resolve_json_key(int(id), name=nm)
+            if not jk:
+                jk = _resolve_json_key(int(id), candidate=nm)
+            if jk:
+                return jk
+        except Exception:
+            pass
+    return None
+
+
+def _save_current_animation_to_temp(client) -> dict:
+    with tempfile.TemporaryDirectory(prefix="atlas_agent_anim_") as td:
+        p = Path(td) / "current.animation3d"
+        ok = client.save_animation(p)
+        if not ok:
+            raise RuntimeError("SaveAnimation failed (no animation available?)")
+        return load_animation(p)
+
+
+def _extract_track_keys(anim: dict, *, id: int, json_key: str) -> list[dict[str, Any]]:
+    """Return key instances for a single track as [{idx,time,easing,value}, ...]."""
+    keys_list: Any = None
+    if int(id) == 0:
+        cam = anim.get("Camera 3DCamera") or {}
+        if isinstance(cam, dict):
+            keys_list = cam.get("keys")
+    elif int(id) in _GROUP_ID_TO_NAME:
+        grp = anim.get(_GROUP_ID_TO_NAME[int(id)]) or {}
+        if isinstance(grp, dict):
+            track = grp.get(str(json_key)) or {}
+            if isinstance(track, dict):
+                keys_list = track.get("keys")
+    else:
+        obj = anim.get(str(int(id))) or {}
+        if isinstance(obj, dict):
+            track = obj.get(str(json_key)) or {}
+            if isinstance(track, dict):
+                keys_list = track.get("keys")
+    if not isinstance(keys_list, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for idx, k in enumerate(keys_list):
+        if not isinstance(k, dict):
+            continue
+        try:
+            tm = float(k.get("time", 0.0))
+        except Exception:
+            tm = 0.0
+        easing = str(k.get("type", "Linear"))
+        out.append({"idx": int(idx), "time": float(tm), "easing": easing, "value": k.get("value")})
+    return out
 
 
 def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
@@ -908,6 +1170,7 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
         ts = client.get_time()
         return json.dumps(
             {
+                "ok": True,
                 "seconds": getattr(ts, "seconds", 0.0),
                 "duration": getattr(ts, "duration", 0.0),
             }
@@ -925,6 +1188,685 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
             for k in lr.keys
         ]
         return json.dumps({"ok": True, "keys": keys})
+
+    if name == "animation_clear_keys_range":
+        id = int(args.get("id"))
+        t0 = float(args.get("t0", 0.0))
+        t1 = float(args.get("t1", 0.0))
+        tol = float(args.get("tolerance", 1e-3))
+        include_times = bool(args.get("include_times", False))
+        if tol < 0:
+            return json.dumps({"ok": False, "error": "tolerance must be >= 0"})
+        tmin, tmax = (t0, t1) if t0 <= t1 else (t1, t0)
+        jk = _resolve_track_json_key(
+            id=id,
+            json_key=args.get("json_key"),
+            name=args.get("name"),
+            _resolve_json_key=_resolve_json_key,
+        )
+        if id != 0 and not jk:
+            return json.dumps({"ok": False, "error": "json_key or name required"})
+        jk = jk or ""
+        try:
+            lr = client.list_keys(id=id, json_key=(jk or None), include_values=False)
+            times = [float(k.time) for k in getattr(lr, "keys", []) or []]
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+        to_remove = [t for t in times if (t >= (tmin - tol) and t <= (tmax + tol))]
+        remove_keys = [
+            {"id": int(id), "json_key": ("" if int(id) == 0 else str(jk)), "time": float(t)}
+            for t in to_remove
+        ]
+        if not remove_keys:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "id": int(id),
+                    "json_key": ("" if int(id) == 0 else str(jk)),
+                    "t0": float(t0),
+                    "t1": float(t1),
+                    "tolerance": float(tol),
+                    "removed": 0,
+                    **({"removed_times": []} if include_times else {}),
+                }
+            )
+        try:
+            ok = client.batch(set_keys=[], remove_keys=remove_keys, commit=True)
+            payload = {
+                "ok": bool(ok),
+                "id": int(id),
+                "json_key": ("" if int(id) == 0 else str(jk)),
+                "t0": float(t0),
+                "t1": float(t1),
+                "tolerance": float(tol),
+                "removed": int(len(remove_keys)),
+            }
+            if include_times:
+                payload["removed_times"] = to_remove
+            return json.dumps(payload)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+    if name == "animation_shift_keys_range":
+        id = int(args.get("id"))
+        t0 = float(args.get("t0", 0.0))
+        t1 = float(args.get("t1", 0.0))
+        delta = float(args.get("delta", 0.0))
+        tol = float(args.get("tolerance", 1e-3))
+        include_times = bool(args.get("include_times", False))
+        on_conflict = _coerce_conflict_policy(args.get("on_conflict"))
+        if tol < 0:
+            return json.dumps({"ok": False, "error": "tolerance must be >= 0"})
+        tmin, tmax = (t0, t1) if t0 <= t1 else (t1, t0)
+        jk = _resolve_track_json_key(
+            id=id,
+            json_key=args.get("json_key"),
+            name=args.get("name"),
+            _resolve_json_key=_resolve_json_key,
+        )
+        if id != 0 and not jk:
+            return json.dumps({"ok": False, "error": "json_key or name required"})
+        jk = jk or ""
+        try:
+            anim = _save_current_animation_to_temp(client)
+            all_keys = _extract_track_keys(anim, id=id, json_key=jk)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+        in_range = [
+            k
+            for k in all_keys
+            if (k["time"] >= (tmin - tol) and k["time"] <= (tmax + tol))
+        ]
+        if not in_range:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "id": int(id),
+                    "json_key": ("" if int(id) == 0 else str(jk)),
+                    "moved": 0,
+                    "skipped": 0,
+                    "overwritten": 0,
+                    "delta": float(delta),
+                }
+            )
+        in_idx = {int(k["idx"]) for k in in_range}
+        outside = [k for k in all_keys if int(k["idx"]) not in in_idx]
+
+        def new_time_for(k: dict[str, Any]) -> float:
+            return float(k["time"]) + float(delta)
+
+        moved_mappings: list[dict[str, float]] = []
+        skipped_times: list[float] = []
+        overwritten_times: list[float] = []
+        remove_keys: list[dict[str, Any]] = []
+        set_keys: list[dict[str, Any]] = []
+
+        # Fail fast on negative target times
+        for k in in_range:
+            nt = new_time_for(k)
+            if nt < 0:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "shift produces negative key time",
+                        "time": float(k["time"]),
+                        "new_time": float(nt),
+                        "delta": float(delta),
+                    }
+                )
+
+        if on_conflict == "skip":
+            # Direction-aware processing prevents collisions with skipped keys.
+            proc = sorted(in_range, key=lambda kk: float(kk["time"]), reverse=delta >= 0)
+            occupied = [float(k["time"]) for k in outside]
+            for k in proc:
+                nt = new_time_for(k)
+                if any(abs(nt - t) <= tol for t in occupied):
+                    skipped_times.append(float(k["time"]))
+                    occupied.append(float(k["time"]))
+                    continue
+                # Move this key
+                remove_keys.append(
+                    {
+                        "id": int(id),
+                        "json_key": ("" if int(id) == 0 else str(jk)),
+                        "time": float(k["time"]),
+                    }
+                )
+                set_keys.append(
+                    {
+                        "id": int(id),
+                        "json_key": ("" if int(id) == 0 else str(jk)),
+                        "time": float(nt),
+                        "easing": str(k.get("easing", "Linear")),
+                        "value": k.get("value"),
+                    }
+                )
+                moved_mappings.append({"from": float(k["time"]), "to": float(nt)})
+                occupied.append(float(nt))
+        else:
+            # Preflight conflicts vs outside keys and collisions among moved keys.
+            moved = []
+            for k in in_range:
+                nt = new_time_for(k)
+                moved.append((float(nt), k))
+            moved.sort(key=lambda x: x[0])
+            for i in range(1, len(moved)):
+                if abs(moved[i][0] - moved[i - 1][0]) <= tol:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "shift would place multiple keys at the same time (within tolerance)",
+                            "tolerance": float(tol),
+                            "times": [moved[i - 1][0], moved[i][0]],
+                        }
+                    )
+            conflicts: list[dict[str, float]] = []
+            for nt, _k in moved:
+                for okk in outside:
+                    if abs(float(okk["time"]) - nt) <= tol:
+                        conflicts.append({"new_time": float(nt), "existing_time": float(okk["time"])})
+            if conflicts and on_conflict == "error":
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "shift conflicts with existing keys (use on_conflict=overwrite or skip)",
+                        "tolerance": float(tol),
+                        "conflicts": conflicts,
+                    }
+                )
+            conflict_idx = set()
+            if conflicts and on_conflict == "overwrite":
+                for okk in outside:
+                    for nt, _k in moved:
+                        if abs(float(okk["time"]) - float(nt)) <= tol:
+                            conflict_idx.add(int(okk["idx"]))
+                            break
+                for okk in outside:
+                    if int(okk["idx"]) in conflict_idx:
+                        remove_keys.append(
+                            {
+                                "id": int(id),
+                                "json_key": ("" if int(id) == 0 else str(jk)),
+                                "time": float(okk["time"]),
+                            }
+                        )
+                        overwritten_times.append(float(okk["time"]))
+            # Remove originals + set shifted keys
+            for nt, k in moved:
+                remove_keys.append(
+                    {
+                        "id": int(id),
+                        "json_key": ("" if int(id) == 0 else str(jk)),
+                        "time": float(k["time"]),
+                    }
+                )
+                set_keys.append(
+                    {
+                        "id": int(id),
+                        "json_key": ("" if int(id) == 0 else str(jk)),
+                        "time": float(nt),
+                        "easing": str(k.get("easing", "Linear")),
+                        "value": k.get("value"),
+                    }
+                )
+                moved_mappings.append({"from": float(k["time"]), "to": float(nt)})
+
+        if not remove_keys and not set_keys:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "id": int(id),
+                    "json_key": ("" if int(id) == 0 else str(jk)),
+                    "moved": 0,
+                    "skipped": int(len(skipped_times)),
+                    "overwritten": int(len(overwritten_times)),
+                    "delta": float(delta),
+                    **({"skipped_times": skipped_times} if include_times else {}),
+                }
+            )
+        try:
+            ok = client.batch(set_keys=set_keys, remove_keys=remove_keys, commit=True)
+            out = {
+                "ok": bool(ok),
+                "id": int(id),
+                "json_key": ("" if int(id) == 0 else str(jk)),
+                "moved": int(len(set_keys)),
+                "skipped": int(len(skipped_times)),
+                "overwritten": int(len(overwritten_times)),
+                "delta": float(delta),
+            }
+            if include_times:
+                out["moved_mappings"] = moved_mappings
+                out["skipped_times"] = skipped_times
+                out["overwritten_times"] = overwritten_times
+            return json.dumps(out)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+    if name == "animation_scale_keys_range":
+        id = int(args.get("id"))
+        t0 = float(args.get("t0", 0.0))
+        t1 = float(args.get("t1", 0.0))
+        scale = float(args.get("scale", 1.0))
+        anchor_mode = str(args.get("anchor", "t0") or "t0").strip().lower()
+        tol = float(args.get("tolerance", 1e-3))
+        include_times = bool(args.get("include_times", False))
+        on_conflict = _coerce_conflict_policy(args.get("on_conflict"))
+        if tol < 0:
+            return json.dumps({"ok": False, "error": "tolerance must be >= 0"})
+        if scale <= 0:
+            return json.dumps({"ok": False, "error": "scale must be > 0"})
+        tmin, tmax = (t0, t1) if t0 <= t1 else (t1, t0)
+        if anchor_mode not in ("t0", "center"):
+            anchor_mode = "t0"
+        anchor_time = float(tmin if anchor_mode == "t0" else (tmin + tmax) * 0.5)
+        if abs(scale - 1.0) < 1e-12:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "id": int(id),
+                    "json_key": ("" if int(id) == 0 else str(args.get("json_key") or "")),
+                    "moved": 0,
+                    "skipped": 0,
+                    "overwritten": 0,
+                    "scale": float(scale),
+                    "anchor": anchor_mode,
+                }
+            )
+        jk = _resolve_track_json_key(
+            id=id,
+            json_key=args.get("json_key"),
+            name=args.get("name"),
+            _resolve_json_key=_resolve_json_key,
+        )
+        if id != 0 and not jk:
+            return json.dumps({"ok": False, "error": "json_key or name required"})
+        jk = jk or ""
+        try:
+            anim = _save_current_animation_to_temp(client)
+            all_keys = _extract_track_keys(anim, id=id, json_key=jk)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+        in_range = [
+            k
+            for k in all_keys
+            if (k["time"] >= (tmin - tol) and k["time"] <= (tmax + tol))
+        ]
+        if not in_range:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "id": int(id),
+                    "json_key": ("" if int(id) == 0 else str(jk)),
+                    "moved": 0,
+                    "skipped": 0,
+                    "overwritten": 0,
+                    "scale": float(scale),
+                    "anchor": anchor_mode,
+                }
+            )
+        in_idx = {int(k["idx"]) for k in in_range}
+        outside = [k for k in all_keys if int(k["idx"]) not in in_idx]
+
+        def new_time_for(k: dict[str, Any]) -> float:
+            return anchor_time + (float(k["time"]) - anchor_time) * float(scale)
+
+        # Fail fast on negative target times
+        for k in in_range:
+            nt = new_time_for(k)
+            if nt < 0:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "scale produces negative key time",
+                        "time": float(k["time"]),
+                        "new_time": float(nt),
+                        "scale": float(scale),
+                        "anchor_time": float(anchor_time),
+                    }
+                )
+
+        moved_mappings: list[dict[str, float]] = []
+        skipped_times: list[float] = []
+        overwritten_times: list[float] = []
+        remove_keys: list[dict[str, Any]] = []
+        set_keys: list[dict[str, Any]] = []
+
+        if on_conflict == "skip":
+            above = [k for k in in_range if float(k["time"]) >= anchor_time]
+            below = [k for k in in_range if float(k["time"]) < anchor_time]
+            above_proc = sorted(above, key=lambda kk: float(kk["time"]), reverse=scale > 1.0)
+            below_proc = sorted(below, key=lambda kk: float(kk["time"]), reverse=scale < 1.0)
+            occupied = [float(k["time"]) for k in outside]
+
+            def proc_key(k: dict[str, Any]):
+                nt = new_time_for(k)
+                if any(abs(nt - t) <= tol for t in occupied):
+                    skipped_times.append(float(k["time"]))
+                    occupied.append(float(k["time"]))
+                    return
+                remove_keys.append(
+                    {
+                        "id": int(id),
+                        "json_key": ("" if int(id) == 0 else str(jk)),
+                        "time": float(k["time"]),
+                    }
+                )
+                set_keys.append(
+                    {
+                        "id": int(id),
+                        "json_key": ("" if int(id) == 0 else str(jk)),
+                        "time": float(nt),
+                        "easing": str(k.get("easing", "Linear")),
+                        "value": k.get("value"),
+                    }
+                )
+                moved_mappings.append({"from": float(k["time"]), "to": float(nt)})
+                occupied.append(float(nt))
+
+            for k in above_proc:
+                proc_key(k)
+            for k in below_proc:
+                proc_key(k)
+        else:
+            moved = []
+            for k in in_range:
+                nt = new_time_for(k)
+                moved.append((float(nt), k))
+            moved.sort(key=lambda x: x[0])
+            for i in range(1, len(moved)):
+                if abs(moved[i][0] - moved[i - 1][0]) <= tol:
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "scale would place multiple keys at the same time (within tolerance)",
+                            "tolerance": float(tol),
+                            "times": [moved[i - 1][0], moved[i][0]],
+                        }
+                    )
+            conflicts: list[dict[str, float]] = []
+            for nt, _k in moved:
+                for okk in outside:
+                    if abs(float(okk["time"]) - nt) <= tol:
+                        conflicts.append({"new_time": float(nt), "existing_time": float(okk["time"])})
+            if conflicts and on_conflict == "error":
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "scale conflicts with existing keys (use on_conflict=overwrite or skip)",
+                        "tolerance": float(tol),
+                        "conflicts": conflicts,
+                    }
+                )
+            conflict_idx = set()
+            if conflicts and on_conflict == "overwrite":
+                for okk in outside:
+                    for nt, _k in moved:
+                        if abs(float(okk["time"]) - float(nt)) <= tol:
+                            conflict_idx.add(int(okk["idx"]))
+                            break
+                for okk in outside:
+                    if int(okk["idx"]) in conflict_idx:
+                        remove_keys.append(
+                            {
+                                "id": int(id),
+                                "json_key": ("" if int(id) == 0 else str(jk)),
+                                "time": float(okk["time"]),
+                            }
+                        )
+                        overwritten_times.append(float(okk["time"]))
+            for nt, k in moved:
+                remove_keys.append(
+                    {
+                        "id": int(id),
+                        "json_key": ("" if int(id) == 0 else str(jk)),
+                        "time": float(k["time"]),
+                    }
+                )
+                set_keys.append(
+                    {
+                        "id": int(id),
+                        "json_key": ("" if int(id) == 0 else str(jk)),
+                        "time": float(nt),
+                        "easing": str(k.get("easing", "Linear")),
+                        "value": k.get("value"),
+                    }
+                )
+                moved_mappings.append({"from": float(k["time"]), "to": float(nt)})
+
+        if not remove_keys and not set_keys:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "id": int(id),
+                    "json_key": ("" if int(id) == 0 else str(jk)),
+                    "moved": 0,
+                    "skipped": int(len(skipped_times)),
+                    "overwritten": int(len(overwritten_times)),
+                    "scale": float(scale),
+                    "anchor": anchor_mode,
+                    **({"skipped_times": skipped_times} if include_times else {}),
+                }
+            )
+        try:
+            ok = client.batch(set_keys=set_keys, remove_keys=remove_keys, commit=True)
+            out = {
+                "ok": bool(ok),
+                "id": int(id),
+                "json_key": ("" if int(id) == 0 else str(jk)),
+                "moved": int(len(set_keys)),
+                "skipped": int(len(skipped_times)),
+                "overwritten": int(len(overwritten_times)),
+                "scale": float(scale),
+                "anchor": anchor_mode,
+                "anchor_time": float(anchor_time),
+            }
+            if include_times:
+                out["moved_mappings"] = moved_mappings
+                out["skipped_times"] = skipped_times
+                out["overwritten_times"] = overwritten_times
+            return json.dumps(out)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+    if name == "animation_duplicate_keys_range":
+        id = int(args.get("id"))
+        t0 = float(args.get("t0", 0.0))
+        t1 = float(args.get("t1", 0.0))
+        dest_t0 = float(args.get("dest_t0", 0.0))
+        tol = float(args.get("tolerance", 1e-3))
+        include_times = bool(args.get("include_times", False))
+        on_conflict = _coerce_conflict_policy(args.get("on_conflict"))
+        if tol < 0:
+            return json.dumps({"ok": False, "error": "tolerance must be >= 0"})
+        tmin, tmax = (t0, t1) if t0 <= t1 else (t1, t0)
+        jk = _resolve_track_json_key(
+            id=id,
+            json_key=args.get("json_key"),
+            name=args.get("name"),
+            _resolve_json_key=_resolve_json_key,
+        )
+        if id != 0 and not jk:
+            return json.dumps({"ok": False, "error": "json_key or name required"})
+        jk = jk or ""
+        try:
+            anim = _save_current_animation_to_temp(client)
+            all_keys = _extract_track_keys(anim, id=id, json_key=jk)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
+
+        in_range = [
+            k
+            for k in all_keys
+            if (k["time"] >= (tmin - tol) and k["time"] <= (tmax + tol))
+        ]
+        if not in_range:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "id": int(id),
+                    "json_key": ("" if int(id) == 0 else str(jk)),
+                    "created": 0,
+                    "skipped": 0,
+                    "overwritten": 0,
+                    "dest_t0": float(dest_t0),
+                }
+            )
+
+        existing_times = [float(k["time"]) for k in all_keys]
+
+        def new_time_for(k: dict[str, Any]) -> float:
+            return float(dest_t0) + (float(k["time"]) - float(tmin))
+
+        # Fail fast on negative target times
+        for k in in_range:
+            nt = new_time_for(k)
+            if nt < 0:
+                return json.dumps(
+                    {
+                        "ok": False,
+                        "error": "duplicate produces negative key time",
+                        "time": float(k["time"]),
+                        "new_time": float(nt),
+                        "dest_t0": float(dest_t0),
+                    }
+                )
+
+        remove_keys: list[dict[str, Any]] = []
+        set_keys: list[dict[str, Any]] = []
+        created_mappings: list[dict[str, float]] = []
+        skipped_mappings: list[dict[str, float]] = []
+        overwritten_times: list[float] = []
+
+        # Identify conflicts vs any existing key time.
+        conflicts: list[tuple[float, dict[str, Any]]] = []
+        for k in in_range:
+            nt = new_time_for(k)
+            if any(abs(nt - t) <= tol for t in existing_times):
+                conflicts.append((float(nt), k))
+
+        if conflicts and on_conflict == "error":
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": "duplicate conflicts with existing keys (use on_conflict=overwrite or skip)",
+                    "tolerance": float(tol),
+                    "conflicts": [
+                        {"new_time": float(nt), "existing_times": [t for t in existing_times if abs(t - nt) <= tol]}
+                        for nt, _k in conflicts
+                    ],
+                }
+            )
+
+        conflict_idx = set()
+        if conflicts and on_conflict == "overwrite":
+            for okk in all_keys:
+                for nt, _k in conflicts:
+                    if abs(float(okk["time"]) - float(nt)) <= tol:
+                        conflict_idx.add(int(okk["idx"]))
+                        break
+            for okk in all_keys:
+                if int(okk["idx"]) in conflict_idx:
+                    remove_keys.append(
+                        {
+                            "id": int(id),
+                            "json_key": ("" if int(id) == 0 else str(jk)),
+                            "time": float(okk["time"]),
+                        }
+                    )
+                    overwritten_times.append(float(okk["time"]))
+
+        for k in in_range:
+            nt = new_time_for(k)
+            if on_conflict == "skip" and any(abs(nt - t) <= tol for t in existing_times):
+                skipped_mappings.append({"from": float(k["time"]), "to": float(nt)})
+                continue
+            set_keys.append(
+                {
+                    "id": int(id),
+                    "json_key": ("" if int(id) == 0 else str(jk)),
+                    "time": float(nt),
+                    "easing": str(k.get("easing", "Linear")),
+                    "value": k.get("value"),
+                }
+            )
+            created_mappings.append({"from": float(k["time"]), "to": float(nt)})
+
+        if not remove_keys and not set_keys:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "id": int(id),
+                    "json_key": ("" if int(id) == 0 else str(jk)),
+                    "created": 0,
+                    "skipped": int(len(skipped_mappings)),
+                    "overwritten": int(len(overwritten_times)),
+                    "dest_t0": float(dest_t0),
+                    **({"skipped_mappings": skipped_mappings} if include_times else {}),
+                }
+            )
+        try:
+            ok = client.batch(set_keys=set_keys, remove_keys=remove_keys, commit=True)
+            out = {
+                "ok": bool(ok),
+                "id": int(id),
+                "json_key": ("" if int(id) == 0 else str(jk)),
+                "created": int(len(set_keys)),
+                "skipped": int(len(skipped_mappings)),
+                "overwritten": int(len(overwritten_times)),
+                "dest_t0": float(dest_t0),
+            }
+            if include_times:
+                out["created_mappings"] = created_mappings
+                out["skipped_mappings"] = skipped_mappings
+                out["overwritten_times"] = overwritten_times
+            return json.dumps(out)
+        except Exception as e:
+            msg = str(e)
+            try:
+                msg = e.details()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            return json.dumps({"ok": False, "error": msg})
 
     if name == "animation_describe_file":
         schema_dir = args.get("schema_dir")

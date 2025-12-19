@@ -271,10 +271,17 @@ class SceneClient:
                     facts["keys"]["objects"][str(oid)] = obj_map
         except Exception:
             pass
-        # Optional: include current scene values for each object (all params)
+        # Optional: include current scene values for key engine scopes and objects (all params)
         if include_scene_values:
             try:
                 sv: dict[str, dict[str, Any]] = {}
+                # Engine scopes (stateless): 0=camera, 1=background, 2=axis, 3=global
+                for scope_id in (0, 1, 2, 3):
+                    try:
+                        vals = self.get_param_values(id=int(scope_id), json_keys=[])
+                        sv[str(scope_id)] = vals
+                    except Exception:
+                        continue
                 for o in facts.get("objects_list", []) or []:
                     oid = int(o.get("id", 0))
                     try:
