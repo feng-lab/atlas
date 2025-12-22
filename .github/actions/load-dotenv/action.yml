@@ -1,0 +1,115 @@
+name: Load dotenv into job environment
+description: Write a dotenv file from a workflow secret and export its variables via GITHUB_ENV.
+inputs:
+  dotenv:
+    description: Raw contents of the dotenv file (e.g. from a GitHub Actions secret).
+    required: true
+  path:
+    description: Path to write the dotenv file (relative to the repo root).
+    required: false
+    default: .env.local
+runs:
+  using: composite
+  steps:
+    - name: Write dotenv file
+      shell: bash -l {0}
+      env:
+        DOTENV_CONTENT: ${{ inputs.dotenv }}
+        DOTENV_PATH: ${{ inputs.path }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${DOTENV_CONTENT:-}" ]; then
+          echo "Error: load-dotenv action received an empty 'dotenv' input." >&2
+          exit 1
+        fi
+        if [ -z "${DOTENV_PATH:-}" ]; then
+          echo "Error: load-dotenv action received an empty 'path' input." >&2
+          exit 1
+        fi
+
+        dotenvDir="$(dirname "${DOTENV_PATH}")"
+        if [ "${dotenvDir}" != "." ]; then
+          mkdir -p "${dotenvDir}"
+        fi
+
+        printf '%s' "${DOTENV_CONTENT}" > "${DOTENV_PATH}"
+        chmod 600 "${DOTENV_PATH}" || true
+
+    - name: Export dotenv variables to GITHUB_ENV
+      shell: bash -l {0}
+      env:
+        DOTENV_PATH: ${{ inputs.path }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${GITHUB_ENV:-}" ]; then
+          echo "Error: GITHUB_ENV is not set; cannot persist env vars across steps." >&2
+          exit 1
+        fi
+        githubEnvPath="${GITHUB_ENV}"
+        if [[ "${githubEnvPath}" =~ ^[A-Za-z]:[\\\\/] ]]; then
+          if command -v cygpath >/dev/null 2>&1; then
+            githubEnvPath="$(cygpath -u "${githubEnvPath}")"
+          else
+            drive="$(printf '%s' "${githubEnvPath:0:1}" | tr 'A-Z' 'a-z')"
+            rest="${githubEnvPath:2}"
+            rest="${rest#\\\\}"
+            rest="${rest#/}"
+            rest="${rest//\\\\//}"
+            githubEnvPath="/${drive}/${rest}"
+          fi
+        fi
+
+        if [ ! -f "${DOTENV_PATH}" ]; then
+          echo "Error: dotenv file not found at '${DOTENV_PATH}' after write step." >&2
+          exit 1
+        fi
+
+        dotenvKeys="$(
+          awk '
+            /^[[:space:]]*(#|$)/ { next }
+            {
+              line = $0
+              sub(/^[[:space:]]*export[[:space:]]+/, "", line)
+              if (match(line, /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=/)) {
+                key = substr(line, RSTART, RLENGTH)
+                sub(/[[:space:]]*=[[:space:]]*$/, "", key)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+                if (!seen[key]++) print key
+              }
+            }
+          ' "${DOTENV_PATH}"
+        )"
+
+        # Sourcing allows multi-line values (e.g., SSH keys) as long as the file uses valid shell syntax.
+        # We temporarily disable `set -u` to avoid failing on benign expansions of unset variables.
+        set +u
+        set -a
+        # shellcheck disable=SC1090
+        source "${DOTENV_PATH}"
+        set +a
+        set -u
+
+        if [ -z "${dotenvKeys}" ]; then
+          exit 0
+        fi
+
+        while IFS= read -r key; do
+          if [[ ! "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            echo "Error: invalid env var name parsed from ${DOTENV_PATH}: '${key}'" >&2
+            exit 1
+          fi
+
+          value="${!key-}"
+          if [[ "${value}" == *$'\n'* ]]; then
+            delimiter="__ENV_${key}_${RANDOM}_${RANDOM}_$$_$(date +%s)__"
+            {
+              printf '%s<<%s\n' "${key}" "${delimiter}"
+              printf '%s\n' "${value}"
+              printf '%s\n' "${delimiter}"
+            } >> "${githubEnvPath}"
+          else
+            printf '%s=%s\n' "${key}" "${value}" >> "${githubEnvPath}"
+          fi
+        done <<< "${dotenvKeys}"

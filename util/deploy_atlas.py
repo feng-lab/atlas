@@ -7,6 +7,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as eTree
 import zipfile
+from typing import Optional
 
 import build_ext_libs
 import common_dirs
@@ -14,6 +15,203 @@ import linuxdeployqt
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
+
+_DISABLE_SIGNING_ENV_VAR = "ATLAS_MACOS_DISABLE_SIGNING"
+_CODESIGN_IDENTITY_ENV_VAR = "MACOS_CODESIGN_IDENTITY"
+_ENTITLEMENTS_ENV_VAR = "ATLAS_MACOS_CODESIGN_ENTITLEMENTS"
+_NOTARY_API_KEY_PATH_ENV_VAR = "MACOS_NOTARYTOOL_API_KEY_PATH"
+_NOTARY_API_KEY_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_KEY_ID"
+_NOTARY_API_ISSUER_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_ISSUER_ID"
+
+
+def _env_truthy(name: str) -> bool:
+    value = os.environ.get(name, "").strip().lower()
+    return value in {"1", "true", "yes", "y", "on"}
+
+
+def _macos_signing_disabled() -> bool:
+    if not common_dirs.is_mac():
+        return False
+    return _env_truthy(_DISABLE_SIGNING_ENV_VAR)
+
+
+def _maybe_load_dotenv() -> None:
+    repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+    env_path = os.path.join(repo_root, ".env")
+    env_local_path = os.path.join(repo_root, ".env.local")
+
+    keys_from_env: set[str] = set()
+    _load_env_file(env_path, keys_from_env=keys_from_env, override_only_keys=None)
+    _load_env_file(env_local_path, keys_from_env=None, override_only_keys=keys_from_env)
+
+
+def _load_env_file(
+    path: str,
+    *,
+    keys_from_env: Optional[set[str]],
+    override_only_keys: Optional[set[str]],
+) -> None:
+    if not os.path.exists(path):
+        return
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("export "):
+                    line = line[len("export ") :].lstrip()
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+                if not key:
+                    continue
+                if (
+                    value.startswith(("'", '"'))
+                    and len(value) >= 2
+                    and value[-1] == value[0]
+                ):
+                    value = value[1:-1]
+
+                if key in os.environ:
+                    if override_only_keys is None or key not in override_only_keys:
+                        continue
+
+                os.environ[key] = value
+                if keys_from_env is not None:
+                    keys_from_env.add(key)
+    except Exception as e:
+        raise RuntimeError(f"Failed reading env file: {path}: {e}")
+
+
+_maybe_load_dotenv()
+
+
+def _macos_codesign_identity() -> str:
+    identity = os.environ.get(_CODESIGN_IDENTITY_ENV_VAR)
+    if not identity:
+        raise RuntimeError(
+            "macOS codesigning is enabled by default but no signing identity is configured. "
+            f"Set {_CODESIGN_IDENTITY_ENV_VAR} (e.g. in `.env.local` in the repo root), or temporarily revert to ad-hoc signing by "
+            f"setting {_DISABLE_SIGNING_ENV_VAR}=1."
+        )
+    return identity
+
+
+def _macos_notarytool_auth_args() -> list[str]:
+    api_key_path = os.environ.get(_NOTARY_API_KEY_PATH_ENV_VAR)
+    api_key_id = os.environ.get(_NOTARY_API_KEY_ID_ENV_VAR)
+    api_issuer_id = os.environ.get(_NOTARY_API_ISSUER_ID_ENV_VAR)
+
+    if not (api_key_path and api_key_id and api_issuer_id):
+        raise RuntimeError(
+            "Notarization is enabled by default but notarytool API key auth is not configured. Set all of:\n"
+            f"  - {_NOTARY_API_KEY_PATH_ENV_VAR}\n"
+            f"  - {_NOTARY_API_KEY_ID_ENV_VAR}\n"
+            f"  - {_NOTARY_API_ISSUER_ID_ENV_VAR}\n"
+            f"Or disable signing via {_DISABLE_SIGNING_ENV_VAR}=1."
+        )
+
+    api_key_path = os.path.expanduser(api_key_path)
+    if not os.path.isabs(api_key_path):
+        api_key_path = os.path.join(common_dirs.atlas_repository_dir(), api_key_path)
+    if not os.path.exists(api_key_path):
+        raise RuntimeError(
+            "Notarytool API key file not found.\n"
+            f"Configured {_NOTARY_API_KEY_PATH_ENV_VAR}: {api_key_path}\n"
+            f"Disable signing via {_DISABLE_SIGNING_ENV_VAR}=1 to use ad-hoc signing."
+        )
+
+    return ["--key", api_key_path, "--key-id", api_key_id, "--issuer", api_issuer_id]
+
+
+def _macos_entitlements_path() -> Optional[str]:
+    entitlements = os.environ.get(_ENTITLEMENTS_ENV_VAR)
+    if not entitlements:
+        return None
+    if os.path.isabs(entitlements):
+        return entitlements
+    return os.path.join(common_dirs.atlas_repository_dir(), entitlements)
+
+
+def _macos_run_checked(args: list[str], *, cwd: Optional[str] = None) -> None:
+    logger.info("Running: %s", " ".join(args))
+    subprocess.run(args, cwd=cwd, shell=False, check=True)
+
+
+def _macos_codesign_bundle(bundle_path: str) -> None:
+    if not common_dirs.is_mac():
+        raise RuntimeError("_macos_codesign_bundle called on non-macOS")
+    if not os.path.exists(bundle_path):
+        raise RuntimeError(f"Bundle path does not exist: {bundle_path}")
+
+    identity = _macos_codesign_identity()
+    entitlements = _macos_entitlements_path()
+
+    _macos_run_checked(["xattr", "-cr", bundle_path])
+
+    cmd = [
+        "codesign",
+        "--force",
+        "--options",
+        "runtime",
+        "--timestamp",
+        "--sign",
+        identity,
+    ]
+    if os.path.isdir(bundle_path):
+        cmd.append("--deep")
+    if entitlements:
+        cmd.extend(["--entitlements", entitlements])
+    cmd.append(bundle_path)
+    _macos_run_checked(cmd)
+
+    verify_cmd = ["codesign", "--verify", "--strict", "--verbose=2"]
+    if os.path.isdir(bundle_path):
+        verify_cmd.append("--deep")
+    verify_cmd.append(bundle_path)
+    _macos_run_checked(verify_cmd)
+
+
+def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
+    if not common_dirs.is_mac():
+        raise RuntimeError("_macos_notarize_and_staple_bundle called on non-macOS")
+    if not os.path.exists(bundle_path):
+        raise RuntimeError(f"Bundle path does not exist: {bundle_path}")
+
+    auth_args = _macos_notarytool_auth_args()
+
+    bundle_dir = os.path.dirname(bundle_path)
+    bundle_name = os.path.basename(bundle_path)
+    notarize_zip = os.path.join(bundle_dir, f"{bundle_name}.notarize.zip")
+    if os.path.exists(notarize_zip):
+        os.remove(notarize_zip)
+
+    _macos_run_checked(
+        ["ditto", "-c", "-k", "--keepParent", bundle_name, notarize_zip], cwd=bundle_dir
+    )
+    _macos_run_checked(
+        [
+            "xcrun",
+            "notarytool",
+            "submit",
+            notarize_zip,
+            "--wait",
+            *auth_args,
+        ]
+    )
+    _macos_run_checked(["xcrun", "stapler", "staple", "-v", bundle_path])
+    _macos_run_checked(["xcrun", "stapler", "validate", "-v", bundle_path])
+    _macos_run_checked(
+        ["spctl", "--assess", "--type", "execute", "--verbose=4", bundle_path]
+    )
+    try:
+        os.remove(notarize_zip)
+    except OSError:
+        pass
 
 
 def _read_git_version_from_header() -> str:
@@ -146,8 +344,17 @@ def build_atlas_package(is_debug_version: bool = False):
         os.makedirs(target_llm_dir, exist_ok=True)
         shutil.copytree(repo_llm_dir, target_llm_dir, dirs_exist_ok=True)
 
-        subprocess.run(['codesign', '--force', '--deep', '--sign', '-',
-                        os.path.join(common_dirs.deploy_target_dir(), app_name)], shell=False, check=True)
+        deployed_app_path = os.path.join(common_dirs.deploy_target_dir(), app_name)
+        if _macos_signing_disabled():
+            subprocess.run(
+                ["codesign", "--force", "--deep", "--sign", "-", deployed_app_path],
+                shell=False,
+                check=True,
+            )
+        else:
+            _macos_codesign_bundle(deployed_app_path)
+            if not is_debug_version:
+                _macos_notarize_and_staple_bundle(deployed_app_path)
     elif common_dirs.is_linux():
         app_name = "Atlas"
 
@@ -332,19 +539,37 @@ def build_atlas_installer():
     shutil.copytree(os.path.join(common_dirs.ext_build_dir(), 'packages-' + suffix, 'fenglab.neutube'),
                     os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'))
 
-    if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), mt_app_name)):
-        os.remove(os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
+    mt_app_path = os.path.join(common_dirs.deploy_target_dir(), mt_app_name)
+    if os.path.exists(mt_app_path):
+        os.remove(mt_app_path)
     if common_dirs.is_windows():
         shutil.copy(os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'installerbase.exe'),
                     os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
     else:
-        shutil.copy(os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'installerbase'),
-                    os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
-    subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'archivegen'),
-                    mt_repo_package_name,
-                    os.path.join(common_dirs.deploy_target_dir(), mt_app_name)],
-                   cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-    os.remove(os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
+        shutil.copy(
+            os.path.join(common_dirs.qt_installer_framework_bin_dir(), "installerbase"),
+            mt_app_path,
+        )
+        if common_dirs.is_mac():
+            if _macos_signing_disabled():
+                subprocess.run(
+                    ["codesign", "--force", "--sign", "-", mt_app_path],
+                    shell=False,
+                    check=True,
+                )
+            else:
+                _macos_codesign_bundle(mt_app_path)
+    subprocess.run(
+        [
+            os.path.join(common_dirs.qt_installer_framework_bin_dir(), "archivegen"),
+            mt_repo_package_name,
+            mt_app_path,
+        ],
+        cwd=common_dirs.deploy_target_dir(),
+        shell=False,
+        check=True,
+    )
+    os.remove(mt_app_path)
     repo_package_folder = os.path.join(common_dirs.deploy_target_dir(),
                                        'packages', 'fenglab.maintenance', 'data')
     if os.path.exists(os.path.join(repo_package_folder, mt_repo_package_name)):
@@ -376,6 +601,18 @@ def build_atlas_installer():
                     '--online-only', '-c', 'config/config-' + suffix + '.xml', '-p', 'packages',
                     installer_base_name],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+
+    if common_dirs.is_mac():
+        installer_app_path = os.path.join(common_dirs.deploy_target_dir(), installer_app_name)
+        if _macos_signing_disabled():
+            subprocess.run(
+                ["codesign", "--force", "--deep", "--sign", "-", installer_app_path],
+                shell=False,
+                check=True,
+            )
+        else:
+            _macos_codesign_bundle(installer_app_path)
+            _macos_notarize_and_staple_bundle(installer_app_path)
 
     if common_dirs.is_windows():
         zipfile.ZipFile(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name), mode='w') \

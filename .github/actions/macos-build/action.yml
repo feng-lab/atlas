@@ -1,45 +1,75 @@
 name: macOS Build and Publish
 description: Build Atlas, publish artifacts, and optionally clean up on self-hosted runners.
-inputs:
-  ssh-private-key:
-    description: SSH private key used for artifact deployment.
-    required: true
-  ssh-known-hosts:
-    description: Known hosts entries for SSH.
-    required: true
-  ssh-server:
-    description: SSH server hostname for deployment.
-    required: true
-  ssh-port:
-    description: SSH server port for deployment.
-    required: true
-  ssh-username:
-    description: SSH username for deployment.
-    required: true
-  ssh-deploy-path:
-    description: Target path on the SSH server for deployment.
-    required: true
-  ssh-server2:
-    description: SSH server hostname for secondary deployment.
-    required: false
-  ssh-port2:
-    description: SSH server port for secondary deployment.
-    required: false
-  ssh-username2:
-    description: SSH username for secondary deployment.
-    required: false
-  ssh-deploy-path2:
-    description: Target path on the secondary SSH server for deployment.
-    required: false
-  anaconda-api-token:
-    description: Token for uploading to Anaconda.
-    required: true
-  pypi-api-token:
-    description: Token for uploading to PyPI.
-    required: true
 runs:
   using: composite
   steps:
+    - name: Configure macOS signing + notarization
+      shell: bash -l {0}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${MACOS_CODESIGN_IDENTITY:-}" ]; then
+          echo "Error: MACOS_CODESIGN_IDENTITY is not set." >&2
+          exit 1
+        fi
+        if [ -z "${MACOS_CODESIGN_P12_BASE64:-}" ] || [ -z "${MACOS_CODESIGN_P12_PASSWORD:-}" ]; then
+          echo "Error: MACOS_CODESIGN_P12_BASE64 / MACOS_CODESIGN_P12_PASSWORD are required." >&2
+          exit 1
+        fi
+        if [ -z "${MACOS_NOTARYTOOL_API_KEY_ID:-}" ] || [ -z "${MACOS_NOTARYTOOL_API_ISSUER_ID:-}" ] || [ -z "${MACOS_NOTARYTOOL_API_KEY_P8_BASE64:-}" ]; then
+          echo "Error: notarytool API key env vars are required (MACOS_NOTARYTOOL_API_KEY_ID, MACOS_NOTARYTOOL_API_ISSUER_ID, MACOS_NOTARYTOOL_API_KEY_P8_BASE64)." >&2
+          exit 1
+        fi
+
+        KEYCHAIN_PATH="${RUNNER_TEMP}/atlas-codesign.keychain-db"
+        CERT_P12_PATH="${RUNNER_TEMP}/atlas-codesign-cert.p12"
+        NOTARY_P8_PATH="${RUNNER_TEMP}/atlas-notary-key.p8"
+
+        eval "$(conda shell.bash hook)"
+        conda activate atlas-ci
+
+        export CERT_P12_PATH NOTARY_P8_PATH
+        python - << 'PY'
+        import base64
+        import os
+        from pathlib import Path
+
+        def write_b64(env: str, path: str) -> None:
+            data = os.environ.get(env)
+            if not data:
+                raise SystemExit(f"Missing env var: {env}")
+            data = data.strip()
+            while data.endswith("%"):
+                data = data[:-1]
+            Path(path).write_bytes(base64.b64decode(data))
+
+        write_b64("MACOS_CODESIGN_P12_BASE64", os.environ["CERT_P12_PATH"])
+        write_b64("MACOS_NOTARYTOOL_API_KEY_P8_BASE64", os.environ["NOTARY_P8_PATH"])
+        PY
+
+        KEYCHAIN_PASSWORD="$(python -c 'import secrets; print(secrets.token_hex(16))')"
+        ORIG_DEFAULT_KEYCHAIN="$(security default-keychain | sed -E 's/^"//; s/"$//')"
+        ORIG_KEYCHAIN_LIST="$(security list-keychains -d user | sed -E 's/^[[:space:]]*\"//; s/\"$//')"
+
+        security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+        security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
+        security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+        security import "${CERT_P12_PATH}" -k "${KEYCHAIN_PATH}" -P "${MACOS_CODESIGN_P12_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+
+        # Ensure both login and the temp keychain are searchable (do not drop existing entries).
+        security list-keychains -d user -s "${KEYCHAIN_PATH}" ${ORIG_KEYCHAIN_LIST}
+        security default-keychain -s "${KEYCHAIN_PATH}"
+        security find-identity -v -p codesigning "${KEYCHAIN_PATH}" || true
+
+        {
+          echo "MACOS_NOTARYTOOL_API_KEY_PATH=${NOTARY_P8_PATH}"
+          echo "ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN=${ORIG_DEFAULT_KEYCHAIN}"
+          echo "ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST<<EOF"
+          echo "${ORIG_KEYCHAIN_LIST}"
+          echo "EOF"
+        } >> "$GITHUB_ENV"
+
     - name: Build and deploy Atlas
       shell: bash -l {0}
       run: |
@@ -75,53 +105,63 @@ runs:
 
     - name: Setup SSH key
       shell: bash -l {0}
-      env:
-        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
-        SSH_KNOWN_HOSTS: ${{ inputs.ssh-known-hosts }}
       run: |
+        set -euo pipefail
+        if [ -z "${SSH_PRIVATE_KEY_BASE64:-}" ] || [ -z "${SSH_KNOWN_HOSTS_BASE64:-}" ]; then
+          echo "Error: SSH_PRIVATE_KEY_BASE64 / SSH_KNOWN_HOSTS_BASE64 are required for deployment." >&2
+          exit 1
+        fi
         mkdir -p ~/.ssh/
-        echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
+        sshPrivateKeyB64="${SSH_PRIVATE_KEY_BASE64//$'\r'/}"
+        sshPrivateKeyB64="${sshPrivateKeyB64//$'\n'/}"
+        if [[ "${sshPrivateKeyB64}" == *% ]]; then
+          sshPrivateKeyB64="${sshPrivateKeyB64%?}"
+        fi
+        printf '%s' "$sshPrivateKeyB64" | base64 --decode > ~/.ssh/private.key
         chmod 600 ~/.ssh/private.key
         # Append CI known_hosts entries; do not clobber existing user configuration
-        if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
-          printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+        sshKnownHostsB64="${SSH_KNOWN_HOSTS_BASE64//$'\r'/}"
+        sshKnownHostsB64="${sshKnownHostsB64//$'\n'/}"
+        if [[ "${sshKnownHostsB64}" == *% ]]; then
+          sshKnownHostsB64="${sshKnownHostsB64%?}"
         fi
+        printf '%s' "$sshKnownHostsB64" | base64 --decode >> ~/.ssh/known_hosts
+        printf '\n' >> ~/.ssh/known_hosts
 
     - name: Deploy artifacts
       shell: bash -l {0}
-      env:
-        SSH_SERVER: ${{ inputs.ssh-server }}
-        SSH_PORT: ${{ inputs.ssh-port }}
-        SSH_USERNAME: ${{ inputs.ssh-username }}
-        SSH_DEPLOY_PATH: ${{ inputs.ssh-deploy-path }}
       run: |
+        set -euo pipefail
+        : "${SSH_SERVER:?Error: SSH_SERVER is not set}"
+        : "${SSH_PORT:?Error: SSH_PORT is not set}"
+        : "${SSH_USERNAME:?Error: SSH_USERNAME is not set}"
+        : "${SSH_DEPLOY_PATH:?Error: SSH_DEPLOY_PATH is not set}"
         cd "$GITHUB_WORKSPACE/deploy"
         rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
         rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
 
     - name: Deploy artifacts (secondary target)
       shell: bash -l {0}
-      env:
-        SSH_SERVER: ${{ inputs.ssh-server2 }}
-        SSH_PORT: ${{ inputs.ssh-port2 }}
-        SSH_USERNAME: ${{ inputs.ssh-username2 }}
-        SSH_DEPLOY_PATH: ${{ inputs.ssh-deploy-path2 }}
       run: |
-        if [ -z "${SSH_SERVER:-}" ] || [ -z "${SSH_PORT:-}" ] || [ -z "${SSH_USERNAME:-}" ] || [ -z "${SSH_DEPLOY_PATH:-}" ]; then
+        if [ -z "${SSH_SERVER2:-}" ] || [ -z "${SSH_PORT2:-}" ] || [ -z "${SSH_USERNAME2:-}" ] || [ -z "${SSH_DEPLOY_PATH2:-}" ]; then
           echo "Secondary SSH deploy target not fully configured; skipping."
           exit 0
         fi
+        set -euo pipefail
         cd "$GITHUB_WORKSPACE/deploy"
-        rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
-        rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+        rsync -avv --delete -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/
+        rsync -tvv -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
 
     - name: Build and upload conda zimg
       # Skip this when publishing a PyPI release (tags starting with "v")
       if: github.event_name != 'create' || github.ref_type != 'tag' || !startsWith(github.event.ref, 'v')
       shell: bash -l {0}
-      env:
-        ANACONDA_API_TOKEN: ${{ inputs.anaconda-api-token }}
       run: |
+        set -euo pipefail
+        if [ -z "${ANACONDA_API_TOKEN:-}" ]; then
+          echo "Error: ANACONDA_API_TOKEN is required for conda uploads." >&2
+          exit 1
+        fi
         eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
@@ -176,11 +216,33 @@ runs:
       if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
       shell: bash -l {0}
       working-directory: python/zimg
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ inputs.pypi-api-token }}
       run: |
         eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         set -euo pipefail
+        if [ -z "${PYPI_API_TOKEN:-}" ]; then
+          echo "Error: PYPI_API_TOKEN is required for PyPI uploads." >&2
+          exit 1
+        fi
+        export TWINE_USERNAME="__token__"
+        export TWINE_PASSWORD="${PYPI_API_TOKEN}"
         python -m twine upload dist/*
+
+    - name: Cleanup macOS signing assets
+      if: ${{ always() }}
+      shell: bash -l {0}
+      run: |
+        set -euo pipefail
+        KEYCHAIN_PATH="${RUNNER_TEMP}/atlas-codesign.keychain-db"
+        CERT_P12_PATH="${RUNNER_TEMP}/atlas-codesign-cert.p12"
+        NOTARY_P8_PATH="${RUNNER_TEMP}/atlas-notary-key.p8"
+
+        if [ -n "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN:-}" ]; then
+          security default-keychain -s "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN}" || true
+        fi
+        if [ -n "${ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST:-}" ]; then
+          # shellcheck disable=SC2086
+          security list-keychains -d user -s ${ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST} || true
+        fi
+        security delete-keychain "${KEYCHAIN_PATH}" || true
+        rm -f "${MACOS_NOTARYTOOL_API_KEY_PATH:-${NOTARY_P8_PATH}}" "${CERT_P12_PATH}" || true

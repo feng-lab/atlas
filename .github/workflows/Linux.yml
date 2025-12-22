@@ -241,6 +241,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Load CI env (.env.local)
+        uses: ./.github/actions/load-dotenv
+        with:
+          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
+
       - name: Free disk space
         shell: bash -l {0}
         run: |
@@ -445,50 +450,65 @@ jobs:
 
       - name: Setup SSH key
         shell: bash -l {0}
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
+          set -euo pipefail
+          if [ -z "${SSH_PRIVATE_KEY_BASE64:-}" ] || [ -z "${SSH_KNOWN_HOSTS_BASE64:-}" ]; then
+            echo "Error: SSH_PRIVATE_KEY_BASE64 / SSH_KNOWN_HOSTS_BASE64 are not set. Provide them via the ATLAS_ENV_LOCAL dotenv secret." >&2
+            exit 1
+          fi
           mkdir -p ~/.ssh/
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
+          sshPrivateKeyB64="${SSH_PRIVATE_KEY_BASE64//$'\r'/}"
+          sshPrivateKeyB64="${sshPrivateKeyB64//$'\n'/}"
+          if [[ "${sshPrivateKeyB64}" == *% ]]; then
+            sshPrivateKeyB64="${sshPrivateKeyB64%?}"
+          fi
+          printf '%s' "$sshPrivateKeyB64" | base64 --decode > ~/.ssh/private.key
           chmod 600 ~/.ssh/private.key
           # Append CI known_hosts entries; do not clobber existing user configuration
-          if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
-            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          sshKnownHostsB64="${SSH_KNOWN_HOSTS_BASE64//$'\r'/}"
+          sshKnownHostsB64="${sshKnownHostsB64//$'\n'/}"
+          if [[ "${sshKnownHostsB64}" == *% ]]; then
+            sshKnownHostsB64="${sshKnownHostsB64%?}"
           fi
+          printf '%s' "$sshKnownHostsB64" | base64 --decode >> ~/.ssh/known_hosts
+          printf '\n' >> ~/.ssh/known_hosts
 
       - name: Deploy artifacts
         shell: bash -l {0}
-        env:
-          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
         run: |
+          set -euo pipefail
+          : "${SSH_SERVER:?Error: SSH_SERVER is not set (ATLAS_ENV_LOCAL)}"
+          : "${SSH_PORT:?Error: SSH_PORT is not set (ATLAS_ENV_LOCAL)}"
+          : "${SSH_USERNAME:?Error: SSH_USERNAME is not set (ATLAS_ENV_LOCAL)}"
+          : "${SSH_DEPLOY_PATH:?Error: SSH_DEPLOY_PATH is not set (ATLAS_ENV_LOCAL)}"
           cd "$GITHUB_WORKSPACE/deploy"
           rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
           rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
 
       - name: Deploy artifacts (secondary target)
         shell: bash -l {0}
-        env:
-          SSH_SERVER: ${{ secrets.SSH_SERVER2 }}
-          SSH_PORT: ${{ secrets.SSH_PORT2 }}
-          SSH_USERNAME: ${{ secrets.SSH_USERNAME2 }}
-          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH2 }}
         run: |
+          set -euo pipefail
+          : "${SSH_SERVER2:?Error: SSH_SERVER2 is not set (ATLAS_ENV_LOCAL)}"
+          : "${SSH_PORT2:?Error: SSH_PORT2 is not set (ATLAS_ENV_LOCAL)}"
+          : "${SSH_USERNAME2:?Error: SSH_USERNAME2 is not set (ATLAS_ENV_LOCAL)}"
+          : "${SSH_DEPLOY_PATH2:?Error: SSH_DEPLOY_PATH2 is not set (ATLAS_ENV_LOCAL)}"
           cd "$GITHUB_WORKSPACE/deploy"
-          rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
-          rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+          rsync -avv --delete -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/
+          rsync -tvv -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
 
       - name: Build and upload conda zimg
         # Skip this when publishing a PyPI release (tags starting with "v")
         if: github.event_name != 'create' || github.ref_type != 'tag' || !startsWith(github.event.ref, 'v')
         shell: bash -l {0}
         env:
-          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
           ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
         run: |
+          set -euo pipefail
+          if [ -z "${ANACONDA_API_TOKEN:-}" ]; then
+            echo "Error: ANACONDA_API_TOKEN is not set. Provide it via the ATLAS_ENV_LOCAL dotenv secret." >&2
+            exit 1
+          fi
           eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
@@ -545,9 +565,13 @@ jobs:
         working-directory: python/zimg
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+          TWINE_PASSWORD: ${{ env.PYPI_API_TOKEN }}
         run: |
           eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           set -euo pipefail
+          if [ -z "${TWINE_PASSWORD:-}" ]; then
+            echo "Error: PYPI_API_TOKEN is not set. Provide it via the ATLAS_ENV_LOCAL dotenv secret." >&2
+            exit 1
+          fi
           python -m twine upload dist/*

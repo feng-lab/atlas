@@ -218,6 +218,10 @@ src/neurolabi/python/QMakeParser.pyc
 /atlas_deps/
 /atlas_test_data/
 
+# Local env secrets
+/.env
+/.env.local
+
 # Vulkan compiled SPIR-V outputs (built by CMake)
 src/atlas/Resources/shader/vulkan/spv/
 

@@ -53,6 +53,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Load CI env (.env.local)
+        uses: ./.github/actions/load-dotenv
+        with:
+          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
+
       - name: Prepare macOS environment
         uses: ./.github/actions/macos-env
         with:
@@ -79,19 +84,6 @@ jobs:
 
       - name: Build and publish
         uses: ./.github/actions/macos-build
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
-          ssh-server: ${{ secrets.SSH_SERVER }}
-          ssh-port: ${{ secrets.SSH_PORT }}
-          ssh-username: ${{ secrets.SSH_USERNAME }}
-          ssh-deploy-path: ${{ secrets.SSH_DEPLOY_PATH }}
-          ssh-server2: ${{ secrets.SSH_SERVER2 }}
-          ssh-port2: ${{ secrets.SSH_PORT2 }}
-          ssh-username2: ${{ secrets.SSH_USERNAME2 }}
-          ssh-deploy-path2: ${{ secrets.SSH_DEPLOY_PATH2 }}
-          anaconda-api-token: ${{ secrets.ANACONDA_API_TOKEN }}
-          pypi-api-token: ${{ secrets.PYPI_API_TOKEN }}
 
   build-env:
     needs: determine-mode
@@ -130,6 +122,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Load CI env (.env.local)
+        uses: ./.github/actions/load-dotenv
+        with:
+          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
+
       - name: Prepare macOS environment
         uses: ./.github/actions/macos-env
         with:
@@ -142,16 +139,3 @@ jobs:
 
       - name: Build and publish
         uses: ./.github/actions/macos-build
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
-          ssh-server: ${{ secrets.SSH_SERVER }}
-          ssh-port: ${{ secrets.SSH_PORT }}
-          ssh-username: ${{ secrets.SSH_USERNAME }}
-          ssh-deploy-path: ${{ secrets.SSH_DEPLOY_PATH }}
-          ssh-server2: ${{ secrets.SSH_SERVER2 }}
-          ssh-port2: ${{ secrets.SSH_PORT2 }}
-          ssh-username2: ${{ secrets.SSH_USERNAME2 }}
-          ssh-deploy-path2: ${{ secrets.SSH_DEPLOY_PATH2 }}
-          anaconda-api-token: ${{ secrets.ANACONDA_API_TOKEN }}
-          pypi-api-token: ${{ secrets.PYPI_API_TOKEN }}
