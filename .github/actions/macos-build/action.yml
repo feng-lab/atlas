@@ -48,8 +48,18 @@ runs:
         PY
 
         KEYCHAIN_PASSWORD="$(python -c 'import secrets; print(secrets.token_hex(16))')"
-        ORIG_DEFAULT_KEYCHAIN="$(security default-keychain | sed -E 's/^"//; s/"$//')"
-        ORIG_KEYCHAIN_LIST="$(security list-keychains -d user | sed -E 's/^[[:space:]]*\"//; s/\"$//')"
+        # On some self-hosted runners, the user may not have a default keychain configured.
+        # Treat missing defaults/search-lists as soft state and proceed with a temp keychain.
+        ORIG_DEFAULT_KEYCHAIN="$(security default-keychain 2>/dev/null | sed -E 's/^"//; s/"$//' || true)"
+        ORIG_KEYCHAIN_LIST="$(
+          security list-keychains -d user 2>/dev/null \
+            | sed -E 's/^[[:space:]]*\"//; s/\"$//' \
+            | grep -F -v -- "${KEYCHAIN_PATH}" \
+            || true
+        )"
+        if [ "${ORIG_DEFAULT_KEYCHAIN}" = "${KEYCHAIN_PATH}" ]; then
+          ORIG_DEFAULT_KEYCHAIN=""
+        fi
 
         security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
         security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
@@ -65,10 +75,14 @@ runs:
         {
           echo "MACOS_NOTARYTOOL_API_KEY_PATH=${NOTARY_P8_PATH}"
           echo "ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN=${ORIG_DEFAULT_KEYCHAIN}"
-          echo "ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST<<EOF"
-          echo "${ORIG_KEYCHAIN_LIST}"
-          echo "EOF"
         } >> "$GITHUB_ENV"
+        if [ -n "${ORIG_KEYCHAIN_LIST}" ]; then
+          {
+            echo "ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST<<EOF"
+            echo "${ORIG_KEYCHAIN_LIST}"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+        fi
 
     - name: Build and deploy Atlas
       shell: bash -l {0}
@@ -237,12 +251,33 @@ runs:
         CERT_P12_PATH="${RUNNER_TEMP}/atlas-codesign-cert.p12"
         NOTARY_P8_PATH="${RUNNER_TEMP}/atlas-notary-key.p8"
 
-        if [ -n "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN:-}" ]; then
-          security default-keychain -s "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN}" || true
+        restoreDefault=""
+        if [ -n "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN:-}" ] && [ "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN}" != "${KEYCHAIN_PATH}" ] && [ -f "${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN}" ]; then
+          restoreDefault="${ATLAS__CODESIGN_ORIG_DEFAULT_KEYCHAIN}"
+        else
+          for candidate in "${HOME}/Library/Keychains/login.keychain-db" "${HOME}/Library/Keychains/login.keychain"; do
+            if [ "${candidate}" != "${KEYCHAIN_PATH}" ] && [ -f "${candidate}" ]; then
+              restoreDefault="${candidate}"
+              break
+            fi
+          done
+          if [ -z "${restoreDefault}" ] && [ -f "/Library/Keychains/System.keychain" ]; then
+            restoreDefault="/Library/Keychains/System.keychain"
+          fi
         fi
+
+        if [ -n "${restoreDefault}" ]; then
+          security default-keychain -s "${restoreDefault}" || true
+        fi
+
         if [ -n "${ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST:-}" ]; then
           # shellcheck disable=SC2086
           security list-keychains -d user -s ${ATLAS__CODESIGN_ORIG_KEYCHAIN_LIST} || true
+        elif [ -n "${restoreDefault}" ]; then
+          security list-keychains -d user -s "${restoreDefault}" || true
         fi
-        security delete-keychain "${KEYCHAIN_PATH}" || true
+
+        if [ -f "${KEYCHAIN_PATH}" ]; then
+          security delete-keychain "${KEYCHAIN_PATH}" || true
+        fi
         rm -f "${MACOS_NOTARYTOOL_API_KEY_PATH:-${NOTARY_P8_PATH}}" "${CERT_P12_PATH}" || true

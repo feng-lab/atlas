@@ -1,21 +1,16 @@
 name: Load dotenv into job environment
-description: Write a dotenv file from a workflow secret and export its variables via GITHUB_ENV.
+description: Export environment variables from a workflow-secret dotenv; values are masked and no file is left behind.
 inputs:
   dotenv:
     description: Raw contents of the dotenv file (e.g. from a GitHub Actions secret).
     required: true
-  path:
-    description: Path to write the dotenv file (relative to the repo root).
-    required: false
-    default: .env.local
 runs:
   using: composite
   steps:
-    - name: Write dotenv file
+    - name: Load dotenv (masked)
       shell: bash -l {0}
       env:
         DOTENV_CONTENT: ${{ inputs.dotenv }}
-        DOTENV_PATH: ${{ inputs.path }}
       run: |
         set -euo pipefail
 
@@ -23,48 +18,81 @@ runs:
           echo "Error: load-dotenv action received an empty 'dotenv' input." >&2
           exit 1
         fi
-        if [ -z "${DOTENV_PATH:-}" ]; then
-          echo "Error: load-dotenv action received an empty 'path' input." >&2
-          exit 1
-        fi
-
-        dotenvDir="$(dirname "${DOTENV_PATH}")"
-        if [ "${dotenvDir}" != "." ]; then
-          mkdir -p "${dotenvDir}"
-        fi
-
-        printf '%s' "${DOTENV_CONTENT}" > "${DOTENV_PATH}"
-        chmod 600 "${DOTENV_PATH}" || true
-
-    - name: Export dotenv variables to GITHUB_ENV
-      shell: bash -l {0}
-      env:
-        DOTENV_PATH: ${{ inputs.path }}
-      run: |
-        set -euo pipefail
 
         if [ -z "${GITHUB_ENV:-}" ]; then
           echo "Error: GITHUB_ENV is not set; cannot persist env vars across steps." >&2
           exit 1
         fi
-        githubEnvPath="${GITHUB_ENV}"
-        if [[ "${githubEnvPath}" =~ ^[A-Za-z]:[\\\\/] ]]; then
-          if command -v cygpath >/dev/null 2>&1; then
-            githubEnvPath="$(cygpath -u "${githubEnvPath}")"
-          else
-            drive="$(printf '%s' "${githubEnvPath:0:1}" | tr 'A-Z' 'a-z')"
-            rest="${githubEnvPath:2}"
+
+        normalize_windows_path() {
+          local path="$1"
+          if [[ "${path}" =~ ^[A-Za-z]:[\\\\/] ]]; then
+            if command -v cygpath >/dev/null 2>&1; then
+              cygpath -u "${path}"
+              return 0
+            fi
+            local drive rest
+            drive="$(printf '%s' "${path:0:1}" | tr 'A-Z' 'a-z')"
+            rest="${path:2}"
             rest="${rest#\\\\}"
             rest="${rest#/}"
             rest="${rest//\\\\//}"
-            githubEnvPath="/${drive}/${rest}"
+            printf '/%s/%s' "${drive}" "${rest}"
+            return 0
           fi
-        fi
+          printf '%s' "${path}"
+        }
 
-        if [ ! -f "${DOTENV_PATH}" ]; then
-          echo "Error: dotenv file not found at '${DOTENV_PATH}' after write step." >&2
-          exit 1
-        fi
+        githubEnvPath="$(normalize_windows_path "${GITHUB_ENV}")"
+
+        tmpRoot="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+        tmpRoot="$(normalize_windows_path "${tmpRoot}")"
+        mkdir -p "${tmpRoot}"
+        umask 077
+
+        tempDotenvPath="$(mktemp "${tmpRoot%/}/atlas-dotenv.XXXXXX")"
+        chmod 600 "${tempDotenvPath}" || true
+
+        cleanup() {
+          rm -f -- "${tempDotenvPath}" 2>/dev/null || true
+        }
+        trap cleanup EXIT
+
+        printf '%s' "${DOTENV_CONTENT}" > "${tempDotenvPath}"
+
+        escape_workflow_command_data() {
+          local data="$1"
+          data="${data//'%'/'%25'}"
+          data="${data//$'\r'/'%0D'}"
+          data="${data//$'\n'/'%0A'}"
+          printf '%s' "${data}"
+        }
+
+        add_mask_line() {
+          local line="$1"
+          if [ -z "${line}" ]; then
+            return 0
+          fi
+          line="$(escape_workflow_command_data "${line}")"
+          printf '::add-mask::%s\n' "${line}"
+        }
+
+        add_mask_value() {
+          local value="$1"
+          if [ -z "${value}" ]; then
+            return 0
+          fi
+          if [[ "${value}" == *$'\n'* ]]; then
+            while IFS= read -r line || [ -n "${line}" ]; do
+              add_mask_line "${line}"
+            done <<< "${value}"
+            return 0
+          fi
+          add_mask_line "${value}"
+        }
+
+        # Best-effort: register masks for the raw secret content immediately to reduce log leak risk.
+        add_mask_value "${DOTENV_CONTENT}"
 
         dotenvKeys="$(
           awk '
@@ -79,7 +107,7 @@ runs:
                 if (!seen[key]++) print key
               }
             }
-          ' "${DOTENV_PATH}"
+          ' "${tempDotenvPath}"
         )"
 
         # Sourcing allows multi-line values (e.g., SSH keys) as long as the file uses valid shell syntax.
@@ -87,7 +115,7 @@ runs:
         set +u
         set -a
         # shellcheck disable=SC1090
-        source "${DOTENV_PATH}"
+        source "${tempDotenvPath}"
         set +a
         set -u
 
@@ -97,11 +125,12 @@ runs:
 
         while IFS= read -r key; do
           if [[ ! "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-            echo "Error: invalid env var name parsed from ${DOTENV_PATH}: '${key}'" >&2
+            echo "Error: invalid env var name parsed from dotenv: '${key}'" >&2
             exit 1
           fi
 
           value="${!key-}"
+          add_mask_value "${value}"
           if [[ "${value}" == *$'\n'* ]]; then
             delimiter="__ENV_${key}_${RANDOM}_${RANDOM}_$$_$(date +%s)__"
             {

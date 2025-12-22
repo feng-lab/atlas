@@ -383,7 +383,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Load CI env (.env.local)
+      - name: Load CI env (masked)
         uses: ./.github/actions/load-dotenv
         with:
           dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
