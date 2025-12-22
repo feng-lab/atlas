@@ -2,9 +2,12 @@ import argparse
 import datetime
 import logging
 import os
+import re
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as eTree
 import zipfile
 from typing import Optional
@@ -22,6 +25,28 @@ _ENTITLEMENTS_ENV_VAR = "ATLAS_MACOS_CODESIGN_ENTITLEMENTS"
 _NOTARY_API_KEY_PATH_ENV_VAR = "MACOS_NOTARYTOOL_API_KEY_PATH"
 _NOTARY_API_KEY_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_KEY_ID"
 _NOTARY_API_ISSUER_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_ISSUER_ID"
+
+_MACOS_NESTED_BUNDLE_SUFFIXES: tuple[str, ...] = (
+    ".app",
+    ".appex",
+    ".bundle",
+    ".framework",
+    ".kext",
+    ".plugin",
+    ".qlgenerator",
+    ".xpc",
+)
+
+_MACOS_MACHO_FILE_EXTENSIONS: frozenset[str] = frozenset({".dylib", ".jnilib", ".so"})
+_MACOS_DISALLOWED_MACHO_ARCHS: frozenset[str] = frozenset({"i386", "ppc", "ppc64"})
+_MACOS_JAR_ENTRY_REMOVE_LIST: frozenset[str] = frozenset(
+    {
+        # Notarytool rejects this vendored TurboJPEG build because it was built with an SDK
+        # older than macOS 10.9. We don't ship a newer build, so remove it from the jar to
+        # satisfy notarization.
+        "META-INF/lib/osx_64/libturbojpeg.dylib",
+    }
+)
 
 
 def _env_truthy(name: str) -> bool:
@@ -132,42 +157,423 @@ def _macos_entitlements_path() -> Optional[str]:
     entitlements = os.environ.get(_ENTITLEMENTS_ENV_VAR)
     if not entitlements:
         return None
-    if os.path.isabs(entitlements):
-        return entitlements
-    return os.path.join(common_dirs.atlas_repository_dir(), entitlements)
+    entitlements = os.path.expanduser(os.path.expandvars(entitlements))
+    if not os.path.isabs(entitlements):
+        entitlements = os.path.join(common_dirs.atlas_repository_dir(), entitlements)
+    if not os.path.exists(entitlements):
+        raise RuntimeError(
+            f"{_ENTITLEMENTS_ENV_VAR} is set but the entitlements file does not exist: {entitlements}"
+        )
+    return entitlements
 
 
 def _macos_run_checked(args: list[str], *, cwd: Optional[str] = None) -> None:
     logger.info("Running: %s", " ".join(args))
     subprocess.run(args, cwd=cwd, shell=False, check=True)
 
+def _macos_is_signable_bundle_dir(path: str) -> bool:
+    if not os.path.isdir(path):
+        return False
+    lower = path.lower()
+    return any(lower.endswith(suffix) for suffix in _MACOS_NESTED_BUNDLE_SUFFIXES)
 
-def _macos_codesign_bundle(bundle_path: str) -> None:
+
+def _macos_file_description(path: str) -> Optional[str]:
+    try:
+        proc = subprocess.run(
+            ["file", "-b", path],
+            shell=False,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    except Exception as e:
+        logger.debug("file(1) failed for %s: %s", path, e)
+        return None
+
+    if proc.returncode != 0:
+        logger.debug(
+            "file(1) returned %s for %s: %s", proc.returncode, path, proc.stdout
+        )
+        return None
+
+    return (proc.stdout or "").strip()
+
+
+def _macos_lipo_archs(path: str) -> Optional[list[str]]:
+    try:
+        proc = subprocess.run(
+            ["lipo", "-archs", path],
+            shell=False,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        logger.debug("lipo(1) failed for %s: %s", path, e)
+        return None
+
+    if proc.returncode != 0:
+        logger.debug(
+            "lipo(1) returned %s for %s: %s", proc.returncode, path, proc.stdout
+        )
+        return None
+
+    archs = (proc.stdout or "").strip()
+    if not archs:
+        return None
+    return archs.split()
+
+
+def _macos_strip_disallowed_macho_archs_in_place(path: str) -> None:
+    archs = _macos_lipo_archs(path)
+    if not archs:
+        return
+
+    to_remove = [arch for arch in archs if arch in _MACOS_DISALLOWED_MACHO_ARCHS]
+    if not to_remove:
+        return
+
+    keep = [arch for arch in archs if arch not in _MACOS_DISALLOWED_MACHO_ARCHS]
+    if not keep:
+        raise RuntimeError(
+            "Mach-O binary contains only unsupported architectures "
+            f"({', '.join(sorted(_MACOS_DISALLOWED_MACHO_ARCHS))}): {path}\n"
+            f"archs: {' '.join(archs)}"
+        )
+
+    logger.info(
+        "Stripping unsupported architectures from %s: remove=%s keep=%s",
+        path,
+        " ".join(to_remove),
+        " ".join(keep),
+    )
+
+    input_path = path
+    tmp_path = f"{path}.lipo"
+    for arch in to_remove:
+        _macos_run_checked(["lipo", "-remove", arch, input_path, "-output", tmp_path])
+        if input_path != path:
+            try:
+                os.remove(input_path)
+            except OSError:
+                pass
+        input_path = tmp_path
+        tmp_path = f"{tmp_path}.next"
+
+    os.replace(input_path, path)
+
+
+def _macos_zipinfo_clone(info: zipfile.ZipInfo) -> zipfile.ZipInfo:
+    # `ZipInfo` contains read-time offsets that aren't relevant for writing. Recreate a
+    # fresh object but preserve metadata so the rewritten jar stays well-formed.
+    cloned = zipfile.ZipInfo(filename=info.filename, date_time=info.date_time)
+    cloned.compress_type = info.compress_type
+    cloned.comment = info.comment
+    cloned.extra = info.extra
+    cloned.create_system = info.create_system
+    cloned.create_version = info.create_version
+    cloned.extract_version = info.extract_version
+    cloned.flag_bits = info.flag_bits
+    cloned.volume = info.volume
+    cloned.internal_attr = info.internal_attr
+    cloned.external_attr = info.external_attr
+    return cloned
+
+
+def _macos_codesign_macho_files_in_jar(
+    jar_path: str, *, identity: str, tmp_parent_dir: str
+) -> None:
+    """Codesign Mach-O binaries embedded inside a .jar file.
+
+    Apple's notarization service scans nested archives (like .jar) and requires any
+    embedded Mach-O binaries to be signed with the same Developer ID identity and a
+    secure timestamp.
+    """
+    if identity == "-":
+        return
+    if not os.path.exists(jar_path):
+        raise RuntimeError(f"Jar path does not exist: {jar_path}")
+
+    replacements: dict[str, bytes] = {}
+    excluded_entries: set[str] = set()
+
+    with tempfile.TemporaryDirectory(
+        prefix="atlas-jar-codesign-", dir=tmp_parent_dir
+    ) as tmp_dir:
+        with zipfile.ZipFile(jar_path, "r") as zin:
+            for info in zin.infolist():
+                if info.is_dir():
+                    continue
+
+                if info.filename in _MACOS_JAR_ENTRY_REMOVE_LIST:
+                    logger.warning(
+                        "Removing unsupported binary from %s: %s",
+                        os.path.basename(jar_path),
+                        info.filename,
+                    )
+                    excluded_entries.add(info.filename)
+                    continue
+
+                _, ext = os.path.splitext(info.filename)
+                if ext.lower() not in _MACOS_MACHO_FILE_EXTENSIONS:
+                    continue
+
+                tmp_file_path = os.path.join(tmp_dir, *info.filename.split("/"))
+                os.makedirs(os.path.dirname(tmp_file_path), exist_ok=True)
+                with open(tmp_file_path, "wb") as f:
+                    f.write(zin.read(info.filename))
+
+                desc = _macos_file_description(tmp_file_path)
+                if not desc or "Mach-O" not in desc:
+                    continue
+
+                _macos_run_checked(["chmod", "u+rw", tmp_file_path])
+                if any(arch in desc.lower() for arch in _MACOS_DISALLOWED_MACHO_ARCHS):
+                    _macos_strip_disallowed_macho_archs_in_place(tmp_file_path)
+                _macos_codesign_target(
+                    tmp_file_path,
+                    identity=identity,
+                    entitlements=None,
+                    file_descriptions={},
+                )
+
+                with open(tmp_file_path, "rb") as f:
+                    replacements[info.filename] = f.read()
+
+        if not replacements and not excluded_entries:
+            return
+
+        logger.info(
+            "Codesigning %d Mach-O files embedded in %s",
+            len(replacements),
+            os.path.basename(jar_path),
+        )
+
+        tmp_jar_path = f"{jar_path}.tmp"
+        if os.path.exists(tmp_jar_path):
+            os.remove(tmp_jar_path)
+
+        with (
+            zipfile.ZipFile(jar_path, "r") as zin,
+            zipfile.ZipFile(tmp_jar_path, "w") as zout,
+        ):
+            zout.comment = zin.comment
+            for info in zin.infolist():
+                cloned = _macos_zipinfo_clone(info)
+                if info.is_dir():
+                    zout.writestr(cloned, b"")
+                    continue
+                if info.filename in excluded_entries:
+                    continue
+                payload = replacements.get(info.filename)
+                if payload is None:
+                    payload = zin.read(info.filename)
+                zout.writestr(cloned, payload)
+
+        os.replace(tmp_jar_path, jar_path)
+        _macos_run_checked(["xattr", "-c", jar_path])
+
+
+def _macos_codesign_macho_files_in_jars_under_dir(
+    root_dir: str, *, identity: str, tmp_parent_dir: str
+) -> None:
+    if identity == "-":
+        return
+    for dirpath, dirnames, filenames in os.walk(root_dir, followlinks=False):
+        dirnames[:] = [
+            name for name in dirnames if not os.path.islink(os.path.join(dirpath, name))
+        ]
+        for filename in filenames:
+            if not filename.lower().endswith(".jar"):
+                continue
+            jar_path = os.path.join(dirpath, filename)
+            if os.path.islink(jar_path):
+                continue
+            _macos_codesign_macho_files_in_jar(
+                jar_path, identity=identity, tmp_parent_dir=tmp_parent_dir
+            )
+
+
+def _macos_collect_signable_targets(root_path: str) -> tuple[list[str], dict[str, str]]:
+    """Return (targets, file_descriptions) for staged signing.
+
+    Targets include:
+      - Mach-O executables/dylibs (regular files only; symlinks skipped)
+      - Nested bundles (.app/.framework/...) as directories
+
+    The returned list excludes root_path itself and is sorted deepest-first (inside-out).
+    """
+    if not os.path.isdir(root_path):
+        return ([], {})
+
+    targets: list[str] = []
+    file_descriptions: dict[str, str] = {}
+
+    for dirpath, dirnames, filenames in os.walk(root_path, followlinks=False):
+        # Avoid traversing symlinked directories (common in .framework layouts).
+        dirnames[:] = [
+            name for name in dirnames if not os.path.islink(os.path.join(dirpath, name))
+        ]
+
+        for dirname in dirnames:
+            child_dir = os.path.join(dirpath, dirname)
+            if _macos_is_signable_bundle_dir(child_dir) and child_dir != root_path:
+                targets.append(child_dir)
+
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            if os.path.islink(file_path):
+                continue
+
+            _, ext = os.path.splitext(filename)
+            ext = ext.lower()
+            is_candidate = ext in _MACOS_MACHO_FILE_EXTENSIONS
+            if not is_candidate:
+                try:
+                    mode = os.stat(file_path).st_mode
+                except OSError:
+                    continue
+                is_candidate = bool(mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
+            if not is_candidate:
+                continue
+
+            desc = _macos_file_description(file_path)
+            if not desc or "Mach-O" not in desc:
+                continue
+
+            targets.append(file_path)
+            file_descriptions[file_path] = desc
+
+    def depth_within_root(path: str) -> int:
+        rel = os.path.relpath(path, root_path)
+        if rel == ".":
+            return 0
+        return rel.count(os.sep)
+
+    # De-dupe by realpath to avoid double-signing through symlinked paths.
+    unique_targets: list[str] = []
+    seen_realpaths: set[str] = set()
+    for target in targets:
+        rp = os.path.realpath(target)
+        if rp in seen_realpaths:
+            continue
+        seen_realpaths.add(rp)
+        unique_targets.append(target)
+
+    unique_targets.sort(key=lambda p: (-depth_within_root(p), p))
+    return (unique_targets, file_descriptions)
+
+
+def _macos_should_apply_entitlements(
+    target_path: str, *, entitlements: Optional[str], file_descriptions: dict[str, str]
+) -> bool:
+    if not entitlements:
+        return False
+    if os.path.isdir(target_path):
+        lower = target_path.lower()
+        return lower.endswith((".app", ".appex", ".xpc"))
+
+    desc = file_descriptions.get(target_path)
+    if not desc:
+        return False
+    return "executable" in desc.lower()
+
+
+def _macos_codesign_target(
+    target_path: str,
+    *,
+    identity: str,
+    entitlements: Optional[str],
+    file_descriptions: dict[str, str],
+) -> None:
+    if identity != "-" and not os.path.isdir(target_path):
+        desc = file_descriptions.get(target_path)
+        if (
+            desc
+            and "Mach-O" in desc
+            and any(arch in desc.lower() for arch in _MACOS_DISALLOWED_MACHO_ARCHS)
+        ):
+            _macos_strip_disallowed_macho_archs_in_place(target_path)
+
+    cmd = ["codesign", "--force", "--sign", identity]
+    if identity != "-":
+        cmd = [
+            "codesign",
+            "--force",
+            "--options",
+            "runtime",
+            "--timestamp",
+            "--sign",
+            identity,
+        ]
+        if _macos_should_apply_entitlements(
+            target_path, entitlements=entitlements, file_descriptions=file_descriptions
+        ):
+            cmd.extend(["--entitlements", entitlements])
+
+    cmd.append(target_path)
+    _macos_run_checked(cmd)
+
+
+def _macos_codesign_bundle(
+    bundle_path: str, *, identity_override: Optional[str] = None
+) -> None:
     if not common_dirs.is_mac():
         raise RuntimeError("_macos_codesign_bundle called on non-macOS")
     if not os.path.exists(bundle_path):
         raise RuntimeError(f"Bundle path does not exist: {bundle_path}")
 
-    identity = _macos_codesign_identity()
-    entitlements = _macos_entitlements_path()
-
+    # Some bundled artifacts (notably JRE legal files) are shipped read-only or even
+    # non-readable. `xattr -cr` needs write permission to clear extended attributes and
+    # `ditto` needs read permission later when packaging for notarization. Make the bundle
+    # user-readable/writable before stripping xattrs so these steps don't fail mid-tree.
+    if os.path.isdir(bundle_path):
+        _macos_run_checked(["chmod", "-R", "-P", "u+rwX", bundle_path])
+    else:
+        _macos_run_checked(["chmod", "u+rwX", bundle_path])
     _macos_run_checked(["xattr", "-cr", bundle_path])
 
-    cmd = [
-        "codesign",
-        "--force",
-        "--options",
-        "runtime",
-        "--timestamp",
-        "--sign",
-        identity,
-    ]
+    identity = (
+        identity_override
+        if identity_override is not None
+        else _macos_codesign_identity()
+    )
+    entitlements = None if identity == "-" else _macos_entitlements_path()
+
+    file_descriptions: dict[str, str] = {}
     if os.path.isdir(bundle_path):
-        cmd.append("--deep")
-    if entitlements:
-        cmd.extend(["--entitlements", entitlements])
-    cmd.append(bundle_path)
-    _macos_run_checked(cmd)
+        # Notary scans nested archives like .jar and requires embedded Mach-O binaries
+        # to be signed. Fix these before signing the enclosing bundle.
+        _macos_codesign_macho_files_in_jars_under_dir(
+            bundle_path, identity=identity, tmp_parent_dir=os.path.dirname(bundle_path)
+        )
+
+        targets, file_descriptions = _macos_collect_signable_targets(bundle_path)
+        if targets:
+            logger.info(
+                "Staged signing %d nested items (inside-out): %s",
+                len(targets),
+                os.path.basename(bundle_path),
+            )
+        for target in targets:
+            _macos_codesign_target(
+                target,
+                identity=identity,
+                entitlements=entitlements,
+                file_descriptions=file_descriptions,
+            )
+
+    _macos_codesign_target(
+        bundle_path,
+        identity=identity,
+        entitlements=entitlements,
+        file_descriptions=file_descriptions,
+    )
 
     verify_cmd = ["codesign", "--verify", "--strict", "--verbose=2"]
     if os.path.isdir(bundle_path):
@@ -190,19 +596,100 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
     if os.path.exists(notarize_zip):
         os.remove(notarize_zip)
 
-    _macos_run_checked(
-        ["ditto", "-c", "-k", "--keepParent", bundle_name, notarize_zip], cwd=bundle_dir
+    # ditto can emit per-file permission errors while still returning success; treat any
+    # such output as fatal so we don't notarize an incomplete zip.
+    ditto_cmd = ["ditto", "-c", "-k", "--keepParent", bundle_name, notarize_zip]
+    logger.info("Running: %s", " ".join(ditto_cmd))
+    proc = subprocess.run(
+        ditto_cmd,
+        cwd=bundle_dir,
+        shell=False,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
     )
-    _macos_run_checked(
-        [
-            "xcrun",
-            "notarytool",
-            "submit",
-            notarize_zip,
-            "--wait",
-            *auth_args,
-        ]
+    ditto_output = (proc.stdout or "").strip()
+    if ditto_output:
+        for line in ditto_output.splitlines():
+            logger.error("%s", line)
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, ditto_cmd)
+    if ditto_output:
+        raise RuntimeError(
+            "Failed creating notarization zip; `ditto` reported errors (see log above). "
+            "This usually means some files inside the bundle are not readable by the current user.\n"
+            f"bundle: {bundle_path}\n"
+            "Fix by ensuring the bundle is user-readable before retrying, e.g.:\n"
+            f"  chmod -R -P u+rwX {bundle_path}"
+        )
+    submit_cmd = ["xcrun", "notarytool", "submit", notarize_zip, "--wait", *auth_args]
+    logger.info("Running: %s", " ".join(submit_cmd))
+    proc = subprocess.Popen(
+        submit_cmd,
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
     )
+
+    id_regex = re.compile(r"^\s*id:\s*([0-9a-fA-F-]{36})\s*$")
+    status_regex = re.compile(r"^\s*status:\s*(\S+)\s*$")
+    submission_id: Optional[str] = None
+    status: Optional[str] = None
+
+    assert proc.stdout is not None
+    for raw_line in proc.stdout:
+        line = raw_line.rstrip("\n")
+        if line:
+            logger.info("%s", line.rstrip())
+        match = id_regex.match(line)
+        if match:
+            submission_id = match.group(1)
+            continue
+        match = status_regex.match(line)
+        if match:
+            status = match.group(1)
+            continue
+
+    proc.wait()
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, submit_cmd)
+    if not submission_id:
+        raise RuntimeError("notarytool submit did not report a submission id")
+    if not status:
+        raise RuntimeError("notarytool submit did not report a final status")
+    logger.info("Notarytool result: id=%s status=%s", submission_id, status)
+    if status != "Accepted":
+        log_path = os.path.join(bundle_dir, f"{bundle_name}.notarytool.log.json")
+        try:
+            _macos_run_checked(
+                ["xcrun", "notarytool", "log", submission_id, log_path, *auth_args]
+            )
+        except subprocess.CalledProcessError:
+            raise RuntimeError(
+                "Notarization failed and fetching the notarization log also failed.\n"
+                f"bundle: {bundle_path}\n"
+                f"id: {submission_id}\n"
+                f"status: {status}\n"
+                "Re-run:\n"
+                f"  xcrun notarytool log {submission_id} <output-path> {' '.join(auth_args)}"
+            )
+        try:
+            with open(log_path, "r", encoding="utf-8") as f:
+                log_text = f.read()
+            logger.error("notarytool log (%s):\n%s", log_path, log_text)
+        except Exception as e:
+            logger.error("Failed printing notarytool log %s: %s", log_path, e)
+        raise RuntimeError(
+            "Notarization failed.\n"
+            f"bundle: {bundle_path}\n"
+            f"id: {submission_id}\n"
+            f"status: {status}\n"
+            f"log: {log_path}\n"
+            "Open the log file above to see which embedded file failed validation."
+        )
     _macos_run_checked(["xcrun", "stapler", "staple", "-v", bundle_path])
     _macos_run_checked(["xcrun", "stapler", "validate", "-v", bundle_path])
     _macos_run_checked(
@@ -346,11 +833,7 @@ def build_atlas_package(is_debug_version: bool = False):
 
         deployed_app_path = os.path.join(common_dirs.deploy_target_dir(), app_name)
         if _macos_signing_disabled():
-            subprocess.run(
-                ["codesign", "--force", "--deep", "--sign", "-", deployed_app_path],
-                shell=False,
-                check=True,
-            )
+            _macos_codesign_bundle(deployed_app_path, identity_override="-")
         else:
             _macos_codesign_bundle(deployed_app_path)
             if not is_debug_version:
@@ -552,11 +1035,7 @@ def build_atlas_installer():
         )
         if common_dirs.is_mac():
             if _macos_signing_disabled():
-                subprocess.run(
-                    ["codesign", "--force", "--sign", "-", mt_app_path],
-                    shell=False,
-                    check=True,
-                )
+                _macos_codesign_bundle(mt_app_path, identity_override="-")
             else:
                 _macos_codesign_bundle(mt_app_path)
     subprocess.run(
@@ -605,11 +1084,7 @@ def build_atlas_installer():
     if common_dirs.is_mac():
         installer_app_path = os.path.join(common_dirs.deploy_target_dir(), installer_app_name)
         if _macos_signing_disabled():
-            subprocess.run(
-                ["codesign", "--force", "--deep", "--sign", "-", installer_app_path],
-                shell=False,
-                check=True,
-            )
+            _macos_codesign_bundle(installer_app_path, identity_override="-")
         else:
             _macos_codesign_bundle(installer_app_path)
             _macos_notarize_and_staple_bundle(installer_app_path)

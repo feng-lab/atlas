@@ -66,6 +66,8 @@ __pycache__/
 /deploy/Atlas/
 /deploy/Atlas.app/
 /deploy/Linux/
+/deploy/*.log
+/deploy/*.json
 /Atlas.AppDir/
 /Atlas/
 /Atlas.app/

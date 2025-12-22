@@ -114,6 +114,13 @@ conda install numpy python conda-build anaconda-client pip
     # see `utils/all.sh` for example
     ```
 
+### macOS signing & notarization (deployment)
+`util/deploy_atlas.py` codesigns nested code inside-out (without `codesign --deep`) and notarizes by default. Configure via env vars:
+- `MACOS_CODESIGN_IDENTITY` (required when signing is enabled)
+- `MACOS_NOTARYTOOL_API_KEY_PATH`, `MACOS_NOTARYTOOL_API_KEY_ID`, `MACOS_NOTARYTOOL_API_ISSUER_ID` (required for notarization)
+- `ATLAS_MACOS_CODESIGN_ENTITLEMENTS` (optional entitlements plist)
+- `ATLAS_MACOS_DISABLE_SIGNING=1` to use ad-hoc signing and skip notarization
+
 ## C++ Version Defines
 * $Repository_DIR/CMakeLists.txt: set(CMAKE_CXX_STANDARD 20)
 * $Repository_DIR/util/build_ext_libs.py: def cpp_standard() ... // fix to 20 now
