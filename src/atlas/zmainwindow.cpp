@@ -23,6 +23,7 @@
 #include "zjson.h"
 #include "zfileutils.h"
 #include "zmessageboxhelpers.h"
+#include "zmarkdownbrowser.h"
 #include "ztheme.h"
 #include <QFileDialog>
 #include <QMessageBox>
@@ -40,7 +41,6 @@
 #include <QDesktopServices>
 #include <QDialog>
 #include <QVBoxLayout>
-#include <QTextBrowser>
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
@@ -48,6 +48,7 @@
 #include <QCoreApplication>
 #include <QProcess>
 #include <QSignalSpy>
+#include <QTimer>
 #include <utility>
 #include <memory>
 
@@ -352,15 +353,16 @@ void ZMainWindow::openDocMd(const QString& name)
   dlg->setAttribute(Qt::WA_DeleteOnClose);
   dlg->setWindowTitle(name);
   auto* layout = new QVBoxLayout(dlg);
-  auto* view = new QTextBrowser(dlg);
+  auto* view = new ZMarkdownBrowser(dlg);
+  view->setSearchPaths(QStringList { docsRoot });
   // Back/Forward toolbar wired to browser history
   auto* tb = new QToolBar(dlg);
   QAction* actBack = tb->addAction(tr("Back"));
   actBack->setEnabled(false);
-  QObject::connect(actBack, &QAction::triggered, view, &QTextBrowser::backward);
+  QObject::connect(actBack, &QAction::triggered, view, &ZMarkdownBrowser::goBack);
   QAction* actFwd = tb->addAction(tr("Forward"));
   actFwd->setEnabled(false);
-  QObject::connect(actFwd, &QAction::triggered, view, &QTextBrowser::forward);
+  QObject::connect(actFwd, &QAction::triggered, view, &ZMarkdownBrowser::goForward);
   QObject::connect(view, &QTextBrowser::backwardAvailable, actBack, &QAction::setEnabled);
   QObject::connect(view, &QTextBrowser::forwardAvailable, actFwd, &QAction::setEnabled);
   view->setOpenExternalLinks(true);
@@ -368,17 +370,22 @@ void ZMainWindow::openDocMd(const QString& name)
   if (!frag.isEmpty()) {
     start.setFragment(frag);
   }
-  view->setSource(start);
   // Home action to return to the starting document
   QAction* actHome = tb->addAction(tr("Home"));
   QObject::connect(actHome, &QAction::triggered, view, [view, start]() {
-    view->setSource(start);
+    view->navigateTo(start);
   });
 
   layout->addWidget(tb);
   layout->addWidget(view);
   dlg->resize(900, 700);
   dlg->show();
+
+  // Delay the initial navigation until the dialog is shown so the view has a
+  // window/screen (for correct HiDPI SVG rasterization).
+  QTimer::singleShot(0, dlg, [view, start]() {
+    view->navigateTo(start);
+  });
 }
 
 void ZMainWindow::raiseViewSettingDockWidget()

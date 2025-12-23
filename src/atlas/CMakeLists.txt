@@ -366,6 +366,7 @@ set(SOURCES
     zstyleditemdelegate.h zstyleditemdelegate.cpp
     zitemeditorfactory.h zitemeditorfactory.cpp
     zmainwindow.h zmainwindow.cpp
+    zmarkdownbrowser.h zmarkdownbrowser.cpp
     zimgdoc.h zimgdoc.cpp
     zimgview.h zimgview.cpp
     zspinboxwithscrollbar.h zspinboxwithscrollbar.cpp

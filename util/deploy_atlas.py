@@ -10,7 +10,7 @@ import sys
 import tempfile
 import xml.etree.ElementTree as eTree
 import zipfile
-from typing import Optional
+from typing import AbstractSet, Optional
 
 import build_ext_libs
 import common_dirs
@@ -25,6 +25,19 @@ _ENTITLEMENTS_ENV_VAR = "ATLAS_MACOS_CODESIGN_ENTITLEMENTS"
 _NOTARY_API_KEY_PATH_ENV_VAR = "MACOS_NOTARYTOOL_API_KEY_PATH"
 _NOTARY_API_KEY_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_KEY_ID"
 _NOTARY_API_ISSUER_ID_ENV_VAR = "MACOS_NOTARYTOOL_API_ISSUER_ID"
+
+# Only import the deployment-related variables from dotenv files to avoid surprising
+# side effects (e.g. altering subprocess behavior via unrelated env vars).
+_DOTENV_KEYS: frozenset[str] = frozenset(
+    {
+        _DISABLE_SIGNING_ENV_VAR,
+        _CODESIGN_IDENTITY_ENV_VAR,
+        _ENTITLEMENTS_ENV_VAR,
+        _NOTARY_API_KEY_PATH_ENV_VAR,
+        _NOTARY_API_KEY_ID_ENV_VAR,
+        _NOTARY_API_ISSUER_ID_ENV_VAR,
+    }
+)
 
 _MACOS_NESTED_BUNDLE_SUFFIXES: tuple[str, ...] = (
     ".app",
@@ -61,13 +74,26 @@ def _macos_signing_disabled() -> bool:
 
 
 def _maybe_load_dotenv() -> None:
+    if not common_dirs.is_mac():
+        return
+
     repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
     env_path = os.path.join(repo_root, ".env")
     env_local_path = os.path.join(repo_root, ".env.local")
 
     keys_from_env: set[str] = set()
-    _load_env_file(env_path, keys_from_env=keys_from_env, override_only_keys=None)
-    _load_env_file(env_local_path, keys_from_env=None, override_only_keys=keys_from_env)
+    _load_env_file(
+        env_path,
+        keys_from_env=keys_from_env,
+        override_only_keys=None,
+        allowed_keys=_DOTENV_KEYS,
+    )
+    _load_env_file(
+        env_local_path,
+        keys_from_env=None,
+        override_only_keys=keys_from_env,
+        allowed_keys=_DOTENV_KEYS,
+    )
 
 
 def _load_env_file(
@@ -75,6 +101,7 @@ def _load_env_file(
     *,
     keys_from_env: Optional[set[str]],
     override_only_keys: Optional[set[str]],
+    allowed_keys: Optional[AbstractSet[str]],
 ) -> None:
     if not os.path.exists(path):
         return
@@ -93,6 +120,8 @@ def _load_env_file(
                 key = key.strip()
                 value = value.strip()
                 if not key:
+                    continue
+                if allowed_keys is not None and key not in allowed_keys:
                     continue
                 if (
                     value.startswith(("'", '"'))
