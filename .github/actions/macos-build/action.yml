@@ -280,4 +280,4 @@ runs:
         if [ -f "${KEYCHAIN_PATH}" ]; then
           security delete-keychain "${KEYCHAIN_PATH}" || true
         fi
-        rm -f "${MACOS_NOTARYTOOL_API_KEY_PATH:-${NOTARY_P8_PATH}}" "${CERT_P12_PATH}" || true
+        rm -f "${NOTARY_P8_PATH}" "${CERT_P12_PATH}" || true

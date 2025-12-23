@@ -8,8 +8,10 @@ Component.prototype.onInstallationStarted = function()
     if (component.updateRequested() || component.installationRequested()) {
         if (installer.value("os") == "win")
             component.installerbaseBinaryPath = "@TargetDir@/tempMaintenanceTool.exe";
-        else if (installer.value("os") == "x11" || installer.value("os") == "mac")
+        else if (installer.value("os") == "x11")
             component.installerbaseBinaryPath = "@TargetDir@/.tempMaintenanceTool";
+        else if (installer.value("os") == "mac")
+            component.installerbaseBinaryPath = "@TargetDir@/MaintenanceTool.app";
         installer.setInstallerBaseBinary(component.installerbaseBinaryPath);
 
         // update resource file
@@ -26,8 +28,13 @@ Component.prototype.createOperationsForArchive = function(archive)
     var normalizedInstallerbaseBinaryPath = component.installerbaseBinaryPath.replace(/@TargetDir@/,
         installer.value("TargetDir"));
 
-    installer.performOperation("SimpleMoveFile",
-        new Array(normalizedInstallerbaseBinaryPath, normalizedInstallerbaseBinaryPath + "_backup"));
+    if (installer.value("os") == "mac") {
+        installer.performOperation("Move",
+            new Array(normalizedInstallerbaseBinaryPath, normalizedInstallerbaseBinaryPath + "_backup"));
+    } else {
+        installer.performOperation("SimpleMoveFile",
+            new Array(normalizedInstallerbaseBinaryPath, normalizedInstallerbaseBinaryPath + "_backup"));
+    }
     component.createOperationsForArchive(archive);
 }
 

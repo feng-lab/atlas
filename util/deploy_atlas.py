@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import hashlib
 import logging
 import os
 import re
@@ -730,6 +731,215 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
         pass
 
 
+def _macos_qtifw_archivegen_path() -> str:
+    archivegen = os.path.join(common_dirs.qt_installer_framework_bin_dir(), "archivegen")
+    if not os.path.exists(archivegen):
+        raise RuntimeError(
+            "Qt Installer Framework `archivegen` was not found at the configured QtIFW location.\n"
+            f"Expected: {archivegen}\n"
+            "Install QtIFW (required for building the installer), or fix your Qt installation path."
+        )
+    return archivegen
+
+
+def _macos_sha256(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _macos_relocate_non_code_entries_from_bundle_macos_to_resources(
+    bundle_path: str,
+) -> None:
+    """Move non-code entries out of Contents/MacOS.
+
+    Some third-party app bundles place data files under `Contents/MacOS/`, and
+    `codesign` can treat those as nested code components (failing the sign
+    operation). Relocate entries that contain no executables and no Mach-O code
+    to `Contents/Resources/` and leave a symlink behind to preserve runtime
+    paths.
+    """
+    contents_dir = os.path.join(bundle_path, "Contents")
+    macos_dir = os.path.join(contents_dir, "MacOS")
+    resources_dir = os.path.join(contents_dir, "Resources")
+    if not os.path.isdir(macos_dir):
+        return
+
+    def is_code_file(file_path: str) -> bool:
+        if os.path.islink(file_path):
+            return False
+        try:
+            mode = os.stat(file_path).st_mode
+        except OSError:
+            return False
+        if mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH):
+            return True
+        _, ext = os.path.splitext(file_path)
+        if ext.lower() in _MACOS_MACHO_FILE_EXTENSIONS:
+            return True
+        desc = _macos_file_description(file_path)
+        return bool(desc and "Mach-O" in desc)
+
+    relocations: list[tuple[str, str, str]] = []
+    for entry in sorted(os.listdir(macos_dir)):
+        src_path = os.path.join(macos_dir, entry)
+        if os.path.islink(src_path):
+            continue
+        if os.path.isdir(src_path):
+            if _macos_is_signable_bundle_dir(src_path):
+                continue
+
+            contains_code = False
+            for dirpath, dirnames, filenames in os.walk(src_path, followlinks=False):
+                dirnames[:] = [
+                    name
+                    for name in dirnames
+                    if not os.path.islink(os.path.join(dirpath, name))
+                ]
+                for filename in filenames:
+                    file_path = os.path.join(dirpath, filename)
+                    if is_code_file(file_path):
+                        contains_code = True
+                        break
+                if contains_code:
+                    break
+            if contains_code:
+                continue
+        elif os.path.isfile(src_path):
+            if is_code_file(src_path):
+                continue
+        else:
+            continue
+
+        dst_path = os.path.join(resources_dir, entry)
+        if os.path.exists(dst_path):
+            raise RuntimeError(
+                "Cannot relocate non-code entry from Contents/MacOS because the target already exists:\n"
+                f"bundle: {bundle_path}\n"
+                f"src: {src_path}\n"
+                f"dst: {dst_path}"
+            )
+        relocations.append((entry, src_path, dst_path))
+
+    if not relocations:
+        return
+
+    os.makedirs(resources_dir, exist_ok=True)
+    for entry, src_path, dst_path in relocations:
+        logger.info(
+            "Relocating non-code entry for codesign: %s -> %s (symlink kept)",
+            src_path,
+            dst_path,
+        )
+        shutil.move(src_path, dst_path)
+        os.symlink(os.path.join("..", "Resources", entry), src_path)
+
+
+def _macos_notarize_qtifw_package_dir(package_dir: str) -> None:
+    """Notarize/staple .app bundles inside a QtIFW package's data archives.
+
+    Qt Installer Framework packages typically store payloads under `data/*.7z`. Apple
+    can't notarize a `.7z` directly, so we extract, sign+notarize the contained `.app`,
+    then repack the archive so the installer can ship the stapled ticket.
+    """
+    if not common_dirs.is_mac():
+        raise RuntimeError("_macos_notarize_qtifw_package_dir called on non-macOS")
+    if not os.path.isdir(package_dir):
+        raise RuntimeError(f"QtIFW package dir not found: {package_dir}")
+
+    data_dir = os.path.join(package_dir, "data")
+    if not os.path.isdir(data_dir):
+        raise RuntimeError(f"QtIFW package missing data/ dir: {package_dir}")
+
+    archivegen = _macos_qtifw_archivegen_path()
+    archives = sorted(
+        f
+        for f in os.listdir(data_dir)
+        if f.lower().endswith(".7z") and os.path.isfile(os.path.join(data_dir, f))
+    )
+    if not archives:
+        raise RuntimeError(f"No .7z archives found under: {data_dir}")
+
+    for archive_name in archives:
+        archive_path = os.path.join(data_dir, archive_name)
+        logger.info("Processing QtIFW payload: %s", archive_path)
+        before_hash = _macos_sha256(archive_path)
+
+        with tempfile.TemporaryDirectory(prefix="atlas-qtifw-", dir=data_dir) as tmp_dir:
+            extract_dir = os.path.join(tmp_dir, "extract")
+            os.makedirs(extract_dir, exist_ok=True)
+
+            common_dirs.unpack_file_to_folder(archive_path, extract_dir)
+
+            app_paths: list[str] = []
+            for dirpath, dirnames, _filenames in os.walk(extract_dir, followlinks=False):
+                dirnames[:] = [
+                    name
+                    for name in dirnames
+                    if not os.path.islink(os.path.join(dirpath, name))
+                ]
+                for dirname in dirnames:
+                    if dirname.lower().endswith(".app"):
+                        app_paths.append(os.path.join(dirpath, dirname))
+
+            if not app_paths:
+                raise RuntimeError(
+                    "QtIFW archive did not contain any .app bundles to notarize: "
+                    f"{archive_path}"
+                )
+
+            # Notarize each embedded app; this is what Gatekeeper will evaluate after install.
+            for app_path in sorted(app_paths):
+                logger.info("Signing/notarizing embedded app: %s", app_path)
+                _macos_relocate_non_code_entries_from_bundle_macos_to_resources(
+                    app_path
+                )
+                _macos_codesign_bundle(app_path)
+                _macos_notarize_and_staple_bundle(app_path)
+
+            root_items = [
+                name
+                for name in sorted(os.listdir(extract_dir))
+                if name not in {".DS_Store", "__MACOSX"} and not name.startswith("._")
+            ]
+            if not root_items:
+                raise RuntimeError(f"QtIFW archive extracted empty: {archive_path}")
+
+            archive_stem, _archive_ext = os.path.splitext(archive_name)
+            tmp_archive_path = os.path.join(tmp_dir, f"{archive_stem}.tmp.7z")
+            cmd = [archivegen, "--format", "7z", "--compression", "5", tmp_archive_path, *root_items]
+            logger.info("Running: %s", " ".join(cmd))
+            subprocess.run(cmd, cwd=extract_dir, shell=False, check=True)
+            if not os.path.exists(tmp_archive_path):
+                # `archivegen` appends the format extension when the output path doesn't end
+                # with it. Always expect `.7z` output but guard with a clear error.
+                appended = f"{tmp_archive_path}.7z"
+                if os.path.exists(appended):
+                    tmp_archive_path = appended
+                else:
+                    raise RuntimeError(
+                        "QtIFW `archivegen` reported success but did not create the expected archive.\n"
+                        f"expected: {tmp_archive_path}\n"
+                        f"also checked: {appended}\n"
+                        f"cwd: {extract_dir}"
+                    )
+
+            backup_path = f"{archive_path}.bak"
+            try:
+                os.remove(backup_path)
+            except OSError:
+                pass
+            os.replace(archive_path, backup_path)
+            os.replace(tmp_archive_path, archive_path)
+
+        after_hash = _macos_sha256(archive_path)
+        logger.info(
+            "Updated %s: sha256 %s -> %s", archive_name, before_hash, after_hash
+        )
+
+
 def _read_git_version_from_header() -> str:
     """Read GIT_VERSION from generated src/version/version.h.
 
@@ -1008,7 +1218,7 @@ def build_atlas_installer():
         suffix = 'macOS'
         app_name = 'Atlas.app'
         repo_package_name = 'atlas.7z'
-        mt_app_name = '.tempMaintenanceTool'
+        mt_app_name = 'MaintenanceTool.app'
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.app'
@@ -1052,32 +1262,71 @@ def build_atlas_installer():
                     os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'))
 
     mt_app_path = os.path.join(common_dirs.deploy_target_dir(), mt_app_name)
-    if os.path.exists(mt_app_path):
-        os.remove(mt_app_path)
-    if common_dirs.is_windows():
-        shutil.copy(os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'installerbase.exe'),
-                    os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
-    else:
-        shutil.copy(
-            os.path.join(common_dirs.qt_installer_framework_bin_dir(), "installerbase"),
-            mt_app_path,
+    if common_dirs.is_mac():
+        if os.path.exists(mt_app_path):
+            shutil.rmtree(mt_app_path, ignore_errors=False, onexc=common_dirs.handleRemoveReadonly)
+
+        subprocess.run(
+            [
+                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "binarycreator"),
+                "-c",
+                os.path.join("config", "config-macOS.xml"),
+                "--mt",
+            ],
+            cwd=common_dirs.deploy_target_dir(),
+            shell=False,
+            check=True,
         )
-        if common_dirs.is_mac():
-            if _macos_signing_disabled():
-                _macos_codesign_bundle(mt_app_path, identity_override="-")
-            else:
-                _macos_codesign_bundle(mt_app_path)
-    subprocess.run(
-        [
-            os.path.join(common_dirs.qt_installer_framework_bin_dir(), "archivegen"),
-            mt_repo_package_name,
-            mt_app_path,
-        ],
-        cwd=common_dirs.deploy_target_dir(),
-        shell=False,
-        check=True,
-    )
-    os.remove(mt_app_path)
+        if not os.path.isdir(mt_app_path):
+            raise RuntimeError(
+                "QtIFW did not create the expected maintenance tool bundle.\n"
+                f"Expected: {mt_app_path}\n"
+                "Check <MaintenanceToolName> in config/config-macOS.xml and your QtIFW installation."
+            )
+
+        if _macos_signing_disabled():
+            _macos_codesign_bundle(mt_app_path, identity_override="-")
+        else:
+            _macos_codesign_bundle(mt_app_path)
+            _macos_notarize_and_staple_bundle(mt_app_path)
+
+        subprocess.run(
+            [
+                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "archivegen"),
+                "--compression",
+                "5",
+                mt_repo_package_name,
+                mt_app_name,
+            ],
+            cwd=common_dirs.deploy_target_dir(),
+            shell=False,
+            check=True,
+        )
+        shutil.rmtree(mt_app_path, ignore_errors=False, onexc=common_dirs.handleRemoveReadonly)
+    else:
+        if os.path.exists(mt_app_path):
+            os.remove(mt_app_path)
+        if common_dirs.is_windows():
+            shutil.copy(
+                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "installerbase.exe"),
+                os.path.join(common_dirs.deploy_target_dir(), mt_app_name),
+            )
+        else:
+            shutil.copy(
+                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "installerbase"),
+                mt_app_path,
+            )
+        subprocess.run(
+            [
+                os.path.join(common_dirs.qt_installer_framework_bin_dir(), "archivegen"),
+                mt_repo_package_name,
+                mt_app_path,
+            ],
+            cwd=common_dirs.deploy_target_dir(),
+            shell=False,
+            check=True,
+        )
+        os.remove(mt_app_path)
     repo_package_folder = os.path.join(common_dirs.deploy_target_dir(),
                                        'packages', 'fenglab.maintenance', 'data')
     if os.path.exists(os.path.join(repo_package_folder, mt_repo_package_name)):
@@ -1172,6 +1421,15 @@ python deploy_atlas.py [--debug-version]
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--debug-version", action='store_true', help="debug version")
+    parser.add_argument(
+        "--notarize-qtifw-package",
+        metavar="DIR",
+        help="Notarize/staple .app payloads inside a Qt Installer Framework package dir (rewrites data/*.7z in-place).",
+    )
     args = parser.parse_args()
+
+    if args.notarize_qtifw_package:
+        _macos_notarize_qtifw_package_dir(args.notarize_qtifw_package)
+        sys.exit(0)
 
     deploy_atlas(is_debug_version=args.debug_version)

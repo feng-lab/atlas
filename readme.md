@@ -115,7 +115,7 @@ conda install numpy python conda-build anaconda-client pip
     ```
 
 ### macOS signing & notarization (deployment)
-`util/deploy_atlas.py` codesigns nested code inside-out (without `codesign --deep`) and notarizes by default. Configure via env vars:
+`util/deploy_atlas.py` codesigns nested code inside-out (without `codesign --deep`) and notarizes by default. It also generates a signed/notarized QtIFW `MaintenanceTool.app` (via `binarycreator --mt`) and ships it in the `fenglab.maintenance` package so the installed Maintenance Tool is signed. Configure via env vars:
 - `MACOS_CODESIGN_IDENTITY` (required when signing is enabled)
 - `MACOS_NOTARYTOOL_API_KEY_PATH`, `MACOS_NOTARYTOOL_API_KEY_ID`, `MACOS_NOTARYTOOL_API_ISSUER_ID` (required for notarization)
 - `ATLAS_MACOS_CODESIGN_ENTITLEMENTS` (optional entitlements plist)
