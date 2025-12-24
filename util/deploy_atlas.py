@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import xml.etree.ElementTree as eTree
 import zipfile
 from typing import AbstractSet, Optional
@@ -61,6 +62,10 @@ _MACOS_JAR_ENTRY_REMOVE_LIST: frozenset[str] = frozenset(
         "META-INF/lib/osx_64/libturbojpeg.dylib",
     }
 )
+
+_MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS = 5
+_MACOS_CODESIGN_TIMESTAMP_RETRY_BASE_DELAY_SECONDS = 2.0
+_MACOS_CODESIGN_TIMESTAMP_RETRY_MAX_DELAY_SECONDS = 30.0
 
 
 def _env_truthy(name: str) -> bool:
@@ -200,6 +205,63 @@ def _macos_entitlements_path() -> Optional[str]:
 def _macos_run_checked(args: list[str], *, cwd: Optional[str] = None) -> None:
     logger.info("Running: %s", " ".join(args))
     subprocess.run(args, cwd=cwd, shell=False, check=True)
+
+
+def _macos_is_transient_codesign_timestamp_failure(output: str) -> bool:
+    if not output:
+        return False
+    lowered = output.lower()
+    return "timestamp service is not available" in lowered
+
+
+def _macos_run_codesign_checked(cmd: list[str], *, cwd: Optional[str] = None) -> None:
+    if not cmd or os.path.basename(cmd[0]) != "codesign":
+        raise ValueError("_macos_run_codesign_checked expects a codesign command")
+
+    for attempt in range(1, _MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS + 1):
+        logger.info("Running: %s", " ".join(cmd))
+        proc = subprocess.run(
+            cmd,
+            cwd=cwd,
+            shell=False,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+
+        output = (proc.stdout or "").rstrip()
+        if output:
+            for line in output.splitlines():
+                logger.info("%s", line)
+
+        if proc.returncode == 0:
+            return
+
+        if _macos_is_transient_codesign_timestamp_failure(output):
+            if attempt == _MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS:
+                break
+
+            delay = min(
+                _MACOS_CODESIGN_TIMESTAMP_RETRY_MAX_DELAY_SECONDS,
+                _MACOS_CODESIGN_TIMESTAMP_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)),
+            )
+            logger.warning(
+                "codesign failed because the timestamp service is not available; retrying in %.1fs (%d/%d)",
+                delay,
+                attempt,
+                _MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS,
+            )
+            time.sleep(delay)
+            continue
+
+        raise subprocess.CalledProcessError(proc.returncode, cmd, output=output)
+
+    raise RuntimeError(
+        "codesign failed after retries because the timestamp service is not available.\n"
+        "This is usually a temporary Apple timestamp server or network issue. Re-run the deployment when network is stable.\n"
+        f"Command: {' '.join(cmd)}"
+    )
 
 def _macos_is_signable_bundle_dir(path: str) -> bool:
     if not os.path.isdir(path):
@@ -547,7 +609,7 @@ def _macos_codesign_target(
             cmd.extend(["--entitlements", entitlements])
 
     cmd.append(target_path)
-    _macos_run_checked(cmd)
+    _macos_run_codesign_checked(cmd)
 
 
 def _macos_codesign_bundle(

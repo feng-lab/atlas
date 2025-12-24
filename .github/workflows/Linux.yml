@@ -431,22 +431,60 @@ jobs:
         shell: bash -l {0}
         run: |
           set -euo pipefail
-          TAG="${TAG_NAME:-${GITHUB_REF#refs/tags/}}"
-          echo "Creating/updating release for tag: $TAG"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists"
-          else
-            gh release create "$TAG" \
-              --title "$TAG" \
-              --generate-notes
-          fi
-          shopt -s nullglob
-          files=(deploy/AtlasInstaller*.zip deploy/atlas-*.zip)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No release zip files found under deploy/" >&2
-            exit 1
-          fi
-          gh release upload "$TAG" "${files[@]}" --clobber
+
+          retry() {
+            local attempts="${1:?attempts missing}"
+            local base_delay="${2:?base_delay missing}"
+            local max_delay="${3:?max_delay missing}"
+            shift 3
+            local attempt=1
+            while true; do
+              if "$@"; then
+                return 0
+              fi
+              local rc=$?
+              if [ "$attempt" -ge "$attempts" ]; then
+                echo "Command failed after ${attempts} attempts (exit ${rc}): $*" >&2
+                return "$rc"
+              fi
+              local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
+              if [ "$sleep_for" -gt "$max_delay" ]; then
+                sleep_for="$max_delay"
+              fi
+              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): $*" >&2
+              sleep "$sleep_for"
+              attempt=$(( attempt + 1 ))
+            done
+          }
+
+          publish_release() {
+            TAG="${TAG_NAME:-${GITHUB_REF#refs/tags/}}"
+            echo "Creating/updating release for tag: $TAG"
+
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Release $TAG already exists"
+            else
+              # `gh release view` can fail due to transient GitHub/network issues. If create fails,
+              # re-check whether the release exists before aborting.
+              if ! gh release create "$TAG" --title "$TAG" --generate-notes; then
+                if gh release view "$TAG" >/dev/null 2>&1; then
+                  echo "Release $TAG exists after failed create; continuing"
+                else
+                  return 1
+                fi
+              fi
+            fi
+
+            shopt -s nullglob
+            files=(deploy/AtlasInstaller*.zip deploy/atlas-*.zip)
+            if [ ${#files[@]} -eq 0 ]; then
+              echo "No release zip files found under deploy/" >&2
+              return 1
+            fi
+            gh release upload "$TAG" "${files[@]}" --clobber
+          }
+
+          retry 5 5 60 publish_release
 
       - name: Setup SSH key
         shell: bash -l {0}
@@ -477,25 +515,73 @@ jobs:
         shell: bash -l {0}
         run: |
           set -euo pipefail
+          retry() {
+            local attempts="${1:?attempts missing}"
+            local base_delay="${2:?base_delay missing}"
+            local max_delay="${3:?max_delay missing}"
+            shift 3
+            local attempt=1
+            while true; do
+              if "$@"; then
+                return 0
+              fi
+              local rc=$?
+              if [ "$attempt" -ge "$attempts" ]; then
+                echo "Command failed after ${attempts} attempts (exit ${rc}): $*" >&2
+                return "$rc"
+              fi
+              local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
+              if [ "$sleep_for" -gt "$max_delay" ]; then
+                sleep_for="$max_delay"
+              fi
+              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): $*" >&2
+              sleep "$sleep_for"
+              attempt=$(( attempt + 1 ))
+            done
+          }
           : "${SSH_SERVER:?Error: SSH_SERVER is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_PORT:?Error: SSH_PORT is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_USERNAME:?Error: SSH_USERNAME is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_DEPLOY_PATH:?Error: SSH_DEPLOY_PATH is not set (ATLAS_ENV_LOCAL)}"
           cd "$GITHUB_WORKSPACE/deploy"
-          rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
-          rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+          retry 5 5 60 rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
+          retry 5 5 60 rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
 
       - name: Deploy artifacts (secondary target)
         shell: bash -l {0}
         run: |
           set -euo pipefail
+          retry() {
+            local attempts="${1:?attempts missing}"
+            local base_delay="${2:?base_delay missing}"
+            local max_delay="${3:?max_delay missing}"
+            shift 3
+            local attempt=1
+            while true; do
+              if "$@"; then
+                return 0
+              fi
+              local rc=$?
+              if [ "$attempt" -ge "$attempts" ]; then
+                echo "Command failed after ${attempts} attempts (exit ${rc}): $*" >&2
+                return "$rc"
+              fi
+              local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
+              if [ "$sleep_for" -gt "$max_delay" ]; then
+                sleep_for="$max_delay"
+              fi
+              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): $*" >&2
+              sleep "$sleep_for"
+              attempt=$(( attempt + 1 ))
+            done
+          }
           : "${SSH_SERVER2:?Error: SSH_SERVER2 is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_PORT2:?Error: SSH_PORT2 is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_USERNAME2:?Error: SSH_USERNAME2 is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_DEPLOY_PATH2:?Error: SSH_DEPLOY_PATH2 is not set (ATLAS_ENV_LOCAL)}"
           cd "$GITHUB_WORKSPACE/deploy"
-          rsync -avv --delete -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/
-          rsync -tvv -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
+          retry 5 5 60 rsync -avv --delete -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/
+          retry 5 5 60 rsync -tvv -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
 
       - name: Build and upload conda zimg
         # Skip this when publishing a PyPI release (tags starting with "v")
