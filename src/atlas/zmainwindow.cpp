@@ -754,6 +754,11 @@ void ZMainWindow::createMenus()
     openDocMd(QStringLiteral("DEVELOPER_GUIDE.md"));
   });
   m_helpMenu->addAction(m_devGuideAction);
+  m_thirdPartyNoticesAction = new QAction(tr("Third-Party Notices"), this);
+  connect(m_thirdPartyNoticesAction, &QAction::triggered, this, [this]() {
+    openDocMd(QStringLiteral("THIRD_PARTY_NOTICES.md"));
+  });
+  m_helpMenu->addAction(m_thirdPartyNoticesAction);
   m_helpMenu->addAction(m_helpAction);
 #ifdef Q_OS_LINUX
   m_helpMenu->addAction(m_createDesktopEntryAction);

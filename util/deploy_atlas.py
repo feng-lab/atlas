@@ -16,6 +16,7 @@ from typing import AbstractSet, Optional
 
 import build_ext_libs
 import common_dirs
+import download_utils
 import linuxdeployqt
 from logger import setup_logger
 
@@ -1046,6 +1047,119 @@ def get_version_token_for_filename() -> str:
     return token
 
 
+_THIRD_PARTY_LICENSE_FILENAME_SUBSTRINGS: tuple[str, ...] = (
+    "license",
+    "licence",
+    "copying",
+    "notice",
+    "copyright",
+)
+
+_THIRD_PARTY_LICENSE_SEARCH_SUBDIRS: tuple[str, ...] = (
+    "",
+    ".github",
+    "docs",
+    "doc",
+    "Documentation",
+    "cmake",
+    "release",
+)
+
+
+def _is_license_filename(name: str) -> bool:
+    lower = name.lower()
+    return any(s in lower for s in _THIRD_PARTY_LICENSE_FILENAME_SUBSTRINGS)
+
+
+def _collect_third_party_license_files_for_component(component_dir: str) -> list[tuple[str, str]]:
+    """Collect license-like files for a single component directory.
+
+    Returns a list of (src_path, rel_path) where rel_path is relative to component_dir.
+    """
+    results: dict[str, str] = {}
+    for subdir in _THIRD_PARTY_LICENSE_SEARCH_SUBDIRS:
+        scan_dir = component_dir if not subdir else os.path.join(component_dir, subdir)
+        if not os.path.isdir(scan_dir):
+            continue
+        for entry in sorted(os.listdir(scan_dir)):
+            src_path = os.path.join(scan_dir, entry)
+            if not os.path.isfile(src_path):
+                continue
+            if not _is_license_filename(entry):
+                continue
+            rel_path = os.path.relpath(src_path, component_dir)
+            # Preserve the first-seen file for a given relative path.
+            results.setdefault(rel_path, src_path)
+    return [(src, rel) for rel, src in sorted(results.items())]
+
+
+def _copy_third_party_licenses_to_resources(resources_dir: str) -> None:
+    """Copy third-party license texts into <Resources>/licenses for deployment bundles."""
+    repo_root = common_dirs.atlas_repository_dir()
+    third_party_root = os.path.join(repo_root, "src", "3rdparty")
+    if not os.path.isdir(third_party_root):
+        raise RuntimeError(f"Third-party directory not found: {third_party_root}")
+
+    dst_root = os.path.join(resources_dir, "licenses")
+    shutil.rmtree(dst_root, ignore_errors=True)
+    os.makedirs(dst_root, exist_ok=True)
+
+    for name in sorted(os.listdir(third_party_root)):
+        component_dir = os.path.join(third_party_root, name)
+        if not os.path.isdir(component_dir):
+            continue
+        if name in {"build", "conda_build"}:
+            continue
+
+        license_files = _collect_third_party_license_files_for_component(component_dir)
+        if not license_files:
+            continue
+
+        for src_path, rel_path in license_files:
+            dst_path = os.path.join(dst_root, name, rel_path)
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            shutil.copy2(src_path, dst_path)
+
+
+def _download_runtime_licenses(dst_runtime_dir: str) -> None:
+    """Download license texts for runtime redistributions into the deployed bundle.
+
+    This avoids storing large, versioned license registries in the repository.
+    """
+    def download(url: str, dst_path: str) -> None:
+        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+        if not download_utils.download_file_with_resume(url, "", dst_path):
+            raise RuntimeError(f"Failed to download {url}")
+
+    # Note: We prefer a stable HTTPS host here to avoid gnu.org connectivity quirks
+    # in some Python SSL stacks.
+    download(
+        "https://raw.githubusercontent.com/spdx/license-list-data/master/text/LGPL-3.0-only.txt",
+        os.path.join(dst_runtime_dir, "Qt", "LGPL-3.0.txt"),
+    )
+    download(
+        "https://raw.githubusercontent.com/spdx/license-list-data/master/text/GPL-3.0-only.txt",
+        os.path.join(dst_runtime_dir, "FFmpeg", "LICENSE.txt"),
+    )
+
+    vulkan_ver = common_dirs.vulkan_SDK_ver()
+    vulkan_base = f"https://vulkan.lunarg.com/software/license/vulkan-{vulkan_ver}"
+    for platform in ("linux", "windows", "macos"):
+        fname = f"vulkan-{vulkan_ver}-{platform}-license-summary.txt"
+        download(
+            f"{vulkan_base}-{platform}-license-summary.txt",
+            os.path.join(dst_runtime_dir, "Vulkan", fname),
+        )
+
+
+def _copy_runtime_redistribution_licenses_to_resources(resources_dir: str) -> None:
+    """Copy license texts for runtime redistributions not rooted in src/3rdparty/."""
+    dst_root = os.path.join(resources_dir, "licenses", "runtime")
+    shutil.rmtree(dst_root, ignore_errors=True)
+    os.makedirs(dst_root, exist_ok=True)
+    _download_runtime_licenses(dst_root)
+
+
 def get_bak_file_name(orig_file: str):
     return orig_file + '.bak'
 
@@ -1133,6 +1247,12 @@ def build_atlas_package(is_debug_version: bool = False):
         target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'Resources', 'json', 'atlas')
         os.makedirs(target_llm_dir, exist_ok=True)
         shutil.copytree(repo_llm_dir, target_llm_dir, dirs_exist_ok=True)
+        _copy_third_party_licenses_to_resources(
+            os.path.join(common_dirs.deploy_target_dir(), app_name, "Contents", "Resources")
+        )
+        _copy_runtime_redistribution_licenses_to_resources(
+            os.path.join(common_dirs.deploy_target_dir(), app_name, "Contents", "Resources")
+        )
 
         deployed_app_path = os.path.join(common_dirs.deploy_target_dir(), app_name)
         if _macos_signing_disabled():
@@ -1171,6 +1291,12 @@ def build_atlas_package(is_debug_version: bool = False):
             target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Resources', 'json', 'atlas')
             os.makedirs(target_llm_dir, exist_ok=True)
             shutil.copytree(repo_llm_dir, target_llm_dir, dirs_exist_ok=True)
+            _copy_third_party_licenses_to_resources(
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir", "Resources")
+            )
+            _copy_runtime_redistribution_licenses_to_resources(
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir", "Resources")
+            )
         else:
             logger.critical('atlas is not built yet')
     else:
@@ -1229,6 +1355,12 @@ def build_atlas_package(is_debug_version: bool = False):
             target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Resources', 'json', 'atlas')
             os.makedirs(target_llm_dir, exist_ok=True)
             shutil.copytree(repo_llm_dir, target_llm_dir, dirs_exist_ok=True)
+            _copy_third_party_licenses_to_resources(
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas", "Resources")
+            )
+            _copy_runtime_redistribution_licenses_to_resources(
+                os.path.join(common_dirs.deploy_target_dir(), "Atlas", "Resources")
+            )
         else:
             logger.critical('atlas is not built yet')
 

@@ -228,6 +228,7 @@ private:
 
   QAction* m_userGuideAction = nullptr;
   QAction* m_devGuideAction = nullptr;
+  QAction* m_thirdPartyNoticesAction = nullptr;
 
   QAction* m_openNewInstanceAction = nullptr;
 

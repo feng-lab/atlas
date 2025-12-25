@@ -854,7 +854,7 @@ else (WIN32)
     message(STATUS "Qt6Core_INCLUDE_DIRS0: ${Qt6Core_INCLUDE_DIRS0}")
     set_source_files_properties(ztheme.cpp PROPERTIES COMPILE_FLAGS "-isystem ${Qt6Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}/QtCore -isystem ${Qt6Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}")
 
-    set(copyright_line "Copyright 2011-2019 Linqing Feng")
+    set(copyright_line "Copyright 2011-2026 Linqing Feng")
     set_target_properties(${APP_NAME} PROPERTIES
                           BUILD_RPATH "@executable_path/../Frameworks;@executable_path/../lib"
                           INSTALL_RPATH "@executable_path/../Frameworks;@executable_path/../lib"

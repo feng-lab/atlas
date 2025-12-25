@@ -229,6 +229,9 @@ src/neurolabi/python/QMakeParser.pyc
 # Vulkan compiled SPIR-V outputs (built by CMake)
 src/atlas/Resources/shader/vulkan/spv/
 
+# Runtime license texts are downloaded at deploy time; keep any local caches untracked.
+src/3rdparty/runtime_licenses/
+
 # Generated LLM docs (schema/capabilities/agent files) — repo root fallback
 /Resources/json/atlas/
 

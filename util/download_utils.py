@@ -7,8 +7,9 @@ import time
 import urllib.request
 from functools import wraps
 
-import common_dirs
 import requests
+
+import common_dirs
 
 logger = logging.getLogger(__name__)
 
@@ -76,13 +77,42 @@ def is_correct_platform(filename):
 
 
 @retry_with_backoff()
-def download_file_with_resume(url, backup_url, target_path, expected_size, expected_sha256):
+def download_file_with_resume(
+    url,
+    backup_url,
+    target_path,
+    expected_size=None,
+    expected_sha256=None,
+):
+    has_expected_size = expected_size is not None and expected_size > 0
+    has_expected_sha256 = bool(expected_sha256)
+
     # Check if file exists and has correct size
     if os.path.exists(target_path):
         current_size = os.path.getsize(target_path)
-        if current_size == expected_size:
+        if has_expected_size and current_size == expected_size:
             logger.info(f"File {target_path} already exists with correct size. Skipping download.")
-            return validate_checksum(target_path, expected_sha256)
+            if has_expected_sha256:
+                return validate_checksum(target_path, expected_sha256)
+            return True
+
+        if not has_expected_size:
+            if current_size == 0:
+                logger.info(f"File {target_path} exists but is empty. Re-downloading.")
+            elif has_expected_sha256:
+                logger.info(f"File {target_path} already exists. Validating checksum.")
+                if validate_checksum(target_path, expected_sha256):
+                    logger.info(
+                        f"File {target_path} already exists with matching checksum. Skipping download."
+                    )
+                    return True
+                logger.warning(
+                    f"File {target_path} checksum mismatch. Re-downloading."
+                )
+                current_size = 0
+            else:
+                logger.info(f"File {target_path} already exists. Skipping download.")
+                return True
         elif current_size > expected_size:
             logger.warning(f"File {target_path} is larger than expected. Re-downloading.")
             current_size = 0
@@ -92,110 +122,170 @@ def download_file_with_resume(url, backup_url, target_path, expected_size, expec
         current_size = 0
 
     http_proxy, https_proxy = get_system_proxy()
-    proxies = {
-        'http': http_proxy,
-        'https': https_proxy
-    }
-    # Print proxy information
+    proxies = None
     if http_proxy or https_proxy:
+        proxies = {}
+        if http_proxy:
+            proxies["http"] = http_proxy
+        if https_proxy:
+            proxies["https"] = https_proxy
         logger.info("Using proxy:")
         if http_proxy:
             logger.info(f"  HTTP Proxy: {http_proxy}")
         if https_proxy:
             logger.info(f"  HTTPS Proxy: {https_proxy}")
 
-    urls = [url, backup_url, url, backup_url]
+    # Requests will consult environment/system proxy settings by default; explicitly
+    # pass a "no proxy" mapping to force a direct connection when needed.
+    no_proxy = {"http": None, "https": None}
+    if proxies:
+        proxy_options = [(proxies, "with proxy"), (no_proxy, "without proxy")]
+    else:
+        proxy_options = [(no_proxy, "")]
+
+    urls = [u for u in (url, backup_url, url, backup_url) if u]
     for current_url in urls:
-        try:
-            logger.info(f"Downloading from {current_url}")
+        for current_proxies, proxy_label in proxy_options:
+            try:
+                proxy_suffix = f" ({proxy_label})" if proxy_label else ""
+                logger.info(f"Downloading from {current_url}{proxy_suffix}")
 
-            # Set up headers
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
-                'Accept': '*/*',
-                'Accept-Encoding': 'gzip, deflate',
-                'Connection': 'keep-alive'
-            }
+                # Refresh current_size from disk in case a previous attempt partially wrote the file.
+                if has_expected_size and os.path.exists(target_path):
+                    current_size = os.path.getsize(target_path)
+                    if current_size > expected_size:
+                        logger.warning(
+                            f"File {target_path} is larger than expected. Re-downloading."
+                        )
+                        current_size = 0
+                else:
+                    current_size = 0
 
-            # Try to use range if file exists
-            if current_size > 0:
-                headers['Range'] = f'bytes={current_size}-'
+                # Set up headers
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+                    'Accept': '*/*',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Connection': 'keep-alive'
+                }
 
-            response = requests.get(current_url, stream=True, proxies=proxies, headers=headers)
+                # Try to use range if file exists and we know the expected size.
+                if current_size > 0 and has_expected_size:
+                    headers['Range'] = f'bytes={current_size}-'
 
-            # If we get a 406 or 416 error, try again without range header
-            if response.status_code in [406, 416]:
-                logger.info(
-                    "Range request not supported or invalid. Downloading entire file."
-                )
-                headers.pop('Range', None)
-                response = requests.get(current_url, stream=True, proxies=proxies, headers=headers)
-                current_size = 0  # Reset current_size as we're downloading from the beginning
+                response = requests.get(current_url, stream=True, proxies=current_proxies, headers=headers)
 
-            response.raise_for_status()
+                if 'Range' in headers and response.status_code != 206:
+                    logger.info(
+                        "Server ignored range request. Downloading entire file."
+                    )
+                    headers.pop('Range', None)
+                    response = requests.get(current_url, stream=True, proxies=current_proxies, headers=headers)
+                    current_size = 0
 
-            start_time = time.time()
-            # Determine whether we have an interactive terminal. In CI (e.g., GitHub Actions),
-            # stdout is not a TTY, and carriage-return updates will spam the log. Fall back to
-            # rate-limited logger updates in that case.
-            interactive = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-            last_log_time = start_time
-            last_logged_pct = -1  # integer percent last logged in non-interactive mode
-            # Append to file if resuming, otherwise write new file
-            mode = 'ab' if current_size > 0 else 'wb'
-            with open(target_path, mode) as file:
-                downloaded_size = current_size
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        file.write(chunk)
-                        downloaded_size += len(chunk)
-                        elapsed_time = time.time() - start_time
-                        # Avoid division by zero if the first chunk arrives too quickly or
-                        # if the clock resolution reports a zero/negative elapsed time.
-                        if elapsed_time > 0:
-                            speed = downloaded_size / (1024 * 1024 * elapsed_time)  # MB/s
-                        else:
-                            speed = 0.0
-                        progress = (downloaded_size / expected_size) * 100
+                # If we get a 406 or 416 error, try again without range header
+                if response.status_code in [406, 416]:
+                    logger.info(
+                        "Range request not supported or invalid. Downloading entire file."
+                    )
+                    headers.pop('Range', None)
+                    response = requests.get(current_url, stream=True, proxies=current_proxies, headers=headers)
+                    current_size = 0  # Reset current_size as we're downloading from the beginning
 
-                        if interactive:
-                            # Update in-place on a single terminal line
-                            sys.stdout.write('\033[K')  # clear to end of line
-                            sys.stdout.write(f"\rProgress: {progress:.2f}% | Speed: {speed:.2f} MB/s")
-                            sys.stdout.flush()
-                        else:
-                            # Non-interactive (CI): log infrequently to avoid flooding logs
-                            now = time.time()
-                            pct_int = int(progress)
-                            if ((now - last_log_time) >= PROGRESS_LOG_INTERVAL_SEC) or \
-                               (pct_int >= last_logged_pct + PROGRESS_LOG_PERCENT_STEP) or \
-                               (pct_int == 100):
-                                logger.info(f"Progress: {progress:.1f}% | Speed: {speed:.2f} MB/s")
-                                last_log_time = now
-                                last_logged_pct = pct_int
+                response.raise_for_status()
 
-            if interactive:
-                # Ensure a newline after the in-place progress line
-                sys.stdout.write('\n')
-                sys.stdout.flush()
-            else:
-                # Keep a blank line separation minimal in logs
-                logger.info('')
+                start_time = time.time()
+                # Determine whether we have an interactive terminal. In CI (e.g., GitHub Actions),
+                # stdout is not a TTY, and carriage-return updates will spam the log. Fall back to
+                # rate-limited logger updates in that case.
+                interactive = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+                last_log_time = start_time
+                last_logged_pct = -1  # integer percent last logged in non-interactive mode
+                # Append to file if resuming, otherwise write new file
+                mode = 'ab' if current_size > 0 else 'wb'
+                with open(target_path, mode) as file:
+                    downloaded_size = current_size
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            file.write(chunk)
+                            downloaded_size += len(chunk)
+                            elapsed_time = time.time() - start_time
+                            # Avoid division by zero if the first chunk arrives too quickly or
+                            # if the clock resolution reports a zero/negative elapsed time.
+                            if elapsed_time > 0:
+                                speed = downloaded_size / (1024 * 1024 * elapsed_time)  # MB/s
+                            else:
+                                speed = 0.0
+                            progress = (downloaded_size / expected_size) * 100 if has_expected_size else None
 
-            if os.path.getsize(target_path) != expected_size:
-                logger.warning(
-                    "Downloaded file size does not match expected size. Trying next URL."
-                )
-                continue
+                            if interactive:
+                                # Update in-place on a single terminal line
+                                sys.stdout.write('\033[K')  # clear to end of line
+                                if progress is not None:
+                                    sys.stdout.write(
+                                        f"\rProgress: {progress:.2f}% | Speed: {speed:.2f} MB/s"
+                                    )
+                                else:
+                                    downloaded_mb = downloaded_size / (1024 * 1024)
+                                    sys.stdout.write(
+                                        f"\rDownloaded: {downloaded_mb:.1f} MB | Speed: {speed:.2f} MB/s"
+                                    )
+                                sys.stdout.flush()
+                            else:
+                                # Non-interactive (CI): log infrequently to avoid flooding logs
+                                now = time.time()
+                                if progress is not None:
+                                    pct_int = int(progress)
+                                    should_log = (
+                                        (now - last_log_time) >= PROGRESS_LOG_INTERVAL_SEC
+                                        or pct_int >= last_logged_pct + PROGRESS_LOG_PERCENT_STEP
+                                        or pct_int == 100
+                                    )
+                                    if should_log:
+                                        logger.info(
+                                            f"Progress: {progress:.1f}% | Speed: {speed:.2f} MB/s"
+                                        )
+                                        last_log_time = now
+                                        last_logged_pct = pct_int
+                                else:
+                                    should_log = (now - last_log_time) >= PROGRESS_LOG_INTERVAL_SEC
+                                    if should_log:
+                                        downloaded_mb = downloaded_size / (1024 * 1024)
+                                        logger.info(
+                                            f"Downloaded: {downloaded_mb:.1f} MB | Speed: {speed:.2f} MB/s"
+                                        )
+                                        last_log_time = now
 
-            if validate_checksum(target_path, expected_sha256):
-                logger.info(f"File downloaded successfully: {target_path}")
-                return True
-            else:
+                if interactive:
+                    # Ensure a newline after the in-place progress line
+                    sys.stdout.write('\n')
+                    sys.stdout.flush()
+                else:
+                    # Keep a blank line separation minimal in logs
+                    logger.info('')
+
+                if has_expected_size and os.path.getsize(target_path) != expected_size:
+                    logger.warning(
+                        "Downloaded file size does not match expected size. Trying next URL."
+                    )
+                    continue
+
+                if os.path.getsize(target_path) == 0:
+                    logger.warning("Downloaded empty file. Trying next URL.")
+                    continue
+
+                if not has_expected_sha256:
+                    logger.info(f"File downloaded successfully: {target_path}")
+                    return True
+
+                if validate_checksum(target_path, expected_sha256):
+                    logger.info(f"File downloaded successfully: {target_path}")
+                    return True
+
                 logger.warning("Checksum validation failed. Trying next URL.")
                 os.remove(target_path)
-        except requests.RequestException as e:
-            logger.error(f"Error downloading from {current_url}: {e}")
+            except requests.RequestException as e:
+                logger.error(f"Error downloading from {current_url}{proxy_suffix}: {e}")
 
     logger.error("Failed to download file from all URLs.")
     return False
