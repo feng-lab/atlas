@@ -377,52 +377,57 @@ inline std::ostream& operator<<(std::ostream& os, const EnumOrUnderlying<TEnum>&
 
 } // namespace nim
 
-template<nim::CanConvertToUtf8QByteArray T>
-struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
-{
-  auto format(const T& v, format_context& ctx) const
-  {
-    auto u8 = v.toUtf8();
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
-  }
-};
-
 namespace fmt {
 
-template<nim::IsUtf8ArrayType T>
-struct is_range<T, char> : std::false_type
+// Prevent Qt UTF-8 byte containers from being treated as ranges by fmt/ranges.h.
+template<>
+struct is_range<QByteArray, char> : std::false_type
 {};
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+template<>
+struct is_range<QByteArrayView, char> : std::false_type
+{};
+template<>
+struct is_range<QUtf8StringView, char> : std::false_type
+{};
+#endif
+
+template<typename T>
+inline constexpr bool IsStringViewFormattableQtType = nim::CanConvertToUtf8QByteArray<T> || nim::IsUtf8ArrayType<T> ||
+                                                      nim::HaveToStringFunction<T> || nim::IsSupportedQtTypeForPrint<T>;
+
+// Generic fmt formatter for selected Qt-ish types.
+//
+// Important: we intentionally implement this as a *single* formatter partial
+// specialization with SFINAE on the character type, rather than multiple
+// constrained specializations of `fmt::formatter<T>`. Some toolchains (notably
+// GCC 11 as used by the PyPI wheel build) reject multiple constrained partial
+// specializations as a redefinition, even when the constraints are intended to
+// be mutually exclusive.
+template<typename T>
+struct formatter<T, std::enable_if_t<IsStringViewFormattableQtType<T>, char>> : formatter<fmt::string_view>
+{
+  auto format(const T& v, format_context& ctx) const
+  {
+    if constexpr (nim::IsUtf8ArrayType<T>) {
+      return formatter<fmt::string_view>::format(fmt::string_view(v.data(), v.size()), ctx);
+    } else if constexpr (nim::CanConvertToUtf8QByteArray<T>) {
+      auto u8 = v.toUtf8();
+      return formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
+    } else if constexpr (nim::HaveToStringFunction<T>) {
+      auto s = v.toString();
+      return formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
+    } else if constexpr (nim::IsSupportedQtTypeForPrint<T>) {
+      auto u8 = nim::qtTypeToQString(v).toUtf8();
+      return formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
+    } else {
+      // Should be unreachable because IsStringViewFormattableQtType<T> is in the specialization.
+      return formatter<fmt::string_view>::format(fmt::string_view{}, ctx);
+    }
+  }
+};
 
 } // namespace fmt
-
-template<nim::IsUtf8ArrayType T>
-struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
-{
-  auto format(const T& v, format_context& ctx) const
-  {
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(v.data(), v.size()), ctx);
-  }
-};
-
-template<nim::HaveToStringFunction T>
-struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
-{
-  auto format(const T& v, format_context& ctx) const
-  {
-    auto s = v.toString();
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(s.data(), s.size()), ctx);
-  }
-};
-
-template<nim::IsSupportedQtTypeForPrint T>
-struct fmt::formatter<T> : fmt::formatter<fmt::string_view>
-{
-  auto format(const T& v, format_context& ctx) const
-  {
-    auto u8 = nim::qtTypeToQString(v).toUtf8();
-    return fmt::formatter<fmt::string_view>::format(fmt::string_view(u8.data(), u8.size()), ctx);
-  }
-};
 
 // qt type iostream support
 template<nim::CanConvertToUtf8QByteArray T>

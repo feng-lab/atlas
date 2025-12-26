@@ -236,3 +236,4 @@ src/3rdparty/runtime_licenses/
 /Resources/json/atlas/
 
 .gradle/
+/python/zimg/dist/

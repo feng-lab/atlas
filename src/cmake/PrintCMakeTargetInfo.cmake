@@ -49,7 +49,24 @@ function(print_target_properties tgt)
         list(FILTER PROP_LIST EXCLUDE REGEX "_LOCATION$")
     endif ()
 
-    string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_UPPERCASE)
+    # For multi-config generators (Visual Studio/Xcode/Ninja Multi-Config),
+    # CMAKE_BUILD_TYPE is empty at configure time. Pick a representative config
+    # so we can expand <CONFIG> placeholders in target property names for debug
+    # output without failing.
+    set(_CONFIG_FOR_PROPS "${CMAKE_BUILD_TYPE}")
+    if(_CONFIG_FOR_PROPS STREQUAL "" AND DEFINED CMAKE_CONFIGURATION_TYPES)
+        foreach(_CANDIDATE Release RelWithDebInfo MinSizeRel Debug)
+            list(FIND CMAKE_CONFIGURATION_TYPES "${_CANDIDATE}" _CANDIDATE_INDEX)
+            if(_CANDIDATE_INDEX GREATER -1)
+                set(_CONFIG_FOR_PROPS "${_CANDIDATE}")
+                break()
+            endif()
+        endforeach()
+        if(_CONFIG_FOR_PROPS STREQUAL "" AND CMAKE_CONFIGURATION_TYPES)
+            list(GET CMAKE_CONFIGURATION_TYPES 0 _CONFIG_FOR_PROPS)
+        endif()
+    endif()
+    string(TOUPPER "${_CONFIG_FOR_PROPS}" CMAKE_BUILD_TYPE_UPPERCASE)
 
     foreach (prop ${PROP_LIST})
         string(REPLACE "<CONFIG>" "${CMAKE_BUILD_TYPE_UPPERCASE}" prop ${prop})

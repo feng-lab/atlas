@@ -144,31 +144,86 @@ endif ()
 
 # install
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/" # source directory
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg # target directory
+        DESTINATION zimg # target directory (relative so --prefix/DESTDIR work)
         FILES_MATCHING PATTERN "*.py"
         PATTERN "*idea*" EXCLUDE
         PATTERN "*cmake*" EXCLUDE
 )
-install(TARGETS ${module_name} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+install(TARGETS ${module_name} DESTINATION zimg)
 
 if (WIN32)
   #  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls.exe DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
-  install(FILES ${FREEIMAGE_DLLS} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
-  install(FILES $<TARGET_FILE:TBB::tbb> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
-  install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
-  install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+  install(FILES ${FREEIMAGE_DLLS} DESTINATION zimg)
+  install(FILES $<TARGET_FILE:TBB::tbb> DESTINATION zimg)
+  install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION zimg)
+  install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION zimg)
 endif (WIN32)
 
 if (APPLE)
-  install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
-  install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
-  install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib/QtCore.framework/Versions/A)
-  install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib/QtGui.framework/Versions/A)
-  install(FILES $<TARGET_FILE:Qt6::DBus> DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib/QtDBus.framework/Versions/A)
+  install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION zimg/lib)
+  install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION zimg/lib)
+  install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION zimg/lib/QtCore.framework/Versions/A)
+  install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION zimg/lib/QtGui.framework/Versions/A)
+  install(FILES $<TARGET_FILE:Qt6::DBus> DESTINATION zimg/lib/QtDBus.framework/Versions/A)
+
+  option(IMG_PY_CODESIGN_INSTALLED_BINARIES "Codesign installed Mach-O binaries on macOS (ensures PyPI wheel imports cleanly)" ON)
+  if (IMG_PY_CODESIGN_INSTALLED_BINARIES)
+    # The Qt framework binaries we ship in the wheel are not full framework bundles
+    # (we avoid symlinks / bundle resources). Their original upstream signatures
+    # fail `codesign --verify` in this layout. Re-signing the installed Mach-O
+    # files fixes runtime loading in downstream environments.
+    #
+    # Signing happens at install time so the wheel RECORD hashes are computed on
+    # the signed artifacts.
+    install(CODE [[
+      set(_install_root "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
+
+      set(_codesign_identity "$ENV{MACOS_CODESIGN_IDENTITY}")
+      if(_codesign_identity STREQUAL "")
+        set(_codesign_identity "-")
+      endif()
+
+      set(_sign_targets
+        "${_install_root}/zimg/_imgpy.abi3.so"
+        "${_install_root}/zimg/lib/libfreeimageplus.dylib"
+        "${_install_root}/zimg/lib/libtbb.12.dylib"
+        "${_install_root}/zimg/lib/QtCore.framework/Versions/A/QtCore"
+        "${_install_root}/zimg/lib/QtGui.framework/Versions/A/QtGui"
+        "${_install_root}/zimg/lib/QtDBus.framework/Versions/A/QtDBus"
+      )
+
+      foreach(_path IN LISTS _sign_targets)
+        if(NOT EXISTS "${_path}")
+          message(STATUS "codesign: skipping missing file: ${_path}")
+          continue()
+        endif()
+
+        execute_process(
+          COMMAND codesign --force --sign "${_codesign_identity}" --timestamp=none "${_path}"
+          RESULT_VARIABLE _cs_rc
+          OUTPUT_VARIABLE _cs_out
+          ERROR_VARIABLE _cs_err
+        )
+        if(NOT _cs_rc EQUAL 0)
+          message(FATAL_ERROR "codesign failed for ${_path} (exit ${_cs_rc})\n${_cs_out}\n${_cs_err}")
+        endif()
+
+        execute_process(
+          COMMAND codesign --verify --strict --verbose=2 "${_path}"
+          RESULT_VARIABLE _verify_rc
+          OUTPUT_VARIABLE _verify_out
+          ERROR_VARIABLE _verify_err
+        )
+        if(NOT _verify_rc EQUAL 0)
+          message(FATAL_ERROR "codesign verify failed for ${_path} (exit ${_verify_rc})\n${_verify_out}\n${_verify_err}")
+        endif()
+      endforeach()
+    ]])
+  endif()
 endif ()
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars" # source directory
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg # target directory
+        DESTINATION zimg # target directory (relative so --prefix/DESTDIR work)
         FILES_MATCHING PATTERN "*.jar"
         PATTERN "*idea*" EXCLUDE
         PATTERN "*cmake*" EXCLUDE
