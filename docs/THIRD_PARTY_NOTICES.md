@@ -9,6 +9,18 @@ Atlas includes and/or redistributes third-party software. License texts and requ
   - Linux: `Atlas.AppDir/Resources/licenses/`
   - Windows: `Atlas/Resources/licenses/`
 
+## NVIDIA shader sources
+
+Atlas includes shader source derived from NVIDIA samples for order-independent transparency (OIT):
+
+- **Dual Depth Peeling + Weighted Average OIT shaders (Louis Bavoil)**:
+  - Source: `src/atlas/Resources/shader/dual_peeling_*.frag`, `src/atlas/Resources/shader/wavg_*.frag`
+  - License: `src/3rdparty/NVIDIA_OIT_DDP_WAVG/LICENSE.txt`
+  - Required notice (per license): "This software contains source code provided by NVIDIA Corporation."
+- **Weighted Blended OIT shaders**:
+  - Source: `src/atlas/Resources/shader/wblended_init.frag`, `src/atlas/Resources/shader/wblended_final.frag`
+  - License: `src/3rdparty/NVIDIA_WeightedBlendedOIT/LICENSE.txt`
+
 ## Runtime binary sources
 
 - FFmpeg binaries are sourced from:

@@ -30,5 +30,5 @@ outputs:
 
 about:
   home: https://feng-lab.github.io
-  license: proprietary - fenglab
-  license_family: PROPRIETARY
+  license: Apache-2.0
+  license_family: Apache

@@ -347,9 +347,7 @@ elseif (APPLE)
   set(MACOSX_BUNDLE_ICON_FILE app.icns)
 endif (WIN32)
 
-set(FORMS
-    LogDialog.ui
-)
+set(FORMS)
 
 set(RESOURCES
     atlas.qrc
@@ -530,8 +528,6 @@ set(SOURCES
     z3dimgslicerenderer.h z3dimgslicerenderer.cpp
     zregionontology.h zregionontology.cpp
     zobjdetailedinfowidget.h zobjdetailedinfowidget.cpp
-    zlogdialog.h zlogdialog.cpp
-    zlogmodelsink.h zlogmodelsink.cpp
     main.cpp
     z3dblockcache.h
     zapplication.cpp zapplication.h
@@ -854,7 +850,7 @@ else (WIN32)
     message(STATUS "Qt6Core_INCLUDE_DIRS0: ${Qt6Core_INCLUDE_DIRS0}")
     set_source_files_properties(ztheme.cpp PROPERTIES COMPILE_FLAGS "-isystem ${Qt6Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}/QtCore -isystem ${Qt6Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}")
 
-    set(copyright_line "Copyright 2011-2026 Linqing Feng")
+    set(copyright_line "Copyright (c) 2011, Linqing Feng")
     set_target_properties(${APP_NAME} PROPERTIES
                           BUILD_RPATH "@executable_path/../Frameworks;@executable_path/../lib"
                           INSTALL_RPATH "@executable_path/../Frameworks;@executable_path/../lib"

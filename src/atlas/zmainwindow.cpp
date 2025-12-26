@@ -272,7 +272,7 @@ void ZMainWindow::about()
     QString("About Atlas"),
     QString(
       "<p>Atlas version %1</p>"
-      "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
+      "<p>Atlas is developed by Linqing Feng (flq@live.com, fenglinqing@gmail.com).</p>"
       "<p>Feng Lab, Research Center for Augmented Intelligence, Institute of Artificial Intelligence, Zhejiang Lab</p>"
       "<p>Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
       "<p>All rights reserved.</p>")
