@@ -745,38 +745,21 @@ jobs:
           }
           retry 5 5 60 deploy_secondary
 
-      - name: Build and upload conda zimg
-        # Skip this when publishing a PyPI release (tags starting with "v")
-        if: github.event_name != 'create' || github.ref_type != 'tag' || !startsWith(github.event.ref, 'v')
+      - name: Publish zimg (PyPI + conda)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          if (-not $env:ANACONDA_API_TOKEN) {
-            Write-Error "ANACONDA_API_TOKEN is not set. Provide it via the ATLAS_ENV_LOCAL dotenv secret."
-            exit 1
+          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
+          Invoke-Expression $condaHook
+          conda activate atlas-ci
+          if ($env:ANACONDA_API_TOKEN) {
+            conda config --set anaconda_upload yes
+            if ($LASTEXITCODE -ne 0) { Write-Error "conda config failed"; exit $LASTEXITCODE }
           }
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
-          cd "$env:GITHUB_WORKSPACE"
-          python util/build_ext_libs.py conda-zimg
-          if ($LASTEXITCODE -ne 0) { Write-Error "build_ext_libs.py conda-zimg failed"; exit $LASTEXITCODE }
-          conda config --set anaconda_upload yes
-          conda-build --token $env:ANACONDA_API_TOKEN --user fenglab zimg-recipe
-          if ($LASTEXITCODE -ne 0) { Write-Error "conda-build failed"; exit $LASTEXITCODE }
-
-      - name: Publish zimg to PyPI
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
           python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "pip upgrade failed"; exit $LASTEXITCODE }
           python -m pip install --no-cache-dir build twine
           if ($LASTEXITCODE -ne 0) { Write-Error "pip install build twine failed"; exit $LASTEXITCODE }
-          python util/publish_zimg_pypi.py
-          if ($LASTEXITCODE -ne 0) { Write-Error "publish_zimg_pypi.py failed"; exit $LASTEXITCODE }
+          python util/publish_zimg.py
+          if ($LASTEXITCODE -ne 0) { Write-Error "publish_zimg.py failed"; exit $LASTEXITCODE }
           Get-ChildItem -Recurse python/zimg/dist | Select-Object FullName

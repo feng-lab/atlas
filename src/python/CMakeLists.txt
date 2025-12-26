@@ -73,20 +73,13 @@ if (NOT CMAKE_DEBUG_POSTFIX)
 endif ()
 message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
 
-set(BUILD_WITH_CONDA ON)
-
-if (DEFINED ENV{PREFIX})
-  message(STATUS "PREFIX environment variable defined, conda build is running: " $ENV{PREFIX})
-else ()
-  set(ENV{PREFIX} $ENV{CONDA_EXE}/../..)
-  message(STATUS "PREFIX environment variable not defined, set this for IDE: " $ENV{PREFIX})
-endif ()
-
 include(PrintCMakeTargetInfo)
 include(LibsForImg)
 
 # subprojects
-add_subdirectory(../img condaimg)
+if (NOT TARGET img)
+  add_subdirectory(../img zimg_img)
+endif ()
 
 # nanobind
 # Try to locate the Python interpreter and development headers before nanobind
@@ -122,7 +115,7 @@ if (IMG_PY_FREE_THREADED)
 endif ()
 
 nanobind_add_module(${module_name} ${NB_ARGS} imgpy.cpp)
-target_link_libraries(${module_name} PRIVATE condaimg)
+target_link_libraries(${module_name} PRIVATE img)
 
 if (APPLE)
   target_compile_options(${module_name} PRIVATE -faligned-allocation)

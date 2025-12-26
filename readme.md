@@ -111,7 +111,6 @@ conda install numpy python conda-build anaconda-client pip
     # build atlas
     python3 util/build_and_deploy_atlas.py [--skip-test]
     # or build CMakeLists.txt
-    # see `utils/all.sh` for example
     ```
 
 ### macOS signing & notarization (deployment)
@@ -145,28 +144,10 @@ conda install numpy python conda-build anaconda-client pip
 
 ## Python Package Build
 ```bash
-conda build purge
-conda build zimg-recipe
-conda remove zimg -y
+python util/publish_zimg.py
+
+# install zimg from pypi
+pip install zimg
+# install zimg from conda
 conda install zimg -c fenglab -y
 ```
-
-Pip (optional, scikit-build)
-```bash
-# Build/install zimg from this repo without conda
-pip install -U pip build
-pip install -e python/atlas_agent          # CLI (dev mode)
-pip install python/zimg                     # builds C++ extension via scikit-build-core
-```
-
-## CLI Utilities
-
-- Export 3D animation (headless): see docs/USER_GUIDE.md for details on `--run_export_3d_animation` flags.
-- Dump Animation3D JSON Schema:
-  ```bash
-  ./Atlas --run_dump_animation3d_schema --dump_animation3d_schema_output animation3d.schema.json -platform offscreen
-  # If no output path is given, writes ./animation3d.schema.json
-  ```
-
-- Agents (LLM) codegen toggle:
-  - Code generation tools are disabled by default for safety. To enable them in the chat agent: `python -m atlas_agent --enable-codegen ...` or set `ATLAS_AGENT_ENABLE_CODEGEN=1`.

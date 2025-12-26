@@ -256,25 +256,7 @@ runs:
         retry 5 5 60 rsync -avv --delete -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/
         retry 5 5 60 rsync -tvv -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
 
-    - name: Build and upload conda zimg
-      # Skip this when publishing a PyPI release (tags starting with "v")
-      if: github.event_name != 'create' || github.ref_type != 'tag' || !startsWith(github.event.ref, 'v')
-      shell: bash -l {0}
-      run: |
-        set -euo pipefail
-        if [ -z "${ANACONDA_API_TOKEN:-}" ]; then
-          echo "Error: ANACONDA_API_TOKEN is required for conda uploads." >&2
-          exit 1
-        fi
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
-        cd "$GITHUB_WORKSPACE"
-        python util/build_ext_libs.py conda-zimg
-        conda config --set anaconda_upload yes
-        conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
-
-    - name: Publish zimg to PyPI
-      if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+    - name: Publish zimg (PyPI + conda)
       shell: bash -l {0}
       run: |
         eval "$(conda shell.bash hook)"
@@ -283,7 +265,10 @@ runs:
         python -m pip install --upgrade pip
         # Ensure build backend is available (redundant if conda tooling already installed)
         python -m pip install --no-cache-dir build twine
-        python util/publish_zimg_pypi.py
+        if [ -n "${ANACONDA_API_TOKEN:-}" ]; then
+          conda config --set anaconda_upload yes
+        fi
+        python util/publish_zimg.py
         ls -R python/zimg/dist
 
     - name: Cleanup macOS signing assets

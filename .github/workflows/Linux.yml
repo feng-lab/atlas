@@ -595,27 +595,7 @@ jobs:
           python util/publish_atlas_agent_pypi.py
           ls -R python/atlas_agent/dist
 
-      - name: Build and upload conda zimg
-        # Skip this when publishing a PyPI release (tags starting with "v")
-        if: github.event_name != 'create' || github.ref_type != 'tag' || !startsWith(github.event.ref, 'v')
-        shell: bash -l {0}
-        env:
-          ATLAS_CLANG_MAJOR: ${{ env.CLANG_MAJOR }}
-        run: |
-          set -euo pipefail
-          if [ -z "${ANACONDA_API_TOKEN:-}" ]; then
-            echo "Error: ANACONDA_API_TOKEN is not set. Provide it via the ATLAS_ENV_LOCAL dotenv secret." >&2
-            exit 1
-          fi
-          eval "$(conda shell.bash hook)"
-          conda activate atlas-ci
-          cd "$GITHUB_WORKSPACE"
-          python util/build_ext_libs.py conda-zimg
-          conda config --set anaconda_upload yes
-          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
-
-      - name: Publish zimg to PyPI
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
+      - name: Publish zimg (PyPI + conda)
         shell: bash -l {0}
         run: |
           eval "$(conda shell.bash hook)"
@@ -623,5 +603,8 @@ jobs:
           set -euo pipefail
           # Ensure build backend is available (redundant if Install conda tooling ran in this job)
           python -m pip install --no-cache-dir build twine
-          python util/publish_zimg_pypi.py
+          if [ -n "${ANACONDA_API_TOKEN:-}" ]; then
+            conda config --set anaconda_upload yes
+          fi
+          python util/publish_zimg.py
           ls -R python/zimg/dist

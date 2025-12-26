@@ -189,11 +189,7 @@ set(IMG_SOURCES
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
 # our target
-if (BUILD_WITH_CONDA)
-    set(LIBRARY_NAME condaimg)
-else ()
-    set(LIBRARY_NAME img)
-endif ()
+set(LIBRARY_NAME img)
 add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${SCIFIO_SOURCES} ${IMG_SOURCES})
 
 if (NOT AARCH64)
