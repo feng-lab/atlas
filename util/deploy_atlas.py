@@ -12,8 +12,10 @@ import tempfile
 import time
 import xml.etree.ElementTree as eTree
 import zipfile
-from typing import AbstractSet, Optional
+from typing import Optional
 
+import atlas_env
+import atlas_version
 import build_ext_libs
 import common_dirs
 import download_utils
@@ -80,75 +82,15 @@ def _macos_signing_disabled() -> bool:
     return _env_truthy(_DISABLE_SIGNING_ENV_VAR)
 
 
-def _maybe_load_dotenv() -> None:
+def load_deploy_env_from_dotenv() -> None:
+    """Load repo `.env`/`.env.local` for deploy/signing.
+
+    This is intentionally explicit (no import-time side effects). Call it from
+    entrypoints that want local `.env.local` support.
+    """
     if not common_dirs.is_mac():
         return
-
-    repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    env_path = os.path.join(repo_root, ".env")
-    env_local_path = os.path.join(repo_root, ".env.local")
-
-    keys_from_env: set[str] = set()
-    _load_env_file(
-        env_path,
-        keys_from_env=keys_from_env,
-        override_only_keys=None,
-        allowed_keys=_DOTENV_KEYS,
-    )
-    _load_env_file(
-        env_local_path,
-        keys_from_env=None,
-        override_only_keys=keys_from_env,
-        allowed_keys=_DOTENV_KEYS,
-    )
-
-
-def _load_env_file(
-    path: str,
-    *,
-    keys_from_env: Optional[set[str]],
-    override_only_keys: Optional[set[str]],
-    allowed_keys: Optional[AbstractSet[str]],
-) -> None:
-    if not os.path.exists(path):
-        return
-
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            for raw_line in f:
-                line = raw_line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if line.startswith("export "):
-                    line = line[len("export ") :].lstrip()
-                if "=" not in line:
-                    continue
-                key, value = line.split("=", 1)
-                key = key.strip()
-                value = value.strip()
-                if not key:
-                    continue
-                if allowed_keys is not None and key not in allowed_keys:
-                    continue
-                if (
-                    value.startswith(("'", '"'))
-                    and len(value) >= 2
-                    and value[-1] == value[0]
-                ):
-                    value = value[1:-1]
-
-                if key in os.environ:
-                    if override_only_keys is None or key not in override_only_keys:
-                        continue
-
-                os.environ[key] = value
-                if keys_from_env is not None:
-                    keys_from_env.add(key)
-    except Exception as e:
-        raise RuntimeError(f"Failed reading env file: {path}: {e}")
-
-
-_maybe_load_dotenv()
+    atlas_env.load_repo_dotenv(allowed_keys=_DOTENV_KEYS)
 
 
 def _macos_codesign_identity() -> str:
@@ -1003,50 +945,6 @@ def _macos_notarize_qtifw_package_dir(package_dir: str) -> None:
         )
 
 
-def _read_git_version_from_header() -> str:
-    """Read GIT_VERSION from generated src/version/version.h.
-
-    Returns the raw C string content without surrounding quotes.
-    Raises RuntimeError if the header is missing or malformed.
-    """
-    repo_root = common_dirs.atlas_repository_dir()
-    vh_path = os.path.join(repo_root, "src", "version", "version.h")
-    if not os.path.exists(vh_path):
-        raise RuntimeError(f"version.h not found: {vh_path}")
-    try:
-        with open(vh_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("#define GIT_VERSION"):
-                    # line format: #define GIT_VERSION "..."
-                    start = line.find('"')
-                    end = line.rfind('"')
-                    if start != -1 and end != -1 and end > start:
-                        return line[start + 1 : end]
-        raise RuntimeError("GIT_VERSION define not found in version.h")
-    except Exception as e:
-        raise RuntimeError(f"Failed reading version.h: {e}")
-
-
-def get_version_token_for_filename() -> str:
-    """Return a filesystem-friendly version token for filenames.
-
-    Uses the git-describe part of GIT_VERSION from version.h (before " build ").
-    """
-    raw = _read_git_version_from_header()
-
-    # Strip the trailing build timestamp appended by CMake if present
-    # e.g., "v0.9.0-1342-g5fecdae3 build 2025-11-15T04:34:33GMT"
-    parts = raw.split(" build ", 1)
-    token = parts[0].strip()
-
-    # Replace spaces/slashes if any remain (defensive)
-    token = token.replace(" ", "_").replace("/", "-")
-    if not token:
-        raise RuntimeError("Empty version token derived from GIT_VERSION")
-    return token
-
-
 _THIRD_PARTY_LICENSE_FILENAME_SUBSTRINGS: tuple[str, ...] = (
     "license",
     "licence",
@@ -1374,7 +1272,7 @@ def build_atlas_package(is_debug_version: bool = False):
 
 
 def pack_atlas_package():
-    version_token = get_version_token_for_filename()
+    version_token = atlas_version.version_token_for_filename()
 
     if common_dirs.is_mac():
         app_name = 'Atlas.app'
@@ -1615,6 +1513,7 @@ def deploy_atlas(is_debug_version: bool = False):
 
 if __name__ == "__main__":
     logger = setup_logger()
+    load_deploy_env_from_dotenv()
 
     parser = argparse.ArgumentParser(
         epilog="""

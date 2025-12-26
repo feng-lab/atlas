@@ -765,62 +765,18 @@ jobs:
           conda-build --token $env:ANACONDA_API_TOKEN --user fenglab zimg-recipe
           if ($LASTEXITCODE -ne 0) { Write-Error "conda-build failed"; exit $LASTEXITCODE }
 
-      - name: Build zimg PyPI wheel
+      - name: Publish zimg to PyPI
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
         shell: pwsh
-        working-directory: python/zimg
         run: |
           $ErrorActionPreference = 'Stop'
           $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
           Invoke-Expression $condaHook
           conda activate atlas-ci
-          $TAG = "$env:GITHUB_REF".Replace('refs/tags/','')
-          $VERSION = $TAG.TrimStart('v')
-          Write-Host "Detected tag: $TAG -> zimg version: $VERSION"
-          $env:VERSION = $VERSION
-          $version = $env:VERSION
-          if (-not $version) {
-            Write-Error "VERSION environment variable is not set"
-            exit 1
-          }
-          $pyproject = "pyproject.toml"
-          $text = Get-Content $pyproject -Raw -Encoding UTF8
-          $pattern = '(?m)^\s*version\s*=\s*"[^"]*"'
-          $replacement = 'version = "{0}"' -f $version
-          $newText = [regex]::Replace($text, $pattern, $replacement, 1)
-          if ($newText -eq $text) {
-            Write-Error "Failed to update version in pyproject.toml"
-            exit 1
-          }
-          Set-Content -Path $pyproject -Value $newText -Encoding UTF8
-          Write-Host "Updated pyproject.toml to version $version"
           python -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { Write-Error "pip upgrade failed"; exit $LASTEXITCODE }
           python -m pip install --no-cache-dir build twine
           if ($LASTEXITCODE -ne 0) { Write-Error "pip install build twine failed"; exit $LASTEXITCODE }
-          Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
-          # Build wheel only; we depend on the full atlas repo (src + src/3rdparty)
-          # via ZIMG_SRC_DIR instead of a self-contained sdist.
-          $env:ZIMG_SRC_DIR = Join-Path $env:GITHUB_WORKSPACE 'src/python'
-          python -m build --wheel
-          if ($LASTEXITCODE -ne 0) { Write-Error "python -m build --wheel failed"; exit $LASTEXITCODE }
-          Get-ChildItem -Recurse dist | Select-Object FullName
-
-      - name: Upload zimg to PyPI
-        if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
-        shell: pwsh
-        working-directory: python/zimg
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ env.PYPI_API_TOKEN }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          if (-not $env:TWINE_PASSWORD) {
-            Write-Error "PYPI_API_TOKEN is not set. Provide it via the ATLAS_ENV_LOCAL dotenv secret."
-            exit 1
-          }
-          $condaHook = (& conda 'shell.powershell' 'hook') | Out-String
-          Invoke-Expression $condaHook
-          conda activate atlas-ci
-          python -m twine upload dist/*
-          if ($LASTEXITCODE -ne 0) { Write-Error "twine upload failed"; exit $LASTEXITCODE }
+          python util/publish_zimg_pypi.py
+          if ($LASTEXITCODE -ne 0) { Write-Error "publish_zimg_pypi.py failed"; exit $LASTEXITCODE }
+          Get-ChildItem -Recurse python/zimg/dist | Select-Object FullName

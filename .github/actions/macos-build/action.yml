@@ -273,64 +273,18 @@ runs:
         conda config --set anaconda_upload yes
         conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
 
-    - name: Build zimg PyPI wheel
+    - name: Publish zimg to PyPI
       if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
       shell: bash -l {0}
-      working-directory: python/zimg
       run: |
         eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         set -euo pipefail
-        TAG="${GITHUB_REF#refs/tags/}"
-        VERSION="${TAG#v}"
-        echo "Detected tag: $TAG -> zimg version: $VERSION"
-        export VERSION="$VERSION"
-        python - << 'PY'
-        import os
-        import re
-        from pathlib import Path
-
-        version = os.environ.get("VERSION")
-        if not version:
-            raise SystemExit("VERSION environment variable is not set")
-
-        pyproject = Path("pyproject.toml")
-        text = pyproject.read_text(encoding="utf-8")
-        new_text, count = re.subn(
-            r'(?m)^\s*version\s*=\s*"[^"]*"',
-            f'version = "{version}"',
-            text,
-        )
-        if count == 0:
-            raise SystemExit("Failed to update version in pyproject.toml")
-        pyproject.write_text(new_text, encoding="utf-8")
-        print(f"Updated pyproject.toml to version {version}")
-        PY
         python -m pip install --upgrade pip
         # Ensure build backend is available (redundant if conda tooling already installed)
         python -m pip install --no-cache-dir build twine
-        rm -rf dist
-        # Build wheel only; we depend on the full atlas repo (src + src/3rdparty)
-        # via ZIMG_SRC_DIR instead of a self-contained sdist.
-        export ZIMG_SRC_DIR="$GITHUB_WORKSPACE/src/python"
-        python -m build --wheel
-        ls -R dist
-
-    - name: Upload zimg to PyPI
-      if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
-      shell: bash -l {0}
-      working-directory: python/zimg
-      run: |
-        eval "$(conda shell.bash hook)"
-        conda activate atlas-ci
-        set -euo pipefail
-        if [ -z "${PYPI_API_TOKEN:-}" ]; then
-          echo "Error: PYPI_API_TOKEN is required for PyPI uploads." >&2
-          exit 1
-        fi
-        export TWINE_USERNAME="__token__"
-        export TWINE_PASSWORD="${PYPI_API_TOKEN}"
-        python -m twine upload dist/*
+        python util/publish_zimg_pypi.py
+        ls -R python/zimg/dist
 
     - name: Cleanup macOS signing assets
       if: ${{ always() }}

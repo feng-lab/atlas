@@ -7,13 +7,11 @@ name = "atlas-build-utils"
 version = "0.1.0"
 description = "Build and deployment utilities for Atlas CI (external deps, packaging, downloads)."
 requires-python = ">=3.12"
-license = { text = "Proprietary" }
 authors = [{ name = "Feng Lab" }]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.12",
-  "License :: Other/Proprietary License",
   "Operating System :: OS Independent",
 ]
 dependencies = [

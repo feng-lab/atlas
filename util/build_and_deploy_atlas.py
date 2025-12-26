@@ -7,6 +7,7 @@ from logger import setup_logger
 
 if __name__ == "__main__":
     logger = setup_logger()
+    deploy_atlas.load_deploy_env_from_dotenv()
 
     parser = argparse.ArgumentParser(
         epilog="""
