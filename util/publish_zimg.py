@@ -461,14 +461,6 @@ def main() -> int:
             print("macOS wheel: build x86_64 + arm64, then fuse to universal2")
         if common_dirs.is_linux():
             print("Linux wheel repair: enabled (linuxdeployqt + RECORD rewrite)")
-        if conda_token:
-            assert conda_source_dir is not None
-            assert conda_cmd_display is not None
-            print(f"Conda stage dir: {conda_source_dir}/zimg")
-            print("Conda build command:", " ".join(conda_cmd_display))
-            print("Conda upload: enabled via conda-build")
-        else:
-            print("Conda: skipped (ANACONDA_API_TOKEN not set)")
         atlas_pypi.maybe_upload_to_pypi(
             out_dir,
             project="zimg",
@@ -477,6 +469,14 @@ def main() -> int:
             raw_git_version=raw_git_version,
             dry_run=True,
         )
+        if conda_token:
+            assert conda_source_dir is not None
+            assert conda_cmd_display is not None
+            print(f"Conda stage dir: {conda_source_dir}/zimg")
+            print("Conda build command:", " ".join(conda_cmd_display))
+            print("Conda upload: enabled via conda-build")
+        else:
+            print("Conda: skipped (ANACONDA_API_TOKEN not set)")
         return 0
 
     atlas_pypi.ensure_empty_dir(out_dir)
@@ -544,6 +544,15 @@ def main() -> int:
     if not wheels:
         raise RuntimeError("Wheel build did not produce any artifacts.")
 
+    atlas_pypi.maybe_upload_to_pypi(
+        out_dir,
+        project="zimg",
+        version=version,
+        git_describe=git_describe,
+        raw_git_version=raw_git_version,
+        dry_run=False,
+    )
+
     if conda_token:
         assert conda_cmd is not None
         assert conda_cmd_display is not None
@@ -558,15 +567,6 @@ def main() -> int:
         _run_checked(conda_cmd, cwd=repo_root, display_cmd=conda_cmd_display)
     else:
         print("Skipping conda build/upload (ANACONDA_API_TOKEN not set)")
-
-    atlas_pypi.maybe_upload_to_pypi(
-        out_dir,
-        project="zimg",
-        version=version,
-        git_describe=git_describe,
-        raw_git_version=raw_git_version,
-        dry_run=False,
-    )
 
     return 0
 
