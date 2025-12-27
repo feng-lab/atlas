@@ -3,6 +3,7 @@ import base64
 import csv
 import hashlib
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -13,6 +14,7 @@ from pathlib import Path
 import atlas_env
 import atlas_pypi
 import atlas_version
+import build_ext_libs
 import common_dirs
 from linuxdeployqt import linux_deploy_deps_to_lib_dir
 
@@ -33,6 +35,64 @@ def _run_checked(
         raise RuntimeError(
             f"Command failed (exit={e.returncode}): {' '.join(display)}"
         ) from None
+
+
+def _prepend_path(env: dict[str, str], dir_path: Path) -> None:
+    existing = env.get("PATH", "")
+    prefix = str(dir_path)
+    if not existing:
+        env["PATH"] = prefix
+        return
+    if existing.split(os.pathsep)[0] == prefix:
+        return
+    env["PATH"] = prefix + os.pathsep + existing
+
+
+def _append_cmake_args(env: dict[str, str], extra_args: list[str]) -> None:
+    if not extra_args:
+        return
+    existing = shlex.split(env.get("CMAKE_ARGS", ""))
+    env["CMAKE_ARGS"] = shlex.join([*existing, *extra_args])
+
+
+def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
+    """
+    Match the native toolchain selection used by `util/build_atlas.py` /
+    `util/build_ext_libs.py` so zimg wheels build consistently across platforms.
+    """
+
+    if common_dirs.use_ninja():
+        ninja_path = Path(common_dirs.get_ninja_binary())
+        if not ninja_path.exists():
+            raise RuntimeError(
+                "Ninja was not found at the expected location. "
+                f"Expected: {ninja_path}. "
+                "Did you run `python3 util/build_ext_libs.py all` (or otherwise stage tools into src/3rdparty/build/)?"
+            )
+
+        _prepend_path(env, ninja_path.parent)
+        env["CMAKE_GENERATOR"] = "Ninja"
+        _append_cmake_args(env, [f"-DCMAKE_MAKE_PROGRAM={ninja_path}"])
+
+    if common_dirs.is_linux() and build_ext_libs.use_clang_in_linux():
+        cc = build_ext_libs.get_clang_in_linux()
+        cxx = build_ext_libs.get_clangplus_in_linux()
+        env["CC"] = cc
+        env["CXX"] = cxx
+
+        if shutil.which(cc, path=env.get("PATH")) is None:
+            raise RuntimeError(
+                f"Expected clang compiler not found in PATH: {cc}. "
+                "Install clang or set `ATLAS_CLANG_MAJOR` / `LLVM_VERSION` to a version available on PATH."
+            )
+        if shutil.which(cxx, path=env.get("PATH")) is None:
+            raise RuntimeError(
+                f"Expected clang compiler not found in PATH: {cxx}. "
+                "Install clang++ or set `ATLAS_CLANG_MAJOR` / `LLVM_VERSION` to a version available on PATH."
+            )
+
+    if common_dirs.is_windows() and common_dirs.use_clang_cl():
+        _append_cmake_args(env, ["-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"])
 
 
 def _sha256_digest_for_wheel_record(path: Path) -> tuple[str, int]:
@@ -218,6 +278,8 @@ def main() -> int:
 
         env = os.environ.copy()
         env["ZIMG_SRC_DIR"] = str(zimg_src_dir)
+        if common_dirs.is_linux() or common_dirs.is_windows():
+            _apply_scikit_build_core_toolchain_env(env)
 
         _run_checked(cmd, cwd=tmp_project, env=env)
 

@@ -145,7 +145,7 @@ runs:
         conda update --all -y
         conda install -y anaconda-client conda-build pip
         python -m pip install --upgrade pip
-        python -m pip install --no-cache-dir aqtinstall requests packaging openai openai-agents grpcio-tools grpcio protobuf jsonschema build twine
+        python -m pip install --no-cache-dir aqtinstall requests packaging
         conda clean --all -y
 
     - name: Cache Qt (installed)

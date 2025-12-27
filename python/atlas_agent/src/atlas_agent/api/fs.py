@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from typing import Iterable
 
-from ..llm_docs import find_repo_root
+from ..repo import find_repo_root
 
 
 def expand_paths(paths: Iterable[str]) -> list[str]:

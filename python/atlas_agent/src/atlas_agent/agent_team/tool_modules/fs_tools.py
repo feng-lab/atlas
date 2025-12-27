@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Required internal helper; fail fast if missing
-from ...llm_docs import find_repo_root  # type: ignore
+from ...repo import find_repo_root  # type: ignore
 from .context import ToolDispatchContext
 from .file_formats import SCENE_LOAD_CATEGORIES, get_supported_extensions
 

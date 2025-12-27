@@ -10,10 +10,8 @@ if sys.version_info < (3, 12):
 import argparse
 import logging
 import os
-from pathlib import Path
 
 from .chat_rpc_team import run_repl as run_team_repl
-from .llm_docs import ensure_llm_docs, find_repo_root, missing_llm_docs, repo_schema_dir
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,21 +40,6 @@ def main(argv: list[str] | None = None) -> int:
         help="Atlas installation root (optional; used to derive exporter path)",
     )
     parser.add_argument(
-        "--prepare-llm-docs",
-        action="store_true",
-        help="If in an Atlas repo, refresh missing LLM docs in repo before starting chat",
-    )
-    parser.add_argument(
-        "--prepare-llm-docs-only",
-        action="store_true",
-        help="Generate/refresh LLM docs in the repo and exit",
-    )
-    parser.add_argument(
-        "--llm-docs-dir",
-        default=None,
-        help="Override target dir for LLM docs (defaults to repo schema dir if in repo)",
-    )
-    parser.add_argument(
         "--allow-screenshots",
         action="store_true",
         help="Enable preview screenshots for Inspector (sets ATLAS_AGENT_ALLOW_SCREENSHOTS=1)",
@@ -79,20 +62,6 @@ def main(argv: list[str] | None = None) -> int:
             "Unknown command; this CLI supports chat only. Usage: python -m atlas_agent --address localhost:50051"
         )
         return 2
-    if args.prepare_llm_docs_only:
-        # One-shot generation; does not require API key
-        repo = find_repo_root()
-        if not repo:
-            logging.error("Not in an Atlas repo (missing sentinels).")
-            return 2
-        out_dir = (
-            Path(args.llm_docs_dir) if args.llm_docs_dir else repo_schema_dir(repo)
-        )
-        ensure_llm_docs(
-            repo, atlas_dir=args.atlas_dir, out_dir=out_dir, force_schema_dump=True
-        )
-        logging.info("LLM docs prepared at %s", out_dir)
-        return 0
 
     if not args.api_key:
         logging.error("OPENAI_API_KEY is required (set --api-key).")
@@ -103,22 +72,6 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["ATLAS_AGENT_ALLOW_SCREENSHOTS"] = "1"
     if args.enable_codegen:
         os.environ["ATLAS_AGENT_ENABLE_CODEGEN"] = "1"
-
-    # Ensure LLM docs when running chat:
-    # - Always fill in missing docs automatically if inside the repo.
-    # - If --prepare-llm-docs is set, force a refresh when missing.
-    repo = find_repo_root()
-    if repo:
-        out_dir = (
-            Path(args.llm_docs_dir) if args.llm_docs_dir else repo_schema_dir(repo)
-        )
-        missing = missing_llm_docs(out_dir)
-        if missing or args.prepare_llm_docs:
-            if missing:
-                logging.info("Preparing LLM docs (missing: %s)", ", ".join(missing))
-            ensure_llm_docs(
-                repo, atlas_dir=args.atlas_dir, out_dir=out_dir, force_schema_dump=False
-            )
 
     return int(
         run_team_repl(

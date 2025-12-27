@@ -12,10 +12,12 @@ import tempfile
 import time
 import xml.etree.ElementTree as eTree
 import zipfile
+from pathlib import Path
 from typing import Optional
 
 import atlas_env
 import atlas_version
+import atlas_llm_docs
 import build_ext_libs
 import common_dirs
 import download_utils
@@ -1131,23 +1133,13 @@ def build_atlas_package(is_debug_version: bool = False):
         subprocess.run(['lipo', '-create', filename, target_filename, '-output', target_filename],
                        shell=False, check=True)
 
-        # Ensure LLM docs are generated in repo and copied into the .app
-        repo_root = common_dirs.atlas_repository_dir()
-        repo_llm_dir = os.path.join(repo_root, 'src', 'atlas', 'Resources', 'json', 'atlas')
-        os.makedirs(repo_llm_dir, exist_ok=True)
-        # Generate missing docs using the agent CLI; use deploy .app as --atlas-dir
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "python.atlas_agent.src.atlas_agent",
-                "--prepare-llm-docs-only",
-                "--atlas-dir",
-                os.path.join(common_dirs.deploy_target_dir(), app_name),
-            ],
-            cwd=repo_root,
-            shell=False,
-            check=True,
+        # Ensure LLM docs are generated in repo and copied into the .app.
+        repo_root = Path(common_dirs.atlas_repository_dir())
+        repo_llm_dir = atlas_llm_docs.repo_schema_dir(repo_root)
+        atlas_llm_docs.ensure_llm_schema_docs(
+            atlas_dir=Path(os.path.join(common_dirs.deploy_target_dir(), app_name)),
+            out_dir=repo_llm_dir,
+            force_schema_dump=True,
         )
         # Copy repo docs into the deployed app
         target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'Resources', 'json', 'atlas')
@@ -1177,22 +1169,13 @@ def build_atlas_package(is_debug_version: bool = False):
                                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
                                         common_dirs.qt_base_dir(),
                                         is_debug_version=is_debug_version)
-            # Ensure LLM docs are generated in repo and copied into AppDir
-            repo_root = common_dirs.atlas_repository_dir()
-            repo_llm_dir = os.path.join(repo_root, 'src', 'atlas', 'Resources', 'json', 'atlas')
-            os.makedirs(repo_llm_dir, exist_ok=True)
-            subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "python.atlas_agent.src.atlas_agent",
-                    "--prepare-llm-docs-only",
-                    "--atlas-dir",
-                    os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir"),
-                ],
-                cwd=repo_root,
-                shell=False,
-                check=True,
+            # Ensure LLM docs are generated in repo and copied into AppDir.
+            repo_root = Path(common_dirs.atlas_repository_dir())
+            repo_llm_dir = atlas_llm_docs.repo_schema_dir(repo_root)
+            atlas_llm_docs.ensure_llm_schema_docs(
+                atlas_dir=Path(os.path.join(common_dirs.deploy_target_dir(), "Atlas.AppDir")),
+                out_dir=repo_llm_dir,
+                force_schema_dump=True,
             )
             target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Resources', 'json', 'atlas')
             os.makedirs(target_llm_dir, exist_ok=True)
@@ -1241,22 +1224,13 @@ def build_atlas_package(is_debug_version: bool = False):
             env = build_ext_libs.get_vcvars_environment()
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), '--no-translations', app_name],
                            cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
-            # Ensure LLM docs are generated in repo and copied into deploy folder
-            repo_root = common_dirs.atlas_repository_dir()
-            repo_llm_dir = os.path.join(repo_root, 'src', 'atlas', 'Resources', 'json', 'atlas')
-            os.makedirs(repo_llm_dir, exist_ok=True)
-            subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "python.atlas_agent.src.atlas_agent",
-                    "--prepare-llm-docs-only",
-                    "--atlas-dir",
-                    os.path.join(common_dirs.deploy_target_dir(), "Atlas"),
-                ],
-                cwd=repo_root,
-                shell=False,
-                check=True,
+            # Ensure LLM docs are generated in repo and copied into deploy folder.
+            repo_root = Path(common_dirs.atlas_repository_dir())
+            repo_llm_dir = atlas_llm_docs.repo_schema_dir(repo_root)
+            atlas_llm_docs.ensure_llm_schema_docs(
+                atlas_dir=Path(os.path.join(common_dirs.deploy_target_dir(), "Atlas")),
+                out_dir=repo_llm_dir,
+                force_schema_dump=True,
             )
             target_llm_dir = os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Resources', 'json', 'atlas')
             os.makedirs(target_llm_dir, exist_ok=True)

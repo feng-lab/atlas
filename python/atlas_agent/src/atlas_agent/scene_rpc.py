@@ -13,7 +13,7 @@ from google.protobuf import struct_pb2  # type: ignore
 from google.protobuf.json_format import MessageToDict  # type: ignore
 from grpc_tools import protoc  # type: ignore
 
-from .llm_docs import find_repo_root  # type: ignore
+from .repo import find_repo_root  # type: ignore
 
 
 def _compile_proto(proto_path: Path, out_dir: Path) -> None:

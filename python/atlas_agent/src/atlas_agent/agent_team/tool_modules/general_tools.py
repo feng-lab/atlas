@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ...codegen_policy import allowed_imports_status, is_codegen_enabled
-from ...llm_docs import find_repo_root  # type: ignore
+from ...repo import find_repo_root  # type: ignore
 from .context import ToolDispatchContext
 
 HANDLED_TOOLS = (
