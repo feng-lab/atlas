@@ -237,3 +237,4 @@ src/3rdparty/runtime_licenses/
 
 .gradle/
 /python/zimg/dist/
+/python/atlas_agent/dist/

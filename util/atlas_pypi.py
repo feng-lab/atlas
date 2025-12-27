@@ -24,7 +24,7 @@ def pep440_version_from_git_describe(git_describe: str) -> str:
     base = match.group(1)
     commits_since_tag = match.group(2)
     # hash = match.group(3)  # intentionally unused: PyPI does not accept local-version (+) uploads.
-    # dirty = match.group(4)  # intentionally unused: uploads are blocked by is_clean_release_tag().
+    # dirty = match.group(4)  # intentionally unused: we do not gate uploads on repo dirtiness.
 
     if commits_since_tag:
         return f"{base}.dev{commits_since_tag}"
@@ -33,7 +33,7 @@ def pep440_version_from_git_describe(git_describe: str) -> str:
 
 def is_clean_release_tag(git_describe: str) -> bool:
     match = _GIT_DESCRIBE_RE.match(git_describe.strip())
-    return bool(match and match.group(2) is None and match.group(4) is None)
+    return bool(match and match.group(2) is None)
 
 
 def update_pyproject_version(pyproject_path: Path, version: str) -> None:
@@ -67,9 +67,11 @@ def maybe_upload_to_pypi(
     version: str,
     git_describe: str,
     dry_run: bool,
+    allow_dev_upload: bool = False,
+    skip_existing: bool = False,
     raw_git_version: str | None = None,
 ) -> None:
-    if not is_clean_release_tag(git_describe):
+    if not is_clean_release_tag(git_describe) and not allow_dev_upload:
         print("Upload: skipped (not a clean release tag)")
         return
 
@@ -82,7 +84,8 @@ def maybe_upload_to_pypi(
             print(
                 "PYPI_API_TOKEN: not set (local runs can define it in `.env.local` at the repo root)"
             )
-        print(f"Upload command: {sys.executable} -m twine upload {dist_dir}/*")
+        skip = " --skip-existing" if skip_existing else ""
+        print(f"Upload command: {sys.executable} -m twine upload{skip} {dist_dir}/*")
         return
 
     if not token:
@@ -101,10 +104,12 @@ def maybe_upload_to_pypi(
     if not dist_files:
         raise RuntimeError(f"No dist artifacts found to upload in: {dist_dir}")
 
-    cmd = [sys.executable, "-m", "twine", "upload", *[str(p) for p in dist_files]]
+    cmd = [sys.executable, "-m", "twine", "upload"]
+    if skip_existing:
+        cmd.append("--skip-existing")
+    cmd.extend(str(p) for p in dist_files)
     env = os.environ.copy()
     env["TWINE_USERNAME"] = "__token__"
     env["TWINE_PASSWORD"] = token
     subprocess.run(cmd, env=env, check=True)
     print(f"Uploaded {project} {version} to PyPI")
-

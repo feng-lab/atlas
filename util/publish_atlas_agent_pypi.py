@@ -20,6 +20,11 @@ def main() -> int:
         action="store_true",
         help="Print resolved version and commands without building/uploading.",
     )
+    parser.add_argument(
+        "--allow-dev-upload",
+        action="store_true",
+        help="Allow uploading dev versions (e.g. X.Y.Z.devN) to PyPI (skips the clean-tag gate).",
+    )
 
     args = parser.parse_args()
 
@@ -45,6 +50,8 @@ def main() -> int:
             git_describe=git_describe,
             raw_git_version=raw_git_version,
             dry_run=True,
+            allow_dev_upload=args.allow_dev_upload,
+            skip_existing=args.allow_dev_upload,
         )
         return 0
 
@@ -75,6 +82,8 @@ def main() -> int:
         git_describe=git_describe,
         raw_git_version=raw_git_version,
         dry_run=False,
+        allow_dev_upload=args.allow_dev_upload,
+        skip_existing=args.allow_dev_upload,
     )
 
     return 0
@@ -82,4 +91,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
