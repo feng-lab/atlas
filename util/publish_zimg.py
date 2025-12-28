@@ -2,6 +2,7 @@ import argparse
 import base64
 import csv
 import hashlib
+import logging
 import os
 import shlex
 import shutil
@@ -17,6 +18,9 @@ import atlas_version
 import build_ext_libs
 import common_dirs
 from linuxdeployqt import linux_deploy_deps_to_lib_dir
+from logger import setup_logger
+
+logger = logging.getLogger(__name__)
 
 _WHEEL_RECORD_HASH_CHUNK_SIZE = 1024 * 1024
 
@@ -371,6 +375,18 @@ def _repair_linux_wheel_in_place(wheel_path: Path) -> None:
         for module_path in modules:
             linux_deploy_deps_to_lib_dir(str(module_path), lib_dir=str(lib_dir))
 
+        deployed_files: list[Path] = []
+        if lib_dir.is_dir():
+            deployed_files = sorted(p for p in lib_dir.iterdir() if p.is_file())
+        if not deployed_files:
+            raise RuntimeError(
+                "Linux wheel repair failed to deploy any shared-library dependencies into "
+                f"{lib_dir} for wheel {wheel_path.name}. "
+                "This likely means `ldd` could not resolve non-system dependencies (e.g. Qt/TBB/FreeImage) "
+                "when scanning `zimg/_imgpy.abi3.so`."
+            )
+        logger.info("Linux wheel repair deployed %d files into %s", len(deployed_files), lib_dir)
+
         _rewrite_wheel_record(wheel_root=wheel_root, dist_info_dir=dist_info_dir)
 
         tmp_wheel = wheel_path.with_name(f"{wheel_path.name}.tmp")
@@ -408,6 +424,7 @@ def _stage_conda_zimg_from_wheel(*, wheel_path: Path, conda_source_dir: Path) ->
 
 
 def main() -> int:
+    setup_logger()
     parser = argparse.ArgumentParser(
         description=("Build and publish the zimg wheel (PyPI) and conda package."),
     )
@@ -434,7 +451,7 @@ def main() -> int:
     raw_git_version = atlas_version.read_git_version_from_header()
     git_describe = atlas_version.git_describe_from_git_version(raw_git_version)
     version = atlas_pypi.pep440_version_from_git_describe(git_describe)
-    print(f"Detected tag: {git_describe} -> zimg version: {version}")
+    logger.info("Detected tag: %s -> zimg version: %s", git_describe, version)
 
     out_dir = repo_root / "python" / "zimg" / "dist"
     cmd = [sys.executable, "-m", "build", "--wheel", "--outdir", str(out_dir)]
@@ -456,11 +473,11 @@ def main() -> int:
         conda_cmd_display = ["conda-build", "--token", "$ANACONDA_API_TOKEN", "zimg-recipe"]
 
     if args.dry_run:
-        print("Build command:", " ".join(cmd))
+        logger.info("Build command: %s", " ".join(cmd))
         if common_dirs.is_mac():
-            print("macOS wheel: build x86_64 + arm64, then fuse to universal2")
+            logger.info("macOS wheel: build x86_64 + arm64, then fuse to universal2")
         if common_dirs.is_linux():
-            print("Linux wheel repair: enabled (linuxdeployqt + RECORD rewrite)")
+            logger.info("Linux wheel repair: enabled (linuxdeployqt + RECORD rewrite)")
         atlas_pypi.maybe_upload_to_pypi(
             out_dir,
             project="zimg",
@@ -472,11 +489,11 @@ def main() -> int:
         if conda_token:
             assert conda_source_dir is not None
             assert conda_cmd_display is not None
-            print(f"Conda stage dir: {conda_source_dir}/zimg")
-            print("Conda build command:", " ".join(conda_cmd_display))
-            print("Conda upload: enabled via conda-build")
+            logger.info("Conda stage dir: %s/zimg", conda_source_dir)
+            logger.info("Conda build command: %s", " ".join(conda_cmd_display))
+            logger.info("Conda upload: enabled via conda-build")
         else:
-            print("Conda: skipped (ANACONDA_API_TOKEN not set)")
+            logger.info("Conda: skipped (ANACONDA_API_TOKEN not set)")
         return 0
 
     atlas_pypi.ensure_empty_dir(out_dir)
@@ -522,7 +539,7 @@ def main() -> int:
                 out_dir=out_dir,
                 macos_target=build_ext_libs.macos_min_version(),
             )
-            print(f"Fused universal2 wheel: {fused}")
+            logger.info("Fused universal2 wheel: %s", fused)
         else:
             env = env_base
             if common_dirs.is_linux() or common_dirs.is_windows():
@@ -534,12 +551,12 @@ def main() -> int:
     if wheels:
         if common_dirs.is_linux():
             for wheel_path in wheels:
-                print(f"Repairing Linux wheel: {wheel_path.name}")
+                logger.info("Repairing Linux wheel: %s", wheel_path.name)
                 _repair_linux_wheel_in_place(wheel_path)
         for wheel in wheels:
-            print(f"Built: {wheel}")
+            logger.info("Built: %s", wheel)
     else:
-        print(f"No wheels found in: {out_dir}")
+        logger.warning("No wheels found in: %s", out_dir)
 
     if not wheels:
         raise RuntimeError("Wheel build did not produce any artifacts.")
@@ -559,14 +576,14 @@ def main() -> int:
         assert conda_source_dir is not None
 
         wheel_path = wheels[0]
-        print(f"Staging conda zimg package from wheel: {wheel_path.name}")
+        logger.info("Staging conda zimg package from wheel: %s", wheel_path.name)
         staged_dir = _stage_conda_zimg_from_wheel(
             wheel_path=wheel_path, conda_source_dir=conda_source_dir
         )
-        print(f"Staged conda package dir: {staged_dir}")
+        logger.info("Staged conda package dir: %s", staged_dir)
         _run_checked(conda_cmd, cwd=repo_root, display_cmd=conda_cmd_display)
     else:
-        print("Skipping conda build/upload (ANACONDA_API_TOKEN not set)")
+        logger.info("Skipping conda build/upload (ANACONDA_API_TOKEN not set)")
 
     return 0
 

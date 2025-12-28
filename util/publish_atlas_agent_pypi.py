@@ -1,4 +1,5 @@
 import argparse
+import logging
 import shutil
 import subprocess
 import sys
@@ -9,9 +10,13 @@ import atlas_env
 import atlas_pypi
 import atlas_version
 import common_dirs
+from logger import setup_logger
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> int:
+    setup_logger()
     parser = argparse.ArgumentParser(
         description=("Build and publish the atlas-agent PyPI wheel."),
     )
@@ -36,13 +41,13 @@ def main() -> int:
     raw_git_version = atlas_version.read_git_version_from_header()
     git_describe = atlas_version.git_describe_from_git_version(raw_git_version)
     version = atlas_pypi.pep440_version_from_git_describe(git_describe)
-    print(f"Detected tag: {git_describe} -> atlas-agent version: {version}")
+    logger.info("Detected tag: %s -> atlas-agent version: %s", git_describe, version)
 
     out_dir = py_project_src / "dist"
     cmd = [sys.executable, "-m", "build", "--wheel", "--outdir", str(out_dir)]
 
     if args.dry_run:
-        print("Build command:", " ".join(cmd))
+        logger.info("Build command: %s", " ".join(cmd))
         atlas_pypi.maybe_upload_to_pypi(
             out_dir,
             project="atlas-agent",
@@ -71,9 +76,9 @@ def main() -> int:
     wheels = sorted(out_dir.glob("*.whl"))
     if wheels:
         for wheel in wheels:
-            print(f"Built: {wheel}")
+            logger.info("Built: %s", wheel)
     else:
-        print(f"No wheels found in: {out_dir}")
+        logger.warning("No wheels found in: %s", out_dir)
 
     atlas_pypi.maybe_upload_to_pypi(
         out_dir,

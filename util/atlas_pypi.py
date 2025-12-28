@@ -1,9 +1,12 @@
+import logging
 import os
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 _GIT_DESCRIBE_RE = re.compile(
     r"^v?(\d+\.\d+\.\d+(?:\.\d+)?)(?:-(\d+)-g([0-9a-f]+))?(?:-(dirty))?$"
@@ -72,20 +75,25 @@ def maybe_upload_to_pypi(
     raw_git_version: str | None = None,
 ) -> None:
     if not is_clean_release_tag(git_describe) and not allow_dev_upload:
-        print("Upload: skipped (not a clean release tag)")
+        logger.info("Upload: skipped (not a clean release tag)")
         return
 
     token = os.environ.get("PYPI_API_TOKEN", "").strip()
     if dry_run:
-        print(f"Project: {project}")
+        logger.info("Project: %s", project)
         if token:
-            print("PYPI_API_TOKEN: set")
+            logger.info("PYPI_API_TOKEN: set")
         else:
-            print(
+            logger.info(
                 "PYPI_API_TOKEN: not set (local runs can define it in `.env.local` at the repo root)"
             )
         skip = " --skip-existing" if skip_existing else ""
-        print(f"Upload command: {sys.executable} -m twine upload{skip} {dist_dir}/*")
+        logger.info(
+            "Upload command: %s -m twine upload%s %s/*",
+            sys.executable,
+            skip,
+            dist_dir,
+        )
         return
 
     if not token:
@@ -97,7 +105,7 @@ def maybe_upload_to_pypi(
                 "Refusing to publish to PyPI: PYPI_API_TOKEN is not set."
                 f"{detail}git_describe: {git_describe}\n"
             )
-        print("PYPI_API_TOKEN is not set; skipping PyPI upload")
+        logger.info("PYPI_API_TOKEN is not set; skipping PyPI upload")
         return
 
     dist_files = sorted(p for p in dist_dir.iterdir() if p.is_file())
@@ -112,4 +120,4 @@ def maybe_upload_to_pypi(
     env["TWINE_USERNAME"] = "__token__"
     env["TWINE_PASSWORD"] = token
     subprocess.run(cmd, env=env, check=True)
-    print(f"Uploaded {project} {version} to PyPI")
+    logger.info("Uploaded %s %s to PyPI", project, version)
