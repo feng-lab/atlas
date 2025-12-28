@@ -133,6 +133,38 @@ if (APPLE)
   )
 endif ()
 
+if (UNIX AND NOT APPLE)
+  # When building a wheel, the Python extension is relocated into site-packages.
+  # Install the shared-library dependencies into `zimg/lib` so that `RPATH=$ORIGIN/lib`
+  # keeps working after relocation.
+  #
+  # Use the SONAME-level filenames (e.g. `.so.6`) to avoid relying on symlinks inside wheels.
+  set(freeimagelibname libfreeimageplus.so.3)
+  add_custom_command(TARGET ${module_name}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
+                     $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
+  )
+  set(tbblibname libtbb.so.12)
+  add_custom_command(TARGET ${module_name}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:TBB::tbb>
+                     $<TARGET_FILE_DIR:${module_name}>/${tbblibname}
+  )
+  set(qtcorelibname libQt6Core.so.6)
+  add_custom_command(TARGET ${module_name}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt6::Core>
+                     $<TARGET_FILE_DIR:${module_name}>/${qtcorelibname}
+  )
+  set(qtguilibname libQt6Gui.so.6)
+  add_custom_command(TARGET ${module_name}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt6::Gui>
+                     $<TARGET_FILE_DIR:${module_name}>/${qtguilibname}
+  )
+endif ()
+
 # target_include_directories(${module_name} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
 
 # install
@@ -213,6 +245,13 @@ if (APPLE)
       endforeach()
     ]])
   endif()
+endif ()
+
+if (UNIX AND NOT APPLE)
+  install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION zimg/lib)
+  install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION zimg/lib)
+  install(FILES $<TARGET_FILE_DIR:${module_name}>/${qtcorelibname} DESTINATION zimg/lib)
+  install(FILES $<TARGET_FILE_DIR:${module_name}>/${qtguilibname} DESTINATION zimg/lib)
 endif ()
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars" # source directory

@@ -352,6 +352,16 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_
 
 
 def linux_deploy_deps_to_lib_dir(binary_name: str, lib_dir: str):
+    """Copy non-system shared-library dependencies of `binary_name` into `lib_dir`.
+
+    This helper relies on `ldd -r` to resolve DT_NEEDED entries. For correct results,
+    `binary_name` must be scanned in an environment where its current DT_RPATH/DT_RUNPATH
+    (and any loader-related env vars such as LD_LIBRARY_PATH) can still resolve its
+    dependencies.
+
+    In particular, running this on a relocated binary can yield incomplete results because the original
+    runtime search paths may no longer point at the dependency directories.
+    """
     blacklist = [
         'linux-vdso.so.1',
         'ld-linux-x86-64.so.2',

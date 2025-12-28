@@ -17,7 +17,6 @@ import atlas_pypi
 import atlas_version
 import build_ext_libs
 import common_dirs
-from linuxdeployqt import linux_deploy_deps_to_lib_dir
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -350,58 +349,29 @@ def _rewrite_wheel_record(*, wheel_root: Path, dist_info_dir: Path) -> None:
         writer.writerows(rows)
 
 
-def _repair_linux_wheel_in_place(wheel_path: Path) -> None:
-    with tempfile.TemporaryDirectory(prefix="zimg_wheel_repair_") as tmp:
-        wheel_root = Path(tmp)
-        with zipfile.ZipFile(wheel_path, "r") as zf:
-            zf.extractall(wheel_root)
+def _assert_linux_wheel_contains_expected_libs(wheel_path: Path) -> None:
+    expected_libs = {
+        "libfreeimageplus.so.3",
+        "libtbb.so.12",
+        "libQt6Gui.so.6",
+        "libQt6Core.so.6",
+    }
 
-        dist_info_dirs = [
-            p for p in wheel_root.iterdir() if p.is_dir() and p.name.endswith(".dist-info")
-        ]
-        if len(dist_info_dirs) != 1:
-            raise RuntimeError(
-                f"Wheel repair expected 1 dist-info directory, got {len(dist_info_dirs)}: {wheel_path}"
-            )
-        dist_info_dir = dist_info_dirs[0]
+    with zipfile.ZipFile(wheel_path, "r") as zf:
+        entries = set(zf.namelist())
 
-        modules = sorted(wheel_root.glob("zimg/*imgpy*.so"))
-        if not modules:
-            raise RuntimeError(
-                f"Wheel repair could not find zimg/*imgpy*.so inside: {wheel_path}"
-            )
-
-        lib_dir = wheel_root / "zimg" / "lib"
-        for module_path in modules:
-            linux_deploy_deps_to_lib_dir(str(module_path), lib_dir=str(lib_dir))
-
-        deployed_files: list[Path] = []
-        if lib_dir.is_dir():
-            deployed_files = sorted(p for p in lib_dir.iterdir() if p.is_file())
-        if not deployed_files:
-            raise RuntimeError(
-                "Linux wheel repair failed to deploy any shared-library dependencies into "
-                f"{lib_dir} for wheel {wheel_path.name}. "
-                "This likely means `ldd` could not resolve non-system dependencies (e.g. Qt/TBB/FreeImage) "
-                "when scanning `zimg/_imgpy.abi3.so`."
-            )
-        logger.info("Linux wheel repair deployed %d files into %s", len(deployed_files), lib_dir)
-
-        _rewrite_wheel_record(wheel_root=wheel_root, dist_info_dir=dist_info_dir)
-
-        tmp_wheel = wheel_path.with_name(f"{wheel_path.name}.tmp")
-        if tmp_wheel.exists():
-            tmp_wheel.unlink()
-
-        with zipfile.ZipFile(tmp_wheel, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for path in sorted(
-                (p for p in wheel_root.rglob("*") if p.is_file()),
-                key=lambda p: p.relative_to(wheel_root).as_posix(),
-            ):
-                rel = path.relative_to(wheel_root).as_posix()
-                zf.write(path, rel)
-
-        os.replace(tmp_wheel, wheel_path)
+    missing = sorted(
+        f"zimg/lib/{name}" for name in expected_libs if f"zimg/lib/{name}" not in entries
+    )
+    if missing:
+        raise RuntimeError(
+            "Linux wheel is missing expected shared libraries under zimg/lib. "
+            "These are installed during the CMake install step so `RPATH=$ORIGIN/lib` keeps working "
+            "after the wheel is relocated into site-packages.\n"
+            f"wheel: {wheel_path}\n"
+            f"missing: {missing}"
+        )
+    logger.info("Linux wheel contains expected shared libraries (%d)", len(expected_libs))
 
 
 def _stage_conda_zimg_from_wheel(*, wheel_path: Path, conda_source_dir: Path) -> Path:
@@ -476,8 +446,6 @@ def main() -> int:
         logger.info("Build command: %s", " ".join(cmd))
         if common_dirs.is_mac():
             logger.info("macOS wheel: build x86_64 + arm64, then fuse to universal2")
-        if common_dirs.is_linux():
-            logger.info("Linux wheel repair: enabled (linuxdeployqt + RECORD rewrite)")
         atlas_pypi.maybe_upload_to_pypi(
             out_dir,
             project="zimg",
@@ -551,8 +519,7 @@ def main() -> int:
     if wheels:
         if common_dirs.is_linux():
             for wheel_path in wheels:
-                logger.info("Repairing Linux wheel: %s", wheel_path.name)
-                _repair_linux_wheel_in_place(wheel_path)
+                _assert_linux_wheel_contains_expected_libs(wheel_path)
         for wheel in wheels:
             logger.info("Built: %s", wheel)
     else:
