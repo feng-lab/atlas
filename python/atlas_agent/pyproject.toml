@@ -27,7 +27,7 @@ dependencies = [
   "protobuf>=4.24.0",
   "jsonschema>=4.18.0",
 ]
-version = "0.1.0"
+version = "0.0.0"
 
 [project.urls]
 Homepage = "https://github.com/feng-lab/atlas"

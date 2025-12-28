@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Optional
 
 import atlas_env
-import atlas_version
 import atlas_llm_docs
+import atlas_version
 import build_ext_libs
 import common_dirs
 import download_utils

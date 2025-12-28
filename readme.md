@@ -11,15 +11,8 @@
 - Agents Guide: [Atlas Agents (Unified)](docs/AGENTS_GUIDE.md)
 
 ## Installation
-### All: install python3 for build scripts and for building the zimg conda package
-```bash
-# install miniconda
-# then
-conda env remove -n pt12 -y
-conda create -n pt12 -y python=3.12
-conda activate pt12
-conda install numpy python conda-build anaconda-client pip
-```
+### All: Python 3.12 (required for build scripts)
+Atlas build scripts require Python 3.12 plus a few packages from PyPI (via `pip`). Any Python installers work (e.g. conda, `uv`, pyenv, or a custom install).
 
 ### macOS:
 * install xcode
@@ -33,9 +26,10 @@ conda install numpy python conda-build anaconda-client pip
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    conda activate pt12
+    # Activate your Python 3.12 environment (conda/venv/uv/etc.)
+    # e.g. conda activate pt12
     # install qt by aqt
-    pip install --upgrade --no-cache-dir aqtinstall
+    python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine
     cd ~
     rm -rf Qt
     mkdir Qt
@@ -48,14 +42,16 @@ conda install numpy python conda-build anaconda-client pip
     ```
 * install intel oneapi basekit
 * fix intel oneapi basekit ipp cmake error: add 'set(IPP_ARCH)' to file `oneapi/ipp/latest/lib/cmake/ipp/ipp-config.cmake`
+* install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3): https://vulkan.lunarg.com/home/welcome
 
 ### Windows:
 * install visual studio 2022, intel oneapi basekit, git
 * install qt6 (by aqt or installer from the qt website)
     ```powershell
-    conda activate pt12
+    # Activate your Python 3.12 environment (conda/venv/uv/etc.)
+    # e.g. conda activate pt12
     # install qt by aqt
-    pip install --upgrade --no-cache-dir aqtinstall
+    python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine
     cd c:
     rm -r Qt
     mkdir Qt
@@ -80,9 +76,10 @@ conda install numpy python conda-build anaconda-client pip
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    conda activate pt12
+    # Activate your Python 3.12 environment (conda/venv/uv/etc.)
+    # e.g. conda activate pt12
     # install qt by aqt
-    pip install --upgrade --no-cache-dir aqtinstall
+    python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine
     cd ~
     rm -rf Qt
     mkdir Qt
@@ -93,7 +90,7 @@ conda install numpy python conda-build anaconda-client pip
     # list modules
     aqt list-tool linux desktop
     ```
-* install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3). On Debian/Ubuntu, prefer LunarG packages or your distro’s Vulkan 1.3 packages: https://vulkan.lunarg.com/home/welcome
+* install Vulkan SDK 1.3+ (and ensure your GPU driver exposes Vulkan 1.3): https://vulkan.lunarg.com/home/welcome
 * install intel oneapi basekit with apt
 
 ### All:
@@ -107,18 +104,11 @@ conda install numpy python conda-build anaconda-client pip
     ```bash
     # in atlas repo
     # build external libraries and python packages
-    python3 util/build_ext_libs.py all
+    python util/build_ext_libs.py all
     # build atlas
-    python3 util/build_and_deploy_atlas.py [--skip-test]
+    python util/build_and_deploy_atlas.py [--skip-test]
     # or build CMakeLists.txt
     ```
-
-### macOS signing & notarization (deployment)
-`util/deploy_atlas.py` codesigns nested code inside-out (without `codesign --deep`) and notarizes by default. It also generates a signed/notarized QtIFW `MaintenanceTool.app` (via `binarycreator --mt`) and ships it in the `fenglab.maintenance` package so the installed Maintenance Tool is signed. Configure via env vars:
-- `MACOS_CODESIGN_IDENTITY` (required when signing is enabled)
-- `MACOS_NOTARYTOOL_API_KEY_PATH`, `MACOS_NOTARYTOOL_API_KEY_ID`, `MACOS_NOTARYTOOL_API_ISSUER_ID` (required for notarization)
-- `ATLAS_MACOS_CODESIGN_ENTITLEMENTS` (optional entitlements plist)
-- `ATLAS_MACOS_DISABLE_SIGNING=1` to use ad-hoc signing and skip notarization
 
 ## C++ Version Defines
 * $Repository_DIR/CMakeLists.txt: set(CMAKE_CXX_STANDARD 20)
@@ -147,11 +137,6 @@ conda install numpy python conda-build anaconda-client pip
 # Builds the wheel; uploads to PyPI only when GIT_VERSION is exactly at a tag.
 python util/publish_zimg.py
 
-# For emergency uploads from non-tag commits, run:
-python util/publish_zimg.py --allow-non-tag-upload
-
 # install zimg from pypi
 pip install zimg
-# install zimg from conda
-conda install zimg -c fenglab -y
 ```

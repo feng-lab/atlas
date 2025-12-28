@@ -436,10 +436,16 @@ def main() -> int:
     cmd = [sys.executable, "-m", "build", "--wheel", "--outdir", str(out_dir)]
 
     conda_token = os.environ.get("ANACONDA_API_TOKEN", "").strip()
+    conda_build_exe = shutil.which("conda-build")
     conda_source_dir: Path | None = None
     conda_cmd: list[str] | None = None
     conda_cmd_display: list[str] | None = None
-    if conda_token:
+    conda_skip_reason: str | None = None
+    if not conda_token:
+        conda_skip_reason = "ANACONDA_API_TOKEN not set"
+    elif conda_build_exe is None:
+        conda_skip_reason = "conda-build not found on PATH"
+    else:
         conda_source_dir = Path(common_dirs.ext_conda_build_dir())
         conda_cmd = [
             "conda-build",
@@ -465,14 +471,21 @@ def main() -> int:
             allow_non_tag_upload=args.allow_non_tag_upload,
             skip_existing=args.allow_non_tag_upload,
         )
-        if conda_token:
+        if conda_skip_reason is None:
             assert conda_source_dir is not None
             assert conda_cmd_display is not None
             logger.info("Conda stage dir: %s/zimg", conda_source_dir)
             logger.info("Conda build command: %s", " ".join(conda_cmd_display))
             logger.info("Conda upload: enabled via conda-build")
         else:
-            logger.info("Conda: skipped (ANACONDA_API_TOKEN not set)")
+            if conda_token:
+                logger.warning("Conda: skipped (%s)", conda_skip_reason)
+                logger.warning(
+                    "To enable conda uploads, install `conda-build` and `anaconda-client` "
+                    "(e.g. in a conda env) and ensure `conda-build` is on PATH."
+                )
+            else:
+                logger.info("Conda: skipped (%s)", conda_skip_reason)
         return 0
 
     atlas_pypi.ensure_empty_dir(out_dir)
@@ -550,7 +563,7 @@ def main() -> int:
         skip_existing=args.allow_non_tag_upload,
     )
 
-    if conda_token:
+    if conda_skip_reason is None:
         assert conda_cmd is not None
         assert conda_cmd_display is not None
         assert conda_source_dir is not None
@@ -563,7 +576,14 @@ def main() -> int:
         logger.info("Staged conda package dir: %s", staged_dir)
         _run_checked(conda_cmd, cwd=repo_root, display_cmd=conda_cmd_display)
     else:
-        logger.info("Skipping conda build/upload (ANACONDA_API_TOKEN not set)")
+        if conda_token:
+            logger.warning("Skipping conda build/upload (%s)", conda_skip_reason)
+            logger.warning(
+                "To enable conda uploads, install `conda-build` and `anaconda-client` "
+                "(e.g. in a conda env) and ensure `conda-build` is on PATH."
+            )
+        else:
+            logger.info("Skipping conda build/upload (%s)", conda_skip_reason)
 
     return 0
 

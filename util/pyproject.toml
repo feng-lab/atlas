@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = []
+build-backend = "nonexistent.shownotbebuilt.backend"
 
 [project]
 name = "atlas-build-utils"
-version = "0.1.0"
+version = "0.0.0"
 description = "Build and deployment utilities for Atlas CI (external deps, packaging, downloads)."
 requires-python = ">=3.12"
 authors = [{ name = "Feng Lab" }]
@@ -21,17 +21,6 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/feng-lab/atlas"
-
-[tool.setuptools]
-package-dir = {"" = "."}
-include-package-data = true
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = [
-  "util",
-  "util.*",
-]
 
 [tool.ruff]
 # Keep formatting/linting out of generated files.
