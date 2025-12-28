@@ -9,34 +9,42 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 _GIT_DESCRIBE_RE = re.compile(
-    r"^v?(\d+\.\d+\.\d+(?:\.\d+)?)(?:-(\d+)-g([0-9a-f]+))?(?:-(dirty))?$"
+    r"^v?(\d+\.\d+(?:\.\d+)*)(?:-(\d+)-g([0-9a-f]+))?(?:-(dirty))?$"
 )
 
 
-def pep440_version_from_git_describe(git_describe: str) -> str:
+def _parse_git_describe_for_pypi(git_describe: str) -> tuple[str, int]:
     match = _GIT_DESCRIBE_RE.match(git_describe.strip())
     if not match:
         raise RuntimeError(
             "Unsupported git-describe format for PyPI.\n"
             f"got: {git_describe!r}\n"
             "expected one of:\n"
-            "  - vX.Y.Z\n"
-            "  - vX.Y.Z-N-g<sha>\n"
+            "  - vX.Y (optionally with additional .N segments)\n"
+            "  - vX.Y-N-g<sha> (optionally with additional .N segments)\n"
+            "  - append -dirty to either form\n"
         )
 
     base = match.group(1)
-    commits_since_tag = match.group(2)
+    commits_since_tag = int(match.group(2) or "0")
     # hash = match.group(3)  # intentionally unused: PyPI does not accept local-version (+) uploads.
     # dirty = match.group(4)  # intentionally unused: we do not gate uploads on repo dirtiness.
+    return (base, commits_since_tag)
 
+
+def pep440_version_from_git_describe(git_describe: str) -> str:
+    base, commits_since_tag = _parse_git_describe_for_pypi(git_describe)
     if commits_since_tag:
-        return f"{base}.dev{commits_since_tag}"
+        return f"{base}.{commits_since_tag}"
     return base
 
 
 def is_clean_release_tag(git_describe: str) -> bool:
-    match = _GIT_DESCRIBE_RE.match(git_describe.strip())
-    return bool(match and match.group(2) is None)
+    try:
+        _base, commits_since_tag = _parse_git_describe_for_pypi(git_describe)
+    except RuntimeError:
+        return False
+    return commits_since_tag == 0
 
 
 def update_pyproject_version(pyproject_path: Path, version: str) -> None:
@@ -70,11 +78,11 @@ def maybe_upload_to_pypi(
     version: str,
     git_describe: str,
     dry_run: bool,
-    allow_dev_upload: bool = False,
+    allow_non_tag_upload: bool = False,
     skip_existing: bool = False,
     raw_git_version: str | None = None,
 ) -> None:
-    if not is_clean_release_tag(git_describe) and not allow_dev_upload:
+    if not is_clean_release_tag(git_describe) and not allow_non_tag_upload:
         logger.info("Upload: skipped (not a clean release tag)")
         return
 

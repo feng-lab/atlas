@@ -3,7 +3,7 @@ name: Windows
 on:
   push:
     branches:
-      - main
+      - mainXX
   create:
     # Runs when a branch or tag is created; we gate to tags in job steps
   workflow_dispatch:

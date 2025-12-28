@@ -26,9 +26,13 @@ def main() -> int:
         help="Print resolved version and commands without building/uploading.",
     )
     parser.add_argument(
-        "--allow-dev-upload",
+        "--allow-non-tag-upload",
+        dest="allow_non_tag_upload",
         action="store_true",
-        help="Allow uploading dev versions (e.g. X.Y.Z.devN) to PyPI (skips the clean-tag gate).",
+        help=(
+            "Allow uploading non-tag versions (e.g. X.Y[.Z[...]].N where N is commits since the last tag) "
+            "to PyPI (skips the clean-tag gate)."
+        ),
     )
 
     args = parser.parse_args()
@@ -55,8 +59,8 @@ def main() -> int:
             git_describe=git_describe,
             raw_git_version=raw_git_version,
             dry_run=True,
-            allow_dev_upload=args.allow_dev_upload,
-            skip_existing=args.allow_dev_upload,
+            allow_non_tag_upload=args.allow_non_tag_upload,
+            skip_existing=args.allow_non_tag_upload,
         )
         return 0
 
@@ -87,8 +91,8 @@ def main() -> int:
         git_describe=git_describe,
         raw_git_version=raw_git_version,
         dry_run=False,
-        allow_dev_upload=args.allow_dev_upload,
-        skip_existing=args.allow_dev_upload,
+        allow_non_tag_upload=args.allow_non_tag_upload,
+        skip_existing=args.allow_non_tag_upload,
     )
 
     return 0

@@ -403,6 +403,15 @@ def main() -> int:
         action="store_true",
         help="Print resolved version and commands without building/uploading.",
     )
+    parser.add_argument(
+        "--allow-non-tag-upload",
+        dest="allow_non_tag_upload",
+        action="store_true",
+        help=(
+            "Allow uploading non-tag versions (e.g. X.Y[.Z[...]].N where N is commits since the last tag) "
+            "to PyPI (skips the clean-tag gate)."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -453,6 +462,8 @@ def main() -> int:
             git_describe=git_describe,
             raw_git_version=raw_git_version,
             dry_run=True,
+            allow_non_tag_upload=args.allow_non_tag_upload,
+            skip_existing=args.allow_non_tag_upload,
         )
         if conda_token:
             assert conda_source_dir is not None
@@ -535,6 +546,8 @@ def main() -> int:
         git_describe=git_describe,
         raw_git_version=raw_git_version,
         dry_run=False,
+        allow_non_tag_upload=args.allow_non_tag_upload,
+        skip_existing=args.allow_non_tag_upload,
     )
 
     if conda_token:

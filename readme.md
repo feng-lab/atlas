@@ -144,7 +144,11 @@ conda install numpy python conda-build anaconda-client pip
 
 ## Python Package Build
 ```bash
+# Builds the wheel; uploads to PyPI only when GIT_VERSION is exactly at a tag.
 python util/publish_zimg.py
+
+# For emergency uploads from non-tag commits, run:
+python util/publish_zimg.py --allow-non-tag-upload
 
 # install zimg from pypi
 pip install zimg
