@@ -185,7 +185,7 @@ Key regions:
 2. **Toolbars** (top rows): quick access to open, save, zoom, view mode toggles, ROI tools, help).
 3. **Objects Manager** (right dock): tree of all loaded objects with visibility and lock controls.
 4. **Central 2D View**: renders images and overlays; responds to navigation and editing gestures.
-5. **Dock widgets** (right, bottom, and floating): view settings, detailed metadata, capture panels, edit widgets, help text.
+5. **Dock widgets** (right, bottom, and floating): object and global view settings, detailed metadata, capture panels, edit widgets, help text.
 6. **Status bar** (bottom): short messages like “Ready” or “scene saved as ...”.
 
 ### 3.2 Menus in Detail
@@ -304,7 +304,7 @@ Steps to load and manage images via `ZImgDoc`:
 2. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
 3. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.
 4. **Full resolution rendering** – in 3D, enable Full Resolution in Object View Setting when you require high-quality output. Monitor GPU memory usage and progress logs.
-5. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...** to choose a new format.
+5. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...**(Ctrl/Cmd+Shift+S) to choose a new format.
 6. **Advanced processing** – Access via the document menu or object context menu:
    - **Stitch Images...** – run the image stitching dialog for tiled data.
    - **Align Sections...** – align serial sections.
@@ -408,7 +408,7 @@ Steps to load and manage images via `ZImgDoc`:
 1. **Zoom** – use mouse wheel, `Ctrl/Cmd` + `+`/`-`, or View toolbar buttons.
 2. **Pan** – enable Scroll Hand Drag mode or press Spacebar while dragging.
 3. **Rubber band selection** – choose Rubber Band Drag and draw selection boxes.
-4. **Fit to window** – `F` (shortcut of Fit Into Window) to reframe the dataset.
+4. **Fit to window** – reframe the dataset.
 
 ### 5.2 View Styles and Slicing
 
@@ -459,10 +459,10 @@ Steps to load and manage images via `ZImgDoc`:
 
 ### 6.2 Camera Navigation
 
-- **Rotate** – left-click drag or `Ctrl/Cmd` + arrow keys.
-- **Pan** – `Shift` + drag or `Shift` + arrow keys.
+- **Rotate** – left-click drag.
+- **Pan** – `Shift` + left-click drag.
 - **Zoom/Dolly** – mouse wheel, `Ctrl/Cmd +`/`-`.
-- **Roll** – `Alt` + drag or `Alt` + left/right arrows.
+- **Roll** – `Alt` + drag.
 - **Reset Camera** – toolbar button or **View → Reset Camera** fits all visible objects.
 - **Context menu** – right-click for quick options.
 
