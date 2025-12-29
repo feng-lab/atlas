@@ -27,6 +27,6 @@ Homepage = "https://github.com/feng-lab/atlas"
 [tool.scikit-build]
 wheel.packages = ["src/zimg"]
 build.verbose = true
-cmake.version = ">=3.24"
+cmake.version = ">=3.26"
 ninja.make-fallback = false
 wheel.py-api = "cp312"

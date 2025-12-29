@@ -11,8 +11,8 @@
 - Agents Guide: [Atlas Agents (Unified)](docs/AGENTS_GUIDE.md)
 
 ## Installation
-### All: Python 3.12 (required for build scripts)
-Atlas build scripts require Python 3.12 plus a few packages from PyPI (via `pip`). Any Python installers work (e.g. conda, `uv`, pyenv, or a custom install).
+### All: Python >=3.12 (required for build scripts)
+Atlas build scripts require Python >=3.12 plus a few packages from PyPI (via `pip`). Any Python installers work (e.g. conda, `uv`, pyenv, or a custom install).
 
 ### macOS:
 * install xcode
@@ -26,7 +26,7 @@ Atlas build scripts require Python 3.12 plus a few packages from PyPI (via `pip`
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    # Activate your Python 3.12 environment (conda/venv/uv/etc.)
+    # Activate your Python environment (conda/venv/uv/etc.)
     # e.g. conda activate pt12
     # install qt by aqt
     python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine
@@ -48,7 +48,7 @@ Atlas build scripts require Python 3.12 plus a few packages from PyPI (via `pip`
 * install visual studio 2022, intel oneapi basekit, git
 * install qt6 (by aqt or installer from the qt website)
     ```powershell
-    # Activate your Python 3.12 environment (conda/venv/uv/etc.)
+    # Activate your Python environment (conda/venv/uv/etc.)
     # e.g. conda activate pt12
     # install qt by aqt
     python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine
@@ -76,7 +76,7 @@ Atlas build scripts require Python 3.12 plus a few packages from PyPI (via `pip`
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    # Activate your Python 3.12 environment (conda/venv/uv/etc.)
+    # Activate your Python environment (conda/venv/uv/etc.)
     # e.g. conda activate pt12
     # install qt by aqt
     python -m pip install --upgrade --no-cache-dir aqtinstall requests packaging build twine

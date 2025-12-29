@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.19.3)
+# Python stable-ABI builds (Development.SABIModule / Python::SABIModule) require
+# CMake >= 3.26 (FindPython).
+cmake_minimum_required(VERSION 3.26)
 project(zimg)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -81,9 +83,45 @@ if (NOT TARGET img)
   add_subdirectory(../img zimg_img)
 endif ()
 
+# ABI toggles: regular (default), stable ABI, and free-threaded
+option(IMG_PY_STABLE_ABI "Build the Python module with CPython's Stable ABI (requires CPython>=3.12)" ON)
+option(IMG_PY_FREE_THREADED "Build free-threaded (nogil) module; requires a free-threaded Python interpreter" OFF)
+
+if (IMG_PY_STABLE_ABI AND IMG_PY_FREE_THREADED)
+  message(WARNING "IMG_PY_STABLE_ABI and IMG_PY_FREE_THREADED are mutually exclusive. Disabling IMG_PY_STABLE_ABI for free-threaded builds.")
+  set(IMG_PY_STABLE_ABI OFF)
+endif ()
+
 # nanobind
-# Try to locate the Python interpreter and development headers before nanobind
-find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module OPTIONAL_COMPONENTS Development.SABIModule)
+# Locate the Python interpreter and development headers before including nanobind.
+# Note: the requested version is a minimum; building against Python >= 3.12 is OK.
+set(_img_py_python_components Interpreter Development.Module)
+if (IMG_PY_STABLE_ABI)
+  list(APPEND _img_py_python_components Development.SABIModule)
+endif ()
+find_package(Python 3.12 REQUIRED COMPONENTS ${_img_py_python_components})
+unset(_img_py_python_components)
+
+if (IMG_PY_STABLE_ABI)
+  # nanobind's STABLE_ABI mode uses Py_LIMITED_API=0x030C0000 (cp312).
+  # Ensure the selected toolchain can actually build an abi3 module; do not
+  # silently fall back to a version-specific extension.
+  if (NOT Python_INTERPRETER_ID STREQUAL "Python")
+    message(FATAL_ERROR "IMG_PY_STABLE_ABI requires CPython, but FindPython detected '${Python_INTERPRETER_ID}' (Python_EXECUTABLE='${Python_EXECUTABLE}').")
+  endif ()
+  if (NOT TARGET Python::SABIModule)
+    message(FATAL_ERROR
+            "IMG_PY_STABLE_ABI is enabled, but CMake could not provide Python::SABIModule.\n"
+            "This usually means the selected Python installation is missing development headers/libraries, or CMake is too old to support Development.SABIModule.\n"
+            "Fixes:\n"
+            "  - Install the Python development package/headers for your interpreter\n"
+            "  - Configure with -DPython_EXECUTABLE=/path/to/python3.14 (or 3.15) to pick the intended interpreter\n"
+            "  - Ensure you are using CMake >= 3.26")
+  endif ()
+  if (DEFINED Python_SOABI AND NOT Python_SOABI STREQUAL "" AND Python_SOABI MATCHES "^[^-]*-[^-]*t-")
+    message(FATAL_ERROR "IMG_PY_STABLE_ABI does not support free-threaded CPython interpreters (SOABI='${Python_SOABI}'). Use a non-free-threaded CPython build or set -DIMG_PY_STABLE_ABI=OFF.")
+  endif ()
+endif ()
 
 # Fallback: on some CMake/Python combinations, Python_INCLUDE_DIRS is only
 # partially populated when requesting Development.Module. Pull from the target.
@@ -99,14 +137,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/nanobind nanobind)
 # build python extensions
 set(module_name _imgpy)
 
-# ABI toggles: regular (default), stable ABI, and free-threaded
-option(IMG_PY_STABLE_ABI "Build the Python module with CPython's Stable ABI (requires CPython>=3.12)" ON)
-option(IMG_PY_FREE_THREADED "Build free-threaded (nogil) module; requires a free-threaded Python interpreter" OFF)
-
 set(NB_ARGS NOMINSIZE)
-if (IMG_PY_STABLE_ABI AND IMG_PY_FREE_THREADED)
-  message(WARNING "IMG_PY_STABLE_ABI and IMG_PY_FREE_THREADED are mutually exclusive. The stable ABI will be disabled for free-threaded builds.")
-endif ()
 if (IMG_PY_STABLE_ABI)
   list(APPEND NB_ARGS STABLE_ABI)
 endif ()
