@@ -205,19 +205,21 @@ static_assert(sizeof(Location) == sizeof(double) * 3, "Location is not compact")
 enum class FileFormat
 {
   Unknown = 0,
-  HDF5Img,
-  OmeTiff,
-  Tiff,
-  Vaa3DRaw,
-  ZeissLsm,
-  Jpeg,
-  JpegXR,
-  Png,
-  FreeImage,
-  MetaImage,
-  ZeissCZI,
-  ITKImage,
-  Leica,
+  HDF5Img = 1,
+  OmeTiff = 2,
+  Tiff = 3,
+  Vaa3DRaw = 4,
+  ZeissLsm = 5,
+  Jpeg = 6,
+  JpegXR = 7,
+  Png = 8,
+#if defined(ZIMG_HAVE_FREEIMAGE)
+  FreeImage = 9,
+#endif
+  MetaImage = 10,
+  ZeissCZI = 11,
+  ITKImage = 12,
+  Leica = 13,
 };
 
 enum class Compression : std::uint16_t

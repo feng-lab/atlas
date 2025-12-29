@@ -9,6 +9,8 @@
 #include <QString>
 #include <QStringList>
 #include <QPolygonF>
+#include <array>
+#include <cstring>
 #include "zglmutils.h"
 
 namespace nb = nanobind;
@@ -69,9 +71,30 @@ struct type_caster<glm::vec<L, T, Q>>
     return true;
   }
 
-  static handle from_cpp(const vec_type& v, rv_policy, cleanup_list*) noexcept
+  static handle from_cpp(const vec_type& v, rv_policy, cleanup_list* cleanup) noexcept
   {
-    return nb::cast(nb::ndarray<nb::numpy, const T>(glm::value_ptr(v), {L})).release();
+    // `type_caster<...>::from_cpp` must be `noexcept`. Avoid `nb::cast(...)` here
+    // since it may throw (e.g., if numpy is unavailable), which would `terminate`.
+    try {
+      const std::array<T, L> buffer = [&] {
+        std::array<T, L> tmp{};
+        std::memcpy(tmp.data(), glm::value_ptr(v), sizeof(T) * L);
+        return tmp;
+      }();
+
+      nb::ndarray<nb::numpy, const T> array(buffer.data(), {L});
+      return type_caster<decltype(array)>::from_cpp(array, rv_policy::copy, cleanup);
+    }
+    catch (nanobind::python_error& e) {
+      e.restore();
+      return nullptr;
+    }
+    catch (const std::exception& e) {
+      if (!PyErr_Occurred()) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+      }
+      return nullptr;
+    }
   }
 };
 
@@ -102,9 +125,31 @@ struct type_caster<glm::mat<C, R, T, Q>>
     return true;
   }
 
-  static handle from_cpp(const mat_type& v, rv_policy, cleanup_list*) noexcept
+  static handle from_cpp(const mat_type& v, rv_policy, cleanup_list* cleanup) noexcept
   {
-    return nb::cast(nb::ndarray<nb::numpy, const T>(glm::value_ptr(glm::transpose(v)), {R, C})).release();
+    // `type_caster<...>::from_cpp` must be `noexcept`. Avoid `nb::cast(...)` here
+    // since it may throw (e.g., if numpy is unavailable), which would `terminate`.
+    try {
+      std::array<T, C * R> buffer{};
+      for (size_t r = 0; r < R; ++r) {
+        for (size_t c = 0; c < C; ++c) {
+          buffer[r * C + c] = v[c][r];
+        }
+      }
+
+      nb::ndarray<nb::numpy, const T> array(buffer.data(), {R, C});
+      return type_caster<decltype(array)>::from_cpp(array, rv_policy::copy, cleanup);
+    }
+    catch (nanobind::python_error& e) {
+      e.restore();
+      return nullptr;
+    }
+    catch (const std::exception& e) {
+      if (!PyErr_Occurred()) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+      }
+      return nullptr;
+    }
   }
 };
 
@@ -133,9 +178,26 @@ struct type_caster<glm::tquat<T, Q>>
     return true;
   }
 
-  static handle from_cpp(const quat_type& v, rv_policy, cleanup_list*) noexcept
+  static handle from_cpp(const quat_type& v, rv_policy, cleanup_list* cleanup) noexcept
   {
-    return nb::cast(nb::ndarray<nb::numpy, const T>(glm::value_ptr(v), {4})).release();
+    // `type_caster<...>::from_cpp` must be `noexcept`. Avoid `nb::cast(...)` here
+    // since it may throw (e.g., if numpy is unavailable), which would `terminate`.
+    try {
+      std::array<T, 4> buffer{};
+      std::memcpy(buffer.data(), glm::value_ptr(v), sizeof(T) * 4);
+      nb::ndarray<nb::numpy, const T> array(buffer.data(), {4});
+      return type_caster<decltype(array)>::from_cpp(array, rv_policy::copy, cleanup);
+    }
+    catch (nanobind::python_error& e) {
+      e.restore();
+      return nullptr;
+    }
+    catch (const std::exception& e) {
+      if (!PyErr_Occurred()) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+      }
+      return nullptr;
+    }
   }
 };
 
@@ -169,13 +231,31 @@ struct type_caster<QPolygonF>
     return true;
   }
 
-  static handle from_cpp(const QPolygonF& v, rv_policy, cleanup_list*) noexcept
+  static handle from_cpp(const QPolygonF& v, rv_policy, cleanup_list* cleanup) noexcept
   {
-    if (v.empty()) {
-      return nb::cast(nb::ndarray<nb::numpy, const double>(nullptr, {(size_t)0, (size_t)2})).release();
+    // `type_caster<...>::from_cpp` must be `noexcept`. Avoid `nb::cast(...)` here
+    // since it may throw (e.g., if numpy is unavailable), which would `terminate`.
+    try {
+      nb::ndarray<nb::numpy, const double> array;
+      if (v.empty()) {
+        array = nb::ndarray<nb::numpy, const double>(nullptr, {(size_t)0, (size_t)2});
+      } else {
+        auto* ptr = reinterpret_cast<const double*>(v.data());
+        array = nb::ndarray<nb::numpy, const double>(ptr, {(size_t)v.size(), (size_t)2});
+      }
+
+      return type_caster<decltype(array)>::from_cpp(array, rv_policy::copy, cleanup);
     }
-    auto ptr = reinterpret_cast<const double*>(v.data());
-    return nb::cast(nb::ndarray<nb::numpy, const double>(ptr, {(size_t)v.size(), (size_t)2})).release();
+    catch (nanobind::python_error& e) {
+      e.restore();
+      return nullptr;
+    }
+    catch (const std::exception& e) {
+      if (!PyErr_Occurred()) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+      }
+      return nullptr;
+    }
   }
 };
 

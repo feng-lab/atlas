@@ -99,28 +99,35 @@ endif (WIN32)
 message(STATUS "JPEGXR_INCLUDE_DIRS: ${JPEGXR_INCLUDE_DIRS}")
 message(STATUS "JPEGXR_LIBRARIES: ${JPEGXR_LIBRARIES}")
 
-if (WIN32)
-  set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage)
-  set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImagePlus.lib
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImage.lib)
-  set(FREEIMAGE_DLLS ${FREEIMAGE_DLLS}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImagePlus.dll
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImage.dll)
-elseif (APPLE)
-  set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
-  set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libfreeimageplus.dylib)
+if (ZIMG_DISABLE_FREEIMAGE)
+  set(FREEIMAGE_INCLUDE_DIRS)
+  set(FREEIMAGE_LIBRARIES)
+  set(FREEIMAGE_DLLS)
+  message(STATUS "FreeImage: disabled (ZIMG_DISABLE_FREEIMAGE=ON)")
 else ()
-  set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
-  set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libfreeimageplus.so)
+  if (WIN32)
+    set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage)
+    set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
+        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImagePlus.lib
+        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImage.lib)
+    set(FREEIMAGE_DLLS ${FREEIMAGE_DLLS}
+        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImagePlus.dll
+        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImage.dll)
+  elseif (APPLE)
+    set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
+    set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
+        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libfreeimageplus.dylib)
+  else ()
+    set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
+        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
+    set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
+        ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libfreeimageplus.so)
+  endif ()
+  message(STATUS "FREEIMAGE_INCLUDE_DIRS: ${FREEIMAGE_INCLUDE_DIRS}")
+  message(STATUS "FREEIMAGE_LIBRARIES: ${FREEIMAGE_LIBRARIES}")
 endif ()
-message(STATUS "FREEIMAGE_INCLUDE_DIRS: ${FREEIMAGE_INCLUDE_DIRS}")
-message(STATUS "FREEIMAGE_LIBRARIES: ${FREEIMAGE_LIBRARIES}")
 
 find_package(WebP REQUIRED
              COMPONENTS webp

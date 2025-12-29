@@ -23,6 +23,7 @@ requirements:
   # Runtime: only require Python >=3.12 (ABI3-compatible)
   run:
     - python >=3.12
+    - numpy >=1.26
 
 test:
 

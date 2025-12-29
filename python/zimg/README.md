@@ -20,6 +20,7 @@ scientific image formats.
 ## Installation
 
 - Requires Python `>= 3.12`.
+- Requires NumPy (installed automatically by `pip install zimg`).
 - If a prebuilt wheel is available for your platform: `pip install zimg`.
 - If `pip` falls back to building from source, see “Building from source” below.
 
@@ -108,7 +109,8 @@ Supported file formats depend on how the wheel/source was built. The
 
 - `Tiff`, `OmeTiff`, `Png`, `Jpeg`, `JpegXR`
 - `ZeissCZI`, `ZeissLsm`, `Leica`
-- `Vaa3DRaw`, `HDF5Img`, `MetaImage`, `ITKImage`, `FreeImage`
+- `Vaa3DRaw`, `HDF5Img`, `MetaImage`, `ITKImage`
+- `FreeImage` (optional; omitted when built with `-DZIMG_DISABLE_FREEIMAGE=ON`)
 
 ## Notes / limitations
 

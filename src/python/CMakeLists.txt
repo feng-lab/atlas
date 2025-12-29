@@ -76,6 +76,10 @@ endif ()
 message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
 
 include(PrintCMakeTargetInfo)
+
+option(ZIMG_DISABLE_FREEIMAGE
+       "Disable FreeImage support in img (removes FreeImage formats and avoids linking libfreeimageplus)."
+       OFF)
 include(LibsForImg)
 
 # subprojects
@@ -90,6 +94,30 @@ option(IMG_PY_FREE_THREADED "Build free-threaded (nogil) module; requires a free
 if (IMG_PY_STABLE_ABI AND IMG_PY_FREE_THREADED)
   message(WARNING "IMG_PY_STABLE_ABI and IMG_PY_FREE_THREADED are mutually exclusive. Disabling IMG_PY_STABLE_ABI for free-threaded builds.")
   set(IMG_PY_STABLE_ABI OFF)
+endif ()
+
+# Packaging: strip debug symbols from installed binaries to reduce wheel/conda size.
+set(_img_py_strip_default OFF)
+if (UNIX AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(_img_py_strip_default ON)
+endif ()
+option(IMG_PY_STRIP_INSTALLED_BINARIES
+       "Strip debug symbols from installed native binaries (reduces wheel size)."
+       ${_img_py_strip_default})
+
+set(_IMG_PY_STRIP_TOOL "")
+if (IMG_PY_STRIP_INSTALLED_BINARIES)
+  if (NOT UNIX)
+    message(FATAL_ERROR "IMG_PY_STRIP_INSTALLED_BINARIES is only supported on UNIX-like platforms.")
+  endif ()
+  if (CMAKE_STRIP)
+    set(_IMG_PY_STRIP_TOOL "${CMAKE_STRIP}")
+  else ()
+    find_program(_IMG_PY_STRIP_TOOL NAMES llvm-strip strip)
+  endif ()
+  if (NOT _IMG_PY_STRIP_TOOL)
+    message(FATAL_ERROR "IMG_PY_STRIP_INSTALLED_BINARIES is enabled, but no strip tool was found.")
+  endif ()
 endif ()
 
 # nanobind
@@ -151,11 +179,13 @@ target_link_libraries(${module_name} PRIVATE img)
 if (APPLE)
   target_compile_options(${module_name} PRIVATE -faligned-allocation)
   set(freeimagelibname libfreeimageplus.dylib)
-  add_custom_command(TARGET ${module_name}
-                     POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                     $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-  )
+  if (NOT ZIMG_DISABLE_FREEIMAGE)
+    add_custom_command(TARGET ${module_name}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
+                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
+    )
+  endif ()
   set(tbblibname libtbb.12.dylib)
   add_custom_command(TARGET ${module_name}
                      POST_BUILD
@@ -171,11 +201,13 @@ if (UNIX AND NOT APPLE)
   #
   # Use the SONAME-level filenames (e.g. `.so.6`) to avoid relying on symlinks inside wheels.
   set(freeimagelibname libfreeimageplus.so.3)
-  add_custom_command(TARGET ${module_name}
-                     POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                     $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-  )
+  if (NOT ZIMG_DISABLE_FREEIMAGE)
+    add_custom_command(TARGET ${module_name}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
+                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
+    )
+  endif ()
   set(tbblibname libtbb.so.12)
   add_custom_command(TARGET ${module_name}
                      POST_BUILD
@@ -209,18 +241,61 @@ install(TARGETS ${module_name} DESTINATION zimg)
 
 if (WIN32)
   #  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls.exe DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
-  install(FILES ${FREEIMAGE_DLLS} DESTINATION zimg)
+  if (NOT ZIMG_DISABLE_FREEIMAGE)
+    install(FILES ${FREEIMAGE_DLLS} DESTINATION zimg)
+  endif ()
   install(FILES $<TARGET_FILE:TBB::tbb> DESTINATION zimg)
   install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION zimg)
   install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION zimg)
 endif (WIN32)
 
 if (APPLE)
-  install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION zimg/lib)
+  if (NOT ZIMG_DISABLE_FREEIMAGE)
+    install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION zimg/lib)
+  endif ()
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION zimg/lib)
   install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION zimg/lib/QtCore.framework/Versions/A)
   install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION zimg/lib/QtGui.framework/Versions/A)
   install(FILES $<TARGET_FILE:Qt6::DBus> DESTINATION zimg/lib/QtDBus.framework/Versions/A)
+
+  option(IMG_PY_STRIP_INSTALLED_MACHO
+         "Strip debug symbols from installed Mach-O binaries on macOS (must run before codesign)."
+         ${IMG_PY_STRIP_INSTALLED_BINARIES})
+  if (IMG_PY_STRIP_INSTALLED_MACHO)
+    set(_img_py_strip_tool "${_IMG_PY_STRIP_TOOL}")
+    set(_img_py_strip_install_code_template [[
+      set(_install_root "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
+      set(_strip_tool "@_img_py_strip_tool@")
+      if(_strip_tool STREQUAL "")
+        message(FATAL_ERROR "strip tool not configured (CMAKE_STRIP/strip not found).")
+      endif()
+
+      file(GLOB _strip_targets
+        "${_install_root}/zimg/_imgpy*.so"
+        "${_install_root}/zimg/lib/*.dylib"
+        "${_install_root}/zimg/lib/*.framework/Versions/*/*"
+      )
+      list(REMOVE_DUPLICATES _strip_targets)
+
+      foreach(_path IN LISTS _strip_targets)
+        if(NOT EXISTS "${_path}")
+          continue()
+        endif()
+
+        execute_process(
+          COMMAND "${_strip_tool}" -S "${_path}"
+          RESULT_VARIABLE _strip_rc
+          OUTPUT_VARIABLE _strip_out
+          ERROR_VARIABLE _strip_err
+        )
+        if(NOT _strip_rc EQUAL 0)
+          message(FATAL_ERROR "strip failed for ${_path} (exit ${_strip_rc})\n${_strip_out}\n${_strip_err}")
+        endif()
+      endforeach()
+    ]])
+    string(CONFIGURE "${_img_py_strip_install_code_template}" _img_py_strip_install_code @ONLY)
+    install(CODE "${_img_py_strip_install_code}")
+  endif ()
 
   option(IMG_PY_CODESIGN_INSTALLED_BINARIES "Codesign installed Mach-O binaries on macOS (ensures PyPI wheel imports cleanly)" ON)
   if (IMG_PY_CODESIGN_INSTALLED_BINARIES)
@@ -279,10 +354,47 @@ if (APPLE)
 endif ()
 
 if (UNIX AND NOT APPLE)
-  install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION zimg/lib)
+  if (NOT ZIMG_DISABLE_FREEIMAGE)
+    install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION zimg/lib)
+  endif ()
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION zimg/lib)
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${qtcorelibname} DESTINATION zimg/lib)
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${qtguilibname} DESTINATION zimg/lib)
+
+  if (IMG_PY_STRIP_INSTALLED_BINARIES)
+    set(_img_py_strip_tool "${_IMG_PY_STRIP_TOOL}")
+    set(_img_py_strip_install_code_template [[
+      set(_install_root "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
+      set(_strip_tool "@_img_py_strip_tool@")
+      if(_strip_tool STREQUAL "")
+        message(FATAL_ERROR "strip tool not configured (CMAKE_STRIP/strip not found).")
+      endif()
+
+      file(GLOB _strip_targets
+        "${_install_root}/zimg/_imgpy*.so"
+        "${_install_root}/zimg/lib/*.so*"
+      )
+      list(REMOVE_DUPLICATES _strip_targets)
+
+      foreach(_path IN LISTS _strip_targets)
+        if(NOT EXISTS "${_path}")
+          continue()
+        endif()
+
+        execute_process(
+          COMMAND "${_strip_tool}" --strip-debug "${_path}"
+          RESULT_VARIABLE _strip_rc
+          OUTPUT_VARIABLE _strip_out
+          ERROR_VARIABLE _strip_err
+        )
+        if(NOT _strip_rc EQUAL 0)
+          message(FATAL_ERROR "strip failed for ${_path} (exit ${_strip_rc})\n${_strip_out}\n${_strip_err}")
+        endif()
+      endforeach()
+    ]])
+    string(CONFIGURE "${_img_py_strip_install_code_template}" _img_py_strip_install_code @ONLY)
+    install(CODE "${_img_py_strip_install_code}")
+  endif ()
 endif ()
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars" # source directory

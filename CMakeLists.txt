@@ -88,6 +88,10 @@ if (ATLAS_USE_OPENGLWIDGET)
 endif ()
 message(STATUS "ATLAS_USE_OPENGLWIDGET: ${ATLAS_USE_OPENGLWIDGET}")
 
+option(ZIMG_DISABLE_FREEIMAGE
+       "Disable FreeImage support in img (removes FreeImage formats and avoids linking libfreeimageplus)."
+       OFF)
+
 include(PrintCMakeTargetInfo)
 
 

@@ -2,7 +2,9 @@
 
 #include "zimgjpegxr.h"
 #include "zimgjpeg.h"
+#if defined(ZIMG_HAVE_FREEIMAGE)
 #include "zimgfreeimage.h"
+#endif
 #include "ztiff.h"
 #include "zstatisticsutils.h"
 #include "zimgregioniterator.h"
@@ -288,13 +290,17 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
                                           res,
                                           pixelTypeIsBGR(sb.directoryEntry.pixelType));
           } else {
+#if defined(ZIMG_HAVE_FREEIMAGE)
             ZImgFreeImage::readMemInfo(fileBuf.data(), sb.dataSize, info);
             res = ZImg(info);
             ZImgFreeImage::readMemImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+#else
+            throw ZException("CZI sub-block requires FreeImage, but this build was compiled without FreeImage support.");
+#endif
           }
         }
-        catch (const ZException&) {
-          throw ZException(fmt::format("not supported compression type {}", sb.directoryEntry.compression));
+        catch (const ZException& e) {
+          throw ZException(fmt::format("not supported compression type {}: {}", sb.directoryEntry.compression, e.what()));
         }
         break;
     }

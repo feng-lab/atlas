@@ -79,7 +79,6 @@ set(IMG_SOURCES
         zimagesse3.h zimagesse3.cpp
         zimg.h zimg.cpp
         zimgformat.h zimgformat.cpp
-        zimgfreeimage.h zimgfreeimage.cpp
         zimginfo.h zimginfo.cpp
         zimginterface.h zimginterface.cpp
         zimgio.h zimgio.cpp
@@ -186,11 +185,19 @@ set(IMG_SOURCES
         zconcurrentlrucache.h
 )
 
+if (NOT ZIMG_DISABLE_FREEIMAGE)
+    list(APPEND IMG_SOURCES zimgfreeimage.h zimgfreeimage.cpp)
+endif ()
+
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
 # our target
 set(LIBRARY_NAME img)
 add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${SCIFIO_SOURCES} ${IMG_SOURCES})
+
+if (NOT ZIMG_DISABLE_FREEIMAGE)
+    target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_HAVE_FREEIMAGE)
+endif ()
 
 if (NOT AARCH64)
     # mkl
@@ -284,7 +291,9 @@ if (WIN32)
 
     set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS /I${TIFFDIR})
     set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS /I${PNG_INCLUDE_DIRS})
-    set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS /I${FREEIMAGE_INCLUDE_DIRS})
+    if (NOT ZIMG_DISABLE_FREEIMAGE)
+        set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS /I${FREEIMAGE_INCLUDE_DIRS})
+    endif ()
     foreach (item IN LISTS JPEGXR_INCLUDE_DIRS)
         message(STATUS "JPEGXR_INCLUDE_DIRS: ${item}")
         set(JXRINC "${JXRINC} /I${item}")
@@ -357,8 +366,12 @@ else (WIN32)
     set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
 endif (WIN32)
 
+if (NOT ZIMG_DISABLE_FREEIMAGE)
+    target_link_libraries(${LIBRARY_NAME} PUBLIC ${FREEIMAGE_LIBRARIES})
+endif ()
+
 target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
-        png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} cpuinfo::cpuinfo
+        png_static ${JPEGXR_LIBRARIES} cpuinfo::cpuinfo
         hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen
         Boost::headers Boost::charconv absl::log_initialize
         GeometricTools glm::glm-header-only

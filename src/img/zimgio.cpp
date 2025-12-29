@@ -10,7 +10,9 @@
 #include "zimgjpeg.h"
 #include "zimgjpegxr.h"
 #include "zimgpng.h"
+#if defined(ZIMG_HAVE_FREEIMAGE)
 #include "zimgfreeimage.h"
+#endif
 #include "zimgmetaimage.h"
 #include "zimgitkimage.h"
 #include "zimghdf5.h"
@@ -44,7 +46,9 @@ ZImgIO::ZImgIO()
   m_ioFormats[FileFormat::Jpeg] = std::make_unique<ZImgJpeg>();
   m_ioFormats[FileFormat::JpegXR] = std::make_unique<ZImgJpegXR>();
   m_ioFormats[FileFormat::Png] = std::make_unique<ZImgPng>();
+#if defined(ZIMG_HAVE_FREEIMAGE)
   m_ioFormats[FileFormat::FreeImage] = std::make_unique<ZImgFreeImage>();
+#endif
   m_ioFormats[FileFormat::MetaImage] = std::make_unique<ZImgMetaImage>();
   m_ioFormats[FileFormat::ITKImage] = std::make_unique<ZImgITKImage>();
   m_ioFormats[FileFormat::HDF5Img] = std::make_unique<ZImgHDF5>();
@@ -88,15 +92,21 @@ void ZImgIO::readInfos(const QString& filename,
       }
       throw ZException(error);
     }
-  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportRead()) {
-    throw ZException(fmt::format("Read format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
+    auto it = m_ioFormats.find(format);
+    if (it == m_ioFormats.end()) {
+      throw ZException(fmt::format("Read format '{}' is not supported", static_cast<int>(format)));
+    }
+    CHECK(it->second);
+    if (!it->second->supportRead()) {
+      throw ZException(fmt::format("Read format '{}' is not supported", it->second->fullName()));
+    }
     try {
       std::vector<ZImgInfo> tmpInfo;
       if (subBlocks) {
         subBlocks->clear();
       }
-      m_ioFormats[format]->readInfo(filename, tmpInfo, subBlocks);
+      it->second->readInfo(filename, tmpInfo, subBlocks);
       if (!tmpInfo.empty()) {
         tmpInfo.swap(res);
         return;
@@ -106,7 +116,7 @@ void ZImgIO::readInfos(const QString& filename,
     catch (const ZException& e) {
       throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
                                    filename,
-                                   m_ioFormats[format]->fullName(),
+                                   it->second->fullName(),
                                    e.what()));
     }
   }
@@ -500,20 +510,26 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
         throw ZException(error);
       }
     }
-  } else if (!m_ioFormats.contains(imgSource.format) || !m_ioFormats[imgSource.format]->supportRead()) {
-    throw ZException(fmt::format("Read format '{}' is not supported", m_ioFormats[imgSource.format]->fullName()));
   } else {
+    auto it = m_ioFormats.find(imgSource.format);
+    if (it == m_ioFormats.end()) {
+      throw ZException(fmt::format("Read format '{}' is not supported", static_cast<int>(imgSource.format)));
+    }
+    CHECK(it->second);
+    if (!it->second->supportRead()) {
+      throw ZException(fmt::format("Read format '{}' is not supported", it->second->fullName()));
+    }
     for (const auto& filename : imgSource.filenames) {
       try {
         ZImgMetadata tmpMeta;
-        m_ioFormats[imgSource.format]->readMetadata(filename, tmpMeta, imgSource.catScenes ? 0 : imgSource.scene);
+        it->second->readMetadata(filename, tmpMeta, imgSource.catScenes ? 0 : imgSource.scene);
         meta.merge(tmpMeta);
         return;
       }
       catch (const ZException& e) {
         throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
                                      filename,
-                                     m_ioFormats[imgSource.format]->fullName(),
+                                     it->second->fullName(),
                                      e.what()));
       }
     }
@@ -551,19 +567,25 @@ void ZImgIO::readThumbnail(const QString& filename,
       }
       throw ZException(error);
     }
-  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportRead()) {
-    throw ZException(fmt::format("Read format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
+    auto it = m_ioFormats.find(format);
+    if (it == m_ioFormats.end()) {
+      throw ZException(fmt::format("Read format '{}' is not supported", static_cast<int>(format)));
+    }
+    CHECK(it->second);
+    if (!it->second->supportRead()) {
+      throw ZException(fmt::format("Read format '{}' is not supported", it->second->fullName()));
+    }
     try {
       ZImgThumbernail tmpThumbnail;
-      m_ioFormats[format]->readThumbnail(filename, tmpThumbnail, region, scene);
+      it->second->readThumbnail(filename, tmpThumbnail, region, scene);
       tmpThumbnail.swap(thumbnail);
       return;
     }
     catch (const ZException& e) {
       throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
                                    filename,
-                                   m_ioFormats[format]->fullName(),
+                                   it->second->fullName(),
                                    e.what()));
     }
   }
@@ -603,19 +625,25 @@ void ZImgIO::readImg(const QString& filename,
       }
       throw ZException(error);
     }
-  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportRead()) {
-    throw ZException(fmt::format("Read format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
+    auto it = m_ioFormats.find(format);
+    if (it == m_ioFormats.end()) {
+      throw ZException(fmt::format("Read format '{}' is not supported", static_cast<int>(format)));
+    }
+    CHECK(it->second);
+    if (!it->second->supportRead()) {
+      throw ZException(fmt::format("Read format '{}' is not supported", it->second->fullName()));
+    }
     try {
       ZImg tmpImg;
-      m_ioFormats[format]->readImg(filename, tmpImg, region, scene, xRatio, yRatio, zRatio);
+      it->second->readImg(filename, tmpImg, region, scene, xRatio, yRatio, zRatio);
       tmpImg.swap(img);
       return;
     }
     catch (const ZException& e) {
       throw ZException(fmt::format("Try read file {} as '{}' format, failed: {}",
                                    filename,
-                                   m_ioFormats[format]->fullName(),
+                                   it->second->fullName(),
                                    e.what()));
     }
   }
@@ -902,15 +930,21 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
       }
       throw ZException(error);
     }
-  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportWrite()) {
-    throw ZException(fmt::format("Write format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
+    auto it = m_ioFormats.find(format);
+    if (it == m_ioFormats.end()) {
+      throw ZException(fmt::format("Write format '{}' is not supported", static_cast<int>(format)));
+    }
+    CHECK(it->second);
+    if (!it->second->supportWrite()) {
+      throw ZException(fmt::format("Write format '{}' is not supported", it->second->fullName()));
+    }
     try {
       if (format == FileFormat::MetaImage) {
-        m_ioFormats[format]->writeImg(filename, img, paras);
+        it->second->writeImg(filename, img, paras);
       } else {
         auto tfn = getTemporaryFilename(filename);
-        m_ioFormats[format]->writeImg(tfn, img, paras);
+        it->second->writeImg(tfn, img, paras);
         renameFile(tfn, filename);
       }
       return;
@@ -918,7 +952,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     catch (const ZException& e) {
       throw ZException(fmt::format("Try write file {} as '{}' format, failed: {}",
                                    filename,
-                                   m_ioFormats[format]->fullName(),
+                                   it->second->fullName(),
                                    e.what()));
     }
   }
@@ -960,15 +994,21 @@ void ZImgIO::writeImg(const QString& filename,
       }
       throw ZException(error);
     }
-  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportWrite()) {
-    throw ZException(fmt::format("Write format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
+    auto it = m_ioFormats.find(format);
+    if (it == m_ioFormats.end()) {
+      throw ZException(fmt::format("Write format '{}' is not supported", static_cast<int>(format)));
+    }
+    CHECK(it->second);
+    if (!it->second->supportWrite()) {
+      throw ZException(fmt::format("Write format '{}' is not supported", it->second->fullName()));
+    }
     try {
       if (format == FileFormat::MetaImage) {
-        m_ioFormats[format]->writeImg(filename, img, paras);
+        it->second->writeImg(filename, img, paras);
       } else {
         auto tfn = getTemporaryFilename(filename);
-        m_ioFormats[format]->writeImg(tfn, img, paras);
+        it->second->writeImg(tfn, img, paras);
         renameFile(tfn, filename);
       }
       return;
@@ -976,7 +1016,7 @@ void ZImgIO::writeImg(const QString& filename,
     catch (const ZException& e) {
       throw ZException(fmt::format("Try write file {} as '{}' format, failed: {}",
                                    filename,
-                                   m_ioFormats[format]->fullName(),
+                                   it->second->fullName(),
                                    e.what()));
     }
   }
@@ -1018,15 +1058,21 @@ void ZImgIO::writeImg(const QString& filename,
       }
       throw ZException(error);
     }
-  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportWrite()) {
-    throw ZException(fmt::format("Write format '{}' is not supported", m_ioFormats[format]->fullName()));
   } else {
+    auto it = m_ioFormats.find(format);
+    if (it == m_ioFormats.end()) {
+      throw ZException(fmt::format("Write format '{}' is not supported", static_cast<int>(format)));
+    }
+    CHECK(it->second);
+    if (!it->second->supportWrite()) {
+      throw ZException(fmt::format("Write format '{}' is not supported", it->second->fullName()));
+    }
     try {
       if (format == FileFormat::MetaImage) {
-        m_ioFormats[format]->writeImg(filename, img, paras);
+        it->second->writeImg(filename, img, paras);
       } else {
         auto tfn = getTemporaryFilename(filename);
-        m_ioFormats[format]->writeImg(tfn, img, paras);
+        it->second->writeImg(tfn, img, paras);
         renameFile(tfn, filename);
       }
       return;
@@ -1034,7 +1080,7 @@ void ZImgIO::writeImg(const QString& filename,
     catch (const ZException& e) {
       throw ZException(fmt::format("Try write file {} as '{}' format, failed: {}",
                                    filename,
-                                   m_ioFormats[format]->fullName(),
+                                   it->second->fullName(),
                                    e.what()));
     }
   }
