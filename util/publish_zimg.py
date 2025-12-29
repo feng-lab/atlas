@@ -349,9 +349,12 @@ def _rewrite_wheel_record(*, wheel_root: Path, dist_info_dir: Path) -> None:
         writer.writerows(rows)
 
 
-def _assert_linux_wheel_contains_expected_libs(wheel_path: Path) -> None:
-    expected_libs = {
-        "libfreeimageplus.so.3",
+def _assert_linux_wheel_contains_expected_libs(
+    wheel_path: Path,
+    *,
+    expect_freeimage: bool,
+) -> None:
+    expected_exact_libs = {
         "libtbb.so.12",
         "libQt6Gui.so.6",
         "libQt6Core.so.6",
@@ -360,9 +363,35 @@ def _assert_linux_wheel_contains_expected_libs(wheel_path: Path) -> None:
     with zipfile.ZipFile(wheel_path, "r") as zf:
         entries = set(zf.namelist())
 
+    lib_names = {
+        Path(entry).name
+        for entry in entries
+        if entry.startswith("zimg/lib/")
+        and entry != "zimg/lib/"
+        and not entry.endswith("/")
+    }
+
     missing = sorted(
-        f"zimg/lib/{name}" for name in expected_libs if f"zimg/lib/{name}" not in entries
+        f"zimg/lib/{name}" for name in expected_exact_libs if name not in lib_names
     )
+
+    freeimage_present = any(
+        name.startswith("libfreeimageplus.so") for name in lib_names
+    )
+    if expect_freeimage:
+        if not freeimage_present:
+            missing.append("zimg/lib/libfreeimageplus.so*")
+    else:
+        if freeimage_present:
+            unexpected = sorted(
+                name for name in lib_names if name.startswith("libfreeimageplus.so")
+            )
+            raise RuntimeError(
+                "Linux wheel contains FreeImage shared libraries under zimg/lib, but FreeImage was disabled.\n"
+                f"wheel: {wheel_path}\n"
+                f"unexpected: {[f'zimg/lib/{name}' for name in unexpected]}"
+            )
+
     if missing:
         raise RuntimeError(
             "Linux wheel is missing expected shared libraries under zimg/lib. "
@@ -371,7 +400,11 @@ def _assert_linux_wheel_contains_expected_libs(wheel_path: Path) -> None:
             f"wheel: {wheel_path}\n"
             f"missing: {missing}"
         )
-    logger.info("Linux wheel contains expected shared libraries (%d)", len(expected_libs))
+    logger.info(
+        "Linux wheel contains expected shared libraries (%d + FreeImage=%s)",
+        len(expected_exact_libs),
+        "on" if expect_freeimage else "off",
+    )
 
 
 def _stage_conda_zimg_from_wheel(*, wheel_path: Path, conda_source_dir: Path) -> Path:
@@ -411,6 +444,12 @@ def main() -> int:
             "Allow uploading non-tag versions (e.g. X.Y[.Z[...]].N where N is commits since the last tag) "
             "to PyPI (skips the clean-tag gate)."
         ),
+    )
+    parser.add_argument(
+        "--disable-freeimage",
+        dest="disable_freeimage",
+        action="store_true",
+        help="Build zimg without FreeImage support (passes -DZIMG_DISABLE_FREEIMAGE=ON).",
     )
 
     args = parser.parse_args()
@@ -459,6 +498,9 @@ def main() -> int:
 
     if args.dry_run:
         logger.info("Build command: %s", " ".join(cmd))
+        logger.info(
+            "FreeImage: %s", "disabled" if args.disable_freeimage else "enabled"
+        )
         if common_dirs.is_mac():
             logger.info("macOS wheel: build x86_64 + arm64, then fuse to universal2")
         atlas_pypi.maybe_upload_to_pypi(
@@ -502,6 +544,8 @@ def main() -> int:
 
         env_base = os.environ.copy()
         env_base["ZIMG_SRC_DIR"] = str(zimg_src_dir)
+        if args.disable_freeimage:
+            _append_cmake_args(env_base, ["-DZIMG_DISABLE_FREEIMAGE=ON"])
 
         if common_dirs.is_mac():
             env_base["MACOSX_DEPLOYMENT_TARGET"] = build_ext_libs.macos_min_version()
@@ -543,7 +587,9 @@ def main() -> int:
     if wheels:
         if common_dirs.is_linux():
             for wheel_path in wheels:
-                _assert_linux_wheel_contains_expected_libs(wheel_path)
+                _assert_linux_wheel_contains_expected_libs(
+                    wheel_path, expect_freeimage=not args.disable_freeimage
+                )
         for wheel in wheels:
             logger.info("Built: %s", wheel)
     else:
