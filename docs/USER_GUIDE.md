@@ -1,7 +1,12 @@
 Atlas User Manual
 =================
+<!-- 这是一段被注释掉的文字 -->
 
-> 📸 **Screenshot to add:** Application splash or title screen that introduces Atlas. Include version number in the window title.
+<!-- > 📸 **Screenshot to add:** Application splash or title screen that introduces Atlas. Include version number in the window title.-->
+
+<p align="center">
+  <img src="./images/version.png" alt="label_region" width="200">
+</p>
 
 ## Table of Contents
 - [1. Introduction](#1-introduction)
@@ -114,7 +119,10 @@ Atlas organizes data into documents. Each document type contributes load actions
 | `Z2DAnimationDoc` | `.animation2d` | Timeline for 2D view parameters. |
 | `Z3DAnimationDoc` | `.animation3d` | Timeline for 3D parameters and camera paths. |
 
-> 📸 **Screenshot to add:** A collage showing different supported object types loaded into the Objects Manager.
+<!-- > 📸 **Screenshot to add:** A collage showing different supported object types loaded into the Objects Manager.-->
+<p align="center">
+  <img src="./images/zuhe.png" alt="label_region" width="800">
+</p>
 
 ### 1.4 How This Guide Is Organized
 
@@ -156,15 +164,20 @@ Atlas keeps runtime files in a few key locations:
 - **Scene files** (`*.scene`): stored wherever you save them; contain serialized document state and view settings.
 - **Animation files** (`*.animation3d`, `*.animation2d`): saved alongside your data or in project folders.
 
-> 📸 **Screenshot to add:** Finder/Explorer window showing config and log directories after first launch.
-
+<!-- > 📸 **Screenshot to add:** Finder/Explorer window showing config and log directories after first launch. -->
+<p align="center">
+  <img src="./images/logfolder.png" alt="label_region" width="300">
+</p>
 ---
 
 ## 3. Guided Tour of the Interface
 
 ### 3.1 2D Main Window at a Glance
 
-> 📸 **Screenshot to add:** The main window with each labeled region (Menus, Toolbars, Objects Manager, 2D View, Docks).
+<!-- > 📸 **Screenshot to add:** The main window with each labeled region (Menus, Toolbars, Objects Manager, 2D View, Docks). -->
+<p align="center">
+  <img src="./images/labeled_region.png" alt="label_region" width="800">
+</p>
 
 Key regions:
 
@@ -172,7 +185,7 @@ Key regions:
 2. **Toolbars** (top rows): quick access to open, save, zoom, view mode toggles, ROI tools, help).
 3. **Objects Manager** (right dock): tree of all loaded objects with visibility and lock controls.
 4. **Central 2D View**: renders images and overlays; responds to navigation and editing gestures.
-5. **Dock widgets** (right, bottom, and floating): view settings, detailed metadata, capture panels, edit widgets, help text.
+5. **Dock widgets** (right, bottom, and floating): object and global view settings, detailed metadata, capture panels, edit widgets, help text.
 6. **Status bar** (bottom): short messages like “Ready” or “scene saved as ...”.
 
 ### 3.2 Menus in Detail
@@ -247,7 +260,10 @@ Dock widgets provide specialized interfaces. You can anchor them to any side, ta
 - **Help** – static reminder of navigation shortcuts; can float for quick reference.
 - **Edit and Output** (`ZObjEditWidget`) – hosts a tab per active editor (ROI editor, animation timeline, puncta detection). Also contains a persistent “Log Output” tab for system logs.
 
-> 📸 **Screenshot to add:** Objects Manager context menu showing Show/Hide, Lock/Unlock, Save, Save As, Make Alias.
+<!-- > 📸 **Screenshot to add:** Objects Manager context menu showing Show/Hide, Lock/Unlock, Save, Save As, Make Alias.-->
+<p align="center">
+  <img src="./images/Objects_Manager _context_menu.png" alt="Objects_Manager _context_menu" width="200">
+</p>
 
 ### 3.5 Status Bar and Notifications
 
@@ -288,13 +304,16 @@ Steps to load and manage images via `ZImgDoc`:
 2. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
 3. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.
 4. **Full resolution rendering** – in 3D, enable Full Resolution in Object View Setting when you require high-quality output. Monitor GPU memory usage and progress logs.
-5. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...** to choose a new format.
+5. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...**(Ctrl/Cmd+Shift+S) to choose a new format.
 6. **Advanced processing** – Access via the document menu or object context menu:
    - **Stitch Images...** – run the image stitching dialog for tiled data.
    - **Align Sections...** – align serial sections.
    - **Correct Chromatic Shift...** – adjust channel misalignment.
 
-> 📸 **Screenshot to add:** Object View Setting dock for an image showing channel controls.
+<!-- > 📸 **Screenshot to add:** Object View Setting dock for an image showing channel controls.-->
+<p align="center">
+  <img src="./images/channel_control.png" alt="channel_control" width="400">
+</p>
 
 ### 4.3 Region of Interest (ROI) Masks
 
@@ -389,7 +408,7 @@ Steps to load and manage images via `ZImgDoc`:
 1. **Zoom** – use mouse wheel, `Ctrl/Cmd` + `+`/`-`, or View toolbar buttons.
 2. **Pan** – enable Scroll Hand Drag mode or press Spacebar while dragging.
 3. **Rubber band selection** – choose Rubber Band Drag and draw selection boxes.
-4. **Fit to window** – `F` (shortcut of Fit Into Window) to reframe the dataset.
+4. **Fit to window** – reframe the dataset.
 
 ### 5.2 View Styles and Slicing
 
@@ -440,10 +459,10 @@ Steps to load and manage images via `ZImgDoc`:
 
 ### 6.2 Camera Navigation
 
-- **Rotate** – left-click drag or `Ctrl/Cmd` + arrow keys.
-- **Pan** – `Shift` + drag or `Shift` + arrow keys.
+- **Rotate** – left-click drag.
+- **Pan** – `Shift` + left-click drag.
 - **Zoom/Dolly** – mouse wheel, `Ctrl/Cmd +`/`-`.
-- **Roll** – `Alt` + drag or `Alt` + left/right arrows.
+- **Roll** – `Alt` + drag.
 - **Reset Camera** – toolbar button or **View → Reset Camera** fits all visible objects.
 - **Context menu** – right-click for quick options.
 
@@ -484,7 +503,10 @@ Steps to load and manage images via `ZImgDoc`:
 2. **Cancel Rendering** – stop the current job without exiting the application.
 3. Check logs for “waiting for 3D scene apply to finish” messages when using blocking options.
 
-> 📸 **Screenshot to add:** 3D window with Progress toolbar visible during a render.
+<!-- > 📸 **Screenshot to add:** 3D window with Progress toolbar visible during a render.-->
+<p align="center">
+  <img src="./images/Progress_toolbar.png" alt="Progress_toolbar" width="800">
+</p>
 
 ---
 
@@ -532,7 +554,10 @@ Steps to load and manage images via `ZImgDoc`:
 5. Click **Capture**.
 6. 2D captures emit the signal `take2DScreenShot` or `takeFixedSize2DScreenShot`, writing PNG images.
 
-> 📸 **Screenshot to add:** 2D Capture dock with annotations of important controls.
+<!-- > 📸 **Screenshot to add:** 2D Capture dock with annotations of important controls.-->
+<p align="center">
+  <img src="./images/2DCapture.png" alt="2DCapture" width="400">
+</p>
 
 ### 8.2 3D Screenshots
 
@@ -542,6 +567,9 @@ Steps to load and manage images via `ZImgDoc`:
 4. Optionally configure rotation sequences (axis, direction, duration, frame rate) for dynamic captures.
 5. Click **Capture**. The engine renders the frame(s) and stores them in the target folder.
 6. Monitor the Progress toolbar; cancel if necessary.
+<p align="center">
+  <img src="./images/3DCapture.png" alt="3DCapture" width="400">
+</p>
 
 ### 8.3 3D Animation Export in the GUI
 
@@ -554,6 +582,9 @@ Steps to load and manage images via `ZImgDoc`:
    - Optional flags (overwrite existing output, limit memory usage).
 4. Start export. Atlas renders frames, optionally encodes a video (ffmpeg integration), and reports progress.
 5. Completion is indicated by progress bar reaching 100% and logs noting success.
+<p align="center">
+  <img src="./images/animationexport.png" alt="animationexport" width="800">
+</p>
 
 ### 8.4 Headless 3D Animation Export
 
@@ -804,4 +835,7 @@ Always consult log output for unsupported file types; Atlas reports when a docum
 
 ---
 
-> 📸 **Screenshot to add:** Closing image showing a completed workspace with 2D and 3D windows side-by-side, annotated with key features referenced in this manual.
+<!-- > 📸 **Screenshot to add:** Closing image showing a completed workspace with 2D and 3D windows side-by-side, annotated with key features referenced in this manual.-->
+<p align="center">
+  <img src="./images/workspace.png" alt="workspace" width="800">
+</p>
