@@ -1,16 +1,51 @@
 import argparse
 import difflib
+import glob
 import json
+import logging
 import mmap
 import os
 import shutil
+import stat
+import subprocess
 import sys
 from collections import OrderedDict
 from pathlib import Path
 
-from common_dirs import *
+from common_dirs import (
+    atlas_repository_dir,
+    ext_build_dir,
+    ext_dir,
+    find_src_package_with_glob,
+    get_cmake_binary,
+    get_ffmpeg_binary,
+    get_gperf_dir,
+    get_ninja_binary,
+    get_package_top_level_folder,
+    handleRemoveReadonly,
+    install_cmake,
+    install_ffmpeg,
+    install_gperf,
+    install_ninja,
+    intel_sw_dir,
+    is_linux,
+    is_mac,
+    is_windows,
+    qt_base_dir,
+    qt_installer_framework_bin_dir,
+    qt_ver,
+    remove_old_src_folder_with_glob,
+    rm_tree,
+    src_package_dir,
+    tbb_dir,
+    unpack_file_to_folder,
+    unpack_tool_to_target_dir,
+    use_clang_cl,
+    use_ninja,
+    vs_install_dir,
+    vulkan_SDK_env_dir,
+)
 from download_atlas_deps import download_atlas_deps
-from linuxdeployqt import linux_deploy_deps_to_lib_dir
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
@@ -2311,56 +2346,42 @@ def build_vtk(src_dir: str, install_dir: str):
         patch_manager.restore_files()
 
 
-def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool = False):
+def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     patches = [
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'modules', 'videoio', 'src', 'cap_msmf.cpp'),
-            from_texts=[r'#include <initguid.h>',
-                        ],
-            to_texts=['#include <initguid.h>\n'
-                      '#include <ks.h>\n',
-                      ],
+            orig_file=os.path.join(
+                src_dir, "modules", "videoio", "src", "cap_msmf.cpp"
+            ),
+            from_texts=[
+                r"#include <initguid.h>",
+            ],
+            to_texts=[
+                "#include <initguid.h>\n#include <ks.h>\n",
+            ],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'modules', 'imgcodecs', 'CMakeLists.txt'),
-            from_texts=[r'ocv_add_perf_tests()',
-                        ],
-            to_texts=['include_directories(BEFORE SYSTEM ' + ext_build_dir().encode(
-                'unicode_escape').decode() + '/include)\n'
-                                             'ocv_add_perf_tests()\n',
-                      ],
-            patch_condition=lambda: conda_build,
+            orig_file=os.path.join(src_dir, "cmake", "OpenCVFindMKL.cmake"),
+            from_texts=[
+                r"macro(mkl_fail)",
+                r"set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib)",
+            ],
+            to_texts=[
+                "set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n"
+                "macro(mkl_fail)\n",
+                r"set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64/gcc4.8 ${MKL_ROOT_DIR}/../tbb/lib/intel64/vc14)",
+            ],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'cmake', 'OpenCVDetectPython.cmake'),
-            from_texts=[r'set(_packages_path "${_path}/Lib/site-packages")'],
-            to_texts=[r'set(_packages_path "Lib/site-packages")'],
-            patch_condition=lambda: conda_build and is_windows(),
+            orig_file=os.path.join(src_dir, "modules", "calib3d", "CMakeLists.txt"),
+            from_texts=[r"${LAPACK_LIBRARIES}"],
+            to_texts=[r""],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'cmake', 'OpenCVFindMKL.cmake'),
-            from_texts=[r'macro(mkl_fail)',
-                        r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib)',
-                        ],
-            to_texts=['set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
-                      'macro(mkl_fail)\n',
-                      r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64/gcc4.8 ${MKL_ROOT_DIR}/../tbb/lib/intel64/vc14)',
-                      ],
-            patch_condition=lambda: not conda_build,
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, 'modules', 'calib3d', 'CMakeLists.txt'),
-            from_texts=[r'${LAPACK_LIBRARIES}'],
-            to_texts=[r''],
-            patch_condition=lambda: not conda_build,
-        ),
-        FilePatcher(
-            orig_file=os.path.join(src_dir, 'modules', 'core', 'CMakeLists.txt'),
-            from_texts=[r'${LAPACK_LIBRARIES}'],
-            to_texts=[r''],
-            patch_condition=lambda: not conda_build,
+            orig_file=os.path.join(src_dir, "modules", "core", "CMakeLists.txt"),
+            from_texts=[r"${LAPACK_LIBRARIES}"],
+            to_texts=[r""],
         ),
     ]
     patch_manager = PatchManager(patches)
@@ -2368,121 +2389,94 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
     try:
         patch_manager.apply_patches()
 
-        if conda_build and is_mac():
-            os.rename(os.path.join(ext_build_dir(), 'include', 'tbb'),
-                      os.path.join(ext_build_dir(), 'include', '__tbb'))
-            os.rename(os.path.join(ext_build_dir(), 'include', 'oneapi'),
-                      os.path.join(ext_build_dir(), 'include', '__oneapi'))
-
         def get_cmakecmd_options(arm64_build: bool = False):
             cmakecmd_options = [
-                '-DOPENCV_SKIP_CMAKE_CXX_STANDARD:BOOL=ON',
-                '-DHAVE_CXX11:BOOL=ON',
-                '-DOPENCV_ENABLE_NONFREE:BOOL=ON',
-                '-DOPENCV_FORCE_3RDPARTY_BUILD:BOOL=OFF',
-                '-DBUILD_ZLIB:BOOL=OFF',
-                '-DBUILD_TIFF:BOOL=OFF',
-                '-DBUILD_JASPER:BOOL=OFF',
-                '-DBUILD_JPEG:BOOL=OFF',
-                '-DBUILD_PNG:BOOL=OFF',
-                '-DBUILD_OPENEXR:BOOL=ON',
-                '-DBUILD_WEBP:BOOL=OFF',
-                '-DBUILD_OPENJPEG:BOOL=OFF',
-
-                '-DBUILD_PROTOBUF:BOOL=OFF',
-
-                '-DWITH_1394:BOOL=OFF',
-                '-DWITH_VTK:BOOL=OFF',
-                '-DWITH_CUDA:BOOL=OFF',
-                '-DWITH_EIGEN:BOOL=ON',
-                '-DWITH_FFMPEG:BOOL=ON',
-                '-DWITH_GSTREAMER:BOOL=OFF',
-                '-DWITH_JASPER:BOOL=OFF',
-                '-DWITH_OPENJPEG:BOOL=ON',
-                '-DWITH_JPEG:BOOL=ON',
-                '-DWITH_WEBP:BOOL=ON',
-                '-DWITH_OPENEXR:BOOL=ON',
-                '-DWITH_PNG:BOOL=ON',
-                '-DWITH_TBB:BOOL=ON',
-                '-DWITH_TIFF:BOOL=OFF',
-                '-DWITH_OPENCL:BOOL=OFF',
-                '-DWITH_OPENCL_SVM:BOOL=OFF',
-                '-DWITH_OPENCLAMDFFT:BOOL=OFF',
-                '-DWITH_OPENCLAMDBLAS:BOOL=OFF',
-                '-DWITH_LAPACK:BOOL=ON',
+                "-DOPENCV_SKIP_CMAKE_CXX_STANDARD:BOOL=ON",
+                "-DHAVE_CXX11:BOOL=ON",
+                "-DOPENCV_ENABLE_NONFREE:BOOL=ON",
+                "-DOPENCV_FORCE_3RDPARTY_BUILD:BOOL=OFF",
+                "-DBUILD_ZLIB:BOOL=OFF",
+                "-DBUILD_TIFF:BOOL=OFF",
+                "-DBUILD_JASPER:BOOL=OFF",
+                "-DBUILD_JPEG:BOOL=OFF",
+                "-DBUILD_PNG:BOOL=OFF",
+                "-DBUILD_OPENEXR:BOOL=ON",
+                "-DBUILD_WEBP:BOOL=OFF",
+                "-DBUILD_OPENJPEG:BOOL=OFF",
+                "-DBUILD_PROTOBUF:BOOL=OFF",
+                "-DWITH_1394:BOOL=OFF",
+                "-DWITH_VTK:BOOL=OFF",
+                "-DWITH_CUDA:BOOL=OFF",
+                "-DWITH_EIGEN:BOOL=ON",
+                "-DWITH_FFMPEG:BOOL=ON",
+                "-DWITH_GSTREAMER:BOOL=OFF",
+                "-DWITH_JASPER:BOOL=OFF",
+                "-DWITH_OPENJPEG:BOOL=ON",
+                "-DWITH_JPEG:BOOL=ON",
+                "-DWITH_WEBP:BOOL=ON",
+                "-DWITH_OPENEXR:BOOL=ON",
+                "-DWITH_PNG:BOOL=ON",
+                "-DWITH_TBB:BOOL=ON",
+                "-DWITH_TIFF:BOOL=OFF",
+                "-DWITH_OPENCL:BOOL=OFF",
+                "-DWITH_OPENCL_SVM:BOOL=OFF",
+                "-DWITH_OPENCLAMDFFT:BOOL=OFF",
+                "-DWITH_OPENCLAMDBLAS:BOOL=OFF",
+                "-DWITH_LAPACK:BOOL=ON",
                 # '-DENABLE_NEON:BOOL=' + ('ON' if arm64_build else 'OFF'),
-                '-DWITH_IPP:BOOL=' + ('OFF' if arm64_build else 'ON'),
-                '-DWITH_MKL:BOOL=' + ('OFF' if arm64_build else 'ON'),
-                '-DMKL_WITH_TBB:BOOL=' + ('OFF' if is_windows() or arm64_build else 'ON'),
+                "-DWITH_IPP:BOOL=" + ("OFF" if arm64_build else "ON"),
+                "-DWITH_MKL:BOOL=" + ("OFF" if arm64_build else "ON"),
+                "-DMKL_WITH_TBB:BOOL="
+                + ("OFF" if is_windows() or arm64_build else "ON"),
                 # mkl_tbb link with static run lib (/MT)
-                '-DMKL_WITH_OPENMP:BOOL=OFF',
-                # '-DMKL_LIBRARIES_DONT_HACK:BOOL=' + ('OFF' if conda_build else 'ON'),  # if on lapack check fails
-                '-DWITH_PROTOBUF:BOOL=ON',
-                '-DWITH_QUIRC:BOOL=OFF',
-
-                '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                '-DBUILD_opencv_apps:BOOL=OFF',
-                '-DBUILD_opencv_js:BOOL=OFF',
-                '-DBUILD_DOCS:BOOL=OFF',
-                '-DBUILD_EXAMPLES:BOOL=OFF',
-                '-DBUILD_PACKAGE:BOOL=OFF',
-                '-DBUILD_PERF_TESTS:BOOL=OFF',
-                '-DBUILD_TESTS:BOOL=OFF',
-                '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
-                '-DBUILD_FAT_JAVA_LIB:BOOL=OFF',
-                '-DBUILD_JAVA:BOOL=OFF',
-
-                '-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF',
-
-                '-DBUILD_opencv_video:BOOL=ON',
-                '-DBUILD_opencv_videoio:BOOL=ON',
-                '-DBUILD_opencv_ts:BOOL=OFF',
-                '-DBUILD_opencv_dnn:BOOL=OFF',
-                '-DBUILD_opencv_world:BOOL=OFF',
-                '-DBUILD_opencv_python2:BOOL=OFF',
-                '-DBUILD_opencv_python3:BOOL=' + ('ON' if conda_build else 'OFF'),
-                '-DPYTHON3_EXECUTABLE=' + sys.executable,
-                '-DBUILD_opencv_java:BOOL=OFF',
-                '-DBUILD_opencv_calib3d:BOOL=OFF',
-                '-DBUILD_opencv_stereo:BOOL=OFF',
-
-                '-DBUILD_opencv_dnn_objdetect:BOOL=OFF',
-                '-DBUILD_opencv_hdf:BOOL=OFF',
-                '-DBUILD_opencv_matlab:BOOL=OFF',
-                '-DBUILD_opencv_sfm:BOOL=OFF',
-                '-DBUILD_opencv_videostab:BOOL=ON',
-                '-DBUILD_opencv_xfeatures2d:BOOL=ON',
-                '-DBUILD_opencv_freetype:BOOL=OFF',
-
-                '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
+                "-DMKL_WITH_OPENMP:BOOL=OFF",
+                "-DWITH_PROTOBUF:BOOL=ON",
+                "-DWITH_QUIRC:BOOL=OFF",
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                "-DBUILD_opencv_apps:BOOL=OFF",
+                "-DBUILD_opencv_js:BOOL=OFF",
+                "-DBUILD_DOCS:BOOL=OFF",
+                "-DBUILD_EXAMPLES:BOOL=OFF",
+                "-DBUILD_PACKAGE:BOOL=OFF",
+                "-DBUILD_PERF_TESTS:BOOL=OFF",
+                "-DBUILD_TESTS:BOOL=OFF",
+                "-DBUILD_WITH_DEBUG_INFO:BOOL=OFF",
+                "-DBUILD_FAT_JAVA_LIB:BOOL=OFF",
+                "-DBUILD_JAVA:BOOL=OFF",
+                "-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF",
+                "-DBUILD_opencv_video:BOOL=ON",
+                "-DBUILD_opencv_videoio:BOOL=ON",
+                "-DBUILD_opencv_ts:BOOL=OFF",
+                "-DBUILD_opencv_dnn:BOOL=OFF",
+                "-DBUILD_opencv_world:BOOL=OFF",
+                "-DBUILD_opencv_python2:BOOL=OFF",
+                "-DBUILD_opencv_python3:BOOL=OFF",
+                "-DPYTHON3_EXECUTABLE=" + sys.executable,
+                "-DBUILD_opencv_java:BOOL=OFF",
+                "-DBUILD_opencv_calib3d:BOOL=OFF",
+                "-DBUILD_opencv_stereo:BOOL=OFF",
+                "-DBUILD_opencv_dnn_objdetect:BOOL=OFF",
+                "-DBUILD_opencv_hdf:BOOL=OFF",
+                "-DBUILD_opencv_matlab:BOOL=OFF",
+                "-DBUILD_opencv_sfm:BOOL=OFF",
+                "-DBUILD_opencv_videostab:BOOL=ON",
+                "-DBUILD_opencv_xfeatures2d:BOOL=ON",
+                "-DBUILD_opencv_freetype:BOOL=OFF",
+                "-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON",
             ]
 
-            if conda_build:
-                logger.info(f'CONDA_PREFIX {os.environ["CONDA_PREFIX"]}')
-                if is_windows():
-                    cmakecmd_options.extend([
-                        '-DTBB_DIR=' + os.environ['CONDA_PREFIX'] + '/Library/lib/cmake/tbb',
-                    ])
-                    if not arm64_build:
-                        cmakecmd_options.extend([
-                            '-DMKL_ROOT_DIR=' + os.environ['CONDA_PREFIX'] + '/Library',
-                        ])
-                else:
-                    cmakecmd_options.extend([
-                        '-DTBB_DIR=' + os.environ['CONDA_PREFIX'] + '/lib/cmake/tbb',
-                    ])
-                    if not arm64_build:
-                        cmakecmd_options.extend([
-                            '-DMKL_ROOT_DIR=' + os.environ['CONDA_PREFIX'],
-                        ])
-            else:
-                cmakecmd_options.extend([
-                    '-DTBB_DIR:PATH=' + tbb_dir(),
-                ])
-                if not arm64_build:
-                    cmakecmd_options.extend([
-                        '-DMKL_ROOT_DIR=' + os.path.join(intel_sw_dir(), 'mkl', 'latest'),
-                    ])
+            cmakecmd_options.extend(
+                [
+                    "-DTBB_DIR:PATH=" + tbb_dir(),
+                ]
+            )
+            if not arm64_build:
+                cmakecmd_options.extend(
+                    [
+                        "-DMKL_ROOT_DIR="
+                        + os.path.join(intel_sw_dir(), "mkl", "latest"),
+                    ]
+                )
 
             if is_windows():
                 cmakecmd_options.extend(['-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
@@ -2511,17 +2505,9 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
         # logger.debug(cmakecmd)
         cmakecmd.extend([src_dir])
 
-        if conda_build and is_windows():
-            env = get_enviroment_from_shell_script(os.path.join(os.environ['CONDA_PREFIX'], 'condabin',
-                                                                'conda.bat'),
-                                                   para='activate',
-                                                   start_env=get_vcvars_environment(),
-                                                   remove_conda_from_path=False)
-            build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
-        else:
-            build_and_install_cmakecmd(cmakecmd, build_dir)
+        build_and_install_cmakecmd(cmakecmd, build_dir)
 
-        if is_mac() and not conda_build:
+        if is_mac():
             build_dir = create_build_dir(src_dir)
             arm64_install_dir = create_arm64_install_dir(src_dir)
             try:
@@ -2534,34 +2520,40 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             finally:
                 rm_tree(arm64_install_dir)
 
-        if not conda_build:
-            if is_windows():
-                orig_file_2 = os.path.join(install_dir, 'x64', 'vc17', 'staticlib', 'OpenCVModules.cmake')
-            else:
-                orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'opencv4', 'OpenCVModules.cmake')
+        if is_windows():
+            orig_file_2 = os.path.join(
+                install_dir, "x64", "vc17", "staticlib", "OpenCVModules.cmake"
+            )
+        else:
+            orig_file_2 = os.path.join(
+                install_dir, "lib", "cmake", "opencv4", "OpenCVModules.cmake"
+            )
 
-            if is_mac():
-                patch_file(orig_file_2,
-                           from_texts=[r';\$<LINK_ONLY:tbb>',
-                                       r';\$<LINK_ONLY:ipphal>',
-                                       ],
-                           to_texts=[r'',
-                                     r';\$<LINK_ONLY:ipphal>;${OpenCV_INSTALL_PATH}/lib/opencv4/3rdparty/libtegra_hal.a',
-                                     ])
-            else:
-                patch_file(orig_file_2,
-                           from_texts=[r';\$<LINK_ONLY:tbb>',
-                                       ],
-                           to_texts=[r'',
-                                     ])
+        if is_mac():
+            patch_file(
+                orig_file_2,
+                from_texts=[
+                    r";\$<LINK_ONLY:tbb>",
+                    r";\$<LINK_ONLY:ipphal>",
+                ],
+                to_texts=[
+                    r"",
+                    r";\$<LINK_ONLY:ipphal>;${OpenCV_INSTALL_PATH}/lib/opencv4/3rdparty/libtegra_hal.a",
+                ],
+            )
+        else:
+            patch_file(
+                orig_file_2,
+                from_texts=[
+                    r";\$<LINK_ONLY:tbb>",
+                ],
+                to_texts=[
+                    r"",
+                ],
+            )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()
-        if conda_build and is_mac():
-            os.rename(os.path.join(ext_build_dir(), 'include', '__tbb'),
-                      os.path.join(ext_build_dir(), 'include', 'tbb'))
-            os.rename(os.path.join(ext_build_dir(), 'include', '__oneapi'),
-                      os.path.join(ext_build_dir(), 'include', 'oneapi'))
 
 
 def build_rocksdb(src_dir: str, install_dir: str):
@@ -2929,46 +2921,22 @@ def build_proxygen(src_dir: str, install_dir: str):
         patch_manager.restore_files()
 
 
-def build_conda_zimg(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
-
-        if is_windows():
-            env = get_enviroment_from_shell_script(os.path.join(os.environ['CONDA_PREFIX'], 'condabin',
-                                                                'conda.bat'),
-                                                   para='activate',
-                                                   start_env=get_vcvars_environment(),
-                                                   remove_conda_from_path=False)
-        else:
-            env = os.environ.copy()
-        env['PREFIX'] = env['CONDA_PREFIX']
-
-        cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
-
-        if is_linux():
-            binary_name = find_src_package_with_glob(os.path.join(build_dir, '*imgpy.*.so'))
-            linux_deploy_deps_to_lib_dir(binary_name, lib_dir=os.path.join(install_dir, 'zimg', 'lib'))
-
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
 def build_ospray(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir, use_ninja=False)
-        cmakecmd.extend(['-DDOWNLOAD_ISPC=ON',
-                         '-DDOWNLOAD_TBB=OFF',
-                         '-DBUILD_EMBREE_FROM_SOURCE=OFF',
-                         '-DBUILD_GLFW=ON',
-                         '-DBUILD_OIDN_FROM_SOURCE=OFF',
-                         ])
+        cmakecmd.extend(
+            [
+                "-DDOWNLOAD_ISPC=ON",
+                "-DDOWNLOAD_TBB=OFF",
+                "-DBUILD_EMBREE_FROM_SOURCE=OFF",
+                "-DBUILD_GLFW=ON",
+                "-DBUILD_OIDN_FROM_SOURCE=OFF",
+            ]
+        )
 
-        cmakecmd.extend([os.path.join(src_dir, 'scripts', 'superbuild')])
+        cmakecmd.extend([os.path.join(src_dir, "scripts", "superbuild")])
         build_and_install_cmakecmd(cmakecmd, build_dir, use_ninja=False, use_cmake=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -2982,31 +2950,48 @@ def build_ants(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         # build_cmakecmd(cmakecmd, build_dir, use_ninja=False)
-        subprocess.run(['make', 'install'],
-                       cwd=os.path.join(build_dir, 'ANTS-build'), shell=False, check=True)
+        subprocess.run(
+            ["make", "install"],
+            cwd=os.path.join(build_dir, "ANTS-build"),
+            shell=False,
+            check=True,
+        )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_skia(src_dir: str, install_dir: str):
     try:
-        subprocess.run(['python', 'tools/git-sync-deps'],
-                       cwd=src_dir, shell=False, check=True)
-        subprocess.run(['bin/gn', 'gen', 'out/Static',
-                        "--args=is_official_build=true skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_use_libpng_decode=false skia_use_libpng_encode=false skia_use_libwebp_decode=false skia_use_libwebp_encode=false skia_use_icu=false skia_use_harfbuzz=false skia_use_fontconfig=false skia_use_expat=false skia_use_freetype=false skia_use_gl=false skia_use_x11=false skia_enable_gpu=false"],
-                       cwd=src_dir, shell=False, check=True)
-        subprocess.run([get_ninja_binary(), '-C', 'out/Static'],
-                       cwd=src_dir, shell=False, check=True)
-        skia_include_dir = os.path.join(install_dir, 'include', 'skia', 'include')
+        subprocess.run(
+            ["python", "tools/git-sync-deps"], cwd=src_dir, shell=False, check=True
+        )
+        subprocess.run(
+            [
+                "bin/gn",
+                "gen",
+                "out/Static",
+                "--args=is_official_build=true skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_use_libpng_decode=false skia_use_libpng_encode=false skia_use_libwebp_decode=false skia_use_libwebp_encode=false skia_use_icu=false skia_use_harfbuzz=false skia_use_fontconfig=false skia_use_expat=false skia_use_freetype=false skia_use_gl=false skia_use_x11=false skia_enable_gpu=false",
+            ],
+            cwd=src_dir,
+            shell=False,
+            check=True,
+        )
+        subprocess.run(
+            [get_ninja_binary(), "-C", "out/Static"],
+            cwd=src_dir,
+            shell=False,
+            check=True,
+        )
+        skia_include_dir = os.path.join(install_dir, "include", "skia", "include")
         if os.path.exists(skia_include_dir):
             shutil.rmtree(skia_include_dir, ignore_errors=False)
-        shutil.copytree(os.path.join(src_dir, 'include'), skia_include_dir)
-        skia_lib_dir = os.path.join(install_dir, 'lib', 'skia')
+        shutil.copytree(os.path.join(src_dir, "include"), skia_include_dir)
+        skia_lib_dir = os.path.join(install_dir, "lib", "skia")
         if os.path.exists(skia_lib_dir):
             shutil.rmtree(skia_lib_dir, ignore_errors=False)
-        glob_copy(os.path.join(src_dir, 'out', 'Static', '*.a'), skia_lib_dir)
+        glob_copy(os.path.join(src_dir, "out", "Static", "*.a"), skia_lib_dir)
     finally:
-        logger.info('done')
+        logger.info("done")
 
 
 def build_or_tools(src_dir: str, install_dir: str):
@@ -3014,17 +2999,20 @@ def build_or_tools(src_dir: str, install_dir: str):
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(['-DBUILD_DEPS:BOOL=OFF',
-                         '-DBUILD_CoinUtils:BOOL=ON',
-                         '-DBUILD_Osi:BOOL=ON',
-                         '-DBUILD_Clp:BOOL=ON',
-                         '-DBUILD_Cgl:BOOL=ON',
-                         '-DBUILD_Cbc:BOOL=ON',
-                         '-DBUILD_HIGHS:BOOL=ON',
-                         '-DBUILD_SCIP:BOOL=ON',
-                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DBUILD_TESTING:BOOL=OFF',
-                         ])
+        cmakecmd.extend(
+            [
+                "-DBUILD_DEPS:BOOL=OFF",
+                "-DBUILD_CoinUtils:BOOL=ON",
+                "-DBUILD_Osi:BOOL=ON",
+                "-DBUILD_Clp:BOOL=ON",
+                "-DBUILD_Cgl:BOOL=ON",
+                "-DBUILD_Cbc:BOOL=ON",
+                "-DBUILD_HIGHS:BOOL=ON",
+                "-DBUILD_SCIP:BOOL=ON",
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                "-DBUILD_TESTING:BOOL=OFF",
+            ]
+        )
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -3033,17 +3021,17 @@ def build_or_tools(src_dir: str, install_dir: str):
 
 
 def build_libs(libs: OrderedDict, use_asan: bool):
-    logger.info(f'extDIR: {ext_dir()}')
+    logger.info(f"extDIR: {ext_dir()}")
 
     download_atlas_deps()
-    logger.info(f'srcPackageDIR: {src_package_dir()}')
+    logger.info(f"srcPackageDIR: {src_package_dir()}")
 
-    remove_path_contains('miniconda')
-    remove_path_contains('anaconda')
+    remove_path_contains("miniconda")
+    remove_path_contains("anaconda")
     logger.info(f"PATH: {os.environ['PATH']}")
 
     if is_windows():
-        os.environ['HOME'] = os.path.expanduser("~")
+        os.environ["HOME"] = os.path.expanduser("~")
 
     logger.info(f"HOME: {os.environ['HOME']}")
 
@@ -3051,73 +3039,92 @@ def build_libs(libs: OrderedDict, use_asan: bool):
         if not build_lib:
             continue
 
-        if lib_name == 'cmake':
+        if lib_name == "cmake":
             install_cmake()
 
-        if lib_name == 'ninja':
+        if lib_name == "ninja":
             install_ninja()
 
-        if lib_name == 'curl':
+        if lib_name == "curl":
             if is_windows():
-                unpack_tool_to_target_dir(src_package_dir(), 'curl*win*')
+                unpack_tool_to_target_dir(src_package_dir(), "curl*win*")
 
-        if lib_name == 'gperf':
+        if lib_name == "gperf":
             if is_windows():
                 install_gperf()
 
-        if lib_name == 'ffmpeg':
+        if lib_name == "ffmpeg":
             install_ffmpeg()
             if is_windows() or is_linux():
                 shutil.copy2(get_ffmpeg_binary(), ext_build_dir())
 
-        if lib_name == 'java':
-            shutil.rmtree(os.path.join(ext_build_dir(), 'jars'), ignore_errors=True)
-            shutil.copytree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'),
-                            dirs_exist_ok=True)
+        if lib_name == "java":
+            shutil.rmtree(os.path.join(ext_build_dir(), "jars"), ignore_errors=True)
+            shutil.copytree(
+                os.path.join(src_package_dir(), "jars"),
+                os.path.join(ext_build_dir(), "jars"),
+                dirs_exist_ok=True,
+            )
 
             if is_mac():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*mac*'))
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "*-jre_x64*mac*")
+                )
             elif is_linux():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*linux*'))
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "*-jre_x64*linux*")
+                )
             else:
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*windows*'))
-            jre_dir = os.path.join(ext_build_dir(), get_package_top_level_folder(package_name))
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "*-jre_x64*windows*")
+                )
+            jre_dir = os.path.join(
+                ext_build_dir(), get_package_top_level_folder(package_name)
+            )
             logger.info(jre_dir)
             if not os.path.exists(jre_dir):
-                if os.path.exists(os.path.join(ext_build_dir(), 'jre')):
-                    os.remove(os.path.join(ext_build_dir(), 'jre'))
-                remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jre*'))
+                if os.path.exists(os.path.join(ext_build_dir(), "jre")):
+                    os.remove(os.path.join(ext_build_dir(), "jre"))
+                remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), "jre*"))
                 unpack_file_to_folder(package_name, ext_build_dir())
                 assert os.path.exists(jre_dir)
-                if os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
-                    os.remove(os.path.join(ext_build_dir(), 'jre'))
-                    logger.info('link jre')
-                    os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
-            if not os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
-                logger.info('link jre')
-                os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
+                if os.path.lexists(os.path.join(ext_build_dir(), "jre")):
+                    os.remove(os.path.join(ext_build_dir(), "jre"))
+                    logger.info("link jre")
+                    os.symlink(jre_dir, os.path.join(ext_build_dir(), "jre"))
+            if not os.path.lexists(os.path.join(ext_build_dir(), "jre")):
+                logger.info("link jre")
+                os.symlink(jre_dir, os.path.join(ext_build_dir(), "jre"))
 
             if is_mac():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_aarch64*mac*'))
-                if not os.path.lexists(os.path.join(ext_build_dir(), 'jrearm')):
-                    os.mkdir(os.path.join(ext_build_dir(), 'jrearm'))
-                jre_dir = os.path.join(ext_build_dir(), 'jrearm', get_package_top_level_folder(package_name))
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "*-jre_aarch64*mac*")
+                )
+                if not os.path.lexists(os.path.join(ext_build_dir(), "jrearm")):
+                    os.mkdir(os.path.join(ext_build_dir(), "jrearm"))
+                jre_dir = os.path.join(
+                    ext_build_dir(),
+                    "jrearm",
+                    get_package_top_level_folder(package_name),
+                )
                 logger.info(jre_dir)
                 if not os.path.exists(jre_dir):
-                    if os.path.exists(os.path.join(ext_build_dir(), 'jre-arm')):
-                        os.remove(os.path.join(ext_build_dir(), 'jre-arm'))
-                    unpack_file_to_folder(package_name, os.path.join(ext_build_dir(), 'jrearm'))
+                    if os.path.exists(os.path.join(ext_build_dir(), "jre-arm")):
+                        os.remove(os.path.join(ext_build_dir(), "jre-arm"))
+                    unpack_file_to_folder(
+                        package_name, os.path.join(ext_build_dir(), "jrearm")
+                    )
                     assert os.path.exists(jre_dir)
-                    if os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
-                        os.remove(os.path.join(ext_build_dir(), 'jre-arm'))
-                        logger.info('link jre-arm')
-                        os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
-                if not os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
-                    logger.info('link jre-arm')
-                    os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
+                    if os.path.lexists(os.path.join(ext_build_dir(), "jre-arm")):
+                        os.remove(os.path.join(ext_build_dir(), "jre-arm"))
+                        logger.info("link jre-arm")
+                        os.symlink(jre_dir, os.path.join(ext_build_dir(), "jre-arm"))
+                if not os.path.lexists(os.path.join(ext_build_dir(), "jre-arm")):
+                    logger.info("link jre-arm")
+                    os.symlink(jre_dir, os.path.join(ext_build_dir(), "jre-arm"))
 
-        if lib_name == 'qt':
-            logger.info(f'Qt {qt_ver()} in {qt_base_dir()}')
+        if lib_name == "qt":
+            logger.info(f"Qt {qt_ver()} in {qt_base_dir()}")
             # if is_windows():
             #     # patch Qt, not necessary for qt6
             #     orig_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h')
@@ -3138,12 +3145,12 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             #         logger.info(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
 
             # patch installer framework
-            pattern_bytes = b'Mozilla/5.0'
-            replace_bytes = b'Mozilla/590'
-            file = os.path.join(qt_installer_framework_bin_dir(), 'installerbase')
+            pattern_bytes = b"Mozilla/5.0"
+            replace_bytes = b"Mozilla/590"
+            file = os.path.join(qt_installer_framework_bin_dir(), "installerbase")
             if is_windows():
-                file += '.exe'
-            with open(file, 'r+b') as f:
+                file += ".exe"
+            with open(file, "r+b") as f:
                 with mmap.mmap(f.fileno(), 0) as mm:
                     all_indexes = []
                     index = mm.find(pattern_bytes)
@@ -3154,321 +3161,393 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                         logger.info(f"Pattern not found in {file}, skip patching.")
                     else:
                         # make backup
-                        shutil.copy2(file, file + '.bak')
+                        shutil.copy2(file, file + ".bak")
                         for index in all_indexes:
-                            mm[index:index + len(replace_bytes)] = replace_bytes
+                            mm[index : index + len(replace_bytes)] = replace_bytes
                         mm.flush()
-                        logger.info(f"{file} successfully patched at {len(all_indexes)} places.")
+                        logger.info(
+                            f"{file} successfully patched at {len(all_indexes)} places."
+                        )
 
-        if lib_name == 'make-cmake-pathlist':
-            with open(os.path.join(ext_build_dir(), 'PathList.cmake'), mode='w', encoding='utf-8') as file:
-                file.write('# Set PATH for CMake\n')
-                file.write(f'set(QT_VERSION {qt_ver()})\n')
+        if lib_name == "make-cmake-pathlist":
+            with open(
+                os.path.join(ext_build_dir(), "PathList.cmake"),
+                mode="w",
+                encoding="utf-8",
+            ) as file:
+                file.write("# Set PATH for CMake\n")
+                file.write(f"set(QT_VERSION {qt_ver()})\n")
                 if is_windows():
-                    file.write('set(QT_HOST_PATH "{0}")\n'.format(qt_base_dir().replace("\\", "/")))
-                    file.write('set(ENV{VULKAN_SDK} ' + '"{0}")\n'.format(vulkan_SDK_env_dir().replace("\\", "/")))
+                    file.write(
+                        'set(QT_HOST_PATH "{0}")\n'.format(
+                            qt_base_dir().replace("\\", "/")
+                        )
+                    )
+                    file.write(
+                        "set(ENV{VULKAN_SDK} "
+                        + '"{0}")\n'.format(vulkan_SDK_env_dir().replace("\\", "/"))
+                    )
                 else:
-                    file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
-                    file.write('set(ENV{VULKAN_SDK} ' + f'{vulkan_SDK_env_dir()})\n')
+                    file.write(f"set(QT_HOST_PATH {qt_base_dir()})\n")
+                    file.write("set(ENV{VULKAN_SDK} " + f"{vulkan_SDK_env_dir()})\n")
 
-        if lib_name == 'fast_float':
-            src_dir = os.path.join(ext_dir(), 'fast_float')
+        if lib_name == "fast_float":
+            src_dir = os.path.join(ext_dir(), "fast_float")
             build_fast_float(src_dir, ext_build_dir())
 
-        if lib_name == 'zlib':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "zlib":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "zlib*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'zlib*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "zlib*"))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_zlib(src_dir, ext_build_dir())
 
-        if lib_name == 'boost':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'boost*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "boost":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "boost*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'boost*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "boost*"))
                 clean_boost(ext_build_dir())
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_boost(src_dir, ext_build_dir())
 
-        if lib_name == 'tbb':
+        if lib_name == "tbb":
             if is_mac():
-                src_dir = os.path.join(ext_dir(), 'oneTBB')
+                src_dir = os.path.join(ext_dir(), "oneTBB")
                 build_tbb(src_dir, ext_build_dir())
 
-        if lib_name == 'eigen':
-            src_dir = os.path.join(ext_dir(), 'eigen')
+        if lib_name == "eigen":
+            src_dir = os.path.join(ext_dir(), "eigen")
             build_eigen(src_dir, ext_build_dir())
 
-        if lib_name == 'pocketfft':
-            src_dir = os.path.join(ext_dir(), 'pocketfft')
+        if lib_name == "pocketfft":
+            src_dir = os.path.join(ext_dir(), "pocketfft")
             build_pocketfft(src_dir, ext_build_dir())
 
-        if lib_name == 'reflect':
-            src_dir = os.path.join(ext_dir(), 'reflect')
+        if lib_name == "reflect":
+            src_dir = os.path.join(ext_dir(), "reflect")
             build_reflect(src_dir, ext_build_dir())
 
-        if lib_name == 'simde':
-            src_dir = os.path.join(ext_dir(), 'simde')
+        if lib_name == "simde":
+            src_dir = os.path.join(ext_dir(), "simde")
             build_simde(src_dir, ext_build_dir())
 
-        if lib_name == 'pybind11':
-            logger.info('pybind11')
+        if lib_name == "pybind11":
+            logger.info("pybind11")
 
-        if lib_name == 'glm':
-            src_dir = os.path.join(ext_dir(), 'glm')
+        if lib_name == "glm":
+            src_dir = os.path.join(ext_dir(), "glm")
             build_glm(src_dir, ext_build_dir())
 
-        if lib_name == 'googletest':
-            logger.info('googletest')
+        if lib_name == "googletest":
+            logger.info("googletest")
 
-        if lib_name == 'cpuinfo':
-            src_dir = os.path.join(ext_dir(), 'cpuinfo')
+        if lib_name == "cpuinfo":
+            src_dir = os.path.join(ext_dir(), "cpuinfo")
             build_cpuinfo(src_dir, ext_build_dir())
 
-        if lib_name == 'gflags':
-            gflags_src_dir = os.path.join(ext_dir(), 'gflags')
+        if lib_name == "gflags":
+            gflags_src_dir = os.path.join(ext_dir(), "gflags")
             build_gflags(gflags_src_dir, ext_build_dir())
 
-        if lib_name == 'glog':
-            src_dir = os.path.join(ext_dir(), 'glog')
+        if lib_name == "glog":
+            src_dir = os.path.join(ext_dir(), "glog")
             build_glog(src_dir, ext_build_dir())
 
-        if lib_name == 'benchmark':
-            src_dir = os.path.join(ext_dir(), 'benchmark')
+        if lib_name == "benchmark":
+            src_dir = os.path.join(ext_dir(), "benchmark")
             build_benchmark(src_dir, ext_build_dir())
 
-        if lib_name == 'openssl':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'openssl*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "openssl":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "openssl*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'openssl*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "openssl*"))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             if is_windows():
-                nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
+                nasm_dir = unpack_tool_to_target_dir(
+                    src_package_dir(), "nasm*win64*", "nasm-*"
+                )
             else:
-                nasm_dir = ''  # does not need
+                nasm_dir = ""  # does not need
             build_openssl(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
-        if lib_name == 'double-conversion':
-            dc_src_dir = os.path.join(ext_dir(), 'double-conversion')
+        if lib_name == "double-conversion":
+            dc_src_dir = os.path.join(ext_dir(), "double-conversion")
             build_double_conversion(dc_src_dir, ext_build_dir())
 
-        if lib_name == 'lz4':
-            lz4_src_dir = os.path.join(ext_dir(), 'lz4')
+        if lib_name == "lz4":
+            lz4_src_dir = os.path.join(ext_dir(), "lz4")
             build_lz4(lz4_src_dir, ext_build_dir())
 
         # lzma
-        if lib_name == 'xz':
-            xz_src_dir = os.path.join(ext_dir(), 'xz')
+        if lib_name == "xz":
+            xz_src_dir = os.path.join(ext_dir(), "xz")
             build_xz(xz_src_dir, ext_build_dir())
 
-        if lib_name == 'zstd':
-            zstd_src_dir = os.path.join(ext_dir(), 'zstd')
+        if lib_name == "zstd":
+            zstd_src_dir = os.path.join(ext_dir(), "zstd")
             build_zstd(zstd_src_dir, ext_build_dir())
 
-        if lib_name == 'fmt':
-            fmt_src_dir = os.path.join(ext_dir(), 'fmt')
+        if lib_name == "fmt":
+            fmt_src_dir = os.path.join(ext_dir(), "fmt")
             build_fmt(fmt_src_dir, ext_build_dir())
 
-        if lib_name == 'libevent':
-            le_src_dir = os.path.join(ext_dir(), 'libevent')
+        if lib_name == "libevent":
+            le_src_dir = os.path.join(ext_dir(), "libevent")
             build_libevent(le_src_dir, ext_build_dir())
 
-        if lib_name == 'snappy':
-            snappy_src_dir = os.path.join(ext_dir(), 'snappy')
+        if lib_name == "snappy":
+            snappy_src_dir = os.path.join(ext_dir(), "snappy")
             build_snappy(snappy_src_dir, ext_build_dir())
 
-        if lib_name == 'bzip2':
-            bz2_src_dir = os.path.join(ext_dir(), 'bzip2')
+        if lib_name == "bzip2":
+            bz2_src_dir = os.path.join(ext_dir(), "bzip2")
             build_bzip2(bz2_src_dir, ext_build_dir())
 
-        if lib_name == 'libsodium':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libsodium*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "libsodium":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "libsodium*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'libsodium*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "libsodium*"))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_libsodium(src_dir, ext_build_dir())
 
-        if lib_name == 'folly':
-            src_dir = os.path.join(ext_dir(), 'folly')
+        if lib_name == "folly":
+            src_dir = os.path.join(ext_dir(), "folly")
             build_folly(src_dir, ext_build_dir(), use_asan=use_asan)
 
-        if lib_name == 'suitesparse':
+        if lib_name == "suitesparse":
             # package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'SuiteSparse*'))
             # src_dir = get_package_top_level_folder(package_name, ext_dir())
             # if not os.path.exists(src_dir):
             #     remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'SuiteSparse*'))
             #     unpack_file_to_folder(package_name, ext_dir())
             #     assert os.path.exists(src_dir)
-            src_dir = os.path.join(ext_dir(), 'SuiteSparse')
+            src_dir = os.path.join(ext_dir(), "SuiteSparse")
             build_suitesparse(src_dir, ext_build_dir())
 
-        if lib_name == 'ceres-solver':
-            src_dir = os.path.join(ext_dir(), 'ceres-solver')
+        if lib_name == "ceres-solver":
+            src_dir = os.path.join(ext_dir(), "ceres-solver")
             build_ceres_solver(src_dir, ext_build_dir())
 
-        if lib_name == 'grpc':
-            src_dir = os.path.join(ext_dir(), 'grpc')
+        if lib_name == "grpc":
+            src_dir = os.path.join(ext_dir(), "grpc")
             if is_windows():
-                nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
+                nasm_dir = unpack_tool_to_target_dir(
+                    src_package_dir(), "nasm*win64*", "nasm-*"
+                )
             else:
-                nasm_dir = ''  # does not need
+                nasm_dir = ""  # does not need
             build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
-        if lib_name == 'glbinding':
-            src_dir = os.path.join(ext_dir(), 'glbinding')
+        if lib_name == "glbinding":
+            src_dir = os.path.join(ext_dir(), "glbinding")
             build_glbinding(src_dir, ext_build_dir())
 
-        if lib_name == 'libjpeg':
+        if lib_name == "libjpeg":
             if is_windows():
-                nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
+                nasm_dir = unpack_tool_to_target_dir(
+                    src_package_dir(), "nasm*win64*", "nasm-*"
+                )
             elif is_mac():
-                nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*macosx*', 'nasm-*')
-                os.chown(os.path.join(nasm_dir, 'nasm'), os.getuid(), os.getgid())
-                os.chmod(os.path.join(nasm_dir, 'nasm'), os.stat(os.path.join(nasm_dir, 'nasm')).st_mode | stat.S_IXUSR)
+                nasm_dir = unpack_tool_to_target_dir(
+                    src_package_dir(), "nasm*macosx*", "nasm-*"
+                )
+                os.chown(os.path.join(nasm_dir, "nasm"), os.getuid(), os.getgid())
+                os.chmod(
+                    os.path.join(nasm_dir, "nasm"),
+                    os.stat(os.path.join(nasm_dir, "nasm")).st_mode | stat.S_IXUSR,
+                )
             else:
-                nasm_dir = ''
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libjpeg*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+                nasm_dir = ""
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "libjpeg*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'libjpeg*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "libjpeg*"))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_libjpeg(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
-        if lib_name == 'libpng':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libpng*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "libpng":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "libpng*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'libpng*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "libpng*"))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_libpng(src_dir, ext_build_dir())
 
-        if lib_name == 'openjpeg':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'openjpeg*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "openjpeg":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "openjpeg*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'openjpeg*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "openjpeg*"))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_openjpeg(src_dir, ext_build_dir())
 
-        if lib_name == 'libwebp':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libwebp*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "libwebp":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "libwebp*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'libwebp*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "libwebp*"))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_libwebp(src_dir, ext_build_dir())
 
-        if lib_name == 'jxrlib':
-            src_dir = os.path.join(ext_dir(), 'jxrlib')
+        if lib_name == "jxrlib":
+            src_dir = os.path.join(ext_dir(), "jxrlib")
             build_jxrlib(src_dir, ext_build_dir())
 
-        if lib_name == 'geometrictools':
-            logger.info('geometrictools')
+        if lib_name == "geometrictools":
+            logger.info("geometrictools")
 
-        if lib_name == 'assimp':
-            src_dir = os.path.join(ext_dir(), 'assimp')
+        if lib_name == "assimp":
+            src_dir = os.path.join(ext_dir(), "assimp")
             build_assimp(src_dir, ext_build_dir())
 
-        if lib_name == 'hdf5':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'hdf5*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "hdf5":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "hdf5*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'hdf5*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "hdf5*"))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_hdf5(src_dir, ext_build_dir())
 
-        if lib_name == 'freeimage':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'freeimage-svn*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "freeimage":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "freeimage-svn*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'freeimage-svn*'))
+                remove_old_src_folder_with_glob(
+                    os.path.join(ext_dir(), "freeimage-svn*")
+                )
                 unpack_file_to_folder(package_name, ext_dir())
             assert os.path.exists(src_dir)
             build_freeimage(src_dir, ext_build_dir())
 
-        if lib_name == 'itk':
-            src_dir = os.path.join(ext_dir(), 'ITK')
+        if lib_name == "itk":
+            src_dir = os.path.join(ext_dir(), "ITK")
             build_itk(src_dir, ext_build_dir())
 
-        if lib_name == 'vtk':
-            src_dir = os.path.join(ext_dir(), 'vtk')
+        if lib_name == "vtk":
+            src_dir = os.path.join(ext_dir(), "vtk")
             build_vtk(src_dir, ext_build_dir())
 
-        if lib_name == 'opencv':
-            src_dir = os.path.join(ext_dir(), 'opencv')
-            src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
+        if lib_name == "opencv":
+            src_dir = os.path.join(ext_dir(), "opencv")
+            src_contrib_dir = os.path.join(ext_dir(), "opencv_contrib")
             build_opencv(src_dir, src_contrib_dir, ext_build_dir())
 
-        if lib_name == 'neuTube':
+        if lib_name == "neuTube":
             if is_windows():
-                suffix = 'Windows'
+                suffix = "Windows"
             elif is_mac():
-                suffix = 'macOS'
+                suffix = "macOS"
             else:
-                suffix = 'Linux'
-            shutil.copytree(os.path.join(src_package_dir(), 'packages-' + suffix),
-                            os.path.join(ext_build_dir(), 'packages-' + suffix),
-                            dirs_exist_ok=True)
+                suffix = "Linux"
+            shutil.copytree(
+                os.path.join(src_package_dir(), "packages-" + suffix),
+                os.path.join(ext_build_dir(), "packages-" + suffix),
+                dirs_exist_ok=True,
+            )
 
-        if lib_name == 'rocksdb':
-            src_dir = os.path.join(ext_dir(), 'rocksdb')
+        if lib_name == "rocksdb":
+            src_dir = os.path.join(ext_dir(), "rocksdb")
             build_rocksdb(src_dir, ext_build_dir())
 
-        if lib_name == 'llfio':
-            src_dir = os.path.join(ext_dir(), 'llfio')
+        if lib_name == "llfio":
+            src_dir = os.path.join(ext_dir(), "llfio")
             build_llfio(src_dir, ext_build_dir())
 
-        if lib_name == 'jansson':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'jansson*'))
-            src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+        if lib_name == "jansson":
+            package_name = find_src_package_with_glob(
+                os.path.join(src_package_dir(), "jansson*")
+            )
+            src_dir = os.path.join(
+                ext_dir(), get_package_top_level_folder(package_name)
+            )
             if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'jansson*'))
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), "jansson*"))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
             build_jansson(src_dir, ext_build_dir())
 
-        if lib_name == 'pcre':
+        if lib_name == "pcre":
             if is_windows():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'pcre2*'))
-                src_dir = os.path.join(ext_dir(), get_package_top_level_folder(package_name))
+                package_name = find_src_package_with_glob(
+                    os.path.join(src_package_dir(), "pcre2*")
+                )
+                src_dir = os.path.join(
+                    ext_dir(), get_package_top_level_folder(package_name)
+                )
                 if not os.path.exists(src_dir):
-                    remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'pcre2*'))
+                    remove_old_src_folder_with_glob(os.path.join(ext_dir(), "pcre2*"))
                     unpack_file_to_folder(package_name, ext_dir())
                     assert os.path.exists(src_dir)
                 build_pcre(src_dir, ext_build_dir())
 
-        if lib_name == 'fizz':
-            src_dir = os.path.join(ext_dir(), 'fizz', 'fizz')
+        if lib_name == "fizz":
+            src_dir = os.path.join(ext_dir(), "fizz", "fizz")
             build_fizz(src_dir, ext_build_dir())
 
-        if lib_name == 'mvfst':
-            src_dir = os.path.join(ext_dir(), 'mvfst')
+        if lib_name == "mvfst":
+            src_dir = os.path.join(ext_dir(), "mvfst")
             build_mvfst(src_dir, ext_build_dir())
 
-        if lib_name == 'wangle':
-            src_dir = os.path.join(ext_dir(), 'wangle', 'wangle')
+        if lib_name == "wangle":
+            src_dir = os.path.join(ext_dir(), "wangle", "wangle")
             build_wangle(src_dir, ext_build_dir())
 
-        if lib_name == 'proxygen':
-            src_dir = os.path.join(ext_dir(), 'proxygen')
+        if lib_name == "proxygen":
+            src_dir = os.path.join(ext_dir(), "proxygen")
             build_proxygen(src_dir, ext_build_dir())
-
-        if lib_name == 'conda-zimg':
-            src_dir = os.path.join(atlas_src_dir(), 'python')
-            build_conda_zimg(src_dir, ext_conda_build_dir())
 
         if lib_name == 'ospray':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ospray*'))
@@ -3562,13 +3641,12 @@ def parse_inputs(argv: list):
         "mvfst",
         "wangle",
         "proxygen",
-        "conda-zimg",
         "ospray",
         "ants",
         "skia",
         "or-tools",
     ]
-    libs = OrderedDict([(lib, False) for lib in lib_list])
+    libs: OrderedDict[str, bool] = OrderedDict([(lib, False) for lib in lib_list])
 
     # not used now
     lib_skip_list = ["ospray", "ants", "skia", "rocksdb", "llfio", "or-tools"]

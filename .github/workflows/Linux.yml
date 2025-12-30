@@ -46,7 +46,7 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py') }}
 
       - name: Free disk space
         if: steps.cache-extlibs.outputs.cache-hit != 'true'
@@ -221,7 +221,7 @@ jobs:
           eval "$(conda shell.bash hook)"
           conda activate atlas-ci
           cd "$GITHUB_WORKSPACE"
-          python util/build_ext_libs.py all --exclude-libs conda-zimg
+          python util/build_ext_libs.py all
 
   build:
     runs-on: ubuntu-22.04
@@ -392,7 +392,7 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-${{ env.CLANG_MAJOR }}-${{ hashFiles('util/atlas_deps_filelist.py') }}
 
       - name: Cache atlas_deps (download archives)
         uses: actions/cache@v4

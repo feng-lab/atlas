@@ -3,7 +3,7 @@ name: Windows
 on:
   push:
     branches:
-      - mainXX
+      - main
   create:
     # Runs when a branch or tag is created; we gate to tags in job steps
   workflow_dispatch:
@@ -45,7 +45,7 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py') }}
           lookup-only: true
 
   build-env-1:
@@ -70,7 +70,7 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-p1-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-p1-${{ hashFiles('util/atlas_deps_filelist.py') }}
 
       - name: Ensure Perl
         if: steps.cache-extlibs-p1.outputs.cache-hit != 'true'
@@ -250,7 +250,7 @@ jobs:
           conda activate atlas-ci
           cd "$env:GITHUB_WORKSPACE"
           conda info
-          python util/build_ext_libs.py all --exclude-libs conda-zimg --stop-before $env:EXT_SPLIT_LIB
+          python util/build_ext_libs.py all --stop-before $env:EXT_SPLIT_LIB
           if ($LASTEXITCODE -ne 0) { Write-Error "External deps build (part 1) failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
   build-env-2:
@@ -347,7 +347,7 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py') }}
           restore-keys: |
             ${{ runner.os }}-ext-p1-
 
@@ -361,7 +361,7 @@ jobs:
           conda activate atlas-ci
           cd "$env:GITHUB_WORKSPACE"
           conda info
-          python util/build_ext_libs.py all --exclude-libs conda-zimg --start-from $env:EXT_SPLIT_LIB
+          python util/build_ext_libs.py all --start-from $env:EXT_SPLIT_LIB
           if ($LASTEXITCODE -ne 0) { Write-Error "External deps build (part 2) failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 
   build:
@@ -543,7 +543,7 @@ jobs:
         with:
           path: |
             src/3rdparty/build
-          key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+          key: ${{ runner.os }}-ext-p2-${{ hashFiles('util/atlas_deps_filelist.py') }}
 
       - name: Cache atlas_deps (download archives)
         uses: actions/cache@v4

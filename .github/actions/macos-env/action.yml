@@ -33,7 +33,7 @@ runs:
       with:
         path: |
           src/3rdparty/build
-        key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py','util/build_ext_libs.py') }}
+        key: ${{ runner.os }}-ext-${{ hashFiles('util/atlas_deps_filelist.py') }}
 
     - name: Install base packages (Homebrew)
       if: ${{ inputs.force-setup == 'true' || steps.cache-extlibs.outputs.cache-hit != 'true' }}
@@ -208,4 +208,4 @@ runs:
         eval "$(conda shell.bash hook)"
         conda activate atlas-ci
         cd "$GITHUB_WORKSPACE"
-        python util/build_ext_libs.py all --exclude-libs conda-zimg
+        python util/build_ext_libs.py all

@@ -26,5 +26,6 @@ Homepage = "https://github.com/feng-lab/atlas"
 # Keep formatting/linting out of generated files.
 # Paths are relative to this pyproject location (util/).
 extend-exclude = [
+  "atlas_deps_filelist.py",
   "atlas_test_data_filelist.py",
 ]
