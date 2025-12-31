@@ -8,7 +8,7 @@ from agents.tracing import set_tracing_disabled  # type: ignore
 
 from .agent_team.base import LLMClient
 from .agent_team.supervisor import Supervisor
-from .capabilities_prompt import build_capabilities_prompt
+from .capabilities_prompt import build_atlas_agent_primer, build_capabilities_prompt
 from .discovery import discover_schema_dir
 from .scene_rpc import SceneClient
 
@@ -29,7 +29,7 @@ class ChatTeam:
         self.llm = LLMClient(api_key=self.api_key, model=self.model)
         self.supervisor = Supervisor(client=self.llm, scene=self.scene, temperature=self.temperature, atlas_dir=self.atlas_dir)
         # Build capabilities context derived from atlas_dir or defaults
-        self._context: Optional[str] = None
+        self._context: Optional[str] = build_atlas_agent_primer()
         # Maintain full-session chat history (list of (role, content)) for grounding future turns
         self._history: list[tuple[str, str]] = []
         # Optional: keep a lightweight last facts projection for post-turn diffs
@@ -50,7 +50,8 @@ class ChatTeam:
             if sd:
                 self._context = build_capabilities_prompt(sd)
         except Exception:
-            self._context = None
+            # Fall back to the stable primer only (schema discovery may fail before Atlas is installed).
+            self._context = build_atlas_agent_primer()
 
     def turn(self, user_text: str, *, shared_context: Optional[str] = None) -> str:
         ctx = shared_context or self._context

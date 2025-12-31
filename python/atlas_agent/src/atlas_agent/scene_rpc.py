@@ -3,35 +3,76 @@ import logging
 import os
 import sys
 import tempfile
+from contextlib import ExitStack
 from dataclasses import dataclass
+from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-import grpc  # type: ignore
-import pkg_resources  # type: ignore
-from google.protobuf import struct_pb2  # type: ignore
-from google.protobuf.json_format import MessageToDict  # type: ignore
-from grpc_tools import protoc  # type: ignore
+import grpc  # type: ignore[import-untyped]
+from google.protobuf import struct_pb2  # type: ignore[import-untyped]
+from google.protobuf.json_format import MessageToDict  # type: ignore[import-untyped]
+from grpc_tools import protoc  # type: ignore[import-untyped]
 
-from .repo import find_repo_root  # type: ignore
+from .repo import find_repo_root
+
+
+def _expand_path(s: str) -> str:
+    t = os.path.expanduser(os.path.expandvars(str(s)))
+    # Normalize obvious Windows separators on POSIX (best-effort)
+    if os.name != "nt" and "\\" in t and ":" in t[:3]:
+        t = t.replace("\\", "/")
+        # strip drive prefix like C:
+        if ":" in t:
+            t = t.split(":", 1)[1]
+    return t
+
+
+def _to_proto_value(py: Any) -> struct_pb2.Value:
+    v = struct_pb2.Value()
+    if py is None:
+        v.null_value = 0
+    elif isinstance(py, bool):
+        v.bool_value = bool(py)
+    elif isinstance(py, (int, float)) and not isinstance(py, bool):
+        v.number_value = float(py)
+    elif isinstance(py, str):
+        v.string_value = py
+    elif isinstance(py, (list, tuple)):
+        lv = struct_pb2.ListValue()
+        for item in py:
+            lv.values.append(_to_proto_value(item))
+        v.list_value.CopyFrom(lv)
+    elif isinstance(py, dict):
+        st = struct_pb2.Struct()
+        for k, val in py.items():
+            st.fields[k].CopyFrom(_to_proto_value(val))
+        v.struct_value.CopyFrom(st)
+    else:
+        v.string_value = str(py)
+    return v
 
 
 def _compile_proto(proto_path: Path, out_dir: Path) -> None:
     # Standard well-known types (e.g., google/protobuf/struct.proto) live here
-    try:
-        std_include = pkg_resources.resource_filename("grpc_tools", "_proto")
-    except Exception:
-        std_include = None
-    args = [
-        "protoc",
-        f"-I{proto_path.parent}",
-        *( [f"-I{std_include}"] if std_include else [] ),
-        f"--python_out={out_dir}",
-        f"--grpc_python_out={out_dir}",
-        str(proto_path),
-    ]
-    if protoc.main(args) != 0:
-        raise RuntimeError("Failed to compile scene.proto stubs")
+    with ExitStack() as stack:
+        std_include: Path | None = None
+        try:
+            std_include = stack.enter_context(
+                as_file(files("grpc_tools").joinpath("_proto"))
+            )
+        except Exception:
+            std_include = None
+        args = [
+            "protoc",
+            f"-I{proto_path.parent}",
+            *([f"-I{std_include}"] if std_include else []),
+            f"--python_out={out_dir}",
+            f"--grpc_python_out={out_dir}",
+            str(proto_path),
+        ]
+        if protoc.main(args) != 0:
+            raise RuntimeError(f"Failed to compile {proto_path.name} stubs")
 
 
 def _load_stubs(repo_root: Path):
@@ -61,8 +102,10 @@ class SceneClient:
         self._logger = logging.getLogger("atlas_agent.rpc")
         if not self._logger.handlers:
             h = logging.StreamHandler()
-            fmt = logging.Formatter(fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-                                     datefmt="%H:%M:%S")
+            fmt = logging.Formatter(
+                fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                datefmt="%H:%M:%S",
+            )
             h.setFormatter(fmt)
             self._logger.addHandler(h)
             # Default to WARNING to reduce noise; override via ATLAS_AGENT_LOG
@@ -120,13 +163,7 @@ class SceneClient:
         exp: list[str] = []
         missing: list[str] = []
         for s in files:
-            t = os.path.expanduser(os.path.expandvars(str(s)))
-            # Normalize obvious Windows separators on POSIX (best-effort)
-            if os.name != "nt" and "\\" in t and ":" in t[:3]:
-                t = t.replace("\\", "/")
-                # strip drive prefix like C:
-                if ":" in t:
-                    t = t.split(":", 1)[1]
+            t = _expand_path(s)
             if not os.path.isabs(t):
                 # leave relative paths as-is; let caller decide base dir
                 pass
@@ -153,20 +190,14 @@ class SceneClient:
             try:
                 p = str(getattr(o, "path", "") or "").strip()
                 if p:
-                    existing_paths.add(os.path.normpath(os.path.expanduser(os.path.expandvars(p))))
+                    existing_paths.add(os.path.normpath(_expand_path(p)))
             except Exception:
                 pass
         to_load: list[str] = []
         skipped: list[str] = []
-        expanded: list[str] = []
         for s in files:
-            t = os.path.expanduser(os.path.expandvars(str(s)))
-            if os.name != "nt" and "\\" in t and ":" in t[:3]:
-                t = t.replace("\\", "/")
-                if ":" in t:
-                    t = t.split(":", 1)[1]
+            t = _expand_path(s)
             t_norm = os.path.normpath(t)
-            expanded.append(t_norm)
             if t_norm in existing_paths:
                 skipped.append(t_norm)
             else:
@@ -254,7 +285,7 @@ class SceneClient:
                             for k in getattr(lr, "keys", []) or []:
                                 try:
                                     vj = getattr(k, "value_json", "") or ""
-                                    val = __import__("json").loads(vj) if vj else None
+                                    val = json.loads(vj) if vj else None
                                 except Exception:
                                     val = None
                                 entries.append({"time": float(getattr(k, "time", 0.0)), **({"value": val} if val is not None else {})})
@@ -383,33 +414,7 @@ class SceneClient:
 
     def camera_rotate(self, op: str, degrees: float = 90.0, base_value: Optional[dict] = None) -> dict:
         self.ensure_view()
-        bv = None
-        if base_value is not None:
-
-            def _to_value(py: Any) -> struct_pb2.Value:
-                v = struct_pb2.Value()
-                if py is None:
-                    v.null_value = 0
-                elif isinstance(py, bool):
-                    v.bool_value = bool(py)
-                elif isinstance(py, (int, float)) and not isinstance(py, bool):
-                    v.number_value = float(py)
-                elif isinstance(py, str):
-                    v.string_value = py
-                elif isinstance(py, (list, tuple)):
-                    lv = struct_pb2.ListValue()
-                    for item in py:
-                        lv.values.append(_to_value(item))
-                    v.list_value.CopyFrom(lv)
-                elif isinstance(py, dict):
-                    st = struct_pb2.Struct()
-                    for k, val in py.items():
-                        st.fields[k].CopyFrom(_to_value(val))
-                    v.struct_value.CopyFrom(st)
-                else:
-                    v.string_value = str(py)
-                return v
-            bv = _to_value(base_value)
+        bv = _to_proto_value(base_value) if base_value is not None else None
         req = self._pb2.CameraRotateRequest(op=str(op), degrees=float(degrees), base_value=bv if bv is not None else None)
         resp = self._stub.CameraRotate(req)
         self._log_rpc("CameraRotate", req, resp)
@@ -453,34 +458,9 @@ class SceneClient:
             )
         st = None
         if params:
-
-            def _to_value(py: Any) -> struct_pb2.Value:
-                v = struct_pb2.Value()
-                if py is None:
-                    v.null_value = 0
-                elif isinstance(py, bool):
-                    v.bool_value = bool(py)
-                elif isinstance(py, (int, float)) and not isinstance(py, bool):
-                    v.number_value = float(py)
-                elif isinstance(py, str):
-                    v.string_value = py
-                elif isinstance(py, (list, tuple)):
-                    lv = struct_pb2.ListValue()
-                    for item in py:
-                        lv.values.append(_to_value(item))
-                    v.list_value.CopyFrom(lv)
-                elif isinstance(py, dict):
-                    st2 = struct_pb2.Struct()
-                    for k2, val in py.items():
-                        st2.fields[k2].CopyFrom(_to_value(val))
-                    v.struct_value.CopyFrom(st2)
-                else:
-                    v.string_value = str(py)
-                return v
-
             st = struct_pb2.Struct()
-            for k, v in params.items():
-                st.fields[k].CopyFrom(_to_value(v))
+            for k, param_value in params.items():
+                st.fields[k].CopyFrom(_to_proto_value(param_value))
         req = self._pb2.CameraSolveRequest(
             mode=str(mode), ids=ids or [], t0=float(t0), t1=float(t1),
             constraints=cons if cons is not None else None,
@@ -518,34 +498,10 @@ class SceneClient:
                 adjust_distance=bool(policies.get("adjust_distance", False)),
                 adjust_clipping=bool(policies.get("adjust_clipping", False)),
             )
-        # Convert dicts to protobuf Values
-        def _to_value(py: Any) -> struct_pb2.Value:
-            v = struct_pb2.Value()
-            if py is None:
-                v.null_value = 0
-            elif isinstance(py, bool):
-                v.bool_value = bool(py)
-            elif isinstance(py, (int, float)) and not isinstance(py, bool):
-                v.number_value = float(py)
-            elif isinstance(py, str):
-                v.string_value = py
-            elif isinstance(py, (list, tuple)):
-                lv = struct_pb2.ListValue()
-                for item in py:
-                    lv.values.append(_to_value(item))
-                v.list_value.CopyFrom(lv)
-            elif isinstance(py, dict):
-                st = struct_pb2.Struct()
-                for k, val in py.items():
-                    st.fields[k].CopyFrom(_to_value(val))
-                v.struct_value.CopyFrom(st)
-            else:
-                v.string_value = str(py)
-            return v
         req = self._pb2.CameraValidateRequest(
             ids=ids or [],
             times=[float(t) for t in times],
-            values=[_to_value(v) for v in values],
+            values=[_to_proto_value(camera_value) for camera_value in values],
             constraints=cons if cons is not None else None,
             policies=pol if pol is not None else None,
         )
@@ -572,31 +528,7 @@ class SceneClient:
     def set_key_camera(self, time: float, easing: str, value: Any) -> bool:
         # Ensure engine/view exists before setting camera keys
         self.ensure_view()
-        py = value
-        def _to_value(py: Any) -> struct_pb2.Value:
-            v = struct_pb2.Value()
-            if py is None:
-                v.null_value = 0
-            elif isinstance(py, bool):
-                v.bool_value = bool(py)
-            elif isinstance(py, (int, float)) and not isinstance(py, bool):
-                v.number_value = float(py)
-            elif isinstance(py, str):
-                v.string_value = py
-            elif isinstance(py, (list, tuple)):
-                lv = struct_pb2.ListValue()
-                for item in py:
-                    lv.values.append(_to_value(item))
-                v.list_value.CopyFrom(lv)
-            elif isinstance(py, dict):
-                st = struct_pb2.Struct()
-                for k, val in py.items():
-                    st.fields[k].CopyFrom(_to_value(val))
-                v.struct_value.CopyFrom(st)
-            else:
-                v.string_value = str(py)
-            return v
-        v = _to_value(py)
+        v = _to_proto_value(value)
         req = self._pb2.SetKeyRequest(id=0, time=time, easing=easing, value=v)
         resp = self._stub.SetKey(req)
         self._log_rpc("SetKey(camera)", req, resp)
@@ -619,30 +551,7 @@ class SceneClient:
 
     # Non-camera parameter key operations (id-based)
     def set_key_param(self, *, id: int, json_key: str, time: float, easing: str = "Linear", value: Any) -> bool:
-        def _to_value(py: Any) -> struct_pb2.Value:
-            v = struct_pb2.Value()
-            if py is None:
-                v.null_value = 0
-            elif isinstance(py, bool):
-                v.bool_value = bool(py)
-            elif isinstance(py, (int, float)) and not isinstance(py, bool):
-                v.number_value = float(py)
-            elif isinstance(py, str):
-                v.string_value = py
-            elif isinstance(py, (list, tuple)):
-                lv = struct_pb2.ListValue()
-                for item in py:
-                    lv.values.append(_to_value(item))
-                v.list_value.CopyFrom(lv)
-            elif isinstance(py, dict):
-                st = struct_pb2.Struct()
-                for k, val in py.items():
-                    st.fields[k].CopyFrom(_to_value(val))
-                v.struct_value.CopyFrom(st)
-            else:
-                v.string_value = str(py)
-            return v
-        v = _to_value(value)
+        v = _to_proto_value(value)
         req = self._pb2.SetKeyRequest(id=int(id), json_key=json_key, time=float(time), easing=easing, value=v)
         resp = self._stub.SetKey(req)
         self._log_rpc("SetKey(param)", req, resp)
@@ -663,39 +572,30 @@ class SceneClient:
         if not set_keys and not remove_keys:
             self._logger.error("Batch: refusing to execute with empty set/remove")
             return False
-        # Helper to convert native Python values to google.protobuf.Value
-        def _to_value(py: Any) -> struct_pb2.Value:
-            v = struct_pb2.Value()
-            if py is None:
-                v.null_value = 0
-            elif isinstance(py, bool):
-                v.bool_value = bool(py)
-            elif isinstance(py, (int, float)) and not isinstance(py, bool):
-                v.number_value = float(py)
-            elif isinstance(py, str):
-                v.string_value = py
-            elif isinstance(py, (list, tuple)):
-                lv = struct_pb2.ListValue()
-                for item in py:
-                    lv.values.append(_to_value(item))
-                v.list_value.CopyFrom(lv)
-            elif isinstance(py, dict):
-                st = struct_pb2.Struct()
-                for k, val in py.items():
-                    st.fields[k].CopyFrom(_to_value(val))
-                v.struct_value.CopyFrom(st)
-            else:
-                v.string_value = str(py)
-            return v
         # Construct protobuf requests (id-only requests)
         pb_set = []
         for s in set_keys:
             id = int(s.get("id", -1))
             val = s.get("value")
             if id == 0:
-                pb_set.append(self._pb2.SetKeyRequest(id=id, time=float(s["time"]), easing=str(s.get("easing", "Linear")), value=_to_value(val)))
+                pb_set.append(
+                    self._pb2.SetKeyRequest(
+                        id=id,
+                        time=float(s["time"]),
+                        easing=str(s.get("easing", "Linear")),
+                        value=_to_proto_value(val),
+                    )
+                )
             else:
-                pb_set.append(self._pb2.SetKeyRequest(id=id, json_key=str(s["json_key"]), time=float(s["time"]), easing=str(s.get("easing", "Linear")), value=_to_value(val)))
+                pb_set.append(
+                    self._pb2.SetKeyRequest(
+                        id=id,
+                        json_key=str(s["json_key"]),
+                        time=float(s["time"]),
+                        easing=str(s.get("easing", "Linear")),
+                        value=_to_proto_value(val),
+                    )
+                )
         pb_rem = []
         for r in remove_keys:
             id = int(r.get("id", -1))
@@ -814,33 +714,16 @@ class SceneClient:
         Each item: { id: int, json_key: str, value: any }
         Returns { ok: bool, results: [{json_key, ok, reason?, normalized_value?}] }
         """
-        def _to_value(py: Any) -> struct_pb2.Value:
-            v = struct_pb2.Value()
-            if py is None:
-                v.null_value = 0
-            elif isinstance(py, bool):
-                v.bool_value = bool(py)
-            elif isinstance(py, (int, float)) and not isinstance(py, bool):
-                v.number_value = float(py)
-            elif isinstance(py, str):
-                v.string_value = py
-            elif isinstance(py, (list, tuple)):
-                lv = struct_pb2.ListValue()
-                for item in py:
-                    lv.values.append(_to_value(item))
-                v.list_value.CopyFrom(lv)
-            elif isinstance(py, dict):
-                st = struct_pb2.Struct()
-                for k, val in py.items():
-                    st.fields[k].CopyFrom(_to_value(val))
-                v.struct_value.CopyFrom(st)
-            else:
-                v.string_value = str(py)
-            return v
         pb_items = []
         for it in set_params:
             id = int(it.get("id"))
-            pb_items.append(self._pb2.SetParam(id=id, json_key=str(it["json_key"]), value=_to_value(it.get("value"))))
+            pb_items.append(
+                self._pb2.SetParam(
+                    id=id,
+                    json_key=str(it["json_key"]),
+                    value=_to_proto_value(it.get("value")),
+                )
+            )
         req = self._pb2.ValidateSceneParamsRequest(set_params=pb_items)
         resp = self._stub.ValidateSceneParams(req)
         self._log_rpc("ValidateSceneParams", req, resp)
@@ -858,33 +741,16 @@ class SceneClient:
 
     def apply_params(self, set_params: list[dict]) -> bool:
         """Apply a batch of scene parameter assignments atomically (no time/easing)."""
-        def _to_value(py: Any) -> struct_pb2.Value:
-            v = struct_pb2.Value()
-            if py is None:
-                v.null_value = 0
-            elif isinstance(py, bool):
-                v.bool_value = bool(py)
-            elif isinstance(py, (int, float)) and not isinstance(py, bool):
-                v.number_value = float(py)
-            elif isinstance(py, str):
-                v.string_value = py
-            elif isinstance(py, (list, tuple)):
-                lv = struct_pb2.ListValue()
-                for item in py:
-                    lv.values.append(_to_value(item))
-                v.list_value.CopyFrom(lv)
-            elif isinstance(py, dict):
-                st = struct_pb2.Struct()
-                for k, val in py.items():
-                    st.fields[k].CopyFrom(_to_value(val))
-                v.struct_value.CopyFrom(st)
-            else:
-                v.string_value = str(py)
-            return v
         pb_items = []
         for it in set_params:
             id = int(it.get("id"))
-            pb_items.append(self._pb2.SetParam(id=id, json_key=str(it["json_key"]), value=_to_value(it.get("value"))))
+            pb_items.append(
+                self._pb2.SetParam(
+                    id=id,
+                    json_key=str(it["json_key"]),
+                    value=_to_proto_value(it.get("value")),
+                )
+            )
         req = self._pb2.ApplySceneParamsRequest(set_params=pb_items)
         resp = self._stub.ApplySceneParams(req)
         self._log_rpc("ApplySceneParams", req, resp)

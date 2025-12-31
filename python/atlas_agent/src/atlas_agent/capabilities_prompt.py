@@ -1,7 +1,11 @@
-"""Build a compact, factual capabilities summary for grounding the agent.
+"""Build compact, factual grounding text for the agent.
 
-This is a light cleanup of the prior implementation with the same behavior,
-plus optional file-format bullets and an optional max_lines truncation.
+Includes:
+- A short "what is Atlas / what is atlas_agent" primer (stable, schema-independent).
+- A condensed capabilities view derived from the discovered schema directory.
+
+This remains a lightweight summarizer with optional file-format bullets and an
+optional max_lines truncation.
 """
 
 import json
@@ -9,6 +13,45 @@ from pathlib import Path
 from typing import List
 
 from .codegen_policy import is_codegen_enabled
+
+
+def build_atlas_agent_primer() -> str:
+    lines: List[str] = []
+    lines.append("Atlas + atlas_agent Primer (factual)")
+    lines.append(
+        "Atlas is a desktop visualization/analysis app for large 2D and 3D datasets (images, ROI masks, region annotations, puncta, SWC trees, meshes, SVG overlays)."
+    )
+    lines.append(
+        "Atlas typically has two windows: a 2D view window and a 3D view window."
+    )
+    lines.append(
+        "Scene (.scene): a static, reproducible Atlas state consisting of a list of renderable objects plus rendering parameters for both the 2D and 3D views; it can be saved/restored."
+    )
+    lines.append(
+        "Objects: each object has rendering parameters (per-view) such as transforms (translate/rotate/scale), appearance (color/style), visibility, and cuts/clipping."
+    )
+    lines.append(
+        "Animation (.animation2d/.animation3d): extends the scene concept with a keyframed timeline. Each parameter is defined by keys like (time,value) with easing/interpolation (Switch/Linear/Ease-in/out)."
+    )
+    lines.append(
+        "At any time t, Atlas evaluates keys to compute parameter values for objects/camera, yielding a reproducible animation; animations can be saved/restored."
+    )
+    lines.append(
+        "Animation2D affects only the 2D view; Animation3D affects only the 3D view. 2D and 3D parameters differ even for the same object type, and some types are view-specific (e.g., meshes render in 3D, not 2D)."
+    )
+    lines.append(
+        "Playback rule: during playback, animation keys override scene values for affected parameters; to change what plays, write/replace keys (not scene-only edits)."
+    )
+    lines.append(
+        "Atlas exposes a local gRPC API so external tools can query the live scene state and apply changes deterministically."
+    )
+    lines.append(
+        "atlas_agent is a CLI + multi-agent system that uses the gRPC API to execute natural-language requests via tool calls (load data, inspect objects/params, edit scene values, write animation keys, save/export)."
+    )
+    lines.append(
+        "Rule of thumb: any request with time/duration implies animation_* tools; otherwise prefer scene_* tools."
+    )
+    return "\n".join(lines)
 
 
 def _load_json(path: Path) -> dict | None:
@@ -42,16 +85,14 @@ def _param_names(params: List[dict]) -> List[str]:
 def build_capabilities_prompt(schema_dir: Path, *, max_lines: int | None = None) -> str:
     caps = _load_capabilities(schema_dir) or {}
     lines: List[str] = []
+    lines.extend(build_atlas_agent_primer().splitlines())
+    lines.append("")
     lines.append("Atlas Capabilities Overview (condensed)")
     lines.append("Use tools to inspect live params: scene_list_params(id); list keys via animation_list_keys(id,json_key).")
     if is_codegen_enabled():
         lines.append(
             "Advanced: codegen is enabled. For complex calculations, small Python helpers can be run via the codegen tool; prefer plan→validate→apply with verification."
         )
-    # Scene vs Timeline contract (high-signal guidance for LLMs)
-    lines.append(
-        "Scene vs Timeline: Scene (.scene) = current display state (no time); Animation (.animation2d/.animation3d) = timeline keys per parameter. Change scene parameters will not affect animation. During playback, animation keys override scene values."
-    )
 
     # Summarize per object type (flat list, no major/advanced split)
     objects = caps.get("objects") or {}

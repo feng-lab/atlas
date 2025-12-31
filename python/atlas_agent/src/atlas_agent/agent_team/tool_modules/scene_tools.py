@@ -615,9 +615,12 @@ def handle(name: str, args: dict, ctx: ToolDispatchContext) -> str | None:
 
     if name == "scene_animation_concepts":
         info = (
-            "Scene (.scene): current objects and their display parameters across 2D/3D. Saving a scene lets you restore the view/state.\n"
-            "Animation (.animation2d/.animation3d): extends the scene with a timeline. Each display parameter (and camera) has keys at specific times, with easing (e.g., Switch/Linear/Exp).\n"
-            "Playback rule: When the timeline plays, animation keys override scene values for the affected parameters. To change what plays, write/replace keys.\n"
+            "Scene (.scene): a static, reproducible Atlas state consisting of a list of renderable objects plus rendering parameters for both the 2D and 3D views; it can be saved/restored.\n"
+            "Objects: each object has per-view rendering parameters such as transforms (translate/rotate/scale), appearance (color/style), visibility, and cuts/clipping.\n"
+            "Animation (.animation2d/.animation3d): extends the scene with a keyframed timeline. Each parameter (and camera) is defined by keys like (time,value) with easing/interpolation (Switch/Linear/Ease-in/out).\n"
+            "At any time t, Atlas evaluates keys to compute parameter values for objects/camera, yielding a reproducible animation; animations can be saved/restored.\n"
+            "Animation2D affects only the 2D view; Animation3D affects only the 3D view. 2D/3D parameters differ even for the same object type, and some types are view-specific (e.g., meshes render in 3D, not 2D).\n"
+            "Playback rule: during playback, animation keys override scene values for affected parameters; to change what plays, write/replace keys.\n"
             "Scene tools (scene_*) are stateless (no time/easing); Animation tools (animation_*) manipulate keys on the timeline."
         )
         return json.dumps({"ok": True, "text": info})
