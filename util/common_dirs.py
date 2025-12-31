@@ -143,13 +143,11 @@ def atlas_test_data_dir() -> str:
     return res
 
 
-def atlas_build_dir(arm64: bool = False) -> str:
+def atlas_build_dir() -> str:
     if use_ninja():
         res = os.path.join(atlas_repository_dir(), 'cmake-build-release-ninja')
     else:
         res = os.path.join(atlas_repository_dir(), 'cmake-build-release')
-    if arm64:
-        res += '-arm64'
     if not os.path.exists(res):
         os.mkdir(res)
     assert os.path.exists(res)
@@ -167,10 +165,10 @@ def python_package_build_dir() -> str:
     return res
 
 
-def atlas_binary_dir(arm64: bool = False) -> str:
-    res = os.path.join(atlas_build_dir(arm64=arm64), 'src', 'atlas')
+def atlas_binary_dir() -> str:
+    res = os.path.join(atlas_build_dir(), 'src', 'atlas')
     if not use_ninja() and sys.platform.startswith('win32'):
-        res = os.path.join(atlas_build_dir(arm64=arm64), 'src', 'atlas', 'Release')
+        res = os.path.join(atlas_build_dir(), 'src', 'atlas', 'Release')
     assert os.path.exists(res)
     return res
 

@@ -1,7 +1,4 @@
 import argparse
-import base64
-import csv
-import hashlib
 import logging
 import os
 import shlex
@@ -20,8 +17,6 @@ import common_dirs
 from logger import setup_logger
 
 logger = logging.getLogger(__name__)
-
-_WHEEL_RECORD_HASH_CHUNK_SIZE = 1024 * 1024
 
 
 def _run_checked(
@@ -74,201 +69,91 @@ def _macos_lipo_archs(path: Path) -> set[str] | None:
     return set(archs)
 
 
-def _macos_is_macho_binary(path: Path) -> bool:
-    return _macos_lipo_archs(path) is not None
+def _wheel_tags_from_wheel_metadata(wheel_path: Path) -> list[str]:
+    with zipfile.ZipFile(wheel_path, "r") as zf:
+        wheel_files = [n for n in zf.namelist() if n.endswith(".dist-info/WHEEL")]
+        if len(wheel_files) != 1:
+            raise RuntimeError(
+                f"Expected exactly 1 *.dist-info/WHEEL file in {wheel_path}, got {len(wheel_files)}: {wheel_files}"
+            )
+        text = zf.read(wheel_files[0]).decode("utf-8", errors="replace")
 
-
-def _macos_update_wheel_tag(*, dist_info_dir: Path, macos_target: str) -> None:
-    wheel_path = dist_info_dir / "WHEEL"
-    text = wheel_path.read_text(encoding="utf-8")
-    lines = text.splitlines()
-
-    tags = [ln for ln in lines if ln.startswith("Tag:")]
+    tags: list[str] = []
+    for line in text.splitlines():
+        if line.startswith("Tag:"):
+            tag = line.split(":", 1)[1].strip()
+            if tag:
+                tags.append(tag)
     if not tags:
-        raise RuntimeError(f"Missing Tag line in {wheel_path}")
-    if len(tags) != 1:
-        raise RuntimeError(f"Expected 1 Tag line in {wheel_path}, got {len(tags)}")
+        raise RuntimeError(f"Wheel metadata contains no Tag entries: {wheel_path}")
+    return tags
 
-    tag = tags[0].split(":", 1)[1].strip()
-    parts = tag.split("-", 2)
-    if len(parts) != 3:
-        raise RuntimeError(f"Unexpected Tag format in {wheel_path}: {tag!r}")
-    pyver, abi, _platform = parts
 
+def _assert_macos_wheel_has_universal2_tag(*, wheel_path: Path, macos_target: str) -> None:
     token = macos_target.strip()
     if not token:
-        raise RuntimeError(f"Empty macOS target for wheel tag (from {macos_target!r})")
+        raise RuntimeError(f"Empty macOS target for wheel tag check (from {macos_target!r})")
     token = token.replace(".", "_")
-    new_tag = f"{pyver}-{abi}-macosx_{token}_universal2"
+    expected_platform = f"macosx_{token}_universal2"
 
-    new_lines = [ln for ln in lines if not ln.startswith("Tag:")]
-    new_lines.append(f"Tag: {new_tag}")
-    wheel_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    tags = _wheel_tags_from_wheel_metadata(wheel_path)
+    for tag in tags:
+        parts = tag.split("-", 2)
+        if len(parts) != 3:
+            continue
+        _pyver, _abi, platform = parts
+        if platform == expected_platform:
+            return
 
-
-def _build_single_wheel(
-    *,
-    project_dir: Path,
-    dist_dir: Path,
-    env: dict[str, str],
-) -> Path:
-    dist_dir.mkdir(parents=True, exist_ok=True)
-    for entry in dist_dir.iterdir():
-        if entry.is_dir():
-            shutil.rmtree(entry)
-        else:
-            entry.unlink()
-
-    cmd = [sys.executable, "-m", "build", "--wheel", "--outdir", str(dist_dir)]
-    _run_checked(cmd, cwd=project_dir, env=env)
-
-    wheels = sorted(dist_dir.glob("*.whl"))
-    if len(wheels) != 1:
-        raise RuntimeError(f"Expected exactly 1 wheel in {dist_dir}, got {len(wheels)}: {wheels}")
-    return wheels[0]
+    raise RuntimeError(
+        "macOS wheel does not have the expected universal2 platform tag.\n"
+        f"wheel: {wheel_path.name}\n"
+        f"expected: {expected_platform}\n"
+        f"found tags: {tags}"
+    )
 
 
-def _fuse_macos_universal2_wheels(
-    *,
-    wheel_x86: Path,
-    wheel_arm: Path,
-    out_dir: Path,
-    macos_target: str,
-) -> Path:
-    desired_archs = {"x86_64", "arm64"}
+_MACOS_UNIVERSAL2_ARCHS: frozenset[str] = frozenset({"arm64", "x86_64"})
+_MACOS_DISALLOWED_MACHO_ARCHS: frozenset[str] = frozenset({"i386", "ppc", "ppc64"})
+_MACOS_UNIVERSAL2_ARCHFLAGS = "-arch arm64 -arch x86_64"
 
-    with tempfile.TemporaryDirectory(prefix="zimg_universal2_fuse_") as tmp:
-        tmp_root = Path(tmp)
-        x86_root = tmp_root / "x86"
-        arm_root = tmp_root / "arm"
-        x86_root.mkdir()
-        arm_root.mkdir()
 
-        with zipfile.ZipFile(wheel_x86, "r") as zf:
-            zf.extractall(x86_root)
-        with zipfile.ZipFile(wheel_arm, "r") as zf:
-            zf.extractall(arm_root)
+def _assert_macos_wheel_is_universal2(*, wheel_root: Path, wheel_name: str) -> None:
+    macho_files: list[Path] = []
+    for path in wheel_root.rglob("*"):
+        if not path.is_file():
+            continue
+        archs = _macos_lipo_archs(path)
+        if archs is None:
+            continue
+        macho_files.append(path)
 
-        dist_info_x86 = [p for p in x86_root.iterdir() if p.is_dir() and p.name.endswith(".dist-info")]
-        dist_info_arm = [p for p in arm_root.iterdir() if p.is_dir() and p.name.endswith(".dist-info")]
-        if len(dist_info_x86) != 1:
+        disallowed = archs & _MACOS_DISALLOWED_MACHO_ARCHS
+        if disallowed:
             raise RuntimeError(
-                f"Universal2 fuse expected 1 dist-info directory in x86 wheel, got {len(dist_info_x86)}: {wheel_x86}"
+                "macOS wheel contains unsupported architectures in a Mach-O binary.\n"
+                f"wheel: {wheel_name}\n"
+                f"path: {path.relative_to(wheel_root).as_posix()}\n"
+                f"archs: {sorted(archs)}\n"
+                f"disallowed: {sorted(disallowed)}"
             )
-        if len(dist_info_arm) != 1:
+        if not _MACOS_UNIVERSAL2_ARCHS.issubset(archs):
             raise RuntimeError(
-                f"Universal2 fuse expected 1 dist-info directory in arm wheel, got {len(dist_info_arm)}: {wheel_arm}"
+                "macOS wheel does not contain universal2 slices in a Mach-O binary.\n"
+                f"wheel: {wheel_name}\n"
+                f"path: {path.relative_to(wheel_root).as_posix()}\n"
+                f"archs: {sorted(archs)}\n"
+                f"required: {sorted(_MACOS_UNIVERSAL2_ARCHS)}"
             )
-        if dist_info_x86[0].name != dist_info_arm[0].name:
-            raise RuntimeError(
-                "Universal2 fuse expected matching dist-info directory names, got: "
-                f"{dist_info_x86[0].name} vs {dist_info_arm[0].name}"
-            )
-        dist_info_dir = dist_info_x86[0]
 
-        files_x86 = sorted(
-            p.relative_to(x86_root).as_posix() for p in x86_root.rglob("*") if p.is_file()
+    module_path = wheel_root / "zimg" / "_imgpy.abi3.so"
+    if not module_path.exists():
+        raise RuntimeError(f"macOS wheel is missing zimg/_imgpy.abi3.so: {wheel_name}")
+
+    if not macho_files:
+        raise RuntimeError(
+            f"macOS wheel contains no Mach-O binaries (unexpected): {wheel_name}"
         )
-        files_arm = sorted(
-            p.relative_to(arm_root).as_posix() for p in arm_root.rglob("*") if p.is_file()
-        )
-        if files_x86 != files_arm:
-            missing_from_arm = sorted(set(files_x86) - set(files_arm))
-            missing_from_x86 = sorted(set(files_arm) - set(files_x86))
-            raise RuntimeError(
-                "Universal2 fuse requires identical wheel layouts.\n"
-                f"Missing from arm: {missing_from_arm}\n"
-                f"Missing from x86: {missing_from_x86}\n"
-            )
-
-        for rel in files_x86:
-            x86_path = x86_root / rel
-            arm_path = arm_root / rel
-
-            x86_archs = _macos_lipo_archs(x86_path)
-            arm_archs = _macos_lipo_archs(arm_path)
-            if x86_archs is None and arm_archs is None:
-                if rel.endswith(".dist-info/RECORD") or rel.endswith(".dist-info/WHEEL"):
-                    continue
-                x86_digest, x86_size = _sha256_digest_for_wheel_record(x86_path)
-                arm_digest, arm_size = _sha256_digest_for_wheel_record(arm_path)
-                if x86_size != arm_size or x86_digest != arm_digest:
-                    raise RuntimeError(
-                        "Universal2 fuse detected mismatched non-binary file contents: "
-                        f"{rel} (x86={wheel_x86.name}, arm={wheel_arm.name})"
-                    )
-                continue
-
-            if x86_archs is None or arm_archs is None:
-                raise RuntimeError(
-                    "Universal2 fuse detected file type mismatch between wheels: "
-                    f"{rel} (x86_macho={x86_archs is not None}, arm_macho={arm_archs is not None})"
-                )
-
-            union_archs = x86_archs | arm_archs
-            if not desired_archs.issubset(union_archs):
-                raise RuntimeError(
-                    "Universal2 fuse requires both x86_64 and arm64 slices; "
-                    f"{rel} has archs x86={sorted(x86_archs)} arm={sorted(arm_archs)}"
-                )
-
-            if desired_archs.issubset(x86_archs):
-                continue
-            if desired_archs.issubset(arm_archs):
-                shutil.copy2(arm_path, x86_path)
-                continue
-
-            if x86_archs & arm_archs:
-                raise RuntimeError(
-                    "Universal2 fuse cannot lipo binaries with overlapping arch sets; "
-                    f"{rel} archs x86={sorted(x86_archs)} arm={sorted(arm_archs)}"
-                )
-
-            tmp_out = x86_path.with_name(x86_path.name + ".tmp")
-            subprocess.run(
-                ["lipo", "-create", str(x86_path), str(arm_path), "-output", str(tmp_out)],
-                check=True,
-            )
-            os.replace(tmp_out, x86_path)
-
-            fused_archs = _macos_lipo_archs(x86_path)
-            if fused_archs is None or not desired_archs.issubset(fused_archs):
-                raise RuntimeError(
-                    "Universal2 fuse produced an unexpected binary: "
-                    f"{rel} archs={sorted(fused_archs or set())}"
-                )
-
-        module_path = x86_root / "zimg" / "_imgpy.abi3.so"
-        if module_path.exists():
-            archs = _macos_lipo_archs(module_path)
-            if archs is None or not desired_archs.issubset(archs):
-                raise RuntimeError(
-                    f"Universal2 wheel validation failed for {module_path}: archs={sorted(archs or set())}"
-                )
-
-        _macos_update_wheel_tag(dist_info_dir=dist_info_dir, macos_target=macos_target)
-        _rewrite_wheel_record(wheel_root=x86_root, dist_info_dir=dist_info_dir)
-
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_name = wheel_x86.name
-        if out_name.endswith("_x86_64.whl"):
-            out_name = out_name[: -len("_x86_64.whl")] + "_universal2.whl"
-        else:
-            raise RuntimeError(f"Unexpected x86 wheel filename (expected *_x86_64.whl): {wheel_x86.name}")
-
-        out_path = out_dir / out_name
-        if out_path.exists():
-            out_path.unlink()
-
-        with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for path in sorted(
-                (p for p in x86_root.rglob("*") if p.is_file()),
-                key=lambda p: p.relative_to(x86_root).as_posix(),
-            ):
-                rel = path.relative_to(x86_root).as_posix()
-                zf.write(path, rel)
-
-        return out_path
 
 
 def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
@@ -276,6 +161,15 @@ def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
     Match the native toolchain selection used by `util/build_atlas.py` /
     `util/build_ext_libs.py` so zimg wheels build consistently across platforms.
     """
+
+    cmake_path = Path(common_dirs.get_cmake_binary())
+    if not cmake_path.exists():
+        raise RuntimeError(
+            "CMake was not found at the expected location. "
+            f"Expected: {cmake_path}. "
+            "Did you run `python3 util/build_ext_libs.py all` (or otherwise stage tools into src/3rdparty/build/)?"
+        )
+    _prepend_path(env, cmake_path.parent)
 
     if common_dirs.use_ninja():
         ninja_path = Path(common_dirs.get_ninja_binary())
@@ -309,44 +203,6 @@ def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
 
     if common_dirs.is_windows() and common_dirs.use_clang_cl():
         _append_cmake_args(env, ["-DCMAKE_C_COMPILER=clang-cl", "-DCMAKE_CXX_COMPILER=clang-cl"])
-
-
-def _sha256_digest_for_wheel_record(path: Path) -> tuple[str, int]:
-    digest = hashlib.sha256()
-    size = 0
-    with path.open("rb") as f:
-        while True:
-            chunk = f.read(_WHEEL_RECORD_HASH_CHUNK_SIZE)
-            if not chunk:
-                break
-            digest.update(chunk)
-            size += len(chunk)
-
-    b64 = base64.urlsafe_b64encode(digest.digest()).rstrip(b"=").decode("ascii")
-    return (b64, size)
-
-
-def _rewrite_wheel_record(*, wheel_root: Path, dist_info_dir: Path) -> None:
-    record_path = dist_info_dir / "RECORD"
-    record_rel = record_path.relative_to(wheel_root).as_posix()
-
-    rows: list[tuple[str, str, str]] = []
-    for path in sorted(
-        (p for p in wheel_root.rglob("*") if p.is_file()),
-        key=lambda p: p.relative_to(wheel_root).as_posix(),
-    ):
-        rel = path.relative_to(wheel_root).as_posix()
-        if rel == record_rel:
-            continue
-        digest_b64, size = _sha256_digest_for_wheel_record(path)
-        rows.append((rel, f"sha256={digest_b64}", str(size)))
-
-    rows.append((record_rel, "", ""))
-
-    record_path.parent.mkdir(parents=True, exist_ok=True)
-    with record_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f, lineterminator="\n")
-        writer.writerows(rows)
 
 
 def _assert_linux_wheel_contains_expected_libs(
@@ -501,8 +357,6 @@ def main() -> int:
         logger.info(
             "FreeImage: %s", "disabled" if args.disable_freeimage else "enabled"
         )
-        if common_dirs.is_mac():
-            logger.info("macOS wheel: build x86_64 + arm64, then fuse to universal2")
         atlas_pypi.maybe_upload_to_pypi(
             out_dir,
             project="zimg",
@@ -547,50 +401,31 @@ def main() -> int:
         if args.disable_freeimage:
             _append_cmake_args(env_base, ["-DZIMG_DISABLE_FREEIMAGE=ON"])
 
+        env = env_base.copy()
         if common_dirs.is_mac():
-            env_base["MACOSX_DEPLOYMENT_TARGET"] = build_ext_libs.macos_min_version()
-
-            dist_x86 = tmp_root / "dist_x86"
-            dist_arm = tmp_root / "dist_arm"
-
-            env_x86 = env_base.copy()
-            env_x86["ARCHFLAGS"] = "-arch x86_64"
-            _append_cmake_args(
-                env_x86,
-                [
-                    "-DCMAKE_SYSTEM_PROCESSOR=x86_64",
-                    "-DCMAKE_OSX_ARCHITECTURES=x86_64",
-                ],
-            )
-            wheel_x86 = _build_single_wheel(project_dir=tmp_project, dist_dir=dist_x86, env=env_x86)
-
-            env_arm = env_base.copy()
-            env_arm["ARCHFLAGS"] = "-arch arm64"
-            _append_cmake_args(
-                env_arm,
-                [
-                    "-DCMAKE_SYSTEM_PROCESSOR=arm64",
-                    "-DCMAKE_OSX_ARCHITECTURES=arm64",
-                ],
-            )
-            wheel_arm = _build_single_wheel(project_dir=tmp_project, dist_dir=dist_arm, env=env_arm)
-
-            fused = _fuse_macos_universal2_wheels(
-                wheel_x86=wheel_x86,
-                wheel_arm=wheel_arm,
-                out_dir=out_dir,
-                macos_target=build_ext_libs.macos_min_version(),
-            )
-            logger.info("Fused universal2 wheel: %s", fused)
-        else:
-            env = env_base
-            if common_dirs.is_linux() or common_dirs.is_windows():
-                _apply_scikit_build_core_toolchain_env(env)
-
-            _run_checked(cmd, cwd=tmp_project, env=env)
+            env["MACOSX_DEPLOYMENT_TARGET"] = build_ext_libs.macos_min_version()
+            env["ARCHFLAGS"] = _MACOS_UNIVERSAL2_ARCHFLAGS
+        _apply_scikit_build_core_toolchain_env(env)
+        _run_checked(cmd, cwd=tmp_project, env=env)
 
     wheels = sorted(out_dir.glob("*.whl"))
     if wheels:
+        if common_dirs.is_mac():
+            for wheel_path in wheels:
+                _assert_macos_wheel_has_universal2_tag(
+                    wheel_path=wheel_path,
+                    macos_target=build_ext_libs.macos_min_version(),
+                )
+                with tempfile.TemporaryDirectory(
+                    prefix="zimg_macos_wheel_validate_"
+                ) as validate_dir:
+                    validate_root = Path(validate_dir)
+                    with zipfile.ZipFile(wheel_path, "r") as zf:
+                        zf.extractall(validate_root)
+                    _assert_macos_wheel_is_universal2(
+                        wheel_root=validate_root,
+                        wheel_name=wheel_path.name,
+                    )
         if common_dirs.is_linux():
             for wheel_path in wheels:
                 _assert_linux_wheel_contains_expected_libs(

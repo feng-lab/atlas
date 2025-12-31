@@ -1110,28 +1110,7 @@ def build_atlas_package(is_debug_version: bool = False):
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
-            logger.critical('atlas is not built yet')
-
-        binary_dir = common_dirs.atlas_binary_dir(arm64=True)
-        logger.info(f'arm64 binaryDIR: {binary_dir}')
-        arm64_app_name = 'Atlas_arm64.app'
-
-        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), arm64_app_name), ignore_errors=True)
-
-        if os.path.exists(os.path.join(binary_dir, app_name)):
-            shutil.copytree(os.path.join(binary_dir, app_name),
-                            os.path.join(common_dirs.deploy_target_dir(), arm64_app_name),
-                            symlinks=True)
-            subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), arm64_app_name],
-                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-        else:
-            logger.critical('arm64 atlas is not built yet')
-
-        filename = os.path.join(common_dirs.deploy_target_dir(), arm64_app_name, 'Contents', 'MacOS', 'Atlas')
-        target_filename = os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas')
-        logger.info(f'merge {filename} to {target_filename}')
-        subprocess.run(['lipo', '-create', filename, target_filename, '-output', target_filename],
-                       shell=False, check=True)
+            raise RuntimeError("Atlas.app was not found in the build output; run `python util/build_atlas.py` first.")
 
         # Ensure LLM docs are generated in repo and copied into the .app.
         repo_root = Path(common_dirs.atlas_repository_dir())
