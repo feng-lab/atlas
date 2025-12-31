@@ -555,6 +555,13 @@ def main() -> int:
 
             env_x86 = env_base.copy()
             env_x86["ARCHFLAGS"] = "-arch x86_64"
+            _append_cmake_args(
+                env_x86,
+                [
+                    "-DCMAKE_SYSTEM_PROCESSOR=x86_64",
+                    "-DCMAKE_OSX_ARCHITECTURES=x86_64",
+                ],
+            )
             wheel_x86 = _build_single_wheel(project_dir=tmp_project, dist_dir=dist_x86, env=env_x86)
 
             env_arm = env_base.copy()
@@ -562,7 +569,6 @@ def main() -> int:
             _append_cmake_args(
                 env_arm,
                 [
-                    "-DCMAKE_SYSTEM_NAME=Darwin",
                     "-DCMAKE_SYSTEM_PROCESSOR=arm64",
                     "-DCMAKE_OSX_ARCHITECTURES=arm64",
                 ],

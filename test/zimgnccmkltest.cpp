@@ -1,10 +1,13 @@
 #include "zimgncc.h"
 #include "zfft.h"
+#include "zmkl.h"
 #include "ztest.h"
 #include <folly/ScopeGuard.h>
 
 DECLARE_bool(zimg_use_mkl_for_fft_if_available);
 DECLARE_uint32(zimg_global_fft_number_of_threads);
+
+#if ZIMG_MKL_ENABLED
 
 TEST(ZImgNCC, normXCorr_S_mkl)
 {
@@ -183,3 +186,5 @@ TEST(ZImgNCC, fft_mkl_pocketfft)
     LOG(ERROR) << "caught Exception: " << e.what();
   }
 }
+
+#endif // ZIMG_MKL_ENABLED

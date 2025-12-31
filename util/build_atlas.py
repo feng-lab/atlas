@@ -1,10 +1,10 @@
 import argparse
-import subprocess
 import logging
 import os
+import subprocess
 
-import common_dirs
 import build_ext_libs
+import common_dirs
 from download_atlas_test_data import download_atlas_test_data
 from logger import setup_logger
 
@@ -37,13 +37,14 @@ def get_cmake_cmd_common_part(arm64: bool = False):
                         ])
         return res
     elif common_dirs.is_mac():
-        res = [common_dirs.get_cmake_binary(),  # '-E', 'echo',
-               '-DCMAKE_BUILD_TYPE=Release',
-               '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
-               '' if not arm64 else '-DCMAKE_SYSTEM_NAME=Darwin',
-               '' if not arm64 else '-DCMAKE_SYSTEM_PROCESSOR=arm64',
-               '' if not arm64 else '-DCMAKE_OSX_ARCHITECTURES=arm64',
-               ]
+        res = [
+            common_dirs.get_cmake_binary(),  # '-E', 'echo',
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON",
+            # "-DCMAKE_SYSTEM_NAME=Darwin",
+            "-DCMAKE_SYSTEM_PROCESSOR=" + ("x86_64" if not arm64 else "arm64"),
+            "-DCMAKE_OSX_ARCHITECTURES=" + ("x86_64" if not arm64 else "arm64"),
+        ]
         if common_dirs.use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + common_dirs.get_ninja_binary()
                         ])
@@ -116,7 +117,7 @@ if __name__ == "__main__":
     logger = setup_logger()
 
     parser = argparse.ArgumentParser(
-        epilog=f"""
+        epilog="""
 Examples:
 
 python build_atlas.py [--use-asan] [--skip-test] [--debug-version] [--arm64]

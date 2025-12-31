@@ -1,8 +1,3 @@
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
-  message(STATUS "AARCH64 build")
-  set(AARCH64 1)
-endif ()
-
 # qt
 include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/PathList.cmake)
 if (NOT INTEL_PATH)
@@ -22,10 +17,7 @@ set(QT_HOST_PATH_CMAKE_DIR ${QT_HOST_PATH}/lib/cmake)
 find_package(TBB REQUIRED tbb)
 print_target_properties(TBB::tbb)
 
-if (AARCH64)
-  set(MKL_INCLUDE_DIRS)
-  set(MKL_LIBRARIES)
-else (AARCH64)
+
   if (WIN32)
     set(MKL_PATH "${INTEL_PATH}\\mkl\\latest")
   else (WIN32)
@@ -49,7 +41,7 @@ else (AARCH64)
         ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
         ${MKL_PATH}/lib/intel64/libmkl_core.a)
   endif ()
-endif (AARCH64)
+
 message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
 message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
 

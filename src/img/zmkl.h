@@ -1,6 +1,12 @@
 #pragma once
 
-#ifdef ZIMG_USE_MKL
+#if defined(ZIMG_USE_MKL) && (defined(__x86_64__) || defined(_M_X64) || defined(__amd64__))
+#define ZIMG_MKL_ENABLED 1
+#else
+#define ZIMG_MKL_ENABLED 0
+#endif
+
+#if ZIMG_MKL_ENABLED
 
 #include <complex>
 //#define MKL_INT MKL_INT64

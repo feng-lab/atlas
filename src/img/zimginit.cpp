@@ -90,7 +90,7 @@ ZImgInit::ZImgInit(const QString& resourcesDIR, const QString& jreDIR, const QSt
     ZCpuInfo::instance().logCpuInfo();
   }
 
-#ifdef ZIMG_USE_MKL
+#if ZIMG_MKL_ENABLED
   if (verbose) {
     // todo: check this for amd cpu
     MKLVersion mklVer;

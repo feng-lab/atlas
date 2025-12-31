@@ -9,6 +9,10 @@
 #pragma warning(push, 0)
 #endif
 
+#if !(defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__)))
+#define EIGEN_USE_LAPACKE_STRICT
+#endif
+
 #ifndef Q_MOC_RUN
 #include <Eigen/Dense>
 #include <boost/math/special_functions/digamma.hpp>

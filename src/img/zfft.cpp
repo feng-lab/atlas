@@ -23,7 +23,7 @@ DEFINE_bool(zimg_use_fftw_for_fft_if_available,
 
 namespace {
 
-#ifdef ZIMG_USE_MKL
+#if ZIMG_MKL_ENABLED
 
 void MKL_DFTI_CHECK(MKL_LONG status)
 {
@@ -56,7 +56,7 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
   auto nthreads = FLAGS_zimg_global_fft_number_of_threads;
   nthreads = nthreads ? nthreads : std::thread::hardware_concurrency();
 
-#ifdef ZIMG_USE_MKL
+#if ZIMG_MKL_ENABLED
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
     ZImg wrapImg;
     // reinterpret_cast allowed (section "Complex numbers")
@@ -137,7 +137,7 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
   auto nthreads = FLAGS_zimg_global_fft_number_of_threads;
   nthreads = nthreads ? nthreads : std::thread::hardware_concurrency();
 
-#ifdef ZIMG_USE_MKL
+#if ZIMG_MKL_ENABLED
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
     // mkl_domain_set_num_threads(FLAGS_zimg_global_fft_number_of_threads, MKL_DOMAIN_FFT);
     // tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);

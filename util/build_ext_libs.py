@@ -289,15 +289,22 @@ def get_common_build_flags(cpp_standard: int = cpp_standard(), with_optimization
             arch_flag = ' -mcpu=apple-m1 '
 
         res['CC'] = 'clang'
-        res['CFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                        f'-fPIC {"" if no_hidden_visibility else "-fvisibility=hidden"} {arch_flag}' + optimization
-        res['LDFLAGS'] = '-stdlib=libc++'
+        res["CFLAGS"] = (
+            f"-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} "
+            f"-fPIC {'' if no_hidden_visibility else '-fvisibility=hidden'} {arch_flag}"
+            + optimization
+        )
+        res["LDFLAGS"] = "-stdlib=libc++"
         res['CXX'] = 'clang++'
-        res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++{cpp_standard} ' \
-                          f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                          f'{"" if no_hidden_visibility else "-fvisibility=hidden -fvisibility-inlines-hidden"} ' \
-                          f'-fPIC {arch_flag}' + optimization
-        res['ASMFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}'
+        res["CXXFLAGS"] = (
+            f"-stdlib=libc++ -std=c++{cpp_standard} "
+            f"-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} "
+            f"{'' if no_hidden_visibility else '-fvisibility=hidden -fvisibility-inlines-hidden'} "
+            f"-fPIC {arch_flag}" + optimization
+        )
+        res["ASMFLAGS"] = (
+            f"-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}"
+        )
     elif is_linux():
         if use_clang_in_linux():
             res['CC'] = get_clang_in_linux()
@@ -419,28 +426,28 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
         elif arm64_only:
             arch = 'arm64'
 
-        res = [get_cmake_binary(),  # '-E', 'echo',
-               '-DCMAKE_BUILD_TYPE=Release',
-               '' if not arm64_only else '-DCMAKE_SYSTEM_NAME=Darwin',
-               # '' if universal else f'-DCMAKE_SYSTEM_PROCESSOR={arch}',
-               '' if not arm64_only else f'-DCMAKE_SYSTEM_PROCESSOR={arch}',
-               '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
-               '-DCMAKE_IGNORE_PREFIX_PATH=/usr/local',
-               '-DCMAKE_IGNORE_PATH=/usr/local/bin',
-               '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
-               '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-               '' if no_hidden_visibility else '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
-               '' if no_hidden_visibility else '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
-               '' if no_hidden_visibility else '-DCMAKE_C_VISIBILITY_PRESET=hidden',
-               f'-DCMAKE_CXX_STANDARD={cpp_standard}',
-               '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
-               '-DCMAKE_CXX_EXTENSIONS=OFF',
-               '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
-               '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
-               '' if (not arm64_only and not universal) else f'-DCMAKE_OSX_ARCHITECTURES={arch}',
-               f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
-               f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
-               ]
+        res = [
+            get_cmake_binary(),  # '-E', 'echo',
+            "-DCMAKE_BUILD_TYPE=Release",
+            # "-DCMAKE_SYSTEM_NAME=Darwin",
+            "" if universal else f"-DCMAKE_SYSTEM_PROCESSOR={arch}",
+            "-DCMAKE_PREFIX_PATH=" + ext_build_dir(),
+            "-DCMAKE_IGNORE_PREFIX_PATH=/usr/local",
+            "-DCMAKE_IGNORE_PATH=/usr/local/bin",
+            "-DCMAKE_MODULE_PATH=" + ext_build_dir(),
+            "-DCMAKE_INSTALL_PREFIX=" + install_dir,
+            "" if no_hidden_visibility else "-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON",
+            "" if no_hidden_visibility else "-DCMAKE_CXX_VISIBILITY_PRESET=hidden",
+            "" if no_hidden_visibility else "-DCMAKE_C_VISIBILITY_PRESET=hidden",
+            f"-DCMAKE_CXX_STANDARD={cpp_standard}",
+            "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
+            "-DCMAKE_CXX_EXTENSIONS=OFF",
+            "-DCMAKE_OSX_DEPLOYMENT_TARGET=" + macos_min_version(),
+            "-DCMAKE_OSX_SYSROOT=" + osx_sysroot,
+            f"-DCMAKE_OSX_ARCHITECTURES={arch}",
+            f"-DCMAKE_C_FLAGS:STRING={cbf['CFLAGS']}",
+            f"-DCMAKE_CXX_FLAGS:STRING={cbf['CXXFLAGS']}",
+        ]
         if use_ninja:
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
         return res
@@ -652,21 +659,32 @@ def build_boost(src_dir: str, install_dir: str):
                                 '--without-icu',
                                 '--prefix=' + install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
-                subprocess.run(['./b2',
-                                '--disable-icu',
-                                'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
-                                f'cxxflags={cbf["CXXFLAGS"]}',
-                                f'linkflags={cbf["LDFLAGS"]}',
-                                f'cflags={cbf["CFLAGS"]}',
-                                f'asmflags={cbf["ASMFLAGS"]}',
-                                # 'target-os=darwin', 'architecture=x86', 'abi=sysv',
-                                # f'cxxflags={cbf["CXXFLAGS"]} -arch x86_64',
-                                # f'linkflags={cbf["LDFLAGS"]} -arch x86_64',
-                                # f'cflags={cbf["CFLAGS"]} -arch x86_64',
-                                # f'asmflags={cbf["ASMFLAGS"]} -arch x86_64',
-                                'install',
-                                ],
-                               cwd=src_dir, shell=False, check=True, env=env)
+                subprocess.run(
+                    [
+                        "./b2",
+                        "--disable-icu",
+                        "variant=release",
+                        "link=static",
+                        "threading=multi",
+                        "runtime-link=shared",
+                        f"cxxflags={cbf['CXXFLAGS']}",
+                        f"linkflags={cbf['LDFLAGS']}",
+                        f"cflags={cbf['CFLAGS']}",
+                        f"asmflags={cbf['ASMFLAGS']}",
+                        "target-os=darwin",
+                        "architecture=x86",
+                        "abi=sysv",
+                        f"cxxflags={cbf['CXXFLAGS']} -arch x86_64",
+                        f"linkflags={cbf['LDFLAGS']} -arch x86_64",
+                        f"cflags={cbf['CFLAGS']} -arch x86_64",
+                        f"asmflags={cbf['ASMFLAGS']} -arch x86_64",
+                        "install",
+                    ],
+                    cwd=src_dir,
+                    shell=False,
+                    check=True,
+                    env=env,
+                )
 
                 cbf = get_common_build_flags(with_optimization=True, arm64_only=True)
                 env = get_env_for_config_make(arm64_only=True)
@@ -675,17 +693,28 @@ def build_boost(src_dir: str, install_dir: str):
                                 '--without-icu',
                                 '--prefix=' + arm64_install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
-                subprocess.run(['./b2',
-                                '--disable-icu',
-                                'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
-                                'target-os=darwin', 'architecture=arm', 'abi=aapcs',
-                                f'cxxflags={cbf["CXXFLAGS"]} -arch arm64',
-                                f'linkflags={cbf["LDFLAGS"]} -arch arm64',
-                                f'cflags={cbf["CFLAGS"]} -arch arm64',
-                                f'asmflags={cbf["ASMFLAGS"]} -arch arm64',
-                                'install',
-                                ],
-                               cwd=src_dir, shell=False, check=True, env=env)
+                subprocess.run(
+                    [
+                        "./b2",
+                        "--disable-icu",
+                        "variant=release",
+                        "link=static",
+                        "threading=multi",
+                        "runtime-link=shared",
+                        "target-os=darwin",
+                        "architecture=arm",
+                        "abi=aapcs",
+                        f"cxxflags={cbf['CXXFLAGS']} -arch arm64",
+                        f"linkflags={cbf['LDFLAGS']} -arch arm64",
+                        f"cflags={cbf['CFLAGS']} -arch arm64",
+                        f"asmflags={cbf['ASMFLAGS']} -arch arm64",
+                        "install",
+                    ],
+                    cwd=src_dir,
+                    shell=False,
+                    check=True,
+                    env=env,
+                )
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
                 rm_tree(arm64_install_dir)
@@ -1317,9 +1346,9 @@ def build_libsodium(src_dir: str, install_dir: str):
                                  '#ifdef SODIUM_STATIC'])
         else:
             env = get_env_for_config_make()
-            # if is_mac():
-            #     env['CFLAGS'] += ' -arch x86_64'
-            #     env['CXXFLAGS'] += ' -arch x86_64'
+            if is_mac():
+                env["CFLAGS"] += " -arch x86_64"
+                env["CXXFLAGS"] += " -arch x86_64"
             subprocess.run(['./configure',
                             '--enable-shared=no',
                             '--enable-static=yes',
@@ -1332,8 +1361,8 @@ def build_libsodium(src_dir: str, install_dir: str):
 
             if is_mac():
                 env = get_env_for_config_make(arm64_only=True)
-                env['CFLAGS'] += ' -arch arm64'
-                env['CXXFLAGS'] += ' -arch arm64'
+                env["CFLAGS"] += " -arch arm64"
+                env["CXXFLAGS"] += " -arch arm64"
                 arm64_install_dir = create_arm64_install_dir(src_dir)
 
                 try:
@@ -1470,13 +1499,15 @@ install(
 
         os.remove(os.path.join(src_dir, 'folly', 'logging', 'BridgeFromGoogleLogging.cpp'))
 
-        cmakecmd_options = ['-DBUILD_SHARED_LIBS:BOOL=OFF',
-                            '-DPYTHON_EXTENSIONS:BOOL=OFF',
-                            '-DBUILD_TESTS:BOOL=OFF',
-                            '-DBOOST_LINK_STATIC=ON',
-                            '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
-                            '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + ('ON' if use_asan else 'OFF'),
-                            src_dir]
+        cmakecmd_options = [
+            "-DBUILD_SHARED_LIBS:BOOL=OFF",
+            "-DPYTHON_EXTENSIONS:BOOL=OFF",
+            "-DBUILD_TESTS:BOOL=OFF",
+            "-DBOOST_LINK_STATIC=ON",
+            "-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON",
+            "-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=" + ("ON" if use_asan else "OFF"),
+            src_dir,
+        ]
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_extention=True, universal=True)
         cmakecmd.extend(cmakecmd_options)
@@ -2393,7 +2424,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             cmakecmd_options = [
                 "-DOPENCV_SKIP_CMAKE_CXX_STANDARD:BOOL=ON",
                 "-DHAVE_CXX11:BOOL=ON",
-                "-DOPENCV_ENABLE_NONFREE:BOOL=ON",
+                "-DOPENCV_ENABLE_NONFREE:BOOL=OFF",
                 "-DOPENCV_FORCE_3RDPARTY_BUILD:BOOL=OFF",
                 "-DBUILD_ZLIB:BOOL=OFF",
                 "-DBUILD_TIFF:BOOL=OFF",
@@ -2518,6 +2549,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
+                print()
                 rm_tree(arm64_install_dir)
 
         if is_windows():
@@ -2529,28 +2561,15 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                 install_dir, "lib", "cmake", "opencv4", "OpenCVModules.cmake"
             )
 
-        if is_mac():
-            patch_file(
-                orig_file_2,
-                from_texts=[
-                    r";\$<LINK_ONLY:tbb>",
-                    r";\$<LINK_ONLY:ipphal>",
-                ],
-                to_texts=[
-                    r"",
-                    r";\$<LINK_ONLY:ipphal>;${OpenCV_INSTALL_PATH}/lib/opencv4/3rdparty/libtegra_hal.a",
-                ],
-            )
-        else:
-            patch_file(
-                orig_file_2,
-                from_texts=[
-                    r";\$<LINK_ONLY:tbb>",
-                ],
-                to_texts=[
-                    r"",
-                ],
-            )
+        patch_file(
+            orig_file_2,
+            from_texts=[
+                r";\$<LINK_ONLY:tbb>",
+            ],
+            to_texts=[
+                r"",
+            ],
+        )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         patch_manager.restore_files()

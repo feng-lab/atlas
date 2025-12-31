@@ -49,7 +49,7 @@ std::string ZComplexImg::toString() const
 
 ZComplexImg& ZComplexImg::conj()
 {
-#ifdef ZIMG_USE_MKL
+#if ZIMG_MKL_ENABLED
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
     vzConj(m_data.size(), m_data.data(), m_data.data());
     return *this;
@@ -81,7 +81,7 @@ ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
     throw ZException(
       fmt::format("complex img addition requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
-#ifdef ZIMG_USE_MKL
+#if ZIMG_MKL_ENABLED
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
     vzAdd(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
     return *this;
@@ -119,7 +119,7 @@ ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
     throw ZException(
       fmt::format("complex img subtraction requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
-#ifdef ZIMG_USE_MKL
+#if ZIMG_MKL_ENABLED
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
     vzSub(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
     return *this;
@@ -164,7 +164,7 @@ ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
     throw ZException(
       fmt::format("complex img multiplies requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
-#ifdef ZIMG_USE_MKL
+#if ZIMG_MKL_ENABLED
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
     vzMul(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
     return *this;
@@ -202,7 +202,7 @@ ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
     throw ZException(
       fmt::format("complex img divides requires same size img as input: this <{}>, other <{}>", *this, rhs));
   }
-#ifdef ZIMG_USE_MKL
+#if ZIMG_MKL_ENABLED
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
     vzDiv(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
     return *this;
