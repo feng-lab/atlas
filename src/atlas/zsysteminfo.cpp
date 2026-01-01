@@ -216,7 +216,13 @@ void ZSystemInfo::addFileToRecentFileList(const QString& fileName) const
   QStringList files = settings.value("recentFileList").toStringList();
   QString fn = QFileInfo(fileName).canonicalFilePath();
   if (fn.isEmpty()) {
-    return;
+    const QString trimmed = fileName.trimmed();
+    const bool isNetworkUrl = trimmed.startsWith("precomputed://", Qt::CaseInsensitive) || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
+                              trimmed.startsWith("http://", Qt::CaseInsensitive) || trimmed.startsWith("https://", Qt::CaseInsensitive);
+    if (!isNetworkUrl) {
+      return;
+    }
+    fn = trimmed;
   }
   files.removeAll(fn);
   files.prepend(fn);

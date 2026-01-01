@@ -80,6 +80,8 @@ Q_SIGNALS:
 protected:
   void loadImg();
 
+  void loadNeuroglancerPrecomputed();
+
   void importImgSequence();
 
   void stitchImgs();
@@ -114,6 +116,8 @@ protected:
 
   size_t loadImg(const ZImgSource& imgSource, QString& errorMsg);
 
+  size_t loadNeuroglancerPrecomputed(const QString& url, QString& errorMsg);
+
   void sendChangedSignal(size_t id);
 
 private:
@@ -132,6 +136,7 @@ private:
   std::map<size_t, std::shared_ptr<ZImgPack>> m_idToImgPacks;
 
   QAction* m_loadImgAction = nullptr;
+  QAction* m_loadNeuroglancerPrecomputedAction = nullptr;
   QAction* m_importImgSequenceAction = nullptr;
 
   QAction* m_stitchImageAction = nullptr;

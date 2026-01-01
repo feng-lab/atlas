@@ -2836,6 +2836,30 @@ def build_proxygen(src_dir: str, install_dir: str):
             ],
         ),
         FilePatcher(
+            orig_file=os.path.join(src_dir, 'cmake', 'proxygen-config.cmake.in'),
+            from_texts=[
+                r"""find_dependency(Boost 1.58 REQUIRED
+  COMPONENTS
+    iostreams
+    context
+    filesystem
+    program_options
+    regex
+    system
+    thread
+)""",
+            ],
+            to_texts=[
+                r"""find_dependency(Boost 1.58 REQUIRED
+  COMPONENTS
+    context
+    filesystem
+    program_options
+    thread
+)""",
+            ],
+        ),
+        FilePatcher(
             orig_file=os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt'),
             from_texts=[
                 r"""${PROXYGEN_FBCODE_ROOT}

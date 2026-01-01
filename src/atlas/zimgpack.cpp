@@ -5,6 +5,7 @@
 #include "zimgcache.h"
 #include "zimgregioncache.h"
 #include "zcancellation.h"
+#include "zneuroglancerprecomputed.h"
 #include <QFileInfo>
 #include <QPoint>
 #include <QDir>
@@ -14,6 +15,7 @@
 #include <boost/iterator/function_output_iterator.hpp>
 #include <cmath>
 #include <algorithm>
+#include <limits>
 #include <memory>
 #include <zbenchtimer.h>
 
@@ -133,6 +135,38 @@ ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo, std::vector<std::share
   VLOG(1) << "imgpack done";
 }
 
+ZImgPack::ZImgPack(std::shared_ptr<ZNeuroglancerPrecomputedVolume> ngVolume)
+  : m_hasUnsavedChange(false)
+  , m_ngVolume(std::move(ngVolume))
+  , m_diskCached(true)
+{
+  CHECK(m_ngVolume);
+
+  m_imgInfo = m_ngVolume->baseImgInfo();
+  m_imgMetaData = ZImgMetadata{};
+  m_minMaxState = MinMaxState::Invalid;
+
+  m_imgSource = ZImgSource{};
+  m_imgSource.filenames = QStringList{m_ngVolume->rootUrl()};
+  m_imgSource.catDim = Dimension::Z;
+  m_imgSource.catScenes = false;
+  m_imgSource.scene = 0;
+  m_imgSource.format = FileFormat::Unknown;
+  m_imgSource.totalFileSize = 0;
+
+  m_allTiles.clear();
+  m_rtToTileIndice.clear();
+  m_rtToTileBoxRTree.clear();
+  m_pyramidalRatios.clear();
+  for (const auto& ratio : m_ngVolume->availableRatios()) {
+    m_pyramidalRatios.insert(ratio);
+  }
+  m_pyramidalRatios.insert({1, 1, 1});
+
+  updateDerivedData();
+  VLOG(1) << "imgpack neuroglancer done";
+}
+
 
 const QString& ZImgPack::sizeInfo() const
 {
@@ -184,6 +218,12 @@ const QString& ZImgPack::detailedInfo() const
   return m_detailedInfo;
 }
 
+QString ZImgPack::neuroglancerRootUrl() const
+{
+  CHECK(m_ngVolume);
+  return m_ngVolume->rootUrl();
+}
+
 void ZImgPack::setChannelColor(size_t c, col4 col)
 {
   CHECK(c < m_imgInfo.numChannels);
@@ -195,6 +235,9 @@ void ZImgPack::setChannelColor(size_t c, col4 col)
 
 void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteParameters& paras)
 {
+  if (m_ngVolume) {
+    throw ZException("Saving Neuroglancer precomputed volumes is not supported (read-only dataset)");
+  }
   if (m_diskCached) {
     ZImg::writeImg(fileName, *this, format, paras);
   } else {
@@ -243,6 +286,50 @@ bool ZImgPack::needUpdate(const QRectF& viewport,
 
   if (mip) { // for now mip is always full-resolution
     return false;
+  }
+
+  if (m_ngVolume) {
+    CHECK(t == 0);
+    auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(readRatio);
+    CHECK(scaleIndexOpt);
+
+    const int64_t z0 = static_cast<int64_t>(z);
+    const std::array<int64_t, 3> box1Start{static_cast<int64_t>(std::floor(viewport.x())),
+                                           static_cast<int64_t>(std::floor(viewport.y())),
+                                           z0};
+    const std::array<int64_t, 3> box1End{static_cast<int64_t>(std::ceil(viewport.right())),
+                                         static_cast<int64_t>(std::ceil(viewport.bottom())),
+                                         z0 + 1};
+    const std::array<int64_t, 3> box2Start{static_cast<int64_t>(std::floor(oldViewport.x())),
+                                           static_cast<int64_t>(std::floor(oldViewport.y())),
+                                           z0};
+    const std::array<int64_t, 3> box2End{static_cast<int64_t>(std::ceil(oldViewport.right())),
+                                         static_cast<int64_t>(std::ceil(oldViewport.bottom())),
+                                         z0 + 1};
+
+    using ChunkKey = std::tuple<size_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t>;
+    auto chunkKeyOf = [](const ZNeuroglancerPrecomputedVolume::Chunk& c) -> ChunkKey {
+      return std::make_tuple(c.scaleIndex,
+                             c.globalStart[0],
+                             c.globalEnd[0],
+                             c.globalStart[1],
+                             c.globalEnd[1],
+                             c.globalStart[2],
+                             c.globalEnd[2]);
+    };
+
+    const auto chunks1 = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt, box1Start, box1End);
+    const auto chunks2 = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt, box2Start, box2End);
+
+    std::set<ChunkKey> keys1;
+    std::set<ChunkKey> keys2;
+    for (const auto& c : chunks1) {
+      keys1.insert(chunkKeyOf(c));
+    }
+    for (const auto& c : chunks2) {
+      keys2.insert(chunkKeyOf(c));
+    }
+    return keys1 != keys2;
   }
 
 #if 1
@@ -298,6 +385,70 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
   scales.clear();
 
   auto readRatio = ratioForScale(scale, scale, 1);
+
+  if (m_ngVolume) {
+    CHECK(t == 0);
+    auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(readRatio);
+    CHECK(scaleIndexOpt);
+
+    const int64_t z0 = static_cast<int64_t>(z);
+    const std::array<int64_t, 3> boxStart{static_cast<int64_t>(std::floor(viewport.x())),
+                                          static_cast<int64_t>(std::floor(viewport.y())),
+                                          z0};
+    const std::array<int64_t, 3> boxEnd{static_cast<int64_t>(std::ceil(viewport.right())),
+                                        static_cast<int64_t>(std::ceil(viewport.bottom())),
+                                        z0 + 1};
+
+    const auto chunks = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
+    if (chunks.empty()) {
+      return;
+    }
+
+    const double tileScale = static_cast<double>(readRatio[0]);
+
+    std::vector<std::shared_ptr<ZImg>> tmpImgs(chunks.size());
+    std::vector<QPoint> tmpLocs(chunks.size());
+
+    auto toIntChecked = [](int64_t v) -> int {
+      if (v < static_cast<int64_t>(std::numeric_limits<int>::min()) ||
+          v > static_cast<int64_t>(std::numeric_limits<int>::max())) {
+        throw ZException(fmt::format("Neuroglancer chunk coordinate {} is out of QPoint range", v));
+      }
+      return static_cast<int>(v);
+    };
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
+      for (size_t i = r.begin(); i != r.end(); ++i) {
+        auto chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        if (!chunkImg) {
+          continue;
+        }
+
+        const int64_t localZ = z0 - chunks[i].baseStart[2];
+        CHECK(localZ >= 0);
+        CHECK(static_cast<size_t>(localZ) < chunkImg->depth());
+
+        ZImg sliceImg = chunkImg->crop(ZImgRegion(0,
+                                                  static_cast<index_t>(chunkImg->width()),
+                                                  0,
+                                                  static_cast<index_t>(chunkImg->height()),
+                                                  static_cast<index_t>(localZ),
+                                                  static_cast<index_t>(localZ + 1)));
+        tmpImgs[i] = std::make_shared<ZImg>(std::move(sliceImg));
+        tmpLocs[i] = QPoint(toIntChecked(chunks[i].baseStart[0]), toIntChecked(chunks[i].baseStart[1]));
+      }
+    });
+
+    for (size_t i = 0; i < tmpImgs.size(); ++i) {
+      if (!tmpImgs[i]) {
+        continue;
+      }
+      imgs.push_back(std::move(tmpImgs[i]));
+      locs.push_back(tmpLocs[i]);
+      scales.push_back(tileScale);
+    }
+    return;
+  }
 
 #if 1
   bool finish =
@@ -377,6 +528,10 @@ void ZImgPack::retrieveCoveredMIPImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
   locs.clear();
   scales.clear();
 
+  if (m_ngVolume) {
+    throw ZException("MIP rendering for Neuroglancer precomputed volumes is not supported yet");
+  }
+
   if (m_mipImgs.empty()) {
     m_mipImgs.resize(m_imgInfo.numTimes);
   }
@@ -403,6 +558,48 @@ void ZImgPack::retrieveCoveredMIPImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
 double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mip) const
 {
   if (m_diskCached) {
+    if (m_ngVolume) {
+      CHECK(t == 0);
+      if (c >= m_imgInfo.numChannels) {
+        return 0;
+      }
+      if (m_imgInfo.depth == 1) {
+        mip = false;
+      }
+      if (mip) {
+        return 0;
+      }
+      if (x >= m_imgInfo.width || y >= m_imgInfo.height || z >= m_imgInfo.depth) {
+        return 0;
+      }
+
+      auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(std::array<size_t, 3>{1, 1, 1});
+      CHECK(scaleIndexOpt);
+
+      const int64_t ix = static_cast<int64_t>(x);
+      const int64_t iy = static_cast<int64_t>(y);
+      const int64_t iz = static_cast<int64_t>(z);
+      const auto chunks =
+        m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt, {ix, iy, iz}, {ix + 1, iy + 1, iz + 1});
+      if (chunks.empty()) {
+        return 0;
+      }
+
+      // Keep value() fast and non-blocking for network-backed datasets.
+      // 3D paging (readRegionToImgAsync) is responsible for pulling data over the network.
+      auto chunkImg = m_ngVolume->tryGetCachedChunk(chunks.front());
+      if (!chunkImg) return 0;
+
+      const int64_t lx = ix - chunks.front().baseStart[0];
+      const int64_t ly = iy - chunks.front().baseStart[1];
+      const int64_t lz = iz - chunks.front().baseStart[2];
+      CHECK(lx >= 0 && ly >= 0 && lz >= 0);
+      CHECK(static_cast<size_t>(lx) < chunkImg->width());
+      CHECK(static_cast<size_t>(ly) < chunkImg->height());
+      CHECK(static_cast<size_t>(lz) < chunkImg->depth());
+      return chunkImg->value<double>(static_cast<size_t>(lx), static_cast<size_t>(ly), static_cast<size_t>(lz), c, 0);
+    }
+
     if (m_imgInfo.depth == 1) {
       mip = false;
     }
@@ -436,6 +633,66 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
 double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, bool mip) const
 {
   if (m_diskCached) {
+    if (m_ngVolume) {
+      CHECK(t == 0);
+      if (c >= m_imgInfo.numChannels) {
+        return 0;
+      }
+      if (m_imgInfo.depth == 1) {
+        mip = false;
+      }
+      if (mip) {
+        return 0;
+      }
+      if (x >= m_imgInfo.width || y >= m_imgInfo.height || z >= m_imgInfo.depth) {
+        return 0;
+      }
+
+      const int64_t ix = static_cast<int64_t>(x);
+      const int64_t iy = static_cast<int64_t>(y);
+      const int64_t iz = static_cast<int64_t>(z);
+
+      // Prefer already-cached data; never trigger network I/O from displayValue()
+      // (called on mouse-move, and in other hot UI paths).
+      for (auto it = m_pyramidalRatios.rbegin(); it != m_pyramidalRatios.rend(); ++it) {
+        const auto& ratio = *it;
+        if (ratio[2] != 1) {
+          continue;
+        }
+        auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(ratio);
+        if (!scaleIndexOpt) {
+          continue;
+        }
+        const auto chunks =
+          m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt, {ix, iy, iz}, {ix + 1, iy + 1, iz + 1});
+        for (const auto& chunk : chunks) {
+          auto chunkImg = m_ngVolume->tryGetCachedChunk(chunk);
+          if (!chunkImg) {
+            continue;
+          }
+
+          const int64_t lx = ix - chunk.baseStart[0];
+          const int64_t ly = iy - chunk.baseStart[1];
+          const int64_t lz = iz - chunk.baseStart[2];
+          CHECK(lx >= 0 && ly >= 0 && lz >= 0);
+
+          const int64_t rx = static_cast<int64_t>(ratio[0]);
+          const int64_t ry = static_cast<int64_t>(ratio[1]);
+          CHECK(rx > 0 && ry > 0);
+
+          const size_t vx = static_cast<size_t>(lx / rx);
+          const size_t vy = static_cast<size_t>(ly / ry);
+          const size_t vz = static_cast<size_t>(lz);
+
+          CHECK(vx < chunkImg->width());
+          CHECK(vy < chunkImg->height());
+          CHECK(vz < chunkImg->depth());
+          return chunkImg->value<double>(vx, vy, vz, c, 0);
+        }
+      }
+      return 0;
+    }
+
     if (m_imgInfo.depth == 1) {
       mip = false;
     }
@@ -503,6 +760,45 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
   ZImgInfo resInfo = rgn.clip(m_imgInfo);
   // create destination
   res = ZImg(resInfo);
+
+  if (m_ngVolume) {
+    if (rgn.tStart() != 0 || rgn.tEnd() != 1) {
+      throw ZException("Neuroglancer precomputed volumes do not support time dimension yet (t must be 0)");
+    }
+
+    auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(std::array<size_t, 3>{1, 1, 1});
+    CHECK(scaleIndexOpt);
+
+    const auto chunks = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt,
+                                                             {static_cast<int64_t>(rgn.start.x),
+                                                              static_cast<int64_t>(rgn.start.y),
+                                                              static_cast<int64_t>(rgn.start.z)},
+                                                             {static_cast<int64_t>(rgn.end.x),
+                                                              static_cast<int64_t>(rgn.end.y),
+                                                              static_cast<int64_t>(rgn.end.z)});
+    if (chunks.empty()) {
+      return res;
+    }
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
+      for (size_t i = r.begin(); i != r.end(); ++i) {
+        auto chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        if (!chunkImg) {
+          continue;
+        }
+
+        ZVoxelCoordinate tileStart(static_cast<index_t>(chunks[i].baseStart[0]),
+                                   static_cast<index_t>(chunks[i].baseStart[1]),
+                                   static_cast<index_t>(chunks[i].baseStart[2]),
+                                   0,
+                                   0);
+        ZVoxelCoordinate start = tileStart - rgn.start;
+        res.pasteImg(*chunkImg, start, false);
+      }
+    });
+
+    return res;
+  }
   // start copy data
   for (auto t = rgn.tStart(); t < rgn.tEnd(); ++t) {
     if (auto tiit = m_rtToTileIndice.find(std::make_tuple(1, 1, 1, t)); tiit != m_rtToTileIndice.end()) {
@@ -900,6 +1196,13 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
 
+  CHECK(xyRatio > 0);
+  CHECK(zRatio > 0);
+  CHECK(sc < m_imgInfo.numChannels);
+  if (m_ngVolume) {
+    CHECK(t == 0);
+  }
+
   bool needToUpdateBlockInfo = false;
   double maxIntensity;
   if (m_blockInfo.cvisit(
@@ -936,6 +1239,116 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
   maybeCancel(cancellationToken);
 
   auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
+  if (m_ngVolume) {
+    auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(readRatio);
+    CHECK(scaleIndexOpt);
+
+    const int64_t baseStartX = static_cast<int64_t>(sx) * static_cast<int64_t>(xyRatio);
+    const int64_t baseStartY = static_cast<int64_t>(sy) * static_cast<int64_t>(xyRatio);
+    const int64_t baseStartZ = static_cast<int64_t>(sz) * static_cast<int64_t>(zRatio);
+    const int64_t baseEndX =
+      (static_cast<int64_t>(sx) + static_cast<int64_t>(resInfo.sWidth())) * static_cast<int64_t>(xyRatio);
+    const int64_t baseEndY =
+      (static_cast<int64_t>(sy) + static_cast<int64_t>(resInfo.sHeight())) * static_cast<int64_t>(xyRatio);
+    const int64_t baseEndZ =
+      (static_cast<int64_t>(sz) + static_cast<int64_t>(resInfo.sDepth())) * static_cast<int64_t>(zRatio);
+
+    const auto chunks = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt,
+                                                             {baseStartX, baseStartY, baseStartZ},
+                                                             {baseEndX, baseEndY, baseEndZ});
+    if (chunks.empty()) {
+      co_return std::shared_ptr<ZImg>();
+    }
+
+    auto tmpResInfo = resInfo;
+    tmpResInfo.width = std::ceil(static_cast<double>(resInfo.width) * static_cast<double>(xyRatio) / readRatio[0]);
+    tmpResInfo.height = std::ceil(static_cast<double>(resInfo.height) * static_cast<double>(xyRatio) / readRatio[1]);
+    tmpResInfo.depth = std::ceil(static_cast<double>(resInfo.depth) * static_cast<double>(zRatio) / readRatio[2]);
+    tmpResInfo.voxelFormat = m_imgInfo.voxelFormat;
+    tmpResInfo.bytesPerVoxel = m_imgInfo.bytesPerVoxel;
+    auto res = std::make_shared<ZImg>(tmpResInfo);
+
+    std::vector<folly::coro::Task<std::shared_ptr<ZImg>>> chunkTasks;
+    chunkTasks.reserve(chunks.size());
+    for (const auto& chunk : chunks) {
+      chunkTasks.push_back(m_ngVolume->readChunkAsync(chunk));
+    }
+    std::vector<std::shared_ptr<ZImg>> chunkImgs = co_await folly::coro::collectAllRange(std::move(chunkTasks));
+
+    maybeCancel(cancellationToken);
+
+    for (size_t i = 0; i < chunks.size(); ++i) {
+      const auto& chunk = chunks[i];
+      const auto& chunkImg = chunkImgs[i];
+      if (!chunkImg) {
+        continue;
+      }
+
+      const index_t dx = static_cast<index_t>(
+        std::round(static_cast<double>(chunk.baseStart[0] - baseStartX) / static_cast<double>(readRatio[0])));
+      const index_t dy = static_cast<index_t>(
+        std::round(static_cast<double>(chunk.baseStart[1] - baseStartY) / static_cast<double>(readRatio[1])));
+      const index_t dz = static_cast<index_t>(
+        std::round(static_cast<double>(chunk.baseStart[2] - baseStartZ) / static_cast<double>(readRatio[2])));
+      const ZVoxelCoordinate start(dx, dy, dz, -static_cast<index_t>(sc), 0);
+      res->pasteImg(*chunkImg, start, false);
+    }
+
+    if (needToUpdateBlockInfo) {
+      maybeCancel(cancellationToken);
+
+      double minv;
+      double maxv;
+      res->computeMinMax(minv, maxv);
+      m_blockInfo.emplace(
+        std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth),
+        std::make_pair(minv, maxv));
+      if (maxv <= displayRangeMin) {
+        co_return std::shared_ptr<ZImg>();
+      }
+    }
+
+    if (res->isSameType(resInfo)) {
+      if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax() ||
+          resInfo.validBitCount != m_imgInfo.validBitCount) {
+        maybeCancel(cancellationToken);
+        res->normalize(displayRangeMin, displayRangeMax);
+      }
+    } else {
+      maybeCancel(cancellationToken);
+      *res = res->convertTo(displayRangeMin, displayRangeMax, resInfo);
+    }
+
+    if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
+      maybeCancel(cancellationToken);
+      res->resize(resInfo.width,
+                  resInfo.height,
+                  resInfo.depth,
+                  Interpolant::Cubic,
+                  true,
+                  false,
+                  FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+    }
+
+    maybeCancel(cancellationToken);
+
+    ZImgRegionCache::instance().insert(ImageRegionCacheHashKeyType(this,
+                                                                   xyRatio,
+                                                                   zRatio,
+                                                                   sx,
+                                                                   sy,
+                                                                   sz,
+                                                                   sc,
+                                                                   t,
+                                                                   resInfo.width,
+                                                                   resInfo.height,
+                                                                   resInfo.depth,
+                                                                   displayRangeMin,
+                                                                   displayRangeMax),
+                                       res);
+    co_return res;
+  }
+
   std::vector<size_t> queryResult;
   if (auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
       tiit != m_rtToTileBoxRTree.end()) {
@@ -1519,6 +1932,10 @@ void ZImgPack::createTileIndexStructure()
 ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio) const
 {
   CHECK(m_pyramidalRatios.contains(ratio));
+  if (m_ngVolume) {
+    CHECK(m_imgInfo.numTimes == 1);
+    return assembleImg(ratio, 0);
+  }
   ZImgInfo info = m_imgInfo;
   info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
   info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
@@ -1553,6 +1970,49 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio) const
 ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
 {
   CHECK(m_pyramidalRatios.contains(ratio));
+  if (m_ngVolume) {
+    CHECK(t == 0);
+    auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(ratio);
+    CHECK(scaleIndexOpt);
+
+    ZImgInfo info = m_imgInfo;
+    info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
+    info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
+    info.depth = (m_imgInfo.depth + ratio[2] - 1) / ratio[2];
+    info.numTimes = 1;
+    const auto& scale = m_ngVolume->scales().at(*scaleIndexOpt);
+    info.voxelSizeX = scale.resolutionNm[0];
+    info.voxelSizeY = scale.resolutionNm[1];
+    info.voxelSizeZ = scale.resolutionNm[2];
+
+    ZImg res(info);
+
+    const auto chunks = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt,
+                                                             {0, 0, 0},
+                                                             {static_cast<int64_t>(m_imgInfo.width),
+                                                              static_cast<int64_t>(m_imgInfo.height),
+                                                              static_cast<int64_t>(m_imgInfo.depth)});
+    if (chunks.empty()) {
+      return res;
+    }
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
+      for (size_t i = r.begin(); i != r.end(); ++i) {
+        auto chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        if (!chunkImg) {
+          continue;
+        }
+        ZVoxelCoordinate start(std::round(static_cast<double>(chunks[i].baseStart[0]) / ratio[0]),
+                               std::round(static_cast<double>(chunks[i].baseStart[1]) / ratio[1]),
+                               std::round(static_cast<double>(chunks[i].baseStart[2]) / ratio[2]),
+                               0,
+                               0);
+        res.pasteImg(*chunkImg, start, false);
+      }
+    });
+
+    return res;
+  }
   ZImgInfo info = m_imgInfo;
   info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
   info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
@@ -1586,6 +2046,49 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
 ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) const
 {
   CHECK(m_pyramidalRatios.contains(ratio) && ratio[2] == 1);
+  if (m_ngVolume) {
+    CHECK(t == 0);
+    auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(ratio);
+    CHECK(scaleIndexOpt);
+
+    ZImgInfo info = m_imgInfo;
+    info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
+    info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
+    info.depth = 1;
+    info.numTimes = 1;
+    const auto& scale = m_ngVolume->scales().at(*scaleIndexOpt);
+    info.voxelSizeX = scale.resolutionNm[0];
+    info.voxelSizeY = scale.resolutionNm[1];
+    info.voxelSizeZ = scale.resolutionNm[2];
+
+    ZImg res(info);
+
+    const int64_t iz = static_cast<int64_t>(z);
+    const auto chunks = m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt,
+                                                             {0, 0, iz},
+                                                             {static_cast<int64_t>(m_imgInfo.width),
+                                                              static_cast<int64_t>(m_imgInfo.height),
+                                                              iz + 1});
+    if (chunks.empty()) {
+      return res;
+    }
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
+      for (size_t i = r.begin(); i != r.end(); ++i) {
+        auto chunkImg = m_ngVolume->readChunkBlocking(chunks[i]);
+        if (!chunkImg) {
+          continue;
+        }
+        const ZVoxelCoordinate start(std::round(static_cast<double>(chunks[i].baseStart[0]) / ratio[0]),
+                                     std::round(static_cast<double>(chunks[i].baseStart[1]) / ratio[1]),
+                                     static_cast<index_t>(chunks[i].baseStart[2] - iz),
+                                     0,
+                                     0);
+        res.pasteImg(*chunkImg, start, false);
+      }
+    });
+    return res;
+  }
   ZImgInfo info = m_imgInfo;
   info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
   info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
@@ -1662,6 +2165,17 @@ void ZImgPack::updateDerivedData()
 
 void ZImgPack::updateNameTootip()
 {
+  if (m_ngVolume) {
+    const QUrl url(m_ngVolume->rootUrl());
+    QString display = m_ngVolume->rootUrl();
+    if (url.isValid() && !url.host().isEmpty()) {
+      display = url.host() + url.path();
+    }
+    m_name = QString("Neuroglancer Precomputed: %1").arg(display);
+    m_tooltip = m_ngVolume->rootUrl();
+    return;
+  }
+
   if (isSequence()) {
     m_name =
       QFileInfo(m_imgSource.filenames[0]).fileName() + QString(" %1 Sequence").arg(enumToQString(m_imgSource.catDim));

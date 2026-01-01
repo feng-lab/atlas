@@ -15,6 +15,22 @@ Key References
 - Image Paging & Progressive Rendering: [Atlas_Image_Paging_and_Progressive_Rendering.md](Atlas_Image_Paging_and_Progressive_Rendering.md)
 - Agents Overview and Tools: [AGENTS_GUIDE.md](AGENTS_GUIDE.md)
 
+Neuroglancer Precomputed (HTTP)
+
+- Atlas can load Neuroglancer “precomputed” volumes over HTTP (both unsharded and sharded storage via `"sharding": {"@type":"neuroglancer_uint64_sharded_v1", ...}`) with these chunk encodings:
+  - `encoding: "raw"` — little-endian raw voxel bytes (Fortran order).
+  - `encoding: "jpeg"` — requires `data_type: "uint8"` and `num_channels` ∈ {1, 3}.
+  - `encoding: "compressed_segmentation"` — requires `data_type` ∈ {`"uint32"`, `"uint64"`} and `compressed_segmentation_block_size`.
+  - Sharded volumes require HTTP `Range` support; Atlas supports `minishard_index_encoding` and `data_encoding` of `raw` or `gzip` as specified in Neuroglancer’s sharded format. (Sharding `data_encoding` is applied first, then the per-scale chunk `encoding` is decoded.)
+- Networking is implemented with proxygen/folly: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
+- Dataset parsing + chunk addressing lives in `src/atlas/zneuroglancerprecomputed.h` and `src/atlas/zneuroglancerprecomputed.cpp` (reads `.../info`, then fetches chunks on demand).
+  - Chunk decode helpers live in `src/atlas/zneuroglancerprecomputedchunkdecoder.h` and `src/atlas/zneuroglancerprecomputedchunkdecoder.cpp`.
+  - Sharded-format helpers are in `src/atlas/zneuroglanceruint64sharding.h` and `src/atlas/zneuroglanceruint64sharding.cpp`.
+- Caches:
+  - Chunk cache size is controlled by `--atlas_ng_precomputed_chunk_cache_memory_proportion`.
+  - Sharded minishard-index cache size is controlled by `--atlas_ng_precomputed_minishard_index_cache_memory_proportion`.
+- Integration point is `ZImgPack`: 2D uses on-demand chunk reads for the visible viewport; 3D paging uses `ZImgPack::readRegionToImgAsync()` to populate the GPU page cache. Synchronous “hot-path” queries (`displayValue()`/`value()`) are cache-only to avoid blocking UI/render threads on network I/O.
+
 Testing (Linking Atlas Code)
 
 - Atlas is still a Qt GUI app. Common code now builds as three static libraries to keep Windows COFF archives well under 4GB with LTCG enabled, while maintaining clean backend boundaries:

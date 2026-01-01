@@ -31,6 +31,17 @@
 
 namespace nim {
 
+namespace {
+
+bool looksLikeNetworkUrl(const QString& s)
+{
+  const QString trimmed = s.trimmed();
+  return trimmed.startsWith("precomputed://", Qt::CaseInsensitive) || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
+         trimmed.startsWith("http://", Qt::CaseInsensitive) || trimmed.startsWith("https://", Qt::CaseInsensitive);
+}
+
+} // namespace
+
 ZDoc::ZDoc(QObject* parent)
   : QObject(parent)
   , m_nextObjId(100)
@@ -708,11 +719,13 @@ void ZDoc::createActions()
 
 bool ZDoc::loadFile(const QString& fileName, QString& errMsg)
 {
-  if (QFile::exists(fileName)) {
+  const QString trimmed = fileName.trimmed();
+  const bool isNetworkUrl = looksLikeNetworkUrl(trimmed);
+  if (QFile::exists(trimmed) || isNetworkUrl) {
     for (auto& docPack : m_docPacks) {
-      if (docPack.doc->canReadFile(fileName)) {
+      if (docPack.doc->canReadFile(trimmed)) {
         QString tmpErr;
-        if (docPack.doc->loadFile(fileName, tmpErr)) {
+        if (docPack.doc->loadFile(trimmed, tmpErr)) {
           errMsg.clear();
           return true;
         }
@@ -720,7 +733,7 @@ bool ZDoc::loadFile(const QString& fileName, QString& errMsg)
       }
     }
     if (errMsg.isEmpty()) {
-      errMsg = tr("File is not supported");
+      errMsg = isNetworkUrl ? tr("URL is not supported") : tr("File is not supported");
     }
   } else {
     errMsg = tr("File does not exist");

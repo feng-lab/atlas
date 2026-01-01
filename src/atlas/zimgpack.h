@@ -20,6 +20,8 @@ namespace bgi = boost::geometry::index;
 
 namespace nim {
 
+class ZNeuroglancerPrecomputedVolume;
+
 class ZImgPackSubBlock : public ZImgSubBlock
 {
 public:
@@ -58,6 +60,8 @@ public:
   explicit ZImgPack(ZImgSource imgSource,
                     ZImgInfo* pInfo = nullptr,
                     std::vector<std::shared_ptr<ZImgSubBlock>>* pSceneSubBlocks = nullptr);
+
+  explicit ZImgPack(std::shared_ptr<ZNeuroglancerPrecomputedVolume> ngVolume);
 
   ~ZImgPack() override = default;
 
@@ -106,6 +110,13 @@ public:
   {
     return m_tooltip;
   }
+
+  [[nodiscard]] bool isNeuroglancerPrecomputed() const
+  {
+    return static_cast<bool>(m_ngVolume);
+  }
+
+  [[nodiscard]] QString neuroglancerRootUrl() const;
 
   void setChannelColor(size_t c, col4 col);
 
@@ -337,6 +348,8 @@ private:
   double m_minIntensity;
   double m_maxIntensity;
   MinMaxState m_minMaxState;
+
+  std::shared_ptr<ZNeuroglancerPrecomputedVolume> m_ngVolume;
 
   bool m_diskCached;
   ZImg m_img;

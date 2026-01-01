@@ -109,7 +109,7 @@ Atlas organizes data into documents. Each document type contributes load actions
 
 | Document | Typical Extensions | Notes |
 | --- | --- | --- |
-| `ZImgDoc` (Images) | `.tif`, `.tiff`, `.ome.tif`, `.mhd`, `.raw`, `.nii`, `.hdr`, `.png`, `.jpg`, `.bmp`, `.exr`, `.lsm`, `.v3draw` | Multi-channel, multi-timepoint volumes supported. Sequences can be imported as stacks. |
+| `ZImgDoc` (Images) | `.tif`, `.tiff`, `.ome.tif`, `.mhd`, `.raw`, `.nii`, `.hdr`, `.png`, `.jpg`, `.bmp`, `.exr`, `.lsm`, `.v3draw` | Multi-channel, multi-timepoint volumes supported. Sequences can be imported as stacks. Also supports Neuroglancer precomputed volumes (`raw`/`jpeg`/`compressed_segmentation`, sharded or unsharded) via URL. |
 | `ZROIDoc` (ROI Masks) | `.roi`, `.mask`, `.nii`, `.mhd`, `.nrrd` | Accepts atlas-generated ROI files or converts mask images into editable ROIs. |
 | `ZRegionAnnotationDoc` | `.annotation`, `.json`, label images | Handles labeled regions; can import/export label images. |
 | `ZPunctaDoc` | `.apo`, `.csv`, `.json` | Stores point clouds like synaptic puncta with undo support. |
@@ -297,15 +297,19 @@ Tip: Objects with IDs <100 (background, axis, lighting) belong to the 3D environ
 
 Steps to load and manage images via `ZImgDoc`:
 
-1. **Load**
+1. **Load local images**
    1. Choose **File → Load Image...**.
    2. Select one or more image files. Atlas supports multi-selection.
    3. Confirm. Each image becomes a new object in the manager.
-2. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
-3. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.
-4. **Full resolution rendering** – in 3D, enable Full Resolution in Object View Setting when you require high-quality output. Monitor GPU memory usage and progress logs.
-5. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...**(Ctrl/Cmd+Shift+S) to choose a new format.
-6. **Advanced processing** – Access via the document menu or object context menu:
+2. **Load Neuroglancer (Precomputed)**
+   1. Choose **File → Load Neuroglancer (Precomputed)...**.
+   2. Paste a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `http://`, `https://`.
+   3. Current limitations: read-only dataset. Supported chunk encodings are `raw`, `jpeg` (uint8, 1 or 3 channels), and `compressed_segmentation` (uint32/uint64 segmentation). Sharded volumes require an HTTP server that supports `Range` requests.
+3. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
+4. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.
+5. **Full resolution rendering** – in 3D, enable Full Resolution in Object View Setting when you require high-quality output. Monitor GPU memory usage and progress logs.
+6. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...**(Ctrl/Cmd+Shift+S) to choose a new format.
+7. **Advanced processing** – Access via the document menu or object context menu:
    - **Stitch Images...** – run the image stitching dialog for tiled data.
    - **Align Sections...** – align serial sections.
    - **Correct Chromatic Shift...** – adjust channel misalignment.

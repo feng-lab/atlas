@@ -4,16 +4,59 @@
 #include "zstitchimagedialog.h"
 #include "zsectionsregistrationdialog.h"
 #include "zchromaticshiftcorrectiondialog.h"
+#include "zneuroglancerprecomputed.h"
 #include "zlog.h"
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
 #include <QApplication>
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QSettings>
+#include <chrono>
 #include <cmath>
+#include <optional>
 #include <set>
 
 namespace nim {
+
+namespace {
+
+bool looksLikeNeuroglancerPrecomputedUrl(const QString& s)
+{
+  const QString trimmed = s.trimmed();
+  return trimmed.startsWith("precomputed://", Qt::CaseInsensitive) || trimmed.startsWith("gs://", Qt::CaseInsensitive) ||
+         trimmed.startsWith("http://", Qt::CaseInsensitive) || trimmed.startsWith("https://", Qt::CaseInsensitive);
+}
+
+std::optional<QString> neuroglancerPrecomputedUrlFromJson(const json::value& jValue)
+{
+  if (!jValue.is_object()) {
+    return std::nullopt;
+  }
+  const auto& jo = jValue.as_object();
+  if (auto it = jo.find("dataSource"); it != jo.end() && it->value().is_string()) {
+    const auto ds = it->value().as_string();
+    if (ds == "neuroglancer_precomputed") {
+      auto urlIt = jo.find("url");
+      if (urlIt == jo.end() || !urlIt->value().is_string()) {
+        throw ZException("Invalid neuroglancer_precomputed image JSON: missing 'url'");
+      }
+      return json::value_to<QString>(urlIt->value());
+    }
+  }
+
+  // Backward-compat: previous attempts may have serialized as a ZImgSource with a URL in filenames[0].
+  if (auto it = jo.find("filenames"); it != jo.end() && it->value().is_array()) {
+    const auto files = json::value_to<QStringList>(it->value());
+    if (!files.isEmpty() && looksLikeNeuroglancerPrecomputedUrl(files[0])) {
+      return files[0];
+    }
+  }
+
+  return std::nullopt;
+}
+
+} // namespace
 
 ZImgDoc::ZImgDoc(ZDoc& doc)
   : ZObjDoc(doc)
@@ -78,16 +121,31 @@ bool ZImgDoc::saveAs(size_t id)
 
 bool ZImgDoc::canReadFile(const QString& fileName) const
 {
+  if (looksLikeNeuroglancerPrecomputedUrl(fileName)) {
+    return true;
+  }
   return ZImg::fileExtensionReadSupported(fileName);
 }
 
 size_t ZImgDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
+  if (looksLikeNeuroglancerPrecomputedUrl(fileName)) {
+    return loadNeuroglancerPrecomputed(fileName, errorMsg);
+  }
   return loadImg(fileName, FileFormat::Unknown, errorMsg);
 }
 
 size_t ZImgDoc::loadFile(const json::value& jValue, QString& errorMsg)
 {
+  try {
+    if (auto urlOpt = neuroglancerPrecomputedUrlFromJson(jValue)) {
+      return loadNeuroglancerPrecomputed(*urlOpt, errorMsg);
+    }
+  }
+  catch (const ZException& e) {
+    errorMsg = e.what();
+    return 0;
+  }
   return loadImg(json::value_to<ZImgSource>(jValue), errorMsg);
 }
 
@@ -95,6 +153,7 @@ std::vector<QAction*> ZImgDoc::loadFileActions() const
 {
   std::vector<QAction*> res;
   res.push_back(m_loadImgAction);
+  res.push_back(m_loadNeuroglancerPrecomputedAction);
   res.push_back(m_importImgSequenceAction);
   return res;
 }
@@ -158,6 +217,13 @@ QString ZImgDoc::objTooltip(size_t id) const
 json::value ZImgDoc::jsonValue(size_t id) const
 {
   auto& pack = m_idToImgPacks.at(id);
+  if (pack->isNeuroglancerPrecomputed()) {
+    json::value jv;
+    auto& jo = jv.emplace_object();
+    jo["dataSource"] = "neuroglancer_precomputed";
+    jo["url"] = json::value_from(pack->neuroglancerRootUrl());
+    return jv;
+  }
   return json::value_from(pack->imgSource());
 }
 
@@ -166,6 +232,16 @@ bool ZImgDoc::isSameObj(const json::value& v1, const json::value& v2) const
   CHECK(v1.is_object() && v2.is_object());
   if (v1 == v2) {
     return true;
+  }
+  try {
+    auto url1 = neuroglancerPrecomputedUrlFromJson(v1);
+    auto url2 = neuroglancerPrecomputedUrlFromJson(v2);
+    if (url1 || url2) {
+      return url1 && url2 && (url1->trimmed() == url2->trimmed());
+    }
+  }
+  catch (const ZException&) {
+    return false;
   }
   if (json::value_to<ZImgSource>(v1) == json::value_to<ZImgSource>(v2)) {
     return true;
@@ -214,6 +290,40 @@ void ZImgDoc::loadImg()
         showCriticalWithDetails(QApplication::activeWindow(), tr("Can not load image %1").arg(filePath), errorMsg);
       }
     }
+  }
+}
+
+void ZImgDoc::loadNeuroglancerPrecomputed()
+{
+  QSettings settings;
+  constexpr const char* kLastUrlKey = "neuroglancer_precomputed/last_url";
+  const QString lastUrl = settings.value(kLastUrlKey).toString();
+
+  bool ok = false;
+  QString url = QInputDialog::getText(QApplication::activeWindow(),
+                                      tr("Load Neuroglancer Precomputed Volume"),
+                                      tr("Dataset URL (root or .../info):"),
+                                      QLineEdit::Normal,
+                                      lastUrl,
+                                      &ok);
+  if (!ok) {
+    return;
+  }
+  url = url.trimmed();
+  if (url.isEmpty()) {
+    return;
+  }
+  settings.setValue(kLastUrlKey, url);
+
+  QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
+  QString errorMsg;
+  const size_t id = loadNeuroglancerPrecomputed(url, errorMsg);
+  QApplication::restoreOverrideCursor();
+
+  if (!id) {
+    showCriticalWithDetails(QApplication::activeWindow(),
+                            tr("Can not load Neuroglancer precomputed volume %1").arg(url),
+                            errorMsg);
   }
 }
 
@@ -392,6 +502,32 @@ size_t ZImgDoc::loadImg(const ZImgSource& imgSource, QString& errorMsg)
   }
 }
 
+size_t ZImgDoc::loadNeuroglancerPrecomputed(const QString& url, QString& errorMsg)
+{
+  try {
+    constexpr std::chrono::milliseconds defaultTimeout{30000};
+    auto vol = ZNeuroglancerPrecomputedVolume::open(url, defaultTimeout);
+    CHECK(vol);
+
+    const QString rootUrl = vol->rootUrl();
+    for (const auto& idPack : m_idToImgPacks) {
+      const auto& pack = idPack.second;
+      if (pack->isNeuroglancerPrecomputed() && pack->neuroglancerRootUrl() == rootUrl) {
+        return idPack.first;
+      }
+    }
+
+    size_t id = addImgPack(new ZImgPack(std::move(vol)));
+
+    ZSystemInfo::instance().addFileToRecentFileList(rootUrl);
+    return id;
+  }
+  catch (const ZException& e) {
+    errorMsg = e.what();
+    return 0;
+  }
+}
+
 void ZImgDoc::sendChangedSignal(size_t id)
 {
   CHECK(m_idToImgPacks.contains(id));
@@ -409,6 +545,14 @@ void ZImgDoc::createActions()
   m_loadImgAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load Image..."), this);
   m_loadImgAction->setStatusTip(tr("Load one or more existing image files"));
   connect(m_loadImgAction, &QAction::triggered, this, qOverload<>(&ZImgDoc::loadImg));
+
+  m_loadNeuroglancerPrecomputedAction =
+    new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("Load &Neuroglancer (Precomputed)..."), this);
+  m_loadNeuroglancerPrecomputedAction->setStatusTip(tr("Load a Neuroglancer precomputed volume via URL"));
+  connect(m_loadNeuroglancerPrecomputedAction,
+          &QAction::triggered,
+          this,
+          qOverload<>(&ZImgDoc::loadNeuroglancerPrecomputed));
 
   m_importImgSequenceAction = new QAction(tr("&Import Sequence Images..."), this);
   m_importImgSequenceAction->setStatusTip(tr("Load sequence images"));

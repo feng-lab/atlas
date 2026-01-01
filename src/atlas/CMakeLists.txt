@@ -41,6 +41,10 @@ message(STATUS "Using gRPC ${gRPC_VERSION}")
 print_target_properties(gRPC::grpc++)
 print_target_properties(gRPC::grpc_cpp_plugin)
 
+find_package(proxygen CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(proxygen::proxygen)
+
 include(gRPCGenerateCPP)
 
 set(PROTOS
@@ -503,6 +507,10 @@ set(SOURCES
     z3dgl.h z3dgl.cpp
     zimgpack.h zimgpack.cpp
     zimgpackdisplay.h zimgpackdisplay.cpp
+    zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
+    zneuroglancerprecomputedchunkdecoder.h zneuroglancerprecomputedchunkdecoder.cpp
+    zneuroglanceruint64sharding.h zneuroglanceruint64sharding.cpp
+    zproxygenhttpclient.h zproxygenhttpclient.cpp
     zimgcache.h zimgcache.cpp
     zsysteminfo.h zsysteminfo.cpp
     zfileutils.h zfileutils.cpp
@@ -702,6 +710,7 @@ target_link_libraries(atlas_core PUBLIC
   gflags::gflags
   Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
   Qt6::CorePrivate Qt6::Test
+  proxygen::proxygen
   gRPC::grpc++ protobuf::libprotobuf)
 if (UNIX AND NOT APPLE)
   target_link_libraries(atlas_core PUBLIC OpenGL::OpenGL OpenGL::EGL)
