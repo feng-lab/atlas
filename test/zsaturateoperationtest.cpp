@@ -3,7 +3,7 @@
 #include "ztest.h"
 #include <iostream>
 #include <vector>
-#include <immintrin.h>
+#include <simde/x86/sse2.h>
 
 namespace {
 
@@ -46,14 +46,15 @@ TEST(saturate, ReinterpretCast)
   LOG(INFO) << "Alignment of int8_t: " << alignof(int8_t);
   LOG(INFO) << "Alignment of uint16_t: " << alignof(uint16_t);
   LOG(INFO) << "Alignment of int16_t: " << alignof(int16_t);
-  LOG(INFO) << "Alignment of __m128i: " << alignof(__m128i);
+  LOG(INFO) << "Alignment of simde__m128i: " << alignof(simde__m128i);
 
   for (int k = 0; k < 10; ++k) {
     auto data = std::make_unique<uint8_t[]>(200);
     for (size_t j = 0; j < 200 - 16; ++j) {
       ASSERT_EQ(static_cast<const void*>(data.get() + j),
-                static_cast<const void*>(reinterpret_cast<const __m128i*>(data.get() + j)));
-      ASSERT_EQ(static_cast<void*>(data.get() + j), static_cast<void*>(reinterpret_cast<__m128i*>(data.get() + j)));
+                static_cast<const void*>(reinterpret_cast<const simde__m128i*>(data.get() + j)));
+      ASSERT_EQ(static_cast<void*>(data.get() + j),
+                static_cast<void*>(reinterpret_cast<simde__m128i*>(data.get() + j)));
     }
   }
 
@@ -61,9 +62,9 @@ TEST(saturate, ReinterpretCast)
     auto data = std::make_unique<int8_t[]>(200);
     for (size_t j = 0; j < 200 - 16; ++j) {
       ASSERT_EQ(reinterpret_cast<intptr_t>(data.get() + j),
-                reinterpret_cast<intptr_t>(reinterpret_cast<const __m128i*>(data.get() + j)));
+                reinterpret_cast<intptr_t>(reinterpret_cast<const simde__m128i*>(data.get() + j)));
       ASSERT_EQ(reinterpret_cast<intptr_t>(data.get() + j),
-                reinterpret_cast<intptr_t>(reinterpret_cast<__m128i*>(data.get() + j)));
+                reinterpret_cast<intptr_t>(reinterpret_cast<simde__m128i*>(data.get() + j)));
     }
   }
 
@@ -71,9 +72,9 @@ TEST(saturate, ReinterpretCast)
     auto data = std::make_unique<uint16_t[]>(200);
     for (size_t j = 0; j < 200 - 16; ++j) {
       ASSERT_EQ(reinterpret_cast<intptr_t>(data.get() + j),
-                reinterpret_cast<intptr_t>(reinterpret_cast<const __m128i*>(data.get() + j)));
+                reinterpret_cast<intptr_t>(reinterpret_cast<const simde__m128i*>(data.get() + j)));
       ASSERT_EQ(reinterpret_cast<intptr_t>(data.get() + j),
-                reinterpret_cast<intptr_t>(reinterpret_cast<__m128i*>(data.get() + j)));
+                reinterpret_cast<intptr_t>(reinterpret_cast<simde__m128i*>(data.get() + j)));
     }
   }
 
@@ -81,9 +82,9 @@ TEST(saturate, ReinterpretCast)
     auto data = std::make_unique<int16_t[]>(200);
     for (size_t j = 0; j < 200 - 16; ++j) {
       ASSERT_EQ(reinterpret_cast<intptr_t>(data.get() + j),
-                reinterpret_cast<intptr_t>(reinterpret_cast<const __m128i*>(data.get() + j)));
+                reinterpret_cast<intptr_t>(reinterpret_cast<const simde__m128i*>(data.get() + j)));
       ASSERT_EQ(reinterpret_cast<intptr_t>(data.get() + j),
-                reinterpret_cast<intptr_t>(reinterpret_cast<__m128i*>(data.get() + j)));
+                reinterpret_cast<intptr_t>(reinterpret_cast<simde__m128i*>(data.get() + j)));
     }
   }
 }

@@ -1,13 +1,12 @@
 #include "zimgncc.h"
 #include "zfft.h"
-#include "zmkl.h"
 #include "ztest.h"
 #include <folly/ScopeGuard.h>
 
 DECLARE_bool(zimg_use_mkl_for_fft_if_available);
 DECLARE_uint32(zimg_global_fft_number_of_threads);
 
-#if ZIMG_MKL_ENABLED
+#if defined(ZIMG_USE_MKL) && (defined(__x86_64__) || defined(_M_X64) || defined(__amd64__))
 
 TEST(ZImgNCC, normXCorr_S_mkl)
 {
