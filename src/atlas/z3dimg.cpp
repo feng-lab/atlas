@@ -553,6 +553,31 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     LOG(INFO) << "no missing blocks";
     return true;
   }
+
+  if (VLOG_IS_ON(2) && m_imgPack.isNeuroglancerPrecomputed()) {
+    std::vector<size_t> missingPerLevel(m_numLevels, 0);
+    for (auto blockID : missingBlockIDs) {
+      size_t level = 0;
+      while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].x) {
+        ++level;
+      }
+      if (level + 1 < m_numLevels) {
+        ++missingPerLevel[level];
+      }
+    }
+
+    std::string msg = "Neuroglancer missing blocks per LOD:";
+    for (size_t l = 0; l + 1 < m_numLevels; ++l) {
+      msg += fmt::format(" L{}(ratio {},{},{}): {}",
+                         l,
+                         m_levelScales[l].x,
+                         m_levelScales[l].y,
+                         m_levelScales[l].z,
+                         missingPerLevel[l]);
+    }
+    VLOG(2) << msg;
+  }
+
   auto numBlocksToRead = m_channelImageCacheManagers[c]->size();
   LOG(INFO) << "total " << m_channelImageCacheManagers[c]->size() << " need " << missingBlockIDs.size();
 

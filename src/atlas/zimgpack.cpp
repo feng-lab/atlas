@@ -1245,6 +1245,20 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
 
   auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
   if (m_ngVolume) {
+    const std::array<size_t, 3> requestedRatio = {static_cast<size_t>(xyRatio),
+                                                  static_cast<size_t>(xyRatio),
+                                                  static_cast<size_t>(zRatio)};
+    if (VLOG_IS_ON(1) && readRatio != requestedRatio) {
+      VLOG(1) << fmt::format("Neuroglancer readRegion requested ratio [{},{},{}] is not available; using [{},{},{}] and "
+                             "resizing (this may increase network I/O).",
+                             requestedRatio[0],
+                             requestedRatio[1],
+                             requestedRatio[2],
+                             readRatio[0],
+                             readRatio[1],
+                             readRatio[2]);
+    }
+
     auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(readRatio);
     CHECK(scaleIndexOpt);
 
