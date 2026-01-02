@@ -23,6 +23,18 @@ namespace nim {
 class ZNeuroglancerPrecomputedVolume
 {
 public:
+  enum class Slice2DRatioPolicy
+  {
+    // Choose a pyramid level whose effective on-screen resolution is closest to 1:1
+    // for the given render scale.
+    BestForScale,
+
+    // Always choose the coarsest available XY pyramid level (largest downsample ratio),
+    // preferring the smallest Z downsample when multiple levels share the same XY ratio.
+    // This is intended for fast "fill the holes" preview rendering during interaction.
+    CoarsestXY,
+  };
+
   struct Scale
   {
     enum class ChunkEncoding
@@ -214,7 +226,12 @@ public:
   [[nodiscard]] SliceTilePack sliceTilePackFor2DViewportBlocking(size_t z,
                                                                  size_t t,
                                                                  const QRectF& viewport,
-                                                                 double renderScale) const;
+                                                                 double renderScale,
+                                                                 Slice2DRatioPolicy ratioPolicy = Slice2DRatioPolicy::BestForScale) const;
+
+  // Returns true if all chunks needed to render the given 2D viewport at the coarsest available XY pyramid
+  // level (Slice2DRatioPolicy::CoarsestXY) are already present in the in-memory chunk cache.
+  [[nodiscard]] bool is2DViewportFullyCachedForCoarsestXY(size_t z, size_t t, const QRectF& viewport) const;
 
   [[nodiscard]] const std::array<int64_t, 3>& baseVoxelOffset() const
   {

@@ -28,7 +28,10 @@ namespace nim {
 
 namespace {
 
-constexpr double kNg2DPreviewScaleForRatioSelection = 0.5;
+// The cache-only pass is intended to be cheap and to quickly paint "something" using already-cached
+// chunks. Cap the target-scale used for ratio selection so we don't try to composite a large number
+// of fine tiles from cache when zoomed in.
+constexpr double kNg2DCacheRenderScaleForRatioSelection = 0.5;
 constexpr int kNg2DRefineDebounceMs = 150;
 
 class ZOverwritePixmapItem : public QGraphicsPixmapItem
@@ -122,7 +125,10 @@ Neuroglancer2DRenderResult renderNeuroglancer2D(Neuroglancer2DRenderParams param
     if (params.pass == Neuroglancer2DRenderParams::Pass::CacheOnly) {
       tiles = params.volume->sliceTilePackFor2DViewportCacheBestEffort(params.z, params.t, params.viewport, params.renderScale);
     } else {
-      tiles = params.volume->sliceTilePackFor2DViewportBlocking(params.z, params.t, params.viewport, params.renderScale);
+      const auto policy = (params.pass == Neuroglancer2DRenderParams::Pass::Preview)
+                            ? ZNeuroglancerPrecomputedVolume::Slice2DRatioPolicy::CoarsestXY
+                            : ZNeuroglancerPrecomputedVolume::Slice2DRatioPolicy::BestForScale;
+      tiles = params.volume->sliceTilePackFor2DViewportBlocking(params.z, params.t, params.viewport, params.renderScale, policy);
     }
 
     out.qImagePack = qImagePackFromZImgs(tiles.imgs,
@@ -872,8 +878,16 @@ void ZImgFilter::requestNeuroglancer2DRender()
   }
 
   // Schedule a coarse preview render immediately (at most one in flight).
-  m_ngPreviewDirty = true;
-  if (!m_ngPreviewInFlight) {
+  bool previewNeeded = true;
+  if (m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && m_display) {
+    previewNeeded = !m_imgPack->neuroglancerVolumeShared()->is2DViewportFullyCachedForCoarsestXY(
+      m_display->slice(),
+      m_display->time(),
+      mapFromSceneRect(m_view.currentViewport()));
+  }
+
+  m_ngPreviewDirty = previewNeeded;
+  if (previewNeeded && !m_ngPreviewInFlight) {
     startNeuroglancer2DRender(/*finalPass=*/false);
   }
 
@@ -912,7 +926,7 @@ void ZImgFilter::startNeuroglancer2DCacheRender()
   params.t = m_display->time();
 
   const double viewScale = effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale());
-  params.renderScale = std::min(viewScale, kNg2DPreviewScaleForRatioSelection);
+  params.renderScale = std::min(viewScale, kNg2DCacheRenderScaleForRatioSelection);
   params.pass = Neuroglancer2DRenderParams::Pass::CacheOnly;
 
   // Channel configuration (copy-only types; safe to move across threads).
@@ -1014,7 +1028,9 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
     params.renderScale = viewScale;
     params.pass = Neuroglancer2DRenderParams::Pass::Final;
   } else {
-    params.renderScale = std::min(viewScale, kNg2DPreviewScaleForRatioSelection);
+    // Preview pass always requests the coarsest available XY pyramid level (see renderNeuroglancer2D),
+    // so the exact renderScale value is not used for ratio selection.
+    params.renderScale = viewScale;
     params.pass = Neuroglancer2DRenderParams::Pass::Preview;
   }
 

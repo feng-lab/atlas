@@ -1088,6 +1088,26 @@ namespace {
   return best;
 }
 
+[[nodiscard]] std::array<size_t, 3> coarsestRatioFor2DPreview(const std::vector<std::array<size_t, 3>>& ratios)
+{
+  CHECK(!ratios.empty());
+
+  // For 2D slice rendering we care primarily about XY resolution; preserve slice
+  // fidelity by preferring smaller Z downsampling when possible.
+  std::array<size_t, 3> best = ratios.front();
+  for (const auto& ratio : ratios) {
+    if (ratio[0] > best[0]) {
+      best = ratio;
+      continue;
+    }
+    if (ratio[0] == best[0] && ratio[2] < best[2]) {
+      best = ratio;
+      continue;
+    }
+  }
+  return best;
+}
+
 [[nodiscard]] std::vector<std::array<size_t, 3>> ratiosAtLeastAsCoarseAs(const std::vector<std::array<size_t, 3>>& ratios,
                                                                          const std::array<size_t, 3>& target)
 {
@@ -1233,7 +1253,8 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
   size_t z,
   size_t t,
   const QRectF& viewport,
-  double renderScale) const
+  double renderScale,
+  Slice2DRatioPolicy ratioPolicy) const
 {
   CHECK(t == 0) << "Neuroglancer precomputed volumes do not support time dimension yet (t must be 0)";
   CHECK(renderScale > 0);
@@ -1245,7 +1266,15 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
     return out;
   }
 
-  const std::array<size_t, 3> targetRatio = bestRatioForIsotropicScale(ratios, renderScale);
+  std::array<size_t, 3> targetRatio{};
+  switch (ratioPolicy) {
+  case Slice2DRatioPolicy::BestForScale:
+    targetRatio = bestRatioForIsotropicScale(ratios, renderScale);
+    break;
+  case Slice2DRatioPolicy::CoarsestXY:
+    targetRatio = coarsestRatioFor2DPreview(ratios);
+    break;
+  }
   out.targetRatio = targetRatio;
 
   if (targetRatio[0] != targetRatio[1]) {
@@ -1324,6 +1353,47 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
   }
 
   return out;
+}
+
+bool ZNeuroglancerPrecomputedVolume::is2DViewportFullyCachedForCoarsestXY(size_t z, size_t t, const QRectF& viewport) const
+{
+  CHECK(t == 0) << "Neuroglancer precomputed volumes do not support time dimension yet (t must be 0)";
+
+  std::vector<std::array<size_t, 3>> ratios = availableRatios();
+  if (ratios.empty()) {
+    return true;
+  }
+
+  const std::array<size_t, 3> ratio = coarsestRatioFor2DPreview(ratios);
+  if (ratio[0] != ratio[1]) {
+    // 2D view assumes an isotropic XY ratio; treat anisotropic levels as unsupported.
+    return false;
+  }
+
+  auto scaleIndexOpt = scaleIndexForRatio(ratio);
+  if (!scaleIndexOpt) {
+    return false;
+  }
+
+  const int64_t z0 = static_cast<int64_t>(z);
+  const std::array<int64_t, 3> boxStart{static_cast<int64_t>(std::floor(viewport.x())),
+                                        static_cast<int64_t>(std::floor(viewport.y())),
+                                        z0};
+  const std::array<int64_t, 3> boxEnd{static_cast<int64_t>(std::ceil(viewport.right())),
+                                      static_cast<int64_t>(std::ceil(viewport.bottom())),
+                                      z0 + 1};
+
+  const auto chunks = chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
+  if (chunks.empty()) {
+    return true;
+  }
+
+  for (const auto& c : chunks) {
+    if (!tryGetCachedChunk(c)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 } // namespace nim

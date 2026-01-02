@@ -382,6 +382,14 @@ else ()
 endif ()
 
 if (APPLE)
+    # When building a universal2 binary, some dependencies may be architecture-specific (e.g. Intel oneAPI MKL is
+    # x86_64-only). The per-arch link step intentionally ignores the non-matching slices, and Apple ld emits noisy
+    # "found architecture 'x86_64', required architecture 'arm64'" warnings. Suppress those warnings.
+    list(LENGTH CMAKE_OSX_ARCHITECTURES ATLAS_OSX_ARCH_COUNT)
+    if (ATLAS_OSX_ARCH_COUNT GREATER 1)
+        # target_link_options(${LIBRARY_NAME} BEFORE PUBLIC -Wl,-no_arch_warnings) # not working, have to use:
+        target_link_options(${LIBRARY_NAME} PUBLIC -Wl,-w) # todo: need better solution
+    endif ()
     target_link_libraries(${LIBRARY_NAME} PUBLIC "-framework Accelerate")
 endif ()
 
