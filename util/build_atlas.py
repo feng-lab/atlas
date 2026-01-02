@@ -49,7 +49,10 @@ def get_cmake_cmd_common_part():
 
 
 def build_atlas(
-    use_asan: bool = False, skip_test: bool = False, debug_version: bool = False
+    use_asan: bool = False,
+    skip_test: bool = False,
+    debug_version: bool = False,
+    enable_network_tests: bool = False,
 ):
     logger.info(f'srcDIR: {common_dirs.atlas_repository_dir()}')
     logger.info(f"buildDIR: {common_dirs.atlas_build_dir()}")
@@ -110,6 +113,9 @@ def build_atlas(
         if not skip_test:
             download_atlas_test_data()
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
+            # Network tests are opt-in. Force them off by default so CI/self-hosted
+            # runners don't fail when outbound access is restricted.
+            env['ATLAS_ENABLE_NETWORK_TESTS'] = '1' if enable_network_tests else '0'
             subprocess.run(
                 [common_dirs.get_ctest_binary(), "--extra-verbose"],
                 cwd=common_dirs.atlas_build_dir(),
@@ -149,6 +155,9 @@ def build_atlas(
         if not skip_test:
             download_atlas_test_data()
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
+            # Network tests are opt-in. Force them off by default so CI/self-hosted
+            # runners don't fail when outbound access is restricted.
+            env['ATLAS_ENABLE_NETWORK_TESTS'] = '1' if enable_network_tests else '0'
             subprocess.run(
                 [common_dirs.get_ctest_binary(), "--extra-verbose"],
                 cwd=common_dirs.atlas_build_dir(),
@@ -172,10 +181,16 @@ python build_atlas.py [--use-asan] [--skip-test] [--debug-version]
     parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
     parser.add_argument("--skip-test", action='store_true', help="skip test")
     parser.add_argument("--debug-version", action='store_true', help="debug version")
+    parser.add_argument(
+        "--enable-network-tests",
+        action="store_true",
+        help="enable network-dependent tests (disabled by default for CI/firewalled environments)",
+    )
     args = parser.parse_args()
 
     build_atlas(
         use_asan=args.use_asan,
         skip_test=args.skip_test,
         debug_version=args.debug_version,
+        enable_network_tests=args.enable_network_tests,
     )

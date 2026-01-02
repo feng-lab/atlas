@@ -104,6 +104,6 @@ add_subdirectory(src/neurolabi/gui)
 add_subdirectory(src/atlas)
 
 option(BUILD_TESTING "Enable tests" ON)
-if (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS) AND (NOT ATLAS_DEBUG_VERSION) AND (NOT CMAKE_CROSSCOMPILING))
+if (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS) AND (NOT CMAKE_CROSSCOMPILING))
   include(test/test.cmake)
 endif ()

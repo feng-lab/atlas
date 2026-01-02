@@ -565,6 +565,8 @@ jobs:
             testdata-
 
       - name: Build and deploy Atlas
+        env:
+          QT_OPENGL: software
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'

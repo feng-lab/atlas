@@ -274,8 +274,10 @@ bool ZImgPack::needUpdate(const QRectF& viewport,
     return false;
   }
 
-  auto readRatio = ratioForScale(scale, scale, 1.);
-  auto oldReadRatio = ratioForScale(oldScale, oldScale, 1.);
+  const double zScale = m_ngVolume ? scale : 1.0;
+  const double oldZScale = m_ngVolume ? oldScale : 1.0;
+  auto readRatio = ratioForScale(scale, scale, zScale);
+  auto oldReadRatio = ratioForScale(oldScale, oldScale, oldZScale);
   if (readRatio != oldReadRatio) {
     return true;
   }
@@ -384,7 +386,8 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
   locs.clear();
   scales.clear();
 
-  auto readRatio = ratioForScale(scale, scale, 1);
+  const double zScale = m_ngVolume ? scale : 1.0;
+  auto readRatio = ratioForScale(scale, scale, zScale);
 
   if (m_ngVolume) {
     CHECK(t == 0);
@@ -405,6 +408,8 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
     }
 
     const double tileScale = static_cast<double>(readRatio[0]);
+    const int64_t ratioZ = static_cast<int64_t>(readRatio[2]);
+    CHECK(ratioZ > 0);
 
     std::vector<std::shared_ptr<ZImg>> tmpImgs(chunks.size());
     std::vector<QPoint> tmpLocs(chunks.size());
@@ -424,7 +429,9 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
           continue;
         }
 
-        const int64_t localZ = z0 - chunks[i].baseStart[2];
+        const int64_t localZBase = z0 - chunks[i].baseStart[2];
+        CHECK(localZBase >= 0);
+        const int64_t localZ = localZBase / ratioZ;
         CHECK(localZ >= 0);
         CHECK(static_cast<size_t>(localZ) < chunkImg->depth());
 
@@ -656,9 +663,6 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
       // (called on mouse-move, and in other hot UI paths).
       for (auto it = m_pyramidalRatios.rbegin(); it != m_pyramidalRatios.rend(); ++it) {
         const auto& ratio = *it;
-        if (ratio[2] != 1) {
-          continue;
-        }
         auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(ratio);
         if (!scaleIndexOpt) {
           continue;
@@ -678,11 +682,12 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
 
           const int64_t rx = static_cast<int64_t>(ratio[0]);
           const int64_t ry = static_cast<int64_t>(ratio[1]);
-          CHECK(rx > 0 && ry > 0);
+          const int64_t rz = static_cast<int64_t>(ratio[2]);
+          CHECK(rx > 0 && ry > 0 && rz > 0);
 
           const size_t vx = static_cast<size_t>(lx / rx);
           const size_t vy = static_cast<size_t>(ly / ry);
-          const size_t vz = static_cast<size_t>(lz);
+          const size_t vz = static_cast<size_t>(lz / rz);
 
           CHECK(vx < chunkImg->width());
           CHECK(vy < chunkImg->height());
@@ -2189,6 +2194,37 @@ void ZImgPack::updateNameTootip()
 std::array<size_t, 3> ZImgPack::ratioForScale(double xScale, double yScale, double zScale) const
 {
   CHECK(!m_pyramidalRatios.empty());
+  CHECK(xScale > 0);
+  CHECK(yScale > 0);
+  CHECK(zScale > 0);
+
+  // For network-backed Neuroglancer sources, prefer a pyramid level whose effective
+  // on-screen resolution is closest to 1:1. This avoids oversampling (which can cause
+  // hundreds of small HTTP requests when zoomed out) while still preserving detail
+  // when zoomed in.
+  if (m_ngVolume) {
+    std::array<size_t, 3> best = {1, 1, 1};
+    double bestErr = std::numeric_limits<double>::infinity();
+    size_t bestRatioSum = 0;
+
+    for (const auto& ratio : m_pyramidalRatios) {
+      const double ex = std::abs(static_cast<double>(ratio[0]) * xScale - 1.0);
+      const double ey = std::abs(static_cast<double>(ratio[1]) * yScale - 1.0);
+      const double ez = std::abs(static_cast<double>(ratio[2]) * zScale - 1.0);
+      const double err = ex + ey + ez;
+      const size_t ratioSum = ratio[0] + ratio[1] + ratio[2];
+
+      // Tie-break toward coarser levels (larger ratios) to reduce network I/O.
+      if (err < bestErr - 1e-12 || (std::abs(err - bestErr) <= 1e-12 && ratioSum > bestRatioSum)) {
+        best = ratio;
+        bestErr = err;
+        bestRatioSum = ratioSum;
+      }
+    }
+
+    return best;
+  }
+
   return readRatioOf(std::max(1.0, std::floor(1.0 / xScale)),
                      std::max(1.0, std::floor(1.0 / yScale)),
                      std::max(1.0, std::floor(1.0 / zScale)));

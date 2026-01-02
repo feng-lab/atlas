@@ -20,6 +20,8 @@ Neuroglancer Precomputed (HTTP)
 - Atlas can load Neuroglancer “precomputed” volumes over HTTP (both unsharded and sharded storage via `"sharding": {"@type":"neuroglancer_uint64_sharded_v1", ...}`) with these chunk encodings:
   - `encoding: "raw"` — little-endian raw voxel bytes (Fortran order).
   - `encoding: "jpeg"` — requires `data_type: "uint8"` and `num_channels` ∈ {1, 3}.
+  - `encoding: "png"` — requires an unsigned `data_type` with 1 or 2 bytes/voxel and `num_channels` ∈ {1, 2, 3, 4}. Output is decoded to planar channel order.
+  - `encoding: "compresso"` — requires an unsigned `data_type` with 1/2/4/8 bytes/voxel and `num_channels = 1` (segmentation-style labels).
   - `encoding: "compressed_segmentation"` — requires `data_type` ∈ {`"uint32"`, `"uint64"`} and `compressed_segmentation_block_size`.
   - Sharded volumes require HTTP `Range` support; Atlas supports `minishard_index_encoding` and `data_encoding` of `raw` or `gzip` as specified in Neuroglancer’s sharded format. (Sharding `data_encoding` is applied first, then the per-scale chunk `encoding` is decoded.)
 - Networking is implemented with proxygen/folly: `src/atlas/zproxygenhttpclient.h` and `src/atlas/zproxygenhttpclient.cpp`.
@@ -44,6 +46,8 @@ Testing (Linking Atlas Code)
   - For headless Qt runs, the tests default to `QT_QPA_PLATFORM=minimal`.
 - Runtime resources (shaders/assets) remain app-packaged; unit tests around Vulkan/RAII pipeline contracts do not depend on runtime discovery.
 - GPU/UI-heavy tests should be gated/opt-in and prefer offscreen surfaces or SwiftShader where available.
+- Neuroglancer precomputed E2E tests:
+  - `test/zneuroglancerprecomputede2etest.cpp` is a networked smoke test (public GCS URLs) gated by `ATLAS_ENABLE_NETWORK_TESTS=1`.
 
 Agents: Preview Screenshots
 

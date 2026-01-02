@@ -712,6 +712,10 @@ target_link_libraries(atlas_core PUBLIC
   Qt6::CorePrivate Qt6::Test
   proxygen::proxygen
   gRPC::grpc++ protobuf::libprotobuf)
+if (WIN32)
+  # Required for importing the Windows system certificate store for HTTPS.
+  target_link_libraries(atlas_core PUBLIC crypt32)
+endif ()
 if (UNIX AND NOT APPLE)
   target_link_libraries(atlas_core PUBLIC OpenGL::OpenGL OpenGL::EGL)
 endif ()

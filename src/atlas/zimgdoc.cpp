@@ -302,7 +302,7 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
   bool ok = false;
   QString url = QInputDialog::getText(QApplication::activeWindow(),
                                       tr("Load Neuroglancer Precomputed Volume"),
-                                      tr("Dataset URL (root or .../info):"),
+                                      tr("Dataset URL (root or .../info; not a viewer state .json):"),
                                       QLineEdit::Normal,
                                       lastUrl,
                                       &ok);

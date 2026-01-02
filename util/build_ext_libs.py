@@ -2704,13 +2704,26 @@ def build_fizz(src_dir: str, install_dir: str):
 
     patches = [
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
-                r'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)',
+                r"list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)",
+                r"    ${sodium_INCLUDE_DIR}",
+                r"    sodium",
             ],
             to_texts=[
-                'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n'
-                'add_library(gflags::gflags ALIAS gflags)',
+                "list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n"
+                "add_library(gflags::gflags ALIAS gflags)",
+                r"",
+                r"",
+            ],
+        ),
+        FilePatcher(
+            orig_file=os.path.join(src_dir, "cmake", "fizz-config.cmake.in"),
+            from_texts=[
+                r"find_dependency(Sodium)",
+            ],
+            to_texts=[
+                "",
             ],
         ),
     ]

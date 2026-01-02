@@ -109,7 +109,7 @@ Atlas organizes data into documents. Each document type contributes load actions
 
 | Document | Typical Extensions | Notes |
 | --- | --- | --- |
-| `ZImgDoc` (Images) | `.tif`, `.tiff`, `.ome.tif`, `.mhd`, `.raw`, `.nii`, `.hdr`, `.png`, `.jpg`, `.bmp`, `.exr`, `.lsm`, `.v3draw` | Multi-channel, multi-timepoint volumes supported. Sequences can be imported as stacks. Also supports Neuroglancer precomputed volumes (`raw`/`jpeg`/`compressed_segmentation`, sharded or unsharded) via URL. |
+| `ZImgDoc` (Images) | `.tif`, `.tiff`, `.ome.tif`, `.mhd`, `.raw`, `.nii`, `.hdr`, `.png`, `.jpg`, `.bmp`, `.exr`, `.lsm`, `.v3draw` | Multi-channel, multi-timepoint volumes supported. Sequences can be imported as stacks. Also supports Neuroglancer precomputed volumes (`raw`/`jpeg`/`png`/`compresso`/`compressed_segmentation`, sharded or unsharded) via URL. |
 | `ZROIDoc` (ROI Masks) | `.roi`, `.mask`, `.nii`, `.mhd`, `.nrrd` | Accepts atlas-generated ROI files or converts mask images into editable ROIs. |
 | `ZRegionAnnotationDoc` | `.annotation`, `.json`, label images | Handles labeled regions; can import/export label images. |
 | `ZPunctaDoc` | `.apo`, `.csv`, `.json` | Stores point clouds like synaptic puncta with undo support. |
@@ -303,8 +303,9 @@ Steps to load and manage images via `ZImgDoc`:
    3. Confirm. Each image becomes a new object in the manager.
 2. **Load Neuroglancer (Precomputed)**
    1. Choose **File → Load Neuroglancer (Precomputed)...**.
-   2. Paste a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `http://`, `https://`.
-   3. Current limitations: read-only dataset. Supported chunk encodings are `raw`, `jpeg` (uint8, 1 or 3 channels), and `compressed_segmentation` (uint32/uint64 segmentation). Sharded volumes require an HTTP server that supports `Range` requests.
+   2. Paste a dataset URL (root or `.../info`). Supported schemes: `precomputed://`, `gs://`, `http://`, `https://`. (Note: Neuroglancer viewer state `.json` URLs are not dataset roots.)
+   3. Current limitations: read-only dataset. Supported chunk encodings are `raw`, `jpeg` (uint8, 1 or 3 channels), `png` (unsigned 1–2 bytes/voxel, 1–4 channels), `compresso` (unsigned 1/2/4/8 bytes/voxel, 1 channel), and `compressed_segmentation` (uint32/uint64 segmentation). Sharded volumes require an HTTP server that supports `Range` requests.
+   4. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
 3. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
 4. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.
 5. **Full resolution rendering** – in 3D, enable Full Resolution in Object View Setting when you require high-quality output. Monitor GPU memory usage and progress logs.

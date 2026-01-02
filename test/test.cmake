@@ -62,6 +62,8 @@ add_gtest_executable(ztupleliketest)
 # This test only exercises header + a few .cpp symbols; there is no GPU work.
 add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_gtest_executable(zneuroglanceruint64shardingtest)
+add_atlas_gtest_executable(zneuroglancerprecomputedchunkdecodertest)
+add_atlas_gtest_executable(zneuroglancerprecomputede2etest)
 
 # Atlas-side tests
 
