@@ -14,9 +14,13 @@
 
 #include <algorithm>
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <limits>
 #include <tuple>
+
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
 
 DEFINE_double(atlas_ng_precomputed_chunk_cache_memory_proportion,
               0.15,
@@ -1052,6 +1056,274 @@ std::shared_ptr<ZImg> ZNeuroglancerPrecomputedVolume::tryGetCachedChunk(const Ch
 std::shared_ptr<ZImg> ZNeuroglancerPrecomputedVolume::readChunkBlocking(const Chunk& chunk) const
 {
   return folly::coro::blockingWait(readChunkAsync(chunk));
+}
+
+namespace {
+
+[[nodiscard]] std::array<size_t, 3> bestRatioForIsotropicScale(const std::vector<std::array<size_t, 3>>& ratios,
+                                                               double scale) // x=y=z
+{
+  CHECK(scale > 0);
+  CHECK(!ratios.empty());
+
+  std::array<size_t, 3> best = ratios.front();
+  double bestErr = std::numeric_limits<double>::infinity();
+  size_t bestRatioSum = 0;
+
+  for (const auto& ratio : ratios) {
+    const double ex = std::abs(static_cast<double>(ratio[0]) * scale - 1.0);
+    const double ey = std::abs(static_cast<double>(ratio[1]) * scale - 1.0);
+    const double ez = std::abs(static_cast<double>(ratio[2]) * scale - 1.0);
+    const double err = ex + ey + ez;
+    const size_t ratioSum = ratio[0] + ratio[1] + ratio[2];
+
+    // Tie-break toward coarser levels (larger ratios) to reduce network I/O.
+    if (err < bestErr - 1e-12 || (std::abs(err - bestErr) <= 1e-12 && ratioSum > bestRatioSum)) {
+      best = ratio;
+      bestErr = err;
+      bestRatioSum = ratioSum;
+    }
+  }
+
+  return best;
+}
+
+[[nodiscard]] std::vector<std::array<size_t, 3>> ratiosAtLeastAsCoarseAs(const std::vector<std::array<size_t, 3>>& ratios,
+                                                                         const std::array<size_t, 3>& target)
+{
+  std::vector<std::array<size_t, 3>> out;
+  out.reserve(ratios.size());
+  for (const auto& r : ratios) {
+    if (r[0] >= target[0] && r[1] >= target[1] && r[2] >= target[2]) {
+      out.push_back(r);
+    }
+  }
+
+  std::sort(out.begin(), out.end(), [](const std::array<size_t, 3>& a, const std::array<size_t, 3>& b) {
+    const size_t as = a[0] + a[1] + a[2];
+    const size_t bs = b[0] + b[1] + b[2];
+    if (as != bs) {
+      return as > bs; // coarser first
+    }
+    return a > b;
+  });
+
+  return out;
+}
+
+} // namespace
+
+ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sliceTilePackFor2DViewportCacheBestEffort(
+  size_t z,
+  size_t t,
+  const QRectF& viewport,
+  double renderScale) const
+{
+  CHECK(t == 0) << "Neuroglancer precomputed volumes do not support time dimension yet (t must be 0)";
+  CHECK(renderScale > 0);
+
+  SliceTilePack out;
+
+  std::vector<std::array<size_t, 3>> ratios = availableRatios();
+  if (ratios.empty()) {
+    return out;
+  }
+
+  const std::array<size_t, 3> targetRatio = bestRatioForIsotropicScale(ratios, renderScale);
+  out.targetRatio = targetRatio;
+
+  if (targetRatio[0] != targetRatio[1]) {
+    throw ZException(fmt::format("Neuroglancer 2D display currently requires isotropic XY downsampling ratios, but got ratio [{},{},{}]",
+                                 targetRatio[0],
+                                 targetRatio[1],
+                                 targetRatio[2]));
+  }
+
+  const int64_t z0 = static_cast<int64_t>(z);
+  const std::array<int64_t, 3> boxStart{static_cast<int64_t>(std::floor(viewport.x())),
+                                        static_cast<int64_t>(std::floor(viewport.y())),
+                                        z0};
+  const std::array<int64_t, 3> boxEnd{static_cast<int64_t>(std::ceil(viewport.right())),
+                                      static_cast<int64_t>(std::ceil(viewport.bottom())),
+                                      z0 + 1};
+
+  const std::vector<std::array<size_t, 3>> candidateRatios = ratiosAtLeastAsCoarseAs(ratios, targetRatio);
+  if (candidateRatios.empty()) {
+    return out;
+  }
+
+  auto toIntChecked = [](int64_t v) -> int {
+    if (v < static_cast<int64_t>(std::numeric_limits<int>::min()) || v > static_cast<int64_t>(std::numeric_limits<int>::max())) {
+      throw ZException(fmt::format("Neuroglancer chunk coordinate {} is out of QPoint range", v));
+    }
+    return static_cast<int>(v);
+  };
+
+  // Collect cached chunks from target->coarser pyramid levels, then let the caller's z-ordering policy decide which
+  // tiles are visible where overlaps exist. This keeps the logic simple while still guaranteeing that we will
+  // show any already-cached coverage immediately.
+  for (const auto& ratio : candidateRatios) {
+    if (ratio[0] != ratio[1]) {
+      // 2D view uses a uniform scale factor, so skip anisotropic XY levels rather than rendering incorrectly.
+      continue;
+    }
+
+    auto scaleIndexOpt = scaleIndexForRatio(ratio);
+    if (!scaleIndexOpt) {
+      continue;
+    }
+
+    const auto chunks = chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
+    if (chunks.empty()) {
+      continue;
+    }
+
+    std::vector<std::shared_ptr<ZImg>> tmpImgs(chunks.size());
+    std::vector<QPoint> tmpLocs(chunks.size());
+
+    const int64_t ratioZ = static_cast<int64_t>(ratio[2]);
+    CHECK(ratioZ > 0);
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
+      for (size_t i = r.begin(); i != r.end(); ++i) {
+        auto chunkImg = tryGetCachedChunk(chunks[i]);
+        if (!chunkImg) {
+          continue;
+        }
+
+        const int64_t localZBase = z0 - chunks[i].baseStart[2];
+        if (localZBase < 0) {
+          continue;
+        }
+
+        const int64_t localZ = localZBase / ratioZ;
+        if (localZ < 0) {
+          continue;
+        }
+        if (static_cast<size_t>(localZ) >= chunkImg->depth()) {
+          continue;
+        }
+
+        ZImg sliceImg = chunkImg->crop(ZImgRegion(0,
+                                                  static_cast<index_t>(chunkImg->width()),
+                                                  0,
+                                                  static_cast<index_t>(chunkImg->height()),
+                                                  static_cast<index_t>(localZ),
+                                                  static_cast<index_t>(localZ + 1)));
+        tmpImgs[i] = std::make_shared<ZImg>(std::move(sliceImg));
+        tmpLocs[i] = QPoint(toIntChecked(chunks[i].baseStart[0]), toIntChecked(chunks[i].baseStart[1]));
+      }
+    });
+
+    const double tileScale = static_cast<double>(ratio[0]);
+    for (size_t i = 0; i < tmpImgs.size(); ++i) {
+      if (!tmpImgs[i]) {
+        continue;
+      }
+      out.imgs.push_back(std::move(tmpImgs[i]));
+      out.locs.push_back(tmpLocs[i]);
+      out.scales.push_back(tileScale);
+    }
+  }
+
+  return out;
+}
+
+ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sliceTilePackFor2DViewportBlocking(
+  size_t z,
+  size_t t,
+  const QRectF& viewport,
+  double renderScale) const
+{
+  CHECK(t == 0) << "Neuroglancer precomputed volumes do not support time dimension yet (t must be 0)";
+  CHECK(renderScale > 0);
+
+  SliceTilePack out;
+
+  std::vector<std::array<size_t, 3>> ratios = availableRatios();
+  if (ratios.empty()) {
+    return out;
+  }
+
+  const std::array<size_t, 3> targetRatio = bestRatioForIsotropicScale(ratios, renderScale);
+  out.targetRatio = targetRatio;
+
+  if (targetRatio[0] != targetRatio[1]) {
+    throw ZException(fmt::format("Neuroglancer 2D display currently requires isotropic XY downsampling ratios, but got ratio [{},{},{}]",
+                                 targetRatio[0],
+                                 targetRatio[1],
+                                 targetRatio[2]));
+  }
+
+  auto scaleIndexOpt = scaleIndexForRatio(targetRatio);
+  if (!scaleIndexOpt) {
+    throw ZException(fmt::format("Neuroglancer requested ratio [{},{},{}] is not available in this dataset",
+                                 targetRatio[0],
+                                 targetRatio[1],
+                                 targetRatio[2]));
+  }
+
+  const int64_t z0 = static_cast<int64_t>(z);
+  const std::array<int64_t, 3> boxStart{static_cast<int64_t>(std::floor(viewport.x())),
+                                        static_cast<int64_t>(std::floor(viewport.y())),
+                                        z0};
+  const std::array<int64_t, 3> boxEnd{static_cast<int64_t>(std::ceil(viewport.right())),
+                                      static_cast<int64_t>(std::ceil(viewport.bottom())),
+                                      z0 + 1};
+
+  const auto chunks = chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
+  if (chunks.empty()) {
+    return out;
+  }
+
+  const int64_t ratioZ = static_cast<int64_t>(targetRatio[2]);
+  CHECK(ratioZ > 0);
+
+  std::vector<std::shared_ptr<ZImg>> tmpImgs(chunks.size());
+  std::vector<QPoint> tmpLocs(chunks.size());
+
+  auto toIntChecked = [](int64_t v) -> int {
+    if (v < static_cast<int64_t>(std::numeric_limits<int>::min()) || v > static_cast<int64_t>(std::numeric_limits<int>::max())) {
+      throw ZException(fmt::format("Neuroglancer chunk coordinate {} is out of QPoint range", v));
+    }
+    return static_cast<int>(v);
+  };
+
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, chunks.size()), [&](const tbb::blocked_range<size_t>& r) {
+    for (size_t i = r.begin(); i != r.end(); ++i) {
+      auto chunkImg = readChunkBlocking(chunks[i]);
+      if (!chunkImg) {
+        continue;
+      }
+
+      const int64_t localZBase = z0 - chunks[i].baseStart[2];
+      CHECK(localZBase >= 0);
+      const int64_t localZ = localZBase / ratioZ;
+      CHECK(localZ >= 0);
+      CHECK(static_cast<size_t>(localZ) < chunkImg->depth());
+
+      ZImg sliceImg = chunkImg->crop(ZImgRegion(0,
+                                                static_cast<index_t>(chunkImg->width()),
+                                                0,
+                                                static_cast<index_t>(chunkImg->height()),
+                                                static_cast<index_t>(localZ),
+                                                static_cast<index_t>(localZ + 1)));
+      tmpImgs[i] = std::make_shared<ZImg>(std::move(sliceImg));
+      tmpLocs[i] = QPoint(toIntChecked(chunks[i].baseStart[0]), toIntChecked(chunks[i].baseStart[1]));
+    }
+  });
+
+  const double tileScale = static_cast<double>(targetRatio[0]);
+  for (size_t i = 0; i < tmpImgs.size(); ++i) {
+    if (!tmpImgs[i]) {
+      continue;
+    }
+    out.imgs.push_back(std::move(tmpImgs[i]));
+    out.locs.push_back(tmpLocs[i]);
+    out.scales.push_back(tileScale);
+  }
+
+  return out;
 }
 
 } // namespace nim

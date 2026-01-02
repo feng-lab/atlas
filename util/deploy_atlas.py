@@ -72,6 +72,10 @@ _MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS = 5
 _MACOS_CODESIGN_TIMESTAMP_RETRY_BASE_DELAY_SECONDS = 2.0
 _MACOS_CODESIGN_TIMESTAMP_RETRY_MAX_DELAY_SECONDS = 30.0
 
+_MACOS_NOTARYTOOL_SUBMIT_RETRY_ATTEMPTS = 5
+_MACOS_NOTARYTOOL_SUBMIT_RETRY_BASE_DELAY_SECONDS = 5.0
+_MACOS_NOTARYTOOL_SUBMIT_RETRY_MAX_DELAY_SECONDS = 120.0
+
 
 def _env_truthy(name: str) -> bool:
     value = os.environ.get(name, "").strip().lower()
@@ -207,6 +211,120 @@ def _macos_run_codesign_checked(cmd: list[str], *, cwd: Optional[str] = None) ->
         "This is usually a temporary Apple timestamp server or network issue. Re-run the deployment when network is stable.\n"
         f"Command: {' '.join(cmd)}"
     )
+
+
+def _macos_is_transient_notarytool_failure(output: str) -> bool:
+    """Best-effort detection of Apple notarytool transient network/service failures."""
+    if not output:
+        return False
+    lowered = output.lower()
+
+    # Example transient error seen in CI:
+    #   Error: abortedUpload(... error: The operation couldn’t be completed.
+    #          (Network.NWError error 54 - Connection reset by peer))
+    transient_markers = (
+        "abortedupload(",
+        "network.nwerror",
+        "nsurlerrordomain",
+        "connection reset by peer",
+        "connection refused",
+        "the network connection was lost",
+        "network connection was lost",
+        "could not connect to the server",
+        "couldn't be completed. (network",
+        "couldn’t be completed. (network",
+        "bad gateway",
+        "service unavailable",
+        "internal server error",
+        "gateway timeout",
+        "timed out",
+        "timeout",
+        "sotos3.",
+    )
+    return any(marker in lowered for marker in transient_markers)
+
+
+def _macos_notarytool_submit_wait_checked(
+    notarize_zip: str, auth_args: list[str]
+) -> tuple[str, str]:
+    submit_cmd = ["xcrun", "notarytool", "submit", notarize_zip, "--wait", *auth_args]
+    id_regex = re.compile(r"^\s*id:\s*([0-9a-fA-F-]{36})\s*$")
+    status_regex = re.compile(r"^\s*status:\s*(\S+)\s*$")
+
+    last_output = ""
+    last_submission_id: Optional[str] = None
+    for attempt in range(1, _MACOS_NOTARYTOOL_SUBMIT_RETRY_ATTEMPTS + 1):
+        attempt_str = f" ({attempt}/{_MACOS_NOTARYTOOL_SUBMIT_RETRY_ATTEMPTS})"
+        logger.info("Running: %s%s", " ".join(submit_cmd), attempt_str)
+        proc = subprocess.Popen(
+            submit_cmd,
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+
+        submission_id: Optional[str] = None
+        status: Optional[str] = None
+        output_lines: list[str] = []
+
+        assert proc.stdout is not None
+        for raw_line in proc.stdout:
+            line = raw_line.rstrip("\n")
+            if line:
+                logger.info("%s", line.rstrip())
+            output_lines.append(line)
+            match = id_regex.match(line)
+            if match:
+                submission_id = match.group(1)
+                continue
+            match = status_regex.match(line)
+            if match:
+                status = match.group(1)
+                continue
+
+        proc.wait()
+        last_output = "\n".join(line for line in output_lines if line)
+        last_submission_id = submission_id
+
+        if proc.returncode == 0:
+            if not submission_id:
+                raise RuntimeError("notarytool submit did not report a submission id")
+            if not status:
+                raise RuntimeError("notarytool submit did not report a final status")
+            return submission_id, status
+
+        if _macos_is_transient_notarytool_failure(last_output):
+            if attempt == _MACOS_NOTARYTOOL_SUBMIT_RETRY_ATTEMPTS:
+                break
+            delay = min(
+                _MACOS_NOTARYTOOL_SUBMIT_RETRY_MAX_DELAY_SECONDS,
+                _MACOS_NOTARYTOOL_SUBMIT_RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)),
+            )
+            logger.warning(
+                "notarytool submit failed due to a transient Apple/network error; retrying in %.1fs (%d/%d)",
+                delay,
+                attempt,
+                _MACOS_NOTARYTOOL_SUBMIT_RETRY_ATTEMPTS,
+            )
+            time.sleep(delay)
+            continue
+
+        raise subprocess.CalledProcessError(
+            proc.returncode, submit_cmd, output=last_output
+        )
+
+    raise RuntimeError(
+        "notarytool submit failed after retries due to a transient Apple/network issue.\n"
+        "This is usually a temporary Apple notary service disruption or a flaky CI network. Re-run the deployment when network is stable.\n"
+        f"zip: {notarize_zip}\n"
+        f"last id: {last_submission_id or '<unknown>'}\n"
+        f"Command: {' '.join(submit_cmd)}\n"
+        "Last output:\n"
+        f"{last_output or '<no output>'}"
+    )
+
 
 def _macos_is_signable_bundle_dir(path: str) -> bool:
     if not os.path.isdir(path):
@@ -660,43 +778,9 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
             "Fix by ensuring the bundle is user-readable before retrying, e.g.:\n"
             f"  chmod -R -P u+rwX {bundle_path}"
         )
-    submit_cmd = ["xcrun", "notarytool", "submit", notarize_zip, "--wait", *auth_args]
-    logger.info("Running: %s", " ".join(submit_cmd))
-    proc = subprocess.Popen(
-        submit_cmd,
-        shell=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
+    submission_id, status = _macos_notarytool_submit_wait_checked(
+        notarize_zip, auth_args
     )
-
-    id_regex = re.compile(r"^\s*id:\s*([0-9a-fA-F-]{36})\s*$")
-    status_regex = re.compile(r"^\s*status:\s*(\S+)\s*$")
-    submission_id: Optional[str] = None
-    status: Optional[str] = None
-
-    assert proc.stdout is not None
-    for raw_line in proc.stdout:
-        line = raw_line.rstrip("\n")
-        if line:
-            logger.info("%s", line.rstrip())
-        match = id_regex.match(line)
-        if match:
-            submission_id = match.group(1)
-            continue
-        match = status_regex.match(line)
-        if match:
-            status = match.group(1)
-            continue
-
-    proc.wait()
-    if proc.returncode != 0:
-        raise subprocess.CalledProcessError(proc.returncode, submit_cmd)
-    if not submission_id:
-        raise RuntimeError("notarytool submit did not report a submission id")
-    if not status:
-        raise RuntimeError("notarytool submit did not report a final status")
     logger.info("Notarytool result: id=%s status=%s", submission_id, status)
     if status != "Accepted":
         log_path = os.path.join(bundle_dir, f"{bundle_name}.notarytool.log.json")

@@ -4,7 +4,9 @@
 
 #include <folly/coro/Task.h>
 
+#include <QPoint>
 #include <QUrl>
+#include <QRectF>
 
 #include <array>
 #include <atomic>
@@ -160,6 +162,14 @@ public:
     std::array<int64_t, 3> baseEnd{};
   };
 
+  struct SliceTilePack
+  {
+    std::vector<std::shared_ptr<ZImg>> imgs;
+    std::vector<QPoint> locs;
+    std::vector<double> scales;
+    std::array<size_t, 3> targetRatio{1, 1, 1};
+  };
+
   static std::shared_ptr<ZNeuroglancerPrecomputedVolume> open(QString url, std::chrono::milliseconds timeout);
 
   [[nodiscard]] const QString& rootUrl() const
@@ -190,6 +200,21 @@ public:
   folly::coro::Task<std::shared_ptr<ZImg>> readChunkAsync(const Chunk& chunk) const;
 
   [[nodiscard]] std::shared_ptr<ZImg> readChunkBlocking(const Chunk& chunk) const;
+
+  // Builds a 2D slice tile pack for display at the target on-screen scale. This will only use chunks already
+  // present in the in-memory chunk cache, and will fall back to coarser pyramid levels as needed to cover the
+  // viewport. The returned tiles are ordered arbitrarily; callers should use their scale/z-ordering policy to
+  // ensure finer tiles overwrite coarser ones.
+  [[nodiscard]] SliceTilePack sliceTilePackFor2DViewportCacheBestEffort(size_t z,
+                                                                        size_t t,
+                                                                        const QRectF& viewport,
+                                                                        double renderScale) const;
+
+  // Builds a 2D slice tile pack by reading the target pyramid level. This may perform network I/O.
+  [[nodiscard]] SliceTilePack sliceTilePackFor2DViewportBlocking(size_t z,
+                                                                 size_t t,
+                                                                 const QRectF& viewport,
+                                                                 double renderScale) const;
 
   [[nodiscard]] const std::array<int64_t, 3>& baseVoxelOffset() const
   {

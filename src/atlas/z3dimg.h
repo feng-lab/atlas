@@ -12,6 +12,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <chrono>
 #include <memory>
 
 #if defined(ATLAS_SANITIZE_ADDRESS)
@@ -409,6 +410,9 @@ private:
   bool m_hasSufficientPageTableCacheSpace = false;
 
   ZVulkanImageBlockUploader* m_vulkanImageBlockUploader = nullptr;
+
+  // Rate-limited logging: when enabled via VLOG, summarize paging demand per LOD.
+  std::vector<std::chrono::steady_clock::time_point> m_lastPagingLodStatsLogTimes;
 };
 
 } // namespace nim

@@ -116,6 +116,12 @@ public:
     return static_cast<bool>(m_ngVolume);
   }
 
+  [[nodiscard]] std::shared_ptr<ZNeuroglancerPrecomputedVolume> neuroglancerVolumeShared() const
+  {
+    CHECK(m_ngVolume);
+    return m_ngVolume;
+  }
+
   [[nodiscard]] QString neuroglancerRootUrl() const;
 
   void setChannelColor(size_t c, col4 col);

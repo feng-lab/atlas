@@ -5,6 +5,8 @@
 #include <QImage>
 #include <tbb/blocked_range.h>
 #include <map>
+#include <memory>
+#include <vector>
 
 namespace nim {
 
@@ -109,37 +111,6 @@ public:
   ZQImagePack toQImagePack(size_t tileWidth = 4096, size_t tileHeight = 4096) const;
 
 private:
-  ZImgInfo imgInfo() const
-  {
-    return m_imgPack.imgInfo();
-  }
-
-  template<typename TVoxel>
-  void setQImageDataBlockCM(const ZImg* img,
-                            QImage* qim,
-                            const tbb::blocked_range<size_t>& rowRange,
-                            const std::vector<size_t>* channels,
-                            const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
-
-  template<typename TVoxel>
-  void setQImageDataBlockCMMultAlpha(const ZImg* img,
-                                     QImage* qim,
-                                     const tbb::blocked_range<size_t>& rowRange,
-                                     const std::vector<size_t>* channels,
-                                     const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
-
-  template<typename TVoxel>
-  void setQImageDataCM(const ZImg& img, QImage& qim) const;
-
-  template<typename TVoxel>
-  void setQImageDataBlock(const ZImg* img,
-                          QImage* qim,
-                          const tbb::blocked_range<size_t>& rowRange,
-                          const std::vector<size_t>* channels) const;
-
-  template<typename TVoxel>
-  void setQImageData(const ZImg& img, QImage& qim) const;
-
   void fillQImage(const ZImg& img, QImage& qim) const;
 
 private:
@@ -156,5 +127,18 @@ private:
   size_t m_mipZStart = 0;
   size_t m_mipZEnd = 0;
 };
+
+// Helper for converting raw ZImg tiles into a ZQImagePack using the same colormap logic as ZImgPackDisplay,
+// without requiring access to a live ZImgPack object. This is safe to use from background threads as long as
+// callers pass fully-owned ZImg instances and value-type parameters.
+[[nodiscard]] ZQImagePack qImagePackFromZImgs(const std::vector<std::shared_ptr<ZImg>>& imgs,
+                                              const std::vector<QPoint>& locs,
+                                              const std::vector<double>& scales,
+                                              const ZImgInfo& imgInfo,
+                                              const std::map<size_t, std::pair<double, double>>& channels,
+                                              const std::map<size_t, col4>& channelColors,
+                                              double alpha,
+                                              size_t tileWidth = 4096,
+                                              size_t tileHeight = 4096);
 
 } // namespace nim

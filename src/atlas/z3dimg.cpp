@@ -8,6 +8,7 @@
 #include "zbenchtimer.h"
 #include "zcancellation.h"
 #include "zcpuinfo.h"
+#include "zneuroglancerprecomputed.h"
 #include <folly/coro/Collect.h>
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
@@ -16,6 +17,7 @@
 #include <folly/coro/FutureUtil.h>
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <memory>
 #include <utility>
@@ -23,6 +25,10 @@
 DEFINE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds,
               5,
               "Interval in seconds for logging folly global executor status during waiting, default is 5");
+
+DEFINE_uint32(atlas_3d_paging_lod_stats_log_interval_ms,
+              500,
+              "Minimum interval in milliseconds between rate-limited per-LOD paging statistics logs, default is 500ms");
 
 DEFINE_uint32(atlas_number_of_blocks_to_use_PBO_threashold,
               0,
@@ -65,6 +71,23 @@ std::unique_ptr<Z3DTexture> createChannelTexture(const ZImg& image)
   return std::make_unique<Z3DTexture>(internalFormat, dimensions, format, dataType, image.channelData(0));
 }
 
+std::array<size_t, 3> bestRatioAtMost(const std::vector<std::array<size_t, 3>>& candidates,
+                                      const std::array<size_t, 3>& requested)
+{
+  std::array<size_t, 3> best = {1, 1, 1};
+  size_t bestSum = 3;
+  for (const auto& ratio : candidates) {
+    if (ratio[0] <= requested[0] && ratio[1] <= requested[1] && ratio[2] <= requested[2]) {
+      const size_t sum = ratio[0] + ratio[1] + ratio[2];
+      if (sum > bestSum) {
+        best = ratio;
+        bestSum = sum;
+      }
+    }
+  }
+  return best;
+}
+
 } // namespace
 
 Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vector<glm::dvec2>& displayRanges)
@@ -91,6 +114,7 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, const std::vecto
   m_nChannels = m_imgPack.imgInfo().numChannels;
   m_volumeGenerations.assign(m_nChannels, 0);
   m_PBO.reset();
+  m_lastPagingLodStatsLogTimes.assign(m_nChannels, std::chrono::steady_clock::time_point{});
 
 #if 0
   // shader limit is 20 channels
@@ -554,28 +578,79 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     return true;
   }
 
-  if (VLOG_IS_ON(2) && m_imgPack.isNeuroglancerPrecomputed()) {
-    std::vector<size_t> missingPerLevel(m_numLevels, 0);
-    for (auto blockID : missingBlockIDs) {
-      size_t level = 0;
-      while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].x) {
-        ++level;
-      }
-      if (level + 1 < m_numLevels) {
-        ++missingPerLevel[level];
-      }
-    }
+  if (VLOG_IS_ON(1) && c < m_lastPagingLodStatsLogTimes.size()) {
+    const auto now = std::chrono::steady_clock::now();
+    const auto interval = std::chrono::milliseconds(FLAGS_atlas_3d_paging_lod_stats_log_interval_ms);
+    if (now - m_lastPagingLodStatsLogTimes[c] >= interval) {
+      m_lastPagingLodStatsLogTimes[c] = now;
 
-    std::string msg = "Neuroglancer missing blocks per LOD:";
-    for (size_t l = 0; l + 1 < m_numLevels; ++l) {
-      msg += fmt::format(" L{}(ratio {},{},{}): {}",
-                         l,
-                         m_levelScales[l].x,
-                         m_levelScales[l].y,
-                         m_levelScales[l].z,
-                         missingPerLevel[l]);
+      std::vector<size_t> missingPerLevel;
+      missingPerLevel.resize(m_numLevels, 0);
+      size_t totalMissingPaged = 0;
+      for (auto blockID : missingBlockIDs) {
+        size_t level = 0;
+        while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].x) {
+          ++level;
+        }
+        if (level + 1 < m_numLevels) {
+          ++missingPerLevel[level];
+          ++totalMissingPaged;
+        }
+      }
+
+      std::string msg = fmt::format("Z3DImg paging LOD demand: channel {} total {} missing blocks",
+                                    c,
+                                    totalMissingPaged);
+      if (m_imgPack.isNeuroglancerPrecomputed()) {
+        auto vol = m_imgPack.neuroglancerVolumeShared();
+        std::vector<std::array<size_t, 3>> candidates = vol->availableRatios();
+        candidates.push_back({1, 1, 1});
+
+        for (size_t l = 0; l + 1 < m_numLevels; ++l) {
+          const size_t count = missingPerLevel[l];
+          if (count == 0) {
+            continue;
+          }
+          const double pct = totalMissingPaged > 0 ? (100.0 * static_cast<double>(count) / totalMissingPaged) : 0.0;
+
+          const std::array<size_t, 3> requested = {m_levelScales[l].x, m_levelScales[l].y, m_levelScales[l].z};
+          const std::array<size_t, 3> readRatio = bestRatioAtMost(candidates, requested);
+          QString scaleKey = QStringLiteral("<unknown>");
+          if (auto idxOpt = vol->scaleIndexForRatio(readRatio)) {
+            scaleKey = vol->scales().at(*idxOpt).key;
+          }
+
+          msg += fmt::format(" | L{}: {} ({:.0f}%) req [{},{},{}] read [{},{},{}] ('{}')",
+                             l,
+                             count,
+                             pct,
+                             requested[0],
+                             requested[1],
+                             requested[2],
+                             readRatio[0],
+                             readRatio[1],
+                             readRatio[2],
+                             scaleKey.toStdString());
+        }
+      } else {
+        for (size_t l = 0; l + 1 < m_numLevels; ++l) {
+          const size_t count = missingPerLevel[l];
+          if (count == 0) {
+            continue;
+          }
+          const double pct = totalMissingPaged > 0 ? (100.0 * static_cast<double>(count) / totalMissingPaged) : 0.0;
+          msg += fmt::format(" | L{}: {} ({:.0f}%) ratio [{},{},{}]",
+                             l,
+                             count,
+                             pct,
+                             m_levelScales[l].x,
+                             m_levelScales[l].y,
+                             m_levelScales[l].z);
+        }
+      }
+
+      VLOG(1) << msg;
     }
-    VLOG(2) << msg;
   }
 
   auto numBlocksToRead = m_channelImageCacheManagers[c]->size();
@@ -1086,6 +1161,60 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   processEventsAndMaybeCancel(cancellationToken);
 
   LOG(INFO) << "reading " << pendingTasks.size() << " image blocks...";
+  if (VLOG_IS_ON(1)) {
+    std::vector<size_t> perLevel;
+    perLevel.resize(m_numLevels, 0);
+    for (const auto& task : pendingTasks) {
+      const glm::uvec4& pageTableEntryKey = std::get<0>(task);
+      CHECK(pageTableEntryKey.w < m_numLevels) << pageTableEntryKey.w << " " << m_numLevels;
+      ++perLevel[pageTableEntryKey.w];
+    }
+
+    if (m_imgPack.isNeuroglancerPrecomputed()) {
+      auto vol = m_imgPack.neuroglancerVolumeShared();
+      std::vector<std::array<size_t, 3>> candidates = vol->availableRatios();
+      candidates.push_back({1, 1, 1});
+
+      std::string msg = fmt::format("Z3DImg paging (Neuroglancer): channel {} batch {} blocks", c, pendingTasks.size());
+      for (size_t level = 0; level < perLevel.size(); ++level) {
+        if (perLevel[level] == 0) {
+          continue;
+        }
+        const std::array<size_t, 3> requested = {m_levelScales[level].x, m_levelScales[level].y, m_levelScales[level].z};
+        const std::array<size_t, 3> readRatio = bestRatioAtMost(candidates, requested);
+        QString scaleKey = QStringLiteral("<unknown>");
+        if (auto idxOpt = vol->scaleIndexForRatio(readRatio)) {
+          scaleKey = vol->scales().at(*idxOpt).key;
+        }
+
+        msg += fmt::format(" | L{}: {} blocks, req [{},{},{}], read [{},{},{}] (scale '{}')",
+                           level,
+                           perLevel[level],
+                           requested[0],
+                           requested[1],
+                           requested[2],
+                           readRatio[0],
+                           readRatio[1],
+                           readRatio[2],
+                           scaleKey.toStdString());
+      }
+      VLOG(1) << msg;
+    } else {
+      std::string msg = fmt::format("Z3DImg paging: channel {} batch {} blocks", c, pendingTasks.size());
+      for (size_t level = 0; level < perLevel.size(); ++level) {
+        if (perLevel[level] == 0) {
+          continue;
+        }
+        msg += fmt::format(" | L{}: {} blocks, ratio [{},{},{}]",
+                           level,
+                           perLevel[level],
+                           m_levelScales[level].x,
+                           m_levelScales[level].y,
+                           m_levelScales[level].z);
+      }
+      VLOG(1) << msg;
+    }
+  }
 
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   auto p = dynamic_cast<folly::ThreadPoolExecutor*>(cpuExecutor.get());

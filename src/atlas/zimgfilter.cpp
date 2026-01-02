@@ -4,18 +4,145 @@
 #include "zimgdoc.h"
 #include "zimgview.h"
 #include "zimgpackdisplay.h"
+#include "zneuroglancerprecomputed.h"
 #include "zlog.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
 #include "ztheme.h"
 #include "zgraphicsview.h"
 #include <QGraphicsPixmapItem>
+#include <QGraphicsSimpleTextItem>
+#include <QFutureWatcher>
 #include <QStyleOption>
 #include <QPainter>
 #include <QPushButton>
+#include <QWindow>
+#include <QtConcurrent/QtConcurrentRun>
+#include <cmath>
 #include <memory>
+#include <array>
+#include <map>
+#include <vector>
 
 namespace nim {
+
+namespace {
+
+constexpr double kNg2DPreviewScaleForRatioSelection = 0.5;
+constexpr int kNg2DRefineDebounceMs = 150;
+
+class ZOverwritePixmapItem : public QGraphicsPixmapItem
+{
+public:
+  using QGraphicsPixmapItem::QGraphicsPixmapItem;
+
+  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override
+  {
+    CHECK(painter);
+    painter->save();
+    painter->setCompositionMode(QPainter::CompositionMode_Source);
+    QGraphicsPixmapItem::paint(painter, option, widget);
+    painter->restore();
+  }
+};
+
+struct Neuroglancer2DRenderParams
+{
+  std::shared_ptr<ZNeuroglancerPrecomputedVolume> volume;
+  ZImgInfo imgInfo;
+  QRectF viewport;
+  size_t z = 0;
+  size_t t = 0;
+  double renderScale = 1.0;
+  enum class Pass
+  {
+    CacheOnly,
+    Preview,
+    Final,
+  };
+  Pass pass = Pass::CacheOnly;
+  std::map<size_t, std::pair<double, double>> channels;
+  std::map<size_t, col4> channelColors;
+  double alpha = 1.0;
+  size_t tileWidth = 4096;
+  size_t tileHeight = 4096;
+};
+
+struct Neuroglancer2DRenderResult
+{
+  uint64_t epoch = 0;
+  Neuroglancer2DRenderParams::Pass pass = Neuroglancer2DRenderParams::Pass::CacheOnly;
+  ZQImagePack qImagePack;
+  QString error;
+};
+
+[[nodiscard]] double effectivePixelScaleForLod(const ZGraphicsView& view, const glm::dvec2& transformScale)
+{
+  const double viewScale = view.currentScale();
+  const double scaleMag = std::max(std::abs(transformScale.x), std::abs(transformScale.y));
+
+  double dpr = 1.0;
+  if (const QWindow* w = view.windowHandle()) {
+    dpr = static_cast<double>(w->devicePixelRatio());
+  } else {
+    dpr = static_cast<double>(view.devicePixelRatioF());
+  }
+
+  CHECK(viewScale > 0);
+  CHECK(scaleMag > 0);
+  CHECK(dpr > 0);
+  return viewScale * scaleMag * dpr;
+}
+
+[[nodiscard]] int neuroglancer2DPassPriority(Neuroglancer2DRenderParams::Pass pass)
+{
+  switch (pass) {
+  case Neuroglancer2DRenderParams::Pass::CacheOnly:
+    return 0;
+  case Neuroglancer2DRenderParams::Pass::Preview:
+    return 1;
+  case Neuroglancer2DRenderParams::Pass::Final:
+    return 2;
+  }
+  return 0;
+}
+
+Neuroglancer2DRenderResult renderNeuroglancer2D(Neuroglancer2DRenderParams params, uint64_t epoch)
+{
+  Neuroglancer2DRenderResult out;
+  out.epoch = epoch;
+  out.pass = params.pass;
+
+  try {
+    CHECK(params.volume);
+    CHECK(params.t == 0);
+    CHECK(params.renderScale > 0);
+
+    ZNeuroglancerPrecomputedVolume::SliceTilePack tiles;
+    if (params.pass == Neuroglancer2DRenderParams::Pass::CacheOnly) {
+      tiles = params.volume->sliceTilePackFor2DViewportCacheBestEffort(params.z, params.t, params.viewport, params.renderScale);
+    } else {
+      tiles = params.volume->sliceTilePackFor2DViewportBlocking(params.z, params.t, params.viewport, params.renderScale);
+    }
+
+    out.qImagePack = qImagePackFromZImgs(tiles.imgs,
+                                        tiles.locs,
+                                        tiles.scales,
+                                        params.imgInfo,
+                                        params.channels,
+                                        params.channelColors,
+                                        params.alpha,
+                                        params.tileWidth,
+                                        params.tileHeight);
+    return out;
+  }
+  catch (const std::exception& e) {
+    out.error = QString::fromUtf8(e.what());
+    return out;
+  }
+}
+
+} // namespace
 
 ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length,
                                                    double height,
@@ -84,6 +211,7 @@ ZImgFilter::ZImgFilter(ZView& view)
   , m_scaleBarLengthInUm("Scale Bar Length", 10., 0.0001, 1e9)
   , m_scaleBarHeight("Scale Bar Height", 5, 1, 500)
   , m_scaleBarColor("Scale Bar Color", glm::vec3(1., 1., 1.))
+  , m_ngRefineTimer(this)
 {
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZImgFilter::visibleChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZImgFilter::opacityChanged);
@@ -107,6 +235,22 @@ ZImgFilter::ZImgFilter(ZView& view)
   }
   connect(&m_view, &ZView::viewportChanged, this, &ZImgFilter::viewportChanged);
   connect(&view.graphicsView(), &ZGraphicsView::scaleChanged, this, &ZImgFilter::viewScaleChanged);
+
+  m_ngRefineTimer.setSingleShot(true);
+  m_ngRefineTimer.setInterval(kNg2DRefineDebounceMs);
+  connect(&m_ngRefineTimer, &QTimer::timeout, this, [this]() {
+    if (!m_isVisible || !m_imgPack || !m_imgPack->isNeuroglancerPrecomputed()) {
+      return;
+    }
+    if (m_view.isMaxZProjView()) {
+      return;
+    }
+    if (m_ngFinalInFlight) {
+      m_ngFinalPending = true;
+      return;
+    }
+    startNeuroglancer2DRender(/*finalPass=*/true);
+  });
 }
 
 void ZImgFilter::setData(ZImgPack& pack)
@@ -114,6 +258,23 @@ void ZImgFilter::setData(ZImgPack& pack)
   m_imgPack = &pack;
   destroyImgItems();
   m_display.reset();
+
+  // Invalidate any in-flight neuroglancer async renders from the previous dataset.
+  ++m_ngRenderEpoch;
+  m_ngCacheInFlight = false;
+  m_ngCacheInFlightEpoch = 0;
+  m_ngCacheDirty = false;
+  m_ngPreviewInFlight = false;
+  m_ngPreviewInFlightEpoch = 0;
+  m_ngPreviewDirty = false;
+  m_ngFinalInFlight = false;
+  m_ngFinalInFlightEpoch = 0;
+  m_ngFinalPending = false;
+  m_ngLastAppliedFinalPass = false;
+  m_ngLastAppliedEpoch = 0;
+  m_ngLastAppliedPassPriority = -1;
+  m_ngRefineTimer.stop();
+  updateNeuroglancerLoadingIndicator();
 
   for (size_t i = 0; i < m_channelVisibleParas.size(); ++i) {
     m_channelColorParas[i]->disconnect();
@@ -556,12 +717,377 @@ void ZImgFilter::hideImgItems()
   if (m_item) {
     m_item->setVisible(false);
   }
+
+  updateNeuroglancerLoadingIndicator();
 }
 
 void ZImgFilter::destroyImgItems()
 {
   m_item.reset();
   m_imgItems.clear();
+  m_ngTiles.clear();
+  m_ngLastAppliedFinalPass = false;
+  m_ngLastAppliedEpoch = 0;
+  m_ngLastAppliedPassPriority = -1;
+}
+
+void ZImgFilter::updateNeuroglancerLoadingIndicator()
+{
+  const bool ngActive = m_isVisible && m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && !m_view.isMaxZProjView();
+  const bool previewBusy = m_ngCacheInFlight || m_ngPreviewInFlight;
+  // Treat the debounce timer as "pending refinement" to reassure the user while interacting.
+  const bool finalBusy = m_ngFinalInFlight || m_ngFinalPending || m_ngRefineTimer.isActive();
+
+  const bool shouldShow = ngActive && (previewBusy || finalBusy);
+  if (!shouldShow) {
+    if (m_ngLoadingBadgeBg) {
+      m_ngLoadingBadgeBg->setVisible(false);
+    }
+    return;
+  }
+
+  if (!m_ngLoadingBadgeBg) {
+    m_ngLoadingBadgeBg = std::make_unique<QGraphicsRectItem>();
+    m_ngLoadingBadgeBg->setZValue(40000);
+    m_ngLoadingBadgeBg->setPen(QPen(QColor(255, 255, 255, 60)));
+    m_ngLoadingBadgeBg->setBrush(QBrush(QColor(0, 0, 0, 160)));
+    m_ngLoadingBadgeBg->setAcceptedMouseButtons(Qt::NoButton);
+    m_ngLoadingBadgeBg->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+    m_view.scene().addItem(m_ngLoadingBadgeBg.get());
+
+    m_ngLoadingBadgeText = std::make_unique<QGraphicsSimpleTextItem>(m_ngLoadingBadgeBg.get());
+    m_ngLoadingBadgeText->setBrush(QBrush(QColor(255, 255, 255, 230)));
+    m_ngLoadingBadgeText->setPen(Qt::NoPen);
+    m_ngLoadingBadgeText->setAcceptedMouseButtons(Qt::NoButton);
+    m_ngLoadingBadgeText->setFlag(QGraphicsItem::ItemIgnoresTransformations, true);
+  }
+
+  QString text;
+  if (finalBusy) {
+    // If we already show a coarse preview, this reassures the user that a sharper pass is coming.
+    text = m_ngLastAppliedFinalPass ? QStringLiteral("Loading…") : QStringLiteral("Refining…");
+  } else {
+    text = QStringLiteral("Loading…");
+  }
+
+  m_ngLoadingBadgeText->setText(text);
+
+  constexpr qreal kPadPx = 6.0;
+  constexpr qreal kMarginPx = 10.0;
+
+  const QRectF textRect = m_ngLoadingBadgeText->boundingRect();
+  m_ngLoadingBadgeText->setPos(kPadPx, kPadPx);
+  m_ngLoadingBadgeBg->setRect(0, 0, textRect.width() + 2 * kPadPx, textRect.height() + 2 * kPadPx);
+
+  const double viewScale = m_view.currentScale();
+  CHECK(viewScale > 0);
+  const qreal marginScene = kMarginPx / static_cast<qreal>(viewScale);
+  const QPointF anchor = m_view.currentViewport().topLeft() + QPointF(marginScene, marginScene);
+  m_ngLoadingBadgeBg->setPos(anchor);
+  m_ngLoadingBadgeBg->setVisible(true);
+}
+
+void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack)
+{
+  if (qImagePack.numImages() == 0) {
+    return;
+  }
+
+  if (!m_imgPack || !m_imgPack->isNeuroglancerPrecomputed() || m_view.isMaxZProjView()) {
+    // Non-network images (or MIP) keep the simpler synchronous path.
+    destroyImgItems();
+    m_item = std::make_unique<ZGraphicsItemGroup>();
+    m_view.scene().addItem(m_item.get());
+    for (size_t i = 0; i < qImagePack.numImages(); ++i) {
+      m_imgItems.push_back(new QGraphicsPixmapItem(QPixmap::fromImage(qImagePack.image(i))));
+      m_imgItems[i]->setScale(qImagePack.scale(i));
+      m_imgItems[i]->setPos(QPointF(qImagePack.location(i)));
+      m_imgItems[i]->setOpacity(1.0);
+      m_imgItems[i]->setVisible(m_isVisible);
+      m_item->addToGroup(m_imgItems[i]);
+    }
+    m_item->setZValue(m_viewPrecedencePara.get());
+    m_item->setTransform(getQTransform());
+    m_item->setOpacity(m_opacity.get());
+    m_item->setVisible(m_isVisible);
+    return;
+  }
+
+  // Neuroglancer: keep already-rendered tiles visible and progressively overwrite with newer tiles.
+  if (!m_item) {
+    m_item = std::make_unique<ZGraphicsItemGroup>();
+    m_view.scene().addItem(m_item.get());
+  }
+
+  m_item->setZValue(m_viewPrecedencePara.get());
+  m_item->setTransform(getQTransform());
+  m_item->setOpacity(m_opacity.get());
+  m_item->setVisible(m_isVisible);
+
+  auto makeKey = [](const QPoint& loc, double scale, const QImage& img) -> ZImgFilter::NgTileKey {
+    const long long scaleRounded = std::llround(scale);
+    const double err = std::abs(scale - static_cast<double>(scaleRounded));
+    CHECK(err <= 1e-6) << "Neuroglancer 2D tile scale is not integral: " << scale;
+    if (scaleRounded < 1) {
+      return {loc.x(), loc.y(), static_cast<size_t>(1), img.width(), img.height()};
+    }
+    return {loc.x(), loc.y(), static_cast<size_t>(scaleRounded), img.width(), img.height()};
+  };
+
+  for (size_t i = 0; i < qImagePack.numImages(); ++i) {
+    const QPoint loc = qImagePack.location(i);
+    const double scale = qImagePack.scale(i);
+    const QImage& img = qImagePack.image(i);
+
+    const NgTileKey key = makeKey(loc, scale, img);
+    QGraphicsPixmapItem* item = nullptr;
+    if (auto it = m_ngTiles.find(key); it != m_ngTiles.end()) {
+      item = it->second;
+    } else {
+      item = static_cast<QGraphicsPixmapItem*>(new ZOverwritePixmapItem());
+      m_ngTiles.emplace(key, item);
+      m_item->addToGroup(item);
+    }
+
+    item->setPixmap(QPixmap::fromImage(img));
+    item->setScale(scale);
+    item->setPos(QPointF(loc));
+    item->setOpacity(1.0);
+    item->setVisible(m_isVisible);
+
+    const qreal subZ = static_cast<qreal>(1.0 / std::max(1e-12, scale));
+    item->setZValue(subZ);
+  }
+}
+
+void ZImgFilter::requestNeuroglancer2DRender()
+{
+  // Bump the epoch so any in-flight renders (cache/preview/final) become stale.
+  ++m_ngRenderEpoch;
+
+  // First, show the best already-cached coverage immediately (no network).
+  m_ngCacheDirty = true;
+  if (!m_ngCacheInFlight) {
+    startNeuroglancer2DCacheRender();
+  }
+
+  // Schedule a coarse preview render immediately (at most one in flight).
+  m_ngPreviewDirty = true;
+  if (!m_ngPreviewInFlight) {
+    startNeuroglancer2DRender(/*finalPass=*/false);
+  }
+
+  // Debounce the final render so we only sharpen once interaction settles.
+  m_ngRefineTimer.start();
+
+  updateNeuroglancerLoadingIndicator();
+}
+
+void ZImgFilter::startNeuroglancer2DCacheRender()
+{
+  CHECK(m_imgPack);
+  CHECK(m_display);
+  CHECK(m_imgPack->isNeuroglancerPrecomputed());
+  CHECK(!m_view.isMaxZProjView());
+
+  if (m_ngCacheInFlight) {
+    m_ngCacheDirty = true;
+    return;
+  }
+
+  m_ngCacheDirty = false;
+  m_ngCacheInFlight = true;
+  m_ngCacheInFlightEpoch = m_ngRenderEpoch;
+
+  updateNeuroglancerLoadingIndicator();
+
+  const uint64_t epoch = m_ngRenderEpoch;
+
+  // Capture all Qt/engine state on the UI thread, then build QImages from cached chunks off-thread.
+  Neuroglancer2DRenderParams params;
+  params.volume = m_imgPack->neuroglancerVolumeShared();
+  params.imgInfo = m_imgPack->imgInfo();
+  params.viewport = mapFromSceneRect(m_view.currentViewport());
+  params.z = m_display->slice();
+  params.t = m_display->time();
+
+  const double viewScale = effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale());
+  params.renderScale = std::min(viewScale, kNg2DPreviewScaleForRatioSelection);
+  params.pass = Neuroglancer2DRenderParams::Pass::CacheOnly;
+
+  // Channel configuration (copy-only types; safe to move across threads).
+  for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
+    if (!m_channelVisibleParas[c]->get()) {
+      continue;
+    }
+    params.channels.emplace(c, std::make_pair(getLowerChannelRange(c), getUpperChannelRange(c)));
+
+    if (m_imgPack->imgInfo().isAlphaChannel(c)) {
+      params.channelColors.emplace(c, col4{255, 255, 255, 255});
+    } else {
+      const auto rgb = m_channelColorParas[c]->get();
+      params.channelColors.emplace(c,
+                                  col4{static_cast<uint8_t>(rgb.r * 255),
+                                       static_cast<uint8_t>(rgb.g * 255),
+                                       static_cast<uint8_t>(rgb.b * 255),
+                                       255});
+    }
+  }
+
+  auto* watcher = new QFutureWatcher<Neuroglancer2DRenderResult>(this);
+  connect(watcher, &QFutureWatcher<Neuroglancer2DRenderResult>::finished, this, [this, watcher]() {
+    const Neuroglancer2DRenderResult result = watcher->result();
+    watcher->deleteLater();
+
+    if (m_ngCacheInFlight && result.epoch == m_ngCacheInFlightEpoch) {
+      m_ngCacheInFlight = false;
+      m_ngCacheInFlightEpoch = 0;
+    }
+
+    if (!result.error.isEmpty()) {
+      LOG(ERROR) << "Neuroglancer 2D cache render failed: " << result.error.toStdString();
+    } else if (m_isVisible && result.epoch == m_ngRenderEpoch) {
+      const int prio = neuroglancer2DPassPriority(result.pass);
+      if (result.epoch != m_ngLastAppliedEpoch) {
+        m_ngLastAppliedEpoch = result.epoch;
+        m_ngLastAppliedPassPriority = -1;
+        m_ngLastAppliedFinalPass = false;
+      }
+      if (prio >= m_ngLastAppliedPassPriority) {
+        applyQImagePack(result.qImagePack);
+        m_ngLastAppliedEpoch = result.epoch;
+        m_ngLastAppliedPassPriority = prio;
+        m_ngLastAppliedFinalPass = false;
+      }
+    }
+
+    updateNeuroglancerLoadingIndicator();
+
+    if (m_ngCacheDirty && !m_ngCacheInFlight && m_isVisible) {
+      startNeuroglancer2DCacheRender();
+    }
+  });
+
+  watcher->setFuture(QtConcurrent::run([params = std::move(params), epoch]() mutable {
+    return renderNeuroglancer2D(std::move(params), epoch);
+  }));
+}
+
+void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
+{
+  CHECK(m_imgPack);
+  CHECK(m_display);
+  CHECK(m_imgPack->isNeuroglancerPrecomputed());
+  CHECK(!m_view.isMaxZProjView());
+
+  if (finalPass) {
+    if (m_ngFinalInFlight) {
+      m_ngFinalPending = true;
+      return;
+    }
+    m_ngFinalInFlight = true;
+    m_ngFinalInFlightEpoch = m_ngRenderEpoch;
+  } else {
+    if (m_ngPreviewInFlight) {
+      m_ngPreviewDirty = true;
+      return;
+    }
+    m_ngPreviewDirty = false;
+    m_ngPreviewInFlight = true;
+    m_ngPreviewInFlightEpoch = m_ngRenderEpoch;
+  }
+
+  updateNeuroglancerLoadingIndicator();
+
+  const uint64_t epoch = m_ngRenderEpoch;
+
+  // Capture all Qt/engine state on the UI thread, then do I/O + decode + QImage building off-thread.
+  Neuroglancer2DRenderParams params;
+  params.volume = m_imgPack->neuroglancerVolumeShared();
+  params.imgInfo = m_imgPack->imgInfo();
+  params.viewport = mapFromSceneRect(m_view.currentViewport());
+  params.z = m_display->slice();
+  params.t = m_display->time();
+
+  const double viewScale = effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale());
+  if (finalPass) {
+    params.renderScale = viewScale;
+    params.pass = Neuroglancer2DRenderParams::Pass::Final;
+  } else {
+    params.renderScale = std::min(viewScale, kNg2DPreviewScaleForRatioSelection);
+    params.pass = Neuroglancer2DRenderParams::Pass::Preview;
+  }
+
+  // Channel configuration (copy-only types; safe to move across threads).
+  for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
+    if (!m_channelVisibleParas[c]->get()) {
+      continue;
+    }
+    params.channels.emplace(c, std::make_pair(getLowerChannelRange(c), getUpperChannelRange(c)));
+
+    if (m_imgPack->imgInfo().isAlphaChannel(c)) {
+      params.channelColors.emplace(c, col4{255, 255, 255, 255});
+    } else {
+      const auto rgb = m_channelColorParas[c]->get();
+      params.channelColors.emplace(c,
+                                  col4{static_cast<uint8_t>(rgb.r * 255),
+                                       static_cast<uint8_t>(rgb.g * 255),
+                                       static_cast<uint8_t>(rgb.b * 255),
+                                       255});
+    }
+  }
+
+  auto* watcher = new QFutureWatcher<Neuroglancer2DRenderResult>(this);
+  connect(watcher, &QFutureWatcher<Neuroglancer2DRenderResult>::finished, this, [this, watcher]() {
+    const Neuroglancer2DRenderResult result = watcher->result();
+    watcher->deleteLater();
+
+    if (result.pass == Neuroglancer2DRenderParams::Pass::Final) {
+      if (m_ngFinalInFlight && result.epoch == m_ngFinalInFlightEpoch) {
+        m_ngFinalInFlight = false;
+        m_ngFinalInFlightEpoch = 0;
+      }
+    } else if (result.pass == Neuroglancer2DRenderParams::Pass::Preview) {
+      if (m_ngPreviewInFlight && result.epoch == m_ngPreviewInFlightEpoch) {
+        m_ngPreviewInFlight = false;
+        m_ngPreviewInFlightEpoch = 0;
+      }
+    }
+
+    if (!result.error.isEmpty()) {
+      LOG(ERROR) << "Neuroglancer 2D render failed: " << result.error.toStdString();
+    } else if (m_isVisible && result.epoch == m_ngRenderEpoch) {
+      const int prio = neuroglancer2DPassPriority(result.pass);
+      if (result.epoch != m_ngLastAppliedEpoch) {
+        m_ngLastAppliedEpoch = result.epoch;
+        m_ngLastAppliedPassPriority = -1;
+        m_ngLastAppliedFinalPass = false;
+      }
+      if (prio >= m_ngLastAppliedPassPriority) {
+        applyQImagePack(result.qImagePack);
+        m_ngLastAppliedEpoch = result.epoch;
+        m_ngLastAppliedPassPriority = prio;
+        m_ngLastAppliedFinalPass = (result.pass == Neuroglancer2DRenderParams::Pass::Final);
+      }
+    }
+
+    updateNeuroglancerLoadingIndicator();
+
+    if (result.pass == Neuroglancer2DRenderParams::Pass::Preview) {
+      if (m_ngPreviewDirty && !m_ngPreviewInFlight && m_isVisible) {
+        startNeuroglancer2DRender(/*finalPass=*/false);
+      }
+    } else if (result.pass == Neuroglancer2DRenderParams::Pass::Final) {
+      if (m_ngFinalPending && !m_ngFinalInFlight && m_isVisible) {
+        m_ngFinalPending = false;
+        startNeuroglancer2DRender(/*finalPass=*/true);
+      }
+    }
+  });
+
+  watcher->setFuture(QtConcurrent::run([params = std::move(params), epoch]() mutable {
+    return renderNeuroglancer2D(std::move(params), epoch);
+  }));
 }
 
 void ZImgFilter::updateImgItems()
@@ -569,6 +1095,39 @@ void ZImgFilter::updateImgItems()
   CHECK(m_isVisible);
 
   // VLOG(1) << curDisplay->slice() << " " << m_lastSlice << " " << m_engine.currentSlice();
+  if (m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && !m_view.isMaxZProjView()) {
+    // Neuroglancer is network-backed; never block the UI thread for tile fetch/decode.
+    // Keep the previous tiles visible while we fetch/compose in the background.
+
+    m_display->setScale(effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale()));
+    QRectF vp = m_view.currentViewport();
+    m_display->setViewport(mapFromSceneRect(vp));
+
+    // If slice/time changed, the old imagery is misleading; drop it immediately.
+    const bool sliceOrTimeChanged = (m_lastSlice != m_view.currentSlice()) || (m_lastTime != m_view.currentTime()) ||
+                                   (m_lastMIP != m_view.isMaxZProjView());
+    if (sliceOrTimeChanged) {
+      destroyImgItems();
+    } else if (!m_item) {
+      // Ensure the group exists so transforms/opacities apply consistently.
+      m_item = std::make_unique<ZGraphicsItemGroup>();
+      m_view.scene().addItem(m_item.get());
+      m_item->setZValue(m_viewPrecedencePara.get());
+      m_item->setTransform(getQTransform());
+      m_item->setOpacity(m_opacity.get());
+      m_item->setVisible(m_isVisible);
+    }
+
+    m_lastMIP = m_display->mip();
+    m_lastSlice = m_display->slice();
+    m_lastTime = m_display->time();
+    m_lastScale = m_display->scale();
+    m_lastViewport = m_display->viewport();
+
+    requestNeuroglancer2DRender();
+    return;
+  }
+
   if (!m_imgItems.empty() && m_displayValid && m_lastMIP == m_view.isMaxZProjView() &&
       m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
     // VLOG(1) << "0";
@@ -579,7 +1138,7 @@ void ZImgFilter::updateImgItems()
   } else {
     destroyImgItems();
 
-    m_display->setScale(m_view.currentScale() * std::max(getTransformScale().x, getTransformScale().y));
+    m_display->setScale(effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale()));
     QRectF vp = m_view.currentViewport();
     m_display->setViewport(mapFromSceneRect(vp));
 
@@ -591,12 +1150,13 @@ void ZImgFilter::updateImgItems()
       // m_imgItems[i]->setFlag(QGraphicsItem::ItemIsSelectable, true);
       m_imgItems[i]->setScale(qImagePack.scale(i));
       m_imgItems[i]->setPos(QPointF(qImagePack.location(i)));
-      m_imgItems[i]->setOpacity(m_opacity.get());
+      m_imgItems[i]->setOpacity(1.0);
       m_imgItems[i]->setVisible(m_isVisible);
       m_item->addToGroup(m_imgItems[i]);
     }
     m_item->setZValue(m_viewPrecedencePara.get());
     m_item->setTransform(getQTransform());
+    m_item->setOpacity(m_opacity.get());
 
     m_lastMIP = m_display->mip();
     m_lastSlice = m_display->slice();
@@ -621,7 +1181,7 @@ void ZImgFilter::viewportChanged()
 {
   if (QRectF vp = mapFromSceneRect(m_view.currentViewport());
       m_imgPack->needUpdate(vp,
-                            m_view.currentScale() * std::max(getTransformScale().x, getTransformScale().y),
+                            effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale()),
                             m_lastViewport,
                             m_lastScale,
                             realT(),
@@ -637,6 +1197,8 @@ void ZImgFilter::viewportChanged()
   if (m_scaleBarItem) {
     m_scaleBarItem->setViewPort(m_view.currentViewport());
   }
+
+  updateNeuroglancerLoadingIndicator();
 }
 
 void ZImgFilter::flipHorizontally()
@@ -686,6 +1248,8 @@ void ZImgFilter::viewScaleChanged(double s)
   if (m_scaleBarItem) {
     m_scaleBarItem->setViewScale(s);
   }
+
+  updateNeuroglancerLoadingIndicator();
 }
 
 } // namespace nim

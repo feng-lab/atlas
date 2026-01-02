@@ -7,7 +7,11 @@
 #include "zgraphicsitemtype.h"
 #include "zgraphicsitemgroup.h"
 #include <QGraphicsPixmapItem>
+#include <QGraphicsSimpleTextItem>
 #include <QPen>
+#include <QTimer>
+#include <map>
+#include <tuple>
 #include <vector>
 
 namespace nim {
@@ -155,6 +159,16 @@ private:
 
   void updateImgItems();
 
+  void requestNeuroglancer2DRender();
+
+  void startNeuroglancer2DCacheRender();
+
+  void startNeuroglancer2DRender(bool finalPass);
+
+  void applyQImagePack(const ZQImagePack& qImagePack);
+
+  void updateNeuroglancerLoadingIndicator();
+
   [[nodiscard]] double getLowerChannelRange(size_t c) const;
 
   [[nodiscard]] double getUpperChannelRange(size_t c) const;
@@ -204,6 +218,30 @@ private:
   int m_lastTime = -1;
   double m_lastScale = 0;
   QRectF m_lastViewport;
+
+  // Neuroglancer: keep the UI responsive by fetching chunks off the UI thread,
+  // and progressively refining from coarse -> sharp after interaction settles.
+  QTimer m_ngRefineTimer;
+  uint64_t m_ngRenderEpoch = 0;
+  bool m_ngCacheInFlight = false;
+  uint64_t m_ngCacheInFlightEpoch = 0;
+  bool m_ngCacheDirty = false;
+  bool m_ngPreviewInFlight = false;
+  uint64_t m_ngPreviewInFlightEpoch = 0;
+  bool m_ngPreviewDirty = false;
+  bool m_ngFinalInFlight = false;
+  uint64_t m_ngFinalInFlightEpoch = 0;
+  bool m_ngFinalPending = false;
+
+  // Neuroglancer 2D: a small overlay badge to indicate progressive loading/refinement.
+  std::unique_ptr<QGraphicsRectItem> m_ngLoadingBadgeBg;
+  std::unique_ptr<QGraphicsSimpleTextItem> m_ngLoadingBadgeText;
+  bool m_ngLastAppliedFinalPass = false;
+  uint64_t m_ngLastAppliedEpoch = 0;
+  int m_ngLastAppliedPassPriority = -1;
+
+  using NgTileKey = std::tuple<int, int, size_t, int, int>;
+  std::map<NgTileKey, QGraphicsPixmapItem*> m_ngTiles;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 };
