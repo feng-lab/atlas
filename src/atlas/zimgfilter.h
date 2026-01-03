@@ -10,7 +10,9 @@
 #include <QGraphicsSimpleTextItem>
 #include <QPen>
 #include <QTimer>
+#include <atomic>
 #include <map>
+#include <memory>
 #include <tuple>
 #include <vector>
 
@@ -165,7 +167,7 @@ private:
 
   void startNeuroglancer2DRender(bool finalPass);
 
-  void applyQImagePack(const ZQImagePack& qImagePack);
+  void applyQImagePack(const ZQImagePack& qImagePack, uint64_t epoch, int passPriority, bool isFinalPass);
 
   void updateNeuroglancerLoadingIndicator();
 
@@ -223,6 +225,7 @@ private:
   // and progressively refining from coarse -> sharp after interaction settles.
   QTimer m_ngRefineTimer;
   uint64_t m_ngRenderEpoch = 0;
+  std::shared_ptr<std::atomic<uint64_t>> m_ngRenderEpochAtomic;
   bool m_ngCacheInFlight = false;
   uint64_t m_ngCacheInFlightEpoch = 0;
   bool m_ngCacheDirty = false;
@@ -237,11 +240,17 @@ private:
   std::unique_ptr<QGraphicsRectItem> m_ngLoadingBadgeBg;
   std::unique_ptr<QGraphicsSimpleTextItem> m_ngLoadingBadgeText;
   bool m_ngLastAppliedFinalPass = false;
-  uint64_t m_ngLastAppliedEpoch = 0;
-  int m_ngLastAppliedPassPriority = -1;
 
   using NgTileKey = std::tuple<int, int, size_t, int, int>;
+
+  struct NgTileApplyState
+  {
+    uint64_t epoch = 0;
+    int passPriority = -1;
+  };
+
   std::map<NgTileKey, QGraphicsPixmapItem*> m_ngTiles;
+  std::map<NgTileKey, NgTileApplyState> m_ngTileApplyState;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 };

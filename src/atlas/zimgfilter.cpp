@@ -18,10 +18,12 @@
 #include <QPushButton>
 #include <QWindow>
 #include <QtConcurrent/QtConcurrentRun>
+#include <QtConcurrent/QtConcurrentMap>
 #include <cmath>
 #include <memory>
 #include <array>
 #include <map>
+#include <limits>
 #include <vector>
 
 namespace nim {
@@ -72,6 +74,40 @@ struct Neuroglancer2DRenderParams
 };
 
 struct Neuroglancer2DRenderResult
+{
+  uint64_t epoch = 0;
+  Neuroglancer2DRenderParams::Pass pass = Neuroglancer2DRenderParams::Pass::CacheOnly;
+  ZQImagePack qImagePack;
+  QString error;
+};
+
+struct Neuroglancer2DTileSharedParams
+{
+  std::shared_ptr<ZNeuroglancerPrecomputedVolume> volume;
+  ZImgInfo imgInfo;
+  size_t z = 0;
+  size_t t = 0;
+  std::array<size_t, 3> targetRatio{1, 1, 1};
+  int64_t ratioZ = 1;
+  double tileScale = 1.0;
+  uint64_t epoch = 0;
+  std::shared_ptr<std::atomic<uint64_t>> epochAtomic;
+  Neuroglancer2DRenderParams::Pass pass = Neuroglancer2DRenderParams::Pass::CacheOnly;
+  std::map<size_t, std::pair<double, double>> channels;
+  std::map<size_t, col4> channelColors;
+  double alpha = 1.0;
+  size_t tileWidth = 4096;
+  size_t tileHeight = 4096;
+};
+
+struct Neuroglancer2DTileTask
+{
+  std::shared_ptr<const Neuroglancer2DTileSharedParams> shared;
+  ZNeuroglancerPrecomputedVolume::Chunk chunk;
+  QPoint loc;
+};
+
+struct Neuroglancer2DTileResult
 {
   uint64_t epoch = 0;
   Neuroglancer2DRenderParams::Pass pass = Neuroglancer2DRenderParams::Pass::CacheOnly;
@@ -140,6 +176,83 @@ Neuroglancer2DRenderResult renderNeuroglancer2D(Neuroglancer2DRenderParams param
                                         params.alpha,
                                         params.tileWidth,
                                         params.tileHeight);
+    return out;
+  }
+  catch (const std::exception& e) {
+    out.error = QString::fromUtf8(e.what());
+    return out;
+  }
+}
+
+[[nodiscard]] bool isEpochCurrent(const std::shared_ptr<std::atomic<uint64_t>>& epochAtomic, uint64_t epoch)
+{
+  if (!epochAtomic) {
+    return true;
+  }
+  return epochAtomic->load(std::memory_order_relaxed) == epoch;
+}
+
+Neuroglancer2DTileResult renderNeuroglancer2DTile(Neuroglancer2DTileTask task)
+{
+  Neuroglancer2DTileResult out;
+  CHECK(task.shared);
+  out.epoch = task.shared->epoch;
+  out.pass = task.shared->pass;
+
+  try {
+    if (!isEpochCurrent(task.shared->epochAtomic, task.shared->epoch)) {
+      return out;
+    }
+
+    CHECK(task.shared->volume);
+    CHECK(task.shared->t == 0);
+    CHECK(task.shared->ratioZ > 0);
+
+    auto chunkImg = task.shared->volume->readChunkBlocking(task.chunk);
+    if (!chunkImg) {
+      return out;
+    }
+
+    if (!isEpochCurrent(task.shared->epochAtomic, task.shared->epoch)) {
+      return out;
+    }
+
+    const int64_t z0 = static_cast<int64_t>(task.shared->z);
+    const int64_t localZBase = z0 - task.chunk.baseStart[2];
+    CHECK(localZBase >= 0);
+    const int64_t localZ = localZBase / task.shared->ratioZ;
+    CHECK(localZ >= 0);
+    CHECK(static_cast<size_t>(localZ) < chunkImg->depth());
+
+    ZImg sliceImg = chunkImg->crop(ZImgRegion(0,
+                                              static_cast<index_t>(chunkImg->width()),
+                                              0,
+                                              static_cast<index_t>(chunkImg->height()),
+                                              static_cast<index_t>(localZ),
+                                              static_cast<index_t>(localZ + 1)));
+
+    if (!isEpochCurrent(task.shared->epochAtomic, task.shared->epoch)) {
+      return out;
+    }
+
+    std::vector<std::shared_ptr<ZImg>> imgs;
+    imgs.push_back(std::make_shared<ZImg>(std::move(sliceImg)));
+
+    std::vector<QPoint> locs;
+    locs.push_back(task.loc);
+
+    std::vector<double> scales;
+    scales.push_back(task.shared->tileScale);
+
+    out.qImagePack = qImagePackFromZImgs(imgs,
+                                         locs,
+                                         scales,
+                                         task.shared->imgInfo,
+                                         task.shared->channels,
+                                         task.shared->channelColors,
+                                         task.shared->alpha,
+                                         task.shared->tileWidth,
+                                         task.shared->tileHeight);
     return out;
   }
   catch (const std::exception& e) {
@@ -219,6 +332,8 @@ ZImgFilter::ZImgFilter(ZView& view)
   , m_scaleBarColor("Scale Bar Color", glm::vec3(1., 1., 1.))
   , m_ngRefineTimer(this)
 {
+  m_ngRenderEpochAtomic = std::make_shared<std::atomic<uint64_t>>(m_ngRenderEpoch);
+
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZImgFilter::visibleChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZImgFilter::opacityChanged);
   addParameter(&m_opacity);
@@ -251,10 +366,6 @@ ZImgFilter::ZImgFilter(ZView& view)
     if (m_view.isMaxZProjView()) {
       return;
     }
-    if (m_ngFinalInFlight) {
-      m_ngFinalPending = true;
-      return;
-    }
     startNeuroglancer2DRender(/*finalPass=*/true);
   });
 }
@@ -267,6 +378,9 @@ void ZImgFilter::setData(ZImgPack& pack)
 
   // Invalidate any in-flight neuroglancer async renders from the previous dataset.
   ++m_ngRenderEpoch;
+  if (m_ngRenderEpochAtomic) {
+    m_ngRenderEpochAtomic->store(m_ngRenderEpoch, std::memory_order_relaxed);
+  }
   m_ngCacheInFlight = false;
   m_ngCacheInFlightEpoch = 0;
   m_ngCacheDirty = false;
@@ -277,8 +391,6 @@ void ZImgFilter::setData(ZImgPack& pack)
   m_ngFinalInFlightEpoch = 0;
   m_ngFinalPending = false;
   m_ngLastAppliedFinalPass = false;
-  m_ngLastAppliedEpoch = 0;
-  m_ngLastAppliedPassPriority = -1;
   m_ngRefineTimer.stop();
   updateNeuroglancerLoadingIndicator();
 
@@ -732,19 +844,19 @@ void ZImgFilter::destroyImgItems()
   m_item.reset();
   m_imgItems.clear();
   m_ngTiles.clear();
+  m_ngTileApplyState.clear();
   m_ngLastAppliedFinalPass = false;
-  m_ngLastAppliedEpoch = 0;
-  m_ngLastAppliedPassPriority = -1;
 }
 
 void ZImgFilter::updateNeuroglancerLoadingIndicator()
 {
   const bool ngActive = m_isVisible && m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && !m_view.isMaxZProjView();
-  const bool previewBusy = m_ngCacheInFlight || m_ngPreviewInFlight;
+  const bool cacheBusy = m_ngCacheInFlight && m_ngCacheInFlightEpoch == m_ngRenderEpoch;
+  const bool previewBusy = m_ngPreviewInFlight && m_ngPreviewInFlightEpoch == m_ngRenderEpoch;
   // Treat the debounce timer as "pending refinement" to reassure the user while interacting.
-  const bool finalBusy = m_ngFinalInFlight || m_ngFinalPending || m_ngRefineTimer.isActive();
+  const bool finalBusy = (m_ngFinalInFlight && m_ngFinalInFlightEpoch == m_ngRenderEpoch) || m_ngFinalPending || m_ngRefineTimer.isActive();
 
-  const bool shouldShow = ngActive && (previewBusy || finalBusy);
+  const bool shouldShow = ngActive && (cacheBusy || previewBusy || finalBusy);
   if (!shouldShow) {
     if (m_ngLoadingBadgeBg) {
       m_ngLoadingBadgeBg->setVisible(false);
@@ -793,7 +905,7 @@ void ZImgFilter::updateNeuroglancerLoadingIndicator()
   m_ngLoadingBadgeBg->setVisible(true);
 }
 
-void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack)
+void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack, uint64_t epoch, int passPriority, bool isFinalPass)
 {
   if (qImagePack.numImages() == 0) {
     return;
@@ -840,12 +952,22 @@ void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack)
     return {loc.x(), loc.y(), static_cast<size_t>(scaleRounded), img.width(), img.height()};
   };
 
+  bool appliedAny = false;
   for (size_t i = 0; i < qImagePack.numImages(); ++i) {
     const QPoint loc = qImagePack.location(i);
     const double scale = qImagePack.scale(i);
     const QImage& img = qImagePack.image(i);
 
     const NgTileKey key = makeKey(loc, scale, img);
+    auto& st = m_ngTileApplyState[key];
+    if (st.epoch != epoch) {
+      st.epoch = epoch;
+      st.passPriority = -1;
+    }
+    if (passPriority < st.passPriority) {
+      continue;
+    }
+    st.passPriority = passPriority;
     QGraphicsPixmapItem* item = nullptr;
     if (auto it = m_ngTiles.find(key); it != m_ngTiles.end()) {
       item = it->second;
@@ -863,6 +985,11 @@ void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack)
 
     const qreal subZ = static_cast<qreal>(1.0 / std::max(1e-12, scale));
     item->setZValue(subZ);
+    appliedAny = true;
+  }
+
+  if (appliedAny && isFinalPass) {
+    m_ngLastAppliedFinalPass = true;
   }
 }
 
@@ -870,6 +997,11 @@ void ZImgFilter::requestNeuroglancer2DRender()
 {
   // Bump the epoch so any in-flight renders (cache/preview/final) become stale.
   ++m_ngRenderEpoch;
+  if (m_ngRenderEpochAtomic) {
+    m_ngRenderEpochAtomic->store(m_ngRenderEpoch, std::memory_order_relaxed);
+  }
+  m_ngFinalPending = false;
+  m_ngLastAppliedFinalPass = false;
 
   // First, show the best already-cached coverage immediately (no network).
   m_ngCacheDirty = true;
@@ -904,7 +1036,7 @@ void ZImgFilter::startNeuroglancer2DCacheRender()
   CHECK(m_imgPack->isNeuroglancerPrecomputed());
   CHECK(!m_view.isMaxZProjView());
 
-  if (m_ngCacheInFlight) {
+  if (m_ngCacheInFlight && m_ngCacheInFlightEpoch == m_ngRenderEpoch) {
     m_ngCacheDirty = true;
     return;
   }
@@ -962,17 +1094,7 @@ void ZImgFilter::startNeuroglancer2DCacheRender()
       LOG(ERROR) << "Neuroglancer 2D cache render failed: " << result.error.toStdString();
     } else if (m_isVisible && result.epoch == m_ngRenderEpoch) {
       const int prio = neuroglancer2DPassPriority(result.pass);
-      if (result.epoch != m_ngLastAppliedEpoch) {
-        m_ngLastAppliedEpoch = result.epoch;
-        m_ngLastAppliedPassPriority = -1;
-        m_ngLastAppliedFinalPass = false;
-      }
-      if (prio >= m_ngLastAppliedPassPriority) {
-        applyQImagePack(result.qImagePack);
-        m_ngLastAppliedEpoch = result.epoch;
-        m_ngLastAppliedPassPriority = prio;
-        m_ngLastAppliedFinalPass = false;
-      }
+      applyQImagePack(result.qImagePack, result.epoch, prio, /*isFinalPass=*/false);
     }
 
     updateNeuroglancerLoadingIndicator();
@@ -994,116 +1116,190 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
   CHECK(m_imgPack->isNeuroglancerPrecomputed());
   CHECK(!m_view.isMaxZProjView());
 
+  const uint64_t epoch = m_ngRenderEpoch;
+  const auto pass = finalPass ? Neuroglancer2DRenderParams::Pass::Final : Neuroglancer2DRenderParams::Pass::Preview;
+
   if (finalPass) {
-    if (m_ngFinalInFlight) {
+    // If a final pass for the current epoch is already running, just mark it pending.
+    // (If a stale epoch is running, we let a newer final render start; results are epoch-gated.)
+    if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
       m_ngFinalPending = true;
       return;
     }
     m_ngFinalInFlight = true;
-    m_ngFinalInFlightEpoch = m_ngRenderEpoch;
+    m_ngFinalInFlightEpoch = epoch;
+    m_ngFinalPending = false;
   } else {
-    if (m_ngPreviewInFlight) {
+    // If a preview pass for the current epoch is already running, just mark it dirty.
+    // (If a stale epoch is running, we let a newer preview render start; results are epoch-gated.)
+    if (m_ngPreviewInFlight && m_ngPreviewInFlightEpoch == epoch) {
       m_ngPreviewDirty = true;
       return;
     }
     m_ngPreviewDirty = false;
     m_ngPreviewInFlight = true;
-    m_ngPreviewInFlightEpoch = m_ngRenderEpoch;
+    m_ngPreviewInFlightEpoch = epoch;
   }
 
   updateNeuroglancerLoadingIndicator();
 
-  const uint64_t epoch = m_ngRenderEpoch;
-
-  // Capture all Qt/engine state on the UI thread, then do I/O + decode + QImage building off-thread.
-  Neuroglancer2DRenderParams params;
-  params.volume = m_imgPack->neuroglancerVolumeShared();
-  params.imgInfo = m_imgPack->imgInfo();
-  params.viewport = mapFromSceneRect(m_view.currentViewport());
-  params.z = m_display->slice();
-  params.t = m_display->time();
-
+  const QRectF viewport = mapFromSceneRect(m_view.currentViewport());
   const double viewScale = effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale());
-  if (finalPass) {
-    params.renderScale = viewScale;
-    params.pass = Neuroglancer2DRenderParams::Pass::Final;
-  } else {
-    // Preview pass always requests the coarsest available XY pyramid level (see renderNeuroglancer2D),
-    // so the exact renderScale value is not used for ratio selection.
-    params.renderScale = viewScale;
-    params.pass = Neuroglancer2DRenderParams::Pass::Preview;
+  const auto ratioPolicy = (pass == Neuroglancer2DRenderParams::Pass::Preview)
+                             ? ZNeuroglancerPrecomputedVolume::Slice2DRatioPolicy::CoarsestXY
+                             : ZNeuroglancerPrecomputedVolume::Slice2DRatioPolicy::BestForScale;
+
+  std::shared_ptr<ZNeuroglancerPrecomputedVolume> volume = m_imgPack->neuroglancerVolumeShared();
+  CHECK(volume);
+
+  ZNeuroglancerPrecomputedVolume::SliceChunkRequests requests;
+  try {
+    requests = volume->sliceChunkRequestsFor2DViewport(m_display->slice(), m_display->time(), viewport, viewScale, ratioPolicy);
   }
+  catch (const std::exception& e) {
+    LOG(ERROR) << "Neuroglancer 2D render setup failed: " << e.what();
+    if (pass == Neuroglancer2DRenderParams::Pass::Final) {
+      if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
+        m_ngFinalInFlight = false;
+        m_ngFinalInFlightEpoch = 0;
+      }
+    } else {
+      if (m_ngPreviewInFlight && m_ngPreviewInFlightEpoch == epoch) {
+        m_ngPreviewInFlight = false;
+        m_ngPreviewInFlightEpoch = 0;
+      }
+    }
+    updateNeuroglancerLoadingIndicator();
+    return;
+  }
+
+  if (requests.chunks.empty()) {
+    if (pass == Neuroglancer2DRenderParams::Pass::Final) {
+      if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
+        m_ngFinalInFlight = false;
+        m_ngFinalInFlightEpoch = 0;
+      }
+    } else {
+      if (m_ngPreviewInFlight && m_ngPreviewInFlightEpoch == epoch) {
+        m_ngPreviewInFlight = false;
+        m_ngPreviewInFlightEpoch = 0;
+      }
+    }
+    updateNeuroglancerLoadingIndicator();
+    return;
+  }
+
+  auto shared = std::make_shared<Neuroglancer2DTileSharedParams>();
+  shared->volume = std::move(volume);
+  shared->imgInfo = m_imgPack->imgInfo();
+  shared->z = m_display->slice();
+  shared->t = m_display->time();
+  shared->targetRatio = requests.targetRatio;
+  shared->ratioZ = static_cast<int64_t>(requests.targetRatio[2]);
+  CHECK(shared->ratioZ > 0);
+  shared->tileScale = static_cast<double>(requests.targetRatio[0]);
+  shared->epoch = epoch;
+  shared->epochAtomic = m_ngRenderEpochAtomic;
+  shared->pass = pass;
 
   // Channel configuration (copy-only types; safe to move across threads).
   for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
     if (!m_channelVisibleParas[c]->get()) {
       continue;
     }
-    params.channels.emplace(c, std::make_pair(getLowerChannelRange(c), getUpperChannelRange(c)));
+    shared->channels.emplace(c, std::make_pair(getLowerChannelRange(c), getUpperChannelRange(c)));
 
     if (m_imgPack->imgInfo().isAlphaChannel(c)) {
-      params.channelColors.emplace(c, col4{255, 255, 255, 255});
+      shared->channelColors.emplace(c, col4{255, 255, 255, 255});
     } else {
       const auto rgb = m_channelColorParas[c]->get();
-      params.channelColors.emplace(c,
-                                  col4{static_cast<uint8_t>(rgb.r * 255),
-                                       static_cast<uint8_t>(rgb.g * 255),
-                                       static_cast<uint8_t>(rgb.b * 255),
-                                       255});
+      shared->channelColors.emplace(c,
+                                   col4{static_cast<uint8_t>(rgb.r * 255),
+                                        static_cast<uint8_t>(rgb.g * 255),
+                                        static_cast<uint8_t>(rgb.b * 255),
+                                        255});
     }
   }
 
-  auto* watcher = new QFutureWatcher<Neuroglancer2DRenderResult>(this);
-  connect(watcher, &QFutureWatcher<Neuroglancer2DRenderResult>::finished, this, [this, watcher]() {
-    const Neuroglancer2DRenderResult result = watcher->result();
+  const QPointF vpCenter = viewport.center();
+  const double cx = vpCenter.x();
+  const double cy = vpCenter.y();
+
+  std::vector<ZNeuroglancerPrecomputedVolume::Chunk> chunks = std::move(requests.chunks);
+  std::sort(chunks.begin(), chunks.end(), [&](const auto& a, const auto& b) {
+    const double ax = 0.5 * static_cast<double>(a.baseStart[0] + a.baseEnd[0]);
+    const double ay = 0.5 * static_cast<double>(a.baseStart[1] + a.baseEnd[1]);
+    const double bx = 0.5 * static_cast<double>(b.baseStart[0] + b.baseEnd[0]);
+    const double by = 0.5 * static_cast<double>(b.baseStart[1] + b.baseEnd[1]);
+    const double da = (ax - cx) * (ax - cx) + (ay - cy) * (ay - cy);
+    const double db = (bx - cx) * (bx - cx) + (by - cy) * (by - cy);
+    if (std::abs(da - db) > 1e-12) {
+      return da < db; // center-first
+    }
+    return a.baseStart < b.baseStart;
+  });
+
+  auto toIntChecked = [](int64_t v) -> int {
+    if (v < static_cast<int64_t>(std::numeric_limits<int>::min()) || v > static_cast<int64_t>(std::numeric_limits<int>::max())) {
+      throw ZException(fmt::format("Neuroglancer chunk coordinate {} is out of QPoint range", v));
+    }
+    return static_cast<int>(v);
+  };
+
+  auto tasks = std::make_shared<std::vector<Neuroglancer2DTileTask>>();
+  tasks->reserve(chunks.size());
+  for (const auto& chunk : chunks) {
+    Neuroglancer2DTileTask t{};
+    t.shared = shared;
+    t.chunk = chunk;
+    t.loc = QPoint(toIntChecked(chunk.baseStart[0]), toIntChecked(chunk.baseStart[1]));
+    tasks->push_back(std::move(t));
+  }
+
+  auto* watcher = new QFutureWatcher<Neuroglancer2DTileResult>(this);
+  connect(watcher, &QFutureWatcher<Neuroglancer2DTileResult>::resultReadyAt, this, [this, watcher](int index) {
+    const Neuroglancer2DTileResult result = watcher->resultAt(index);
+    if (!result.error.isEmpty()) {
+      LOG(ERROR) << "Neuroglancer 2D tile render failed: " << result.error.toStdString();
+      return;
+    }
+    if (!m_isVisible || result.epoch != m_ngRenderEpoch) {
+      return;
+    }
+    const int prio = neuroglancer2DPassPriority(result.pass);
+    applyQImagePack(result.qImagePack, result.epoch, prio, /*isFinalPass=*/result.pass == Neuroglancer2DRenderParams::Pass::Final);
+  });
+
+  connect(watcher, &QFutureWatcher<Neuroglancer2DTileResult>::finished, this, [this, watcher, tasks, pass, epoch]() {
     watcher->deleteLater();
 
-    if (result.pass == Neuroglancer2DRenderParams::Pass::Final) {
-      if (m_ngFinalInFlight && result.epoch == m_ngFinalInFlightEpoch) {
+    if (pass == Neuroglancer2DRenderParams::Pass::Final) {
+      if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
         m_ngFinalInFlight = false;
         m_ngFinalInFlightEpoch = 0;
       }
-    } else if (result.pass == Neuroglancer2DRenderParams::Pass::Preview) {
-      if (m_ngPreviewInFlight && result.epoch == m_ngPreviewInFlightEpoch) {
+    } else if (pass == Neuroglancer2DRenderParams::Pass::Preview) {
+      if (m_ngPreviewInFlight && m_ngPreviewInFlightEpoch == epoch) {
         m_ngPreviewInFlight = false;
         m_ngPreviewInFlightEpoch = 0;
       }
     }
 
-    if (!result.error.isEmpty()) {
-      LOG(ERROR) << "Neuroglancer 2D render failed: " << result.error.toStdString();
-    } else if (m_isVisible && result.epoch == m_ngRenderEpoch) {
-      const int prio = neuroglancer2DPassPriority(result.pass);
-      if (result.epoch != m_ngLastAppliedEpoch) {
-        m_ngLastAppliedEpoch = result.epoch;
-        m_ngLastAppliedPassPriority = -1;
-        m_ngLastAppliedFinalPass = false;
-      }
-      if (prio >= m_ngLastAppliedPassPriority) {
-        applyQImagePack(result.qImagePack);
-        m_ngLastAppliedEpoch = result.epoch;
-        m_ngLastAppliedPassPriority = prio;
-        m_ngLastAppliedFinalPass = (result.pass == Neuroglancer2DRenderParams::Pass::Final);
-      }
-    }
-
     updateNeuroglancerLoadingIndicator();
 
-    if (result.pass == Neuroglancer2DRenderParams::Pass::Preview) {
-      if (m_ngPreviewDirty && !m_ngPreviewInFlight && m_isVisible) {
+    if (pass == Neuroglancer2DRenderParams::Pass::Preview) {
+      if (m_ngPreviewDirty && (!m_ngPreviewInFlight || m_ngPreviewInFlightEpoch != m_ngRenderEpoch) && m_isVisible) {
         startNeuroglancer2DRender(/*finalPass=*/false);
       }
-    } else if (result.pass == Neuroglancer2DRenderParams::Pass::Final) {
-      if (m_ngFinalPending && !m_ngFinalInFlight && m_isVisible) {
+    } else if (pass == Neuroglancer2DRenderParams::Pass::Final) {
+      if (m_ngFinalPending && (!m_ngFinalInFlight || m_ngFinalInFlightEpoch != m_ngRenderEpoch) && m_isVisible) {
         m_ngFinalPending = false;
         startNeuroglancer2DRender(/*finalPass=*/true);
       }
     }
   });
 
-  watcher->setFuture(QtConcurrent::run([params = std::move(params), epoch]() mutable {
-    return renderNeuroglancer2D(std::move(params), epoch);
-  }));
+  watcher->setFuture(QtConcurrent::mapped(*tasks, renderNeuroglancer2DTile));
 }
 
 void ZImgFilter::updateImgItems()

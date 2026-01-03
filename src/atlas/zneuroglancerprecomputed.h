@@ -182,6 +182,12 @@ public:
     std::array<size_t, 3> targetRatio{1, 1, 1};
   };
 
+  struct SliceChunkRequests
+  {
+    std::vector<Chunk> chunks;
+    std::array<size_t, 3> targetRatio{1, 1, 1};
+  };
+
   static std::shared_ptr<ZNeuroglancerPrecomputedVolume> open(QString url, std::chrono::milliseconds timeout);
 
   [[nodiscard]] const QString& rootUrl() const
@@ -228,6 +234,14 @@ public:
                                                                  const QRectF& viewport,
                                                                  double renderScale,
                                                                  Slice2DRatioPolicy ratioPolicy = Slice2DRatioPolicy::BestForScale) const;
+
+  // Computes the set of chunk bounding boxes intersecting a 2D viewport at the selected pyramid level.
+  // This does not perform any network I/O; callers can schedule chunk reads as needed (e.g. for incremental rendering).
+  [[nodiscard]] SliceChunkRequests sliceChunkRequestsFor2DViewport(size_t z,
+                                                                   size_t t,
+                                                                   const QRectF& viewport,
+                                                                   double renderScale,
+                                                                   Slice2DRatioPolicy ratioPolicy = Slice2DRatioPolicy::BestForScale) const;
 
   // Returns true if all chunks needed to render the given 2D viewport at the coarsest available XY pyramid
   // level (Slice2DRatioPolicy::CoarsestXY) are already present in the in-memory chunk cache.

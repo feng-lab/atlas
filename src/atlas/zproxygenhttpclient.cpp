@@ -150,7 +150,9 @@ bool tryAddWindowsSystemCertStoreTo(/*inout*/ folly::SSLContext& ctx, const char
 {
   CHECK(storeName);
 
-  HCERTSTORE storeHandle = CertOpenSystemStoreA(nullptr, storeName);
+  // CertOpenSystemStoreA takes an integral "legacy crypto provider" handle.
+  // Use 0 to indicate the default provider (nullptr is not implicitly convertible on MSVC).
+  HCERTSTORE storeHandle = CertOpenSystemStoreA(static_cast<HCRYPTPROV_LEGACY>(0), storeName);
   if (!storeHandle) {
     return false;
   }

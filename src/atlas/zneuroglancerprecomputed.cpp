@@ -7,7 +7,9 @@
 #include "zlog.h"
 #include "zconcurrentlrucache.h"
 
+#include <folly/ExceptionWrapper.h>
 #include <folly/coro/BlockingWait.h>
+#include <folly/coro/SharedPromise.h>
 #include <folly/compression/Compression.h>
 
 #include <boost/json.hpp>
@@ -17,6 +19,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <mutex>
 #include <tuple>
 
 #include <tbb/blocked_range.h>
@@ -381,6 +384,16 @@ ZNeuroglancerPrecomputedVolume::Scale::Sharding::DataEncoding parseShardedEncodi
 
 struct ZNeuroglancerPrecomputedVolume::ChunkCache
 {
+  struct InFlightChunkRead
+  {
+    folly::coro::SharedPromise<std::shared_ptr<ZImg>> promise;
+  };
+
+  struct InFlightMinishardIndexRead
+  {
+    folly::coro::SharedPromise<std::shared_ptr<const DecodedMinishardIndex>> promise;
+  };
+
   ChunkCache(size_t chunkMaxBytes, size_t minishardIndexMaxBytes)
     : chunkCache(chunkMaxBytes, ZCpuInfo::instance().nLogicalCores * 2)
     , minishardIndexCache(minishardIndexMaxBytes, ZCpuInfo::instance().nLogicalCores * 2)
@@ -388,6 +401,10 @@ struct ZNeuroglancerPrecomputedVolume::ChunkCache
 
   ZConcurrentLRUCache<ChunkCacheKey, std::shared_ptr<ZImg>> chunkCache;
   ZConcurrentLRUCache<MinishardIndexCacheKey, std::shared_ptr<const DecodedMinishardIndex>> minishardIndexCache;
+
+  std::mutex inFlightMutex;
+  std::map<ChunkCacheKey, std::shared_ptr<InFlightChunkRead>> inFlightChunkReads;
+  std::map<MinishardIndexCacheKey, std::shared_ptr<InFlightMinishardIndexRead>> inFlightMinishardIndexReads;
 };
 
 QString ZNeuroglancerPrecomputedVolume::normalizeRootUrl(QString url)
@@ -839,201 +856,292 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZNeuroglancerPrecomputedVolume::readChu
     co_return cached.value();
   }
 
-  const size_t sx = static_cast<size_t>(chunk.globalEnd[0] - chunk.globalStart[0]);
-  const size_t sy = static_cast<size_t>(chunk.globalEnd[1] - chunk.globalStart[1]);
-  const size_t sz = static_cast<size_t>(chunk.globalEnd[2] - chunk.globalStart[2]);
-  const size_t bytesPerVoxel = m_baseImgInfo.bytesPerVoxel;
-  const size_t expectedBytes = sx * sy * sz * m_numChannels * bytesPerVoxel;
-
-  std::vector<uint8_t> payload;
-  std::string chunkDebugUrl;
-
-  if (scale.sharding) {
-    const auto& sharding = *scale.sharding;
-    std::array<uint64_t, 3> g{};
-    for (size_t d = 0; d < 3; ++d) {
-      const int64_t localStart = chunk.globalStart[d] - scale.voxelOffset[d];
-      CHECK(localStart >= 0);
-      const int64_t cs = scale.chunkSize[d];
-      CHECK(cs > 0);
-      CHECK((localStart % cs) == 0);
-      g[d] = static_cast<uint64_t>(localStart / cs);
-    }
-    const uint64_t chunkId = ZNeuroglancerUint64Sharding::compressedMortonCode(g, scale.chunkGridSize);
-
-    const uint64_t shiftedChunkId = chunkId >> sharding.preshiftBits;
-    const uint64_t hashCode = (sharding.hash == Scale::Sharding::Hash::Identity)
-                                ? shiftedChunkId
-                                : ZNeuroglancerUint64Sharding::murmurHash3X86_128Hash64Bits(shiftedChunkId, /*seed=*/0);
-    const uint64_t shardAndMinishard = hashCode & sharding.shardAndMinishardMask;
-    const uint64_t minishard = shardAndMinishard & sharding.minishardMask;
-    const uint64_t shard = (shardAndMinishard >> sharding.minishardBits) & sharding.shardMask;
-
-    const MinishardIndexCacheKey minishardCacheKey = std::make_tuple(chunk.scaleIndex, shardAndMinishard);
-
-    std::shared_ptr<const DecodedMinishardIndex> minishardIndex;
-    if (auto cached = m_chunkCache->minishardIndexCache.find(
-          minishardCacheKey,
-          ZConcurrentLRUCache<MinishardIndexCacheKey, std::shared_ptr<const DecodedMinishardIndex>>::FindStrategy::MaybeUpdateLRUList);
-        cached) {
-      minishardIndex = cached.value();
+  std::shared_ptr<ChunkCache::InFlightChunkRead> inFlight;
+  std::optional<folly::coro::Future<std::shared_ptr<ZImg>>> sharedFuture;
+  bool isLeader = false;
+  {
+    const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
+    auto it = m_chunkCache->inFlightChunkReads.find(cacheKey);
+    if (it != m_chunkCache->inFlightChunkReads.end()) {
+      inFlight = it->second;
+      sharedFuture = inFlight->promise.getFuture();
     } else {
-      auto entryOpt = co_await getShardIndexEntry(scale, sharding, m_defaultTimeout, shard, minishard);
-      if (!entryOpt) {
+      inFlight = std::make_shared<ChunkCache::InFlightChunkRead>();
+      m_chunkCache->inFlightChunkReads.emplace(cacheKey, inFlight);
+      isLeader = true;
+    }
+  }
+
+  if (!isLeader) {
+    CHECK(sharedFuture);
+    co_return co_await std::move(*sharedFuture);
+  }
+
+  auto eraseInFlight = [&]() {
+    const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
+    auto it = m_chunkCache->inFlightChunkReads.find(cacheKey);
+    if (it != m_chunkCache->inFlightChunkReads.end() && it->second == inFlight) {
+      m_chunkCache->inFlightChunkReads.erase(it);
+    }
+  };
+
+  auto doRead = [&]() -> folly::coro::Task<std::shared_ptr<ZImg>> {
+    const size_t sx = static_cast<size_t>(chunk.globalEnd[0] - chunk.globalStart[0]);
+    const size_t sy = static_cast<size_t>(chunk.globalEnd[1] - chunk.globalStart[1]);
+    const size_t sz = static_cast<size_t>(chunk.globalEnd[2] - chunk.globalStart[2]);
+    const size_t bytesPerVoxel = m_baseImgInfo.bytesPerVoxel;
+    const size_t expectedBytes = sx * sy * sz * m_numChannels * bytesPerVoxel;
+
+    std::vector<uint8_t> payload;
+    std::string chunkDebugUrl;
+
+    if (scale.sharding) {
+      const auto& sharding = *scale.sharding;
+      std::array<uint64_t, 3> g{};
+      for (size_t d = 0; d < 3; ++d) {
+        const int64_t localStart = chunk.globalStart[d] - scale.voxelOffset[d];
+        CHECK(localStart >= 0);
+        const int64_t cs = scale.chunkSize[d];
+        CHECK(cs > 0);
+        CHECK((localStart % cs) == 0);
+        g[d] = static_cast<uint64_t>(localStart / cs);
+      }
+      const uint64_t chunkId = ZNeuroglancerUint64Sharding::compressedMortonCode(g, scale.chunkGridSize);
+
+      const uint64_t shiftedChunkId = chunkId >> sharding.preshiftBits;
+      const uint64_t hashCode = (sharding.hash == Scale::Sharding::Hash::Identity)
+                                  ? shiftedChunkId
+                                  : ZNeuroglancerUint64Sharding::murmurHash3X86_128Hash64Bits(shiftedChunkId, /*seed=*/0);
+      const uint64_t shardAndMinishard = hashCode & sharding.shardAndMinishardMask;
+      const uint64_t minishard = shardAndMinishard & sharding.minishardMask;
+      const uint64_t shard = (shardAndMinishard >> sharding.minishardBits) & sharding.shardMask;
+
+      const MinishardIndexCacheKey minishardCacheKey = std::make_tuple(chunk.scaleIndex, shardAndMinishard);
+
+      auto getOrFetchMinishardIndex = [&]() -> folly::coro::Task<std::shared_ptr<const DecodedMinishardIndex>> {
+        if (auto cached = m_chunkCache->minishardIndexCache.find(
+              minishardCacheKey,
+              ZConcurrentLRUCache<MinishardIndexCacheKey, std::shared_ptr<const DecodedMinishardIndex>>::FindStrategy::MaybeUpdateLRUList);
+            cached) {
+          co_return cached.value();
+        }
+
+        std::shared_ptr<ChunkCache::InFlightMinishardIndexRead> inFlightMinishard;
+        std::optional<folly::coro::Future<std::shared_ptr<const DecodedMinishardIndex>>> sharedMinishardFuture;
+        bool isMinishardLeader = false;
+        {
+          const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
+          auto it = m_chunkCache->inFlightMinishardIndexReads.find(minishardCacheKey);
+          if (it != m_chunkCache->inFlightMinishardIndexReads.end()) {
+            inFlightMinishard = it->second;
+            sharedMinishardFuture = inFlightMinishard->promise.getFuture();
+          } else {
+            inFlightMinishard = std::make_shared<ChunkCache::InFlightMinishardIndexRead>();
+            m_chunkCache->inFlightMinishardIndexReads.emplace(minishardCacheKey, inFlightMinishard);
+            isMinishardLeader = true;
+          }
+        }
+
+        if (!isMinishardLeader) {
+          CHECK(sharedMinishardFuture);
+          co_return co_await std::move(*sharedMinishardFuture);
+        }
+
+        auto eraseMinishardInFlight = [&]() {
+          const std::lock_guard<std::mutex> lock(m_chunkCache->inFlightMutex);
+          auto it = m_chunkCache->inFlightMinishardIndexReads.find(minishardCacheKey);
+          if (it != m_chunkCache->inFlightMinishardIndexReads.end() && it->second == inFlightMinishard) {
+            m_chunkCache->inFlightMinishardIndexReads.erase(it);
+          }
+        };
+
+        try {
+          auto entryOpt = co_await getShardIndexEntry(scale, sharding, m_defaultTimeout, shard, minishard);
+          if (!entryOpt) {
+            inFlightMinishard->promise.setValue(std::shared_ptr<const DecodedMinishardIndex>());
+            eraseMinishardInFlight();
+            co_return std::shared_ptr<const DecodedMinishardIndex>();
+          }
+
+          std::shared_ptr<const DecodedMinishardIndex> minishardIndex;
+          if (entryOpt->minishardIndexStart == entryOpt->minishardIndexEnd) {
+            minishardIndex = std::make_shared<DecodedMinishardIndex>();
+          } else {
+            const uint64_t absStart = entryOpt->baseDataOffset + entryOpt->minishardIndexStart;
+            const uint64_t absEnd = entryOpt->baseDataOffset + entryOpt->minishardIndexEnd;
+            if (absEnd < absStart) {
+              throw ZException("Invalid shard index entry: end offset < start offset");
+            }
+            auto bytesOpt = co_await getHttpRangeBytes(entryOpt->dataUrl, m_defaultTimeout, absStart, absEnd - absStart);
+            if (!bytesOpt) {
+              inFlightMinishard->promise.setValue(std::shared_ptr<const DecodedMinishardIndex>());
+              eraseMinishardInFlight();
+              co_return std::shared_ptr<const DecodedMinishardIndex>();
+            }
+            auto decodedBytes = decodeShardedBytes(std::move(*bytesOpt), sharding.minishardIndexEncoding);
+            DecodedMinishardIndex decodedIndex =
+              ZNeuroglancerUint64Sharding::decodeMinishardIndex(std::span<const uint8_t>(decodedBytes.data(), decodedBytes.size()),
+                                                               entryOpt->baseDataOffset);
+            minishardIndex = std::make_shared<DecodedMinishardIndex>(std::move(decodedIndex));
+          }
+
+          m_chunkCache->minishardIndexCache.insert(minishardCacheKey, minishardIndex, minishardIndex->byteSize());
+          inFlightMinishard->promise.setValue(minishardIndex);
+          eraseMinishardInFlight();
+          co_return minishardIndex;
+        }
+        catch (...) {
+          inFlightMinishard->promise.setException(folly::exception_wrapper(std::current_exception()));
+          eraseMinishardInFlight();
+          throw;
+        }
+      };
+
+      auto minishardIndex = co_await getOrFetchMinishardIndex();
+      if (!minishardIndex) {
         co_return std::shared_ptr<ZImg>();
       }
 
-      chunkDebugUrl = entryOpt->dataUrl;
+      const auto it = std::lower_bound(minishardIndex->keys.begin(), minishardIndex->keys.end(), chunkId);
+      if (it == minishardIndex->keys.end() || *it != chunkId) {
+        co_return std::shared_ptr<ZImg>();
+      }
+      const size_t idx = static_cast<size_t>(std::distance(minishardIndex->keys.begin(), it));
+      CHECK(idx < minishardIndex->starts.size());
+      CHECK(idx < minishardIndex->ends.size());
 
-      if (entryOpt->minishardIndexStart == entryOpt->minishardIndexEnd) {
-        minishardIndex = std::make_shared<DecodedMinishardIndex>();
+      std::string dataUrl;
+      if (!chunkDebugUrl.empty()) {
+        dataUrl = chunkDebugUrl;
       } else {
-        const uint64_t absStart = entryOpt->baseDataOffset + entryOpt->minishardIndexStart;
-        const uint64_t absEnd = entryOpt->baseDataOffset + entryOpt->minishardIndexEnd;
-        if (absEnd < absStart) {
-          throw ZException("Invalid shard index entry: end offset < start offset");
+        const QString shardHex = shardHexString(shard, sharding.shardHexDigits);
+        const int mode = sharding.shardFileMode.load();
+        if (mode == 2) {
+          dataUrl = toStdString(scale.url.resolved(QUrl(shardHex + ".data")).toString());
+        } else if (mode == 1) {
+          dataUrl = toStdString(scale.url.resolved(QUrl(shardHex + ".shard")).toString());
+        } else {
+          auto entryOpt = co_await getShardIndexEntry(scale, sharding, m_defaultTimeout, shard, minishard);
+          if (!entryOpt) {
+            co_return std::shared_ptr<ZImg>();
+          }
+          dataUrl = entryOpt->dataUrl;
         }
-        auto bytesOpt = co_await getHttpRangeBytes(entryOpt->dataUrl, m_defaultTimeout, absStart, absEnd - absStart);
-        if (!bytesOpt) {
-          co_return std::shared_ptr<ZImg>();
-        }
-        auto decodedBytes = decodeShardedBytes(std::move(*bytesOpt), sharding.minishardIndexEncoding);
-        DecodedMinishardIndex decodedIndex =
-          ZNeuroglancerUint64Sharding::decodeMinishardIndex(std::span<const uint8_t>(decodedBytes.data(), decodedBytes.size()),
-                                                           entryOpt->baseDataOffset);
-        minishardIndex = std::make_shared<DecodedMinishardIndex>(std::move(decodedIndex));
       }
 
-      m_chunkCache->minishardIndexCache.insert(minishardCacheKey, minishardIndex, minishardIndex->byteSize());
-    }
-
-    const auto it = std::lower_bound(minishardIndex->keys.begin(), minishardIndex->keys.end(), chunkId);
-    if (it == minishardIndex->keys.end() || *it != chunkId) {
-      co_return std::shared_ptr<ZImg>();
-    }
-    const size_t idx = static_cast<size_t>(std::distance(minishardIndex->keys.begin(), it));
-    CHECK(idx < minishardIndex->starts.size());
-    CHECK(idx < minishardIndex->ends.size());
-
-    std::string dataUrl;
-    if (!chunkDebugUrl.empty()) {
-      dataUrl = chunkDebugUrl;
+      const uint64_t dataStart = minishardIndex->starts[idx];
+      const uint64_t dataEnd = minishardIndex->ends[idx];
+      if (dataEnd < dataStart) {
+        throw ZException("Invalid minishard index: end offset < start offset");
+      }
+      auto bytesOpt = co_await getHttpRangeBytes(dataUrl, m_defaultTimeout, dataStart, dataEnd - dataStart);
+      if (!bytesOpt) {
+        co_return std::shared_ptr<ZImg>();
+      }
+      payload = decodeShardedBytes(std::move(*bytesOpt), sharding.dataEncoding);
+      chunkDebugUrl = dataUrl;
     } else {
-      const QString shardHex = shardHexString(shard, sharding.shardHexDigits);
-      const int mode = sharding.shardFileMode.load();
-      if (mode == 2) {
-        dataUrl = toStdString(scale.url.resolved(QUrl(shardHex + ".data")).toString());
-      } else if (mode == 1) {
-        dataUrl = toStdString(scale.url.resolved(QUrl(shardHex + ".shard")).toString());
-      } else {
-        auto entryOpt = co_await getShardIndexEntry(scale, sharding, m_defaultTimeout, shard, minishard);
-        if (!entryOpt) {
-          co_return std::shared_ptr<ZImg>();
-        }
-        dataUrl = entryOpt->dataUrl;
+      const std::string urlStr = toStdString(chunkUrl(chunk).toString());
+      chunkDebugUrl = urlStr;
+      auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(urlStr, m_defaultTimeout);
+      if (!resOpt) {
+        co_return std::shared_ptr<ZImg>();
       }
+      payload = std::move(resOpt->body);
     }
 
-    const uint64_t dataStart = minishardIndex->starts[idx];
-    const uint64_t dataEnd = minishardIndex->ends[idx];
-    if (dataEnd < dataStart) {
-      throw ZException("Invalid minishard index: end offset < start offset");
+    std::vector<uint8_t> body;
+    switch (scale.chunkEncoding) {
+    case Scale::ChunkEncoding::Raw:
+      body = std::move(payload);
+      break;
+    case Scale::ChunkEncoding::Jpeg: {
+      CHECK(bytesPerVoxel == 1);
+      body = ZNeuroglancerPrecomputedChunkDecoder::decodeJpegToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
+                                                                   /*expectedVoxelCount=*/sx * sy * sz,
+                                                                   /*expectedChannels=*/m_numChannels);
+      break;
     }
-    auto bytesOpt = co_await getHttpRangeBytes(dataUrl, m_defaultTimeout, dataStart, dataEnd - dataStart);
-    if (!bytesOpt) {
-      co_return std::shared_ptr<ZImg>();
+    case Scale::ChunkEncoding::Png: {
+      CHECK(bytesPerVoxel == 1 || bytesPerVoxel == 2);
+      body = ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
+                                                                  /*expectedVoxelCount=*/sx * sy * sz,
+                                                                  /*expectedChannels=*/m_numChannels,
+                                                                  bytesPerVoxel);
+      break;
     }
-    payload = decodeShardedBytes(std::move(*bytesOpt), sharding.dataEncoding);
-    chunkDebugUrl = dataUrl;
-  } else {
-    const std::string urlStr = toStdString(chunkUrl(chunk).toString());
-    chunkDebugUrl = urlStr;
-    auto resOpt = co_await ZProxygenHttpClient::instance().getBytes(urlStr, m_defaultTimeout);
-    if (!resOpt) {
-      co_return std::shared_ptr<ZImg>();
+    case Scale::ChunkEncoding::Compresso: {
+      CHECK(bytesPerVoxel == 1 || bytesPerVoxel == 2 || bytesPerVoxel == 4 || bytesPerVoxel == 8);
+      CHECK(m_numChannels == 1);
+      body = ZNeuroglancerPrecomputedChunkDecoder::decodeCompressoToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
+                                                                        /*expectedChunkSize=*/{sx, sy, sz},
+                                                                        bytesPerVoxel);
+      break;
     }
-    payload = std::move(resOpt->body);
-  }
-
-  std::vector<uint8_t> body;
-  switch (scale.chunkEncoding) {
-  case Scale::ChunkEncoding::Raw:
-    body = std::move(payload);
-    break;
-  case Scale::ChunkEncoding::Jpeg: {
-    CHECK(bytesPerVoxel == 1);
-    body = ZNeuroglancerPrecomputedChunkDecoder::decodeJpegToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
-                                                                 /*expectedVoxelCount=*/sx * sy * sz,
-                                                                 /*expectedChannels=*/m_numChannels);
-    break;
-  }
-  case Scale::ChunkEncoding::Png: {
-    CHECK(bytesPerVoxel == 1 || bytesPerVoxel == 2);
-    body = ZNeuroglancerPrecomputedChunkDecoder::decodePngToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
-                                                                /*expectedVoxelCount=*/sx * sy * sz,
-                                                                /*expectedChannels=*/m_numChannels,
-                                                                bytesPerVoxel);
-    break;
-  }
-  case Scale::ChunkEncoding::Compresso: {
-    CHECK(bytesPerVoxel == 1 || bytesPerVoxel == 2 || bytesPerVoxel == 4 || bytesPerVoxel == 8);
-    CHECK(m_numChannels == 1);
-    body = ZNeuroglancerPrecomputedChunkDecoder::decodeCompressoToRaw(std::span<const uint8_t>(payload.data(), payload.size()),
-                                                                      /*expectedChunkSize=*/{sx, sy, sz},
-                                                                      bytesPerVoxel);
-    break;
-  }
-  case Scale::ChunkEncoding::CompressedSegmentation: {
-    CHECK(scale.compressedSegmentationBlockSize);
-    CHECK(m_dataTypeString == "uint32" || m_dataTypeString == "uint64");
-    std::array<size_t, 3> blockSize{};
-    for (size_t d = 0; d < 3; ++d) {
-      const int64_t v = (*scale.compressedSegmentationBlockSize)[d];
-      CHECK(v > 0);
-      blockSize[d] = static_cast<size_t>(v);
+    case Scale::ChunkEncoding::CompressedSegmentation: {
+      CHECK(scale.compressedSegmentationBlockSize);
+      CHECK(m_dataTypeString == "uint32" || m_dataTypeString == "uint64");
+      std::array<size_t, 3> blockSize{};
+      for (size_t d = 0; d < 3; ++d) {
+        const int64_t v = (*scale.compressedSegmentationBlockSize)[d];
+        CHECK(v > 0);
+        blockSize[d] = static_cast<size_t>(v);
+      }
+      const bool isUint64 = (m_dataTypeString == "uint64");
+      body = ZNeuroglancerPrecomputedChunkDecoder::decodeCompressedSegmentationToRaw(
+        std::span<const uint8_t>(payload.data(), payload.size()),
+        /*chunkSize=*/{sx, sy, sz},
+        /*numChannels=*/m_numChannels,
+        blockSize,
+        isUint64);
+      break;
     }
-    const bool isUint64 = (m_dataTypeString == "uint64");
-    body = ZNeuroglancerPrecomputedChunkDecoder::decodeCompressedSegmentationToRaw(
-      std::span<const uint8_t>(payload.data(), payload.size()),
-      /*chunkSize=*/{sx, sy, sz},
-      /*numChannels=*/m_numChannels,
-      blockSize,
-      isUint64);
-    break;
+    }
+
+    if (body.size() != expectedBytes) {
+      throw ZException(fmt::format("Neuroglancer chunk decode size mismatch for '{}': got {} bytes, expected {} bytes",
+                                   chunkDebugUrl,
+                                   body.size(),
+                                   expectedBytes));
+    }
+
+    if (bytesPerVoxel > 1 && std::endian::native == std::endian::big) {
+      swapEndianInPlace(body.data(), bytesPerVoxel, sx * sy * sz * m_numChannels);
+    }
+
+    ZImgInfo info;
+    info.width = sx;
+    info.height = sy;
+    info.depth = sz;
+    info.numChannels = m_numChannels;
+    info.numTimes = 1;
+    info.bytesPerVoxel = m_baseImgInfo.bytesPerVoxel;
+    info.voxelFormat = m_baseImgInfo.voxelFormat;
+    info.validBitCount = m_baseImgInfo.validBitCount;
+    info.voxelSizeUnit = VoxelSizeUnit::nm;
+    info.voxelSizeX = scale.resolutionNm[0];
+    info.voxelSizeY = scale.resolutionNm[1];
+    info.voxelSizeZ = scale.resolutionNm[2];
+    info.createDefaultDescriptions();
+
+    auto img = std::make_shared<ZImg>(info);
+    std::memcpy(img->timeData<uint8_t>(0), body.data(), body.size());
+
+    m_chunkCache->chunkCache.insert(cacheKey, img, img->byteNumber());
+    co_return img;
+  };
+
+  try {
+    auto img = co_await doRead();
+    inFlight->promise.setValue(img);
+    eraseInFlight();
+    co_return img;
   }
+  catch (...) {
+    inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
+    eraseInFlight();
+    throw;
   }
-
-  if (body.size() != expectedBytes) {
-    throw ZException(fmt::format("Neuroglancer chunk decode size mismatch for '{}': got {} bytes, expected {} bytes",
-                                 chunkDebugUrl,
-                                 body.size(),
-                                 expectedBytes));
-  }
-
-  if (bytesPerVoxel > 1 && std::endian::native == std::endian::big) {
-    swapEndianInPlace(body.data(), bytesPerVoxel, sx * sy * sz * m_numChannels);
-  }
-
-  ZImgInfo info;
-  info.width = sx;
-  info.height = sy;
-  info.depth = sz;
-  info.numChannels = m_numChannels;
-  info.numTimes = 1;
-  info.bytesPerVoxel = m_baseImgInfo.bytesPerVoxel;
-  info.voxelFormat = m_baseImgInfo.voxelFormat;
-  info.validBitCount = m_baseImgInfo.validBitCount;
-  info.voxelSizeUnit = VoxelSizeUnit::nm;
-  info.voxelSizeX = scale.resolutionNm[0];
-  info.voxelSizeY = scale.resolutionNm[1];
-  info.voxelSizeZ = scale.resolutionNm[2];
-  info.createDefaultDescriptions();
-
-  auto img = std::make_shared<ZImg>(info);
-  std::memcpy(img->timeData<uint8_t>(0), body.data(), body.size());
-
-  m_chunkCache->chunkCache.insert(cacheKey, img, img->byteNumber());
-  co_return img;
 }
 
 std::shared_ptr<ZImg> ZNeuroglancerPrecomputedVolume::tryGetCachedChunk(const Chunk& chunk) const
@@ -1352,6 +1460,61 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
     out.scales.push_back(tileScale);
   }
 
+  return out;
+}
+
+ZNeuroglancerPrecomputedVolume::SliceChunkRequests ZNeuroglancerPrecomputedVolume::sliceChunkRequestsFor2DViewport(
+  size_t z,
+  size_t t,
+  const QRectF& viewport,
+  double renderScale,
+  Slice2DRatioPolicy ratioPolicy) const
+{
+  CHECK(t == 0) << "Neuroglancer precomputed volumes do not support time dimension yet (t must be 0)";
+  CHECK(renderScale > 0);
+
+  SliceChunkRequests out;
+
+  std::vector<std::array<size_t, 3>> ratios = availableRatios();
+  if (ratios.empty()) {
+    return out;
+  }
+
+  std::array<size_t, 3> targetRatio{};
+  switch (ratioPolicy) {
+  case Slice2DRatioPolicy::BestForScale:
+    targetRatio = bestRatioForIsotropicScale(ratios, renderScale);
+    break;
+  case Slice2DRatioPolicy::CoarsestXY:
+    targetRatio = coarsestRatioFor2DPreview(ratios);
+    break;
+  }
+  out.targetRatio = targetRatio;
+
+  if (targetRatio[0] != targetRatio[1]) {
+    throw ZException(fmt::format("Neuroglancer 2D display currently requires isotropic XY downsampling ratios, but got ratio [{},{},{}]",
+                                 targetRatio[0],
+                                 targetRatio[1],
+                                 targetRatio[2]));
+  }
+
+  auto scaleIndexOpt = scaleIndexForRatio(targetRatio);
+  if (!scaleIndexOpt) {
+    throw ZException(fmt::format("Neuroglancer requested ratio [{},{},{}] is not available in this dataset",
+                                 targetRatio[0],
+                                 targetRatio[1],
+                                 targetRatio[2]));
+  }
+
+  const int64_t z0 = static_cast<int64_t>(z);
+  const std::array<int64_t, 3> boxStart{static_cast<int64_t>(std::floor(viewport.x())),
+                                        static_cast<int64_t>(std::floor(viewport.y())),
+                                        z0};
+  const std::array<int64_t, 3> boxEnd{static_cast<int64_t>(std::ceil(viewport.right())),
+                                      static_cast<int64_t>(std::ceil(viewport.bottom())),
+                                      z0 + 1};
+
+  out.chunks = chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
   return out;
 }
 
