@@ -27,6 +27,14 @@ DEFINE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds,
               5,
               "Interval in seconds for logging folly global executor status during waiting, default is 5");
 
+DEFINE_uint32(atlas_3d_paging_queue_poll_interval_ms,
+              50,
+              "Polling interval in milliseconds while waiting for 3D paging block reads (lower improves cancellation responsiveness), default is 50ms");
+
+DEFINE_uint32(atlas_ng_precomputed_3d_max_concurrent_block_reads,
+              256,
+              "Maximum number of concurrent Neuroglancer block read tasks during 3D paging (limits network pressure and speeds up cancellation), default is 256");
+
 DEFINE_uint32(atlas_3d_paging_lod_stats_log_interval_ms,
               500,
               "Minimum interval in milliseconds between rate-limited per-LOD paging statistics logs, default is 500ms");
@@ -1073,11 +1081,17 @@ Z3DImg::readImageBlocksToBufferAsync(size_t c,
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   processEventsAndMaybeCancel(cancellationToken);
 
+  size_t effectiveBatchSize = m_blockUploadingBatchSize;
+  if (m_imgPack.isNeuroglancerPrecomputed()) {
+    effectiveBatchSize = std::min(effectiveBatchSize, static_cast<size_t>(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads));
+  }
+  CHECK(effectiveBatchSize > 0);
+
   size_t taskIdx = 0;
   while (taskIdx < pendingTasks.size()) {
     processEventsAndMaybeCancel(cancellationToken);
 
-    size_t numberOfTasks = std::min(m_blockUploadingBatchSize, pendingTasks.size() - taskIdx);
+    size_t numberOfTasks = std::min(effectiveBatchSize, pendingTasks.size() - taskIdx);
 
     std::vector<folly::coro::TaskWithExecutor<void>> blockTasks;
     blockTasks.reserve(numberOfTasks);
@@ -1132,15 +1146,30 @@ Z3DImg::readImageBlocksToQueueAsync(size_t c,
   auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
   maybeCancel(cancellationToken);
 
-  std::vector<folly::coro::TaskWithExecutor<void>> blockTasks;
-  blockTasks.reserve(pendingTasks.size());
-  for (size_t taskIdx = 0; taskIdx < pendingTasks.size(); ++taskIdx) {
-    maybeCancel(cancellationToken);
-    blockTasks.push_back(
-      folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(),
-                                   readImageBlockToQueueAsync(c, pendingTasks, taskIdx, resInfo, queue)));
+  size_t effectiveBatchSize = m_blockUploadingBatchSize;
+  if (m_imgPack.isNeuroglancerPrecomputed()) {
+    effectiveBatchSize = std::min(effectiveBatchSize, static_cast<size_t>(FLAGS_atlas_ng_precomputed_3d_max_concurrent_block_reads));
   }
-  co_await folly::coro::collectAllRange(std::move(blockTasks));
+  CHECK(effectiveBatchSize > 0);
+
+  size_t taskIdx = 0;
+  while (taskIdx < pendingTasks.size()) {
+    maybeCancel(cancellationToken);
+
+    const size_t numberOfTasks = std::min(effectiveBatchSize, pendingTasks.size() - taskIdx);
+    std::vector<folly::coro::TaskWithExecutor<void>> blockTasks;
+    blockTasks.reserve(numberOfTasks);
+
+    const size_t finalTaskIdx = taskIdx + numberOfTasks;
+    for (; taskIdx < finalTaskIdx; ++taskIdx) {
+      maybeCancel(cancellationToken);
+      blockTasks.push_back(
+        folly::coro::co_withExecutor(folly::getGlobalCPUExecutor(),
+                                     readImageBlockToQueueAsync(c, pendingTasks, taskIdx, resInfo, queue)));
+    }
+
+    co_await folly::coro::collectAllRange(std::move(blockTasks));
+  }
 
   maybeCancel(cancellationToken);
   LOG(INFO) << "image blocks reading finished.";
@@ -1305,8 +1334,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
       if (imgQueue.try_dequeue_until(
             elem,
-            std::chrono::steady_clock::now() +
-              std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
+            std::chrono::steady_clock::now() + std::chrono::milliseconds(FLAGS_atlas_3d_paging_queue_poll_interval_ms))) {
         const auto& [pageTableEntryKey, pageTableEntryPtr] = pendingTasks[std::get<0>(elem)];
         if (!std::get<1>(elem)) {
           ++emptyBlockCount;

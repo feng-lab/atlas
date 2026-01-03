@@ -1287,12 +1287,24 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
     tmpResInfo.bytesPerVoxel = m_imgInfo.bytesPerVoxel;
     auto res = std::make_shared<ZImg>(tmpResInfo);
 
+    // For Neuroglancer, a single 3D paging block read can intersect multiple
+    // underlying chunks (depending on the dataset chunkSize). If we read all of
+    // them concurrently, total in-flight HTTP requests can explode during
+    // full-resolution 3D paging (many blocks * many chunks per block). This
+    // hurts cancellation responsiveness and can amplify transient socket/TLS
+    // errors.
+    //
+    // Limit per-block chunk concurrency; overall concurrency is already bounded
+    // at the block level by Z3DImg.
+    constexpr size_t maxConcurrentChunkReadsPerBlock = 1;
+
     std::vector<folly::coro::Task<std::shared_ptr<ZImg>>> chunkTasks;
     chunkTasks.reserve(chunks.size());
     for (const auto& chunk : chunks) {
       chunkTasks.push_back(m_ngVolume->readChunkAsync(chunk));
     }
-    std::vector<std::shared_ptr<ZImg>> chunkImgs = co_await folly::coro::collectAllRange(std::move(chunkTasks));
+    std::vector<std::shared_ptr<ZImg>> chunkImgs =
+      co_await folly::coro::collectAllWindowed(std::move(chunkTasks), maxConcurrentChunkReadsPerBlock);
 
     maybeCancel(cancellationToken);
 

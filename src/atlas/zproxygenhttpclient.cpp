@@ -1,10 +1,14 @@
 #include "zproxygenhttpclient.h"
 
+#include "zcancellation.h"
+
 #include <folly/String.h>
 #include <folly/compression/Compression.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/IOBufQueue.h>
+#include <folly/OperationCancelled.h>
+#include <folly/coro/Sleep.h>
 #include <proxygen/lib/http/coro/client/HTTPCoroConnector.h>
 #include <proxygen/lib/http/HTTPHeaders.h>
 #include <proxygen/lib/http/HTTPMessage.h>
@@ -14,8 +18,15 @@
 
 #include <gflags/gflags.h>
 
+#include <QCoreApplication>
+#include <QNetworkProxy>
+#include <QNetworkProxyFactory>
+#include <QNetworkProxyQuery>
+#include <QUrl>
+
 #include <cstring>
 #include <cstdlib>
+#include <algorithm>
 #include <exception>
 #include <fstream>
 #include <memory>
@@ -28,6 +39,24 @@
 DEFINE_string(atlas_http_ca_bundle,
               "",
               "Path to a PEM CA bundle for HTTPS requests (overrides auto-detect; also respects env SSL_CERT_FILE).");
+
+DEFINE_string(atlas_http_proxy_strategy,
+              "auto",
+              "Outbound HTTP proxy strategy using OS system proxy settings only (no proxy URL flags). "
+              "Values: auto (alternate direct/proxy between retries), no_proxy (always direct), "
+              "proxy_if_available (always use system proxy if one exists for the URL).");
+
+DEFINE_uint32(atlas_http_max_retries,
+              2,
+              "Maximum number of retries for transient network/handshake errors in HTTP GET (default 2).");
+
+DEFINE_uint32(atlas_http_retry_backoff_initial_ms,
+              200,
+              "Initial backoff delay in milliseconds before retrying transient HTTP errors (default 200ms).");
+
+DEFINE_uint32(atlas_http_retry_backoff_max_ms,
+              2000,
+              "Maximum backoff delay in milliseconds for transient HTTP error retries (default 2000ms).");
 
 namespace nim {
 namespace {
@@ -145,6 +174,107 @@ std::optional<std::string> findCaBundlePath()
   return std::nullopt;
 }
 
+struct ProxyEndpoint
+{
+  std::string host;
+  uint16_t port = 0;
+};
+
+enum class ProxyStrategy
+{
+  Auto,
+  NoProxy,
+  ProxyIfAvailable,
+};
+
+ProxyStrategy proxyStrategyFromFlag()
+{
+  std::string s = FLAGS_atlas_http_proxy_strategy;
+  folly::toLowerAscii(s);
+  if (s.empty() || s == "auto" || s == "automatic") {
+    return ProxyStrategy::Auto;
+  }
+  if (s == "no_proxy" || s == "noproxy" || s == "none" || s == "direct") {
+    return ProxyStrategy::NoProxy;
+  }
+  if (s == "proxy_if_available" || s == "proxyifavailable" || s == "use_proxy_if_available" || s == "proxy") {
+    return ProxyStrategy::ProxyIfAvailable;
+  }
+  throw ZException(fmt::format(
+    "Invalid --atlas_http_proxy_strategy='{}' (expected: auto, no_proxy, proxy_if_available)",
+    FLAGS_atlas_http_proxy_strategy));
+}
+
+std::optional<ProxyEndpoint> systemHttpProxyForUrl(const std::string& url)
+{
+  if (QCoreApplication::instance() == nullptr) {
+    return std::nullopt;
+  }
+
+  const QUrl qurl(QString::fromStdString(url));
+  if (!qurl.isValid()) {
+    return std::nullopt;
+  }
+
+  // systemProxyForQuery() returns proxies in the order they should be tried.
+  const QNetworkProxyQuery query(qurl);
+  const QList<QNetworkProxy> proxies = QNetworkProxyFactory::systemProxyForQuery(query);
+  if (proxies.isEmpty()) {
+    return std::nullopt;
+  }
+
+  // Respect "NoProxy" when that's the system decision for this URL.
+  // Qt returns proxies in the order they should be attempted; if the first entry
+  // is NoProxy, the correct behavior is to connect directly.
+  if (proxies.front().type() == QNetworkProxy::NoProxy) {
+    return std::nullopt;
+  }
+
+  // Otherwise, scan for the first supported HTTP proxy in the ordered list.
+  // This handles environments where the OS provides multiple proxy candidates
+  // (e.g. PAC) without introducing custom proxy config in Atlas.
+  for (const QNetworkProxy& candidate : proxies) {
+    if (candidate.type() == QNetworkProxy::HttpProxy || candidate.type() == QNetworkProxy::HttpCachingProxy) {
+      const QString host = candidate.hostName();
+      const int port = candidate.port();
+      if (host.isEmpty() || port <= 0 || port > 65535) {
+        continue;
+      }
+
+      ProxyEndpoint out{};
+      out.host = host.toStdString();
+      out.port = static_cast<uint16_t>(port);
+      return out;
+    }
+
+    // If the system provided a non-HTTP proxy first (e.g. SOCKS), we can't use it
+    // with Proxygen's HTTP CONNECT proxy support. We'll keep scanning for an HTTP
+    // proxy candidate and fall back to direct if none exist.
+    if (candidate.type() != QNetworkProxy::NoProxy) {
+      VLOG(1) << fmt::format(
+        "Ignoring unsupported system proxy type {} for URL '{}'",
+        static_cast<int>(candidate.type()),
+        url);
+    }
+  }
+
+  return std::nullopt;
+}
+
+proxygen::coro::HTTPClientConnectionCache::ProxyParams makeConnectProxyParams(const ProxyEndpoint& endpoint)
+{
+  proxygen::coro::HTTPClientConnectionCache::ProxyParams params{};
+  params.server = endpoint.host;
+  params.port = endpoint.port;
+  params.useConnect = true;
+  params.poolParams = proxygen::coro::HTTPCoroSessionPool::defaultPoolParams();
+  params.connParams = proxygen::coro::HTTPCoroConnector::defaultConnectionParams();
+  // Proxy connection itself is usually plaintext; keep sslContext unset here.
+  params.connParams.sslContext = nullptr;
+  params.sessionParams = proxygen::coro::HTTPCoroConnector::defaultSessionParams();
+  return params;
+}
+
 #if defined(_WIN32)
 bool tryAddWindowsSystemCertStoreTo(/*inout*/ folly::SSLContext& ctx, const char* storeName, int& addedCerts, int& failedCerts)
 {
@@ -232,6 +362,46 @@ bool looksLikeTlsTrustStoreError(std::string_view message)
          message.find("SSL") != std::string_view::npos || message.find("tls") != std::string_view::npos;
 }
 
+bool isRetryableHttpError(const proxygen::coro::HTTPError& e)
+{
+  using proxygen::coro::HTTPErrorCode;
+  switch (e.code) {
+  case HTTPErrorCode::CONNECT_ERROR:
+  case HTTPErrorCode::_H3_CONNECT_ERROR:
+  case HTTPErrorCode::TRANSPORT_EOF:
+  case HTTPErrorCode::TRANSPORT_READ_ERROR:
+  case HTTPErrorCode::TRANSPORT_WRITE_ERROR:
+  case HTTPErrorCode::READ_TIMEOUT:
+  case HTTPErrorCode::WRITE_TIMEOUT:
+  case HTTPErrorCode::DROPPED:
+  case HTTPErrorCode::REFUSED_STREAM:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool isRetryableExceptionMessage(std::string_view message)
+{
+  // Heuristic for transient socket/TLS issues surfaced as std::exception.
+  return message.find("handshake") != std::string_view::npos || message.find("Network error") != std::string_view::npos ||
+         message.find("TLS") != std::string_view::npos || message.find("SSL") != std::string_view::npos ||
+         message.find("EOF") != std::string_view::npos;
+}
+
+std::chrono::milliseconds retryBackoffForAttempt(uint32_t attempt)
+{
+  const uint32_t initial = FLAGS_atlas_http_retry_backoff_initial_ms;
+  const uint32_t maxDelay = std::max<uint32_t>(initial, FLAGS_atlas_http_retry_backoff_max_ms);
+  uint64_t delay = initial;
+  // Exponential backoff: initial * 2^attempt
+  delay <<= std::min<uint32_t>(attempt, 20u);
+  if (delay > maxDelay) {
+    delay = maxDelay;
+  }
+  return std::chrono::milliseconds(static_cast<int64_t>(delay));
+}
+
 } // namespace
 
 ZProxygenHttpClient& ZProxygenHttpClient::instance()
@@ -242,9 +412,13 @@ ZProxygenHttpClient& ZProxygenHttpClient::instance()
 
 ZProxygenHttpClient::ZProxygenHttpClient()
   : m_eventBaseThread("atlas_proxygen_http")
-  , m_connCache(*m_eventBaseThread.getEventBase())
   , m_sslContext(makeClientSslContext(m_caBundlePath))
-{}
+{
+  folly::EventBase* evb = m_eventBaseThread.getEventBase();
+  CHECK(evb);
+
+  m_directConnCache = std::make_unique<proxygen::coro::HTTPClientConnectionCache>(*evb);
+}
 
 folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBytes(
   std::string url,
@@ -261,6 +435,9 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
   std::chrono::milliseconds timeout,
   std::vector<std::pair<std::string, std::string>> requestHeaders)
 {
+  auto cancellationToken = co_await folly::coro::co_current_cancellation_token;
+  maybeCancel(cancellationToken);
+
   proxygen::URL parsedUrl(url);
   if (!parsedUrl.isValid() || parsedUrl.getHost().empty()) {
     throw ZException(fmt::format("Invalid URL '{}'", url));
@@ -273,58 +450,148 @@ folly::coro::Task<std::optional<ZHttpGetBytesResult>> ZProxygenHttpClient::getBy
     isSecure = (scheme == "https");
   }
 
+  const ProxyStrategy proxyStrategy = proxyStrategyFromFlag();
+  const std::optional<ProxyEndpoint> systemProxy = (proxyStrategy == ProxyStrategy::NoProxy) ? std::nullopt : systemHttpProxyForUrl(url);
+
+  auto getOrCreateProxyCache = [&](const ProxyEndpoint& endpoint) -> proxygen::coro::HTTPClientConnectionCache* {
+    const std::string key = fmt::format("{}:{}", endpoint.host, endpoint.port);
+    auto it = m_proxyConnCaches.find(key);
+    if (it != m_proxyConnCaches.end()) {
+      return it->second.get();
+    }
+    folly::EventBase* evb = m_eventBaseThread.getEventBase();
+    CHECK(evb);
+    auto cache = std::make_unique<proxygen::coro::HTTPClientConnectionCache>(*evb, makeConnectProxyParams(endpoint));
+    auto* cachePtr = cache.get();
+    m_proxyConnCaches.emplace(key, std::move(cache));
+    LOG(INFO) << fmt::format("Using system HTTP proxy: {}:{} (CONNECT)", endpoint.host, endpoint.port);
+    return cachePtr;
+  };
+
   proxygen::coro::HTTPClient::RequestHeaderMap headerMap;
   headerMap.emplace("accept-encoding", "identity");
   for (auto& [k, v] : requestHeaders) {
     headerMap.emplace(std::move(k), std::move(v));
   }
 
-  try {
-    proxygen::coro::HTTPCoroConnector::ConnectionParams connParams{};
-    const proxygen::coro::HTTPCoroConnector::ConnectionParams* connParamsPtr = nullptr;
-    if (isSecure) {
-      CHECK(m_sslContext);
-      connParams = proxygen::coro::HTTPCoroConnector::defaultConnectionParams();
-      connParams.sslContext = m_sslContext;
-      connParams.serverName = parsedUrl.getHost();
-      connParamsPtr = &connParams;
+  const uint32_t maxRetries = FLAGS_atlas_http_max_retries;
+  for (uint32_t attempt = 0; attempt <= maxRetries; ++attempt) {
+    maybeCancel(cancellationToken);
+
+    proxygen::coro::HTTPClientConnectionCache* connCache = m_directConnCache.get();
+    if (systemProxy) {
+      const bool useProxy = [&]() {
+        switch (proxyStrategy) {
+        case ProxyStrategy::NoProxy:
+          return false;
+        case ProxyStrategy::ProxyIfAvailable:
+          return true;
+        case ProxyStrategy::Auto:
+          // Alternate direct/proxy between attempts (attempt 0 is direct).
+          return (attempt % 2u) == 1u;
+        }
+        return false;
+      }();
+      if (useProxy) {
+        connCache = getOrCreateProxyCache(*systemProxy);
+      }
+    }
+    CHECK(connCache);
+
+    auto attemptResult = co_await folly::coro::co_awaitTry([&]() -> folly::coro::Task<ZHttpGetBytesResult> {
+      maybeCancel(cancellationToken);
+
+      proxygen::coro::HTTPCoroConnector::ConnectionParams connParams{};
+      const proxygen::coro::HTTPCoroConnector::ConnectionParams* connParamsPtr = nullptr;
+      if (isSecure) {
+        CHECK(m_sslContext);
+        connParams = proxygen::coro::HTTPCoroConnector::defaultConnectionParams();
+        connParams.sslContext = m_sslContext;
+        connParams.serverName = parsedUrl.getHost();
+        connParamsPtr = &connParams;
+      }
+
+      auto sessionRes = co_await connCache->getSessionWithReservation(url, timeout, connParamsPtr);
+      maybeCancel(cancellationToken);
+
+      auto response = co_await proxygen::coro::HTTPClient::get(
+        sessionRes.session,
+        std::move(sessionRes.reservation),
+        parsedUrl,
+        timeout,
+        headerMap);
+
+      ZHttpGetBytesResult out{};
+      CHECK(response.headers);
+      out.status = response.headers->getStatusCode();
+      const auto& headers = response.headers->getHeaders();
+      out.contentType = headers.getSingleOrEmpty("content-type");
+      out.contentEncoding = headers.getSingleOrEmpty("content-encoding");
+
+      auto bodyBuf = response.body.move();
+      out.body = iobufToBytes(bodyBuf.get());
+      out.body = decompressIfNeeded(std::move(out.body), out.contentEncoding);
+      co_return out;
+    }());
+
+    if (attemptResult.hasValue()) {
+      co_return std::move(attemptResult).value();
     }
 
-    auto sessionRes = co_await m_connCache.getSessionWithReservation(url, timeout, connParamsPtr);
-    auto response =
-      co_await proxygen::coro::HTTPClient::get(sessionRes.session, std::move(sessionRes.reservation), parsedUrl, timeout, std::move(headerMap));
+    CHECK(attemptResult.hasException());
+    folly::exception_wrapper error = std::move(attemptResult).exception();
 
-    ZHttpGetBytesResult out{};
-    CHECK(response.headers);
-    out.status = response.headers->getStatusCode();
-    const auto& headers = response.headers->getHeaders();
-    out.contentType = headers.getSingleOrEmpty("content-type");
-    out.contentEncoding = headers.getSingleOrEmpty("content-encoding");
-
-    auto bodyBuf = response.body.move();
-    out.body = iobufToBytes(bodyBuf.get());
-    out.body = decompressIfNeeded(std::move(out.body), out.contentEncoding);
-    co_return out;
-  }
-  catch (const proxygen::coro::HTTPError& e) {
-    if (e.httpMessage && e.httpMessage->getStatusCode() == 404) {
-      co_return std::nullopt;
+    if (error.is_compatible_with<folly::OperationCancelled>()) {
+      // Folly coroutines report cancellation via OperationCancelled.
+      // Convert to our cancellation type so callers treat it as expected control-flow.
+      throw ZCancellationException();
     }
-    std::string msg = e.what();
+
+    if (const auto* httpErr = error.get_exception<proxygen::coro::HTTPError>(); httpErr != nullptr) {
+      if (httpErr->httpMessage && httpErr->httpMessage->getStatusCode() == 404) {
+        co_return std::nullopt;
+      }
+
+      const bool retryable = isRetryableHttpError(*httpErr);
+      if (attempt < maxRetries && retryable) {
+        VLOG(1) << fmt::format("HTTP GET transient error (attempt {}/{}): '{}' ({})",
+                               attempt + 1,
+                               maxRetries + 1,
+                               url,
+                               httpErr->describe());
+        co_await folly::coro::sleepReturnEarlyOnCancel(retryBackoffForAttempt(attempt));
+        continue;
+      }
+
+      std::string msg(httpErr->what());
+      if (isSecure && looksLikeTlsTrustStoreError(msg)) {
+        msg += fmt::format(" (CA bundle: '{}'; override with --atlas_http_ca_bundle=... or env SSL_CERT_FILE)",
+                           m_caBundlePath.empty() ? "<auto>" : m_caBundlePath);
+      }
+      throw ZException(fmt::format("HTTP GET failed for '{}': {}", url, msg));
+    }
+
+    // Fall back to message-based retry heuristics for non-proxygen errors.
+    std::string msg(error.what().toStdString());
+    const bool retryable = isRetryableExceptionMessage(msg);
+    if (attempt < maxRetries && retryable) {
+      VLOG(1) << fmt::format("HTTP GET transient exception (attempt {}/{}): '{}' ({})",
+                             attempt + 1,
+                             maxRetries + 1,
+                             url,
+                             msg);
+      co_await folly::coro::sleepReturnEarlyOnCancel(retryBackoffForAttempt(attempt));
+      continue;
+    }
+
     if (isSecure && looksLikeTlsTrustStoreError(msg)) {
       msg += fmt::format(" (CA bundle: '{}'; override with --atlas_http_ca_bundle=... or env SSL_CERT_FILE)",
                          m_caBundlePath.empty() ? "<auto>" : m_caBundlePath);
     }
     throw ZException(fmt::format("HTTP GET failed for '{}': {}", url, msg));
   }
-  catch (const std::exception& e) {
-    std::string msg = e.what();
-    if (isSecure && looksLikeTlsTrustStoreError(msg)) {
-      msg += fmt::format(" (CA bundle: '{}'; override with --atlas_http_ca_bundle=... or env SSL_CERT_FILE)",
-                         m_caBundlePath.empty() ? "<auto>" : m_caBundlePath);
-    }
-    throw ZException(fmt::format("HTTP GET failed for '{}': {}", url, msg));
-  }
+
+  throw ZException(fmt::format("HTTP GET failed for '{}': exhausted retries", url));
 }
 
 } // namespace nim

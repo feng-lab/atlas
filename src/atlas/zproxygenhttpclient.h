@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -48,9 +49,11 @@ private:
 
 private:
   folly::ScopedEventBaseThread m_eventBaseThread;
-  proxygen::coro::HTTPClientConnectionCache m_connCache;
   std::shared_ptr<const folly::SSLContext> m_sslContext;
   std::string m_caBundlePath;
+
+  std::unique_ptr<proxygen::coro::HTTPClientConnectionCache> m_directConnCache;
+  std::unordered_map<std::string, std::unique_ptr<proxygen::coro::HTTPClientConnectionCache>> m_proxyConnCaches;
 };
 
 } // namespace nim

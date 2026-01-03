@@ -15,6 +15,7 @@
 #include <chrono>
 
 DECLARE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds);
+DECLARE_uint32(atlas_3d_paging_queue_poll_interval_ms);
 
 namespace nim {
 
@@ -173,8 +174,7 @@ size_t ZVulkanPagedImageBlockUploader::readAndUploadImageBlocks(
 
     if (imgQueue.try_dequeue_until(
           elem,
-          std::chrono::steady_clock::now() +
-            std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
+          std::chrono::steady_clock::now() + std::chrono::milliseconds(FLAGS_atlas_3d_paging_queue_poll_interval_ms))) {
       const auto taskIndex = std::get<0>(elem);
       const auto& [pageTableEntryKey, pageTableEntryPtr] = pendingTasks[taskIndex];
 
