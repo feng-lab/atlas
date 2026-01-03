@@ -9,6 +9,7 @@
 #include "zcancellation.h"
 #include "zcpuinfo.h"
 #include "zneuroglancerprecomputed.h"
+#include <folly/OperationCancelled.h>
 #include <folly/coro/Collect.h>
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
@@ -1345,9 +1346,17 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       CHECK(m_blockUploadingBatchSize > 0);
 
 #if 1
-      folly::coro::blockingWait(folly::coro::co_withCancellation(
-        cancellationToken,
-        readImageBlocksToBufferAsync(c, pendingTasks, resInfo, pboLocalBuffer.data())));
+      try {
+        folly::coro::blockingWait(folly::coro::co_withCancellation(
+          cancellationToken,
+          readImageBlocksToBufferAsync(c, pendingTasks, resInfo, pboLocalBuffer.data())));
+      }
+      catch (const folly::OperationCancelled&) {
+        // co_withCancellation reports cancellation via folly::OperationCancelled.
+        // Translate to Atlas' cancellation type so higher-level paging/rendering
+        // code can handle it consistently.
+        throw ZCancellationException();
+      }
 #else
       size_t taskIdx = 0;
       while (taskIdx < pendingTasks.size()) {

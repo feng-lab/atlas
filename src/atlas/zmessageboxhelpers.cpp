@@ -1,6 +1,7 @@
 #include "zmessageboxhelpers.h"
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
@@ -15,6 +16,8 @@
 #include <QGuiApplication>
 #include <QAbstractButton>
 #include <QPushButton>
+#include <QThread>
+#include <QPointer>
 
 namespace nim {
 
@@ -23,6 +26,21 @@ void showCriticalWithDetails(QWidget* parent,
                              const QString& details,
                              const QString& windowTitle)
 {
+  // Qt widgets must be created on the main (GUI) thread. When errors originate from background threads
+  // (e.g. the rendering thread), queue the dialog to the GUI thread instead of crashing on macOS.
+  if (QCoreApplication* app = QCoreApplication::instance(); app && QThread::currentThread() != app->thread()) {
+    const QString summaryCopy = summary;
+    const QString detailsCopy = details;
+    const QString windowTitleCopy = windowTitle;
+    QPointer<QWidget> parentPtr(parent);
+    QMetaObject::invokeMethod(app,
+                              [parentPtr, summaryCopy, detailsCopy, windowTitleCopy]() {
+                                showCriticalWithDetails(parentPtr.data(), summaryCopy, detailsCopy, windowTitleCopy);
+                              },
+                              Qt::QueuedConnection);
+    return;
+  }
+
   QDialog dialog(parent);
   dialog.setModal(true);
   dialog.setWindowTitle(windowTitle.isEmpty() ? QApplication::applicationName() : windowTitle);
