@@ -553,6 +553,17 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
     }
 
     setCurrentTime(static_cast<double>(i) / framePerSecond);
+    QString exportErr;
+    if (!static_cast<ZView*>(m_engine)->waitFor2DExportFrameReady(progress, &exportErr)) {
+      if (progress->wasCanceled()) {
+        break;
+      }
+      if (!exportErr.isEmpty()) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not export frame %1").arg(i), exportErr);
+      }
+      break;
+    }
+
     QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (!canvasPainter.renderToImage(filepath, width, height, &err)) {

@@ -19,6 +19,9 @@
 #include <QToolButton>
 #include <QGraphicsPixmapItem>
 #include <QApplication>
+#include <QCoreApplication>
+#include <QEventLoop>
+#include <QProgressDialog>
 
 namespace nim {
 
@@ -573,6 +576,37 @@ void ZView::changeViewport()
 
 void ZView::takeFixedSizeScreenShot(const QString& filename, int width, int height)
 {
+  QString prepErr;
+  for (const auto& view : m_objViews) {
+    view->prepare2DExportFrame();
+  }
+  QCoreApplication::processEvents(QEventLoop::AllEvents);
+
+  bool ready = true;
+  for (const auto& view : m_objViews) {
+    QString viewErr;
+    if (!view->is2DExportFrameReady(&viewErr)) {
+      ready = false;
+      if (!viewErr.isEmpty()) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not take screenshot %1").arg(filename), viewErr);
+        return;
+      }
+      break;
+    }
+  }
+
+  if (!ready) {
+    QProgressDialog progress(tr("Preparing screenshot..."), tr("Cancel"), 0, 0, QApplication::activeWindow());
+    progress.setWindowModality(Qt::WindowModal);
+    progress.show();
+    if (!waitFor2DExportFrameReady(&progress, &prepErr)) {
+      if (!progress.wasCanceled() && !prepErr.isEmpty()) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not take screenshot %1").arg(filename), prepErr);
+      }
+      return;
+    }
+  }
+
   QString err;
   if (!m_view->renderToImage(filename, width, height, &err)) {
     showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save screenshot %1").arg(filename), err);
@@ -581,9 +615,80 @@ void ZView::takeFixedSizeScreenShot(const QString& filename, int width, int heig
 
 void ZView::takeScreenShot(const QString& filename)
 {
+  QString prepErr;
+  for (const auto& view : m_objViews) {
+    view->prepare2DExportFrame();
+  }
+  QCoreApplication::processEvents(QEventLoop::AllEvents);
+
+  bool ready = true;
+  for (const auto& view : m_objViews) {
+    QString viewErr;
+    if (!view->is2DExportFrameReady(&viewErr)) {
+      ready = false;
+      if (!viewErr.isEmpty()) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not take screenshot %1").arg(filename), viewErr);
+        return;
+      }
+      break;
+    }
+  }
+
+  if (!ready) {
+    QProgressDialog progress(tr("Preparing screenshot..."), tr("Cancel"), 0, 0, QApplication::activeWindow());
+    progress.setWindowModality(Qt::WindowModal);
+    progress.show();
+    if (!waitFor2DExportFrameReady(&progress, &prepErr)) {
+      if (!progress.wasCanceled() && !prepErr.isEmpty()) {
+        showCriticalWithDetails(QApplication::activeWindow(), tr("Can not take screenshot %1").arg(filename), prepErr);
+      }
+      return;
+    }
+  }
+
   QString err;
   if (!m_view->renderToImage(filename, &err)) {
     showCriticalWithDetails(QApplication::activeWindow(), tr("Can not save screenshot %1").arg(filename), err);
+  }
+}
+
+bool ZView::waitFor2DExportFrameReady(QProgressDialog* progress, QString* errorMsg)
+{
+  if (errorMsg) {
+    errorMsg->clear();
+  }
+
+  for (const auto& view : m_objViews) {
+    view->prepare2DExportFrame();
+  }
+
+  // Let any queued signals kick off async work before we start waiting.
+  QCoreApplication::processEvents(QEventLoop::AllEvents);
+
+  while (true) {
+    if (progress && progress->wasCanceled()) {
+      return false;
+    }
+
+    bool allReady = true;
+    for (const auto& view : m_objViews) {
+      QString viewErr;
+      if (!view->is2DExportFrameReady(&viewErr)) {
+        allReady = false;
+        if (!viewErr.isEmpty()) {
+          if (errorMsg) {
+            *errorMsg = viewErr;
+          }
+          return false;
+        }
+      }
+    }
+
+    if (allReady) {
+      return true;
+    }
+
+    QCoreApplication::processEvents(QEventLoop::AllEvents | QEventLoop::WaitForMoreEvents, 50);
   }
 }
 

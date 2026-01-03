@@ -391,6 +391,9 @@ void ZImgFilter::setData(ZImgPack& pack)
   m_ngFinalInFlightEpoch = 0;
   m_ngFinalPending = false;
   m_ngLastAppliedFinalPass = false;
+  m_ngFinalCompletedEpoch = std::numeric_limits<uint64_t>::max();
+  m_ngFinalErrorEpoch = std::numeric_limits<uint64_t>::max();
+  m_ngFinalError.clear();
   m_ngRefineTimer.stop();
   updateNeuroglancerLoadingIndicator();
 
@@ -856,7 +859,11 @@ void ZImgFilter::updateNeuroglancerLoadingIndicator()
   // Treat the debounce timer as "pending refinement" to reassure the user while interacting.
   const bool finalBusy = (m_ngFinalInFlight && m_ngFinalInFlightEpoch == m_ngRenderEpoch) || m_ngFinalPending || m_ngRefineTimer.isActive();
 
-  const bool shouldShow = ngActive && (cacheBusy || previewBusy || finalBusy);
+  // If we already finished the final pass for this epoch, the displayed imagery should be sharp and complete.
+  // Hide the badge even if earlier background passes (cache/preview) are still winding down.
+  const bool finalDone = m_ngFinalCompletedEpoch == m_ngRenderEpoch;
+
+  const bool shouldShow = ngActive && !finalDone && (cacheBusy || previewBusy || finalBusy);
   if (!shouldShow) {
     if (m_ngLoadingBadgeBg) {
       m_ngLoadingBadgeBg->setVisible(false);
@@ -993,6 +1000,51 @@ void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack, uint64_t epoch, 
   }
 }
 
+void ZImgFilter::prepare2DExportFrame()
+{
+  const bool ngActive = m_isVisible && m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && !m_view.isMaxZProjView();
+  if (!ngActive) {
+    return;
+  }
+
+  if (m_ngFinalCompletedEpoch == m_ngRenderEpoch) {
+    return;
+  }
+
+  // For deterministic export we don't want to wait for the debounce; force a final pass immediately.
+  m_ngRefineTimer.stop();
+  if (!m_ngFinalInFlight || m_ngFinalInFlightEpoch != m_ngRenderEpoch) {
+    startNeuroglancer2DRender(/*finalPass=*/true);
+  }
+}
+
+bool ZImgFilter::is2DExportFrameReady(QString* errorMsg) const
+{
+  if (errorMsg) {
+    errorMsg->clear();
+  }
+
+  const bool ngActive = m_isVisible && m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && !m_view.isMaxZProjView();
+  if (!ngActive) {
+    return true;
+  }
+
+  if (m_ngFinalErrorEpoch == m_ngRenderEpoch) {
+    if (errorMsg) {
+      *errorMsg = m_ngFinalError;
+    }
+    return false;
+  }
+
+  if (m_ngFinalCompletedEpoch != m_ngRenderEpoch) {
+    return false;
+  }
+
+  // Defensive: if something is still in-flight/pending for this epoch, don't claim readiness.
+  const bool finalBusy = (m_ngFinalInFlight && m_ngFinalInFlightEpoch == m_ngRenderEpoch) || m_ngFinalPending || m_ngRefineTimer.isActive();
+  return !finalBusy;
+}
+
 void ZImgFilter::requestNeuroglancer2DRender()
 {
   // Bump the epoch so any in-flight renders (cache/preview/final) become stale.
@@ -1002,6 +1054,9 @@ void ZImgFilter::requestNeuroglancer2DRender()
   }
   m_ngFinalPending = false;
   m_ngLastAppliedFinalPass = false;
+  m_ngFinalCompletedEpoch = std::numeric_limits<uint64_t>::max();
+  m_ngFinalErrorEpoch = std::numeric_limits<uint64_t>::max();
+  m_ngFinalError.clear();
 
   // First, show the best already-cached coverage immediately (no network).
   m_ngCacheDirty = true;
@@ -1159,6 +1214,10 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
   catch (const std::exception& e) {
     LOG(ERROR) << "Neuroglancer 2D render setup failed: " << e.what();
     if (pass == Neuroglancer2DRenderParams::Pass::Final) {
+      m_ngFinalErrorEpoch = epoch;
+      m_ngFinalError = QString("Neuroglancer 2D final render setup failed: %1").arg(QString::fromUtf8(e.what()));
+    }
+    if (pass == Neuroglancer2DRenderParams::Pass::Final) {
       if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
         m_ngFinalInFlight = false;
         m_ngFinalInFlightEpoch = 0;
@@ -1175,6 +1234,7 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
 
   if (requests.chunks.empty()) {
     if (pass == Neuroglancer2DRenderParams::Pass::Final) {
+      m_ngFinalCompletedEpoch = epoch;
       if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
         m_ngFinalInFlight = false;
         m_ngFinalInFlightEpoch = 0;
@@ -1261,6 +1321,10 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
     const Neuroglancer2DTileResult result = watcher->resultAt(index);
     if (!result.error.isEmpty()) {
       LOG(ERROR) << "Neuroglancer 2D tile render failed: " << result.error.toStdString();
+      if (result.pass == Neuroglancer2DRenderParams::Pass::Final && result.epoch == m_ngRenderEpoch && m_ngFinalErrorEpoch != result.epoch) {
+        m_ngFinalErrorEpoch = result.epoch;
+        m_ngFinalError = QString("Neuroglancer 2D final tile render failed: %1").arg(result.error);
+      }
       return;
     }
     if (!m_isVisible || result.epoch != m_ngRenderEpoch) {
@@ -1271,9 +1335,30 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
   });
 
   connect(watcher, &QFutureWatcher<Neuroglancer2DTileResult>::finished, this, [this, watcher, tasks, pass, epoch]() {
+    // Ensure the final on-screen state includes all results even if some resultReadyAt notifications are still queued.
+    for (int i = 0; i < static_cast<int>(tasks->size()); ++i) {
+      const Neuroglancer2DTileResult result = watcher->resultAt(i);
+      if (!result.error.isEmpty()) {
+        if (result.pass == Neuroglancer2DRenderParams::Pass::Final && result.epoch == m_ngRenderEpoch &&
+            m_ngFinalErrorEpoch != result.epoch) {
+          m_ngFinalErrorEpoch = result.epoch;
+          m_ngFinalError = QString("Neuroglancer 2D final tile render failed: %1").arg(result.error);
+        }
+        continue;
+      }
+      if (!m_isVisible || result.epoch != m_ngRenderEpoch) {
+        continue;
+      }
+      const int prio = neuroglancer2DPassPriority(result.pass);
+      applyQImagePack(result.qImagePack, result.epoch, prio, /*isFinalPass=*/result.pass == Neuroglancer2DRenderParams::Pass::Final);
+    }
+
     watcher->deleteLater();
 
     if (pass == Neuroglancer2DRenderParams::Pass::Final) {
+      if (epoch == m_ngRenderEpoch) {
+        m_ngFinalCompletedEpoch = epoch;
+      }
       if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
         m_ngFinalInFlight = false;
         m_ngFinalInFlightEpoch = 0;

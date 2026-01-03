@@ -18,6 +18,8 @@ class QActionGroup;
 
 class QGraphicsScene;
 
+class QProgressDialog;
+
 namespace nim {
 
 class ZDoc;
@@ -240,6 +242,10 @@ public:
   void takeFixedSizeScreenShot(const QString& filename, int width, int height);
 
   void takeScreenShot(const QString& filename);
+
+  // For deterministic 2D animation export: waits (processing events) until all object views report
+  // their async work complete for the current frame. If progress is non-null, supports cancellation.
+  [[nodiscard]] bool waitFor2DExportFrameReady(QProgressDialog* progress, QString* errorMsg);
 
 Q_SIGNALS:
   void objViewReady(size_t id);

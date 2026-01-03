@@ -10,7 +10,9 @@
 #include <QGraphicsSimpleTextItem>
 #include <QPen>
 #include <QTimer>
+#include <QString>
 #include <atomic>
+#include <limits>
 #include <map>
 #include <memory>
 #include <tuple>
@@ -110,6 +112,10 @@ public:
   }
 
   void setData(ZImgPack& pack);
+
+  void prepare2DExportFrame() override;
+
+  [[nodiscard]] bool is2DExportFrameReady(QString* errorMsg) const override;
 
   void releaseItemsOwnership();
 
@@ -226,6 +232,9 @@ private:
   QTimer m_ngRefineTimer;
   uint64_t m_ngRenderEpoch = 0;
   std::shared_ptr<std::atomic<uint64_t>> m_ngRenderEpochAtomic;
+  uint64_t m_ngFinalCompletedEpoch = std::numeric_limits<uint64_t>::max();
+  uint64_t m_ngFinalErrorEpoch = std::numeric_limits<uint64_t>::max();
+  QString m_ngFinalError;
   bool m_ngCacheInFlight = false;
   uint64_t m_ngCacheInFlightEpoch = 0;
   bool m_ngCacheDirty = false;

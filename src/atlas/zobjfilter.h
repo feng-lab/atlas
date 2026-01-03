@@ -4,6 +4,7 @@
 #include "z2dtransformparameter.h"
 #include "zview.h"
 #include <QObject>
+#include <QString>
 #include <QTransform>
 
 namespace nim {
@@ -58,6 +59,18 @@ public:
   virtual void rotateClockwise(double, double) {}
 
   virtual void rotateCounterclockwise(double, double) {}
+
+  // Called before a 2D animation export captures a frame. Filters with async work can use this hook
+  // to kick off any required rendering/fetch tasks.
+  virtual void prepare2DExportFrame() {}
+
+  // Returns true when the filter is ready for deterministic 2D export frame capture.
+  // If false and errorMsg is set, export should abort and report the error.
+  [[nodiscard]] virtual bool is2DExportFrameReady(QString* errorMsg) const
+  {
+    (void)errorMsg;
+    return true;
+  }
 
   std::vector<ZParameter*> parameters()
   {

@@ -386,6 +386,7 @@ Steps to load and manage images via `ZImgDoc`:
 2. **Edit** – open the animation tab in Edit and Output. Set keyframes, timing, interpolation.
 3. **Bind view** – the animation references the current 2D view; ensure the animation is visible to preview.
 4. **Save** – Save or Save As to store `.animation2d` files.
+5. **Export** – when exporting image sequences/video, Atlas waits for any asynchronous rendering work (e.g. Neuroglancer tile refinement) to complete before capturing each frame; cancel to stop waiting.
 
 ### 4.10 3D Animations
 
@@ -558,6 +559,7 @@ Steps to load and manage images via `ZImgDoc`:
    - Use window size or specify custom width/height.
 5. Click **Capture**.
 6. 2D captures emit the signal `take2DScreenShot` or `takeFixedSize2DScreenShot`, writing PNG images.
+7. If the view contains async-rendered content (e.g. Neuroglancer), Atlas waits for refinement to complete before saving; cancel to stop waiting.
 
 <!-- > 📸 **Screenshot to add:** 2D Capture dock with annotations of important controls.-->
 <p align="center">

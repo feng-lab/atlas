@@ -162,6 +162,32 @@ public:
 
   void selectionChanged(const QList<QGraphicsItem*>&) override {}
 
+  void prepare2DExportFrame() override
+  {
+    for (const auto& idFilter : m_idToFilter) {
+      idFilter.second->prepare2DExportFrame();
+    }
+  }
+
+  [[nodiscard]] bool is2DExportFrameReady(QString* errorMsg) const override
+  {
+    if (errorMsg) {
+      errorMsg->clear();
+    }
+
+    for (const auto& idFilter : m_idToFilter) {
+      QString filterErr;
+      if (!idFilter.second->is2DExportFrameReady(&filterErr)) {
+        if (errorMsg) {
+          *errorMsg = filterErr;
+        }
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   void rotateClockwise(double x, double y) override
   {
     for (const auto& idFilter : m_idToFilter) {

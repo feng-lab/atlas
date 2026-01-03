@@ -6,6 +6,7 @@
 #include "zobjdoc.h"
 #include <QObject>
 #include <QRectF>
+#include <QString>
 
 namespace nim {
 
@@ -57,6 +58,18 @@ public:
 
   // called if selection changed from view
   virtual void selectionChanged(const QList<QGraphicsItem*>& items) = 0;
+
+  // Called before a 2D animation export captures a frame. Views with async rendering (e.g. network tiles)
+  // can use this hook to kick off any required work.
+  virtual void prepare2DExportFrame() {}
+
+  // Returns true when the view is ready for deterministic 2D export frame capture.
+  // If false and errorMsg is set, export should abort and report the error.
+  [[nodiscard]] virtual bool is2DExportFrameReady(QString* errorMsg) const
+  {
+    (void)errorMsg;
+    return true;
+  }
 
   //
   virtual void rotateClockwise(double x, double y) = 0;
