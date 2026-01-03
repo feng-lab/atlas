@@ -28,9 +28,10 @@ Neuroglancer Precomputed (HTTP)
 - Dataset parsing + chunk addressing lives in `src/atlas/zneuroglancerprecomputed.h` and `src/atlas/zneuroglancerprecomputed.cpp` (reads `.../info`, then fetches chunks on demand).
   - Chunk decode helpers live in `src/atlas/zneuroglancerprecomputedchunkdecoder.h` and `src/atlas/zneuroglancerprecomputedchunkdecoder.cpp`.
   - Sharded-format helpers are in `src/atlas/zneuroglanceruint64sharding.h` and `src/atlas/zneuroglanceruint64sharding.cpp`.
-- Caches:
-  - Chunk cache size is controlled by `--atlas_ng_precomputed_chunk_cache_memory_proportion`.
-  - Sharded minishard-index cache size is controlled by `--atlas_ng_precomputed_minishard_index_cache_memory_proportion`.
+- Caches (per opened Neuroglancer volume; these are budgets, not preallocated):
+  - Chunk cache size is controlled by `--atlas_ng_precomputed_chunk_cache_memory_proportion` (default `0.3`, valid range `[0, 1]`).
+  - Sharded minishard-index cache size is controlled by `--atlas_ng_precomputed_minishard_index_cache_memory_proportion` (default `0.05`, valid range `[0, 1]`).
+  - Higher values can significantly improve 2D/3D interaction (less network I/O and fewer recomputes), but opening multiple Neuroglancer layers simultaneously multiplies the memory budget.
 - Integration point is `ZImgPack`: 2D uses on-demand chunk reads for the visible viewport; 3D paging uses `ZImgPack::readRegionToImgAsync()` to populate the GPU page cache. Synchronous “hot-path” queries (`displayValue()`/`value()`) are cache-only to avoid blocking UI/render threads on network I/O.
   - 2D Neuroglancer rendering is progressive: cache-only (best-effort from cached chunks) → preview (fetch coarsest XY to fill holes) → final (fetch best-for-scale after debounce). Preview is skipped if coarsest XY coverage is already cached.
 

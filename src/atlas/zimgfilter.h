@@ -3,6 +3,7 @@
 #include "zobjfilter.h"
 #include "zimgpackdisplay.h"
 #include "znumericparameter.h"
+#include "zoptionparameter.h"
 #include "zparameter.h"
 #include "zgraphicsitemtype.h"
 #include "zgraphicsitemgroup.h"
@@ -157,6 +158,8 @@ private:
 
   void opacityChanged();
 
+  void colorizationModeChanged();
+
   void mipRangeChanged();
 
   void visibleChanged();
@@ -173,7 +176,11 @@ private:
 
   void startNeuroglancer2DRender(bool finalPass);
 
+  [[nodiscard]] bool isNeuroglancer2DViewportFullyCachedAtFinalLod(const QRectF& viewport, double viewScale) const;
+
   void applyQImagePack(const ZQImagePack& qImagePack, uint64_t epoch, int passPriority, bool isFinalPass);
+
+  void trimNeuroglancerTilesAfterFinal(uint64_t epoch);
 
   void updateNeuroglancerLoadingIndicator();
 
@@ -197,6 +204,8 @@ private:
 
   void viewScaleChanged(double s);
 
+  [[nodiscard]] ZImgColorizationMode currentColorizationMode() const;
+
 private:
   ZImgPack* m_imgPack = nullptr;
 
@@ -211,6 +220,7 @@ private:
   std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
   std::vector<std::unique_ptr<ZDoubleSpanParameter>> m_doubleChannelRangeParas;
   std::vector<std::unique_ptr<ZVec3Parameter>> m_channelColorParas;
+  ZStringIntOptionParameter m_colorizationMode;
   ZDoubleParameter m_opacity;
   std::unique_ptr<ZIntSpanParameter> m_mipRange;
   ZBoolParameter m_showScaleBar;

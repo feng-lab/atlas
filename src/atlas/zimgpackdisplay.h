@@ -10,6 +10,12 @@
 
 namespace nim {
 
+enum class ZImgColorizationMode
+{
+  Intensity,
+  SegmentationLabels,
+};
+
 class ZImgPackDisplay
 {
 public:
@@ -74,6 +80,16 @@ public:
     m_alpha = std::min(1.0, std::max(0.0, a));
   }
 
+  void setColorizationMode(ZImgColorizationMode mode)
+  {
+    m_colorizationMode = mode;
+  }
+
+  [[nodiscard]] ZImgColorizationMode colorizationMode() const
+  {
+    return m_colorizationMode;
+  }
+
   void setMIP(bool v)
   {
     if (m_imgPack.imgInfo().depth > 1) {
@@ -122,6 +138,7 @@ private:
   std::map<size_t, std::pair<double, double>> m_channels;
   std::map<size_t, col4> m_channelColors;
   mutable double m_alpha;
+  ZImgColorizationMode m_colorizationMode = ZImgColorizationMode::Intensity;
 
   bool m_mip = false;
   size_t m_mipZStart = 0;
@@ -139,6 +156,7 @@ private:
                                               const std::map<size_t, col4>& channelColors,
                                               double alpha,
                                               size_t tileWidth = 4096,
-                                              size_t tileHeight = 4096);
+                                              size_t tileHeight = 4096,
+                                              ZImgColorizationMode colorizationMode = ZImgColorizationMode::Intensity);
 
 } // namespace nim

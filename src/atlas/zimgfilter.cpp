@@ -71,6 +71,7 @@ struct Neuroglancer2DRenderParams
   double alpha = 1.0;
   size_t tileWidth = 4096;
   size_t tileHeight = 4096;
+  ZImgColorizationMode colorizationMode = ZImgColorizationMode::Intensity;
 };
 
 struct Neuroglancer2DRenderResult
@@ -98,6 +99,7 @@ struct Neuroglancer2DTileSharedParams
   double alpha = 1.0;
   size_t tileWidth = 4096;
   size_t tileHeight = 4096;
+  ZImgColorizationMode colorizationMode = ZImgColorizationMode::Intensity;
 };
 
 struct Neuroglancer2DTileTask
@@ -168,14 +170,15 @@ Neuroglancer2DRenderResult renderNeuroglancer2D(Neuroglancer2DRenderParams param
     }
 
     out.qImagePack = qImagePackFromZImgs(tiles.imgs,
-                                        tiles.locs,
-                                        tiles.scales,
-                                        params.imgInfo,
-                                        params.channels,
-                                        params.channelColors,
-                                        params.alpha,
-                                        params.tileWidth,
-                                        params.tileHeight);
+                                         tiles.locs,
+                                         tiles.scales,
+                                         params.imgInfo,
+                                         params.channels,
+                                         params.channelColors,
+                                         params.alpha,
+                                         params.tileWidth,
+                                         params.tileHeight,
+                                         params.colorizationMode);
     return out;
   }
   catch (const std::exception& e) {
@@ -252,7 +255,8 @@ Neuroglancer2DTileResult renderNeuroglancer2DTile(Neuroglancer2DTileTask task)
                                          task.shared->channelColors,
                                          task.shared->alpha,
                                          task.shared->tileWidth,
-                                         task.shared->tileHeight);
+                                         task.shared->tileHeight,
+                                         task.shared->colorizationMode);
     return out;
   }
   catch (const std::exception& e) {
@@ -325,6 +329,7 @@ void ZImgScaleBarGraphicsItem::updatePos()
 
 ZImgFilter::ZImgFilter(ZView& view)
   : ZObjFilter(view)
+  , m_colorizationMode("Voxel Display")
   , m_opacity(QString("Opacity"), 1.0, 0.0, 1.0)
   , m_showScaleBar("Show Scale Bar", false)
   , m_scaleBarLengthInUm("Scale Bar Length", 10., 0.0001, 1e9)
@@ -335,6 +340,15 @@ ZImgFilter::ZImgFilter(ZView& view)
   m_ngRenderEpochAtomic = std::make_shared<std::atomic<uint64_t>>(m_ngRenderEpoch);
 
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZImgFilter::visibleChanged);
+  m_colorizationMode.addOptions("Intensity", "Segmentation Labels");
+  m_colorizationMode.select("Intensity");
+  m_colorizationMode.setDescription(QStringLiteral(
+    "Controls how voxel values are converted to colors in the 2D view:\n"
+    "- 'Intensity' (default) uses per-channel range + color parameters.\n"
+    "- 'Segmentation Labels' treats the volume as a label map and assigns a stable pseudo-random color to each label ID.\n"
+    "  This is recommended for Neuroglancer 'type=segmentation' volumes and other label images."));
+  connect(&m_colorizationMode, &ZStringIntOptionParameter::valueChanged, this, &ZImgFilter::colorizationModeChanged);
+  addParameter(&m_colorizationMode);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZImgFilter::opacityChanged);
   addParameter(&m_opacity);
   connect(&m_showScaleBar, &ZBoolParameter::valueChanged, this, &ZImgFilter::showScaleBarChanged);
@@ -414,7 +428,20 @@ void ZImgFilter::setData(ZImgPack& pack)
     dr = glm::dvec2(m_imgPack->minIntensity(), m_imgPack->maxIntensity());
   }
 
+  const bool labelCapable =
+    (m_imgPack->imgInfo().voxelFormat == VoxelFormat::Unsigned && m_imgPack->imgInfo().numChannels == 1);
+  {
+    const QSignalBlocker blocker(m_colorizationMode);
+    if (!labelCapable) {
+      m_colorizationMode.select("Intensity");
+    } else if (m_imgPack->isNeuroglancerPrecomputed() && m_imgPack->neuroglancerVolumeShared()->isSegmentation()) {
+      m_colorizationMode.select("Segmentation Labels");
+    }
+    m_colorizationMode.setEnabled(labelCapable);
+  }
+
   for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
+    const bool labelMode = currentColorizationMode() == ZImgColorizationMode::SegmentationLabels;
     m_channelVisibleParas.emplace_back(
       std::make_unique<ZBoolParameter>(QString("Show %1").arg(m_imgPack->imgInfo().displayChannelName(c)), true));
     m_doubleChannelRangeParas.emplace_back(std::make_unique<ZDoubleSpanParameter>(
@@ -449,7 +476,8 @@ void ZImgFilter::setData(ZImgPack& pack)
             &ZImgFilter::channelRangeChanged);
     connect(m_channelColorParas[c].get(), &ZVec3Parameter::valueChanged, this, &ZImgFilter::channelColorChanged);
 
-    if (m_imgPack->imgInfo().isAlphaChannel(c)) {
+    m_doubleChannelRangeParas[c]->setVisible(!labelMode);
+    if (labelMode || m_imgPack->imgInfo().isAlphaChannel(c)) {
       m_channelColorParas[c]->setVisible(false);
     }
   }
@@ -466,6 +494,7 @@ void ZImgFilter::setData(ZImgPack& pack)
   addParameter(m_mipRange.get());
 
   m_display = std::make_unique<ZImgPackDisplay>(*m_imgPack);
+  m_display->setColorizationMode(currentColorizationMode());
   if (m_view.isMaxZProjView() && m_imgPack->imgInfo().depth > 1) {
     m_display->setMIP(true);
     m_display->setMIPZRange(m_mipRange->get().x, m_mipRange->get().y);
@@ -596,6 +625,7 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(*pb, 1);
 
     m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
+    m_widgetsGroup->addChild(m_colorizationMode, 1);
     for (size_t i = 0; i < m_channelVisibleParas.size(); ++i) {
       m_widgetsGroup->addChild(*m_channelVisibleParas[i], 1);
       m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
@@ -673,6 +703,7 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
     m_widgetsGroup->addChild(*pb, 1);
 
     m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
+    m_widgetsGroup->addChild(m_colorizationMode, 1);
     for (size_t i = 0; i < m_channelVisibleParas.size(); ++i) {
       m_widgetsGroup->addChild(*m_channelVisibleParas[i], 1);
       m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
@@ -781,6 +812,43 @@ void ZImgFilter::channelColorChanged()
   if (!m_isVisible) {
     destroyImgItems(); // will create new one next time
   } else {
+    updateImgItems();
+  }
+}
+
+ZImgColorizationMode ZImgFilter::currentColorizationMode() const
+{
+  if (m_colorizationMode.isSelected("Segmentation Labels")) {
+    return ZImgColorizationMode::SegmentationLabels;
+  }
+  return ZImgColorizationMode::Intensity;
+}
+
+void ZImgFilter::colorizationModeChanged()
+{
+  const bool labelMode = currentColorizationMode() == ZImgColorizationMode::SegmentationLabels;
+  if (m_imgPack) {
+    for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
+      if (c < m_doubleChannelRangeParas.size()) {
+        m_doubleChannelRangeParas[c]->setVisible(!labelMode);
+      }
+      if (c < m_channelColorParas.size()) {
+        const bool showColor = !labelMode && !m_imgPack->imgInfo().isAlphaChannel(c);
+        m_channelColorParas[c]->setVisible(showColor);
+      }
+    }
+  }
+  updateViewSettingWidgetsGroup();
+
+  if (m_display) {
+    m_display->setColorizationMode(currentColorizationMode());
+  }
+
+  // Mode changes should be visually immediate; for Neuroglancer this also forces a new async render epoch.
+  m_displayValid = false;
+  destroyImgItems();
+
+  if (m_isVisible) {
     updateImgItems();
   }
 }
@@ -1000,6 +1068,42 @@ void ZImgFilter::applyQImagePack(const ZQImagePack& qImagePack, uint64_t epoch, 
   }
 }
 
+void ZImgFilter::trimNeuroglancerTilesAfterFinal(uint64_t epoch)
+{
+  if (!m_item) {
+    return;
+  }
+
+  const int finalPrio = neuroglancer2DPassPriority(Neuroglancer2DRenderParams::Pass::Final);
+
+  std::vector<NgTileKey> toDelete;
+  toDelete.reserve(m_ngTiles.size());
+  for (const auto& it : m_ngTiles) {
+    const NgTileKey& key = it.first;
+    auto stIt = m_ngTileApplyState.find(key);
+    if (stIt == m_ngTileApplyState.end()) {
+      toDelete.push_back(key);
+      continue;
+    }
+
+    const NgTileApplyState& st = stIt->second;
+    if (st.epoch != epoch || st.passPriority < finalPrio) {
+      toDelete.push_back(key);
+    }
+  }
+
+  for (const NgTileKey& key : toDelete) {
+    auto it = m_ngTiles.find(key);
+    if (it == m_ngTiles.end()) {
+      continue;
+    }
+    QGraphicsPixmapItem* item = it->second;
+    m_ngTiles.erase(it);
+    m_ngTileApplyState.erase(key);
+    delete item;
+  }
+}
+
 void ZImgFilter::prepare2DExportFrame()
 {
   const bool ngActive = m_isVisible && m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && !m_view.isMaxZProjView();
@@ -1058,6 +1162,10 @@ void ZImgFilter::requestNeuroglancer2DRender()
   m_ngFinalErrorEpoch = std::numeric_limits<uint64_t>::max();
   m_ngFinalError.clear();
 
+  const QRectF viewport = mapFromSceneRect(m_view.currentViewport());
+  const double viewScale = effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale());
+  const bool finalFullyCached = isNeuroglancer2DViewportFullyCachedAtFinalLod(viewport, viewScale);
+
   // First, show the best already-cached coverage immediately (no network).
   m_ngCacheDirty = true;
   if (!m_ngCacheInFlight) {
@@ -1065,12 +1173,13 @@ void ZImgFilter::requestNeuroglancer2DRender()
   }
 
   // Schedule a coarse preview render immediately (at most one in flight).
-  bool previewNeeded = true;
-  if (m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && m_display) {
-    previewNeeded = !m_imgPack->neuroglancerVolumeShared()->is2DViewportFullyCachedForCoarsestXY(
-      m_display->slice(),
-      m_display->time(),
-      mapFromSceneRect(m_view.currentViewport()));
+  bool previewNeeded = false;
+  if (!finalFullyCached) {
+    previewNeeded = true;
+    if (m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && m_display) {
+      previewNeeded = !m_imgPack->neuroglancerVolumeShared()->is2DViewportFullyCachedForCoarsestXY(m_display->slice(), m_display->time(),
+                                                                                                   viewport);
+    }
   }
 
   m_ngPreviewDirty = previewNeeded;
@@ -1079,9 +1188,47 @@ void ZImgFilter::requestNeuroglancer2DRender()
   }
 
   // Debounce the final render so we only sharpen once interaction settles.
-  m_ngRefineTimer.start();
+  if (!finalFullyCached) {
+    m_ngRefineTimer.start();
+  } else {
+    m_ngRefineTimer.stop();
+    m_ngFinalPending = false;
+  }
 
   updateNeuroglancerLoadingIndicator();
+}
+
+bool ZImgFilter::isNeuroglancer2DViewportFullyCachedAtFinalLod(const QRectF& viewport, double viewScale) const
+{
+  if (!m_imgPack || !m_imgPack->isNeuroglancerPrecomputed()) {
+    return false;
+  }
+  if (!m_display) {
+    return false;
+  }
+
+  std::shared_ptr<ZNeuroglancerPrecomputedVolume> volume = m_imgPack->neuroglancerVolumeShared();
+  if (!volume) {
+    return false;
+  }
+
+  try {
+    const auto requests = volume->sliceChunkRequestsFor2DViewport(m_display->slice(),
+                                                                  m_display->time(),
+                                                                  viewport,
+                                                                  viewScale,
+                                                                  ZNeuroglancerPrecomputedVolume::Slice2DRatioPolicy::BestForScale);
+
+    for (const auto& c : requests.chunks) {
+      if (!volume->tryGetCachedChunk(c)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  catch (const std::exception&) {
+    return false;
+  }
 }
 
 void ZImgFilter::startNeuroglancer2DCacheRender()
@@ -1113,8 +1260,10 @@ void ZImgFilter::startNeuroglancer2DCacheRender()
   params.t = m_display->time();
 
   const double viewScale = effectivePixelScaleForLod(m_view.graphicsView(), getTransformScale());
-  params.renderScale = std::min(viewScale, kNg2DCacheRenderScaleForRatioSelection);
+  const bool treatAsFinal = isNeuroglancer2DViewportFullyCachedAtFinalLod(params.viewport, viewScale);
+  params.renderScale = treatAsFinal ? viewScale : std::min(viewScale, kNg2DCacheRenderScaleForRatioSelection);
   params.pass = Neuroglancer2DRenderParams::Pass::CacheOnly;
+  params.colorizationMode = currentColorizationMode();
 
   // Channel configuration (copy-only types; safe to move across threads).
   for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
@@ -1136,7 +1285,7 @@ void ZImgFilter::startNeuroglancer2DCacheRender()
   }
 
   auto* watcher = new QFutureWatcher<Neuroglancer2DRenderResult>(this);
-  connect(watcher, &QFutureWatcher<Neuroglancer2DRenderResult>::finished, this, [this, watcher]() {
+  connect(watcher, &QFutureWatcher<Neuroglancer2DRenderResult>::finished, this, [this, watcher, treatAsFinal]() {
     const Neuroglancer2DRenderResult result = watcher->result();
     watcher->deleteLater();
 
@@ -1147,9 +1296,18 @@ void ZImgFilter::startNeuroglancer2DCacheRender()
 
     if (!result.error.isEmpty()) {
       LOG(ERROR) << "Neuroglancer 2D cache render failed: " << result.error.toStdString();
+      if (treatAsFinal && result.epoch == m_ngRenderEpoch && m_ngFinalErrorEpoch != result.epoch) {
+        m_ngFinalErrorEpoch = result.epoch;
+        m_ngFinalError = QString("Neuroglancer 2D cached-final render failed: %1").arg(result.error);
+      }
     } else if (m_isVisible && result.epoch == m_ngRenderEpoch) {
-      const int prio = neuroglancer2DPassPriority(result.pass);
-      applyQImagePack(result.qImagePack, result.epoch, prio, /*isFinalPass=*/false);
+      const auto applyPass = treatAsFinal ? Neuroglancer2DRenderParams::Pass::Final : result.pass;
+      const int prio = neuroglancer2DPassPriority(applyPass);
+      applyQImagePack(result.qImagePack, result.epoch, prio, /*isFinalPass=*/treatAsFinal);
+      if (treatAsFinal) {
+        m_ngFinalCompletedEpoch = result.epoch;
+        trimNeuroglancerTilesAfterFinal(result.epoch);
+      }
     }
 
     updateNeuroglancerLoadingIndicator();
@@ -1261,6 +1419,7 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
   shared->epoch = epoch;
   shared->epochAtomic = m_ngRenderEpochAtomic;
   shared->pass = pass;
+  shared->colorizationMode = currentColorizationMode();
 
   // Channel configuration (copy-only types; safe to move across threads).
   for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
@@ -1362,6 +1521,12 @@ void ZImgFilter::startNeuroglancer2DRender(bool finalPass)
       if (m_ngFinalInFlight && m_ngFinalInFlightEpoch == epoch) {
         m_ngFinalInFlight = false;
         m_ngFinalInFlightEpoch = 0;
+      }
+      if (epoch == m_ngRenderEpoch) {
+        // Once we have a complete final pass for the current epoch, drop any cached/preview/stale tiles.
+        // Keeping older passes is useful for opaque rendering, but with transparency (e.g. overlaying
+        // segmentation) it causes coarse tiles to show through and appear "blocky" at chunk boundaries.
+        trimNeuroglancerTilesAfterFinal(epoch);
       }
     } else if (pass == Neuroglancer2DRenderParams::Pass::Preview) {
       if (m_ngPreviewInFlight && m_ngPreviewInFlightEpoch == epoch) {

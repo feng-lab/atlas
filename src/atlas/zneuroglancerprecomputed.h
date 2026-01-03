@@ -180,6 +180,10 @@ public:
     std::vector<QPoint> locs;
     std::vector<double> scales;
     std::array<size_t, 3> targetRatio{1, 1, 1};
+    // True if the tile pack contains a complete, hole-free coverage at targetRatio using only cached chunks.
+    // This is useful for callers that want to skip a more expensive "final" render when the requested LOD is
+    // already fully available in the in-memory chunk cache.
+    bool fullyCachedAtTargetRatio = false;
   };
 
   struct SliceChunkRequests
@@ -198,6 +202,21 @@ public:
   [[nodiscard]] const ZImgInfo& baseImgInfo() const
   {
     return m_baseImgInfo;
+  }
+
+  [[nodiscard]] const QString& dataTypeString() const
+  {
+    return m_dataTypeString;
+  }
+
+  [[nodiscard]] const QString& volumeTypeString() const
+  {
+    return m_volumeTypeString;
+  }
+
+  [[nodiscard]] bool isSegmentation() const
+  {
+    return m_volumeTypeString == "segmentation";
   }
 
   [[nodiscard]] const std::vector<Scale>& scales() const
@@ -222,7 +241,8 @@ public:
   // Builds a 2D slice tile pack for display at the target on-screen scale. This will only use chunks already
   // present in the in-memory chunk cache, and will fall back to coarser pyramid levels as needed to cover the
   // viewport. The returned tiles are ordered arbitrarily; callers should use their scale/z-ordering policy to
-  // ensure finer tiles overwrite coarser ones.
+  // ensure finer tiles overwrite coarser ones. If the target pyramid level is fully cached for the viewport,
+  // the function returns only that level and sets SliceTilePack::fullyCachedAtTargetRatio.
   [[nodiscard]] SliceTilePack sliceTilePackFor2DViewportCacheBestEffort(size_t z,
                                                                         size_t t,
                                                                         const QRectF& viewport,

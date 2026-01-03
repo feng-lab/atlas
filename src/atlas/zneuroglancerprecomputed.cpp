@@ -26,12 +26,12 @@
 #include <tbb/parallel_for.h>
 
 DEFINE_double(atlas_ng_precomputed_chunk_cache_memory_proportion,
-              0.15,
-              "Proportion of RAM that will be used for Neuroglancer precomputed chunk cache, default is 0.15");
+              0.3,
+              "Proportion of RAM that will be used for Neuroglancer precomputed chunk cache, default is 0.3");
 
 DEFINE_double(atlas_ng_precomputed_minishard_index_cache_memory_proportion,
-              0.02,
-              "Proportion of RAM that will be used for Neuroglancer precomputed sharded minishard index cache, default is 0.02");
+              0.05,
+              "Proportion of RAM that will be used for Neuroglancer precomputed sharded minishard index cache, default is 0.05");
 
 namespace nim {
 namespace json = boost::json;
@@ -718,6 +718,25 @@ std::shared_ptr<ZNeuroglancerPrecomputedVolume> ZNeuroglancerPrecomputedVolume::
     vol->m_ratioToScaleIndex.emplace(ratio, scaleIndex);
   }
 
+  auto validateCacheProportion = [](double p, const char* flagName) {
+    if (!std::isfinite(p) || p < 0.0 || p > 1.0) {
+      throw ZException(fmt::format("Invalid flag --{}={} (expected a proportion in [0, 1])", flagName, p));
+    }
+  };
+
+  validateCacheProportion(FLAGS_atlas_ng_precomputed_chunk_cache_memory_proportion,
+                          "atlas_ng_precomputed_chunk_cache_memory_proportion");
+  validateCacheProportion(FLAGS_atlas_ng_precomputed_minishard_index_cache_memory_proportion,
+                          "atlas_ng_precomputed_minishard_index_cache_memory_proportion");
+
+  const double totalProp = FLAGS_atlas_ng_precomputed_chunk_cache_memory_proportion +
+                           FLAGS_atlas_ng_precomputed_minishard_index_cache_memory_proportion;
+  if (totalProp > 0.85) {
+    LOG(WARNING) << "Neuroglancer precomputed caches are configured to use "
+                 << static_cast<int>(std::lround(totalProp * 100.0))
+                 << "% of physical RAM per opened volume. This may increase paging or cause out-of-memory conditions.";
+  }
+
   const size_t chunkCacheBytes =
     static_cast<size_t>(static_cast<double>(ZCpuInfo::instance().nPhysicalRAM) * FLAGS_atlas_ng_precomputed_chunk_cache_memory_proportion);
   const size_t minishardIndexCacheBytes =
@@ -1287,23 +1306,21 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
     return static_cast<int>(v);
   };
 
-  // Collect cached chunks from target->coarser pyramid levels, then let the caller's z-ordering policy decide which
-  // tiles are visible where overlaps exist. This keeps the logic simple while still guaranteeing that we will
-  // show any already-cached coverage immediately.
-  for (const auto& ratio : candidateRatios) {
+  auto appendCachedSlicesForRatio = [&](const std::array<size_t, 3>& ratio,
+                                        const std::vector<Chunk>& chunks,
+                                        bool* fullyCachedOut) {
     if (ratio[0] != ratio[1]) {
       // 2D view uses a uniform scale factor, so skip anisotropic XY levels rather than rendering incorrectly.
-      continue;
+      if (fullyCachedOut) {
+        *fullyCachedOut = false;
+      }
+      return;
     }
-
-    auto scaleIndexOpt = scaleIndexForRatio(ratio);
-    if (!scaleIndexOpt) {
-      continue;
-    }
-
-    const auto chunks = chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
     if (chunks.empty()) {
-      continue;
+      if (fullyCachedOut) {
+        *fullyCachedOut = true;
+      }
+      return;
     }
 
     std::vector<std::shared_ptr<ZImg>> tmpImgs(chunks.size());
@@ -1343,6 +1360,17 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
       }
     });
 
+    if (fullyCachedOut) {
+      bool full = true;
+      for (const auto& img : tmpImgs) {
+        if (!img) {
+          full = false;
+          break;
+        }
+      }
+      *fullyCachedOut = full;
+    }
+
     const double tileScale = static_cast<double>(ratio[0]);
     for (size_t i = 0; i < tmpImgs.size(); ++i) {
       if (!tmpImgs[i]) {
@@ -1352,6 +1380,45 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
       out.locs.push_back(tmpLocs[i]);
       out.scales.push_back(tileScale);
     }
+  };
+
+  // First: attempt the targetRatio. If it is fully cached, return *only* that level.
+  // Keeping coarser underlays would cause visible "blocky" blending artifacts when the image is rendered
+  // with transparency (e.g. segmentation overlays), because QGraphicsItemGroup opacity makes lower layers
+  // show through.
+  {
+    const auto scaleIndexOpt = scaleIndexForRatio(targetRatio);
+    if (scaleIndexOpt) {
+      const auto chunks = chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
+      appendCachedSlicesForRatio(targetRatio, chunks, &out.fullyCachedAtTargetRatio);
+      if (out.fullyCachedAtTargetRatio) {
+        return out;
+      }
+    }
+  }
+
+  // Fallback: collect cached chunks from coarser pyramid levels to cover as much of the viewport as possible.
+  // Callers should use their scale/z-ordering policy to ensure finer tiles overwrite coarser ones.
+  for (const auto& ratio : candidateRatios) {
+    if (ratio[0] != ratio[1]) {
+      // 2D view uses a uniform scale factor, so skip anisotropic XY levels rather than rendering incorrectly.
+      continue;
+    }
+    if (ratio == targetRatio) {
+      // We already appended any cached targetRatio tiles above. Only consider strictly-coarser levels here.
+      continue;
+    }
+
+    auto scaleIndexOpt = scaleIndexForRatio(ratio);
+    if (!scaleIndexOpt) {
+      continue;
+    }
+
+    const auto chunks = chunksIntersectingBaseBox(*scaleIndexOpt, boxStart, boxEnd);
+    if (chunks.empty()) {
+      continue;
+    }
+    appendCachedSlicesForRatio(ratio, chunks, /*fullyCachedOut=*/nullptr);
   }
 
   return out;

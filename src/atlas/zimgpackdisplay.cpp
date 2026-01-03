@@ -18,7 +18,82 @@ struct ZImgToQImageContext
   const std::map<size_t, std::pair<double, double>>* channels = nullptr;
   const std::map<size_t, col4>* channelColors = nullptr;
   double alpha = 1.0;
+  ZImgColorizationMode colorizationMode = ZImgColorizationMode::Intensity;
 };
+
+[[nodiscard]] uint64_t splitmix64(uint64_t x)
+{
+  // SplitMix64 constants from Steele et al.; used for fast, deterministic hashing.
+  x += 0x9e3779b97f4a7c15ULL;
+  x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+  return x ^ (x >> 31);
+}
+
+[[nodiscard]] inline col4 labelColorForId(uint64_t id, uint8_t alpha)
+{
+  // Segmentation IDs are not required to be contiguous or small. We use a deterministic hash
+  // to generate a stable pseudo-random color for each ID.
+  if (id == 0) {
+    return col4{0, 0, 0, alpha};
+  }
+
+  const uint64_t h = splitmix64(id);
+
+  // Avoid very dark colors by biasing RGB up.
+  constexpr uint8_t kMinChannel = 64;
+  constexpr uint8_t kChannelSpan = 191; // 64..255 inclusive
+  const uint8_t r = static_cast<uint8_t>(kMinChannel + ((h >> 0) & 0xff) * kChannelSpan / 255);
+  const uint8_t g = static_cast<uint8_t>(kMinChannel + ((h >> 8) & 0xff) * kChannelSpan / 255);
+  const uint8_t b = static_cast<uint8_t>(kMinChannel + ((h >> 16) & 0xff) * kChannelSpan / 255);
+  return col4{r, g, b, alpha};
+}
+
+template<typename TVoxel>
+void setQImageDataBlockLabels(const ZImgToQImageContext& ctx,
+                              const ZImg* img,
+                              QImage* qim,
+                              const tbb::blocked_range<size_t>& rowRange,
+                              size_t channel)
+{
+  CHECK(img);
+  CHECK(qim);
+  CHECK(ctx.channels);
+  CHECK(ctx.imgInfo);
+
+  const uint8_t a = static_cast<uint8_t>(std::clamp(ctx.alpha, 0.0, 1.0) * 255 + 0.5);
+  const TVoxel* imgData = img->rowData<TVoxel>(rowRange.begin(), 0, channel, 0);
+  for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
+    QRgb* qimData = reinterpret_cast<QRgb*>(qim->scanLine(i));
+
+    for (int j = 0; j < qim->width(); ++j) {
+      const uint64_t id = static_cast<uint64_t>(*(imgData++));
+      const col4 c = labelColorForId(id, a);
+      qimData[j] = qRgba(c.r, c.g, c.b, c.a);
+    }
+  }
+}
+
+template<typename TVoxel>
+[[nodiscard]] bool setQImageDataLabels(const ZImgToQImageContext& ctx, const ZImg& img, QImage& qim)
+{
+  if (!ctx.channels || ctx.channels->empty()) {
+    return false;
+  }
+  if (ctx.channels->size() != 1) {
+    return false;
+  }
+
+  const size_t ch = ctx.channels->begin()->first;
+  if (ctx.imgInfo && ctx.imgInfo->isAlphaChannel(ch)) {
+    return false;
+  }
+
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()), [&](const tbb::blocked_range<size_t>& range) {
+    setQImageDataBlockLabels<TVoxel>(ctx, &img, &qim, range, ch);
+  });
+  return true;
+}
 
 template<typename TVoxel>
 void setQImageDataBlockCM([[maybe_unused]] const ZImgToQImageContext& ctx,
@@ -246,6 +321,31 @@ void fillQImageFromZImgImpl(const ZImgToQImageContext& ctx, const ZImg& img, QIm
   if (ctx.channels->empty()) {
     return;
   }
+
+  if (ctx.colorizationMode == ZImgColorizationMode::SegmentationLabels && img.voxelFormat() == VoxelFormat::Unsigned) {
+    const size_t bytesPerVoxel = img.bytesPerVoxel();
+    bool ok = false;
+    switch (bytesPerVoxel) {
+      case 1:
+        ok = setQImageDataLabels<uint8_t>(ctx, img, qim);
+        break;
+      case 2:
+        ok = setQImageDataLabels<uint16_t>(ctx, img, qim);
+        break;
+      case 4:
+        ok = setQImageDataLabels<uint32_t>(ctx, img, qim);
+        break;
+      case 8:
+        ok = setQImageDataLabels<uint64_t>(ctx, img, qim);
+        break;
+      default:
+        break;
+    }
+    if (ok) {
+      return;
+    }
+  }
+
   size_t bytesPerVoxel = img.bytesPerVoxel();
   VoxelFormat vf = img.voxelFormat();
   if (vf == VoxelFormat::Float) {
@@ -438,6 +538,7 @@ void ZImgPackDisplay::fillQImage(const ZImg& img, QImage& qim) const
     .channels = &m_channels,
     .channelColors = &m_channelColors,
     .alpha = m_alpha,
+    .colorizationMode = m_colorizationMode,
   };
   fillQImageFromZImgImpl(ctx, img, qim);
 }
@@ -450,7 +551,8 @@ ZQImagePack qImagePackFromZImgs(const std::vector<std::shared_ptr<ZImg>>& imgs,
                                 const std::map<size_t, col4>& channelColors,
                                 double alpha,
                                 size_t tileWidth,
-                                size_t tileHeight)
+                                size_t tileHeight,
+                                ZImgColorizationMode colorizationMode)
 {
   CHECK(imgs.size() == locs.size());
   CHECK(imgs.size() == scales.size());
@@ -465,6 +567,7 @@ ZQImagePack qImagePackFromZImgs(const std::vector<std::shared_ptr<ZImg>>& imgs,
     .channels = &channels,
     .channelColors = &channelColors,
     .alpha = alpha,
+    .colorizationMode = colorizationMode,
   };
 
   for (size_t i = 0; i < imgs.size(); ++i) {
