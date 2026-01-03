@@ -4,13 +4,14 @@
 #include "zstitchimagedialog.h"
 #include "zsectionsregistrationdialog.h"
 #include "zchromaticshiftcorrectiondialog.h"
+#include "zloadneuroglancerprecomputeddialog.h"
 #include "zneuroglancerprecomputed.h"
+#include "zneuroglancerprecomputeddatasetlist.h"
 #include "zlog.h"
 #include "ztheme.h"
 #include "zmessageboxhelpers.h"
 #include <QApplication>
 #include <QFileDialog>
-#include <QInputDialog>
 #include <QSettings>
 #include <chrono>
 #include <cmath>
@@ -299,21 +300,28 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
   constexpr const char* kLastUrlKey = "neuroglancer_precomputed/last_url";
   const QString lastUrl = settings.value(kLastUrlKey).toString();
 
-  bool ok = false;
-  QString url = QInputDialog::getText(QApplication::activeWindow(),
-                                      tr("Load Neuroglancer Precomputed Volume"),
-                                      tr("Dataset URL (root or .../info; not a viewer state .json):"),
-                                      QLineEdit::Normal,
-                                      lastUrl,
-                                      &ok);
-  if (!ok) {
+  ZLoadNeuroglancerPrecomputedDialog dlg(QApplication::activeWindow());
+  dlg.setInitialUrl(lastUrl);
+  if (dlg.exec() != QDialog::Accepted) {
     return;
   }
-  url = url.trimmed();
+
+  const QString url = dlg.selectedUrl().trimmed();
+  const QString displayName = dlg.selectedName().trimmed();
   if (url.isEmpty()) {
     return;
   }
   settings.setValue(kLastUrlKey, url);
+
+  // Persist any history edits performed in the dialog (rename/remove).
+  {
+    QString saveErr;
+    auto entries = dlg.userHistoryEntries();
+    ZNeuroglancerPrecomputedDatasetList::normalizeAndDeduplicate(&entries);
+    if (!ZNeuroglancerPrecomputedDatasetList::saveUserHistory(entries, &saveErr)) {
+      LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr.toStdString();
+    }
+  }
 
   QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
   QString errorMsg;
@@ -324,6 +332,50 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
     showCriticalWithDetails(QApplication::activeWindow(),
                             tr("Can not load Neuroglancer precomputed volume %1").arg(url),
                             errorMsg);
+    return;
+  }
+
+  // Record successful opens into a dedicated (named) Neuroglancer history list in the user config directory.
+  {
+    QString loadErr;
+    auto entries = ZNeuroglancerPrecomputedDatasetList::loadUserHistory(&loadErr);
+    if (!loadErr.isEmpty()) {
+      LOG(WARNING) << "Failed to load Neuroglancer history: " << loadErr.toStdString();
+    }
+
+    const auto& pack = m_idToImgPacks.at(id);
+    CHECK(pack);
+    CHECK(pack->isNeuroglancerPrecomputed());
+
+    auto defaultNameFromUrl = [](QString u) -> QString {
+      QString s = u.trimmed();
+      // Strip nested schemes like "precomputed://gs://..."
+      for (int i = 0; i < 2; ++i) {
+        const int idx = s.indexOf("://");
+        if (idx < 0) {
+          break;
+        }
+        s = s.mid(idx + 3);
+      }
+      QStringList parts = s.split('/', Qt::SkipEmptyParts);
+      if (parts.size() >= 2) {
+        return parts[parts.size() - 2] + "/" + parts[parts.size() - 1];
+      }
+      if (!parts.isEmpty()) {
+        return parts.front();
+      }
+      return u.trimmed();
+    };
+
+    ZNeuroglancerPrecomputedDatasetList::Entry e;
+    e.url = pack->neuroglancerRootUrl();
+    e.name = !displayName.isEmpty() ? displayName : defaultNameFromUrl(e.url);
+    ZNeuroglancerPrecomputedDatasetList::upsertMostRecent(&entries, std::move(e));
+
+    QString saveErr;
+    if (!ZNeuroglancerPrecomputedDatasetList::saveUserHistory(entries, &saveErr)) {
+      LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr.toStdString();
+    }
   }
 }
 
@@ -518,8 +570,6 @@ size_t ZImgDoc::loadNeuroglancerPrecomputed(const QString& url, QString& errorMs
     }
 
     size_t id = addImgPack(new ZImgPack(std::move(vol)));
-
-    ZSystemInfo::instance().addFileToRecentFileList(rootUrl);
     return id;
   }
   catch (const ZException& e) {

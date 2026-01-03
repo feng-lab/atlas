@@ -347,7 +347,8 @@ elseif (APPLE)
       ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/ffmpeg
       ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls
-      ${CMAKE_CURRENT_SOURCE_DIR}/settings_flagfile.txt)
+      ${CMAKE_CURRENT_SOURCE_DIR}/settings_flagfile.txt
+      ${CMAKE_CURRENT_SOURCE_DIR}/neuroglancer_precomputed_examples.json)
   set(MACOSX_BUNDLE_ICON_FILE app.icns)
 endif (WIN32)
 
@@ -370,6 +371,8 @@ set(SOURCES
     zmainwindow.h zmainwindow.cpp
     zmarkdownbrowser.h zmarkdownbrowser.cpp
     zimgdoc.h zimgdoc.cpp
+    zneuroglancerprecomputeddatasetlist.h zneuroglancerprecomputeddatasetlist.cpp
+    zloadneuroglancerprecomputeddialog.h zloadneuroglancerprecomputeddialog.cpp
     zimgview.h zimgview.cpp
     zspinboxwithscrollbar.h zspinboxwithscrollbar.cpp
     zgraphicsview.h zgraphicsview.cpp
@@ -785,6 +788,10 @@ if (WIN32)
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/neuroglancer_precomputed_examples.json"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jre"
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/jre")
   add_custom_command(TARGET ${APP_NAME}
@@ -969,6 +976,10 @@ else (WIN32)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/settings_flagfile.txt
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/neuroglancer_precomputed_examples.json
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD

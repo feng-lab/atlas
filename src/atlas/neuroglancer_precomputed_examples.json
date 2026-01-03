@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "datasets": [
+    {
+      "name": "Janelia FlyEM FIB-25 (image)",
+      "kind": "image",
+      "url": "precomputed://gs://neuroglancer-public-data/flyem_fib-25/image"
+    },
+    {
+      "name": "Janelia FlyEM FIB-25 (ground truth segmentation)",
+      "kind": "segmentation",
+      "url": "precomputed://gs://neuroglancer-public-data/flyem_fib-25/ground_truth"
+    },
+    {
+      "name": "Kasthuri 2011 (image)",
+      "kind": "image",
+      "url": "precomputed://gs://neuroglancer-public-data/kasthuri2011/image"
+    },
+    {
+      "name": "Kasthuri 2011 (color corrected image)",
+      "kind": "image",
+      "url": "precomputed://gs://neuroglancer-public-data/kasthuri2011/image_color_corrected"
+    },
+    {
+      "name": "Kasthuri 2011 (ground truth segmentation)",
+      "kind": "segmentation",
+      "url": "precomputed://gs://neuroglancer-public-data/kasthuri2011/ground_truth"
+    },
+    {
+      "name": "FlyEM Hemibrain v1.0 (emdata image, CLAHE YZ JPEG)",
+      "kind": "image",
+      "url": "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/emdata/clahe_yz/jpeg"
+    },
+    {
+      "name": "FlyEM Hemibrain v1.0 (segmentation)",
+      "kind": "segmentation",
+      "url": "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/v1.0/segmentation"
+    },
+    {
+      "name": "FlyEM Hemibrain v1.0 (ROIs segmentation)",
+      "kind": "segmentation",
+      "url": "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/v1.0/rois"
+    },
+    {
+      "name": "FlyEM Hemibrain v1.0 (mitochondria segmentation)",
+      "kind": "segmentation",
+      "url": "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/mito_20190717.27250582"
+    },
+    {
+      "name": "FlyEM Hemibrain v1.0 (mask segmentation)",
+      "kind": "segmentation",
+      "url": "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/mask_normalized_round6"
+    },
+    {
+      "name": "FAFB v14 (original image)",
+      "kind": "image",
+      "url": "precomputed://gs://neuroglancer-fafb-data/fafb_v14/fafb_v14_orig"
+    },
+    {
+      "name": "FAFB v14 (CLAHE image)",
+      "kind": "image",
+      "url": "precomputed://gs://neuroglancer-fafb-data/fafb_v14/fafb_v14_clahe"
+    },
+    {
+      "name": "FAFB-FFN1 (2019-08-05 segmentation)",
+      "kind": "segmentation",
+      "url": "precomputed://gs://fafb-ffn1-20190805/segmentation"
+    }
+  ]
+}
