@@ -3,6 +3,7 @@
 #include "zimgdisplay.h"
 #include "zlog.h"
 #include "zmessageboxhelpers.h"
+#include "zneuroglancersegmentationcolors.h"
 #include <QApplication>
 #include <tbb/parallel_for.h>
 #include <algorithm>
@@ -20,34 +21,6 @@ struct ZImgToQImageContext
   double alpha = 1.0;
   ZImgColorizationMode colorizationMode = ZImgColorizationMode::Intensity;
 };
-
-[[nodiscard]] uint64_t splitmix64(uint64_t x)
-{
-  // SplitMix64 constants from Steele et al.; used for fast, deterministic hashing.
-  x += 0x9e3779b97f4a7c15ULL;
-  x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
-  x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
-  return x ^ (x >> 31);
-}
-
-[[nodiscard]] inline col4 labelColorForId(uint64_t id, uint8_t alpha)
-{
-  // Segmentation IDs are not required to be contiguous or small. We use a deterministic hash
-  // to generate a stable pseudo-random color for each ID.
-  if (id == 0) {
-    return col4{0, 0, 0, alpha};
-  }
-
-  const uint64_t h = splitmix64(id);
-
-  // Avoid very dark colors by biasing RGB up.
-  constexpr uint8_t kMinChannel = 64;
-  constexpr uint8_t kChannelSpan = 191; // 64..255 inclusive
-  const uint8_t r = static_cast<uint8_t>(kMinChannel + ((h >> 0) & 0xff) * kChannelSpan / 255);
-  const uint8_t g = static_cast<uint8_t>(kMinChannel + ((h >> 8) & 0xff) * kChannelSpan / 255);
-  const uint8_t b = static_cast<uint8_t>(kMinChannel + ((h >> 16) & 0xff) * kChannelSpan / 255);
-  return col4{r, g, b, alpha};
-}
 
 template<typename TVoxel>
 void setQImageDataBlockLabels(const ZImgToQImageContext& ctx,
@@ -68,7 +41,7 @@ void setQImageDataBlockLabels(const ZImgToQImageContext& ctx,
 
     for (int j = 0; j < qim->width(); ++j) {
       const uint64_t id = static_cast<uint64_t>(*(imgData++));
-      const col4 c = labelColorForId(id, a);
+      const col4 c = neuroglancer::labelColorForId(id, a);
       qimData[j] = qRgba(c.r, c.g, c.b, c.a);
     }
   }

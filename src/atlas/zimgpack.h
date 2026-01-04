@@ -14,6 +14,7 @@
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <tuple>
 #include <array>
+#include <memory>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -123,6 +124,18 @@ public:
   }
 
   [[nodiscard]] QString neuroglancerRootUrl() const;
+
+  // Returns true when this ZImgPack is a Neuroglancer segmentation volume that has been adapted
+  // to present an RGB (3x uint8) view for 3D rendering.
+  [[nodiscard]] bool isNeuroglancerSegmentationRgbFor3D() const
+  {
+    return m_ngSegmentationRgbFor3D;
+  }
+
+  // Creates an RGB (3-channel uint8) view of a Neuroglancer segmentation volume for 3D visualization.
+  // This does not change the underlying dataset; it only affects how reads are presented to callers
+  // (e.g. Z3DImg expects scalar channels and will treat these as R/G/B).
+  [[nodiscard]] std::unique_ptr<ZImgPack> makeNeuroglancerSegmentationRgbFor3D() const;
 
   void setChannelColor(size_t c, col4 col);
 
@@ -356,6 +369,7 @@ private:
   MinMaxState m_minMaxState;
 
   std::shared_ptr<ZNeuroglancerPrecomputedVolume> m_ngVolume;
+  bool m_ngSegmentationRgbFor3D = false;
 
   bool m_diskCached;
   ZImg m_img;

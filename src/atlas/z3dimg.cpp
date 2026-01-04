@@ -19,6 +19,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <chrono>
 #include <memory>
 #include <utility>
@@ -273,16 +274,30 @@ void Z3DImg::setScale(const glm::vec3& scale)
     return;
   }
 
-  // Fast-path: skip work if effective voxel-world dimension would not change
-  // New voxel world dimension depends on abs(scale) and fixed m_volumeSpacing
-  glm::vec3 newVoxelWorldDimension = glm::abs(scale) * m_volumeSpacing;
-  if (glm::all(glm::epsilonEqual(newVoxelWorldDimension, m_volumeVoxelWorldDimension, 1e-6f))) {
-    return;
-  }
-
   const ZImgInfo& info = m_imgPack.imgInfo();
+
+  // Invariant: the paging LOD hierarchy should be stable for datasets that provide
+  // physical voxel spacing. In particular, Neuroglancer pyramids often use anisotropic
+  // steps (e.g. 2x2x1) to respect voxel sizes; tying LOD generation to a user-controlled
+  // transform scale can cause ratio mismatches and unnecessary network resampling.
+  //
+  // Therefore:
+  // - If voxel size is available, derive LOD anisotropy from voxelSize{X,Y,Z}.
+  // - Otherwise (no physical spacing), preserve legacy behavior and derive anisotropy
+  //   from the user-provided scale.
+  const bool hasPhysicalVoxelSize =
+    info.voxelSizeUnit != VoxelSizeUnit::none && std::isfinite(info.voxelSizeX) && std::isfinite(info.voxelSizeY) &&
+    std::isfinite(info.voxelSizeZ) && info.voxelSizeX > 0.0 && info.voxelSizeY > 0.0 && info.voxelSizeZ > 0.0;
+
   glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
-  glm::dvec3 relativeResolution = glm::dvec3(glm::abs(scale));
+  glm::dvec3 relativeResolution = [&]() -> glm::dvec3 {
+    if (hasPhysicalVoxelSize) {
+      const double xy = std::max(info.voxelSizeX, info.voxelSizeY);
+      CHECK(std::isfinite(xy) && xy > 0.0);
+      return glm::dvec3(xy, xy, info.voxelSizeZ);
+    }
+    return glm::dvec3(glm::abs(scale));
+  }();
   // make x and y scales same
   relativeResolution.x = std::max(relativeResolution.x, relativeResolution.y);
   relativeResolution.y = relativeResolution.x;
@@ -291,29 +306,124 @@ void Z3DImg::setScale(const glm::vec3& scale)
   relativeResolution /= minRes;
   imgDim *= relativeResolution;
   glm::dvec3 levels = glm::ceil(glm::log2(imgDim / glm::dvec3(m_imageBlockSize))) + 1.0;
-  m_numLevels = std::max(std::max(levels.x, levels.y), levels.z);
+  const size_t requestedNumLevels = std::max(std::max(levels.x, levels.y), levels.z);
 
   std::vector<size_t> sortedIndex = argSort(&relativeResolution[0], &relativeResolution[0] + 3);
-  std::vector<size_t> stayRounds(3, 0);
-  CHECK(relativeResolution[sortedIndex[0]] == 1.0);
-  for (size_t i = 1; i < 3; ++i) {
-    double res = relativeResolution[sortedIndex[0]];
-    while (true) {
-      if (res * 2 < relativeResolution[sortedIndex[i]]) {
-        res *= 2;
-        ++stayRounds[sortedIndex[i]];
-      } else {
-        if ((res * 2 - relativeResolution[sortedIndex[i]]) < (relativeResolution[sortedIndex[i]] - res)) {
+  const std::vector<size_t> baseStayRounds = [&]() {
+    std::vector<size_t> stayRounds(3, 0);
+    CHECK(relativeResolution[sortedIndex[0]] == 1.0);
+    for (size_t i = 1; i < 3; ++i) {
+      double res = relativeResolution[sortedIndex[0]];
+      while (true) {
+        if (res * 2 < relativeResolution[sortedIndex[i]]) {
+          res *= 2;
           ++stayRounds[sortedIndex[i]];
+        } else {
+          if ((res * 2 - relativeResolution[sortedIndex[i]]) < (relativeResolution[sortedIndex[i]] - res)) {
+            ++stayRounds[sortedIndex[i]];
+          }
+          break;
         }
+      }
+    }
+    return stayRounds;
+  }();
+
+  const auto candidateLevelScales = [&]() {
+    std::vector<glm::uvec3> out;
+    out.resize(requestedNumLevels);
+    std::vector<size_t> stayRounds = baseStayRounds;
+    for (size_t l = 0; l < requestedNumLevels; ++l) {
+      if (l == 0) {
+        out[l] = glm::uvec3(1, 1, 1);
+      } else {
+        if (stayRounds[sortedIndex[2]] > stayRounds[sortedIndex[1]]) {
+          --stayRounds[sortedIndex[2]];
+          out[l][sortedIndex[2]] = out[l - 1][sortedIndex[2]];
+          out[l][sortedIndex[1]] = out[l - 1][sortedIndex[1]] * 2;
+          out[l][sortedIndex[0]] = out[l - 1][sortedIndex[0]] * 2;
+        } else if (stayRounds[sortedIndex[2]] > 0) {
+          CHECK(stayRounds[sortedIndex[2]] == stayRounds[sortedIndex[1]]);
+          --stayRounds[sortedIndex[2]];
+          --stayRounds[sortedIndex[1]];
+          out[l][sortedIndex[2]] = out[l - 1][sortedIndex[2]];
+          out[l][sortedIndex[1]] = out[l - 1][sortedIndex[1]];
+          out[l][sortedIndex[0]] = out[l - 1][sortedIndex[0]] * 2;
+        } else {
+          out[l] = out[l - 1] * 2_u32;
+        }
+      }
+      CHECK(out[l].x == out[l].y);
+    }
+    return out;
+  }();
+
+  auto isStructureIdentical = [&](size_t effectiveNumLevels) -> bool {
+    if (m_levelScales.empty() || effectiveNumLevels != m_numLevels) {
+      return false;
+    }
+    for (size_t l = 0; l < effectiveNumLevels; ++l) {
+      const auto& a = m_levelScales[l];
+      const auto& b = candidateLevelScales[l];
+      if (a.x != b.x || a.y != b.y || a.z != b.z) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Determine the effective number of LOD levels after clamping the coarsest
+  // level to the preloaded downsampled volume (m_volumeDimension).
+  const glm::vec3 absScale = glm::abs(scale);
+  const glm::vec3 candidateVolumeVoxelWorldDimension = absScale * m_volumeSpacing;
+  const float candidateVolumeVoxelWorldSize = std::max(std::max(candidateVolumeVoxelWorldDimension.x,
+                                                                candidateVolumeVoxelWorldDimension.y),
+                                                       candidateVolumeVoxelWorldDimension.z);
+  size_t candidateEffectiveNumLevels = requestedNumLevels;
+  for (size_t l = 0; l < requestedNumLevels; ++l) {
+    if (hasPhysicalVoxelSize) {
+      // Physical-resolution mode: clamp based purely on voxel-downsample factors, independent of
+      // user transform scale. This keeps the paging hierarchy stable.
+      const glm::vec3 levelScaleF(candidateLevelScales[l]);
+      if (levelScaleF.x >= m_volumeSpacing.x && levelScaleF.y >= m_volumeSpacing.y && levelScaleF.z >= m_volumeSpacing.z) {
+        candidateEffectiveNumLevels = l + 1;
+        break;
+      }
+    } else {
+      const glm::vec3 voxelWorldDim = absScale * glm::vec3(candidateLevelScales[l]);
+      const float voxelWorldSize = std::min(std::min(voxelWorldDim.x, voxelWorldDim.y), voxelWorldDim.z);
+      if (voxelWorldSize > candidateVolumeVoxelWorldSize) {
+        candidateEffectiveNumLevels = l + 1;
         break;
       }
     }
   }
 
-  m_volumeVoxelWorldDimension = glm::abs(scale) * m_volumeSpacing;
-  m_volumeVoxelWorldSize =
-    std::max(std::max(m_volumeVoxelWorldDimension.x, m_volumeVoxelWorldDimension.y), m_volumeVoxelWorldDimension.z);
+  // Fast path: if the LOD hierarchy itself doesn't change, keep page tables / caches intact
+  // and only update the world-size metadata used by shaders.
+  if (isStructureIdentical(candidateEffectiveNumLevels)) {
+    if (glm::all(glm::epsilonEqual(candidateVolumeVoxelWorldDimension, m_volumeVoxelWorldDimension, 1e-6f))) {
+      return;
+    }
+    m_volumeVoxelWorldDimension = candidateVolumeVoxelWorldDimension;
+    m_volumeVoxelWorldSize = candidateVolumeVoxelWorldSize;
+    if (m_voxelWorldDimensions.size() != m_numLevels) {
+      m_voxelWorldDimensions.resize(m_numLevels);
+    }
+    if (m_voxelWorldSizes.size() != m_numLevels) {
+      m_voxelWorldSizes.resize(m_numLevels);
+    }
+    for (size_t l = 0; l < m_numLevels; ++l) {
+      m_voxelWorldDimensions[l] = absScale * glm::vec3(m_levelScales[l]);
+      m_voxelWorldSizes[l] =
+        std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
+    }
+    return;
+  }
+
+  m_numLevels = requestedNumLevels;
+  m_volumeVoxelWorldDimension = candidateVolumeVoxelWorldDimension;
+  m_volumeVoxelWorldSize = candidateVolumeVoxelWorldSize;
   LOG(INFO) << "volumeDimension: " << m_volumeDimension << " volumeVoxelWorldDimension: " << m_volumeVoxelWorldDimension
             << " volumeVoxelWorldSize: " << m_volumeVoxelWorldSize;
 
@@ -328,6 +438,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
   m_voxelWorldSizes.resize(m_numLevels);
   size_t numImageBlocks = 0;
   size_t numPageTableBlocks = 0;
+  std::vector<size_t> stayRounds = baseStayRounds;
   for (size_t l = 0; l < m_numLevels; ++l) {
     if (l == 0) {
       m_levelScales[l] = glm::uvec3(1, 1, 1);
@@ -350,10 +461,20 @@ void Z3DImg::setScale(const glm::vec3& scale)
     }
     CHECK(m_levelScales[l].x == m_levelScales[l].y);
 
-    m_voxelWorldDimensions[l] = glm::abs(scale) * glm::vec3(m_levelScales[l]);
+    m_voxelWorldDimensions[l] = absScale * glm::vec3(m_levelScales[l]);
     m_voxelWorldSizes[l] =
       std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
-    if (m_voxelWorldSizes[l] > m_volumeVoxelWorldSize) {
+    bool clampToPreview = false;
+    if (hasPhysicalVoxelSize) {
+      // In physical-resolution mode, keep the hierarchy stable by clamping once
+      // this level is coarser than the preloaded downsampled volume in all axes.
+      const glm::vec3 levelScaleF(m_levelScales[l]);
+      clampToPreview =
+        levelScaleF.x >= m_volumeSpacing.x && levelScaleF.y >= m_volumeSpacing.y && levelScaleF.z >= m_volumeSpacing.z;
+    } else {
+      clampToPreview = m_voxelWorldSizes[l] > m_volumeVoxelWorldSize;
+    }
+    if (clampToPreview) {
       m_numLevels = l + 1;
       m_imageDimensions[l] = m_volumeDimension;
       m_voxelWorldDimensions[l] = m_volumeVoxelWorldDimension;

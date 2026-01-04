@@ -169,11 +169,19 @@ private:
   // get 3D position from 2D screen position and depth
   glm::vec3 get3DPosition(glm::ivec2 pos2D, double depth, int width, int height);
 
-private:
+ private:
   Z3DImgRaycasterRenderer m_imgRaycasterRenderer;
   Z3DImgSliceRenderer m_imgSliceRenderer;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
+  // Optional adapter pack used when 3D rendering needs a different view of the source
+  // (e.g. Neuroglancer uint64 segmentation shown as an RGB volume for visualization).
+  // Must outlive m_3dImg since Z3DImg holds a reference to its ZImgPack.
+  std::unique_ptr<ZImgPack> m_imgPackOverride;
+  // Tracks whether we auto-initialized coordTransform.scale() from voxel-size aspect ratios.
+  // If the user later changes the scale, we stop overriding it on subsequent dataset loads.
+  bool m_hasAutoVoxelAspectScale = false;
+  glm::vec3 m_autoVoxelAspectScale{1.f, 1.f, 1.f};
   std::unique_ptr<Z3DImg> m_3dImg;
   ZBoolParameter m_stayOnTop;
   ZBoolParameter m_fullResolutionRendering;

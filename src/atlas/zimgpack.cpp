@@ -6,6 +6,7 @@
 #include "zimgregioncache.h"
 #include "zcancellation.h"
 #include "zneuroglancerprecomputed.h"
+#include "zneuroglancersegmentationcolors.h"
 #include <QFileInfo>
 #include <QPoint>
 #include <QDir>
@@ -61,6 +62,200 @@ struct MaxOp
 } // namespace
 
 namespace nim {
+
+namespace {
+
+template<typename TVoxel>
+void pasteNeuroglancerSegmentationChunkAsRgbTyped(const ZImg& src,
+                                                  ZImg& dst,
+                                                  const ZVoxelCoordinate& start /*dst coords*/)
+{
+  CHECK(dst.isType<uint8_t>());
+  CHECK(dst.numChannels() == 3);
+  CHECK(src.voxelFormat() == VoxelFormat::Unsigned);
+  CHECK(src.numTimes() == 1);
+  CHECK(src.numChannels() == 1);
+
+  const index_t dstW = static_cast<index_t>(dst.width());
+  const index_t dstH = static_cast<index_t>(dst.height());
+  const index_t dstD = static_cast<index_t>(dst.depth());
+  const index_t srcW = static_cast<index_t>(src.width());
+  const index_t srcH = static_cast<index_t>(src.height());
+  const index_t srcD = static_cast<index_t>(src.depth());
+
+  const index_t dstX0 = std::max<index_t>(0, start.x);
+  const index_t dstY0 = std::max<index_t>(0, start.y);
+  const index_t dstZ0 = std::max<index_t>(0, start.z);
+  const index_t dstX1 = std::min(dstW, start.x + srcW);
+  const index_t dstY1 = std::min(dstH, start.y + srcH);
+  const index_t dstZ1 = std::min(dstD, start.z + srcD);
+  if (dstX0 >= dstX1 || dstY0 >= dstY1 || dstZ0 >= dstZ1) {
+    return;
+  }
+
+  const index_t srcX0 = dstX0 - start.x;
+  const index_t srcY0 = dstY0 - start.y;
+  const index_t srcZ0 = dstZ0 - start.z;
+  CHECK(srcX0 >= 0 && srcY0 >= 0 && srcZ0 >= 0);
+
+  const auto dstPlaneStride = static_cast<size_t>(dst.width() * dst.height());
+  const auto dstRowStride = static_cast<size_t>(dst.width());
+  const auto srcPlaneStride = static_cast<size_t>(src.width() * src.height());
+  const auto srcRowStride = static_cast<size_t>(src.width());
+
+  uint8_t* dstR = dst.channelData<uint8_t>(0);
+  uint8_t* dstG = dst.channelData<uint8_t>(1);
+  uint8_t* dstB = dst.channelData<uint8_t>(2);
+  const TVoxel* srcIds = src.channelData<TVoxel>(0);
+
+  for (index_t z = dstZ0; z < dstZ1; ++z) {
+    const index_t localZ = z - dstZ0;
+    const size_t dstPlaneOff = static_cast<size_t>(z) * dstPlaneStride;
+    const size_t srcPlaneOff = static_cast<size_t>(srcZ0 + localZ) * srcPlaneStride;
+
+    for (index_t y = dstY0; y < dstY1; ++y) {
+      const index_t localY = y - dstY0;
+      const size_t dstRowOff = dstPlaneOff + static_cast<size_t>(y) * dstRowStride + static_cast<size_t>(dstX0);
+      const size_t srcRowOff =
+        srcPlaneOff + static_cast<size_t>(srcY0 + localY) * srcRowStride + static_cast<size_t>(srcX0);
+
+      for (index_t x = 0; x < dstX1 - dstX0; ++x) {
+        const uint64_t id = static_cast<uint64_t>(srcIds[srcRowOff + static_cast<size_t>(x)]);
+        const col4 c = neuroglancer::labelColorForId(id);
+        const size_t dstIdx = dstRowOff + static_cast<size_t>(x);
+        dstR[dstIdx] = c.r;
+        dstG[dstIdx] = c.g;
+        dstB[dstIdx] = c.b;
+      }
+    }
+  }
+}
+
+void pasteNeuroglancerSegmentationChunkAsRgb(const ZImg& src, ZImg& dst, const ZVoxelCoordinate& start)
+{
+  CHECK(src.voxelFormat() == VoxelFormat::Unsigned);
+  switch (src.bytesPerVoxel()) {
+    case 1:
+      pasteNeuroglancerSegmentationChunkAsRgbTyped<uint8_t>(src, dst, start);
+      return;
+    case 2:
+      pasteNeuroglancerSegmentationChunkAsRgbTyped<uint16_t>(src, dst, start);
+      return;
+    case 4:
+      pasteNeuroglancerSegmentationChunkAsRgbTyped<uint32_t>(src, dst, start);
+      return;
+    case 8:
+      pasteNeuroglancerSegmentationChunkAsRgbTyped<uint64_t>(src, dst, start);
+      return;
+    default:
+      break;
+  }
+  CHECK(false) << "Unsupported voxel type for Neuroglancer segmentation conversion: bytesPerVoxel=" << src.bytesPerVoxel();
+}
+
+template<typename TVoxel>
+void pasteNeuroglancerSegmentationChunkAsRgbComponentTyped(const ZImg& src,
+                                                           ZImg& dst,
+                                                           const ZVoxelCoordinate& start /*dst coords*/,
+                                                           size_t component)
+{
+  CHECK(dst.isType<uint8_t>());
+  CHECK(dst.numChannels() == 1);
+  CHECK(component < 3);
+  CHECK(src.voxelFormat() == VoxelFormat::Unsigned);
+  CHECK(src.numTimes() == 1);
+  CHECK(src.numChannels() == 1);
+
+  const index_t dstW = static_cast<index_t>(dst.width());
+  const index_t dstH = static_cast<index_t>(dst.height());
+  const index_t dstD = static_cast<index_t>(dst.depth());
+  const index_t srcW = static_cast<index_t>(src.width());
+  const index_t srcH = static_cast<index_t>(src.height());
+  const index_t srcD = static_cast<index_t>(src.depth());
+
+  const index_t dstX0 = std::max<index_t>(0, start.x);
+  const index_t dstY0 = std::max<index_t>(0, start.y);
+  const index_t dstZ0 = std::max<index_t>(0, start.z);
+  const index_t dstX1 = std::min(dstW, start.x + srcW);
+  const index_t dstY1 = std::min(dstH, start.y + srcH);
+  const index_t dstZ1 = std::min(dstD, start.z + srcD);
+  if (dstX0 >= dstX1 || dstY0 >= dstY1 || dstZ0 >= dstZ1) {
+    return;
+  }
+
+  const index_t srcX0 = dstX0 - start.x;
+  const index_t srcY0 = dstY0 - start.y;
+  const index_t srcZ0 = dstZ0 - start.z;
+  CHECK(srcX0 >= 0 && srcY0 >= 0 && srcZ0 >= 0);
+
+  const auto dstPlaneStride = static_cast<size_t>(dst.width() * dst.height());
+  const auto dstRowStride = static_cast<size_t>(dst.width());
+  const auto srcPlaneStride = static_cast<size_t>(src.width() * src.height());
+  const auto srcRowStride = static_cast<size_t>(src.width());
+
+  uint8_t* dstOut = dst.channelData<uint8_t>(0);
+  const TVoxel* srcIds = src.channelData<TVoxel>(0);
+
+  for (index_t z = dstZ0; z < dstZ1; ++z) {
+    const index_t localZ = z - dstZ0;
+    const size_t dstPlaneOff = static_cast<size_t>(z) * dstPlaneStride;
+    const size_t srcPlaneOff = static_cast<size_t>(srcZ0 + localZ) * srcPlaneStride;
+
+    for (index_t y = dstY0; y < dstY1; ++y) {
+      const index_t localY = y - dstY0;
+      const size_t dstRowOff = dstPlaneOff + static_cast<size_t>(y) * dstRowStride + static_cast<size_t>(dstX0);
+      const size_t srcRowOff =
+        srcPlaneOff + static_cast<size_t>(srcY0 + localY) * srcRowStride + static_cast<size_t>(srcX0);
+
+      for (index_t x = 0; x < dstX1 - dstX0; ++x) {
+        const uint64_t id = static_cast<uint64_t>(srcIds[srcRowOff + static_cast<size_t>(x)]);
+        const col4 c = neuroglancer::labelColorForId(id);
+        uint8_t v = 0_u8;
+        switch (component) {
+          case 0:
+            v = c.r;
+            break;
+          case 1:
+            v = c.g;
+            break;
+          case 2:
+            v = c.b;
+            break;
+          default:
+            break;
+        }
+        dstOut[dstRowOff + static_cast<size_t>(x)] = v;
+      }
+    }
+  }
+}
+
+void pasteNeuroglancerSegmentationChunkAsRgbComponent(const ZImg& src,
+                                                      ZImg& dst,
+                                                      const ZVoxelCoordinate& start,
+                                                      size_t component)
+{
+  CHECK(src.voxelFormat() == VoxelFormat::Unsigned);
+  switch (src.bytesPerVoxel()) {
+    case 1:
+      pasteNeuroglancerSegmentationChunkAsRgbComponentTyped<uint8_t>(src, dst, start, component);
+      return;
+    case 2:
+      pasteNeuroglancerSegmentationChunkAsRgbComponentTyped<uint16_t>(src, dst, start, component);
+      return;
+    case 4:
+      pasteNeuroglancerSegmentationChunkAsRgbComponentTyped<uint32_t>(src, dst, start, component);
+      return;
+    case 8:
+      pasteNeuroglancerSegmentationChunkAsRgbComponentTyped<uint64_t>(src, dst, start, component);
+      return;
+    default:
+      break;
+  }
+  CHECK(false) << "Unsupported voxel type for Neuroglancer segmentation conversion: bytesPerVoxel=" << src.bytesPerVoxel();
+}
+
+} // namespace
 
 ZImgPackSubBlock::ZImgPackSubBlock(const std::shared_ptr<ZImg>& img,
                                    size_t ratio,
@@ -222,6 +417,30 @@ QString ZImgPack::neuroglancerRootUrl() const
 {
   CHECK(m_ngVolume);
   return m_ngVolume->rootUrl();
+}
+
+std::unique_ptr<ZImgPack> ZImgPack::makeNeuroglancerSegmentationRgbFor3D() const
+{
+  CHECK(m_ngVolume);
+  CHECK(m_ngVolume->isSegmentation());
+
+  auto out = std::make_unique<ZImgPack>(m_ngVolume);
+  out->m_ngSegmentationRgbFor3D = true;
+
+  // Present a 3-channel uint8 RGB view to 3D rendering code.
+  out->m_imgInfo.numChannels = 3;
+  out->m_imgInfo.bytesPerVoxel = 1;
+  out->m_imgInfo.voxelFormat = VoxelFormat::Unsigned;
+  out->m_imgInfo.validBitCount = 8;
+  out->m_imgInfo.lastChannelIsAlphaChannel = false;
+  out->m_imgInfo.createDefaultDescriptions();
+
+  // Make the intent explicit in the UI and use standard RGB channel colors.
+  out->m_imgInfo.channelNames = {"R", "G", "B"};
+  out->m_imgInfo.channelColors = {col4{255, 0, 0}, col4{0, 255, 0}, col4{0, 0, 255}};
+
+  out->updateDerivedData();
+  return out;
 }
 
 void ZImgPack::setChannelColor(size_t c, col4 col)
@@ -882,6 +1101,25 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
         }
       }
     }
+
+    if (VLOG_IS_ON(1)) {
+      QString scaleKey = QStringLiteral("<unknown>");
+      if (auto idxOpt = m_ngVolume->scaleIndexForRatio(ratio)) {
+        scaleKey = m_ngVolume->scales().at(*idxOpt).key;
+      }
+      VLOG(1) << fmt::format(
+        "ZImgPack resizedImg (Neuroglancer): target {}x{}x{} required ratio >= [{},{},{}] chose [{},{},{}] (scale '{}')",
+        width,
+        height,
+        depth,
+        required[0],
+        required[1],
+        required[2],
+        ratio[0],
+        ratio[1],
+        ratio[2],
+        scaleKey.toStdString());
+    }
   } else {
     ratio = readRatioOf(std::max(1.0, std::floor(static_cast<double>(m_imgInfo.width) / width)),
                         std::max(1.0, std::floor(static_cast<double>(m_imgInfo.height) / height)),
@@ -890,7 +1128,11 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
 
   res = assembleImg(ratio, t);
   if (res.width() != width || res.height() != height || res.depth() != depth) {
-    res.resize(width, height, depth);
+    if (m_ngSegmentationRgbFor3D) {
+      res.resize(width, height, depth, Interpolant::Nearest, false, false, FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+    } else {
+      res.resize(width, height, depth);
+    }
   }
   return res;
 }
@@ -1367,8 +1609,16 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
         std::round(static_cast<double>(chunk.baseStart[1] - baseStartY) / static_cast<double>(readRatio[1])));
       const index_t dz = static_cast<index_t>(
         std::round(static_cast<double>(chunk.baseStart[2] - baseStartZ) / static_cast<double>(readRatio[2])));
-      const ZVoxelCoordinate start(dx, dy, dz, -static_cast<index_t>(sc), 0);
-      res->pasteImg(*chunkImg, start, false);
+      if (m_ngSegmentationRgbFor3D) {
+        CHECK(m_ngVolume->isSegmentation());
+        CHECK(sc < 3);
+        CHECK(res->numChannels() == 1);
+        const ZVoxelCoordinate start(dx, dy, dz, 0, 0);
+        pasteNeuroglancerSegmentationChunkAsRgbComponent(*chunkImg, *res, start, sc);
+      } else {
+        const ZVoxelCoordinate start(dx, dy, dz, -static_cast<index_t>(sc), 0);
+        res->pasteImg(*chunkImg, start, false);
+      }
     }
 
     if (needToUpdateBlockInfo) {
@@ -1398,11 +1648,13 @@ folly::coro::Task<std::shared_ptr<ZImg>> ZImgPack::readRegionToImgAsync(index_t 
 
     if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
       maybeCancel(cancellationToken);
+      const Interpolant interpolant = m_ngSegmentationRgbFor3D ? Interpolant::Nearest : Interpolant::Cubic;
+      const bool antialiasing = m_ngSegmentationRgbFor3D ? false : true;
       res->resize(resInfo.width,
                   resInfo.height,
                   resInfo.depth,
-                  Interpolant::Cubic,
-                  true,
+                  interpolant,
+                  antialiasing,
                   false,
                   FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
     }
@@ -2084,7 +2336,12 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
                                std::round(static_cast<double>(chunks[i].baseStart[2]) / ratio[2]),
                                0,
                                0);
-        res.pasteImg(*chunkImg, start, false);
+        if (m_ngSegmentationRgbFor3D) {
+          CHECK(m_ngVolume->isSegmentation());
+          pasteNeuroglancerSegmentationChunkAsRgb(*chunkImg, res, start);
+        } else {
+          res.pasteImg(*chunkImg, start, false);
+        }
       }
     });
 
@@ -2161,7 +2418,12 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
                                      static_cast<index_t>(chunks[i].baseStart[2] - iz),
                                      0,
                                      0);
-        res.pasteImg(*chunkImg, start, false);
+        if (m_ngSegmentationRgbFor3D) {
+          CHECK(m_ngVolume->isSegmentation());
+          pasteNeuroglancerSegmentationChunkAsRgb(*chunkImg, res, start);
+        } else {
+          res.pasteImg(*chunkImg, start, false);
+        }
       }
     });
     return res;

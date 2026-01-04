@@ -8,8 +8,10 @@
 #include "z3drenderglobalstate.h"
 #include "zmesh.h"
 #include "zcancellation.h"
+#include "zneuroglancerprecomputed.h"
 #include <folly/ScopeGuard.h>
 #include <QMenu>
+#include <cmath>
 #include <memory>
 #include <utility>
 
@@ -242,21 +244,75 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
   try {
     m_channelVisibleParas.clear();
     m_transferFuncParas.clear();
-    std::vector<glm::dvec2> drs;
-    if (imgPack.imgInfo().isType<uint8_t>()) {
-      drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels, glm::dvec2(0, 255));
-    } else if (imgPack.hasMinMax() && imgPack.maxIntensity() > imgPack.minIntensity()) {
-      drs = std::vector<glm::dvec2>(
-        imgPack.imgInfo().numChannels,
-        glm::dvec2(imgPack.minIntensity() + (imgPack.maxIntensity() - imgPack.minIntensity()) * 0.02,
-                   imgPack.maxIntensity()));
-    } else {
-      drs = std::vector<glm::dvec2>(
-        imgPack.imgInfo().numChannels,
-        glm::dvec2(imgPack.rangeMin() + (imgPack.rangeMax() - imgPack.rangeMin()) * 0.02, imgPack.rangeMax()));
+
+    // Z3DImg holds a reference to the provided ZImgPack, so any adapter pack
+    // must live as long as m_3dImg.
+    m_3dImg.reset();
+    m_imgPackOverride.reset();
+    const ZImgPack* packFor3D = &imgPack;
+    if (imgPack.isNeuroglancerPrecomputed()) {
+      auto vol = imgPack.neuroglancerVolumeShared();
+      if (vol->isSegmentation()) {
+        m_imgPackOverride = imgPack.makeNeuroglancerSegmentationRgbFor3D();
+        CHECK(m_imgPackOverride);
+        packFor3D = m_imgPackOverride.get();
+        LOG(INFO) << "Neuroglancer segmentation: using RGB adapter pack for 3D visualization.";
+      }
     }
 
-    m_3dImg = std::make_unique<Z3DImg>(imgPack, m_rendererParameters.coordTransform.scale(), drs);
+    // Neuroglancer pyramids often use anisotropic scale steps (e.g. 2x2x1) for volumes whose
+    // Z resolution is coarser than XY. If we keep the default (1,1,1) scale, Z3DImg's LOD
+    // level scales become isotropic (2x2x2, 4x4x4, ...) and can drift from the dataset's
+    // available ratios, forcing extra network downloads + resampling.
+    //
+    // To match Neuroglancer's intended downsampling behavior, initialize the coordinate
+    // transform scale from voxel size *ratios* (unitless), but only if the user hasn't
+    // already customized the scale.
+    if (imgPack.isNeuroglancerPrecomputed()) {
+      const glm::vec3 currentScale = m_rendererParameters.coordTransform.scale();
+      const bool isDefaultScale = glm::all(glm::epsilonEqual(currentScale, glm::vec3(1.f), 1e-6f));
+      const bool isPreviousAutoScale =
+        m_hasAutoVoxelAspectScale && glm::all(glm::epsilonEqual(currentScale, m_autoVoxelAspectScale, 1e-6f));
+      if (isDefaultScale || isPreviousAutoScale) {
+        const ZImgInfo& info = packFor3D->imgInfo();
+        if (info.voxelSizeUnit != VoxelSizeUnit::none && std::isfinite(info.voxelSizeX) &&
+            std::isfinite(info.voxelSizeY) && std::isfinite(info.voxelSizeZ) && info.voxelSizeX > 0.0 &&
+            info.voxelSizeY > 0.0 && info.voxelSizeZ > 0.0) {
+          const double xy = std::max(info.voxelSizeX, info.voxelSizeY);
+          const double zOverXY = info.voxelSizeZ / xy;
+          if (std::isfinite(zOverXY) && zOverXY > 0.0) {
+            const glm::vec3 suggestedScale(1.f, 1.f, static_cast<float>(zOverXY));
+            m_hasAutoVoxelAspectScale = true;
+            m_autoVoxelAspectScale = suggestedScale;
+            m_rendererParameters.coordTransform.setScale(suggestedScale);
+            LOG(INFO) << fmt::format(
+              "Neuroglancer 3D: using voxel-size aspect ratio for coordTransform scale: "
+              "voxelSize=({:.6g},{:.6g},{:.6g}) -> scale=(1,1,{:.6g})",
+              info.voxelSizeX,
+              info.voxelSizeY,
+              info.voxelSizeZ,
+              zOverXY);
+          }
+        }
+      }
+    }
+
+    std::vector<glm::dvec2> drs;
+    if (packFor3D->imgInfo().isType<uint8_t>()) {
+      drs = std::vector<glm::dvec2>(packFor3D->imgInfo().numChannels, glm::dvec2(0, 255));
+    } else if (packFor3D->hasMinMax() && packFor3D->maxIntensity() > packFor3D->minIntensity()) {
+      drs = std::vector<glm::dvec2>(
+        packFor3D->imgInfo().numChannels,
+        glm::dvec2(packFor3D->minIntensity() + (packFor3D->maxIntensity() - packFor3D->minIntensity()) * 0.02,
+                   packFor3D->maxIntensity()));
+    } else {
+      drs = std::vector<glm::dvec2>(
+        packFor3D->imgInfo().numChannels,
+        glm::dvec2(packFor3D->rangeMin() + (packFor3D->rangeMax() - packFor3D->rangeMin()) * 0.02,
+                   packFor3D->rangeMax()));
+    }
+
+    m_3dImg = std::make_unique<Z3DImg>(*packFor3D, m_rendererParameters.coordTransform.scale(), drs);
     updateBlockIDTarget();
 
     // Layer target channel depth managed inside renderers now
@@ -277,10 +333,10 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
       m_doubleChannelRangeParas.emplace_back(
         std::make_unique<ZDoubleSpanParameter>(QString("Channel %1 Display Range").arg(c + 1),
                                                drs[c],
-                                               imgPack.rangeMin(),
-                                               imgPack.rangeMax()));
+                                               packFor3D->rangeMin(),
+                                               packFor3D->rangeMax()));
       m_doubleChannelRangeParas.back()->setStyle("SPINBOX");
-      if (imgPack.imgInfo().voxelFormat != VoxelFormat::Float) {
+      if (packFor3D->imgInfo().voxelFormat != VoxelFormat::Float) {
         m_doubleChannelRangeParas.back()->setDecimal(0);
         m_doubleChannelRangeParas.back()->setSingleStep(1);
       }
