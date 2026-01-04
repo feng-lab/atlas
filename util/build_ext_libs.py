@@ -2827,29 +2827,31 @@ def build_proxygen(src_dir: str, install_dir: str):
 
     patches = [
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
+            orig_file=os.path.join(src_dir, "CMakeLists.txt"),
             from_texts=[
-                r'list(APPEND GFLAG_DEPENDENCIES gflags)',
-                r'find_program(PROXYGEN_PYTHON python3)',
-                r'-Wextra',
-                r'    iostreams',
-                r'    chrono',
-                r'    regex',
-                r'    system',
+                r"list(APPEND GFLAG_DEPENDENCIES gflags)",
+                r"find_program(PROXYGEN_PYTHON python3)",
+                r"-Wextra",
+                r"    iostreams",
+                r"    chrono",
+                r"    regex",
+                r"    system",
             ],
             to_texts=[
-                'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
-                'add_library(gflags::gflags ALIAS gflags)',
-                r'find_program(PROXYGEN_PYTHON python)' if is_windows() else r'find_program(PROXYGEN_PYTHON python3)',
-                r'' if is_windows() else r'-Wextra',
-                r'',
-                r'',
-                r'',
-                r'',
+                "list(APPEND GFLAG_DEPENDENCIES gflags)\n"
+                "add_library(gflags::gflags ALIAS gflags)",
+                r"find_program(PROXYGEN_PYTHON python)"
+                if is_windows()
+                else r"find_program(PROXYGEN_PYTHON python3)",
+                r"" if is_windows() else r"-Wextra",
+                r"",
+                r"",
+                r"",
+                r"",
             ],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'cmake', 'proxygen-config.cmake.in'),
+            orig_file=os.path.join(src_dir, "cmake", "proxygen-config.cmake.in"),
             from_texts=[
                 r"""find_dependency(Boost 1.58 REQUIRED
   COMPONENTS
@@ -2873,32 +2875,36 @@ def build_proxygen(src_dir: str, install_dir: str):
             ],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt'),
+            orig_file=os.path.join(src_dir, "proxygen", "lib", "CMakeLists.txt"),
             from_texts=[
                 r"""${PROXYGEN_FBCODE_ROOT}
         ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
-                r'Boost::boost',
-                r'Boost::iostreams',
+                r"    zstd"
+                r"Boost::boost",
+                r"Boost::iostreams",
             ],
             to_texts=[
                 "${PROXYGEN_FBCODE_ROOT}\n${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http\n${PROXYGEN_GPERF}",
-                r'',
-                r'',
+                r"",
+                r"",
+                r"",
             ],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'proxygen', 'httpserver', 'samples', 'hq', 'ConnIdLogger.h'),
+            orig_file=os.path.join(
+                src_dir, "proxygen", "httpserver", "samples", "hq", "ConnIdLogger.h"
+            ),
             from_texts=[
-                r'const struct ::tm* tm_time,',
-                r'tm_time);',
+                r"const struct ::tm* tm_time,",
+                r"tm_time);",
             ],
             to_texts=[
-                r'const google::LogMessageTime& tm_time,',
+                r"const google::LogMessageTime& tm_time,",
                 "&(tm_time.tm()));",
             ],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'cmake', 'FindZstd.cmake'),
+            orig_file=os.path.join(src_dir, "cmake", "FindZstd.cmake"),
             from_texts=[
                 r"""find_library(ZSTD_LIBRARIES
   NAMES zstd""",
@@ -2907,22 +2913,22 @@ def build_proxygen(src_dir: str, install_dir: str):
             to_texts=[
                 r"""find_library(ZSTD_LIBRARIES
   NAMES zstd zstd_static""",
-                r'if(TRUE)',
+                r"if(TRUE)",
             ],
             patch_condition=is_windows,
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'proxygen', 'external', 'CMakeLists.txt'),
+            orig_file=os.path.join(src_dir, "proxygen", "external", "CMakeLists.txt"),
             from_texts=[
                 r'"-Wno-implicit-fallthrough"',
             ],
             to_texts=[
-                r'',
+                r"",
             ],
             patch_condition=is_windows,
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt'),
+            orig_file=os.path.join(src_dir, "proxygen", "lib", "CMakeLists.txt"),
             from_texts=[
                 r"""    COMMAND
         ${CMAKE_CURRENT_SOURCE_DIR}/http/gen_HTTPCommonHeaders.sh""",
@@ -2940,10 +2946,12 @@ def build_proxygen(src_dir: str, install_dir: str):
             patch_condition=is_windows,
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'proxygen', 'lib', 'services', 'RequestWorkerThread.cpp'),
+            orig_file=os.path.join(
+                src_dir, "proxygen", "lib", "services", "RequestWorkerThread.cpp"
+            ),
             from_texts=[
-                r'sigset_t ss;',
-                r'PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);',
+                r"sigset_t ss;",
+                r"PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);",
             ],
             to_texts=[
                 "#ifndef _MSC_VER\nsigset_t ss;",
