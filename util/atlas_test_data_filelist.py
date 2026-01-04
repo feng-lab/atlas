@@ -1,415 +1,297 @@
 files_to_download = [
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint8_add_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint8_add_test.dat',
-        'expected_size': 30000158,
-        'expected_sha256': '15a83689736e181cb5b8ad0ebde90d640ec173e74ce60fc85dbfa67dd3524495',
-        'filename': 'uint8_add_test.dat',
+        "expected_size": 30000158,
+        "expected_sha256": "15a83689736e181cb5b8ad0ebde90d640ec173e74ce60fc85dbfa67dd3524495",
+        "filename": "uint8_add_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int8_mul_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int8_mul_test.dat',
-        'expected_size': 36000158,
-        'expected_sha256': '117ff279e0522e44f2b18d52d47ee5583b5057450ee7ce974676add3c5bf11a7',
-        'filename': 'int8_mul_test.dat',
+        "expected_size": 36000158,
+        "expected_sha256": "117ff279e0522e44f2b18d52d47ee5583b5057450ee7ce974676add3c5bf11a7",
+        "filename": "int8_mul_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint16_div_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint16_div_test.dat',
-        'expected_size': 60000308,
-        'expected_sha256': '54b08467963f3f69f0b2ffbabdc6675fe4c2d192aa5e5bd30fe9e15920fc45fc',
-        'filename': 'uint16_div_test.dat',
+        "expected_size": 60000308,
+        "expected_sha256": "54b08467963f3f69f0b2ffbabdc6675fe4c2d192aa5e5bd30fe9e15920fc45fc",
+        "filename": "uint16_div_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint32_sub_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint32_sub_test.dat',
-        'expected_size': 120000608,
-        'expected_sha256': '6deb176374266517fca3903e9370bf4af6763079581b50a7e0ef5253ded93753',
-        'filename': 'uint32_sub_test.dat',
+        "expected_size": 120000608,
+        "expected_sha256": "6deb176374266517fca3903e9370bf4af6763079581b50a7e0ef5253ded93753",
+        "filename": "uint32_sub_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int32_add_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int32_add_test.dat',
-        'expected_size': 144000608,
-        'expected_sha256': '4ceb4a8d2aeb9d718a2fcc09e1a5c2881b0c2692baaf23132ba208b55f5dcf98',
-        'filename': 'int32_add_test.dat',
+        "expected_size": 144000608,
+        "expected_sha256": "4ceb4a8d2aeb9d718a2fcc09e1a5c2881b0c2692baaf23132ba208b55f5dcf98",
+        "filename": "int32_add_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint64_mul_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint64_mul_test.dat',
-        'expected_size': 240001208,
-        'expected_sha256': '235b02644f94099995bc6d5213cfbc84659fe0e09aa070d328f2fada61a8b31c',
-        'filename': 'uint64_mul_test.dat',
+        "expected_size": 240001208,
+        "expected_sha256": "235b02644f94099995bc6d5213cfbc84659fe0e09aa070d328f2fada61a8b31c",
+        "filename": "uint64_mul_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint32_div_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint32_div_test.dat',
-        'expected_size': 120000608,
-        'expected_sha256': 'bc3a7b9facec4cba841cfc18de877367ac64b3b6a82432bcb720ffe2a0fb02a9',
-        'filename': 'uint32_div_test.dat',
+        "expected_size": 120000608,
+        "expected_sha256": "bc3a7b9facec4cba841cfc18de877367ac64b3b6a82432bcb720ffe2a0fb02a9",
+        "filename": "uint32_div_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint16_sub_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint16_sub_test.dat',
-        'expected_size': 60000308,
-        'expected_sha256': '60a54e7b0880aecdbf3d12917b63973ee8e60873b6e90560689e21e4e1abb46d',
-        'filename': 'uint16_sub_test.dat',
+        "expected_size": 60000308,
+        "expected_sha256": "60a54e7b0880aecdbf3d12917b63973ee8e60873b6e90560689e21e4e1abb46d",
+        "filename": "uint16_sub_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int16_add_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int16_add_test.dat',
-        'expected_size': 72000308,
-        'expected_sha256': 'aafd0cc34e430c1e500aecea0632a7eab95bf92afacd68559b8d6360d3bad7f7',
-        'filename': 'int16_add_test.dat',
+        "expected_size": 72000308,
+        "expected_sha256": "aafd0cc34e430c1e500aecea0632a7eab95bf92afacd68559b8d6360d3bad7f7",
+        "filename": "int16_add_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int32_div_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int32_div_test.dat',
-        'expected_size': 144000608,
-        'expected_sha256': 'bb0f5db031117731712906bdb2cecf239adaa90bda01002bd24c9d6968f1bc81',
-        'filename': 'int32_div_test.dat',
+        "expected_size": 144000608,
+        "expected_sha256": "bb0f5db031117731712906bdb2cecf239adaa90bda01002bd24c9d6968f1bc81",
+        "filename": "int32_div_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int16_sub_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int16_sub_test.dat',
-        'expected_size': 72000308,
-        'expected_sha256': 'c17a608798dfd5ebb731cea4fb384ef6d1feeb363bdfbcaf97b87e47927552f5',
-        'filename': 'int16_sub_test.dat',
+        "expected_size": 72000308,
+        "expected_sha256": "c17a608798dfd5ebb731cea4fb384ef6d1feeb363bdfbcaf97b87e47927552f5",
+        "filename": "int16_sub_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint16_add_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint16_add_test.dat',
-        'expected_size': 60000308,
-        'expected_sha256': '06d03acbb05a16d0e378a9eab495fa943577ec5c2bcf2a7fd681153b99a0bc1b',
-        'filename': 'uint16_add_test.dat',
+        "expected_size": 60000308,
+        "expected_sha256": "06d03acbb05a16d0e378a9eab495fa943577ec5c2bcf2a7fd681153b99a0bc1b",
+        "filename": "uint16_add_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/benchmark.zip',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/benchmark.zip',
-        'expected_size': 43334143,
-        'expected_sha256': '754b88a1a3df42e15df1e50d8eab253b9bf0b0461164c21aad12b2b9fd8af7f8',
-        'filename': 'benchmark.zip',
+        "expected_size": 43334143,
+        "expected_sha256": "754b88a1a3df42e15df1e50d8eab253b9bf0b0461164c21aad12b2b9fd8af7f8",
+        "filename": "benchmark.zip"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int16_div_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int16_div_test.dat',
-        'expected_size': 72000308,
-        'expected_sha256': 'a9c9275466441f7a4c19555c49ba93debc0fda128753a6689ce54d45b49c5a9d',
-        'filename': 'int16_div_test.dat',
+        "expected_size": 72000308,
+        "expected_sha256": "a9c9275466441f7a4c19555c49ba93debc0fda128753a6689ce54d45b49c5a9d",
+        "filename": "int16_div_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int32_sub_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int32_sub_test.dat',
-        'expected_size': 144000608,
-        'expected_sha256': '4098f772525577e15f17ae173fa64d11a907f863307bdc55655a402b4e74c571',
-        'filename': 'int32_sub_test.dat',
+        "expected_size": 144000608,
+        "expected_sha256": "4098f772525577e15f17ae173fa64d11a907f863307bdc55655a402b4e74c571",
+        "filename": "int32_sub_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int64_mul_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int64_mul_test.dat',
-        'expected_size': 288001208,
-        'expected_sha256': 'a50819ca1e0ed0678e1d202835d8cb1054b66309806591fe14939bebd871f2dc',
-        'filename': 'int64_mul_test.dat',
+        "expected_size": 288001208,
+        "expected_sha256": "a50819ca1e0ed0678e1d202835d8cb1054b66309806591fe14939bebd871f2dc",
+        "filename": "int64_mul_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint32_add_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint32_add_test.dat',
-        'expected_size': 120000608,
-        'expected_sha256': '57a79f00464311e6c07c3b170239edc42b808b3aa4c40ee7ca725586a84ebdc9',
-        'filename': 'uint32_add_test.dat',
+        "expected_size": 120000608,
+        "expected_sha256": "57a79f00464311e6c07c3b170239edc42b808b3aa4c40ee7ca725586a84ebdc9",
+        "filename": "uint32_add_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/test1.swc',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/test1.swc',
-        'expected_size': 105,
-        'expected_sha256': '5325fc2607d67a551519f496f4f9529c467dc8a4f79312e7974bcbe5b8441431',
-        'filename': 'test1.swc',
+        "expected_size": 105,
+        "expected_sha256": "5325fc2607d67a551519f496f4f9529c467dc8a4f79312e7974bcbe5b8441431",
+        "filename": "test1.swc"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint8_div_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint8_div_test.dat',
-        'expected_size': 30000158,
-        'expected_sha256': 'ed7fa92498a863162bfd2fef8c79711e2a26d3f7be72fea95fa5c821d4f48c89',
-        'filename': 'uint8_div_test.dat',
+        "expected_size": 30000158,
+        "expected_sha256": "ed7fa92498a863162bfd2fef8c79711e2a26d3f7be72fea95fa5c821d4f48c89",
+        "filename": "uint8_div_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint8_sub_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint8_sub_test.dat',
-        'expected_size': 30000158,
-        'expected_sha256': '8ea522732410ab54df2cbe9ad3def40cf06ff34b47acab04ffe334fbfee09a4b',
-        'filename': 'uint8_sub_test.dat',
+        "expected_size": 30000158,
+        "expected_sha256": "8ea522732410ab54df2cbe9ad3def40cf06ff34b47acab04ffe334fbfee09a4b",
+        "filename": "uint8_sub_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/test2.swc',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/test2.swc',
-        'expected_size': 212,
-        'expected_sha256': '85da549b6a82e63afad62bfa3e1b84401d5123a5a86a53ac2a44bb132560c91f',
-        'filename': 'test2.swc',
+        "expected_size": 212,
+        "expected_sha256": "85da549b6a82e63afad62bfa3e1b84401d5123a5a86a53ac2a44bb132560c91f",
+        "filename": "test2.swc"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/test.sobj',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/test.sobj',
-        'expected_size': 148572,
-        'expected_sha256': 'dd8b05b45640e4ca9f223ff3b2861ddddb35ef00b26b8890d38df3ce4f45ded6',
-        'filename': 'test.sobj',
+        "expected_size": 148572,
+        "expected_sha256": "dd8b05b45640e4ca9f223ff3b2861ddddb35ef00b26b8890d38df3ce4f45ded6",
+        "filename": "test.sobj"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int16_mul_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int16_mul_test.dat',
-        'expected_size': 72000308,
-        'expected_sha256': 'cba11d2b66896ec0752daded8e837eba889fcb59bfaba52e5ed05ddb6f9219e5',
-        'filename': 'int16_mul_test.dat',
+        "expected_size": 72000308,
+        "expected_sha256": "cba11d2b66896ec0752daded8e837eba889fcb59bfaba52e5ed05ddb6f9219e5",
+        "filename": "int16_mul_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int64_div_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int64_div_test.dat',
-        'expected_size': 288001208,
-        'expected_sha256': 'a1852769837f8e7ca2e4182185eb2f76b5c56789b4d284b6f9f1b98c519ebfb8',
-        'filename': 'int64_div_test.dat',
+        "expected_size": 288001208,
+        "expected_sha256": "a1852769837f8e7ca2e4182185eb2f76b5c56789b4d284b6f9f1b98c519ebfb8",
+        "filename": "int64_div_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/treetest.swc',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/treetest.swc',
-        'expected_size': 578,
-        'expected_sha256': 'f296651ad5450d2533e7a2f1d23ba645cb59f43650896c6c867c172e40b8924e',
-        'filename': 'treetest.swc',
+        "expected_size": 578,
+        "expected_sha256": "f296651ad5450d2533e7a2f1d23ba645cb59f43650896c6c867c172e40b8924e",
+        "filename": "treetest.swc"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/test.swc',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/test.swc',
-        'expected_size': 179,
-        'expected_sha256': 'b03cba0cae40f9b83b76434efc878009464826b4d089c7b8b8665c2c02b64441',
-        'filename': 'test.swc',
+        "expected_size": 179,
+        "expected_sha256": "b03cba0cae40f9b83b76434efc878009464826b4d089c7b8b8665c2c02b64441",
+        "filename": "test.swc"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int32_mul_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int32_mul_test.dat',
-        'expected_size': 144000608,
-        'expected_sha256': '797ac6c487013d7cd603d434e7a43d0564612571a5e4a61352148f655fba8b9d',
-        'filename': 'int32_mul_test.dat',
+        "expected_size": 144000608,
+        "expected_sha256": "797ac6c487013d7cd603d434e7a43d0564612571a5e4a61352148f655fba8b9d",
+        "filename": "int32_mul_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint64_add_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint64_add_test.dat',
-        'expected_size': 240001208,
-        'expected_sha256': '8d9672fe3914e4c8ec1d47e56bca2122e7100a5ce8e361189d0c31e037d9efdc',
-        'filename': 'uint64_add_test.dat',
+        "expected_size": 240001208,
+        "expected_sha256": "8d9672fe3914e4c8ec1d47e56bca2122e7100a5ce8e361189d0c31e037d9efdc",
+        "filename": "uint64_add_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int64_sub_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int64_sub_test.dat',
-        'expected_size': 288001208,
-        'expected_sha256': 'b6394ec5817893fdaf0e006a0b2d627ed3534116ecc77004bd8013de5ac5f13b',
-        'filename': 'int64_sub_test.dat',
+        "expected_size": 288001208,
+        "expected_sha256": "b6394ec5817893fdaf0e006a0b2d627ed3534116ecc77004bd8013de5ac5f13b",
+        "filename": "int64_sub_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/0515_15Py.swc',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/0515_15Py.swc',
-        'expected_size': 208759,
-        'expected_sha256': 'd9405ea01b8a4ac4e76034bc296801c26120857adb12f8349ec0f54e82ff5ac0',
-        'filename': '0515_15Py.swc',
+        "expected_size": 208759,
+        "expected_sha256": "d9405ea01b8a4ac4e76034bc296801c26120857adb12f8349ec0f54e82ff5ac0",
+        "filename": "0515_15Py.swc"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int8_add_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int8_add_test.dat',
-        'expected_size': 36000158,
-        'expected_sha256': 'd0c953457ec04250f6080cd0167b67ba1837691c8b5d281d7bf6f0c75b63e765',
-        'filename': 'int8_add_test.dat',
+        "expected_size": 36000158,
+        "expected_sha256": "d0c953457ec04250f6080cd0167b67ba1837691c8b5d281d7bf6f0c75b63e765",
+        "filename": "int8_add_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint8_mul_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint8_mul_test.dat',
-        'expected_size': 30000158,
-        'expected_sha256': '8886ae048f316d6d0c38e922c6c5865d537d4d453979babf2cb8c75a643bc716',
-        'filename': 'uint8_mul_test.dat',
+        "expected_size": 30000158,
+        "expected_sha256": "8886ae048f316d6d0c38e922c6c5865d537d4d453979babf2cb8c75a643bc716",
+        "filename": "uint8_mul_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int8_div_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int8_div_test.dat',
-        'expected_size': 36000158,
-        'expected_sha256': '40bc678e4d3e91f6d3ce5559dab25228921cba320b32dcea82da672ecef58efb',
-        'filename': 'int8_div_test.dat',
+        "expected_size": 36000158,
+        "expected_sha256": "40bc678e4d3e91f6d3ce5559dab25228921cba320b32dcea82da672ecef58efb",
+        "filename": "int8_div_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int8_sub_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int8_sub_test.dat',
-        'expected_size': 36000158,
-        'expected_sha256': '2dc255f18fd984a6379c27289e054023bbaed358a58addccd5a4f1b40a2e88cf',
-        'filename': 'int8_sub_test.dat',
+        "expected_size": 36000158,
+        "expected_sha256": "2dc255f18fd984a6379c27289e054023bbaed358a58addccd5a4f1b40a2e88cf",
+        "filename": "int8_sub_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/int64_add_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/int64_add_test.dat',
-        'expected_size': 288001208,
-        'expected_sha256': '9392b67919862e9e0ca3faf0a445121027aee3956448fa2f4ad300abceb3cfdb',
-        'filename': 'int64_add_test.dat',
+        "expected_size": 288001208,
+        "expected_sha256": "9392b67919862e9e0ca3faf0a445121027aee3956448fa2f4ad300abceb3cfdb",
+        "filename": "int64_add_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint32_mul_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint32_mul_test.dat',
-        'expected_size': 120000608,
-        'expected_sha256': 'b9393c3d3a4abe3d7244bcfbb920772263c57f3ae29888239a684e59fe97dd38',
-        'filename': 'uint32_mul_test.dat',
+        "expected_size": 120000608,
+        "expected_sha256": "b9393c3d3a4abe3d7244bcfbb920772263c57f3ae29888239a684e59fe97dd38",
+        "filename": "uint32_mul_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint64_sub_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint64_sub_test.dat',
-        'expected_size': 240001208,
-        'expected_sha256': '1db4451eefb71f865f40247e35186e6282d75ea179ee31e533e5743553091104',
-        'filename': 'uint64_sub_test.dat',
+        "expected_size": 240001208,
+        "expected_sha256": "1db4451eefb71f865f40247e35186e6282d75ea179ee31e533e5743553091104",
+        "filename": "uint64_sub_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint16_mul_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint16_mul_test.dat',
-        'expected_size': 60000308,
-        'expected_sha256': '72a513c0cf27da6f7eb563eef3b092767480dab5f81e39175662f69b562daa46',
-        'filename': 'uint16_mul_test.dat',
+        "expected_size": 60000308,
+        "expected_sha256": "72a513c0cf27da6f7eb563eef3b092767480dab5f81e39175662f69b562daa46",
+        "filename": "uint16_mul_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/uint64_div_test.dat',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/uint64_div_test.dat',
-        'expected_size': 240001208,
-        'expected_sha256': '29cf037c972544250b26002b56232cf1990304fef78ec3a73073360bc5442ddb',
-        'filename': 'uint64_div_test.dat',
+        "expected_size": 240001208,
+        "expected_sha256": "29cf037c972544250b26002b56232cf1990304fef78ec3a73073360bc5442ddb",
+        "filename": "uint64_div_test.dat"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1doublefilterres.raw',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1doublefilterres.raw',
-        'expected_size': 159113635,
-        'expected_sha256': '9d0b17206b5df6540efa608d9ea4305efd33f03339e7de19f969e55a2fb43776',
-        'filename': 'img/im3d1doublefilterres.raw',
+        "expected_size": 159113635,
+        "expected_sha256": "9d0b17206b5df6540efa608d9ea4305efd33f03339e7de19f969e55a2fb43776",
+        "filename": "img/im3d1doublefilterres.raw"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1_resize_cubic_aa_res.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1_resize_cubic_aa_res.tif',
-        'expected_size': 12059424,
-        'expected_sha256': 'ad02d059e9969b8bf9cc494ab8ce87bfadd7024b466bdb0cad449a20a7c50d19',
-        'filename': 'img/im3d1_resize_cubic_aa_res.tif',
+        "expected_size": 12059424,
+        "expected_sha256": "ad02d059e9969b8bf9cc494ab8ce87bfadd7024b466bdb0cad449a20a7c50d19",
+        "filename": "img/im3d1_resize_cubic_aa_res.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1_resize_linear_aa_res.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1_resize_linear_aa_res.tif',
-        'expected_size': 10595786,
-        'expected_sha256': '339e4619921160b18bfabb76395881837af1f2bf54795ea239bf7d5ac1f26a59',
-        'filename': 'img/im3d1_resize_linear_aa_res.tif',
+        "expected_size": 10595786,
+        "expected_sha256": "339e4619921160b18bfabb76395881837af1f2bf54795ea239bf7d5ac1f26a59",
+        "filename": "img/im3d1_resize_linear_aa_res.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/fileread.txt',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/fileread.txt',
-        'expected_size': 123,
-        'expected_sha256': 'cd88052c9da41b798d9307fd88132653333b3f72de29a9c13c813be35cac1af9',
-        'filename': 'img/fileread.txt',
+        "expected_size": 123,
+        "expected_sha256": "cd88052c9da41b798d9307fd88132653333b3f72de29a9c13c813be35cac1af9",
+        "filename": "img/fileread.txt"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1_resize_lanczos2_aa_res.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1_resize_lanczos2_aa_res.tif',
-        'expected_size': 12061348,
-        'expected_sha256': '77d1ca533fc207ddb2f52245fda679643c5f2e8e2c7ee08e08a45acbde927778',
-        'filename': 'img/im3d1_resize_lanczos2_aa_res.tif',
+        "expected_size": 12061348,
+        "expected_sha256": "77d1ca533fc207ddb2f52245fda679643c5f2e8e2c7ee08e08a45acbde927778",
+        "filename": "img/im3d1_resize_lanczos2_aa_res.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im2d1filterres.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im2d1filterres.tif',
-        'expected_size': 4228330,
-        'expected_sha256': 'dadf6b04a3ebad97a2115cb271175e3453320076b237def8ff5bdb5ce0e44a6c',
-        'filename': 'img/im2d1filterres.tif',
+        "expected_size": 4228330,
+        "expected_sha256": "dadf6b04a3ebad97a2115cb271175e3453320076b237def8ff5bdb5ce0e44a6c",
+        "filename": "img/im2d1filterres.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1maxres.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1maxres.tif',
-        'expected_size': 732756,
-        'expected_sha256': '668ecd198cfaa8f06add1fd5b9589d97b503ff0444a24cda1388c244f093d6b2',
-        'filename': 'img/im3d1maxres.tif',
+        "expected_size": 732756,
+        "expected_sha256": "668ecd198cfaa8f06add1fd5b9589d97b503ff0444a24cda1388c244f093d6b2",
+        "filename": "img/im3d1maxres.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1minres.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1minres.tif',
-        'expected_size': 535368,
-        'expected_sha256': '9ca20ea02a0a209e0492cd0b6f67429bf95beb476d56dea34da79947cd910a35',
-        'filename': 'img/im3d1minres.tif',
+        "expected_size": 535368,
+        "expected_sha256": "9ca20ea02a0a209e0492cd0b6f67429bf95beb476d56dea34da79947cd910a35",
+        "filename": "img/im3d1minres.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1_resize_lanczos2_res.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1_resize_lanczos2_res.tif',
-        'expected_size': 7916854,
-        'expected_sha256': '12f905c2f8fe68b2c95451147585e24681abbd6bac5c84b283b1179ecaf2b47e',
-        'filename': 'img/im3d1_resize_lanczos2_res.tif',
+        "expected_size": 7916854,
+        "expected_sha256": "12f905c2f8fe68b2c95451147585e24681abbd6bac5c84b283b1179ecaf2b47e",
+        "filename": "img/im3d1_resize_lanczos2_res.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1_resize_nearest_res.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1_resize_nearest_res.tif',
-        'expected_size': 134814,
-        'expected_sha256': 'e7d842d4d33bb00702209c871ff146cc6e7e2bf8ba19f22f1049786be191199c',
-        'filename': 'img/im3d1_resize_nearest_res.tif',
+        "expected_size": 134814,
+        "expected_sha256": "e7d842d4d33bb00702209c871ff146cc6e7e2bf8ba19f22f1049786be191199c",
+        "filename": "img/im3d1_resize_nearest_res.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im2d1.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im2d1.tif',
-        'expected_size': 4227834,
-        'expected_sha256': '1f2c2c9e6a787cce1a1682ac827b2863475d3ed7790ba3dc07869b902b5cb49b',
-        'filename': 'img/im2d1.tif',
+        "expected_size": 4227834,
+        "expected_sha256": "1f2c2c9e6a787cce1a1682ac827b2863475d3ed7790ba3dc07869b902b5cb49b",
+        "filename": "img/im2d1.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/text.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/text.tif',
-        'expected_size': 2740,
-        'expected_sha256': '6c4186b505fb5e1fc7e237634ba4c35ad360f43ec33bdd6f48ac698a73c215b4',
-        'filename': 'img/text.tif',
+        "expected_size": 2740,
+        "expected_sha256": "6c4186b505fb5e1fc7e237634ba4c35ad360f43ec33bdd6f48ac698a73c215b4",
+        "filename": "img/text.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im2d1doublefilterres.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im2d1doublefilterres.tif',
-        'expected_size': 33554566,
-        'expected_sha256': 'ad4baed931e24d6428ee071b9f21d34df779a4502e572ab997499456bb8dd408',
-        'filename': 'img/im2d1doublefilterres.tif',
+        "expected_size": 33554566,
+        "expected_sha256": "ad4baed931e24d6428ee071b9f21d34df779a4502e572ab997499456bb8dd408",
+        "filename": "img/im2d1doublefilterres.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1_resize_cubic_res.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1_resize_cubic_res.tif',
-        'expected_size': 7883070,
-        'expected_sha256': '5ce66d4a8510c67a1965804a997fbd34b88f7a4f58301ad7c8de2f9cc869be1f',
-        'filename': 'img/im3d1_resize_cubic_res.tif',
+        "expected_size": 7883070,
+        "expected_sha256": "5ce66d4a8510c67a1965804a997fbd34b88f7a4f58301ad7c8de2f9cc869be1f",
+        "filename": "img/im3d1_resize_cubic_res.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1_resize_lanczos3_res.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1_resize_lanczos3_res.tif',
-        'expected_size': 10798590,
-        'expected_sha256': '0a42e5e8d2b6918527a4a2985f07269c842f12805d34eab49a5745ac0c49afad',
-        'filename': 'img/im3d1_resize_lanczos3_res.tif',
+        "expected_size": 10798590,
+        "expected_sha256": "0a42e5e8d2b6918527a4a2985f07269c842f12805d34eab49a5745ac0c49afad",
+        "filename": "img/im3d1_resize_lanczos3_res.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1_resize_linear_res.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1_resize_linear_res.tif',
-        'expected_size': 2520262,
-        'expected_sha256': 'ee6aab8b0e1608416b8e44d5a0eba7dbba4182cfbfde4d781b6bf1f9b5107f7f',
-        'filename': 'img/im3d1_resize_linear_res.tif',
+        "expected_size": 2520262,
+        "expected_sha256": "ee6aab8b0e1608416b8e44d5a0eba7dbba4182cfbfde4d781b6bf1f9b5107f7f",
+        "filename": "img/im3d1_resize_linear_res.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1_resize_lanczos3_aa_res.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1_resize_lanczos3_aa_res.tif',
-        'expected_size': 12110002,
-        'expected_sha256': 'd24700207c26729cf12afdf88a3efff0ae59af1d89e1c12bdd8dc4ee0fdf140d',
-        'filename': 'img/im3d1_resize_lanczos3_aa_res.tif',
+        "expected_size": 12110002,
+        "expected_sha256": "d24700207c26729cf12afdf88a3efff0ae59af1d89e1c12bdd8dc4ee0fdf140d",
+        "filename": "img/im3d1_resize_lanczos3_aa_res.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im2d1minres.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im2d1minres.tif',
-        'expected_size': 654288,
-        'expected_sha256': '6c94638b538b1d8e291d74dfbc5290a7c60d66acbf2559ef46392f6d14afeb28',
-        'filename': 'img/im2d1minres.tif',
+        "expected_size": 654288,
+        "expected_sha256": "6c94638b538b1d8e291d74dfbc5290a7c60d66acbf2559ef46392f6d14afeb28",
+        "filename": "img/im2d1minres.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im3d1.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im3d1.tif',
-        'expected_size': 1506992,
-        'expected_sha256': 'd355af3c7613fe4c59489b2940dfa438cd60fc7028f336d6af34ae0e704bd48d',
-        'filename': 'img/im3d1.tif',
+        "expected_size": 1506992,
+        "expected_sha256": "d355af3c7613fe4c59489b2940dfa438cd60fc7028f336d6af34ae0e704bd48d",
+        "filename": "img/im3d1.tif"
     },
     {
-        'url': 'https://neutracing.com/static/atlas_test_data/img/im2d1maxres.tif',
-        'backup_url': 'https://fenglab.xyz/static/atlas_test_data/img/im2d1maxres.tif',
-        'expected_size': 654416,
-        'expected_sha256': 'efaa72bfeced8ac5874cfd81b0227249533f0fec74af4a86eec81e7ddae6a76b',
-        'filename': 'img/im2d1maxres.tif',
-    },
+        "expected_size": 654416,
+        "expected_sha256": "efaa72bfeced8ac5874cfd81b0227249533f0fec74af4a86eec81e7ddae6a76b",
+        "filename": "img/im2d1maxres.tif"
+    }
 ]

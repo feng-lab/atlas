@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import atlas_file_hosts
 import common_dirs
 import download_utils
 
@@ -73,10 +74,19 @@ def _download_json_file(*, url: str, backup_url: str, out_path: Path) -> None:
 
 
 def _download_missing_schema_files(*, out_dir: Path, missing: list[str]) -> None:
+    primary_host, backup_host = atlas_file_hosts.get_file_hosts()
     for name in missing:
         _download_json_file(
-            url=f"https://neutracing.com/static/installers/{name}",
-            backup_url=f"https://fenglab.xyz/static/installers/{name}",
+            url=atlas_file_hosts.static_file_url(
+                host=primary_host,
+                static_subdir="installers",
+                relative_path=name,
+            ),
+            backup_url=atlas_file_hosts.static_file_url(
+                host=backup_host,
+                static_subdir="installers",
+                relative_path=name,
+            ),
             out_path=(out_dir / name),
         )
 
