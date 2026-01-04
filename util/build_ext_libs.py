@@ -2917,7 +2917,7 @@ def build_proxygen(src_dir: str, install_dir: str):
             from_texts=[
                 r"""${PROXYGEN_FBCODE_ROOT}
         ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
-                r"    zstd"
+                r"    zstd",
                 r"Boost::boost",
                 r"Boost::iostreams",
             ],
