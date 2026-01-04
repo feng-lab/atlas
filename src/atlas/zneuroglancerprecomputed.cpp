@@ -2,6 +2,8 @@
 
 #include "zcpuinfo.h"
 #include "zneuroglancerprecomputedchunkdecoder.h"
+#include "zneuroglancerprecomputedmesh.h"
+#include "zneuroglancerprecomputedsegmentproperties.h"
 #include "zneuroglanceruint64sharding.h"
 #include "zproxygenhttpclient.h"
 #include "zlog.h"
@@ -407,6 +409,16 @@ struct ZNeuroglancerPrecomputedVolume::ChunkCache
   std::map<MinishardIndexCacheKey, std::shared_ptr<InFlightMinishardIndexRead>> inFlightMinishardIndexReads;
 };
 
+struct ZNeuroglancerPrecomputedVolume::InFlightSegmentPropertiesLoad
+{
+  folly::coro::SharedPromise<std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties>> promise;
+};
+
+struct ZNeuroglancerPrecomputedVolume::InFlightMeshSourceLoad
+{
+  folly::coro::SharedPromise<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>> promise;
+};
+
 QString ZNeuroglancerPrecomputedVolume::normalizeRootUrl(QString url)
 {
   url = url.trimmed();
@@ -543,6 +555,27 @@ std::shared_ptr<ZNeuroglancerPrecomputedVolume> ZNeuroglancerPrecomputedVolume::
   baseInfo.voxelSizeZ = vol->m_baseResolutionNm[2];
   baseInfo.createDefaultDescriptions();
   vol->m_baseImgInfo = baseInfo;
+
+  vol->m_segmentPropertiesKey = optionalString(root, "segment_properties");
+  if (!vol->m_segmentPropertiesKey.isEmpty()) {
+    QString segDir = vol->m_segmentPropertiesKey;
+    if (!segDir.endsWith('/')) {
+      segDir += '/';
+    }
+    vol->m_segmentPropertiesDirUrl = vol->m_rootQUrl.resolved(QUrl(segDir));
+  }
+
+  vol->m_meshKey = optionalString(root, "mesh");
+  if (!vol->m_meshKey.isEmpty()) {
+    if (vol->m_volumeTypeString != "segmentation") {
+      throw ZException("Invalid neuroglancer info: 'mesh' is only valid for segmentation volumes");
+    }
+    QString meshDir = vol->m_meshKey;
+    if (!meshDir.endsWith('/')) {
+      meshDir += '/';
+    }
+    vol->m_meshDirUrl = vol->m_rootQUrl.resolved(QUrl(meshDir));
+  }
 
   vol->m_scales.clear();
   vol->m_ratioToScaleIndex.clear();
@@ -743,6 +776,119 @@ std::shared_ptr<ZNeuroglancerPrecomputedVolume> ZNeuroglancerPrecomputedVolume::
     static_cast<size_t>(static_cast<double>(ZCpuInfo::instance().nPhysicalRAM) * FLAGS_atlas_ng_precomputed_minishard_index_cache_memory_proportion);
   vol->m_chunkCache = std::make_unique<ChunkCache>(chunkCacheBytes, minishardIndexCacheBytes);
   return vol;
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecomputedVolume::segmentPropertiesShared() const
+{
+  const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
+  return m_segmentProperties;
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> ZNeuroglancerPrecomputedVolume::loadSegmentPropertiesBlocking() const
+{
+  if (!hasSegmentPropertiesDirectory()) {
+    throw ZException("This Neuroglancer dataset does not specify 'segment_properties' in its volume info.");
+  }
+
+  std::shared_ptr<InFlightSegmentPropertiesLoad> inFlight;
+  std::optional<folly::coro::Future<std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties>>> sharedFuture;
+  bool isLeader = false;
+  {
+    const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
+    if (m_segmentProperties) {
+      return m_segmentProperties;
+    }
+    if (m_segmentPropertiesInFlight) {
+      inFlight = m_segmentPropertiesInFlight;
+      sharedFuture = inFlight->promise.getFuture();
+    } else {
+      m_segmentPropertiesInFlight = std::make_shared<InFlightSegmentPropertiesLoad>();
+      inFlight = m_segmentPropertiesInFlight;
+      isLeader = true;
+    }
+  }
+
+  if (!isLeader) {
+    CHECK(sharedFuture);
+    return folly::coro::blockingWait(std::move(*sharedFuture));
+  }
+
+  try {
+    auto loaded =
+      ZNeuroglancerPrecomputedSegmentProperties::open(segmentPropertiesDirUrl(), m_defaultTimeout);
+    inFlight->promise.setValue(loaded);
+
+    const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
+    m_segmentProperties = loaded;
+    if (m_segmentPropertiesInFlight == inFlight) {
+      m_segmentPropertiesInFlight.reset();
+    }
+    return loaded;
+  }
+  catch (...) {
+    inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
+    const std::lock_guard<std::mutex> lock(m_segmentPropertiesMutex);
+    if (m_segmentPropertiesInFlight == inFlight) {
+      m_segmentPropertiesInFlight.reset();
+    }
+    throw;
+  }
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedVolume::meshSourceShared() const
+{
+  const std::lock_guard<std::mutex> lock(m_meshMutex);
+  return m_meshSource;
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomputedVolume::loadMeshSourceBlocking() const
+{
+  if (!hasMeshDirectory()) {
+    throw ZException("This Neuroglancer dataset does not specify 'mesh' in its volume info.");
+  }
+
+  std::shared_ptr<InFlightMeshSourceLoad> inFlight;
+  std::optional<folly::coro::Future<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>>> sharedFuture;
+  bool isLeader = false;
+  {
+    const std::lock_guard<std::mutex> lock(m_meshMutex);
+    if (m_meshSource) {
+      return m_meshSource;
+    }
+    if (m_meshSourceInFlight) {
+      inFlight = m_meshSourceInFlight;
+      sharedFuture = inFlight->promise.getFuture();
+    } else {
+      m_meshSourceInFlight = std::make_shared<InFlightMeshSourceLoad>();
+      inFlight = m_meshSourceInFlight;
+      isLeader = true;
+    }
+  }
+
+  if (!isLeader) {
+    CHECK(sharedFuture);
+    return folly::coro::blockingWait(std::move(*sharedFuture));
+  }
+
+  try {
+    auto loaded = ZNeuroglancerPrecomputedMeshSource::open(meshDirUrl(), m_baseResolutionNm, m_baseVoxelOffset, m_defaultTimeout);
+    inFlight->promise.setValue(loaded);
+
+    const std::lock_guard<std::mutex> lock(m_meshMutex);
+    m_meshSource = loaded;
+    if (m_meshSourceInFlight == inFlight) {
+      m_meshSourceInFlight.reset();
+    }
+    return loaded;
+  }
+  catch (...) {
+    inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
+    const std::lock_guard<std::mutex> lock(m_meshMutex);
+    if (m_meshSourceInFlight == inFlight) {
+      m_meshSourceInFlight.reset();
+    }
+    throw;
+  }
 }
 
 std::optional<size_t> ZNeuroglancerPrecomputedVolume::scaleIndexForRatio(const std::array<size_t, 3>& ratio) const

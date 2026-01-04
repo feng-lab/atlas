@@ -2036,25 +2036,31 @@ def build_assimp(src_dir: str, install_dir: str):
 
     patches = [
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'include', 'assimp', 'defs.h'),
-            from_texts=[r'#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))'],
-            to_texts=[r'#define AI_MAX_ALLOC(type) ((size_t(256) * 1024 * 1024 * 1024) / sizeof(type))'],
+            orig_file=os.path.join(src_dir, "include", "assimp", "defs.h"),
+            from_texts=[
+                r"#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))"
+            ],
+            to_texts=[
+                r"#define AI_MAX_ALLOC(type) ((size_t(256) * 1024 * 1024 * 1024) / sizeof(type))"
+            ],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'code', 'CMakeLists.txt'),
-            from_texts=[r'-Werror',
-                        r'/WX'],
-            to_texts=[r' ',
-                      r' '],
+            orig_file=os.path.join(src_dir, "code", "CMakeLists.txt"),
+            from_texts=[r"-Werror", r"/WX"],
+            to_texts=[r" ", r" "],
         ),
         FilePatcher(
-            orig_file=os.path.join(src_dir, 'CMakeLists.txt'),
-            from_texts=[r' /WX',
-                        r'ADD_COMPILE_OPTIONS(/source-charset:utf-8)',
-                        ],
-            to_texts=[r' ',
-                      r'',
-                      ],
+            orig_file=os.path.join(src_dir, "CMakeLists.txt"),
+            from_texts=[
+                r" /WX",
+                r"ADD_COMPILE_OPTIONS(/source-charset:utf-8)",
+                r'SET(DRACO_GLTF_BITSTREAM ON CACHE BOOL "" FORCE)',
+            ],
+            to_texts=[
+                r" ",
+                r"",
+                r'SET(DRACO_GLTF_BITSTREAM OFF CACHE BOOL "" FORCE)',
+            ],
         ),
     ]
     patch_manager = PatchManager(patches)
@@ -2065,15 +2071,47 @@ def build_assimp(src_dir: str, install_dir: str):
         os.remove(os.path.join(src_dir, 'cmake-modules', 'FindZLIB.cmake'))
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
-        cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
-                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DASSIMP_BUILD_FRAMEWORK:BOOL=OFF',
-                         '-DASSIMP_BUILD_TESTS:BOOL=OFF',
-                         '-DASSIMP_BUILD_ZLIB:BOOL=OFF',
-                         '-DASSIMP_HUNTER_ENABLED:BOOL=OFF'])
+        cmakecmd.extend(
+            [
+                "-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF",
+                "-DBUILD_SHARED_LIBS:BOOL=OFF",
+                "-DASSIMP_BUILD_FRAMEWORK:BOOL=OFF",
+                "-DASSIMP_BUILD_TESTS:BOOL=OFF",
+                "-DASSIMP_BUILD_ZLIB:BOOL=OFF",
+                "-DASSIMP_HUNTER_ENABLED:BOOL=OFF",
+                "-DASSIMP_BUILD_DRACO_STATIC:BOOL=ON",
+            ]
+        )
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        # Assimp's exported `assimp::draco` target points to `${_IMPORT_PREFIX}/include`.
+        # Install Draco headers (and the generated draco_features.h) there so Atlas can
+        # include <draco/...> directly when decoding Neuroglancer precomputed meshes.
+        draco_src_include_dir = os.path.join(src_dir, "contrib", "draco", "src", "draco")
+        draco_dst_include_dir = os.path.join(install_dir, "include", "draco")
+        if not os.path.isdir(draco_src_include_dir):
+            raise RuntimeError(f"Draco headers not found in Assimp source tree: {draco_src_include_dir}")
+        if os.path.exists(draco_dst_include_dir):
+            shutil.rmtree(draco_dst_include_dir, ignore_errors=False, onexc=handleRemoveReadonly)
+        os.makedirs(draco_dst_include_dir, exist_ok=True)
+        for root, dirs, files in os.walk(draco_src_include_dir):
+            rel = os.path.relpath(root, draco_src_include_dir)
+            dst_root = draco_dst_include_dir if rel == "." else os.path.join(draco_dst_include_dir, rel)
+            os.makedirs(dst_root, exist_ok=True)
+            for name in files:
+                if not name.lower().endswith(".h"):
+                    continue
+                shutil.copy2(os.path.join(root, name), os.path.join(dst_root, name))
+
+        draco_features_src = os.path.join(build_dir, "draco", "draco_features.h")
+        if not os.path.isfile(draco_features_src):
+            raise RuntimeError(
+                f"draco_features.h was not generated during the Assimp build (expected at {draco_features_src}). "
+                "Ensure Draco is enabled for Assimp (ASSIMP_BUILD_DRACO_STATIC=ON)."
+            )
+        shutil.copy2(draco_features_src, os.path.join(draco_dst_include_dir, "draco_features.h"))
 
         # if is_mac():
         #     subprocess.run(['install_name_tool', '-id', '@rpath/libIrrXML.dylib', 'lib/libIrrXML.dylib'],

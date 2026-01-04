@@ -20,6 +20,10 @@ public:
 
   void askToSave(const ZMesh& msh, const QString& title = "");
 
+  // Add a mesh that does not come from a local file path (e.g. network-backed Neuroglancer mesh).
+  // The `sourceJson` is stored in the scene file so the mesh can be reloaded on restore.
+  size_t addMeshFromExternalSource(ZMesh& mesh, QString displayName, QString tooltip, json::value sourceJson);
+
   // ZObjDoc interface
 
 public:
@@ -77,6 +81,7 @@ private:
   struct MeshPack
   { // mesh and its associated data
     MeshPack(ZMesh& imesh, const QString& path_);
+    MeshPack(ZMesh& imesh, QString displayName, QString tooltip, json::value sourceJson);
 
     ~MeshPack();
 
@@ -99,6 +104,9 @@ private:
     ZMesh mesh;
     std::vector<ZMesh*> meshList;
     QString path;
+    json::value sourceJson;
+    QString displayNameOverride;
+    QString tooltipOverride;
     bool hasUnsavedChange = false;
 
     // derived data

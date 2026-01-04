@@ -5,6 +5,7 @@
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
 #include "zparameter.h"
+#include "zstringparameter.h"
 #include "zgraphicsitemtype.h"
 #include "zgraphicsitemgroup.h"
 #include <QGraphicsPixmapItem>
@@ -149,6 +150,9 @@ protected:
 
   void updateViewSettingWidgetsGroup();
 
+Q_SIGNALS:
+  void requestNeuroglancerMeshLoad(uint64_t segmentId, bool finestLod);
+
 private:
   void channelVisibleChanged();
 
@@ -171,6 +175,10 @@ private:
   void updateImgItems();
 
   void requestNeuroglancer2DRender();
+
+  void loadNeuroglancerSegmentProperties();
+
+  void loadNeuroglancerMesh();
 
   void startNeuroglancer2DCacheRender();
 
@@ -240,6 +248,13 @@ private:
   // Neuroglancer: keep the UI responsive by fetching chunks off the UI thread,
   // and progressively refining from coarse -> sharp after interaction settles.
   QTimer m_ngRefineTimer;
+
+  // Neuroglancer segmentation: optional metadata + mesh tools.
+  ZStringParameter m_ngMeshSegmentId;
+  ZStringIntOptionParameter m_ngMeshLodPolicy;
+  bool m_ngSegmentPropertiesLoading = false;
+  QString m_ngSegmentPropertiesError;
+
   uint64_t m_ngRenderEpoch = 0;
   std::shared_ptr<std::atomic<uint64_t>> m_ngRenderEpochAtomic;
   uint64_t m_ngFinalCompletedEpoch = std::numeric_limits<uint64_t>::max();

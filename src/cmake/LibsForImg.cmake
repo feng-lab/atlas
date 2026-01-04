@@ -243,6 +243,10 @@ set(_QT_LIBS_ Qt6::Core Qt6::Gui)
 find_package(assimp REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(assimp::assimp)
+if (NOT TARGET assimp::draco)
+  message(FATAL_ERROR "Atlas requires Draco for Neuroglancer mesh decoding, but the found Assimp package does not export 'assimp::draco'. Rebuild 3rdparty Assimp with Draco enabled (util/build_ext_libs.py assimp).")
+endif ()
+print_target_properties(assimp::draco)
 
 find_package(VTK REQUIRED COMPONENTS FiltersGeometry FiltersSources IOXML FiltersModeling
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)

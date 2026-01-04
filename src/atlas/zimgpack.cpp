@@ -838,9 +838,55 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
     return res;
   }
 
-  auto ratio = readRatioOf(std::max(1.0, std::floor(static_cast<double>(m_imgInfo.width) / width)),
-                           std::max(1.0, std::floor(static_cast<double>(m_imgInfo.height) / height)),
-                           std::max(1.0, std::floor(static_cast<double>(m_imgInfo.depth) / depth)));
+  std::array<size_t, 3> ratio = {1, 1, 1};
+  if (m_ngVolume) {
+    // For Neuroglancer sources, prefer downloading a pyramid level whose voxel grid already fits within
+    // the requested output dimensions (w/h/d). Some datasets skip intermediate scales, and choosing the
+    // nearest finer level can explode network I/O (download a huge volume just to downsample again).
+    //
+    // We therefore choose the *least* coarse ratio that still makes the volume <= target dims, and only
+    // fall back to client-side downsampling if even the coarsest server-side level is still too large.
+    auto ceilDiv = [](size_t a, size_t b) -> size_t {
+      CHECK(b > 0);
+      return (a + b - 1) / b;
+    };
+
+    const std::array<size_t, 3> required = {
+      ceilDiv(m_imgInfo.width, width),
+      ceilDiv(m_imgInfo.height, height),
+      ceilDiv(m_imgInfo.depth, depth),
+    };
+
+    bool foundFit = false;
+    size_t bestSum = std::numeric_limits<size_t>::max();
+    for (const auto& r : m_pyramidalRatios) {
+      if (r[0] >= required[0] && r[1] >= required[1] && r[2] >= required[2]) {
+        const size_t sum = r[0] + r[1] + r[2];
+        if (!foundFit || sum < bestSum) {
+          ratio = r;
+          bestSum = sum;
+          foundFit = true;
+        }
+      }
+    }
+
+    if (!foundFit) {
+      // No server-side level is coarse enough; fall back to downloading the coarsest available
+      // level (minimum data) and downsampling locally.
+      size_t maxSum = 0;
+      for (const auto& r : m_pyramidalRatios) {
+        const size_t sum = r[0] + r[1] + r[2];
+        if (sum > maxSum) {
+          ratio = r;
+          maxSum = sum;
+        }
+      }
+    }
+  } else {
+    ratio = readRatioOf(std::max(1.0, std::floor(static_cast<double>(m_imgInfo.width) / width)),
+                        std::max(1.0, std::floor(static_cast<double>(m_imgInfo.height) / height)),
+                        std::max(1.0, std::floor(static_cast<double>(m_imgInfo.depth) / depth)));
+  }
 
   res = assembleImg(ratio, t);
   if (res.width() != width || res.height() != height || res.depth() != depth) {

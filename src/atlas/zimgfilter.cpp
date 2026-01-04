@@ -6,6 +6,7 @@
 #include "zimgpackdisplay.h"
 #include "zneuroglancerprecomputed.h"
 #include "zlog.h"
+#include "zmessageboxhelpers.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
 #include "ztheme.h"
@@ -13,6 +14,7 @@
 #include <QGraphicsPixmapItem>
 #include <QGraphicsSimpleTextItem>
 #include <QFutureWatcher>
+#include <QApplication>
 #include <QStyleOption>
 #include <QPainter>
 #include <QPushButton>
@@ -336,6 +338,8 @@ ZImgFilter::ZImgFilter(ZView& view)
   , m_scaleBarHeight("Scale Bar Height", 5, 1, 500)
   , m_scaleBarColor("Scale Bar Color", glm::vec3(1., 1., 1.))
   , m_ngRefineTimer(this)
+  , m_ngMeshSegmentId("Neuroglancer Mesh Segment ID")
+  , m_ngMeshLodPolicy("Neuroglancer Mesh LOD")
 {
   m_ngRenderEpochAtomic = std::make_shared<std::atomic<uint64_t>>(m_ngRenderEpoch);
 
@@ -370,6 +374,16 @@ ZImgFilter::ZImgFilter(ZView& view)
   }
   connect(&m_view, &ZView::viewportChanged, this, &ZImgFilter::viewportChanged);
   connect(&view.graphicsView(), &ZGraphicsView::scaleChanged, this, &ZImgFilter::viewScaleChanged);
+
+  m_ngMeshSegmentId.setDescription(QStringLiteral(
+    "Segment ID (uint64) used for Neuroglancer segmentation mesh loading."));
+
+  m_ngMeshLodPolicy.addOptions("Coarsest", "Finest");
+  m_ngMeshLodPolicy.select("Coarsest");
+  m_ngMeshLodPolicy.setDescription(QStringLiteral(
+    "Select which LOD to load for multi-resolution meshes.\n"
+    "- Coarsest: fastest preview (recommended)\n"
+    "- Finest: highest detail (may be large/slow)"));
 
   m_ngRefineTimer.setSingleShot(true);
   m_ngRefineTimer.setInterval(kNg2DRefineDebounceMs);
@@ -614,42 +628,8 @@ std::shared_ptr<ZWidgetsGroup> ZImgFilter::viewSettingWidgetsGroup()
 {
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>(m_imgPack->name(), 1);
-    m_widgetsGroup->addChild(m_visible, 1);
-
-    auto pb = new QPushButton("Bring to Front");
-    connect(pb, &QPushButton::clicked, this, &ZImgFilter::bringToFront);
-    m_widgetsGroup->addChild(*pb, 1);
-
-    pb = new QPushButton("Send to Back");
-    connect(pb, &QPushButton::clicked, this, &ZImgFilter::sendToBack);
-    m_widgetsGroup->addChild(*pb, 1);
-
-    m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
-    m_widgetsGroup->addChild(m_colorizationMode, 1);
-    for (size_t i = 0; i < m_channelVisibleParas.size(); ++i) {
-      m_widgetsGroup->addChild(*m_channelVisibleParas[i], 1);
-      m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
-      m_widgetsGroup->addChild(*m_doubleChannelRangeParas[i], 1);
-    }
-
-    pb = new QPushButton(ZTheme::instance().icon(ZTheme::FlipHorizontalIcon), "Flip Horizontally");
-    connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipHorizontally);
-    m_widgetsGroup->addChild(*pb, 1);
-
-    pb = new QPushButton(ZTheme::instance().icon(ZTheme::FlipVerticalIcon), "Flip Vertically");
-    connect(pb, &QPushButton::clicked, this, &ZImgFilter::flipVertically);
-    m_widgetsGroup->addChild(*pb, 1);
-
-    m_widgetsGroup->addChild(m_transform, 1);
-    m_widgetsGroup->addChild(m_offsetPara, 1);
-    m_widgetsGroup->addChild(m_opacity, 1);
-    m_widgetsGroup->addChild(*m_mipRange, 1);
-    m_widgetsGroup->addChild(m_showScaleBar, 2);
-    m_widgetsGroup->addChild(m_scaleBarLengthInUm, 2);
-    m_widgetsGroup->addChild(m_scaleBarColor, 2);
-    m_widgetsGroup->addChild(m_scaleBarHeight, 2);
-    m_widgetsGroup->setBasicAdvancedCutoff(5);
   }
+  updateViewSettingWidgetsGroup();
   return m_widgetsGroup;
 }
 
@@ -704,6 +684,30 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
 
     m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     m_widgetsGroup->addChild(m_colorizationMode, 1);
+
+    // Neuroglancer segmentation helpers.
+    if (m_imgPack && m_imgPack->isNeuroglancerPrecomputed() && m_imgPack->neuroglancerVolumeShared()->isSegmentation()) {
+      std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol = m_imgPack->neuroglancerVolumeShared();
+
+      if (vol->hasSegmentPropertiesDirectory()) {
+        const bool loaded = static_cast<bool>(vol->segmentPropertiesShared());
+        QString text = loaded ? "Segment Properties Loaded"
+                              : (m_ngSegmentPropertiesLoading ? "Loading Segment Properties..." : "Load Segment Properties");
+        auto* loadPropsBtn = new QPushButton(text);
+        loadPropsBtn->setEnabled(!loaded && !m_ngSegmentPropertiesLoading);
+        connect(loadPropsBtn, &QPushButton::clicked, this, &ZImgFilter::loadNeuroglancerSegmentProperties);
+        m_widgetsGroup->addChild(*loadPropsBtn, 2);
+      }
+
+      if (vol->hasMeshDirectory()) {
+        m_widgetsGroup->addChild(m_ngMeshSegmentId, 2);
+        m_widgetsGroup->addChild(m_ngMeshLodPolicy, 2);
+        auto* loadMeshBtn = new QPushButton("Load Mesh for Segment");
+        connect(loadMeshBtn, &QPushButton::clicked, this, &ZImgFilter::loadNeuroglancerMesh);
+        m_widgetsGroup->addChild(*loadMeshBtn, 2);
+      }
+    }
+
     for (size_t i = 0; i < m_channelVisibleParas.size(); ++i) {
       m_widgetsGroup->addChild(*m_channelVisibleParas[i], 1);
       m_widgetsGroup->addChild(*m_channelColorParas[i], 1);
@@ -730,6 +734,76 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }
+}
+
+void ZImgFilter::loadNeuroglancerSegmentProperties()
+{
+  if (!m_imgPack || !m_imgPack->isNeuroglancerPrecomputed()) {
+    return;
+  }
+  std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol = m_imgPack->neuroglancerVolumeShared();
+  if (!vol || !vol->hasSegmentPropertiesDirectory()) {
+    return;
+  }
+  if (m_ngSegmentPropertiesLoading) {
+    return;
+  }
+
+  m_ngSegmentPropertiesLoading = true;
+  m_ngSegmentPropertiesError.clear();
+  updateViewSettingWidgetsGroup();
+
+  auto* watcher = new QFutureWatcher<QString>(this);
+  connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher]() {
+    const QString err = watcher->result();
+    watcher->deleteLater();
+
+    m_ngSegmentPropertiesLoading = false;
+    m_ngSegmentPropertiesError = err;
+
+    if (!err.isEmpty()) {
+      showCriticalWithDetails(QApplication::activeWindow(), tr("Failed to load segment properties"), err);
+    }
+
+    updateViewSettingWidgetsGroup();
+  });
+
+  watcher->setFuture(QtConcurrent::run([vol]() -> QString {
+    try {
+      (void)vol->loadSegmentPropertiesBlocking();
+      return {};
+    }
+    catch (const ZException& e) {
+      return QString::fromUtf8(e.what());
+    }
+    catch (const std::exception& e) {
+      return QString::fromUtf8(e.what());
+    }
+  }));
+}
+
+void ZImgFilter::loadNeuroglancerMesh()
+{
+  if (!m_imgPack || !m_imgPack->isNeuroglancerPrecomputed()) {
+    return;
+  }
+  std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol = m_imgPack->neuroglancerVolumeShared();
+  if (!vol || !vol->hasMeshDirectory()) {
+    return;
+  }
+
+  const QString s = m_ngMeshSegmentId.get().trimmed();
+  bool ok = false;
+  const qulonglong seg = s.toULongLong(&ok, 10);
+  if (!ok || s.isEmpty()) {
+    showCriticalWithDetails(QApplication::activeWindow(),
+                            tr("Invalid segment ID"),
+                            tr("Segment ID must be a base-10 uint64 value."));
+    return;
+  }
+
+  const bool finest = m_ngMeshLodPolicy.isSelected("Finest");
+  Q_EMIT requestNeuroglancerMeshLoad(static_cast<uint64_t>(seg), finest);
 }
 
 void ZImgFilter::channelVisibleChanged()

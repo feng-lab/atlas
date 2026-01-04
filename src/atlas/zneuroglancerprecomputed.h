@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -194,6 +195,13 @@ public:
 
   static std::shared_ptr<ZNeuroglancerPrecomputedVolume> open(QString url, std::chrono::milliseconds timeout);
 
+  // Normalizes a dataset root URL for Neuroglancer precomputed volumes:
+  // - Accepts optional "precomputed://" prefix.
+  // - Maps "gs://bucket/path" to "https://storage.googleapis.com/bucket/path".
+  // - Strips trailing "/info" and ensures the result ends with '/'.
+  // This does not perform any network I/O and is safe to call for scene serialization/dedup.
+  static QString normalizeRootUrl(QString url);
+
   [[nodiscard]] const QString& rootUrl() const
   {
     return m_rootUrl;
@@ -218,6 +226,50 @@ public:
   {
     return m_volumeTypeString == "segmentation";
   }
+
+  [[nodiscard]] bool hasSegmentPropertiesDirectory() const
+  {
+    return !m_segmentPropertiesKey.isEmpty();
+  }
+
+  [[nodiscard]] const QString& segmentPropertiesKey() const
+  {
+    return m_segmentPropertiesKey;
+  }
+
+  [[nodiscard]] QUrl segmentPropertiesDirUrl() const
+  {
+    CHECK(hasSegmentPropertiesDirectory());
+    return m_segmentPropertiesDirUrl;
+  }
+
+  [[nodiscard]] std::shared_ptr<const class ZNeuroglancerPrecomputedSegmentProperties> segmentPropertiesShared() const;
+
+  // Loads segment properties from the segment_properties directory specified in the volume info.
+  // This performs network I/O and may take time; prefer calling from a worker thread.
+  std::shared_ptr<const class ZNeuroglancerPrecomputedSegmentProperties> loadSegmentPropertiesBlocking() const;
+
+  [[nodiscard]] bool hasMeshDirectory() const
+  {
+    return !m_meshKey.isEmpty();
+  }
+
+  [[nodiscard]] const QString& meshKey() const
+  {
+    return m_meshKey;
+  }
+
+  [[nodiscard]] QUrl meshDirUrl() const
+  {
+    CHECK(hasMeshDirectory());
+    return m_meshDirUrl;
+  }
+
+  [[nodiscard]] std::shared_ptr<const class ZNeuroglancerPrecomputedMeshSource> meshSourceShared() const;
+
+  // Loads mesh metadata from the mesh directory specified in the volume info.
+  // This performs network I/O (reading mesh/info) and may take time; prefer calling from a worker thread.
+  std::shared_ptr<const class ZNeuroglancerPrecomputedMeshSource> loadMeshSourceBlocking() const;
 
   [[nodiscard]] const std::vector<Scale>& scales() const
   {
@@ -275,8 +327,6 @@ public:
 private:
   ZNeuroglancerPrecomputedVolume() = default;
 
-  static QString normalizeRootUrl(QString url);
-
   static int64_t floorDiv(int64_t a, int64_t b);
   static int64_t ceilDiv(int64_t a, int64_t b);
 
@@ -286,6 +336,8 @@ private:
 
 private:
   struct ChunkCache;
+  struct InFlightSegmentPropertiesLoad;
+  struct InFlightMeshSourceLoad;
 
   QString m_rootUrl;
   QUrl m_rootQUrl;
@@ -303,6 +355,18 @@ private:
 
   std::chrono::milliseconds m_defaultTimeout{30000};
   mutable std::unique_ptr<ChunkCache> m_chunkCache;
+
+  QString m_segmentPropertiesKey;
+  QUrl m_segmentPropertiesDirUrl;
+  mutable std::mutex m_segmentPropertiesMutex;
+  mutable std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> m_segmentProperties;
+  mutable std::shared_ptr<InFlightSegmentPropertiesLoad> m_segmentPropertiesInFlight;
+
+  QString m_meshKey;
+  QUrl m_meshDirUrl;
+  mutable std::mutex m_meshMutex;
+  mutable std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> m_meshSource;
+  mutable std::shared_ptr<InFlightMeshSourceLoad> m_meshSourceInFlight;
 };
 
 } // namespace nim

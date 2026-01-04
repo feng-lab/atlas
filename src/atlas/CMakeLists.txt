@@ -511,6 +511,8 @@ set(SOURCES
     zimgpack.h zimgpack.cpp
     zimgpackdisplay.h zimgpackdisplay.cpp
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
+    zneuroglancerprecomputedmesh.h zneuroglancerprecomputedmesh.cpp
+    zneuroglancerprecomputedsegmentproperties.h zneuroglancerprecomputedsegmentproperties.cpp
     zneuroglancerprecomputedchunkdecoder.h zneuroglancerprecomputedchunkdecoder.cpp
     zneuroglanceruint64sharding.h zneuroglanceruint64sharding.cpp
     zproxygenhttpclient.h zproxygenhttpclient.cpp
@@ -714,6 +716,7 @@ target_link_libraries(atlas_core PUBLIC
   Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
   Qt6::CorePrivate Qt6::Test
   proxygen::proxygen
+  assimp::draco
   gRPC::grpc++ protobuf::libprotobuf)
 if (WIN32)
   # Required for importing the Windows system certificate store for HTTPS.
