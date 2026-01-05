@@ -23,6 +23,12 @@ DEFINE_uint32(atlas_volume_rendering_maximum_round,
               100,
               "Maximum number of rounds for volume rendering, default is 100");
 
+DEFINE_uint32(atlas_volume_rendering_progressive_blockid_effective_attachments,
+              2,
+              "Caps how many Block-ID attachments are processed per progressive 3D volume rendering round. "
+              "Lower values reduce per-round latency (more frequent refinement updates) but may require more rounds "
+              "to converge. Set to 0 to disable the cap and use all available attachments.");
+
 #if defined(__linux__)
 DEFINE_bool(atlas_debug_texture_output, false, "produce debug intermediate texture to /data/testoutput");
 #endif
@@ -254,6 +260,7 @@ void Z3DImgRaycasterRenderer::enqueueRenderBatches(Z3DEye eye, RenderBackend bac
     auto blockLease =
       pool.acquireBlockIdRenderTarget(m_outputSize, -1, -1.0, std::optional<RenderBackend>(RenderBackend::Vulkan));
     payload.blockIdAttachmentCount = blockLease.attachments;
+    payload.blockIdEffectiveAttachmentCount = FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments;
     payload.blockIdLease = std::make_shared<Z3DScratchResourcePool::RenderTargetLease>(std::move(blockLease));
   }
 
@@ -1107,6 +1114,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     bool lastRound = render3DImageForOneRound(eye,
                                               visibleIdxs[m_channelIdx[eye]],
                                               m_round[eye],
+                                              /*progressive=*/true,
                                               ze_to_zw_a,
                                               ze_to_zw_b,
                                               ze_to_screen_pixel_voxel_size,
@@ -1164,6 +1172,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         bool lastRound = render3DImageForOneRound(eye,
                                                   c,
                                                   round,
+                                                  /*progressive=*/false,
                                                   ze_to_zw_a,
                                                   ze_to_zw_b,
                                                   ze_to_screen_pixel_voxel_size,
@@ -1255,6 +1264,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
                                                        size_t c,
                                                        uint32_t round,
+                                                       bool progressive,
                                                        float ze_to_zw_a,
                                                        float ze_to_zw_b,
                                                        float ze_to_screen_pixel_voxel_size,
@@ -1304,10 +1314,22 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     lastTarget->release();
   }
 
-  // Acquire multi-attachment Block ID RT via scratch pool
+  // Acquire multi-attachment Block ID RT via scratch pool.
+  //
+  // For interactive progressive rendering, reduce the number of attachments used for missing-block
+  // discovery to shorten each progressive round (fewer block IDs captured per pixel => fewer blocks
+  // paged per round). This improves time-to-next-frame but may require more rounds to converge.
   auto blockLease = scratchPool.acquireBlockIdRenderTarget(lastTarget->size());
+  uint32_t effectiveAttachments = blockLease.attachments;
+  if (progressive) {
+    const uint32_t cap = FLAGS_atlas_volume_rendering_progressive_blockid_effective_attachments;
+    if (cap != 0u) {
+      effectiveAttachments = std::min(effectiveAttachments, cap);
+    }
+  }
+  effectiveAttachments = std::max<uint32_t>(1u, effectiveAttachments);
   blockLease.renderTarget->bind();
-  glDrawBuffers(static_cast<GLsizei>(blockLease.attachments), g_drawBuffers);
+  glDrawBuffers(static_cast<GLsizei>(effectiveAttachments), g_drawBuffers);
   glClear(GL_COLOR_BUFFER_BIT);
 
   m_img->bindFullResBlockIDsShader(*m_image3DRaycasterBlockIDsShader, c);
@@ -1362,7 +1384,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     // need to upload some image blocks to GPU
     bool hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
 
-    for (auto att = 1u; !hasEnoughMissingIDs && !lastRound && att < blockLease.attachments; ++att) {
+    for (auto att = 1u; !hasEnoughMissingIDs && !lastRound && att < effectiveAttachments; ++att) {
       auto numberBlock = ccSet.size();
       blockLease.renderTarget->attachment(g_drawBuffers[att])
         ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());

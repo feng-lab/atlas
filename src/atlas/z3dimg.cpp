@@ -277,9 +277,9 @@ void Z3DImg::setScale(const glm::vec3& scale)
   const ZImgInfo& info = m_imgPack.imgInfo();
 
   // Invariant: the paging LOD hierarchy should be stable for datasets that provide
-  // physical voxel spacing. In particular, Neuroglancer pyramids often use anisotropic
-  // steps (e.g. 2x2x1) to respect voxel sizes; tying LOD generation to a user-controlled
-  // transform scale can cause ratio mismatches and unnecessary network resampling.
+  // physical voxel spacing. Many pyramidal formats use anisotropic steps (e.g. 2x2x1)
+  // to respect voxel sizes; tying LOD generation to a user-controlled transform scale
+  // can cause ratio mismatches and unnecessary resampling.
   //
   // Therefore:
   // - If voxel size is available, derive LOD anisotropy from voxelSize{X,Y,Z}.

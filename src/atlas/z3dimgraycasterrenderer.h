@@ -206,10 +206,11 @@ private:
 
   double render3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs, bool progressive = false);
 
-  // return ture if is last round
+  // Returns true if this is the last progressive round.
   bool render3DImageForOneRound(Z3DEye eye,
                                 size_t c,
                                 uint32_t round,
+                                bool progressive,
                                 float ze_to_zw_a,
                                 float ze_to_zw_b,
                                 float ze_to_screen_pixel_voxel_size,

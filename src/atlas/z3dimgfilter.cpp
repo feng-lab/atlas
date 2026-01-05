@@ -260,39 +260,34 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
       }
     }
 
-    // Neuroglancer pyramids often use anisotropic scale steps (e.g. 2x2x1) for volumes whose
-    // Z resolution is coarser than XY. If we keep the default (1,1,1) scale, Z3DImg's LOD
-    // level scales become isotropic (2x2x2, 4x4x4, ...) and can drift from the dataset's
-    // available ratios, forcing extra network downloads + resampling.
+    // For datasets that provide physical voxel spacing, initialize the coordinate transform
+    // scale from voxel-size *ratios* (unitless). This improves both visual aspect and paging
+    // LOD behavior for anisotropic volumes (e.g. Z resolution coarser than XY).
     //
-    // To match Neuroglancer's intended downsampling behavior, initialize the coordinate
-    // transform scale from voxel size *ratios* (unitless), but only if the user hasn't
-    // already customized the scale.
-    if (imgPack.isNeuroglancerPrecomputed()) {
-      const glm::vec3 currentScale = m_rendererParameters.coordTransform.scale();
-      const bool isDefaultScale = glm::all(glm::epsilonEqual(currentScale, glm::vec3(1.f), 1e-6f));
-      const bool isPreviousAutoScale =
-        m_hasAutoVoxelAspectScale && glm::all(glm::epsilonEqual(currentScale, m_autoVoxelAspectScale, 1e-6f));
-      if (isDefaultScale || isPreviousAutoScale) {
-        const ZImgInfo& info = packFor3D->imgInfo();
-        if (info.voxelSizeUnit != VoxelSizeUnit::none && std::isfinite(info.voxelSizeX) &&
-            std::isfinite(info.voxelSizeY) && std::isfinite(info.voxelSizeZ) && info.voxelSizeX > 0.0 &&
-            info.voxelSizeY > 0.0 && info.voxelSizeZ > 0.0) {
-          const double xy = std::max(info.voxelSizeX, info.voxelSizeY);
-          const double zOverXY = info.voxelSizeZ / xy;
-          if (std::isfinite(zOverXY) && zOverXY > 0.0) {
-            const glm::vec3 suggestedScale(1.f, 1.f, static_cast<float>(zOverXY));
-            m_hasAutoVoxelAspectScale = true;
-            m_autoVoxelAspectScale = suggestedScale;
-            m_rendererParameters.coordTransform.setScale(suggestedScale);
-            LOG(INFO) << fmt::format(
-              "Neuroglancer 3D: using voxel-size aspect ratio for coordTransform scale: "
-              "voxelSize=({:.6g},{:.6g},{:.6g}) -> scale=(1,1,{:.6g})",
-              info.voxelSizeX,
-              info.voxelSizeY,
-              info.voxelSizeZ,
-              zOverXY);
-          }
+    // Only apply this auto-scale when the user has not customized the scale (or the current
+    // scale is the one we previously auto-applied).
+    const glm::vec3 currentScale = m_rendererParameters.coordTransform.scale();
+    const bool isDefaultScale = glm::all(glm::epsilonEqual(currentScale, glm::vec3(1.f), 1e-6f));
+    const bool isPreviousAutoScale =
+      m_hasAutoVoxelAspectScale && glm::all(glm::epsilonEqual(currentScale, m_autoVoxelAspectScale, 1e-6f));
+    if (isDefaultScale || isPreviousAutoScale) {
+      const ZImgInfo& info = packFor3D->imgInfo();
+      if (info.voxelSizeUnit != VoxelSizeUnit::none && std::isfinite(info.voxelSizeX) && std::isfinite(info.voxelSizeY) &&
+          std::isfinite(info.voxelSizeZ) && info.voxelSizeX > 0.0 && info.voxelSizeY > 0.0 && info.voxelSizeZ > 0.0) {
+        const double xy = std::max(info.voxelSizeX, info.voxelSizeY);
+        const double zOverXY = info.voxelSizeZ / xy;
+        if (std::isfinite(zOverXY) && zOverXY > 0.0) {
+          const glm::vec3 suggestedScale(1.f, 1.f, static_cast<float>(zOverXY));
+          m_hasAutoVoxelAspectScale = true;
+          m_autoVoxelAspectScale = suggestedScale;
+          m_rendererParameters.coordTransform.setScale(suggestedScale);
+          LOG(INFO) << fmt::format(
+            "3D: using voxel-size aspect ratio for coordTransform scale: "
+            "voxelSize=({:.6g},{:.6g},{:.6g}) -> scale=(1,1,{:.6g})",
+            info.voxelSizeX,
+            info.voxelSizeY,
+            info.voxelSizeZ,
+            zOverXY);
         }
       }
     }

@@ -572,6 +572,12 @@ struct ImgRaycasterPayload
   const std::vector<Z3DTransferFunction*>* transferFunctions = nullptr;
   std::vector<uint32_t> blockIdReadback;
   uint32_t blockIdAttachmentCount = 0u;
+  // If non-zero, caps how many block-ID attachments should be *processed* (compacted/read back)
+  // for missing-block discovery in progressive rendering. This is primarily a UX/perf knob:
+  // fewer attachments reduces per-round latency (especially when paging requires slow I/O)
+  // at the cost of requiring more rounds to converge. The block-ID pass may still render to more
+  // attachments depending on backend/shader constraints.
+  uint32_t blockIdEffectiveAttachmentCount = 0u;
   uint32_t roundsRemaining = 0u;
   uint32_t progressiveGeneration = 0u;
 

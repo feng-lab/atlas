@@ -1062,8 +1062,14 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
     return;
   }
   const uint32_t attachmentCount = std::max<uint32_t>(1u, payload.blockIdLease->attachments);
-  CHECK_LE(attachmentCount, 8u) << "Unified BlockList header supports up to 8 attachments";
-  ensureBlockIdCompactionPipeline(attachmentCount, mode);
+  CHECK_LE(attachmentCount, 8u) << "Block-ID compaction supports up to 8 attachments";
+  uint32_t effectiveAttachmentCount = attachmentCount;
+  if (payload.blockIdEffectiveAttachmentCount != 0u) {
+    effectiveAttachmentCount =
+      std::min<uint32_t>(attachmentCount, std::max<uint32_t>(1u, payload.blockIdEffectiveAttachmentCount));
+  }
+  CHECK_LE(effectiveAttachmentCount, 8u) << "Unified BlockList header supports up to 8 attachments";
+  ensureBlockIdCompactionPipeline(effectiveAttachmentCount, mode);
   uint32_t imgW = firstBlock->width();
   uint32_t imgH = firstBlock->height();
   // Optional: dual probe (sampled + storage) and skip normal compaction
@@ -1114,7 +1120,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
   // Iterate every Block-ID attachment and dispatch compaction on each.
   // Allocate a fresh override descriptor set per attachment to avoid updating a bound set.
 
-  for (uint32_t att = 0; att < attachmentCount; ++att) {
+  for (uint32_t att = 0; att < effectiveAttachmentCount; ++att) {
     processEventsAndMaybeCancel(cancellationToken);
     ZVulkanTexture* blockTex = payload.blockIdLease->colorAttachment(att);
     if (!blockTex) {
@@ -1297,7 +1303,7 @@ void ZVulkanImgRaycasterPipelineContext::recordBlockIdCompaction(Z3DRendererBase
                                                  streamKey = payload.streamKey,
                                                  eye = batch.eye,
                                                  channelCount = static_cast<uint32_t>(payload.visibleChannels.size()),
-                                                 attCount = attachmentCount,
+                                                 attCount = effectiveAttachmentCount,
                                                  channelIndex = resolvedChannelIndex,
                                                  channelIndexRaw = static_cast<uint32_t>(payload.channelIndexRaw),
                                                  imagePtr = payload.image]() {
