@@ -96,6 +96,11 @@ jobs:
           fetch-depth: 1
           submodules: recursive
 
+      - name: Load CI env (masked)
+        uses: ./.github/actions/load-dotenv
+        with:
+          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
+
       - name: Prepare macOS environment
         uses: ./.github/actions/macos-env
         with:

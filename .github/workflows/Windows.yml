@@ -64,6 +64,11 @@ jobs:
           fetch-depth: 1
           submodules: recursive
 
+      - name: Load CI env (masked)
+        uses: ./.github/actions/load-dotenv
+        with:
+          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
+
       - name: Cache 3rdparty build (part 1)
         id: cache-extlibs-p1
         uses: actions/cache@v4
@@ -268,6 +273,11 @@ jobs:
           ref: ${{ github.event_name == 'create' && github.event.ref || github.ref }}
           fetch-depth: 1
           submodules: recursive
+
+      - name: Load CI env (masked)
+        uses: ./.github/actions/load-dotenv
+        with:
+          dotenv: ${{ secrets.ATLAS_ENV_LOCAL }}
 
       - name: Ensure Perl
         shell: pwsh
