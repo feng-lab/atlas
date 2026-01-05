@@ -180,6 +180,16 @@ public:
 
   void releaseBackendResources() override
   {
+    // Backend switches invalidate scratch-pool resources (entry/exit, progressive
+    // layer targets, accumulators) and also invalidate the progressive bookkeeping
+    // that depends on their contents. If we keep m_channelIdx/m_round across the
+    // switch, the Vulkan progressive path may skip its round-0 clears and blend
+    // against uninitialized accumulators, producing over-saturated output.
+    //
+    // Resetting here ensures the next frame starts a fresh progressive cycle on
+    // the newly-selected backend (matches the "start from Vulkan" behavior).
+    releaseScratchResources();
+
     // Clear GL cache; textures will be deleted with unique_ptr
     m_transferCache.textures.clear();
     m_transferCache.meta.clear();

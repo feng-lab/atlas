@@ -9,6 +9,7 @@
 #include <folly/CancellationToken.h>
 #include <set>
 #include <functional>
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
@@ -225,7 +226,10 @@ public:
 
   [[nodiscard]] glm::vec3 imageAddressToNormalizedTextureCoord(size_t channel) const
   {
-    const auto dimension = m_channelImageCacheTextures[channel]->dimension();
+    (void)channel;
+    const glm::uvec3 dimension = imageCacheSize();
+    CHECK(dimension.x > 0u && dimension.y > 0u && dimension.z > 0u)
+      << "dimension=(" << dimension.x << "," << dimension.y << "," << dimension.z << ")";
     return 1.f / glm::vec3(dimension);
   }
 
@@ -325,6 +329,8 @@ protected:
 
   void resetCacheSystem(size_t c);
 
+  void ensureGLPagingTexturesForChannel(size_t c);
+
 protected:
   const glm::uvec3 m_pageTableBlockSize = glm::uvec3(32, 32, 32);
   glm::uvec3 m_pageTableCacheNumBlocks;
@@ -351,6 +357,7 @@ protected:
   std::vector<std::unique_ptr<Z3DBlockCache<glm::uvec4>>> m_channelPageTableCacheManagers;
   std::vector<std::unique_ptr<Z3DTexture>> m_channelImageCacheTextures;
   std::vector<std::unique_ptr<Z3DBlockCache<glm::uvec4>>> m_channelImageCacheManagers;
+  std::vector<uint8_t> m_glPagingTexturesDirty;
   std::vector<uint64_t> m_volumeGenerations;
 
   size_t m_numLevels = 1;
@@ -373,6 +380,7 @@ private:
   {
     std::shared_ptr<const ZImg> image;
     std::unique_ptr<Z3DTexture> texture;
+    uint64_t textureGeneration = 0;
     glm::uvec3 dimensions{0u, 0u, 0u};
   };
 

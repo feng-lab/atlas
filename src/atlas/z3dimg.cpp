@@ -227,11 +227,15 @@ std::shared_ptr<const ZImg> Z3DImg::channelImageShared(size_t c) const
 Z3DTexture* Z3DImg::channelTexture(size_t c) const
 {
   CHECK_LT(c, m_channelResources.size());
-  if (!m_channelResources[c].texture && m_channelResources[c].image) {
-    // Lazily create GL texture for this channel if needed
-    const_cast<Z3DImg*>(this)->m_channelResources[c].texture = createChannelTexture(*m_channelResources[c].image);
+  auto& channel = const_cast<Z3DImg*>(this)->m_channelResources[c];
+  CHECK(channel.image != nullptr);
+  const uint64_t generation = c < m_volumeGenerations.size() ? m_volumeGenerations[c] : 0;
+  if (!channel.texture || channel.textureGeneration != generation) {
+    channel.texture = createChannelTexture(*channel.image);
+    CHECK(channel.texture != nullptr) << "Failed to create channel texture.";
+    channel.textureGeneration = generation;
   }
-  return m_channelResources[c].texture.get();
+  return channel.texture.get();
 }
 
 glm::uvec3 Z3DImg::channelDimensions(size_t c) const
@@ -549,7 +553,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
   m_hasSufficientPageTableCacheSpace =
     m_pageTableCacheNumBlocks.x * m_pageTableCacheNumBlocks.y * m_pageTableCacheNumBlocks.z >= numPageTableBlocks;
 
-  auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
+  const auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
   m_imageCacheNumBlocks = glm::uvec3(0);
   for (size_t z = 1; z <= 2048_u32 / imageBlockTotalSize.z; ++z) {
     for (size_t y = z; y <= 2048_u32 / imageBlockTotalSize.y; ++y) {
@@ -573,71 +577,69 @@ void Z3DImg::setScale(const glm::vec3& scale)
     }
   }
   m_pageTableCacheSize = m_pageTableCacheNumBlocks * m_pageTableBlockSize;
-  auto imageCacheSize = m_imageCacheNumBlocks * imageBlockTotalSize;
+  const glm::uvec3 imageCacheDimensions = m_imageCacheNumBlocks * imageBlockTotalSize;
   LOG(INFO) << "maxMemoryForImageCache: " << m_maxMemoryForImageCache
             << " maxMemoryForPageTableCache: " << m_maxMemoryForPageTableCache;
-  LOG(INFO) << "imageCacheSize: " << imageCacheSize << " imageCacheNumBlocks: " << m_imageCacheNumBlocks
+  LOG(INFO) << "imageCacheSize: " << imageCacheDimensions << " imageCacheNumBlocks: " << m_imageCacheNumBlocks
             << " pageTableCacheSize: " << m_pageTableCacheSize
             << " pageTableCacheNumBlocks: " << m_pageTableCacheNumBlocks;
 
+  // CPU paging state is backend-neutral and always required for paging decisions.
+  // GPU-resident paging caches (OpenGL textures / Vulkan textures) are backend-specific.
   if (m_channelPageDirectories.size() != m_nChannels) {
     m_channelPageDirectories.resize(m_nChannels);
-    m_channelPageDirectoryTextures.resize(m_nChannels);
-
+  }
+  if (m_channelPageTableCacheManagers.size() != m_nChannels) {
     m_channelPageTableCacheManagers.resize(m_nChannels);
+  }
+  if (m_channelPageTableCaches.size() != m_nChannels) {
     m_channelPageTableCaches.resize(m_nChannels);
-    m_channelPageTableCacheTextures.resize(m_nChannels);
-
+  }
+  if (m_channelImageCacheManagers.size() != m_nChannels) {
     m_channelImageCacheManagers.resize(m_nChannels);
+  }
+
+  // Keep GL-side vectors sized, but do not create/destroy GL resources here.
+  // setScale() can be called while Vulkan is the active backend.
+  if (m_channelPageDirectoryTextures.size() < m_nChannels) {
+    m_channelPageDirectoryTextures.resize(m_nChannels);
+  }
+  if (m_channelPageTableCacheTextures.size() < m_nChannels) {
+    m_channelPageTableCacheTextures.resize(m_nChannels);
+  }
+  if (m_channelImageCacheTextures.size() < m_nChannels) {
     m_channelImageCacheTextures.resize(m_nChannels);
   }
+  if (m_glPagingTexturesDirty.size() < m_nChannels) {
+    m_glPagingTexturesDirty.resize(m_nChannels, true);
+  }
+
   for (size_t c = 0; c < m_nChannels; ++c) {
-    // page directory
+    // page directory (CPU)
     m_channelPageDirectories[c].resize(size_t(m_pageDirectorySize.x) * m_pageDirectorySize.y * m_pageDirectorySize.z);
     std::ranges::fill(m_channelPageDirectories[c], glm::uvec4(0));
-    if (!m_channelPageDirectoryTextures[c] || m_channelPageDirectoryTextures[c]->dimension() != m_pageDirectorySize) {
-      m_channelPageDirectoryTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
-                                                                       GLint(GL_RGBA32UI),
-                                                                       m_pageDirectorySize,
-                                                                       GL_RGBA_INTEGER,
-                                                                       GL_UNSIGNED_INT,
-                                                                       m_channelPageDirectories[c].data(),
-                                                                       GLint(GL_NEAREST),
-                                                                       GLint(GL_NEAREST));
-    }
 
-    // page table
+    // page table (CPU)
     m_channelPageTableCacheManagers[c] =
       std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, m_invalidKey);
     m_channelPageTableCaches[c].resize(size_t(m_pageTableCacheSize.x) * m_pageTableCacheSize.y *
                                        m_pageTableCacheSize.z);
     std::ranges::fill(m_channelPageTableCaches[c], glm::uvec4(0));
-    if (!m_channelPageTableCacheTextures[c] ||
-        m_channelPageTableCacheTextures[c]->dimension() != m_pageTableCacheSize) {
-      m_channelPageTableCacheTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
-                                                                        GLint(GL_RGBA32UI),
-                                                                        m_pageTableCacheSize,
-                                                                        GL_RGBA_INTEGER,
-                                                                        GL_UNSIGNED_INT,
-                                                                        m_channelPageTableCaches[c].data(),
-                                                                        GLint(GL_NEAREST),
-                                                                        GLint(GL_NEAREST));
-    }
 
-    // image cache
+    // image cache (CPU bookkeeping)
     m_channelImageCacheManagers[c] =
       std::make_unique<Z3DBlockCache<glm::uvec4>>(imageBlockTotalSize, m_imageCacheNumBlocks, m_invalidKey);
-    if (!m_channelImageCacheTextures[c] || m_channelImageCacheTextures[c]->dimension() != imageCacheSize) {
-      m_channelImageCacheTextures[c] = std::make_unique<Z3DTexture>(GLint(GL_R8),
-                                                                    imageCacheSize,
-                                                                    GL_RED,
-                                                                    GL_UNSIGNED_BYTE,
-                                                                    nullptr,
-                                                                    GLint(GL_LINEAR),
-                                                                    GLint(GL_LINEAR),
-                                                                    GLint(GL_CLAMP_TO_BORDER));
-      m_channelImageCacheTextures[c]->clearImage();
-    }
+
+    // Any existing GL paging textures are now out-of-date with the CPU paging state.
+    // Mark them dirty so OpenGL-only call sites can recreate/rehydrate them lazily
+    // under a valid GL context.
+    m_glPagingTexturesDirty[c] = true;
+  }
+
+  // If Vulkan paging uploader is active, its per-image resources depend on the
+  // computed cache dimensions; update them proactively.
+  if (m_vulkanImageBlockUploader) {
+    m_vulkanImageBlockUploader->ensureImageResources(*this);
   }
 
   for (size_t l = 0; l < m_numLevels; ++l) {
@@ -668,6 +670,10 @@ void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRange
 
 void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const
 {
+  const_cast<Z3DImg*>(this)->ensureGLPagingTexturesForChannel(c);
+  CHECK(m_channelPageDirectoryTextures[c] != nullptr);
+  CHECK(m_channelPageTableCacheTextures[c] != nullptr);
+
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
   shader.setUniform("page_table_block_size", m_pageTableBlockSize);
   shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
@@ -681,6 +687,11 @@ void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const
 
 void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
 {
+  const_cast<Z3DImg*>(this)->ensureGLPagingTexturesForChannel(c);
+  CHECK(m_channelPageDirectoryTextures[c] != nullptr);
+  CHECK(m_channelPageTableCacheTextures[c] != nullptr);
+  CHECK(m_channelImageCacheTextures[c] != nullptr);
+
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
   shader.setUniform("page_table_block_size", m_pageTableBlockSize);
   shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
@@ -706,6 +717,10 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   if (missingBlockIDs.empty()) {
     LOG(INFO) << "no missing blocks";
     return true;
+  }
+
+  if (!m_vulkanImageBlockUploader) {
+    ensureGLPagingTexturesForChannel(c);
   }
 
   if (VLOG_IS_ON(1) && c < m_lastPagingLodStatsLogTimes.size()) {
@@ -1005,8 +1020,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
 void Z3DImg::readVolumes()
 {
-  m_channelResources.clear();
-  m_channelResources.resize(m_nChannels);
+  if (m_channelResources.size() != m_nChannels) {
+    m_channelResources.resize(m_nChannels);
+  }
 
   if (m_volumeGenerations.size() != m_nChannels) {
     m_volumeGenerations.assign(m_nChannels, 0);
@@ -1027,8 +1043,6 @@ void Z3DImg::readVolumes()
     channel.dimensions = glm::uvec3(static_cast<uint32_t>(channel.image->width()),
                                     static_cast<uint32_t>(channel.image->height()),
                                     static_cast<uint32_t>(channel.image->depth()));
-    channel.texture = createChannelTexture(*channel.image);
-    CHECK(channel.texture != nullptr) << "Failed to create channel texture.";
     ++m_volumeGenerations[0];
   } else {
     for (size_t i = 0; i < m_nChannels; ++i) {
@@ -1045,8 +1059,6 @@ void Z3DImg::readVolumes()
       channel.dimensions = glm::uvec3(static_cast<uint32_t>(channel.image->width()),
                                       static_cast<uint32_t>(channel.image->height()),
                                       static_cast<uint32_t>(channel.image->depth()));
-      channel.texture = createChannelTexture(*channel.image);
-      CHECK(channel.texture != nullptr) << "Failed to create channel texture.";
       ++m_volumeGenerations[i];
     }
   }
@@ -1090,9 +1102,68 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
 
 void Z3DImg::releaseGLResources()
 {
+  // Release GL-only helper objects as well (e.g. PBO used for paging uploads).
+  // These are tied to the active GL context and must not survive backend switches
+  // that destroy/recreate the context.
+  m_PBO.reset();
+
+  // When switching away from OpenGL, the resident full-resolution paging cache
+  // contents (image blocks) live only in GL textures. The CPU page directory /
+  // page table arrays encode *where* blocks are mapped, but not the underlying
+  // voxel data. If we keep those mappings after releasing GL textures, a
+  // different backend (Vulkan) may incorrectly assume blocks are resident and
+  // skip re-paging, which leads to sampling undefined image-cache contents.
+  //
+  // Fix: clear paging state so the next backend repopulates caches on demand.
+  if (m_isVolumeDownsampled) {
+    const size_t expectedPageDirectoryEntries =
+      size_t(m_pageDirectorySize.x) * m_pageDirectorySize.y * m_pageDirectorySize.z;
+    const size_t expectedPageTableEntries =
+      size_t(m_pageTableCacheSize.x) * m_pageTableCacheSize.y * m_pageTableCacheSize.z;
+    const glm::uvec3 imageBlockTotal = m_imageBlockSize + m_imageBlockSizePad;
+
+    VLOG(1) << "Clearing paging CPU state for backend switch: channels=" << m_nChannels
+            << ", pageDirectoryEntries=" << expectedPageDirectoryEntries << " (" << m_pageDirectorySize << ")"
+            << ", pageTableEntries=" << expectedPageTableEntries << " (" << m_pageTableCacheSize << ")"
+            << ", imageCacheSize=" << (m_imageCacheNumBlocks * imageBlockTotal) << " (blocks " << m_imageCacheNumBlocks
+            << ", blockExtent " << imageBlockTotal << ")";
+
+    // Keep vectors sized correctly and zero-filled for all channels.
+    if (m_channelPageDirectories.size() != m_nChannels) {
+      m_channelPageDirectories.resize(m_nChannels);
+    }
+    if (m_channelPageTableCaches.size() != m_nChannels) {
+      m_channelPageTableCaches.resize(m_nChannels);
+    }
+    if (m_channelPageTableCacheManagers.size() != m_nChannels) {
+      m_channelPageTableCacheManagers.resize(m_nChannels);
+    }
+    if (m_channelImageCacheManagers.size() != m_nChannels) {
+      m_channelImageCacheManagers.resize(m_nChannels);
+    }
+
+    for (size_t c = 0; c < m_nChannels; ++c) {
+      m_channelPageDirectories[c].resize(expectedPageDirectoryEntries);
+      std::ranges::fill(m_channelPageDirectories[c], glm::uvec4(0));
+
+      m_channelPageTableCaches[c].resize(expectedPageTableEntries);
+      std::ranges::fill(m_channelPageTableCaches[c], glm::uvec4(0));
+
+      m_channelPageTableCacheManagers[c] =
+        std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, m_invalidKey);
+      m_channelImageCacheManagers[c] =
+        std::make_unique<Z3DBlockCache<glm::uvec4>>(imageBlockTotal, m_imageCacheNumBlocks, m_invalidKey);
+    }
+
+#ifdef ATLAS_CHECK_CACHE
+    m_usedPageTableEntry.clear();
+#endif
+  }
+
   // Release per-channel GL textures
   for (auto& ch : m_channelResources) {
     ch.texture.reset();
+    ch.textureGeneration = 0;
   }
   // Release paging-related GL textures (if any)
   for (auto& tex : m_channelPageDirectoryTextures) {
@@ -1306,6 +1377,9 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     VLOG(3) << "using Vulkan image block uploader";
     return m_vulkanImageBlockUploader->readAndUploadImageBlocks(*this, c, pendingTasks, cancellationToken, bt);
   }
+
+  ensureGLPagingTexturesForChannel(c);
+  CHECK(m_channelImageCacheTextures[c] != nullptr);
 
   size_t emptyBlockCount = 0;
 
@@ -1712,17 +1786,95 @@ void Z3DImg::resetCacheSystem(size_t c)
   // The caller (updateAndUploadPageDirectoryCaches) will upload page caches via
   // the Vulkan path after rebuilding tasks, keeping GL/Vulkan separation intact.
   if (!m_vulkanImageBlockUploader) {
+    ensureGLPagingTexturesForChannel(c);
     m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
     m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
   }
+}
+
+void Z3DImg::ensureGLPagingTexturesForChannel(size_t c)
+{
+  CHECK(m_isVolumeDownsampled);
+  CHECK_LT(c, m_nChannels);
+  CHECK(m_vulkanImageBlockUploader == nullptr) << "GL paging textures requested while Vulkan uploader is active";
+
+  if (m_glPagingTexturesDirty.size() < m_nChannels) {
+    m_glPagingTexturesDirty.resize(m_nChannels, true);
+  }
+  if (m_channelPageDirectoryTextures.size() < m_nChannels) {
+    m_channelPageDirectoryTextures.resize(m_nChannels);
+  }
+  if (m_channelPageTableCacheTextures.size() < m_nChannels) {
+    m_channelPageTableCacheTextures.resize(m_nChannels);
+  }
+  if (m_channelImageCacheTextures.size() < m_nChannels) {
+    m_channelImageCacheTextures.resize(m_nChannels);
+  }
+
+  CHECK_LT(c, m_channelPageDirectories.size());
+  CHECK_LT(c, m_channelPageTableCaches.size());
+
+  CHECK(m_pageDirectorySize.x > 0u && m_pageDirectorySize.y > 0u && m_pageDirectorySize.z > 0u) << m_pageDirectorySize;
+  CHECK(m_pageTableCacheSize.x > 0u && m_pageTableCacheSize.y > 0u && m_pageTableCacheSize.z > 0u) << m_pageTableCacheSize;
+
+  const glm::uvec3 imageBlockTotal = m_imageBlockSize + m_imageBlockSizePad;
+  const glm::uvec3 imageCacheDimensions = m_imageCacheNumBlocks * imageBlockTotal;
+  CHECK(imageCacheDimensions.x > 0u && imageCacheDimensions.y > 0u && imageCacheDimensions.z > 0u) << imageCacheDimensions;
+
+  const bool shouldRecreate = m_glPagingTexturesDirty[c] != 0u;
+  if (shouldRecreate) {
+    m_channelPageDirectoryTextures[c].reset();
+    m_channelPageTableCacheTextures[c].reset();
+    m_channelImageCacheTextures[c].reset();
+  }
+
+  if (!m_channelPageDirectoryTextures[c] || m_channelPageDirectoryTextures[c]->dimension() != m_pageDirectorySize) {
+    m_channelPageDirectoryTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
+                                                                     GLint(GL_RGBA32UI),
+                                                                     m_pageDirectorySize,
+                                                                     GL_RGBA_INTEGER,
+                                                                     GL_UNSIGNED_INT,
+                                                                     m_channelPageDirectories[c].data(),
+                                                                     GLint(GL_NEAREST),
+                                                                     GLint(GL_NEAREST));
+  }
+
+  if (!m_channelPageTableCacheTextures[c] || m_channelPageTableCacheTextures[c]->dimension() != m_pageTableCacheSize) {
+    m_channelPageTableCacheTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
+                                                                      GLint(GL_RGBA32UI),
+                                                                      m_pageTableCacheSize,
+                                                                      GL_RGBA_INTEGER,
+                                                                      GL_UNSIGNED_INT,
+                                                                      m_channelPageTableCaches[c].data(),
+                                                                      GLint(GL_NEAREST),
+                                                                      GLint(GL_NEAREST));
+  }
+
+  if (!m_channelImageCacheTextures[c] || m_channelImageCacheTextures[c]->dimension() != imageCacheDimensions) {
+    m_channelImageCacheTextures[c] = std::make_unique<Z3DTexture>(GLint(GL_R8),
+                                                                  imageCacheDimensions,
+                                                                  GL_RED,
+                                                                  GL_UNSIGNED_BYTE,
+                                                                  nullptr,
+                                                                  GLint(GL_LINEAR),
+                                                                  GLint(GL_LINEAR),
+                                                                  GLint(GL_CLAMP_TO_BORDER));
+    m_channelImageCacheTextures[c]->clearImage();
+  }
+
+  m_glPagingTexturesDirty[c] = 0u;
 }
 
 void Z3DImg::rebuildGLPagingResources()
 {
   // Recreate GL paging textures for all channels and reset CPU arrays to zero-filled state.
   // Page sizes and block counts are assumed already computed (constructor/setScale path).
+  //
+  // Backend switches may destroy and recreate the OpenGL context; drop any GL object
+  // wrappers that cache names from a previous context (e.g. PBO).
+  m_PBO.reset();
 
-  auto imageBlockTotal = m_imageBlockSize + m_imageBlockSizePad;
+  const auto imageBlockTotal = m_imageBlockSize + m_imageBlockSizePad;
   const glm::uvec3 imageCacheSize = m_imageCacheNumBlocks * imageBlockTotal;
 
   // Ensure vectors are sized correctly
@@ -1746,6 +1898,11 @@ void Z3DImg::rebuildGLPagingResources()
   }
   if (m_channelImageCacheManagers.size() != m_nChannels) {
     m_channelImageCacheManagers.resize(m_nChannels);
+  }
+  if (m_glPagingTexturesDirty.size() != m_nChannels) {
+    m_glPagingTexturesDirty.assign(m_nChannels, 0u);
+  } else {
+    std::ranges::fill(m_glPagingTexturesDirty, 0u);
   }
 
   for (size_t c = 0; c < m_nChannels; ++c) {
@@ -1791,6 +1948,7 @@ void Z3DImg::rebuildGLPagingResources()
                                                                   GLint(GL_LINEAR),
                                                                   GLint(GL_CLAMP_TO_BORDER));
     m_channelImageCacheTextures[c]->clearImage();
+    m_glPagingTexturesDirty[c] = 0u;
   }
   setVulkanImageBlockUploader(nullptr); // reset Vulkan uploader if any
   VLOG(2) << "rebuildGLPagingResources finished";
