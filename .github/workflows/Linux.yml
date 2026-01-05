@@ -546,6 +546,12 @@ jobs:
           cd "$GITHUB_WORKSPACE/deploy"
           retry 5 5 60 rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
           retry 5 5 60 rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+          schemaDir="$GITHUB_WORKSPACE/src/atlas/Resources/json/atlas"
+          retry 5 5 60 rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" \
+            "$schemaDir/animation3d.schema.json" \
+            "$schemaDir/capabilities.json" \
+            "$schemaDir/supported_file_formats.json" \
+            $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
 
       - name: Deploy artifacts (secondary target)
         shell: bash -l {0}
@@ -582,6 +588,12 @@ jobs:
           cd "$GITHUB_WORKSPACE/deploy"
           retry 5 5 60 rsync -avv --delete -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/
           retry 5 5 60 rsync -tvv -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
+          schemaDir="$GITHUB_WORKSPACE/src/atlas/Resources/json/atlas"
+          retry 5 5 60 rsync -tvv -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" \
+            "$schemaDir/animation3d.schema.json" \
+            "$schemaDir/capabilities.json" \
+            "$schemaDir/supported_file_formats.json" \
+            $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
 
       - name: Publish atlas-agent to PyPI
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
