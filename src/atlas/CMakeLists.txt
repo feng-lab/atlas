@@ -513,6 +513,8 @@ set(SOURCES
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
     zneuroglancerprecomputedmesh.h zneuroglancerprecomputedmesh.cpp
     zneuroglancerprecomputedsegmentproperties.h zneuroglancerprecomputedsegmentproperties.cpp
+    zneuroglancersegmentpropertiesdialog.h zneuroglancersegmentpropertiesdialog.cpp
+    zneuroglancersegmentpropertiesmodel.h zneuroglancersegmentpropertiesmodel.cpp
     zneuroglancerprecomputedchunkdecoder.h zneuroglancerprecomputedchunkdecoder.cpp
     zneuroglanceruint64sharding.h zneuroglanceruint64sharding.cpp
     zproxygenhttpclient.h zproxygenhttpclient.cpp

@@ -621,7 +621,7 @@ jobs:
           conda activate atlas-ci
           set -euo pipefail
           # Ensure build backend is available (redundant if Install conda tooling ran in this job)
-          python -m pip install --no-cache-dir build twine
+          python -m pip install --no-cache-dir build twine auditwheel
           if [ -n "${ANACONDA_API_TOKEN:-}" ]; then
             conda config --set anaconda_upload yes
           fi

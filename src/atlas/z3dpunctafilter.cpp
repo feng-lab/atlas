@@ -131,6 +131,7 @@ void Z3DPunctaFilter::setData(ZPunctaPack& puncta)
   CHECK(!m_punctaPack);
   m_punctaPack = &puncta;
   updateData();
+  initializeRotationCenterIfDefault();
 
   connect(m_punctaPack, &ZPunctaPack::selectionChanged, this, &Z3DPunctaFilter::invalidateResult);
   connect(this, &Z3DPunctaFilter::punctumSelected, m_punctaPack, &ZPunctaPack::onPunctumSelected);
@@ -288,9 +289,6 @@ void Z3DPunctaFilter::prepareData()
                                         punctum->maxIntensity() / 255.f,
                                         punctum->maxIntensity() / 2.f);
   }
-
-  initializeCutRange();
-  initializeRotationCenter();
 
   m_sphereRenderer.setData(&m_pointAndRadius, &m_specularAndShininess);
   prepareColor();

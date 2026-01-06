@@ -22,8 +22,6 @@ double Z3DRegionAnnotationFilter::process(Z3DEye eye)
 {
   syncRendererState();
 
-  initializeCutRange();
-  initializeRotationCenter();
   for (const auto& idFilter : m_idToMeshFilters) {
     idFilter.second->process(eye);
   }
@@ -196,6 +194,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
   invalidateResult();
 
   updateBoundBox();
+  initializeRotationCenterIfDefault();
 
   if (m_widgetsGroup) {
     m_viewSettingTreeModel =

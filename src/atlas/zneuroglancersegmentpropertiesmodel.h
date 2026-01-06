@@ -1,0 +1,54 @@
+#pragma once
+
+#include "zneuroglancerprecomputedsegmentproperties.h"
+
+#include <QAbstractTableModel>
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+
+namespace nim {
+
+class ZNeuroglancerSegmentPropertiesModel : public QAbstractTableModel
+{
+  Q_OBJECT
+
+public:
+  enum class Column
+  {
+    Id = 0,
+    Label = 1,
+    Description = 2,
+    Tags = 3,
+    Count = 4,
+  };
+
+  explicit ZNeuroglancerSegmentPropertiesModel(std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> props,
+                                              QObject* parent = nullptr);
+
+  [[nodiscard]] int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+
+  [[nodiscard]] int columnCount(const QModelIndex& parent = QModelIndex()) const override;
+
+  [[nodiscard]] QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+
+  [[nodiscard]] QVariant headerData(int section,
+                                    Qt::Orientation orientation,
+                                    int role = Qt::DisplayRole) const override;
+
+  [[nodiscard]] std::optional<uint64_t> segmentIdForRow(int row) const;
+
+private:
+  [[nodiscard]] static QString columnName(Column c);
+
+private:
+  std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> m_props;
+
+  const ZNeuroglancerPrecomputedSegmentProperties::Property* m_labelProp = nullptr;
+  const ZNeuroglancerPrecomputedSegmentProperties::Property* m_descriptionProp = nullptr;
+  const ZNeuroglancerPrecomputedSegmentProperties::Property* m_tagsProp = nullptr;
+};
+
+} // namespace nim
+

@@ -130,6 +130,7 @@ void Z3DMeshFilter::setData(std::vector<ZMesh*>* meshList)
   invalidateResult();
 
   updateBoundBox();
+  initializeRotationCenterIfDefault();
 }
 
 bool Z3DMeshFilter::isReady(Z3DEye eye) const
@@ -255,9 +256,6 @@ void Z3DMeshFilter::prepareData()
   }
 
   deregisterPickingObjects();
-
-  initializeCutRange();
-  initializeRotationCenter();
 
   m_triangleListRenderer.setData(&m_meshList);
   prepareColor();

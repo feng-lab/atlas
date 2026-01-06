@@ -764,6 +764,69 @@ double Z3DCompositor::processGL(Z3DEye eye)
     return filter && filter->isReady(eye) && filter->hasTransparent(eye);
   });
 
+  // Debug aid: during incremental mesh streaming we occasionally observe frames where the
+  // volume appears missing even though the image filter is in the pipeline. The compositor
+  // chooses the geometry-only path when `anyVolumeReady == false`; log that decision (and
+  // per-volume readiness) on transitions and when volumes are unexpectedly not ready.
+  //
+  // Rate-limited to avoid flooding logs in normal interactive use.
+  {
+    static std::optional<bool> s_lastAnyVolumeReady;
+    static auto s_lastLogTime = std::chrono::steady_clock::now() - std::chrono::hours(24);
+    constexpr auto kLogInterval = std::chrono::milliseconds(750);
+
+    const bool changed = !s_lastAnyVolumeReady || (*s_lastAnyVolumeReady != anyVolumeReady);
+    const bool unexpectedNoVolume = (!anyVolumeReady && !vFilters.empty());
+    const auto now = std::chrono::steady_clock::now();
+    if ((changed || unexpectedNoVolume) && (now - s_lastLogTime) > kLogInterval) {
+      s_lastAnyVolumeReady = anyVolumeReady;
+      s_lastLogTime = now;
+
+      VLOG(1) << fmt::format("Z3DCompositor volume decision (GL): anyVolumeReady={} volFilters={} geomFilters={} eye={}",
+                             anyVolumeReady,
+                             vFilters.size(),
+                             filters.size(),
+                             static_cast<int>(eye));
+      if (VLOG_IS_ON(2)) {
+        size_t readyCount = 0;
+        size_t transparentCount = 0;
+        size_t hasImageCount = 0;
+        for (size_t i = 0; i < vFilters.size(); ++i) {
+          const Z3DImgFilter* vf = vFilters[i];
+          if (!vf) {
+            VLOG(2) << fmt::format("  vol[{}]: <null>", i);
+            continue;
+          }
+          const bool ready = vf->isReady(eye);
+          const bool valid = vf->isValid(eye);
+          const bool hasImage = vf->hasImage();
+          const bool hasTrans = vf->hasTransparent(eye);
+          // `m_transparentValid` is the internal flag backing hasTransparent().
+          const bool transValid = vf->m_transparentValid[static_cast<size_t>(eye)];
+          readyCount += ready ? 1u : 0u;
+          transparentCount += hasTrans ? 1u : 0u;
+          hasImageCount += hasImage ? 1u : 0u;
+
+          VLOG(2) << fmt::format(
+            "  vol[{}]: {} ptr={} ready={} valid={} hasImage={} hasTransparent={} transparentValid={} stayOnTop={}",
+            i,
+            vf->className().toStdString(),
+            (const void*)vf,
+            ready,
+            valid,
+            hasImage,
+            hasTrans,
+            transValid,
+            vf->isStayOnTop());
+        }
+        VLOG(2) << fmt::format("  summary: ready={} hasImage={} hasTransparent={}",
+                               readyCount,
+                               hasImageCount,
+                               transparentCount);
+      }
+    }
+  }
+
   glEnable(GL_DEPTH_TEST);
 
   if (transparencyMode == TransparencyMode::BlendNoDepthMask || transparencyMode == TransparencyMode::BlendDelayed) {

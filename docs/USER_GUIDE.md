@@ -310,13 +310,17 @@ Steps to load and manage images via `ZImgDoc`:
    6. Current limitations: read-only dataset. Supported chunk encodings are `raw`, `jpeg` (uint8, 1 or 3 channels), `png` (unsigned 1–2 bytes/voxel, 1–4 channels), `compresso` (unsigned 1/2/4/8 bytes/voxel, 1 channel), and `compressed_segmentation` (uint32/uint64 segmentation). Sharded volumes require an HTTP server that supports `Range` requests.
    7. Segmentation datasets (`type=segmentation`) default to **Voxel Display → Segmentation Labels** (stable pseudo‑random colors per label ID). You can switch back to intensity rendering via the Object View Setting dock.
    8. For segmentation datasets, Atlas also supports optional Neuroglancer metadata:
-	      - **Segment Properties**: if the dataset has a `segment_properties/` directory, Atlas loads it on demand when needed (e.g. for labeling mesh tooltips or bulk mesh import). Some public datasets do not provide this metadata.
+	      - **Segment Properties**: if the dataset has a `segment_properties/` directory, Atlas can load and browse it from the 2D slice view (right‑click) via **Show Neuroglancer Segment Properties…**. Some public datasets do not provide this metadata.
+	        - When segment properties are loaded, Atlas augments hover readouts (status bar) with the segment’s **Label** and **Description** (when available).
 	      - **Meshes**: if the dataset has a `mesh/` directory, you can import segmentation meshes from the 2D slice view (right‑click) using:
 	        - **Copy Neuroglancer Segment ID Under Cursor**
 	        - **Load Neuroglancer Mesh for Segment Under Cursor**
+	        - **Load Neuroglancer Mesh for Segment ID…** (manual ID entry; clipboard auto‑prefill if it contains a single uint64)
+	        - **Load Neuroglancer Meshes for Segment IDs from Clipboard…** (extracts IDs, de‑duplicates, and loads them)
+	        - **Load Neuroglancer Meshes for Visible Segments (cached)…** (collects segment IDs from cached tiles in the current viewport *at the target LOD for the current zoom*; coarse fallback tiles are ignored. ID 0 is treated as background and ignored.)
 	        - **Load Neuroglancer Meshes for All Segments (segment_properties)…** (can be very slow and memory heavy)
 	        Mesh import is progressive: Atlas loads a coarse mesh first, then refines to the finest available LOD by replacing mesh geometry in-place.
-	        Note: these actions only pick IDs from already visible/cached tiles and will not trigger additional chunk downloads just to resolve a segment ID. If multiple segmentation layers are visible, Atlas uses the top-most layer (highest view precedence) under the cursor.
+	        Note: these actions only pick IDs from already visible/cached tiles and will not trigger additional chunk downloads just to resolve a segment ID. If multiple segmentation layers are visible, Atlas uses the top-most layer (highest view precedence) under the cursor (and for dataset‑scoped actions, the top-most visible segmentation layer).
 	  9. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
 	3. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
 4. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.

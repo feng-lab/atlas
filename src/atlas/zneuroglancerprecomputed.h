@@ -180,6 +180,8 @@ public:
     std::vector<std::shared_ptr<ZImg>> imgs;
     std::vector<QPoint> locs;
     std::vector<double> scales;
+    // Per-tile downsample ratio (relative to the base scale). Aligned with imgs/locs/scales.
+    std::vector<std::array<size_t, 3>> ratios;
     std::array<size_t, 3> targetRatio{1, 1, 1};
     // True if the tile pack contains a complete, hole-free coverage at targetRatio using only cached chunks.
     // This is useful for callers that want to skip a more expensive "final" render when the requested LOD is

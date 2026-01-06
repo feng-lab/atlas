@@ -164,6 +164,7 @@ void Z3DSwcFilter::setData(ZSwcPack& swcPack)
   m_swcPack = &swcPack;
   m_swcColorParameters.setData(m_swcPack);
   updateData();
+  initializeRotationCenterIfDefault();
 
   connect(m_swcPack, &ZSwcPack::selectionChanged, this, &Z3DSwcFilter::invalidateResult);
   connect(this, &Z3DSwcFilter::treeNodeSelected, m_swcPack, &ZSwcPack::onTreeNodeSelected);
@@ -460,9 +461,6 @@ void Z3DSwcFilter::prepareData()
   for (auto& tn : m_swcPack->decomposedNodes()) {
     m_pointAndRadius.emplace_back(tn->x, tn->y, tn->z, std::max(.5, tn->radius));
   }
-
-  initializeCutRange();
-  initializeRotationCenter();
 
   m_coneRenderer.setData(&m_baseAndBaseRadius, &m_axisAndTopRadius);
   m_lineRenderer.setData(std::move(m_lines));

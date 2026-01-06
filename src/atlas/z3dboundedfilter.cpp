@@ -3,6 +3,7 @@
 #include "z3drenderglobalstate.h"
 #include "zexception.h"
 #include "zlog.h"
+#include <cmath>
 #include <algorithm>
 #include <folly/ScopeGuard.h>
 #include <Mathematics/DistLineRay.h>
@@ -520,6 +521,49 @@ void Z3DBoundedFilter::initializeRotationCenter()
 {
   const ZBBox<glm::dvec3>& bound = notTransformedBoundBox();
   m_rendererParameters.coordTransform.setRotationCenter(glm::vec3((bound.minCorner + bound.maxCorner) / 2.0));
+}
+
+void Z3DBoundedFilter::initializeRotationCenterIfDefault()
+{
+  auto& transform = m_rendererParameters.coordTransform;
+
+  auto isNearZeroVec3 = [](const glm::vec3& v) {
+    constexpr float kVecEps = 1e-6f;
+    return std::abs(v.x) <= kVecEps && std::abs(v.y) <= kVecEps && std::abs(v.z) <= kVecEps;
+  };
+  auto isNearOneVec3 = [](const glm::vec3& v) {
+    constexpr float kVecEps = 1e-6f;
+    return std::abs(v.x - 1.f) <= kVecEps && std::abs(v.y - 1.f) <= kVecEps && std::abs(v.z - 1.f) <= kVecEps;
+  };
+  auto isNearIdentityQuat = [](const glm::quat& q) {
+    constexpr float kQuatEps = 1e-6f;
+    const float absW = std::abs(q.w);
+    return std::abs(absW - 1.f) <= kQuatEps && std::abs(q.x) <= kQuatEps && std::abs(q.y) <= kQuatEps &&
+           std::abs(q.z) <= kQuatEps;
+  };
+
+  const glm::vec3 scale = transform.scale();
+  const glm::vec3 translation = transform.translation();
+  const glm::quat rotation = transform.rotation();
+  const glm::vec3 rotationCenter = transform.rotationCenter();
+
+  const bool isDefaultTransform = isNearOneVec3(scale) && isNearZeroVec3(translation) && isNearIdentityQuat(rotation) &&
+                                  isNearZeroVec3(rotationCenter);
+  if (!isDefaultTransform) {
+    return;
+  }
+
+  const ZBBox<glm::dvec3>& bound = notTransformedBoundBox();
+  if (bound.empty()) {
+    return;
+  }
+
+  const glm::vec3 desiredCenter = glm::vec3((bound.minCorner + bound.maxCorner) / 2.0);
+  if (isNearZeroVec3(desiredCenter - rotationCenter)) {
+    return;
+  }
+
+  transform.setRotationCenter(desiredCenter);
 }
 
 void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)

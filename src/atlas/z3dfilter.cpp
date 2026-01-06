@@ -142,8 +142,13 @@ void Z3DFilter::addInteractionHandler(Z3DInteractionHandler& handler)
   m_interactionHandlers.push_back(&handler);
 }
 
-void Z3DFilter::updateSize(const glm::uvec2& /*targetSize*/)
+void Z3DFilter::updateSize(const glm::uvec2& targetSize)
 {
+  if (targetSize == m_lastUpdateSize) {
+    return;
+  }
+  m_lastUpdateSize = targetSize;
+
   // Provide a reason so downstream logs can attribute this invalidation.
 #ifdef NO // ATLAS_DEBUG_VERSION
   debugSetInvalidateReason("updateSize");

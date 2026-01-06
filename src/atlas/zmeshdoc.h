@@ -32,6 +32,11 @@ public:
   // Intended for progressive refinement (e.g. Neuroglancer mesh LOD refinement).
   void replaceMeshGeometry(size_t id, ZMesh& mesh);
 
+  // Update the display name / tooltip of an external-source mesh (e.g. Neuroglancer),
+  // without modifying its geometry. This is useful when optional metadata (like
+  // segment_properties) becomes available after the mesh has already been loaded.
+  void updateExternalMeshMetadata(size_t id, QString displayName, QString tooltip);
+
 Q_SIGNALS:
   void meshChanged(size_t id);
 

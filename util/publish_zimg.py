@@ -1,4 +1,5 @@
 import argparse
+import importlib.util
 import logging
 import os
 import shlex
@@ -206,41 +207,62 @@ def _assert_linux_wheel_contains_expected_libs(
     with zipfile.ZipFile(wheel_path, "r") as zf:
         entries = set(zf.namelist())
 
-    lib_names = {
-        Path(entry).name
-        for entry in entries
-        if entry.startswith("zimg/lib/")
-        and entry != "zimg/lib/"
-        and not entry.endswith("/")
-    }
+    lib_dirs = ("zimg/lib/", "zimg.libs/")
+    lib_names: set[str] = set()
+    for entry in entries:
+        if entry.endswith("/"):
+            continue
+        if not any(entry.startswith(prefix) for prefix in lib_dirs):
+            continue
+        lib_names.add(Path(entry).name)
+
+    def _has_expected_lib(name: str) -> bool:
+        if name in lib_names:
+            return True
+        # auditwheel may inject a hash into the SONAME to avoid collisions
+        # (e.g. libQt6Core-<hash>.so.6).
+        if ".so" not in name:
+            return False
+        prefix, suffix = name.split(".so", 1)
+        if not prefix:
+            return False
+        needle = f"{prefix}-"
+        return any(
+            candidate.startswith(needle) and candidate.endswith(f".so{suffix}")
+            for candidate in lib_names
+        )
 
     missing = sorted(
-        f"zimg/lib/{name}" for name in expected_exact_libs if name not in lib_names
+        name for name in expected_exact_libs if not _has_expected_lib(name)
     )
 
     freeimage_present = any(
-        name.startswith("libfreeimageplus.so") for name in lib_names
+        name.startswith("libfreeimageplus.so") or name.startswith("libfreeimageplus-")
+        for name in lib_names
     )
     if expect_freeimage:
         if not freeimage_present:
-            missing.append("zimg/lib/libfreeimageplus.so*")
+            missing.append("libfreeimageplus.so*")
     else:
         if freeimage_present:
             unexpected = sorted(
-                name for name in lib_names if name.startswith("libfreeimageplus.so")
+                name
+                for name in lib_names
+                if name.startswith("libfreeimageplus.so") or name.startswith("libfreeimageplus-")
             )
             raise RuntimeError(
-                "Linux wheel contains FreeImage shared libraries under zimg/lib, but FreeImage was disabled.\n"
+                "Linux wheel contains FreeImage shared libraries, but FreeImage was disabled.\n"
                 f"wheel: {wheel_path}\n"
-                f"unexpected: {[f'zimg/lib/{name}' for name in unexpected]}"
+                f"unexpected: {unexpected}"
             )
 
     if missing:
         raise RuntimeError(
-            "Linux wheel is missing expected shared libraries under zimg/lib. "
-            "These are installed during the CMake install step so `RPATH=$ORIGIN/lib` keeps working "
+            "Linux wheel is missing expected shared libraries. "
+            "These are installed during the CMake install step so the extension can find them "
             "after the wheel is relocated into site-packages.\n"
             f"wheel: {wheel_path}\n"
+            f"searched wheel dirs: {list(lib_dirs)}\n"
             f"missing: {missing}"
         )
     logger.info(
@@ -248,6 +270,85 @@ def _assert_linux_wheel_contains_expected_libs(
         len(expected_exact_libs),
         "on" if expect_freeimage else "off",
     )
+
+
+def _assert_linux_wheel_has_pypi_compatible_platform_tag(*, wheel_path: Path) -> None:
+    """
+    PyPI rejects native Linux wheels tagged as `linux_x86_64` (and similar).
+    We must upload `manylinux*` or `musllinux*` wheels.
+    """
+
+    tags = _wheel_tags_from_wheel_metadata(wheel_path)
+    for tag in tags:
+        parts = tag.split("-", 2)
+        if len(parts) != 3:
+            continue
+        _pyver, _abi, platform = parts
+        if platform.startswith("manylinux") or platform.startswith("musllinux"):
+            return
+
+    raise RuntimeError(
+        "Linux wheel does not have a PyPI-compatible platform tag.\n"
+        "PyPI rejects native Linux wheels tagged as `linux_x86_64`; upload a `manylinux*` or `musllinux*` wheel.\n"
+        f"wheel: {wheel_path.name}\n"
+        f"found tags: {tags}"
+    )
+
+
+def _repair_linux_wheel_with_auditwheel(*, wheel_path: Path, out_dir: Path) -> Path:
+    auditwheel_spec = importlib.util.find_spec("auditwheel")
+    if auditwheel_spec is None:
+        raise RuntimeError(
+            "auditwheel is required to publish Linux wheels to PyPI, but it is not installed.\n"
+            "Install it in the active Python environment and retry.\n"
+            "For example:\n"
+            "  python -m pip install --upgrade auditwheel\n"
+        )
+
+    with tempfile.TemporaryDirectory(prefix="zimg_auditwheel_") as tmp:
+        wheelhouse = Path(tmp)
+        cmd = [
+            sys.executable,
+            "-m",
+            "auditwheel",
+            "repair",
+            "--wheel-dir",
+            str(wheelhouse),
+            str(wheel_path),
+        ]
+        _run_checked(
+            cmd,
+            display_cmd=[
+                "python",
+                "-m",
+                "auditwheel",
+                "repair",
+                "--wheel-dir",
+                "<tmp>",
+                wheel_path.name,
+            ],
+        )
+
+        repaired = sorted(wheelhouse.glob("*.whl"))
+        if len(repaired) != 1:
+            raise RuntimeError(
+                "Expected auditwheel to produce exactly 1 repaired wheel.\n"
+                f"input wheel: {wheel_path}\n"
+                f"output dir: {wheelhouse}\n"
+                f"found: {[p.name for p in repaired]}"
+            )
+
+        repaired_path = repaired[0]
+        final_path = out_dir / repaired_path.name
+        shutil.move(str(repaired_path), str(final_path))
+
+    try:
+        wheel_path.unlink()
+    except FileNotFoundError:
+        pass
+
+    logger.info("Repaired Linux wheel with auditwheel: %s", final_path.name)
+    return final_path
 
 
 def _stage_conda_zimg_from_wheel(*, wheel_path: Path, conda_source_dir: Path) -> Path:
@@ -266,6 +367,15 @@ def _stage_conda_zimg_from_wheel(*, wheel_path: Path, conda_source_dir: Path) ->
 
         conda_source_dir.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src_pkg_dir, dst_pkg_dir, symlinks=False)
+
+        # auditwheel uses a sibling `<project>.libs/` directory for vendored
+        # shared libraries; include it so the conda package matches the wheel.
+        src_libs_dir = wheel_root / "zimg.libs"
+        if src_libs_dir.is_dir():
+            dst_libs_dir = conda_source_dir / "zimg.libs"
+            if dst_libs_dir.exists():
+                shutil.rmtree(dst_libs_dir)
+            shutil.copytree(src_libs_dir, dst_libs_dir, symlinks=False)
         return dst_pkg_dir
 
 
@@ -383,7 +493,32 @@ def main() -> int:
         )
         atlas_pypi.update_pyproject_version(tmp_project / "pyproject.toml", version)
 
-        env_base = os.environ.copy()
+        if common_dirs.is_windows():
+            # `python -m build` (PEP 517) executes the backend in an isolated venv but
+            # still inherits our process environment. When running under MSYS2 /
+            # MinGW shells, `PATH` often contains GNU toolchains (e.g. `c++.exe`)
+            # which causes CMake+Ninja to silently select the wrong compiler.
+            #
+            # Match `util/build_atlas.py`: enter an MSVC dev environment and scrub
+            # MinGW from PATH so scikit-build-core configures with MSVC.
+            env_base = build_ext_libs.get_vcvars_environment()
+            # Build deterministically with MSVC. Some shells (MSYS2) predefine CC/CXX
+            # to GNU toolchains; leaving them set can override CMake's compiler
+            # selection even when the MSVC environment is active.
+            env_base.pop("CC", None)
+            env_base.pop("CXX", None)
+            env_base.pop("CFLAGS", None)
+            env_base.pop("CXXFLAGS", None)
+            cl_path = shutil.which("cl", path=env_base.get("PATH"))
+            if cl_path is None:
+                raise RuntimeError(
+                    "MSVC environment setup failed: `cl.exe` not found on PATH after vcvarsall.\n"
+                    "This wheel must be built with MSVC (not MinGW). Ensure Visual Studio 2022 "
+                    "is installed and `util/common_dirs.py:vs_install_dir()` points to it."
+                )
+            logger.info("Using MSVC toolchain for wheel build (cl=%s)", cl_path)
+        else:
+            env_base = os.environ.copy()
         env_base["ZIMG_SRC_DIR"] = str(zimg_src_dir)
         if args.disable_freeimage:
             _append_cmake_args(env_base, ["-DZIMG_DISABLE_FREEIMAGE=ON"])
@@ -397,6 +532,16 @@ def main() -> int:
 
     wheels = sorted(out_dir.glob("*.whl"))
     if wheels:
+        if common_dirs.is_linux():
+            repaired: list[Path] = []
+            for wheel_path in wheels:
+                repaired.append(
+                    _repair_linux_wheel_with_auditwheel(wheel_path=wheel_path, out_dir=out_dir)
+                )
+            wheels = repaired
+            for wheel_path in wheels:
+                _assert_linux_wheel_has_pypi_compatible_platform_tag(wheel_path=wheel_path)
+
         if common_dirs.is_mac():
             for wheel_path in wheels:
                 _assert_macos_wheel_has_universal2_tag(

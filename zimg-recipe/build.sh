@@ -17,3 +17,6 @@
 #ninja install
 
 cp -r zimg ${SP_DIR}
+if [ -d zimg.libs ]; then
+  cp -r zimg.libs ${SP_DIR}
+fi

@@ -308,6 +308,13 @@ protected:
 
   void initializeRotationCenter();
 
+  // Initialize the rotation center based on the current bound box, but only if the
+  // transform is still at its default state. This is intended to be called when
+  // new data becomes available (e.g. setData/updateData), not from per-frame
+  // rendering paths, to avoid mid-frame invalidations and to avoid clobbering
+  // user edits when streaming/progressive data arrives.
+  void initializeRotationCenterIfDefault();
+
   void setTransformEnabled(bool v)
   {
     m_transformEnabled = v;

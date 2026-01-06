@@ -56,6 +56,18 @@ void ZMeshDoc::replaceMeshGeometry(size_t id, ZMesh& mesh)
   Q_EMIT meshChanged(id);
 }
 
+void ZMeshDoc::updateExternalMeshMetadata(size_t id, QString displayName, QString tooltip)
+{
+  CHECK(m_idToMeshPacks.contains(id));
+  auto& pack = m_idToMeshPacks.at(id);
+  CHECK(!pack->sourceJson.is_null()) << "updateExternalMeshMetadata is only valid for external-source meshes";
+
+  pack->displayNameOverride = std::move(displayName);
+  pack->tooltipOverride = std::move(tooltip);
+  pack->updateDerivedData();
+  packInfoUpdated(pack.get());
+}
+
 void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
 {
   QStringList filters;

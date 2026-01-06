@@ -166,6 +166,11 @@ protected:
 
   QString m_name;
 
+  // Last render target size observed via updateSize(). Used to avoid triggering
+  // expensive invalidation/cancellation cascades when the engine rebuilds the
+  // pipeline but the output size is unchanged (e.g. during incremental mesh loads).
+  glm::uvec2 m_lastUpdateSize{0u, 0u};
+
   // all parameters that can change the render behavior
   std::vector<ZParameter*> m_parameters;
   std::set<QString> m_parameterNames;

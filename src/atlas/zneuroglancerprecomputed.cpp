@@ -1525,6 +1525,7 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
       out.imgs.push_back(std::move(tmpImgs[i]));
       out.locs.push_back(tmpLocs[i]);
       out.scales.push_back(tileScale);
+      out.ratios.push_back(ratio);
     }
   };
 
@@ -1671,6 +1672,7 @@ ZNeuroglancerPrecomputedVolume::SliceTilePack ZNeuroglancerPrecomputedVolume::sl
     out.imgs.push_back(std::move(tmpImgs[i]));
     out.locs.push_back(tmpLocs[i]);
     out.scales.push_back(tileScale);
+    out.ratios.push_back(targetRatio);
   }
 
   return out;
