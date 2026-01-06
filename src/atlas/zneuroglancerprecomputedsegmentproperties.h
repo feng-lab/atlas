@@ -9,6 +9,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace nim {
@@ -57,6 +58,11 @@ public:
 
   static std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties> open(const QUrl& dirUrl,
                                                                          std::chrono::milliseconds timeout);
+
+  // Parses the contents of a `segment_properties/info` JSON file.
+  // This does not perform any network I/O. `dirUrl` is used for error messages and bookkeeping only.
+  static std::shared_ptr<ZNeuroglancerPrecomputedSegmentProperties> parseInfoJsonText(const QUrl& dirUrl,
+                                                                                      std::string_view infoJsonText);
 
   [[nodiscard]] const QUrl& dirUrl() const
   {
