@@ -7,6 +7,13 @@ Z3DMeshView::Z3DMeshView(ZMeshDoc& doc, Z3DRenderingEngine& engine)
 {
   docMeshesAdded(m_doc.objs());
   connect(&m_doc, &ZMeshDoc::objAdded, this, &Z3DMeshView::docMeshAdded);
+  connect(&m_doc, &ZMeshDoc::meshChanged, this, [this](size_t id) {
+    auto it = m_idToFilter.find(id);
+    if (it == m_idToFilter.end()) {
+      return;
+    }
+    it->second->setData(m_doc.meshList(id));
+  });
 }
 
 void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)

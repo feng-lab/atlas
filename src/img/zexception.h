@@ -58,4 +58,11 @@ class ZCancellationException : public ZException
   using ZException::ZException;
 };
 
+// Indicates a missing optional resource at an I/O boundary (e.g. HTTP 404 for a
+// Neuroglancer mesh that doesn't exist for a given segment).
+class ZNotFoundException : public ZException
+{
+  using ZException::ZException;
+};
+
 } // namespace nim

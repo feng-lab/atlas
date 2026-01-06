@@ -3,6 +3,8 @@
 #include "zmesh.h"
 #include "zobjdoc.h"
 
+#include <optional>
+
 namespace nim {
 
 class ZMeshDoc : public ZObjDoc
@@ -23,6 +25,15 @@ public:
   // Add a mesh that does not come from a local file path (e.g. network-backed Neuroglancer mesh).
   // The `sourceJson` is stored in the scene file so the mesh can be reloaded on restore.
   size_t addMeshFromExternalSource(ZMesh& mesh, QString displayName, QString tooltip, json::value sourceJson);
+
+  [[nodiscard]] std::optional<size_t> findMeshByExternalSource(const json::value& sourceJson) const;
+
+  // Replace the geometry of an existing mesh object and notify 3D views.
+  // Intended for progressive refinement (e.g. Neuroglancer mesh LOD refinement).
+  void replaceMeshGeometry(size_t id, ZMesh& mesh);
+
+Q_SIGNALS:
+  void meshChanged(size_t id);
 
   // ZObjDoc interface
 

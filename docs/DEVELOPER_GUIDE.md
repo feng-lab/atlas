@@ -34,6 +34,9 @@ Neuroglancer Precomputed (HTTP)
   - Higher values can significantly improve 2D/3D interaction (less network I/O and fewer recomputes), but opening multiple Neuroglancer layers simultaneously multiplies the memory budget.
 - Integration point is `ZImgPack`: 2D uses on-demand chunk reads for the visible viewport; 3D paging uses `ZImgPack::readRegionToImgAsync()` to populate the GPU page cache. Synchronous “hot-path” queries (`displayValue()`/`value()`) are cache-only to avoid blocking UI/render threads on network I/O.
   - 2D Neuroglancer rendering is progressive: cache-only (best-effort from cached chunks) → preview (fetch coarsest XY to fill holes) → final (fetch best-for-scale after debounce). Preview is skipped if coarsest XY coverage is already cached.
+- Neuroglancer segmentation extras:
+  - Segment properties (`segment_properties/`) are supported via `ZNeuroglancerPrecomputedSegmentProperties` (`src/atlas/zneuroglancerprecomputedsegmentproperties.*`) and are loaded on demand by mesh/tooling paths (no explicit per-object button required).
+  - Precomputed meshes (`mesh/`) are supported via `ZNeuroglancerPrecomputedMeshSource` (`src/atlas/zneuroglancerprecomputedmesh.*`). Mesh import is initiated from the 2D right-click context menu and adds a normal `ZMesh` object to `ZMeshDoc`. Atlas loads a coarse LOD first, then refines to the finest available LOD by replacing mesh geometry in-place (`ZMeshDoc::replaceMeshGeometry` + `meshChanged` signal).
 
 Testing (Linking Atlas Code)
 

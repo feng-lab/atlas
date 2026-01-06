@@ -89,6 +89,7 @@ void ZGraphicsScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* contextMen
     QAction* pasteAction = menu.addAction("Paste Here");
     QAction* pasteHFlipAction = menu.addAction("Paste Horizonally Flipped");
     QAction* pasteVFlipAction = menu.addAction("Paste Vertically Flipped");
+    m_view->appendContextMenuActions(menu, contextMenuEvent->scenePos(), contextMenuEvent->modifiers());
     QAction* selectedAction = menu.exec(contextMenuEvent->screenPos());
     if (selectedAction == pasteAction) {
       m_view->pasteHere(m_view->currentSlice(), contextMenuEvent->scenePos());

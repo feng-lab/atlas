@@ -17,6 +17,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -141,6 +142,11 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
+  // Neuroglancer segmentation helper: attempts to get the label ID under the given scene position
+  // using only already-cached chunks (no network I/O). Returns nullopt if this filter does not
+  // represent a visible Neuroglancer segmentation volume at the position, or if the chunk is not cached.
+  [[nodiscard]] std::optional<uint64_t> cachedNeuroglancerSegmentationIdAtScenePos(const QPointF& scenePos) const;
+
 protected:
   void viewPrecedenceChanged() override;
 
@@ -149,9 +155,6 @@ protected:
   void offsetChanged() override;
 
   void updateViewSettingWidgetsGroup();
-
-Q_SIGNALS:
-  void requestNeuroglancerMeshLoad(uint64_t segmentId, bool finestLod);
 
 private:
   void channelVisibleChanged();
@@ -175,10 +178,6 @@ private:
   void updateImgItems();
 
   void requestNeuroglancer2DRender();
-
-  void loadNeuroglancerSegmentProperties();
-
-  void loadNeuroglancerMesh();
 
   void startNeuroglancer2DCacheRender();
 
@@ -248,12 +247,6 @@ private:
   // Neuroglancer: keep the UI responsive by fetching chunks off the UI thread,
   // and progressively refining from coarse -> sharp after interaction settles.
   QTimer m_ngRefineTimer;
-
-  // Neuroglancer segmentation: optional metadata + mesh tools.
-  ZStringParameter m_ngMeshSegmentId;
-  ZStringIntOptionParameter m_ngMeshLodPolicy;
-  bool m_ngSegmentPropertiesLoading = false;
-  QString m_ngSegmentPropertiesError;
 
   uint64_t m_ngRenderEpoch = 0;
   std::shared_ptr<std::atomic<uint64_t>> m_ngRenderEpochAtomic;

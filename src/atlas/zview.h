@@ -20,6 +20,8 @@ class QGraphicsScene;
 
 class QProgressDialog;
 
+class QMenu;
+
 namespace nim {
 
 class ZDoc;
@@ -230,6 +232,9 @@ public:
   void pasteHere(int slice, QPointF point, bool hFlip = false, bool vFlip = false);
 
   void paste();
+
+  // Allows registered object views to contribute actions to the 2D right-click context menu at a scene position.
+  void appendContextMenuActions(QMenu& menu, QPointF scenePos, Qt::KeyboardModifiers modifiers);
 
   void checkViewport();
 

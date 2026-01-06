@@ -452,6 +452,9 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedM
   if (!resOpt) {
     co_return std::nullopt;
   }
+  if (resOpt->status == 404) {
+    co_return std::nullopt;
+  }
   if (resOpt->status != 200) {
     throw ZException(fmt::format("HTTP GET failed for '{}' (status {})", url, resOpt->status));
   }
@@ -472,6 +475,9 @@ folly::coro::Task<std::optional<std::vector<uint8_t>>> ZNeuroglancerPrecomputedM
     m_timeout,
     {{"range", fmt::format("bytes={}-{}", offset, endInclusive)}});
   if (!resOpt) {
+    co_return std::nullopt;
+  }
+  if (resOpt->status == 404) {
     co_return std::nullopt;
   }
   if (resOpt->status != 206 && resOpt->status != 200) {
@@ -502,9 +508,8 @@ folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::lo
 
   auto metaBytesOpt = co_await getHttpBytesAsync(metaUrl);
   if (!metaBytesOpt) {
-    throw ZException(fmt::format("Neuroglancer legacy mesh metadata not found for segment {} (expected '{}')",
-                                 segmentId,
-                                 metaUrl));
+    throw ZNotFoundException(
+      fmt::format("Neuroglancer legacy mesh metadata not found for segment {} (expected '{}')", segmentId, metaUrl));
   }
 
   const std::string metaText(reinterpret_cast<const char*>(metaBytesOpt->data()), metaBytesOpt->size());
@@ -851,16 +856,17 @@ folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::lo
   if (info.sharding) {
     auto bytesOpt = co_await getShardedManifestBytesAsync(segmentId, &manifestStart, *info.sharding);
     if (!bytesOpt) {
-      throw ZException(fmt::format("Neuroglancer multi-LOD mesh manifest not found for segment {}", segmentId));
+      throw ZNotFoundException(fmt::format("Neuroglancer multi-LOD mesh manifest not found for segment {}", segmentId));
     }
     manifestBytes = std::move(*bytesOpt);
   } else {
     const std::string indexUrl = toStdString(base + segStr + ".index");
     auto bytesOpt = co_await getHttpBytesAsync(indexUrl);
     if (!bytesOpt) {
-      throw ZException(fmt::format("Neuroglancer multi-LOD mesh manifest not found for segment {} (expected '{}')",
-                                   segmentId,
-                                   indexUrl));
+      throw ZNotFoundException(
+        fmt::format("Neuroglancer multi-LOD mesh manifest not found for segment {} (expected '{}')",
+                    segmentId,
+                    indexUrl));
     }
     manifestBytes = std::move(*bytesOpt);
   }
@@ -908,14 +914,15 @@ folly::coro::Task<std::shared_ptr<ZMesh>> ZNeuroglancerPrecomputedMeshSource::lo
 
     auto bytesOpt = co_await getHttpRangeBytesAsync(dataUrlStr, lodDataStart, lodBytes);
     if (!bytesOpt) {
-      throw ZException("Failed to read sharded mesh fragment data");
+      throw ZNotFoundException("Failed to read sharded mesh fragment data");
     }
     fragBytes = std::move(*bytesOpt);
   } else {
     const std::string fragUrl = toStdString(base + segStr);
     auto bytesOpt = co_await getHttpRangeBytesAsync(fragUrl, lodOffset, lodBytes);
     if (!bytesOpt) {
-      throw ZException(fmt::format("Neuroglancer multi-LOD mesh fragment data not found for segment {}", segmentId));
+      throw ZNotFoundException(
+        fmt::format("Neuroglancer multi-LOD mesh fragment data not found for segment {}", segmentId));
     }
     fragBytes = std::move(*bytesOpt);
   }

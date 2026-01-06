@@ -92,6 +92,11 @@ public:
     return m_properties;
   }
 
+  [[nodiscard]] const std::vector<uint64_t>& ids() const
+  {
+    return m_ids;
+  }
+
 private:
   struct IdIndex
   {

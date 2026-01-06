@@ -4,6 +4,8 @@
 #include "zimgdoc.h"
 #include "zimgfilter.h"
 
+class QMenu;
+
 namespace nim {
 
 class ZImgView : public ZFilterView<ZImgDoc, ZImgFilter>
@@ -17,6 +19,11 @@ public:
 
 public:
   QString infoOfPos(double x, double y) override;
+
+  void appendContextMenuActions(QMenu& menu,
+                                size_t activeObjId,
+                                const QPointF& scenePos,
+                                Qt::KeyboardModifiers modifiers) override;
 
 private:
   void docImgsAdded(const std::vector<size_t>& objs);

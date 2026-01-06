@@ -15,6 +15,8 @@
 #include <tuple>
 #include <array>
 #include <memory>
+#include <optional>
+#include <set>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -200,6 +202,11 @@ public:
 
   // same as value but can use low resolution image value
   double displayValue(size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0, bool mip = false) const;
+
+  // Neuroglancer: returns a cached segmentation ID (uint64) at the specified base voxel coordinate,
+  // without triggering any network I/O. This is suitable for hot UI paths (e.g. context-menu actions)
+  // that must not block or initiate downloads. Returns nullopt if the needed chunk is not in cache.
+  [[nodiscard]] std::optional<uint64_t> tryGetCachedNeuroglancerSegmentationId(size_t x, size_t y, size_t z) const;
 
   ZImg crop(const ZImgRegion& region) const;
 

@@ -65,6 +65,65 @@ namespace nim {
 
 namespace {
 
+template<typename TValue>
+std::optional<TValue> tryGetCachedNeuroglancerValueAtBaseVoxel(const ZNeuroglancerPrecomputedVolume& vol,
+                                                               const std::set<std::array<size_t, 3>>& ratios,
+                                                               const ZImgInfo& baseInfo,
+                                                               size_t x,
+                                                               size_t y,
+                                                               size_t z,
+                                                               size_t c)
+{
+  if (c >= baseInfo.numChannels) {
+    return std::nullopt;
+  }
+  if (x >= baseInfo.width || y >= baseInfo.height || z >= baseInfo.depth) {
+    return std::nullopt;
+  }
+
+  const int64_t ix = static_cast<int64_t>(x);
+  const int64_t iy = static_cast<int64_t>(y);
+  const int64_t iz = static_cast<int64_t>(z);
+
+  for (const auto& ratio : ratios) {
+    auto scaleIndexOpt = vol.scaleIndexForRatio(ratio);
+    if (!scaleIndexOpt) {
+      continue;
+    }
+    const auto chunks = vol.chunksIntersectingBaseBox(*scaleIndexOpt, {ix, iy, iz}, {ix + 1, iy + 1, iz + 1});
+    for (const auto& chunk : chunks) {
+      auto chunkImg = vol.tryGetCachedChunk(chunk);
+      if (!chunkImg) {
+        continue;
+      }
+      if (chunkImg->isEmpty()) {
+        continue;
+      }
+
+      const int64_t lx = ix - chunk.baseStart[0];
+      const int64_t ly = iy - chunk.baseStart[1];
+      const int64_t lz = iz - chunk.baseStart[2];
+      CHECK(lx >= 0 && ly >= 0 && lz >= 0);
+
+      const int64_t rx = static_cast<int64_t>(ratio[0]);
+      const int64_t ry = static_cast<int64_t>(ratio[1]);
+      const int64_t rz = static_cast<int64_t>(ratio[2]);
+      CHECK(rx > 0 && ry > 0 && rz > 0);
+
+      const size_t vx = static_cast<size_t>(lx / rx);
+      const size_t vy = static_cast<size_t>(ly / ry);
+      const size_t vz = static_cast<size_t>(lz / rz);
+
+      CHECK(vx < chunkImg->width());
+      CHECK(vy < chunkImg->height());
+      CHECK(vz < chunkImg->depth());
+      return chunkImg->value<TValue>(vx, vy, vz, c, 0);
+    }
+  }
+
+  return std::nullopt;
+}
+
 template<typename TVoxel>
 void pasteNeuroglancerSegmentationChunkAsRgbTyped(const ZImg& src,
                                                   ZImg& dst,
@@ -861,60 +920,17 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
   if (m_diskCached) {
     if (m_ngVolume) {
       CHECK(t == 0);
-      if (c >= m_imgInfo.numChannels) {
-        return 0;
-      }
       if (m_imgInfo.depth == 1) {
         mip = false;
       }
       if (mip) {
         return 0;
       }
-      if (x >= m_imgInfo.width || y >= m_imgInfo.height || z >= m_imgInfo.depth) {
-        return 0;
-      }
-
-      const int64_t ix = static_cast<int64_t>(x);
-      const int64_t iy = static_cast<int64_t>(y);
-      const int64_t iz = static_cast<int64_t>(z);
-
       // Prefer already-cached data; never trigger network I/O from displayValue()
       // (called on mouse-move, and in other hot UI paths).
-      for (auto it = m_pyramidalRatios.rbegin(); it != m_pyramidalRatios.rend(); ++it) {
-        const auto& ratio = *it;
-        auto scaleIndexOpt = m_ngVolume->scaleIndexForRatio(ratio);
-        if (!scaleIndexOpt) {
-          continue;
-        }
-        const auto chunks =
-          m_ngVolume->chunksIntersectingBaseBox(*scaleIndexOpt, {ix, iy, iz}, {ix + 1, iy + 1, iz + 1});
-        for (const auto& chunk : chunks) {
-          auto chunkImg = m_ngVolume->tryGetCachedChunk(chunk);
-          if (!chunkImg) {
-            continue;
-          }
-
-          const int64_t lx = ix - chunk.baseStart[0];
-          const int64_t ly = iy - chunk.baseStart[1];
-          const int64_t lz = iz - chunk.baseStart[2];
-          CHECK(lx >= 0 && ly >= 0 && lz >= 0);
-
-          const int64_t rx = static_cast<int64_t>(ratio[0]);
-          const int64_t ry = static_cast<int64_t>(ratio[1]);
-          const int64_t rz = static_cast<int64_t>(ratio[2]);
-          CHECK(rx > 0 && ry > 0 && rz > 0);
-
-          const size_t vx = static_cast<size_t>(lx / rx);
-          const size_t vy = static_cast<size_t>(ly / ry);
-          const size_t vz = static_cast<size_t>(lz / rz);
-
-          CHECK(vx < chunkImg->width());
-          CHECK(vy < chunkImg->height());
-          CHECK(vz < chunkImg->depth());
-          return chunkImg->value<double>(vx, vy, vz, c, 0);
-        }
-      }
-      return 0;
+      const auto vOpt =
+        tryGetCachedNeuroglancerValueAtBaseVoxel<double>(*m_ngVolume, m_pyramidalRatios, m_imgInfo, x, y, z, c);
+      return vOpt.value_or(0.0);
     }
 
     if (m_imgInfo.depth == 1) {
@@ -960,6 +976,18 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
     return m_maximumProjectedAlongZImg.value<double>(x, y, 0, c, t);
   }
   return m_img.value<double>(x, y, z, c, t);
+}
+
+std::optional<uint64_t> ZImgPack::tryGetCachedNeuroglancerSegmentationId(size_t x, size_t y, size_t z) const
+{
+  if (!m_diskCached || !m_ngVolume) {
+    return std::nullopt;
+  }
+  CHECK(m_ngVolume);
+  if (!m_ngVolume->isSegmentation()) {
+    return std::nullopt;
+  }
+  return tryGetCachedNeuroglancerValueAtBaseVoxel<uint64_t>(*m_ngVolume, m_pyramidalRatios, m_imgInfo, x, y, z, 0);
 }
 
 ZImg ZImgPack::crop(const ZImgRegion& region) const

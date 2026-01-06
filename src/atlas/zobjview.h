@@ -8,6 +8,8 @@
 #include <QRectF>
 #include <QString>
 
+class QMenu;
+
 namespace nim {
 
 class ZObjView : public QObject
@@ -32,6 +34,19 @@ public:
 
   // to show on info bar, default return empty
   virtual QString infoOfPos(double x, double y);
+
+  // Allows views to contribute to the 2D context menu at a scene position. `activeObjId` is the object currently
+  // selected in the Objects Manager / View Setting dock (0 if none). Default is no-op.
+  virtual void appendContextMenuActions(QMenu& menu,
+                                       size_t activeObjId,
+                                       const QPointF& scenePos,
+                                       Qt::KeyboardModifiers modifiers)
+  {
+    (void)menu;
+    (void)activeObjId;
+    (void)scenePos;
+    (void)modifiers;
+  }
 
   // called to show a certain slice of certain time
   virtual void setNormalView(int slice, int time) = 0;

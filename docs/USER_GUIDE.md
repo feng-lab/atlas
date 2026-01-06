@@ -309,8 +309,16 @@ Steps to load and manage images via `ZImgDoc`:
    5. The history is stored in the user config folder as `neuroglancer_precomputed_history.json` (open via **Help → Open Config Folder**).
    6. Current limitations: read-only dataset. Supported chunk encodings are `raw`, `jpeg` (uint8, 1 or 3 channels), `png` (unsigned 1–2 bytes/voxel, 1–4 channels), `compresso` (unsigned 1/2/4/8 bytes/voxel, 1 channel), and `compressed_segmentation` (uint32/uint64 segmentation). Sharded volumes require an HTTP server that supports `Range` requests.
    7. Segmentation datasets (`type=segmentation`) default to **Voxel Display → Segmentation Labels** (stable pseudo‑random colors per label ID). You can switch back to intensity rendering via the Object View Setting dock.
-   8. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
-3. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
+   8. For segmentation datasets, Atlas also supports optional Neuroglancer metadata:
+	      - **Segment Properties**: if the dataset has a `segment_properties/` directory, Atlas loads it on demand when needed (e.g. for labeling mesh tooltips or bulk mesh import). Some public datasets do not provide this metadata.
+	      - **Meshes**: if the dataset has a `mesh/` directory, you can import segmentation meshes from the 2D slice view (right‑click) using:
+	        - **Copy Neuroglancer Segment ID Under Cursor**
+	        - **Load Neuroglancer Mesh for Segment Under Cursor**
+	        - **Load Neuroglancer Meshes for All Segments (segment_properties)…** (can be very slow and memory heavy)
+	        Mesh import is progressive: Atlas loads a coarse mesh first, then refines to the finest available LOD by replacing mesh geometry in-place.
+	        Note: these actions only pick IDs from already visible/cached tiles and will not trigger additional chunk downloads just to resolve a segment ID. If multiple segmentation layers are visible, Atlas uses the top-most layer (highest view precedence) under the cursor.
+	  9. If HTTPS requests fail with certificate/CA errors, set env `SSL_CERT_FILE` (common in conda) or run Atlas with `--atlas_http_ca_bundle=/path/to/cert.pem` (macOS default: `/etc/ssl/cert.pem`; Windows defaults to the system trust store, but the flag can be used for custom bundles).
+	3. **Import sequences** – use **File → Import Sequence Images...** to select an ordered set of images. Atlas stacks the frames into a volume.
 4. **View settings** – with the image selected, the Object View Setting dock exposes channel toggles, color maps, and transfer functions. Modify per alias if needed.
 5. **Full resolution rendering** – in 3D, enable Full Resolution in Object View Setting when you require high-quality output. Monitor GPU memory usage and progress logs.
 6. **Save** – `ZImgDoc` saves back to original paths when possible. If the format does not support writing (or the image was imported as a sequence), use **Save As...**(Ctrl/Cmd+Shift+S) to choose a new format.

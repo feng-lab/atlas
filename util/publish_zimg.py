@@ -163,23 +163,10 @@ def _apply_scikit_build_core_toolchain_env(env: dict[str, str]) -> None:
     """
 
     cmake_path = Path(common_dirs.get_cmake_binary())
-    if not cmake_path.exists():
-        raise RuntimeError(
-            "CMake was not found at the expected location. "
-            f"Expected: {cmake_path}. "
-            "Did you run `python3 util/build_ext_libs.py all` (or otherwise stage tools into src/3rdparty/build/)?"
-        )
     _prepend_path(env, cmake_path.parent)
 
     if common_dirs.use_ninja():
         ninja_path = Path(common_dirs.get_ninja_binary())
-        if not ninja_path.exists():
-            raise RuntimeError(
-                "Ninja was not found at the expected location. "
-                f"Expected: {ninja_path}. "
-                "Did you run `python3 util/build_ext_libs.py all` (or otherwise stage tools into src/3rdparty/build/)?"
-            )
-
         _prepend_path(env, ninja_path.parent)
         env["CMAKE_GENERATOR"] = "Ninja"
         _append_cmake_args(env, [f"-DCMAKE_MAKE_PROGRAM={ninja_path}"])

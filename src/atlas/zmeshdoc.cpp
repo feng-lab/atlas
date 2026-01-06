@@ -36,6 +36,26 @@ size_t ZMeshDoc::addMeshFromExternalSource(ZMesh& mesh, QString displayName, QSt
   return id;
 }
 
+std::optional<size_t> ZMeshDoc::findMeshByExternalSource(const json::value& sourceJson) const
+{
+  for (const auto& idPack : m_idToMeshPacks) {
+    if (isSameObj(sourceJson, jsonValue(idPack.first))) {
+      return idPack.first;
+    }
+  }
+  return std::nullopt;
+}
+
+void ZMeshDoc::replaceMeshGeometry(size_t id, ZMesh& mesh)
+{
+  CHECK(m_idToMeshPacks.contains(id));
+  auto& pack = m_idToMeshPacks.at(id);
+  pack->mesh.swap(mesh);
+  pack->updateDerivedData();
+  m_doc.updateObjInfo(id);
+  Q_EMIT meshChanged(id);
+}
+
 void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
 {
   QStringList filters;
@@ -177,16 +197,7 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
         return 0;
       }
 
-      QString lod = "coarsest";
-      if (auto lodIt = jo.find("lod_policy"); lodIt != jo.end() && !lodIt->value().is_null()) {
-        if (!lodIt->value().is_string()) {
-          errorMsg = QString("Invalid neuroglancer mesh JSON: lod_policy must be a string");
-          return 0;
-        }
-        lod = json::value_to<QString>(lodIt->value()).trimmed().toLower();
-      }
-      const auto lodPolicy = (lod == "finest") ? ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest
-                                               : ZNeuroglancerPrecomputedMeshSource::LodPolicy::Coarsest;
+      const auto lodPolicy = ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest;
 
       // Deduplicate before performing any network work.
       for (const auto& idPack : m_idToMeshPacks) {
@@ -241,7 +252,6 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
       normalized["type"] = "neuroglancer_precomputed_mesh";
       normalized["segmentation_root_url"] = json::value_from(normalizedRootUrl);
       normalized["segment_id"] = json::value_from(QString::number(segId));
-      normalized["lod_policy"] = json::value_from(lod);
       if (!vol->meshKey().isEmpty()) {
         normalized["mesh_key"] = json::value_from(vol->meshKey());
       }
@@ -372,12 +382,12 @@ bool ZMeshDoc::isSameObj(const json::value& v1, const json::value& v2) const
 
       const QString seg = json::value_to<QString>(itSeg->value()).trimmed();
 
-      QString lod = "coarsest";
-      if (auto itLod = o.find("lod_policy"); itLod != o.end() && itLod->value().is_string()) {
-        lod = json::value_to<QString>(itLod->value()).trimmed().toLower();
+      QString meshKey;
+      if (auto itMeshKey = o.find("mesh_key"); itMeshKey != o.end() && itMeshKey->value().is_string()) {
+        meshKey = json::value_to<QString>(itMeshKey->value()).trimmed();
       }
 
-      return QString("%1|%2|%3|%4").arg(type, root, seg, lod);
+      return QString("%1|%2|%3|%4").arg(type, root, seg, meshKey);
     };
 
     const auto k1 = keyFor(v1.as_object());

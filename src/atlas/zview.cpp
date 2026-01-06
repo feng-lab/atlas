@@ -22,6 +22,7 @@
 #include <QCoreApplication>
 #include <QEventLoop>
 #include <QProgressDialog>
+#include <QMenu>
 
 namespace nim {
 
@@ -397,6 +398,14 @@ void ZView::paste()
   VLOG(1) << "paste";
   for (const auto& view : m_objViews) {
     view->pasteKeyPressed(currentSlice(), m_scene->lastPressedPoint(), false, false);
+  }
+}
+
+void ZView::appendContextMenuActions(QMenu& menu, QPointF scenePos, Qt::KeyboardModifiers modifiers)
+{
+  const size_t activeId = m_doc.viewSettingId();
+  for (const auto& view : m_objViews) {
+    view->appendContextMenuActions(menu, activeId, scenePos, modifiers);
   }
 }
 
