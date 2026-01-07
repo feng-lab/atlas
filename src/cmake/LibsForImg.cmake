@@ -235,10 +235,9 @@ message(STATUS "QT_HOST_PATH: " ${QT_HOST_PATH})
 message(STATUS "QT_VERSION: " ${QT_VERSION})
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Gui PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
+find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
 print_target_properties(Qt6::Core)
-print_target_properties(Qt6::Gui)
-set(_QT_LIBS_ Qt6::Core Qt6::Gui)
+set(_QT_LIBS_ Qt6::Core)
 
 find_package(assimp REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)

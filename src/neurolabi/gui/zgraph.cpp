@@ -1,5 +1,6 @@
 #include "zgraph.h"
 
+#include <cassert>
 #include <iostream>
 #include <fstream>
 #include <algorithm>

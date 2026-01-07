@@ -47,6 +47,17 @@ def _prepend_path(env: dict[str, str], dir_path: Path) -> None:
     env["PATH"] = prefix + os.pathsep + existing
 
 
+def _prepend_search_path(env: dict[str, str], *, key: str, dir_path: Path) -> None:
+    existing = env.get(key, "")
+    prefix = str(dir_path)
+    if not existing:
+        env[key] = prefix
+        return
+    if existing.split(os.pathsep)[0] == prefix:
+        return
+    env[key] = prefix + os.pathsep + existing
+
+
 def _append_cmake_args(env: dict[str, str], extra_args: list[str]) -> None:
     if not extra_args:
         return
@@ -200,7 +211,6 @@ def _assert_linux_wheel_contains_expected_libs(
 ) -> None:
     expected_exact_libs = {
         "libtbb.so.12",
-        "libQt6Gui.so.6",
         "libQt6Core.so.6",
     }
 
@@ -305,6 +315,22 @@ def _repair_linux_wheel_with_auditwheel(*, wheel_path: Path, out_dir: Path) -> P
             "  python -m pip install --upgrade auditwheel\n"
         )
 
+    env = os.environ.copy()
+
+    # auditwheel discovers and bundles non-manylinux shared-library dependencies.
+    # When we vendor Qt into the wheel, its transitive deps (e.g. ICU) still live
+    # in the Qt install prefix. Add Qt's lib dir to LD_LIBRARY_PATH so auditwheel
+    # can locate and bundle those dependencies deterministically.
+    qt_lib_dir = Path(common_dirs.qt_base_dir()) / "lib"
+    if qt_lib_dir.is_dir():
+        _prepend_search_path(env, key="LD_LIBRARY_PATH", dir_path=qt_lib_dir)
+        logger.info("auditwheel: prepending LD_LIBRARY_PATH with: %s", qt_lib_dir.as_posix())
+    else:
+        logger.warning(
+            "auditwheel: Qt lib dir not found; repair may fail (qt_lib_dir=%s)",
+            qt_lib_dir.as_posix(),
+        )
+
     with tempfile.TemporaryDirectory(prefix="zimg_auditwheel_") as tmp:
         wheelhouse = Path(tmp)
         cmd = [
@@ -312,17 +338,20 @@ def _repair_linux_wheel_with_auditwheel(*, wheel_path: Path, out_dir: Path) -> P
             "-m",
             "auditwheel",
             "repair",
+            "--strip",
             "--wheel-dir",
             str(wheelhouse),
             str(wheel_path),
         ]
         _run_checked(
             cmd,
+            env=env,
             display_cmd=[
                 "python",
                 "-m",
                 "auditwheel",
                 "repair",
+                "--strip",
                 "--wheel-dir",
                 "<tmp>",
                 wheel_path.name,

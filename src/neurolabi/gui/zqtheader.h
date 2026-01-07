@@ -9,6 +9,9 @@ class ZQImage {};
 class ZQPainter{};
 #define QPainter ZQPainter
 
+class ZQColor {};
+#define QColor ZQColor
+
 //class ZQPoint {
 //public:
 //  ZQPoint() {}
@@ -45,9 +48,8 @@ class ZQPaintDevice{};
 #include <QRect>
 #include <QDebug>
 #include <QPen>
+#include <QColor>
 #include "qt/gui/utilities.h"
 #endif
-
-#include <QColor>
 
 #endif // ZQTHEADER_H

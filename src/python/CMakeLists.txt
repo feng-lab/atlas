@@ -219,12 +219,6 @@ if (UNIX AND NOT APPLE)
                      COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt6::Core>
                      $<TARGET_FILE_DIR:${module_name}>/${qtcorelibname}
   )
-  set(qtguilibname libQt6Gui.so.6)
-  add_custom_command(TARGET ${module_name}
-                     POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Qt6::Gui>
-                     $<TARGET_FILE_DIR:${module_name}>/${qtguilibname}
-  )
 endif ()
 
 # target_include_directories(${module_name} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
@@ -245,7 +239,6 @@ if (WIN32)
   endif ()
   install(FILES $<TARGET_FILE:TBB::tbb> DESTINATION zimg)
   install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION zimg)
-  install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION zimg)
 endif (WIN32)
 
 if (APPLE)
@@ -254,8 +247,6 @@ if (APPLE)
   endif ()
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION zimg/lib)
   install(FILES $<TARGET_FILE:Qt6::Core> DESTINATION zimg/lib/QtCore.framework/Versions/A)
-  install(FILES $<TARGET_FILE:Qt6::Gui> DESTINATION zimg/lib/QtGui.framework/Versions/A)
-  install(FILES $<TARGET_FILE:Qt6::DBus> DESTINATION zimg/lib/QtDBus.framework/Versions/A)
 
   option(IMG_PY_STRIP_INSTALLED_MACHO
          "Strip debug symbols from installed Mach-O binaries on macOS (must run before codesign)."
@@ -318,8 +309,6 @@ if (APPLE)
         "${_install_root}/zimg/lib/libfreeimageplus.dylib"
         "${_install_root}/zimg/lib/libtbb.12.dylib"
         "${_install_root}/zimg/lib/QtCore.framework/Versions/A/QtCore"
-        "${_install_root}/zimg/lib/QtGui.framework/Versions/A/QtGui"
-        "${_install_root}/zimg/lib/QtDBus.framework/Versions/A/QtDBus"
       )
 
       foreach(_path IN LISTS _sign_targets)
@@ -358,7 +347,6 @@ if (UNIX AND NOT APPLE)
   endif ()
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${tbblibname} DESTINATION zimg/lib)
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${qtcorelibname} DESTINATION zimg/lib)
-  install(FILES $<TARGET_FILE_DIR:${module_name}>/${qtguilibname} DESTINATION zimg/lib)
 
   if (IMG_PY_STRIP_INSTALLED_BINARIES)
     set(_img_py_strip_tool "${_IMG_PY_STRIP_TOOL}")

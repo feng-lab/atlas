@@ -155,6 +155,11 @@ files_to_download = [
         "filename": "int8_add_test.dat"
     },
     {
+        "expected_size": 22254972,
+        "expected_sha256": "017ffd5cc37c3190f18ad8370499df81ec7cb822a2e80e09fc6cb4c25091bd63",
+        "filename": "T_Sub_20190628_OE40_Ret2_.tif.tif_label_2d_v2_spline.nimroi"
+    },
+    {
         "expected_size": 30000158,
         "expected_sha256": "8886ae048f316d6d0c38e922c6c5865d537d4d453979babf2cb8c75a643bc716",
         "filename": "uint8_mul_test.dat"
@@ -188,6 +193,11 @@ files_to_download = [
         "expected_size": 60000308,
         "expected_sha256": "72a513c0cf27da6f7eb563eef3b092767480dab5f81e39175662f69b562daa46",
         "filename": "uint16_mul_test.dat"
+    },
+    {
+        "expected_size": 12674293,
+        "expected_sha256": "43bf9993f9c824f4a7fc951437ec75a6a32e813f001b31dafc28b88bba67b533",
+        "filename": "20190325_ROE10_HC_.tif_fix.tif_ch2_label_2d_spline.nimroi"
     },
     {
         "expected_size": 240001208,
