@@ -7,6 +7,158 @@ import tempfile
 
 logger = logging.getLogger(__name__)
 
+_APPIMAGE_EXCLUDELIST_URL = (
+    "https://raw.githubusercontent.com/probonopd/AppImages/master/excludelist"
+)
+
+# Some system-provided libraries are tightly coupled to the host graphics stack
+# (Mesa vs NVIDIA, kernel/userspace ABI, etc.) and should never be bundled into
+# an AppDir/AppImage. The upstream excludelist usually covers the common SONAMEs,
+# but we add a prefix-based hardening layer so major-version bumps (e.g. .so.2)
+# or vendor-specific variants do not accidentally get copied.
+_HARD_EXCLUDE_PREFIXES = (
+    "libGL.so",
+    "libOpenGL.so",
+    "libEGL.so",
+    "libGLESv1_CM.so",
+    "libGLESv2.so",
+    "libGLX.so",
+    "libGLdispatch.so",
+    "libglapi.so",
+    # X11 / XCB
+    "libX11.so",
+    "libXau.so",
+    "libXdmcp.so",
+    "libXext.so",
+    "libXrender.so",
+    "libXfixes.so",
+    "libXcursor.so",
+    "libXi.so",
+    "libXrandr.so",
+    "libXinerama.so",
+    "libXcomposite.so",
+    "libXdamage.so",
+    "libXtst.so",
+    "libXss.so",
+    "libSM.so",
+    "libICE.so",
+    "libxcb.so",
+    "libxcb-",
+    # Wayland
+    "libwayland-",
+    # Vulkan (loader, ICDs, layers)
+    "libvulkan.so",
+    "libvulkan_",
+    "libVkLayer_",
+    "libvulkan_intel.so",
+    "libvulkan_radeon.so",
+    "libvulkan_lvp.so",
+    "libvulkan_nouveau.so",
+    "libnvidia-",
+)
+
+
+def is_blacklisted(soname_or_path, blacklist):
+    if soname_or_path in blacklist:
+        return True
+    base = os.path.basename(soname_or_path)
+    if base in blacklist:
+        return True
+    for prefix in _HARD_EXCLUDE_PREFIXES:
+        if soname_or_path.startswith(prefix) or base.startswith(prefix):
+            return True
+    return False
+
+
+def load_appimage_excludelist():
+    """Fetch the AppImage excludelist used to decide which system libs not to bundle.
+
+    We rely on this list (rather than file-system location heuristics) to avoid bundling
+    base system libraries (glibc, GPU driver libs, etc.) while still bundling non-base
+    dependencies that live in /usr/lib on most distros (e.g. libzstd).
+    """
+    wget_path = which("wget")
+    if wget_path:
+        cp = subprocess.run(
+            [wget_path, "--quiet", _APPIMAGE_EXCLUDELIST_URL, "-O", "-"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            check=False,
+        )
+        if cp.returncode == 0 and cp.stdout:
+            return cp.stdout
+        logger.warning(
+            "Failed to fetch AppImage excludelist with wget (rc=%s): %s",
+            cp.returncode,
+            (cp.stderr or "").strip(),
+        )
+
+    curl_path = which("curl")
+    if curl_path:
+        cp = subprocess.run(
+            [curl_path, "-L", "--fail", "--silent", _APPIMAGE_EXCLUDELIST_URL],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            encoding="utf-8",
+            check=False,
+        )
+        if cp.returncode == 0 and cp.stdout:
+            return cp.stdout
+        logger.warning(
+            "Failed to fetch AppImage excludelist with curl (rc=%s): %s",
+            cp.returncode,
+            (cp.stderr or "").strip(),
+        )
+
+    raise RuntimeError(
+        "Unable to fetch AppImage excludelist; ensure 'wget' or 'curl' is available and "
+        "network access to raw.githubusercontent.com is working."
+    )
+
+
+def build_blacklist():
+    """Build the blacklist (a.k.a. excludelist) used to filter ldd results."""
+    blacklist = [
+        "linux-vdso.so.1",
+        "ld-linux-x86-64.so.2",
+        "/lib64/ld-linux-x86-64.so.2",
+    ]
+
+    raw_excludelist = load_appimage_excludelist()
+    excludelist_entries = 0
+    for line in raw_excludelist.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        excludelist_entries += 1
+        blacklist.append(line)
+
+    blacklist = sorted(set(blacklist))
+    # We intentionally ship libstdc++ and libgcc_s with the AppDir to avoid ABI drift.
+    blacklist = [
+        p
+        for p in blacklist
+        if p and not p.startswith("libstdc++.so") and not p.startswith("libgcc_s.so")
+    ]
+    logger.info(
+        "Loaded AppImage excludelist (%d entries), blacklist size=%d",
+        excludelist_entries,
+        len(blacklist),
+    )
+    return blacklist
+
+
+def prepend_search_path(env, key, dir_path):
+    existing = env.get(key, "")
+    prefix = dir_path
+    if not existing:
+        env[key] = prefix
+        return
+    if existing.split(os.pathsep)[0] == prefix:
+        return
+    env[key] = prefix + os.pathsep + existing
+
 
 def merge_dicts(x, y):
     """Given two dicts, merge them into a new dict as a shallow copy."""
@@ -35,10 +187,10 @@ def which(program):
     return None
 
 
-def resolve_dependencies(executable, blacklist):
+def resolve_dependencies(executable, blacklist, env=None):
     # NOTE Use 'ldd' method for now.
     # TODO Use non-ldd method for cross-compiled apps
-    return ldd(executable, blacklist)
+    return ldd(executable, blacklist, env=env)
     # objdump(executable)
     # return {}
 
@@ -89,15 +241,15 @@ def objdumpr(executable, libs, blacklist):
     return libs
 
 
-def ldd(executable, blacklist):
+def ldd(executable, blacklist, env=None):
     """Get all library dependencies (recursive) of 'executable' """
     libs = {}
-    return lddr(executable, libs, blacklist)
+    return lddr(executable, libs, blacklist, env=env)
 
 
-def lddr(executable, libs, blacklist):
+def lddr(executable, libs, blacklist, env=None):
     """Get all library dependencies (recursive) of 'executable' """
-    output = subprocess.check_output(["ldd", "-r", executable]).decode('utf-8')
+    output = subprocess.check_output(["ldd", "-r", executable], env=env).decode("utf-8")
     output = output.split('\n')
 
     for line in output:
@@ -108,7 +260,7 @@ def lddr(executable, libs, blacklist):
         if len(split) == 0:
             continue
 
-        if split[0] in blacklist or os.path.basename(split[0]) in blacklist:
+        if is_blacklisted(split[0], blacklist):
             # debug("'%s' is blacklisted. Skipping..." % (split[0]))
             continue
 
@@ -135,7 +287,7 @@ def lddr(executable, libs, blacklist):
 
             logger.debug("Resolved %s to %s", so, realpath)
 
-            libs = merge_dicts(libs, lddr(realpath, libs, blacklist))
+            libs = merge_dicts(libs, lddr(realpath, libs, blacklist, env=env))
         else:
             libs[so]['dependants'].add(executable)
 
@@ -238,13 +390,13 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
 
         if details['type'] == 'lib':
             src = details['realpath']
-            if details['so'].startswith('libstdc++.so') or details['so'].startswith('libgcc_s.so') or \
-                    details['so'].startswith('libatomic.so') or \
-                    (not src.startswith('/usr/lib/') and not src.startswith('/lib/')):
-                dst = dest_dir + os.sep + appdir_libs + os.sep + dep
-                logger.debug("Copying library " + dep + ": " + src + ' -> ' + dst)
-                shutil.copyfile(src, dst)  # overrides dest no questions asked
-                strip(dst)
+            # Dependency filtering is performed in resolve_dependencies() via the AppImage
+            # excludelist; copy every remaining DT_NEEDED entry even if it resides in
+            # /usr/lib on the build machine (e.g. libzstd.so.1 on Ubuntu).
+            dst = dest_dir + os.sep + appdir_libs + os.sep + dep
+            logger.debug("Copying library " + dep + ": " + src + " -> " + dst)
+            shutil.copyfile(src, dst)  # overrides dest no questions asked
+            strip(dst)
 
         elif details['type'] == 'qml plugin':
             src = details['realpath']
@@ -307,19 +459,7 @@ def build_appimage(appdir, appimage):
 
 
 def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_version: bool = False):
-    blacklist = [
-        'linux-vdso.so.1',
-        'ld-linux-x86-64.so.2',
-        '/lib64/ld-linux-x86-64.so.2'
-    ]
-
-    update_blacklist_cmd = r'wget --quiet https://raw.githubusercontent.com/probonopd/AppImages/master/excludelist' \
-                           r' -O - | sort | uniq | grep -v "^#.*" | grep "[^-\s]"'
-    blacklist += os.popen(update_blacklist_cmd).read().split('\n')
-    logger.info(blacklist)
-    blacklist = [p for p in blacklist if not p.startswith("libstdc++.so") and not p.startswith("libgcc_s.so")]
-    logger.info(blacklist)
-    # exit(0)
+    blacklist = build_blacklist()
 
     qt_qml_dir = qt_base_dir + os.sep + 'qml'
     qt_bin_dir = qt_base_dir + os.sep + 'bin'
@@ -342,7 +482,19 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_
     dependencies = {}
 
     logger.info("Resolving shared object dependencies for '%s'", os.path.basename(binary_name))
-    exedeps = resolve_dependencies(binary_name, blacklist)
+    env = os.environ.copy()
+    binary_lib_dir = os.path.join(os.path.dirname(binary_name), "lib")
+    if os.path.isdir(binary_lib_dir):
+        prepend_search_path(env, "LD_LIBRARY_PATH", binary_lib_dir)
+    if os.path.isdir(qt_lib_dir):
+        prepend_search_path(env, "LD_LIBRARY_PATH", qt_lib_dir)
+    else:
+        logger.warning(
+            "Qt lib dir not found; dependency scanning may be incomplete (qt_lib_dir=%s)",
+            qt_lib_dir,
+        )
+    logger.info("ldd: using LD_LIBRARY_PATH=%s", env.get("LD_LIBRARY_PATH", ""))
+    exedeps = resolve_dependencies(binary_name, blacklist, env=env)
 
     dependencies = merge_dicts(dependencies, exedeps)
 
@@ -362,19 +514,7 @@ def linux_deploy_deps_to_lib_dir(binary_name: str, lib_dir: str):
     In particular, running this on a relocated binary can yield incomplete results because the original
     runtime search paths may no longer point at the dependency directories.
     """
-    blacklist = [
-        'linux-vdso.so.1',
-        'ld-linux-x86-64.so.2',
-        '/lib64/ld-linux-x86-64.so.2'
-    ]
-
-    update_blacklist_cmd = r'wget --quiet https://raw.githubusercontent.com/probonopd/AppImages/master/excludelist' \
-                           r' -O - | sort | uniq | grep -v "^#.*" | grep "[^-\s]"'
-    blacklist += os.popen(update_blacklist_cmd).read().split('\n')
-    logger.info(blacklist)
-    blacklist = [p for p in blacklist if not p.startswith("libstdc++.so") and not p.startswith("libgcc_s.so")]
-    logger.info(blacklist)
-    # exit(0)
+    blacklist = build_blacklist()
 
     # temporary directory to work in
     tmp_dir = os.path.join(tempfile.gettempdir(), "linuxdeployqt.py.tmp")
@@ -399,11 +539,8 @@ def linux_deploy_deps_to_lib_dir(binary_name: str, lib_dir: str):
         details = dependencies[dep]
 
         if details['type'] == 'lib':
-            src = details['realpath']
-            if details["so"].startswith("libatomic.so") or (
-                not src.startswith("/usr/lib/") and not src.startswith("/lib/")
-            ):
-                dst = lib_dir + os.sep + dep
-                logger.debug("Copying library " + dep + ": " + src + ' -> ' + dst)
-                shutil.copyfile(src, dst)  # overrides dest no questions asked
-                strip(dst)
+            src = details["realpath"]
+            dst = lib_dir + os.sep + dep
+            logger.debug("Copying library " + dep + ": " + src + " -> " + dst)
+            shutil.copyfile(src, dst)  # overrides dest no questions asked
+            strip(dst)
