@@ -1,6 +1,6 @@
 #include "zstitchimagedialog.h"
 
-#include "zimg.h"
+#include "zimgqtutils.h"
 #include "zimgdisplay.h"
 #include "zstringutils.h"
 #include "zsysteminfo.h"
@@ -433,7 +433,7 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
       QString str = QString("Image %1").arg(i + 1);
       painter.drawText(rect, str);
     }
-    ZImg::fromQImage(image).save(selectionImageOutputName);
+    ZImgQtUtils::fromQImage(image).save(selectionImageOutputName);
     LOG(INFO) << QString("%1 saved.").arg(selectionImageOutputName);
   }
 }

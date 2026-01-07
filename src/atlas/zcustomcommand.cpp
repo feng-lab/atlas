@@ -13,6 +13,7 @@
 #include "zregionontology.h"
 #include "zjson.h"
 #include "zbenchtimer.h"
+#include "zlogqtgui.h"
 #include "zrandom.h"
 #include "zstringutils.h"
 #include "zmainwindow.h"

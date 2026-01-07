@@ -156,3 +156,4 @@ std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToStroke(const QPainte
 // }
 
 } // namespace nim
+

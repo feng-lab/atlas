@@ -8,7 +8,6 @@
 #include <nanobind/ndarray.h>
 #include <QString>
 #include <QStringList>
-#include <QPolygonF>
 #include <array>
 #include <cstring>
 #include "zglmutils.h"
@@ -186,64 +185,6 @@ struct type_caster<glm::tquat<T, Q>>
       std::array<T, 4> buffer{};
       std::memcpy(buffer.data(), glm::value_ptr(v), sizeof(T) * 4);
       nb::ndarray<nb::numpy, const T> array(buffer.data(), {4});
-      return type_caster<decltype(array)>::from_cpp(array, rv_policy::copy, cleanup);
-    }
-    catch (nanobind::python_error& e) {
-      e.restore();
-      return nullptr;
-    }
-    catch (const std::exception& e) {
-      if (!PyErr_Occurred()) {
-        PyErr_SetString(PyExc_RuntimeError, e.what());
-      }
-      return nullptr;
-    }
-  }
-};
-
-template<>
-struct type_caster<QPolygonF>
-{
-  NB_TYPE_CASTER(QPolygonF, const_name("QPolygonF"));
-
-  static_assert(std::is_standard_layout_v<QPolygonF::value_type> && sizeof(QPolygonF::value_type) == 2 * sizeof(double),
-                "need simple layout");
-
-  bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept
-  {
-    using Arr = nb::ndarray<nb::numpy, double>;
-    make_caster<Arr> ac;
-    if (!ac.from_python(src, flags_for_local_caster<Arr>(flags), cleanup)) {
-      return false;
-    }
-    auto buf = ac.operator cast_t<Arr>();
-    if (buf.ndim() != 2 || buf.shape(1) != 2) {
-      return false;
-    }
-    value = QPolygonF();
-    value.resize(buf.shape(0));
-    auto* data = buf.data();
-    int64_t s0 = buf.stride(0), s1 = buf.stride(1);
-    for (ssize_t r = 0; r < (ssize_t)buf.shape(0); ++r) {
-      value[r].setX(*(data + r * s0 + 0 * s1));
-      value[r].setY(*(data + r * s0 + 1 * s1));
-    }
-    return true;
-  }
-
-  static handle from_cpp(const QPolygonF& v, rv_policy, cleanup_list* cleanup) noexcept
-  {
-    // `type_caster<...>::from_cpp` must be `noexcept`. Avoid `nb::cast(...)` here
-    // since it may throw (e.g., if numpy is unavailable), which would `terminate`.
-    try {
-      nb::ndarray<nb::numpy, const double> array;
-      if (v.empty()) {
-        array = nb::ndarray<nb::numpy, const double>(nullptr, {(size_t)0, (size_t)2});
-      } else {
-        auto* ptr = reinterpret_cast<const double*>(v.data());
-        array = nb::ndarray<nb::numpy, const double>(ptr, {(size_t)v.size(), (size_t)2});
-      }
-
       return type_caster<decltype(array)>::from_cpp(array, rv_policy::copy, cleanup);
     }
     catch (nanobind::python_error& e) {

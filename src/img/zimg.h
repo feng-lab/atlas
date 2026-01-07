@@ -1969,8 +1969,6 @@ public:
   // from alpha pre-multiplied color to normal color, assume last channel is alpha channel
   ZImg& correctPreMultipliedColor();
 
-  static ZImg fromQImage(const QImage& image);
-
   [[nodiscard]] double sum() const;
 
 #ifdef _NEUTUBE_

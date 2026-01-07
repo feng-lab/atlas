@@ -1,6 +1,6 @@
 #include "zgraphicsview.h"
 
-#include "zimg.h"
+#include "zimgqtutils.h"
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QWheelEvent>
@@ -96,7 +96,7 @@ bool ZGraphicsView::renderToImage(const QString& filename, QString* err)
     QPainter painter(&img);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
     render(&painter);
-    ZImg::fromQImage(img).save(filename);
+    ZImgQtUtils::fromQImage(img).save(filename);
     return true;
   }
   catch (const ZException& e) {
@@ -114,7 +114,7 @@ bool ZGraphicsView::renderToImage(const QString& filename, int width, int height
     QPainter painter(&img);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
     render(&painter, QRectF(), QRect(), Qt::KeepAspectRatioByExpanding);
-    ZImg::fromQImage(img).save(filename);
+    ZImgQtUtils::fromQImage(img).save(filename);
     return true;
   }
   catch (const ZException& e) {

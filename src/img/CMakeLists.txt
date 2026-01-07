@@ -162,7 +162,7 @@ set(IMG_SOURCES
         zstitchimage.cpp zstitchimage.h
         zimginit.h zimginit.cpp
         zjson.h zjson.cpp
-        zroiutils.cpp zroiutils.h
+        zroimaskrasterizer.cpp zroimaskrasterizer.h
         zlogcache.cpp zlogcache.h
         zminimumspanningtree.cpp zminimumspanningtree.h
         zmkl.h

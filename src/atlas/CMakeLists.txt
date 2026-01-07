@@ -80,9 +80,10 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Svg SvgWidgets Concurrent Test
+find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Gui Widgets Network Svg SvgWidgets Concurrent Test
              PATHS ${QT_HOST_PATH} NO_DEFAULT_PATH)
 print_target_properties(Qt6::Core)
+print_target_properties(Qt6::Gui)
 print_target_properties(Qt6::Widgets)
 print_target_properties(Qt6::Network)
 print_target_properties(Qt6::Svg)
@@ -475,7 +476,10 @@ set(SOURCES
     zboostgeometryadaptor.h
     z3dcanvaseventlistener.h
     zimgvoxelcolormap.h
+    zimgqtutils.h zimgqtutils.cpp
+    zlogqtgui.h zlogqtgui.cpp
     zroi.h zroi.cpp
+    zroiutils.h zroiutils.cpp
     zroidoc.h zroidoc.cpp
     zroiview.h zroiview.cpp
     zroifilter.h zroifilter.cpp

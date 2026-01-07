@@ -7,7 +7,6 @@
 #include "zvoxelcoordinate.h"
 #include <QPoint>
 #include <QFile>
-#include <QKeySequence>
 #include <absl/log/log_sink_registry.h>
 #include <absl/log/initialize.h>
 #include <absl/log/internal/globals.h>
@@ -219,12 +218,7 @@ static_assert(is_formattable<QSize>(), "QSize should be formattable");
 #endif
 static_assert(is_formattable<QRect>(), "QRect should be formattable");
 static_assert(is_formattable<QRectF>(), "QRectF should be formattable");
-static_assert(is_formattable<QKeySequence>(), "QKeySequence should be formattable");
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-static_assert(is_formattable<QKeyCombination>(), "QKeyCombination should be formattable");
-#endif
 static_assert(is_formattable<QStringList>(), "QStringList should be formattable");
-static_assert(is_formattable<QList<QKeySequence>>(), "QList<QKeySequence> should be formattable");
 static_assert(is_formattable<QContiguousCache<int>>(), "QContiguousCache<int> should be formattable");
 static_assert(is_formattable<QSharedPointer<int>>(), "QSharedPointer<int> should be formattable");
 static_assert(is_formattable<col4>(), "col4 should be formattable");
@@ -247,12 +241,7 @@ static_assert(is_streamable<QSize>(), "QSize should be streamable");
 #endif
 static_assert(is_streamable<QRect>(), "QRect should be streamable");
 static_assert(is_streamable<QRectF>(), "QRectF should be streamable");
-static_assert(is_streamable<QKeySequence>(), "QKeySequence should be streamable");
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-static_assert(is_streamable<QKeyCombination>(), "QKeyCombination should be streamable");
-#endif
 static_assert(is_streamable<QStringList>(), "QStringList should be streamable");
-static_assert(is_streamable<QList<QKeySequence>>(), "QList<QKeySequence> should be streamable");
 static_assert(is_streamable<QContiguousCache<int>>(), "QContiguousCache<int> should be streamable");
 static_assert(is_streamable<QSharedPointer<int>>(), "QSharedPointer<int> should be streamable");
 static_assert(is_streamable<col4>(), "col4 should be streamable");

@@ -12,7 +12,7 @@
 #include "zpunctadetection.h"
 #include "zsectionsregistration.h"
 #include "zchromaticshiftcorrection.h"
-#include "zroiutils.h"
+#include "zroimaskrasterizer.h"
 #include "zimgautothreshold.h"
 #include "zswc.h"
 #include "zmesh.h"
@@ -252,6 +252,74 @@ nb::ndarray<nanobind::numpy, const T> vectorToArray(const std::vector<T>& v)
 {
   return v.empty() ? nb::ndarray<nanobind::numpy, const T>()
                    : nb::ndarray<nanobind::numpy, const T>(v.data(), {v.size()});
+}
+
+std::vector<glm::dvec2> roiPointsFromArray(const nb::ndarray<nb::numpy, const double>& points, const char* name)
+{
+  if (points.ndim() != 2 || points.shape(1) != 2) {
+    throw nb::type_error((std::string(name) + " must have shape (N, 2)").c_str());
+  }
+
+  std::vector<glm::dvec2> out;
+  out.reserve(points.shape(0));
+
+  const auto* data = points.data();
+  const int64_t s0 = points.stride(0);
+  const int64_t s1 = points.stride(1);
+
+  for (size_t i = 0; i < points.shape(0); ++i) {
+    const int64_t base = static_cast<int64_t>(i) * s0;
+    const double x = *(data + base + 0 * s1);
+    const double y = *(data + base + 1 * s1);
+    out.emplace_back(x, y);
+  }
+  return out;
+}
+
+ZROIMaskShapeType roiShapeTypeFromString(const std::string& type)
+{
+  if (type == "Rect") {
+    return ZROIMaskShapeType::Rect;
+  }
+  if (type == "Ellipse") {
+    return ZROIMaskShapeType::Ellipse;
+  }
+  if (type == "Polygon") {
+    return ZROIMaskShapeType::Polygon;
+  }
+  if (type == "Spline") {
+    return ZROIMaskShapeType::Spline;
+  }
+  if (type == "Line") {
+    return ZROIMaskShapeType::Line;
+  }
+  throw nb::value_error(("Unsupported ROI shape type: " + type).c_str());
+}
+
+void validateROIPoints(const std::vector<glm::dvec2>& points, ZROIMaskShapeType type, const char* ctx)
+{
+  if (type == ZROIMaskShapeType::Rect || type == ZROIMaskShapeType::Ellipse) {
+    if (points.size() != 2) {
+      throw nb::value_error((std::string(ctx) + " requires exactly 2 points").c_str());
+    }
+    return;
+  }
+
+  if (type == ZROIMaskShapeType::Polygon) {
+    if (points.size() < 4 || points.front() != points.back()) {
+      throw nb::value_error((std::string(ctx) + " must be closed (first point == last point)").c_str());
+    }
+    return;
+  }
+
+  if (type == ZROIMaskShapeType::Spline || type == ZROIMaskShapeType::Line) {
+    if (points.size() < 2) {
+      throw nb::value_error((std::string(ctx) + " requires at least 2 points").c_str());
+    }
+    return;
+  }
+
+  throw nb::value_error("Unknown ZROIMaskShapeType");
 }
 
 } // namespace
@@ -1309,13 +1377,87 @@ See also
       return fmt::format("<_imgpy.ZImgNCCMatch>");
     });
 
-  nb::class_<ZROIUtils>(m, "ZROIUtils")
-    .def_static("splineToMask", &ZROIUtils::splineToMask, "spline"_a.noconvert())
-    .def_static("rectToMask", &ZROIUtils::rectToMask, "rect"_a.noconvert())
-    .def_static("ellipseToMask", &ZROIUtils::ellipseToMask, "ellipse"_a.noconvert())
-    .def_static("polygonToMask", &ZROIUtils::polygonToMask, "polygon"_a.noconvert())
-    .def_static("shapeToMask", &ZROIUtils::shapeToMask, "shapes"_a)
-    .def("__repr__", [](const ZROIUtils&) {
+  struct ZROIUtilsPy
+  {};
+
+  nb::class_<ZROIUtilsPy>(m, "ZROIUtils")
+    .def_static(
+      "splineToMask",
+      [](const nb::ndarray<nb::numpy, const double>& spline) -> std::tuple<ZImg, index_t, index_t> {
+        ZROIMaskOperation2D op;
+        op.isAdd = true;
+        op.type = ZROIMaskShapeType::Spline;
+        op.poly = roiPointsFromArray(spline, "spline");
+        validateROIPoints(op.poly, op.type, "Spline");
+        std::vector<ZROIMaskOperation2D> ops;
+        ops.push_back(std::move(op));
+        return ZROIMaskRasterizer::shapeToMask(ops);
+      },
+      "spline"_a.noconvert())
+    .def_static(
+      "rectToMask",
+      [](const nb::ndarray<nb::numpy, const double>& rect) -> std::tuple<ZImg, index_t, index_t> {
+        ZROIMaskOperation2D op;
+        op.isAdd = true;
+        op.type = ZROIMaskShapeType::Rect;
+        op.poly = roiPointsFromArray(rect, "rect");
+        validateROIPoints(op.poly, op.type, "Rect");
+        std::vector<ZROIMaskOperation2D> ops;
+        ops.push_back(std::move(op));
+        return ZROIMaskRasterizer::shapeToMask(ops);
+      },
+      "rect"_a.noconvert())
+    .def_static(
+      "ellipseToMask",
+      [](const nb::ndarray<nb::numpy, const double>& ellipse) -> std::tuple<ZImg, index_t, index_t> {
+        ZROIMaskOperation2D op;
+        op.isAdd = true;
+        op.type = ZROIMaskShapeType::Ellipse;
+        op.poly = roiPointsFromArray(ellipse, "ellipse");
+        validateROIPoints(op.poly, op.type, "Ellipse");
+        std::vector<ZROIMaskOperation2D> ops;
+        ops.push_back(std::move(op));
+        return ZROIMaskRasterizer::shapeToMask(ops);
+      },
+      "ellipse"_a.noconvert())
+    .def_static(
+      "polygonToMask",
+      [](const nb::ndarray<nb::numpy, const double>& polygon) -> std::tuple<ZImg, index_t, index_t> {
+        ZROIMaskOperation2D op;
+        op.isAdd = true;
+        op.type = ZROIMaskShapeType::Polygon;
+        op.poly = roiPointsFromArray(polygon, "polygon");
+        validateROIPoints(op.poly, op.type, "Polygon");
+        std::vector<ZROIMaskOperation2D> ops;
+        ops.push_back(std::move(op));
+        return ZROIMaskRasterizer::shapeToMask(ops);
+      },
+      "polygon"_a.noconvert())
+    .def_static(
+      "shapeToMask",
+      [](nb::handle shapeOps) -> std::tuple<ZImg, index_t, index_t> {
+        std::vector<ZROIMaskOperation2D> ops;
+        for (nb::handle item : nb::borrow<nb::iterable>(shapeOps)) {
+          const nb::tuple t = nb::cast<nb::tuple>(item);
+          if (t.size() != 3) {
+            throw nb::type_error("shapeToMask expects entries of the form (points, type, isAdd)");
+          }
+          const auto points = nb::cast<nb::ndarray<nb::numpy, const double>>(t[0]);
+          const std::string type = nb::cast<std::string>(t[1]);
+          const bool isAdd = nb::cast<bool>(t[2]);
+
+          ZROIMaskOperation2D op;
+          op.isAdd = isAdd;
+          op.type = roiShapeTypeFromString(type);
+          op.poly = roiPointsFromArray(points, "points");
+          const std::string ctx = "shape '" + type + "'";
+          validateROIPoints(op.poly, op.type, ctx.c_str());
+          ops.push_back(std::move(op));
+        }
+        return ZROIMaskRasterizer::shapeToMask(ops);
+      },
+      "shapes"_a)
+    .def("__repr__", [](const ZROIUtilsPy&) {
       return fmt::format("<_imgpy.ZROIUtils>");
     });
 

@@ -8,7 +8,8 @@
 #include <QString>
 #include <QStringList>
 #include <QList>
-#include <QColor>
+
+#include "zqtheader.h"
 
 #include "zstackobject.h"
 #include "tz_locseg_chain.h"
