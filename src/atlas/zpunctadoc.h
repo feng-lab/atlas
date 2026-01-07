@@ -3,6 +3,8 @@
 #include "zobjdoc.h"
 #include "zpunctapack.h"
 
+#include <optional>
+
 namespace nim {
 
 class ZPunctaDoc : public ZObjDoc
@@ -17,6 +19,14 @@ public:
   {
     return *m_idToPunctaPacks.at(id);
   }
+
+  // Add puncta that does not come from a local file path (e.g. network-backed Neuroglancer annotations).
+  // The `sourceJson` is stored in the scene file so the puncta can be reloaded on restore.
+  size_t addPunctaFromExternalSource(ZPuncta puncta, QString displayName, QString tooltip, json::value sourceJson);
+
+  [[nodiscard]] std::optional<size_t> findPunctaByExternalSource(const json::value& sourceJson) const;
+
+  void updateExternalPunctaMetadata(size_t id, QString displayName, QString tooltip);
 
   // ZObjDoc interface
 

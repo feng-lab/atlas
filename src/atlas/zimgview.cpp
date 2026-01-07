@@ -1,8 +1,10 @@
 #include "zimgview.h"
 
 #include "zmeshdoc.h"
+#include "zpunctadoc.h"
 #include "zskeletondoc.h"
 #include "zneuroglancerprecomputedmesh.h"
+#include "zneuroglancerprecomputedannotations.h"
 #include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancerprecomputedsegmentproperties.h"
 #include "zneuroglancersegmentpropertiesdialog.h"
@@ -20,6 +22,7 @@
 #include <algorithm>
 #include <limits>
 #include <set>
+#include <string>
 #include <unordered_set>
 
 namespace nim {
@@ -42,6 +45,23 @@ struct NeuroglancerSkeletonLoadResult
   json::value sourceJson;
   QString displayName;
   QString tooltip;
+};
+
+struct NeuroglancerAnnotationsSourceOpenResult
+{
+  QString error;
+  std::shared_ptr<const ZNeuroglancerPrecomputedAnnotationsSource> source;
+  QStringList relationshipIds;
+};
+
+struct NeuroglancerAnnotationsLoadResult
+{
+  QString error;
+  json::value sourceJson;
+  QString displayName;
+  QString tooltip;
+  std::shared_ptr<ZPuncta> puncta;
+  std::shared_ptr<ZSkeleton> skeleton;
 };
 
 struct NeuroglancerMeshSourceKey
@@ -304,6 +324,269 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
   const bool hasAnySkeleton = std::any_of(candidates.begin(), candidates.end(), [](const Candidate& c) {
     return c.hasSkeletonDirectory;
   });
+
+  auto promptAndLoadAnnotationsForSegment =
+    [this](const std::shared_ptr<ZNeuroglancerPrecomputedVolume>& vol, uint64_t segmentId) {
+    CHECK(vol);
+
+    QString prefill;
+    const QString clip = QApplication::clipboard()->text().trimmed();
+    if (clip.contains("://") || clip.startsWith("gs://")) {
+      prefill = clip;
+    }
+
+    const QString annUserText = QInputDialog::getText(
+                                  QApplication::activeWindow(),
+                                  QApplication::applicationName(),
+                                  QStringLiteral("Neuroglancer annotations dataset URL (precomputed root):\n"
+                                                 "(e.g. precomputed://gs://.../annotations)\n\n"
+                                                 "The dataset must be '@type': neuroglancer_annotations_v1."),
+                                  QLineEdit::Normal,
+                                  prefill)
+                                .trimmed();
+    if (annUserText.isEmpty()) {
+      return;
+    }
+
+    QString annRootUrl;
+    try {
+      annRootUrl = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(annUserText);
+    }
+    catch (const std::exception& e) {
+      QMessageBox::information(QApplication::activeWindow(),
+                               QApplication::applicationName(),
+                               QString("Invalid annotations URL:\n%1").arg(QString::fromUtf8(e.what())));
+      return;
+    }
+
+    auto* openWatcher = new QFutureWatcher<NeuroglancerAnnotationsSourceOpenResult>(this);
+    connect(openWatcher,
+            &QFutureWatcher<NeuroglancerAnnotationsSourceOpenResult>::finished,
+            this,
+            [this, openWatcher, vol, segmentId, annRootUrl]() {
+              const NeuroglancerAnnotationsSourceOpenResult r = openWatcher->result();
+              openWatcher->deleteLater();
+
+              if (!r.error.isEmpty()) {
+                QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), r.error);
+                return;
+              }
+              if (!r.source) {
+                QMessageBox::information(QApplication::activeWindow(),
+                                         QApplication::applicationName(),
+                                         QStringLiteral("Failed to open Neuroglancer annotations dataset."));
+                return;
+              }
+              if (r.relationshipIds.isEmpty()) {
+                QMessageBox::information(
+                  QApplication::activeWindow(),
+                  QApplication::applicationName(),
+                  QStringLiteral("This Neuroglancer annotations dataset declares no relationships.\n\n"
+                                 "Atlas currently supports relationship-index based loads (by segment/object ID)."));
+                return;
+              }
+
+              QString relationshipId;
+              if (r.relationshipIds.size() == 1) {
+                relationshipId = r.relationshipIds.at(0);
+              } else {
+                bool ok = false;
+                relationshipId = QInputDialog::getItem(QApplication::activeWindow(),
+                                                       QApplication::applicationName(),
+                                                       QStringLiteral("Select relationship id (used to map object IDs to annotations):"),
+                                                       r.relationshipIds,
+                                                       /*current=*/0,
+                                                       /*editable=*/false,
+                                                       &ok)
+                                  .trimmed();
+                if (!ok || relationshipId.isEmpty()) {
+                  return;
+                }
+              }
+
+              json::object sourceObj;
+              sourceObj["type"] = "neuroglancer_precomputed_annotations";
+              sourceObj["segmentation_root_url"] = json::value_from(vol->rootUrl());
+              sourceObj["annotation_root_url"] = json::value_from(annRootUrl);
+              sourceObj["relationship_id"] = json::value_from(relationshipId);
+              sourceObj["object_id"] = json::value_from(QString::number(static_cast<qulonglong>(segmentId)));
+              const json::value sourceJson = sourceObj;
+
+              if (auto existing = m_doc.doc().punctaDoc().findPunctaByExternalSource(sourceJson)) {
+                (void)existing;
+                return;
+              }
+              if (auto existing = m_doc.doc().skeletonDoc().findSkeletonByExternalSource(sourceJson)) {
+                (void)existing;
+                return;
+              }
+
+              auto* loadWatcher = new QFutureWatcher<NeuroglancerAnnotationsLoadResult>(this);
+              connect(loadWatcher,
+                      &QFutureWatcher<NeuroglancerAnnotationsLoadResult>::finished,
+                      this,
+                      [this, loadWatcher]() {
+                        NeuroglancerAnnotationsLoadResult out = loadWatcher->result();
+                        loadWatcher->deleteLater();
+
+                        if (!out.error.isEmpty()) {
+                          QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), out.error);
+                          return;
+                        }
+
+                        if (out.puncta) {
+                          if (m_doc.doc().punctaDoc().findPunctaByExternalSource(out.sourceJson)) {
+                            return;
+                          }
+                          (void)m_doc.doc().punctaDoc().addPunctaFromExternalSource(std::move(*out.puncta),
+                                                                                    out.displayName,
+                                                                                    out.tooltip,
+                                                                                    out.sourceJson);
+                          return;
+                        }
+                        if (out.skeleton) {
+                          if (m_doc.doc().skeletonDoc().findSkeletonByExternalSource(out.sourceJson)) {
+                            return;
+                          }
+                          (void)m_doc.doc().skeletonDoc().addSkeletonFromExternalSource(*out.skeleton,
+                                                                                        out.displayName,
+                                                                                        out.tooltip,
+                                                                                        out.sourceJson);
+                          return;
+                        }
+
+                        QMessageBox::information(QApplication::activeWindow(),
+                                                 QApplication::applicationName(),
+                                                 QStringLiteral("No renderable annotation geometry was produced."));
+                      });
+
+              loadWatcher->setFuture(QtConcurrent::run([vol, segmentId, source = r.source, relationshipId, annRootUrl, sourceJson]() {
+                NeuroglancerAnnotationsLoadResult out;
+                out.sourceJson = sourceJson;
+                try {
+                  CHECK(vol);
+                  CHECK(source);
+                  const auto anns = source->loadAnnotationsForRelatedObjectBlocking(relationshipId, segmentId);
+                  if (anns.empty()) {
+                    out.error = QString("No annotations found for segment %1 (relationship '%2')")
+                                  .arg(static_cast<qulonglong>(segmentId))
+                                  .arg(relationshipId);
+                    return out;
+                  }
+
+                  if (source->annotationType() == ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Point) {
+                    std::list<ZPunctum> pts;
+                    for (const auto& a : anns) {
+                      if (a.points.size() != 1) {
+                        continue;
+                      }
+                      const auto& p = a.points[0];
+                      ZPunctum punctum(p.x, p.y, p.z, /*r=*/2.0);
+                      punctum.name = std::to_string(static_cast<unsigned long long>(a.id));
+                      punctum.setMaxIntensity(255.0);
+                      punctum.setMeanIntensity(255.0);
+                      if (a.rgba8) {
+                        const auto& c = *a.rgba8;
+                        punctum.setColor(col4(c[0], c[1], c[2], c[3]));
+                      }
+                      pts.push_back(std::move(punctum));
+                    }
+                    if (pts.empty()) {
+                      out.error = QString("No POINT annotations decoded for segment %1 (relationship '%2')")
+                                    .arg(static_cast<qulonglong>(segmentId))
+                                    .arg(relationshipId);
+                      return out;
+                    }
+                    {
+                      auto p = std::make_shared<ZPuncta>();
+                      p->data = std::move(pts);
+                      out.puncta = std::move(p);
+                    }
+                    out.displayName =
+                      QString("NG Annotations %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(relationshipId);
+                    out.tooltip =
+                      QString("Neuroglancer precomputed annotations\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nCount: %5")
+                        .arg(vol->rootUrl())
+                        .arg(annRootUrl)
+                        .arg(relationshipId)
+                        .arg(static_cast<qulonglong>(segmentId))
+                        .arg(static_cast<qulonglong>(out.puncta->data.size()));
+                    return out;
+                  }
+
+                  if (source->annotationType() == ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Line ||
+                      source->annotationType() == ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Polyline) {
+                    std::vector<glm::vec3> vertices;
+                    std::vector<glm::uvec2> edges;
+                    size_t numSegments = 0;
+                    for (const auto& a : anns) {
+                      if (a.points.size() < 2) {
+                        continue;
+                      }
+                      const size_t base = vertices.size();
+                      vertices.insert(vertices.end(), a.points.begin(), a.points.end());
+                      for (size_t i = 0; i + 1 < a.points.size(); ++i) {
+                        edges.emplace_back(static_cast<uint32_t>(base + i), static_cast<uint32_t>(base + i + 1));
+                        ++numSegments;
+                      }
+                    }
+                    if (vertices.empty() || edges.empty()) {
+                      out.error = QString("No LINE/POLYLINE annotations decoded for segment %1 (relationship '%2')")
+                                    .arg(static_cast<qulonglong>(segmentId))
+                                    .arg(relationshipId);
+                      return out;
+                    }
+                    auto skel = std::make_shared<ZSkeleton>();
+                    skel->setVertices(std::move(vertices));
+                    skel->setEdges(std::move(edges));
+                    out.skeleton = std::move(skel);
+                    out.displayName =
+                      QString("NG Annotations %1 (%2)").arg(static_cast<qulonglong>(segmentId)).arg(relationshipId);
+                    out.tooltip =
+                      QString("Neuroglancer precomputed annotations (lines)\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nSegments: %5")
+                        .arg(vol->rootUrl())
+                        .arg(annRootUrl)
+                        .arg(relationshipId)
+                        .arg(static_cast<qulonglong>(segmentId))
+                        .arg(static_cast<qulonglong>(numSegments));
+                    return out;
+                  }
+
+                  out.error = QString("Unsupported annotation_type for rendering: only POINT/LINE/POLYLINE are supported.");
+                  return out;
+                }
+                catch (const ZNotFoundException&) {
+                  out.error = QString("No annotations found for segment %1 (relationship '%2')")
+                                .arg(static_cast<qulonglong>(segmentId))
+                                .arg(relationshipId);
+                  return out;
+                }
+                catch (const std::exception& e) {
+                  out.error = QString("Failed to load neuroglancer annotations:\n%1").arg(QString::fromUtf8(e.what()));
+                  return out;
+                }
+              }));
+            });
+
+    openWatcher->setFuture(QtConcurrent::run([vol, annRootUrl]() -> NeuroglancerAnnotationsSourceOpenResult {
+      NeuroglancerAnnotationsSourceOpenResult out;
+      try {
+        CHECK(vol);
+        std::array<double, 3> baseResNm{vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ};
+        out.source = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(annRootUrl), baseResNm, vol->baseVoxelOffset(), vol->defaultTimeout());
+        CHECK(out.source);
+        for (const auto& rel : out.source->relationships()) {
+          if (!rel.id.trimmed().isEmpty()) {
+            out.relationshipIds << rel.id;
+          }
+        }
+      }
+      catch (const std::exception& e) {
+        out.error = QString("Failed to open neuroglancer annotations dataset:\n%1").arg(QString::fromUtf8(e.what()));
+      }
+      return out;
+    }));
+  };
 
   auto startMeshLoad =
     [this](const std::shared_ptr<ZNeuroglancerPrecomputedVolume>& vol, QString meshSourceDirUrl, uint64_t segmentId) {
@@ -1043,6 +1326,36 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     });
   }
 
+  {
+    auto* loadAnnUnderCursorAct = menu.addAction("Load Neuroglancer Annotations for Segment Under Cursor…");
+    connect(loadAnnUnderCursorAct, &QAction::triggered, this, [scenePos, candidates, promptAndLoadAnnotationsForSegment]() {
+      int bestPrecedence = std::numeric_limits<int>::min();
+      std::optional<uint64_t> bestSeg;
+      std::shared_ptr<ZNeuroglancerPrecomputedVolume> bestVol;
+      for (const auto& c : candidates) {
+        CHECK(c.filter);
+        const std::optional<uint64_t> segOpt = c.filter->cachedNeuroglancerSegmentationIdAtScenePos(scenePos);
+        if (!segOpt) {
+          continue;
+        }
+        const int precedence = c.filter->viewPrecedence();
+        if (!bestSeg || precedence > bestPrecedence) {
+          bestPrecedence = precedence;
+          bestSeg = segOpt;
+          bestVol = c.vol;
+        }
+      }
+      if (!bestSeg || !bestVol) {
+        QMessageBox::information(QApplication::activeWindow(),
+                                 QApplication::applicationName(),
+                                 QStringLiteral("No cached Neuroglancer segment ID is available under the cursor yet.\n\n"
+                                                "Wait for the visible tiles to finish loading, then try again."));
+        return;
+      }
+      promptAndLoadAnnotationsForSegment(bestVol, *bestSeg);
+    });
+  }
+
   // Choose the top-most (highest view precedence) visible segmentation layer for dataset-scoped actions.
   auto pickTopmostSegmentationCandidate = [&](auto wantsCandidate) -> const Candidate* {
     int bestPrecedence = std::numeric_limits<int>::min();
@@ -1060,6 +1373,37 @@ void ZImgView::appendContextMenuActions(QMenu& menu,
     }
     return best;
   };
+
+  if (const Candidate* topAny = pickTopmostSegmentationCandidate([](const Candidate&) { return true; })) {
+    if (topAny->vol) {
+      const std::shared_ptr<ZNeuroglancerPrecomputedVolume> topVol = topAny->vol;
+      auto* loadAnnByIdAct =
+        menu.addAction(QString("Load Neuroglancer Annotations for Segment ID… (%1)").arg(topVol->rootUrl()));
+      connect(loadAnnByIdAct, &QAction::triggered, this, [topVol, promptAndLoadAnnotationsForSegment]() {
+        QString prefill;
+        if (const auto clipOpt = parseUint64Base10(QApplication::clipboard()->text())) {
+          prefill = QString::number(static_cast<qulonglong>(*clipOpt));
+        }
+        const QString s = QInputDialog::getText(QApplication::activeWindow(),
+                                                QApplication::applicationName(),
+                                                QStringLiteral("Neuroglancer segment/object ID (uint64, base-10):"),
+                                                QLineEdit::Normal,
+                                                prefill)
+                            .trimmed();
+        if (s.isEmpty()) {
+          return;
+        }
+        const auto idOpt = parseUint64Base10(s);
+        if (!idOpt) {
+          QMessageBox::information(QApplication::activeWindow(),
+                                   QApplication::applicationName(),
+                                   QStringLiteral("Invalid object ID. Expected a base-10 uint64 value."));
+          return;
+        }
+        promptAndLoadAnnotationsForSegment(topVol, *idOpt);
+      });
+    }
+  }
 
   const Candidate* topMesh = hasAnyMesh ? pickTopmostSegmentationCandidate([](const Candidate& c) {
     return c.hasMeshDirectory;

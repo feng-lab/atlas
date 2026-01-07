@@ -520,6 +520,7 @@ set(SOURCES
     zimgpack.h zimgpack.cpp
     zimgpackdisplay.h zimgpackdisplay.cpp
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
+    zneuroglancerprecomputedannotations.h zneuroglancerprecomputedannotations.cpp
     zneuroglancerprecomputedmesh.h zneuroglancerprecomputedmesh.cpp
     zneuroglancerprecomputedskeleton.h zneuroglancerprecomputedskeleton.cpp
     zneuroglancerprecomputedsegmentproperties.h zneuroglancerprecomputedsegmentproperties.cpp

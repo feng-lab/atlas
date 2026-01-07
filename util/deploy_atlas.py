@@ -1,9 +1,11 @@
 import argparse
 import datetime
 import hashlib
+import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import stat
 import subprocess
@@ -76,10 +78,157 @@ _MACOS_NOTARYTOOL_SUBMIT_RETRY_ATTEMPTS = 5
 _MACOS_NOTARYTOOL_SUBMIT_RETRY_BASE_DELAY_SECONDS = 5.0
 _MACOS_NOTARYTOOL_SUBMIT_RETRY_MAX_DELAY_SECONDS = 120.0
 
+_MACOS_STAPLER_VERBOSE_ENV_VAR = "ATLAS_MACOS_STAPLER_VERBOSE"
+_MACOS_NOTARYTOOL_PRINT_FULL_LOG_ENV_VAR = "ATLAS_MACOS_NOTARYTOOL_PRINT_FULL_LOG"
+_MACOS_SPCTL_VERBOSE_ENV_VAR = "ATLAS_MACOS_SPCTL_VERBOSE"
+
+_MACOS_LOG_REDACTED_PLACEHOLDER = "<redacted>"
+_MACOS_LOG_SENSITIVE_FLAGS_WITH_VALUE: frozenset[str] = frozenset(
+    {
+        # Apple notarization API key auth.
+        "--key",
+        "--key-id",
+        "--issuer",
+        # Codesign identity can contain Team IDs / certificate subjects.
+        "--sign",
+        # Generic (future-proofing).
+        "--password",
+        "--passphrase",
+        "--token",
+        "--access-token",
+        "--refresh-token",
+    }
+)
+
+
+def _macos_format_command_for_logging(args: list[str]) -> str:
+    """Best-effort command formatting for logs that redacts obvious secrets.
+
+    We intentionally redact values for well-known secret-bearing flags to avoid
+    leaking credentials into CI logs. This is a logging-only transformation: we
+    always execute the original command list.
+    """
+    redacted: list[str] = []
+    i = 0
+    while i < len(args):
+        arg = args[i]
+
+        # Handle `--flag value` forms.
+        if arg in _MACOS_LOG_SENSITIVE_FLAGS_WITH_VALUE:
+            redacted.append(arg)
+            if i + 1 < len(args):
+                value = args[i + 1]
+                if arg == "--sign" and value == "-":
+                    # Ad-hoc signing is not sensitive and is useful to see in logs.
+                    redacted.append(value)
+                else:
+                    redacted.append(_MACOS_LOG_REDACTED_PLACEHOLDER)
+                i += 2
+                continue
+            i += 1
+            continue
+
+        # Handle `--flag=value` forms.
+        redacted_value = None
+        for flag in _MACOS_LOG_SENSITIVE_FLAGS_WITH_VALUE:
+            prefix = f"{flag}="
+            if arg.startswith(prefix):
+                value = arg[len(prefix) :]
+                if flag == "--sign" and value == "-":
+                    redacted_value = arg
+                else:
+                    redacted_value = f"{prefix}{_MACOS_LOG_REDACTED_PLACEHOLDER}"
+                break
+        if redacted_value is not None:
+            redacted.append(redacted_value)
+            i += 1
+            continue
+
+        redacted.append(arg)
+        i += 1
+
+    return shlex.join(redacted)
+
 
 def _env_truthy(name: str) -> bool:
     value = os.environ.get(name, "").strip().lower()
     return value in {"1", "true", "yes", "y", "on"}
+
+
+def _running_in_ci() -> bool:
+    # Public repos => CI logs are typically world-readable. Treat "CI" as a
+    # signal to avoid verbose logging that could leak metadata or create huge logs.
+    return _env_truthy("CI") or _env_truthy("GITHUB_ACTIONS")
+
+
+def _allow_verbose_diagnostics_in_logs() -> bool:
+    # Lock down verbose output in CI (especially GitHub Actions), since logs are public.
+    return not _running_in_ci()
+
+
+def _macos_log_notarytool_result_summary(log_path: str, log_text: str) -> None:
+    """Log a concise summary of a `notarytool log` JSON file.
+
+    The full JSON can be quite noisy in CI logs. Prefer printing a readable
+    summary and leaving the complete JSON on disk for inspection.
+    """
+    logger.error("notarytool log saved: %s", log_path)
+
+    try:
+        payload = json.loads(log_text)
+    except json.JSONDecodeError:
+        if _allow_verbose_diagnostics_in_logs():
+            logger.error(
+                "notarytool log is not valid JSON; set %s=1 to print the full log.",
+                _MACOS_NOTARYTOOL_PRINT_FULL_LOG_ENV_VAR,
+            )
+        else:
+            logger.error(
+                "notarytool log is not valid JSON; full log printing is disabled in CI."
+            )
+        return
+
+    if isinstance(payload, dict):
+        status = payload.get("status")
+        status_summary = payload.get("statusSummary") or payload.get("message")
+        if status or status_summary:
+            logger.error(
+                "notarytool status: %s%s",
+                status or "<unknown>",
+                f" ({status_summary})" if status_summary else "",
+            )
+
+        issues = payload.get("issues")
+        if isinstance(issues, list) and issues:
+            logger.error("notarytool issues (%d):", len(issues))
+            for issue in issues:
+                if not isinstance(issue, dict):
+                    logger.error("  - %s", issue)
+                    continue
+
+                severity = issue.get("severity") or issue.get("level") or "<unknown>"
+                path = issue.get("path") or issue.get("file") or ""
+                message = issue.get("message") or issue.get("description") or ""
+
+                parts: list[str] = [str(severity)]
+                if path:
+                    parts.append(str(path))
+                if message:
+                    parts.append(str(message))
+                logger.error("  - %s", " | ".join(parts))
+
+        return
+
+    logger.error(
+        "notarytool log JSON has an unexpected top-level type (%s).",
+        type(payload).__name__,
+    )
+    if _allow_verbose_diagnostics_in_logs():
+        logger.error(
+            "Set %s=1 to print the full log.", _MACOS_NOTARYTOOL_PRINT_FULL_LOG_ENV_VAR
+        )
+    else:
+        logger.error("Full log printing is disabled in CI.")
 
 
 def _macos_signing_disabled() -> bool:
@@ -152,7 +301,7 @@ def _macos_entitlements_path() -> Optional[str]:
 
 
 def _macos_run_checked(args: list[str], *, cwd: Optional[str] = None) -> None:
-    logger.info("Running: %s", " ".join(args))
+    logger.info("Running: %s", _macos_format_command_for_logging(args))
     subprocess.run(args, cwd=cwd, shell=False, check=True)
 
 
@@ -168,7 +317,7 @@ def _macos_run_codesign_checked(cmd: list[str], *, cwd: Optional[str] = None) ->
         raise ValueError("_macos_run_codesign_checked expects a codesign command")
 
     for attempt in range(1, _MACOS_CODESIGN_TIMESTAMP_RETRY_ATTEMPTS + 1):
-        logger.info("Running: %s", " ".join(cmd))
+        logger.info("Running: %s", _macos_format_command_for_logging(cmd))
         proc = subprocess.run(
             cmd,
             cwd=cwd,
@@ -209,7 +358,7 @@ def _macos_run_codesign_checked(cmd: list[str], *, cwd: Optional[str] = None) ->
     raise RuntimeError(
         "codesign failed after retries because the timestamp service is not available.\n"
         "This is usually a temporary Apple timestamp server or network issue. Re-run the deployment when network is stable.\n"
-        f"Command: {' '.join(cmd)}"
+        f"Command: {_macos_format_command_for_logging(cmd)}"
     )
 
 
@@ -255,7 +404,11 @@ def _macos_notarytool_submit_wait_checked(
     last_submission_id: Optional[str] = None
     for attempt in range(1, _MACOS_NOTARYTOOL_SUBMIT_RETRY_ATTEMPTS + 1):
         attempt_str = f" ({attempt}/{_MACOS_NOTARYTOOL_SUBMIT_RETRY_ATTEMPTS})"
-        logger.info("Running: %s%s", " ".join(submit_cmd), attempt_str)
+        logger.info(
+            "Running: %s%s",
+            _macos_format_command_for_logging(submit_cmd),
+            attempt_str,
+        )
         proc = subprocess.Popen(
             submit_cmd,
             shell=False,
@@ -320,7 +473,7 @@ def _macos_notarytool_submit_wait_checked(
         "This is usually a temporary Apple notary service disruption or a flaky CI network. Re-run the deployment when network is stable.\n"
         f"zip: {notarize_zip}\n"
         f"last id: {last_submission_id or '<unknown>'}\n"
-        f"Command: {' '.join(submit_cmd)}\n"
+        f"Command: {_macos_format_command_for_logging(submit_cmd)}\n"
         "Last output:\n"
         f"{last_output or '<no output>'}"
     )
@@ -754,7 +907,7 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
     # ditto can emit per-file permission errors while still returning success; treat any
     # such output as fatal so we don't notarize an incomplete zip.
     ditto_cmd = ["ditto", "-c", "-k", "--keepParent", bundle_name, notarize_zip]
-    logger.info("Running: %s", " ".join(ditto_cmd))
+    logger.info("Running: %s", _macos_format_command_for_logging(ditto_cmd))
     proc = subprocess.run(
         ditto_cmd,
         cwd=bundle_dir,
@@ -789,18 +942,26 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
                 ["xcrun", "notarytool", "log", submission_id, log_path, *auth_args]
             )
         except subprocess.CalledProcessError:
+            safe_cmd = _macos_format_command_for_logging(
+                ["xcrun", "notarytool", "log", submission_id, "<output-path>", *auth_args]
+            )
             raise RuntimeError(
                 "Notarization failed and fetching the notarization log also failed.\n"
                 f"bundle: {bundle_path}\n"
                 f"id: {submission_id}\n"
                 f"status: {status}\n"
                 "Re-run:\n"
-                f"  xcrun notarytool log {submission_id} <output-path> {' '.join(auth_args)}"
+                f"  {safe_cmd}"
             )
         try:
             with open(log_path, "r", encoding="utf-8") as f:
                 log_text = f.read()
-            logger.error("notarytool log (%s):\n%s", log_path, log_text)
+            if _allow_verbose_diagnostics_in_logs() and _env_truthy(
+                _MACOS_NOTARYTOOL_PRINT_FULL_LOG_ENV_VAR
+            ):
+                logger.error("notarytool log (%s):\n%s", log_path, log_text)
+            else:
+                _macos_log_notarytool_result_summary(log_path, log_text)
         except Exception as e:
             logger.error("Failed printing notarytool log %s: %s", log_path, e)
         raise RuntimeError(
@@ -811,11 +972,54 @@ def _macos_notarize_and_staple_bundle(bundle_path: str) -> None:
             f"log: {log_path}\n"
             "Open the log file above to see which embedded file failed validation."
         )
-    _macos_run_checked(["xcrun", "stapler", "staple", "-v", bundle_path])
-    _macos_run_checked(["xcrun", "stapler", "validate", "-v", bundle_path])
-    _macos_run_checked(
-        ["spctl", "--assess", "--type", "execute", "--verbose=4", bundle_path]
+
+    # `stapler -v` prints the full CloudKit ticket payload (very large) which
+    # is noisy in CI and can expose unnecessary metadata. Keep logs concise by
+    # default, and allow opting into verbose output when debugging.
+    stapler_verbose = _allow_verbose_diagnostics_in_logs() and _env_truthy(
+        _MACOS_STAPLER_VERBOSE_ENV_VAR
     )
+
+    staple_cmd = ["xcrun", "stapler", "staple"]
+    if stapler_verbose:
+        staple_cmd.append("-v")
+    staple_cmd.append(bundle_path)
+    _macos_run_checked(staple_cmd)
+
+    validate_cmd = ["xcrun", "stapler", "validate"]
+    if stapler_verbose:
+        validate_cmd.append("-v")
+    validate_cmd.append(bundle_path)
+    _macos_run_checked(validate_cmd)
+
+    spctl_verbose = _allow_verbose_diagnostics_in_logs() and _env_truthy(
+        _MACOS_SPCTL_VERBOSE_ENV_VAR
+    )
+    spctl_cmd = ["spctl", "--assess", "--type", "execute"]
+    if spctl_verbose:
+        spctl_cmd.append("--verbose=4")
+    spctl_cmd.append(bundle_path)
+
+    logger.info("Running: %s", _macos_format_command_for_logging(spctl_cmd))
+    proc = subprocess.run(
+        spctl_cmd,
+        shell=False,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    spctl_output = (proc.stdout or "").strip()
+    if proc.returncode != 0:
+        if spctl_output:
+            for line in spctl_output.splitlines():
+                logger.error("%s", line)
+        raise subprocess.CalledProcessError(proc.returncode, spctl_cmd, output=spctl_output)
+    if spctl_verbose and spctl_output:
+        for line in spctl_output.splitlines():
+            logger.info("%s", line)
+    else:
+        logger.info("spctl assessment: accepted")
     try:
         os.remove(notarize_zip)
     except OSError:
@@ -1000,8 +1204,16 @@ def _macos_notarize_qtifw_package_dir(package_dir: str) -> None:
 
             archive_stem, _archive_ext = os.path.splitext(archive_name)
             tmp_archive_path = os.path.join(tmp_dir, f"{archive_stem}.tmp.7z")
-            cmd = [archivegen, "--format", "7z", "--compression", "5", tmp_archive_path, *root_items]
-            logger.info("Running: %s", " ".join(cmd))
+            cmd = [
+                archivegen,
+                "--format",
+                "7z",
+                "--compression",
+                "5",
+                tmp_archive_path,
+                *root_items,
+            ]
+            logger.info("Running: %s", _macos_format_command_for_logging(cmd))
             subprocess.run(cmd, cwd=extract_dir, shell=False, check=True)
             if not os.path.exists(tmp_archive_path):
                 # `archivegen` appends the format extension when the output path doesn't end

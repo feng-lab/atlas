@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zobjpack.h"
+#include "zjson.h"
 #include "zpuncta.h"
 #include "zglmutils.h"
 #include "zbbox.h"
@@ -118,6 +119,15 @@ protected:
 private:
   friend class ZPunctaEditCommand;
 
+public:
+  // If set, the puncta pack is not backed by a local file path (e.g. network-backed Neuroglancer annotations).
+  // Stored in the scene file so the puncta can be reloaded on restore.
+  json::value sourceJson;
+  QString displayNameOverride;
+  QString tooltipOverride;
+  bool hasUnsavedChange = false;
+
+private:
   mutable QString m_info;
   QString m_name;
   QString m_tooltip;

@@ -595,22 +595,35 @@ jobs:
             echo "Error: SSH_PRIVATE_KEY_BASE64 / SSH_KNOWN_HOSTS_BASE64 are not set. Provide them via the ATLAS_ENV_LOCAL dotenv secret." >&2
             exit 1
           fi
-          mkdir -p ~/.ssh/
+          tmpRoot="${RUNNER_TEMP:-/tmp}"
+          if command -v cygpath >/dev/null 2>&1; then
+            tmpRoot="$(cygpath -u "${tmpRoot}")"
+          fi
+          sshDir="${tmpRoot}/atlas-ssh"
+          mkdir -p "${sshDir}"
+          sshKeyPath="${sshDir}/deploy.key"
+          knownHostsPath="${sshDir}/known_hosts"
           sshPrivateKeyB64="${SSH_PRIVATE_KEY_BASE64//$'\r'/}"
           sshPrivateKeyB64="${sshPrivateKeyB64//$'\n'/}"
           if [[ "${sshPrivateKeyB64}" == *% ]]; then
             sshPrivateKeyB64="${sshPrivateKeyB64%?}"
           fi
-          printf '%s' "$sshPrivateKeyB64" | base64 --decode > ~/.ssh/private.key
-          chmod 600 ~/.ssh/private.key
-          # Append CI known_hosts entries; do not clobber existing user configuration
+          printf '%s' "$sshPrivateKeyB64" | base64 --decode > "${sshKeyPath}"
+          chmod 600 "${sshKeyPath}"
+          # Use a temp known_hosts file; do not mutate ~/.ssh on self-hosted runners.
           sshKnownHostsB64="${SSH_KNOWN_HOSTS_BASE64//$'\r'/}"
           sshKnownHostsB64="${sshKnownHostsB64//$'\n'/}"
           if [[ "${sshKnownHostsB64}" == *% ]]; then
             sshKnownHostsB64="${sshKnownHostsB64%?}"
           fi
-          printf '%s' "$sshKnownHostsB64" | base64 --decode >> ~/.ssh/known_hosts
-          printf '\n' >> ~/.ssh/known_hosts
+          printf '%s' "$sshKnownHostsB64" | base64 --decode > "${knownHostsPath}"
+          printf '\n' >> "${knownHostsPath}"
+
+          {
+            echo "ATLAS__SSH_DIR=${sshDir}"
+            echo "ATLAS__SSH_KEY_PATH=${sshKeyPath}"
+            echo "ATLAS__SSH_KNOWN_HOSTS_PATH=${knownHostsPath}"
+          } >> "$GITHUB_ENV"
 
       - name: Create or update release and upload assets (gh CLI)
         if: github.event_name == 'create' && github.ref_type == 'tag' && startsWith(github.event.ref, 'v')
@@ -633,14 +646,14 @@ jobs:
               fi
               local rc=$?
               if [ "$attempt" -ge "$attempts" ]; then
-                echo "Command failed after ${attempts} attempts (exit ${rc}): $*" >&2
+                echo "Command failed after ${attempts} attempts (exit ${rc}): ${1:-<unknown>}" >&2
                 return "$rc"
               fi
               local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
               if [ "$sleep_for" -gt "$max_delay" ]; then
                 sleep_for="$max_delay"
               fi
-              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): $*" >&2
+              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): ${1:-<unknown>}" >&2
               sleep "$sleep_for"
               attempt=$(( attempt + 1 ))
             done
@@ -691,14 +704,14 @@ jobs:
               fi
               local rc=$?
               if [ "$attempt" -ge "$attempts" ]; then
-                echo "Command failed after ${attempts} attempts (exit ${rc}): $*" >&2
+                echo "Command failed after ${attempts} attempts (exit ${rc}): ${1:-<unknown>}" >&2
                 return "$rc"
               fi
               local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
               if [ "$sleep_for" -gt "$max_delay" ]; then
                 sleep_for="$max_delay"
               fi
-              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): $*" >&2
+              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): ${1:-<unknown>}" >&2
               sleep "$sleep_for"
               attempt=$(( attempt + 1 ))
             done
@@ -707,12 +720,15 @@ jobs:
           : "${SSH_PORT:?Error: SSH_PORT is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_USERNAME:?Error: SSH_USERNAME is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_DEPLOY_PATH:?Error: SSH_DEPLOY_PATH is not set (ATLAS_ENV_LOCAL)}"
+          : "${ATLAS__SSH_KEY_PATH:?Error: ATLAS__SSH_KEY_PATH is not set}"
+          : "${ATLAS__SSH_KNOWN_HOSTS_PATH:?Error: ATLAS__SSH_KNOWN_HOSTS_PATH is not set}"
+          sshCommonArgs=(-i "$ATLAS__SSH_KEY_PATH" -o "UserKnownHostsFile=$ATLAS__SSH_KNOWN_HOSTS_PATH" -o StrictHostKeyChecking=yes -o LogLevel=ERROR)
           deploy_primary() {
             # Ensure remote paths exist and replace the Windows package folder
-            ssh -p "$SSH_PORT" -i ~/.ssh/private.key "$SSH_USERNAME@$SSH_SERVER" \
+            ssh -p "$SSH_PORT" "${sshCommonArgs[@]}" "$SSH_USERNAME@$SSH_SERVER" \
               "mkdir -p '$SSH_DEPLOY_PATH/packages' '$SSH_DEPLOY_PATH/installers' && rm -rf '$SSH_DEPLOY_PATH/packages/Windows'"
-            scp -P "$SSH_PORT" -i ~/.ssh/private.key -r "deploy/Windows" "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/"
-            scp -P "$SSH_PORT" -i ~/.ssh/private.key deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/"
+            scp -P "$SSH_PORT" "${sshCommonArgs[@]}" -r "deploy/Windows" "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/"
+            scp -P "$SSH_PORT" "${sshCommonArgs[@]}" deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/"
           }
           retry 5 5 60 deploy_primary
 
@@ -732,14 +748,14 @@ jobs:
               fi
               local rc=$?
               if [ "$attempt" -ge "$attempts" ]; then
-                echo "Command failed after ${attempts} attempts (exit ${rc}): $*" >&2
+                echo "Command failed after ${attempts} attempts (exit ${rc}): ${1:-<unknown>}" >&2
                 return "$rc"
               fi
               local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
               if [ "$sleep_for" -gt "$max_delay" ]; then
                 sleep_for="$max_delay"
               fi
-              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): $*" >&2
+              echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): ${1:-<unknown>}" >&2
               sleep "$sleep_for"
               attempt=$(( attempt + 1 ))
             done
@@ -748,14 +764,26 @@ jobs:
           : "${SSH_PORT2:?Error: SSH_PORT2 is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_USERNAME2:?Error: SSH_USERNAME2 is not set (ATLAS_ENV_LOCAL)}"
           : "${SSH_DEPLOY_PATH2:?Error: SSH_DEPLOY_PATH2 is not set (ATLAS_ENV_LOCAL)}"
+          : "${ATLAS__SSH_KEY_PATH:?Error: ATLAS__SSH_KEY_PATH is not set}"
+          : "${ATLAS__SSH_KNOWN_HOSTS_PATH:?Error: ATLAS__SSH_KNOWN_HOSTS_PATH is not set}"
+          sshCommonArgs=(-i "$ATLAS__SSH_KEY_PATH" -o "UserKnownHostsFile=$ATLAS__SSH_KNOWN_HOSTS_PATH" -o StrictHostKeyChecking=yes -o LogLevel=ERROR)
           deploy_secondary() {
             # Ensure remote paths exist and replace the Windows package folder
-            ssh -p "$SSH_PORT2" -i ~/.ssh/private.key "$SSH_USERNAME2@$SSH_SERVER2" \
+            ssh -p "$SSH_PORT2" "${sshCommonArgs[@]}" "$SSH_USERNAME2@$SSH_SERVER2" \
               "mkdir -p '$SSH_DEPLOY_PATH2/packages' '$SSH_DEPLOY_PATH2/installers' && rm -rf '$SSH_DEPLOY_PATH2/packages/Windows'"
-            scp -P "$SSH_PORT2" -i ~/.ssh/private.key -r "deploy/Windows" "$SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/"
-            scp -P "$SSH_PORT2" -i ~/.ssh/private.key deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/"
+            scp -P "$SSH_PORT2" "${sshCommonArgs[@]}" -r "deploy/Windows" "$SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/"
+            scp -P "$SSH_PORT2" "${sshCommonArgs[@]}" deploy/AtlasInstaller-Windows.zip "$SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/"
           }
           retry 5 5 60 deploy_secondary
+
+      - name: Cleanup SSH assets
+        if: ${{ always() }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          if [ -n "${ATLAS__SSH_DIR:-}" ] && [ -d "${ATLAS__SSH_DIR}" ]; then
+            rm -rf "${ATLAS__SSH_DIR}" || true
+          fi
 
       - name: Publish zimg (PyPI + conda)
         shell: pwsh

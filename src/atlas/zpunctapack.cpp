@@ -16,7 +16,10 @@ ZPunctaPack::ZPunctaPack(ZPuncta puncta, const QString& path, size_t id, ZPuncta
   updateDerivedData();
   updateViewRelatedData();
   createContextMenu();
-  connect(&m_undoStack, &QUndoStack::cleanChanged, this, &ZPunctaPack::undoStackCleanChanged);
+  connect(&m_undoStack, &QUndoStack::cleanChanged, this, [this](bool clean) {
+    hasUnsavedChange = !clean;
+    Q_EMIT undoStackCleanChanged(clean);
+  });
 }
 
 ZPunctaPack::~ZPunctaPack()
@@ -45,7 +48,11 @@ void ZPunctaPack::save(const QString& fileName, const QString& format)
 {
   m_puncta.save(fileName, format);
   m_path = QFileInfo(fileName).canonicalFilePath();
+  sourceJson = {};
+  displayNameOverride.clear();
+  tooltipOverride.clear();
   m_undoStack.setClean();
+  hasUnsavedChange = false;
   updateDerivedData();
 }
 
@@ -189,8 +196,21 @@ void ZPunctaPack::showPunctaContextMenu(QPoint globalPos)
 void ZPunctaPack::updateDerivedData()
 {
   m_info.clear();
-  m_name = QFileInfo(m_path).fileName();
-  m_tooltip = m_path;
+  if (!displayNameOverride.isEmpty()) {
+    m_name = displayNameOverride;
+  } else if (!m_path.isEmpty()) {
+    m_name = QFileInfo(m_path).fileName();
+  } else {
+    m_name = QStringLiteral("Puncta");
+  }
+
+  if (!tooltipOverride.isEmpty()) {
+    m_tooltip = tooltipOverride;
+  } else if (!m_path.isEmpty()) {
+    m_tooltip = m_path;
+  } else {
+    m_tooltip.clear();
+  }
 }
 
 void ZPunctaPack::updateViewRelatedData()

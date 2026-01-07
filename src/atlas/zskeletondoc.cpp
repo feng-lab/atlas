@@ -4,6 +4,7 @@
 #include "zimgdoc.h"
 #include "zlog.h"
 #include "zneuroglancerprecomputed.h"
+#include "zneuroglancerprecomputedannotations.h"
 #include "zneuroglancerprecomputedsegmentproperties.h"
 #include "zneuroglancerprecomputedskeleton.h"
 
@@ -113,6 +114,139 @@ size_t ZSkeletonDoc::loadFile(const json::value& jValue, QString& errorMsg)
         return 0;
       }
       const QString type = json::value_to<QString>(typeIt->value()).trimmed();
+
+      if (type == "neuroglancer_precomputed_annotations") {
+        auto segRootIt = jo.find("segmentation_root_url");
+        if (segRootIt == jo.end() || !segRootIt->value().is_string()) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: missing string field 'segmentation_root_url'");
+          return 0;
+        }
+        const QString normalizedSegRootUrl =
+          ZNeuroglancerPrecomputedVolume::normalizeRootUrl(json::value_to<QString>(segRootIt->value()));
+
+        auto annRootIt = jo.find("annotation_root_url");
+        if (annRootIt == jo.end() || !annRootIt->value().is_string()) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: missing string field 'annotation_root_url'");
+          return 0;
+        }
+        const QString normalizedAnnRootUrl =
+          ZNeuroglancerPrecomputedVolume::normalizeRootUrl(json::value_to<QString>(annRootIt->value()));
+
+        auto relIt = jo.find("relationship_id");
+        if (relIt == jo.end() || !relIt->value().is_string()) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: missing string field 'relationship_id'");
+          return 0;
+        }
+        const QString relationshipId = json::value_to<QString>(relIt->value()).trimmed();
+        if (relationshipId.isEmpty()) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: relationship_id must be non-empty");
+          return 0;
+        }
+
+        auto objIt = jo.find("object_id");
+        if (objIt == jo.end() || !objIt->value().is_string()) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: missing string field 'object_id'");
+          return 0;
+        }
+        const QString objStr = json::value_to<QString>(objIt->value()).trimmed();
+        const auto objOpt = parseUint64Base10(objStr);
+        if (!objOpt) {
+          errorMsg = QString("Invalid neuroglancer annotations JSON: object_id must be base-10 uint64");
+          return 0;
+        }
+        const uint64_t objectId = *objOpt;
+
+        // Deduplicate before performing any network work.
+        for (const auto& idPack : m_idToSkeletonPacks) {
+          if (isSameObj(jValue, jsonValue(idPack.first))) {
+            return idPack.first;
+          }
+        }
+
+        // Try to reuse an already-opened segmentation volume.
+        std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol;
+        for (const size_t imgId : m_doc.objsOfDoc(&m_doc.imgDoc())) {
+          const ZImgPack& pack = m_doc.imgDoc().imgPack(imgId);
+          if (!pack.isNeuroglancerPrecomputed()) {
+            continue;
+          }
+          if (pack.neuroglancerRootUrl() == normalizedSegRootUrl && pack.neuroglancerVolumeShared()->isSegmentation()) {
+            vol = pack.neuroglancerVolumeShared();
+            break;
+          }
+        }
+        if (!vol) {
+          vol = ZNeuroglancerPrecomputedVolume::open(normalizedSegRootUrl, kDefaultTimeout);
+        }
+        CHECK(vol);
+
+        std::array<double, 3> baseResNm{vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ};
+        auto source = ZNeuroglancerPrecomputedAnnotationsSource::open(QUrl(normalizedAnnRootUrl),
+                                                                      baseResNm,
+                                                                      vol->baseVoxelOffset(),
+                                                                      vol->defaultTimeout());
+        CHECK(source);
+
+        if (source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Line &&
+            source->annotationType() != ZNeuroglancerPrecomputedAnnotationsSource::AnnotationType::Polyline) {
+          errorMsg = QString("Unsupported neuroglancer annotations type for skeleton: expected LINE or POLYLINE");
+          return 0;
+        }
+
+        const auto anns = source->loadAnnotationsForRelatedObjectBlocking(relationshipId, objectId);
+        if (anns.empty()) {
+          errorMsg = QString("No annotations found for object %1 (relationship '%2')")
+                       .arg(static_cast<qulonglong>(objectId))
+                       .arg(relationshipId);
+          return 0;
+        }
+
+        std::vector<glm::vec3> vertices;
+        std::vector<glm::uvec2> edges;
+        size_t numSegments = 0;
+
+        for (const auto& a : anns) {
+          if (a.points.size() < 2) {
+            continue;
+          }
+          const size_t base = vertices.size();
+          vertices.insert(vertices.end(), a.points.begin(), a.points.end());
+          for (size_t i = 0; i + 1 < a.points.size(); ++i) {
+            edges.emplace_back(static_cast<uint32_t>(base + i), static_cast<uint32_t>(base + i + 1));
+            ++numSegments;
+          }
+        }
+        if (vertices.empty() || edges.empty()) {
+          errorMsg = QString("No LINE/POLYLINE segments decoded for object %1 (relationship '%2')")
+                       .arg(static_cast<qulonglong>(objectId))
+                       .arg(relationshipId);
+          return 0;
+        }
+
+        auto skel = std::make_shared<ZSkeleton>();
+        skel->setVertices(std::move(vertices));
+        skel->setEdges(std::move(edges));
+
+        json::object normalized;
+        normalized["type"] = "neuroglancer_precomputed_annotations";
+        normalized["segmentation_root_url"] = json::value_from(normalizedSegRootUrl);
+        normalized["annotation_root_url"] = json::value_from(normalizedAnnRootUrl);
+        normalized["relationship_id"] = json::value_from(relationshipId);
+        normalized["object_id"] = json::value_from(QString::number(static_cast<qulonglong>(objectId)));
+
+        const QString displayName =
+          QString("NG Annotations %1 (%2)").arg(static_cast<qulonglong>(objectId)).arg(relationshipId);
+        const QString tooltip =
+          QString("Neuroglancer precomputed annotations (lines)\nSegmentation: %1\nAnnotations: %2\nRelationship: %3\nObject: %4\nSegments: %5")
+            .arg(normalizedSegRootUrl)
+            .arg(normalizedAnnRootUrl)
+            .arg(relationshipId)
+            .arg(static_cast<qulonglong>(objectId))
+            .arg(static_cast<qulonglong>(numSegments));
+
+        return addSkeletonFromExternalSource(*skel, displayName, tooltip, normalized);
+      }
+
       if (type != "neuroglancer_precomputed_skeleton") {
         errorMsg = QString("Unsupported skeleton JSON type '%1'").arg(type);
         return 0;
@@ -322,6 +456,31 @@ bool ZSkeletonDoc::isSameObj(const json::value& v1, const json::value& v2) const
         return std::nullopt;
       }
       const QString type = json::value_to<QString>(itType->value()).trimmed();
+      if (type == "neuroglancer_precomputed_annotations") {
+        auto itSegRoot = o.find("segmentation_root_url");
+        auto itAnnRoot = o.find("annotation_root_url");
+        auto itRel = o.find("relationship_id");
+        auto itObj = o.find("object_id");
+        if (itSegRoot == o.end() || !itSegRoot->value().is_string() || itAnnRoot == o.end() || !itAnnRoot->value().is_string() ||
+            itRel == o.end() || !itRel->value().is_string() || itObj == o.end() || !itObj->value().is_string()) {
+          return std::nullopt;
+        }
+
+        QString segRoot = json::value_to<QString>(itSegRoot->value());
+        QString annRoot = json::value_to<QString>(itAnnRoot->value());
+        try {
+          segRoot = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(segRoot));
+          annRoot = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(annRoot));
+        }
+        catch (...) {
+          return std::nullopt;
+        }
+
+        const QString rel = json::value_to<QString>(itRel->value()).trimmed();
+        const QString obj = json::value_to<QString>(itObj->value()).trimmed();
+        return QString("%1|%2|%3|%4|%5").arg(type, segRoot, annRoot, rel, obj);
+      }
+
       if (type != "neuroglancer_precomputed_skeleton") {
         return std::nullopt;
       }

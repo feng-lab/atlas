@@ -70,7 +70,18 @@ runs:
         # Ensure both login and the temp keychain are searchable (do not drop existing entries).
         security list-keychains -d user -s "${KEYCHAIN_PATH}" ${ORIG_KEYCHAIN_LIST}
         security default-keychain -s "${KEYCHAIN_PATH}"
-        security find-identity -v -p codesigning "${KEYCHAIN_PATH}" || true
+        # Public CI logs: do not print certificate subjects / Team IDs. Still sanity-check
+        # that at least one codesigning identity is available in the temp keychain.
+        identityCount="$(
+          security find-identity -v -p codesigning "${KEYCHAIN_PATH}" 2>/dev/null \
+            | grep -E -c '^[[:space:]]*[0-9]+\\)' \
+            || true
+        )"
+        if [ "${identityCount}" = "0" ]; then
+          echo "Error: no codesigning identities found in the temporary keychain. Check MACOS_CODESIGN_IDENTITY and the P12 import step." >&2
+          exit 1
+        fi
+        echo "Codesigning identities available in temp keychain: ${identityCount}"
 
         {
           echo "MACOS_NOTARYTOOL_API_KEY_PATH=${NOTARY_P8_PATH}"
@@ -113,14 +124,14 @@ runs:
             fi
             local rc=$?
             if [ "$attempt" -ge "$attempts" ]; then
-              echo "Command failed after ${attempts} attempts (exit ${rc}): $*" >&2
+              echo "Command failed after ${attempts} attempts (exit ${rc}): ${1:-<unknown>}" >&2
               return "$rc"
             fi
             local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
             if [ "$sleep_for" -gt "$max_delay" ]; then
               sleep_for="$max_delay"
             fi
-            echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): $*" >&2
+            echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): ${1:-<unknown>}" >&2
             sleep "$sleep_for"
             attempt=$(( attempt + 1 ))
           done
@@ -163,22 +174,34 @@ runs:
           echo "Error: SSH_PRIVATE_KEY_BASE64 / SSH_KNOWN_HOSTS_BASE64 are required for deployment." >&2
           exit 1
         fi
-        mkdir -p ~/.ssh/
+
+        sshDir="${RUNNER_TEMP:-/tmp}/atlas-ssh"
+        mkdir -p "${sshDir}"
+        sshKeyPath="${sshDir}/deploy.key"
+        knownHostsPath="${sshDir}/known_hosts"
+
         sshPrivateKeyB64="${SSH_PRIVATE_KEY_BASE64//$'\r'/}"
         sshPrivateKeyB64="${sshPrivateKeyB64//$'\n'/}"
         if [[ "${sshPrivateKeyB64}" == *% ]]; then
           sshPrivateKeyB64="${sshPrivateKeyB64%?}"
         fi
-        printf '%s' "$sshPrivateKeyB64" | base64 --decode > ~/.ssh/private.key
-        chmod 600 ~/.ssh/private.key
-        # Append CI known_hosts entries; do not clobber existing user configuration
+        printf '%s' "$sshPrivateKeyB64" | base64 --decode > "${sshKeyPath}"
+        chmod 600 "${sshKeyPath}"
+
+        # Use a temp known_hosts file; do not mutate ~/.ssh on self-hosted runners.
         sshKnownHostsB64="${SSH_KNOWN_HOSTS_BASE64//$'\r'/}"
         sshKnownHostsB64="${sshKnownHostsB64//$'\n'/}"
         if [[ "${sshKnownHostsB64}" == *% ]]; then
           sshKnownHostsB64="${sshKnownHostsB64%?}"
         fi
-        printf '%s' "$sshKnownHostsB64" | base64 --decode >> ~/.ssh/known_hosts
-        printf '\n' >> ~/.ssh/known_hosts
+        printf '%s' "$sshKnownHostsB64" | base64 --decode > "${knownHostsPath}"
+        printf '\n' >> "${knownHostsPath}"
+
+        {
+          echo "ATLAS__SSH_DIR=${sshDir}"
+          echo "ATLAS__SSH_KEY_PATH=${sshKeyPath}"
+          echo "ATLAS__SSH_KNOWN_HOSTS_PATH=${knownHostsPath}"
+        } >> "$GITHUB_ENV"
 
     - name: Deploy artifacts
       shell: bash -l {0}
@@ -197,14 +220,14 @@ runs:
             fi
             local rc=$?
             if [ "$attempt" -ge "$attempts" ]; then
-              echo "Command failed after ${attempts} attempts (exit ${rc}): $*" >&2
+              echo "Command failed after ${attempts} attempts (exit ${rc}): ${1:-<unknown>}" >&2
               return "$rc"
             fi
             local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
             if [ "$sleep_for" -gt "$max_delay" ]; then
               sleep_for="$max_delay"
             fi
-            echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): $*" >&2
+            echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): ${1:-<unknown>}" >&2
             sleep "$sleep_for"
             attempt=$(( attempt + 1 ))
           done
@@ -214,9 +237,13 @@ runs:
         : "${SSH_PORT:?Error: SSH_PORT is not set}"
         : "${SSH_USERNAME:?Error: SSH_USERNAME is not set}"
         : "${SSH_DEPLOY_PATH:?Error: SSH_DEPLOY_PATH is not set}"
+        : "${ATLAS__SSH_KEY_PATH:?Error: ATLAS__SSH_KEY_PATH is not set}"
+        : "${ATLAS__SSH_KNOWN_HOSTS_PATH:?Error: ATLAS__SSH_KNOWN_HOSTS_PATH is not set}"
+
+        sshCmd="ssh -p $SSH_PORT -i $ATLAS__SSH_KEY_PATH -o UserKnownHostsFile=$ATLAS__SSH_KNOWN_HOSTS_PATH -o StrictHostKeyChecking=yes -o LogLevel=ERROR"
         cd "$GITHUB_WORKSPACE/deploy"
-        retry 5 5 60 rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
-        retry 5 5 60 rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+        retry 5 5 60 rsync -av --delete -e "${sshCmd}" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
+        retry 5 5 60 rsync -tv -e "${sshCmd}" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
 
     - name: Deploy artifacts (secondary target)
       shell: bash -l {0}
@@ -239,22 +266,26 @@ runs:
             fi
             local rc=$?
             if [ "$attempt" -ge "$attempts" ]; then
-              echo "Command failed after ${attempts} attempts (exit ${rc}): $*" >&2
+              echo "Command failed after ${attempts} attempts (exit ${rc}): ${1:-<unknown>}" >&2
               return "$rc"
             fi
             local sleep_for=$(( base_delay * (2 ** (attempt - 1)) ))
             if [ "$sleep_for" -gt "$max_delay" ]; then
               sleep_for="$max_delay"
             fi
-            echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): $*" >&2
+            echo "Command failed (exit ${rc}); retrying in ${sleep_for}s (${attempt}/${attempts}): ${1:-<unknown>}" >&2
             sleep "$sleep_for"
             attempt=$(( attempt + 1 ))
           done
         }
 
+        : "${ATLAS__SSH_KEY_PATH:?Error: ATLAS__SSH_KEY_PATH is not set}"
+        : "${ATLAS__SSH_KNOWN_HOSTS_PATH:?Error: ATLAS__SSH_KNOWN_HOSTS_PATH is not set}"
+
+        sshCmd="ssh -p $SSH_PORT2 -i $ATLAS__SSH_KEY_PATH -o UserKnownHostsFile=$ATLAS__SSH_KNOWN_HOSTS_PATH -o StrictHostKeyChecking=yes -o LogLevel=ERROR"
         cd "$GITHUB_WORKSPACE/deploy"
-        retry 5 5 60 rsync -avv --delete -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/
-        retry 5 5 60 rsync -tvv -e "ssh -p $SSH_PORT2 -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
+        retry 5 5 60 rsync -av --delete -e "${sshCmd}" ${{ runner.os }} $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/packages/
+        retry 5 5 60 rsync -tv -e "${sshCmd}" AtlasInstaller*.zip $SSH_USERNAME2@$SSH_SERVER2:$SSH_DEPLOY_PATH2/installers/
 
     - name: Publish zimg (PyPI + conda)
       shell: bash -l {0}
@@ -308,5 +339,8 @@ runs:
 
         if [ -f "${KEYCHAIN_PATH}" ]; then
           security delete-keychain "${KEYCHAIN_PATH}" || true
+        fi
+        if [ -n "${ATLAS__SSH_DIR:-}" ] && [ -d "${ATLAS__SSH_DIR}" ]; then
+          rm -rf "${ATLAS__SSH_DIR}" || true
         fi
         rm -f "${NOTARY_P8_PATH}" "${CERT_P12_PATH}" || true
