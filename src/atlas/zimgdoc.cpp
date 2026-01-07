@@ -13,6 +13,7 @@
 #include <QApplication>
 #include <QFileDialog>
 #include <QSettings>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <optional>
@@ -398,6 +399,38 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
     CHECK(pack);
     CHECK(pack->isNeuroglancerPrecomputed());
 
+    // Apply any per-dataset mesh/skeleton source overrides stored in history. This makes the "history"
+    // entry act as the persistent dataset configuration for mesh/skeleton loading.
+    const QString rootUrl = pack->neuroglancerRootUrl();
+    const QString normalizedRoot = ZNeuroglancerPrecomputedDatasetList::normalizedUrlForMatch(rootUrl);
+
+    auto historyIt =
+      std::find_if(entries.begin(), entries.end(), [&](const ZNeuroglancerPrecomputedDatasetList::Entry& e) {
+        return ZNeuroglancerPrecomputedDatasetList::normalizedUrlForMatch(e.url) == normalizedRoot;
+      });
+    if (historyIt != entries.end()) {
+      auto applyOverride = [&](const QString& overrideText,
+                               auto setter,
+                               const char* kind) {
+        const QString text = overrideText.trimmed();
+        if (text.isEmpty()) {
+          return;
+        }
+        QString err;
+        if (!setter(text, &err)) {
+          LOG(WARNING) << "Failed to apply Neuroglancer " << kind << " source override from history: "
+                       << err.toStdString();
+        }
+      };
+
+      applyOverride(historyIt->meshSourceOverrideUrl,
+                    [&](const QString& s, QString* err) { return pack->setNeuroglancerMeshSourceOverride(s, err); },
+                    "mesh");
+      applyOverride(historyIt->skeletonSourceOverrideUrl,
+                    [&](const QString& s, QString* err) { return pack->setNeuroglancerSkeletonSourceOverride(s, err); },
+                    "skeleton");
+    }
+
     auto defaultNameFromUrl = [](QString u) -> QString {
       QString s = u.trimmed();
       // Strip nested schemes like "precomputed://gs://..."
@@ -421,6 +454,12 @@ void ZImgDoc::loadNeuroglancerPrecomputed()
     ZNeuroglancerPrecomputedDatasetList::Entry e;
     e.url = pack->neuroglancerRootUrl();
     e.name = !displayName.isEmpty() ? displayName : defaultNameFromUrl(e.url);
+    if (historyIt != entries.end()) {
+      // Preserve per-dataset configuration when recording a new "most recent" entry.
+      e.kind = historyIt->kind;
+      e.meshSourceOverrideUrl = historyIt->meshSourceOverrideUrl;
+      e.skeletonSourceOverrideUrl = historyIt->skeletonSourceOverrideUrl;
+    }
     ZNeuroglancerPrecomputedDatasetList::upsertMostRecent(&entries, std::move(e));
 
     QString saveErr;

@@ -1,6 +1,7 @@
 #include "zroiutils.h"
 
 #include "zglobal.h"
+#include "zroimaskrasterizer.h"
 #include <NaturalSplineCurve.h>
 #include <QImage>
 #include <QPainter>
@@ -58,49 +59,93 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
 
 std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToMask(const QPainterPath& path)
 {
+  if (path.isEmpty()) {
+    return std::make_tuple(ZImg(), 0_z, 0_z);
+  }
+
+  const auto polys = path.toFillPolygons();
+  if (polys.isEmpty()) {
+    return std::make_tuple(ZImg(), 0_z, 0_z);
+  }
+
+  std::vector<ZROIMaskOperation2D> ops;
+  ops.reserve(static_cast<size_t>(polys.size()));
+
+  for (const auto& poly : polys) {
+    if (poly.size() < 3) {
+      continue;
+    }
+    ZROIMaskOperation2D op;
+    op.isAdd = true;
+    op.type = ZROIMaskShapeType::Polygon;
+    op.poly.reserve(static_cast<size_t>(poly.size()));
+    for (const auto& p : poly) {
+      op.poly.emplace_back(p.x(), p.y());
+    }
+    ops.push_back(std::move(op));
+  }
+
+  if (ops.empty()) {
+    return std::make_tuple(ZImg(), 0_z, 0_z);
+  }
+
+  ZROIMaskRasterizerSettings settings;
+  settings.supersample = 5;
+  return ZROIMaskRasterizer::shapeToMask(ops, settings);
+}
+
+std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToMaskQt(const QPainterPath& path)
+{
   ZImg img;
   if (path.isEmpty()) {
     return std::make_tuple(img, 0_z, 0_z);
   }
-  QRectF pathRect = path.boundingRect();
-  auto minX = std::max(0_z, static_cast<index_t>(std::floor(pathRect.left())));
-  auto maxX = static_cast<index_t>(std::ceil(pathRect.right()));
-  auto minY = std::max(0_z, static_cast<index_t>(std::floor(pathRect.top())));
-  auto maxY = static_cast<index_t>(std::ceil(pathRect.bottom()));
+
+  const QRectF pathRect = path.boundingRect();
+  const auto minX = std::max(0_z, static_cast<index_t>(std::floor(pathRect.left())));
+  const auto maxX = static_cast<index_t>(std::ceil(pathRect.right()));
+  const auto minY = std::max(0_z, static_cast<index_t>(std::floor(pathRect.top())));
+  const auto maxY = static_cast<index_t>(std::ceil(pathRect.bottom()));
   if (maxX < minX || maxY < minY) {
     return std::make_tuple(img, 0_z, 0_z);
   }
 
-  index_t scale = 5;
-  while (scale > 0 && ((maxX - minX + 1) * scale > 32767 || (maxY - minY + 1) * scale > 32767)) {
+  constexpr index_t kDefaultSupersample = 5;
+  constexpr index_t kMaxQImageDim = 32767; // QImage uses signed 16-bit dimensions internally.
+
+  index_t scale = kDefaultSupersample;
+  while (scale > 0 && ((maxX - minX + 1) * scale > kMaxQImageDim || (maxY - minY + 1) * scale > kMaxQImageDim)) {
     --scale;
   }
+
   if (scale == 0) {
-    img = ZImg(ZImgInfo(maxX - minX + 1, maxY - minY + 1));
+    img = ZImg(ZImgInfo(static_cast<size_t>(maxX - minX + 1), static_cast<size_t>(maxY - minY + 1), 1));
     for (auto y = minY; y <= maxY; ++y) {
       for (auto x = minX; x <= maxX; ++x) {
         if (path.contains(QPointF(x, y))) { // not accurate for some spline
-          *img.data<uint8_t>(x - minX, y - minY, 0) = 1;
+          *img.data<uint8_t>(static_cast<size_t>(x - minX), static_cast<size_t>(y - minY), 0) = 1_u8;
         }
       }
     }
   } else {
-    QImage imageOut((maxX - minX + 1) * scale, (maxY - minY + 1) * scale, QImage::Format_Mono);
+    QImage imageOut(static_cast<int>((maxX - minX + 1) * scale),
+                    static_cast<int>((maxY - minY + 1) * scale),
+                    QImage::Format_Mono);
     imageOut.fill(0);
     QPainter painter(&imageOut);
     painter.setBrush(Qt::white);
     painter.setPen(Qt::NoPen);
-    painter.scale(scale, scale);
-    painter.translate(-minX, -minY);
+    painter.scale(static_cast<double>(scale), static_cast<double>(scale));
+    painter.translate(-static_cast<double>(minX), -static_cast<double>(minY));
     painter.drawPath(path);
-    // auto image = imageOut.scaled(maxX - minX + 1, maxY - minY + 1, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    img = ZImg(ZImgInfo(imageOut.width(), imageOut.height()));
+
+    img = ZImg(ZImgInfo(imageOut.width(), imageOut.height(), 1));
     for (size_t y = 0; y < img.height(); ++y) {
       for (size_t x = 0; x < img.width(); ++x) {
-        *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) ? 1_u8 : 0_u8;
+        *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(static_cast<int>(x), static_cast<int>(y)) ? 1_u8 : 0_u8;
       }
     }
-    img.resize(maxX - minX + 1, maxY - minY + 1, 1);
+    img.resize(static_cast<size_t>(maxX - minX + 1), static_cast<size_t>(maxY - minY + 1), 1);
   }
 
   return std::make_tuple(img, minX, minY);
@@ -156,4 +201,3 @@ std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToStroke(const QPainte
 // }
 
 } // namespace nim
-

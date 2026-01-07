@@ -5,6 +5,7 @@
 #include "zsaturateoperation.h"
 #include "zregionontology.h"
 #include "zroiutils.h"
+#include "zroimaskrasterizer.h"
 #include "zioutils.h"
 #include "zimginterpolate.h"
 #include <QFile>
@@ -12,6 +13,39 @@
 #include <cmath>
 
 namespace nim {
+namespace {
+
+ZROIMaskShapeType toMaskType(ROIType t)
+{
+  switch (t) {
+    case ROIType::Rect:
+      return ZROIMaskShapeType::Rect;
+    case ROIType::Ellipse:
+      return ZROIMaskShapeType::Ellipse;
+    case ROIType::Polygon:
+      return ZROIMaskShapeType::Polygon;
+    case ROIType::Spline:
+      return ZROIMaskShapeType::Spline;
+    case ROIType::Line:
+      return ZROIMaskShapeType::Line;
+  }
+  CHECK(false);
+  return ZROIMaskShapeType::Polygon;
+}
+
+ZROIMaskOperation2D toMaskOp(const ZROIShapeOperation& op)
+{
+  ZROIMaskOperation2D res;
+  res.isAdd = op.isAdd;
+  res.type = toMaskType(op.type);
+  res.poly.reserve(static_cast<size_t>(op.poly.size()));
+  for (const auto& p : op.poly) {
+    res.poly.emplace_back(p.x(), p.y());
+  }
+  return res;
+}
+
+} // namespace
 
 void ZROIShapeOperation::flipAround(double x, double y, bool hFlip, bool vFlip)
 {
@@ -763,11 +797,34 @@ ZImg ZROI::toMaskImg(int outWidth,
 {
   ZImg img;
   const auto& bBox = boundBox();
+  ZROIMaskRasterizerSettings rasterSettings;
+  rasterSettings.supersample = 5;
+  rasterSettings.lineStrokeWidth = 2.0;
+  rasterSettings.scaleX = scaleX;
+  rasterSettings.scaleY = scaleY;
+
+  const auto rasterizeShapeToMask = [&](const std::vector<ZROIShapeOperation>& shapeOps)
+    -> std::tuple<ZImg, index_t, index_t> {
+    std::vector<ZROIMaskOperation2D> maskOps;
+    maskOps.reserve(shapeOps.size());
+    for (const auto& op : shapeOps) {
+      maskOps.push_back(toMaskOp(op));
+    }
+    return ZROIMaskRasterizer::shapeToMask(maskOps, rasterSettings);
+  };
+
   if (bBox.minCorner.z == bBox.maxCorner.z) {
     img = ZImg(ZImgInfo(bBox.maxCorner.x * scaleX + 3, bBox.maxCorner.y * scaleY + 3, 1));
-    const QPainterPath& path = slicePaintPath(cbegin()->first, scaleX, scaleY);
-    auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
-    img.pasteImg(mask, ZVoxelCoordinate(x_start, y_start));
+
+    const int slice = cbegin()->first;
+    const auto& sliceROI = m_sliceROIs.at(slice);
+    for (const auto& entry : sliceROI.m_idToShapeOperations) {
+      auto [mask, xStart, yStart] = rasterizeShapeToMask(entry.second);
+      if (mask.isEmpty()) {
+        continue;
+      }
+      img.pasteImgMax(mask, ZVoxelCoordinate(xStart, yStart, 0_z), false);
+    }
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
       img = img.crop(ZImgRegion(0, bBox.maxCorner.x * scaleX + 1, 0, bBox.maxCorner.y * scaleY + 1, 0, 1));
@@ -786,16 +843,20 @@ ZImg ZROI::toMaskImg(int outWidth,
         continue;
       }
       // VLOG(1) << slice;
-      const QPainterPath& path = slicePaintPath(slice, scaleX, scaleY);
-      auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
-      if (mask.isEmpty()) {
-        continue;
+      const index_t zPlane = static_cast<index_t>(slice);
+      CHECK(zPlane < img.sDepth());
+      bool hasAnyMask = false;
+      for (const auto& entry : ROI.m_idToShapeOperations) {
+        auto [mask, xStart, yStart] = rasterizeShapeToMask(entry.second);
+        if (mask.isEmpty()) {
+          continue;
+        }
+        hasAnyMask = true;
+        img.pasteImgMax(mask, ZVoxelCoordinate(xStart, yStart, zPlane), false);
       }
-      if (mask.sum() == 0.0) {
-        continue;
+      if (hasAnyMask) {
+        srcSlices.push_back(static_cast<size_t>(slice));
       }
-      img.pasteImg(mask, ZVoxelCoordinate(x_start, y_start, slice));
-      srcSlices.push_back(slice);
     }
 
     if (doInterpolation) {

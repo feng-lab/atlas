@@ -4,6 +4,7 @@
 
 #include <QApplication>
 #include <QDialogButtonBox>
+#include <QFormLayout>
 #include <QGroupBox>
 #include <QHeaderView>
 #include <QHBoxLayout>
@@ -27,12 +28,25 @@ constexpr int kExamplesColName = 0;
 constexpr int kExamplesColKind = 1;
 constexpr int kExamplesColUrl = 2;
 
+constexpr int kRoleHistoryKind = Qt::UserRole + 1;
+constexpr int kRoleHistoryMeshSourceOverrideUrl = Qt::UserRole + 2;
+constexpr int kRoleHistorySkeletonSourceOverrideUrl = Qt::UserRole + 3;
+
 [[nodiscard]] QString modelTextOrEmpty(const QStandardItemModel* model, const QModelIndex& index)
 {
   if (!model || !index.isValid()) {
     return {};
   }
   const QVariant v = model->data(index, Qt::DisplayRole);
+  return v.toString();
+}
+
+[[nodiscard]] QString modelRoleTextOrEmpty(const QStandardItemModel* model, const QModelIndex& index, int role)
+{
+  if (!model || !index.isValid()) {
+    return {};
+  }
+  const QVariant v = model->data(index, role);
   return v.toString();
 }
 
@@ -89,7 +103,7 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
       LOG(WARNING) << "Failed to load Neuroglancer history: " << historyErr.toStdString();
     }
     for (const auto& e : history) {
-      addHistoryRow(e.name, e.url);
+      addHistoryRow(e);
     }
 
     m_historyView = new QTableView();
@@ -111,7 +125,53 @@ ZLoadNeuroglancerPrecomputedDialog::ZLoadNeuroglancerPrecomputedDialog(QWidget* 
     buttonsRow->addStretch(1);
     layout->addLayout(buttonsRow);
 
+    auto* sourcesBox = new QGroupBox(tr("Sources (optional)"));
+    auto* sourcesLayout = new QVBoxLayout(sourcesBox);
+    {
+      auto* meshRow = new QHBoxLayout();
+      meshRow->addWidget(new QLabel(tr("Mesh source override:")));
+      m_historyMeshSourceLabel = new QLabel(tr("<none>"));
+      m_historyMeshSourceLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+      m_historyMeshSourceLabel->setWordWrap(true);
+      meshRow->addWidget(m_historyMeshSourceLabel, /*stretch=*/1);
+      sourcesLayout->addLayout(meshRow);
+    }
+    {
+      auto* skelRow = new QHBoxLayout();
+      skelRow->addWidget(new QLabel(tr("Skeleton source override:")));
+      m_historySkeletonSourceLabel = new QLabel(tr("<none>"));
+      m_historySkeletonSourceLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+      m_historySkeletonSourceLabel->setWordWrap(true);
+      skelRow->addWidget(m_historySkeletonSourceLabel, /*stretch=*/1);
+      sourcesLayout->addLayout(skelRow);
+    }
+    {
+      auto* row = new QHBoxLayout();
+      m_historyEditSourcesBtn = new QPushButton(tr("Edit Sources..."));
+      connect(m_historyEditSourcesBtn,
+              &QPushButton::clicked,
+              this,
+              &ZLoadNeuroglancerPrecomputedDialog::editSelectedHistorySources);
+      row->addWidget(m_historyEditSourcesBtn);
+
+      m_historyClearSourcesBtn = new QPushButton(tr("Clear Sources"));
+      connect(m_historyClearSourcesBtn,
+              &QPushButton::clicked,
+              this,
+              &ZLoadNeuroglancerPrecomputedDialog::clearSelectedHistorySources);
+      row->addWidget(m_historyClearSourcesBtn);
+
+      row->addStretch(1);
+      sourcesLayout->addLayout(row);
+    }
+    layout->addWidget(sourcesBox);
+
     wireSelectionToEdits(m_historyView, m_historyModel, kHistoryColName, kHistoryColUrl);
+    connect(m_historyView->selectionModel(),
+            &QItemSelectionModel::selectionChanged,
+            this,
+            [this](const QItemSelection&, const QItemSelection&) { updateHistorySourceUi(); });
+    updateHistorySourceUi();
 
     tabs->addTab(tab, tr("History"));
   }
@@ -211,18 +271,31 @@ std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> ZLoadNeuroglancerPrecomp
     ZNeuroglancerPrecomputedDatasetList::Entry e;
     e.name = modelTextOrEmpty(m_historyModel, m_historyModel->index(r, kHistoryColName)).trimmed();
     e.url = modelTextOrEmpty(m_historyModel, m_historyModel->index(r, kHistoryColUrl)).trimmed();
+    e.kind = modelRoleTextOrEmpty(m_historyModel, m_historyModel->index(r, kHistoryColUrl), kRoleHistoryKind).trimmed();
+    e.meshSourceOverrideUrl =
+      modelRoleTextOrEmpty(m_historyModel, m_historyModel->index(r, kHistoryColUrl), kRoleHistoryMeshSourceOverrideUrl)
+        .trimmed();
+    e.skeletonSourceOverrideUrl =
+      modelRoleTextOrEmpty(m_historyModel,
+                           m_historyModel->index(r, kHistoryColUrl),
+                           kRoleHistorySkeletonSourceOverrideUrl)
+        .trimmed();
     out.push_back(std::move(e));
   }
   return out;
 }
 
-void ZLoadNeuroglancerPrecomputedDialog::addHistoryRow(const QString& name, const QString& url)
+void ZLoadNeuroglancerPrecomputedDialog::addHistoryRow(const ZNeuroglancerPrecomputedDatasetList::Entry& entry)
 {
   CHECK(m_historyModel);
 
   QList<QStandardItem*> row;
-  row << new QStandardItem(name);
-  row << new QStandardItem(url);
+  row << new QStandardItem(entry.name);
+  auto* urlItem = new QStandardItem(entry.url);
+  urlItem->setData(entry.kind, kRoleHistoryKind);
+  urlItem->setData(entry.meshSourceOverrideUrl, kRoleHistoryMeshSourceOverrideUrl);
+  urlItem->setData(entry.skeletonSourceOverrideUrl, kRoleHistorySkeletonSourceOverrideUrl);
+  row << urlItem;
   m_historyModel->appendRow(row);
 }
 
@@ -271,6 +344,103 @@ void ZLoadNeuroglancerPrecomputedDialog::removeSelectedHistory()
 
   const int r = rows.front().row();
   m_historyModel->removeRow(r);
+  updateHistorySourceUi();
+}
+
+void ZLoadNeuroglancerPrecomputedDialog::updateHistorySourceUi()
+{
+  if (!m_historyView || !m_historyModel || !m_historyMeshSourceLabel || !m_historySkeletonSourceLabel ||
+      !m_historyEditSourcesBtn || !m_historyClearSourcesBtn) {
+    return;
+  }
+
+  const QModelIndexList rows = m_historyView->selectionModel()->selectedRows();
+  const bool hasSel = !rows.isEmpty();
+  m_historyEditSourcesBtn->setEnabled(hasSel);
+  m_historyClearSourcesBtn->setEnabled(hasSel);
+
+  QString mesh;
+  QString skel;
+  if (hasSel) {
+    const int r = rows.front().row();
+    const QModelIndex urlIdx = m_historyModel->index(r, kHistoryColUrl);
+    mesh = modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistoryMeshSourceOverrideUrl).trimmed();
+    skel = modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistorySkeletonSourceOverrideUrl).trimmed();
+  }
+
+  m_historyMeshSourceLabel->setText(mesh.isEmpty() ? tr("<none>") : mesh);
+  m_historySkeletonSourceLabel->setText(skel.isEmpty() ? tr("<none>") : skel);
+}
+
+void ZLoadNeuroglancerPrecomputedDialog::editSelectedHistorySources()
+{
+  if (!m_historyView || !m_historyModel) {
+    return;
+  }
+
+  const QModelIndexList rows = m_historyView->selectionModel()->selectedRows();
+  if (rows.isEmpty()) {
+    return;
+  }
+
+  const int r = rows.front().row();
+  const QModelIndex urlIdx = m_historyModel->index(r, kHistoryColUrl);
+  const QString currentMesh = modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistoryMeshSourceOverrideUrl).trimmed();
+  const QString currentSkel =
+    modelRoleTextOrEmpty(m_historyModel, urlIdx, kRoleHistorySkeletonSourceOverrideUrl).trimmed();
+
+  QDialog dlg(this);
+  dlg.setWindowTitle(tr("Edit Neuroglancer Sources"));
+  auto* layout = new QVBoxLayout(&dlg);
+
+  auto* help = new QLabel(tr("Optional per-dataset overrides for Neuroglancer mesh/skeleton sources.\n"
+                             "Leave blank to clear. Values may be absolute URLs or dataset-relative paths."));
+  help->setWordWrap(true);
+  layout->addWidget(help);
+
+  auto* form = new QFormLayout();
+  auto* meshEdit = new QLineEdit(currentMesh);
+  meshEdit->setPlaceholderText(tr("e.g. precomputed://... or relative path"));
+  form->addRow(tr("Mesh source override:"), meshEdit);
+
+  auto* skelEdit = new QLineEdit(currentSkel);
+  skelEdit->setPlaceholderText(tr("e.g. precomputed://... or relative path"));
+  form->addRow(tr("Skeleton source override:"), skelEdit);
+  layout->addLayout(form);
+
+  auto* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+  connect(buttonBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+  connect(buttonBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+  layout->addWidget(buttonBox);
+
+  if (dlg.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  const QString newMesh = meshEdit->text().trimmed();
+  const QString newSkel = skelEdit->text().trimmed();
+
+  m_historyModel->setData(urlIdx, newMesh, kRoleHistoryMeshSourceOverrideUrl);
+  m_historyModel->setData(urlIdx, newSkel, kRoleHistorySkeletonSourceOverrideUrl);
+  updateHistorySourceUi();
+}
+
+void ZLoadNeuroglancerPrecomputedDialog::clearSelectedHistorySources()
+{
+  if (!m_historyView || !m_historyModel) {
+    return;
+  }
+
+  const QModelIndexList rows = m_historyView->selectionModel()->selectedRows();
+  if (rows.isEmpty()) {
+    return;
+  }
+
+  const int r = rows.front().row();
+  const QModelIndex urlIdx = m_historyModel->index(r, kHistoryColUrl);
+  m_historyModel->setData(urlIdx, QString(), kRoleHistoryMeshSourceOverrideUrl);
+  m_historyModel->setData(urlIdx, QString(), kRoleHistorySkeletonSourceOverrideUrl);
+  updateHistorySourceUi();
 }
 
 } // namespace nim

@@ -205,6 +205,11 @@ files_to_download = [
         "filename": "uint64_div_test.dat"
     },
     {
+        "expected_size": 21120,
+        "expected_sha256": "faba733a516e277bc0f27f59a3614d7399e60b07a6e0ee51352fc8024f2b1d40",
+        "filename": "test1.nimroi"
+    },
+    {
         "expected_size": 159113635,
         "expected_sha256": "9d0b17206b5df6540efa608d9ea4305efd33f03339e7de19f969e55a2fb43776",
         "filename": "img/im3d1doublefilterres.raw"

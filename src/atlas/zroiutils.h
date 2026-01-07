@@ -12,8 +12,15 @@ class ZROIUtils
 public:
   static QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = true);
 
-  // return tight mask, x_start, y_start in which mask could be empty
+  // Rasterize a filled QPainterPath into a tight binary mask.
+  //
+  // Note: this uses the fast scanline-based ZROIMaskRasterizer backend (via polygons extracted
+  // from the QPainterPath) and may differ slightly from Qt's QPainter/QImage rasterization at edges.
   static std::tuple<ZImg, index_t, index_t> qPainterPathToMask(const QPainterPath& path);
+
+  // Legacy/reference implementation that rasterizes via Qt (QPainter -> QImage::Format_Mono).
+  // This is kept for historical behavior parity and for tests/benchmarks.
+  static std::tuple<ZImg, index_t, index_t> qPainterPathToMaskQt(const QPainterPath& path);
 
   static std::tuple<ZImg, index_t, index_t> qPainterPathToStroke(const QPainterPath& path, double width = 2.);
 
@@ -91,4 +98,3 @@ public:
 };
 
 } // namespace nim
-

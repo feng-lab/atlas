@@ -13,9 +13,10 @@
 namespace nim {
 namespace {
 
-constexpr std::array<const char*, 2> kNimroiTestFiles = {
+constexpr std::array<const char*, 3> kNimroiTestFiles = {
   "20190325_ROE10_HC_.tif_fix.tif_ch2_label_2d_spline.nimroi",
   "T_Sub_20190628_OE40_Ret2_.tif.tif_label_2d_v2_spline.nimroi",
+  "test1.nimroi",
 };
 
 constexpr int kSlicesPerFileToTest = 2;
@@ -234,20 +235,32 @@ TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
     LOG(INFO) << "Testing nimroi: " << fileName << " slices=" << roi.numSlices()
               << " selected=" << slicesToTest.size();
 
-    ZBenchTimer qtTimer("Qt qPainterPathToMask");
+    ZBenchTimer qtTimer("Qt baseline qPainterPathToMask");
+    ZBenchTimer fastTimer("ZROIUtils qPainterPathToMask");
     ZBenchTimer newTimer("ZROIMaskRasterizer");
     qtTimer.reset();
+    fastTimer.reset();
     newTimer.reset();
 
     for (const int slice : slicesToTest) {
-      ZImg refMask;
-      index_t refXStart = 0_z;
-      index_t refYStart = 0_z;
+      ZImg qtMask;
+      index_t qtXStart = 0_z;
+      index_t qtYStart = 0_z;
       {
         qtTimer.start();
         const QPainterPath refPath = roi.slicePaintPath(slice);
-        std::tie(refMask, refXStart, refYStart) = ZROIUtils::qPainterPathToMask(refPath);
+        std::tie(qtMask, qtXStart, qtYStart) = ZROIUtils::qPainterPathToMaskQt(refPath);
         qtTimer.stop();
+      }
+
+      ZImg fastMask;
+      index_t fastXStart = 0_z;
+      index_t fastYStart = 0_z;
+      {
+        fastTimer.start();
+        const QPainterPath refPath = roi.slicePaintPath(slice);
+        std::tie(fastMask, fastXStart, fastYStart) = ZROIUtils::qPainterPathToMask(refPath);
+        fastTimer.stop();
       }
 
       MaskWithOffset newMask;
@@ -257,45 +270,59 @@ TEST(ZROIMaskRasterizer, MatchesQtMaskForNimroiFixtures)
         newTimer.stop();
       }
 
-      if (refMask.isEmpty() && newMask.mask.isEmpty()) {
+      if (qtMask.isEmpty() && fastMask.isEmpty() && newMask.mask.isEmpty()) {
         continue;
       }
-      ASSERT_FALSE(refMask.isEmpty()) << "Qt reference mask unexpectedly empty for " << fileName << " slice " << slice;
+      ASSERT_FALSE(qtMask.isEmpty()) << "Qt baseline mask unexpectedly empty for " << fileName << " slice " << slice;
+      ASSERT_FALSE(fastMask.isEmpty()) << "ZROIUtils::qPainterPathToMask mask unexpectedly empty for " << fileName
+                                       << " slice " << slice;
       ASSERT_FALSE(newMask.mask.isEmpty())
         << "New rasterizer mask unexpectedly empty for " << fileName << " slice " << slice;
 
-      const index_t commonMinX = std::min(refXStart, newMask.xStart);
-      const index_t commonMinY = std::min(refYStart, newMask.yStart);
+      const index_t commonMinX = std::min(std::min(qtXStart, fastXStart), newMask.xStart);
+      const index_t commonMinY = std::min(std::min(qtYStart, fastYStart), newMask.yStart);
       const index_t commonMaxX =
-        std::max(refXStart + refMask.sWidth(), newMask.xStart + newMask.mask.sWidth());
+        std::max(std::max(qtXStart + qtMask.sWidth(), fastXStart + fastMask.sWidth()), newMask.xStart + newMask.mask.sWidth());
       const index_t commonMaxY =
-        std::max(refYStart + refMask.sHeight(), newMask.yStart + newMask.mask.sHeight());
+        std::max(std::max(qtYStart + qtMask.sHeight(), fastYStart + fastMask.sHeight()), newMask.yStart + newMask.mask.sHeight());
       ASSERT_GT(commonMaxX, commonMinX);
       ASSERT_GT(commonMaxY, commonMinY);
 
       const size_t canvasW = static_cast<size_t>(commonMaxX - commonMinX);
       const size_t canvasH = static_cast<size_t>(commonMaxY - commonMinY);
 
-      ZImg refCanvas(ZImgInfo(canvasW, canvasH, 1));
+      ZImg qtCanvas(ZImgInfo(canvasW, canvasH, 1));
+      ZImg fastCanvas(ZImgInfo(canvasW, canvasH, 1));
       ZImg newCanvas(ZImgInfo(canvasW, canvasH, 1));
-      refCanvas.fill(0);
+      qtCanvas.fill(0);
+      fastCanvas.fill(0);
       newCanvas.fill(0);
 
-      refCanvas.pasteImg(refMask, ZVoxelCoordinate(refXStart - commonMinX, refYStart - commonMinY));
+      qtCanvas.pasteImg(qtMask, ZVoxelCoordinate(qtXStart - commonMinX, qtYStart - commonMinY));
+      fastCanvas.pasteImg(fastMask, ZVoxelCoordinate(fastXStart - commonMinX, fastYStart - commonMinY));
       newCanvas.pasteImg(newMask.mask, ZVoxelCoordinate(newMask.xStart - commonMinX, newMask.yStart - commonMinY));
 
-      const auto stats = computeStats(refCanvas, newCanvas);
+      const auto fastStats = computeStats(qtCanvas, fastCanvas);
+      const auto newStats = computeStats(qtCanvas, newCanvas);
       LOG(INFO) << "  slice " << slice << " canvas=" << canvasW << "x" << canvasH
-                << " union=" << stats.unionPixels << " diff=" << stats.diffPixels << " iou=" << stats.iou;
+                << " qt_vs_fast union=" << fastStats.unionPixels << " diff=" << fastStats.diffPixels
+                << " iou=" << fastStats.iou << " qt_vs_new union=" << newStats.unionPixels << " diff="
+                << newStats.diffPixels << " iou=" << newStats.iou;
 
       // This test is meant to validate the mask result (binary). Minor edge differences can
       // happen due to rasterization details, but they should be extremely small for typical ROIs.
-      EXPECT_GE(stats.iou, 0.999) << "Low IoU for " << fileName << " slice " << slice
-                                  << " (diffPixels=" << stats.diffPixels << ", union=" << stats.unionPixels
-                                  << ", canvas=" << canvasW << "x" << canvasH << ")";
+      EXPECT_GE(fastStats.iou, 0.999) << "Low IoU for " << fileName << " slice " << slice
+                                      << " (qt_vs_fast diffPixels=" << fastStats.diffPixels
+                                      << ", union=" << fastStats.unionPixels << ", canvas=" << canvasW << "x"
+                                      << canvasH << ")";
+      EXPECT_GE(newStats.iou, 0.999) << "Low IoU for " << fileName << " slice " << slice
+                                     << " (qt_vs_new diffPixels=" << newStats.diffPixels
+                                     << ", union=" << newStats.unionPixels << ", canvas=" << canvasW << "x" << canvasH
+                                     << ")";
     }
 
     LOG(INFO) << qtTimer;
+    LOG(INFO) << fastTimer;
     LOG(INFO) << newTimer;
   }
 }

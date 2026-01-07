@@ -14,50 +14,6 @@ namespace {
 
 constexpr int kListVersion = 1;
 
-[[nodiscard]] std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> defaultExampleList()
-{
-  std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> out;
-
-  // From Neuroglancer README examples.
-  out.push_back(
-    {"Janelia FlyEM FIB-25 (image)", "image", "precomputed://gs://neuroglancer-public-data/flyem_fib-25/image"});
-  out.push_back({"Janelia FlyEM FIB-25 (ground truth segmentation)",
-                 "segmentation",
-                 "precomputed://gs://neuroglancer-public-data/flyem_fib-25/ground_truth"});
-  out.push_back({"Kasthuri 2011 (image)", "image", "precomputed://gs://neuroglancer-public-data/kasthuri2011/image"});
-  out.push_back({"Kasthuri 2011 (color corrected image)",
-                 "image",
-                 "precomputed://gs://neuroglancer-public-data/kasthuri2011/image_color_corrected"});
-  out.push_back({"Kasthuri 2011 (ground truth segmentation)",
-                 "segmentation",
-                 "precomputed://gs://neuroglancer-public-data/kasthuri2011/ground_truth"});
-
-  // From viewer state: gs://neuroglancer-janelia-flyem-hemibrain/v1.0/neuroglancer_demo_states/base.json
-  out.push_back({"FlyEM Hemibrain v1.0 (emdata image, CLAHE YZ JPEG)",
-                 "image",
-                 "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/emdata/clahe_yz/jpeg"});
-  out.push_back({"FlyEM Hemibrain v1.0 (segmentation)",
-                 "segmentation",
-                 "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/v1.0/segmentation"});
-  out.push_back({"FlyEM Hemibrain v1.0 (ROIs segmentation)",
-                 "segmentation",
-                 "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/v1.0/rois"});
-  out.push_back({"FlyEM Hemibrain v1.0 (mitochondria segmentation)",
-                 "segmentation",
-                 "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/mito_20190717.27250582"});
-  out.push_back({"FlyEM Hemibrain v1.0 (mask segmentation)",
-                 "segmentation",
-                 "precomputed://gs://neuroglancer-janelia-flyem-hemibrain/mask_normalized_round6"});
-
-  // From viewer state: gs://fafb-ffn1/main_ng.json
-  out.push_back(
-    {"FAFB v14 (original image)", "image", "precomputed://gs://neuroglancer-fafb-data/fafb_v14/fafb_v14_orig"});
-  out.push_back({"FAFB v14 (CLAHE image)", "image", "precomputed://gs://neuroglancer-fafb-data/fafb_v14/fafb_v14_clahe"});
-  out.push_back({"FAFB-FFN1 (2019-08-05 segmentation)", "segmentation", "precomputed://gs://fafb-ffn1-20190805/segmentation"});
-
-  return out;
-}
-
 } // namespace
 
 QString ZNeuroglancerPrecomputedDatasetList::examplesFilename()
@@ -84,23 +40,26 @@ std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> ZNeuroglancerPrecomputed
 {
   QString err;
   std::vector<Entry> entries;
-  {
-    const QFileInfo fi(examplesFilePath());
-    if (fi.exists()) {
-      try {
-        const auto jo = loadJsonObject(examplesFilePath());
-        entries = parseListObject(jo, &err);
-      }
-      catch (const std::exception& e) {
-        err = QString("Failed to parse %1: %2").arg(examplesFilePath()).arg(QString::fromUtf8(e.what()));
-      }
+
+  // Load from the installed resources directory (allows patching examples without rebuilding).
+  const QFileInfo diskFi(examplesFilePath());
+  if (diskFi.exists()) {
+    try {
+      const auto jo = loadJsonObject(examplesFilePath());
+      entries = parseListObject(jo, &err);
+    }
+    catch (const std::exception& e) {
+      err = QString("Failed to parse %1: %2").arg(examplesFilePath()).arg(QString::fromUtf8(e.what()));
     }
   }
-  if (!err.isEmpty()) {
-    LOG(WARNING) << "Failed to load Neuroglancer examples list: " << err.toStdString();
-  }
+
   if (entries.empty()) {
-    entries = defaultExampleList();
+    if (!diskFi.exists()) {
+      err = QString("Examples file not found: %1").arg(examplesFilePath());
+    }
+    if (!err.isEmpty()) {
+      LOG(WARNING) << "Failed to load Neuroglancer examples list: " << err.toStdString();
+    }
   }
   normalizeAndDeduplicate(&entries);
   if (errorMsg) {
@@ -168,14 +127,39 @@ void ZNeuroglancerPrecomputedDatasetList::normalizeAndDeduplicate(std::vector<En
     if (url.isEmpty()) {
       continue;
     }
+
+    auto trimOrEmpty = [](const QString& s) { return s.trimmed(); };
+
+    Entry clean = e;
+    clean.url = url;
+    clean.name = trimOrEmpty(e.name);
+    clean.kind = trimOrEmpty(e.kind);
+    clean.meshSourceOverrideUrl = trimOrEmpty(e.meshSourceOverrideUrl);
+    clean.skeletonSourceOverrideUrl = trimOrEmpty(e.skeletonSourceOverrideUrl);
+
+    // If duplicates exist (e.g. manual edits), merge missing optional metadata into the first occurrence
+    // to avoid losing overrides during normalization.
     if (seen.contains(url)) {
+      auto it = std::find_if(out.begin(), out.end(), [&](const Entry& x) { return x.url == url; });
+      if (it == out.end()) {
+        continue;
+      }
+      if (it->name.isEmpty() && !clean.name.isEmpty()) {
+        it->name = std::move(clean.name);
+      }
+      if (it->kind.isEmpty() && !clean.kind.isEmpty()) {
+        it->kind = std::move(clean.kind);
+      }
+      if (it->meshSourceOverrideUrl.isEmpty() && !clean.meshSourceOverrideUrl.isEmpty()) {
+        it->meshSourceOverrideUrl = std::move(clean.meshSourceOverrideUrl);
+      }
+      if (it->skeletonSourceOverrideUrl.isEmpty() && !clean.skeletonSourceOverrideUrl.isEmpty()) {
+        it->skeletonSourceOverrideUrl = std::move(clean.skeletonSourceOverrideUrl);
+      }
       continue;
     }
+
     seen.insert(url);
-    Entry clean;
-    clean.url = url;
-    clean.name = e.name.trimmed();
-    clean.kind = e.kind.trimmed();
     out.push_back(std::move(clean));
   }
 
@@ -189,6 +173,8 @@ void ZNeuroglancerPrecomputedDatasetList::upsertMostRecent(std::vector<Entry>* e
   entry.url = normalizedUrl(std::move(entry.url));
   entry.name = entry.name.trimmed();
   entry.kind = entry.kind.trimmed();
+  entry.meshSourceOverrideUrl = entry.meshSourceOverrideUrl.trimmed();
+  entry.skeletonSourceOverrideUrl = entry.skeletonSourceOverrideUrl.trimmed();
   if (entry.url.isEmpty()) {
     return;
   }
@@ -215,6 +201,11 @@ QString ZNeuroglancerPrecomputedDatasetList::normalizedUrl(QString url)
     u.chop(1);
   }
   return u.trimmed();
+}
+
+QString ZNeuroglancerPrecomputedDatasetList::normalizedUrlForMatch(QString url)
+{
+  return normalizedUrl(std::move(url));
 }
 
 std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> ZNeuroglancerPrecomputedDatasetList::parseListObject(const json::object& jo,
@@ -264,6 +255,12 @@ std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> ZNeuroglancerPrecomputed
     if (auto kindIt = o.find("kind"); kindIt != o.end() && kindIt->value().is_string()) {
       e.kind = json::value_to<QString>(kindIt->value());
     }
+    if (auto meshIt = o.find("mesh_source_override_url"); meshIt != o.end() && meshIt->value().is_string()) {
+      e.meshSourceOverrideUrl = json::value_to<QString>(meshIt->value());
+    }
+    if (auto skelIt = o.find("skeleton_source_override_url"); skelIt != o.end() && skelIt->value().is_string()) {
+      e.skeletonSourceOverrideUrl = json::value_to<QString>(skelIt->value());
+    }
     out.push_back(std::move(e));
   }
 
@@ -285,6 +282,12 @@ json::object ZNeuroglancerPrecomputedDatasetList::toListObject(const std::vector
     }
     if (!e.kind.trimmed().isEmpty()) {
       o["kind"] = json::value_from(e.kind.trimmed());
+    }
+    if (!e.meshSourceOverrideUrl.trimmed().isEmpty()) {
+      o["mesh_source_override_url"] = json::value_from(e.meshSourceOverrideUrl.trimmed());
+    }
+    if (!e.skeletonSourceOverrideUrl.trimmed().isEmpty()) {
+      o["skeleton_source_override_url"] = json::value_from(e.skeletonSourceOverrideUrl.trimmed());
     }
     datasets.push_back(std::move(o));
   }

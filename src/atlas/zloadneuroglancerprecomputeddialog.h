@@ -9,6 +9,8 @@
 class QLineEdit;
 class QStandardItemModel;
 class QTableView;
+class QLabel;
+class QPushButton;
 
 namespace nim {
 
@@ -27,11 +29,14 @@ public:
   [[nodiscard]] std::vector<ZNeuroglancerPrecomputedDatasetList::Entry> userHistoryEntries() const;
 
 private:
-  void addHistoryRow(const QString& name, const QString& url);
+  void addHistoryRow(const ZNeuroglancerPrecomputedDatasetList::Entry& entry);
   void setUrlAndName(const QString& url, const QString& name);
 
   void wireSelectionToEdits(QTableView* view, QStandardItemModel* model, int nameCol, int urlCol);
   void removeSelectedHistory();
+  void updateHistorySourceUi();
+  void editSelectedHistorySources();
+  void clearSelectedHistorySources();
 
 private:
   QLineEdit* m_urlEdit = nullptr;
@@ -39,6 +44,10 @@ private:
 
   QStandardItemModel* m_historyModel = nullptr;
   QTableView* m_historyView = nullptr;
+  QLabel* m_historyMeshSourceLabel = nullptr;
+  QLabel* m_historySkeletonSourceLabel = nullptr;
+  QPushButton* m_historyEditSourcesBtn = nullptr;
+  QPushButton* m_historyClearSourcesBtn = nullptr;
 
   QStandardItemModel* m_examplesModel = nullptr;
   QTableView* m_examplesView = nullptr;

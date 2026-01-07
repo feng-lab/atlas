@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <cstdarg>
+#include <cstring>
 
 #include "zjsonparser.h"
 #include "c_json.h"
@@ -88,7 +89,7 @@ const json_t* ZJsonObject::operator[] (const char *key) const
     json_t *value;
 
     json_object_foreach(m_data, qkey, value) {
-      if (strcmp(qkey, key) == 0) {
+      if (std::strcmp(qkey, key) == 0) {
         return value;
       }
     }
