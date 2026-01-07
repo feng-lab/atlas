@@ -6,6 +6,8 @@
 #include "zimgregioncache.h"
 #include "zcancellation.h"
 #include "zneuroglancerprecomputed.h"
+#include "zneuroglancerprecomputedmesh.h"
+#include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancersegmentationcolors.h"
 #include <QFileInfo>
 #include <QPoint>
@@ -476,6 +478,237 @@ QString ZImgPack::neuroglancerRootUrl() const
 {
   CHECK(m_ngVolume);
   return m_ngVolume->rootUrl();
+}
+
+namespace {
+
+[[nodiscard]] std::optional<QString> normalizeNeuroglancerExternalSourceDirUrl(const ZNeuroglancerPrecomputedVolume& vol,
+                                                                              QString userText,
+                                                                              QString* errorMsg)
+{
+  if (errorMsg) {
+    errorMsg->clear();
+  }
+
+  QString s = userText.trimmed();
+  if (s.isEmpty()) {
+    if (errorMsg) {
+      *errorMsg = QStringLiteral("URL/path is empty");
+    }
+    return std::nullopt;
+  }
+
+  // Accept:
+  // - relative dir (e.g. "mesh" or "skeletons") resolved against the segmentation root url
+  // - absolute urls like "precomputed://gs://..." or "https://..."
+  if (s.contains("://") || s.startsWith("gs://", Qt::CaseInsensitive)) {
+    try {
+      // normalizeRootUrl enforces a trailing slash and strips a direct /info suffix.
+      const QString normalized = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(s));
+      return normalized;
+    }
+    catch (const std::exception& e) {
+      if (errorMsg) {
+        *errorMsg = QString::fromUtf8(e.what());
+      }
+      return std::nullopt;
+    }
+  }
+
+  if (!s.endsWith('/')) {
+    s += '/';
+  }
+  const QUrl base(vol.rootUrl());
+  const QUrl dirUrl = base.resolved(QUrl(s));
+  if (!dirUrl.isValid()) {
+    if (errorMsg) {
+      *errorMsg = QStringLiteral("Invalid URL/path");
+    }
+    return std::nullopt;
+  }
+  QString normalized = dirUrl.toString(QUrl::StripTrailingSlash);
+  if (!normalized.endsWith('/')) {
+    normalized += '/';
+  }
+  return normalized;
+}
+
+} // namespace
+
+bool ZImgPack::hasNeuroglancerMeshSourceOverride() const
+{
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  return !m_ngMeshSourceOverrideUrl.trimmed().isEmpty();
+}
+
+QString ZImgPack::neuroglancerMeshSourceOverrideUrl() const
+{
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  return m_ngMeshSourceOverrideUrl.trimmed();
+}
+
+bool ZImgPack::hasNeuroglancerSkeletonSourceOverride() const
+{
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  return !m_ngSkeletonSourceOverrideUrl.trimmed().isEmpty();
+}
+
+QString ZImgPack::neuroglancerSkeletonSourceOverrideUrl() const
+{
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  return m_ngSkeletonSourceOverrideUrl.trimmed();
+}
+
+bool ZImgPack::hasNeuroglancerMeshSourceConfigured() const
+{
+  if (!m_ngVolume || !m_ngVolume->isSegmentation()) {
+    return false;
+  }
+  if (m_ngVolume->hasMeshDirectory()) {
+    return true;
+  }
+  return hasNeuroglancerMeshSourceOverride();
+}
+
+bool ZImgPack::hasNeuroglancerSkeletonSourceConfigured() const
+{
+  if (!m_ngVolume || !m_ngVolume->isSegmentation()) {
+    return false;
+  }
+  if (m_ngVolume->hasSkeletonDirectory()) {
+    return true;
+  }
+  return hasNeuroglancerSkeletonSourceOverride();
+}
+
+bool ZImgPack::setNeuroglancerMeshSourceOverride(QString userText, QString* errorMsg)
+{
+  if (!m_ngVolume || !m_ngVolume->isSegmentation()) {
+    if (errorMsg) {
+      *errorMsg = QStringLiteral("Not a Neuroglancer segmentation dataset");
+    }
+    return false;
+  }
+
+  QString err;
+  const auto urlOpt = normalizeNeuroglancerExternalSourceDirUrl(*m_ngVolume, std::move(userText), &err);
+  if (!urlOpt) {
+    if (errorMsg) {
+      *errorMsg = err;
+    }
+    return false;
+  }
+
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  m_ngMeshSourceOverrideUrl = *urlOpt;
+  m_ngMeshSourceOverride.reset();
+  return true;
+}
+
+bool ZImgPack::setNeuroglancerSkeletonSourceOverride(QString userText, QString* errorMsg)
+{
+  if (!m_ngVolume || !m_ngVolume->isSegmentation()) {
+    if (errorMsg) {
+      *errorMsg = QStringLiteral("Not a Neuroglancer segmentation dataset");
+    }
+    return false;
+  }
+
+  QString err;
+  const auto urlOpt = normalizeNeuroglancerExternalSourceDirUrl(*m_ngVolume, std::move(userText), &err);
+  if (!urlOpt) {
+    if (errorMsg) {
+      *errorMsg = err;
+    }
+    return false;
+  }
+
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  m_ngSkeletonSourceOverrideUrl = *urlOpt;
+  m_ngSkeletonSourceOverride.reset();
+  return true;
+}
+
+void ZImgPack::clearNeuroglancerMeshSourceOverride()
+{
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  m_ngMeshSourceOverrideUrl.clear();
+  m_ngMeshSourceOverride.reset();
+}
+
+void ZImgPack::clearNeuroglancerSkeletonSourceOverride()
+{
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  m_ngSkeletonSourceOverrideUrl.clear();
+  m_ngSkeletonSourceOverride.reset();
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZImgPack::loadNeuroglancerMeshSourceBlocking() const
+{
+  CHECK(m_ngVolume);
+  CHECK(m_ngVolume->isSegmentation());
+
+  QString overrideUrl;
+  {
+    const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+    overrideUrl = m_ngMeshSourceOverrideUrl.trimmed();
+    if (!overrideUrl.isEmpty() && m_ngMeshSourceOverride) {
+      return m_ngMeshSourceOverride;
+    }
+  }
+
+  if (overrideUrl.isEmpty()) {
+    return m_ngVolume->loadMeshSourceBlocking();
+  }
+
+  const ZImgInfo& info = m_ngVolume->baseImgInfo();
+  const std::array<double, 3> baseResolutionNm{info.voxelSizeX, info.voxelSizeY, info.voxelSizeZ};
+
+  auto loaded = ZNeuroglancerPrecomputedMeshSource::open(QUrl(overrideUrl),
+                                                        baseResolutionNm,
+                                                        m_ngVolume->baseVoxelOffset(),
+                                                        m_ngVolume->defaultTimeout());
+  CHECK(loaded);
+
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  if (m_ngMeshSourceOverrideUrl.trimmed() == overrideUrl) {
+    m_ngMeshSourceOverride = loaded;
+  }
+  return loaded;
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZImgPack::loadNeuroglancerSkeletonSourceBlocking() const
+{
+  CHECK(m_ngVolume);
+  CHECK(m_ngVolume->isSegmentation());
+
+  QString overrideUrl;
+  {
+    const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+    overrideUrl = m_ngSkeletonSourceOverrideUrl.trimmed();
+    if (!overrideUrl.isEmpty() && m_ngSkeletonSourceOverride) {
+      return m_ngSkeletonSourceOverride;
+    }
+  }
+
+  if (overrideUrl.isEmpty()) {
+    return m_ngVolume->loadSkeletonSourceBlocking();
+  }
+
+  const ZImgInfo& info = m_ngVolume->baseImgInfo();
+  const std::array<double, 3> baseResolutionNm{info.voxelSizeX, info.voxelSizeY, info.voxelSizeZ};
+
+  auto loaded = ZNeuroglancerPrecomputedSkeletonSource::open(QUrl(overrideUrl),
+                                                            baseResolutionNm,
+                                                            m_ngVolume->baseVoxelOffset(),
+                                                            m_ngVolume->defaultTimeout());
+  CHECK(loaded);
+
+  const std::lock_guard<std::mutex> lock(m_ngExternalSourcesMutex);
+  if (m_ngSkeletonSourceOverrideUrl.trimmed() == overrideUrl) {
+    m_ngSkeletonSourceOverride = loaded;
+  }
+  return loaded;
 }
 
 std::unique_ptr<ZImgPack> ZImgPack::makeNeuroglancerSegmentationRgbFor3D() const

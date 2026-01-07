@@ -15,6 +15,7 @@
 #include <tuple>
 #include <array>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 
@@ -24,6 +25,8 @@ namespace bgi = boost::geometry::index;
 namespace nim {
 
 class ZNeuroglancerPrecomputedVolume;
+class ZNeuroglancerPrecomputedMeshSource;
+class ZNeuroglancerPrecomputedSkeletonSource;
 
 class ZImgPackSubBlock : public ZImgSubBlock
 {
@@ -138,6 +141,37 @@ public:
   // This does not change the underlying dataset; it only affects how reads are presented to callers
   // (e.g. Z3DImg expects scalar channels and will treat these as R/G/B).
   [[nodiscard]] std::unique_ptr<ZImgPack> makeNeuroglancerSegmentationRgbFor3D() const;
+
+  // ---- Neuroglancer external sources (mesh/skeletons) ----
+  //
+  // Neuroglancer "mesh" and "skeletons" are key→geometry stores, not volumes.
+  // Many datasets do not declare these sources in the volume's info. To support
+  // explicit per-dataset configuration, Atlas allows users to register override
+  // source URLs. These overrides are used by UI actions (mesh/skeleton loading)
+  // and do not affect image chunk reads.
+  [[nodiscard]] bool hasNeuroglancerMeshSourceOverride() const;
+  [[nodiscard]] QString neuroglancerMeshSourceOverrideUrl() const;
+  [[nodiscard]] bool hasNeuroglancerSkeletonSourceOverride() const;
+  [[nodiscard]] QString neuroglancerSkeletonSourceOverrideUrl() const;
+
+  // Returns true if either the dataset declares a mesh/skeletons directory in its volume info
+  // or the user has registered an override URL.
+  [[nodiscard]] bool hasNeuroglancerMeshSourceConfigured() const;
+  [[nodiscard]] bool hasNeuroglancerSkeletonSourceConfigured() const;
+
+  // Sets an override URL (absolute URL or relative path) for the mesh/skeleton source used by this dataset.
+  // If userText is relative, it is resolved against the dataset's root URL. The resulting URL is normalized
+  // to a directory form with a trailing slash. Returns false and sets errorMsg on parse/validation failure.
+  bool setNeuroglancerMeshSourceOverride(QString userText, QString* errorMsg);
+  bool setNeuroglancerSkeletonSourceOverride(QString userText, QString* errorMsg);
+
+  void clearNeuroglancerMeshSourceOverride();
+  void clearNeuroglancerSkeletonSourceOverride();
+
+  // Opens the configured mesh/skeleton source. If a user override is set, it is used; otherwise the dataset's
+  // declared 'mesh'/'skeletons' directory is used. This may perform network I/O.
+  std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> loadNeuroglancerMeshSourceBlocking() const;
+  std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> loadNeuroglancerSkeletonSourceBlocking() const;
 
   void setChannelColor(size_t c, col4 col);
 
@@ -377,6 +411,14 @@ private:
 
   std::shared_ptr<ZNeuroglancerPrecomputedVolume> m_ngVolume;
   bool m_ngSegmentationRgbFor3D = false;
+
+  // Optional user-registered Neuroglancer external source URLs (normalized, with trailing slash).
+  // These are stored on the dataset object (shared by aliases) so the configuration is explicit.
+  mutable std::mutex m_ngExternalSourcesMutex;
+  QString m_ngMeshSourceOverrideUrl;
+  QString m_ngSkeletonSourceOverrideUrl;
+  mutable std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> m_ngMeshSourceOverride;
+  mutable std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> m_ngSkeletonSourceOverride;
 
   bool m_diskCached;
   ZImg m_img;

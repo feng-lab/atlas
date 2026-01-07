@@ -43,6 +43,8 @@ class ZRegionAnnotationDoc;
 
 class ZMeshDoc;
 
+class ZSkeletonDoc;
+
 class ZObjPack;
 
 class ZDoc : public QObject
@@ -222,6 +224,11 @@ public:
     return *m_meshDoc;
   }
 
+  ZSkeletonDoc& skeletonDoc()
+  {
+    return *m_skeletonDoc;
+  }
+
   ZRegionAnnotationDoc& regionAnnotationDoc()
   {
     return *m_regionAnnotationDoc;
@@ -337,6 +344,7 @@ private:
   ZSwcDoc* m_swcDoc = nullptr;
   ZSvgDoc* m_svgDoc = nullptr;
   ZMeshDoc* m_meshDoc = nullptr;
+  ZSkeletonDoc* m_skeletonDoc = nullptr;
   ZRegionAnnotationDoc* m_regionAnnotationDoc = nullptr;
 };
 

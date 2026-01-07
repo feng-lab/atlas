@@ -15,6 +15,9 @@
 #include <QGraphicsSimpleTextItem>
 #include <QFutureWatcher>
 #include <QApplication>
+#include <QInputDialog>
+#include <QLabel>
+#include <QMessageBox>
 #include <QStyleOption>
 #include <QPainter>
 #include <QPushButton>
@@ -627,7 +630,7 @@ std::optional<uint64_t> ZImgFilter::cachedNeuroglancerSegmentationIdAtScenePos(c
     return std::nullopt;
   }
   std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol = m_imgPack->neuroglancerVolumeShared();
-  if (!vol || !vol->isSegmentation() || !vol->hasMeshDirectory()) {
+  if (!vol || !vol->isSegmentation()) {
     return std::nullopt;
   }
   if (m_view.isMaxZProjView()) {
@@ -691,6 +694,134 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
     m_widgetsGroup->removeAllChildren();
 
     m_widgetsGroup->addChild(m_visible, 1);
+
+    if (m_imgPack && m_imgPack->isNeuroglancerPrecomputed()) {
+      std::shared_ptr<ZNeuroglancerPrecomputedVolume> vol = m_imgPack->neuroglancerVolumeShared();
+      if (vol && vol->isSegmentation()) {
+        auto ngGroup = std::make_shared<ZWidgetsGroup>(QStringLiteral("Neuroglancer Sources"), 1);
+
+        auto addStatus = [&](const QString& text) {
+          auto* label = new QLabel(text);
+          label->setWordWrap(true);
+          label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+          ngGroup->addChild(*label, 1);
+        };
+
+        auto effectiveUrlOrEmpty = [](const QString& s) -> QString {
+          const QString t = s.trimmed();
+          return t.isEmpty() ? QStringLiteral("<not configured>") : t;
+        };
+
+        const QString meshOverride = m_imgPack->neuroglancerMeshSourceOverrideUrl();
+        const QString skeletonOverride = m_imgPack->neuroglancerSkeletonSourceOverrideUrl();
+
+        QString meshEffective;
+        if (!meshOverride.isEmpty()) {
+          meshEffective = meshOverride;
+        } else if (vol->hasMeshDirectory()) {
+          meshEffective = vol->meshDirUrl().toString(QUrl::StripTrailingSlash) + "/";
+        }
+
+        QString skeletonEffective;
+        if (!skeletonOverride.isEmpty()) {
+          skeletonEffective = skeletonOverride;
+        } else if (vol->hasSkeletonDirectory()) {
+          skeletonEffective = vol->skeletonDirUrl().toString(QUrl::StripTrailingSlash) + "/";
+        }
+
+        addStatus(QStringLiteral("Mesh source: %1").arg(effectiveUrlOrEmpty(meshEffective)));
+        if (vol->hasMeshDirectory()) {
+          addStatus(QStringLiteral("  (declared in dataset info as key '%1')").arg(vol->meshKey()));
+        } else if (!meshOverride.isEmpty()) {
+          addStatus(QStringLiteral("  (override; dataset info does not declare a mesh key)"));
+        }
+
+        auto* setMesh = new QPushButton(QStringLiteral("Set Mesh Source Override…"));
+        connect(setMesh, &QPushButton::clicked, this, [this, vol]() {
+          CHECK(m_imgPack);
+          QString prefill = m_imgPack->neuroglancerMeshSourceOverrideUrl();
+          if (prefill.isEmpty() && vol->hasMeshDirectory()) {
+            prefill = vol->meshKey();
+          }
+          const QString s = QInputDialog::getText(
+                              QApplication::activeWindow(),
+                              QApplication::applicationName(),
+                              QStringLiteral("Mesh source directory URL or relative path:\n"
+                                             "(Relative paths are resolved against this dataset's root URL.)"),
+                              QLineEdit::Normal,
+                              prefill)
+                            .trimmed();
+          if (s.isEmpty()) {
+            return;
+          }
+          QString err;
+          if (!m_imgPack->setNeuroglancerMeshSourceOverride(s, &err)) {
+            QMessageBox::information(QApplication::activeWindow(),
+                                     QApplication::applicationName(),
+                                     QStringLiteral("Failed to set mesh source override:\n%1").arg(err));
+            return;
+          }
+          updateViewSettingWidgetsGroup();
+        });
+        ngGroup->addChild(*setMesh, 1);
+
+        auto* clearMesh = new QPushButton(QStringLiteral("Clear Mesh Source Override"));
+        clearMesh->setEnabled(m_imgPack->hasNeuroglancerMeshSourceOverride());
+        connect(clearMesh, &QPushButton::clicked, this, [this]() {
+          CHECK(m_imgPack);
+          m_imgPack->clearNeuroglancerMeshSourceOverride();
+          updateViewSettingWidgetsGroup();
+        });
+        ngGroup->addChild(*clearMesh, 1);
+
+        addStatus(QStringLiteral("Skeleton source: %1").arg(effectiveUrlOrEmpty(skeletonEffective)));
+        if (vol->hasSkeletonDirectory()) {
+          addStatus(QStringLiteral("  (declared in dataset info as key '%1')").arg(vol->skeletonKey()));
+        } else if (!skeletonOverride.isEmpty()) {
+          addStatus(QStringLiteral("  (override; dataset info does not declare a skeletons key)"));
+        }
+
+        auto* setSkel = new QPushButton(QStringLiteral("Set Skeleton Source Override…"));
+        connect(setSkel, &QPushButton::clicked, this, [this, vol]() {
+          CHECK(m_imgPack);
+          QString prefill = m_imgPack->neuroglancerSkeletonSourceOverrideUrl();
+          if (prefill.isEmpty() && vol->hasSkeletonDirectory()) {
+            prefill = vol->skeletonKey();
+          }
+          const QString s = QInputDialog::getText(
+                              QApplication::activeWindow(),
+                              QApplication::applicationName(),
+                              QStringLiteral("Skeleton source directory URL or relative path:\n"
+                                             "(Relative paths are resolved against this dataset's root URL.)"),
+                              QLineEdit::Normal,
+                              prefill)
+                            .trimmed();
+          if (s.isEmpty()) {
+            return;
+          }
+          QString err;
+          if (!m_imgPack->setNeuroglancerSkeletonSourceOverride(s, &err)) {
+            QMessageBox::information(QApplication::activeWindow(),
+                                     QApplication::applicationName(),
+                                     QStringLiteral("Failed to set skeleton source override:\n%1").arg(err));
+            return;
+          }
+          updateViewSettingWidgetsGroup();
+        });
+        ngGroup->addChild(*setSkel, 1);
+
+        auto* clearSkel = new QPushButton(QStringLiteral("Clear Skeleton Source Override"));
+        clearSkel->setEnabled(m_imgPack->hasNeuroglancerSkeletonSourceOverride());
+        connect(clearSkel, &QPushButton::clicked, this, [this]() {
+          CHECK(m_imgPack);
+          m_imgPack->clearNeuroglancerSkeletonSourceOverride();
+          updateViewSettingWidgetsGroup();
+        });
+        ngGroup->addChild(*clearSkel, 1);
+
+        m_widgetsGroup->addChild(ngGroup);
+      }
+    }
 
     auto pb = new QPushButton("Bring to Front");
     connect(pb, &QPushButton::clicked, this, &ZImgFilter::bringToFront);

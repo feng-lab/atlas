@@ -15,6 +15,7 @@
 #include "zsvgdoc.h"
 #include "zregionannotationdoc.h"
 #include "zmeshdoc.h"
+#include "zskeletondoc.h"
 #include "ztheme.h"
 #include "zchooseobjdialog.h"
 #include "zmessageboxhelpers.h"
@@ -76,6 +77,9 @@ ZDoc::ZDoc(QObject* parent)
 
   m_meshDoc = new ZMeshDoc(*this);
   registerObjDoc(m_meshDoc);
+
+  m_skeletonDoc = new ZSkeletonDoc(*this);
+  registerObjDoc(m_skeletonDoc);
 
   m_regionAnnotationDoc = new ZRegionAnnotationDoc(*this);
   registerObjDoc(m_regionAnnotationDoc);

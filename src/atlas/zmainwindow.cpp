@@ -14,6 +14,7 @@
 #include "zimgview.h"
 #include "zpunctaview.h"
 #include "zswcview.h"
+#include "zskeletonview.h"
 #include "zmeshdoc.h"
 #include "z2danimationdoc.h"
 #include "z3danimationdoc.h"
@@ -267,16 +268,12 @@ void ZMainWindow::openRecentFile()
 
 void ZMainWindow::about()
 {
-  QMessageBox::about(
-    QApplication::activeWindow(),
-    QString("About Atlas"),
-    QString(
-      "<p>Atlas version %1</p>"
-      "<p>Atlas is developed by Linqing Feng (flq@live.com, fenglinqing@gmail.com).</p>"
-      "<p>Feng Lab, Research Center for Augmented Intelligence, Institute of Artificial Intelligence, Zhejiang Lab</p>"
-      "<p>Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
-      "<p>All rights reserved.</p>")
-      .arg(m_versionString));
+  QMessageBox::about(QApplication::activeWindow(),
+                     QString("About Atlas"),
+                     QString("<p>Atlas version %1</p>"
+                             "<p>Atlas is developed by Linqing Feng (flq@live.com, fenglinqing@gmail.com).</p>"
+                             "<p>All rights reserved.</p>")
+                       .arg(m_versionString));
 }
 
 #ifdef Q_OS_LINUX
@@ -560,6 +557,7 @@ void ZMainWindow::init()
   m_view->registerObjView(std::make_unique<ZROIView>(m_doc->roiDoc(), *m_view));
   m_view->registerObjView(std::make_unique<ZPunctaView>(m_doc->punctaDoc(), *m_view));
   m_view->registerObjView(std::make_unique<ZSwcView>(m_doc->swcDoc(), *m_view));
+  m_view->registerObjView(std::make_unique<ZSkeletonView>(m_doc->skeletonDoc(), *m_view));
   m_view->registerObjView(std::make_unique<ZRegionAnnotationView>(m_doc->regionAnnotationDoc(), *m_view));
   m_view->registerObjView(std::make_unique<ZSvgView>(m_doc->svgDoc(), *m_view));
 

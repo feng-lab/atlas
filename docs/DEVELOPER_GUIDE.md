@@ -37,6 +37,10 @@ Neuroglancer Precomputed (HTTP)
 - Neuroglancer segmentation extras:
   - Segment properties (`segment_properties/`) are supported via `ZNeuroglancerPrecomputedSegmentProperties` (`src/atlas/zneuroglancerprecomputedsegmentproperties.*`) and are loaded on demand by mesh/tooling paths (no explicit per-object button required).
   - Precomputed meshes (`mesh/`) are supported via `ZNeuroglancerPrecomputedMeshSource` (`src/atlas/zneuroglancerprecomputedmesh.*`). Mesh import is initiated from the 2D right-click context menu and adds a normal `ZMesh` object to `ZMeshDoc`. Atlas loads a coarse LOD first, then refines to the finest available LOD by replacing mesh geometry in-place (`ZMeshDoc::replaceMeshGeometry` + `meshChanged` signal).
+  - Precomputed skeletons (`skeletons/`) are supported via `ZNeuroglancerPrecomputedSkeletonSource` (`src/atlas/zneuroglancerprecomputedskeleton.*`) and are imported into `ZSkeletonDoc` for SWC-like rendering.
+  - Mesh/skeleton source resolution:
+    - If the segmentation `info` declares `mesh`/`skeletons` keys, Atlas uses those directory URLs.
+    - Otherwise, users can configure per-dataset overrides on the `ZImgPack` (UI: Object View Setting → “Neuroglancer Sources”). These overrides are serialized in `.scene` files and used by the right-click import actions (Atlas does not prompt for source URLs in the context menu).
 
 Testing (Linking Atlas Code)
 

@@ -140,7 +140,52 @@ size_t ZImgDoc::loadFile(const json::value& jValue, QString& errorMsg)
 {
   try {
     if (auto urlOpt = neuroglancerPrecomputedUrlFromJson(jValue)) {
-      return loadNeuroglancerPrecomputed(*urlOpt, errorMsg);
+      const size_t id = loadNeuroglancerPrecomputed(*urlOpt, errorMsg);
+      if (id == 0) {
+        return 0;
+      }
+
+      // Restore per-dataset Neuroglancer mesh/skeleton source overrides (if present).
+      // These are optional and may be absent for most datasets.
+      if (jValue.is_object()) {
+        ZImgPack& pack = imgPack(id);
+        const auto& jo = jValue.as_object();
+
+        auto applyOverride = [&](const char* key,
+                                 auto setter,
+                                 auto clearFn) {
+          auto it = jo.find(key);
+          if (it == jo.end()) {
+            return;
+          }
+          if (!it->value().is_string()) {
+            LOG(WARNING) << "Ignoring invalid neuroglancer_precomputed JSON field '" << key
+                         << "' (expected string).";
+            return;
+          }
+          const QString text = json::value_to<QString>(it->value()).trimmed();
+          if (text.isEmpty()) {
+            clearFn();
+            return;
+          }
+          QString err;
+          if (!setter(text, &err)) {
+            LOG(WARNING) << "Failed to apply neuroglancer_precomputed override '" << key
+                         << "': " << err.toStdString();
+          }
+        };
+
+        applyOverride(
+          "mesh_source_override_url",
+          [&](const QString& s, QString* err) { return pack.setNeuroglancerMeshSourceOverride(s, err); },
+          [&]() { pack.clearNeuroglancerMeshSourceOverride(); });
+        applyOverride(
+          "skeleton_source_override_url",
+          [&](const QString& s, QString* err) { return pack.setNeuroglancerSkeletonSourceOverride(s, err); },
+          [&]() { pack.clearNeuroglancerSkeletonSourceOverride(); });
+      }
+
+      return id;
     }
   }
   catch (const ZException& e) {
@@ -223,6 +268,12 @@ json::value ZImgDoc::jsonValue(size_t id) const
     auto& jo = jv.emplace_object();
     jo["dataSource"] = "neuroglancer_precomputed";
     jo["url"] = json::value_from(pack->neuroglancerRootUrl());
+    if (pack->hasNeuroglancerMeshSourceOverride()) {
+      jo["mesh_source_override_url"] = json::value_from(pack->neuroglancerMeshSourceOverrideUrl());
+    }
+    if (pack->hasNeuroglancerSkeletonSourceOverride()) {
+      jo["skeleton_source_override_url"] = json::value_from(pack->neuroglancerSkeletonSourceOverrideUrl());
+    }
     return jv;
   }
   return json::value_from(pack->imgSource());

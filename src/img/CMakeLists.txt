@@ -124,6 +124,7 @@ set(IMG_SOURCES
         zpunctaio.cpp zpunctaio.h
         zpunctum.cpp zpunctum.h
         zswc.h zswc.cpp
+        zskeleton.h zskeleton.cpp
         ztree.hpp
         zvoxelregion.h zvoxelregion.cpp
         zimgtile.h zimgtile.cpp

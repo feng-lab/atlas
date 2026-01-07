@@ -214,6 +214,11 @@ public:
     return m_baseImgInfo;
   }
 
+  [[nodiscard]] std::chrono::milliseconds defaultTimeout() const
+  {
+    return m_defaultTimeout;
+  }
+
   [[nodiscard]] const QString& dataTypeString() const
   {
     return m_dataTypeString;
@@ -272,6 +277,28 @@ public:
   // Loads mesh metadata from the mesh directory specified in the volume info.
   // This performs network I/O (reading mesh/info) and may take time; prefer calling from a worker thread.
   std::shared_ptr<const class ZNeuroglancerPrecomputedMeshSource> loadMeshSourceBlocking() const;
+
+  [[nodiscard]] bool hasSkeletonDirectory() const
+  {
+    return !m_skeletonKey.isEmpty();
+  }
+
+  [[nodiscard]] const QString& skeletonKey() const
+  {
+    return m_skeletonKey;
+  }
+
+  [[nodiscard]] QUrl skeletonDirUrl() const
+  {
+    CHECK(hasSkeletonDirectory());
+    return m_skeletonDirUrl;
+  }
+
+  [[nodiscard]] std::shared_ptr<const class ZNeuroglancerPrecomputedSkeletonSource> skeletonSourceShared() const;
+
+  // Loads skeleton metadata from the skeletons directory specified in the volume info.
+  // This performs network I/O (reading skeletons/info) and may take time; prefer calling from a worker thread.
+  std::shared_ptr<const class ZNeuroglancerPrecomputedSkeletonSource> loadSkeletonSourceBlocking() const;
 
   [[nodiscard]] const std::vector<Scale>& scales() const
   {
@@ -340,6 +367,7 @@ private:
   struct ChunkCache;
   struct InFlightSegmentPropertiesLoad;
   struct InFlightMeshSourceLoad;
+  struct InFlightSkeletonSourceLoad;
 
   QString m_rootUrl;
   QUrl m_rootQUrl;
@@ -369,6 +397,12 @@ private:
   mutable std::mutex m_meshMutex;
   mutable std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> m_meshSource;
   mutable std::shared_ptr<InFlightMeshSourceLoad> m_meshSourceInFlight;
+
+  QString m_skeletonKey;
+  QUrl m_skeletonDirUrl;
+  mutable std::mutex m_skeletonMutex;
+  mutable std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> m_skeletonSource;
+  mutable std::shared_ptr<InFlightSkeletonSourceLoad> m_skeletonSourceInFlight;
 };
 
 } // namespace nim

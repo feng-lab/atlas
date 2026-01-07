@@ -12,6 +12,8 @@
 #include "z3dswcview.h"
 #include "zmeshdoc.h"
 #include "z3dmeshview.h"
+#include "zskeletondoc.h"
+#include "z3dskeletonview.h"
 #include "z3danimationdoc.h"
 #include "z3danimationview.h"
 #include "z3dregionannotationview.h"
@@ -942,6 +944,10 @@ void Z3DRenderingEngine::init()
       auto meshView = new Z3DMeshView(*meshDoc, *this);
       connect(meshView, &Z3DMeshView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
       m_3dObjViews.emplace_back(meshView);
+    } else if (auto skeletonDoc = qobject_cast<ZSkeletonDoc*>(objDoc)) {
+      auto skeletonView = new Z3DSkeletonView(*skeletonDoc, *this);
+      connect(skeletonView, &Z3DSkeletonView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
+      m_3dObjViews.emplace_back(skeletonView);
     }
     // else if (auto aniDoc = qobject_cast<Z3DAnimationDoc*>(objDoc)) {
     //   auto aniView = new Z3DAnimationView(*aniDoc, *this);

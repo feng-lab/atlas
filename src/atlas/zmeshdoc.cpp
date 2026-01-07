@@ -209,6 +209,13 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
         return 0;
       }
 
+      QString meshSourceUserText;
+      if (auto itUrl = jo.find("mesh_source_url"); itUrl != jo.end() && itUrl->value().is_string()) {
+        meshSourceUserText = json::value_to<QString>(itUrl->value()).trimmed();
+      } else if (auto itKey = jo.find("mesh_key"); itKey != jo.end() && itKey->value().is_string()) {
+        meshSourceUserText = json::value_to<QString>(itKey->value()).trimmed();
+      }
+
       const auto lodPolicy = ZNeuroglancerPrecomputedMeshSource::LodPolicy::Finest;
 
       // Deduplicate before performing any network work.
@@ -236,17 +243,35 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
       }
 
       std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> source;
-      if (vol->hasMeshDirectory()) {
-        source = vol->loadMeshSourceBlocking();
-      } else if (auto meshKeyIt = jo.find("mesh_key"); meshKeyIt != jo.end() && meshKeyIt->value().is_string()) {
-        constexpr std::chrono::milliseconds timeout{30000};
-        QString meshKey = json::value_to<QString>(meshKeyIt->value());
-        if (!meshKey.endsWith('/')) {
-          meshKey += '/';
+      QString meshSourceDirUrlForJson;
+      if (!meshSourceUserText.isEmpty()) {
+        QString s = meshSourceUserText.trimmed();
+        if (s.contains("://") || s.startsWith("gs://")) {
+          try {
+            s = ZNeuroglancerPrecomputedVolume::normalizeRootUrl(std::move(s));
+          }
+          catch (const std::exception&) {
+            errorMsg = QString("Invalid neuroglancer mesh JSON: mesh_source_url is not a valid URL");
+            return 0;
+          }
+        } else {
+          if (!s.endsWith('/')) {
+            s += '/';
+          }
+          const QUrl dirUrl = QUrl(vol->rootUrl()).resolved(QUrl(s));
+          s = dirUrl.toString(QUrl::StripTrailingSlash);
         }
-        const QUrl meshDirUrl = QUrl(vol->rootUrl()).resolved(QUrl(meshKey));
+        if (!s.endsWith('/')) {
+          s += '/';
+        }
+        meshSourceDirUrlForJson = s;
+
+        constexpr std::chrono::milliseconds timeout{30000};
         std::array<double, 3> baseRes{vol->baseImgInfo().voxelSizeX, vol->baseImgInfo().voxelSizeY, vol->baseImgInfo().voxelSizeZ};
-        source = ZNeuroglancerPrecomputedMeshSource::open(meshDirUrl, baseRes, vol->baseVoxelOffset(), timeout);
+        source = ZNeuroglancerPrecomputedMeshSource::open(QUrl(meshSourceDirUrlForJson), baseRes, vol->baseVoxelOffset(), timeout);
+      } else if (vol->hasMeshDirectory()) {
+        source = vol->loadMeshSourceBlocking();
+        meshSourceDirUrlForJson = vol->meshDirUrl().toString(QUrl::StripTrailingSlash) + "/";
       } else {
         errorMsg = QString("Neuroglancer volume does not specify a mesh directory");
         return 0;
@@ -264,8 +289,8 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
       normalized["type"] = "neuroglancer_precomputed_mesh";
       normalized["segmentation_root_url"] = json::value_from(normalizedRootUrl);
       normalized["segment_id"] = json::value_from(QString::number(segId));
-      if (!vol->meshKey().isEmpty()) {
-        normalized["mesh_key"] = json::value_from(vol->meshKey());
+      if (!meshSourceDirUrlForJson.isEmpty()) {
+        normalized["mesh_source_url"] = json::value_from(meshSourceDirUrlForJson);
       }
 
       return addMeshFromExternalSource(*mesh,
@@ -394,12 +419,22 @@ bool ZMeshDoc::isSameObj(const json::value& v1, const json::value& v2) const
 
       const QString seg = json::value_to<QString>(itSeg->value()).trimmed();
 
-      QString meshKey;
-      if (auto itMeshKey = o.find("mesh_key"); itMeshKey != o.end() && itMeshKey->value().is_string()) {
-        meshKey = json::value_to<QString>(itMeshKey->value()).trimmed();
+      QString meshSourceDirUrl;
+      if (auto itUrl = o.find("mesh_source_url"); itUrl != o.end() && itUrl->value().is_string()) {
+        meshSourceDirUrl = json::value_to<QString>(itUrl->value()).trimmed();
+      } else if (auto itMeshKey = o.find("mesh_key"); itMeshKey != o.end() && itMeshKey->value().is_string()) {
+        QString meshKey = json::value_to<QString>(itMeshKey->value()).trimmed();
+        if (!meshKey.endsWith('/')) {
+          meshKey += '/';
+        }
+        const QUrl meshDirUrl = QUrl(root).resolved(QUrl(meshKey));
+        meshSourceDirUrl = meshDirUrl.toString(QUrl::StripTrailingSlash);
+      }
+      if (!meshSourceDirUrl.isEmpty() && !meshSourceDirUrl.endsWith('/')) {
+        meshSourceDirUrl += '/';
       }
 
-      return QString("%1|%2|%3|%4").arg(type, root, seg, meshKey);
+      return QString("%1|%2|%3|%4").arg(type, root, seg, meshSourceDirUrl);
     };
 
     const auto k1 = keyFor(v1.as_object());

@@ -64,6 +64,7 @@ add_atlas_gtest_executable(zvulkanpipelinecontexttest)
 add_atlas_gtest_executable(zneuroglanceruint64shardingtest)
 add_atlas_gtest_executable(zneuroglancerprecomputedchunkdecodertest)
 add_atlas_gtest_executable(zneuroglancerprecomputedsegmentpropertiestest)
+add_atlas_gtest_executable(zneuroglancerprecomputedskeletontest)
 add_atlas_gtest_executable(zneuroglancerprecomputede2etest)
 
 # Atlas-side tests

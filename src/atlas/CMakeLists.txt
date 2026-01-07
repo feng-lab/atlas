@@ -398,9 +398,14 @@ set(SOURCES
     z3dmeshfilter.h z3dmeshfilter.cpp
     z3dswcfilter.h z3dswcfilter.cpp
     zmeshdoc.h zmeshdoc.cpp
+    zskeletondoc.h zskeletondoc.cpp
     zswcdoc.h zswcdoc.cpp
+    zskeletonfilter.h zskeletonfilter.cpp
+    zskeletonview.h zskeletonview.cpp
     z3dswcview.h z3dswcview.cpp
     z3dmeshview.h z3dmeshview.cpp
+    z3dskeletonfilter.h z3dskeletonfilter.cpp
+    z3dskeletonview.h z3dskeletonview.cpp
     zobjfilter.h zobjfilter.cpp
     zanimation.h zanimation.cpp
     zparameteranimation.h zparameteranimation.cpp
@@ -512,6 +517,7 @@ set(SOURCES
     zimgpackdisplay.h zimgpackdisplay.cpp
     zneuroglancerprecomputed.h zneuroglancerprecomputed.cpp
     zneuroglancerprecomputedmesh.h zneuroglancerprecomputedmesh.cpp
+    zneuroglancerprecomputedskeleton.h zneuroglancerprecomputedskeleton.cpp
     zneuroglancerprecomputedsegmentproperties.h zneuroglancerprecomputedsegmentproperties.cpp
     zneuroglancersegmentpropertiesdialog.h zneuroglancersegmentpropertiesdialog.cpp
     zneuroglancersegmentpropertiesmodel.h zneuroglancersegmentpropertiesmodel.cpp

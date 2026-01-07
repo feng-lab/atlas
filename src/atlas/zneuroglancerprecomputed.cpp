@@ -3,6 +3,7 @@
 #include "zcpuinfo.h"
 #include "zneuroglancerprecomputedchunkdecoder.h"
 #include "zneuroglancerprecomputedmesh.h"
+#include "zneuroglancerprecomputedskeleton.h"
 #include "zneuroglancerprecomputedsegmentproperties.h"
 #include "zneuroglanceruint64sharding.h"
 #include "zproxygenhttpclient.h"
@@ -419,6 +420,11 @@ struct ZNeuroglancerPrecomputedVolume::InFlightMeshSourceLoad
   folly::coro::SharedPromise<std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource>> promise;
 };
 
+struct ZNeuroglancerPrecomputedVolume::InFlightSkeletonSourceLoad
+{
+  folly::coro::SharedPromise<std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource>> promise;
+};
+
 QString ZNeuroglancerPrecomputedVolume::normalizeRootUrl(QString url)
 {
   url = url.trimmed();
@@ -575,6 +581,18 @@ std::shared_ptr<ZNeuroglancerPrecomputedVolume> ZNeuroglancerPrecomputedVolume::
       meshDir += '/';
     }
     vol->m_meshDirUrl = vol->m_rootQUrl.resolved(QUrl(meshDir));
+  }
+
+  vol->m_skeletonKey = optionalString(root, "skeletons");
+  if (!vol->m_skeletonKey.isEmpty()) {
+    if (vol->m_volumeTypeString != "segmentation") {
+      throw ZException("Invalid neuroglancer info: 'skeletons' is only valid for segmentation volumes");
+    }
+    QString skelDir = vol->m_skeletonKey;
+    if (!skelDir.endsWith('/')) {
+      skelDir += '/';
+    }
+    vol->m_skeletonDirUrl = vol->m_rootQUrl.resolved(QUrl(skelDir));
   }
 
   vol->m_scales.clear();
@@ -886,6 +904,63 @@ std::shared_ptr<const ZNeuroglancerPrecomputedMeshSource> ZNeuroglancerPrecomput
     const std::lock_guard<std::mutex> lock(m_meshMutex);
     if (m_meshSourceInFlight == inFlight) {
       m_meshSourceInFlight.reset();
+    }
+    throw;
+  }
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZNeuroglancerPrecomputedVolume::skeletonSourceShared() const
+{
+  const std::lock_guard<std::mutex> lock(m_skeletonMutex);
+  return m_skeletonSource;
+}
+
+std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource> ZNeuroglancerPrecomputedVolume::loadSkeletonSourceBlocking() const
+{
+  if (!hasSkeletonDirectory()) {
+    throw ZException("This Neuroglancer dataset does not specify 'skeletons' in its volume info.");
+  }
+
+  std::shared_ptr<InFlightSkeletonSourceLoad> inFlight;
+  std::optional<folly::coro::Future<std::shared_ptr<const ZNeuroglancerPrecomputedSkeletonSource>>> sharedFuture;
+  bool isLeader = false;
+  {
+    const std::lock_guard<std::mutex> lock(m_skeletonMutex);
+    if (m_skeletonSource) {
+      return m_skeletonSource;
+    }
+    if (m_skeletonSourceInFlight) {
+      inFlight = m_skeletonSourceInFlight;
+      sharedFuture = inFlight->promise.getFuture();
+    } else {
+      m_skeletonSourceInFlight = std::make_shared<InFlightSkeletonSourceLoad>();
+      inFlight = m_skeletonSourceInFlight;
+      isLeader = true;
+    }
+  }
+
+  if (!isLeader) {
+    CHECK(sharedFuture);
+    return folly::coro::blockingWait(std::move(*sharedFuture));
+  }
+
+  try {
+    auto loaded =
+      ZNeuroglancerPrecomputedSkeletonSource::open(skeletonDirUrl(), m_baseResolutionNm, m_baseVoxelOffset, m_defaultTimeout);
+    inFlight->promise.setValue(loaded);
+
+    const std::lock_guard<std::mutex> lock(m_skeletonMutex);
+    m_skeletonSource = loaded;
+    if (m_skeletonSourceInFlight == inFlight) {
+      m_skeletonSourceInFlight.reset();
+    }
+    return loaded;
+  }
+  catch (...) {
+    inFlight->promise.setException(folly::exception_wrapper(std::current_exception()));
+    const std::lock_guard<std::mutex> lock(m_skeletonMutex);
+    if (m_skeletonSourceInFlight == inFlight) {
+      m_skeletonSourceInFlight.reset();
     }
     throw;
   }
