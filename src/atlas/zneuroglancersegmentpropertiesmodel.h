@@ -15,13 +15,19 @@ class ZNeuroglancerSegmentPropertiesModel : public QAbstractTableModel
   Q_OBJECT
 
 public:
-  enum class Column
+  struct ColumnSpec
   {
-    Id = 0,
-    Label = 1,
-    Description = 2,
-    Tags = 3,
-    Count = 4,
+    enum class Kind
+    {
+      Id,
+      String,
+      Number,
+      Tags,
+    };
+
+    Kind kind = Kind::Id;
+    QString header;
+    const ZNeuroglancerPrecomputedSegmentProperties::Property* prop = nullptr;
   };
 
   explicit ZNeuroglancerSegmentPropertiesModel(std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> props,
@@ -40,15 +46,9 @@ public:
   [[nodiscard]] std::optional<uint64_t> segmentIdForRow(int row) const;
 
 private:
-  [[nodiscard]] static QString columnName(Column c);
-
-private:
   std::shared_ptr<const ZNeuroglancerPrecomputedSegmentProperties> m_props;
 
-  const ZNeuroglancerPrecomputedSegmentProperties::Property* m_labelProp = nullptr;
-  const ZNeuroglancerPrecomputedSegmentProperties::Property* m_descriptionProp = nullptr;
-  const ZNeuroglancerPrecomputedSegmentProperties::Property* m_tagsProp = nullptr;
+  std::vector<ColumnSpec> m_columns;
 };
 
 } // namespace nim
-

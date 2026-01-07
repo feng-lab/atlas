@@ -520,12 +520,10 @@ def install_ffmpeg():
                        cwd=ext_build_dir(),
                        shell=False,
                        check=True)
-        os.chmod(os.path.join(ext_build_dir(), 'ffmpeg'), stat.S_IRWXU or stat.S_IXGRP or stat.S_IRGRP or stat.S_IROTH)
-        if is_my_computer():
-            # from https://evermeet.cx/ffmpeg/
-            if os.path.lexists('/usr/local/bin/ffmpeg'):
-                os.remove('/usr/local/bin/ffmpeg')
-            os.symlink(os.path.join(ext_build_dir(), 'ffmpeg'), '/usr/local/bin/ffmpeg')
+        os.chmod(
+            os.path.join(ext_build_dir(), "ffmpeg"),
+            stat.S_IRWXU or stat.S_IXGRP or stat.S_IRGRP or stat.S_IROTH,
+        )
 
 
 def get_cmake_binary() -> str:

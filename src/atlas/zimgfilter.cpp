@@ -5,6 +5,7 @@
 #include "zimgview.h"
 #include "zimgpackdisplay.h"
 #include "zneuroglancerprecomputed.h"
+#include "zneuroglancerprecomputeddatasetlist.h"
 #include "zlog.h"
 #include "zmessageboxhelpers.h"
 #include "znumericparameter.h"
@@ -24,6 +25,7 @@
 #include <QWindow>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QtConcurrent/QtConcurrentMap>
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <array>
@@ -40,6 +42,77 @@ namespace {
 // of fine tiles from cache when zoomed in.
 constexpr double kNg2DCacheRenderScaleForRatioSelection = 0.5;
 constexpr int kNg2DRefineDebounceMs = 150;
+
+QString defaultNameFromUrl(QString u)
+{
+  QString s = u.trimmed();
+  // Strip nested schemes like "precomputed://gs://..."
+  for (int i = 0; i < 2; ++i) {
+    const int idx = s.indexOf("://");
+    if (idx < 0) {
+      break;
+    }
+    s = s.mid(idx + 3);
+  }
+  QStringList parts = s.split('/', Qt::SkipEmptyParts);
+  if (parts.size() >= 2) {
+    return parts[parts.size() - 2] + "/" + parts[parts.size() - 1];
+  }
+  if (!parts.isEmpty()) {
+    return parts.front();
+  }
+  return u.trimmed();
+}
+
+void persistNeuroglancerSourceOverridesToHistory(const ZImgPack& pack, const QString& kindHint)
+{
+  if (!pack.isNeuroglancerPrecomputed()) {
+    return;
+  }
+
+  const QString rootUrl = pack.neuroglancerRootUrl();
+  const QString normalizedRoot = ZNeuroglancerPrecomputedDatasetList::normalizedUrlForMatch(rootUrl);
+  if (normalizedRoot.isEmpty()) {
+    return;
+  }
+
+  QString loadErr;
+  auto entries = ZNeuroglancerPrecomputedDatasetList::loadUserHistory(&loadErr);
+  if (!loadErr.isEmpty()) {
+    LOG(WARNING) << "Failed to load Neuroglancer history: " << loadErr.toStdString();
+  }
+
+  auto it = std::find_if(entries.begin(), entries.end(), [&](const ZNeuroglancerPrecomputedDatasetList::Entry& e) {
+    return ZNeuroglancerPrecomputedDatasetList::normalizedUrlForMatch(e.url) == normalizedRoot;
+  });
+
+  ZNeuroglancerPrecomputedDatasetList::Entry entry;
+  if (it != entries.end()) {
+    entry = *it;
+  } else {
+    entry.url = rootUrl;
+    entry.name = defaultNameFromUrl(rootUrl);
+    entry.kind = kindHint.trimmed();
+  }
+
+  entry.url = rootUrl;
+  if (entry.name.trimmed().isEmpty()) {
+    entry.name = defaultNameFromUrl(rootUrl);
+  }
+  if (entry.kind.trimmed().isEmpty()) {
+    entry.kind = kindHint.trimmed();
+  }
+
+  entry.meshSourceOverrideUrl = pack.neuroglancerMeshSourceOverrideUrl();
+  entry.skeletonSourceOverrideUrl = pack.neuroglancerSkeletonSourceOverrideUrl();
+
+  ZNeuroglancerPrecomputedDatasetList::upsertMostRecent(&entries, std::move(entry));
+
+  QString saveErr;
+  if (!ZNeuroglancerPrecomputedDatasetList::saveUserHistory(entries, &saveErr)) {
+    LOG(WARNING) << "Failed to save Neuroglancer history: " << saveErr.toStdString();
+  }
+}
 
 class ZOverwritePixmapItem : public QGraphicsPixmapItem
 {
@@ -761,6 +834,7 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
                                      QStringLiteral("Failed to set mesh source override:\n%1").arg(err));
             return;
           }
+          persistNeuroglancerSourceOverridesToHistory(*m_imgPack, QStringLiteral("segmentation"));
           updateViewSettingWidgetsGroup();
         });
         ngGroup->addChild(*setMesh, 1);
@@ -770,6 +844,7 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
         connect(clearMesh, &QPushButton::clicked, this, [this]() {
           CHECK(m_imgPack);
           m_imgPack->clearNeuroglancerMeshSourceOverride();
+          persistNeuroglancerSourceOverridesToHistory(*m_imgPack, QStringLiteral("segmentation"));
           updateViewSettingWidgetsGroup();
         });
         ngGroup->addChild(*clearMesh, 1);
@@ -806,6 +881,7 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
                                      QStringLiteral("Failed to set skeleton source override:\n%1").arg(err));
             return;
           }
+          persistNeuroglancerSourceOverridesToHistory(*m_imgPack, QStringLiteral("segmentation"));
           updateViewSettingWidgetsGroup();
         });
         ngGroup->addChild(*setSkel, 1);
@@ -815,6 +891,7 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
         connect(clearSkel, &QPushButton::clicked, this, [this]() {
           CHECK(m_imgPack);
           m_imgPack->clearNeuroglancerSkeletonSourceOverride();
+          persistNeuroglancerSourceOverridesToHistory(*m_imgPack, QStringLiteral("segmentation"));
           updateViewSettingWidgetsGroup();
         });
         ngGroup->addChild(*clearSkel, 1);

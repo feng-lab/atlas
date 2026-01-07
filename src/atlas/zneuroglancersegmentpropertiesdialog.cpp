@@ -48,7 +48,7 @@ ZNeuroglancerSegmentPropertiesDialog::ZNeuroglancerSegmentPropertiesDialog(std::
   m_statusLabel->setWordWrap(true);
 
   m_searchEdit = new QLineEdit(this);
-  m_searchEdit->setPlaceholderText(QStringLiteral("Search (ID / label / description / tags)…"));
+  m_searchEdit->setPlaceholderText(QStringLiteral("Search (any field)…"));
   m_searchEdit->setEnabled(false);
 
   m_countLabel = new QLabel(this);

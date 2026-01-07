@@ -483,8 +483,8 @@ File_Bundle_S ZStackFile::toFileBundleS() const
   File_Bundle_S fs;
 
   if (!m_urlList.empty()) {
-    fs.prefix = const_cast<char*>(
-          ZString::absolutePath(m_urlList[0], m_prefix).c_str());
+    m_fileBundlePrefixCache = ZString::absolutePath(m_urlList[0], m_prefix);
+    fs.prefix = const_cast<char*>(m_fileBundlePrefixCache.c_str());
     fs.suffix = const_cast<char*>(m_suffix.c_str());
   } else {
     fs.prefix = NULL;

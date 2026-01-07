@@ -77,6 +77,10 @@ private:
   std::vector<std::string> m_urlList;
   std::string m_prefix;
   std::string m_suffix;
+  // Backing storage for `File_Bundle_S::prefix` returned by `toFileBundleS()`.
+  // The C API expects a `char*`, so we must keep the underlying buffer alive
+  // after `toFileBundleS()` returns.
+  mutable std::string m_fileBundlePrefixCache;
   int m_numWidth;
   int m_firstNum;
   int m_lastNum;
